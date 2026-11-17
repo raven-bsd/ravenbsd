@@ -9,7 +9,7 @@
 
 #![forbid(unsafe_code)]
 
-use super::buddy::{BuddyAllocator, BuddyError, Pager};
+use crate::buddy::{BuddyAllocator, BuddyError, Pager};
 
 /// The shared source of order-0 frames a magazine layer draws from.
 pub trait FrameSource {
@@ -19,7 +19,9 @@ pub trait FrameSource {
     fn free_frame(&mut self, frame: u64) -> Result<(), BuddyError>;
 }
 
-impl<'a, const ORDERS: usize, P: Pager> FrameSource for BuddyAllocator<'a, ORDERS, P> {
+impl<const ORDERS: usize, const MAX_BLOCKS: usize, P: Pager> FrameSource
+    for BuddyAllocator<ORDERS, MAX_BLOCKS, P>
+{
     fn alloc_frame(&mut self) -> Result<u64, BuddyError> {
         self.alloc(0)
     }
@@ -227,21 +229,6 @@ impl<const NCPUS: usize, const CACHE_CAP: usize, const REMOTE_CAP: usize>
     /// The cache's remote-free queue length for `cpu`.
     pub fn remote_frames(&self, cpu: usize) -> usize {
         self.cpus[cpu].remote_len
-    }
-
-    /// Pop one cached or remote frame from any CPU, or `None` when every cache and remote queue
-    /// is empty. Used to quiesce the magazines when the per-CPU path is disabled for debugging.
-    pub fn pop_any(&mut self) -> Option<u64> {
-        for cpu in 0..NCPUS {
-            if let Some(frame) = self.cpus[cpu].pop() {
-                return Some(frame);
-            }
-            if self.cpus[cpu].remote_len > 0 {
-                self.cpus[cpu].remote_len -= 1;
-                return Some(self.cpus[cpu].remote[self.cpus[cpu].remote_len]);
-            }
-        }
-        None
     }
 
     /// Total frames cached across all CPUs.
