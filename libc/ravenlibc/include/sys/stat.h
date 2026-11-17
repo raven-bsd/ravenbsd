@@ -86,6 +86,10 @@ int mkdir(const char *, mode_t);
 int mkfifo(const char *, mode_t);
 int mkdirat(int, const char *, mode_t);
 int mkfifoat(int, const char *, mode_t);
+int fchownat(int, const char *, uid_t, gid_t, int);
+int stat64(const char *__restrict, struct stat *__restrict);
+int fstat64(int, struct stat *);
+int lstat64(const char *__restrict, struct stat *__restrict);
 
 #if __XSI_VISIBLE || __BSD_VISIBLE
 int mknod(const char *, mode_t, dev_t);
