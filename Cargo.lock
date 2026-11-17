@@ -3425,6 +3425,19 @@ name = "raven-trace-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-trace-demo"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-rt",
+ "raven-scheme",
+ "raven-trace-core",
+ "trace",
+]
+
+[[package]]
 name = "raven-tty-core"
 version = "0.1.0"
 
@@ -3869,6 +3882,15 @@ name = "toml_writer"
 version = "1.2.0+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "009dbb7700f11c55ef83aebbe4c0e9cf1f1ac0844bd8d6f00dc38f302026e13a"
+
+[[package]]
+name = "trace"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+ "raven-trace-core",
+]
 
 [[package]]
 name = "typenum"
