@@ -13,6 +13,7 @@ notes = "P1: assert.h and the assert macro compile under the POSIX feature macro
 
 # P1 batch (a): the headers absent from the ravenlibc include root. The compile test uses the
 # same POSIX feature macros as the gate and exercises the macro/interface surface where present.
+
 [[row]]
 id = "header.float.h"
 status = "present"
@@ -63,6 +64,7 @@ notes = "P1 batch a: POSIX.1-2024 <tgmath.h> (C17 7.25) type-generic real macros
 
 # P1 batch B: stdio/stdlib/string/math/time/locale/wchar. The first executable slice binds the
 # string collation and multibyte/float entry points whose engines already exist.
+
 [[row]]
 id = "interface.strcoll"
 status = "present"
@@ -131,6 +133,7 @@ notes = "P1 batch B: C23 7.22.3.4 free_aligned_sized; alignment/size hints over 
 
 # P1 batch B stdio: the simple stdio exports. Each row is backed by the lower-level stdio-engine
 # test run and the libc.a symbol check in tests/libc/posix/stdio/check-stdio.sh.
+
 [[row]]
 id = "interface.clearerr_unlocked"
 status = "present"
@@ -2093,6 +2096,7 @@ evidence = ""
 notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
 
 # P1 batch B stdlib: the ecvt/fcvt digit buffers.
+
 [[row]]
 id = "interface.ecvt_r"
 status = "present"
@@ -2244,6 +2248,7 @@ evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
 notes = "P1 batch B: pclose over the kernel raw PIPE2 call, posix_spawn and waitpid; libc.a symbol"
 
 # P1 batch B time: the process CPU clock id.
+
 [[row]]
 id = "interface.clock_getcpuclockid"
 status = "present"
@@ -2255,9 +2260,9 @@ notes = "P1 batch B: clock_getcpuclockid returns CLOCK_PROCESS_CPUTIME_ID for pi
 
 [[row]]
 id = "interface.getdents"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: getdents export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: getdents is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.posix_fadvise"
@@ -2279,15 +2284,15 @@ notes = "P1c: ppoll export; symbol audit over Symbol.map/Symbols.list/frozen/lib
 
 [[row]]
 id = "interface.madvise"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: madvise export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: madvise is not in the POSIX.1-2024 Issue 8 XSH function index (Linux/BSD extension (POSIX has posix_madvise)); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.mlock2"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: mlock2 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: mlock2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension (POSIX has mlock)); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.mlockall"
@@ -2327,9 +2332,9 @@ notes = "P1c: posix_madvise export; symbol audit over Symbol.map/Symbols.list/fr
 
 [[row]]
 id = "interface.getrlimit64"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: getrlimit64 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: getrlimit64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.pselect"
@@ -2345,9 +2350,9 @@ notes = "P1c: select export; symbol audit over Symbol.map/Symbols.list/frozen/li
 
 [[row]]
 id = "interface.lchmod"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: lchmod export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: lchmod is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.lockf"
@@ -2369,33 +2374,33 @@ notes = "P1c: fstatvfs export; symbol audit over Symbol.map/Symbols.list/frozen/
 
 [[row]]
 id = "interface.preadv2"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: preadv2 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: preadv2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.preadv"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: preadv export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: preadv is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.pwritev2"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: pwritev2 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: pwritev2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.pwritev"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: pwritev export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: pwritev is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.brk"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: brk export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: brk is not in the POSIX.1-2024 Issue 8 XSH function index (BSD/legacy extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.dup3"
@@ -2405,15 +2410,15 @@ notes = "P1c: dup3 export; symbol audit over Symbol.map/Symbols.list/frozen/libc
 
 [[row]]
 id = "interface.eaccess"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: eaccess export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: eaccess is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.euidaccess"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: euidaccess export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: euidaccess is not in the POSIX.1-2024 Issue 8 XSH function index (GNU/BSD extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.faccessat"
@@ -2441,9 +2446,9 @@ notes = "P1c: fpathconf export; symbol audit over Symbol.map/Symbols.list/frozen
 
 [[row]]
 id = "interface.ftruncate64"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: ftruncate64 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: ftruncate64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension (_LARGEFILE64_SOURCE)); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.getentropy"
@@ -2453,9 +2458,9 @@ notes = "P1c: getentropy export; symbol audit over Symbol.map/Symbols.list/froze
 
 [[row]]
 id = "interface.getpagesize"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: getpagesize export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: getpagesize is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.pathconf"
@@ -2483,9 +2488,9 @@ notes = "P1c: readlinkat export; symbol audit over Symbol.map/Symbols.list/froze
 
 [[row]]
 id = "interface.sethostname"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: sethostname export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: sethostname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.sleep"
@@ -2495,15 +2500,15 @@ notes = "P1c: sleep export; symbol audit over Symbol.map/Symbols.list/frozen/lib
 
 [[row]]
 id = "interface.syncfs"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: syncfs export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: syncfs is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.truncate64"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: truncate64 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: truncate64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension."
 
 [[row]]
 id = "interface.truncate"
@@ -2519,6 +2524,189 @@ notes = "P1c: ttyname export; symbol audit over Symbol.map/Symbols.list/frozen/l
 
 [[row]]
 id = "interface.usleep"
-status = "present"
-evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
-notes = "P1c: usleep export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: usleep is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.lutimes"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: lutimes is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.timegm"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: timegm is not in the POSIX.1-2024 Issue 8 XSH function index (BSD/GNU extension); kept under its extension macro, waived as an extension."
+
+# P1f round 7: remaining interface rows that are absent from the Issue 8 XSH function
+# index. They are Linux/BSD/LFS/removed interfaces, not required POSIX.1-2024 names.
+
+[[row]]
+id = "interface.acct"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: acct is not in the POSIX.1-2024 Issue 8 XSH function index (BSD process-accounting extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.adjtime"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: adjtime is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.fallocate"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: fallocate is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.futimes"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: futimes is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.futimesat"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: futimesat is not in the POSIX.1-2024 Issue 8 XSH function index (GNU/BSD extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.getdomainname"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: getdomainname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.getdtablesize"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: getdtablesize is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.getitimer"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: getitimer is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.gettid"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: gettid is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.memfd_create"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: memfd_create is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.mincore"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: mincore is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.name_to_handle_at"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: name_to_handle_at is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.open_by_handle_at"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: open_by_handle_at is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.readahead"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: readahead is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.setdomainname"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: setdomainname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.setitimer"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: setitimer is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.setpgrp"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: setpgrp is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (setpgid is the POSIX name)); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.setrlimit64"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: setrlimit64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.settimeofday"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: settimeofday is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.splice"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: splice is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.statx"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: statx is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.sync_file_range"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: sync_file_range is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.tee"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: tee is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.ualarm"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: ualarm is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.ulimit"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: ulimit is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (getrlimit/setrlimit are the POSIX names)); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.utime"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: utime is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (utimensat/utimes are the POSIX names)); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.vhangup"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: vhangup is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+[[row]]
+id = "interface.vmsplice"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
+notes = "P1f: vmsplice is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
