@@ -6,8 +6,8 @@
 Evaluated by `libc-gate` on 2026-11-17 from the C74h tree (origin/master `beedfbbd`). C74h ran
 `libc-gate eval` and refreshed every row; C74g had already made `libc-dynamic` pass. Every status
 below has an evidence file under `build/libc-gate/`; the table is
-`cargo run -q -p libc-gate -- table`. C74z-S11 re-evaluated row 3.1 on `72c630bd` and wrote
-`build/libc-gate-c74z-s11/3.1.txt`; the row below uses that evidence. The remaining NOT MET rows
+`cargo run -q -p libc-gate -- table`. C74z-S12 re-evaluated row 3.1 on `d97f7c1a` and wrote
+`build/libc-gate-c74z-s12/3.1.txt`; the row below uses that evidence. The remaining NOT MET rows
 are P1b/P1c work, lint fixes, missing donor data, a size-budget lane, a fuzz soak, and unavailable
 host tooling, and are listed with their owning lane.
 
@@ -20,19 +20,19 @@ host tooling, and are listed with their owning lane.
 | 1 correctness | 1.1.audit target-case symbol audit (C64j) | MET | build/libc-gate/1.1.audit.txt | exit 0: required=66 present=66 missing=0 |
 | 1 correctness | 1.2 donor suites G1 (C2-C6) | NOT MET | build/libc-gate/1.2.txt | exit 3: expected 0 |
 | 1 correctness | 1.3 LTP and pjdfstest (C7, C8) | INFO | build/libc-gate/1.3.txt | owner-run LTP/pjdfstest results not supplied; INFO per C71/3.B.1.4 |
-| 1 correctness | 1.4 differential tests (C9) | NOT MET | build/libc-gate/1.4.txt | 26 families cannot find ravenbsd-resources in the minion clone; `tls-layout` is MET |
+| 1 correctness | 1.4 differential tests (C9) | MET | build/libc-gate-c74q/1.4.txt | 27/27 families MET with `RAVENBSD_RESOURCES` (C74q) |
 | 1 correctness | 1.5 host unit tests | MET | build/libc-gate/1.5.txt | 31 host crates via `cargo nextest run` |
 | 1 correctness | 1.6 Miri (C11) | BLOCKED | build/libc-gate/1.6.txt | preflight command failed |
-| 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 17 violations: 3 in `ld/src/raw/exports.rs` (C74g SAFETY comments), 14 pre-existing |
+| 1 correctness | 1.7 lints (C16) | MET | build/libc-gate/1.7.txt | `cargo xtask libc-lint` clean (C74i/P1f5/ABI sync) |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate-c74ah/2.1.txt | harness present; `libc-world check` passes (200 packages, 197.5 weighted); blocked on `results/x86_64/world.json` because `ravenbsd-resources/world-src` and a `donors.lock` world entry are absent (H-11) and the list is PLACEHOLDER (H-12) |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate-c74ah/2.2.txt | harness present; real `build --subset smoke5` yields 5/5 `placeholder` (`version not frozen (H-12)`), gate 0/100 built; blocked on H-11 tarballs + H-12 freeze; no synthetic results |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z-s11/3.1.txt | exit 1: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; full three-arch rebuild + six B-only/layout rows re-frozen; remaining 44 S/F + 2 INV-S-P2-P0 + 2 boot |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z-s12/3.1.txt | exit 1: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; C74z-S12 full rebuild and S/F classification (27 real-growth candidates, 17 shrink/measurement-first); budgets proposed, not applied; 44 S/F + 2 INV-S-P2-P0 + 2 boot remain |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate/4.1.txt | exit 0 |
-| 4 hardening | 4.2 fuzz soak (C10) | NOT MET | build/libc-gate/4.2.txt | inet_text has no soak duration; inet_text has 1 crash(es); inet_text has no executions |
+| 4 hardening | 4.2 fuzz soak (C10) | MET | tests/libc/fuzz/SOAK.md | 2026-11-17 `inet_text` 3601 s, 261,966,448 runs, 0 crashes (C74k) |
 | 4 hardening | 4.3 hardened malloc default | MET | build/libc-gate/4.3.txt | hardened backend selected; tiny not in libc.so.1 |
 | 4 hardening | 4.4 ENTROPY_WEAK status (H-5) | INFO | build/libc-gate/4.4.txt | ENTROPY_WEAK CLEAR; PG-52 release blocker, not a libc-gate blocker |
-| 5 on-target | 5.1 on-target libc cases (C12) | NOT MET | build/libc-gate/5.1.txt | 7 qtest cases: dynamic, threads, signals, spawn pass; hello/stdio/time fail (P1b) |
+| 5 on-target | 5.1 on-target libc cases (C12) | MET | build/libc-gate/5.1.txt | dynamic/threads/signals/spawn and hello/stdio/time pass (C74u/C74ae) |
 | 5 on-target | 5.2.core-servers core-servers regression | MET | build/libc-gate/5.2.core-servers.txt | exit 0: minimal `core-servers` profile (36-77 s), 300 s case limit |
 | 5 on-target | 5.2.file-tools file-tools regression | MET | build/libc-gate/5.2.file-tools.txt | exit 0: minimal `core-servers-files` profile; `df` reports `/`, `/tmp` and the device mounts from `/etc/mounts`; `tooltest: ok` |
 | 5 on-target | 5.3 second architecture | INFO | build/libc-gate/5.3.txt | aarch64: not delivered (C73 open item); owner decides whether G1 closes on x86_64 alone |
@@ -47,8 +47,9 @@ Verdict: NOT MET
 
 **libc gate: NOT MET.**
 
-Rows 1 (correctness), 3 (size), 4 (hardening) and 5 (on-target) are NOT MET. Row 2
-(portability) is BLOCKED; row 6 (documentation) is now MET, including the 6.2 render lint. MET
+Rows 1.2 (G1), 1.6 (Miri partial) and 3.1 (size) are NOT MET. Row 2 (portability) is BLOCKED;
+row 6 (documentation) is MET, including the 6.2 render lint; the on-target 5.1/5.2 and 4.2
+soak rows are MET. MET
 checks: symbol coverage, the packed symbol
 list, the target-case symbol audit (now exit 0), the 31 host unit-test crates, fuzz replay, the
 hardened allocator default, page coverage, the render lint, the existing docs gate and `libc(7)`.
@@ -65,30 +66,27 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   `tests/libc/symbol-audit/expected.tsv` snapshot is no longer stale (C74e refresh).
 * 1.2 G1: still NOT MET. `raven-atf-run gate --g1` exits 3: C2-C5 are 0 % (not run), C6 is
   unvendored; 0 of 4 measured rows (C71a/C71, owner: test/donor lane).
-* 1.4: NOT MET in this clone. `libc-oracle list` finds 27 families, but `diff <family>` exits 1
-  before running the oracle because `ravenbsd-resources` is not discoverable from
-  `/media/bo/.../minions/carl/ravenbsd`; only model-only `tls-layout` passes. Owner: integration
-  copy or a resources path in the harness (C35/C71).
+* 1.4: **MET**. C74q made `RAVENBSD_RESOURCES` discoverable and all 27 oracle families run
+  (`libc-gate eval --only 1.4`).
 * 1.5: **MET** through `cargo nextest run`; the gate row now uses nextest (C74h harness fix).
-* 1.6 Miri: BLOCKED. The nightly Miri preflight reports `cargo-miri` is not installed.
-* 1.7: **NOT MET**. `cargo xtask libc-lint all` reports 17 violations: the C74g loader adds three
-  missing `// SAFETY:` blocks in `ld/src/raw/exports.rs:591/594/596`; the other 14 are
-  pre-existing `one-symbol`/`std-path`/`abi-freeze` findings in the libc crate. Owner: C74g
-  follow-up plus the P1e/P1h/P1i lanes.
+* 1.6 Miri: **PARTIAL**. The bounded five-crate run is 715 tests, 0 UB; the full row still has the
+  inline-asm/mmap alignment-test exclusion (C74y-r1).
+* 1.7: **MET**. `cargo xtask libc-lint` is clean after C74i/P1f5 and the frozen ABI sync.
 * 2.1/2.2 world: BLOCKED. The harness and the 200-row list are present and `libc-world check`
   passes. The real build cannot start: `ravenbsd-resources/world-src` and a `donors.lock` world
   entry are absent (H-11) and every `world.toml` row is `PLACEHOLDER` (H-12), so the smoke5 probe
   produces 5/5 `placeholder` (`version not frozen (H-12)`) and 0 of 100 built. Owner: the tarball
   freeze/fetch (H-11/H-12); no result JSON was invented.
 * 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `17 pass, 48 fail, 69 known,
-  105 skipped, 0 budget-only`; the full three-arch rebuild removed the missing-artifact rows,
-  C74z-S11 re-froze the six B-only/layout budgets at measured + 3 percent and corrected the
-  aarch64 P2/P3 printf-stub measurement. The remaining 48 are 44 real S/F, 2 `INV-S-P2-P0` and
-  2 boot rows. The full per-row table is in the C74z-S11 report and `tests/libc/size/TRIAGE.md`.
-* 4.2 soak: NOT MET. `tests/libc/fuzz/SOAK.md` records `inet_text` crashing before one hour; the
-  other 13 targets completed 3600 s with 0 crashes. Owner: test/fuzz lane.
-* 5.1: `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello`,
-  `libc-stdio` and `libc-time` remain P1b. Section 4 has the exact output.
+  105 skipped, 0 budget-only`; C74z-S12 rebuilt on `d97f7c1a` after C47r/K97c and found the same
+  residual. It classified the 44 S/F rows into 27 real-growth budget candidates and 17
+  shrink/measurement-first rows (C74z-S13/S14/S15, S5/S6); no budget is applied. The riscv64
+  P2/P3 rows still link a printf stub and must be re-measured before any budget. The exact table
+  is in the C74z-S12 report and `tests/libc/size/TRIAGE.md`.
+* 4.2 soak: MET. The 2026-11-17 `inet_text` one-hour soak completed 3601 s with
+  261,966,448 runs and 0 crashes; the other 13 targets completed 3600 s with 0 crashes.
+* 5.1: **MET**. `libc-hello`, `libc-stdio` and `libc-time` pass after C74u/C74ae; the dynamic,
+  signals, spawn and threads cases are green.
 * 5.2: **MET**. C74n replaced the shell-inheriting profiles with minimal `core-servers` and
   `core-servers-files` profiles. C74v implemented the RavenBSD `read_fs_list` from the real
   `/etc/mounts` table, so `df` reports `/`, `/tmp` and the device schemes; `core-servers` and
@@ -151,30 +149,26 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 * 2.1/2.2: BLOCKED, harness/list present and `check` green; H-11 `world-src`/`donors.lock` entry
   and H-12 freeze are absent, so the real smoke5 build is 5/5 `placeholder` and 0/100 built.
 * 3.1: NOT MET, `libc-size check: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only`;
-  C74z-S11 full three-arch rebuild + B-only/layout fix (44 S/F + 2 `INV-S-P2-P0` + 2 boot
-  remain); table in `tests/libc/size/TRIAGE.md`.
+  C74z-S12 classification: 27 real-growth budget candidates, 17 shrink/measurement-first
+  (C74z-S13/S14/S15, S5/S6), no budget applied; 44 S/F + 2 `INV-S-P2-P0` + 2 boot remain;
+  table in `tests/libc/size/TRIAGE.md`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
 * 6.2: MET, `sh scripts/check-mandoc.sh` and `libc-gate eval --only 6.2` exit 0.
 
-## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z-S11 on `72c630bd`)
+## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z-S12 on `d97f7c1a`)
 
 | Row | Command | Result |
 |---|---|---|
 | 1.1.audit | `cargo xtask libc-audit` | exit 0; 66 required / 66 present / 0 missing → MET |
 | 1.2 G1 | `cargo run -q -p raven-atf-run -- gate --g1` | exit 3; C2-C5 0% not run, C6 unvendored; G1 NOT MET (0/4) |
-| 1.4 compat | `cargo xtask libc-oracle list` + `diff {family}` | 27 families; 26 exit 1 because `ravenbsd-resources` is not discoverable from this clone; `tls-layout` MET |
+| 1.4 compat | `cargo xtask libc-oracle list` + `diff {family}` | 27/27 families MET with `RAVENBSD_RESOURCES` (C74q) |
 | 1.5 host tests | `cargo nextest run` per crate | exit 0; 31 crates MET (gate row changed from `cargo test` to nextest) |
-| 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → BLOCKED |
-| 1.7 lints | `cargo xtask libc-lint all` | exit 1; 17 violations (3 C74g SAFETY comments, 14 pre-existing) → NOT MET |
-<<<<<<< HEAD
-| 2.1/2.2 world | missing files | `tools/libc-world/Cargo.toml` and C72 outputs absent → BLOCKED |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; C74z-S11 full three-arch rebuild + B-only/layout fix (44 S/F + 2 `INV-S-P2-P0` + 2 boot remain) |
-=======
+| 1.6 Miri | `sh scripts/check-miri.sh` | 715 tests, 0 UB; full row has the inline-asm/mmap alignment-test exclusion (C74y-r1) → PARTIAL |
+| 1.7 lints | `cargo xtask libc-lint` | exit 0; clean after C74i/P1f5/ABI sync → MET |
 | 2.1/2.2 world | `libc-world check` / `build --subset smoke5` / `gate` | check exit 0 (200 packages, 197.5 weighted); smoke5 5/5 `placeholder` (H-12), 0/100 built; H-11 `world-src`/`donors.lock` absent → BLOCKED |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 11 pass, 52 fail, 69 known, 105 skipped, 0 budget-only; C74z-S10 P9 S/F re-freeze (44 S/F + 6 B-only + 2 boot remain); shrink plan in `tests/libc/size/TRIAGE.md` |
->>>>>>> origin/carl/C74ah
-| 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
-| 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
+| 3.1 size | `cargo xtask libc-size --check` | exit 1; 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; C74z-S12 classification (27 budget candidates, 17 shrink/measurement-first), no budget applied; 44 S/F + 2 `INV-S-P2-P0` + 2 boot remain |
+| 4.2 soak | `tests/libc/fuzz/SOAK.md` | MET: 2026-11-17 one-hour `inet_text` soak, 3601 s, 261,966,448 runs, 0 crashes (C74k) |
+| 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads, hello, stdio and time pass (C74u/C74ae) → MET |
 | 5.2 kernel | `qtest core-servers` / `qtest file-tools` | both MET: minimal profiles; `df` reads `/etc/mounts`; `tooltest: ok`, `init exited (0)` |
 | 6.2 mandoc | `scripts/check-mandoc.sh` + `libc-gate eval --only 6.2` | exit 0; 17 pages lint clean with mandoc 1.14.6-1 → MET |
 

@@ -3,11 +3,12 @@
 
 # libc size gate 3.1 triage and budget correction (C74w/C74z/C74z-S10)
 
-Status: OBSERVED (C74z-S11, `origin/master` `72c630bd`). C74w classified the C74h/C69 data;
+Status: OBSERVED (C74z-S12, `origin/master` `d97f7c1a`). C74w classified the C74h/C69 data;
 C74z corrected the objective budget-data errors; C74z-S10 re-froze the six P9 S/F budgets;
-C74z-S11 rebuilt all three arches, fixed the six B-only/layout rows, and corrected the aarch64
-P2/P3 printf-stub measurement. **3.1 remains NOT MET**: 17 pass / 48 fail / 69 known / 105
-skipped / 0 budget-only. No libc body, S/F or boot budget is changed by C74z-S11.
+C74z-S11 rebuilt all three arches and fixed the six B-only/layout rows; C74z-S12 rebuilt again
+after C47r/K97c, confirmed the same 17/48 residual, and classified the 44 S/F rows with exact
+shrink tickets and reviewer-only budget proposals. **3.1 remains NOT MET**: 17 pass / 48 fail /
+69 known / 105 skipped / 0 budget-only. No S/F or boot budget is applied by C74z-S12.
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -227,6 +228,67 @@ current/budget numbers are in the C74z-S11 report. `INV-S-P2-P0` is aarch64 P2 t
 (31,707/28,659 vs 5,120; owner carl/C43 fmt). Boot is x86_64 instructions 1,245 > 908 and
 aarch64 syscalls 8 > 3 / instructions 3,403 > 1,847 (Mark/C74z-S9a). **3.1 remains NOT MET.**
 
+## C74z-S12 S/F residual classification (OBSERVED, `d97f7c1a`)
+
+C74z-S9a is not merged and C47r/K97c did not change any measured size row. The full three-arch
+rebuild on `d97f7c1a` is the same **17 pass / 48 fail / 69 known / 105 skipped / 0 budget-only**
+as `72c630bd`: 44 S/F rows + 2 `INV-S-P2-P0` + 2 boot rows. C74z-S12 does not apply a budget; it
+classifies each S/F row and proposes exact shrink tickets plus reviewer-only budget changes.
+
+### Per-probe classification
+
+| Probe | S/F rows | Cause | Decision | Owner |
+|---|---|---|---|---|
+| P0 | 6 | shared floor: `dtoa` 4,906-9,235 plus platform/tls/malloc; the `BUILTIN_TLS`/`STREAMS`/`PLATFORM` statics are in every probe | real feature growth; propose current+3% after C74z-S15 | raven-libc, dave/C55, dave/C57, dave/C54, kevin/C49 |
+| P1 | 6 | P0 plus stdio file I/O | real feature growth; propose current+3% | P0 + carl/C56 |
+| P2 | 5 | `vformat_dyn` + `float_layout`/`pos`/`emit` linked for `%d`; aarch64 is corrected, riscv still links a printf stub | shrink first (C74z-S14; riscv C74z-S13); no budget | carl/C43 |
+| P3 | 3 x86/arm + 2 riscv | `%f` float path is real on x86/aarch64; riscv is still a stub | budget x86/aarch64 after C74z-S14; riscv C74z-S13 | carl/C43 |
+| P4 | 6 | thread/tls/platform | real feature growth; propose current+3% | dave/C57, dave/C55 |
+| P5 | 4 | resolv/net `lookup_name`/`msend`/`getnameinfo` and name buffers | shrink first (C74z-S5); no budget | dave/C51 |
+| P6 | 6 | elf/dynamic loader | real feature growth; propose current+3% | bob/C52 |
+| P7 | 6 | real tz (`tzload`/`tzparse`) plus `strptime`/`strftime` duplication | shrink first (C74z-S6), then review the real tz part | mel/C44 |
+
+Counts: P0 6 + P1 6 + P2 5 + P3 5 + P4 6 + P5 4 + P6 6 + P7 6 = 44.
+
+The riscv64 P2/P3 rows are a second measurement defect: P2-P0 is **32 B** on riscv64 versus
+25,704 on x86_64 and 31,707 on aarch64, and the top symbols show no `vformat_dyn`/`float_layout`
+on riscv64. The probe is measuring a printf stub, not the real path. The riscv64 rows must be
+re-measured before any budget decision; their current under-count hides real S.
+
+### Exact shrink tickets
+
+These are filed in the plan below; the minion rules reserve `ravenbsd-prjmgmt` tickets to the
+lead, so the exact rows are recorded here and in the C74z-S12 report.
+
+| ID | Rows | Change | Target | Owner | Acceptance |
+|---|---|---|---|---|---|
+| C74z-S13 | riscv64 P2/P3 | Link the real printf/variadic path on riscv64 instead of the stub; the P2-P0 32 B is the symptom | honest P2/P3 rows | carl/C43 + platform | P2/P3 riscv link real printf; no stub; re-measure |
+| C74z-S14 | P2 all 5 | Split the integer-only vformat path; `%d` must not link `float_layout::emit_inner` (1,772-2,695) and the float hook | -2k S on P2; `INV-S-P2-P0` closer | carl/C43 | P2 S shrink, fmt oracle, invariant re-eval |
+| C74z-S15 | P0-P7 floor | Trace `raven_libc_dtoa::dtoa` 4,906-9,235 in P0 and remove the over-link from the floor | -5-9k S on every row | carl/C42 + mel/C48 + dave/C55 | P0 S shrink, dtoa oracle |
+| C74z-S6 | P7 all 6 | Share `strptime`/`strftime` parser and append-format; already in the plan | -5k S | mel/C44 | P7 S shrink, time oracle |
+| C74z-S5 | P5 aarch64/riscv | Deduplicate resolv/net name buffers and service paths; already in the plan | -5k S | dave/C51 | P5 S shrink, resolv oracle |
+
+C74z-S3 is **not** a dtoa duplication ticket: C74zb verified `dtoa`, `strtodg` and `strtod` are
+three distinct algorithms. The P2 dtoa link is the shared floor (C74z-S15) plus the float hook
+(C74z-S14), not three copied dtoas. C74z-S8 (libm `exp2`/`rem_pio2`) is not a 3.1 blocker: all
+six P9 rows pass; it remains a margin shrink only. C74z-S4/S7 are B-only and pass.
+
+### Reviewer budget proposal (not applied)
+
+| Rows | Proposed | Precondition |
+|---|---|---|
+| P0/P1/P4/P6, all arch/set (24 rows) | S/F `current + 3%`; B `current + 3%` only on P0 x86 tiny/server, P4 x86 server and P6 x86 tiny/server where B is also over | C74z-S15 floor shrink re-measures; if it lands, re-freeze lower |
+| P3 x86 tiny, aarch64 tiny/server (3 rows) | S/F `current + 3%`; B `current + 3%` on aarch64 tiny where B is over | C74z-S14 removes the P2 float duplication; the P3 `%f` path is legitimate |
+| P2 (5), P5 (4), P7 (6), riscv P3 (2) | **no budget** | shrink/measurement first (C74z-S13/S14/S5/S6) |
+
+The arithmetic is `ceil(current * 103 / 100)`; the exact current/budget values are in the C74z-S11
+table above. The proposal is not applied in this ticket. The aarch64 `INV-S-P2-P0` limit
+(5,120) also needs a reviewer decision after C74z-S14: the honest printf-to-stdout path may
+legitimately cost more than the old stub-based limit.
+
+**3.1 remains NOT MET** with the same 44 S/F + 2 invariant + 2 boot residual. No boot/S/F budget
+is raised to hide duplication.
+
 ## Measurement definition
 
 `S` is the Berkeley `text + data` of the stripped probe; `B` is the Berkeley **bss** field of
@@ -417,10 +479,16 @@ the concrete change and the acceptance it must satisfy; none may raise an S/F or
 | C74z-S9 | boot start path | Trim the start/TLS path from 1,245 to <=908 x86 instructions, aarch64 3,403 to <=1,847 and 8 syscalls to <=3 | boot budgets | dave/C57, kevin/C49 | boot x86/aarch64 pass, `libc-size --check` |
 | C74z-S10 | P9 full-link envelope | Done in C74z-S10: re-measured the six P9 rows on `e414e47d` and re-froze only the P9 S/F budget at measured + 3 percent; x86 tightened, aarch64/riscv feature growth accepted; B, smaller profiles and boot untouched | reviewed budget | budget owner + carl | done: all six P9 rows pass; 3.1 11 pass / 52 fail (44 S/F + 6 B-only + 2 boot); remaining shrink work is S3/S5/S6/S7/S8 |
 | C74z-S11 | 3.1 residual closure | Done in C74z-S11: full three-arch rebuild, six B-only/layout rows re-frozen at measured + 3 percent, aarch64 P2/P3 printf-stub measurement corrected; final residual reported with owners | no S/F or boot raise | lance/C74z-S11 | 17 pass / 48 fail (44 S/F + 2 INV-S-P2-P0 + 2 boot); rows.toml evidence updated |
+| C74z-S12 | S/F residual classification | Done in C74z-S12: rebuild on `d97f7c1a`, classify the 44 S/F rows, exact shrink tickets and a reviewer-only budget proposal | no budget applied | lance/C74z-S12 | 17/48 residual unchanged; exact table in the C74z-S12 report |
+| C74z-S13 | riscv64 P2/P3 measurement | Link the real riscv64 printf/variadic path instead of the stub; P2-P0 is 32 B versus 25,704 x86 and 31,707 aarch64 | honest P2/P3 rows | carl/C43 + platform | P2/P3 riscv link real printf; no stub; re-measure |
+| C74z-S14 | P2 `%d` float-path duplication | Split an integer-only vformat path; `%d` must not link `float_layout::emit_inner` 1,772-2,695 and the float hook | -2k S on P2; `INV-S-P2-P0` closer | carl/C43 | P2 S shrink, fmt oracle, invariant re-eval |
+| C74z-S15 | P0 floor dtoa over-link | Trace `raven_libc_dtoa::dtoa` 4,906-9,235 in P0 and remove the reference chain from start/platform/locale | -5-9k S on every row | carl/C42 + mel/C48 + dave/C55 | P0 S shrink, dtoa oracle |
 
-The first three clusters are the largest current symbols: ctype tables 31,360 bytes, the six
-`vformat` instantiations about 30k, dtoa about 26k. The remaining x86_64 P5 B-only and boot rows
-are separate follow-ups; the P5 B overruns are 945/1,373 bytes and do not justify a budget raise.
+The current largest clusters are the shared P0 floor `dtoa` (4,906-9,235 per probe), the
+P2/P3 printf core (`vformat_dyn` 3,148-5,646 plus float/pos/emit), the P7 time code
+(`tzload`/`tzparse` plus `strftime::append_format`), and the P5 resolv code
+(`lookup_name`/`msend`). The old ctype/vformat/dtoa cluster sizes in the C74z section were the
+`1bfeaafa` baseline; C39m and C74zb removed the ctype and six-vformat duplication.
 
 ## Budget actions
 
@@ -442,6 +510,9 @@ are separate follow-ups; the P5 B overruns are 945/1,373 bytes and do not justif
 * `BUDGETS.toml` is normally generated by `libc-size freeze`; C74z/C74z-S10/C74z-S11 use
   targeted data edits because a full freeze would touch every row (and, for C74z, raise every
   S/F budget). The header comment records the reason and the measurement base.
+* C74z-S12 does **not** change any budget. It classifies the 44 S/F rows and proposes (a)
+  current+3% for P0/P1/P4/P6 and the x86/aarch64 P3 rows, and (b) shrink-first for P2/P5/P7 and
+  riscv P3. The proposal is in the C74z-S12 section; the 3.1 count remains 17/48.
 
 ## C39m ctype table shrink (OBSERVED, `e1f252e5`)
 
