@@ -847,20 +847,54 @@ mod program {
             };
             let mut env = self.environment();
             let mut fdmap: Vec<(i32, u32)> = Vec::new();
-            for fd in [0u8, 1, 2] {
+            let tty = self.tty;
+            let mut child_io = *io;
+            let mut captures: Vec<(Handle, Handle, Stream)> = Vec::new();
+            for fd in [1u8, 2] {
                 let stream = stream_at(io, fd).unwrap_or(Stream::Console);
-                if let Stream::Handle(handle) = stream {
-                    // `spawn` installs self/initfs/namespace as handles 0..2, so the first
-                    // transferred descriptor is handle 3.
-                    let child = 3u32
-                        .checked_add(
-                            u32::try_from(fdmap.len())
-                                .map_err(|_| "too many inherited descriptors".to_string())?,
-                        )
-                        .ok_or_else(|| "too many inherited descriptors".to_string())?;
-                    fdmap.push((i32::from(fd), handle.0));
-                    env.push(format!("RSH_FD{fd}={child}"));
+                if !stream.is_console() {
+                    continue;
                 }
+                let (read, write) = match raven_rt::pipe::pipe() {
+                    Ok(pair) => pair,
+                    Err(error) => {
+                        for (read, write, _) in captures {
+                            let _ = raven_rt::handle_close(read);
+                            let _ = raven_rt::handle_close(write);
+                        }
+                        return Err(format!("pipe: {}", error.description()));
+                    }
+                };
+                if set_stream(&mut child_io, fd, Stream::Handle(write)).is_err() {
+                    let _ = raven_rt::handle_close(read);
+                    let _ = raven_rt::handle_close(write);
+                    for (read, write, _) in captures {
+                        let _ = raven_rt::handle_close(read);
+                        let _ = raven_rt::handle_close(write);
+                    }
+                    return Err("unsupported descriptor".to_string());
+                }
+                captures.push((read, write, stream));
+            }
+            for fd in [0u8, 1, 2] {
+                let stream = stream_at(&child_io, fd).unwrap_or(Stream::Console);
+                let handle = match stream {
+                    Stream::Handle(handle) => handle,
+                    Stream::Console => tty,
+                };
+                if handle == Handle::NONE {
+                    continue;
+                }
+                // `spawn` installs self/initfs/namespace as handles 0..2, so the first
+                // transferred descriptor is handle 3.
+                let child = 3u32
+                    .checked_add(
+                        u32::try_from(fdmap.len())
+                            .map_err(|_| "too many inherited descriptors".to_string())?,
+                    )
+                    .ok_or_else(|| "too many inherited descriptors".to_string())?;
+                fdmap.push((i32::from(fd), handle.0));
+                env.push(format!("RSH_FD{fd}={child}"));
             }
             let env_refs: Vec<&str> = env.iter().map(String::as_str).collect();
             let options = SpawnOptions {
@@ -874,8 +908,23 @@ mod program {
                 sigdefault: &zero,
                 ignored: &zero,
             };
-            spawn_with_attributes(&initfs, path, &options, &attributes)
-                .map_err(|error| format!("{error:?}"))
+            match spawn_with_attributes(&initfs, path, &options, &attributes) {
+                Ok(child) => {
+                    for (read, write, output) in captures {
+                        let _ = raven_rt::handle_close(write);
+                        let _ = copy_pipe(read, output, tty);
+                        let _ = raven_rt::handle_close(read);
+                    }
+                    Ok(child)
+                }
+                Err(error) => {
+                    for (read, write, _) in captures {
+                        let _ = raven_rt::handle_close(read);
+                        let _ = raven_rt::handle_close(write);
+                    }
+                    Err(format!("{error:?}"))
+                }
+            }
         }
 
         fn resolve_program(&mut self, name: &str) -> Option<String> {
@@ -958,6 +1007,23 @@ mod program {
             Err(error) => {
                 raven_rt::eprintln!("rsh: {}: {}", name, error.description());
                 126
+            }
+        }
+    }
+
+    /// Copy a captured pipe to its console stream until EOF.
+    fn copy_pipe(input: Handle, output: Stream, tty: Handle) -> i32 {
+        let mut buffer = [0u8; 512];
+        loop {
+            match Client::new().read(input, 0, &mut buffer) {
+                Ok(0) => return 0,
+                Ok(count) => {
+                    if output.write_all(tty, &buffer[..count]).is_err() {
+                        return 1;
+                    }
+                }
+                Err(Errno::EINTR) => continue,
+                Err(_) => return 1,
             }
         }
     }
