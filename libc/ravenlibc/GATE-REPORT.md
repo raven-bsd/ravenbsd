@@ -3,9 +3,10 @@
 
 # ravenlibc libc gate report
 
-Evaluated by `libc-gate` on 2026-11-17 from the C74d tree (origin/master `bd1d1de1`). Every
-status below has an evidence file under `build/libc-gate/`; the table is
-`cargo run -q -p libc-gate -- table`. C74d refreshed the non-P1 rows (audit, G1, compat, Miri,
+Evaluated by `libc-gate` on 2026-11-17 from the C74d tree (origin/master `bd1d1de1`). C74f
+refreshed the `libc-dynamic` row and the section 4 dynamic paragraph from `72237c57`; the table
+verdict is unchanged. Every status below has an evidence file under `build/libc-gate/`; the table
+is `cargo run -q -p libc-gate -- table`. C74d refreshed the non-P1 rows (audit, G1, compat, Miri,
 world, size, soak, mandoc) with their exact current commands and results; the remaining NOT MET
 rows are P1b/P1c, the dynamic runtime, or unavailable host tooling, and are listed with their
 owning lane.
