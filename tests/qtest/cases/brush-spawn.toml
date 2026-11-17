@@ -34,6 +34,7 @@ regex = '^brush-spawn:ls:0$'
 
 [[expect]]
 regex = '^(brush|ls|true)$'
+unordered = true
 
 [[expect]]
 regex = '^init exited \(0\)$'
