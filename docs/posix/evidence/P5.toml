@@ -74,7 +74,7 @@ notes = "P5: mkfifo/mknod FIFO, character-device and socket nodes on ramfs and U
 id = "filesystem.record-lock"
 status = "present"
 evidence = "qtest:posix-fs-record-lock"
-notes = "P5c: raw RECORD_LOCK shared/exclusive ranges, F_GETLK conflicting owner, F_SETLKW blocking, close and exit release"
+notes = "P5c2: raw RECORD_LOCK and libc fcntl F_GETLK/F_SETLK/F_SETLKW over the same kernel table; shared/exclusive ranges, conflicting-owner return, EAGAIN conflict, blocking wakeup, close and exit release"
 
 [[row]]
 id = "filesystem.stat-family"

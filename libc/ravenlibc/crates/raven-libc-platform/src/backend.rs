@@ -18,6 +18,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use raven_abi::errno::Errno;
+use raven_abi::types::fcntl::{RecordLock, UNLCK};
 use raven_abi::types::{Handle, Rights};
 use raven_abi::uname::Uname;
 use raven_libc_abi::structs::Timespec;
@@ -61,6 +62,17 @@ pub trait SysBackend {
     fn dup(&self, handle: Handle, rights: u32) -> Result<Handle, Errno>;
     /// Fill the 64-byte `FSTAT` record.
     fn fstat(&self, handle: Handle, out: &mut [u8; 64]) -> Result<(), Errno>;
+    /// Apply a POSIX byte-range lock operation to `handle`.
+    ///
+    /// The default answers `ENOSYS`; [`RealSys`] forwards to the kernel `RECORD_LOCK` path.
+    fn record_lock(
+        &self,
+        _handle: Handle,
+        _command: u32,
+        _lock: &mut RecordLock,
+    ) -> Result<(), Errno> {
+        Err(Errno::ENOSYS)
+    }
     /// Send a `CALL` request and return the response length.
     fn call(&self, handle: Handle, req: &[u8], resp: &mut [u8]) -> Result<usize, Errno>;
     /// Transfer a handle to another process.
@@ -157,6 +169,15 @@ impl SysBackend for RealSys {
 
     fn fstat(&self, handle: Handle, out: &mut [u8; 64]) -> Result<(), Errno> {
         raven_libc_sys::sys::fstat(handle, out)
+    }
+
+    fn record_lock(
+        &self,
+        handle: Handle,
+        command: u32,
+        lock: &mut RecordLock,
+    ) -> Result<(), Errno> {
+        raven_libc_sys::sys::record_lock(handle, command, lock)
     }
 
     fn call(&self, handle: Handle, req: &[u8], resp: &mut [u8]) -> Result<usize, Errno> {
@@ -296,6 +317,9 @@ struct FakeWorld {
     sleeps: Vec<u64>,
     debug_output: Vec<u8>,
     pub trace: Vec<u64>,
+    record_lock_calls: Vec<(Handle, u32, RecordLock)>,
+    record_lock_reply: RecordLock,
+    record_lock_error: Option<Errno>,
 }
 
 /// Deterministic in-memory backend for host tests.
@@ -336,6 +360,12 @@ impl FakeSys {
                 sleeps: Vec::new(),
                 debug_output: Vec::new(),
                 trace: Vec::new(),
+                record_lock_calls: Vec::new(),
+                record_lock_reply: RecordLock {
+                    l_type: UNLCK,
+                    ..RecordLock::default()
+                },
+                record_lock_error: None,
             }),
         }
     }
@@ -463,6 +493,23 @@ impl FakeSys {
     /// Bytes written through `DEBUG_WRITE`.
     pub fn debug_output(&self) -> Vec<u8> {
         self.world.borrow().debug_output.clone()
+    }
+
+    /// The record-lock replies to return from `GETLK`.
+    pub fn set_record_lock_reply(&self, reply: RecordLock) -> &Self {
+        self.world.borrow_mut().record_lock_reply = reply;
+        self
+    }
+
+    /// Make the next `RECORD_LOCK` call fail with `error`.
+    pub fn fail_record_lock(&self, error: Errno) -> &Self {
+        self.world.borrow_mut().record_lock_error = Some(error);
+        self
+    }
+
+    /// The `(handle, command, lock)` triples passed to `RECORD_LOCK`, in call order.
+    pub fn record_lock_calls(&self) -> Vec<(Handle, u32, RecordLock)> {
+        self.world.borrow().record_lock_calls.clone()
     }
 
     /// The bytes of a mapping, if any.
@@ -677,6 +724,24 @@ impl SysBackend for FakeSys {
             gid: 1000,
         };
         record.encode(out).map_err(|error| error.errno())
+    }
+
+    fn record_lock(
+        &self,
+        handle: Handle,
+        command: u32,
+        lock: &mut RecordLock,
+    ) -> Result<(), Errno> {
+        self.record(0x5245_434B);
+        let mut world = self.world.borrow_mut();
+        world.record_lock_calls.push((handle, command, *lock));
+        if let Some(error) = world.record_lock_error {
+            return Err(error);
+        }
+        if command == raven_abi::types::fcntl::GETLK {
+            *lock = world.record_lock_reply;
+        }
+        Ok(())
     }
 
     fn call(&self, handle: Handle, req: &[u8], resp: &mut [u8]) -> Result<usize, Errno> {
