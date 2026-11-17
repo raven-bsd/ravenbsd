@@ -6,7 +6,7 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T23:10:02Z
+- Date: 2026-11-17T23:58:42Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: host-only
