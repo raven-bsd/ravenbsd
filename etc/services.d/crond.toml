@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Minimal cron daemon. It reads /var/cron/<user> and spawns jobs through the kernel;
+# the image must mount a writable /var/cron (the P4y qtest mounts ramfs there).
+name = "crond"
+exec = "/sbin/crond"
+needs = ["scheme:file"]
+readiness = "none"
+restart = "on-failure"

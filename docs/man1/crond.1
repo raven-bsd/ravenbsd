@@ -1,0 +1,40 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt CROND 1
+.Os RavenBSD
+.Sh NAME
+.Nm crond
+.Nd minimal per-minute cron daemon
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+The
+.Nm
+daemon reads every regular file under
+.Pa /var/cron ,
+parses it as a crontab, and runs matching commands once per minute through the kernel spawn
+path.
+.Pp
+Each job logs
+.Dq crond: start
+and
+.Dq crond: exit
+with the user, command and status. A missing or empty spool is not an error.
+.Pp
+The scheduler is serial: a command is waited for before the next start. Overlap detection and
+.Ql @reboot
+are explicit unsupported cases. Shell metacharacters in a command are rejected; use a script
+if redirection or pipelines are needed.
+.Sh ENVIRONMENT
+The spool directory is
+.Pa /var/cron .
+The image must mount a writable filesystem there; the P4y qtest mounts ramfs.
+.Sh EXIT STATUS
+.Nm
+runs until terminated. It exits non-zero only on an unrecoverable startup error.
+.Sh SEE ALSO
+.Xr crontab 1
+.Sh STANDARDS
+Five-field cron scheduling at minute granularity. `@reboot`, overlap policies and GNU
+extensions are documented omissions.
