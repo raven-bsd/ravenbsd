@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "client"
+exec = "/sbin/frtsvc"
+args = ["restart"]
+needs = ["scheme:frt"]
+readiness = "exit"
+restart = "on-failure"
+max_restarts = 0

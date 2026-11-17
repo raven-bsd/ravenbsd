@@ -1347,6 +1347,16 @@ name = "raven-evq-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-fault-reconnect"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-fdt-lite"
 version = "0.1.0"
 
