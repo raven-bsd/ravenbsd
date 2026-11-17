@@ -12,6 +12,7 @@ use crate::CodeUnit;
 
 pub mod atoi;
 pub mod atol;
+pub mod ecvt;
 pub mod scan;
 pub mod strtol;
 pub mod strtonum;
@@ -19,6 +20,7 @@ pub mod strtoul;
 
 pub use atoi::atoi;
 pub use atol::{atol, atoll};
+pub use ecvt::{Converted, ecvt_digits, fcvt_digits};
 pub use scan::scan_integer;
 pub use strtol::strtol;
 pub use strtonum::{StrtonumError, strtonum};

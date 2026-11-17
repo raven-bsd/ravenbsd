@@ -32,10 +32,7 @@ __BEGIN_DECLS
 #define __NEED_struct_timespec
 #define __NEED_pid_t
 #define __NEED_time_t
-
-#if __BSD_VISIBLE
 #define __NEED_size_t
-#endif
 
 #include <bits/alltypes.h>
 
@@ -66,6 +63,14 @@ int     sched_yield(void);
 #define SCHED_IDLE 5
 #define SCHED_DEADLINE 6
 #define SCHED_RESET_ON_FORK 0x40000000
+
+#if __POSIX_VISIBLE >= 202405 || __XSI_VISIBLE || __BSD_VISIBLE
+typedef struct cpu_set_t { unsigned long __bits[128/sizeof(long)]; } cpu_set_t;
+int __sched_cpucount(size_t, const cpu_set_t *);
+int sched_getcpu(void);
+int sched_getaffinity(pid_t, size_t, cpu_set_t *);
+int sched_setaffinity(pid_t, size_t, const cpu_set_t *);
+#endif
 
 #if __BSD_VISIBLE
 #define CSIGNAL		0x000000ff
@@ -99,12 +104,6 @@ int (memcmp)(const void *, const void *, size_t);
 void *(memset)(void *, int, size_t);
 void *(calloc)(size_t, size_t);
 void (free)(void *);
-
-typedef struct cpu_set_t { unsigned long __bits[128/sizeof(long)]; } cpu_set_t;
-int __sched_cpucount(size_t, const cpu_set_t *);
-int sched_getcpu(void);
-int sched_getaffinity(pid_t, size_t, cpu_set_t *);
-int sched_setaffinity(pid_t, size_t, const cpu_set_t *);
 
 #define __CPU_op_S(i, size, set, op) ( (i)/8U >= (size) ? 0 : \
 	(((unsigned long *)(set))[(i)/8/sizeof(long)] op (1UL<<((i)%(8*sizeof(long))))) )

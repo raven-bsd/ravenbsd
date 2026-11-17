@@ -33,6 +33,7 @@
 __BEGIN_DECLS
 
 #define __NEED_size_t
+#define __NEED_wchar_t
 #if __POSIX_VISIBLE || __XSI_VISIBLE || __BSD_VISIBLE
 #define __NEED_locale_t
 #endif
@@ -119,9 +120,19 @@ int __xpg_strerror_r(int, char *, size_t);
 char *__gnu_strerror_r(int, char *, size_t);
 #endif
 
-#if __BSD_VISIBLE
+/*
+ * POSIX.1-2024 adds strlcpy/strlcat (Issue 8, CX) to <string.h> and wcslcpy/wcslcat to
+ * <wchar.h>. The POSIX profile assigns the wide pair to this header too, so declare both here;
+ * the definitions already exist in the string and wchar slices.
+ */
+#if __POSIX_VISIBLE >= 202405 || __BSD_VISIBLE
 size_t strlcpy(char *__restrict, const char *__restrict, size_t);
 size_t strlcat(char *__restrict, const char *__restrict, size_t);
+size_t wcslcpy(wchar_t *__restrict, const wchar_t *__restrict, size_t);
+size_t wcslcat(wchar_t *__restrict, const wchar_t *__restrict, size_t);
+#endif
+
+#if __BSD_VISIBLE
 char *strsep(char **, const char *);
 char *strnstr(const char *, const char *, size_t);
 void explicit_bzero(void *, size_t);

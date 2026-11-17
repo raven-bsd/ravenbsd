@@ -42,13 +42,12 @@ __BEGIN_DECLS
 
 #define RTLD_DI_LINKMAP 2
 
-#if __BSD_VISIBLE
+#if __POSIX_VISIBLE || __XSI_VISIBLE || __BSD_VISIBLE
 int    dlclose(void *);
 char  *dlerror(void);
 void  *dlopen(const char *, int);
 void  *dlsym(void *__restrict, const char *__restrict);
 
-#if __BSD_VISIBLE
 typedef struct {
 	const char *dli_fname;
 	void *dli_fbase;
@@ -57,7 +56,6 @@ typedef struct {
 } Dl_info;
 int dladdr(const void *, Dl_info *);
 int dlinfo(void *, int, void *);
-#endif
 
 #endif
 __END_DECLS
