@@ -264,6 +264,8 @@ RAVEN_1.0 {
 		getdelim;
 		getline;
 		gets;
+		pclose;
+		popen;
 		printf;
 		remove;
 		rewind;

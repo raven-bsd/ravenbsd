@@ -779,12 +779,14 @@ opterr
 optind
 optopt
 optreset
+pclose
 perror
 personality
 pidfile
 pipe2
 pledge
 poll
+popen
 port_alert
 port_associate
 port_create

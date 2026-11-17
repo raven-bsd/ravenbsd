@@ -15,7 +15,7 @@ archive=build/x86_64/libc.a
 [ -f "$archive" ] || { echo "posix stdio2: $archive is missing" >&2; exit 1; }
 
 for symbol in \
-    cuserid dprintf gets renameat2 tmpfile tmpfile64 tmpnam vdprintf vsnprintf_l
+    cuserid dprintf gets pclose popen renameat2 tmpfile tmpfile64 tmpnam vdprintf vsnprintf_l
 do
     if ! nm -g --defined-only "$archive" 2>/dev/null | grep -Eq " $symbol$"; then
         echo "posix stdio2: missing libc.a symbol $symbol" >&2

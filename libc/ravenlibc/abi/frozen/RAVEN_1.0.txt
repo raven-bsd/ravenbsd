@@ -777,12 +777,14 @@ opterr D 4 x86_64
 optind D 4 x86_64
 optopt D 4 x86_64
 optreset D 4 x86_64
+pclose F 160 x86_64
 perror F 5 x86_64
 personality F 264 x86_64
 pidfile F 147 x86_64
 pipe2 F 57 x86_64
 pledge F 291 x86_64
 poll F 344 x86_64
+popen F 898 x86_64
 port_alert F 99 x86_64
 port_associate F 262 x86_64
 port_create F 57 x86_64

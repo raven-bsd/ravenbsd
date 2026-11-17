@@ -10,6 +10,7 @@
 pub(crate) mod file;
 pub(crate) mod gets;
 pub(crate) mod open_wmemstream;
+pub(crate) mod popen;
 pub(crate) mod stderr;
 pub(crate) mod stdin;
 pub(crate) mod stdout;

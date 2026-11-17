@@ -2228,3 +2228,17 @@ id = "interface.wcsrtombs"
 status = "present"
 evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 notes = "P1 batch B: wchar wcsrtombs; ctype/stdio suite and libc.a symbol"
+
+# P1 batch B stdio: the process-pipe pair.
+
+[[row]]
+id = "interface.popen"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: popen over the kernel raw PIPE2 call, posix_spawn and waitpid; libc.a symbol"
+
+[[row]]
+id = "interface.pclose"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: pclose over the kernel raw PIPE2 call, posix_spawn and waitpid; libc.a symbol"

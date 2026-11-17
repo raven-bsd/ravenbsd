@@ -6,29 +6,29 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T04:23:51Z
+- Date: 2026-11-17T07:42:49Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 1145 pass, 655 fail, 10 skip
+- Counts: 1320 pass, 484 fail, 6 skip
 
 ## Summary
 
 | area | pass | fail | skip |
 |---|---:|---:|---:|
 | external | 0 | 0 | 3 |
-| filesystem | 14 | 6 | 0 |
-| header | 40 | 46 | 0 |
-| interface | 925 | 497 | 0 |
+| filesystem | 18 | 2 | 0 |
+| header | 42 | 44 | 0 |
+| interface | 1071 | 351 | 0 |
 | link | 1 | 0 | 0 |
 | process | 16 | 1 | 0 |
 | shell | 3 | 22 | 0 |
-| target | 0 | 0 | 7 |
+| target | 2 | 2 | 3 |
 | tty | 12 | 0 | 0 |
-| utility | 134 | 83 | 0 |
-| **all** | **1145** | **655** | **10** |
+| utility | 155 | 62 | 0 |
+| **all** | **1320** | **484** | **6** |
 
 ## Rows
 
@@ -43,18 +43,18 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `filesystem.mkdir-rmdir` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.mmap-file` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.mount` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.ownership` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
+| `filesystem.ownership` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
 | `filesystem.path-resolution` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.permission` | filesystem | pass | `qtest:perm` |  |
 | `filesystem.record-lock` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `filesystem.rename` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.sparse-file` | filesystem | pass | `test:tests/posix/fs/sparse-file/test.sh` |  |
-| `filesystem.special-file` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
+| `filesystem.sparse-file` | filesystem | fail | `test:tests/posix/fs/sparse-file/test.sh` | test evidence `tests/posix/fs/sparse-file/test.sh` failed: error: command `/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --package fsd-ufs` exited with code 101 |
+| `filesystem.special-file` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
 | `filesystem.stat-family` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.statvfs` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
+| `filesystem.statvfs` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
 | `filesystem.symlink` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.sync` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
-| `filesystem.timestamp` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
+| `filesystem.sync` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
+| `filesystem.timestamp` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
 | `filesystem.truncate` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.umask` | filesystem | pass | `test:tests/posix/fs/umask/test.sh` |  |
 | `header.aio.h` | header | fail | `profile` | profile status partial |
@@ -106,8 +106,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.stdbool.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.stddef.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.stdint.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_48.c` |  |
-| `header.stdio.h` | header | fail | `profile` | profile status partial |
-| `header.stdlib.h` | header | fail | `profile` | profile status partial |
+| `header.stdio.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_49.c` |  |
+| `header.stdlib.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_50.c` |  |
 | `header.string.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_51.c` |  |
 | `header.strings.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_52.c` |  |
 | `header.stropts.h` | header | fail | `profile` | profile status partial |
@@ -157,10 +157,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.acct` | interface | fail | `profile` | profile status missing |
 | `interface.acos` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_12.c` |  |
 | `interface.acosf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_13.c` |  |
-| `interface.acosfNx` | interface | fail | `profile` | profile status missing |
+| `interface.acosfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.acosh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_15.c` |  |
 | `interface.acoshf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_16.c` |  |
-| `interface.acoshfNx` | interface | fail | `profile` | profile status missing |
+| `interface.acoshfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.acoshl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.acosl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.acospi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
@@ -184,26 +184,26 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.asctime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.asin` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_39.c` |  |
 | `interface.asinf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_40.c` |  |
-| `interface.asinfNx` | interface | fail | `profile` | profile status missing |
+| `interface.asinfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.asinh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_42.c` |  |
 | `interface.asinhf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_43.c` |  |
-| `interface.asinhfNx` | interface | fail | `profile` | profile status missing |
+| `interface.asinhfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.asinhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.asinl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.asinpi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.assert` | interface | fail | `profile` | profile status missing |
-| `interface.at_quick_exit` | interface | fail | `profile` | profile status missing |
+| `interface.at_quick_exit` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.atan` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_50.c` |  |
 | `interface.atan2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_51.c` |  |
 | `interface.atan2f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_52.c` |  |
-| `interface.atan2fNx` | interface | fail | `profile` | profile status missing |
+| `interface.atan2fNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.atan2l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.atan2pi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.atanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_56.c` |  |
-| `interface.atanfNx` | interface | fail | `profile` | profile status missing |
+| `interface.atanfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.atanh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_58.c` |  |
 | `interface.atanhf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_59.c` |  |
-| `interface.atanhfNx` | interface | fail | `profile` | profile status missing |
+| `interface.atanhfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.atanhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.atanl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.atanpi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
@@ -227,37 +227,37 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.c8rtomb` | interface | fail | `profile` | profile status missing |
 | `interface.cabs` | interface | fail | `profile` | profile status missing |
 | `interface.cabsf` | interface | fail | `profile` | profile status missing |
-| `interface.cabsfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cabsfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cabsl` | interface | fail | `profile` | profile status missing |
 | `interface.cacos` | interface | fail | `profile` | profile status missing |
 | `interface.cacosf` | interface | fail | `profile` | profile status missing |
-| `interface.cacosfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cacosfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cacosh` | interface | fail | `profile` | profile status missing |
 | `interface.cacoshf` | interface | fail | `profile` | profile status missing |
-| `interface.cacoshfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cacoshfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cacoshl` | interface | fail | `profile` | profile status missing |
 | `interface.cacosl` | interface | fail | `profile` | profile status missing |
 | `interface.call_once` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_94.c` |  |
 | `interface.calloc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_95.c` |  |
-| `interface.canonicalizefNx` | interface | fail | `profile` | profile status missing |
+| `interface.canonicalizefNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.carg` | interface | fail | `profile` | profile status missing |
 | `interface.cargf` | interface | fail | `profile` | profile status missing |
-| `interface.cargfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cargfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cargl` | interface | fail | `profile` | profile status missing |
 | `interface.casin` | interface | fail | `profile` | profile status missing |
 | `interface.casinf` | interface | fail | `profile` | profile status missing |
-| `interface.casinfNx` | interface | fail | `profile` | profile status missing |
+| `interface.casinfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.casinh` | interface | fail | `profile` | profile status missing |
 | `interface.casinhf` | interface | fail | `profile` | profile status missing |
-| `interface.casinhfNx` | interface | fail | `profile` | profile status missing |
+| `interface.casinhfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.casinhl` | interface | fail | `profile` | profile status missing |
 | `interface.casinl` | interface | fail | `profile` | profile status missing |
 | `interface.catan` | interface | fail | `profile` | profile status missing |
 | `interface.catanf` | interface | fail | `profile` | profile status missing |
-| `interface.catanfNx` | interface | fail | `profile` | profile status missing |
+| `interface.catanfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.catanh` | interface | fail | `profile` | profile status missing |
 | `interface.catanhf` | interface | fail | `profile` | profile status missing |
-| `interface.catanhfNx` | interface | fail | `profile` | profile status missing |
+| `interface.catanhfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.catanhl` | interface | fail | `profile` | profile status missing |
 | `interface.catanl` | interface | fail | `profile` | profile status missing |
 | `interface.catclose` | interface | fail | `profile` | profile status missing |
@@ -268,19 +268,19 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.cbrtl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ccos` | interface | fail | `profile` | profile status missing |
 | `interface.ccosf` | interface | fail | `profile` | profile status missing |
-| `interface.ccosfNx` | interface | fail | `profile` | profile status missing |
+| `interface.ccosfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.ccosh` | interface | fail | `profile` | profile status missing |
 | `interface.ccoshf` | interface | fail | `profile` | profile status missing |
-| `interface.ccoshfNx` | interface | fail | `profile` | profile status missing |
+| `interface.ccoshfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.ccoshl` | interface | fail | `profile` | profile status missing |
 | `interface.ccosl` | interface | fail | `profile` | profile status missing |
 | `interface.ceil` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_131.c` |  |
 | `interface.ceilf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_132.c` |  |
-| `interface.ceilfNx` | interface | fail | `profile` | profile status missing |
+| `interface.ceilfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.ceill` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.cexp` | interface | fail | `profile` | profile status missing |
 | `interface.cexpf` | interface | fail | `profile` | profile status missing |
-| `interface.cexpfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cexpfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cexpl` | interface | fail | `profile` | profile status missing |
 | `interface.cfgetispeed` | interface | fail | `profile` | profile status missing |
 | `interface.cfgetospeed` | interface | fail | `profile` | profile status missing |
@@ -294,7 +294,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.chroot` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_148.c` | declaration did not compile |
 | `interface.cimag` | interface | fail | `profile` | profile status missing |
 | `interface.cimagf` | interface | fail | `profile` | profile status missing |
-| `interface.cimagfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cimagfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cimagl` | interface | fail | `profile` | profile status missing |
 | `interface.clearerr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_153.c` |  |
 | `interface.clearerr_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
@@ -306,7 +306,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.clock_settime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_160.c` |  |
 | `interface.clog` | interface | fail | `profile` | profile status missing |
 | `interface.clogf` | interface | fail | `profile` | profile status missing |
-| `interface.clogfNx` | interface | fail | `profile` | profile status missing |
+| `interface.clogfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.clogl` | interface | fail | `profile` | profile status missing |
 | `interface.close` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_165.c` |  |
 | `interface.closedir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_166.c` |  |
@@ -321,60 +321,60 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.confstr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_175.c` |  |
 | `interface.conj` | interface | fail | `profile` | profile status missing |
 | `interface.conjf` | interface | fail | `profile` | profile status missing |
-| `interface.conjfNx` | interface | fail | `profile` | profile status missing |
+| `interface.conjfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.conjl` | interface | fail | `profile` | profile status missing |
 | `interface.connect` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_180.c` |  |
 | `interface.copy_file_range` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_181.c` | declaration did not compile |
 | `interface.copysign` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_182.c` |  |
 | `interface.copysignf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_183.c` |  |
-| `interface.copysignfNx` | interface | fail | `profile` | profile status missing |
+| `interface.copysignfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.copysignl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.cos` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_186.c` |  |
 | `interface.cosf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_187.c` |  |
-| `interface.cosfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cosfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cosh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_189.c` |  |
 | `interface.coshf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_190.c` |  |
-| `interface.coshfNx` | interface | fail | `profile` | profile status missing |
+| `interface.coshfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.coshl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.cosl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.cospi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.cpow` | interface | fail | `profile` | profile status missing |
 | `interface.cpowf` | interface | fail | `profile` | profile status missing |
-| `interface.cpowfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cpowfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cpowl` | interface | fail | `profile` | profile status missing |
 | `interface.cproj` | interface | fail | `profile` | profile status missing |
 | `interface.cprojf` | interface | fail | `profile` | profile status missing |
-| `interface.cprojfNx` | interface | fail | `profile` | profile status missing |
+| `interface.cprojfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.cprojl` | interface | fail | `profile` | profile status missing |
 | `interface.creal` | interface | fail | `profile` | profile status missing |
 | `interface.crealf` | interface | fail | `profile` | profile status missing |
-| `interface.crealfNx` | interface | fail | `profile` | profile status missing |
+| `interface.crealfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.creall` | interface | fail | `profile` | profile status missing |
 | `interface.creat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_207.c` |  |
 | `interface.creat64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_208.c` | declaration did not compile |
 | `interface.csin` | interface | fail | `profile` | profile status missing |
 | `interface.csinf` | interface | fail | `profile` | profile status missing |
-| `interface.csinfNx` | interface | fail | `profile` | profile status missing |
+| `interface.csinfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.csinh` | interface | fail | `profile` | profile status missing |
 | `interface.csinhf` | interface | fail | `profile` | profile status missing |
-| `interface.csinhfNx` | interface | fail | `profile` | profile status missing |
+| `interface.csinhfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.csinhl` | interface | fail | `profile` | profile status missing |
 | `interface.csinl` | interface | fail | `profile` | profile status missing |
 | `interface.csqrt` | interface | fail | `profile` | profile status missing |
 | `interface.csqrtf` | interface | fail | `profile` | profile status missing |
-| `interface.csqrtfNx` | interface | fail | `profile` | profile status missing |
+| `interface.csqrtfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.csqrtl` | interface | fail | `profile` | profile status missing |
 | `interface.ctan` | interface | fail | `profile` | profile status missing |
 | `interface.ctanf` | interface | fail | `profile` | profile status missing |
-| `interface.ctanfNx` | interface | fail | `profile` | profile status missing |
+| `interface.ctanfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.ctanh` | interface | fail | `profile` | profile status missing |
 | `interface.ctanhf` | interface | fail | `profile` | profile status missing |
-| `interface.ctanhfNx` | interface | fail | `profile` | profile status missing |
+| `interface.ctanhfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.ctanhl` | interface | fail | `profile` | profile status missing |
 | `interface.ctanl` | interface | fail | `profile` | profile status missing |
 | `interface.ctermid` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.ctime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
-| `interface.cuserid` | interface | fail | `profile` | profile status missing |
+| `interface.cuserid` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.daemon` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_232.c` | declaration did not compile |
 | `interface.dcgettext` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_233.c` |  |
 | `interface.dcngettext` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_234.c` |  |
@@ -386,7 +386,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.dlclose` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_240.c` | declaration did not compile |
 | `interface.dlinfo` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_241.c` | declaration did not compile |
 | `interface.dngettext` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_242.c` |  |
-| `interface.dprintf` | interface | fail | `profile` | profile status missing |
+| `interface.dprintf` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.drand48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_244.c` |  |
 | `interface.dremf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_245.c` | declaration did not compile |
 | `interface.dup` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_246.c` |  |
@@ -394,7 +394,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.dup3` | interface | fail | `profile` | profile status missing |
 | `interface.duplocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_249.c` |  |
 | `interface.eaccess` | interface | fail | `profile` | profile status missing |
-| `interface.ecvt_r` | interface | fail | `profile` | profile status missing |
+| `interface.ecvt_r` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.endgrent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_252.c` |  |
 | `interface.endhostent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_253.c` |  |
 | `interface.endnetent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_254.c` |  |
@@ -422,24 +422,24 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.exp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_276.c` |  |
 | `interface.exp10` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_277.c` | declaration did not compile |
 | `interface.exp10f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_278.c` | declaration did not compile |
-| `interface.exp10fNx` | interface | fail | `profile` | profile status missing |
+| `interface.exp10fNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.exp10l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.exp10m1` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.exp2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_282.c` |  |
 | `interface.exp2f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_283.c` |  |
-| `interface.exp2fNx` | interface | fail | `profile` | profile status missing |
+| `interface.exp2fNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.exp2l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.exp2m1` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.expf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_287.c` |  |
-| `interface.expfNx` | interface | fail | `profile` | profile status missing |
+| `interface.expfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.expl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.expm1` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_290.c` |  |
 | `interface.expm1f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_291.c` |  |
-| `interface.expm1fNx` | interface | fail | `profile` | profile status missing |
+| `interface.expm1fNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.expm1l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fabs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_294.c` |  |
 | `interface.fabsf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_295.c` |  |
-| `interface.fabsfNx` | interface | fail | `profile` | profile status missing |
+| `interface.fabsfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fabsl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.faccessat` | interface | fail | `profile` | profile status missing |
 | `interface.fallocate` | interface | fail | `profile` | profile status missing |
@@ -451,12 +451,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fchownat` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_305.c` | declaration did not compile |
 | `interface.fclose` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_306.c` |  |
 | `interface.fcntl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_307.c` |  |
-| `interface.fcvt_r` | interface | fail | `profile` | profile status missing |
+| `interface.fcvt_r` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.fdatasync` | interface | fail | `profile` | profile status missing |
 | `interface.fdetach` | interface | fail | `profile` | profile status missing |
 | `interface.fdim` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_311.c` |  |
 | `interface.fdimf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_312.c` |  |
-| `interface.fdimfNx` | interface | fail | `profile` | profile status missing |
+| `interface.fdimfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fdiml` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fdopen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_315.c` |  |
 | `interface.feclearexcept` | interface | fail | `profile` | profile status missing |
@@ -490,39 +490,39 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fgetpos64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fgets` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_345.c` |  |
 | `interface.fgetwc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_346.c` |  |
-| `interface.fgetwc_unlocked` | interface | fail | `profile` | profile status missing |
-| `interface.fgetws` | interface | fail | `profile` | profile status missing |
+| `interface.fgetwc_unlocked` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.fgetws` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.fileno` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_349.c` |  |
 | `interface.fileno_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.finitef` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_351.c` | declaration did not compile |
 | `interface.flockfile` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.floor` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_353.c` |  |
 | `interface.floorf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_354.c` |  |
-| `interface.floorfNx` | interface | fail | `profile` | profile status missing |
+| `interface.floorfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.floorl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.flsl` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_357.c` | declaration did not compile |
 | `interface.flsll` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_358.c` | declaration did not compile |
 | `interface.fma` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_359.c` |  |
 | `interface.fmaf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_360.c` |  |
-| `interface.fmafNx` | interface | fail | `profile` | profile status missing |
+| `interface.fmafNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fmal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fmax` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_363.c` |  |
 | `interface.fmaxf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_364.c` |  |
-| `interface.fmaxfNx` | interface | fail | `profile` | profile status missing |
+| `interface.fmaxfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fmaximum_mag_num` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fmaxl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fmaxmag` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.fmaxmagfNx` | interface | fail | `profile` | profile status missing |
+| `interface.fmaxmagfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fmin` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_370.c` |  |
 | `interface.fminf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_371.c` |  |
-| `interface.fminfNx` | interface | fail | `profile` | profile status missing |
+| `interface.fminfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fminimum_mag_num` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fminl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fminmag` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.fminmagfNx` | interface | fail | `profile` | profile status missing |
+| `interface.fminmagfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fmod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_377.c` |  |
 | `interface.fmodf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_378.c` |  |
-| `interface.fmodfNx` | interface | fail | `profile` | profile status missing |
+| `interface.fmodfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fmodl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fmtmsg` | interface | fail | `profile` | profile status missing |
 | `interface.fnmatch` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_382.c` |  |
@@ -536,10 +536,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fputc_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fputs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_391.c` |  |
 | `interface.fputs_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
-| `interface.fputwc` | interface | fail | `profile` | profile status missing |
-| `interface.fputwc_unlocked` | interface | fail | `profile` | profile status missing |
-| `interface.fputws` | interface | fail | `profile` | profile status missing |
-| `interface.fputws_unlocked` | interface | fail | `profile` | profile status missing |
+| `interface.fputwc` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.fputwc_unlocked` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.fputws` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.fputws_unlocked` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.fread` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_397.c` |  |
 | `interface.fread_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.free` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_399.c` |  |
@@ -551,7 +551,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.freopen64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.frexp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_406.c` |  |
 | `interface.frexpf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_407.c` |  |
-| `interface.frexpfNx` | interface | fail | `profile` | profile status missing |
+| `interface.frexpfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.frexpl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fromfp` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fromfpx` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
@@ -579,11 +579,11 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.futimens` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_433.c` |  |
 | `interface.futimes` | interface | fail | `profile` | profile status missing |
 | `interface.futimesat` | interface | fail | `profile` | profile status missing |
-| `interface.fwide` | interface | fail | `profile` | profile status missing |
-| `interface.fwprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_437.c` |  |
+| `interface.fwide` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.fwprintf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.fwrite` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_438.c` |  |
 | `interface.fwrite_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
-| `interface.fwscanf` | interface | fail | `profile` | profile status missing |
+| `interface.fwscanf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.gammaf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_441.c` | declaration did not compile |
 | `interface.gammal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.getaddrinfo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_443.c` |  |
@@ -592,7 +592,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getchar` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_446.c` |  |
 | `interface.getchar_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.getcwd` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_448.c` |  |
-| `interface.getdate` | interface | fail | `profile` | profile status missing |
+| `interface.getdate` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.getdelim` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.getdents` | interface | fail | `profile` | profile status missing |
 | `interface.getdomainname` | interface | fail | `profile` | profile status missing |
@@ -620,7 +620,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getnameinfo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_474.c` |  |
 | `interface.getopt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_475.c` |  |
 | `interface.getpagesize` | interface | fail | `profile` | profile status missing |
-| `interface.getpayloadfNx` | interface | fail | `profile` | profile status missing |
+| `interface.getpayloadfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.getpeername` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_478.c` |  |
 | `interface.getpgid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_479.c` |  |
 | `interface.getpgrp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_480.c` |  |
@@ -638,7 +638,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getrlimit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_492.c` |  |
 | `interface.getrlimit64` | interface | fail | `profile` | profile status missing |
 | `interface.getrusage` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_494.c` |  |
-| `interface.gets` | interface | fail | `profile` | profile status missing |
+| `interface.gets` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.getservbyname_r` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_496.c` | declaration did not compile |
 | `interface.getservbyport_r` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_497.c` | declaration did not compile |
 | `interface.getsid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_498.c` |  |
@@ -653,10 +653,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getutxid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_507.c` |  |
 | `interface.getutxline` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_508.c` |  |
 | `interface.getw` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
-| `interface.getwc` | interface | fail | `profile` | profile status missing |
-| `interface.getwc_unlocked` | interface | fail | `profile` | profile status missing |
-| `interface.getwchar` | interface | fail | `profile` | profile status missing |
-| `interface.getwchar_unlocked` | interface | fail | `profile` | profile status missing |
+| `interface.getwc` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.getwc_unlocked` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.getwchar` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.getwchar_unlocked` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.glob` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_514.c` |  |
 | `interface.globfree` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_515.c` |  |
 | `interface.gmtime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_516.c` |  |
@@ -671,7 +671,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.htons` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_525.c` |  |
 | `interface.hypot` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_526.c` |  |
 | `interface.hypotf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_527.c` |  |
-| `interface.hypotfNx` | interface | fail | `profile` | profile status missing |
+| `interface.hypotfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.hypotl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.iconv` | interface | fail | `profile` | profile status missing |
 | `interface.iconv_close` | interface | fail | `profile` | profile status missing |
@@ -778,7 +778,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.lcong48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_632.c` |  |
 | `interface.ldexp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_633.c` |  |
 | `interface.ldexpf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_634.c` |  |
-| `interface.ldexpfNx` | interface | fail | `profile` | profile status missing |
+| `interface.ldexpfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.ldexpl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ldiv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_637.c` |  |
 | `interface.lgamma` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_638.c` |  |
@@ -795,14 +795,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.llabs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_649.c` |  |
 | `interface.lldiv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_650.c` |  |
 | `interface.llogb` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.llogbfNx` | interface | fail | `profile` | profile status missing |
+| `interface.llogbfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.llrint` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.llrintf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.llrintfNx` | interface | fail | `profile` | profile status missing |
+| `interface.llrintfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.llrintl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.llround` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.llroundf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.llroundfNx` | interface | fail | `profile` | profile status missing |
+| `interface.llroundfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.llroundl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.localeconv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_661.c` |  |
 | `interface.localtime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_662.c` |  |
@@ -810,7 +810,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.log` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_664.c` |  |
 | `interface.log10` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_665.c` |  |
 | `interface.log10f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_666.c` |  |
-| `interface.log10fNx` | interface | fail | `profile` | profile status missing |
+| `interface.log10fNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.log10l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.log10p1` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.log1p` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_670.c` |  |
@@ -818,26 +818,26 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.log1pl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.log2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_673.c` |  |
 | `interface.log2f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_674.c` |  |
-| `interface.log2fNx` | interface | fail | `profile` | profile status missing |
+| `interface.log2fNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.log2l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.log2p1` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.logb` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.logbf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.logbfNx` | interface | fail | `profile` | profile status missing |
+| `interface.logbfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.logbl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.logf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_682.c` |  |
-| `interface.logfNx` | interface | fail | `profile` | profile status missing |
+| `interface.logfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.logl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.logp1fNx` | interface | fail | `profile` | profile status missing |
+| `interface.logp1fNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.longjmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_686.c` |  |
 | `interface.lrand48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_687.c` |  |
 | `interface.lrint` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.lrintf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.lrintfNx` | interface | fail | `profile` | profile status missing |
+| `interface.lrintfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.lrintl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.lround` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.lroundf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.lroundfNx` | interface | fail | `profile` | profile status missing |
+| `interface.lroundfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.lroundl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.lseek` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_696.c` |  |
 | `interface.lseek64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_697.c` | declaration did not compile |
@@ -853,8 +853,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.mbrtoc8` | interface | fail | `profile` | profile status missing |
 | `interface.mbrtowc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_708.c` |  |
 | `interface.mbsinit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_709.c` |  |
-| `interface.mbsnrtowcs` | interface | fail | `profile` | profile status missing |
-| `interface.mbsrtowcs` | interface | fail | `profile` | profile status missing |
+| `interface.mbsnrtowcs` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.mbsrtowcs` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.mbstowcs` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.mbtowc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_713.c` |  |
 | `interface.memchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_714.c` |  |
@@ -872,7 +872,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.mkfifoat` | interface | fail | `profile` | profile status missing |
 | `interface.mknod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_727.c` |  |
 | `interface.mknodat` | interface | fail | `profile` | profile status missing |
-| `interface.mkstemp` | interface | fail | `profile` | profile status missing |
+| `interface.mkstemp` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.mktime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_730.c` |  |
 | `interface.mlock` | interface | fail | `profile` | profile status missing |
 | `interface.mlock2` | interface | fail | `profile` | profile status missing |
@@ -880,7 +880,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.mmap` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_734.c` |  |
 | `interface.modf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_735.c` |  |
 | `interface.modff` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_736.c` |  |
-| `interface.modffNx` | interface | fail | `profile` | profile status missing |
+| `interface.modffNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.modfl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.mprotect` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_739.c` |  |
 | `interface.mq_close` | interface | fail | `profile` | profile status missing |
@@ -911,23 +911,23 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.name_to_handle_at` | interface | fail | `profile` | profile status missing |
 | `interface.nan` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nanf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.nanfNx` | interface | fail | `profile` | profile status missing |
+| `interface.nanfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.nanl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nanosleep` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_770.c` |  |
 | `interface.nearbyint` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nearbyintf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.nearbyintfNx` | interface | fail | `profile` | profile status missing |
+| `interface.nearbyintfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.nearbyintl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.newlocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_775.c` |  |
 | `interface.nextafter` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nextafterf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.nextafterfNx` | interface | fail | `profile` | profile status missing |
+| `interface.nextafterfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.nextafterl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.nextdownfNx` | interface | fail | `profile` | profile status missing |
+| `interface.nextdownfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.nexttoward` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nexttowardf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nexttowardl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.nextupfNx` | interface | fail | `profile` | profile status missing |
+| `interface.nextupfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.nftw` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_785.c` |  |
 | `interface.nftw64` | interface | fail | `profile` | profile status missing |
 | `interface.ngettext` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_787.c` |  |
@@ -939,18 +939,18 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.open` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_793.c` |  |
 | `interface.open64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_794.c` | declaration did not compile |
 | `interface.open_by_handle_at` | interface | fail | `profile` | profile status missing |
-| `interface.open_wmemstream` | interface | fail | `profile` | profile status missing |
+| `interface.open_wmemstream` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.openat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_797.c` |  |
 | `interface.opendir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_798.c` |  |
 | `interface.openlog` | interface | fail | `profile` | profile status missing |
 | `interface.pathconf` | interface | fail | `profile` | profile status missing |
 | `interface.pause` | interface | fail | `profile` | profile status missing |
-| `interface.pclose` | interface | fail | `profile` | profile status missing |
+| `interface.pclose` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.perror` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_803.c` |  |
 | `interface.pipe` | interface | fail | `profile` | profile status missing |
 | `interface.pipe2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_805.c` |  |
 | `interface.poll` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_806.c` |  |
-| `interface.popen` | interface | fail | `profile` | profile status missing |
+| `interface.popen` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.posix_close` | interface | fail | `profile` | profile status missing |
 | `interface.posix_fadvise` | interface | fail | `profile` | profile status missing |
 | `interface.posix_fallocate` | interface | fail | `profile` | profile status missing |
@@ -982,7 +982,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.pow10f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_836.c` | declaration did not compile |
 | `interface.pow10l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.powf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_838.c` |  |
-| `interface.powfNx` | interface | fail | `profile` | profile status missing |
+| `interface.powfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.powl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.pown` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.powr` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
@@ -1112,16 +1112,16 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.puts` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_966.c` |  |
 | `interface.pututxline` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_967.c` |  |
 | `interface.putw` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
-| `interface.putwc` | interface | fail | `profile` | profile status missing |
-| `interface.putwc_unlocked` | interface | fail | `profile` | profile status missing |
-| `interface.putwchar` | interface | fail | `profile` | profile status missing |
-| `interface.putwchar_unlocked` | interface | fail | `profile` | profile status missing |
+| `interface.putwc` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.putwc_unlocked` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.putwchar` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.putwchar_unlocked` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.pwrite` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_973.c` |  |
 | `interface.pwrite64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_974.c` | declaration did not compile |
 | `interface.pwritev` | interface | fail | `profile` | profile status missing |
 | `interface.pwritev2` | interface | fail | `profile` | profile status missing |
 | `interface.qsort` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_977.c` |  |
-| `interface.quick_exit` | interface | fail | `profile` | profile status missing |
+| `interface.quick_exit` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.raise` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_979.c` |  |
 | `interface.rand` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_980.c` |  |
 | `interface.rand_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_981.c` |  |
@@ -1148,7 +1148,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.regnsub` | interface | fail | `profile` | profile status missing |
 | `interface.remainder` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.remainderf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.remainderfNx` | interface | fail | `profile` | profile status missing |
+| `interface.remainderfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.remainderl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.remove` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1007.c` |  |
 | `interface.remque` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1008.c` |  |
@@ -1157,19 +1157,19 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.remquol` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.rename` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1012.c` |  |
 | `interface.renameat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1013.c` |  |
-| `interface.renameat2` | interface | fail | `profile` | profile status missing |
+| `interface.renameat2` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.rewind` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1015.c` |  |
 | `interface.rewinddir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1016.c` |  |
 | `interface.rint` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1017.c` |  |
 | `interface.rintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1018.c` |  |
-| `interface.rintfNx` | interface | fail | `profile` | profile status missing |
+| `interface.rintfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.rintl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.rmdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1021.c` |  |
 | `interface.rootn` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.round` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1023.c` |  |
-| `interface.roundevenfNx` | interface | fail | `profile` | profile status missing |
+| `interface.roundevenfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.roundf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1025.c` |  |
-| `interface.roundfNx` | interface | fail | `profile` | profile status missing |
+| `interface.roundfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.roundl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.scalb` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1028.c` | declaration did not compile |
 | `interface.scalbf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1029.c` | declaration did not compile |
@@ -1232,8 +1232,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.setlogmask` | interface | fail | `profile` | profile status missing |
 | `interface.setnetent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1087.c` |  |
 | `interface.setpassent` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1088.c` | declaration did not compile |
-| `interface.setpayloadfNx` | interface | fail | `profile` | profile status missing |
-| `interface.setpayloadsigfNx` | interface | fail | `profile` | profile status missing |
+| `interface.setpayloadfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
+| `interface.setpayloadsigfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.setpgid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1091.c` |  |
 | `interface.setpgrp` | interface | fail | `profile` | profile status missing |
 | `interface.setpriority` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1093.c` |  |
@@ -1292,10 +1292,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sincosf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1146.c` | declaration did not compile |
 | `interface.sincosl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.sinf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1148.c` |  |
-| `interface.sinfNx` | interface | fail | `profile` | profile status missing |
+| `interface.sinfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.sinh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1150.c` |  |
 | `interface.sinhf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1151.c` |  |
-| `interface.sinhfNx` | interface | fail | `profile` | profile status missing |
+| `interface.sinhfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.sinhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.sinl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.sinpi` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1155.c` |  |
@@ -1308,7 +1308,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1162.c` |  |
 | `interface.sqrt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1163.c` |  |
 | `interface.sqrtf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1164.c` |  |
-| `interface.sqrtfNx` | interface | fail | `profile` | profile status missing |
+| `interface.sqrtfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.sqrtl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.srand` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1167.c` |  |
 | `interface.srand48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1168.c` |  |
@@ -1316,7 +1316,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sscanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1170.c` |  |
 | `interface.stat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1171.c` |  |
 | `interface.stat64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1172.c` | declaration did not compile |
-| `interface.statvfs` | interface | fail | `profile` | profile status missing |
+| `interface.statvfs` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.statx` | interface | fail | `profile` | profile status missing |
 | `interface.stime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.strcasecmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1176.c` |  |
@@ -1357,7 +1357,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.strtok` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1211.c` |  |
 | `interface.strtok_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1212.c` |  |
 | `interface.strtol` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1213.c` |  |
-| `interface.strtold` | interface | fail | `profile` | profile status missing |
+| `interface.strtold` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.strtoll` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1215.c` |  |
 | `interface.strtonum` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1216.c` | declaration did not compile |
 | `interface.strtoul` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1217.c` |  |
@@ -1366,8 +1366,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.strxfrm` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
 | `interface.strxfrm_l` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
 | `interface.swab` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1222.c` |  |
-| `interface.swprintf` | interface | fail | `profile` | profile status missing |
-| `interface.swscanf` | interface | fail | `profile` | profile status missing |
+| `interface.swprintf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.swscanf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.symlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1225.c` |  |
 | `interface.symlinkat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1226.c` |  |
 | `interface.sync` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1227.c` |  |
@@ -1379,10 +1379,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.system` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1233.c` |  |
 | `interface.tan` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1234.c` |  |
 | `interface.tanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1235.c` |  |
-| `interface.tanfNx` | interface | fail | `profile` | profile status missing |
+| `interface.tanfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.tanh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1237.c` |  |
 | `interface.tanhf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1238.c` |  |
-| `interface.tanhfNx` | interface | fail | `profile` | profile status missing |
+| `interface.tanhfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.tanhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.tanl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.tanpi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
@@ -1413,17 +1413,17 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.thrd_yield` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1267.c` |  |
 | `interface.time` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1268.c` |  |
 | `interface.timegm` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1269.c` | declaration did not compile |
-| `interface.timer_create` | interface | fail | `profile` | profile status missing |
-| `interface.timer_delete` | interface | fail | `profile` | profile status missing |
-| `interface.timer_getoverrun` | interface | fail | `profile` | profile status missing |
-| `interface.timer_gettime` | interface | fail | `profile` | profile status missing |
-| `interface.timer_settime` | interface | fail | `profile` | profile status missing |
+| `interface.timer_create` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
+| `interface.timer_delete` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
+| `interface.timer_getoverrun` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
+| `interface.timer_gettime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
+| `interface.timer_settime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.times` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1275.c` |  |
 | `interface.timespec_get` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.timespec_getres` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
-| `interface.tmpfile` | interface | fail | `profile` | profile status missing |
-| `interface.tmpfile64` | interface | fail | `profile` | profile status missing |
-| `interface.tmpnam` | interface | fail | `profile` | profile status missing |
+| `interface.tmpfile` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
+| `interface.tmpfile64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
+| `interface.tmpnam` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.toascii` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1281.c` |  |
 | `interface.tolower` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1282.c` |  |
 | `interface.tolower_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1283.c` |  |
@@ -1439,7 +1439,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.truncate` | interface | fail | `profile` | profile status missing |
 | `interface.truncate64` | interface | fail | `profile` | profile status missing |
 | `interface.truncf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1295.c` |  |
-| `interface.truncfNx` | interface | fail | `profile` | profile status missing |
+| `interface.truncfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.truncl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.tss_create` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1298.c` |  |
 | `interface.tss_delete` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1299.c` |  |
@@ -1452,13 +1452,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ualarm` | interface | fail | `profile` | profile status missing |
 | `interface.ufromfp` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ufromfpx` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.ufromfpxfNx` | interface | fail | `profile` | profile status missing |
+| `interface.ufromfpxfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.ulimit` | interface | fail | `profile` | profile status missing |
 | `interface.umask` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1311.c` |  |
 | `interface.umaxabs` | interface | fail | `profile` | profile status missing |
 | `interface.uname` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1313.c` |  |
 | `interface.ungetc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1314.c` |  |
-| `interface.ungetwc` | interface | fail | `profile` | profile status missing |
+| `interface.ungetwc` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.unlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1316.c` |  |
 | `interface.unlinkat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1317.c` |  |
 | `interface.unlockpt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1318.c` |  |
@@ -1474,26 +1474,26 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.va_copy` | interface | fail | `profile` | profile status missing |
 | `interface.va_end` | interface | fail | `profile` | profile status missing |
 | `interface.va_start` | interface | fail | `profile` | profile status missing |
-| `interface.vdprintf` | interface | fail | `profile` | profile status missing |
+| `interface.vdprintf` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.versionsort` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1332.c` | declaration did not compile |
 | `interface.vfork` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1333.c` | declaration did not compile |
 | `interface.vfprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1334.c` |  |
 | `interface.vfscanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1335.c` |  |
-| `interface.vfwprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1336.c` |  |
-| `interface.vfwscanf` | interface | fail | `profile` | profile status missing |
+| `interface.vfwprintf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.vfwscanf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.vhangup` | interface | fail | `profile` | profile status missing |
 | `interface.vmsplice` | interface | fail | `profile` | profile status missing |
 | `interface.vprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1340.c` |  |
 | `interface.vscanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1341.c` |  |
 | `interface.vsnprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1342.c` |  |
-| `interface.vsnprintf_l` | interface | fail | `profile` | profile status missing |
+| `interface.vsnprintf_l` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.vsprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1344.c` |  |
 | `interface.vsscanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1345.c` |  |
-| `interface.vswprintf` | interface | fail | `profile` | profile status missing |
-| `interface.vswscanf` | interface | fail | `profile` | profile status missing |
+| `interface.vswprintf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.vswscanf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.vsyslog` | interface | fail | `profile` | profile status missing |
-| `interface.vwprintf` | interface | fail | `profile` | profile status missing |
-| `interface.vwscanf` | interface | fail | `profile` | profile status missing |
+| `interface.vwprintf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.vwscanf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wait` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1351.c` |  |
 | `interface.wait3` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1352.c` | declaration did not compile |
 | `interface.wait4` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1353.c` | declaration did not compile |
@@ -1520,24 +1520,24 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.wcsncmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1374.c` |  |
 | `interface.wcsncpy` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1375.c` |  |
 | `interface.wcsnlen` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
-| `interface.wcsnrtombs` | interface | fail | `profile` | profile status missing |
+| `interface.wcsnrtombs` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcspbrk` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1378.c` |  |
 | `interface.wcsrchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1379.c` |  |
-| `interface.wcsrtombs` | interface | fail | `profile` | profile status missing |
+| `interface.wcsrtombs` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcsspn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1381.c` |  |
 | `interface.wcsstr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1382.c` |  |
-| `interface.wcstod` | interface | fail | `profile` | profile status missing |
-| `interface.wcstof` | interface | fail | `profile` | profile status missing |
-| `interface.wcstofNx` | interface | fail | `profile` | profile status missing |
-| `interface.wcstoimax` | interface | fail | `profile` | profile status missing |
+| `interface.wcstod` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.wcstof` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.wcstofNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
+| `interface.wcstoimax` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcstok` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
-| `interface.wcstol` | interface | fail | `profile` | profile status missing |
-| `interface.wcstold` | interface | fail | `profile` | profile status missing |
-| `interface.wcstoll` | interface | fail | `profile` | profile status missing |
+| `interface.wcstol` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.wcstold` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.wcstoll` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcstombs` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
-| `interface.wcstoul` | interface | fail | `profile` | profile status missing |
-| `interface.wcstoull` | interface | fail | `profile` | profile status missing |
-| `interface.wcstoumax` | interface | fail | `profile` | profile status missing |
+| `interface.wcstoul` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.wcstoull` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.wcstoumax` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcswidth` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1395.c` |  |
 | `interface.wcsxfrm` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcsxfrm_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
@@ -1555,10 +1555,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.wmemset` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1409.c` |  |
 | `interface.wordexp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1410.c` |  |
 | `interface.wordfree` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1411.c` |  |
-| `interface.wprintf` | interface | fail | `profile` | profile status missing |
+| `interface.wprintf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.write` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1413.c` |  |
 | `interface.writev` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1414.c` |  |
-| `interface.wscanf` | interface | fail | `profile` | profile status missing |
+| `interface.wscanf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.y0` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1416.c` |  |
 | `interface.y0f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1417.c` | declaration did not compile |
 | `interface.y1` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1418.c` |  |
@@ -1609,10 +1609,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `shell.trap` | shell | pass | `waiver` | owner waiver: P4a: EXIT traps pass; signal traps need PG-7 signal delivery |
 | `shell.umask` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `target.libc-dynamic` | target | skip | `cargo xtask qtest --case libc-dynamic --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-dynamic --arch x86_64` |
-| `target.libc-hello` | target | skip | `cargo xtask qtest --case libc-hello --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-hello --arch x86_64` |
-| `target.libc-signals` | target | skip | `cargo xtask qtest --case libc-signals --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-signals --arch x86_64` |
-| `target.libc-spawn` | target | skip | `cargo xtask qtest --case libc-spawn --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-spawn --arch x86_64` |
-| `target.libc-stdio` | target | skip | `cargo xtask qtest --case libc-stdio --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-stdio --arch x86_64` |
+| `target.libc-hello` | target | fail | `cargo xtask qtest --case libc-hello --arch x86_64` | qtest: exit status 35; expected success; unmatched expectations: ^libc-hello: string ok$, ^init exited \(0\)$; 2 forbidden line(s) matched |
+| `target.libc-signals` | target | pass | `cargo xtask qtest --case libc-signals --arch x86_64` |  |
+| `target.libc-spawn` | target | pass | `cargo xtask qtest --case libc-spawn --arch x86_64` |  |
+| `target.libc-stdio` | target | fail | `cargo xtask qtest --case libc-stdio --arch x86_64` | qtest: exit status 35; expected success; unmatched expectations: ^libc-stdio: scanf ok$, ^libc-stdio: file ok$, ^libc-stdio: initfs read ok$, ^libc-stdio: buffer ok$, ^libc-stdio: std streams ok$, ^libc-stdio: memstream ok$, ^libc-stdio: wide ok$, ^libc-stdio: getline ok$, ^libc-stdio: done$, ^init exited \(0\)$ |
 | `target.libc-threads` | target | skip | `cargo xtask qtest --case libc-threads --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-threads --arch x86_64` |
 | `target.libc-time` | target | skip | `cargo xtask qtest --case libc-time --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-time --arch x86_64` |
 | `tty.canonical` | tty | pass | `qtest:pty-session` |  |
@@ -1628,10 +1628,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `tty.termios` | tty | pass | `waiver` | owner waiver: P3: the existing ravenlibc platform wrapper has host tests over GET_MODE/SET_MODE/FLUSH, but no target libc termios case covers the speed/flag fields; pty-session exercises the protocol only. Kept waived rather than claiming a false pass |
 | `tty.ttyname` | tty | pass | `waiver` | owner waiver: P3: isatty/ttyname wrappers exist but there is no target pty identity case; P3 keeps the row honest instead of claiming the libc path |
 | `util.admin` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.alias` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.alias` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.ar` | utility | pass | `test:tests/posix/utility/archive/ar/test.sh` |  |
 | `util.arch` | utility | pass | `test:tests/posix/utility/misc/arch/test.sh` |  |
-| `util.asa` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.asa` | utility | pass | `test:tests/posix/utility/simple/asa/test.sh` |  |
 | `util.at` | utility | pass | `test:tests/posix/utility/at/test.sh` |  |
 | `util.awk` | utility | pass | `test:tests/posix/utility/text2/awk/test.sh` |  |
 | `util.b2sum` | utility | pass | `test:tests/posix/utility/misc/b2sum/test.sh` |  |
@@ -1641,13 +1641,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.basenc` | utility | pass | `test:tests/posix/utility/misc/basenc/test.sh` |  |
 | `util.batch` | utility | pass | `test:tests/posix/utility/at/test.sh` |  |
 | `util.bc` | utility | pass | `test:tests/posix/utility/bc/test.sh` |  |
-| `util.bg` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.break` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.bg` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; asynchronous lists and $! are not implemented |
+| `util.break` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.c17` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.c99` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.cal` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.cal` | utility | pass | `test:tests/posix/utility/simple/cal/test.sh` |  |
 | `util.cat` | utility | pass | `test:tests/posix/utility/file/cat/test.sh` |  |
-| `util.cd` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.cd` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.cflow` | utility | pass | `test:tests/posix/utility/devtools/test.sh` |  |
 | `util.chgrp` | utility | pass | `test:tests/posix/utility/file/chgrp/test.sh` |  |
 | `util.chmod` | utility | pass | `test:tests/posix/utility/file/chmod/test.sh` |  |
@@ -1656,9 +1656,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.cmp` | utility | pass | `test:tests/posix/utility/text2/cmp/test.sh` |  |
 | `util.cod` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.comm` | utility | pass | `test:tests/posix/utility/text/comm/test.sh` |  |
-| `util.command` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.command` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.compress` | utility | pass | `test:tests/posix/utility/compress/compress/test.sh` |  |
-| `util.continue` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.continue` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.cp` | utility | pass | `test:tests/posix/utility/file/cp/test.sh` |  |
 | `util.crontab` | utility | pass | `test:tests/posix/utility/crontab/test.sh` |  |
 | `util.csplit` | utility | pass | `test:tests/posix/utility/text/csplit/test.sh` |  |
@@ -1672,22 +1672,22 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.diff` | utility | pass | `test:tests/posix/utility/text2/diff/test.sh` |  |
 | `util.dircolors` | utility | pass | `test:tests/posix/utility/misc/dircolors/test.sh` |  |
 | `util.dirname` | utility | pass | `test:tests/posix/utility/text/dirname/test.sh` |  |
-| `util.dot` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.dot` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.du` | utility | pass | `test:tests/posix/utility/file/du/test.sh` |  |
 | `util.echo` | utility | pass | `test:tests/posix/utility/misc2/echo/test.sh` |  |
 | `util.ed` | utility | pass | `test:tests/posix/utility/ed/ed/test.sh` |  |
-| `util.env` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
-| `util.eval` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.env` | utility | pass | `qtest:posix-util-system` |  |
+| `util.eval` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.ex` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.exec` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.exit` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.exec` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
+| `util.exit` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.expand` | utility | pass | `test:tests/posix/utility/text/expand/test.sh` |  |
-| `util.export` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.export` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.expr` | utility | pass | `test:tests/posix/utility/text/expr/test.sh` |  |
 | `util.factor` | utility | pass | `test:tests/posix/utility/misc/factor/test.sh` |  |
 | `util.false` | utility | pass | `test:tests/posix/utility/misc/false/test.sh` |  |
-| `util.fc` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.fg` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.fc` | utility | pass | `waiver` | owner waiver: P45: interactive history editing is outside the non-interactive posix-shell qtest (P9c login) |
+| `util.fg` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; no foreground/background job model |
 | `util.file` | utility | pass | `test:tests/posix/utility/file/file/test.sh` |  |
 | `util.find` | utility | pass | `test:tests/posix/utility/file/find/test.sh` |  |
 | `util.fmt` | utility | pass | `test:tests/posix/utility/misc/fmt/test.sh` |  |
@@ -1695,37 +1695,37 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.fort77` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.gencat` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
 | `util.get` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.getconf` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
-| `util.getopts` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.getconf` | utility | pass | `qtest:posix-util-system` |  |
+| `util.getopts` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.grep` | utility | pass | `test:tests/posix/utility/text2/grep/test.sh` |  |
 | `util.groups` | utility | pass | `test:tests/posix/utility/misc/groups/test.sh` |  |
-| `util.hash` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.hash` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.head` | utility | pass | `test:tests/posix/utility/text/head/test.sh` |  |
 | `util.hostid` | utility | pass | `test:tests/posix/utility/misc/hostid/test.sh` |  |
 | `util.iconv` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
-| `util.id` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.id` | utility | pass | `qtest:posix-util-system` |  |
 | `util.install` | utility | pass | `test:tests/posix/utility/misc/install/test.sh` |  |
 | `util.ipcrm` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ipcs` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.jobs` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.jobs` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; no job table or asynchronous list |
 | `util.join` | utility | pass | `test:tests/posix/utility/text/join/test.sh` |  |
-| `util.kill` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.kill` | utility | pass | `qtest:posix-util-system` |  |
 | `util.lex` | utility | pass | `test:tests/posix/utility/parsers/lex/test.sh` |  |
 | `util.link` | utility | pass | `test:tests/posix/utility/file/link/test.sh` |  |
 | `util.ln` | utility | pass | `test:tests/posix/utility/file/ln/test.sh` |  |
 | `util.locale` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
 | `util.localedef` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.logger` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.logger` | utility | pass | `qtest:posix-util-system` |  |
 | `util.logname` | utility | pass | `test:tests/posix/utility/misc/logname/test.sh` |  |
 | `util.lp` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ls` | utility | pass | `test:tests/posix/utility/file/ls/test.sh` |  |
 | `util.m4` | utility | pass | `test:tests/posix/utility/m4/test.sh` |  |
-| `util.mail` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.mailx` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.mail` | utility | pass | `test:tests/posix/utility/mail/mail/test.sh` |  |
+| `util.mailx` | utility | pass | `test:tests/posix/utility/mail/mailx/test.sh` |  |
 | `util.make` | utility | pass | `test:tests/posix/utility/make/test.sh` |  |
 | `util.man` | utility | pass | `test:tests/posix/utility/misc2/man/test.sh` |  |
 | `util.md5sum` | utility | pass | `test:tests/posix/utility/misc/md5sum/test.sh` |  |
-| `util.mesg` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.mesg` | utility | pass | `qtest:posix-util-system` |  |
 | `util.mkdir` | utility | pass | `test:tests/posix/utility/file/mkdir/test.sh` |  |
 | `util.mkfifo` | utility | pass | `test:tests/posix/utility/file/mkfifo/test.sh` |  |
 | `util.mknod` | utility | pass | `test:tests/posix/utility/file/mknod/test.sh` |  |
@@ -1734,10 +1734,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.mv` | utility | pass | `test:tests/posix/utility/file/mv/test.sh` |  |
 | `util.neqn` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.newgrp` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.nice` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.nice` | utility | pass | `qtest:posix-util-system` |  |
 | `util.nl` | utility | pass | `test:tests/posix/utility/text/nl/test.sh` |  |
 | `util.nm` | utility | pass | `test:tests/posix/utility/binutils/nm/test.sh` |  |
-| `util.nohup` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.nohup` | utility | pass | `qtest:posix-util-system` |  |
 | `util.nproc` | utility | pass | `test:tests/posix/utility/misc/nproc/test.sh` |  |
 | `util.numfmt` | utility | pass | `test:tests/posix/utility/misc/numfmt/test.sh` |  |
 | `util.od` | utility | pass | `test:tests/posix/utility/text/od/test.sh` |  |
@@ -1750,7 +1750,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.printenv` | utility | pass | `test:tests/posix/utility/misc/printenv/test.sh` |  |
 | `util.printf` | utility | pass | `test:tests/posix/utility/text/printf/test.sh` |  |
 | `util.prs` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.ps` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.ps` | utility | pass | `qtest:posix-util-system` |  |
 | `util.ptx` | utility | pass | `test:tests/posix/utility/misc/ptx/test.sh` |  |
 | `util.pwd` | utility | pass | `test:tests/posix/utility/file/pwd/test.sh` |  |
 | `util.qalter` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1764,12 +1764,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.qsig` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.qstat` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.qsub` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.read` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.read` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.readlink` | utility | pass | `test:tests/posix/utility/file/readlink/test.sh` |  |
-| `util.readonly` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.readonly` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.realpath` | utility | pass | `test:tests/posix/utility/file/realpath/test.sh` |  |
-| `util.renice` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
-| `util.return` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.renice` | utility | pass | `qtest:posix-util-system` |  |
+| `util.return` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.rm` | utility | pass | `test:tests/posix/utility/file/rm/test.sh` |  |
 | `util.rmdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.rmdir` | utility | pass | `test:tests/posix/utility/file/rmdir/test.sh` |  |
@@ -1777,14 +1777,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.sccs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.sed` | utility | pass | `test:tests/posix/utility/text2/sed/test.sh` |  |
 | `util.seq` | utility | pass | `test:tests/posix/utility/misc/seq/test.sh` |  |
-| `util.set` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.set` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.sh` | utility | fail | `userland/bin/rsh` | profile status partial; no POSIX utility test |
 | `util.sha1sum` | utility | pass | `test:tests/posix/utility/misc/sha1sum/test.sh` |  |
 | `util.sha224sum` | utility | pass | `test:tests/posix/utility/misc/sha224sum/test.sh` |  |
 | `util.sha256sum` | utility | pass | `test:tests/posix/utility/misc/sha256sum/test.sh` |  |
 | `util.sha384sum` | utility | pass | `test:tests/posix/utility/misc/sha384sum/test.sh` |  |
 | `util.sha512sum` | utility | pass | `test:tests/posix/utility/misc/sha512sum/test.sh` |  |
-| `util.shift` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.shift` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.shred` | utility | pass | `test:tests/posix/utility/misc/shred/test.sh` |  |
 | `util.shuf` | utility | pass | `test:tests/posix/utility/misc/shuf/test.sh` |  |
 | `util.sleep` | utility | pass | `test:tests/posix/utility/misc/sleep/test.sh` |  |
@@ -1800,32 +1800,32 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.tabs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.tac` | utility | pass | `test:tests/posix/utility/misc/tac/test.sh` |  |
 | `util.tail` | utility | pass | `test:tests/posix/utility/text/tail/test.sh` |  |
-| `util.talk` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.talk` | utility | pass | `test:tests/posix/utility/talk/test.sh` |  |
 | `util.tar` | utility | pass | `test:tests/posix/utility/archive/tar/test.sh` |  |
 | `util.tee` | utility | pass | `test:tests/posix/utility/text/tee/test.sh` |  |
-| `util.test` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.test` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.time` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.timeout` | utility | pass | `test:tests/posix/utility/misc/timeout/test.sh` |  |
 | `util.times` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.touch` | utility | pass | `test:tests/posix/utility/file/touch/test.sh` |  |
 | `util.tput` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.tr` | utility | pass | `test:tests/posix/utility/text/tr/test.sh` |  |
-| `util.trap` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.trap` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.true` | utility | pass | `test:tests/posix/utility/misc/true/test.sh` |  |
 | `util.truncate` | utility | pass | `test:tests/posix/utility/misc/truncate/test.sh` |  |
 | `util.tsort` | utility | pass | `test:tests/posix/utility/text/tsort/test.sh` |  |
 | `util.tty` | utility | pass | `test:tests/posix/utility/system/tty/test.sh` |  |
-| `util.type` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.type` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.ulimit` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.umask` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.unalias` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.uname` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.umask` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
+| `util.unalias` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
+| `util.uname` | utility | pass | `qtest:posix-util-system` |  |
 | `util.uncompress` | utility | pass | `test:tests/posix/utility/compress/uncompress/test.sh` |  |
 | `util.unexpand` | utility | pass | `test:tests/posix/utility/text/unexpand/test.sh` |  |
 | `util.unget` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.uniq` | utility | pass | `test:tests/posix/utility/text/uniq/test.sh` |  |
 | `util.unlink` | utility | pass | `test:tests/posix/utility/file/unlink/test.sh` |  |
-| `util.unset` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.unset` | utility | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `util.uptime` | utility | pass | `test:tests/posix/utility/misc/uptime/test.sh` |  |
 | `util.users` | utility | pass | `test:tests/posix/utility/misc/users/test.sh` |  |
 | `util.uucp` | utility | pass | `test:tests/posix/utility/uucp/uucp/test.sh` |  |
@@ -1835,7 +1835,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.uux` | utility | pass | `test:tests/posix/utility/uucp/uux/test.sh` |  |
 | `util.val` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.vi` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.wait` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.wait` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; no asynchronous child/job table |
 | `util.wc` | utility | pass | `test:tests/posix/utility/text/wc/test.sh` |  |
 | `util.what` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.who` | utility | pass | `test:tests/posix/utility/misc/who/test.sh` |  |

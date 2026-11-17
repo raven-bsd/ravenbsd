@@ -5456,7 +5456,7 @@ evidence = "none"
 id = "interface.pclose"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
 
 [[trace]]
 id = "interface.perror"
@@ -5486,7 +5486,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.popen"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
 
 [[trace]]
 id = "interface.posix_close"
@@ -9506,7 +9506,7 @@ evidence = "none"
 id = "util.alias"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.ar"
@@ -9524,7 +9524,7 @@ evidence = "test:tests/posix/utility/misc/arch/test.sh"
 id = "util.asa"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/simple/asa/test.sh"
 
 [[trace]]
 id = "util.at"
@@ -9590,7 +9590,7 @@ evidence = "none"
 id = "util.break"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.c17"
@@ -9608,7 +9608,7 @@ evidence = "none"
 id = "util.cal"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/simple/cal/test.sh"
 
 [[trace]]
 id = "util.cat"
@@ -9620,7 +9620,7 @@ evidence = "test:tests/posix/utility/file/cat/test.sh"
 id = "util.cd"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.cflow"
@@ -9674,7 +9674,7 @@ evidence = "test:tests/posix/utility/text/comm/test.sh"
 id = "util.command"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.compress"
@@ -9686,7 +9686,7 @@ evidence = "test:tests/posix/utility/compress/compress/test.sh"
 id = "util.continue"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.cp"
@@ -9770,7 +9770,7 @@ evidence = "test:tests/posix/utility/text/dirname/test.sh"
 id = "util.dot"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.du"
@@ -9800,7 +9800,7 @@ evidence = "qtest:posix-util-system"
 id = "util.eval"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.ex"
@@ -9812,13 +9812,13 @@ evidence = "none"
 id = "util.exec"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.exit"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.expand"
@@ -9830,7 +9830,7 @@ evidence = "test:tests/posix/utility/text/expand/test.sh"
 id = "util.export"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.expr"
@@ -9896,7 +9896,7 @@ evidence = "none"
 id = "util.gencat"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/locale/test.sh"
 
 [[trace]]
 id = "util.get"
@@ -9914,7 +9914,7 @@ evidence = "qtest:posix-util-system"
 id = "util.getopts"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.grep"
@@ -9932,7 +9932,7 @@ evidence = "test:tests/posix/utility/misc/groups/test.sh"
 id = "util.hash"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.head"
@@ -9950,7 +9950,7 @@ evidence = "test:tests/posix/utility/misc/hostid/test.sh"
 id = "util.iconv"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/locale/test.sh"
 
 [[trace]]
 id = "util.id"
@@ -10016,7 +10016,7 @@ evidence = "test:tests/posix/utility/file/ln/test.sh"
 id = "util.locale"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/locale/test.sh"
 
 [[trace]]
 id = "util.localedef"
@@ -10058,13 +10058,13 @@ evidence = "test:tests/posix/utility/m4/test.sh"
 id = "util.mail"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/mail/mail/test.sh"
 
 [[trace]]
 id = "util.mailx"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/mail/mailx/test.sh"
 
 [[trace]]
 id = "util.make"
@@ -10322,7 +10322,7 @@ evidence = "none"
 id = "util.read"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.readlink"
@@ -10334,7 +10334,7 @@ evidence = "test:tests/posix/utility/file/readlink/test.sh"
 id = "util.readonly"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.realpath"
@@ -10352,7 +10352,7 @@ evidence = "qtest:posix-util-system"
 id = "util.return"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.rm"
@@ -10400,7 +10400,7 @@ evidence = "test:tests/posix/utility/misc/seq/test.sh"
 id = "util.set"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.sh"
@@ -10442,7 +10442,7 @@ evidence = "test:tests/posix/utility/misc/sha512sum/test.sh"
 id = "util.shift"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.shred"
@@ -10538,7 +10538,7 @@ evidence = "test:tests/posix/utility/text/tail/test.sh"
 id = "util.talk"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/talk"
+evidence = "test:tests/posix/utility/talk/test.sh"
 
 [[trace]]
 id = "util.tar"
@@ -10556,7 +10556,7 @@ evidence = "test:tests/posix/utility/text/tee/test.sh"
 id = "util.test"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.time"
@@ -10598,7 +10598,7 @@ evidence = "test:tests/posix/utility/text/tr/test.sh"
 id = "util.trap"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.true"
@@ -10628,7 +10628,7 @@ evidence = "test:tests/posix/utility/system/tty/test.sh"
 id = "util.type"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.ulimit"
@@ -10640,13 +10640,13 @@ evidence = "none"
 id = "util.umask"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.unalias"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.uname"
@@ -10688,7 +10688,7 @@ evidence = "test:tests/posix/utility/file/unlink/test.sh"
 id = "util.unset"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "util.uptime"

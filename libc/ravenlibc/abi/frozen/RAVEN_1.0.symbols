@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1475
+# records: 1477
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -778,12 +778,14 @@ opterr D 4 all 0 unistd.h
 optind D 4 all 0 unistd.h
 optopt D 4 all 0 unistd.h
 optreset F - all 2 -
+pclose F - all 0 stdio.h
 perror F - all 0 stdio.h
 personality F - all 2 -
 pidfile F - x86_64 2 -
 pipe2 F - all 0 -
 pledge F - all 2 -
 poll F - all 1 -
+popen F - all 0 stdio.h
 port_alert F - all 2 -
 port_associate F - all 2 -
 port_create F - all 2 -
