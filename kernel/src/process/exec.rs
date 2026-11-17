@@ -31,8 +31,16 @@ use super::{AddressSpace, Process, ProcessError, ProcessState, UserAddressSpace}
 /// the caller's memory object.
 pub const MAX_EXEC_IMAGE: usize = 1024 * 1024;
 
-/// `ET_DYN`; dynamic executables and `PT_INTERP` are not loaded by this slice.
+/// `ET_EXEC`: a fixed-address executable.
+const ET_EXEC: u16 = 2;
+/// `ET_DYN`: a position-independent executable or shared object.
 const ET_DYN: u16 = 3;
+/// Load bias for an `ET_DYN` main image; matches `raven-spawn`'s `MAIN_PIE_BASE`.
+const MAIN_PIE_BASE: u64 = 0x0000_1000_0000_0000;
+/// Load bias for a `PT_INTERP` image; matches `raven-spawn`'s `INTERP_BASE`.
+const INTERP_BASE: u64 = 0x0000_2000_0000_0000;
+/// Largest `PT_INTERP` image read from the initfs for one exec.
+const MAX_INTERP_IMAGE: usize = 2 * 1024 * 1024;
 
 /// The user context a successful exec installs on syscall return.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,40 +78,76 @@ pub fn replace_image(
     }
     let thread = crate::sched::current_thread().ok_or(Errno::ESRCH)?;
 
-    let elf = Elf::parse(
-        image,
-        super::TARGET_MACHINE,
-        super::USER_MIN..super::USER_END,
-    )
-    .map_err(|_| Errno::ENOEXEC)?;
-    if elf.interp().is_some() {
-        return Err(Errno::ENOTSUP);
+    let kind = elf_type(image).ok_or(Errno::ENOEXEC)?;
+    let range = if kind == ET_DYN {
+        0..super::USER_END
+    } else {
+        super::USER_MIN..super::USER_END
+    };
+    let elf = Elf::parse(image, super::TARGET_MACHINE, range).map_err(|_| Errno::ENOEXEC)?;
+    let main_bias = match kind {
+        ET_EXEC => 0,
+        ET_DYN => MAIN_PIE_BASE,
+        _ => return Err(Errno::ENOEXEC),
+    };
+    let main_entry = elf.entry().checked_add(main_bias).ok_or(Errno::ENOEXEC)?;
+    let (interpreter, interpreter_data) = match elf.interp() {
+        Some(path) => {
+            if !path.starts_with('/') {
+                return Err(Errno::ENOEXEC);
+            }
+            let entry = crate::initfs::lookup(path).ok_or(Errno::ENOENT)?;
+            if entry.data.len() > MAX_INTERP_IMAGE {
+                return Err(Errno::EFBIG);
+            }
+            if elf_type(entry.data) != Some(ET_DYN) {
+                return Err(Errno::ENOEXEC);
+            }
+            let parsed = Elf::parse(entry.data, super::TARGET_MACHINE, 0..super::USER_END)
+                .map_err(|_| Errno::ENOEXEC)?;
+            if parsed.interp().is_some() {
+                return Err(Errno::ENOEXEC);
+            }
+            (Some(parsed), Some(entry.data))
+        }
+        None => (None, None),
+    };
+    let interpreter_bias = if interpreter.is_some() {
+        INTERP_BASE
+    } else {
+        0
+    };
+    let initial_entry = match &interpreter {
+        Some(interp) => interp
+            .entry()
+            .checked_add(interpreter_bias)
+            .ok_or(Errno::ENOEXEC)?,
+        None => main_entry,
+    };
+    let phdr = elf
+        .phdr_vaddr()
+        .and_then(|value| value.checked_add(main_bias));
+    if interpreter.is_some() && phdr.is_none() {
+        return Err(Errno::ENOEXEC);
     }
-    let dynamic = image
-        .get(16..18)
-        .and_then(|bytes| <[u8; 2]>::try_from(bytes).ok())
-        .map(u16::from_le_bytes)
-        == Some(ET_DYN);
-    if dynamic {
-        return Err(Errno::ENOTSUP);
-    }
-
+    let aux = super::StackAuxv {
+        phdr: phdr.unwrap_or(0),
+        base: interpreter_bias,
+        entry: main_entry,
+        phnum: elf.phnum() as u64,
+    };
     let ids = *caller.ids.lock();
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
     let mut new_space = UserAddressSpace::new(address_space);
-    super::load_segments(&mut new_space, &elf, image).map_err(process_errno)?;
+    if let (Some(interp), Some(data)) = (&interpreter, interpreter_data) {
+        super::load_segments(&mut new_space, interp, data, interpreter_bias)
+            .map_err(process_errno)?;
+    }
+    super::load_segments(&mut new_space, &elf, image, main_bias).map_err(process_errno)?;
     let argv_refs: Vec<&[u8]> = argv.iter().map(Vec::as_slice).collect();
     let envp_refs: Vec<&[u8]> = envp.iter().map(Vec::as_slice).collect();
-    let stack = super::build_stack(
-        &mut new_space,
-        path,
-        &argv_refs,
-        &envp_refs,
-        &ids,
-        elf.entry(),
-        &elf,
-    )
-    .map_err(process_errno)?;
+    let stack = super::build_stack(&mut new_space, path, &argv_refs, &envp_refs, &ids, aux)
+        .map_err(process_errno)?;
 
     // Collect the handle exits before the switch: the image and stack are now fully built, so a
     // close failure can no longer abort the exec.
@@ -157,10 +201,18 @@ pub fn replace_image(
     let command = super::command_from_argv(argv, path);
     *caller.command.lock() = command;
     caller.pending_exec.lock().replace(ExecContext {
-        entry: elf.entry(),
+        entry: initial_entry,
         stack,
     });
     Ok(())
+}
+
+/// Read `e_type` from an ELF64 header.
+fn elf_type(image: &[u8]) -> Option<u16> {
+    image
+        .get(16..18)
+        .and_then(|bytes| <[u8; 2]>::try_from(bytes).ok())
+        .map(u16::from_le_bytes)
 }
 
 /// Take the pending exec context for the current process, if any.

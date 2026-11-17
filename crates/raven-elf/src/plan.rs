@@ -183,7 +183,25 @@ pub fn plan_load<'a>(
     page: u64,
     mode: LoadMode,
 ) -> Result<impl Iterator<Item = MapStep> + 'a, ElfError> {
-    if page == 0 {
+    plan_load_biased(elf, page, 0, mode)
+}
+
+/// Plan the page mappings needed to load `elf` at `bias`.
+///
+/// This is [`plan_load`] with a load bias added to every segment address and entry. The crate's
+/// validation of the raw segment addresses has already run, so an `ET_DYN` image whose segments
+/// start at zero can be parsed with `0..USER_END` and then based at a non-zero address. `bias`
+/// must be a multiple of `page`; the biased range must stay inside the parse-time user range.
+///
+/// `ET_EXEC` callers use `bias == 0`; an `ET_DYN` main executable and its `PT_INTERP` image use
+/// one bias each.
+pub fn plan_load_biased<'a>(
+    elf: &'a Elf<'a>,
+    page: u64,
+    bias: u64,
+    mode: LoadMode,
+) -> Result<impl Iterator<Item = MapStep> + 'a, ElfError> {
+    if page == 0 || !bias.is_multiple_of(page) {
         return Err(ElfError::BadPhdr);
     }
     let user_range = elf.user_range();
@@ -195,13 +213,15 @@ pub fn plan_load<'a>(
         if segment.memsz == 0 {
             continue;
         }
-        let start = page_floor(segment.vaddr, page);
-        let file_end = segment
+        let biased_vaddr = segment
             .vaddr
+            .checked_add(bias)
+            .ok_or(ElfError::SegmentOutsideUserRange)?;
+        let start = page_floor(biased_vaddr, page);
+        let file_end = biased_vaddr
             .checked_add(segment.filesz)
             .ok_or(ElfError::SegmentOutsideUserRange)?;
-        let mem_end = segment
-            .vaddr
+        let mem_end = biased_vaddr
             .checked_add(segment.memsz)
             .ok_or(ElfError::SegmentOutsideUserRange)?;
         let end = page_ceil(mem_end, page).ok_or(ElfError::SegmentOutsideUserRange)?;
@@ -220,7 +240,7 @@ pub fn plan_load<'a>(
         let file_offset_base = if segment.filesz == 0 {
             segment.offset
         } else {
-            let delta = segment.vaddr.checked_sub(start).ok_or(ElfError::BadPhdr)?;
+            let delta = biased_vaddr.checked_sub(start).ok_or(ElfError::BadPhdr)?;
             segment.offset.checked_sub(delta).ok_or(ElfError::BadPhdr)?
         };
         if let Some(previous) = previous_end
@@ -268,3 +288,7 @@ fn page_ceil(value: u64, page: u64) -> Option<u64> {
         value.checked_add(page - remainder)
     }
 }
+
+#[cfg(test)]
+#[path = "plan_ut.rs"]
+mod tests;
