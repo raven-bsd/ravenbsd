@@ -484,6 +484,28 @@ the concrete change and the acceptance it must satisfy; none may raise an S/F or
 | C74z-S14 | P2 `%d` float-path duplication | Split an integer-only vformat path; `%d` must not link `float_layout::emit_inner` 1,772-2,695 and the float hook | -2k S on P2; `INV-S-P2-P0` closer | carl/C43 | P2 S shrink, fmt oracle, invariant re-eval |
 | C74z-S15 | P0 floor dtoa over-link | Trace `raven_libc_dtoa::dtoa` 4,906-9,235 in P0 and remove the reference chain from start/platform/locale | -5-9k S on every row | carl/C42 + mel/C48 + dave/C55 | P0 S shrink, dtoa oracle |
 
+### C74z-S14 result (OBSERVED, `265b996a`)
+
+The tiny profile (`raven-libc` feature `tiny` -> `raven-libc-fmt/tiny`) now compiles the float
+call out of `vformat`: `%f` emits the R-13 `*float*` stub and never references
+`float_layout::emit_inner`/the float hook. The float module stays in the archive but is
+unreferenced, so the other tiny probes keep their link set. The float/server build is unchanged
+(`float_layout` still emits real digits).
+
+| Probe | S before -> after | State |
+|---|---|---|
+| P2 x86_64 tiny | 95,195 -> 91,027 (**-4,168**) | FAIL -> PASS |
+| P2 x86_64 server | 101,699 -> 101,293 (**-406**) | FAIL -> PASS |
+| P2 aarch64 tiny | 116,007 -> 109,891 (**-6,116**) | FAIL (gap still 31.6k) |
+| P2 aarch64 server | 107,213 -> 108,313 (+1,100) | FAIL (FloatConv move codegen) |
+| P2 riscv64 tiny/server | 59,510 / 57,432 -> 59,510 / 57,210 (0 / -222) | FAIL (C74z-S13) |
+| INV-S-P2-P0 x86_64 | 25,688 / 27,768 -> 21,936 / 27,712 | KNOWN |
+
+3.1 count is 54 before and after: three x86 P2/P3 rows flip to pass, while the smaller tiny
+archive shifts layout and adds P5 x86_64 B +432 (9 over), P8 aarch64 B +936, and pulls an
+`iconv` allocator CGU into P7 aarch64 (R-14 rule). No budget is raised; those three need a
+follow-up measurement/link fix.
+
 The current largest clusters are the shared P0 floor `dtoa` (4,906-9,235 per probe), the
 P2/P3 printf core (`vformat_dyn` 3,148-5,646 plus float/pos/emit), the P7 time code
 (`tzload`/`tzparse` plus `strftime::append_format`), and the P5 resolv code
