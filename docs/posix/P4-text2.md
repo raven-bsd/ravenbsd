@@ -56,3 +56,16 @@ userspace); no new external dependency was added.
 `docs/posix/evidence/P4-text2.toml` contains the six structured `test:` rows. The P0b loader
 accepts the `P4-text2` batch file; `posix-check` executes each script and reports the rows as
 present. No row is present without a passing case.
+
+## Verification record
+
+All 23 `tests/posix/utility/run-*.sh` runners exit 0. `run-text2.sh` reports **6 pass, 0 fail,
+0 defect**; the four P4e tools (`grep`, `cmp`, `diff`, `strings`) each pass their host case, and so
+do `sed`/`awk`. `cargo xtask qtest --case posix-util-system --arch x86_64` and
+`cargo xtask qtest --case posix-shell --arch x86_64` both pass on direct execution.
+
+A host-only `posix-check` run reports **1123 pass, 583 fail, 104 skip** overall and **144 pass,
+39 fail, 34 skip** in the utility area. The thirty-nine utility failures are the thirty-eight
+unimplemented utilities plus `util.sh` (`rsh` is not a POSIX sh); none is a P4e tool. The
+thirty-four skips are qtest-evidenced rows (shell built-ins and the system tools) whose
+`posix-shell`/`posix-util-system` qtests pass directly.
