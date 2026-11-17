@@ -185,6 +185,7 @@ members = [
     "userland/bin/awk",
     "userland/bin/ar",
     "userland/bin/nm",
+    "userland/bin/talk",
     "userland/bin/strip",
     "userland/bin/compress",
     "userland/bin/ed",

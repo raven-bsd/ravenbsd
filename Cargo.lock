@@ -3638,6 +3638,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "talk"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "tar"
 version = "0.1.0"
 dependencies = [

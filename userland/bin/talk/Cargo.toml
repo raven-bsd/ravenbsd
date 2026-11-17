@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "talk"
+version = "0.1.0"
+description = "RavenBSD talk: bounded local two-way terminal session protocol."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "talk"
+path = "src/lib.rs"
+
+[[bin]]
+name = "talk"
+path = "src/main.rs"
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-rt = { path = "../../rt" }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+raven-tool-core = { path = "../../../crates/raven-tool-core" }
+
+[lints]
+workspace = true

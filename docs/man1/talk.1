@@ -1,0 +1,108 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt TALK 1
+.Os RavenBSD
+.Sh NAME
+.Nm talk
+.Nd talk to another user
+.Sh SYNOPSIS
+.Nm
+.Ar address
+.Op Ar terminal
+.Nm
+.Fl l
+.Op Ar terminal
+.Nm
+.Fl -loopback
+.Sh DESCRIPTION
+The
+.Nm
+utility establishes a two-way, screen-oriented session with another user.
+The
+.Ar address
+operand has the form
+.Sm off
+.Ar user Op @ Ar host .
+.Sm on
+The optional
+.Ar terminal
+operand selects one of the recipient's terminals.
+.Pp
+The caller sends an invitation with the
+.Dq "Message from" ,
+.Dq "connection requested by"
+and
+.Dq "respond with"
+lines.
+The recipient accepts or declines.
+Once active, both parties can type simultaneously, and their text is shown in separate regions
+of the screen.
+The invitation and session are carried by the bounded
+.Dq RVTALK/1
+protocol.
+.Pp
+The following controls are handled:
+.Bl -tag -width Ds -compact
+.It Ctrl-C
+Send
+.Dv BYE
+and terminate the local session with status 0.
+.It Ctrl-D
+End the local input and notify the peer.
+.It Ctrl-L
+Refresh the local split screen.
+.It Ctrl-G
+Alert the recipient's terminal.
+.El
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl l
+Listen for an invitation instead of sending one.
+This is a local extension; POSIX defines no
+.Nm
+options.
+.It Fl -loopback
+Run both ends of the protocol in one process and print a readable transcript.
+This is a local diagnostic for the bounded protocol, not a peer session.
+.El
+.Sh CURRENT LIMITATION
+This image has no logged-in terminal registry and no peer transport.
+The
+.Ql ttyd
+service records only a session's foreground group, session id and hangup bit;
+.Xr consd 8
+serves one console and the
+.Ql ptyd
+service serves one anonymous master/slave pair.
+There is no
+.Ql who
+terminal list to locate the recipient and no
+.Nm talkd
+to carry the invitation.
+Consequently a local
+.Nm
+call reports that the recipient is not reachable and exits with status 1;
+.Fl l
+reports that no peer transport exists.
+Network
+.Ar host
+addresses other than
+.Ql localhost
+are rejected explicitly.
+The local loopback diagnostic is the only complete session path until a
+terminal registry and peer transport exist.
+.Sh EXIT STATUS
+.Ex -std
+A declined invitation, unsupported network address, unreachable recipient,
+missing peer transport or protocol failure exits with status 1; a usage error
+exits with status 2.
+.Sh SEE ALSO
+.Xr write 1 ,
+.Xr consd 8
+.Sh STANDARDS
+RavenBSD implements the documented POSIX
+.Nm
+invitation, split-screen, forwarding, EOF and termination model with the
+current-limitation noted above.
