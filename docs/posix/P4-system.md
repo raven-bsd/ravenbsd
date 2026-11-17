@@ -12,6 +12,12 @@ The P4u three-row batch is complete: `mesg`, `logger` and `renice` all pass. The
 system family is 12/13, with only P4o's `util.ps` outstanding. No row is waived and no missing
 behavior is claimed present. The docs gate is green.
 
+## Merge status
+
+The P4u work merged into `origin/master` at `6719346c`. This branch commit records the
+post-merge documentation state; no P4u behavior or row status changed. The twelve present rows
+and the `P4d-D2` `util.ps` defect are unchanged.
+
 This is a host/QEMU test result. It is not a board result and it does not change the release
 profile or the release gate.
 
