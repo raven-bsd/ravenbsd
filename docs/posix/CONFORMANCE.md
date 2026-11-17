@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T00:21:35Z
+- Date: 2026-11-17T00:49:39Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 911 pass, 888 fail, 10 skip
+- Counts: 922 pass, 877 fail, 10 skip
 
 ## Summary
 
@@ -23,12 +23,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | header | 30 | 56 | 0 |
 | interface | 713 | 708 | 0 |
 | link | 1 | 0 | 0 |
-| process | 17 | 0 | 0 |
+| process | 16 | 1 | 0 |
 | shell | 7 | 18 | 0 |
 | target | 0 | 0 | 7 |
 | tty | 12 | 0 | 0 |
-| utility | 112 | 105 | 0 |
-| **all** | **911** | **888** | **10** |
+| utility | 124 | 93 | 0 |
+| **all** | **922** | **877** | **10** |
 
 ## Rows
 
@@ -1569,18 +1569,18 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `process.exec` | process | pass | `qtest:proc-exec` |  |
 | `process.fork` | process | pass | `qtest:proc-fork` |  |
 | `process.job-control` | process | pass | `qtest:tty-job-control` |  |
-| `process.popen` | process | pass | `waiver` | owner waiver: P3/P17: no pipe primitive and no libc spawn backend; kernel SPAWN/WAIT are available but not wired to popen |
-| `process.posix-spawn` | process | pass | `waiver` | owner waiver: P17: native libc spawn exists, but libc-spawn needs a built target sysroot; the former process-server SPAWN protocol is not wired into libc |
+| `process.popen` | process | pass | `waiver` | owner waiver: P3/P17: pipe/exec exist in the kernel; libc popen/system integration is still open |
+| `process.posix-spawn` | process | pass | `waiver` | owner waiver: P17: native kernel spawn exists; libc target sysroot wiring remains |
 | `process.priority` | process | pass | `qtest:proc-priority` |  |
 | `process.process-group` | process | pass | `qtest:proc-session` |  |
 | `process.process-id` | process | pass | `qtest:proc-registry` |  |
 | `process.resource` | process | pass | `qtest:proc-session` |  |
 | `process.session` | process | pass | `qtest:proc-session` |  |
 | `process.signal` | process | pass | `qtest:proc-signal` |  |
-| `process.system` | process | pass | `waiver` | owner waiver: P3/P17: needs a pipe-capable shell client; no process-server/libc system() path |
+| `process.system` | process | pass | `waiver` | owner waiver: P3/P17: needs libc system()/popen integration; no userspace process server |
 | `process.terminate` | process | pass | `qtest:proc-session` |  |
 | `process.times` | process | pass | `qtest:proc-session` |  |
-| `process.tty-control` | process | pass | `qtest:tty-control` |  |
+| `process.tty-control` | process | fail | `qtest:tty-control` | qtest: exit status 35; expected success; unmatched expectations: ^tty-control: ctty=1 fg=1$, ^tty-control: ttyd=1 orphan=1$, ^tty-control: sig=1$, ^tty-control: hangup=1$, ^tty-control: ok$, ^tty-ctl: fg-read$, ^tty-ctl: ttou$, ^tty-ctl: fg-write$, ^tty-hup: leader$, ^tty-hup: got$, ^tty-hup: eio$, ^init exited \(0\)$ |
 | `process.wait` | process | pass | `qtest:proc-session` |  |
 | `shell.arithmetic-expansion` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
 | `shell.command-substitution` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
@@ -1639,7 +1639,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.basename` | utility | pass | `test:tests/posix/utility/text/basename/test.sh` |  |
 | `util.basenc` | utility | pass | `test:tests/posix/utility/misc/basenc/test.sh` |  |
 | `util.batch` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.bc` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.bc` | utility | pass | `test:tests/posix/utility/bc/test.sh` |  |
 | `util.bg` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.break` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.c17` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1675,7 +1675,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.du` | utility | pass | `test:tests/posix/utility/file/du/test.sh` |  |
 | `util.echo` | utility | fail | `userland/bin/echo` | profile status partial; no POSIX utility test |
 | `util.ed` | utility | pass | `test:tests/posix/utility/ed/ed/test.sh` |  |
-| `util.env` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.env` | utility | pass | `qtest:posix-util-system` |  |
 | `util.eval` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ex` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.exec` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1694,7 +1694,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.fort77` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.gencat` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.get` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.getconf` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.getconf` | utility | pass | `qtest:posix-util-system` |  |
 | `util.getopts` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.grep` | utility | pass | `test:tests/posix/utility/text2/grep/test.sh` |  |
 | `util.groups` | utility | pass | `test:tests/posix/utility/misc/groups/test.sh` |  |
@@ -1702,19 +1702,19 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.head` | utility | pass | `test:tests/posix/utility/text/head/test.sh` |  |
 | `util.hostid` | utility | pass | `test:tests/posix/utility/misc/hostid/test.sh` |  |
 | `util.iconv` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.id` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.id` | utility | pass | `qtest:posix-util-system` |  |
 | `util.install` | utility | pass | `test:tests/posix/utility/misc/install/test.sh` |  |
 | `util.ipcrm` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ipcs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.jobs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.join` | utility | pass | `test:tests/posix/utility/text/join/test.sh` |  |
-| `util.kill` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.kill` | utility | pass | `qtest:posix-util-system` |  |
 | `util.lex` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.link` | utility | pass | `test:tests/posix/utility/file/link/test.sh` |  |
 | `util.ln` | utility | pass | `test:tests/posix/utility/file/ln/test.sh` |  |
 | `util.locale` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.localedef` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.logger` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.logger` | utility | pass | `qtest:posix-util-system` |  |
 | `util.logname` | utility | pass | `test:tests/posix/utility/misc/logname/test.sh` |  |
 | `util.lp` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ls` | utility | pass | `test:tests/posix/utility/file/ls/test.sh` |  |
@@ -1729,14 +1729,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.mkfifo` | utility | pass | `test:tests/posix/utility/file/mkfifo/test.sh` |  |
 | `util.mknod` | utility | pass | `test:tests/posix/utility/file/mknod/test.sh` |  |
 | `util.mktemp` | utility | pass | `test:tests/posix/utility/misc/mktemp/test.sh` |  |
-| `util.more` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.more` | utility | pass | `test:tests/posix/utility/ttytools/more/test.sh` |  |
 | `util.mv` | utility | pass | `test:tests/posix/utility/file/mv/test.sh` |  |
 | `util.neqn` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.newgrp` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.nice` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.nice` | utility | pass | `qtest:posix-util-system` |  |
 | `util.nl` | utility | pass | `test:tests/posix/utility/text/nl/test.sh` |  |
 | `util.nm` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.nohup` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.nohup` | utility | pass | `qtest:posix-util-system` |  |
 | `util.nproc` | utility | pass | `test:tests/posix/utility/misc/nproc/test.sh` |  |
 | `util.numfmt` | utility | pass | `test:tests/posix/utility/misc/numfmt/test.sh` |  |
 | `util.od` | utility | pass | `test:tests/posix/utility/text/od/test.sh` |  |
@@ -1767,7 +1767,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.readlink` | utility | pass | `test:tests/posix/utility/file/readlink/test.sh` |  |
 | `util.readonly` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.realpath` | utility | pass | `test:tests/posix/utility/file/realpath/test.sh` |  |
-| `util.renice` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.renice` | utility | pass | `qtest:posix-util-system` |  |
 | `util.return` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.rm` | utility | pass | `test:tests/posix/utility/file/rm/test.sh` |  |
 | `util.rmdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1818,7 +1818,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.ulimit` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.umask` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.unalias` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.uname` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.uname` | utility | pass | `qtest:posix-util-system` |  |
 | `util.uncompress` | utility | pass | `test:tests/posix/utility/compress/uncompress/test.sh` |  |
 | `util.unexpand` | utility | pass | `test:tests/posix/utility/text/unexpand/test.sh` |  |
 | `util.unget` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1838,7 +1838,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.wc` | utility | pass | `test:tests/posix/utility/text/wc/test.sh` |  |
 | `util.what` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.who` | utility | pass | `test:tests/posix/utility/misc/who/test.sh` |  |
-| `util.write` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.write` | utility | pass | `test:tests/posix/utility/ttytools/write/test.sh` |  |
 | `util.xargs` | utility | pass | `test:tests/posix/utility/xargs/test.sh` |  |
 | `util.yacc` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.yes` | utility | pass | `test:tests/posix/utility/misc/yes/test.sh` |  |
