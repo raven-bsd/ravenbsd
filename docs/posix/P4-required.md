@@ -3,9 +3,10 @@
 
 # P4 required utility acceptance
 
-Status: OBSERVED (P4a10, base `origin/master` `1aa9e959`). P4a7 leaves exactly seven required
-utilities. This note is the single acceptance surface for them; P4a10 adds the booted-image target
-gate. No utility, profile or evidence-toml code is changed here.
+Status: OBSERVED (P4a11, base `origin/master` `1939ae69`). P4a7 leaves exactly seven required
+utilities. This note is the single acceptance surface for them; P4a10 added the booted-image
+target gate and P4a11 fixed the localedef target main. No profile, seed or evidence-toml code is
+changed here.
 
 ## Host runner
 
@@ -20,7 +21,7 @@ The runner executes each tool's own per-tool host test and prints one line per r
 * `[FAIL] <tool>: exit <n>` - the test exists and failed; the log is indented under the line.
 * `[DEFECT] <tool>: missing ...` - the tool source or its per-tool test is absent.
 
-Observed on `1aa9e959`: `required-runner: 7 pass, 0 fail, 0 defect`, exit 0.
+Observed on `1939ae69`: `required-runner: 7 pass, 0 fail, 0 defect`, exit 0.
 
 ## Target gate
 
@@ -29,19 +30,20 @@ cargo xtask qtest --case required-utils --arch x86_64
 ```
 
 The fixture boots a minimal initfs with the seven tools, `initfsd`/`ramfsd`/`vfsd` (for
-`newgrp`'s account files), a `/bin/true` child for `time`, a `/bin/sh` credential probe for
-`newgrp`, and `/etc/passwd`, `/etc/group`, `/etc/shadow`, `/etc/locale` and `/etc/charmap`. Each
-case is bounded and non-interactive. The fixture exits 1 because `localedef`'s target build is
-still a host-only stub, so the qtest declares `expect_exit = "failure"`; the other six rows pass.
+`newgrp`'s account files and localedef's `file:` input/output), a `/bin/true` child for `time`, a
+`/bin/sh` credential probe for `newgrp`, and `/etc/passwd`, `/etc/group`, `/etc/shadow`,
+`/etc/locale` and `/etc/charmap`. Each case is bounded and non-interactive. All seven utilities
+pass, so the qtest declares `expect_exit = "success"`.
 
-Observed summary on `1aa9e959`: `required-utils: 9 cases, 8 pass, 1 fail` (the nine cases are
-`time`, `times`, `tput`, three `ulimit` cases, `lp`, `localedef`, `newgrp`).
+Observed summary on `1939ae69`: `required-utils: 10 cases, 10 pass, 0 fail` (the ten cases are
+`time`, `times`, `tput`, three `ulimit` cases, `lp`, `localedef`, the localedef catalog check and
+`newgrp`).
 
 ## Seven required rows
 
 | Utility | Host evidence | Target evidence | Notes |
 |---|---|---|---|
-| `localedef` | `sh tests/posix/utility/simple3/localedef/test.sh` - pass | **FAIL** - `localedef: target build is host-only` | otto/P4a4; no target evidence registered until the target build compiles the catalog instead of returning the stub |
+| `localedef` | `sh tests/posix/utility/simple3/localedef/test.sh` - pass | `qtest:required-utils` - pass | otto/P4a4 + P4a11; target reads `file:` inputs and writes the `ff88ff89` catalog (211 bytes in the fixture); target stub removed |
 | `lp` | `sh tests/posix/utility/simple5/lp/test.sh` - pass | `qtest:required-utils` - pass | tim/P4a6; no-destination diagnostic and exit 1 asserted, no printer/network |
 | `newgrp` | `sh tests/posix/utility/simple4/newgrp/test.sh` - pass | `qtest:required-utils` - pass | mel/P4a5; `/bin/sh` probe reports `uid=0 gid=100` after the group switch |
 | `time` | `sh tests/posix/utility/simple2/time/test.sh` - pass | `qtest:required-utils` - pass | bob/P4a3; `real`/`user`/`sys` output, `real` is the observed monotonic time |
@@ -49,9 +51,8 @@ Observed summary on `1aa9e959`: `required-utils: 9 cases, 8 pass, 1 fail` (the n
 | `tput` | `sh tests/posix/utility/simple2/tput/test.sh` - pass | `qtest:required-utils` - pass | bob/P4a3; `tput cols` prints `80` |
 | `ulimit` | `sh tests/posix/utility/simple2/ulimit/test.sh` - pass | `qtest:required-utils` - pass | bob/P4a3; `-n` query prints the default and `-n 128` exits 0 (the limit is per-process, so the next case is a fresh process) |
 
-Six target rows have evidence; `localedef` stays a target FAIL and is not registered as passing.
-The `qtest:required-utils` case covers all six in one booted image; the failing row is visible in
-the same transcript rather than hidden by a green qtest exit.
+All seven target rows have evidence. The `qtest:required-utils` case covers them in one booted
+image, including the localedef catalog-magic check.
 
 ## Target transcript excerpt
 
@@ -81,17 +82,19 @@ required-utils: lp start
 lp: no print destination configured
 required-utils: lp exit=1 PASS
 required-utils: localedef start
-localedef: target build is host-only
-required-utils: localedef exit=1 FAIL
+required-utils: localedef exit=0 PASS
+required-utils: localedef catalog magic=ff88ff89 bytes=211 PASS
 required-utils: newgrp start
 required-utils: shell uid=0 gid=100
 required-utils: newgrp exit=0 PASS
-required-utils: 9 cases, 8 pass, 1 fail
+required-utils: 10 cases, 10 pass, 0 fail
 ```
 
 The `tput` capability has no trailing newline in the serial log; the qtest matches the `80` prefix.
 The `ulimit` set case is accepted per process; a later `ulimit -n` in a new process correctly shows
-the inherited default, not the previous process's setting.
+the inherited default, not the previous process's setting. `localedef` reads `/etc/locale` and
+`/etc/charmap` through `file:` and writes `/tmp/catalog`; the fixture checks the catalog starts
+with `ff88ff89` before it counts the row as PASS.
 
 ## Self-test
 
@@ -100,4 +103,5 @@ the inherited default, not the previous process's setting.
 `1 pass, 1 fail, 5 defect`, exits non-zero, and never passes a missing row. It also checks the real
 tree has exactly seven row lines and an exit status consistent with its summary.
 
-P4a10 changes no utility, profile, seed or generated POSIX document.
+P4a10 added the target gate; P4a11 fixed the localedef target main and the fixture catalog check.
+No profile, seed or generated POSIX document is changed.
