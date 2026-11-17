@@ -6,7 +6,7 @@
 mod common;
 
 use common::VecDisk;
-use ufs_core::check::{Mode, Problem, Report, check};
+use ufs_core::check::{Mode, Problem, Recovery, Report, check, recover};
 use ufs_core::mkfs::{MkfsOptions, format};
 use ufs_core::{FileType, Ino, MountOptions, Ufs};
 
@@ -560,7 +560,7 @@ fn random_single_byte_mutations_never_panic() {
 }
 
 #[test]
-fn missing_lost_found_is_reported_unrepairable() {
+fn missing_lost_found_is_recreated_on_repair() {
     let mut disk = simple_image(16 * MIB, 2);
     let geometry = Geometry::read(&disk.data, 8192);
     // Remove the root entry for lost+found and create an orphan directory.
@@ -571,11 +571,69 @@ fn missing_lost_found_is_reported_unrepairable() {
     write_u32(&mut disk.data, offset, 0);
     let report = check(&mut disk, Mode::Repair).expect("repair");
     assert!(
-        has(&report, Problem::LostFoundMissing),
-        "{:?}",
+        report.clean_after,
+        "repair should recreate lost+found and reconnect: {:?}",
         report.findings
     );
-    assert!(!report.clean_after, "{:?}", report.findings);
+    let mut ufs = Ufs::mount(disk, MountOptions { read_only: true }).expect("mount");
+    let lf = ufs.lookup(ufs.root(), b"lost+found").expect("lost+found");
+    let mut found = false;
+    ufs.readdir(lf, 0, &mut |entry, _| {
+        if entry.kind == FileType::Directory && entry.name.starts_with(b"#") {
+            found = true;
+        }
+        true
+    })
+    .expect("readdir");
+    assert!(found, "orphan not reconnected");
+}
+
+fn orphan_disk() -> VecDisk {
+    let mut disk = simple_image(16 * MIB, 2);
+    let geometry = Geometry::read(&disk.data, 8192);
+    let root = geometry.dir_block(&disk.data, 2);
+    let offset = find_entry(&disk.data, root, b"dir").expect("dir entry");
+    write_u32(&mut disk.data, offset, 0);
+    disk
+}
+
+#[test]
+fn recover_mounts_a_clean_image() {
+    let mut disk = simple_image(16 * MIB, 2);
+    assert_eq!(recover(&mut disk, false).expect("recover"), Recovery::Clean);
+    let mut disk = simple_image(16 * MIB, 2);
+    assert_eq!(recover(&mut disk, true).expect("recover"), Recovery::Clean);
+}
+
+#[test]
+fn unsynced_write_is_repairable() {
+    let mut ufs = formatted(16 * MIB, 2);
+    let root = ufs.root();
+    let file = ufs.create(root, b"crash.txt", 0o644, 0, 0).expect("create");
+    ufs.write(file, 0, b"crash-checkpoint").expect("write");
+    let mut disk = ufs.into_inner();
+    let report = check(&mut disk, Mode::ReadOnly).expect("check");
+    assert!(
+        !report.clean_after,
+        "unsynced write should be detected as dirty: {:?}",
+        report.findings
+    );
+    let repair = check(&mut disk, Mode::Repair).expect("repair");
+    assert!(repair.clean_after, "{:?}", repair.findings);
+}
+
+#[test]
+fn recover_repairs_or_refuses_a_dirty_image() {
+    let mut disk = orphan_disk();
+    match recover(&mut disk, true).expect("recover") {
+        Recovery::Refused { findings } => assert!(findings >= 1),
+        other => panic!("expected refused, got {other:?}"),
+    }
+    let mut disk = orphan_disk();
+    match recover(&mut disk, false).expect("recover") {
+        Recovery::Repaired { fixed } => assert!(fixed >= 1),
+        other => panic!("expected repaired, got {other:?}"),
+    }
 }
 
 #[test]

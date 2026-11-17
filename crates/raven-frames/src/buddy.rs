@@ -68,10 +68,22 @@ pub struct BuddyStats {
     pub alloc_fail: u64,
 }
 
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BlockState {
     Free,
     Allocated,
+    Reserved,
+}
+
+/// The state of one frame as observed from the outside (A5c kernel integration).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FrameState {
+    /// The frame belongs to a free block.
+    Free,
+    /// The frame belongs to an allocated block.
+    Allocated,
+    /// The frame was reserved and is never handed out until released.
     Reserved,
 }
 
@@ -80,30 +92,44 @@ const NONE: u32 = u32::MAX;
 
 /// One order-0 block's descriptor: its state, the order of the buddy block it belongs to, and the
 /// free-list link for the head of a free block.
+///
+/// The type is public only so a caller (the kernel) can declare a fixed storage array in BSS; its
+/// fields and constructors are the allocator's business.
 #[derive(Clone, Copy, Debug)]
-struct Block {
+pub struct Block {
     state: BlockState,
     order: u8,
     next_free: u32,
 }
 
 impl Block {
-    const fn empty() -> Self {
+    /// A free descriptor with no free-list link.
+    pub const fn empty() -> Self {
         Self {
             state: BlockState::Free,
             order: 0,
             next_free: NONE,
         }
     }
+
+    /// An all-zero descriptor, so a caller's storage array lands in `.bss`; the allocator resets
+    /// every descriptor during construction, so the initial value only affects placement.
+    pub const fn zeroed() -> Self {
+        Self {
+            state: BlockState::Free,
+            order: 0,
+            next_free: 0,
+        }
+    }
 }
 
 /// A power-of-two buddy frame allocator over a caller-supplied frame range.
 ///
-/// `ORDERS` is the number of buddy orders (one more than the maximum order) and `MAX_BLOCKS` is
-/// the number of order-0 blocks (a power of two, the maximum managed frame count). The pager `P`
-/// is consulted on every allocation and free.
-pub struct BuddyAllocator<const ORDERS: usize, const MAX_BLOCKS: usize, P: Pager = NoPager> {
-    blocks: [Block; MAX_BLOCKS],
+/// `ORDERS` is the number of buddy orders (one more than the maximum order). The caller provides
+/// the order-0 descriptor storage (`blocks`), so the allocator itself is small and the kernel can
+/// keep the ~1 MiB array in BSS. The pager `P` is consulted on every allocation and free.
+pub struct BuddyAllocator<'a, const ORDERS: usize, P: Pager = NoPager> {
+    blocks: &'a mut [Block],
     free_heads: [u32; ORDERS],
     base_frame: u64,
     frame_count: u64,
@@ -115,22 +141,31 @@ pub struct BuddyAllocator<const ORDERS: usize, const MAX_BLOCKS: usize, P: Pager
     alloc_fail: u64,
 }
 
-impl<const ORDERS: usize, const MAX_BLOCKS: usize, P: Pager + Default>
-    BuddyAllocator<ORDERS, MAX_BLOCKS, P>
-{
+impl<'a, const ORDERS: usize, P: Pager + Default> BuddyAllocator<'a, ORDERS, P> {
     /// Create an allocator over `[base_frame, base_frame + frame_count)` with the default pager.
-    pub fn new(base_frame: u64, frame_count: u64) -> Result<Self, BuddyError> {
-        Self::with_pager(base_frame, frame_count, P::default())
+    pub fn new(
+        blocks: &'a mut [Block],
+        base_frame: u64,
+        frame_count: u64,
+    ) -> Result<Self, BuddyError> {
+        Self::with_pager(blocks, base_frame, frame_count, P::default())
     }
 }
 
-impl<const ORDERS: usize, const MAX_BLOCKS: usize, P: Pager> BuddyAllocator<ORDERS, MAX_BLOCKS, P> {
+impl<'a, const ORDERS: usize, P: Pager> BuddyAllocator<'a, ORDERS, P> {
     /// Create an allocator over `[base_frame, base_frame + frame_count)` with an explicit pager.
     ///
-    /// `frame_count` must be a non-zero power of two no greater than `MAX_BLOCKS`, and its base-2
-    /// logarithm must be less than `ORDERS`.
-    pub fn with_pager(base_frame: u64, frame_count: u64, pager: P) -> Result<Self, BuddyError> {
-        if frame_count == 0 || !frame_count.is_power_of_two() || (frame_count as usize) > MAX_BLOCKS
+    /// `frame_count` must be a non-zero power of two no greater than `blocks.len()`, and its
+    /// base-2 logarithm must be less than `ORDERS`.
+    pub fn with_pager(
+        blocks: &'a mut [Block],
+        base_frame: u64,
+        frame_count: u64,
+        pager: P,
+    ) -> Result<Self, BuddyError> {
+        if frame_count == 0
+            || !frame_count.is_power_of_two()
+            || (frame_count as usize) > blocks.len()
         {
             return Err(BuddyError::OutOfRange);
         }
@@ -138,8 +173,11 @@ impl<const ORDERS: usize, const MAX_BLOCKS: usize, P: Pager> BuddyAllocator<ORDE
         if top_order >= ORDERS {
             return Err(BuddyError::OrderTooLarge);
         }
+        for block in blocks.iter_mut() {
+            *block = Block::empty();
+        }
         let mut allocator = Self {
-            blocks: [Block::empty(); MAX_BLOCKS],
+            blocks,
             free_heads: [NONE; ORDERS],
             base_frame,
             frame_count,
@@ -169,6 +207,19 @@ impl<const ORDERS: usize, const MAX_BLOCKS: usize, P: Pager> BuddyAllocator<ORDE
     /// Return `true` when `frame` is in the managed range.
     pub fn contains(&self, frame: u64) -> bool {
         frame >= self.base_frame && frame < self.base_frame.saturating_add(self.frame_count)
+    }
+
+    /// The state of `frame`, or `None` when it is outside the managed range.
+    pub fn state(&self, frame: u64) -> Option<FrameState> {
+        let index = usize::try_from(frame.checked_sub(self.base_frame)?).ok()?;
+        if index >= self.frame_count as usize {
+            return None;
+        }
+        Some(match self.blocks[index].state {
+            BlockState::Free => FrameState::Free,
+            BlockState::Allocated => FrameState::Allocated,
+            BlockState::Reserved => FrameState::Reserved,
+        })
     }
 
     /// Allocate a block of `2^order` contiguous frames.
@@ -279,6 +330,100 @@ impl<const ORDERS: usize, const MAX_BLOCKS: usize, P: Pager> BuddyAllocator<ORDE
         self.coalesce(index, order);
         self.frees = self.frees.saturating_add(1);
         Ok(())
+    }
+
+    /// Release one order-0 frame that is either allocated or reserved (A5c loader reclaim).
+    ///
+    /// A reserved frame returns to the free lists and its reservation count drops; an allocated
+    /// order-0 frame behaves like [`free`](Self::free). A frame that belongs to a larger block is
+    /// rejected with [`BuddyError::OutOfRange`] so a partial release cannot corrupt the block.
+    ///
+    /// # Errors
+    ///
+    /// [`BuddyError::OutOfRange`] and [`BuddyError::DoubleFree`].
+    pub fn release(&mut self, frame: u64) -> Result<(), BuddyError> {
+        let Some(index) = frame.checked_sub(self.base_frame) else {
+            return Err(BuddyError::OutOfRange);
+        };
+        let index = usize::try_from(index).map_err(|_| BuddyError::OutOfRange)?;
+        if index >= self.frame_count as usize {
+            return Err(BuddyError::OutOfRange);
+        }
+        let state = self.blocks[index].state;
+        if state == BlockState::Free {
+            return Err(BuddyError::DoubleFree);
+        }
+        if self.blocks[index].order != 0 {
+            return Err(BuddyError::OutOfRange);
+        }
+        self.mark_block(index, 0, BlockState::Free);
+        self.coalesce(index, 0);
+        if state == BlockState::Reserved {
+            self.reserved = self.reserved.saturating_sub(1);
+        }
+        self.frees = self.frees.saturating_add(1);
+        Ok(())
+    }
+
+    /// Allocate `count` contiguous order-0 frames starting at an `align`-aligned frame and ending
+    /// below `max_frame` (exclusive), for the kernel's DMA path (A5c).
+    ///
+    /// Every frame is taken as an independent order-0 block, so the caller can free the run frame
+    /// by frame with [`free`](Self::free) exactly as the existing DMA teardown does. A candidate
+    /// run that hits an allocated or reserved frame is rolled back and the next aligned run is
+    /// tried.
+    ///
+    /// # Errors
+    ///
+    /// [`BuddyError::ZeroSize`], [`BuddyError::Misaligned`] and [`BuddyError::OutOfFrames`].
+    pub fn alloc_contiguous(
+        &mut self,
+        count: u64,
+        align: u64,
+        max_frame: u64,
+    ) -> Result<u64, BuddyError> {
+        if count == 0 {
+            return Err(BuddyError::ZeroSize);
+        }
+        if align == 0 || !align.is_power_of_two() {
+            return Err(BuddyError::Misaligned);
+        }
+        let managed_end = self.base_frame.saturating_add(self.frame_count);
+        let limit = max_frame.min(managed_end);
+        if count > limit.saturating_sub(self.base_frame) {
+            self.alloc_fail = self.alloc_fail.saturating_add(1);
+            return Err(BuddyError::OutOfFrames);
+        }
+        let mut start = self.base_frame;
+        let misaligned = start % align;
+        if misaligned != 0 {
+            start = start
+                .checked_add(align - misaligned)
+                .ok_or(BuddyError::OutOfRange)?;
+        }
+        while start.checked_add(count).is_some_and(|end| end <= limit) {
+            let saved_allocs = self.allocs;
+            let saved_frees = self.frees;
+            let mut allocated = 0u64;
+            while allocated < count {
+                if self.alloc_at(start + allocated, 0).is_err() {
+                    break;
+                }
+                allocated += 1;
+            }
+            if allocated == count {
+                return Ok(start);
+            }
+            for frame in start..start + allocated {
+                let _ = self.free(frame, 0);
+            }
+            // A failed probe is not a completed allocation: keep the counters meaningful.
+            self.allocs = saved_allocs;
+            self.frees = saved_frees;
+            start = start.checked_add(align).ok_or(BuddyError::OutOfRange)?;
+        }
+        self.alloc_fail = self.alloc_fail.saturating_add(1);
+        Err(BuddyError::OutOfFrames)
     }
 
     /// Reserve `count` frames starting at `frame` so they are never allocated.
