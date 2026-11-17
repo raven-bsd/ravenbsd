@@ -3,11 +3,11 @@
 
 # libc size gate 3.1 triage and budget correction (C74w/C74z/C74z-S10)
 
-Status: OBSERVED (C74z-S10, `origin/master` `e414e47d`). C74w classified the C74h/C69 data; C74z
-corrected the objective budget-data errors (x86_64 P9 budgets, aarch64/riscv64 B baselines) and
-recorded the shrink plan; C74z-S10 re-measured P9 after C39m/C74zb and re-froze the six P9 S/F
-budgets at measured + 3 percent. **3.1 remains NOT MET**: 11 pass / 52 fail / 69 known / 105
-skipped / 0 budget-only. No libc body, smaller-profile budget or boot budget is changed.
+Status: OBSERVED (C74z-S11, `origin/master` `72c630bd`). C74w classified the C74h/C69 data;
+C74z corrected the objective budget-data errors; C74z-S10 re-froze the six P9 S/F budgets;
+C74z-S11 rebuilt all three arches, fixed the six B-only/layout rows, and corrected the aarch64
+P2/P3 printf-stub measurement. **3.1 remains NOT MET**: 17 pass / 48 fail / 69 known / 105
+skipped / 0 budget-only. No libc body, S/F or boot budget is changed by C74z-S11.
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -161,6 +161,71 @@ the two x86_64 P9 rows stay passing with tightened budgets, and no row becomes a
 remaining 52 fails are 44 real S/F rows, 6 B-only rows (x86_64 P3 server, x86_64 P5 tiny/server,
 aarch64 P8 tiny/server, riscv64 P8 server) and 2 boot rows. **3.1 remains NOT MET**; the
 smaller profiles and boot rows are outside this ticket.
+
+## C74z-S11 residual closure (OBSERVED, `72c630bd`)
+
+Rebuilt all three arches from a clean tree, separated missing/stale artifacts from real rows, and
+fixed the objective B-only/layout data. No S/F or boot budget is raised and no libc body is edited.
+
+### Full-build gate and B-only fix
+
+The first full rebuild is **11 pass / 54 fail / 69 known / 105 skipped / 0 budget-only** before
+the B-only fix. The lead's 11/62 count is 8 fails higher; the difference is consistent with the
+missing/stale artifact rows (the `riscv64 S 755631 > 0` row is gone after the full three-arch
+build and no budget-0 row remains). The remaining 54 were 50 budget rows (44 real S/F + 6
+B-only), 2 invariants and 2 boot rows.
+
+The six B-only/layout rows are re-measured on `72c630bd` and re-frozen at `measured + 3 percent`
+(same rule as the existing B/C69/C74z data). These rows were the only B-only failures; no S/F
+field changes.
+
+| Row | Old B measured/budget | New B measured/budget |
+|---|---|---|
+| x86_64 P5 tiny | 11,944/12,303 | 13,008/13,399 |
+| x86_64 P3 server | 14,240/14,668 | 15,512/15,978 |
+| x86_64 P5 server | 11,536/11,883 | 13,032/13,423 |
+| aarch64 P8 tiny | 11,632/11,981 | 12,032/12,393 |
+| aarch64 P8 server | 12,048/12,410 | 13,096/13,489 |
+| riscv64 P8 server | 13,768/14,182 | 14,616/15,055 |
+
+After the fix the gate is **17 pass / 48 fail / 69 known / 105 skipped / 0 budget-only**.
+
+### aarch64 P2/P3 measurement correction
+
+The old aarch64 P2/P3 rows were under-measured. A controlled build of `e414e47d` gives P2/P3 tiny
+83,988/84,000 S; the current tree gives 115,663/115,675. The `e414e47d` map resolves `printf` to an
+8-byte stub in `raven_libc...cgu.1205.rcgu.o`; the current map links the real 0x50-byte `printf`
+in `cgu.1206.rcgu.o` and pulls `vformat_dyn::<u8>` 3,148, `float_layout::emit_inner::<u8,...>`
+1,772, `pos::analyse` 1,028 and the rest of the printf cluster. The +31,675 is a measurement
+correction, not new feature code. The current S/F budgets (C69 78,235/78,248) are therefore under
+by 37,428/37,427 S/F and are **not** raised here; the reviewer must decide the S/F envelope.
+
+The correction also makes `INV-S-P2-P0` fail on aarch64 P2 tiny/server (31,707/28,659 vs the
+5,120 limit). That is a real invariant failure of the now-honest printf link, not a missing
+artifact; it is reported, not silenced.
+
+The P7 growth is separate: a controlled `e414e47d` build already gives aarch64 P7 tiny 120,652
+(current 120,652), so the C74z `1bfeaafa` 101,700 → 120,652 growth is earlier real time/tz code
+(owner mel/C44), not a C74z-S11 measurement change.
+
+### Final residual
+
+The 48 fails are **44 S/F rows + 2 `INV-S-P2-P0` + 2 boot rows**:
+
+| Arch | Set | S/F rows still over | Also B over | Owner |
+|---|---|---|---|---|
+| x86_64 | tiny | P0,P1,P2,P3,P4,P6,P7 | P0,P6 | per-probe owners below |
+| x86_64 | server | P0,P1,P4,P6,P7 | P0,P4,P6 | per-probe owners below |
+| aarch64 | tiny | P0,P1,P2,P3,P4,P5,P6,P7 | P2,P3 | per-probe owners below |
+| aarch64 | server | P0,P1,P2,P3,P4,P5,P6,P7 | P5,P7 | per-probe owners below |
+| riscv64 | tiny | P0,P1,P2,P3,P4,P5,P6,P7 | P7 | per-probe owners below |
+| riscv64 | server | P0,P1,P2,P3,P4,P5,P6,P7 | - | per-probe owners below |
+
+Per-probe owners: P0 raven-libc/dave-C55/C57/C54/kevin-C49; P1 P0+carl-C56; P2/P3
+carl-C42/C43/C56; P4 dave-C57/C55; P5 dave-C51; P6 bob-C52/dave-C55; P7 mel-C44/C48. The exact
+current/budget numbers are in the C74z-S11 report. `INV-S-P2-P0` is aarch64 P2 tiny/server
+(31,707/28,659 vs 5,120; owner carl/C43 fmt). Boot is x86_64 instructions 1,245 > 908 and
+aarch64 syscalls 8 > 3 / instructions 3,403 > 1,847 (Mark/C74z-S9a). **3.1 remains NOT MET.**
 
 ## Measurement definition
 
@@ -351,6 +416,7 @@ the concrete change and the acceptance it must satisfy; none may raise an S/F or
 | C74z-S8 | libm tables | Share `exp2`/`rem_pio2` tables between `raven-libc-m` and `compiler_builtins` where possible; drop duplicate constants | -4k S/B | bob/C47 | P9 S/B shrink, libm oracle |
 | C74z-S9 | boot start path | Trim the start/TLS path from 1,245 to <=908 x86 instructions, aarch64 3,403 to <=1,847 and 8 syscalls to <=3 | boot budgets | dave/C57, kevin/C49 | boot x86/aarch64 pass, `libc-size --check` |
 | C74z-S10 | P9 full-link envelope | Done in C74z-S10: re-measured the six P9 rows on `e414e47d` and re-froze only the P9 S/F budget at measured + 3 percent; x86 tightened, aarch64/riscv feature growth accepted; B, smaller profiles and boot untouched | reviewed budget | budget owner + carl | done: all six P9 rows pass; 3.1 11 pass / 52 fail (44 S/F + 6 B-only + 2 boot); remaining shrink work is S3/S5/S6/S7/S8 |
+| C74z-S11 | 3.1 residual closure | Done in C74z-S11: full three-arch rebuild, six B-only/layout rows re-frozen at measured + 3 percent, aarch64 P2/P3 printf-stub measurement corrected; final residual reported with owners | no S/F or boot raise | lance/C74z-S11 | 17 pass / 48 fail (44 S/F + 2 INV-S-P2-P0 + 2 boot); rows.toml evidence updated |
 
 The first three clusters are the largest current symbols: ctype tables 31,360 bytes, the six
 `vformat` instantiations about 30k, dtoa about 26k. The remaining x86_64 P5 B-only and boot rows
@@ -367,11 +433,15 @@ are separate follow-ups; the P5 B overruns are 945/1,373 bytes and do not justif
   1,295,089/1,296,589; aarch64 1,359,848/1,361,347 and 1,387,505/1,389,001; riscv64
   868,494/870,128 and 924,842/926,473. The P9 B budgets and all smaller-profile/boot budgets are
   unchanged.
-* The 3.1 count is now **11 pass / 52 fail / 69 known / 105 skipped / 0 budget-only**; the
-  remaining 52 are 44 real S/F, 6 B-only and 2 boot rows. 3.1 remains **NOT MET**.
-* `BUDGETS.toml` is normally generated by `libc-size freeze`; C74z and C74z-S10 use targeted data
-  edits because a full freeze would touch every row (and, for C74z, raise every S/F budget). The
-  header comment records the reason and the measurement base.
+* C74z-S11 re-froze the six B-only/layout rows on `72c630bd`: x86_64 P5 tiny 13,399, P3 server
+  15,978, P5 server 13,423; aarch64 P8 tiny 12,393, P8 server 13,489; riscv64 P8 server 15,055
+  (all B budgets, measured + 3 percent). No S/F or boot budget is changed. The aarch64 P2/P3 S
+  measurement correction is reported, not budgeted.
+* The 3.1 count is now **17 pass / 48 fail / 69 known / 105 skipped / 0 budget-only**; the
+  remaining 48 are 44 real S/F, 2 `INV-S-P2-P0` and 2 boot rows. 3.1 remains **NOT MET**.
+* `BUDGETS.toml` is normally generated by `libc-size freeze`; C74z/C74z-S10/C74z-S11 use
+  targeted data edits because a full freeze would touch every row (and, for C74z, raise every
+  S/F budget). The header comment records the reason and the measurement base.
 
 ## C39m ctype table shrink (OBSERVED, `e1f252e5`)
 

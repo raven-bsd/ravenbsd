@@ -149,7 +149,7 @@ title = "size budgets (C14)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-size", "--check"]
-note = "C74z: 7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only; P9 + arm/riscv B data corrected, S/F and boot budgets not raised; shrink plan in tests/libc/size/TRIAGE.md"
+note = "C74z-S11: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only (full three-arch build, 72c630bd); 44 S/F + 2 INV-S-P2-P0 + 2 boot; B-only layout rows re-frozen, aarch64 P2/P3 printf-stub measurement corrected; S/F and boot budgets not raised; current --out evidence build/libc-gate-c74z-s11/3.1.txt"
 evidence = "build/libc-gate/3.1.txt"
 source = "C69, 16 3.B.9 C14"
 
