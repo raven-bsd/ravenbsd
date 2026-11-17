@@ -52,6 +52,8 @@ struct FTW {
 
 int ftw(const char *, int (*)(const char *, const struct stat *, int), int);
 int nftw(const char *, int (*)(const char *, const struct stat *, int, struct FTW *), int, int);
+int ftw64(const char *, int (*)(const char *, const struct stat *, int), int);
+int nftw64(const char *, int (*)(const char *, const struct stat *, int, struct FTW *), int, int);
 
 __END_DECLS
 

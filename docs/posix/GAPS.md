@@ -12,13 +12,13 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 1 | 0 | 19 | 0 |
-| headers | 86 | 2 | 44 | 40 | 0 |
-| interfaces | 1422 | 416 | 0 | 1006 | 0 |
+| headers | 86 | 2 | 29 | 55 | 0 |
+| interfaces | 1422 | 375 | 0 | 1047 | 0 |
 | process | 17 | 0 | 0 | 14 | 3 |
-| shell | 25 | 0 | 0 | 18 | 7 |
+| shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
-| utilities | 217 | 86 | 5 | 126 | 0 |
-| **all** | **1799** | **505** | **49** | **1230** | **15** |
+| utilities | 217 | 38 | 1 | 173 | 5 |
+| **all** | **1799** | **416** | **30** | **1337** | **16** |
 
 Traceability rows: 1799; profile rows: 1799.
 
@@ -38,34 +38,34 @@ Traceability rows: 1799; profile rows: 1799.
 | `header.fcntl.h` | `fcntl.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.fenv.h` | `fenv.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.float.h` | `float.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
-| `header.fmtmsg.h` | `fmtmsg.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.fmtmsg.h` | `fmtmsg.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.fnmatch.h` | `fnmatch.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.ftw.h` | `ftw.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.ftw.h` | `ftw.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.glob.h` | `glob.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.grp.h` | `grp.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.iconv.h` | `iconv.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.inttypes.h` | `inttypes.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.grp.h` | `grp.h` | present | P1 | `libc/ravenlibc/include` |  |
+| `header.iconv.h` | `iconv.h` | present | P1 | `libc/ravenlibc/include` |  |
+| `header.inttypes.h` | `inttypes.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.iso646.h` | `iso646.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.langinfo.h` | `langinfo.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.libgen.h` | `libgen.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.libgen.h` | `libgen.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.libintl.h` | `libintl.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.limits.h` | `limits.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.locale.h` | `locale.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.math.h` | `math.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.monetary.h` | `monetary.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.monetary.h` | `monetary.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.mqueue.h` | `mqueue.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.ndbm.h` | `ndbm.h` | missing | P1 | `none` |  |
-| `header.net-if.h` | `net/if.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.net-if.h` | `net/if.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.netdb.h` | `netdb.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.netinet-in.h` | `netinet/in.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.netinet-tcp.h` | `netinet/tcp.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.nl_types.h` | `nl_types.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.nl_types.h` | `nl_types.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.poll.h` | `poll.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.pthread.h` | `pthread.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.pwd.h` | `pwd.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.regex.h` | `regex.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.pwd.h` | `pwd.h` | present | P1 | `libc/ravenlibc/include` |  |
+| `header.regex.h` | `regex.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sched.h` | `sched.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.search.h` | `search.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.search.h` | `search.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.semaphore.h` | `semaphore.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.setjmp.h` | `setjmp.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.signal.h` | `signal.h` | partial | P1 | `libc/ravenlibc/include` |  |
@@ -97,18 +97,18 @@ Traceability rows: 1799; profile rows: 1799.
 | `header.sys-un.h` | `sys/un.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-utsname.h` | `sys/utsname.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-wait.h` | `sys/wait.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.syslog.h` | `syslog.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.syslog.h` | `syslog.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.tar.h` | `tar.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.termios.h` | `termios.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.tgmath.h` | `tgmath.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.threads.h` | `threads.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.time.h` | `time.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.trace.h` | `trace.h` | missing | P1 | `none` |  |
-| `header.uchar.h` | `uchar.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.uchar.h` | `uchar.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.ulimit.h` | `ulimit.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.unistd.h` | `unistd.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.utime.h` | `utime.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.utmpx.h` | `utmpx.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.utmpx.h` | `utmpx.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.wchar.h` | `wchar.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.wctype.h` | `wctype.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.wordexp.h` | `wordexp.h` | present | P1 | `libc/ravenlibc/include` |  |
@@ -186,7 +186,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.atoi` | `atoi` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.atol` | `atol` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.atoll` | `atoll` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
-| `interface.basename` | `basename` | missing | P1 | `none` | libgen.h |
+| `interface.basename` | `basename` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libgen.h |
 | `interface.bcmp` | `bcmp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | strings.h |
 | `interface.bcopy` | `bcopy` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | strings.h |
 | `interface.bind` | `bind` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
@@ -196,9 +196,9 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.bsearch` | `bsearch` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.btowc` | `btowc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.bzero` | `bzero` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | strings.h |
-| `interface.c16rtomb` | `c16rtomb` | missing | P1 | `none` | uchar.h |
-| `interface.c32rtomb` | `c32rtomb` | missing | P1 | `none` | uchar.h |
-| `interface.c8rtomb` | `c8rtomb` | missing | P1 | `none` | uchar.h |
+| `interface.c16rtomb` | `c16rtomb` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
+| `interface.c32rtomb` | `c32rtomb` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
+| `interface.c8rtomb` | `c8rtomb` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
 | `interface.cabs` | `cabs` | missing | P1 | `none` | complex.h |
 | `interface.cabsf` | `cabsf` | missing | P1 | `none` | complex.h |
 | `interface.cabsfNx` | `cabsfNx` | missing | P1 | `none` | complex.h |
@@ -226,17 +226,17 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.casinhfNx` | `casinhfNx` | missing | P1 | `none` | complex.h |
 | `interface.casinhl` | `casinhl` | missing | P1 | `none` | complex.h |
 | `interface.casinl` | `casinl` | missing | P1 | `none` | complex.h |
-| `interface.catan` | `catan` | missing | P1 | `none` | nl_types.h |
+| `interface.catan` | `catan` | missing | P1 | `none` | complex.h |
 | `interface.catanf` | `catanf` | missing | P1 | `none` | complex.h |
 | `interface.catanfNx` | `catanfNx` | missing | P1 | `none` | complex.h |
-| `interface.catanh` | `catanh` | missing | P1 | `none` | nl_types.h |
+| `interface.catanh` | `catanh` | missing | P1 | `none` | complex.h |
 | `interface.catanhf` | `catanhf` | missing | P1 | `none` | complex.h |
 | `interface.catanhfNx` | `catanhfNx` | missing | P1 | `none` | complex.h |
 | `interface.catanhl` | `catanhl` | missing | P1 | `none` | complex.h |
 | `interface.catanl` | `catanl` | missing | P1 | `none` | complex.h |
-| `interface.catclose` | `catclose` | missing | P1 | `none` | nl_types.h |
-| `interface.catgets` | `catgets` | missing | P1 | `none` | nl_types.h |
-| `interface.catopen` | `catopen` | missing | P1 | `none` | nl_types.h |
+| `interface.catclose` | `catclose` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | nl_types.h |
+| `interface.catgets` | `catgets` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | nl_types.h |
+| `interface.catopen` | `catopen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | nl_types.h |
 | `interface.cbrt` | `cbrt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.cbrtf` | `cbrtf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.cbrtl` | `cbrtl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
@@ -284,7 +284,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.clogl` | `clogl` | missing | P1 | `none` | complex.h |
 | `interface.close` | `close` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.closedir` | `closedir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
-| `interface.closelog` | `closelog` | missing | P1 | `none` | syslog.h |
+| `interface.closelog` | `closelog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
 | `interface.cnd_broadcast` | `cnd_broadcast` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.cnd_destroy` | `cnd_destroy` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.cnd_init` | `cnd_init` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
@@ -355,7 +355,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.dgettext` | `dgettext` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libintl.h |
 | `interface.difftime` | `difftime` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
 | `interface.dirfd` | `dirfd` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
-| `interface.dirname` | `dirname` | missing | P1 | `none` | libgen.h |
+| `interface.dirname` | `dirname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libgen.h |
 | `interface.div` | `div` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.dlclose` | `dlclose` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dlfcn.h |
 | `interface.dlinfo` | `dlinfo` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dlfcn.h |
@@ -498,7 +498,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.fmodf` | `fmodf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.fmodfNx` | `fmodfNx` | missing | P1 | `none` | math.h |
 | `interface.fmodl` | `fmodl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.fmtmsg` | `fmtmsg` | missing | P1 | `none` | fmtmsg.h |
+| `interface.fmtmsg` | `fmtmsg` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fmtmsg.h |
 | `interface.fnmatch` | `fnmatch` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fnmatch.h |
 | `interface.fopen` | `fopen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.fopen64` | `fopen64` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
@@ -548,7 +548,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.ftruncate64` | `ftruncate64` | missing | P1 | `none` | unistd.h |
 | `interface.ftrylockfile` | `ftrylockfile` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.ftw` | `ftw` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ftw.h |
-| `interface.ftw64` | `ftw64` | missing | P1 | `none` | ftw.h |
+| `interface.ftw64` | `ftw64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ftw.h |
 | `interface.funlockfile` | `funlockfile` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.futimens` | `futimens` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.futimes` | `futimes` | missing | P1 | `none` | sys/time.h |
@@ -635,25 +635,25 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.globfree` | `globfree` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | glob.h |
 | `interface.gmtime` | `gmtime` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
 | `interface.grantpt` | `grantpt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
-| `interface.hcreate` | `hcreate` | missing | P1 | `none` | search.h |
-| `interface.hcreate_r` | `hcreate_r` | missing | P1 | `none` | search.h |
-| `interface.hdestroy` | `hdestroy` | missing | P1 | `none` | search.h |
-| `interface.hdestroy_r` | `hdestroy_r` | missing | P1 | `none` | search.h |
+| `interface.hcreate` | `hcreate` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | search.h |
+| `interface.hcreate_r` | `hcreate_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | search.h |
+| `interface.hdestroy` | `hdestroy` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | search.h |
+| `interface.hdestroy_r` | `hdestroy_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | search.h |
 | `interface.herror` | `herror` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
-| `interface.hsearch_r` | `hsearch_r` | missing | P1 | `none` | search.h |
+| `interface.hsearch_r` | `hsearch_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | search.h |
 | `interface.htonl` | `htonl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | arpa/inet.h |
 | `interface.htons` | `htons` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | arpa/inet.h |
 | `interface.hypot` | `hypot` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.hypotf` | `hypotf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.hypotfNx` | `hypotfNx` | missing | P1 | `none` | math.h |
 | `interface.hypotl` | `hypotl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.iconv` | `iconv` | missing | P1 | `none` | iconv.h |
-| `interface.iconv_close` | `iconv_close` | missing | P1 | `none` | iconv.h |
-| `interface.iconv_open` | `iconv_open` | missing | P1 | `none` | iconv.h |
-| `interface.if_freenameindex` | `if_freenameindex` | missing | P1 | `none` | net/if.h |
-| `interface.if_indextoname` | `if_indextoname` | missing | P1 | `none` | net/if.h |
-| `interface.if_nameindex` | `if_nameindex` | missing | P1 | `none` | net/if.h |
-| `interface.if_nametoindex` | `if_nametoindex` | missing | P1 | `none` | net/if.h |
+| `interface.iconv` | `iconv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | iconv.h |
+| `interface.iconv_close` | `iconv_close` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | iconv.h |
+| `interface.iconv_open` | `iconv_open` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | iconv.h |
+| `interface.if_freenameindex` | `if_freenameindex` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | net/if.h |
+| `interface.if_indextoname` | `if_indextoname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | net/if.h |
+| `interface.if_nameindex` | `if_nameindex` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | net/if.h |
+| `interface.if_nametoindex` | `if_nametoindex` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | net/if.h |
 | `interface.ilogb` | `ilogb` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.ilogbf` | `ilogbf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.ilogbl` | `ilogbl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
@@ -822,9 +822,9 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.malloc` | `malloc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.mblen` | `mblen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.mbrlen` | `mbrlen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
-| `interface.mbrtoc16` | `mbrtoc16` | missing | P1 | `none` | uchar.h |
-| `interface.mbrtoc32` | `mbrtoc32` | missing | P1 | `none` | uchar.h |
-| `interface.mbrtoc8` | `mbrtoc8` | missing | P1 | `none` | uchar.h |
+| `interface.mbrtoc16` | `mbrtoc16` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
+| `interface.mbrtoc32` | `mbrtoc32` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
+| `interface.mbrtoc8` | `mbrtoc8` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
 | `interface.mbrtowc` | `mbrtowc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.mbsinit` | `mbsinit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.mbsnrtowcs` | `mbsnrtowcs` | missing | P1 | `none` | wchar.h |
@@ -903,7 +903,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.nexttowardl` | `nexttowardl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.nextupfNx` | `nextupfNx` | missing | P1 | `none` | math.h |
 | `interface.nftw` | `nftw` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ftw.h |
-| `interface.nftw64` | `nftw64` | missing | P1 | `none` | ftw.h |
+| `interface.nftw64` | `nftw64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ftw.h |
 | `interface.ngettext` | `ngettext` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libintl.h |
 | `interface.nice` | `nice` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.nrand48` | `nrand48` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
@@ -916,7 +916,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.open_wmemstream` | `open_wmemstream` | missing | P1 | `none` | wchar.h |
 | `interface.openat` | `openat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.opendir` | `opendir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
-| `interface.openlog` | `openlog` | missing | P1 | `none` | syslog.h |
+| `interface.openlog` | `openlog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
 | `interface.pathconf` | `pathconf` | missing | P1 | `none` | unistd.h |
 | `interface.pause` | `pause` | missing | P1 | `none` | unistd.h |
 | `interface.pclose` | `pclose` | missing | P1 | `none` | stdio.h |
@@ -1079,10 +1079,10 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.putchar` | `putchar` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.putchar_unlocked` | `putchar_unlocked` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.putenv` | `putenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
-| `interface.putgrent` | `putgrent` | missing | P1 | `none` | grp.h |
+| `interface.putgrent` | `putgrent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | grp.h |
 | `interface.putmsg` | `putmsg` | missing | P1 | `none` | stropts.h |
 | `interface.putpmsg` | `putpmsg` | missing | P1 | `none` | stropts.h |
-| `interface.putpwent` | `putpwent` | missing | P1 | `none` | pwd.h |
+| `interface.putpwent` | `putpwent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | pwd.h |
 | `interface.puts` | `puts` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.pututxline` | `pututxline` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
 | `interface.putw` | `putw` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
@@ -1114,12 +1114,12 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.recvfrom` | `recvfrom` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.recvmmsg` | `recvmmsg` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.recvmsg` | `recvmsg` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
-| `interface.regasub` | `regasub` | missing | P1 | `none` | regex.h |
+| `interface.regasub` | `regasub` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | regex.h |
 | `interface.regcomp` | `regcomp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | regex.h |
 | `interface.regerror` | `regerror` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | regex.h |
 | `interface.regexec` | `regexec` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | regex.h |
 | `interface.regfree` | `regfree` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | regex.h |
-| `interface.regnsub` | `regnsub` | missing | P1 | `none` | regex.h |
+| `interface.regnsub` | `regnsub` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | regex.h |
 | `interface.remainder` | `remainder` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.remainderf` | `remainderf` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.remainderfNx` | `remainderfNx` | missing | P1 | `none` | math.h |
@@ -1203,7 +1203,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.setjmp` | `setjmp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | setjmp.h |
 | `interface.setlinebuf` | `setlinebuf` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.setlocale` | `setlocale` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | locale.h |
-| `interface.setlogmask` | `setlogmask` | missing | P1 | `none` | syslog.h |
+| `interface.setlogmask` | `setlogmask` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
 | `interface.setnetent` | `setnetent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
 | `interface.setpassent` | `setpassent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | pwd.h |
 | `interface.setpayloadfNx` | `setpayloadfNx` | missing | P1 | `none` | math.h |
@@ -1305,8 +1305,8 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.strerror` | `strerror` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
 | `interface.strerror_l` | `strerror_l` | present | P1 | `test:tests/libc/posix/string/check-string.sh` | string.h |
 | `interface.strerror_r` | `strerror_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
-| `interface.strfmon` | `strfmon` | missing | P1 | `none` | monetary.h |
-| `interface.strfmon_l` | `strfmon_l` | missing | P1 | `none` | monetary.h |
+| `interface.strfmon` | `strfmon` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | monetary.h |
+| `interface.strfmon_l` | `strfmon_l` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | monetary.h |
 | `interface.strfromd` | `strfromd` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.strfromf` | `strfromf` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.strftime` | `strftime` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
@@ -1349,7 +1349,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.syncfs` | `syncfs` | missing | P1 | `none` | unistd.h |
 | `interface.syscall` | `syscall` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.sysconf` | `sysconf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.syslog` | `syslog` | missing | P1 | `none` | syslog.h |
+| `interface.syslog` | `syslog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
 | `interface.system` | `system` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.tan` | `tan` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.tanf` | `tanf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -1429,7 +1429,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.ufromfpxfNx` | `ufromfpxfNx` | missing | P1 | `none` | math.h |
 | `interface.ulimit` | `ulimit` | missing | P1 | `none` | ulimit.h |
 | `interface.umask` | `umask` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
-| `interface.umaxabs` | `umaxabs` | missing | P1 | `none` | inttypes.h |
+| `interface.umaxabs` | `umaxabs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | inttypes.h |
 | `interface.uname` | `uname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/utsname.h |
 | `interface.ungetc` | `ungetc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.ungetwc` | `ungetwc` | missing | P1 | `none` | wchar.h |
@@ -1443,7 +1443,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.utime` | `utime` | missing | P1 | `none` | utime.h |
 | `interface.utimensat` | `utimensat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.utimes` | `utimes` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/time.h |
-| `interface.utmpxname` | `utmpxname` | missing | P1 | `none` | utmpx.h |
+| `interface.utmpxname` | `utmpxname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
 | `interface.va_arg` | `va_arg` | missing | P1 | `none` | stdarg.h |
 | `interface.va_copy` | `va_copy` | missing | P1 | `none` | stdarg.h |
 | `interface.va_end` | `va_end` | missing | P1 | `none` | stdarg.h |
@@ -1465,7 +1465,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.vsscanf` | `vsscanf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.vswprintf` | `vswprintf` | missing | P1 | `none` | wchar.h |
 | `interface.vswscanf` | `vswscanf` | missing | P1 | `none` | wchar.h |
-| `interface.vsyslog` | `vsyslog` | missing | P1 | `none` | syslog.h |
+| `interface.vsyslog` | `vsyslog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
 | `interface.vwprintf` | `vwprintf` | missing | P1 | `none` | wchar.h |
 | `interface.vwscanf` | `vwscanf` | missing | P1 | `none` | wchar.h |
 | `interface.wait` | `wait` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/wait.h |
@@ -1503,7 +1503,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.wcstod` | `wcstod` | missing | P1 | `none` | wchar.h |
 | `interface.wcstof` | `wcstof` | missing | P1 | `none` | wchar.h |
 | `interface.wcstofNx` | `wcstofNx` | missing | P1 | `none` | wchar.h |
-| `interface.wcstoimax` | `wcstoimax` | missing | P1 | `none` | wchar.h |
+| `interface.wcstoimax` | `wcstoimax` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.wcstok` | `wcstok` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.wcstol` | `wcstol` | missing | P1 | `none` | wchar.h |
 | `interface.wcstold` | `wcstold` | missing | P1 | `none` | wchar.h |
@@ -1511,7 +1511,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.wcstombs` | `wcstombs` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib.sh` | stdlib.h |
 | `interface.wcstoul` | `wcstoul` | missing | P1 | `none` | wchar.h |
 | `interface.wcstoull` | `wcstoull` | missing | P1 | `none` | wchar.h |
-| `interface.wcstoumax` | `wcstoumax` | missing | P1 | `none` | wchar.h |
+| `interface.wcstoumax` | `wcstoumax` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.wcswidth` | `wcswidth` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.wcsxfrm` | `wcsxfrm` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.wcsxfrm_l` | `wcsxfrm_l` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
@@ -1545,27 +1545,27 @@ Traceability rows: 1799; profile rows: 1799.
 | id | utility | status | owner | evidence | test |
 |---|---|---|---|---|---|
 | `util.admin` | `admin` | missing | P4 | `none` | none |
-| `util.alias` | `alias` | missing | P4 | `none` | none |
+| `util.alias` | `alias` | present | P4 | `qtest:posix-shell` | none |
 | `util.ar` | `ar` | present | P4 | `test:tests/posix/utility/archive/ar/test.sh` | none |
 | `util.arch` | `arch` | present | P4 | `test:tests/posix/utility/misc/arch/test.sh` | none |
-| `util.asa` | `asa` | missing | P4 | `none` | none |
-| `util.at` | `at` | missing | P4 | `none` | none |
+| `util.asa` | `asa` | present | P4 | `test:tests/posix/utility/simple/asa/test.sh` | none |
+| `util.at` | `at` | present | P4 | `test:tests/posix/utility/at/test.sh` | none |
 | `util.awk` | `awk` | present | P4 | `test:tests/posix/utility/text2/awk/test.sh` | none |
 | `util.b2sum` | `b2sum` | present | P4 | `test:tests/posix/utility/misc/b2sum/test.sh` | none |
 | `util.base32` | `base32` | present | P4 | `test:tests/posix/utility/misc/base32/test.sh` | none |
 | `util.base64` | `base64` | present | P4 | `test:tests/posix/utility/misc/base64/test.sh` | none |
 | `util.basename` | `basename` | present | P4 | `test:tests/posix/utility/text/basename/test.sh` | none |
 | `util.basenc` | `basenc` | present | P4 | `test:tests/posix/utility/misc/basenc/test.sh` | none |
-| `util.batch` | `batch` | missing | P4 | `none` | none |
+| `util.batch` | `batch` | present | P4 | `test:tests/posix/utility/at/test.sh` | none |
 | `util.bc` | `bc` | present | P4 | `test:tests/posix/utility/bc/test.sh` | none |
-| `util.bg` | `bg` | missing | P4 | `none` | none |
-| `util.break` | `break` | missing | P4 | `none` | none |
+| `util.bg` | `bg` | waived | P4 | `none` | none; waiver: P45: PG-56 job control; asynchronous lists and $! are not implemented |
+| `util.break` | `break` | present | P4 | `qtest:posix-shell` | none |
 | `util.c17` | `c17` | missing | P4 | `none` | none |
 | `util.c99` | `c99` | missing | P4 | `none` | none |
-| `util.cal` | `cal` | missing | P4 | `none` | none |
+| `util.cal` | `cal` | present | P4 | `test:tests/posix/utility/simple/cal/test.sh` | none |
 | `util.cat` | `cat` | present | P4 | `test:tests/posix/utility/file/cat/test.sh` | none |
-| `util.cd` | `cd` | missing | P4 | `none` | none |
-| `util.cflow` | `cflow` | missing | P4 | `none` | none |
+| `util.cd` | `cd` | present | P4 | `qtest:posix-shell` | none |
+| `util.cflow` | `cflow` | present | P4 | `test:tests/posix/utility/devtools/test.sh` | none |
 | `util.chgrp` | `chgrp` | present | P4 | `test:tests/posix/utility/file/chgrp/test.sh` | none |
 | `util.chmod` | `chmod` | present | P4 | `test:tests/posix/utility/file/chmod/test.sh` | none |
 | `util.chown` | `chown` | present | P4 | `test:tests/posix/utility/file/chown/test.sh` | none |
@@ -1573,74 +1573,74 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.cmp` | `cmp` | present | P4 | `test:tests/posix/utility/text2/cmp/test.sh` | none |
 | `util.cod` | `cod` | missing | P4 | `none` | none |
 | `util.comm` | `comm` | present | P4 | `test:tests/posix/utility/text/comm/test.sh` | none |
-| `util.command` | `command` | missing | P4 | `none` | none |
+| `util.command` | `command` | present | P4 | `qtest:posix-shell` | none |
 | `util.compress` | `compress` | present | P4 | `test:tests/posix/utility/compress/compress/test.sh` | none |
-| `util.continue` | `continue` | missing | P4 | `none` | none |
+| `util.continue` | `continue` | present | P4 | `qtest:posix-shell` | none |
 | `util.cp` | `cp` | present | P4 | `test:tests/posix/utility/file/cp/test.sh` | none |
 | `util.crontab` | `crontab` | present | P4 | `test:tests/posix/utility/crontab/test.sh` | none |
 | `util.csplit` | `csplit` | present | P4 | `test:tests/posix/utility/text/csplit/test.sh` | none |
-| `util.ctags` | `ctags` | missing | P4 | `none` | none |
+| `util.ctags` | `ctags` | present | P4 | `test:tests/posix/utility/devtools/test.sh` | none |
 | `util.cut` | `cut` | present | P4 | `test:tests/posix/utility/text/cut/test.sh` | none |
-| `util.cxref` | `cxref` | missing | P4 | `none` | none |
-| `util.date` | `date` | partial | P4 | `userland/bin/date` | none |
+| `util.cxref` | `cxref` | present | P4 | `test:tests/posix/utility/devtools/test.sh` | none |
+| `util.date` | `date` | present | P4 | `test:tests/posix/utility/misc2/date/test.sh` | none |
 | `util.dd` | `dd` | present | P4 | `test:tests/posix/utility/file/dd/test.sh` | none |
 | `util.delta` | `delta` | missing | P4 | `none` | none |
 | `util.df` | `df` | present | P4 | `test:tests/posix/utility/file/df/test.sh` | none |
 | `util.diff` | `diff` | present | P4 | `test:tests/posix/utility/text2/diff/test.sh` | none |
 | `util.dircolors` | `dircolors` | present | P4 | `test:tests/posix/utility/misc/dircolors/test.sh` | none |
 | `util.dirname` | `dirname` | present | P4 | `test:tests/posix/utility/text/dirname/test.sh` | none |
-| `util.dot` | `dot` | missing | P4 | `none` | none |
+| `util.dot` | `dot` | present | P4 | `qtest:posix-shell` | none |
 | `util.du` | `du` | present | P4 | `test:tests/posix/utility/file/du/test.sh` | none |
-| `util.echo` | `echo` | partial | P4 | `userland/bin/echo` | none |
+| `util.echo` | `echo` | present | P4 | `test:tests/posix/utility/misc2/echo/test.sh` | none |
 | `util.ed` | `ed` | present | P4 | `test:tests/posix/utility/ed/ed/test.sh` | none |
 | `util.env` | `env` | present | P4 | `qtest:posix-util-system` | none |
-| `util.eval` | `eval` | missing | P4 | `none` | none |
+| `util.eval` | `eval` | present | P4 | `qtest:posix-shell` | none |
 | `util.ex` | `ex` | missing | P4 | `none` | none |
-| `util.exec` | `exec` | missing | P4 | `none` | none |
-| `util.exit` | `exit` | missing | P4 | `none` | none |
+| `util.exec` | `exec` | present | P4 | `qtest:posix-shell` | none |
+| `util.exit` | `exit` | present | P4 | `qtest:posix-shell` | none |
 | `util.expand` | `expand` | present | P4 | `test:tests/posix/utility/text/expand/test.sh` | none |
-| `util.export` | `export` | missing | P4 | `none` | none |
+| `util.export` | `export` | present | P4 | `qtest:posix-shell` | none |
 | `util.expr` | `expr` | present | P4 | `test:tests/posix/utility/text/expr/test.sh` | none |
 | `util.factor` | `factor` | present | P4 | `test:tests/posix/utility/misc/factor/test.sh` | none |
 | `util.false` | `false` | present | P4 | `test:tests/posix/utility/misc/false/test.sh` | none |
-| `util.fc` | `fc` | missing | P4 | `none` | none |
-| `util.fg` | `fg` | missing | P4 | `none` | none |
+| `util.fc` | `fc` | waived | P4 | `none` | none; waiver: P45: interactive history editing is outside the non-interactive posix-shell qtest (P9c login) |
+| `util.fg` | `fg` | waived | P4 | `none` | none; waiver: P45: PG-56 job control; no foreground/background job model |
 | `util.file` | `file` | present | P4 | `test:tests/posix/utility/file/file/test.sh` | none |
 | `util.find` | `find` | present | P4 | `test:tests/posix/utility/file/find/test.sh` | none |
 | `util.fmt` | `fmt` | present | P4 | `test:tests/posix/utility/misc/fmt/test.sh` | none |
 | `util.fold` | `fold` | present | P4 | `test:tests/posix/utility/text/fold/test.sh` | none |
 | `util.fort77` | `fort77` | missing | P4 | `none` | none |
-| `util.gencat` | `gencat` | missing | P4 | `none` | none |
+| `util.gencat` | `gencat` | present | P4 | `test:tests/posix/utility/locale/test.sh` | none |
 | `util.get` | `get` | missing | P4 | `none` | none |
 | `util.getconf` | `getconf` | present | P4 | `qtest:posix-util-system` | none |
-| `util.getopts` | `getopts` | missing | P4 | `none` | none |
+| `util.getopts` | `getopts` | present | P4 | `qtest:posix-shell` | none |
 | `util.grep` | `grep` | present | P4 | `test:tests/posix/utility/text2/grep/test.sh` | none |
 | `util.groups` | `groups` | present | P4 | `test:tests/posix/utility/misc/groups/test.sh` | none |
-| `util.hash` | `hash` | missing | P4 | `none` | none |
+| `util.hash` | `hash` | present | P4 | `qtest:posix-shell` | none |
 | `util.head` | `head` | present | P4 | `test:tests/posix/utility/text/head/test.sh` | none |
 | `util.hostid` | `hostid` | present | P4 | `test:tests/posix/utility/misc/hostid/test.sh` | none |
-| `util.iconv` | `iconv` | missing | P4 | `none` | none |
+| `util.iconv` | `iconv` | present | P4 | `test:tests/posix/utility/locale/test.sh` | none |
 | `util.id` | `id` | present | P4 | `qtest:posix-util-system` | none |
 | `util.install` | `install` | present | P4 | `test:tests/posix/utility/misc/install/test.sh` | none |
 | `util.ipcrm` | `ipcrm` | missing | P4 | `none` | none |
 | `util.ipcs` | `ipcs` | missing | P4 | `none` | none |
-| `util.jobs` | `jobs` | missing | P4 | `none` | none |
+| `util.jobs` | `jobs` | waived | P4 | `none` | none; waiver: P45: PG-56 job control; no job table or asynchronous list |
 | `util.join` | `join` | present | P4 | `test:tests/posix/utility/text/join/test.sh` | none |
 | `util.kill` | `kill` | present | P4 | `qtest:posix-util-system` | none |
-| `util.lex` | `lex` | missing | P4 | `none` | none |
+| `util.lex` | `lex` | present | P4 | `test:tests/posix/utility/parsers/lex/test.sh` | none |
 | `util.link` | `link` | present | P4 | `test:tests/posix/utility/file/link/test.sh` | none |
 | `util.ln` | `ln` | present | P4 | `test:tests/posix/utility/file/ln/test.sh` | none |
-| `util.locale` | `locale` | missing | P4 | `none` | none |
+| `util.locale` | `locale` | present | P4 | `test:tests/posix/utility/locale/test.sh` | none |
 | `util.localedef` | `localedef` | missing | P4 | `none` | none |
 | `util.logger` | `logger` | present | P4 | `qtest:posix-util-system` | none |
 | `util.logname` | `logname` | present | P4 | `test:tests/posix/utility/misc/logname/test.sh` | none |
 | `util.lp` | `lp` | missing | P4 | `none` | none |
 | `util.ls` | `ls` | present | P4 | `test:tests/posix/utility/file/ls/test.sh` | none |
 | `util.m4` | `m4` | present | P4 | `test:tests/posix/utility/m4/test.sh` | none |
-| `util.mail` | `mail` | missing | P4 | `none` | none |
-| `util.mailx` | `mailx` | missing | P4 | `none` | none |
+| `util.mail` | `mail` | present | P4 | `test:tests/posix/utility/mail/mail/test.sh` | none |
+| `util.mailx` | `mailx` | present | P4 | `test:tests/posix/utility/mail/mailx/test.sh` | none |
 | `util.make` | `make` | present | P4 | `test:tests/posix/utility/make/test.sh` | none |
-| `util.man` | `man` | partial | P4 | `userland/bin/man` | none |
+| `util.man` | `man` | present | P4 | `test:tests/posix/utility/misc2/man/test.sh` | none |
 | `util.md5sum` | `md5sum` | present | P4 | `test:tests/posix/utility/misc/md5sum/test.sh` | none |
 | `util.mesg` | `mesg` | present | P4 | `qtest:posix-util-system` | none |
 | `util.mkdir` | `mkdir` | present | P4 | `test:tests/posix/utility/file/mkdir/test.sh` | none |
@@ -1653,7 +1653,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.newgrp` | `newgrp` | missing | P4 | `none` | none |
 | `util.nice` | `nice` | present | P4 | `qtest:posix-util-system` | none |
 | `util.nl` | `nl` | present | P4 | `test:tests/posix/utility/text/nl/test.sh` | none |
-| `util.nm` | `nm` | missing | P4 | `none` | none |
+| `util.nm` | `nm` | present | P4 | `test:tests/posix/utility/binutils/nm/test.sh` | none |
 | `util.nohup` | `nohup` | present | P4 | `qtest:posix-util-system` | none |
 | `util.nproc` | `nproc` | present | P4 | `test:tests/posix/utility/misc/nproc/test.sh` | none |
 | `util.numfmt` | `numfmt` | present | P4 | `test:tests/posix/utility/misc/numfmt/test.sh` | none |
@@ -1667,7 +1667,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.printenv` | `printenv` | present | P4 | `test:tests/posix/utility/misc/printenv/test.sh` | none |
 | `util.printf` | `printf` | present | P4 | `test:tests/posix/utility/text/printf/test.sh` | none |
 | `util.prs` | `prs` | missing | P4 | `none` | none |
-| `util.ps` | `ps` | partial | P4 | `userland/bin/ps` | tests/qtest/cases/modern-json-tools.toml |
+| `util.ps` | `ps` | present | P4 | `qtest:posix-util-system` | tests/qtest/cases/modern-json-tools.toml |
 | `util.ptx` | `ptx` | present | P4 | `test:tests/posix/utility/misc/ptx/test.sh` | none |
 | `util.pwd` | `pwd` | present | P4 | `test:tests/posix/utility/file/pwd/test.sh` | none |
 | `util.qalter` | `qalter` | missing | P4 | `none` | none |
@@ -1681,12 +1681,12 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.qsig` | `qsig` | missing | P4 | `none` | none |
 | `util.qstat` | `qstat` | missing | P4 | `none` | none |
 | `util.qsub` | `qsub` | missing | P4 | `none` | none |
-| `util.read` | `read` | missing | P4 | `none` | none |
+| `util.read` | `read` | present | P4 | `qtest:posix-shell` | none |
 | `util.readlink` | `readlink` | present | P4 | `test:tests/posix/utility/file/readlink/test.sh` | none |
-| `util.readonly` | `readonly` | missing | P4 | `none` | none |
+| `util.readonly` | `readonly` | present | P4 | `qtest:posix-shell` | none |
 | `util.realpath` | `realpath` | present | P4 | `test:tests/posix/utility/file/realpath/test.sh` | none |
 | `util.renice` | `renice` | present | P4 | `qtest:posix-util-system` | none |
-| `util.return` | `return` | missing | P4 | `none` | none |
+| `util.return` | `return` | present | P4 | `qtest:posix-shell` | none |
 | `util.rm` | `rm` | present | P4 | `test:tests/posix/utility/file/rm/test.sh` | none |
 | `util.rmdel` | `rmdel` | missing | P4 | `none` | none |
 | `util.rmdir` | `rmdir` | present | P4 | `test:tests/posix/utility/file/rmdir/test.sh` | none |
@@ -1694,14 +1694,14 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.sccs` | `sccs` | missing | P4 | `none` | none |
 | `util.sed` | `sed` | present | P4 | `test:tests/posix/utility/text2/sed/test.sh` | none |
 | `util.seq` | `seq` | present | P4 | `test:tests/posix/utility/misc/seq/test.sh` | none |
-| `util.set` | `set` | missing | P4 | `none` | none |
+| `util.set` | `set` | present | P4 | `qtest:posix-shell` | none |
 | `util.sh` | `sh` | partial | P4 | `userland/bin/rsh` | none |
 | `util.sha1sum` | `sha1sum` | present | P4 | `test:tests/posix/utility/misc/sha1sum/test.sh` | none |
 | `util.sha224sum` | `sha224sum` | present | P4 | `test:tests/posix/utility/misc/sha224sum/test.sh` | none |
 | `util.sha256sum` | `sha256sum` | present | P4 | `test:tests/posix/utility/misc/sha256sum/test.sh` | none |
 | `util.sha384sum` | `sha384sum` | present | P4 | `test:tests/posix/utility/misc/sha384sum/test.sh` | none |
 | `util.sha512sum` | `sha512sum` | present | P4 | `test:tests/posix/utility/misc/sha512sum/test.sh` | none |
-| `util.shift` | `shift` | missing | P4 | `none` | none |
+| `util.shift` | `shift` | present | P4 | `qtest:posix-shell` | none |
 | `util.shred` | `shred` | present | P4 | `test:tests/posix/utility/misc/shred/test.sh` | none |
 | `util.shuf` | `shuf` | present | P4 | `test:tests/posix/utility/misc/shuf/test.sh` | none |
 | `util.sleep` | `sleep` | present | P4 | `test:tests/posix/utility/misc/sleep/test.sh` | none |
@@ -1710,55 +1710,55 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.stat` | `stat` | present | P4 | `test:tests/posix/utility/file/stat/test.sh` | none |
 | `util.stdbuf` | `stdbuf` | present | P4 | `test:tests/posix/utility/misc/stdbuf/test.sh` | none |
 | `util.strings` | `strings` | present | P4 | `test:tests/posix/utility/text2/strings/test.sh` | none |
-| `util.strip` | `strip` | missing | P4 | `none` | none |
+| `util.strip` | `strip` | present | P4 | `test:tests/posix/utility/binutils/strip/test.sh` | none |
 | `util.stty` | `stty` | present | P4 | `test:tests/posix/utility/system/stty/test.sh` | none |
 | `util.sum` | `sum` | present | P4 | `test:tests/posix/utility/misc/sum/test.sh` | none |
 | `util.sync` | `sync` | present | P4 | `test:tests/posix/utility/misc/sync/test.sh` | none |
 | `util.tabs` | `tabs` | missing | P4 | `none` | none |
 | `util.tac` | `tac` | present | P4 | `test:tests/posix/utility/misc/tac/test.sh` | none |
 | `util.tail` | `tail` | present | P4 | `test:tests/posix/utility/text/tail/test.sh` | none |
-| `util.talk` | `talk` | missing | P4 | `none` | none |
+| `util.talk` | `talk` | present | P4 | `test:tests/posix/utility/talk/test.sh` | none |
 | `util.tar` | `tar` | present | P4 | `test:tests/posix/utility/archive/tar/test.sh` | none |
 | `util.tee` | `tee` | present | P4 | `test:tests/posix/utility/text/tee/test.sh` | none |
-| `util.test` | `test` | missing | P4 | `none` | none |
+| `util.test` | `test` | present | P4 | `qtest:posix-shell` | none |
 | `util.time` | `time` | missing | P4 | `none` | none |
 | `util.timeout` | `timeout` | present | P4 | `test:tests/posix/utility/misc/timeout/test.sh` | none |
 | `util.times` | `times` | missing | P4 | `none` | none |
 | `util.touch` | `touch` | present | P4 | `test:tests/posix/utility/file/touch/test.sh` | none |
 | `util.tput` | `tput` | missing | P4 | `none` | none |
 | `util.tr` | `tr` | present | P4 | `test:tests/posix/utility/text/tr/test.sh` | none |
-| `util.trap` | `trap` | missing | P4 | `none` | none |
+| `util.trap` | `trap` | present | P4 | `qtest:posix-shell` | none |
 | `util.true` | `true` | present | P4 | `test:tests/posix/utility/misc/true/test.sh` | none |
 | `util.truncate` | `truncate` | present | P4 | `test:tests/posix/utility/misc/truncate/test.sh` | none |
 | `util.tsort` | `tsort` | present | P4 | `test:tests/posix/utility/text/tsort/test.sh` | none |
 | `util.tty` | `tty` | present | P4 | `test:tests/posix/utility/system/tty/test.sh` | none |
-| `util.type` | `type` | missing | P4 | `none` | none |
+| `util.type` | `type` | present | P4 | `qtest:posix-shell` | none |
 | `util.ulimit` | `ulimit` | missing | P4 | `none` | none |
-| `util.umask` | `umask` | missing | P4 | `none` | none |
-| `util.unalias` | `unalias` | missing | P4 | `none` | none |
+| `util.umask` | `umask` | present | P4 | `qtest:posix-shell` | none |
+| `util.unalias` | `unalias` | present | P4 | `qtest:posix-shell` | none |
 | `util.uname` | `uname` | present | P4 | `qtest:posix-util-system` | none |
 | `util.uncompress` | `uncompress` | present | P4 | `test:tests/posix/utility/compress/uncompress/test.sh` | none |
 | `util.unexpand` | `unexpand` | present | P4 | `test:tests/posix/utility/text/unexpand/test.sh` | none |
 | `util.unget` | `unget` | missing | P4 | `none` | none |
 | `util.uniq` | `uniq` | present | P4 | `test:tests/posix/utility/text/uniq/test.sh` | none |
 | `util.unlink` | `unlink` | present | P4 | `test:tests/posix/utility/file/unlink/test.sh` | none |
-| `util.unset` | `unset` | missing | P4 | `none` | none |
+| `util.unset` | `unset` | present | P4 | `qtest:posix-shell` | none |
 | `util.uptime` | `uptime` | present | P4 | `test:tests/posix/utility/misc/uptime/test.sh` | none |
 | `util.users` | `users` | present | P4 | `test:tests/posix/utility/misc/users/test.sh` | none |
-| `util.uucp` | `uucp` | missing | P4 | `none` | none |
+| `util.uucp` | `uucp` | present | P4 | `test:tests/posix/utility/uucp/uucp/test.sh` | none |
 | `util.uudecode` | `uudecode` | present | P4 | `test:tests/posix/utility/archive/uudecode/test.sh` | none |
 | `util.uuencode` | `uuencode` | present | P4 | `test:tests/posix/utility/archive/uuencode/test.sh` | none |
-| `util.uustat` | `uustat` | missing | P4 | `none` | none |
-| `util.uux` | `uux` | missing | P4 | `none` | none |
+| `util.uustat` | `uustat` | present | P4 | `test:tests/posix/utility/uucp/uustat/test.sh` | none |
+| `util.uux` | `uux` | present | P4 | `test:tests/posix/utility/uucp/uux/test.sh` | none |
 | `util.val` | `val` | missing | P4 | `none` | none |
 | `util.vi` | `vi` | missing | P4 | `none` | none |
-| `util.wait` | `wait` | missing | P4 | `none` | none |
+| `util.wait` | `wait` | waived | P4 | `none` | none; waiver: P45: PG-56 job control; no asynchronous child/job table |
 | `util.wc` | `wc` | present | P4 | `test:tests/posix/utility/text/wc/test.sh` | none |
 | `util.what` | `what` | missing | P4 | `none` | none |
 | `util.who` | `who` | present | P4 | `test:tests/posix/utility/misc/who/test.sh` | none |
 | `util.write` | `write` | present | P4 | `test:tests/posix/utility/ttytools/write/test.sh` | none |
 | `util.xargs` | `xargs` | present | P4 | `test:tests/posix/utility/xargs/test.sh` | none |
-| `util.yacc` | `yacc` | missing | P4 | `none` | none |
+| `util.yacc` | `yacc` | present | P4 | `test:tests/posix/utility/parsers/yacc/test.sh` | none |
 | `util.yes` | `yes` | present | P4 | `test:tests/posix/utility/misc/yes/test.sh` | none |
 | `util.zcat` | `zcat` | present | P4 | `test:tests/posix/utility/compress/zcat/test.sh` | none |
 
@@ -1774,16 +1774,16 @@ Traceability rows: 1799; profile rows: 1799.
 | `shell.field-splitting` | `field-splitting` | present | P4 | `qtest:posix-shell` | IFS field splitting |
 | `shell.function` | `function` | present | P4 | `qtest:posix-shell` | function definition and invocation |
 | `shell.getopts` | `getopts` | present | P4 | `qtest:posix-shell` | getopts option processing |
-| `shell.here-document` | `here-document` | waived | P4 | `none` | here-document redirection; waiver: P4a: target script/source stdout returns failed to write whole buffer; << and <<- are proven in the host fixture; follow-up target file-open/stdio |
+| `shell.here-document` | `here-document` | present | P4 | `qtest:posix-shell` | here-document redirection |
 | `shell.interactive-shell` | `interactive-shell` | waived | P4 | `none` | interactive prompt and command reading; waiver: P4a: interactive login is P9c; modern-shell-login records the dependency |
 | `shell.job-control` | `job-control` | waived | P4 | `none` | background jobs, fg/bg/jobs and terminal control; waiver: P4a: PG-56 process groups/sessions/tty control is not implemented |
-| `shell.list` | `list` | waived | P4 | `none` | sequence and asynchronous lists; waiver: P4a: sequence lists pass; asynchronous $! and wait pid need the job model (PG-56) |
+| `shell.list` | `list` | present | P4 | `qtest:posix-shell` | sequence and asynchronous lists |
 | `shell.loop` | `loop` | present | P4 | `qtest:posix-shell` | for/while/until loops |
 | `shell.parameter-expansion` | `parameter-expansion` | present | P4 | `qtest:posix-shell` | POSIX parameter expansion forms |
 | `shell.pathname-expansion` | `pathname-expansion` | present | P4 | `qtest:posix-shell` | glob expansion |
-| `shell.pipeline` | `pipeline` | waived | P4 | `none` | connect commands with pipes; waiver: P4a: PG-35 pipe2 is ENOSYS |
+| `shell.pipeline` | `pipeline` | present | P4 | `qtest:posix-shell` | connect commands with pipes |
 | `shell.quote-removal` | `quote-removal` | present | P4 | `qtest:posix-shell` | quote removal |
-| `shell.redirection` | `redirection` | waived | P4 | `none` | input/output/append/dup redirection; waiver: P4a: input <, exec 3<, exec 3<&- and >&- pass; target > and >> to a file return failed to write whole buffer; follow-up target file-open/stdio |
+| `shell.redirection` | `redirection` | present | P4 | `qtest:posix-shell` | input/output/append/dup redirection |
 | `shell.regular-builtin` | `regular-builtin` | present | P4 | `qtest:posix-shell` | regular built-in utility dispatch |
 | `shell.set-options` | `set-options` | present | P4 | `qtest:posix-shell` | set -e/-u/-x and positional parameters |
 | `shell.shell-variable` | `shell-variable` | present | P4 | `qtest:posix-shell` | shell variables and environment import/export |
@@ -1886,10 +1886,10 @@ Traceability rows: 1799; profile rows: 1799.
 
 ## Current tree
 
-- frozen exported symbols: 1441
-- `userland/bin` directories: 74
+- frozen exported symbols: 1483
+- `userland/bin` directories: 95
 - headers under `libc/ravenlibc/include`: 228
-- utility directories: adduser, ar, awk, bc, beep, cat, cmp, compress, cp, crontab, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, getconf, getty, grep, groupadd, hostname, id, ifconfig, kill, logger, login, ls, m4, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, nice, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, su, svcctl, tar, touch, umount, uname, uncompress, useradd, uudecode, uuencode, whoami, write, xargs, zcat
+- utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, logger, login, ls, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, touch, trace, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
 
 ## Top gaps
 
@@ -1901,22 +1901,10 @@ Traceability rows: 1799; profile rows: 1799.
 | header | `dirent.h` | `libc/ravenlibc/include` |
 | header | `fcntl.h` | `libc/ravenlibc/include` |
 | header | `fenv.h` | `libc/ravenlibc/include` |
-| header | `fmtmsg.h` | `libc/ravenlibc/include` |
-| header | `ftw.h` | `libc/ravenlibc/include` |
-| header | `grp.h` | `libc/ravenlibc/include` |
-| header | `iconv.h` | `libc/ravenlibc/include` |
-| header | `inttypes.h` | `libc/ravenlibc/include` |
-| header | `libgen.h` | `libc/ravenlibc/include` |
 | header | `math.h` | `libc/ravenlibc/include` |
-| header | `monetary.h` | `libc/ravenlibc/include` |
 | header | `mqueue.h` | `libc/ravenlibc/include` |
 | header | `ndbm.h` | `none` |
-| header | `net/if.h` | `libc/ravenlibc/include` |
-| header | `nl_types.h` | `libc/ravenlibc/include` |
 | header | `poll.h` | `libc/ravenlibc/include` |
-| header | `pwd.h` | `libc/ravenlibc/include` |
-| header | `regex.h` | `libc/ravenlibc/include` |
-| header | `search.h` | `libc/ravenlibc/include` |
 | header | `signal.h` | `libc/ravenlibc/include` |
 | header | `stdio.h` | `libc/ravenlibc/include` |
 | header | `stdlib.h` | `libc/ravenlibc/include` |
@@ -1932,15 +1920,12 @@ Traceability rows: 1799; profile rows: 1799.
 | header | `sys/statvfs.h` | `libc/ravenlibc/include` |
 | header | `sys/time.h` | `libc/ravenlibc/include` |
 | header | `sys/uio.h` | `libc/ravenlibc/include` |
-| header | `syslog.h` | `libc/ravenlibc/include` |
 | header | `termios.h` | `libc/ravenlibc/include` |
 | header | `time.h` | `libc/ravenlibc/include` |
 | header | `trace.h` | `none` |
-| header | `uchar.h` | `libc/ravenlibc/include` |
 | header | `ulimit.h` | `libc/ravenlibc/include` |
 | header | `unistd.h` | `libc/ravenlibc/include` |
 | header | `utime.h` | `libc/ravenlibc/include` |
-| header | `utmpx.h` | `libc/ravenlibc/include` |
 | header | `wchar.h` | `libc/ravenlibc/include` |
 | interface | `acct` | `none` |
 | interface | `acosfNx` | `none` |
@@ -1968,12 +1953,27 @@ Traceability rows: 1799; profile rows: 1799.
 | interface | `atan2fNx` | `none` |
 | interface | `atanfNx` | `none` |
 | interface | `atanhfNx` | `none` |
-| interface | `basename` | `none` |
 | interface | `brk` | `none` |
-| interface | `c16rtomb` | `none` |
-| interface | `c32rtomb` | `none` |
-| interface | `c8rtomb` | `none` |
 | interface | `cabs` | `none` |
 | interface | `cabsf` | `none` |
+| interface | `cabsfNx` | `none` |
+| interface | `cabsl` | `none` |
+| interface | `cacos` | `none` |
+| interface | `cacosf` | `none` |
+| interface | `cacosfNx` | `none` |
+| interface | `cacosh` | `none` |
+| interface | `cacoshf` | `none` |
+| interface | `cacoshfNx` | `none` |
+| interface | `cacoshl` | `none` |
+| interface | `cacosl` | `none` |
+| interface | `canonicalizefNx` | `none` |
+| interface | `carg` | `none` |
+| interface | `cargf` | `none` |
+| interface | `cargfNx` | `none` |
+| interface | `cargl` | `none` |
+| interface | `casin` | `none` |
+| interface | `casinf` | `none` |
+| interface | `casinfNx` | `none` |
+| interface | `casinh` | `none` |
 
-569 gap rows are listed in full in the tables above; this short table is a review aid.
+462 gap rows are listed in full in the tables above; this short table is a review aid.

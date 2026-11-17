@@ -33,7 +33,7 @@ __BEGIN_DECLS
 #define __NEED_size_t
 #define __NEED_gid_t
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 #define __NEED_FILE
 #endif
 
@@ -59,18 +59,18 @@ void           endgrent(void);
 void           setgrent(void);
 #endif
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 struct group  *fgetgrent(FILE *);
 int putgrent(const struct group *, FILE *);
 #endif
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 int getgrouplist(const char *, gid_t, gid_t *, int *);
 int setgroups(size_t, const gid_t *);
 int initgroups(const char *, gid_t);
 #endif
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 int setgroupent(int);
 #endif
 

@@ -272,10 +272,12 @@ RAVEN_1.0 {
 		read;
 		write;
 		# --- regex (C60c) ---
+		regasub;
 		regcomp;
 		regerror;
 		regexec;
 		regfree;
+		regnsub;
 		# --- glob (C60c) ---
 		fnmatch;
 		glob;
@@ -294,7 +296,9 @@ RAVEN_1.0 {
 		fts_read;
 		fts_set;
 		ftw;
+		ftw64;
 		nftw;
+		nftw64;
 		opendir;
 		posix_getdents;
 		readdir;
@@ -382,6 +386,7 @@ RAVEN_1.0 {
 		suboptarg;
 		# --- compat (C65; x86_64 only until its c_char follow-up) ---
 		addmntent; # x86_64
+		utmpxname; # x86_64
 		backtrace; # x86_64
 		backtrace_symbols; # x86_64
 		backtrace_symbols_fd; # x86_64
@@ -838,6 +843,38 @@ RAVEN_1.0 {
 		setlocale;
 		textdomain;
 		uselocale;
+		# --- locale/names (P1h) ---
+		basename;
+		c16rtomb;
+		c32rtomb;
+		c8rtomb;
+		catclose;
+		catgets;
+		catopen;
+		closelog;
+		dirname;
+		fmtmsg;
+		hcreate;
+		hcreate_r;
+		hdestroy;
+		hdestroy_r;
+		hsearch;
+		hsearch_r;
+		iconv;
+		iconv_close;
+		iconv_open;
+		mbrtoc16;
+		mbrtoc32;
+		mbrtoc8;
+		openlog;
+		setlogmask;
+		strfmon;
+		strfmon_l;
+		syslog;
+		umaxabs;
+		vsyslog;
+		wcstoimax;
+		wcstoumax;
 		# --- wchar (C60b) ---
 		wcscasecmp;
 		wcscat;
@@ -1017,6 +1054,11 @@ RAVEN_1.0 {
 		setnetent;
 		setprotoent;
 		setservent;
+		# --- net/if names (P1h) ---
+		if_freenameindex;
+		if_indextoname;
+		if_nameindex;
+		if_nametoindex;
 		# --- socket (C64b, C63) ---
 		accept;
 		accept4;
@@ -1181,6 +1223,7 @@ RAVEN_1.0 {
 		getpwnam_r;
 		getpwuid;
 		getpwuid_r;
+		putpwent;
 		setpassent;
 		setpwent;
 		uid_from_user;
@@ -1196,6 +1239,7 @@ RAVEN_1.0 {
 		getgrouplist;
 		gid_from_group;
 		group_from_gid;
+		putgrent;
 		setgrent;
 		setgroupent;
 		# --- exit registry and the stack guard (C61 integration) ---

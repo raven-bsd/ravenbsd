@@ -11,6 +11,7 @@
 pub(crate) mod cursor;
 pub(crate) mod getspent;
 pub(crate) mod lookup;
+pub(crate) mod putpwent;
 pub(crate) mod putspent;
 pub(crate) mod setspent;
 pub(crate) mod shadow;

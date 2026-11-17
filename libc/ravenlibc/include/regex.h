@@ -72,7 +72,7 @@ int	regexec(const regex_t *__restrict, const char *__restrict, size_t,
 	    regmatch_t [], int);
 void	regfree(regex_t *);
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 ssize_t	regnsub(char *, size_t, const char *, const regmatch_t *, const char *);
 ssize_t	regasub(char **, const char *, const regmatch_t *, const char *);
 #endif

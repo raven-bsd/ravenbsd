@@ -16,5 +16,6 @@ pub(crate) mod getgrnam_r;
 pub(crate) mod getgrouplist;
 pub(crate) mod gid_from_group;
 pub(crate) mod group_from_gid;
+pub(crate) mod putgrent;
 pub(crate) mod setgrent;
 pub(crate) mod setgroupent;

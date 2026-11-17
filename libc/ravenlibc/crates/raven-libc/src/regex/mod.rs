@@ -13,6 +13,7 @@ pub(crate) mod regcomp;
 pub(crate) mod regerror;
 pub(crate) mod regexec;
 pub(crate) mod regfree;
+pub(crate) mod regsub;
 
 use raven_libc_ctype::MbState;
 use raven_libc_regex::{MbResult, RegMatch, Regex, RegexLocale, Utf8Locale, Wctype};

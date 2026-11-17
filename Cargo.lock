@@ -1755,6 +1755,7 @@ dependencies = [
  "raven-libc-fmt",
  "raven-libc-fts",
  "raven-libc-glob",
+ "raven-libc-iconv",
  "raven-libc-locale",
  "raven-libc-m",
  "raven-libc-malloc",

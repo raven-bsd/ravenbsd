@@ -38,6 +38,7 @@ __BEGIN_DECLS
 typedef struct { intmax_t quot, rem; } imaxdiv_t;
 
 intmax_t imaxabs(intmax_t);
+uintmax_t umaxabs(intmax_t);
 imaxdiv_t imaxdiv(intmax_t, intmax_t);
 
 intmax_t strtoimax(const char *__restrict, char **__restrict, int);

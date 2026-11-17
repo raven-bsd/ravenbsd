@@ -34,7 +34,7 @@ __BEGIN_DECLS
 #define __NEED_uid_t
 #define __NEED_gid_t
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 #define __NEED_FILE
 #endif
 
@@ -62,12 +62,12 @@ struct passwd *getpwnam (const char *);
 int getpwuid_r (uid_t, struct passwd *, char *, size_t, struct passwd **);
 int getpwnam_r (const char *, struct passwd *, char *, size_t, struct passwd **);
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 struct passwd *fgetpwent(FILE *);
 int putpwent(const struct passwd *, FILE *);
 #endif
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 int setpassent(int);
 #endif
 
