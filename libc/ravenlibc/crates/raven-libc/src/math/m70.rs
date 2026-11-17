@@ -342,6 +342,36 @@ pub mod g8 {
         }
     }
 
+    extern "C" fn sqrtl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::sqrtl(*x);
+        }
+    }
+
+    extern "C" fn cbrtl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::cbrtl(*x);
+        }
+    }
+
     lda_to_i64!(llroundl, llroundl_inner);
     lda_nan!(nanl, nanl_inner);
+    lda_unary!(sqrtl, sqrtl_inner);
+    lda_unary!(cbrtl, cbrtl_inner);
+}
+
+/// `hypotl`.
+pub mod g9 {
+    use raven_libc_m::LongDouble;
+
+    extern "C" fn hypotl_inner(out: *mut LongDouble, x: *const LongDouble, y: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::hypotl(*x, *y);
+        }
+    }
+
+    lda_binary!(hypotl, hypotl_inner);
 }

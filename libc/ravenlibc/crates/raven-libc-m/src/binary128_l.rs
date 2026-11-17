@@ -163,6 +163,16 @@ pub fn significandl(x: LongDouble) -> LongDouble {
     x.significand()
 }
 
+/// `cbrtl`: the real cube root.
+pub fn cbrtl(x: LongDouble) -> LongDouble {
+    x.cbrt()
+}
+
+/// `hypotl`: `sqrt(x^2 + y^2)` without intermediate overflow.
+pub fn hypotl(x: LongDouble, y: LongDouble) -> LongDouble {
+    x.hypot(y)
+}
+
 /// `nanl`.
 pub fn nanl() -> LongDouble {
     LongDouble::nan()

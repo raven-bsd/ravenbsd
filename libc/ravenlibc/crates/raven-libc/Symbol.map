@@ -608,7 +608,7 @@ RAVEN_1.0 {
 		canonicalizef;
 		cbrt;
 		cbrtf;
-		cbrtl; # x86_64
+		cbrtl; # x86_64 aarch64
 		ceil;
 		ceilf;
 		ceill; # x86_64 aarch64
@@ -704,7 +704,7 @@ RAVEN_1.0 {
 		getpayloadf;
 		hypot;
 		hypotf;
-		hypotl; # x86_64
+		hypotl; # x86_64 aarch64
 		ilogb;
 		ilogbf;
 		ilogbl; # x86_64 aarch64
@@ -842,7 +842,7 @@ RAVEN_1.0 {
 		sinpif;
 		sqrt;
 		sqrtf;
-		sqrtl; # x86_64
+		sqrtl; # x86_64 aarch64
 		statvfs;
 		strfromd;
 		strfromf;

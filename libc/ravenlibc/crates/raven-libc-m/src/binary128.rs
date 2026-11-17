@@ -298,6 +298,78 @@ impl LongDouble128 {
         }
     }
 
+    /// `cbrt`: the real cube root, refined by Newton's method.
+    ///
+    /// The seed is an `f64` cube root of the mantissa (exact `f64` arithmetic, no platform
+    /// `cbrt`), scaled by the exponent reduced modulo three; three binary128 Newton steps then
+    /// take it to the 113-bit format. The result is within 1 ULP (see the tests and the C47o
+    /// report for the evidence); no in-tree binary128 oracle exists for a tighter claim.
+    pub fn cbrt(self) -> Self {
+        if self.is_zero() || !self.is_finite() {
+            return self;
+        }
+        if self.sign_bit() {
+            return self.abs().cbrt().copysign(LongDouble128::zero(true));
+        }
+        let (exponent, _) = unpack(self.bits);
+        // value = m * 2^e with m in [1, 2); reduce e = 3q + r so cbrt = cbrt(m * 2^r) * 2^q.
+        let q = exponent.div_euclid(3);
+        let scaled = self.scalbn(-(q * 3));
+        // `scaled` is now in [1, 8). An f64 Newton on the mantissa gives a ~50-bit seed.
+        let seed = scaled.to_f64();
+        let mut y = seed;
+        let mut step = 0u32;
+        while step < 6 {
+            y = (2.0 * y + seed / (y * y)) / 3.0;
+            step = step.saturating_add(1);
+        }
+        let two = LongDouble128::from_f64(2.0);
+        let three = LongDouble128::from_f64(3.0);
+        let mut root = LongDouble128::from_f64(y);
+        // Three binary128 Newton steps: 50 -> 100 -> 200 bits of accuracy.
+        let mut iteration = 0u32;
+        while iteration < 3 {
+            root = two.mul(root).add(scaled.div(root.mul(root))).div(three);
+            iteration = iteration.saturating_add(1);
+        }
+        if q == 0 {
+            return root;
+        }
+        let mut result = root.scalbn(q);
+        // Rounding of the intermediate steps can land one ULP off; correct with one nudge.
+        let mut nudge = 0u32;
+        while nudge < 2
+            && result.mul(result).mul(result).total_cmp(self) == core::cmp::Ordering::Greater
+        {
+            result = result.next_after(LongDouble128::zero(false));
+            nudge = nudge.saturating_add(1);
+        }
+        result
+    }
+
+    /// `hypot`: `sqrt(x^2 + y^2)` without intermediate overflow or underflow.
+    pub fn hypot(self, other: Self) -> Self {
+        if self.is_infinite() || other.is_infinite() {
+            return LongDouble128::infinity(false);
+        }
+        if self.is_nan() || other.is_nan() {
+            return LongDouble128::nan();
+        }
+        let a = self.abs();
+        let b = other.abs();
+        let (large, small) = if a.total_cmp(b) == core::cmp::Ordering::Less {
+            (b, a)
+        } else {
+            (a, b)
+        };
+        if large.is_zero() {
+            return LongDouble128::zero(false);
+        }
+        let ratio = small.div(large);
+        let sum = LongDouble128::one().add(ratio.mul(ratio));
+        large.mul(sum.sqrt())
+    }
+
     /// `|x|`.
     pub fn abs(self) -> Self {
         Self {
