@@ -338,15 +338,11 @@ mod program {
                 }
             }
             let (bytes, eof, interrupt) = take_input();
-            if interrupt {
-                if dispatch(session.escape(), client, transport) {
-                    return session.exit_status();
-                }
+            if interrupt && dispatch(session.escape(), client, transport) {
+                return session.exit_status();
             }
-            if eof {
-                if dispatch(session.local_eof(), client, transport) {
-                    return session.exit_status();
-                }
+            if eof && dispatch(session.local_eof(), client, transport) {
+                return session.exit_status();
             }
             for byte in bytes {
                 let event = session.local_char(char::from(byte));
