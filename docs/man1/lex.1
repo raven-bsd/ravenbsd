@@ -1,0 +1,73 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt LEX 1
+.Os RavenBSD
+.Sh NAME
+.Nm lex
+.Nd generate a C lexical scanner (bounded POSIX core)
+.Sh SYNOPSIS
+.Nm
+.Op Fl tv
+.Op Fl o Ar file
+.Op Ar file
+.Sh DESCRIPTION
+.Nm
+reads a lex specification and writes a C scanner.
+The definitions section supports
+.Li %{ ... %} ,
+name definitions and
+.Li %s
+inclusive or
+.Li %x
+exclusive start conditions.
+The rules section supports
+.Li yylex ,
+.Li yytext ,
+.Li yyleng ,
+.Li BEGIN ,
+.Li ECHO
+and
+.Li yywrap ,
+longest match with rule order, quoted strings, character classes, repetitions and
+.Li ^
+/
+.Li $
+line context.
+The generated scanner uses the host
+.Xr regex 3
+engine.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl t
+Write the scanner to standard output instead of
+.Pa lex.yy.c .
+.It Fl v
+Report the output path on standard error.
+.It Fl o Ar file
+Write to
+.Ar file .
+.El
+.Sh FILES
+.Bl -tag -width lex.yy.c
+.It Pa lex.yy.c
+Default output.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr yacc 1 ,
+.Xr regex 3
+.Sh BUGS
+Trailing context, the
+.Li <<EOF>>
+rule, GNU
+.Li %option ,
+.Li REJECT ,
+.Li yyless ,
+.Li unput
+and
+.Li input
+are not supported.
+The generated scanner reads its input into memory and does not support NUL bytes.
