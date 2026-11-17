@@ -4,12 +4,15 @@
 //! Process start: `__raven_libc_start`, the C8 stack parse and the fifteen ordered steps of
 //! `donor-map/10` 3.12.2, costed by `donor-map/16` 3.A.9.1.
 //!
-//! The entry objects (`crt1.o`, `Scrt1.o`, `rcrt1.o`) call this one function with four
+//! The entry objects (`crt1.o`, `Scrt1.o`, `rcrt1.o`) call this one function with five
 //! arguments (C61 4.2, RD-new 1):
 //!
 //! * `sp0`: the C8 stack (`CONTRACTS.md` C8);
 //! * `rtld_fini`: the loader exit hook, or 0 (static and static-PIE);
-//! * `iplt_start`, `iplt_end`: the static `IRELATIVE` range, or 0, 0.
+//! * `iplt_start`, `iplt_end`: the static `IRELATIVE` range, or 0, 0;
+//! * `entry`: the program entry (`main`) address from the crt object. Passing it explicitly
+//!   keeps the shared libc free of a strong undefined `main`; a program with its own entry
+//!   (the Rust PIE `_start`) never calls this function.
 //!
 //! The function is split into a stage 1 that owns the parsed auxiliary vector and a stage 2
 //! that runs the constructors and `main`, so the auxv frame does not stay live for the life of
@@ -174,9 +177,6 @@ unsafe extern "C" {
     /// The one main-thread initialisation of C64 (`src/pthread/__raven_init_main_thread.rs`).
     fn __raven_init_main_thread(auxv: *const usize, canary: usize);
 
-    /// The program entry point linked into the executable.
-    fn main(argc: c_int, argv: *const *const u8, envp: *const *const u8) -> c_int;
-
     /// `yes`/`no` owner of the environment block; C41 provides the storage.
     static mut environ: *mut *mut u8;
     /// The full program name.
@@ -247,9 +247,9 @@ unsafe extern "C" {
 ///
 /// # Safety
 ///
-/// `sp0` must be the C8 stack pointer the kernel or `spawn` built and the two `iplt` words the
-/// static `IRELATIVE` range of the link (or 0, 0). Only `crt1.o`, `Scrt1.o` and `rcrt1.o` call
-/// this, with exactly those values.
+/// `sp0` must be the C8 stack pointer the kernel or `spawn` built, the two `iplt` words the
+/// static `IRELATIVE` range of the link (or 0, 0), and `entry` the program's `main` address.
+/// Only `crt1.o`, `Scrt1.o` and `rcrt1.o` call this, with exactly those values.
 #[unsafe(no_mangle)]
 #[inline(never)]
 pub unsafe extern "C" fn __raven_libc_start(
@@ -257,6 +257,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     rtld_fini: usize,
     iplt_start: usize,
     iplt_end: usize,
+    entry: usize,
 ) -> ! {
     // STEP 1: parse the C8 stack; a broken argv terminator is a hard start error.
     // SAFETY: the entry object passes the C8 stack pointer; the parser bounds every read.
@@ -360,8 +361,9 @@ pub unsafe extern "C" fn __raven_libc_start(
 
     // Steps 12-15 run in stage 2 so this frame, with the auxiliary table, is gone before the
     // program's constructors and `main`.
-    // SAFETY: the C8 arrays outlive the process and `rtld_fini` is the loader's hook or 0.
-    unsafe { stage2(stack.argc, stack.argv, stack.envp, rtld_fini) }
+    // SAFETY: the C8 arrays outlive the process, `rtld_fini` is the loader's hook or 0, and
+    // `entry` is the `main` address the crt object passed.
+    unsafe { stage2(stack.argc, stack.argv, stack.envp, rtld_fini, entry) }
 }
 
 /// Install every strong hook of the shell.
@@ -388,6 +390,7 @@ unsafe fn stage2(
     argv: *const *const u8,
     envp: *const *const u8,
     rtld_fini: usize,
+    entry: usize,
 ) -> ! {
     // STEP 12: the constructor arrays run below; the step-13 registration is made first so the
     // finaliser is the oldest exit entry and therefore runs last (10-13).
@@ -426,10 +429,14 @@ unsafe fn stage2(
     // STEP 14: the initial `errno` value is zero.
     raven_libc_sys::errno::set_errno(0);
 
-    // STEP 15: run `main` and leave through the stdlib `exit`.
-    // SAFETY: `main` is the program's entry point with the C signature, and `argv`/`envp` are
-    // the C8 arrays.
-    let code = unsafe { main(argc as c_int, argv, envp) };
+    // STEP 15: run the entry the crt passed and leave through the stdlib `exit`. The pointer is
+    // the program's `main`; libc itself no longer references a strong `main`, so a Rust PIE that
+    // never calls this start path loads without one.
+    // SAFETY: the crt passes the address of a function with the C `main` signature; `argv` and
+    // `envp` are the C8 arrays.
+    let main: extern "C" fn(c_int, *const *const u8, *const *const u8) -> c_int =
+        unsafe { core::mem::transmute(entry) };
+    let code = main(argc as c_int, argv, envp);
     crate::stdlib::exit::exit(code)
 }
 
