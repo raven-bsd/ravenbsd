@@ -423,15 +423,7 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
             RunBackend::HostLinux => {
                 bail!("host-linux: raven-libc-sys has no Linux backend (O-B5)");
             }
-            RunBackend::Qemu => {
-                if config.suite.framework == Framework::Atf {
-                    bail!(
-                        "qemu backend: on-target ATF listing/execution is a later ticket (C73); \
-                         exit-status suites are supported"
-                    );
-                }
-            }
-            RunBackend::None => {}
+            RunBackend::Qemu | RunBackend::None => {}
         }
         let Some(_sysroot) = &config.sysroot else {
             bail!("target mode needs --sysroot DIR");
@@ -696,13 +688,12 @@ fn process_program(
     let mut outcomes = Vec::new();
     match suite.framework {
         Framework::Atf => {
-            let cases_list = match runner::list(
-                report
-                    .binary
-                    .as_deref()
-                    .expect("built program has a binary"),
-                Some(&source_dir),
-                config.max_timeout,
+            let cases_list = match list_cases(
+                config,
+                suite,
+                program,
+                report.binary.as_deref(),
+                &source_dir,
             ) {
                 Ok(cases) => cases,
                 Err(error) => {
@@ -829,6 +820,31 @@ fn process_program(
     })
 }
 
+fn list_cases(
+    config: &RunConfig,
+    suite: &SuiteFile,
+    program: &Program,
+    binary: Option<&Path>,
+    source_dir: &Path,
+) -> Result<Vec<TpCase>> {
+    let Some(binary) = binary else {
+        bail!("program {} has no binary", program.name);
+    };
+    if config.mode == Mode::Target && config.backend == RunBackend::Qemu {
+        let work_root = config
+            .out
+            .join("work")
+            .join(&suite.suite)
+            .join(&program.name);
+        fs::create_dir_all(&work_root)
+            .with_context(|| format!("cannot create {}", work_root.display()))?;
+        let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
+        let guest = qemu::Guest::new(&config.root);
+        return qemu::list_atf(&qemu, &guest, binary, &work_root, config.keep);
+    }
+    runner::list(binary, Some(source_dir), config.max_timeout)
+}
+
 fn run_case(
     config: &RunConfig,
     suite: &SuiteFile,
@@ -851,7 +867,8 @@ fn run_case(
         return match config.backend {
             RunBackend::Qemu => {
                 let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
-                qemu::run_init_program(&qemu, binary, 0, &work_root, config.keep)
+                let guest = qemu::Guest::new(&config.root);
+                qemu::run_atf_case(&qemu, &guest, binary, case, &work_root, config.keep)
             }
             _ => Ok(runner::Observation {
                 verdict: Verdict::NotRun,
@@ -886,16 +903,37 @@ fn run_exit(
     if config.mode == Mode::Target {
         return match config.backend {
             RunBackend::Qemu => {
-                if !program.args.is_empty() {
-                    // The kernel starts `/init` with only argv[0] (`kernel/src/process/mod.rs`);
-                    // a program that needs arguments is honestly not run, not a false failure.
-                    return Ok(runner::Observation {
-                        verdict: Verdict::NotRun,
-                        reason: "qemu-no-argv".to_string(),
-                    });
-                }
                 let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
-                qemu::run_init_program(&qemu, binary, program.expect_exit, &work_root, config.keep)
+                if program.args.is_empty() {
+                    qemu::run_init_program(
+                        &qemu,
+                        binary,
+                        program.expect_exit,
+                        &work_root,
+                        config.keep,
+                    )
+                } else {
+                    let guest = qemu::Guest::new(&config.root);
+                    let env = qemu::target_env();
+                    let observation = qemu::run_guest(
+                        &qemu,
+                        &guest,
+                        &qemu::GuestJob {
+                            program: binary,
+                            mode: qemu::GuestMode::Exec,
+                            args: &program.args,
+                            env: &env,
+                            result: None,
+                            workdir: &work_root,
+                            keep: config.keep,
+                        },
+                    )?;
+                    Ok(qemu::judge_guest(
+                        &observation,
+                        program.expect_exit,
+                        config.max_timeout,
+                    ))
+                }
             }
             _ => Ok(runner::Observation {
                 verdict: Verdict::NotRun,

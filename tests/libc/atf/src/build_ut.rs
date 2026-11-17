@@ -283,6 +283,7 @@ fn target_link_args_use_lld_without_the_clang_driver() {
     assert_eq!(args[1], "gnu");
     assert_eq!(args[2], "--sysroot=/sysroot");
     assert!(args.contains(&"-static".to_string()));
+    assert!(args.contains(&"--gc-sections".to_string()));
     assert!(args.windows(2).any(|pair| pair == ["-o", "/out/program"]));
     let crt1 = args
         .iter()
@@ -335,6 +336,29 @@ fn target_link_args_add_libatf_for_atf_only() {
         !plain
             .iter()
             .any(|arg| arg == "/out/libatf-c/target/libatf-c.a")
+    );
+}
+
+#[test]
+fn the_target_shim_compiles_with_the_target_headers() {
+    let args = target_shim_args(
+        Path::new("/sysroot"),
+        Path::new("/src/rl_target_shim.c"),
+        Path::new("/out/rl_target_shim.o"),
+    );
+    assert!(
+        args.iter()
+            .any(|arg| arg == "--target=x86_64-unknown-ravenbsd")
+    );
+    assert!(args.iter().any(|arg| arg == "--sysroot=/sysroot"));
+    assert!(args.iter().any(|arg| arg == "-I/sysroot/usr/include"));
+    assert!(
+        args.windows(2)
+            .any(|pair| pair == ["-c", "/src/rl_target_shim.c"])
+    );
+    assert!(
+        args.windows(2)
+            .any(|pair| pair == ["-o", "/out/rl_target_shim.o"])
     );
 }
 

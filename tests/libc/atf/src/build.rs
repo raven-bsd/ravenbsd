@@ -19,6 +19,8 @@ use crate::{BuildStatus, Framework, Mode};
 
 /// Directory of ATF's own sources inside `vendor/atf`.
 const ATF_SOURCES: &[&str] = &["atf-c", "atf-c/detail"];
+/// Weak target diagnostics the C donor tests call but the current C ABI does not export.
+const TARGET_SHIM: &str = "tests/libc/atf/shim/rl_target_shim.c";
 
 /// Builds programs in one mode.
 #[derive(Clone, Debug)]
@@ -289,6 +291,7 @@ impl Builder {
                 self.build_atf()?;
             }
         }
+        object_list.push(self.target_shim()?);
         let args = target_link_args(
             sysroot,
             &binary,
@@ -314,6 +317,27 @@ impl Builder {
             report.missing_symbols = missing_symbols;
             Ok(report)
         }
+    }
+
+    /// Compile the weak target shim once per output tree.
+    fn target_shim(&self) -> Result<PathBuf> {
+        let sysroot = self.sysroot()?;
+        let directory = self.out.join("target-shim");
+        fs::create_dir_all(&directory)
+            .with_context(|| format!("cannot create {}", directory.display()))?;
+        let object = directory.join("rl_target_shim.o");
+        let source = self.root.join(TARGET_SHIM);
+        let args = target_shim_args(sysroot, &source, &object);
+        let output = run(self.target_compiler(), &args, self.root())?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot compile the target shim: {line}");
+        }
+        Ok(object)
     }
 
     fn report(&self, output: CommandOutput, binary: Option<PathBuf>) -> BuildReport {
@@ -553,6 +577,22 @@ fn rust_lld() -> Option<PathBuf> {
     None
 }
 
+/// Arguments that compile the weak target shim with the target headers.
+fn target_shim_args(sysroot: &Path, source: &Path, object: &Path) -> Vec<String> {
+    vec![
+        "--target=x86_64-unknown-ravenbsd".to_string(),
+        format!("--sysroot={}", sysroot.display()),
+        "-std=gnu11".to_string(),
+        "-O1".to_string(),
+        "-w".to_string(),
+        format!("-I{}", sysroot.join("usr/include").display()),
+        "-c".to_string(),
+        source.display().to_string(),
+        "-o".to_string(),
+        object.display().to_string(),
+    ]
+}
+
 /// Arguments for the direct-lld target link (no clang driver in the path).
 fn target_link_args(
     sysroot: &Path,
@@ -571,6 +611,9 @@ fn target_link_args(
         "-z".to_string(),
         "max-page-size=4096".to_string(),
         "--error-limit=0".to_string(),
+        // Drop unreferenced libc sections: the kernel `PROC_EXEC` image limit is 1 MiB, and the
+        // full static archive otherwise leaves an ATF program just over it.
+        "--gc-sections".to_string(),
         "-o".to_string(),
         binary.display().to_string(),
         sysroot.join("usr/lib/crt1.o").display().to_string(),

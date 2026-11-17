@@ -93,6 +93,123 @@ fn the_image_installs_the_kernel_and_initfs() {
 }
 
 #[test]
+fn guest_markers_round_trip() {
+    let text = "boot\nG1-OUTPUT-BEGIN\nhello\nworld\nG1-OUTPUT-END\nG1-EXIT 3\n";
+    assert_eq!(marker_int(text, "G1-EXIT "), Some(3));
+    assert_eq!(
+        marker_block(text, "G1-OUTPUT-BEGIN", "G1-OUTPUT-END"),
+        Some(b"hello\nworld".to_vec())
+    );
+    assert_eq!(
+        marker_string("G1-RESULT-ERROR open failed\n", "G1-RESULT-ERROR "),
+        Some("open failed".to_string())
+    );
+    let crlf = "G1-RESULT-BEGIN\r\npassed\r\nG1-RESULT-END\r\n";
+    assert_eq!(
+        marker_block(crlf, "G1-RESULT-BEGIN", "G1-RESULT-END"),
+        Some(b"passed".to_vec())
+    );
+}
+
+#[test]
+fn the_guest_manifest_carries_argv_env_and_result() {
+    let text = guest_manifest(
+        GuestMode::Exec,
+        &["hello world".to_string(), "-x".to_string()],
+        &["TZ=UTC".to_string()],
+        Some("/tmp/result"),
+    );
+    assert!(text.contains("mode=exec\n"));
+    assert!(text.contains("program=/tests/program\n"));
+    assert!(text.contains("arg=/tests/program\n"));
+    assert!(text.contains("arg=hello world\n"));
+    assert!(text.contains("arg=-x\n"));
+    assert!(text.contains("env=TZ=UTC\n"));
+    assert!(text.contains("result=/tmp/result\n"));
+}
+
+#[test]
+fn the_guest_initfs_has_the_services_and_the_program() {
+    let config = QemuConfig::new(Path::new("/repo"), 60);
+    let guest = Guest::new(Path::new("/repo"));
+    let specs = guest_initfs_specs(
+        &config,
+        &guest,
+        Path::new("/out/program"),
+        Path::new("/work/manifest"),
+        Path::new("/work/g1.toml"),
+        None,
+        Path::new("/work/svcd.conf"),
+    );
+    assert!(
+        specs
+            .iter()
+            .any(|spec| spec == "/init=/repo/build/fixtures/g1/guest/bin/init")
+    );
+    assert!(
+        specs
+            .iter()
+            .any(|spec| spec == "/tests/program=/out/program:0755")
+    );
+    assert!(
+        specs
+            .iter()
+            .any(|spec| spec == "/etc/services.d/vfsd.toml=/repo/etc/services.d/vfsd.toml")
+    );
+    assert!(
+        specs
+            .iter()
+            .any(|spec| spec == "/g1/manifest=/work/manifest")
+    );
+}
+
+#[test]
+fn exec_read_adds_the_result_reader_service() {
+    let (service, reader, svcd) = guest_service(GuestMode::ExecRead);
+    assert!(service.contains("args = [\"g1wrap\", \"run\"]"));
+    let reader = reader.expect("reader service");
+    assert!(reader.contains("args = [\"g1wrap\", \"read\"]"));
+    assert!(reader.contains("needs = [\"g1\"]"));
+    assert_eq!(svcd, "exit_when_exits = \"g1-read\"\n");
+    let (_, reader, svcd) = guest_service(GuestMode::Exec);
+    assert!(reader.is_none());
+    assert_eq!(svcd, "exit_when_exits = \"g1\"\n");
+}
+
+#[test]
+fn guest_judging_uses_the_wrapper_exit_code() {
+    let pass = GuestObservation {
+        exit: Some(0),
+        output: Vec::new(),
+        result: None,
+        result_error: None,
+        qemu_status: Some(33),
+        timed_out: false,
+        serial: String::new(),
+    };
+    assert_eq!(judge_guest(&pass, 0, 60).verdict, Verdict::Pass);
+    let fail = GuestObservation {
+        exit: Some(2),
+        ..pass.clone()
+    };
+    assert_eq!(judge_guest(&fail, 0, 60).verdict, Verdict::Fail);
+    assert_eq!(
+        judge_guest(&fail, 0, 60).reason,
+        "behaviour:expected exit 0, got 2"
+    );
+    let crashed = GuestObservation { exit: None, ..pass };
+    assert_eq!(judge_guest(&crashed, 0, 60).verdict, Verdict::Fail);
+}
+
+#[test]
+fn the_target_environment_has_the_host_runner_values() {
+    let env = target_env();
+    assert!(env.iter().any(|item| item == "TMPDIR=/tmp"));
+    assert!(env.iter().any(|item| item == "TZ=UTC"));
+    assert!(env.iter().any(|item| item == "LC_ALL=C.UTF-8"));
+}
+
+#[test]
 fn qemu_uses_the_c5_exit_device_and_stdio_serial() {
     let args = qemu_args(
         Path::new("/work/boot.img"),
