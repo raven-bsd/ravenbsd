@@ -38,11 +38,16 @@ extern crate alloc;
 mod context;
 mod id;
 mod sampling;
+mod sink;
 mod trace;
 mod tracer;
 
 pub use context::TraceContext;
 pub use id::{COUNTER_BITS, COUNTER_MASK, SpanId, TraceId, TraceIdGen};
 pub use sampling::Sampling;
+pub use sink::{
+    RING_MAGIC, RING_VERSION, RingError, RingHeader, Span, SpanKind, SpanRecord, SpanRing,
+    TraceReader, TraceSink,
+};
 pub use trace::{Error, Limits, Trace};
 pub use tracer::Tracer;
