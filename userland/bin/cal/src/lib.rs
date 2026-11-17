@@ -285,7 +285,7 @@ fn month_lines(year: i32, month: u32) -> Vec<String> {
     for day in 1..=days_in_month(year, month) {
         cells.push(Some(day));
     }
-    while cells.len() % 7 != 0 {
+    while !cells.len().is_multiple_of(7) {
         cells.push(None);
     }
     for week in cells.chunks(7) {
