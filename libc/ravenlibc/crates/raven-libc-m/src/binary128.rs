@@ -160,6 +160,19 @@ impl LongDouble128 {
         self.bits
     }
 
+    /// Bridge from C42's `raven_libc_dtoa::LongDouble` byte image.
+    ///
+    /// The gdtoa output is already the target `long double` bit image; on aarch64/riscv64 that
+    /// image is IEEE binary128, so the bridge is the little-endian 128-bit pattern.
+    pub fn from_dtoa_bytes(bytes: [u8; 16]) -> Self {
+        Self::from_bits(u128::from_le_bytes(bytes))
+    }
+
+    /// Bridge to C42's `raven_libc_dtoa::LongDouble` byte image.
+    pub fn to_dtoa_bytes(self) -> [u8; 16] {
+        self.to_bits().to_le_bytes()
+    }
+
     /// Signed zero.
     pub const fn zero(negative: bool) -> Self {
         Self {
