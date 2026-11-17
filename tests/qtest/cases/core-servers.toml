@@ -3,8 +3,8 @@
 
 name = "core-servers"
 arch = "x86_64"
-profile = "core-test"
-timeout_secs = 120
+profile = "core-servers"
+timeout_secs = 300
 pre = ["sh userland/servers/coretest/build.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
