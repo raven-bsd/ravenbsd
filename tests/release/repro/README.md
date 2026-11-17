@@ -4,8 +4,9 @@
 # Release image reproducibility fixtures
 
 This directory records the host-only two-build check for the 0.1.0 release images. The executable
-check is `scripts/repro-release.sh`; the recorded hashes and the determinism verdict are in
-`docs/releases/0.1.0-repro.md`.
+check is `scripts/repro-release.sh`; the method, the commit-id input and the diagnosis table are
+in `docs/releases/0.1.0-repro.md`; the recorded hashes for the branch commit are in
+`tickets/dave/reports/C74cs.md`.
 
 ## Running it
 
@@ -18,7 +19,10 @@ sh scripts/repro-release.sh --self-test     # comparison logic only, no image bu
 
 The full run takes about one minute per architecture on a warm tree and needs
 `RAVEN_RPI_FIRMWARE` (or `ravenbsd-resources/rpi-firmware/boot` in the usual workspace layout)
-for the Pi 4 leg. A missing firmware directory is a hard failure, not a skip.
+for the Pi 4 leg. A missing firmware directory is a hard failure, not a skip. The tree must be
+clean: the image embeds `<git-id>[-dirty] <commit-date>`, so a dirty build is not a release
+artifact. The script verifies the kernel carries the current clean commit id before accepting a
+pair.
 
 ## What the self-test covers
 
@@ -34,16 +38,11 @@ comparison code must classify:
 It also checks that SHA-256 returns 64 hex characters. It never touches `build/` and never claims
 an image verdict.
 
-## Recorded run (2026-11-17, `24f8cbff`)
+## Recorded run
 
-| Image | Size | SHA-256 (a = b) | Verdict |
-|---|---|---|---|
-| x86_64 `release` | 335544320 | `f270369a8664b7aa0d1b87e3fd295291d3ee9f0ec051cb2011c8e4350ae8df14` | REPRODUCIBLE |
-| Pi 4 `pi4-release` | 335544320 | `230d9a0ce243cd55a5144d0c2ecd5c6836639994845d2996cc08bd9e23bef73c` | REPRODUCIBLE |
-
-The constituent `kernel.elf`, `loader.efi` and `initfs.img` hashes matched between the two builds
-for both images. The complete artifact hashes, environment and the future-difference diagnosis
-table are in `docs/releases/0.1.0-repro.md`.
+The recorded pair for the commit that added this check (both images 335544320 bytes, build a =
+build b, all constituent artifacts matching) is in `tickets/dave/reports/C74cs.md`. The hash is
+commit-specific because the kernel carries the git id; do not compare it to a different commit.
 
 ## Scope
 

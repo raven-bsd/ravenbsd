@@ -89,6 +89,10 @@ elf_build_id() {
     fi
 }
 
+kernel_version_id() {
+    strings "$1" 2>/dev/null | grep -m1 -F "$2" || true
+}
+
 copy_artifacts() {
     arch=$1
     destination=$2
@@ -185,6 +189,26 @@ build_image() {
     esac
 }
 
+verify_kernel_id() {
+    arch=$1
+    kernel=build/$arch/kernel.elf
+    if [ ! -f "$kernel" ]; then
+        echo "repro-release: $kernel is missing after the $arch build" >&2
+        return 1
+    fi
+    if ! strings "$kernel" 2>/dev/null | grep -qF "$head "; then
+        echo "repro-release: $arch kernel does not carry the clean-tree build id '$head '" >&2
+        echo "  the image builder reused an artifact from another commit or a dirty tree" >&2
+        echo "  remove build/$arch/kernel.elf (and loader/initfs if advised) and rerun" >&2
+        strings "$kernel" 2>/dev/null | grep -E 'RavenBSD kernel|20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | head -3 >&2 || true
+        return 1
+    fi
+    if strings "$kernel" 2>/dev/null | grep -qF "$head-dirty "; then
+        echo "repro-release: $arch kernel was built from a dirty tree" >&2
+        return 1
+    fi
+}
+
 check_arch() {
     arch=$1
     work=$out/$arch
@@ -194,6 +218,9 @@ check_arch() {
     for side in a b; do
         echo "==> $arch image build $side"
         build_image "$arch" "$side" "$work/$side.img" "$work/logs/build-$side.log" || return 1
+        if ! verify_kernel_id "$arch"; then
+            return 1
+        fi
         copy_artifacts "$arch" "$work/$side-artifacts"
     done
 
@@ -279,6 +306,25 @@ self_test() {
 if [ "$self_test" -eq 1 ]; then
     self_test
     exit $?
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+    echo "repro-release: working tree is dirty; a release image must be built from a clean commit" >&2
+    echo "  commit or stash the changes first (git status lists them)" >&2
+    exit 2
+fi
+head=$(git rev-parse --short HEAD)
+epoch=$(git log -1 --format=%ct)
+SOURCE_DATE_EPOCH=$epoch
+export SOURCE_DATE_EPOCH
+echo "repro-release: commit=$head SOURCE_DATE_EPOCH=$epoch"
+
+# The kernel embeds `RAVEN_BUILD_ID`; cargo reruns the kernel build when the id env changes, but
+# a cached artifact from another tree state must never be accepted. Rebuild the kernel from this
+# checkout before the pair (cheap: one crate), which also makes the embedded-id check meaningful.
+if ! cargo clean -p raven-kernel >/dev/null 2>&1; then
+    echo "repro-release: could not clean the cached kernel crate" >&2
+    exit 2
 fi
 
 if [ "$archs" = all ]; then
