@@ -29,7 +29,8 @@ but never given a thread is reaped at once: it can never run, so
 completes immediately.
 .Pp
 .Nm
-may be called again on the same terminal process; it returns the stored code each time.  The
+may be called again on the same terminal process; it returns the stored code each time.
+The
 teardown itself (address space, handle table, scheme names) runs exactly once.
 .Sh RETURN VALUES
 On success

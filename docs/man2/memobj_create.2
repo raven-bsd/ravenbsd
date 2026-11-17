@@ -10,9 +10,11 @@
 .Ft Handle
 .Fn memobj_create "usize len" "usize flags"
 .Sh DESCRIPTION
-The .Nm system call creates a memory object. With a zero
+The .Nm system call creates a memory object.
+With a zero
 .Fa flags
-argument it is anonymous and zero-filled. With the
+argument it is anonymous and zero-filled.
+With the
 .Dv memobj::PAGER
 flag the caller becomes the object's pager: no frames are allocated, the
 returned handle is the pager key, and page faults are served with

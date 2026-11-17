@@ -12,7 +12,8 @@
 .Nm writes up to
 .Fa max
 records of `{ cookie: u64, events: u32, _pad: u32 }` and returns their count.
-Zero timeout means wait indefinitely; an elapsed timeout returns zero.  Only
+Zero timeout means wait indefinitely; an elapsed timeout returns zero.
+Only
 one thread may block in a particular queue at a time.
 .Sh ERRORS
 .Bl -tag -width Er

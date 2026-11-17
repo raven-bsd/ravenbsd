@@ -20,7 +20,8 @@ u32 attach_count
 struct { u32 handle; u32 rights_mask; } attach[attach_count]
 .Ed
 .Pp
-All fields are little-endian.  At most four attachments are accepted.
+All fields are little-endian.
+At most four attachments are accepted.
 Each
 .Va handle
 is looked up in the replying server's table and must carry

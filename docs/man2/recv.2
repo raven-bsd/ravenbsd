@@ -30,7 +30,8 @@ The returned handle is a server-side request handle; pass it to
 to complete the request.
 .Pp
 The captured buffers are kernel-owned copies of the client range, not mappings of the client's
-frames.  A
+frames.
+A
 .Dv READ
 capture is writable and is copied back to the client on completion when the client's mapping
 is unchanged; a
@@ -40,7 +41,8 @@ or
 request capture is read-only for the server.
 The server sees the bytes as they were when the syscall started.
 .Pp
-The destination address is validated when a request is dequeued.  If it is not a valid user
+The destination address is validated when a request is dequeued.
+If it is not a valid user
 range, the request is completed with
 .Er EPROTO
 (so its client never waits forever) and
@@ -65,8 +67,8 @@ is smaller than one packet, or the caller has no registered scheme.
 is not a valid user destination.
 .El
 .Sh SEE ALSO
-.Xr send 2 ,
 .Xr call 2 ,
+.Xr send 2 ,
 .Xr scheme 7
 .Sh STANDARDS
 RavenBSD ABI v1.

@@ -18,18 +18,22 @@ and
 .Pp
 Filesystem
 .Nm
-is sequential.  The server keeps the cursor in the open-file description and
-advances it by the number of bytes returned.  The wire offset must be zero; a
+is sequential.
+The server keeps the cursor in the open-file description and
+advances it by the number of bytes returned.
+The wire offset must be zero; a
 server returns
 .Er EINVAL
-for a nonzero offset.  There is no positional read in protocol version 1.
+for a nonzero offset.
+There is no positional read in protocol version 1.
 The kernel has no offset argument for this syscall and always sends zero; a
 server-side nonzero offset can only come from a raw protocol peer.
 .Pp
 A
 .Xr dup 2
 or a transferred reference shares the same description, so a read through either
-handle advances the same cursor.  The
+handle advances the same cursor.
+The
 .Xr close 2
 of one duplicate does not disturb the survivor.
 .Pp
@@ -37,14 +41,16 @@ On a directory handle,
 .Nm
 returns packed directory-entry records (see
 .Pa raven-proto-fs ) .
-A zero-byte result is end of directory.  A buffer smaller than the next complete
+A zero-byte result is end of directory.
+A buffer smaller than the next complete
 record returns
 .Er EINVAL .
 The server records the directory generation at the first read; if a create,
 unlink, rmdir, rename or symlink changes the directory before the next read, the
 next read returns
 .Er EINVAL
-and the caller must reopen the directory to restart.  Directory entries do not
+and the caller must reopen the directory to restart.
+Directory entries do not
 include
 .Ql .\&
 or
