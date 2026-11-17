@@ -1,0 +1,60 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt LOGGER 1
+.Os RavenBSD
+.Sh NAME
+.Nm logger
+.Nd write a record to the system log
+.Sh SYNOPSIS
+.Nm
+.Op Fl p Ar priority
+.Op Fl t Ar tag
+.Op Fl f Ar file
+.Op Ar message ...
+.Sh DESCRIPTION
+.Nm
+opens
+.Pa log:<tag>
+and writes
+.Dq Li <priority> Ns Ar message
+to the
+.Nm logd
+ring.
+The default priority is
+.Ql user.notice
+and the default tag is
+.Ql logger .
+.Pp
+The priority is a number, a
+.Ql facility.severity
+pair, a severity, or a facility.
+Supported facilities are
+.Ql kern , user , mail , daemon , auth , syslog , lpr , news , uucp , cron ,
+.Ql authpriv , ftp
+and
+.Ql local0
+through
+.Ql local7 ;
+severities are
+.Ql emerg , alert , crit , err , warning , notice , info
+and
+.Ql debug .
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl p Ar priority
+Select the syslog priority.
+.It Fl t Ar tag
+Select the log name.
+.It Fl f Ar file
+Log the file contents instead of the message operands.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A read/write or usage error exits non-zero.
+.Sh SEE ALSO
+.Xr dmesg 1 ,
+.Xr syslog 3
+.Sh STANDARDS
+IEEE Std 1003.1-2024
+.Pq POSIX.1-2024 .

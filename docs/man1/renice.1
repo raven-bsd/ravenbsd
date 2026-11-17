@@ -1,0 +1,49 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt RENICE 1
+.Os RavenBSD
+.Sh NAME
+.Nm renice
+.Nd alter the nice value of a process, process group or user
+.Sh SYNOPSIS
+.Nm
+.Op Fl n
+.Ar priority
+.Op Fl p | Fl g | Fl u
+.Ar id ...
+.Sh DESCRIPTION
+.Nm
+sets the absolute nice value
+.Ar priority
+for each target and prints the resulting value as
+.Dq Li id: value .
+The kernel enforces the same permission rules as
+.Xr setpriority 2 :
+an unprivileged caller may only lower its own niceness.
+.Pp
+The default selector is a process id.
+.Fl g
+selects a process group and
+.Fl u
+a user id.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl n
+Take the priority from the following argument.
+.It Fl p
+Select process ids.
+.It Fl g
+Select process-group ids.
+.It Fl u
+Select user ids.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A target failure exits 1; a usage error exits 2.
+.Sh SEE ALSO
+.Xr nice 1 ,
+.Xr getpriority 2
+.Sh STANDARDS
+IEEE Std 1003.1-2024
+.Pq POSIX.1-2024 .

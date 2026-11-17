@@ -61,3 +61,15 @@ id = "util.nohup"
 status = "present"
 evidence = "qtest:posix-util-system"
 notes = "P4o: non-terminal stdout path; exec and exit status. Terminal-only nohup.out redirection is unavailable (no fd 1/isatty/dup2) and is recorded as a libc/tty follow-up"
+
+[[row]]
+id = "util.logger"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4u: first-party logger; priority/tag record through log: and dmesg readback"
+
+[[row]]
+id = "util.renice"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4u: first-party renice; set/query niceness through P2l and kernel permission rules"

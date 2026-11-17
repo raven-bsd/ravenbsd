@@ -1,0 +1,37 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt MESG 1
+.Os RavenBSD
+.Sh NAME
+.Nm mesg
+.Nd control terminal write permission
+.Sh SYNOPSIS
+.Nm
+.Op y | n
+.Sh DESCRIPTION
+.Nm
+reports whether other users may write to the current terminal.
+With
+.Ql y
+it attempts to allow writes and with
+.Ql n
+to refuse them by changing the terminal's group-write bit.
+.Pp
+The current
+.Pa tty:console
+server exposes a fixed mode and has no chmod operation, so the query works
+but a set request fails. That is the exact
+.Ql P4u-D1
+follow-up.
+.Sh EXIT STATUS
+.Ex -std
+The query exits 0 when writes are allowed and 1 when they are refused.
+A failed set or usage error exits non-zero.
+.Sh SEE ALSO
+.Xr tty 1 ,
+.Xr stty 1
+.Sh STANDARDS
+IEEE Std 1003.1-2024
+.Pq POSIX.1-2024 ,
+except the unavailable set path noted above.
