@@ -470,3 +470,118 @@ fn modf_returns_the_fraction_and_the_truncated_integral() {
     let (fraction, integral) = LongDouble128::from_f64(f64::NAN).modf();
     assert!(fraction.is_nan() && integral.is_nan());
 }
+
+#[test]
+fn cbrt_is_within_one_ulp_of_the_f64_reference() {
+    // Exact cubes and special values.
+    assert_eq!(LongDouble128::from_f64(8.0).cbrt().to_f64(), 2.0);
+    assert_eq!(LongDouble128::from_f64(27.0).cbrt().to_f64(), 3.0);
+    assert_eq!(LongDouble128::from_f64(0.125).cbrt().to_f64(), 0.5);
+    assert_eq!(LongDouble128::from_f64(-27.0).cbrt().to_f64(), -3.0);
+    assert!(LongDouble128::zero(false).cbrt().is_zero());
+    assert!(LongDouble128::from_f64(f64::INFINITY).cbrt().is_infinite());
+    assert!(
+        LongDouble128::from_f64(f64::NEG_INFINITY)
+            .cbrt()
+            .is_infinite()
+    );
+    assert!(LongDouble128::from_f64(-1.0).cbrt().to_f64() < -0.99);
+    // f64 is the only in-tree reference for the binary128 result; compare its rounding.
+    for &value in &[
+        0.5,
+        1.0,
+        2.0,
+        3.0,
+        7.0,
+        1e-9,
+        1e9,
+        1234.5,
+        1.0e300,
+        1.0e-300,
+        f64::MIN_POSITIVE,
+    ] {
+        let got = LongDouble128::from_f64(value).cbrt().to_f64();
+        let want = value.cbrt();
+        assert_eq!(got, want, "cbrt({value})");
+    }
+}
+
+#[test]
+fn hypot_is_exact_for_f64_pythagorean_triples() {
+    let hypot = |x: f64, y: f64| {
+        LongDouble128::from_f64(x)
+            .hypot(LongDouble128::from_f64(y))
+            .to_f64()
+    };
+    assert_eq!(hypot(3.0, 4.0), 5.0);
+    assert_eq!(hypot(5.0, 12.0), 13.0);
+    assert_eq!(hypot(8.0, 15.0), 17.0);
+    assert_eq!(hypot(0.0, 0.0), 0.0);
+    assert_eq!(hypot(-3.0, -4.0), 5.0);
+    // `hypot(x, 0)` must be exactly `|x|` (the scaled path multiplies by one).
+    for &value in &[1.0, 2.5, 1.0e300, 1.0e-300, f64::MIN_POSITIVE] {
+        assert_eq!(
+            LongDouble128::from_f64(value)
+                .hypot(LongDouble128::zero(false))
+                .to_f64(),
+            value.abs()
+        );
+        assert_eq!(
+            LongDouble128::from_f64(value)
+                .hypot(LongDouble128::zero(false))
+                .to_bits(),
+            LongDouble128::from_f64(value).abs().to_bits()
+        );
+    }
+    assert!(
+        LongDouble128::from_f64(f64::INFINITY)
+            .hypot(LongDouble128::from_f64(f64::NAN))
+            .is_infinite()
+    );
+    assert!(
+        LongDouble128::from_f64(1.0)
+            .hypot(LongDouble128::from_f64(f64::NAN))
+            .is_nan()
+    );
+    // The scaling keeps huge and tiny pairs finite.
+    assert_eq!(hypot(1.0e300, 1.0e300), 1.4142135623730951e300);
+    assert_eq!(hypot(1.0e-300, 1.0e-300), 1.4142135623730951e-300);
+}
+
+#[test]
+fn cbrt_and_hypot_match_the_f64_oracle_over_a_deterministic_sweep() {
+    // The only in-tree reference for binary128 is the host f64 math; the binary128 result must
+    // round to the same f64 for a spread of exponents and mantissas. Deterministic LCG, no
+    // dependency, so the sweep is reproducible.
+    let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut checked = 0u32;
+    while checked < 2_000 {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let x = f64::from_bits(state);
+        if !x.is_finite() || x == 0.0 {
+            continue;
+        }
+        assert_eq!(
+            LongDouble128::from_f64(x).cbrt().to_f64(),
+            x.cbrt(),
+            "cbrt({x})"
+        );
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let y = f64::from_bits(state);
+        if !y.is_finite() {
+            continue;
+        }
+        assert_eq!(
+            LongDouble128::from_f64(x)
+                .hypot(LongDouble128::from_f64(y))
+                .to_f64(),
+            x.hypot(y),
+            "hypot({x}, {y})"
+        );
+        checked = checked.saturating_add(1);
+    }
+}
