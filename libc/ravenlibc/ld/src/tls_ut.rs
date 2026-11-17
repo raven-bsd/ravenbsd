@@ -81,3 +81,38 @@ fn the_variant_one_aarch64_first_module_rounds_to_64() {
     .expect("layout");
     assert!(layout.offset >= 16);
 }
+
+#[test]
+fn the_tls_desc_argument_uses_the_tpoff_formula() {
+    use raven_libc_elf::Arch;
+    use raven_libc_elf::consts::{TLS_TCB_SIZE, TLS_TP_OFFSET_RISCV};
+
+    let sym = 0x10u64;
+    let addend = -0x8i64;
+    let module = 0x40i64;
+    let biased = sym.wrapping_add_signed(addend);
+
+    assert_eq!(
+        desc_argument(Arch::X86_64, sym, addend, module),
+        biased.wrapping_sub(module as u64)
+    );
+    assert_eq!(
+        desc_argument(Arch::Aarch64, sym, addend, module),
+        biased.wrapping_add(module as u64)
+    );
+    assert_eq!(
+        desc_argument(Arch::Riscv64, sym, addend, module),
+        biased
+            .wrapping_add(module as u64)
+            .wrapping_sub(TLS_TP_OFFSET_RISCV)
+            .wrapping_sub(TLS_TCB_SIZE)
+    );
+}
+
+#[test]
+fn an_aarch64_tls_desc_argument_is_the_module_offset() {
+    use raven_libc_elf::Arch;
+
+    assert_eq!(desc_argument(Arch::Aarch64, 0, 0, 0x50), 0x50);
+    assert_eq!(desc_argument(Arch::Aarch64, 4, 4, 0x50), 0x58);
+}

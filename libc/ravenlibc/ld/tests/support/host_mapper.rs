@@ -74,6 +74,7 @@ struct State {
     writes_outside: usize,
     events: Vec<Event>,
     debug: Vec<u8>,
+    tls_offsets: Vec<(u32, usize)>,
 }
 
 type Shared = Rc<RefCell<State>>;
@@ -455,8 +456,23 @@ impl RelocApplier for HostApplier {
         u64::from(obj.0).saturating_add(1)
     }
 
-    fn tls_static_offset(&mut self, _obj: raven_libc_elf::ObjId) -> Result<i64, ApplyError> {
-        Ok(0)
+    fn tls_static_offset(&mut self, obj: raven_libc_elf::ObjId) -> Result<i64, ApplyError> {
+        let state = self.state.borrow();
+        let offset = state
+            .tls_offsets
+            .iter()
+            .find(|(id, _)| *id == obj.0)
+            .map_or(0, |(_, offset)| *offset);
+        i64::try_from(offset).map_err(|_| ApplyError::OutOfRange)
+    }
+
+    fn set_tls_offset(&mut self, obj: raven_libc_elf::ObjId, offset: usize) {
+        let mut state = self.state.borrow_mut();
+        if let Some(entry) = state.tls_offsets.iter_mut().find(|(id, _)| *id == obj.0) {
+            entry.1 = offset;
+        } else {
+            state.tls_offsets.push((obj.0, offset));
+        }
     }
 
     fn tls_desc_alloc(
@@ -493,6 +509,16 @@ impl RelocApplier for HostApplier {
 }
 
 impl HostApplier {
+    /// The static TLS offset recorded for `obj`, if the loader assigned one.
+    pub fn tls_offset(&self, obj: raven_libc_elf::ObjId) -> Option<usize> {
+        self.state
+            .borrow()
+            .tls_offsets
+            .iter()
+            .find(|(id, _)| *id == obj.0)
+            .map(|(_, offset)| *offset)
+    }
+
     fn write(&mut self, addr: u64, bytes: &[u8]) -> Result<(), ApplyError> {
         let mut state = self.state.borrow_mut();
         let len = u64::try_from(bytes.len()).map_err(|_| ApplyError::BadAlignment)?;
