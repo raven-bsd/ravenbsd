@@ -1014,6 +1014,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         i32::try_from(self.rlimits().nofile_soft).unwrap_or(i32::MAX)
     }
 
+    /// `gettid`: the calling thread's stable tid (`THREAD_SELF`).
+    pub fn gettid(&self) -> Result<i32, Errno> {
+        raven_libc_sys::sys::thread_self().map(|tid| i32::try_from(tid).unwrap_or(i32::MAX))
+    }
+
     /// `gethostid`: `sys:kern/hostid`, or zero when the sysctl is absent.
     pub fn gethostid(&self) -> i32 {
         let Ok(bytes) = self.read_sys(b"kern/hostid") else {

@@ -1337,3 +1337,915 @@ id = "interface.wcsftime_l"
 status = "present"
 evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 notes = "P1 batch B: wchar/wctype wcsftime_l; raven-libc-ctype suite and libc.a symbol"
+
+# P1 batch B math.h: added exports; executable evidence and libc.a symbol.
+
+[[row]]
+id = "interface.statvfs"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: math.h statvfs; package suite and libc.a symbol"
+
+# P1 batch B stdlib.h: added exports; executable evidence and libc.a symbol.
+
+[[row]]
+id = "interface.at_quick_exit"
+status = "present"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
+notes = "P1 batch B: stdlib.h at_quick_exit; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.quick_exit"
+status = "present"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
+notes = "P1 batch B: stdlib.h quick_exit; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.mkstemp"
+status = "present"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
+notes = "P1 batch B: stdlib.h mkstemp; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.strtold"
+status = "present"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
+notes = "P1 batch B: stdlib.h strtold; package suite and libc.a symbol"
+
+# P1 batch B stdio.h: added exports; executable evidence and libc.a symbol.
+
+[[row]]
+id = "interface.cuserid"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h cuserid; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.dprintf"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h dprintf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.gets"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h gets; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.renameat2"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h renameat2; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.tmpfile"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h tmpfile; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.tmpfile64"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h tmpfile64; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.tmpnam"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h tmpnam; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.vdprintf"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h vdprintf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.vsnprintf_l"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: stdio.h vsnprintf_l; package suite and libc.a symbol"
+
+# P1 batch B wchar.h: added exports; executable evidence and libc.a symbol.
+
+[[row]]
+id = "interface.fgetwc_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fgetwc_unlocked; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.fgetws"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fgetws; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.fputwc"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fputwc; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.fputwc_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fputwc_unlocked; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.fputws"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fputws; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.fputws_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fputws_unlocked; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.fwide"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fwide; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.getwc"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h getwc; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.getwc_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h getwc_unlocked; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.getwchar"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h getwchar; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.getwchar_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h getwchar_unlocked; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.putwc"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h putwc; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.putwc_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h putwc_unlocked; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.putwchar"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h putwchar; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.putwchar_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h putwchar_unlocked; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.ungetwc"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h ungetwc; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.wprintf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h wprintf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.fwprintf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fwprintf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.swprintf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h swprintf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.wscanf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h wscanf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.fwscanf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h fwscanf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.swscanf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h swscanf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.vwprintf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h vwprintf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.vfwprintf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h vfwprintf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.vswprintf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h vswprintf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.vwscanf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h vwscanf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.vfwscanf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h vfwscanf; package suite and libc.a symbol"
+
+[[row]]
+id = "interface.vswscanf"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar.h vswscanf; package suite and libc.a symbol"
+
+# P1 batch B: the fNx rows are ISO C/TS 18661-3 notation placeholders, not linkable symbols.
+
+[[row]]
+id = "interface.acosfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.acoshfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.asinfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.asinhfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.atan2fNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.atanfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.atanhfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cabsfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cacosfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cacoshfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.canonicalizefNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cargfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.casinfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.casinhfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.catanfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.catanhfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.ccosfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.ccoshfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.ceilfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cexpfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cimagfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.clogfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.conjfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.copysignfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cosfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.coshfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cpowfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.cprojfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.crealfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.csinfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.csinhfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.csqrtfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.ctanfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.ctanhfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.exp10fNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.exp2fNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.expfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.expm1fNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.fabsfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.fdimfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.floorfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.fmafNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.fmaxfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.fmaxmagfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.fminfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.fminmagfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.fmodfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.frexpfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.getpayloadfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.hypotfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.ldexpfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.llogbfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.llrintfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.llroundfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.log10fNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.log2fNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.logbfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.logfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.logp1fNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.lrintfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.lroundfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.modffNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.nanfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.nearbyintfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.nextafterfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.nextdownfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.nextupfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.powfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.remainderfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.rintfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.roundevenfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.roundfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.setpayloadfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.setpayloadsigfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.sinfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.sinhfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.sqrtfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.tanfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.tanhfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.truncfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.ufromfpxfNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+[[row]]
+id = "interface.wcstofNx"
+status = "waived"
+evidence = ""
+notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+# P1 batch B stdlib: the ecvt/fcvt digit buffers.
+[[row]]
+id = "interface.ecvt_r"
+status = "present"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
+notes = "P1 batch B: ecvt_r over the C42 digit generator; stdlib suite and libc.a symbol"
+
+[[row]]
+id = "interface.fcvt_r"
+status = "present"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
+notes = "P1 batch B: fcvt_r over the C42 digit generator; stdlib suite and libc.a symbol"
+
+# P1 batch B wchar numeric: the wide strto* bridge.
+
+[[row]]
+id = "interface.wcstod"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstod over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstof"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstof over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstold"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstold over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstol"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstol over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoll"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoll over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoul"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoul over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoull"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoull over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoimax"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoimax over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoumax"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoumax over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+# P1 batch B time timers/getdate and wchar conversions.
+
+[[row]]
+id = "interface.getdate"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time getdate; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_create"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_create; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_delete"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_delete; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_getoverrun"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_getoverrun; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_gettime"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_gettime; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_settime"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_settime; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.mbsnrtowcs"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar mbsnrtowcs; ctype/stdio suite and libc.a symbol"
+
+[[row]]
+id = "interface.mbsrtowcs"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar mbsrtowcs; ctype/stdio suite and libc.a symbol"
+
+[[row]]
+id = "interface.open_wmemstream"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar open_wmemstream; ctype/stdio suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsnrtombs"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar wcsnrtombs; ctype/stdio suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsrtombs"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar wcsrtombs; ctype/stdio suite and libc.a symbol"
+
+# P1 batch B stdio: the process-pipe pair.
+
+[[row]]
+id = "interface.popen"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: popen over the kernel raw PIPE2 call, posix_spawn and waitpid; libc.a symbol"
+
+[[row]]
+id = "interface.pclose"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
+notes = "P1 batch B: pclose over the kernel raw PIPE2 call, posix_spawn and waitpid; libc.a symbol"
+
+# P1 batch B time: the process CPU clock id.
+[[row]]
+id = "interface.clock_getcpuclockid"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: clock_getcpuclockid returns CLOCK_PROCESS_CPUTIME_ID for pid 0/the caller; other pids return ESRCH. raven-libc-time suite and libc.a symbol"

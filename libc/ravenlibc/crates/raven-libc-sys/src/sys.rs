@@ -110,6 +110,13 @@ pub fn nanosleep(ns: u64) -> Result<(), Errno> {
         .map(|_| ())
 }
 
+/// Return the calling thread's stable 30-bit thread id (`THREAD_SELF`).
+pub fn thread_self() -> Result<u32, Errno> {
+    // SAFETY: THREAD_SELF takes no arguments and returns the tid directly.
+    let value = unsafe { arch::syscall0(raven_abi::syscall::THREAD_SELF) };
+    crate::errno::ret(value).and_then(|value| u32::try_from(value).map_err(|_| Errno::EOVERFLOW))
+}
+
 /// Read the system identification record.
 pub fn uname() -> Result<Uname, Errno> {
     let mut record = Uname::zeroed();

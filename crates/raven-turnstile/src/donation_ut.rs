@@ -213,3 +213,45 @@ fn stats_and_objects_are_delegated() {
     // An untouched object reports the default (all-zero) snapshot.
     assert_eq!(d.stats(99), crate::LockStats::default());
 }
+
+#[test]
+fn end_call_no_alloc_matches_full_refresh() {
+    let mut d = Donation::new();
+    d.register(0, prio(20)).unwrap(); // server, owns lock 9
+    d.register(1, prio(5)).unwrap(); // client
+    d.register(2, prio(10)).unwrap(); // waiter on the server's lock
+    d.begin_call(1, 0).unwrap();
+    d.acquire(9, 0).unwrap();
+    d.block(9, 2).unwrap();
+    assert_eq!(d.effective_priority(0), Some(prio(5)));
+
+    d.end_call_no_alloc(1, 0).expect("edge removal");
+    assert!(!d.is_dirty(), "three-thread graph fits the bound");
+    assert_eq!(d.effective_priority(0), Some(prio(10)));
+    // The global recomputation must agree with the allocation-free local one.
+    d.check_invariants()
+        .expect("invariant after allocation-free end_call");
+
+    assert_eq!(d.end_call_no_alloc(1, 0), Err(DonationError::StaleCall));
+}
+
+#[test]
+fn end_call_no_alloc_marks_wide_graphs_dirty() {
+    // A 65-deep call chain: removing the head edge affects 65 dependents, one more than the
+    // allocation-free bound, so the graph is marked dirty instead of allocating in teardown.
+    const CHAIN: u32 = 65;
+    let mut d = Donation::new();
+    for thread in 0..=CHAIN {
+        d.register(thread, prio(u8::try_from(thread).unwrap()))
+            .unwrap();
+    }
+    for thread in 0..CHAIN {
+        d.begin_call(thread, thread + 1).unwrap();
+    }
+    d.end_call_no_alloc(0, 1).expect("edge removal");
+    assert!(d.is_dirty(), "wide dependent closure must be deferred");
+    d.refresh_if_dirty();
+    assert!(!d.is_dirty());
+    d.check_invariants()
+        .expect("invariant after deferred refresh");
+}

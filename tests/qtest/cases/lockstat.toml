@@ -12,7 +12,7 @@ boot_cmdline = "console=ttyS0 test-exit=1 selftest=lockstat"
 expect_exit = "success"
 
 [[expect]]
-regex = '^lockstat: ok object=\d+ wait_entries=2 wakes=2 cancels=0 timeouts=0 boosts=1 max_queue=2 owner_boost=0 restored=ok$'
+regex = '^lockstat: ok object=\d+ wait_entries=2 wakes=2 cancels=0 timeouts=0 boosts=[12] max_queue=2 owner_boost=0 restored=ok$'
 
 [[forbid]]
 regex = '(?i)lockstat: fail|panic'

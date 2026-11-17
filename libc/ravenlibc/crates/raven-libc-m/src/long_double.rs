@@ -19,6 +19,7 @@
 //! arithmetic is not implemented yet and is listed in the C47c report.
 
 use core::cmp::Ordering;
+use core::ops::{Add, Div, Mul, Neg, Sub};
 
 use crate::consts::{FP_INFINITE, FP_NAN, FP_NORMAL, FP_SUBNORMAL, FP_ZERO};
 
@@ -537,6 +538,53 @@ impl LongDouble {
             significand += 1;
         }
         LongDouble::from_parts(negative, 0, significand)
+    }
+}
+
+impl PartialEq for LongDouble {
+    fn eq(&self, other: &Self) -> bool {
+        LongDouble::partial_cmp(*self, *other) == Some(Ordering::Equal)
+    }
+}
+
+impl PartialOrd for LongDouble {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        LongDouble::partial_cmp(*self, *other)
+    }
+}
+
+impl Neg for LongDouble {
+    type Output = Self;
+    fn neg(self) -> Self {
+        LongDouble::from_bits(self.to_bits() ^ SIGN_MASK)
+    }
+}
+
+impl Add for LongDouble {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        LongDouble::add(self, other)
+    }
+}
+
+impl Sub for LongDouble {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        LongDouble::sub(self, other)
+    }
+}
+
+impl Mul for LongDouble {
+    type Output = Self;
+    fn mul(self, other: Self) -> Self {
+        LongDouble::mul(self, other)
+    }
+}
+
+impl Div for LongDouble {
+    type Output = Self;
+    fn div(self, other: Self) -> Self {
+        LongDouble::div(self, other)
     }
 }
 

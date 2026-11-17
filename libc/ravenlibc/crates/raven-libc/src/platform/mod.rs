@@ -54,6 +54,7 @@ pub(crate) mod renameat;
 pub(crate) mod rmdir;
 pub(crate) mod stat;
 pub(crate) mod statfs;
+pub(crate) mod statvfs;
 pub(crate) mod symlink;
 pub(crate) mod symlinkat;
 pub(crate) mod sync;

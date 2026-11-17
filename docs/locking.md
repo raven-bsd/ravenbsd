@@ -166,10 +166,22 @@ Landed (OBSERVED):
   client -> server -> lock-owner chain runs the owner at the client's priority. After every edge
   change the kernel re-applies all registered threads' effective priorities
   (`sync_all_boosts`), which also restores base priorities when an edge disappears.
+* Teardown (`L6b`): `donation_end_call` uses `Donation::end_call_no_alloc`. It removes the edge
+  immediately and recomputes only the server's dependent closure (lock owners it waits on, call
+  servers it calls) with a local fixed point over a fixed 64-thread array; outside that closure
+  the cached priorities are stable, so the result is exact. A wider closure marks the graph dirty
+  and the next allocating mutation refreshes it wholesale. Nothing allocates or sorts on the
+  process-death, fault or cancel path, which is what `proc-death-cleanup` exercises.
 * Nested calls compose recursively: the boosted server thread is itself the client of the next
   call, and its effective priority (not its base) is the donation value.
-* `selftest=locking` and `selftest=ipc-donation` are QEMU qtests (`locking`, `ipc-donation`); both
-  assert the observed boost and the restoration.
+* `selftest=locking`, `selftest=lockstat` and `selftest=ipc-donation` are QEMU qtests (`locking`,
+  `lockstat`, `ipc-donation`); both assert the observed boost and the restoration.
+* Wake protocol (`L6b`): a thread that blocks for a selftest sets its "asleep" flag *after*
+  `begin_block`; the waker waits for that flag and calls `sync::wake_blocked`, which retries until
+  `sched::wake` accepts the wake (it returns `false` for a `Ready` thread without leaving a
+  pending wake). `Mutex::unlock` uses the same retrying wake for a handed-off waiter, closing the
+  preemption window between `block` and `block_current`. The lockstat owner sleeps while both
+  waiters queue, so no spin gate depends on a particular CPU placement.
 
 The global recomputation may be replaced by incremental propagation along the wait-for chain
 (bounded depth 8) as long as it yields the same effective priorities (PROPOSED). Deadlock

@@ -21,8 +21,9 @@ archive=build/x86_64/libc.a
 [ -f "$archive" ] || { echo "posix time: $archive is missing" >&2; exit 1; }
 
 for symbol in \
-    asctime clock_nanosleep ctime stime strftime_l strptime_l \
-    timespec_get timespec_getres tzset wcsftime
+    asctime clock_getcpuclockid clock_nanosleep ctime getdate stime strftime_l strptime_l \
+    timespec_get timespec_getres tzset wcsftime timer_create timer_delete timer_getoverrun \
+    timer_gettime timer_settime
 do
     if ! nm -g --defined-only "$archive" 2>/dev/null | grep -Eq " $symbol$"; then
         echo "posix time: missing libc.a symbol $symbol" >&2
