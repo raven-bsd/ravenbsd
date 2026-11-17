@@ -233,6 +233,17 @@ pub fn fetestexcept(excepts: i32) -> i32 {
     (current_flags() & (excepts as u32) & FE_ALL_EXCEPT) as i32
 }
 
+/// Set the given exception flags without raising them (C23 `fesetexcept`).
+pub fn fesetexcept(excepts: i32) -> i32 {
+    let saved = FexceptT((excepts as u32) & FE_ALL_EXCEPT);
+    fesetexceptflag(&saved, excepts)
+}
+
+/// Test the flags saved in `flagp` against `excepts` (C23 `fetestexceptflag`).
+pub fn fetestexceptflag(flagp: &FexceptT, excepts: i32) -> i32 {
+    (flagp.0 & (excepts as u32) & FE_ALL_EXCEPT) as i32
+}
+
 /// The current rounding mode.
 pub fn fegetround() -> i32 {
     let mut control = 0u16;

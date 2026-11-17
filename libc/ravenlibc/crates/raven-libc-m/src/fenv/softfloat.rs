@@ -134,6 +134,17 @@ pub fn fetestexcept(excepts: i32) -> i32 {
     (flags_of(load()) & (excepts as u32) & FE_ALL_EXCEPT) as i32
 }
 
+/// Set the given flags without raising them (C23 `fesetexcept`).
+pub fn fesetexcept(excepts: i32) -> i32 {
+    let saved = FexceptT((excepts as u32) & FE_ALL_EXCEPT);
+    fesetexceptflag(&saved, excepts)
+}
+
+/// Test the flags saved in `flagp` against `excepts` (C23 `fetestexceptflag`).
+pub fn fetestexceptflag(flagp: &FexceptT, excepts: i32) -> i32 {
+    (flagp.0 & (excepts as u32) & FE_ALL_EXCEPT) as i32
+}
+
 /// The rounding mode: always nearest on the soft profile.
 pub fn fegetround() -> i32 {
     FE_TONEAREST as i32

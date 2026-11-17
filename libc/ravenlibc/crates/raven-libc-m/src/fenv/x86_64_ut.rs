@@ -132,3 +132,21 @@ fn the_mode_record_saves_the_control_state() {
     assert_eq!(fegetround(), FE_TOWARDZERO as i32);
     assert_eq!(fesetround(saved), 0);
 }
+
+#[test]
+fn setexcept_and_testexceptflag_round_trip() {
+    feclearexcept(FE_ALL_EXCEPT as i32);
+    assert_eq!(fesetexcept((FE_OVERFLOW | FE_INEXACT) as i32), 0);
+    assert_eq!(
+        fetestexcept(FE_ALL_EXCEPT as i32),
+        (FE_OVERFLOW | FE_INEXACT) as i32
+    );
+    let mut flag = FexceptT::default();
+    assert_eq!(fegetexceptflag(&mut flag, FE_ALL_EXCEPT as i32), 0);
+    assert_eq!(
+        fetestexceptflag(&flag, FE_OVERFLOW as i32),
+        FE_OVERFLOW as i32
+    );
+    assert_eq!(fetestexceptflag(&flag, FE_INVALID as i32), 0);
+    feclearexcept(FE_ALL_EXCEPT as i32);
+}

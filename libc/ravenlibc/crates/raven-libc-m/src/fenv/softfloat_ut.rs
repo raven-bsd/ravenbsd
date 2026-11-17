@@ -6,7 +6,7 @@
 #![allow(clippy::panic, clippy::unwrap_used)]
 
 use super::*;
-use crate::consts::{FE_ALL_EXCEPT, FE_INEXACT, FE_OVERFLOW, FE_TONEAREST, FE_UPWARD};
+use crate::consts::{FE_ALL_EXCEPT, FE_INEXACT, FE_INVALID, FE_OVERFLOW, FE_TONEAREST, FE_UPWARD};
 
 #[test]
 fn flags_are_software_state() {
@@ -64,4 +64,22 @@ fn exception_masks_are_software_too() {
     assert_eq!(fedisableexcept(FE_INEXACT as i32), FE_INEXACT as i32);
     let _ = feenableexcept(previous);
     let _ = fedisableexcept(FE_ALL_EXCEPT as i32);
+}
+
+#[test]
+fn setexcept_and_testexceptflag_round_trip() {
+    feclearexcept(FE_ALL_EXCEPT as i32);
+    assert_eq!(fesetexcept((FE_OVERFLOW | FE_INEXACT) as i32), 0);
+    assert_eq!(
+        fetestexcept(FE_ALL_EXCEPT as i32),
+        (FE_OVERFLOW | FE_INEXACT) as i32
+    );
+    let mut flag = FexceptT::default();
+    assert_eq!(fegetexceptflag(&mut flag, FE_ALL_EXCEPT as i32), 0);
+    assert_eq!(
+        fetestexceptflag(&flag, FE_OVERFLOW as i32),
+        FE_OVERFLOW as i32
+    );
+    assert_eq!(fetestexceptflag(&flag, FE_INVALID as i32), 0);
+    feclearexcept(FE_ALL_EXCEPT as i32);
 }
