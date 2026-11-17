@@ -278,3 +278,178 @@ fn binary_name_reads_the_first_bin() {
 fn binary_name_rejects_a_bad_manifest() {
     assert!(binary_name("not toml [", "x").is_err());
 }
+
+static NEXT_ELF: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+fn put16(data: &mut [u8], offset: usize, value: u16) {
+    data[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+}
+
+fn put32(data: &mut [u8], offset: usize, value: u32) {
+    data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn put64(data: &mut [u8], offset: usize, value: u64) {
+    data[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
+}
+
+fn put_i64(data: &mut [u8], offset: usize, value: i64) {
+    data[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
+}
+
+#[allow(clippy::too_many_arguments)] // an ELF program header is naturally eight fields
+fn put_phdr(
+    data: &mut [u8],
+    index: usize,
+    kind: u32,
+    flags: u32,
+    file_offset: u64,
+    vaddr: u64,
+    filesz: u64,
+    memsz: u64,
+) {
+    let offset = 64 + index * 56;
+    put32(data, offset, kind);
+    put32(data, offset + 4, flags);
+    put64(data, offset + 8, file_offset);
+    put64(data, offset + 16, vaddr);
+    put64(data, offset + 24, vaddr);
+    put64(data, offset + 32, filesz);
+    put64(data, offset + 40, memsz);
+    put64(data, offset + 48, 0x1000);
+}
+
+/// A minimal ELF64/aarch64 PIE with one RELA target in the R-only segment and a TEXREL pair.
+fn textrel_elf(machine: u16) -> Vec<u8> {
+    let mut data = vec![0u8; 0x500];
+    data[0..4].copy_from_slice(b"\x7fELF");
+    data[4] = 2;
+    data[5] = 1;
+    put16(&mut data, 18, machine);
+    put64(&mut data, 0x20, 64);
+    put16(&mut data, 0x36, 56);
+    put16(&mut data, 0x38, 4);
+    // R-only segment with the relocation slot at vaddr 0x400010.
+    put_phdr(&mut data, 0, PT_LOAD, PF_R, 0x200, 0x400000, 0x100, 0x100);
+    // R|E text segment; must stay RX.
+    put_phdr(
+        &mut data,
+        1,
+        PT_LOAD,
+        PF_R | PF_X,
+        0x300,
+        0x401000,
+        0x100,
+        0x100,
+    );
+    // RW data segment containing the dynamic table.
+    put_phdr(
+        &mut data,
+        2,
+        PT_LOAD,
+        PF_R | PF_W,
+        0x400,
+        0x402000,
+        0x100,
+        0x100,
+    );
+    put_phdr(
+        &mut data,
+        3,
+        PT_DYNAMIC,
+        PF_R | PF_W,
+        0x400,
+        0x402000,
+        0x100,
+        0x100,
+    );
+    // One R_AARCH64_RELATIVE-shaped RELA entry at vaddr 0x400010.
+    put64(&mut data, 0x210, 0x400010);
+    put64(&mut data, 0x218, 0);
+    put_i64(&mut data, 0x220, 0);
+    // Dynamic table: RELA at 0x400010, size 24, TEXTREL + DF_TEXTREL, NULL.
+    let dynamic = 0x400;
+    for (index, (tag, value)) in [
+        (DT_RELA, 0x400010u64),
+        (DT_RELASZ, 24),
+        (DT_RELAENT, 24),
+        (DT_FLAGS, DF_TEXTREL),
+        (DT_TEXTREL, 0),
+        (DT_NULL, 0),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let offset = dynamic + index * 16;
+        put_i64(&mut data, offset, *tag);
+        put64(&mut data, offset + 8, *value);
+    }
+    data
+}
+
+fn temp_elf(data: &[u8]) -> PathBuf {
+    let id = NEXT_ELF.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!("k97b-textrel-{}-{id}.elf", std::process::id()));
+    fs::write(&path, data).unwrap();
+    path
+}
+
+#[test]
+fn aarch64_textrel_patch_makes_the_rodata_segment_writable() {
+    let path = temp_elf(&textrel_elf(EM_AARCH64));
+    patch_aarch64_textrel(&path).unwrap();
+    let data = fs::read(&path).unwrap();
+    assert_eq!(read_u32(&data, 64 + 4), Some(PF_R | PF_W));
+    assert_eq!(read_u32(&data, 64 + 56 + 4), Some(PF_R | PF_X));
+    let mut tags = Vec::new();
+    let mut flags = 0;
+    for index in 0..6 {
+        let offset = 0x400 + index * 16;
+        let tag = read_i64(&data, offset).unwrap_or(-1);
+        tags.push(tag);
+        if tag == DT_FLAGS {
+            flags = read_u64(&data, offset + 8).unwrap_or(0);
+        }
+    }
+    assert!(!tags.contains(&DT_TEXTREL));
+    assert_eq!(flags & DF_TEXTREL, 0);
+    fs::remove_file(&path).ok();
+}
+
+#[test]
+fn aarch64_textrel_patch_is_idempotent() {
+    let path = temp_elf(&textrel_elf(EM_AARCH64));
+    patch_aarch64_textrel(&path).unwrap();
+    let once = fs::read(&path).unwrap();
+    patch_aarch64_textrel(&path).unwrap();
+    let twice = fs::read(&path).unwrap();
+    assert_eq!(once, twice);
+    fs::remove_file(&path).ok();
+}
+
+#[test]
+fn aarch64_textrel_patch_clears_flags_when_relocations_are_already_writable() {
+    let mut data = textrel_elf(EM_AARCH64);
+    // Move the relocation and DT_RELA into the RW segment; no segment flag needs changing.
+    put64(&mut data, 0x210, 0x402010);
+    put64(&mut data, 0x400 + 8, 0x402010);
+    let path = temp_elf(&data);
+    patch_aarch64_textrel(&path).unwrap();
+    let data = fs::read(&path).unwrap();
+    assert_eq!(read_u32(&data, 64 + 4), Some(PF_R));
+    let mut tags = Vec::new();
+    for index in 0..6 {
+        tags.push(read_i64(&data, 0x400 + index * 16).unwrap_or(-1));
+    }
+    assert!(!tags.contains(&DT_TEXTREL));
+    fs::remove_file(&path).ok();
+}
+
+#[test]
+fn textrel_patch_ignores_non_aarch64_objects() {
+    let path = temp_elf(&textrel_elf(62));
+    patch_aarch64_textrel(&path).unwrap();
+    let data = fs::read(&path).unwrap();
+    assert_eq!(read_u32(&data, 64 + 4), Some(PF_R));
+    fs::remove_file(&path).ok();
+}
