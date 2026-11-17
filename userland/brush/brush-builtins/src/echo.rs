@@ -41,9 +41,19 @@ impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for EchoCommand {
         context: brush_core::ExecutionContext<'_, SE>,
     ) -> Result<brush_core::ExecutionResult, Self::Error> {
         let mut trailing_newline = !self.no_trailing_newline;
+        // Pre-size the line: growing a zero-capacity buffer goes through the Raven bulk
+        // `realloc` path, whose freed block is currently handed out again by `Tiny`; the
+        // shell then loses the first eight bytes of the output. One allocation avoids it.
+        let total = self
+            .args
+            .iter()
+            .map(|arg| arg.len())
+            .sum::<usize>()
+            .saturating_add(self.args.len().saturating_sub(1))
+            .saturating_add(1);
         let mut s;
         if self.interpret_backslash_escapes {
-            s = String::new();
+            s = String::with_capacity(total.max(1));
             for (i, arg) in self.args.iter().enumerate() {
                 if i > 0 {
                     s.push(' ');
@@ -61,7 +71,13 @@ impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for EchoCommand {
                 }
             }
         } else {
-            s = self.args.join(" ");
+            s = String::with_capacity(total.max(1));
+            for (i, arg) in self.args.iter().enumerate() {
+                if i > 0 {
+                    s.push(' ');
+                }
+                s.push_str(arg);
+            }
         }
 
         if trailing_newline {

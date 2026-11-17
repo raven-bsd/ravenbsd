@@ -54,8 +54,9 @@ pub unsafe extern "C" fn posix_spawn(
         }))
     };
     let cwd = crate::ffi::platform::global().cwd();
+    let table = crate::process::parent_fd_table();
     let ctx = SpawnCtx {
-        table: &[],
+        table: &table,
         cwd: &cwd,
         sigmask: [0; 128],
         ignored: [0; 128],
