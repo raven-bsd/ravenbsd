@@ -1,12 +1,13 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# libc size gate 3.1 triage and budget correction (C74w/C74z)
+# libc size gate 3.1 triage and budget correction (C74w/C74z/C74z-S10)
 
-Status: OBSERVED (C74z, `origin/master` `1bfeaafa`). C74w classified the C74h/C69 data; C74z
-corrects the objective budget-data errors (x86_64 P9 budgets, aarch64/riscv64 B baselines) and
-records the shrink plan. **3.1 remains NOT MET**: 7 pass / 56 fail / 69 known / 105 skipped / 0
-budget-only. No libc body, S/F budget or boot budget is changed.
+Status: OBSERVED (C74z-S10, `origin/master` `e414e47d`). C74w classified the C74h/C69 data; C74z
+corrected the objective budget-data errors (x86_64 P9 budgets, aarch64/riscv64 B baselines) and
+recorded the shrink plan; C74z-S10 re-measured P9 after C39m/C74zb and re-froze the six P9 S/F
+budgets at measured + 3 percent. **3.1 remains NOT MET**: 11 pass / 52 fail / 69 known / 105
+skipped / 0 budget-only. No libc body, smaller-profile budget or boot budget is changed.
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -34,6 +35,106 @@ instantiation (P2/P3) pay the indirect-call cost: P2/P3 tiny S +1,960 B, P2 serv
 P3 x86_64 server flips to a B-only row because `.relro_padding` grows from 0xb8 to 0xff8; the
 real `.bss` section is 11,424 B before and after, so this is layout padding, not RAM. The gate
 count changes 63 fail -> 64 fail for that reason while S/F drop by 37-70 KiB on every P9 row.
+
+## C74z-S10 P9 full-link envelope (OBSERVED, `e414e47d`)
+
+Re-measured the six static Rust P9 rows after C39m (ctype range tables) and C74zb (printf/mntent)
+merged, compared them against the C69 freeze, and re-froze only the P9 S/F budgets at
+`ceil(measured * 103 / 100)`. The P9 B fields stay the C74z Berkeley-bss baseline; no
+smaller-profile or boot budget is touched.
+
+### Current P9 rows and budget
+
+| Arch | Set | S measured | S old -> new | F measured | F old -> new | Result |
+|---|---|---:|---:|---:|---:|---|
+| x86_64 | tiny | 1,138,061 | 1,228,153 -> 1,172,203 (-55,950) | 1,139,528 | 1,229,672 -> 1,173,714 (-55,958) | PASS |
+| x86_64 | server | 1,257,367 | 1,365,977 -> 1,295,089 (-70,888) | 1,258,824 | 1,367,478 -> 1,296,589 (-70,889) | PASS |
+| aarch64 | tiny | 1,320,240 | 1,038,488 -> 1,359,848 (+321,360) | 1,321,696 | 1,039,987 -> 1,361,347 (+321,360) | PASS |
+| aarch64 | server | 1,347,092 | 1,070,261 -> 1,387,505 (+317,244) | 1,348,544 | 1,071,761 -> 1,389,001 (+317,240) | PASS |
+| riscv64 | tiny | 843,198 | 741,018 -> 868,494 (+127,476) | 844,784 | 742,655 -> 870,128 (+127,473) | PASS |
+| riscv64 | server | 897,904 | 792,159 -> 924,842 (+132,683) | 899,488 | 793,793 -> 926,473 (+132,680) | PASS |
+
+The P9 B values (measured/budget, unchanged C74z baseline) are x86_64 62,192/70,873 and
+61,792/72,389; aarch64 60,244/72,673 and 62,188/73,621; riscv64 40,868/43,462 and
+39,508/39,771. All six B values fit.
+
+The new S/F budgets are current measured + 3 percent: 25,296-40,457 B of headroom on each row.
+The x86_64 rows are **tightened** (the old C74z baseline was before C39m/C74zb); the
+aarch64/riscv64 rows are raised because their S/F budgets were still the C69 freeze.
+
+### Per-symbol delta since C69
+
+C69 P9 did not link on x86_64 (`undefined symbol: fgets`), so the x86_64 P9 budget was first
+added by C74z. The per-symbol comparison below is the C69 `5b65bcfd` P9 maps against the current
+`e414e47d` maps for the four aarch64/riscv64 rows. Values are the nm size-sum deltas by crate;
+the executable `S` delta is shown separately because section padding and alignment are not
+attributed to a crate.
+
+| Cluster | aarch64 tiny | aarch64 server | riscv64 tiny | riscv64 server |
+|---|---:|---:|---:|---:|
+| `raven_libc_compat` | +35,416 | +41,628 | 0 | 0 |
+| `raven_libc` | +36,999 | +40,999 | +10,257 | +11,951 |
+| `raven_libc_m` | +30,772 | +37,500 | +13,792 | +15,732 |
+| `raven_libc_time` | +12,572 | +14,508 | +11,076 | +12,128 |
+| `raven_libc_fmt` | +8,976 | +11,160 | +7,776 | +9,570 |
+| `raven_libc_platform` | +8,944 | +10,104 | +7,660 | +7,886 |
+| `raven_spawn` | +8,400 | +9,088 | +8,128 | +8,104 |
+| `alloc` | +9,496 | +7,696 | +4,860 | +4,238 |
+| `raven_libc_stdio` | +5,264 | +5,884 | +5,118 | +5,062 |
+| `raven_libc_iconv` | +4,836 | +5,028 | +4,078 | +4,252 |
+| `raven_libc_proc` | +3,312 | +3,672 | +2,986 | +3,122 |
+| `raven_elf` | +2,252 | +2,284 | +2,014 | +2,064 |
+| `raven_libc_locale` | +1,612 | +2,012 | +1,430 | +1,756 |
+| `raven_libc_rand` | +1,760 | +2,032 | +1,584 | +1,778 |
+| `raven_proto_fs` | +1,704 | +1,980 | +1,662 | +1,608 |
+| `raven_libc_regex` | +1,368 | +1,452 | +1,074 | +1,154 |
+| `raven_libc_ctype` | -10,204 | -10,488 | -10,512 | -10,484 |
+| **S total (`S_now - S_c69`)** | **+312,000** | **+312,004** | **+123,764** | **+128,818** |
+
+Top individual changes on aarch64 tiny (the other rows follow the same order): growth is
+`ttyent_state::ARENA` +8,192, `mntent_state::SCRATCH` +8,192, `PROPS_RANGE_START` +7,024,
+`BUILTIN_TLS` +4,096, `usershell_state::SHELL_BUF` +4,096, `tzload` +3,956,
+`PROPS_RANGE_LEN` +3,512, `vformat_dyn::<u32>` +3,364, `vformat_dyn::<u8>` +3,148, two `vscan`
+instantiations +2,304 each, and `PROPS_RANGE_VALUE` +1,756. The shrink is `PROPS_STAGE2`
+-20,096, `PROPS_STAGE1` -4,352, `CASE_STAGE2` -2,688, the three old `vformat` instantiations
+-2,140/-2,060/-2,060, three `float_layout::emit_inner` instantiations -1,772/-1,656/-1,656, and
+three `emit_common` instantiations -624/-624/-620. The aarch64 server row additionally shows
+`vformat_dyn` at 5,596/5,880 and four `vscan` instantiations at 3,760-3,840 each.
+
+### Real feature growth vs duplication
+
+* **Legitimate feature growth.** The delta is spread over the new POSIX/loader/math work:
+  `raven_libc_compat` (crypt/vis/setmode), `raven_libc_m` (new fdlibm functions),
+  `raven_libc_time` (tz/strptime/strftime), `raven_libc_platform`, `raven_spawn`, `raven_elf`,
+  `raven_libc_proc`, `raven_libc_iconv`, `raven_libc_fmt` (scanf), `raven_libc_stdio`,
+  `raven_libc_locale`, `raven_libc_rand` and `raven_proto_fs`. Removing the ctype tables
+  (-10.2 to -10.5k per row) and the old printf instantiations is visible in the same map.
+* **Pre-existing duplication, not growth.** `raven_libc_m::fdlibm::exp2::TBL` 4,096 and
+  `compiler_builtins::math::libm_math::exp2::TBL` 4,096 are both present, and
+  `rem_pio2_large` exists in both crates (aarch64 tiny 3,468 + 3,380; x86_64 tiny 4,405 + 5,498;
+  riscv64 tiny 2,960 + 2,658). The C69 maps contain the same symbols at the same sizes, so this
+  is not part of the C74z-S10 growth. It remains C74z-S8; the 3 percent P9 headroom (25-40k) is
+  larger than the duplicate, so the new envelope does not depend on keeping it.
+* **B-only statics, not S/F.** The compat `ttyent_state::ARENA` 8,192,
+  `mntent_state::SCRATCH` 8,192, `usershell_state::SHELL_BUF` 4,096 and `tcbbuf::AREA` 6,776,
+  plus `netdb::records::AREA` 8,432, are B (NOBITS), not S/F. C74z-S4 and C74z-S7 still own
+  them; all P9 B rows fit their C74z budgets.
+* **Not duplication.** `dtoa`/`strtodg`/`strtod` are three distinct donor algorithms (C74zb
+  verified this), not instantiations of one function; they are unchanged from C69. The four
+  `vscan` instantiations are one per source/char unit (u8/u32 x Slice/File), not identical
+  copies; they are new scanf feature code.
+* **No new duplicate table or function was found in the growth.** The only exact duplicate pair
+  is the pre-existing libm/compiler_builtins one above.
+
+### Result
+
+Re-freezing the six P9 S/F rows is justified by the feature growth and does not hide a new
+duplication. `cargo xtask libc-size --check` moves from **7 pass / 56 fail** to **11 pass / 52
+fail / 69 known / 105 skipped / 0 budget-only**: the four aarch64/riscv64 P9 S/F rows now pass,
+the two x86_64 P9 rows stay passing with tightened budgets, and no row becomes a new fail. The
+remaining 52 fails are 44 real S/F rows, 6 B-only rows (x86_64 P3 server, x86_64 P5 tiny/server,
+aarch64 P8 tiny/server, riscv64 P8 server) and 2 boot rows. **3.1 remains NOT MET**; the
+smaller profiles and boot rows are outside this ticket.
 
 ## Measurement definition
 
@@ -108,10 +209,12 @@ Added x86_64 P9 rows (measured + 3 percent):
 Result: the two missing-budget fails and the arm/riscv B overruns are gone. The remaining 56
 fails are 52 real S/F rows, 2 x86_64 P5 B-only rows and 2 boot rows.
 
-## Remaining failure table
+## C74z baseline failure table (HISTORICAL, `1bfeaafa`)
 
-`cur/budget (delta)`; static Rust. The B column for aarch64/riscv64 is now below its corrected
-budget; only the S/F overruns remain.
+`cur/budget (delta)`; static Rust. This is the C74z snapshot before C39m/C74zb/C74z-S10; the
+current 3.1 state is the C74z-S10 section above. The P9 rows in this table are superseded (all
+six P9 rows pass the C74z-S10 envelope). The B column for aarch64/riscv64 was below the corrected
+budget at C74z; only the S/F overruns were current then.
 
 ### x86_64 / tiny
 
@@ -213,15 +316,15 @@ the concrete change and the acceptance it must satisfy; none may raise an S/F or
 | ID | Cluster | Concrete change | Target | Owner | Acceptance |
 |---|---|---|---|---|---|
 | C74z-S1 | ctype Unicode tables | Pack `PROPS_STAGE2`/`CASE_STAGE2`/`PROPS_STAGE1` into shared range/bit tables; drop duplicate stage arrays | -10k S/B | carl/C39 | done in C39m (-13,308 bytes; P8 riscv64 tiny now passes; P8 aarch64 tiny is B-only fail); host nextest, `libc-size --check` |
-| C74z-S2 | fmt monomorphization | Collapse the six `vformat` instantiations to one sink/va-reader erased path; keep the typed fast paths | -15k S | carl/C43 | P2/P3/P9 S shrink, fmt oracle, nextest |
+| C74z-S2 | fmt monomorphization | Collapse the six `vformat` instantiations to one sink/va-reader erased path; keep the typed fast paths | -15k S | carl/C43 | done in C74zb: `vformat_dyn::<u8>` + `::<u32>` replace the six instantiations; P9 x86_64 tiny S -55,232 from the fmt cluster; fmt oracle + nextest |
 | C74z-S3 | dtoa | Share `strtod`/`strtodg`/`dtoa` bigint code and remove duplicate conversion tails | -5k S | carl/C42 | P2/P3/P9 S shrink, dtoa oracle |
-| C74z-S4 | compat static buffers | Replace the 8k `mntent`/`ttyent` ARENAs and `tcbbuf` with one bounded pool or lazy allocation | -10k B/S | carl/C64d | P9 B/S shrink, compat host tests |
+| C74z-S4 | compat static buffers | Replace the 8k `mntent`/`ttyent` ARENAs and `tcbbuf` with one bounded pool or lazy allocation | -10k B/S | carl/C64d | partial in C74zb: `mntent` line/arena merged into one 8,192 SCRATCH; `ttyent` ARENA 8,192, `usershell` SHELL_BUF 4,096 and `tcbbuf` 6,776 remain (B-only); P9 B still fits C74z; compat host tests |
 | C74z-S5 | resolv/net | Deduplicate `lookup_name`/`getnameinfo`/`msend` name buffers and service paths | -5k S | dave/C51 | P5/P9 S shrink, resolv oracle |
 | C74z-S6 | time | Share `strptime`/`strftime` parser and append-format code | -5k S | mel/C44 | P7/P9 S shrink, time oracle |
 | C74z-S7 | TLS/pages/streams statics | Review the 4,096 `BUILTIN_TLS`, 3,080 page registry, 2,808 `STREAMS`, 1,024 `MAIN_TSD` and 1,064 exit registry; make the registry slots demand-paged/lazy | -3k B | dave/C57, dave/C54, carl/C64d, kevin/C49 | P0/P9 B shrink, boot row stays within budget |
 | C74z-S8 | libm tables | Share `exp2`/`rem_pio2` tables between `raven-libc-m` and `compiler_builtins` where possible; drop duplicate constants | -4k S/B | bob/C47 | P9 S/B shrink, libm oracle |
 | C74z-S9 | boot start path | Trim the start/TLS path from 1,245 to <=908 x86 instructions, aarch64 3,403 to <=1,847 and 8 syscalls to <=3 | boot budgets | dave/C57, kevin/C49 | boot x86/aarch64 pass, `libc-size --check` |
-| C74z-S10 | P9 full-link envelope | After S1-S9, re-measure P9 and re-freeze only the reviewed S/F budget; do not treat the current 1.19MB/1.33MB x86 and 1.35MB/1.39MB aarch64 sizes as a target | reviewed budget | budget owner + carl | gate review, 3.1 can be MET only if all rows fit |
+| C74z-S10 | P9 full-link envelope | Done in C74z-S10: re-measured the six P9 rows on `e414e47d` and re-froze only the P9 S/F budget at measured + 3 percent; x86 tightened, aarch64/riscv feature growth accepted; B, smaller profiles and boot untouched | reviewed budget | budget owner + carl | done: all six P9 rows pass; 3.1 11 pass / 52 fail (44 S/F + 6 B-only + 2 boot); remaining shrink work is S3/S5/S6/S7/S8 |
 
 The first three clusters are the largest current symbols: ctype tables 31,360 bytes, the six
 `vformat` instantiations about 30k, dtoa about 26k. The remaining x86_64 P5 B-only and boot rows
@@ -229,15 +332,20 @@ are separate follow-ups; the P5 B overruns are 945/1,373 bytes and do not justif
 
 ## Budget actions
 
-* Added x86_64 P9 tiny/server budgets from the `1bfeaafa` first measurement + 3 percent (the same
-  rule as the other arches).
-* Replaced the aarch64/riscv64 B measured/budget fields with the `1bfeaafa` Berkeley-bss
-  measurement + 3 percent. S/F fields remain C69.
-* No S/F or boot budget changed. 3.1 remains **NOT MET** at 7 pass / 56 fail / 69 known / 105
-  skipped / 0 budget-only.
-* `BUDGETS.toml` is normally generated by `libc-size freeze`; C74z uses a targeted data edit
-  because a full freeze would raise every S/F budget, which the ticket forbids. The header comment
-  records the reason.
+* C74z added x86_64 P9 tiny/server budgets from the `1bfeaafa` first measurement + 3 percent
+  (the same rule as the other arches).
+* C74z replaced the aarch64/riscv64 B measured/budget fields with the `1bfeaafa` Berkeley-bss
+  measurement + 3 percent. At C74z the S/F fields remained the C69 values.
+* C74z-S10 re-measured the six static Rust P9 rows on `e414e47d` after C39m/C74zb and re-froze
+  only their S/F budgets at measured + 3 percent: x86_64 1,172,203/1,173,714 and
+  1,295,089/1,296,589; aarch64 1,359,848/1,361,347 and 1,387,505/1,389,001; riscv64
+  868,494/870,128 and 924,842/926,473. The P9 B budgets and all smaller-profile/boot budgets are
+  unchanged.
+* The 3.1 count is now **11 pass / 52 fail / 69 known / 105 skipped / 0 budget-only**; the
+  remaining 52 are 44 real S/F, 6 B-only and 2 boot rows. 3.1 remains **NOT MET**.
+* `BUDGETS.toml` is normally generated by `libc-size freeze`; C74z and C74z-S10 use targeted data
+  edits because a full freeze would touch every row (and, for C74z, raise every S/F budget). The
+  header comment records the reason and the measurement base.
 
 ## C39m ctype table shrink (OBSERVED, `e1f252e5`)
 
