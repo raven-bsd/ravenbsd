@@ -47,6 +47,11 @@ sys/stat.h lstat64
 sys/stat.h stat64
 sys/wait.h wait3
 sys/wait.h wait4
+inttypes.h wcstoimax
+inttypes.h wcstoumax
+stdlib.h strtof
+sys/statvfs.h statvfs
+wchar.h wcsftime
 unistd.h chroot
 unistd.h copy_file_range
 unistd.h daemon

@@ -135,6 +135,24 @@ fn lockf_probe_uses_the_posix_header() {
 }
 
 #[test]
+fn seed_header_gaps_use_the_posix_header() {
+    for (name, seed_header, posix_header) in [
+        ("statvfs", "math.h", "sys/statvfs.h"),
+        ("strtof", "math.h", "stdlib.h"),
+        ("wcsftime", "time.h", "wchar.h"),
+        ("wcstoimax", "wchar.h", "inttypes.h"),
+        ("wcstoumax", "wchar.h", "inttypes.h"),
+    ] {
+        let source = probe_source(&interface_row(name, seed_header));
+        assert!(
+            source.contains(&format!("#include <{posix_header}>")),
+            "{name}: {source}"
+        );
+        assert!(source.contains(&format!("&{name}")), "{name}: {source}");
+    }
+}
+
+#[test]
 fn macro_rows_use_a_macro_probe_not_an_address() {
     for (name, header, needle) in [
         (

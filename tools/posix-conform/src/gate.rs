@@ -256,6 +256,10 @@ fn interface_compile(
 pub(crate) fn probe_source(row: &InterfaceRow) -> String {
     let header = match row.name.as_str() {
         "lockf" => "unistd.h",
+        "statvfs" => "sys/statvfs.h",
+        "strtof" => "stdlib.h",
+        "wcsftime" => "wchar.h",
+        "wcstoimax" | "wcstoumax" => "inttypes.h",
         _ => row.header.as_str(),
     };
     match row.name.as_str() {
