@@ -667,6 +667,14 @@ pub extern "C" fn ap_entry(cpu: u64) -> ! {
     // installed the IPI and AP-timer gates, so this AP sees them without rebuilding the table.
     load_bsp_idt();
     lapic_init_ap();
+    // Ring-3 support on this AP: its own GDT/TSS, the per-CPU syscall MSRs and the FP/SIMD state.
+    crate::arch::x86_64::gdt::load(cpu);
+    crate::arch::x86_64::syscall::init_cpu();
+    if !crate::sched::context::init_fpu() {
+        // Without SSE this CPU cannot enter ring 3; keep it as a kernel-only CPU. The scheduler
+        // still allows user threads to migrate elsewhere, so the system remains usable.
+        kprintln!("smp: cpu {cpu} has no SSE; user SMP disabled on it");
+    }
     block(cpu).online.store(1, Ordering::Release);
     // Wait until the BSP has installed the IPI gates before enabling this AP's timer.
     while !AP_TIMERS_GO.load(Ordering::Acquire) {

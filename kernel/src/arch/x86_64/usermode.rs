@@ -86,7 +86,7 @@ pub fn set_current_thread(value: u64) {
 ///
 /// `root` must be the process address space whose upper half contains the kernel mappings.
 pub fn enter(entry: u64, stack: u64, kernel_stack_top: u64, root: PhysAddr) -> ! {
-    crate::arch::x86_64::gdt::set_rsp0(kernel_stack_top);
+    crate::arch::x86_64::gdt::set_rsp0(0, kernel_stack_top);
     set_kernel_rsp(kernel_stack_top);
     // SAFETY: all kernel mappings are present in the user root's upper half, the TSS rsp0 and
     // per-CPU kernel stack are installed, and the iret frame is built in registers/stack below.

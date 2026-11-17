@@ -112,17 +112,31 @@ unsafe extern "C" {
     fn syscall_entry();
 }
 
-/// Configure the syscall MSRs and per-CPU GS bases.
+/// Configure the boot processor's syscall MSRs and per-CPU GS bases.
 pub fn init() {
     percpu_init();
+    init_msrs();
+    wrmsr(IA32_GS_BASE, 0);
+    wrmsr(IA32_KERNEL_GS_BASE, percpu_address());
+}
+
+/// Configure the syscall MSRs on an application processor.
+///
+/// `STAR`, `LSTAR`, `FMASK` and `EFER.SCE` are per-CPU state; an AP that enters ring 3 must
+/// install them before its first user syscall.  The GS pair is already installed by `ap_start`'s
+/// `install_gs`, and `enter_user` normalises it before ring 3.
+pub fn init_cpu() {
+    init_msrs();
+}
+
+/// Write `EFER.SCE`, `STAR`, `LSTAR`, `FMASK` and enable FSGSBASE on this CPU.
+fn init_msrs() {
     let efer = rdmsr(IA32_EFER);
     wrmsr(IA32_EFER, efer | 1);
     let star = (u64::from(STAR_USER_BASE) << 48) | (u64::from(KERNEL_CS) << 32);
     wrmsr(IA32_STAR, star);
     wrmsr(IA32_LSTAR, syscall_entry as *const () as usize as u64);
     wrmsr(IA32_FMASK, SYSCALL_FMASK);
-    wrmsr(IA32_GS_BASE, 0);
-    wrmsr(IA32_KERNEL_GS_BASE, percpu_address());
     enable_fsgsbase();
 }
 
