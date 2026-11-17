@@ -13,14 +13,14 @@ utilities. No utility implementation was changed.
   pure argument and formatting APIs that the wrappers call.
 * `tests/posix/utility/misc2/evidence` is a small host-only workspace crate with one integration
   test file per tool. It depends on `raven-echo`, `raven-date` and `man`; it is not a product crate.
-* `tests/posix/utility/run-misc2.sh` runs each `test.sh` in a fresh log. Every case uses
+* `tests/posix/utility/misc2/run-misc2.sh` runs each `test.sh` in a fresh log. Every case uses
   `cargo nextest`, because nextest is mandatory for Rust tests.
 * No vendored source or utility binary was edited.
 
 ```sh
-sh tests/posix/utility/run-misc2.sh
-sh tests/posix/utility/run-misc2.sh echo
-sh tests/posix/utility/run-misc2.sh --list
+sh tests/posix/utility/misc2/run-misc2.sh
+sh tests/posix/utility/misc2/run-misc2.sh echo
+sh tests/posix/utility/misc2/run-misc2.sh --list
 ```
 
 ## Tool matrix
@@ -44,7 +44,7 @@ All three `test:` scripts pass. The evidence rows are in `docs/posix/evidence/P4
 ## Acceptance
 
 ```
-sh tests/posix/utility/run-misc2.sh
+sh tests/posix/utility/misc2/run-misc2.sh
 cargo xtask posix-check --profile posix --arch x86_64
 make check-fast
 ```

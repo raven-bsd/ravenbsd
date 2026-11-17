@@ -7,7 +7,7 @@
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-root=$(CDPATH= cd -- "$here/../../.." && pwd)
+root=$(CDPATH= cd -- "$here/../../../.." && pwd)
 
 present="echo date man"
 
@@ -35,7 +35,7 @@ fail=0
 failed_names=
 
 for tool in $selected; do
-    case_dir=$here/misc2/$tool
+    case_dir=$here/$tool
     if [ ! -f "$case_dir/test.sh" ]; then
         printf '[FAIL] %s: missing %s/test.sh\n' "$tool" "$case_dir"
         fail=$((fail + 1))
