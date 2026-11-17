@@ -74,3 +74,34 @@ operation (adopt of four contexts, open_child/close/record over four candidate i
 state, deduplicating states and bounded to 8 transitions per path. At every state it checks:
 spans and records are bounded; no span has a zero trace id; and no closed span retains a parent or
 remote parent. The state/transition counts are printed by the test.
+
+## 9. Wire field (`raven-proto-trace`, Q3)
+
+The one value that crosses the kernel boundary is the 64-bit `trace_id`; `span_id` and the sampling
+decision are process-local and are not on the wire.
+
+| Property | Value |
+|---|---|
+| Field | `trace_id: u64`, little-endian |
+| Encoded length | 8 bytes (fixed, always present) |
+| "not traced" | `0` (`raven_proto_trace::UNTRACED`) |
+| Native `MsgHeader` offset | 16 (`txid`@0, `ordinal`@8, `flags`@12, `trace_id`@16) — `R-IPC-4` |
+| Scheme packet | a `trace_id` field added in the kernel integration (S69 owns `kernel/src/ipc/**`) |
+
+`crates/raven-proto-trace` is the pure codec: `parse`/`parse_exact`/`encode`/`format` with a typed
+`TraceError` (`TooShort`, `TrailingBytes`) and no allocation and no panic. A zero field is *missing*
+(`is_untraced` → the receiver starts a new trace); a too-short field is *malformed* and is dropped
+and counted by the caller, never a fault.
+
+### Bounded overhead when disabled
+
+The field is fixed-size and always present, so a disabled consumer pays exactly one predicted branch
+(compare the id against zero) plus an 8-byte copy — no allocation, no variable-length decode, no
+registry touch. Propagation is otherwise unchanged: the kernel stamps and copies the field; the
+server's current `trace_id` becomes the caller's for the call (`R-OBS-6`).
+
+### ABI the kernel integration will need (reviewer-owned, not edited here)
+
+* `TRACE_SET` (`R-OBS-6`): an unprivileged syscall to set the calling thread's current `trace_id`;
+  the number is unassigned and must be added to `crates/raven-abi/src/syscall.rs`.
+* The scheme-packet `trace_id` field lands in `kernel/src/ipc/protocol.rs` once S69 merges.
