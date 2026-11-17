@@ -17,6 +17,7 @@ cat >"$tmp/pairs" <<'EOF'
 dirent.h versionsort
 fcntl.h creat64
 fcntl.h open64
+poll.h ppoll
 sys/resource.h prlimit
 sys/stat.h fchownat
 sys/stat.h fstat64
@@ -29,9 +30,11 @@ unistd.h copy_file_range
 unistd.h daemon
 unistd.h endusershell
 unistd.h execvpe
+unistd.h getentropy
 unistd.h getresgid
 unistd.h getresuid
 unistd.h issetugid
+unistd.h lockf
 unistd.h lseek64
 unistd.h pread64
 unistd.h pwrite64

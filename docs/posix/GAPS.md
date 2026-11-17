@@ -13,14 +13,14 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 0 | 0 | 20 | 0 |
 | headers | 86 | 2 | 11 | 73 | 0 |
-| interfaces | 1423 | 43 | 0 | 1298 | 82 |
+| interfaces | 1425 | 43 | 0 | 1300 | 82 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
 | utilities | 217 | 0 | 1 | 180 | 36 |
-| **all** | **1800** | **45** | **12** | **1614** | **129** |
+| **all** | **1802** | **45** | **12** | **1616** | **129** |
 
-Traceability rows: 1800; profile rows: 1800.
+Traceability rows: 1802; profile rows: 1802.
 
 ## Headers
 
@@ -192,7 +192,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.bind` | `bind` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.bind_textdomain_codeset` | `bind_textdomain_codeset` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libintl.h |
 | `interface.bindtextdomain` | `bindtextdomain` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libintl.h |
-| `interface.brk` | `brk` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.brk` | `brk` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.bsearch` | `bsearch` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.btowc` | `btowc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.bzero` | `bzero` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | strings.h |
@@ -365,9 +365,9 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.dremf` | `dremf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.dup` | `dup` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.dup2` | `dup2` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.dup3` | `dup3` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.dup3` | `dup3` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.duplocale` | `duplocale` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | locale.h |
-| `interface.eaccess` | `eaccess` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.eaccess` | `eaccess` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.ecvt_r` | `ecvt_r` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib2.sh` | stdlib.h |
 | `interface.endgrent` | `endgrent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | grp.h |
 | `interface.endhostent` | `endhostent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
@@ -384,7 +384,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.erfcl` | `erfcl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.erff` | `erff` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.erfl` | `erfl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.euidaccess` | `euidaccess` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.euidaccess` | `euidaccess` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.execl` | `execl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.execle` | `execle` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.execlp` | `execlp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
@@ -415,10 +415,10 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.fabsf` | `fabsf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.fabsfNx` | `fabsfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fabsl` | `fabsl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.faccessat` | `faccessat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.faccessat` | `faccessat` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.fallocate` | `fallocate` | missing | P1 | `none` | fcntl.h |
 | `interface.fattach` | `fattach` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stropts.h |
-| `interface.fchdir` | `fchdir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.fchdir` | `fchdir` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.fchmod` | `fchmod` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.fchmodat` | `fchmodat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.fchown` | `fchown` | missing | P1 | `none` | unistd.h |
@@ -426,7 +426,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.fclose` | `fclose` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.fcntl` | `fcntl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.fcvt_r` | `fcvt_r` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib2.sh` | stdlib.h |
-| `interface.fdatasync` | `fdatasync` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.fdatasync` | `fdatasync` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.fdetach` | `fdetach` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stropts.h |
 | `interface.fdim` | `fdim` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.fdimf` | `fdimf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -503,7 +503,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.fopen` | `fopen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.fopen64` | `fopen64` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.fork` | `fork` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.fpathconf` | `fpathconf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.fpathconf` | `fpathconf` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.fpclassify` | `fpclassify` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.fprintf` | `fprintf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.fputc` | `fputc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
@@ -538,14 +538,14 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.fstat` | `fstat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.fstat64` | `fstat64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.fstatat` | `fstatat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
-| `interface.fstatvfs` | `fstatvfs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/statvfs.h |
+| `interface.fstatvfs` | `fstatvfs` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/statvfs.h |
 | `interface.fsync` | `fsync` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.ftell` | `ftell` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.ftello` | `ftello` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.ftello64` | `ftello64` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.ftok` | `ftok` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/ipc.h |
 | `interface.ftruncate` | `ftruncate` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.ftruncate64` | `ftruncate64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.ftruncate64` | `ftruncate64` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.ftrylockfile` | `ftrylockfile` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.ftw` | `ftw` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ftw.h |
 | `interface.ftw64` | `ftw64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ftw.h |
@@ -568,11 +568,11 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.getcwd` | `getcwd` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getdate` | `getdate` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.getdelim` | `getdelim` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
-| `interface.getdents` | `getdents` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
+| `interface.getdents` | `getdents` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | dirent.h |
 | `interface.getdomainname` | `getdomainname` | missing | P1 | `none` | unistd.h |
 | `interface.getdtablesize` | `getdtablesize` | missing | P1 | `none` | unistd.h |
 | `interface.getegid` | `getegid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.getentropy` | `getentropy` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.getentropy` | `getentropy` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.getenv` | `getenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.geteuid` | `geteuid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getgid` | `getgid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
@@ -593,7 +593,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.getmsg` | `getmsg` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stropts.h |
 | `interface.getnameinfo` | `getnameinfo` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
 | `interface.getopt` | `getopt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.getpagesize` | `getpagesize` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.getpagesize` | `getpagesize` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.getpayloadfNx` | `getpayloadfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.getpeername` | `getpeername` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.getpgid` | `getpgid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
@@ -610,7 +610,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.getresgid` | `getresgid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getresuid` | `getresuid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getrlimit` | `getrlimit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
-| `interface.getrlimit64` | `getrlimit64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
+| `interface.getrlimit64` | `getrlimit64` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/resource.h |
 | `interface.getrusage` | `getrusage` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
 | `interface.gets` | `gets` | present | P1 | `test:tests/libc/posix/stdio/check-stdio2.sh` | stdio.h |
 | `interface.getservbyname_r` | `getservbyname_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
@@ -748,7 +748,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.kill` | `kill` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.killpg` | `killpg` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.labs` | `labs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
-| `interface.lchmod` | `lchmod` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
+| `interface.lchmod` | `lchmod` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/stat.h |
 | `interface.lchown` | `lchown` | missing | P1 | `none` | sys/stat.h |
 | `interface.lcong48` | `lcong48` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.ldexp` | `ldexp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -771,6 +771,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.lldiv` | `lldiv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.llogb` | `llogb` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.llogbfNx` | `llogbfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
+| `interface.llogbl` | `llogbl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.llrint` | `llrint` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.llrintf` | `llrintf` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.llrintfNx` | `llrintfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
@@ -781,7 +782,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.llroundl` | `llroundl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.localeconv` | `localeconv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | locale.h |
 | `interface.localtime` | `localtime` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
-| `interface.lockf` | `lockf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
+| `interface.lockf` | `lockf` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/stat.h |
 | `interface.log` | `log` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.log10` | `log10` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.log10f` | `log10f` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -819,7 +820,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.lstat` | `lstat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.lstat64` | `lstat64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.lutimes` | `lutimes` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/time.h |
-| `interface.madvise` | `madvise` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
+| `interface.madvise` | `madvise` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
 | `interface.malloc` | `malloc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.mblen` | `mblen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.mbrlen` | `mbrlen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
@@ -842,16 +843,16 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.memset_explicit` | `memset_explicit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
 | `interface.mincore` | `mincore` | missing | P1 | `none` | sys/mman.h |
 | `interface.mkdir` | `mkdir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
-| `interface.mkdirat` | `mkdirat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
+| `interface.mkdirat` | `mkdirat` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/stat.h |
 | `interface.mkfifo` | `mkfifo` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.mkfifoat` | `mkfifoat` | missing | P1 | `none` | sys/stat.h |
 | `interface.mknod` | `mknod` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.mknodat` | `mknodat` | missing | P1 | `none` | sys/stat.h |
 | `interface.mkstemp` | `mkstemp` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib2.sh` | stdlib.h |
 | `interface.mktime` | `mktime` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
-| `interface.mlock` | `mlock` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
-| `interface.mlock2` | `mlock2` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
-| `interface.mlockall` | `mlockall` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
+| `interface.mlock` | `mlock` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
+| `interface.mlock2` | `mlock2` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
+| `interface.mlockall` | `mlockall` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
 | `interface.mmap` | `mmap` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
 | `interface.modf` | `modf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.modff` | `modff` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -873,15 +874,15 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.msgget` | `msgget` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/msg.h |
 | `interface.msgrcv` | `msgrcv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/msg.h |
 | `interface.msgsnd` | `msgsnd` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/msg.h |
-| `interface.msync` | `msync` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
+| `interface.msync` | `msync` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
 | `interface.mtx_destroy` | `mtx_destroy` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.mtx_init` | `mtx_init` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.mtx_lock` | `mtx_lock` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.mtx_timedlock` | `mtx_timedlock` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.mtx_trylock` | `mtx_trylock` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.mtx_unlock` | `mtx_unlock` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
-| `interface.munlock` | `munlock` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
-| `interface.munlockall` | `munlockall` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
+| `interface.munlock` | `munlock` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
+| `interface.munlockall` | `munlockall` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
 | `interface.munmap` | `munmap` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
 | `interface.name_to_handle_at` | `name_to_handle_at` | missing | P1 | `none` | fcntl.h |
 | `interface.nan` | `nan` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
@@ -918,19 +919,19 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.openat` | `openat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.opendir` | `opendir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.openlog` | `openlog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
-| `interface.pathconf` | `pathconf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.pathconf` | `pathconf` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.pause` | `pause` | missing | P1 | `none` | unistd.h |
 | `interface.pclose` | `pclose` | present | P1 | `test:tests/libc/posix/stdio/check-stdio2.sh` | stdio.h |
 | `interface.perror` | `perror` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
-| `interface.pipe` | `pipe` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.pipe` | `pipe` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.pipe2` | `pipe2` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.poll` | `poll` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | poll.h |
 | `interface.popen` | `popen` | present | P1 | `test:tests/libc/posix/stdio/check-stdio2.sh` | stdio.h |
-| `interface.posix_close` | `posix_close` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.posix_fadvise` | `posix_fadvise` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
-| `interface.posix_fallocate` | `posix_fallocate` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
+| `interface.posix_close` | `posix_close` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.posix_fadvise` | `posix_fadvise` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | fcntl.h |
+| `interface.posix_fallocate` | `posix_fallocate` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | fcntl.h |
 | `interface.posix_getdents` | `posix_getdents` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
-| `interface.posix_madvise` | `posix_madvise` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
+| `interface.posix_madvise` | `posix_madvise` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
 | `interface.posix_memalign` | `posix_memalign` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.posix_openpt` | `posix_openpt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.posix_spawn_file_actions_addclose` | `posix_spawn_file_actions_addclose` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | spawn.h |
@@ -961,14 +962,14 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.powl` | `powl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.pown` | `pown` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.powr` | `powr` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.ppoll` | `ppoll` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | poll.h |
+| `interface.ppoll` | `ppoll` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | poll.h |
 | `interface.pread` | `pread` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.pread64` | `pread64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.preadv` | `preadv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/uio.h |
-| `interface.preadv2` | `preadv2` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/uio.h |
+| `interface.preadv` | `preadv` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/uio.h |
+| `interface.preadv2` | `preadv2` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/uio.h |
 | `interface.printf` | `printf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.prlimit` | `prlimit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
-| `interface.pselect` | `pselect` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/select.h |
+| `interface.pselect` | `pselect` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/select.h |
 | `interface.psiginfo` | `psiginfo` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.psignal` | `psignal` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.pthread_atfork` | `pthread_atfork` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | pthread.h |
@@ -1093,8 +1094,8 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.putwchar_unlocked` | `putwchar_unlocked` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.pwrite` | `pwrite` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.pwrite64` | `pwrite64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.pwritev` | `pwritev` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/uio.h |
-| `interface.pwritev2` | `pwritev2` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/uio.h |
+| `interface.pwritev` | `pwritev` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/uio.h |
+| `interface.pwritev2` | `pwritev2` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/uio.h |
 | `interface.qsort` | `qsort` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.quick_exit` | `quick_exit` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib2.sh` | stdlib.h |
 | `interface.raise` | `raise` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
@@ -1106,7 +1107,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.readdir` | `readdir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.readdir_r` | `readdir_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.readlink` | `readlink` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.readlinkat` | `readlinkat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.readlinkat` | `readlinkat` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.readv` | `readv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/uio.h |
 | `interface.realloc` | `realloc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.reallocarray` | `reallocarray` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
@@ -1169,7 +1170,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.sched_yield` | `sched_yield` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sched.h |
 | `interface.secure_getenv` | `secure_getenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.seekdir` | `seekdir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
-| `interface.select` | `select` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/select.h |
+| `interface.select` | `select` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/select.h |
 | `interface.sem_clockwait` | `sem_clockwait` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | semaphore.h |
 | `interface.sem_close` | `sem_close` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | semaphore.h |
 | `interface.sem_destroy` | `sem_destroy` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | semaphore.h |
@@ -1199,7 +1200,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.setgroupent` | `setgroupent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | grp.h |
 | `interface.setgroups` | `setgroups` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | grp.h |
 | `interface.sethostent` | `sethostent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
-| `interface.sethostname` | `sethostname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.sethostname` | `sethostname` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.setitimer` | `setitimer` | missing | P1 | `none` | sys/time.h |
 | `interface.setjmp` | `setjmp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | setjmp.h |
 | `interface.setlinebuf` | `setlinebuf` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
@@ -1251,6 +1252,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.signal` | `signal` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.signbit` | `signbit` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.significandf` | `significandf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
+| `interface.significandl` | `significandl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.sigorset` | `sigorset` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.sigpause` | `sigpause` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.sigpending` | `sigpending` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
@@ -1274,7 +1276,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.sinhl` | `sinhl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.sinl` | `sinl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.sinpi` | `sinpi` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
-| `interface.sleep` | `sleep` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.sleep` | `sleep` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.snprintf` | `snprintf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.sockatmark` | `sockatmark` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.socket` | `socket` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
@@ -1347,7 +1349,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.symlinkat` | `symlinkat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.sync` | `sync` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.sync_file_range` | `sync_file_range` | missing | P1 | `none` | fcntl.h |
-| `interface.syncfs` | `syncfs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.syncfs` | `syncfs` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.syscall` | `syscall` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.sysconf` | `sysconf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.syslog` | `syslog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
@@ -1411,8 +1413,8 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.towupper` | `towupper` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wctype.h |
 | `interface.towupper_l` | `towupper_l` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wctype.h |
 | `interface.trunc` | `trunc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
-| `interface.truncate` | `truncate` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.truncate64` | `truncate64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.truncate` | `truncate` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.truncate64` | `truncate64` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.truncf` | `truncf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.truncfNx` | `truncfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.truncl` | `truncl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
@@ -1420,7 +1422,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.tss_delete` | `tss_delete` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.tss_get` | `tss_get` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.tss_set` | `tss_set` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
-| `interface.ttyname` | `ttyname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.ttyname` | `ttyname` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.ttyname_r` | `ttyname_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.twalk` | `twalk` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | search.h |
 | `interface.tzset` | `tzset` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
@@ -1440,7 +1442,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.unsetenv` | `unsetenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.updwtmpx` | `updwtmpx` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
 | `interface.uselocale` | `uselocale` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | locale.h |
-| `interface.usleep` | `usleep` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
+| `interface.usleep` | `usleep` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.utime` | `utime` | missing | P1 | `none` | utime.h |
 | `interface.utimensat` | `utimensat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.utimes` | `utimes` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/time.h |

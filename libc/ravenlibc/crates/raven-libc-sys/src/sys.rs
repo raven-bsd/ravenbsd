@@ -12,6 +12,7 @@ use core::sync::atomic::AtomicU32;
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
+use raven_abi::types::fcntl::RecordLock;
 use raven_abi::types::{Handle, Rights, Timespec, futex, map as map_flags, prot};
 use raven_abi::uname::Uname;
 
@@ -569,6 +570,25 @@ pub fn fstat(handle: Handle, out: &mut [u8; 64]) -> Result<(), Errno> {
             handle.0 as usize,
             out.as_mut_ptr() as usize,
             out.len(),
+        )
+    })
+    .map(|_| ())
+}
+
+/// Apply a POSIX byte-range lock operation to `handle`.
+///
+/// `command` is one of [`raven_abi::types::fcntl::GETLK`], [`raven_abi::types::fcntl::SETLK`]
+/// or [`raven_abi::types::fcntl::SETLKW`]. The kernel reads the input lock and, for `GETLK`,
+/// writes the first conflicting record back into `lock`.
+pub fn record_lock(handle: Handle, command: u32, lock: &mut RecordLock) -> Result<(), Errno> {
+    // SAFETY: RECORD_LOCK reads the 32-byte input record and, for GETLK, writes the same
+    // 32-byte record back; `lock` is a live, aligned `RecordLock`.
+    crate::errno::ret(unsafe {
+        arch::syscall3(
+            raven_abi::syscall::RECORD_LOCK,
+            handle.0 as usize,
+            command as usize,
+            lock as *mut RecordLock as usize,
         )
     })
     .map(|_| ())

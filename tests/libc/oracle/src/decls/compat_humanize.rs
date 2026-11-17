@@ -5,10 +5,14 @@
 //!
 //! Wiring needs a C35 change (`decls/mod.rs` and the oracle feature list).
 
-#![allow(dead_code)]
+#![allow(dead_code, missing_docs)]
 
 use core::ffi::{c_char, c_int};
 
+#[cfg_attr(
+    feature = "oracle-compat-humanize",
+    link(name = "oracle_compat_humanize", kind = "dylib")
+)]
 unsafe extern "C" {
     pub fn oracle_humanize_number(
         buffer: *mut c_char,

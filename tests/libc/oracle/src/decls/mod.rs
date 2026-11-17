@@ -7,6 +7,18 @@
 //! feature off the module is not compiled; with it on, the test binary links
 //! `liboracle_<family>.so` from `LIBRARY_PATH` and loads it through `LD_LIBRARY_PATH`.
 
+#[cfg(feature = "oracle-compat-crypt")]
+pub mod compat_crypt;
+
+#[cfg(feature = "oracle-compat-humanize")]
+pub mod compat_humanize;
+
+#[cfg(feature = "oracle-compat-setmode")]
+pub mod compat_setmode;
+
+#[cfg(feature = "oracle-compat-vis")]
+pub mod compat_vis;
+
 #[cfg(feature = "oracle-string-basic")]
 pub mod string_basic;
 

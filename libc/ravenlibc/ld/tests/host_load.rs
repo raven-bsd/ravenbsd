@@ -10,7 +10,7 @@ mod host_mapper;
 
 use host_mapper::{Event, HostApplier, HostMapper, HostMem};
 use raven_libc_elf::{DigestError, Ehdr, ElfError, MemView, ObjId, Phdr};
-use raven_libc_rtld::dlfcn::{RTLD_NEXT, RTLD_NODELETE, RTLD_NOLOAD};
+use raven_libc_rtld::dlfcn::{RTLD_GLOBAL, RTLD_NEXT, RTLD_NODELETE, RTLD_NOLOAD};
 use raven_libc_rtld::loadobj::{LoadError, Loader};
 use raven_libc_rtld::main_flow::{StartCtx, rtld_main};
 use raven_libc_rtld::table::RtldTable;
@@ -604,6 +604,40 @@ fn dlclose_uses_reference_counts_and_honours_nodelete() {
     assert!(loader.object(pinned).expect("object").nodelete);
     assert_eq!(loader.dlclose(pinned), 0);
     assert!(loader.object(pinned).is_some());
+}
+
+#[test]
+fn dlopen_assigns_static_tls_offsets_before_relocation() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some((mut loader, _dir)) = loader() else {
+        return;
+    };
+    let id = loader.dlopen(b"libtls.so", 0).expect("load");
+    let object = loader.object(id).expect("object");
+    assert!(object.tls_size > 0);
+    assert_eq!(loader.applier.tls_offset(id), Some(object.tls_offset));
+}
+
+#[test]
+fn dlclose_keeps_a_tls_object_after_one_handle_closes() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some((mut loader, _dir)) = loader() else {
+        return;
+    };
+    let local = loader.dlopen(b"libtls.so", 0).expect("local");
+    let global = loader.dlopen(b"libtls.so", RTLD_GLOBAL).expect("global");
+    assert_eq!(local, global);
+    assert_eq!(loader.object(local).expect("object").refcount, 2);
+    assert_eq!(loader.dlclose(global), 0);
+    let object = loader.object(local).expect("object stays after one close");
+    assert_eq!(object.refcount, 1);
+    assert!(object.has_tls());
+    assert!(loader.dlsym(Some(local), b"tls_marker", 0).is_some());
+    assert_eq!(loader.dlclose(local), 0);
+    // A static-TLS object stays mapped after its last close; the thread may still hold a
+    // descriptor offset into its block.
+    let object = loader.object(local).expect("TLS object stays mapped");
+    assert!(object.has_tls());
 }
 
 #[test]

@@ -611,12 +611,12 @@ RAVEN_1.0 {
 		cbrtl; # x86_64
 		ceil;
 		ceilf;
-		ceill; # x86_64
+		ceill; # x86_64 aarch64
 		compoundn;
 		compoundnf;
 		copysign;
 		copysignf;
-		copysignl; # x86_64
+		copysignl; # x86_64 aarch64
 		cos;
 		cosf;
 		cosh;
@@ -650,15 +650,15 @@ RAVEN_1.0 {
 		expm1l; # x86_64
 		fabs;
 		fabsf;
-		fabsl; # x86_64
+		fabsl; # x86_64 aarch64
 		fdim;
 		fdimf;
-		fdiml; # x86_64
+		fdiml; # x86_64 aarch64
 		finite;
 		finitef;
 		floor;
 		floorf;
-		floorl; # x86_64
+		floorl; # x86_64 aarch64
 		fma;
 		fmaf;
 		fmal; # x86_64
@@ -672,7 +672,7 @@ RAVEN_1.0 {
 		fmaximum_num;
 		fmaximum_numf;
 		fmaximumf;
-		fmaxl; # x86_64
+		fmaxl; # x86_64 aarch64
 		fmaxmag;
 		fmaxmagf;
 		fmin;
@@ -685,16 +685,16 @@ RAVEN_1.0 {
 		fminimum_num;
 		fminimum_numf;
 		fminimumf;
-		fminl; # x86_64
+		fminl; # x86_64 aarch64
 		fminmag;
 		fminmagf;
 		fmod;
 		fmodf;
-		fmodl; # x86_64
+		fmodl; # x86_64 aarch64
 		fpclassify;
 		frexp;
 		frexpf;
-		frexpl; # x86_64
+		frexpl; # x86_64 aarch64
 		fromfp;
 		fromfpx;
 		gamma;
@@ -707,7 +707,7 @@ RAVEN_1.0 {
 		hypotl; # x86_64
 		ilogb;
 		ilogbf;
-		ilogbl; # x86_64
+		ilogbl; # x86_64 aarch64
 		iscanonical;
 		iseqsig;
 		isfinite;
@@ -731,7 +731,7 @@ RAVEN_1.0 {
 		jnf;
 		ldexp;
 		ldexpf;
-		ldexpl; # x86_64
+		ldexpl; # x86_64 aarch64
 		lgamma;
 		lgamma_r;
 		lgammaf;
@@ -739,13 +739,13 @@ RAVEN_1.0 {
 		lgammal; # x86_64
 		lgammal_r; # x86_64
 		llogb;
-		llogbl; # x86_64
+		llogbl; # x86_64 aarch64
 		llrint;
 		llrintf;
-		llrintl; # x86_64
+		llrintl; # x86_64 aarch64
 		llround;
 		llroundf;
-		llroundl; # x86_64
+		llroundl; # x86_64 aarch64
 		log;
 		log10;
 		log10f;
@@ -762,31 +762,31 @@ RAVEN_1.0 {
 		log2p1f;
 		logb;
 		logbf;
-		logbl; # x86_64
+		logbl; # x86_64 aarch64
 		logf;
 		logl; # x86_64
 		lrint;
 		lrintf;
-		lrintl; # x86_64
+		lrintl; # x86_64 aarch64
 		lround;
 		lroundf;
-		lroundl; # x86_64
+		lroundl; # x86_64 aarch64
 		modf;
 		modff;
-		modfl; # x86_64
+		modfl; # x86_64 aarch64
 		nan;
 		nanf;
-		nanl; # x86_64
+		nanl; # x86_64 aarch64
 		nearbyint;
 		nearbyintf;
-		nearbyintl; # x86_64
+		nearbyintl; # x86_64 aarch64
 		nextafter;
 		nextafterf;
-		nextafterl; # x86_64
+		nextafterl; # x86_64 aarch64
 		nextdown;
 		nexttoward; # x86_64
 		nexttowardf; # x86_64
-		nexttowardl; # x86_64
+		nexttowardl; # x86_64 aarch64
 		nextup;
 		pow;
 		pow10;
@@ -800,35 +800,35 @@ RAVEN_1.0 {
 		powrf;
 		remainder;
 		remainderf;
-		remainderl; # x86_64
+		remainderl; # x86_64 aarch64
 		remquo;
 		remquof;
-		remquol; # x86_64
+		remquol; # x86_64 aarch64
 		rint;
 		rintf;
-		rintl; # x86_64
+		rintl; # x86_64 aarch64
 		rootn;
 		rootnf;
 		round;
 		roundeven;
 		roundf;
-		roundl; # x86_64
+		roundl; # x86_64 aarch64
 		rsqrt;
 		rsqrtf;
 		scalb;
 		scalbf;
 		scalbln;
 		scalblnf;
-		scalblnl; # x86_64
+		scalblnl; # x86_64 aarch64
 		scalbn;
 		scalbnf;
-		scalbnl; # x86_64
+		scalbnl; # x86_64 aarch64
 		setpayload;
 		setpayloadsig;
 		signbit;
 		significand;
 		significandf;
-		significandl; # x86_64
+		significandl; # x86_64 aarch64
 		sin;
 		sincos;
 		sincosf;
@@ -863,7 +863,7 @@ RAVEN_1.0 {
 		totalordermagf;
 		trunc;
 		truncf;
-		truncl; # x86_64
+		truncl; # x86_64 aarch64
 		ufromfp;
 		ufromfpx;
 		y0;

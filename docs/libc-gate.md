@@ -48,8 +48,8 @@ The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 * MET: 1.1, 1.1.pack, 1.1.audit, 1.5, 4.1, 4.3, 6.1, 6.3, 6.4.
 * NOT MET: 1.2 (G1 0/4), 1.4 (26 families cannot find `ravenbsd-resources` in the minion
   clone), 1.7 (26 lint violations; the loader files are clean after C74i), 3.1 (size budgets),
-  4.2 (`inet_text` soak), 5.1 (hello/stdio/time), 5.2 (core-servers timeout at 120 s but passes at
-  600 s; file-tools never starts `tooltest` even at 600 s).
+  4.2 (`inet_text` soak), 5.1 (hello/stdio/time), 5.2 (core-servers now MET; file-tools still
+  fails in uutils `df`).
 * BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
@@ -58,9 +58,9 @@ exit 0); the host-test row now runs through `cargo nextest run`; `libc-dynamic`,
 `libc-spawn` and `libc-threads` pass; `libc-hello` fails only the P1b `string` check (auxv ok);
 `libc-stdio` and `libc-time` remain P1b. C74i then added the three missing loader SAFETY
 comments: `libc-lint` now reports 26 violations, all outside the loader files (P1f/phil 14,
-P1h/otto 8, P1i/tim 3, ABI/contract 1). C74j reproduced 5.2: `core-servers` passes with a 600 s
-budget (the 120 s case limit is too small), while `file-tools` reaches the `rsh` prompt but never
-starts `tooltest` even at 600 s; those belong to the qtest/core-test and file-tools-test/init
-lanes, not libc. The gate cannot close until the size-budget lane, the G1 donor data, the
-`inet_text` soak, the three P1b target cases, the 5.2 harness/profile owners, the lint backlog,
+P1h/otto 8, P1i/tim 3, ABI/contract 1). C74n closed 5.2.core-servers with a minimal profile and
+a 300 s case limit; 5.2.file-tools now stages and starts `tooltest`, which fails at `df` because
+the uutils `read_fs_list` returns an empty list on RavenBSD (owner: uutils/P1f), not libc. The
+gate cannot close until the size-budget lane, the G1 donor data, the `inet_text` soak, the three
+P1b target cases, the file-tools/uutils owner, the lint backlog,
 and the missing Miri/world/mandoc tooling are resolved by their owners.

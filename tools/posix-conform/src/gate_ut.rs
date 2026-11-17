@@ -5,8 +5,10 @@
 
 use std::path::Path;
 
-use crate::gate::{GateReport, Verdict, render};
-use crate::model::{BehaviorRow, Meta, PlatformStatus, Profile, STANDARD, Status, TraceFile};
+use crate::gate::{GateReport, Verdict, probe_source, render};
+use crate::model::{
+    BehaviorRow, InterfaceRow, Meta, PlatformStatus, Profile, STANDARD, Status, TraceFile,
+};
 use crate::render::render_gaps;
 
 fn report() -> GateReport {
@@ -103,4 +105,50 @@ fn gaps_keep_a_waiver_visible() {
         text.contains("waiver: OWNER WAIVER: P5 omits fork for the first gate"),
         "{text}"
     );
+}
+
+fn interface_row(name: &str, header: &str) -> InterfaceRow {
+    InterfaceRow {
+        meta: Meta {
+            id: format!("interface.{name}"),
+            standard: STANDARD.to_string(),
+            status: Status::Present,
+            evidence: "none".to_string(),
+            owner: "P1".to_string(),
+            waiver: String::new(),
+            notes: String::new(),
+            pg: Vec::new(),
+        },
+        name: name.to_string(),
+        header: header.to_string(),
+        kind: "func".to_string(),
+        required: true,
+        signature: String::new(),
+    }
+}
+
+#[test]
+fn lockf_probe_uses_the_posix_header() {
+    let source = probe_source(&interface_row("lockf", "sys/stat.h"));
+    assert!(source.contains("#include <unistd.h>"), "{source}");
+    assert!(source.contains("&lockf"), "{source}");
+}
+
+#[test]
+fn macro_rows_use_a_macro_probe_not_an_address() {
+    for (name, header, needle) in [
+        (
+            "offsetof",
+            "stddef.h",
+            "offsetof(struct probe_object, member)",
+        ),
+        ("va_start", "stdarg.h", "va_start(ap, count)"),
+        ("va_arg", "stdarg.h", "va_arg(ap, int)"),
+        ("va_copy", "stdarg.h", "va_copy(copy, ap)"),
+        ("va_end", "stdarg.h", "va_end(ap)"),
+    ] {
+        let source = probe_source(&interface_row(name, header));
+        assert!(source.contains(needle), "{name}: {source}");
+        assert!(!source.contains(&format!("&{name}")), "{name}: {source}");
+    }
 }
