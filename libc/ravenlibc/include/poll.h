@@ -48,7 +48,7 @@ struct pollfd {
 
 int poll (struct pollfd *, nfds_t, int);
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __POSIX_VISIBLE >= 202405
 #define __NEED_time_t
 #define __NEED_struct_timespec
 #define __NEED_sigset_t
