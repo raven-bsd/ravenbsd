@@ -1,10 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# K97: the dynamic userland gate. The pre step builds the `shell-test` initfs and asserts the
-# staged /bin programs carry PT_INTERP /libexec/ld-elf.so.1 and DT_NEEDED libc.so.1 while
-# /init and /sbin stay static. The boot then starts the dynamic /bin/rsh service and requires
-# its `rsh: ready` line, which can only print after the loader has entered its main.
+# K97/K97c: the dynamic userland gate. The pre step builds the selected profile's initfs and
+# asserts the staged /bin programs carry PT_INTERP /libexec/ld-elf.so.1 and DT_NEEDED libc.so.1
+# while /init and /sbin stay static. The boot then starts the dynamic /bin/rsh service and
+# requires its `rsh: ready` line, which can only print after the loader has entered its main.
+#
+# `--arch aarch64` overrides the case arch and boots the same profile on the harness's generic
+# `virt,gic-version=2` machine (the Pi 4 disk image cannot be booted by this harness: QEMU 6.2
+# has no `raspi4b` machine). The pre step selects `pi4-release` for aarch64 and verifies the
+# real Pi 4 binary staging separately; see tickets/kevin/reports/K97c.md.
 
 name = "dynamic-userland"
 arch = "x86_64"
