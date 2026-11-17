@@ -665,16 +665,16 @@ fn resolve(grammar: &Grammar) -> Result<Resolved, Error> {
     }
     // Precedence-only tokens that never appeared in %token.
     for token in &grammar.tokens {
-        if let Some(Symbol::Char(byte)) = parse_symbol(&token.name, 0).ok() {
+        if let Ok(Symbol::Char(byte)) = parse_symbol(&token.name, 0) {
             used_numbers.insert(i32::from(byte));
         }
     }
     let mut precedence = BTreeMap::new();
     for token in &grammar.tokens {
-        if let (Some(level), Some(assoc)) = (token.precedence, token.assoc) {
-            if let Some(number) = token_numbers.get(&token.name) {
-                precedence.insert(*number, (level, assoc));
-            }
+        if let (Some(level), Some(assoc)) = (token.precedence, token.assoc)
+            && let Some(number) = token_numbers.get(&token.name)
+        {
+            precedence.insert(*number, (level, assoc));
         }
     }
     let mut rules = Vec::new();
@@ -943,10 +943,10 @@ pub fn tables(grammar: &Grammar) -> Result<Tables, Error> {
             if let Some(next) = state_map.get(&target) {
                 let from = merged_index[index];
                 let to = merged_index[*next];
-                if let Some(existing) = transitions.insert((from, symbol), to) {
-                    if existing != to {
-                        return Err(Error::new(0, "inconsistent LALR transition"));
-                    }
+                if let Some(existing) = transitions.insert((from, symbol), to)
+                    && existing != to
+                {
+                    return Err(Error::new(0, "inconsistent LALR transition"));
                 }
             }
         }
@@ -1279,12 +1279,12 @@ fn translate_action(action: &str, length: usize, line: usize) -> Result<String, 
         let byte = bytes[index];
         if let Some(current) = quote {
             output.push(byte as char);
-            if byte == b'\\' {
-                if let Some(next) = bytes.get(index + 1) {
-                    output.push(*next as char);
-                    index += 2;
-                    continue;
-                }
+            if byte == b'\\'
+                && let Some(next) = bytes.get(index + 1)
+            {
+                output.push(*next as char);
+                index += 2;
+                continue;
             }
             if byte == current {
                 quote = None;

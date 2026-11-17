@@ -504,12 +504,12 @@ fn expand_definitions_at(
         let byte = bytes[index];
         if quote {
             output.push(byte as char);
-            if byte == b'\\' {
-                if let Some(next) = bytes.get(index + 1) {
-                    output.push(*next as char);
-                    index += 2;
-                    continue;
-                }
+            if byte == b'\\'
+                && let Some(next) = bytes.get(index + 1)
+            {
+                output.push(*next as char);
+                index += 2;
+                continue;
             }
             if byte == b'"' {
                 quote = false;
@@ -642,7 +642,7 @@ fn ends_with_unescaped_dollar(text: &str) -> bool {
             break;
         }
     }
-    backslashes % 2 == 0
+    backslashes.is_multiple_of(2)
 }
 
 fn translate_body(text: &str) -> Result<String, Error> {
