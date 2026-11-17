@@ -238,6 +238,7 @@ members = [
     "userland/bin/passwd",
     "userland/bin/groupadd",
     "userland/bin/su",
+    "userland/bin/newgrp",
     "userland/bin/id",
     "userland/bin/whoami",
     "userland/bin/df",

@@ -1,0 +1,48 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt NEWGRP 1
+.Os RavenBSD
+.Sh NAME
+.Nm newgrp
+.Nd switch to a group and start a shell
+.Sh SYNOPSIS
+.Nm
+.Op Fl l
+.Op Ar group
+.Sh DESCRIPTION
+The
+.Nm
+utility resolves
+.Ar group
+from the system group database, verifies that the caller is root, the group's primary member,
+or an explicit member, installs the new real and effective group id through the existing libc
+credential path, and starts the user's shell.
+With no operand it selects the caller's login group from the password database.
+A numeric operand is a group id; otherwise it is a group name.
+.Pp
+The shell is
+.Ev SHELL
+when set, then the login shell from the password record, then
+.Pa /bin/brush .
+The options are:
+.Bl -tag -width Ds
+.It Fl l
+Start the shell as a login shell: the argv[0] name is prefixed with a dash and the login
+environment is supplied.
+.El
+.Pp
+A group password is not prompted for in this slice. A caller who is not a member is denied with
+.Dq permission denied: group password is not supported
+rather than blocking on the console.
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for an unknown group, permission or credential failure, 2 for usage.
+.Sh SEE ALSO
+.Xr su 1 ,
+.Xr login 1
+.Sh STANDARDS
+A documented subset of POSIX
+.Nm newgrp .
+Group password prompting, `/etc/gshadow`, user functions and any session manager are
+unsupported.
