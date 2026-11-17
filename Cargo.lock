@@ -3254,6 +3254,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-trace-core"
+version = "0.1.0"
+
+[[package]]
 name = "raven-tty-core"
 version = "0.1.0"
 
