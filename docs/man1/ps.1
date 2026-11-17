@@ -42,16 +42,14 @@ PID PPID UID GID CMD
 .Pp
 The kernel's
 .Ql PROC_PID_INFO
-exposes pid, ppid, uid and gid but no command path, and
-.Nm kernel process info
-has no process-list operation.
+is asked for 41 words: the first eight are pid, ppid, pgid, sid, uid, euid, gid and egid,
+and the UTF-8 command name follows at byte offset 64.
 The
 .Ql CMD
-field is therefore
-.Ql ?
-for every process except pid 1, which is
-.Ql init ;
-a real command source is a follow-up.
+field prints that name.
+Kernel-spawned service children may show
+.Ql child
+until their spawn sets a more specific command.
 .Pp
 .Fl -selftest
 reads every status record, checks that the directory is non-empty and every
@@ -108,10 +106,6 @@ $ ps --json
 The service view is RavenBSD-specific.
 The
 .Fl e
-fields are the POSIX subset available from
-.Ql PROC_PID_INFO ;
-the
-.Ql CMD
-field remains
-.Ql ?
-until a pid-to-command source exists.
+fields are the POSIX subset available from the 41-word
+.Ql PROC_PID_INFO
+payload; the command name is the kernel process command.

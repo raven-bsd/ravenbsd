@@ -6,7 +6,7 @@
 # A non-empty defect is a known missing or non-conforming implementation; it is
 # reported as DEFECT and is never claimed present.
 util.id	id	id
-util.ps	ps	ps -e	P4d-D2
+util.ps	ps	ps -e
 util.uname	uname	uname -a
 util.env	env	env
 util.getconf	getconf	getconf ARG_MAX

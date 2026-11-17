@@ -3,7 +3,8 @@
 SPDX-License-Identifier: BSD-3-Clause
 Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-Status: PROPOSED. The `raven-vmem` arena (A1) is implemented; `raven-kmem` (A2+) is the next layer.
+Status: PROPOSED. `raven-vmem` (A1), `raven-kmem` (A2) and its per-CPU magazines/depot (A3) are
+implemented; the kernel-integration layer (A4) and beyond are next.
 
 This is the working note for the memory lane. The requirement source is
 `ravenbsd-prjmgmt/architecture/kernel-next/03-memory.md` (R-MEM-1 .. R-MEM-25); the allocator lane
@@ -64,20 +65,68 @@ the `segments()` / `allocated_segments()` / `free_segments()` iterators. `kmem` 
 3. An allocated tag covers exactly the range the caller received.
 4. Byte conservation: `total_free + total_allocated` equals the imported measure.
 
-## 3. What A1 defers to A2+
+## 3. kmem model (A2, OBSERVED)
+
+`raven-kmem` (`crates/raven-kmem`) is the pure `no_std` + `alloc` layer over `raven-vmem`. It adds
+the general size classes, per-class slab free lists, named object caches and a `GlobalAlloc` shim —
+still no kernel dependency and no global or static state: the caller builds the arena and hands it
+to `Kmem::new`, which owns it.
+
+* **General classes** (R-MEM-8): `8, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024,
+  1536, 2048, 3072, 4096, 8192`. `alloc(size, align)` routes a request to the smallest class that
+  fits, or straight to the arena when it is above 8192 bytes or needs an alignment stricter than
+  its class offers (`align > 16`). `free` uses the same `(size, align)`, so the pair always agrees.
+* **Slabs**: a slab is one arena allocation cut into equal slots of `stride = align_up(size, align)`
+  bytes; each slab keeps its free slots in a plain `Vec` of indices, so allocation is a pop and free
+  is a push — no intrusive links in object memory and no `unsafe`. Fully-free slabs return to the
+  arena through `reap` (and `cache_destroy`).
+* **Object caches**: `cache_create(name, size, align)` / `cache_alloc` / `cache_free` /
+  `cache_reap` / `cache_destroy` / `cache_stats`, addressed by a stable `CacheId`. The first
+  [`SIZE_CLASSES`] slots are the general classes and cannot be destroyed.
+* **`GlobalAlloc` shim** (`KmemAlloc`): `alloc`/`dealloc`/`realloc` over the caller-provided
+  arena, with `realloc` staying in place across a size-class boundary and copying otherwise. This
+  module is the only `unsafe` in the crate; the safe modules carry `#![forbid(unsafe_code)]`.
+* **Alignment and statistics**: returned addresses are aligned to `align`; `CacheStats`/`KmemStats`
+  expose allocs, frees, alloc failures, slabs, in-use/free objects, waste bytes and reaped slabs.
+
+Typed caches (`Cache<T>` -> `Box<T, CacheAlloc>`, R-MEM-5) are not here: reconstructing a typed
+pointer from an address is unsafe and belongs with the kernel integration (A4).
+
+## 4. Magazines and depot (A3, OBSERVED)
+
+`MagCache` adds the per-CPU magazine layer over the slab [`Cache`], with a [`Cpu`] trait supplying
+the current CPU id and online count (the kernel reads these from hardware; host tests use a fake).
+This is what removes the shared lock from the fast path.
+
+* **Fast path**: [`MagCache::alloc`]/[`MagCache::free`] pop/push the current CPU's `loaded` magazine
+  (falling back to `previous`); a successful operation touches only per-CPU data, takes no lock and
+  performs no atomic read-modify-write. Magazines are preallocated to their capacity, so the fast
+  path never allocates.
+* **Depot** (slow path): when `loaded` and `previous` are both empty (alloc) or both full (free),
+  the cache exchanges a whole magazine with the shared depot; only when the depot cannot help does
+  it touch the slab layer.
+* **Remote free**: a cross-CPU free lands in the freeing CPU's bounded remote queue (`rounds` slots);
+  when it fills, the queue moves into a full magazine in the depot, and the allocator drains it on
+  the next slow path. The depot itself is bounded to `2 * online` full magazines, draining the
+  excess back to the slab layer.
+* **Dynamic sizing**: `magazine_rounds(online)` scales the magazine from [`ROUNDS_MIN`] (15, one
+  CPU) up to [`ROUNDS_MAX`] (143) with the online CPU count; the contention-driven doubling of
+  R-MEM-7 stays deferred to A4, which owns the real per-CPU preemption context.
+* **Correctness invariant** (tested): `slab_in_use == live + free_in_mags + free_in_depot +
+  free_in_remote` at every step; the hammers drive 1/2/4 simulated CPUs and a million operations
+  and assert no object is lost or duplicated.
+
+## 5. What A1/A2/A3 defer to A4+
 
 The architecture names three allocation policies and a quantum/import hierarchy. A1 ships
 `FirstFit`, `BestFit` and `NextFit`; the `InstantFit` power-of-two freelists and quantum caches are
-not part of A1's contract and belong with the kmem hot path (A3, where the `O(1)` fast path and its
-contention counters are specified). A1 also keeps the import source explicit: the caller passes the
+not part of A1's contract and belong with the kmem hot path (A4, where the real per-CPU preemption
+and contention counters live). A1 also keeps the import source explicit: the caller passes the
 range, and the kernel-integrating ticket will feed it from the kva/ID arenas (R-MEM-3). There is no
 global or static state, and no release hook yet; both land when the arena is wired to real mapping.
 
-## 4. kmem next steps (A2..A6, PROPOSED)
+## 6. kmem next steps (A4..A6, PROPOSED)
 
-* **A2** object caches over vmem with the general size classes and the `GlobalAlloc` shim
-  (R-MEM-5, R-MEM-8).
-* **A3** per-CPU magazines and the depot layer (R-MEM-6, R-MEM-7).
 * **A4** kernel integration replacing `kernel/src/memory/heap.rs` once the kernel lane releases
   that path (R-MEM-3, R-MEM-23, R-MEM-24).
 * **A5** per-CPU frame caches, buddy/zones and pager hooks (R-MEM-13..15).

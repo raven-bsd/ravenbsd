@@ -1,0 +1,75 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt UUSTAT 1
+.Os RavenBSD
+.Sh NAME
+.Nm uustat
+.Nd list, summarize and cancel queued uucp jobs
+.Sh SYNOPSIS
+.Nm
+.Op Fl a
+.Op Fl q
+.Op Fl s Ar system
+.Op Fl u Ar user
+.Op Fl k Ar job
+.Sh DESCRIPTION
+The
+.Nm
+utility reads the queue under
+.Pa /var/spool/uucp
+and prints, summarizes or cancels jobs.
+Without
+.Fl a
+or
+.Fl u ,
+only jobs for the current user are shown.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl a
+Include every user.
+.It Fl q
+Print a one-line summary of job, system and user counts.
+.It Fl s Ar system
+Select one destination system.
+.It Fl u Ar user
+Select one requesting user.
+.It Fl k Ar job
+Cancel the numbered job.
+.El
+.Pp
+A list line is
+.D1 Ar id user system grade kind state
+where
+.Ar state
+is
+.Ql queued .
+The queue format and peer configuration are documented in
+.Xr uucp 1
+and
+.Pa docs/posix/P4-uucp.md .
+.Sh FILES
+.Bl -tag -width /var/spool/uucp -compact
+.It Pa /etc/uucp/config
+Peer and spool configuration.
+.It Pa /var/spool/uucp/queue
+Queued job records.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A missing job or queue error exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr uucp 1 ,
+.Xr uux 1
+.Sh STANDARDS
+RavenBSD implements the documented list, summary and cancel subset. The
+.Fl e ,
+.Fl i ,
+.Fl o ,
+.Fl r ,
+.Fl W ,
+.Fl y
+and
+.Fl z
+forms are not implemented.

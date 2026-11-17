@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T02:21:43Z
+- Date: 2026-11-17T03:22:19Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 937 pass, 863 fail, 10 skip
+- Counts: 1142 pass, 658 fail, 10 skip
 
 ## Summary
 
@@ -21,14 +21,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | external | 0 | 0 | 3 |
 | filesystem | 19 | 1 | 0 |
 | header | 40 | 46 | 0 |
-| interface | 714 | 708 | 0 |
-| link | 0 | 1 | 0 |
+| interface | 925 | 497 | 0 |
+| link | 1 | 0 | 0 |
 | process | 16 | 1 | 0 |
 | shell | 3 | 22 | 0 |
 | target | 0 | 0 | 7 |
 | tty | 12 | 0 | 0 |
-| utility | 133 | 84 | 0 |
-| **all** | **937** | **863** | **10** |
+| utility | 126 | 91 | 0 |
+| **all** | **1142** | **658** | **10** |
 
 ## Rows
 
@@ -161,9 +161,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.acosh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_15.c` |  |
 | `interface.acoshf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_16.c` |  |
 | `interface.acoshfNx` | interface | fail | `profile` | profile status missing |
-| `interface.acoshl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.acosl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.acospi` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.acoshl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.acosl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.acospi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.adjtime` | interface | fail | `profile` | profile status missing |
 | `interface.aio_cancel` | interface | fail | `profile` | profile status missing |
 | `interface.aio_cancel64` | interface | fail | `profile` | profile status missing |
@@ -181,34 +181,34 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.aio_write64` | interface | fail | `profile` | profile status missing |
 | `interface.alarm` | interface | fail | `profile` | profile status missing |
 | `interface.alphasort` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_37.c` |  |
-| `interface.asctime` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
+| `interface.asctime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.asin` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_39.c` |  |
 | `interface.asinf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_40.c` |  |
 | `interface.asinfNx` | interface | fail | `profile` | profile status missing |
 | `interface.asinh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_42.c` |  |
 | `interface.asinhf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_43.c` |  |
 | `interface.asinhfNx` | interface | fail | `profile` | profile status missing |
-| `interface.asinhl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.asinl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.asinpi` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.asinhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.asinl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.asinpi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.assert` | interface | fail | `profile` | profile status missing |
 | `interface.at_quick_exit` | interface | fail | `profile` | profile status missing |
 | `interface.atan` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_50.c` |  |
 | `interface.atan2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_51.c` |  |
 | `interface.atan2f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_52.c` |  |
 | `interface.atan2fNx` | interface | fail | `profile` | profile status missing |
-| `interface.atan2l` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.atan2pi` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.atan2l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.atan2pi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.atanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_56.c` |  |
 | `interface.atanfNx` | interface | fail | `profile` | profile status missing |
 | `interface.atanh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_58.c` |  |
 | `interface.atanhf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_59.c` |  |
 | `interface.atanhfNx` | interface | fail | `profile` | profile status missing |
-| `interface.atanhl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.atanl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.atanpi` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.atanhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.atanl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.atanpi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.atexit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_64.c` |  |
-| `interface.atof` | interface | fail | `test:tests/libc/posix/stdlib/check-stdlib.sh` | test evidence `tests/libc/posix/stdlib/check-stdlib.sh` failed: posix stdlib: missing libc.a symbol atof |
+| `interface.atof` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.atoi` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_66.c` |  |
 | `interface.atol` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_67.c` |  |
 | `interface.atoll` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_68.c` |  |
@@ -265,7 +265,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.catopen` | interface | fail | `profile` | profile status missing |
 | `interface.cbrt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_120.c` |  |
 | `interface.cbrtf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_121.c` |  |
-| `interface.cbrtl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.cbrtl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ccos` | interface | fail | `profile` | profile status missing |
 | `interface.ccosf` | interface | fail | `profile` | profile status missing |
 | `interface.ccosfNx` | interface | fail | `profile` | profile status missing |
@@ -277,7 +277,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ceil` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_131.c` |  |
 | `interface.ceilf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_132.c` |  |
 | `interface.ceilfNx` | interface | fail | `profile` | profile status missing |
-| `interface.ceill` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.ceill` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.cexp` | interface | fail | `profile` | profile status missing |
 | `interface.cexpf` | interface | fail | `profile` | profile status missing |
 | `interface.cexpfNx` | interface | fail | `profile` | profile status missing |
@@ -297,12 +297,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.cimagfNx` | interface | fail | `profile` | profile status missing |
 | `interface.cimagl` | interface | fail | `profile` | profile status missing |
 | `interface.clearerr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_153.c` |  |
-| `interface.clearerr_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.clearerr_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.clock` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_155.c` |  |
 | `interface.clock_getcpuclockid` | interface | fail | `profile` | profile status missing |
 | `interface.clock_getres` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_157.c` |  |
 | `interface.clock_gettime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_158.c` |  |
-| `interface.clock_nanosleep` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
+| `interface.clock_nanosleep` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.clock_settime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_160.c` |  |
 | `interface.clog` | interface | fail | `profile` | profile status missing |
 | `interface.clogf` | interface | fail | `profile` | profile status missing |
@@ -317,7 +317,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.cnd_signal` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_171.c` |  |
 | `interface.cnd_timedwait` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_172.c` |  |
 | `interface.cnd_wait` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_173.c` |  |
-| `interface.compoundn` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.compoundn` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.confstr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_175.c` |  |
 | `interface.conj` | interface | fail | `profile` | profile status missing |
 | `interface.conjf` | interface | fail | `profile` | profile status missing |
@@ -328,16 +328,16 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.copysign` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_182.c` |  |
 | `interface.copysignf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_183.c` |  |
 | `interface.copysignfNx` | interface | fail | `profile` | profile status missing |
-| `interface.copysignl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.copysignl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.cos` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_186.c` |  |
 | `interface.cosf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_187.c` |  |
 | `interface.cosfNx` | interface | fail | `profile` | profile status missing |
 | `interface.cosh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_189.c` |  |
 | `interface.coshf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_190.c` |  |
 | `interface.coshfNx` | interface | fail | `profile` | profile status missing |
-| `interface.coshl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.cosl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.cospi` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.coshl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.cosl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.cospi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.cpow` | interface | fail | `profile` | profile status missing |
 | `interface.cpowf` | interface | fail | `profile` | profile status missing |
 | `interface.cpowfNx` | interface | fail | `profile` | profile status missing |
@@ -372,8 +372,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ctanhfNx` | interface | fail | `profile` | profile status missing |
 | `interface.ctanhl` | interface | fail | `profile` | profile status missing |
 | `interface.ctanl` | interface | fail | `profile` | profile status missing |
-| `interface.ctermid` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.ctime` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
+| `interface.ctermid` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.ctime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.cuserid` | interface | fail | `profile` | profile status missing |
 | `interface.daemon` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_232.c` | declaration did not compile |
 | `interface.dcgettext` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_233.c` |  |
@@ -407,9 +407,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.erf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_261.c` |  |
 | `interface.erfc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_262.c` |  |
 | `interface.erfcf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_263.c` |  |
-| `interface.erfcl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.erfcl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.erff` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_265.c` |  |
-| `interface.erfl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.erfl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.euidaccess` | interface | fail | `profile` | profile status missing |
 | `interface.execl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_268.c` |  |
 | `interface.execle` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_269.c` |  |
@@ -423,24 +423,24 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.exp10` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_277.c` | declaration did not compile |
 | `interface.exp10f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_278.c` | declaration did not compile |
 | `interface.exp10fNx` | interface | fail | `profile` | profile status missing |
-| `interface.exp10l` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.exp10m1` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.exp10l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.exp10m1` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.exp2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_282.c` |  |
 | `interface.exp2f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_283.c` |  |
 | `interface.exp2fNx` | interface | fail | `profile` | profile status missing |
-| `interface.exp2l` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.exp2m1` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.exp2l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.exp2m1` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.expf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_287.c` |  |
 | `interface.expfNx` | interface | fail | `profile` | profile status missing |
-| `interface.expl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.expl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.expm1` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_290.c` |  |
 | `interface.expm1f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_291.c` |  |
 | `interface.expm1fNx` | interface | fail | `profile` | profile status missing |
-| `interface.expm1l` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.expm1l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fabs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_294.c` |  |
 | `interface.fabsf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_295.c` |  |
 | `interface.fabsfNx` | interface | fail | `profile` | profile status missing |
-| `interface.fabsl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.fabsl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.faccessat` | interface | fail | `profile` | profile status missing |
 | `interface.fallocate` | interface | fail | `profile` | profile status missing |
 | `interface.fattach` | interface | fail | `profile` | profile status missing |
@@ -457,7 +457,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fdim` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_311.c` |  |
 | `interface.fdimf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_312.c` |  |
 | `interface.fdimfNx` | interface | fail | `profile` | profile status missing |
-| `interface.fdiml` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.fdiml` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fdopen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_315.c` |  |
 | `interface.feclearexcept` | interface | fail | `profile` | profile status missing |
 | `interface.fegetenv` | interface | fail | `profile` | profile status missing |
@@ -466,10 +466,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fegetround` | interface | fail | `profile` | profile status missing |
 | `interface.feholdexcept` | interface | fail | `profile` | profile status missing |
 | `interface.feof` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_322.c` |  |
-| `interface.feof_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.feof_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.feraiseexcept` | interface | fail | `profile` | profile status missing |
 | `interface.ferror` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_325.c` |  |
-| `interface.ferror_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.ferror_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fesetenv` | interface | fail | `profile` | profile status missing |
 | `interface.fesetexcept` | interface | fail | `profile` | profile status missing |
 | `interface.fesetexceptflag` | interface | fail | `profile` | profile status missing |
@@ -480,120 +480,120 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.feupdateenv` | interface | fail | `profile` | profile status missing |
 | `interface.fexecve` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_335.c` |  |
 | `interface.fflush` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_336.c` |  |
-| `interface.fflush_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fflush_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.ffs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_338.c` |  |
 | `interface.ffsl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_339.c` |  |
 | `interface.ffsll` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_340.c` |  |
 | `interface.fgetc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_341.c` |  |
-| `interface.fgetc_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.fgetpos` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.fgetpos64` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fgetc_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.fgetpos` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.fgetpos64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fgets` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_345.c` |  |
 | `interface.fgetwc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_346.c` |  |
 | `interface.fgetwc_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.fgetws` | interface | fail | `profile` | profile status missing |
 | `interface.fileno` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_349.c` |  |
-| `interface.fileno_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fileno_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.finitef` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_351.c` | declaration did not compile |
-| `interface.flockfile` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.flockfile` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.floor` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_353.c` |  |
 | `interface.floorf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_354.c` |  |
 | `interface.floorfNx` | interface | fail | `profile` | profile status missing |
-| `interface.floorl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.floorl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.flsl` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_357.c` | declaration did not compile |
 | `interface.flsll` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_358.c` | declaration did not compile |
 | `interface.fma` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_359.c` |  |
 | `interface.fmaf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_360.c` |  |
 | `interface.fmafNx` | interface | fail | `profile` | profile status missing |
-| `interface.fmal` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.fmal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fmax` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_363.c` |  |
 | `interface.fmaxf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_364.c` |  |
 | `interface.fmaxfNx` | interface | fail | `profile` | profile status missing |
-| `interface.fmaximum_mag_num` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.fmaxl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.fmaxmag` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.fmaximum_mag_num` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.fmaxl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.fmaxmag` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fmaxmagfNx` | interface | fail | `profile` | profile status missing |
 | `interface.fmin` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_370.c` |  |
 | `interface.fminf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_371.c` |  |
 | `interface.fminfNx` | interface | fail | `profile` | profile status missing |
-| `interface.fminimum_mag_num` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.fminl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.fminmag` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.fminimum_mag_num` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.fminl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.fminmag` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fminmagfNx` | interface | fail | `profile` | profile status missing |
 | `interface.fmod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_377.c` |  |
 | `interface.fmodf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_378.c` |  |
 | `interface.fmodfNx` | interface | fail | `profile` | profile status missing |
-| `interface.fmodl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.fmodl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fmtmsg` | interface | fail | `profile` | profile status missing |
 | `interface.fnmatch` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_382.c` |  |
 | `interface.fopen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_383.c` |  |
-| `interface.fopen64` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fopen64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fork` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_385.c` |  |
 | `interface.fpathconf` | interface | fail | `profile` | profile status missing |
-| `interface.fpclassify` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.fpclassify` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_388.c` |  |
 | `interface.fputc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_389.c` |  |
-| `interface.fputc_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fputc_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fputs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_391.c` |  |
-| `interface.fputs_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fputs_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fputwc` | interface | fail | `profile` | profile status missing |
 | `interface.fputwc_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.fputws` | interface | fail | `profile` | profile status missing |
 | `interface.fputws_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.fread` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_397.c` |  |
-| `interface.fread_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fread_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.free` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_399.c` |  |
-| `interface.free_aligned_sized` | interface | fail | `test:tests/libc/posix/stdlib/check-stdlib.sh` | test evidence `tests/libc/posix/stdlib/check-stdlib.sh` failed: posix stdlib: missing libc.a symbol atof |
-| `interface.free_sized` | interface | fail | `test:tests/libc/posix/stdlib/check-stdlib.sh` | test evidence `tests/libc/posix/stdlib/check-stdlib.sh` failed: posix stdlib: missing libc.a symbol atof |
+| `interface.free_aligned_sized` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
+| `interface.free_sized` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.freeaddrinfo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_402.c` |  |
 | `interface.freelocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_403.c` |  |
 | `interface.freopen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_404.c` |  |
-| `interface.freopen64` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.freopen64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.frexp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_406.c` |  |
 | `interface.frexpf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_407.c` |  |
 | `interface.frexpfNx` | interface | fail | `profile` | profile status missing |
-| `interface.frexpl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.fromfp` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.fromfpx` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.frexpl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.fromfp` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.fromfpx` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.fscanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_412.c` |  |
 | `interface.fseek` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_413.c` |  |
-| `interface.fseeko` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.fseeko64` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.fsetpos` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.fsetpos64` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fseeko` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.fseeko64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.fsetpos` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.fsetpos64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fstat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_418.c` |  |
 | `interface.fstat64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_419.c` | declaration did not compile |
 | `interface.fstatat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_420.c` |  |
 | `interface.fstatvfs` | interface | fail | `profile` | profile status missing |
 | `interface.fsync` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_422.c` |  |
 | `interface.ftell` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_423.c` |  |
-| `interface.ftello` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.ftello64` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.ftello` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.ftello64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.ftok` | interface | fail | `profile` | profile status missing |
 | `interface.ftruncate` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_427.c` |  |
 | `interface.ftruncate64` | interface | fail | `profile` | profile status missing |
-| `interface.ftrylockfile` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.ftrylockfile` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.ftw` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_430.c` |  |
 | `interface.ftw64` | interface | fail | `profile` | profile status missing |
-| `interface.funlockfile` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.funlockfile` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.futimens` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_433.c` |  |
 | `interface.futimes` | interface | fail | `profile` | profile status missing |
 | `interface.futimesat` | interface | fail | `profile` | profile status missing |
 | `interface.fwide` | interface | fail | `profile` | profile status missing |
 | `interface.fwprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_437.c` |  |
 | `interface.fwrite` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_438.c` |  |
-| `interface.fwrite_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.fwrite_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.fwscanf` | interface | fail | `profile` | profile status missing |
 | `interface.gammaf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_441.c` | declaration did not compile |
-| `interface.gammal` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.gammal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.getaddrinfo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_443.c` |  |
-| `interface.getc` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.getc_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.getc` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.getc_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.getchar` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_446.c` |  |
-| `interface.getchar_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.getchar_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.getcwd` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_448.c` |  |
 | `interface.getdate` | interface | fail | `profile` | profile status missing |
-| `interface.getdelim` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.getdelim` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.getdents` | interface | fail | `profile` | profile status missing |
 | `interface.getdomainname` | interface | fail | `profile` | profile status missing |
 | `interface.getdtablesize` | interface | fail | `profile` | profile status missing |
@@ -652,7 +652,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getutxent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_506.c` |  |
 | `interface.getutxid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_507.c` |  |
 | `interface.getutxline` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_508.c` |  |
-| `interface.getw` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.getw` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.getwc` | interface | fail | `profile` | profile status missing |
 | `interface.getwc_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.getwchar` | interface | fail | `profile` | profile status missing |
@@ -672,7 +672,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.hypot` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_526.c` |  |
 | `interface.hypotf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_527.c` |  |
 | `interface.hypotfNx` | interface | fail | `profile` | profile status missing |
-| `interface.hypotl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.hypotl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.iconv` | interface | fail | `profile` | profile status missing |
 | `interface.iconv_close` | interface | fail | `profile` | profile status missing |
 | `interface.iconv_open` | interface | fail | `profile` | profile status missing |
@@ -682,7 +682,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.if_nametoindex` | interface | fail | `profile` | profile status missing |
 | `interface.ilogb` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_537.c` |  |
 | `interface.ilogbf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_538.c` |  |
-| `interface.ilogbl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.ilogbl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.imaxabs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_540.c` |  |
 | `interface.imaxdiv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_541.c` |  |
 | `interface.inet_addr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_542.c` |  |
@@ -704,24 +704,24 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.isatty` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_558.c` |  |
 | `interface.isblank` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_559.c` |  |
 | `interface.isblank_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_560.c` |  |
-| `interface.iscanonical` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.iscanonical` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.iscntrl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_562.c` |  |
 | `interface.iscntrl_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_563.c` |  |
 | `interface.isdigit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_564.c` |  |
 | `interface.isdigit_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_565.c` |  |
-| `interface.iseqsig` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.isfinite` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.iseqsig` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.isfinite` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.isgraph` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_568.c` |  |
 | `interface.isgraph_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_569.c` |  |
-| `interface.isgreater` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.isgreaterequal` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.isless` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.islessequal` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.islessgreater` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.isgreater` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.isgreaterequal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.isless` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.islessequal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.islessgreater` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.islower` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_575.c` |  |
 | `interface.islower_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_576.c` |  |
-| `interface.isnan` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.isnormal` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.isnan` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.isnormal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.isprint` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_579.c` |  |
 | `interface.isprint_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_580.c` |  |
 | `interface.ispunct` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_581.c` |  |
@@ -730,39 +730,39 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.issignaling` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_584.c` | declaration did not compile |
 | `interface.isspace` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_585.c` |  |
 | `interface.isspace_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_586.c` |  |
-| `interface.issubnormal` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.isunordered` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.issubnormal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.isunordered` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.isupper` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_589.c` |  |
 | `interface.isupper_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_590.c` |  |
 | `interface.iswalnum` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_591.c` |  |
-| `interface.iswalnum_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswalnum_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswalpha` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_593.c` |  |
-| `interface.iswalpha_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswalpha_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswblank` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_595.c` |  |
-| `interface.iswblank_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswblank_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswcntrl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_597.c` |  |
-| `interface.iswcntrl_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswcntrl_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswctype` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_599.c` |  |
-| `interface.iswctype_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswctype_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswdigit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_601.c` |  |
-| `interface.iswdigit_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswdigit_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswgraph` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_603.c` |  |
-| `interface.iswgraph_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswgraph_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswlower` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_605.c` | declaration did not compile |
-| `interface.iswlower_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswlower_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswprint` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_607.c` |  |
-| `interface.iswprint_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswprint_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswpunct` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_609.c` |  |
-| `interface.iswpunct_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswpunct_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswspace` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_611.c` |  |
-| `interface.iswspace_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswspace_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswupper` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_613.c` |  |
-| `interface.iswupper_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswupper_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.iswxdigit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_615.c` |  |
-| `interface.iswxdigit_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.iswxdigit_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.isxdigit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_617.c` |  |
 | `interface.isxdigit_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_618.c` |  |
-| `interface.iszero` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.iszero` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.j0` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_620.c` |  |
 | `interface.j0f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_621.c` | declaration did not compile |
 | `interface.j1` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_622.c` |  |
@@ -779,14 +779,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ldexp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_633.c` |  |
 | `interface.ldexpf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_634.c` |  |
 | `interface.ldexpfNx` | interface | fail | `profile` | profile status missing |
-| `interface.ldexpl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.ldexpl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ldiv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_637.c` |  |
 | `interface.lgamma` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_638.c` |  |
 | `interface.lgamma_r` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_639.c` | declaration did not compile |
 | `interface.lgammaf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_640.c` |  |
 | `interface.lgammaf_r` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_641.c` | declaration did not compile |
-| `interface.lgammal` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.lgammal_r` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.lgammal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.lgammal_r` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.link` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_644.c` |  |
 | `interface.linkat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_645.c` |  |
 | `interface.lio_listio` | interface | fail | `profile` | profile status missing |
@@ -794,16 +794,16 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.listen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_648.c` |  |
 | `interface.llabs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_649.c` |  |
 | `interface.lldiv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_650.c` |  |
-| `interface.llogb` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.llogb` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.llogbfNx` | interface | fail | `profile` | profile status missing |
-| `interface.llrint` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.llrintf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.llrint` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.llrintf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.llrintfNx` | interface | fail | `profile` | profile status missing |
-| `interface.llrintl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.llround` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.llroundf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.llrintl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.llround` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.llroundf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.llroundfNx` | interface | fail | `profile` | profile status missing |
-| `interface.llroundl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.llroundl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.localeconv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_661.c` |  |
 | `interface.localtime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_662.c` |  |
 | `interface.lockf` | interface | fail | `profile` | profile status missing |
@@ -811,34 +811,34 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.log10` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_665.c` |  |
 | `interface.log10f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_666.c` |  |
 | `interface.log10fNx` | interface | fail | `profile` | profile status missing |
-| `interface.log10l` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.log10p1` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.log10l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.log10p1` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.log1p` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_670.c` |  |
 | `interface.log1pf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_671.c` |  |
-| `interface.log1pl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.log1pl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.log2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_673.c` |  |
 | `interface.log2f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_674.c` |  |
 | `interface.log2fNx` | interface | fail | `profile` | profile status missing |
-| `interface.log2l` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.log2p1` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.logb` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.logbf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.log2l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.log2p1` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.logb` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.logbf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.logbfNx` | interface | fail | `profile` | profile status missing |
-| `interface.logbl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.logbl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.logf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_682.c` |  |
 | `interface.logfNx` | interface | fail | `profile` | profile status missing |
-| `interface.logl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.logl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.logp1fNx` | interface | fail | `profile` | profile status missing |
 | `interface.longjmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_686.c` |  |
 | `interface.lrand48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_687.c` |  |
-| `interface.lrint` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.lrintf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.lrint` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.lrintf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.lrintfNx` | interface | fail | `profile` | profile status missing |
-| `interface.lrintl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.lround` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.lroundf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.lrintl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.lround` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.lroundf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.lroundfNx` | interface | fail | `profile` | profile status missing |
-| `interface.lroundl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.lroundl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.lseek` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_696.c` |  |
 | `interface.lseek64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_697.c` | declaration did not compile |
 | `interface.lstat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_698.c` |  |
@@ -855,7 +855,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.mbsinit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_709.c` |  |
 | `interface.mbsnrtowcs` | interface | fail | `profile` | profile status missing |
 | `interface.mbsrtowcs` | interface | fail | `profile` | profile status missing |
-| `interface.mbstowcs` | interface | fail | `test:tests/libc/posix/stdlib/check-stdlib.sh` | test evidence `tests/libc/posix/stdlib/check-stdlib.sh` failed: posix stdlib: missing libc.a symbol atof |
+| `interface.mbstowcs` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.mbtowc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_713.c` |  |
 | `interface.memchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_714.c` |  |
 | `interface.memcmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_715.c` |  |
@@ -881,7 +881,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.modf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_735.c` |  |
 | `interface.modff` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_736.c` |  |
 | `interface.modffNx` | interface | fail | `profile` | profile status missing |
-| `interface.modfl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.modfl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.mprotect` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_739.c` |  |
 | `interface.mq_close` | interface | fail | `profile` | profile status missing |
 | `interface.mq_getattr` | interface | fail | `profile` | profile status missing |
@@ -909,24 +909,24 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.munlockall` | interface | fail | `profile` | profile status missing |
 | `interface.munmap` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_764.c` |  |
 | `interface.name_to_handle_at` | interface | fail | `profile` | profile status missing |
-| `interface.nan` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.nanf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.nan` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.nanf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nanfNx` | interface | fail | `profile` | profile status missing |
-| `interface.nanl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.nanl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nanosleep` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_770.c` |  |
-| `interface.nearbyint` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.nearbyintf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.nearbyint` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.nearbyintf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nearbyintfNx` | interface | fail | `profile` | profile status missing |
-| `interface.nearbyintl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.nearbyintl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.newlocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_775.c` |  |
-| `interface.nextafter` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.nextafterf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.nextafter` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.nextafterf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nextafterfNx` | interface | fail | `profile` | profile status missing |
-| `interface.nextafterl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.nextafterl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nextdownfNx` | interface | fail | `profile` | profile status missing |
-| `interface.nexttoward` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.nexttowardf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.nexttowardl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.nexttoward` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.nexttowardf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.nexttowardl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nextupfNx` | interface | fail | `profile` | profile status missing |
 | `interface.nftw` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_785.c` |  |
 | `interface.nftw64` | interface | fail | `profile` | profile status missing |
@@ -980,12 +980,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.pow` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_834.c` |  |
 | `interface.pow10` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_835.c` | declaration did not compile |
 | `interface.pow10f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_836.c` | declaration did not compile |
-| `interface.pow10l` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.pow10l` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.powf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_838.c` |  |
 | `interface.powfNx` | interface | fail | `profile` | profile status missing |
-| `interface.powl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.pown` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.powr` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.powl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.pown` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.powr` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ppoll` | interface | fail | `profile` | profile status missing |
 | `interface.pread` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_844.c` |  |
 | `interface.pread64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_845.c` | declaration did not compile |
@@ -1100,10 +1100,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.pthread_spin_unlock` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_954.c` |  |
 | `interface.pthread_testcancel` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_955.c` |  |
 | `interface.ptsname_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_956.c` |  |
-| `interface.putc` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.putc_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.putc` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.putc_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.putchar` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_959.c` |  |
-| `interface.putchar_unlocked` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.putchar_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.putenv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_961.c` |  |
 | `interface.putgrent` | interface | fail | `profile` | profile status missing |
 | `interface.putmsg` | interface | fail | `profile` | profile status missing |
@@ -1111,7 +1111,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.putpwent` | interface | fail | `profile` | profile status missing |
 | `interface.puts` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_966.c` |  |
 | `interface.pututxline` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_967.c` |  |
-| `interface.putw` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.putw` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.putwc` | interface | fail | `profile` | profile status missing |
 | `interface.putwc_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.putwchar` | interface | fail | `profile` | profile status missing |
@@ -1146,15 +1146,15 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.regexec` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1000.c` |  |
 | `interface.regfree` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1001.c` |  |
 | `interface.regnsub` | interface | fail | `profile` | profile status missing |
-| `interface.remainder` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.remainderf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.remainder` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.remainderf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.remainderfNx` | interface | fail | `profile` | profile status missing |
-| `interface.remainderl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.remainderl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.remove` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1007.c` |  |
 | `interface.remque` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1008.c` |  |
-| `interface.remquo` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.remquof` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.remquol` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.remquo` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.remquof` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.remquol` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.rename` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1012.c` |  |
 | `interface.renameat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1013.c` |  |
 | `interface.renameat2` | interface | fail | `profile` | profile status missing |
@@ -1163,22 +1163,22 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.rint` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1017.c` |  |
 | `interface.rintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1018.c` |  |
 | `interface.rintfNx` | interface | fail | `profile` | profile status missing |
-| `interface.rintl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.rintl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.rmdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1021.c` |  |
-| `interface.rootn` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.rootn` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.round` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1023.c` |  |
 | `interface.roundevenfNx` | interface | fail | `profile` | profile status missing |
 | `interface.roundf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1025.c` |  |
 | `interface.roundfNx` | interface | fail | `profile` | profile status missing |
-| `interface.roundl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.roundl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.scalb` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1028.c` | declaration did not compile |
 | `interface.scalbf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1029.c` | declaration did not compile |
-| `interface.scalbln` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.scalblnf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.scalblnl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.scalbln` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.scalblnf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.scalblnl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.scalbn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1033.c` |  |
 | `interface.scalbnf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1034.c` |  |
-| `interface.scalbnl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.scalbnl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.scandir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1036.c` |  |
 | `interface.scanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1037.c` |  |
 | `interface.sched_get_priority_max` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1038.c` |  |
@@ -1213,8 +1213,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.send` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1067.c` |  |
 | `interface.sendmsg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1068.c` |  |
 | `interface.sendto` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1069.c` |  |
-| `interface.setbuf` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
-| `interface.setbuffer` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.setbuf` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
+| `interface.setbuffer` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.setdomainname` | interface | fail | `profile` | profile status missing |
 | `interface.setegid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1073.c` |  |
 | `interface.setenv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1074.c` |  |
@@ -1227,7 +1227,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sethostname` | interface | fail | `profile` | profile status missing |
 | `interface.setitimer` | interface | fail | `profile` | profile status missing |
 | `interface.setjmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1083.c` |  |
-| `interface.setlinebuf` | interface | fail | `test:tests/libc/posix/stdio/check-stdio.sh` | test evidence `tests/libc/posix/stdio/check-stdio.sh` failed: posix stdio: missing libc.a symbol clearerr_unlocked |
+| `interface.setlinebuf` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.setlocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1085.c` |  |
 | `interface.setlogmask` | interface | fail | `profile` | profile status missing |
 | `interface.setnetent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1087.c` |  |
@@ -1274,7 +1274,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sigismember` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1128.c` |  |
 | `interface.siglongjmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1129.c` |  |
 | `interface.signal` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1130.c` |  |
-| `interface.signbit` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.signbit` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.significandf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1132.c` | declaration did not compile |
 | `interface.sigorset` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1133.c` | declaration did not compile |
 | `interface.sigpause` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1134.c` |  |
@@ -1290,14 +1290,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sin` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1144.c` |  |
 | `interface.sincos` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1145.c` | declaration did not compile |
 | `interface.sincosf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1146.c` | declaration did not compile |
-| `interface.sincosl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.sincosl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.sinf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1148.c` |  |
 | `interface.sinfNx` | interface | fail | `profile` | profile status missing |
 | `interface.sinh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1150.c` |  |
 | `interface.sinhf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1151.c` |  |
 | `interface.sinhfNx` | interface | fail | `profile` | profile status missing |
-| `interface.sinhl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.sinl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.sinhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.sinl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.sinpi` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1155.c` |  |
 | `interface.sleep` | interface | fail | `profile` | profile status missing |
 | `interface.snprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1157.c` |  |
@@ -1309,7 +1309,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sqrt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1163.c` |  |
 | `interface.sqrtf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1164.c` |  |
 | `interface.sqrtfNx` | interface | fail | `profile` | profile status missing |
-| `interface.sqrtl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.sqrtl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.srand` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1167.c` |  |
 | `interface.srand48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1168.c` |  |
 | `interface.srandom` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1169.c` |  |
@@ -1318,25 +1318,25 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.stat64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1172.c` | declaration did not compile |
 | `interface.statvfs` | interface | fail | `profile` | profile status missing |
 | `interface.statx` | interface | fail | `profile` | profile status missing |
-| `interface.stime` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
+| `interface.stime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.strcasecmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1176.c` |  |
 | `interface.strcasecmp_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1177.c` |  |
 | `interface.strcat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1178.c` |  |
 | `interface.strchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1179.c` |  |
 | `interface.strcmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1180.c` |  |
-| `interface.strcoll` | interface | fail | `test:tests/libc/posix/string/check-string.sh` | test evidence `tests/libc/posix/string/check-string.sh` failed: posix string: missing libc.a symbol strcoll |
-| `interface.strcoll_l` | interface | fail | `test:tests/libc/posix/string/check-string.sh` | test evidence `tests/libc/posix/string/check-string.sh` failed: posix string: missing libc.a symbol strcoll |
+| `interface.strcoll` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
+| `interface.strcoll_l` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
 | `interface.strcpy` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1183.c` |  |
 | `interface.strcspn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1184.c` |  |
 | `interface.strerror` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1185.c` |  |
-| `interface.strerror_l` | interface | fail | `test:tests/libc/posix/string/check-string.sh` | test evidence `tests/libc/posix/string/check-string.sh` failed: posix string: missing libc.a symbol strcoll |
+| `interface.strerror_l` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
 | `interface.strerror_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1187.c` |  |
 | `interface.strfmon` | interface | fail | `profile` | profile status missing |
 | `interface.strfmon_l` | interface | fail | `profile` | profile status missing |
-| `interface.strfromd` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.strfromf` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.strfromd` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.strfromf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.strftime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1192.c` |  |
-| `interface.strftime_l` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
+| `interface.strftime_l` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.strlcat` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1194.c` | declaration did not compile |
 | `interface.strlcpy` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1195.c` | declaration did not compile |
 | `interface.strlen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1196.c` |  |
@@ -1347,12 +1347,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.strncpy` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1201.c` |  |
 | `interface.strnlen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1202.c` |  |
 | `interface.strpbrk` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1203.c` |  |
-| `interface.strptime_l` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
+| `interface.strptime_l` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.strrchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1205.c` |  |
 | `interface.strspn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1206.c` |  |
 | `interface.strstr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1207.c` |  |
-| `interface.strtod` | interface | fail | `test:tests/libc/posix/stdlib/check-stdlib.sh` | test evidence `tests/libc/posix/stdlib/check-stdlib.sh` failed: posix stdlib: missing libc.a symbol atof |
-| `interface.strtof` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.strtod` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
+| `interface.strtof` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.strtoimax` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1210.c` |  |
 | `interface.strtok` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1211.c` |  |
 | `interface.strtok_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1212.c` |  |
@@ -1363,8 +1363,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.strtoul` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1217.c` |  |
 | `interface.strtoull` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1218.c` |  |
 | `interface.strtoumax` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1219.c` |  |
-| `interface.strxfrm` | interface | fail | `test:tests/libc/posix/string/check-string.sh` | test evidence `tests/libc/posix/string/check-string.sh` failed: posix string: missing libc.a symbol strcoll |
-| `interface.strxfrm_l` | interface | fail | `test:tests/libc/posix/string/check-string.sh` | test evidence `tests/libc/posix/string/check-string.sh` failed: posix string: missing libc.a symbol strcoll |
+| `interface.strxfrm` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
+| `interface.strxfrm_l` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
 | `interface.swab` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1222.c` |  |
 | `interface.swprintf` | interface | fail | `profile` | profile status missing |
 | `interface.swscanf` | interface | fail | `profile` | profile status missing |
@@ -1383,9 +1383,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.tanh` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1237.c` |  |
 | `interface.tanhf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1238.c` |  |
 | `interface.tanhfNx` | interface | fail | `profile` | profile status missing |
-| `interface.tanhl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.tanl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.tanpi` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.tanhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.tanl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.tanpi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.tcdrain` | interface | fail | `profile` | profile status missing |
 | `interface.tcflow` | interface | fail | `profile` | profile status missing |
 | `interface.tcflush` | interface | fail | `profile` | profile status missing |
@@ -1402,7 +1402,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.textdomain` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1256.c` |  |
 | `interface.tgamma` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1257.c` |  |
 | `interface.tgammaf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1258.c` |  |
-| `interface.tgammal` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.tgammal` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.thrd_create` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1260.c` |  |
 | `interface.thrd_current` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1261.c` |  |
 | `interface.thrd_detach` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1262.c` |  |
@@ -1419,8 +1419,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.timer_gettime` | interface | fail | `profile` | profile status missing |
 | `interface.timer_settime` | interface | fail | `profile` | profile status missing |
 | `interface.times` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1275.c` |  |
-| `interface.timespec_get` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
-| `interface.timespec_getres` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
+| `interface.timespec_get` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
+| `interface.timespec_getres` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.tmpfile` | interface | fail | `profile` | profile status missing |
 | `interface.tmpfile64` | interface | fail | `profile` | profile status missing |
 | `interface.tmpnam` | interface | fail | `profile` | profile status missing |
@@ -1430,17 +1430,17 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.toupper` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1284.c` |  |
 | `interface.toupper_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1285.c` |  |
 | `interface.towctrans` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1286.c` |  |
-| `interface.towctrans_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.towctrans_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.towlower` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1288.c` |  |
-| `interface.towlower_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.towlower_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.towupper` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1290.c` |  |
-| `interface.towupper_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.towupper_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.trunc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1292.c` |  |
 | `interface.truncate` | interface | fail | `profile` | profile status missing |
 | `interface.truncate64` | interface | fail | `profile` | profile status missing |
 | `interface.truncf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1295.c` |  |
 | `interface.truncfNx` | interface | fail | `profile` | profile status missing |
-| `interface.truncl` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.truncl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.tss_create` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1298.c` |  |
 | `interface.tss_delete` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1299.c` |  |
 | `interface.tss_get` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1300.c` |  |
@@ -1448,10 +1448,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ttyname` | interface | fail | `profile` | profile status missing |
 | `interface.ttyname_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1303.c` |  |
 | `interface.twalk` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1304.c` |  |
-| `interface.tzset` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
+| `interface.tzset` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.ualarm` | interface | fail | `profile` | profile status missing |
-| `interface.ufromfp` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
-| `interface.ufromfpx` | interface | fail | `test:tests/libc/posix/math/check-math.sh` | test evidence `tests/libc/posix/math/check-math.sh` failed: collect2: error: ld returned 1 exit status |
+| `interface.ufromfp` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
+| `interface.ufromfpx` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ufromfpxfNx` | interface | fail | `profile` | profile status missing |
 | `interface.ulimit` | interface | fail | `profile` | profile status missing |
 | `interface.umask` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1311.c` |  |
@@ -1501,25 +1501,25 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.waitpid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1355.c` |  |
 | `interface.wcrtomb` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1356.c` |  |
 | `interface.wcscasecmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1357.c` |  |
-| `interface.wcscasecmp_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wcscasecmp_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcscat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1359.c` |  |
 | `interface.wcschr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1360.c` |  |
 | `interface.wcscmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1361.c` |  |
-| `interface.wcscoll` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
-| `interface.wcscoll_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wcscoll` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.wcscoll_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcscpy` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1364.c` |  |
 | `interface.wcscspn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1365.c` |  |
-| `interface.wcsftime` | interface | fail | `test:tests/libc/posix/time/check-time.sh` | test evidence `tests/libc/posix/time/check-time.sh` failed: posix time: missing libc.a symbol asctime |
-| `interface.wcsftime_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wcsftime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
+| `interface.wcsftime_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcslcat` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1368.c` | declaration did not compile |
 | `interface.wcslcpy` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1369.c` | declaration did not compile |
 | `interface.wcslen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1370.c` |  |
 | `interface.wcsncasecmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1371.c` |  |
-| `interface.wcsncasecmp_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wcsncasecmp_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcsncat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1373.c` |  |
 | `interface.wcsncmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1374.c` |  |
 | `interface.wcsncpy` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1375.c` |  |
-| `interface.wcsnlen` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wcsnlen` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcsnrtombs` | interface | fail | `profile` | profile status missing |
 | `interface.wcspbrk` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1378.c` |  |
 | `interface.wcsrchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1379.c` |  |
@@ -1530,23 +1530,23 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.wcstof` | interface | fail | `profile` | profile status missing |
 | `interface.wcstofNx` | interface | fail | `profile` | profile status missing |
 | `interface.wcstoimax` | interface | fail | `profile` | profile status missing |
-| `interface.wcstok` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wcstok` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcstol` | interface | fail | `profile` | profile status missing |
 | `interface.wcstold` | interface | fail | `profile` | profile status missing |
 | `interface.wcstoll` | interface | fail | `profile` | profile status missing |
-| `interface.wcstombs` | interface | fail | `test:tests/libc/posix/stdlib/check-stdlib.sh` | test evidence `tests/libc/posix/stdlib/check-stdlib.sh` failed: posix stdlib: missing libc.a symbol atof |
+| `interface.wcstombs` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.wcstoul` | interface | fail | `profile` | profile status missing |
 | `interface.wcstoull` | interface | fail | `profile` | profile status missing |
 | `interface.wcstoumax` | interface | fail | `profile` | profile status missing |
 | `interface.wcswidth` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1395.c` |  |
-| `interface.wcsxfrm` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
-| `interface.wcsxfrm_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wcsxfrm` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
+| `interface.wcsxfrm_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wctob` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1398.c` |  |
 | `interface.wctomb` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1399.c` |  |
 | `interface.wctrans` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1400.c` |  |
-| `interface.wctrans_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wctrans_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wctype` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1402.c` |  |
-| `interface.wctype_l` | interface | fail | `test:tests/libc/posix/wchar/check-wchar.sh` | test evidence `tests/libc/posix/wchar/check-wchar.sh` failed: posix wchar: missing libc.a symbol iswalnum_l |
+| `interface.wctype_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.wcwidth` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1404.c` |  |
 | `interface.wmemchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1405.c` |  |
 | `interface.wmemcmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1406.c` |  |
@@ -1565,7 +1565,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.y1f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1419.c` | declaration did not compile |
 | `interface.yn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1420.c` |  |
 | `interface.ynf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1421.c` | declaration did not compile |
-| `link.libc` | link | fail | `nm -g --defined-only ./build/x86_64/libc.a` | 122 required symbols absent from libc.a |
+| `link.libc` | link | pass | `nm -g --defined-only ./build/x86_64/libc.a` | 0 required symbols absent from libc.a |
 | `process.credential` | process | pass | `qtest:proc-credentials` |  |
 | `process.exec` | process | pass | `qtest:proc-exec` |  |
 | `process.fork` | process | pass | `qtest:proc-fork` |  |
@@ -1648,7 +1648,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.cal` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.cat` | utility | pass | `test:tests/posix/utility/file/cat/test.sh` |  |
 | `util.cd` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.cflow` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.cflow` | utility | pass | `test:tests/posix/utility/devtools/test.sh` |  |
 | `util.chgrp` | utility | pass | `test:tests/posix/utility/file/chgrp/test.sh` |  |
 | `util.chmod` | utility | pass | `test:tests/posix/utility/file/chmod/test.sh` |  |
 | `util.chown` | utility | pass | `test:tests/posix/utility/file/chown/test.sh` |  |
@@ -1662,9 +1662,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.cp` | utility | pass | `test:tests/posix/utility/file/cp/test.sh` |  |
 | `util.crontab` | utility | pass | `test:tests/posix/utility/crontab/test.sh` |  |
 | `util.csplit` | utility | pass | `test:tests/posix/utility/text/csplit/test.sh` |  |
-| `util.ctags` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.ctags` | utility | pass | `test:tests/posix/utility/devtools/test.sh` |  |
 | `util.cut` | utility | pass | `test:tests/posix/utility/text/cut/test.sh` |  |
-| `util.cxref` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.cxref` | utility | pass | `test:tests/posix/utility/devtools/test.sh` |  |
 | `util.date` | utility | pass | `test:tests/posix/utility/misc2/date/test.sh` |  |
 | `util.dd` | utility | pass | `test:tests/posix/utility/file/dd/test.sh` |  |
 | `util.delta` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1676,7 +1676,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.du` | utility | pass | `test:tests/posix/utility/file/du/test.sh` |  |
 | `util.echo` | utility | pass | `test:tests/posix/utility/misc2/echo/test.sh` |  |
 | `util.ed` | utility | pass | `test:tests/posix/utility/ed/ed/test.sh` |  |
-| `util.env` | utility | pass | `qtest:posix-util-system` |  |
+| `util.env` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.eval` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ex` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.exec` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1695,7 +1695,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.fort77` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.gencat` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.get` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.getconf` | utility | pass | `qtest:posix-util-system` |  |
+| `util.getconf` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.getopts` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.grep` | utility | pass | `test:tests/posix/utility/text2/grep/test.sh` |  |
 | `util.groups` | utility | pass | `test:tests/posix/utility/misc/groups/test.sh` |  |
@@ -1703,19 +1703,19 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.head` | utility | pass | `test:tests/posix/utility/text/head/test.sh` |  |
 | `util.hostid` | utility | pass | `test:tests/posix/utility/misc/hostid/test.sh` |  |
 | `util.iconv` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.id` | utility | pass | `qtest:posix-util-system` |  |
+| `util.id` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.install` | utility | pass | `test:tests/posix/utility/misc/install/test.sh` |  |
 | `util.ipcrm` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ipcs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.jobs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.join` | utility | pass | `test:tests/posix/utility/text/join/test.sh` |  |
-| `util.kill` | utility | pass | `qtest:posix-util-system` |  |
+| `util.kill` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.lex` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.link` | utility | pass | `test:tests/posix/utility/file/link/test.sh` |  |
 | `util.ln` | utility | pass | `test:tests/posix/utility/file/ln/test.sh` |  |
 | `util.locale` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.localedef` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.logger` | utility | pass | `qtest:posix-util-system` |  |
+| `util.logger` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.logname` | utility | pass | `test:tests/posix/utility/misc/logname/test.sh` |  |
 | `util.lp` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ls` | utility | pass | `test:tests/posix/utility/file/ls/test.sh` |  |
@@ -1725,7 +1725,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.make` | utility | pass | `test:tests/posix/utility/make/test.sh` |  |
 | `util.man` | utility | pass | `test:tests/posix/utility/misc2/man/test.sh` |  |
 | `util.md5sum` | utility | pass | `test:tests/posix/utility/misc/md5sum/test.sh` |  |
-| `util.mesg` | utility | pass | `qtest:posix-util-system` |  |
+| `util.mesg` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.mkdir` | utility | pass | `test:tests/posix/utility/file/mkdir/test.sh` |  |
 | `util.mkfifo` | utility | pass | `test:tests/posix/utility/file/mkfifo/test.sh` |  |
 | `util.mknod` | utility | pass | `test:tests/posix/utility/file/mknod/test.sh` |  |
@@ -1734,10 +1734,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.mv` | utility | pass | `test:tests/posix/utility/file/mv/test.sh` |  |
 | `util.neqn` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.newgrp` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.nice` | utility | pass | `qtest:posix-util-system` |  |
+| `util.nice` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.nl` | utility | pass | `test:tests/posix/utility/text/nl/test.sh` |  |
 | `util.nm` | utility | pass | `test:tests/posix/utility/binutils/nm/test.sh` |  |
-| `util.nohup` | utility | pass | `qtest:posix-util-system` |  |
+| `util.nohup` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.nproc` | utility | pass | `test:tests/posix/utility/misc/nproc/test.sh` |  |
 | `util.numfmt` | utility | pass | `test:tests/posix/utility/misc/numfmt/test.sh` |  |
 | `util.od` | utility | pass | `test:tests/posix/utility/text/od/test.sh` |  |
@@ -1768,7 +1768,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.readlink` | utility | pass | `test:tests/posix/utility/file/readlink/test.sh` |  |
 | `util.readonly` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.realpath` | utility | pass | `test:tests/posix/utility/file/realpath/test.sh` |  |
-| `util.renice` | utility | pass | `qtest:posix-util-system` |  |
+| `util.renice` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.return` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.rm` | utility | pass | `test:tests/posix/utility/file/rm/test.sh` |  |
 | `util.rmdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1819,7 +1819,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.ulimit` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.umask` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.unalias` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.uname` | utility | pass | `qtest:posix-util-system` |  |
+| `util.uname` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.uncompress` | utility | pass | `test:tests/posix/utility/compress/uncompress/test.sh` |  |
 | `util.unexpand` | utility | pass | `test:tests/posix/utility/text/unexpand/test.sh` |  |
 | `util.unget` | utility | fail | `none` | profile status missing; no POSIX utility test |

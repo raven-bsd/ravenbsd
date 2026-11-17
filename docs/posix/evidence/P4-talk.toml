@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P44 talk evidence.
+#
+# util.talk remains partial/missing: this image has no peer-terminal registry
+# (ttyd exposes only foreground/session ids), no who/utmp terminal list, and no
+# talkd or peer transport. The bounded local protocol loopback is tested by
+# test:tests/posix/utility/talk/test.sh but it is not the POSIX peer surface.
+# No [[row]] is emitted, so the profile row stays honestly partial instead of
+# claiming a session the platform cannot establish.
+schema = 1
+standard = "posix-2024"

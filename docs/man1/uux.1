@@ -1,0 +1,84 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt UUX 1
+.Os RavenBSD
+.Sh NAME
+.Nm uux
+.Nd queue a command for a configured uucp peer
+.Sh SYNOPSIS
+.Nm
+.Op Fl bcCjnz
+.Op Fl a Ar user
+.Op Fl g Ar grade
+.Op Fl x Ar debug
+.Ar command-string
+.Sh DESCRIPTION
+The
+.Nm
+utility parses a
+.Ql system!command
+string and queues it under
+.Pa /var/spool/uucp .
+No remote command is executed in this image.
+.Pp
+Words may be single- or double-quoted; a backslash quotes the next character.
+The supported redirections are
+.Ql < Ar file
+for a local input file,
+.Ql < Fl
+for the serial-console standard input, and
+.Ql >
+or
+.Ql >>
+followed by an output name.
+Pipes, command lists, globbing and shell expansion are not interpreted.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl b
+Accept the break compatibility flag.
+.It Fl c
+Accept the spool-copy compatibility flag. The queue always embeds the input payload.
+.It Fl C
+Same as
+.Fl c .
+.It Fl j
+Print the queued job id.
+.It Fl n
+Never mail completion.
+.It Fl z
+Mail on success (recorded flag; no mail transport exists).
+.It Fl a Ar user
+Set the requesting user name.
+.It Fl g Ar grade
+Set the one-byte job grade (default
+.Ql n ) .
+.It Fl x Ar debug
+Parse and ignore a debug level.
+.El
+.Pp
+An unknown peer is an error. The peer list and spool root come from
+.Pa /etc/uucp/config ;
+see
+.Xr uucp 1 .
+.Sh FILES
+.Bl -tag -width /var/spool/uucp -compact
+.It Pa /etc/uucp/config
+Peer and spool configuration.
+.It Pa /var/spool/uucp/queue
+Queued job records.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A missing input, unknown peer or queue error exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr uucp 1 ,
+.Xr uustat 1
+.Sh STANDARDS
+RavenBSD implements a bounded POSIX uux command-queueing subset. Command execution and the
+.Fl p ,
+.Fl r
+and
+.Fl s
+forms are not implemented.

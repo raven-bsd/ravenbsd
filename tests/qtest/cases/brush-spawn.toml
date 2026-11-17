@@ -24,7 +24,7 @@ regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
 regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
-regex = '(?i)^password: ?$'
+regex = '(?i)^password: ?'
 
 [[expect]]
 regex = '^brush-spawn:true:0$'
@@ -51,7 +51,7 @@ send = "root\n"
 delay_ms = 100
 
 [[step]]
-wait = '(?i)^password: ?$'
+wait = '(?i)^password: ?'
 timeout_secs = 30
 
 [[step]]

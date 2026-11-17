@@ -175,6 +175,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
+name = "cflow"
+version = "0.1.0"
+dependencies = [
+ "raven-cparse",
+ "raven-rt",
+]
+
+[[package]]
 name = "cmov"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -256,12 +264,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctags"
+version = "0.1.0"
+dependencies = [
+ "raven-cparse",
+ "raven-rt",
+]
+
+[[package]]
 name = "ctutils"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "261af4dc7a06ea8a527a8717d8cbba3417530d6ea14e1edb3de6b67806be474f"
 dependencies = [
  "cmov",
+]
+
+[[package]]
+name = "cxref"
+version = "0.1.0"
+dependencies = [
+ "raven-cparse",
+ "raven-rt",
 ]
 
 [[package]]
@@ -476,6 +500,10 @@ name = "itoa"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
+
+[[package]]
+name = "lex"
+version = "0.1.0"
 
 [[package]]
 name = "lexopt"
@@ -1033,6 +1061,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-cap-revoke"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-cat"
 version = "0.1.0"
 dependencies = [
@@ -1130,6 +1168,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-cparse"
+version = "0.1.0"
+
+[[package]]
 name = "raven-crontab-fixture"
 version = "0.1.0"
 dependencies = [
@@ -1137,6 +1179,10 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
 ]
+
+[[package]]
+name = "raven-cyclic"
+version = "0.1.0"
 
 [[package]]
 name = "raven-date"
@@ -1619,6 +1665,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-kmem"
+version = "0.1.0"
+dependencies = [
+ "raven-vmem",
+]
+
+[[package]]
 name = "raven-libc"
 version = "0.1.0"
 dependencies = [
@@ -1952,6 +2005,15 @@ dependencies = [
  "raven-libc-abi",
  "raven-libc-sys",
  "raven-libc-tls",
+]
+
+[[package]]
+name = "raven-libc-spawn-test"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-personality-linux",
+ "raven-libc-platform",
 ]
 
 [[package]]
@@ -2482,6 +2544,10 @@ name = "raven-proto-svc"
 version = "0.1.0"
 
 [[package]]
+name = "raven-proto-trace"
+version = "0.1.0"
+
+[[package]]
 name = "raven-proto-tty"
 version = "0.1.0"
 dependencies = [
@@ -2586,6 +2652,10 @@ dependencies = [
  "raven-abi",
  "raven-rt",
 ]
+
+[[package]]
+name = "raven-ring"
+version = "0.1.0"
 
 [[package]]
 name = "raven-ringbuf"
@@ -3247,6 +3317,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-trace-core"
+version = "0.1.0"
+
+[[package]]
 name = "raven-tty-core"
 version = "0.1.0"
 
@@ -3631,6 +3705,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "talk"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "tar"
 version = "0.1.0"
 dependencies = [
@@ -3804,6 +3888,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "uucp"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "uudecode"
 version = "0.1.0"
 dependencies = [
@@ -3819,6 +3912,24 @@ version = "0.1.0"
 dependencies = [
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "uustat"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+ "uucp",
+]
+
+[[package]]
+name = "uux"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+ "uucp",
 ]
 
 [[package]]
@@ -3898,6 +4009,10 @@ dependencies = [
  "toml",
  "ufs-mkfs",
 ]
+
+[[package]]
+name = "yacc"
+version = "0.1.0"
 
 [[package]]
 name = "zcat"
