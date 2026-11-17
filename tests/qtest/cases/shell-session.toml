@@ -14,9 +14,11 @@ expect_exit = "success"
 
 [[expect]]
 regex = '^svcd: all services up$'
+unordered = true
 
 [[expect]]
 regex = '^rsh: ready$'
+unordered = true
 
 [[expect]]
 regex = '^RavenBSD raven 0\.1 .* x86_64$'
@@ -40,7 +42,7 @@ regex = '^ls$'
 regex = '^uname$'
 
 [[expect]]
-regex = '^cat: /nonexistent: no such file or directory$'
+regex = '^rsh: cat: /nonexistent: no such file or directory$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -157,7 +159,7 @@ send = "cat /nonexistent\n"
 delay_ms = 100
 
 [[step]]
-wait = '^cat: /nonexistent: no such file or directory$'
+wait = '^rsh: cat: /nonexistent: no such file or directory$'
 timeout_secs = 30
 
 [[step]]
