@@ -22,7 +22,7 @@ with their owning lane.
 | 1 correctness | 1.4 differential tests (C9) | NOT MET | build/libc-gate/1.4.txt | 26 families cannot find ravenbsd-resources in the minion clone; `tls-layout` is MET |
 | 1 correctness | 1.5 host unit tests | MET | build/libc-gate/1.5.txt | 31 host crates via `cargo nextest run` |
 | 1 correctness | 1.6 Miri (C11) | BLOCKED | build/libc-gate/1.6.txt | preflight command failed |
-| 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 17 violations: 3 in `ld/src/raw/exports.rs` (C74g SAFETY comments), 14 pre-existing |
+| 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 26 violations: loader files clean (C74i); P1f/phil 14, P1h/otto 8, P1i/tim 3, ABI/contract 1 |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate/2.1.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate/2.2.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate/3.1.txt | exit 1: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
@@ -69,10 +69,10 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   copy or a resources path in the harness (C35/C71).
 * 1.5: **MET** through `cargo nextest run`; the gate row now uses nextest (C74h harness fix).
 * 1.6 Miri: BLOCKED. The nightly Miri preflight reports `cargo-miri` is not installed.
-* 1.7: **NOT MET**. `cargo xtask libc-lint all` reports 17 violations: the C74g loader adds three
-  missing `// SAFETY:` blocks in `ld/src/raw/exports.rs:591/594/596`; the other 14 are
-  pre-existing `one-symbol`/`std-path`/`abi-freeze` findings in the libc crate. Owner: C74g
-  follow-up plus the P1e/P1h/P1i lanes.
+* 1.7: **NOT MET**. `cargo xtask libc-lint` reports 26 violations; C74i fixed the three
+  C74g `missing-safety` findings in `ld/src/raw/exports.rs` and the loader files are clean.
+  Remaining owners: P1f/phil 14, P1h/otto 8, P1i/tim 3, ABI/contract 1 (`abi-freeze`).
+  No P1f/P1h/P1i code was edited here.
 * 2.1/2.2 world: BLOCKED. `tools/libc-world/Cargo.toml` and the C72 outputs are absent.
 * 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `4 pass, 48 fail, 25 known,
   282 skipped, 40 budget-only`; budgets were not lowered.
@@ -134,8 +134,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 
 * 1.3 LTP/pjdfstest: INFO, no owner-supplied runs.
 * 1.6 Miri: BLOCKED, `build/libc-gate/1.6.txt`; `cargo-miri` is not installed for nightly.
-* 1.7 lints: NOT MET, `build/libc-gate/1.7.txt`; 17 violations (3 C74g SAFETY comments, 14
-  pre-existing).
+* 1.7 lints: NOT MET, `build/libc-gate/1.7.txt`; 26 violations, loader clean (C74i).
 * 2.1/2.2: BLOCKED, `tools/libc-world/Cargo.toml`, C72 outputs and H-11 tarballs are absent.
 * 3.1: NOT MET, `libc-size check: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
@@ -150,7 +149,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 1.4 compat | `cargo xtask libc-oracle list` + `diff {family}` | 27 families; 26 exit 1 because `ravenbsd-resources` is not discoverable from this clone; `tls-layout` MET |
 | 1.5 host tests | `cargo nextest run` per crate | exit 0; 31 crates MET (gate row changed from `cargo test` to nextest) |
 | 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → BLOCKED |
-| 1.7 lints | `cargo xtask libc-lint all` | exit 1; 17 violations (3 C74g SAFETY comments, 14 pre-existing) → NOT MET |
+| 1.7 lints | `cargo xtask libc-lint` | exit 1; 26 violations, loader clean after C74i → NOT MET |
 | 2.1/2.2 world | missing files | `tools/libc-world/Cargo.toml` and C72 outputs absent → BLOCKED |
 | 3.1 size | `cargo xtask libc-size --check` | exit 1; 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
