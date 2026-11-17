@@ -41,14 +41,14 @@ cargo xtask qtest --case libc-spawn --arch x86_64
 
 The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
-## Current verdict (2026-11-17, C74w)
+## Current verdict (2026-11-17, C74z)
 
 **NOT MET.** `cargo run -q -p libc-gate -- verdict` exits 1.
 
 * MET: 1.1, 1.1.pack, 1.1.audit, 1.4, 1.5, 5.1, 5.2, 4.1, 4.3, 6.1, 6.3, 6.4.
 * NOT MET: 1.2 (G1 0/4; C74x qemu backend C4 7/15, C5 12/18), 1.7 (15 lint violations:
-  P1f 14, ABI 1), 3.1 (C74w triage: 5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only),
-  4.2 (one-hour `inet_text` soak recorded; row re-eval pending).
+  P1f 14, ABI 1), 3.1 (C74z corrected data: 7 pass, 56 fail, 69 known, 105 skipped,
+  0 budget-only), 4.2 (one-hour `inet_text` soak recorded; row re-eval pending).
 * BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
@@ -63,34 +63,27 @@ C74u closed 5.1 (`sscanf`, `tzname`). C74q closed 1.4 (27/27) and C74k recorded 
 `inet_text` soak. The gate cannot close until G1, the size-budget cluster, the remaining lint
 backlog, and the missing Miri/world/mandoc tooling are resolved by their owners.
 
-## 3.1 size triage (C74w, OBSERVED on `19b6f229`)
+## 3.1 size triage (C74w, budget correction C74z; OBSERVED on `1bfeaafa`)
 
-`cargo xtask libc-size --check` reports `5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only`
-(not the C74h `4/48/25/282/40`). The full 58-row table, deltas and per-row owners are in
+`cargo xtask libc-size --check` reports `7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only`
+after the C74z data correction (C74w had 5/58 before the missing P9 and stale arm/riscv B fixes).
+The full failure table, budget diff, deltas and per-row owners are in
 `tests/libc/size/TRIAGE.md`. The classification:
 
 * 54 budget overruns, 52 with real `S`/`F` growth since the C69 freeze (x86_64 small,
-  aarch64/riscv64 3-12 percent; P9 full link +306k/+322k and +141k/+159k `S`). Two x86_64 P5
-  rows are B-only. Two more fails are the missing x86_64 P9 budgets and two are boot rows.
-* The aarch64/riscv64 B budgets are stale: the old B budget is 6.9k/7.8k versus 14.3k on x86_64
-  for the same source, while the current `.bss` section is 11,392 on all three. Re-freezing that
-  baseline is a budget-owner decision, not a C74w edit.
-* x86_64 P9 tiny/server have **no budget** at all; aarch64/riscv64 P9 do. The harness reports
-  `no budget` as FAIL. The budget owner must set or explicitly waive the full-link envelope.
+  aarch64/riscv64 3-12 percent; P9 full link +311k/+328k and +141k/+159k `S`). Two x86_64 P5
+  rows are B-only. Two more fails are boot rows.
+* C74z added the missing x86_64 P9 tiny/server budgets (first `1bfeaafa` measurement + 3 percent)
+  and re-baselined the aarch64/riscv64 B measured/budget fields to the same Berkeley-bss
+  definition as x86_64. S/F and boot budgets were not raised.
 * Boot: x86_64 start instructions 1,245 > 908; aarch64 syscalls 8 > 3 and instructions 3,403 >
   1,847. Real start/TLS/allocator growth (dave/C57, kevin/C49).
 * `B` is the Berkeley `llvm-size` bss field (all NOBITS, including `.relro_padding`), not only
   the `.bss` section. `build/size/libc-size.json`/`.md` are run artifacts and leave `budget_* = 0`
-  and `status = ok`; the console and `build/libc-gate-c74w/3.1.txt` are the check evidence.
+  and `status = ok`; the console and `build/libc-gate-c74z/3.1.txt` are the check evidence.
 
-No budget or libc body is changed by C74w; 3.1 stays NOT MET. Shrink candidates with the largest
-current symbols are the ctype Unicode tables (carl/C39), fmt `vformat` monomorphizations
-(carl/C43), dtoa (carl/C42), the compat static buffers (carl/C64d), resolv/net (dave/C51), time
-(mel/C44) and the TLS/pages/streams statics (dave/C57/C54, carl/C64d, kevin/C49).
-=======
-P1h/otto 8, P1i/tim 3, ABI/contract 1). C74n closed 5.2.core-servers with a minimal profile; C74v
-implemented the RavenBSD `read_fs_list` from the real `/etc/mounts` table, so `df` reports the
-mounted filesystems and 5.2.file-tools passes too. Row 5.2 is now MET. The gate cannot close
-until the size-budget lane, the G1 donor data, the `inet_text` soak, the three P1b target cases,
-the lint backlog, and the missing Miri/world/mandoc tooling are resolved by their owners.
->>>>>>> origin/carl/C74v
+3.1 stays NOT MET because the 52 real S/F rows and 2 boot rows do not fit. Shrink candidates are
+the ctype Unicode tables (carl/C39), fmt `vformat` monomorphizations (carl/C43), dtoa (carl/C42),
+the compat static buffers (carl/C64d), resolv/net (dave/C51), time (mel/C44), the TLS/pages/
+streams statics (dave/C57/C54, carl/C64d, kevin/C49), and the boot start path. The per-cluster
+follow-up list is C74z-S1 through C74z-S10 in `tests/libc/size/TRIAGE.md`.

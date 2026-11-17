@@ -25,7 +25,7 @@ with their owning lane.
 | 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 17 violations: 3 in `ld/src/raw/exports.rs` (C74g SAFETY comments), 14 pre-existing |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate/2.1.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate/2.2.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74w/3.1.txt | exit 1: 5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only; triage in `tests/libc/size/TRIAGE.md` |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z/3.1.txt | exit 1: 7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only; C74z budget data + shrink plan in `tests/libc/size/TRIAGE.md` |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate/4.1.txt | exit 0 |
 | 4 hardening | 4.2 fuzz soak (C10) | NOT MET | build/libc-gate/4.2.txt | inet_text has no soak duration; inet_text has 1 crash(es); inet_text has no executions |
@@ -74,9 +74,9 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   pre-existing `one-symbol`/`std-path`/`abi-freeze` findings in the libc crate. Owner: C74g
   follow-up plus the P1e/P1h/P1i lanes.
 * 2.1/2.2 world: BLOCKED. `tools/libc-world/Cargo.toml` and the C72 outputs are absent.
-* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `5 pass, 58 fail, 69 known,
-  105 skipped, 0 budget-only`; C74w triage in `tests/libc/size/TRIAGE.md`; budgets were not
-  raised.
+* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `7 pass, 56 fail, 69 known,
+  105 skipped, 0 budget-only`; C74z corrected the P9/arm-riscv B data and added the shrink plan
+  in `tests/libc/size/TRIAGE.md`; S/F and boot budgets were not raised.
 * 4.2 soak: NOT MET. `tests/libc/fuzz/SOAK.md` records `inet_text` crashing before one hour; the
   other 13 targets completed 3600 s with 0 crashes. Owner: test/fuzz lane.
 * 5.1: `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello`,
@@ -140,12 +140,12 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 * 1.7 lints: NOT MET, `build/libc-gate/1.7.txt`; 17 violations (3 C74g SAFETY comments, 14
   pre-existing).
 * 2.1/2.2: BLOCKED, `tools/libc-world/Cargo.toml`, C72 outputs and H-11 tarballs are absent.
-* 3.1: NOT MET, `libc-size check: 5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only`;
-  C74w triage in `tests/libc/size/TRIAGE.md`.
+* 3.1: NOT MET, `libc-size check: 7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only`;
+  C74z budget data + shrink plan in `tests/libc/size/TRIAGE.md`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
 * 6.2: BLOCKED, `which mandoc` exits 1.
 
-## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74w on `19b6f229`)
+## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z on `1bfeaafa`)
 
 | Row | Command | Result |
 |---|---|---|
@@ -156,7 +156,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → BLOCKED |
 | 1.7 lints | `cargo xtask libc-lint all` | exit 1; 17 violations (3 C74g SAFETY comments, 14 pre-existing) → NOT MET |
 | 2.1/2.2 world | missing files | `tools/libc-world/Cargo.toml` and C72 outputs absent → BLOCKED |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only; C74w triage in `tests/libc/size/TRIAGE.md` |
+| 3.1 size | `cargo xtask libc-size --check` | exit 1; 7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only; C74z budget data + shrink plan in `tests/libc/size/TRIAGE.md` |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
 | 5.2 kernel | `qtest core-servers` / `qtest file-tools` | both MET: minimal profiles; `df` reads `/etc/mounts`; `tooltest: ok`, `init exited (0)` |
