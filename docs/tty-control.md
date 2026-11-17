@@ -5,7 +5,7 @@
 
 P2m closes the `process.tty-control`/`process.job-control` layer on top of the merged P3 tty
 servers. The kernel owns the session/terminal state; `ttyd` remains the session server and data
-handle, `consd` provides the console `tty:` scheme, and `procd` supplies the spawn/setpgid/wait
+handle, `consd` provides the console `tty:` scheme, and the kernel supplies spawn/setpgid/wait
 path used by the fixture.
 
 ## Raw operations
@@ -49,7 +49,7 @@ caller against the tty's controlling state:
 * hung terminal: return `EIO`.
 
 The stop signals are the P2f job-control signals: the process gets the stop wait status and its
-parent sees it through `PROC_WAIT_EX`/procd. This slice keeps P2f's status-level stop/continue
+parent sees it through `PROC_WAIT_EX`. This slice keeps P2f's status-level stop/continue
 model; it does not suspend the scheduler context.
 
 ## Hangup
@@ -70,7 +70,7 @@ marks its own session state; the kernel session-leader exit is the signalling pa
 * the session handle has a synthetic read (`EAGAIN`) and write (`accepted`) path so the kernel's
   background check is observable without duplicating the pty data path.
 
-The `tty-control` fixture starts `ttyd` before `procd` (a procd child inherits procd's namespace
+The `tty-control` fixture starts `ttyd` before spawning (the child inherits the namespace
 snapshot), acquires a controlling terminal, spawns a child into the same `ttyd` session, drives
 foreground/background reads and writes, checks the orphaned `EIO`, and creates a session-leader
 child with a foreground grandchild to exercise hangup.

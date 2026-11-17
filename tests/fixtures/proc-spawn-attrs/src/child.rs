@@ -29,15 +29,15 @@ mod program {
         match mode {
             "exec" => {
                 let test = args.env_get("TEST").unwrap_or("<unset>");
-                raven_rt::println!("procd-child: exec TEST={test}");
+                raven_rt::println!("proc-attrs-child: exec TEST={test}");
                 7
             }
             "sleep" => {
-                raven_rt::println!("procd-child: sleeping");
+                raven_rt::println!("proc-attrs-child: sleeping");
                 loop {
                     let signal = receive_signal();
                     if signal == 15 {
-                        raven_rt::println!("procd-child: got signal 15");
+                        raven_rt::println!("proc-attrs-child: got signal 15");
                         return 143;
                     }
                     if signal < 0 {
@@ -47,7 +47,7 @@ mod program {
             }
             "attrs" => attrs(&args),
             _ => {
-                raven_rt::println!("procd-child: unknown mode={mode}");
+                raven_rt::println!("proc-attrs-child: unknown mode={mode}");
                 2
             }
         }
@@ -69,14 +69,14 @@ mod program {
             true
         };
         raven_rt::println!(
-            "procd-child: attrs fd={} cloexec={} pgid={} sig={}",
+            "proc-attrs-child: attrs fd={} cloexec={} pgid={} sig={}",
             u8::from(fd_ok),
             u8::from(cloexec_ok),
             u8::from(pgid_ok),
             u8::from(sig_ok)
         );
         if fd_ok && cloexec_ok && pgid_ok && sig_ok {
-            raven_rt::println!("procd-child: ok");
+            raven_rt::println!("proc-attrs-child: ok");
             // Keep the child alive long enough for procd's post-spawn pid/group queries.
             let _ = raven_rt::nanosleep(100_000_000);
             0

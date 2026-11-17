@@ -2,9 +2,9 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 [package]
-name = "raven-procd"
+name = "raven-proc-spawn-attrs"
 version = "0.1.0"
-description = "RavenBSD process-model server: spawn, wait, kill and process-group subset."
+description = "Kernel process spawn attributes: fd map, signal mask and pgroup."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -13,21 +13,18 @@ rust-version.workspace = true
 [package.metadata.raven]
 target = "none"
 
-[lib]
-name = "raven_procd"
-path = "src/lib.rs"
+[[bin]]
+name = "raven-proc-attrs-init"
+path = "src/init.rs"
 
 [[bin]]
-name = "procd"
-path = "src/main.rs"
+name = "raven-proc-attrs-child"
+path = "src/child.rs"
 
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-initfs = { path = "../../../crates/raven-initfs" }
-raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
-raven-proto-proc = { path = "../../../crates/raven-proto-proc" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
-raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [lints]
 workspace = true

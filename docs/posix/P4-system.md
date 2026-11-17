@@ -25,9 +25,9 @@ The fixture builds user programs with `--release`: the kernel `PROC_EXEC` path c
 1 MiB, and debug builds of `whoami`/`nice` exceed it. Release builds are ~40–60 KiB and let
 `env`/`nice`/`nohup` exec commands through the P2k path.
 
-The rev 36 merge is `origin/master` `e9d91b57`. It includes the merged procd/P2e work, but
+The rev 36 merge is `origin/master` `e9d91b57`. It includes the kernel process model, but
 `PROC_PID_INFO` still writes only eight words (pid, ppid, pgid, sid, uid, euid, gid, egid) and
-`procd` keeps `Child.image` only for its own children with no list operation. `ps -e` therefore
+The kernel keeps the process record but `PROC_PID_INFO` writes only identity, not the command. `ps -e` therefore
 cannot fill `cmd`.
 
 `tests/posix/utility/run-system.sh` runs the case and maps the transcript to
@@ -84,7 +84,7 @@ waived part; the exact follow-up is a libc/tty output-handle API (`isatty`, `dup
 
 | Defect | Row | Exact missing piece | Follow-up |
 |---|---|---|---|
-| `P4d-D2` | `util.ps` | no command-name/path source for a pid. The kernel keeps `Process.path`, but `PROC_PID_INFO` writes only pid/ppid/pgid/sid/uid/euid/gid/egid. `procd` keeps `Child.image` only for children it created, and the v1 `proc:` protocol has no list operation. `svc:` status exposes a service-local handle, not a pid. `ps -e` therefore prints `?` for `cmd` | add a kernel pid-path query or a procd list operation, then print the real `cmd` |
+| `P4d-D2` | `util.ps` | no command-name/path source for a pid. The kernel keeps `Process.path`, but `PROC_PID_INFO` writes only pid/ppid/pgid/sid/uid/euid/gid/egid. the kernel keeps `Process.path` but `PROC_PID_INFO` does not expose it. `svc:` status exposes a service-local handle, not a pid. `ps -e` therefore prints `?` for `cmd` | add a kernel pid-path query (P2o), then print the real `cmd` |
 
 `P4d-D1` (`id -r`) remains resolved by the uutils `id`. `P4d-D3`..`D8` are resolved by the
 first-party `env`, `getconf`, `kill` and `nice` implementations. `P4d-D9` is reduced to the
