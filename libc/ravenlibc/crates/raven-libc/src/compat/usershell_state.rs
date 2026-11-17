@@ -28,7 +28,20 @@ use raven_libc_compat::ReadFile;
 use raven_libc_compat::usershell::Shells;
 
 pub(crate) static mut SHELLS: Option<Shells> = None;
-pub(crate) static mut SHELL_BUF: [u8; 4096] = [0; 4096];
+static mut SHELL_BUF: *mut [u8; 4096] = core::ptr::null_mut();
+
+/// The shell string buffer, allocated on first use. `getusershell` already allocates for the
+/// parsed `/etc/shells`, so this replaces 4 KiB of BSS with one word.
+pub(crate) fn shell_buffer() -> &'static mut [u8; 4096] {
+    // SAFETY: the C API is not re-entrant; the pointer is published once and never freed.
+    unsafe {
+        let slot = &raw mut SHELL_BUF;
+        if (*slot).is_null() {
+            *slot = alloc::boxed::Box::into_raw(alloc::boxed::Box::new([0u8; 4096]));
+        }
+        &mut **slot
+    }
+}
 
 pub(crate) struct RealFiles;
 
@@ -77,3 +90,7 @@ pub(crate) unsafe fn init() {
     // SAFETY: the static is private; the C API is not re-entrant.
     unsafe { *&raw mut SHELLS = Some(Shells::load(&mut RealFiles)) };
 }
+
+#[cfg(test)]
+#[path = "usershell_state_ut.rs"]
+mod tests;
