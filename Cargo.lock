@@ -556,12 +556,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "linked_list_allocator"
-version = "0.10.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b23ac50abb8261cb38c6e2a7192d3302e0836dac1628f6a93b82b4fad185897"
-
-[[package]]
 name = "linux-corpus"
 version = "0.1.0"
 dependencies = [
@@ -1636,7 +1630,6 @@ name = "raven-kernel"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "linked_list_allocator",
  "raven-abi",
  "raven-bootinfo",
  "raven-elf",
@@ -1644,6 +1637,7 @@ dependencies = [
  "raven-handles",
  "raven-initfs",
  "raven-iommu",
+ "raven-kmem",
  "raven-mem",
  "raven-pager",
  "raven-pci",
@@ -1653,6 +1647,7 @@ dependencies = [
  "raven-timemath",
  "raven-usercopy",
  "raven-vma",
+ "raven-vmem",
  "spin",
 ]
 

@@ -8,8 +8,9 @@
 //! vectors later — as boundary-tagged spans with neighbour coalescing.
 //!
 //! The crate is `no_std` + `alloc`, contains no unsafe code and holds no global or static state.
-//! Constructors allocate the fixed tag slab; [`Vmem::alloc`], [`Vmem::alloc_at`], [`Vmem::free`]
-//! and [`Vmem::import`] never allocate, so the arena can itself back an allocator.
+//! The boundary-tag slab is a fixed inline array, so [`Vmem::new`], [`Vmem::alloc`],
+//! [`Vmem::alloc_at`], [`Vmem::free`] and [`Vmem::import`] never allocate — the arena can itself
+//! back an allocator.
 //!
 //! ```
 //! use raven_vmem::Vmem;
@@ -31,6 +32,6 @@ mod arena;
 mod error;
 mod segment;
 
-pub use arena::{DEFAULT_TAG_CAPACITY, Vmem, VmemStats};
+pub use arena::{Arena, DEFAULT_TAG_CAPACITY, Vmem, VmemGeneric, VmemStats};
 pub use error::{Policy, VmemError};
 pub use segment::{Segment, SegmentState};

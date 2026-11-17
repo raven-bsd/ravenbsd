@@ -3,8 +3,6 @@
 
 //! The arena, its boundary tags and the allocation policies.
 
-use alloc::vec::Vec;
-
 use crate::error::{Policy, VmemError};
 use crate::segment::{Segment, SegmentState};
 
@@ -12,15 +10,15 @@ use crate::segment::{Segment, SegmentState};
 ///
 /// The value matches the bootstrap pool named by the kernel memory design (R-MEM-2): an empty
 /// arena is one tag and each split costs at most two, so 256 tags cover the first kmem caches
-/// without growing the slab. Callers with a larger expected extent count use
-/// [`Vmem::with_capacity`].
+/// without growing the slab. Callers that expect more extents use [`VmemGeneric`] with a larger
+/// `N` directly.
 pub const DEFAULT_TAG_CAPACITY: usize = 256;
 
 /// One boundary tag: a maximal extent in one of the two states.
 ///
 /// The arena keeps its tags sorted by address. Because every extent ends at a boundary and the
 /// next tag starts there, the tag alone describes both of its physical neighbours; the sorted
-/// vector lets the arena find them without intrusive pointers, which keeps the crate free of
+/// array lets the arena find them without intrusive pointers, which keeps the crate free of
 /// unsafe code.
 #[derive(Clone, Copy, Debug)]
 struct Span {
@@ -65,10 +63,10 @@ pub struct VmemStats {
 
 /// A virtual-memory arena over a caller-supplied set of address ranges.
 ///
-/// The arena owns a fixed-capacity tag slab allocated by [`Vmem::new`] or
-/// [`Vmem::with_capacity`]. Allocation and free never allocate: a request that would need a tag
-/// the slab cannot hold fails with [`VmemError::NoTags`] and leaves the arena unchanged. That is
-/// what allows the arena itself to sit underneath the kernel allocator.
+/// The tag slab is a fixed inline array of `N` boundary tags, so the arena never allocates through
+/// the global allocator — neither at construction nor at [`VmemGeneric::alloc`]/[`VmemGeneric::free`].
+/// A request that would need a tag beyond `N` fails with [`VmemError::NoTags`] and leaves the arena
+/// unchanged. That is what lets the arena sit underneath the kernel allocator.
 ///
 /// Invariants after every successful operation:
 ///
@@ -77,48 +75,34 @@ pub struct VmemStats {
 /// * no two adjacent tags are both free (free neighbours are coalesced);
 /// * an allocated tag covers exactly the range a caller received.
 #[derive(Debug)]
-pub struct Vmem {
-    spans: Vec<Span>,
-    tag_limit: usize,
+pub struct VmemGeneric<const N: usize> {
+    spans: [Span; N],
+    len: usize,
     next_fit: u64,
     allocs: u64,
     frees: u64,
     alloc_fail: u64,
 }
 
-impl Vmem {
-    /// Create an arena covering `[start, start + size)` with [`DEFAULT_TAG_CAPACITY`] tags.
+/// An arena with the default [`DEFAULT_TAG_CAPACITY`] tag slab.
+pub type Vmem = VmemGeneric<DEFAULT_TAG_CAPACITY>;
+
+impl<const N: usize> VmemGeneric<N> {
+    /// Create an arena covering `[start, start + size)`.
     ///
-    /// Any later [`Vmem::import`] adds a disjoint range to the same arena.
+    /// Any later [`VmemGeneric::import`] adds a disjoint range to the same arena.
     ///
     /// # Errors
     ///
     /// [`VmemError::ZeroLength`] for a zero length, [`VmemError::Overflow`] when the range does
-    /// not fit in the address space, and [`VmemError::Capacity`] when the tag slab cannot be
-    /// allocated.
+    /// not fit in the address space, and [`VmemError::NoTags`] when `N` is zero.
     pub fn new(start: u64, size: u64) -> Result<Self, VmemError> {
-        Self::with_capacity(start, size, DEFAULT_TAG_CAPACITY)
-    }
-
-    /// Create an arena covering `[start, start + size)` with room for `max_tags` boundary tags.
-    ///
-    /// The tag slab is allocated here, once. A `max_tags` of zero is rejected with
-    /// [`VmemError::NoTags`]: at least one tag is needed for the initial range.
-    ///
-    /// # Errors
-    ///
-    /// The same errors as [`Vmem::new`], plus [`VmemError::NoTags`] for a zero tag capacity.
-    pub fn with_capacity(start: u64, size: u64, max_tags: usize) -> Result<Self, VmemError> {
-        if max_tags == 0 {
+        if N == 0 {
             return Err(VmemError::NoTags);
         }
-        let mut spans = Vec::new();
-        spans
-            .try_reserve_exact(max_tags)
-            .map_err(|_| VmemError::Capacity)?;
         let mut arena = Self {
-            spans,
-            tag_limit: max_tags,
+            spans: [Span::new(0, 0, SegmentState::Free); N],
+            len: 0,
             next_fit: start,
             allocs: 0,
             frees: 0,
@@ -143,18 +127,17 @@ impl Vmem {
             return Err(VmemError::ZeroLength);
         }
         let end = base.checked_add(size).ok_or(VmemError::Overflow)?;
-        let idx = self.spans.partition_point(|span| span.base < base);
+        let idx = self.partition_point(|span| span.base < base);
         if idx > 0 && self.spans[idx - 1].end() > base {
             return Err(VmemError::Overlap);
         }
-        if idx < self.spans.len() && end > self.spans[idx].base {
+        if idx < self.len && end > self.spans[idx].base {
             return Err(VmemError::Overlap);
         }
 
         let left_free =
             idx > 0 && self.spans[idx - 1].is_free() && self.spans[idx - 1].end() == base;
-        let right_free =
-            idx < self.spans.len() && self.spans[idx].is_free() && self.spans[idx].base == end;
+        let right_free = idx < self.len && self.spans[idx].is_free() && self.spans[idx].base == end;
 
         if left_free {
             let left = idx - 1;
@@ -166,11 +149,10 @@ impl Vmem {
             self.spans[idx].size = end - base;
             self.coalesce(idx);
         } else {
-            if self.spans.len() >= self.tag_limit {
+            if self.len >= N {
                 return Err(VmemError::NoTags);
             }
-            self.spans
-                .insert(idx, Span::new(base, size, SegmentState::Free));
+            self.insert_span(idx, Span::new(base, size, SegmentState::Free));
             self.coalesce(idx);
         }
         Ok(())
@@ -178,13 +160,13 @@ impl Vmem {
 
     /// Return `true` when `addr` lies inside an imported range, free or allocated.
     pub fn contains(&self, addr: u64) -> bool {
-        let idx = self.spans.partition_point(|span| span.base <= addr);
+        let idx = self.partition_point(|span| span.base <= addr);
         idx > 0 && addr < self.spans[idx - 1].end()
     }
 
     /// Return `true` when the whole range `[addr, addr + size)` is imported.
     ///
-    /// A zero length is treated as a probe for `addr`, so it follows [`Vmem::contains`].
+    /// A zero length is treated as a probe for `addr`, so it follows [`VmemGeneric::contains`].
     pub fn contains_range(&self, addr: u64, size: u64) -> bool {
         if size == 0 {
             return self.contains(addr);
@@ -192,7 +174,7 @@ impl Vmem {
         let Some(end) = addr.checked_add(size) else {
             return false;
         };
-        let idx = self.spans.partition_point(|span| span.base <= addr);
+        let idx = self.partition_point(|span| span.base <= addr);
         if idx == 0 {
             return false;
         }
@@ -203,7 +185,7 @@ impl Vmem {
     /// Allocate `size` bytes at an address aligned to the power-of-two `align`.
     ///
     /// Uses [`Policy::BestFit`]. On success the returned address belongs to a segment that remains
-    /// allocated until passed back to [`Vmem::free`] with the same size.
+    /// allocated until passed back to [`VmemGeneric::free`] with the same size.
     ///
     /// # Errors
     ///
@@ -217,7 +199,7 @@ impl Vmem {
     ///
     /// # Errors
     ///
-    /// The same errors as [`Vmem::alloc`].
+    /// The same errors as [`VmemGeneric::alloc`].
     pub fn alloc_with(&mut self, size: u64, align: u64, policy: Policy) -> Result<u64, VmemError> {
         match self.try_alloc(size, align, policy) {
             Ok(base) => {
@@ -267,8 +249,8 @@ impl Vmem {
         if size == 0 {
             return Err(VmemError::ZeroLength);
         }
-        let idx = self.spans.partition_point(|span| span.base < base);
-        if idx >= self.spans.len() || self.spans[idx].base != base {
+        let idx = self.partition_point(|span| span.base < base);
+        if idx >= self.len || self.spans[idx].base != base {
             return Err(VmemError::UnknownSegment);
         }
         if self.spans[idx].is_free() {
@@ -285,27 +267,33 @@ impl Vmem {
 
     /// Number of boundary tags in use (free plus allocated segments).
     pub fn span_count(&self) -> usize {
-        self.spans.len()
+        self.len
     }
 
     /// Number of free segments.
     pub fn free_span_count(&self) -> usize {
-        self.spans.iter().filter(|span| span.is_free()).count()
+        self.spans[..self.len]
+            .iter()
+            .filter(|span| span.is_free())
+            .count()
     }
 
     /// Number of allocated segments.
     pub fn allocated_span_count(&self) -> usize {
-        self.spans.iter().filter(|span| !span.is_free()).count()
+        self.spans[..self.len]
+            .iter()
+            .filter(|span| !span.is_free())
+            .count()
     }
 
     /// Maximum number of boundary tags the arena can hold.
-    pub fn tag_capacity(&self) -> usize {
-        self.tag_limit
+    pub const fn tag_capacity(&self) -> usize {
+        N
     }
 
     /// Size of the largest free segment, or zero when nothing is free.
     pub fn largest_free(&self) -> u64 {
-        self.spans
+        self.spans[..self.len]
             .iter()
             .filter(|span| span.is_free())
             .map(|span| span.size)
@@ -315,7 +303,7 @@ impl Vmem {
 
     /// Sum of all free segments.
     pub fn total_free(&self) -> u64 {
-        self.spans
+        self.spans[..self.len]
             .iter()
             .filter(|span| span.is_free())
             .fold(0u64, |total, span| total.saturating_add(span.size))
@@ -323,7 +311,7 @@ impl Vmem {
 
     /// Sum of all allocated segments.
     pub fn total_allocated(&self) -> u64 {
-        self.spans
+        self.spans[..self.len]
             .iter()
             .filter(|span| !span.is_free())
             .fold(0u64, |total, span| total.saturating_add(span.size))
@@ -333,8 +321,8 @@ impl Vmem {
     ///
     /// Zero means one free segment covers everything free; approaching one means free memory is
     /// scattered. With no free memory at all the value is `1.0`. The ratio is exposed for
-    /// statistics only; the exact integers stay available through [`Vmem::largest_free`] and
-    /// [`Vmem::total_free`].
+    /// statistics only; the exact integers stay available through [`VmemGeneric::largest_free`]
+    /// and [`VmemGeneric::total_free`].
     pub fn fragmentation(&self) -> f32 {
         let total = self.total_free();
         if total == 0 {
@@ -345,7 +333,7 @@ impl Vmem {
 
     /// Iterate over every tracked segment in address order.
     pub fn segments(&self) -> impl Iterator<Item = Segment> + '_ {
-        self.spans
+        self.spans[..self.len]
             .iter()
             .map(|span| Segment::new(span.base, span.size, span.state))
     }
@@ -366,7 +354,7 @@ impl Vmem {
             allocs: self.allocs,
             frees: self.frees,
             alloc_fail: self.alloc_fail,
-            spans: self.spans.len(),
+            spans: self.len,
             free_bytes: self.total_free(),
             used_bytes: self.total_allocated(),
             largest_free: self.largest_free(),
@@ -398,7 +386,6 @@ impl Vmem {
         }
         let end = addr.checked_add(size).ok_or(VmemError::Overflow)?;
         let Some(idx) = self
-            .spans
             .partition_point(|span| span.base <= addr)
             .checked_sub(1)
         else {
@@ -422,12 +409,11 @@ impl Vmem {
     /// Find a free span that can hold `size` at `align` and return its index and candidate base.
     fn find(&self, size: u64, align: u64, policy: Policy) -> Option<(usize, u64)> {
         if policy == Policy::NextFit {
-            let start = self.spans.partition_point(|span| span.base < self.next_fit);
-            let len = self.spans.len();
-            for step in 0..len {
+            let start = self.partition_point(|span| span.base < self.next_fit);
+            for step in 0..self.len {
                 let mut idx = start + step;
-                if idx >= len {
-                    idx -= len;
+                if idx >= self.len {
+                    idx -= self.len;
                 }
                 if let Some(base) = fit(self.spans[idx], size, align) {
                     return Some((idx, base));
@@ -437,7 +423,7 @@ impl Vmem {
         }
 
         let mut best: Option<(usize, u64, u64)> = None;
-        for (idx, span) in self.spans.iter().enumerate() {
+        for (idx, span) in self.spans[..self.len].iter().enumerate() {
             let Some(base) = fit(*span, size, align) else {
                 continue;
             };
@@ -466,23 +452,20 @@ impl Vmem {
         } else {
             usize::from(suffix > 0)
         };
-        if self.spans.len() + extra > self.tag_limit {
+        if self.len + extra > N {
             return Err(VmemError::NoTags);
         }
 
         if prefix > 0 {
             self.spans[idx] = Span::new(span.base, prefix, SegmentState::Free);
-            self.spans
-                .insert(idx + 1, Span::new(base, size, SegmentState::Allocated));
+            self.insert_span(idx + 1, Span::new(base, size, SegmentState::Allocated));
             if suffix > 0 {
-                self.spans
-                    .insert(idx + 2, Span::new(end, suffix, SegmentState::Free));
+                self.insert_span(idx + 2, Span::new(end, suffix, SegmentState::Free));
             }
         } else {
             self.spans[idx] = Span::new(base, size, SegmentState::Allocated);
             if suffix > 0 {
-                self.spans
-                    .insert(idx + 1, Span::new(end, suffix, SegmentState::Free));
+                self.insert_span(idx + 1, Span::new(end, suffix, SegmentState::Free));
             }
         }
         Ok(())
@@ -496,18 +479,46 @@ impl Vmem {
             {
                 let size = self.spans[idx].size;
                 self.spans[previous].size += size;
-                self.spans.remove(idx);
+                self.remove_span(idx);
                 idx = previous;
             }
         }
-        if idx + 1 < self.spans.len() {
+        if idx + 1 < self.len {
             let next = idx + 1;
             if self.spans[next].is_free() && self.spans[idx].end() == self.spans[next].base {
                 let size = self.spans[next].size;
                 self.spans[idx].size += size;
-                self.spans.remove(next);
+                self.remove_span(next);
             }
         }
+    }
+
+    /// Index of the first element for which `pred` is false, over the used prefix.
+    fn partition_point(&self, pred: impl Fn(Span) -> bool) -> usize {
+        let mut lo = 0;
+        let mut hi = self.len;
+        while lo < hi {
+            let mid = (lo + hi) / 2;
+            if pred(self.spans[mid]) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    }
+
+    fn insert_span(&mut self, idx: usize, span: Span) {
+        debug_assert!(self.len < N);
+        self.spans.copy_within(idx..self.len, idx + 1);
+        self.spans[idx] = span;
+        self.len += 1;
+    }
+
+    fn remove_span(&mut self, idx: usize) {
+        debug_assert!(idx < self.len);
+        self.spans.copy_within(idx + 1..self.len, idx);
+        self.len -= 1;
     }
 }
 
@@ -520,6 +531,27 @@ fn fit(span: Span, size: u64, align: u64) -> Option<u64> {
     let base = span.base.checked_add(mask)? & !mask;
     let end = base.checked_add(size)?;
     (end <= span.end()).then_some(base)
+}
+
+/// An address-space source the slab and size-class allocators draw from.
+///
+/// [`VmemGeneric`] implements this for every tag capacity, so a caller passes the arena it owns
+/// (of any `N`) without the allocator types having to know `N`.
+pub trait Arena {
+    /// Allocate `size` bytes aligned to the power-of-two `align`.
+    fn alloc(&mut self, size: u64, align: u64) -> Result<u64, VmemError>;
+    /// Return an exact `[base, base + size)` segment.
+    fn free(&mut self, base: u64, size: u64) -> Result<(), VmemError>;
+}
+
+impl<const N: usize> Arena for VmemGeneric<N> {
+    fn alloc(&mut self, size: u64, align: u64) -> Result<u64, VmemError> {
+        VmemGeneric::alloc(self, size, align)
+    }
+
+    fn free(&mut self, base: u64, size: u64) -> Result<(), VmemError> {
+        VmemGeneric::free(self, base, size)
+    }
 }
 
 #[cfg(test)]
