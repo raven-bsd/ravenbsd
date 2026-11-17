@@ -23,6 +23,9 @@
 extern crate alloc;
 
 #[cfg(target_os = "none")]
+mod trace;
+
+#[cfg(target_os = "none")]
 mod program {
     use alloc::collections::BTreeMap;
     use alloc::format;
@@ -52,6 +55,11 @@ mod program {
     /// Budget for proxy open-file descriptions.
     const MAX_OPEN_FILES: usize = 256;
 
+    /// S11 `Opcode::Open` wire value.
+    const OPEN_OPCODE: u16 = 1;
+    /// S11 `Opcode::Read` wire value.
+    const READ_OPCODE: u16 = 2;
+
     #[derive(Clone, Copy)]
     struct PagerRegion {
         target: Handle,
@@ -72,6 +80,7 @@ mod program {
         opens: OpenTable<Proxy>,
         pagers: BTreeMap<u32, PagerRegion>,
         mount_generation: u32,
+        probe: crate::trace::Probe,
     }
 
     impl VfsHandler {
@@ -81,6 +90,7 @@ mod program {
                 opens: OpenTable::new(),
                 pagers: BTreeMap::new(),
                 mount_generation: 1,
+                probe: crate::trace::Probe::server(),
             }
         }
 
@@ -756,6 +766,7 @@ mod program {
             _mode: u32,
             ctx: &Ctx,
         ) -> HandlerResult<Opened> {
+            self.probe.record(ctx.trace_id, OPEN_OPCODE);
             let (path, requires_dir) = self.normalize_request_path(path)?;
             let directory = requires_dir || flags.directory();
             let target_flags = OpenFlags::from_wire(flags.to_wire() & !WIRE_OPEN_DIRECTORY)
@@ -816,6 +827,17 @@ mod program {
             }
         }
 
+        fn read_with(
+            &mut self,
+            file: u64,
+            offset: u64,
+            buffer: &mut [u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<usize> {
+            self.probe.record(ctx.trace_id, READ_OPCODE);
+            self.read(file, offset, buffer)
+        }
+
         fn write(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
             if offset != 0 {
                 return Err(Errno::EINVAL.into());
@@ -834,6 +856,17 @@ mod program {
             } else {
                 Ok(copy_read(&Client::new(), target, Some(offset), buffer)?)
             }
+        }
+
+        fn pread_with(
+            &mut self,
+            file: u64,
+            offset: u64,
+            buffer: &mut [u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<usize> {
+            self.probe.record(ctx.trace_id, READ_OPCODE);
+            self.pread(file, offset, buffer)
         }
 
         fn pwrite(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {

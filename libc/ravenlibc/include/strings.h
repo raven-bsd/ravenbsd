@@ -48,6 +48,9 @@ int ffs(int);
 #if __XSI_VISIBLE || __BSD_VISIBLE
 int ffsl(long);
 int ffsll(long long);
+int fls(int);
+int flsl(long);
+int flsll(long long);
 #endif
 
 int strcasecmp(const char *, const char *);
@@ -56,12 +59,6 @@ int strncasecmp(const char *, const char *, size_t);
 #if __POSIX_VISIBLE >= 200809 || __BSD_VISIBLE
 int strcasecmp_l(const char *, const char *, locale_t);
 int strncasecmp_l(const char *, const char *, size_t, locale_t);
-#endif
-
-#if __BSD_VISIBLE
-int fls(int);
-int flsl(long);
-int flsll(long long);
 #endif
 
 __END_DECLS

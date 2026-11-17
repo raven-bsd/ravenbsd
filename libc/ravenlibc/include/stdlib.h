@@ -87,6 +87,7 @@ void srand (unsigned);
 void *malloc (size_t);
 void *calloc (size_t, size_t);
 void *realloc (void *, size_t);
+void *reallocarray (void *, size_t, size_t);
 void free (void *);
 void free_sized (void *, size_t);
 void free_aligned_sized (void *, size_t, size_t);
@@ -163,13 +164,20 @@ int heapsort (void *, size_t, size_t,
 	int (*)(const void *, const void *));
 int mergesort (void *, size_t, size_t,
 	int (*)(const void *, const void *));
-long long strtonum (const char *, long long, long long, const char **);
 int getenv_r (const char *, char *, size_t);
 int clearenv (void);
+#endif
+
+/*
+ * POSIX.1-2024 adds secure_getenv (defect 922). The POSIX profile also lists the OpenBSD
+ * strtonum extension under this header, so it is visible with the same CX feature set.
+ */
+#if __POSIX_VISIBLE >= 202405 || __XSI_VISIBLE || __BSD_VISIBLE
+long long strtonum (const char *, long long, long long, const char **);
 char *secure_getenv (const char *);
 #endif
 
-#if __BSD_VISIBLE || defined(_GNU_SOURCE)
+#if __XSI_VISIBLE || __BSD_VISIBLE || defined(_GNU_SOURCE)
 char *ecvt (double, int, int *, int *);
 char *fcvt (double, int, int *, int *);
 char *gcvt (double, int, char *);

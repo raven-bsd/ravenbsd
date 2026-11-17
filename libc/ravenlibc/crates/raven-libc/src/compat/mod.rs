@@ -72,6 +72,13 @@ pub(crate) fn unsupported() -> c_int {
     -1
 }
 
+/// Return the C failure value with `error` set.
+pub(crate) fn fail(error: raven_libc_abi::errno::Errno) -> c_int {
+    // SAFETY: `__errno_location` returns this thread's valid errno cell.
+    unsafe { set_errno(c_int::from(error.0)) };
+    -1
+}
+
 /// The length of a NUL-terminated C string, bounded by `max`.
 pub(crate) unsafe fn c_len(pointer: *const c_char, max: usize) -> usize {
     let mut length = 0usize;
@@ -221,6 +228,60 @@ pub mod uuid_hash;
 pub mod uuid_is_nil;
 pub mod uuid_to_string;
 pub mod vis;
+
+// P1c-ipc-tty: one module per exported symbol or alias group. The archive check K4 limits a
+// member to four global text symbols, so the AIO `64` spellings share their base module and
+// every other family is split one symbol per file.
+pub mod aio_cancel;
+pub mod aio_error;
+pub mod aio_fsync;
+pub mod aio_read;
+pub mod aio_return;
+pub mod aio_suspend;
+pub mod aio_write;
+pub mod cfgetispeed;
+pub mod cfgetospeed;
+pub mod cfsetispeed;
+pub mod cfsetospeed;
+pub mod cfsetspeed;
+pub mod fattach;
+pub mod ftok;
+pub mod getmsg;
+pub mod isastream;
+pub mod lio_listio;
+pub mod mq_close;
+pub mod mq_getattr;
+pub mod mq_notify;
+pub mod mq_open;
+pub mod mq_receive;
+pub mod mq_send;
+pub mod mq_setattr;
+pub mod mq_timedreceive;
+pub mod mq_timedsend;
+pub mod mq_unlink;
+pub mod msgctl;
+pub mod msgget;
+pub mod msgrcv;
+pub mod msgsnd;
+pub mod putmsg;
+pub mod semctl;
+pub mod semget;
+pub mod semop;
+pub mod semtimedop;
+pub mod shm_unlink;
+pub mod shmat;
+pub mod shmctl;
+pub mod shmdt;
+pub mod shmget;
+pub mod stropts_state;
+pub mod tcdrain;
+pub mod tcflow;
+pub mod tcflush;
+pub mod tcgetsid;
+pub mod tcgetwinsize;
+pub mod tcsendbreak;
+pub mod tcsetwinsize;
+pub mod tty_ipc_state;
 
 /// The C `FILE` type (opaque to this shell; the stdio crate owns its layout).
 pub(crate) type File = c_void;

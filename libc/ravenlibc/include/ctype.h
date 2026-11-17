@@ -175,4 +175,10 @@ static __inline int __raven_toupper(int _c)
 
 __END_DECLS
 
+/*
+ * The POSIX profile assigns the `iswlower` interface to <ctype.h>; <wctype.h> owns the wide
+ * character predicates, so make them visible from this header too.
+ */
+#include <wctype.h>
+
 #endif

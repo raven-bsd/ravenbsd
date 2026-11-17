@@ -29,12 +29,18 @@ mkdir -p "$out"
 target_dir=${CARGO_TARGET_DIR:-target}
 
 RUSTFLAGS="$rustflags" \
-    cargo build -p raven-trace-demo -p trace -p raven-initfsd -p raven-blockd -p fsd-ufs \
+    cargo build -p raven-trace-demo -p trace -p raven-initfsd -p raven-blockd -p fsd-ufs -p raven-vfsd \
         --target "$target" --release
 
 # The real blockd RAM backend serves this GPT-wrapped UFS image from the initfs.
 gzip -dc tests/ufs-vectors/golden/ufs2-b4096.img.gz > "$out/ufs.img"
 cargo run -q -p raven-k54-mkimage -- "$out/ufs.img" "$out/blockd.img"
+
+# vfsd mounts the initfs root and the UFS tree; the demo reads file:/mnt/ten.txt.
+cat > "$out/mounts" <<'EOF'
+/ initfs:
+/mnt ufs:
+EOF
 
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
@@ -44,4 +50,6 @@ cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "/initfsd=$target_dir/$target/release/raven-initfsd:0755" \
     "/blockd=$target_dir/$target/release/raven-blockd:0755" \
     "/fsd-ufs=$target_dir/$target/release/fsd-ufs:0755" \
+    "/vfsd=$target_dir/$target/release/raven-vfsd:0755" \
+    "/etc/mounts=$out/mounts:0644" \
     "/etc/blockd.img=$out/blockd.img:0644"

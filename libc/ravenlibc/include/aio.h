@@ -74,6 +74,21 @@ int aio_fsync(int, struct aiocb *);
 
 int lio_listio(int, struct aiocb *__restrict const *__restrict, int, struct sigevent *__restrict);
 
+/*
+ * RavenBSD: off_t is 64-bit on every supported architecture, so the LFS spellings share the
+ * base record and are real exported symbols (not macros). They answer ENOSYS like the base
+ * names while the kernel has no asynchronous-I/O primitive.
+ */
+int aio_read64(struct aiocb *);
+int aio_write64(struct aiocb *);
+int aio_error64(const struct aiocb *);
+ssize_t aio_return64(struct aiocb *);
+int aio_cancel64(int, struct aiocb *);
+int aio_suspend64(const struct aiocb *const [], int, const struct timespec *);
+int aio_fsync64(int, struct aiocb *);
+int lio_listio64(int, struct aiocb *__restrict const *__restrict, int,
+    struct sigevent *__restrict);
+
 #endif
 __END_DECLS
 

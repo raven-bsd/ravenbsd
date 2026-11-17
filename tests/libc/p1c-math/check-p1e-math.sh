@@ -66,7 +66,7 @@ done
 for name in \
     feclearexcept fegetexceptflag feraiseexcept fesetexcept fesetexceptflag \
     fetestexcept fetestexceptflag fegetround fesetround fegetenv feholdexcept \
-    fesetenv feupdateenv
+    fesetenv feupdateenv fegetmode fesetmode
 do
     probe fenv.h "$name"
 done
