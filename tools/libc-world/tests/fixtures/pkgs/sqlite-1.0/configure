@@ -1,0 +1,27 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+set -eu
+prefix=/usr
+host=
+for arg in "$@"; do
+  case $arg in
+    --prefix=*) prefix=${arg#*=} ;;
+    --host=*) host=${arg#*=} ;;
+  esac
+done
+cat > Makefile <<EOF
+CC = ${CC:-cc}
+AR = ${AR:-ar}
+prefix = $prefix
+all: libsqlite.a
+libsqlite.a: sqlite.o
+	\$(AR) rcs \$@ sqlite.o
+sqlite.o: sqlite.c
+	\$(CC) -c sqlite.c -o sqlite.o
+install: libsqlite.a
+	mkdir -p \$(DESTDIR)\$(prefix)/lib
+	cp libsqlite.a \$(DESTDIR)\$(prefix)/lib/
+EOF
+echo "checking for strlcpy... yes"
+echo "configured host=$host"
