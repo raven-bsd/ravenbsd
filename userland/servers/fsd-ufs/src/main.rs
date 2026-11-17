@@ -90,8 +90,16 @@ mod program {
         raven_rt::println!(
             "fsd-ufs: mounted {device} partition {partition} as {scheme}: ({size} bytes)"
         );
-        if let ufs_core::check::Recovery::Repaired { fixed } = recovery {
-            raven_rt::println!("fsd-ufs: repaired {fixed} findings on {device}");
+        match recovery {
+            ufs_core::check::Recovery::Repaired { fixed } => {
+                raven_rt::println!("fsd-ufs: repaired {fixed} findings on {device}");
+            }
+            ufs_core::check::Recovery::Replayed { repaired } => {
+                raven_rt::println!(
+                    "fsd-ufs: journal replayed on {device}; repaired {repaired} findings"
+                );
+            }
+            ufs_core::check::Recovery::Clean | ufs_core::check::Recovery::Refused { .. } => {}
         }
         raven_rt::println!(
             "fsd-ufs: mode={} journal={}",

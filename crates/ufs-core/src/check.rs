@@ -206,6 +206,11 @@ pub fn check<D: BlockIo>(disk: &mut D, mode: Mode) -> Result<Report, UfsError> {
 pub enum Recovery {
     /// The read-only check was clean; the image may mount.
     Clean,
+    /// A dirty WAPBL journal was replayed; the image may mount.
+    Replayed {
+        /// Number of findings the repair pass fixed after replay.
+        repaired: usize,
+    },
     /// The repair pass fixed every finding; the image may mount.
     Repaired {
         /// Number of findings the repair pass fixed.
@@ -226,16 +231,23 @@ impl Recovery {
     }
 }
 
-/// The mount-time recovery policy: refuse to mount an image that still reports findings.
+/// The mount-time recovery policy: replay a dirty journal, then refuse an image that still
+/// reports findings.
 ///
-/// Runs a read-only [`check`]; a clean image mounts. A dirty read-only mount is refused without a
-/// write. A dirty read-write mount runs the existing [`Mode::Repair`] preen pass and mounts only
-/// when the follow-up verification is clean; otherwise it is refused with the residual count.
-/// This is the policy that keeps `fsd-ufs` from serving a known-dirty image.
+/// A dirty WAPBL journal is replayed first on a writable mount; a read-only mount refuses it with
+/// [`UfsError::Unsupported`]. The read-only [`check`] then runs; a clean image mounts. A dirty
+/// read-write mount runs the existing [`Mode::Repair`] preen pass and mounts only when the
+/// follow-up verification is clean; otherwise it is refused with the residual count. This is the
+/// policy that keeps `fsd-ufs` from serving a known-dirty image.
 pub fn recover<D: BlockIo>(disk: &mut D, read_only: bool) -> Result<Recovery, UfsError> {
+    let replayed = replay_journal(disk, read_only)?;
     let first = check(disk, Mode::ReadOnly)?;
     if first.clean_after {
-        return Ok(Recovery::Clean);
+        return Ok(if replayed {
+            Recovery::Replayed { repaired: 0 }
+        } else {
+            Recovery::Clean
+        });
     }
     if read_only {
         return Ok(Recovery::Refused {
@@ -244,14 +256,47 @@ pub fn recover<D: BlockIo>(disk: &mut D, read_only: bool) -> Result<Recovery, Uf
     }
     let repaired = check(disk, Mode::Repair)?;
     if repaired.clean_after {
-        Ok(Recovery::Repaired {
-            fixed: repaired.fixed.len(),
-        })
+        if replayed {
+            Ok(Recovery::Replayed {
+                repaired: repaired.fixed.len(),
+            })
+        } else {
+            Ok(Recovery::Repaired {
+                fixed: repaired.fixed.len(),
+            })
+        }
     } else {
         Ok(Recovery::Refused {
             findings: repaired.findings.len(),
         })
     }
+}
+
+/// Replay a dirty WAPBL log in place. Returns whether a log was replayed.
+///
+/// A read-only mount cannot write the log and returns the same typed error as [`crate::Ufs::mount`].
+/// After replay the log is reset; the following check repairs any inode the aborted transaction left.
+fn replay_journal<D: BlockIo>(disk: &mut D, read_only: bool) -> Result<bool, UfsError> {
+    let fs = ffs_vfsops::probe(disk)?;
+    if !fs.has_journal() {
+        return Ok(false);
+    }
+    let Some(mut journal) = crate::wapbl::Journal::from_super(&fs, disk.size_bytes())? else {
+        return Ok(false);
+    };
+    if !journal.is_dirty(disk)? {
+        return Ok(false);
+    }
+    if read_only {
+        return Err(UfsError::Unsupported("dirty journal on read-only mount"));
+    }
+    let fs_bytes = fs
+        .size
+        .checked_mul(u64::from(fs.fsize))
+        .ok_or(UfsError::BadSuperblock("filesystem size"))?;
+    let _ = journal.replay(disk, fs_bytes)?;
+    disk.flush().map_err(|_| UfsError::Io)?;
+    Ok(true)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

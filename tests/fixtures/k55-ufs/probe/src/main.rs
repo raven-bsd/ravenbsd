@@ -32,6 +32,7 @@ mod program {
     use raven_scheme::Client;
     use ufs_core::BlockIo;
     use ufs_core::check::{Mode, check};
+    use ufs_core::mkfs::{MkfsOptions, format_journaled};
 
     entry!(main);
 
@@ -63,6 +64,7 @@ mod program {
         mmap_file()?;
         persistence()?;
         refusal()?;
+        journal()?;
         Ok(())
     }
 
@@ -542,6 +544,50 @@ mod program {
             let _ = raven_rt::nanosleep(10_000_000);
         }
         false
+    }
+
+    /// Format a journaled image, restart fsd-ufs on it, and verify a writable journaled mount.
+    fn journal() -> Result<(), String> {
+        let client = Client::new();
+        let _ = svc_control(&client, "fsd-ufs", Op::Stop);
+        wait_state(&client, "fsd-ufs", State::Stopped)?;
+
+        let disk = open_partition("block:0", 1)?;
+        let options = MkfsOptions {
+            size: disk.size_bytes(),
+            version: 2,
+            block_size: 4096,
+            fragment_size: 512,
+            bytes_per_inode: 4096,
+            minfree: 5,
+            label: "p5f",
+            timestamp: 0,
+        };
+        let ufs = format_journaled(disk, &options, 1024 * 1024)
+            .map_err(|error| format!("journal format: {error:?}"))?;
+        let _ = ufs
+            .unmount()
+            .map_err(|error| format!("journal unmount: {error:?}"))?;
+
+        svc_control(&client, "fsd-ufs", Op::Start)?;
+        wait_state(&client, "fsd-ufs", State::Running)?;
+        fs::mount("/ufs", "ufs:")
+            .map_err(|error| format!("journal mount: {}", error.description()))?;
+        let mut file = fs::open("file:/ufs/jtest", O_RDWR | O_CREAT)
+            .map_err(|error| format!("journal create: {}", error.description()))?;
+        file.write(b"journal-data")
+            .map_err(|error| format!("journal write: {}", error.description()))?;
+        file.close()
+            .map_err(|error| format!("journal close: {}", error.description()))?;
+        fs::sync().map_err(|error| format!("journal sync: {}", error.description()))?;
+        let data = fs::read_to_vec("file:/ufs/jtest")
+            .map_err(|error| format!("journal read: {}", error.description()))?;
+        if data.as_slice() != b"journal-data" {
+            return Err(format!("journal read {} bytes", data.len()));
+        }
+        raven_rt::println!("fsd-ufs-rw: probe journal mount ok");
+        fs::umount("/ufs").map_err(|error| format!("journal umount: {}", error.description()))?;
+        Ok(())
     }
 
     fn svc_control(client: &Client, name: &str, operation: Op) -> Result<(), String> {
