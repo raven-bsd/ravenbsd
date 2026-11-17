@@ -9,33 +9,37 @@
 
 use super::*;
 use core::alloc::{GlobalAlloc, Layout};
-use raven_vmem::Vmem;
+use raven_vmem::VmemGeneric;
+
+/// The shim used by these tests: enough slabs and tags for the byte-preserving hammer.
+type TestAlloc = KmemAllocGeneric<64, 512>;
+type TestKmem = KmemGeneric<64, 512>;
 
 /// Build a shim whose arena covers a real heap buffer of `bytes` bytes. The buffer is returned
 /// alongside the shim so it stays alive while the shim is used.
-fn shim(bytes: usize) -> (KmemAlloc, Box<[u8]>) {
+fn shim(bytes: usize) -> (TestAlloc, Box<[u8]>) {
     let backing: Box<[u8]> = alloc::vec![0u8; bytes].into_boxed_slice();
     let base = backing.as_ptr() as usize as u64;
-    let arena = Vmem::with_capacity(base, bytes as u64, 8192).expect("arena");
-    let shim = KmemAlloc::new(Kmem::new(arena).expect("kmem"));
+    let arena = VmemGeneric::<512>::new(base, bytes as u64).expect("arena");
+    let shim = TestAlloc::new(TestKmem::new(arena).expect("kmem"));
     (shim, backing)
 }
 
 /// `GlobalAlloc::alloc` through the shim.
-fn shim_alloc(shim: &KmemAlloc, layout: Layout) -> *mut u8 {
+fn shim_alloc(shim: &TestAlloc, layout: Layout) -> *mut u8 {
     // SAFETY: `layout` is a valid layout and the returned pointer, when non-null, is valid for
     // `layout.size()` bytes; the caller releases it with `shim_dealloc`.
     unsafe { GlobalAlloc::alloc(shim, layout) }
 }
 
 /// `GlobalAlloc::dealloc` through the shim.
-fn shim_dealloc(shim: &KmemAlloc, ptr: *mut u8, layout: Layout) {
+fn shim_dealloc(shim: &TestAlloc, ptr: *mut u8, layout: Layout) {
     // SAFETY: `ptr` was returned by `shim_alloc` for `layout` and not yet freed.
     unsafe { GlobalAlloc::dealloc(shim, ptr, layout) };
 }
 
 /// `GlobalAlloc::realloc` through the shim.
-fn shim_realloc(shim: &KmemAlloc, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+fn shim_realloc(shim: &TestAlloc, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
     // SAFETY: `ptr` was returned by `shim_alloc` for `layout` and not yet freed; `new_size` is an
     // ordinary non-negative length.
     unsafe { GlobalAlloc::realloc(shim, ptr, layout, new_size) }
@@ -149,7 +153,7 @@ impl Rng {
 
 #[test]
 fn global_alloc_hammer() {
-    let (shim, _backing) = shim(0x40_0000);
+    let (shim, _backing) = shim(0x4_0000);
     let mut rng = Rng(0xfeed_beef_cafe_f00d);
     let mut live: Vec<(usize, usize, usize)> = Vec::new();
 

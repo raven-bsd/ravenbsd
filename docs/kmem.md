@@ -3,8 +3,8 @@
 SPDX-License-Identifier: BSD-3-Clause
 Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-Status: PROPOSED. `raven-vmem` (A1), `raven-kmem` (A2) and its per-CPU magazines/depot (A3) are
-implemented; the kernel-integration layer (A4) and beyond are next.
+Status: OBSERVED for A1–A4. `raven-vmem` (A1), `raven-kmem` (A2), its per-CPU magazines/depot (A3)
+and the kernel heap integration (A4) are implemented and booting; A5/A6 remain.
 
 This is the working note for the memory lane. The requirement source is
 `ravenbsd-prjmgmt/architecture/kernel-next/03-memory.md` (R-MEM-1 .. R-MEM-25); the allocator lane
@@ -116,18 +116,36 @@ This is what removes the shared lock from the fast path.
   free_in_remote` at every step; the hammers drive 1/2/4 simulated CPUs and a million operations
   and assert no object is lost or duplicated.
 
-## 5. What A1/A2/A3 defer to A4+
+## 5. Kernel heap integration (A4, OBSERVED)
+
+`kernel/src/memory/heap.rs` now routes the global allocator through `raven-kmem`: a `KmemGeneric`
+over a `VmemGeneric` arena spanning `KERNEL_HEAP_BASE`, with the initial 4 MiB mapped from fresh
+frames and 1 MiB growth steps imported into the arena on allocation failure.
+
+* **No recursion**: the arena's boundary tags and every slab/magazine freelist are fixed inline
+  storage (reworked in A4 round 1), so allocation never re-enters the global allocator. `Vmem` is
+  now `VmemGeneric<N>` (const tag capacity), `Cache` is `Cache<MAX_SLABS>` with a fixed free bitmap,
+  `Kmem` is `KmemGeneric<MAX_SLABS, TAGS>` and `MagCache` is `MagCache<MAX_SLABS, NCPUS, NDEPOT>`;
+  the `Arena` trait decouples the slab layer from the arena's tag capacity.
+* **Boot stack**: the fixed allocator state (~900 KiB for `MAX_SLABS=256`, `TAGS=8192`) is
+  constructed during `heap::init`, so the boot stack was widened from 64 KiB to 8 MiB (BSS) on both
+  architectures.
+* **Limits**: `TAGS=8192` bounds the arena to roughly 16 MiB of heap; `MAX_SLABS=256` bounds each
+  size class to ~1 MiB of live objects. The OOM path is unchanged: `alloc` returns null and the
+  runtime raises its allocation-error panic.
+* The per-CPU magazine fast path is preserved and host-tested but is not yet wired into the kernel
+  heap (the slab layer is the A4 fast path); that is the remaining piece of the original "use the
+  boot CPU id and online count" note and lands with the magazine-kernel glue.
+
+## 6. What A1..A4 defer to A5+
 
 The architecture names three allocation policies and a quantum/import hierarchy. A1 ships
 `FirstFit`, `BestFit` and `NextFit`; the `InstantFit` power-of-two freelists and quantum caches are
-not part of A1's contract and belong with the kmem hot path (A4, where the real per-CPU preemption
-and contention counters live). A1 also keeps the import source explicit: the caller passes the
-range, and the kernel-integrating ticket will feed it from the kva/ID arenas (R-MEM-3). There is no
-global or static state, and no release hook yet; both land when the arena is wired to real mapping.
+not part of A1's contract and belong with the kmem hot path (where the real per-CPU preemption and
+contention counters live). A1 also keeps the import source explicit: the kernel feeds the arena
+from the mapped heap range, and the wider kva/ID arenas (R-MEM-3) land with the frame/ID work.
 
-## 6. kmem next steps (A4..A6, PROPOSED)
+## 7. kmem next steps (A5..A6, PROPOSED)
 
-* **A4** kernel integration replacing `kernel/src/memory/heap.rs` once the kernel lane releases
-  that path (R-MEM-3, R-MEM-23, R-MEM-24).
 * **A5** per-CPU frame caches, buddy/zones and pager hooks (R-MEM-13..15).
 * **A6** debug modes behind `kmem_flags` (R-MEM-10).

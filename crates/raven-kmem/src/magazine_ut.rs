@@ -24,12 +24,12 @@ impl Cpu for IdCpu {
 }
 
 fn arena(bytes: u64) -> Vmem {
-    Vmem::with_capacity(0x1000_0000, bytes, 8192).expect("arena")
+    Vmem::new(0x1000_0000, bytes).expect("arena")
 }
 
 /// The conservation invariant: every object removed from a slab is either handed out (live), in a
 /// magazine, in the depot or in a remote queue — none is lost or duplicated.
-fn assert_conserved(cache: &MagCache, live: usize) {
+fn assert_conserved(cache: &MagCache<128, 4, 16>, live: usize) {
     let s = cache.stats();
     assert_eq!(
         s.slab_in_use,
@@ -58,7 +58,7 @@ fn magazine_rounds_scales_with_cpu_count() {
 #[test]
 fn fast_path_reuses_freed_objects() {
     let mut arena = arena(0x10_0000);
-    let mut cache = MagCache::new("t", 32, 8, 1);
+    let mut cache = MagCache::<128, 4, 16>::new("t", 32, 8, 1);
     let cpu = IdCpu { id: 0, online: 1 };
     let mut addrs = alloc::vec::Vec::new();
     for _ in 0..magazine_rounds(1) {
@@ -78,7 +78,7 @@ fn fast_path_reuses_freed_objects() {
 #[test]
 fn depot_deposits_when_both_magazines_are_full() {
     let mut arena = arena(0x40_0000);
-    let mut cache = MagCache::new("t", 32, 8, 1);
+    let mut cache = MagCache::<128, 4, 16>::new("t", 32, 8, 1);
     let cpu = IdCpu { id: 0, online: 1 };
     let rounds = magazine_rounds(1);
     let count = rounds * 2 + 1;
@@ -106,7 +106,7 @@ fn depot_deposits_when_both_magazines_are_full() {
 fn magazine_exhaustion_returns_none_not_panic() {
     // Exactly one 4096-byte slab -> 128 objects of 32 bytes.
     let mut arena = Vmem::new(0x1000_0000, 4096).expect("arena");
-    let mut cache = MagCache::new("t", 32, 8, 1);
+    let mut cache = MagCache::<128, 4, 16>::new("t", 32, 8, 1);
     let cpu = IdCpu { id: 0, online: 1 };
     let mut count = 0;
     while cache.alloc(&mut arena, &cpu).is_some() {
@@ -119,7 +119,7 @@ fn magazine_exhaustion_returns_none_not_panic() {
 #[test]
 fn remote_free_returns_to_the_allocating_pool() {
     let mut arena = arena(0x10_0000);
-    let mut cache = MagCache::new("t", 16, 8, 2);
+    let mut cache = MagCache::<128, 4, 16>::new("t", 16, 8, 2);
     let cpu0 = IdCpu { id: 0, online: 2 };
     let cpu1 = IdCpu { id: 1, online: 2 };
     let addr = cache.alloc(&mut arena, &cpu0).expect("alloc on cpu0");
@@ -131,7 +131,7 @@ fn remote_free_returns_to_the_allocating_pool() {
 #[test]
 fn remote_free_queue_is_bounded() {
     let mut arena = arena(0x10_0000);
-    let mut cache = MagCache::new("t", 16, 8, 1);
+    let mut cache = MagCache::<128, 4, 16>::new("t", 16, 8, 1);
     let cpu = IdCpu { id: 0, online: 1 };
     let rounds = magazine_rounds(1);
     let mut addrs = alloc::vec::Vec::new();
@@ -170,7 +170,7 @@ impl Rng {
 
 fn run_hammer(online: usize, ops: usize, arena_bytes: u64) {
     let mut arena = arena(arena_bytes);
-    let mut cache = MagCache::new("t", 32, 8, online);
+    let mut cache = MagCache::<128, 4, 16>::new("t", 32, 8, online);
     let mut rng = Rng(0x0ddc_0ffe_e123_4567 ^ online as u64);
     let mut live: Vec<u64> = Vec::new();
     let mut live_set: BTreeSet<u64> = BTreeSet::new();
@@ -211,20 +211,20 @@ fn run_hammer(online: usize, ops: usize, arena_bytes: u64) {
 
 #[test]
 fn hammer_one_cpu() {
-    run_hammer(1, 50_000, 0x40_0000);
+    run_hammer(1, 50_000, 0x8_0000);
 }
 
 #[test]
 fn hammer_two_cpus() {
-    run_hammer(2, 50_000, 0x40_0000);
+    run_hammer(2, 50_000, 0x8_0000);
 }
 
 #[test]
 fn hammer_four_cpus() {
-    run_hammer(4, 50_000, 0x40_0000);
+    run_hammer(4, 50_000, 0x8_0000);
 }
 
 #[test]
 fn million_operations_no_lost_or_duplicated() {
-    run_hammer(4, 1_000_000, 0x80_0000);
+    run_hammer(4, 1_000_000, 0x8_0000);
 }

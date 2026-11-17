@@ -7,14 +7,12 @@
 //! `loaded` magazine, so a successful pop/push never takes a shared lock and never performs an
 //! atomic read-modify-write. Only when a magazine runs empty (alloc) or full (free) does the cache
 //! fall to the depot, and only when the depot cannot help does it touch the slab layer. The remote
-//! free queue per CPU is bounded and drains into the depot when full, so a cross-CPU free never
-//! blocks on an unbounded list.
+//! free queue per CPU is bounded and drains into the depot when full. Every buffer is a fixed
+//! inline array, so the cache never allocates through the global allocator.
 
 #![forbid(unsafe_code)]
 
-use alloc::vec::Vec;
-
-use raven_vmem::Vmem;
+use raven_vmem::Arena;
 
 use crate::cache::Cache;
 use crate::error::KmemError;
@@ -48,48 +46,51 @@ pub trait Cpu {
 }
 
 /// A fixed-capacity stack of object addresses.
-///
-/// The backing `Vec` is preallocated to the magazine's capacity, so `push` up to capacity never
-/// allocates — the fast path is allocation-free.
+#[derive(Clone, Copy, Debug)]
 struct Magazine {
-    items: Vec<u64>,
+    items: [u64; ROUNDS_MAX],
+    len: usize,
     capacity: usize,
 }
 
 impl Magazine {
     fn new(capacity: usize) -> Self {
         Self {
-            items: Vec::with_capacity(capacity),
+            items: [0; ROUNDS_MAX],
+            len: 0,
             capacity,
         }
     }
 
     fn push(&mut self, addr: u64) -> bool {
-        if self.items.len() == self.capacity {
+        if self.len == self.capacity {
             return false;
         }
-        self.items.push(addr);
+        self.items[self.len] = addr;
+        self.len += 1;
         true
     }
 
     fn pop(&mut self) -> Option<u64> {
-        self.items.pop()
+        if self.len == 0 {
+            return None;
+        }
+        self.len -= 1;
+        Some(self.items[self.len])
     }
 
     fn len(&self) -> usize {
-        self.items.len()
-    }
-
-    fn drain_all(&mut self) -> alloc::vec::Drain<'_, u64> {
-        self.items.drain(..)
+        self.len
     }
 }
 
 /// One CPU's magazine pair plus its bounded remote free queue.
+#[derive(Clone, Copy, Debug)]
 struct CpuMag {
     loaded: Magazine,
     prev: Magazine,
-    remote: Vec<u64>,
+    remote: [u64; ROUNDS_MAX],
+    remote_len: usize,
 }
 
 impl CpuMag {
@@ -97,7 +98,8 @@ impl CpuMag {
         Self {
             loaded: Magazine::new(rounds),
             prev: Magazine::new(rounds),
-            remote: Vec::with_capacity(rounds),
+            remote: [0; ROUNDS_MAX],
+            remote_len: 0,
         }
     }
 }
@@ -143,14 +145,16 @@ pub struct MagCacheStats {
 /// that keep the common case off any shared structure. Construct with the number of online CPUs;
 /// every [`MagCache::alloc`] / [`MagCache::free`] / [`MagCache::remote_free`] call then names the
 /// current CPU through the [`Cpu`] trait.
-pub struct MagCache {
+pub struct MagCache<const MAX_SLABS: usize, const NCPUS: usize, const NDEPOT: usize> {
     name: &'static str,
-    cache: Cache,
+    cache: Cache<MAX_SLABS>,
     rounds: usize,
     online: usize,
-    depot_full: Vec<Magazine>,
-    depot_empty: Vec<Magazine>,
-    cpus: Vec<CpuMag>,
+    depot_full: [Magazine; NDEPOT],
+    depot_full_len: usize,
+    depot_empty: [Magazine; NDEPOT],
+    depot_empty_len: usize,
+    cpus: [CpuMag; NCPUS],
     allocs: u64,
     frees: u64,
     remote_frees: u64,
@@ -158,21 +162,24 @@ pub struct MagCache {
     depot_drains: u64,
 }
 
-impl MagCache {
+impl<const MAX_SLABS: usize, const NCPUS: usize, const NDEPOT: usize>
+    MagCache<MAX_SLABS, NCPUS, NDEPOT>
+{
     /// Create a cache for `object_size`-byte objects aligned to `align`, sized for `online_cpus`
     /// CPUs. `object_size` must be non-zero and `align` a power of two (as in [`Cache`]).
     pub fn new(name: &'static str, object_size: usize, align: usize, online_cpus: usize) -> Self {
-        let online = online_cpus.max(1);
+        let online = online_cpus.max(1).min(NCPUS);
         let rounds = magazine_rounds(online);
-        let cpus = (0..online).map(|_| CpuMag::new(rounds)).collect();
         Self {
             name,
             cache: Cache::new(name, object_size, align),
             rounds,
             online,
-            depot_full: Vec::new(),
-            depot_empty: Vec::new(),
-            cpus,
+            depot_full: [Magazine::new(rounds); NDEPOT],
+            depot_full_len: 0,
+            depot_empty: [Magazine::new(rounds); NDEPOT],
+            depot_empty_len: 0,
+            cpus: [CpuMag::new(rounds); NCPUS],
             allocs: 0,
             frees: 0,
             remote_frees: 0,
@@ -186,7 +193,7 @@ impl MagCache {
     /// The fast path pops the current CPU's `loaded` magazine (falling back to `previous`), which
     /// touches no shared state. The slow path drains the CPU's remote queue, then refills from the
     /// depot, then builds a fresh magazine from the slab layer.
-    pub fn alloc(&mut self, arena: &mut Vmem, cpu: &dyn Cpu) -> Option<u64> {
+    pub fn alloc(&mut self, arena: &mut impl Arena, cpu: &dyn Cpu) -> Option<u64> {
         let id = cpu.current();
         debug_assert!(id < self.online, "cpu id {id} out of range");
         let popped = {
@@ -231,12 +238,9 @@ impl MagCache {
             }
         }
         // Both magazines are full: deposit one and retry with a fresh shell.
-        let empty = self
-            .depot_empty
-            .pop()
-            .unwrap_or_else(|| Magazine::new(self.rounds));
+        let empty = self.pop_empty_magazine();
         let full = core::mem::replace(&mut self.cpus[id].loaded, empty);
-        self.depot_full.push(full);
+        self.push_full_magazine(full);
         let pushed = self.cpus[id].loaded.push(addr);
         debug_assert!(pushed);
         self.frees = self.frees.saturating_add(1);
@@ -250,14 +254,17 @@ impl MagCache {
     pub fn remote_free(&mut self, cpu: &dyn Cpu, addr: u64) {
         let id = cpu.current();
         debug_assert!(id < self.online, "cpu id {id} out of range");
-        self.cpus[id].remote.push(addr);
+        let mag = &mut self.cpus[id];
+        mag.remote[mag.remote_len] = addr;
+        mag.remote_len += 1;
         self.remote_frees = self.remote_frees.saturating_add(1);
-        if self.cpus[id].remote.len() == self.rounds {
+        if mag.remote_len == self.rounds {
             let mut full = Magazine::new(self.rounds);
-            for addr in self.cpus[id].remote.drain(..) {
-                full.push(addr);
+            for i in 0..mag.remote_len {
+                full.push(mag.remote[i]);
             }
-            self.depot_full.push(full);
+            mag.remote_len = 0;
+            self.push_full_magazine(full);
             self.drain_depot_excess();
         }
     }
@@ -265,28 +272,31 @@ impl MagCache {
     /// Return every object in the magazines, depot and remote queues to the slab layer. Fully-free
     /// slabs are *not* returned to the arena (use [`MagCache::reap`] for that).
     pub fn drain_all(&mut self) {
-        for mag in &mut self.cpus {
-            for addr in mag.loaded.drain_all() {
+        for mag in &mut self.cpus[..self.online] {
+            while let Some(addr) = mag.loaded.pop() {
                 let _ = self.cache.free(addr);
             }
-            for addr in mag.prev.drain_all() {
+            while let Some(addr) = mag.prev.pop() {
                 let _ = self.cache.free(addr);
             }
-            for addr in mag.remote.drain(..) {
+            for i in 0..mag.remote_len {
+                let _ = self.cache.free(mag.remote[i]);
+            }
+            mag.remote_len = 0;
+        }
+        for i in 0..self.depot_full_len {
+            let full = &mut self.depot_full[i];
+            while let Some(addr) = full.pop() {
                 let _ = self.cache.free(addr);
             }
         }
-        for mut full in self.depot_full.drain(..) {
-            for addr in full.drain_all() {
-                let _ = self.cache.free(addr);
-            }
-        }
-        self.depot_empty.clear();
+        self.depot_full_len = 0;
+        self.depot_empty_len = 0;
     }
 
     /// Drain everything back to the slab layer and return every fully-free slab to the arena.
     /// Returns the number of slabs reaped.
-    pub fn reap(&mut self, arena: &mut Vmem) -> usize {
+    pub fn reap(&mut self, arena: &mut impl Arena) -> usize {
         self.drain_all();
         self.cache.reap(arena)
     }
@@ -294,19 +304,24 @@ impl MagCache {
     /// Snapshot the cache's counters and accounting.
     pub fn stats(&self) -> MagCacheStats {
         let slab = self.cache.stats();
-        let free_in_mags: usize = self
-            .cpus
+        let free_in_mags: usize = self.cpus[..self.online]
             .iter()
             .map(|mag| mag.loaded.len() + mag.prev.len())
             .sum();
-        let free_in_depot: usize = self.depot_full.iter().map(Magazine::len).sum();
-        let free_in_remote: usize = self.cpus.iter().map(|mag| mag.remote.len()).sum();
+        let free_in_depot: usize = self.depot_full[..self.depot_full_len]
+            .iter()
+            .map(Magazine::len)
+            .sum();
+        let free_in_remote: usize = self.cpus[..self.online]
+            .iter()
+            .map(|mag| mag.remote_len)
+            .sum();
         MagCacheStats {
             allocs: self.allocs,
             frees: self.frees,
             remote_frees: self.remote_frees,
-            depot_full: self.depot_full.len(),
-            depot_empty: self.depot_empty.len(),
+            depot_full: self.depot_full_len,
+            depot_empty: self.depot_empty_len,
             depot_refills: self.depot_refills,
             depot_drains: self.depot_drains,
             rounds: self.rounds,
@@ -325,21 +340,42 @@ impl MagCache {
         self.name
     }
 
+    fn pop_empty_magazine(&mut self) -> Magazine {
+        if self.depot_empty_len > 0 {
+            self.depot_empty_len -= 1;
+            self.depot_empty[self.depot_empty_len]
+        } else {
+            Magazine::new(self.rounds)
+        }
+    }
+
+    fn push_full_magazine(&mut self, full: Magazine) {
+        debug_assert!(self.depot_full_len < NDEPOT);
+        self.depot_full[self.depot_full_len] = full;
+        self.depot_full_len += 1;
+    }
+
     /// Refill the CPU's `loaded` magazine from the remote queue, the depot, or the slab layer.
     /// Returns `false` when the slab layer is exhausted.
-    fn refill(&mut self, arena: &mut Vmem, id: usize) -> bool {
+    fn refill(&mut self, arena: &mut impl Arena, id: usize) -> bool {
         // Remote queue first, so cross-CPU frees come back promptly.
-        if !self.cpus[id].remote.is_empty() {
+        if self.cpus[id].remote_len > 0 {
             let mut fresh = Magazine::new(self.rounds);
-            for addr in self.cpus[id].remote.drain(..) {
-                fresh.push(addr);
+            for i in 0..self.cpus[id].remote_len {
+                fresh.push(self.cpus[id].remote[i]);
             }
+            self.cpus[id].remote_len = 0;
             self.cpus[id].loaded = fresh;
             return true;
         }
-        if let Some(full) = self.depot_full.pop() {
+        if self.depot_full_len > 0 {
+            self.depot_full_len -= 1;
+            let full = self.depot_full[self.depot_full_len];
             let empty = core::mem::replace(&mut self.cpus[id].loaded, full);
-            self.depot_empty.push(empty);
+            if self.depot_empty_len < NDEPOT {
+                self.depot_empty[self.depot_empty_len] = empty;
+                self.depot_empty_len += 1;
+            }
             self.depot_refills = self.depot_refills.saturating_add(1);
             return true;
         }
@@ -349,8 +385,7 @@ impl MagCache {
                 Ok(addr) => {
                     fresh.push(addr);
                 }
-                Err(KmemError::Exhausted) => break,
-                Err(_) => break,
+                Err(KmemError::Exhausted) | Err(_) => break,
             }
         }
         if fresh.len() == 0 {
@@ -364,11 +399,10 @@ impl MagCache {
     /// Keep the depot bounded: drain full magazines back to the slab layer beyond the bound.
     fn drain_depot_excess(&mut self) {
         let bound = (DEPOT_MULT * self.online).max(2);
-        while self.depot_full.len() > bound {
-            let Some(mut full) = self.depot_full.pop() else {
-                break;
-            };
-            for addr in full.drain_all() {
+        while self.depot_full_len > bound {
+            self.depot_full_len -= 1;
+            let mut full = self.depot_full[self.depot_full_len];
+            while let Some(addr) = full.pop() {
                 let _ = self.cache.free(addr);
             }
             self.depot_drains = self.depot_drains.saturating_add(1);

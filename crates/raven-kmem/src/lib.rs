@@ -41,7 +41,7 @@ mod size;
 
 pub use cache::CacheStats;
 pub use error::KmemError;
-pub use global::KmemAlloc;
-pub use kmem::{CacheId, Kmem, KmemStats};
+pub use global::{KmemAlloc, KmemAllocGeneric};
+pub use kmem::{CacheId, DEFAULT_MAX_SLABS, Kmem, KmemGeneric, KmemStats};
 pub use magazine::{Cpu, MagCache, MagCacheStats, ROUNDS_MAX, ROUNDS_MIN, magazine_rounds};
 pub use size::{LARGE_THRESHOLD, SIZE_CLASSES, class_align, class_for, classify};
