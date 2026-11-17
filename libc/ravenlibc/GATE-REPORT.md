@@ -3,13 +3,12 @@
 
 # ravenlibc libc gate report
 
-Evaluated by `libc-gate` on 2026-11-17 from the C74d tree (origin/master `bd1d1de1`). C74f and
-C74g refreshed the `libc-dynamic` row and the section 4 dynamic paragraph; the table verdict is
-otherwise unchanged. Every status below has an evidence file under `build/libc-gate/`; the table
-is `cargo run -q -p libc-gate -- table`. C74d refreshed the non-P1 rows (audit, G1, compat, Miri,
-world, size, soak, mandoc) with their exact current commands and results; the remaining NOT MET
-rows are P1b/P1c, the dynamic runtime, or unavailable host tooling, and are listed with their
-owning lane.
+Evaluated by `libc-gate` on 2026-11-17 from the C74h tree (origin/master `beedfbbd`). C74h ran
+`libc-gate eval` and refreshed every row; C74g had already made `libc-dynamic` pass. Every status
+below has an evidence file under `build/libc-gate/`; the table is
+`cargo run -q -p libc-gate -- table`. The remaining NOT MET rows are P1b/P1c work, lint fixes,
+missing donor data, a size-budget lane, a fuzz soak, and unavailable host tooling, and are listed
+with their owning lane.
 
 ## 1. Gate table
 
@@ -17,22 +16,22 @@ owning lane.
 |---|---|---|---|---|
 | 1 correctness | 1.1 symbol coverage (C1) | MET | build/libc-gate/1.1.txt | exit 0 |
 | 1 correctness | 1.1.pack packed symbol list (C1) | MET | build/libc-gate/1.1.pack.txt | exit 0 |
-| 1 correctness | 1.1.audit target-case symbol audit (C64j) | NOT MET | build/libc-gate/1.1.audit.txt | exit 1: expected 0 |
+| 1 correctness | 1.1.audit target-case symbol audit (C64j) | MET | build/libc-gate/1.1.audit.txt | exit 0: required=66 present=66 missing=0 |
 | 1 correctness | 1.2 donor suites G1 (C2-C6) | NOT MET | build/libc-gate/1.2.txt | exit 3: expected 0 |
 | 1 correctness | 1.3 LTP and pjdfstest (C7, C8) | INFO | build/libc-gate/1.3.txt | owner-run LTP/pjdfstest results not supplied; INFO per C71/3.B.1.4 |
-| 1 correctness | 1.4 differential tests (C9) | NOT MET | build/libc-gate/1.4.txt | 27 oracle families |
-| 1 correctness | 1.5 host unit tests | MET | build/libc-gate/1.5.txt | 31 host crates |
+| 1 correctness | 1.4 differential tests (C9) | NOT MET | build/libc-gate/1.4.txt | 26 families cannot find ravenbsd-resources in the minion clone; `tls-layout` is MET |
+| 1 correctness | 1.5 host unit tests | MET | build/libc-gate/1.5.txt | 31 host crates via `cargo nextest run` |
 | 1 correctness | 1.6 Miri (C11) | BLOCKED | build/libc-gate/1.6.txt | preflight command failed |
-| 1 correctness | 1.7 lints (C16) | MET | build/libc-gate/1.7.txt | exit 0 |
+| 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 17 violations: 3 in `ld/src/raw/exports.rs` (C74g SAFETY comments), 14 pre-existing |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate/2.1.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate/2.2.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate/3.1.txt | exit 1: expected 0 |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate/3.1.txt | exit 1: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate/4.1.txt | exit 0 |
 | 4 hardening | 4.2 fuzz soak (C10) | NOT MET | build/libc-gate/4.2.txt | inet_text has no soak duration; inet_text has 1 crash(es); inet_text has no executions |
 | 4 hardening | 4.3 hardened malloc default | MET | build/libc-gate/4.3.txt | hardened backend selected; tiny not in libc.so.1 |
 | 4 hardening | 4.4 ENTROPY_WEAK status (H-5) | INFO | build/libc-gate/4.4.txt | ENTROPY_WEAK CLEAR; PG-52 release blocker, not a libc-gate blocker |
-| 5 on-target | 5.1 on-target libc cases (C12) | NOT MET | build/libc-gate/5.1.txt | 7 qtest cases |
+| 5 on-target | 5.1 on-target libc cases (C12) | NOT MET | build/libc-gate/5.1.txt | 7 qtest cases: dynamic, threads, signals, spawn pass; hello/stdio/time fail (P1b) |
 | 5 on-target | 5.2.core-servers core-servers regression | NOT MET | build/libc-gate/5.2.core-servers.txt | exit 1: expected 0 |
 | 5 on-target | 5.2.file-tools file-tools regression | NOT MET | build/libc-gate/5.2.file-tools.txt | exit 1: expected 0 |
 | 5 on-target | 5.3 second architecture | INFO | build/libc-gate/5.3.txt | aarch64: not delivered (C73 open item); owner decides whether G1 closes on x86_64 alone |
@@ -48,40 +47,44 @@ Verdict: NOT MET
 **libc gate: NOT MET.**
 
 Rows 1 (correctness), 3 (size), 4 (hardening) and 5 (on-target) are NOT MET. Rows 2
-(portability) and 6 (documentation) are BLOCKED. MET checks: symbol coverage and the packed
-symbol list, the 31 host unit-test crates, fuzz replay, the hardened allocator default, page
-coverage, the existing docs gate and `libc(7)`. The gate cannot close.
+(portability) and 6 (documentation) are BLOCKED. MET checks: symbol coverage, the packed symbol
+list, the target-case symbol audit (now exit 0), the 31 host unit-test crates, fuzz replay, the
+hardened allocator default, page coverage, the existing docs gate and `libc(7)`. The gate cannot
+close because of the lint violations, missing G1/donor data, the size-budget lane, the
+`inet_text` soak, the three P1b target cases, the core-servers/file-tools regression and
+unavailable Miri/world/mandoc.
 
-C57c and C76 are merged, so the old `libc-threads` list-corruption blocker is gone. The thread
-case now advances through `mutex/cond/once/tsd/tls/rwlock/sem/barrier` and times out before
-`detach` returns. The remaining on-target gaps are unchanged in kind and are listed in section 4.
+`libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` are green. The remaining target
+failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tzname).
 
 ## 3. Rows changed by this refresh
 
-* 1.1.audit: still NOT MET. `cargo xtask libc-audit` reports 66 required, 66 present, 0 missing;
-  the `tests/libc/symbol-audit/expected.tsv` snapshot is stale (13 C64i-era MISSING rows are now
-  PRESENT in the generated matrix). The snapshot is outside C74d's Owns (C64j/C64l follow-up).
-* 1.2 G1: `raven-atf-run gate --g1` exits 3: C2-C5 are 0 % (not run) and C6 is unvendored; 0 of
-  4 measured rows (C71a/C71).
-* 1.4: 23 of 27 oracle families pass; `compat-crypt`, `compat-humanize`, `compat-setmode` and
-  `compat-vis` fail because `raven-libc-oracle` has no `oracle-<family>` feature (C35/C71).
-* 1.6 Miri: UNAVAILABLE. The nightly Miri preflight reports that `cargo-miri` is not installed
-  for the nightly toolchain; the pinned stable channel has no Miri.
-* 1.7: MET, exit 0; `libc-lint` reports 0 violations (the C74b `sem_trywait.rs` fix).
-* 2.1/2.2 world: UNAVAILABLE. `cargo run -p libc-world` fails because the `libc-world` package
-  and `tools/libc-world/Cargo.toml` are absent; C72 outputs and H-11 tarballs are not in master.
-* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `6 pass, 63 fail, 68 known,
-  102 skipped, 0 budget-only`; budgets were not lowered.
+* 1.1.audit: **MET**. `cargo xtask libc-audit` exits 0: required=66, present=66, missing=0; the
+  `tests/libc/symbol-audit/expected.tsv` snapshot is no longer stale (C74e refresh).
+* 1.2 G1: still NOT MET. `raven-atf-run gate --g1` exits 3: C2-C5 are 0 % (not run), C6 is
+  unvendored; 0 of 4 measured rows (C71a/C71, owner: test/donor lane).
+* 1.4: NOT MET in this clone. `libc-oracle list` finds 27 families, but `diff <family>` exits 1
+  before running the oracle because `ravenbsd-resources` is not discoverable from
+  `/media/bo/.../minions/carl/ravenbsd`; only model-only `tls-layout` passes. Owner: integration
+  copy or a resources path in the harness (C35/C71).
+* 1.5: **MET** through `cargo nextest run`; the gate row now uses nextest (C74h harness fix).
+* 1.6 Miri: BLOCKED. The nightly Miri preflight reports `cargo-miri` is not installed.
+* 1.7: **NOT MET**. `cargo xtask libc-lint all` reports 17 violations: the C74g loader adds three
+  missing `// SAFETY:` blocks in `ld/src/raw/exports.rs:591/594/596`; the other 14 are
+  pre-existing `one-symbol`/`std-path`/`abi-freeze` findings in the libc crate. Owner: C74g
+  follow-up plus the P1e/P1h/P1i lanes.
+* 2.1/2.2 world: BLOCKED. `tools/libc-world/Cargo.toml` and the C72 outputs are absent.
+* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `4 pass, 48 fail, 25 known,
+  282 skipped, 40 budget-only`; budgets were not lowered.
 * 4.2 soak: NOT MET. `tests/libc/fuzz/SOAK.md` records `inet_text` crashing before one hour; the
-  other 13 targets completed 3600 s with 0 crashes.
-* 5.1: only `libc-signals`, `libc-spawn` and `libc-threads` pass; section 4 has the exact
-  case output.
-* 5.2: both inherited qtests fail with timeouts. `core-servers` times out after 120 s and
-  `file-tools` after 240 s; both serial logs stop at `loader: RavenBSD loader 0.1 (x86_64)` and
-  never reach `init`. This is a kernel/server-lane regression.
-* 6.2 mandoc: UNAVAILABLE. `which mandoc` exits 1; the render lint cannot run in this environment.
+  other 13 targets completed 3600 s with 0 crashes. Owner: test/fuzz lane.
+* 5.1: `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello`,
+  `libc-stdio` and `libc-time` remain P1b. Section 4 has the exact output.
+* 5.2: both inherited qtests fail with timeouts. `core-servers` times out and never reaches
+  `init`; `file-tools` times out after the same loader stop. Kernel/server-lane regression.
+* 6.2 mandoc: BLOCKED. `which mandoc` exits 1; the render lint cannot run.
 
-## 4. Seven-case matrix (OBSERVED, 2026-11-17)
+## 4. Seven-case matrix (OBSERVED, 2026-11-17, C74h)
 
 Each row is a direct `cargo xtask qtest --case <case> --arch x86_64` run.
 
@@ -130,30 +133,31 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 ## 5. Other rows
 
 * 1.3 LTP/pjdfstest: INFO, no owner-supplied runs.
-* 1.6 Miri: UNAVAILABLE, `build/libc-gate/1.6.txt`; `cargo-miri` is not installed for the
-  nightly toolchain.
-* 2.1/2.2: UNAVAILABLE, `tools/libc-world/Cargo.toml`, C72 outputs and H-11 tarballs are absent.
-* 3.1: NOT MET, `libc-size check: 6 pass, 63 fail, 68 known, 102 skipped, 0 budget-only`; the
-  failures include P0/P1/P4/P6 size, `INV-LIBC-SO-NEEDED` on all three arches, boot instruction
-  limits and `libc.so.1` size.
+* 1.6 Miri: BLOCKED, `build/libc-gate/1.6.txt`; `cargo-miri` is not installed for nightly.
+* 1.7 lints: NOT MET, `build/libc-gate/1.7.txt`; 17 violations (3 C74g SAFETY comments, 14
+  pre-existing).
+* 2.1/2.2: BLOCKED, `tools/libc-world/Cargo.toml`, C72 outputs and H-11 tarballs are absent.
+* 3.1: NOT MET, `libc-size check: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
 * 6.2: BLOCKED, `which mandoc` exits 1.
 
-## 6. C74d non-P1 evidence refresh (OBSERVED, origin/master `bd1d1de1`)
+## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`)
 
 | Row | Command | Result |
 |---|---|---|
-| 1.1.audit | `cargo xtask libc-audit` | exit 1; 66 required / 66 present / 0 missing; stale `tests/libc/symbol-audit/expected.tsv` (out of Owns) |
+| 1.1.audit | `cargo xtask libc-audit` | exit 0; 66 required / 66 present / 0 missing → MET |
 | 1.2 G1 | `cargo run -q -p raven-atf-run -- gate --g1` | exit 3; C2-C5 0% not run, C6 unvendored; G1 NOT MET (0/4) |
-| 1.4 compat | `cargo xtask libc-oracle list` + `diff {family}` | 4 of 27 families fail: `compat-crypt`, `compat-humanize`, `compat-setmode`, `compat-vis` lack `oracle-*` features |
-| 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → UNAVAILABLE |
-| 2.1/2.2 world | `cargo run -q -p libc-world -- check` | exit 101; `libc-world` package not in the workspace → UNAVAILABLE |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 6 pass, 63 fail, 68 known, 102 skipped |
+| 1.4 compat | `cargo xtask libc-oracle list` + `diff {family}` | 27 families; 26 exit 1 because `ravenbsd-resources` is not discoverable from this clone; `tls-layout` MET |
+| 1.5 host tests | `cargo nextest run` per crate | exit 0; 31 crates MET (gate row changed from `cargo test` to nextest) |
+| 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → BLOCKED |
+| 1.7 lints | `cargo xtask libc-lint all` | exit 1; 17 violations (3 C74g SAFETY comments, 14 pre-existing) → NOT MET |
+| 2.1/2.2 world | missing files | `tools/libc-world/Cargo.toml` and C72 outputs absent → BLOCKED |
+| 3.1 size | `cargo xtask libc-size --check` | exit 1; 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
-| 6.2 mandoc | `which mandoc` | exit 1; not installed → UNAVAILABLE |
+| 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
+| 5.2 kernel | `qtest --case core-servers/file-tools` | both time out after the loader; kernel/server lane |
+| 6.2 mandoc | `which mandoc` | exit 1; not installed → BLOCKED |
 
-`sh scripts/libc-symbol-audit.sh` exits 1 for the same stale snapshot; the required 66 symbols are
-all PRESENT. `cargo xtask libc-lint` is clean (`0 violations`), and `cargo run -q -p libc-gate --
-verdict` remains `NOT MET` (exit 1) because rows 1.1.audit, 1.2, 1.4, 3.1, 4.2, 5.1 and 5.2 are
-red and 1.6/2.1/2.2/6.2 are unavailable in this environment. The only remaining on-target
-blockers are P1b/P1c (`libc-hello` string, `libc-stdio`, `libc-time`, `libc-dynamic` runtime).
+`cargo run -q -p libc-gate -- eval` evaluated 90 checks; `table` and `verdict` exit 1 with
+`NOT MET`. `scripts/libc-symbol-audit.sh` and `cargo xtask libc-audit` both exit 0. The only
+remaining on-target blockers are P1b (`libc-hello` string, `libc-stdio`, `libc-time`).

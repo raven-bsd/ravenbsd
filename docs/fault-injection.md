@@ -14,8 +14,20 @@ sh scripts/fault-injection.sh --arch x86_64              # fault-restart + fault
 sh scripts/fault-injection.sh --arch aarch64             # same two cases on aarch64
 sh scripts/fault-injection.sh --profile release          # x86_64 release matrix (netd, vfsd)
 sh scripts/fault-injection.sh --case fault-reconnect     # one case
-sh scripts/fault-injection.sh --soak 86400               # repeat the selected set for 24 h
+sh scripts/fault-injection.sh --soak 24h                 # repeat the selected set for 24 h
+sh scripts/fault-injection.sh --soak 86400               # the same budget in seconds
 cargo xtask qtest --case fault-restart --arch aarch64    # the qtest the driver runs
+```
+
+`--soak` takes a duration: `<n>` (seconds), `<n>s`, `<n>m`, `<n>h` or `<a>h<b>m` (`1h30m`). Any
+other value is a usage error (exit 2) that names the offending value, and a budget that would run
+zero iterations (`--soak 0s`) is rejected rather than reported as a pass: a soak with no runs is
+never green. `--self-test` runs the duration-parser checks without starting a QEMU case, and
+`tests/scripts/check-fault-injection-duration.sh` wraps the parser, the usage-error paths and the
+zero-run guard as a host check (no QEMU):
+
+```sh
+sh tests/scripts/check-fault-injection-duration.sh
 ```
 
 ## Cases

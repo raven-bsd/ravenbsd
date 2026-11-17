@@ -43,7 +43,7 @@ title = "target-case symbol audit (C64j)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-audit"]
-note = "all 66 required symbols PRESENT; expected.tsv is stale (13 C64i MISSING rows are now PRESENT); the snapshot is outside C74d's Owns"
+note = "C74h: 66 required / 66 present / 0 missing; expected.tsv is current (exit 0)"
 evidence = "build/libc-gate/1.1.audit.txt"
 source = "C64j, C64l"
 
@@ -76,7 +76,7 @@ required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-oracle", "list"]
 child_argv = ["cargo", "xtask", "libc-oracle", "diff", "{family}"]
-note = "4 of 27 families lack an oracle-* feature: compat-crypt, compat-humanize, compat-setmode, compat-vis"
+note = "C74h: 26 of 27 families cannot start because ravenbsd-resources is not discoverable from the minion clone; tls-layout is MET"
 expand = "oracle"
 blocked_on = { exit = [77] }
 evidence = "build/libc-gate/1.4.txt"
@@ -88,8 +88,8 @@ row = 1
 title = "host unit tests"
 required = true
 kind = "argv"
-argv = ["cargo", "test", "-p", "raven-libc-abi"]
-child_argv = ["cargo", "test", "-p", "{crate}"]
+argv = ["cargo", "nextest", "run", "-p", "raven-libc-abi"]
+child_argv = ["cargo", "nextest", "run", "-p", "{crate}"]
 expand = "crates"
 evidence = "build/libc-gate/1.5.txt"
 source = "C34 data, xtask/crates.toml"
@@ -114,7 +114,7 @@ title = "lints (C16)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-lint", "all"]
-note = "1 violation: pthread/sem_trywait.rs:11 -> fixed; libc-lint now reports 0 violations"
+note = "C74h: 17 violations (3 C74g SAFETY comments in ld/src/raw/exports.rs, 14 pre-existing)"
 evidence = "build/libc-gate/1.7.txt"
 source = "C34"
 
@@ -149,7 +149,7 @@ title = "size budgets (C14)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-size", "--check"]
-note = "6 pass, 63 fail, 68 known, 102 skipped; budgets not lowered"
+note = "C74h: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only; budgets not lowered"
 evidence = "build/libc-gate/3.1.txt"
 source = "C69, 16 3.B.9 C14"
 
@@ -217,7 +217,7 @@ argv = ["cargo", "xtask", "qtest", "--case", "libc-hello", "--arch", "x86_64"]
 child_argv = ["cargo", "xtask", "qtest", "--case", "{case}", "--arch", "x86_64"]
 expand = "qtest"
 cases = ["libc-hello", "libc-stdio", "libc-time", "libc-threads", "libc-signals", "libc-dynamic", "libc-spawn"]
-note = "C74c 2026-11-17: threads, signals and spawn pass; hello string is P1b (auxv ok); stdio page fault 0x3 is P1b; time misses P1b sleep/usleep/tzname; dynamic shape ok, runtime invalid argument in ld-elf.so.1"
+note = "C74h: dynamic, threads, signals and spawn pass; hello string is P1b (auxv ok); stdio page fault 0x3 is P1b; time misses P1b sleep/usleep/tzname"
 evidence = "build/libc-gate/5.1.txt"
 source = "C73, 16 3.B.9 C12"
 

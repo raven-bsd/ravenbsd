@@ -17,8 +17,8 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
-| utilities | 217 | 37 | 1 | 174 | 5 |
-| **all** | **1800** | **82** | **12** | **1608** | **98** |
+| utilities | 217 | 0 | 1 | 180 | 36 |
+| **all** | **1800** | **45** | **12** | **1614** | **129** |
 
 Traceability rows: 1800; profile rows: 1800.
 
@@ -1545,7 +1545,7 @@ Traceability rows: 1800; profile rows: 1800.
 
 | id | utility | status | owner | evidence | test |
 |---|---|---|---|---|---|
-| `util.admin` | `admin` | missing | P4 | `none` | none |
+| `util.admin` | `admin` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists admin only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.alias` | `alias` | present | P4 | `qtest:posix-shell` | none |
 | `util.ar` | `ar` | present | P4 | `test:tests/posix/utility/archive/ar/test.sh` | none |
 | `util.arch` | `arch` | present | P4 | `test:tests/posix/utility/misc/arch/test.sh` | none |
@@ -1561,8 +1561,8 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.bc` | `bc` | present | P4 | `test:tests/posix/utility/bc/test.sh` | none |
 | `util.bg` | `bg` | waived | P4 | `none` | none; waiver: P45: PG-56 job control; asynchronous lists and $! are not implemented |
 | `util.break` | `break` | present | P4 | `qtest:posix-shell` | none |
-| `util.c17` | `c17` | missing | P4 | `none` | none |
-| `util.c99` | `c99` | missing | P4 | `none` | none |
+| `util.c17` | `c17` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists c17 only under the optional C-Language Development Utilities option ([ CD ]). RavenBSD has no C compiler; waived. |
+| `util.c99` | `c99` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 (Issue 8) replaces c99 with c17 and omits c99 from the utility list. Removed; waived. |
 | `util.cal` | `cal` | present | P4 | `test:tests/posix/utility/simple/cal/test.sh` | none |
 | `util.cat` | `cat` | present | P4 | `test:tests/posix/utility/file/cat/test.sh` | none |
 | `util.cd` | `cd` | present | P4 | `qtest:posix-shell` | none |
@@ -1572,7 +1572,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.chown` | `chown` | present | P4 | `test:tests/posix/utility/file/chown/test.sh` | none |
 | `util.cksum` | `cksum` | present | P4 | `test:tests/posix/utility/file/cksum/test.sh` | none |
 | `util.cmp` | `cmp` | present | P4 | `test:tests/posix/utility/text2/cmp/test.sh` | none |
-| `util.cod` | `cod` | missing | P4 | `none` | none |
+| `util.cod` | `cod` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits cod from the Issue 8 utility list. Removed; waived. |
 | `util.comm` | `comm` | present | P4 | `test:tests/posix/utility/text/comm/test.sh` | none |
 | `util.command` | `command` | present | P4 | `qtest:posix-shell` | none |
 | `util.compress` | `compress` | present | P4 | `test:tests/posix/utility/compress/compress/test.sh` | none |
@@ -1585,7 +1585,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.cxref` | `cxref` | present | P4 | `test:tests/posix/utility/devtools/test.sh` | none |
 | `util.date` | `date` | present | P4 | `test:tests/posix/utility/misc2/date/test.sh` | none |
 | `util.dd` | `dd` | present | P4 | `test:tests/posix/utility/file/dd/test.sh` | none |
-| `util.delta` | `delta` | missing | P4 | `none` | none |
+| `util.delta` | `delta` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists delta only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.df` | `df` | present | P4 | `test:tests/posix/utility/file/df/test.sh` | none |
 | `util.diff` | `diff` | present | P4 | `test:tests/posix/utility/text2/diff/test.sh` | none |
 | `util.dircolors` | `dircolors` | present | P4 | `test:tests/posix/utility/misc/dircolors/test.sh` | none |
@@ -1596,7 +1596,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.ed` | `ed` | present | P4 | `test:tests/posix/utility/ed/ed/test.sh` | none |
 | `util.env` | `env` | present | P4 | `qtest:posix-util-system` | none |
 | `util.eval` | `eval` | present | P4 | `qtest:posix-shell` | none |
-| `util.ex` | `ex` | missing | P4 | `none` | none |
+| `util.ex` | `ex` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists ex only under the optional User Portability Utilities option ([ UP ]). Not supported; waived. |
 | `util.exec` | `exec` | present | P4 | `qtest:posix-shell` | none |
 | `util.exit` | `exit` | present | P4 | `qtest:posix-shell` | none |
 | `util.expand` | `expand` | present | P4 | `test:tests/posix/utility/text/expand/test.sh` | none |
@@ -1610,9 +1610,9 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.find` | `find` | present | P4 | `test:tests/posix/utility/file/find/test.sh` | none |
 | `util.fmt` | `fmt` | present | P4 | `test:tests/posix/utility/misc/fmt/test.sh` | none |
 | `util.fold` | `fold` | present | P4 | `test:tests/posix/utility/text/fold/test.sh` | none |
-| `util.fort77` | `fort77` | missing | P4 | `none` | none |
+| `util.fort77` | `fort77` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits fort77 from the Issue 8 utility list (FORTRAN dropped). Removed; waived. |
 | `util.gencat` | `gencat` | present | P4 | `test:tests/posix/utility/locale/test.sh` | none |
-| `util.get` | `get` | missing | P4 | `none` | none |
+| `util.get` | `get` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists get only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.getconf` | `getconf` | present | P4 | `qtest:posix-util-system` | none |
 | `util.getopts` | `getopts` | present | P4 | `qtest:posix-shell` | none |
 | `util.grep` | `grep` | present | P4 | `test:tests/posix/utility/text2/grep/test.sh` | none |
@@ -1623,8 +1623,8 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.iconv` | `iconv` | present | P4 | `test:tests/posix/utility/locale/test.sh` | none |
 | `util.id` | `id` | present | P4 | `qtest:posix-util-system` | none |
 | `util.install` | `install` | present | P4 | `test:tests/posix/utility/misc/install/test.sh` | none |
-| `util.ipcrm` | `ipcrm` | missing | P4 | `none` | none |
-| `util.ipcs` | `ipcs` | missing | P4 | `none` | none |
+| `util.ipcrm` | `ipcrm` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists ipcrm only under the optional XSI option ([ XSI ]). Not supported; waived. |
+| `util.ipcs` | `ipcs` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists ipcs only under the optional XSI option ([ XSI ]). Not supported; waived. |
 | `util.jobs` | `jobs` | waived | P4 | `none` | none; waiver: P45: PG-56 job control; no job table or asynchronous list |
 | `util.join` | `join` | present | P4 | `test:tests/posix/utility/text/join/test.sh` | none |
 | `util.kill` | `kill` | present | P4 | `qtest:posix-util-system` | none |
@@ -1632,10 +1632,10 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.link` | `link` | present | P4 | `test:tests/posix/utility/file/link/test.sh` | none |
 | `util.ln` | `ln` | present | P4 | `test:tests/posix/utility/file/ln/test.sh` | none |
 | `util.locale` | `locale` | present | P4 | `test:tests/posix/utility/locale/test.sh` | none |
-| `util.localedef` | `localedef` | missing | P4 | `none` | none |
+| `util.localedef` | `localedef` | present | P4 | `test:tests/posix/utility/simple3/localedef/test.sh` | none |
 | `util.logger` | `logger` | present | P4 | `qtest:posix-util-system` | none |
 | `util.logname` | `logname` | present | P4 | `test:tests/posix/utility/misc/logname/test.sh` | none |
-| `util.lp` | `lp` | missing | P4 | `none` | none |
+| `util.lp` | `lp` | present | P4 | `test:tests/posix/utility/simple5/lp/test.sh` | none |
 | `util.ls` | `ls` | present | P4 | `test:tests/posix/utility/file/ls/test.sh` | none |
 | `util.m4` | `m4` | present | P4 | `test:tests/posix/utility/m4/test.sh` | none |
 | `util.mail` | `mail` | present | P4 | `test:tests/posix/utility/mail/mail/test.sh` | none |
@@ -1650,7 +1650,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.mktemp` | `mktemp` | present | P4 | `test:tests/posix/utility/misc/mktemp/test.sh` | none |
 | `util.more` | `more` | present | P4 | `test:tests/posix/utility/ttytools/more/test.sh` | none |
 | `util.mv` | `mv` | present | P4 | `test:tests/posix/utility/file/mv/test.sh` | none |
-| `util.neqn` | `neqn` | missing | P4 | `none` | none |
+| `util.neqn` | `neqn` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits neqn from the Issue 8 utility list. Removed; waived. |
 | `util.newgrp` | `newgrp` | present | P4 | `test:tests/posix/utility/simple4/newgrp/test.sh` | none |
 | `util.nice` | `nice` | present | P4 | `qtest:posix-util-system` | none |
 | `util.nl` | `nl` | present | P4 | `test:tests/posix/utility/text/nl/test.sh` | none |
@@ -1667,21 +1667,21 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.pr` | `pr` | present | P4 | `test:tests/posix/utility/text/pr/test.sh` | none |
 | `util.printenv` | `printenv` | present | P4 | `test:tests/posix/utility/misc/printenv/test.sh` | none |
 | `util.printf` | `printf` | present | P4 | `test:tests/posix/utility/text/printf/test.sh` | none |
-| `util.prs` | `prs` | missing | P4 | `none` | none |
+| `util.prs` | `prs` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists prs only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.ps` | `ps` | present | P4 | `qtest:posix-util-system` | tests/qtest/cases/modern-json-tools.toml |
 | `util.ptx` | `ptx` | present | P4 | `test:tests/posix/utility/misc/ptx/test.sh` | none |
 | `util.pwd` | `pwd` | present | P4 | `test:tests/posix/utility/file/pwd/test.sh` | none |
-| `util.qalter` | `qalter` | missing | P4 | `none` | none |
-| `util.qdel` | `qdel` | missing | P4 | `none` | none |
-| `util.qhold` | `qhold` | missing | P4 | `none` | none |
-| `util.qmove` | `qmove` | missing | P4 | `none` | none |
-| `util.qmsg` | `qmsg` | missing | P4 | `none` | none |
-| `util.qrerun` | `qrerun` | missing | P4 | `none` | none |
-| `util.qrls` | `qrls` | missing | P4 | `none` | none |
-| `util.qselect` | `qselect` | missing | P4 | `none` | none |
-| `util.qsig` | `qsig` | missing | P4 | `none` | none |
-| `util.qstat` | `qstat` | missing | P4 | `none` | none |
-| `util.qsub` | `qsub` | missing | P4 | `none` | none |
+| `util.qalter` | `qalter` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qalter utility from the Issue 8 list. Removed; waived. |
+| `util.qdel` | `qdel` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qdel utility from the Issue 8 list. Removed; waived. |
+| `util.qhold` | `qhold` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qhold utility from the Issue 8 list. Removed; waived. |
+| `util.qmove` | `qmove` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qmove utility from the Issue 8 list. Removed; waived. |
+| `util.qmsg` | `qmsg` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qmsg utility from the Issue 8 list. Removed; waived. |
+| `util.qrerun` | `qrerun` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qrerun utility from the Issue 8 list. Removed; waived. |
+| `util.qrls` | `qrls` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qrls utility from the Issue 8 list. Removed; waived. |
+| `util.qselect` | `qselect` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qselect utility from the Issue 8 list. Removed; waived. |
+| `util.qsig` | `qsig` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qsig utility from the Issue 8 list. Removed; waived. |
+| `util.qstat` | `qstat` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qstat utility from the Issue 8 list. Removed; waived. |
+| `util.qsub` | `qsub` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qsub utility from the Issue 8 list. Removed; waived. |
 | `util.read` | `read` | present | P4 | `qtest:posix-shell` | none |
 | `util.readlink` | `readlink` | present | P4 | `test:tests/posix/utility/file/readlink/test.sh` | none |
 | `util.readonly` | `readonly` | present | P4 | `qtest:posix-shell` | none |
@@ -1689,10 +1689,10 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.renice` | `renice` | present | P4 | `qtest:posix-util-system` | none |
 | `util.return` | `return` | present | P4 | `qtest:posix-shell` | none |
 | `util.rm` | `rm` | present | P4 | `test:tests/posix/utility/file/rm/test.sh` | none |
-| `util.rmdel` | `rmdel` | missing | P4 | `none` | none |
+| `util.rmdel` | `rmdel` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists rmdel only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.rmdir` | `rmdir` | present | P4 | `test:tests/posix/utility/file/rmdir/test.sh` | none |
-| `util.sact` | `sact` | missing | P4 | `none` | none |
-| `util.sccs` | `sccs` | missing | P4 | `none` | none |
+| `util.sact` | `sact` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists sact only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
+| `util.sccs` | `sccs` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists sccs only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.sed` | `sed` | present | P4 | `test:tests/posix/utility/text2/sed/test.sh` | none |
 | `util.seq` | `seq` | present | P4 | `test:tests/posix/utility/misc/seq/test.sh` | none |
 | `util.set` | `set` | present | P4 | `qtest:posix-shell` | none |
@@ -1715,18 +1715,18 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.stty` | `stty` | present | P4 | `test:tests/posix/utility/system/stty/test.sh` | none |
 | `util.sum` | `sum` | present | P4 | `test:tests/posix/utility/misc/sum/test.sh` | none |
 | `util.sync` | `sync` | present | P4 | `test:tests/posix/utility/misc/sync/test.sh` | none |
-| `util.tabs` | `tabs` | missing | P4 | `none` | none |
+| `util.tabs` | `tabs` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists tabs under the optional XSI option ([ XSI ]); it was removed from the User Portability Utilities option in Issue 7. Not supported; waived. |
 | `util.tac` | `tac` | present | P4 | `test:tests/posix/utility/misc/tac/test.sh` | none |
 | `util.tail` | `tail` | present | P4 | `test:tests/posix/utility/text/tail/test.sh` | none |
 | `util.talk` | `talk` | present | P4 | `test:tests/posix/utility/talk/test.sh` | none |
 | `util.tar` | `tar` | present | P4 | `test:tests/posix/utility/archive/tar/test.sh` | none |
 | `util.tee` | `tee` | present | P4 | `test:tests/posix/utility/text/tee/test.sh` | none |
 | `util.test` | `test` | present | P4 | `qtest:posix-shell` | none |
-| `util.time` | `time` | missing | P4 | `none` | none |
+| `util.time` | `time` | present | P4 | `test:tests/posix/utility/simple2/time/test.sh` | none |
 | `util.timeout` | `timeout` | present | P4 | `test:tests/posix/utility/misc/timeout/test.sh` | none |
-| `util.times` | `times` | missing | P4 | `none` | none |
+| `util.times` | `times` | present | P4 | `test:tests/posix/utility/simple2/times/test.sh` | none |
 | `util.touch` | `touch` | present | P4 | `test:tests/posix/utility/file/touch/test.sh` | none |
-| `util.tput` | `tput` | missing | P4 | `none` | none |
+| `util.tput` | `tput` | present | P4 | `test:tests/posix/utility/simple2/tput/test.sh` | none |
 | `util.tr` | `tr` | present | P4 | `test:tests/posix/utility/text/tr/test.sh` | none |
 | `util.trap` | `trap` | present | P4 | `qtest:posix-shell` | none |
 | `util.true` | `true` | present | P4 | `test:tests/posix/utility/misc/true/test.sh` | none |
@@ -1734,13 +1734,13 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.tsort` | `tsort` | present | P4 | `test:tests/posix/utility/text/tsort/test.sh` | none |
 | `util.tty` | `tty` | present | P4 | `test:tests/posix/utility/system/tty/test.sh` | none |
 | `util.type` | `type` | present | P4 | `qtest:posix-shell` | none |
-| `util.ulimit` | `ulimit` | missing | P4 | `none` | none |
+| `util.ulimit` | `ulimit` | present | P4 | `test:tests/posix/utility/simple2/ulimit/test.sh` | none |
 | `util.umask` | `umask` | present | P4 | `qtest:posix-shell` | none |
 | `util.unalias` | `unalias` | present | P4 | `qtest:posix-shell` | none |
 | `util.uname` | `uname` | present | P4 | `qtest:posix-util-system` | none |
 | `util.uncompress` | `uncompress` | present | P4 | `test:tests/posix/utility/compress/uncompress/test.sh` | none |
 | `util.unexpand` | `unexpand` | present | P4 | `test:tests/posix/utility/text/unexpand/test.sh` | none |
-| `util.unget` | `unget` | missing | P4 | `none` | none |
+| `util.unget` | `unget` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists unget only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.uniq` | `uniq` | present | P4 | `test:tests/posix/utility/text/uniq/test.sh` | none |
 | `util.unlink` | `unlink` | present | P4 | `test:tests/posix/utility/file/unlink/test.sh` | none |
 | `util.unset` | `unset` | present | P4 | `qtest:posix-shell` | none |
@@ -1751,11 +1751,11 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.uuencode` | `uuencode` | present | P4 | `test:tests/posix/utility/archive/uuencode/test.sh` | none |
 | `util.uustat` | `uustat` | present | P4 | `test:tests/posix/utility/uucp/uustat/test.sh` | none |
 | `util.uux` | `uux` | present | P4 | `test:tests/posix/utility/uucp/uux/test.sh` | none |
-| `util.val` | `val` | missing | P4 | `none` | none |
-| `util.vi` | `vi` | missing | P4 | `none` | none |
+| `util.val` | `val` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists val only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
+| `util.vi` | `vi` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists vi only under the optional User Portability Utilities option ([ UP ]). Not supported; waived. |
 | `util.wait` | `wait` | waived | P4 | `none` | none; waiver: P45: PG-56 job control; no asynchronous child/job table |
 | `util.wc` | `wc` | present | P4 | `test:tests/posix/utility/text/wc/test.sh` | none |
-| `util.what` | `what` | missing | P4 | `none` | none |
+| `util.what` | `what` | waived | P4 | `none` | none; waiver: P4f: POSIX.1-2024 lists what only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.who` | `who` | present | P4 | `test:tests/posix/utility/misc/who/test.sh` | none |
 | `util.write` | `write` | present | P4 | `test:tests/posix/utility/ttytools/write/test.sh` | none |
 | `util.xargs` | `xargs` | present | P4 | `test:tests/posix/utility/xargs/test.sh` | none |
@@ -1888,9 +1888,9 @@ Traceability rows: 1800; profile rows: 1800.
 ## Current tree
 
 - frozen exported symbols: 1736
-- `userland/bin` directories: 96
+- `userland/bin` directories: 102
 - headers under `libc/ravenlibc/include`: 228
-- utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, logger, login, ls, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, newgrp, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, touch, trace, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
+- utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, localedef, logger, login, lp, ls, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, newgrp, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, time, times, touch, tput, trace, ulimit, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
 
 ## Top gaps
 
@@ -1977,4 +1977,4 @@ Traceability rows: 1800; profile rows: 1800.
 | interface | `ldexpfNx` | `none` |
 | interface | `llogbfNx` | `none` |
 
-192 gap rows are listed in full in the tables above; this short table is a review aid.
+186 gap rows are listed in full in the tables above; this short table is a review aid.

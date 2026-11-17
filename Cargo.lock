@@ -650,6 +650,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "localedef"
+version = "0.1.0"
+dependencies = [
+ "gencat",
+ "raven-libc-locale",
+ "raven-rt",
+]
+
+[[package]]
 name = "log"
 version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -665,6 +674,15 @@ dependencies = [
  "raven-proto-tty",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "lp"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -3926,6 +3944,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "time"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "times"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "toml"
 version = "1.2.1+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3963,6 +4000,15 @@ name = "toml_writer"
 version = "1.2.0+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "009dbb7700f11c55ef83aebbe4c0e9cf1f1ac0844bd8d6f00dc38f302026e13a"
+
+[[package]]
+name = "tput"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "trace"
@@ -4065,6 +4111,15 @@ name = "uguid"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c8352f8c05e47892e7eaf13b34abd76a7f4aeaf817b716e88789381927f199c"
+
+[[package]]
+name = "ulimit"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "uncompress"
