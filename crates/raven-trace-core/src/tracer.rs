@@ -3,7 +3,7 @@
 
 //! The tracing facade with the disabled fast path.
 
-use crate::{Limits, SpanId, Trace, TraceContext};
+use crate::{Limits, Span, SpanId, Trace, TraceContext, TraceSink};
 
 /// A [`Trace`] wrapped with a global enable flag.
 ///
@@ -80,6 +80,16 @@ impl Tracer {
     /// Append one record to `span`; `true` on success.
     pub fn record(&mut self, span: SpanId, event: u64) -> bool {
         self.enabled && self.trace.record(span, event).is_ok()
+    }
+
+    /// Record `span` into a cross-process [`TraceSink`] when tracing is enabled.
+    ///
+    /// The disabled path writes nothing and returns `false`.
+    pub fn emit_sink(&self, sink: &mut TraceSink<'_>, span: Span) -> bool {
+        if !self.enabled {
+            return false;
+        }
+        sink.emit(&span).is_ok()
     }
 
     /// The underlying registry (read-only view of spans, parents and records).

@@ -28,6 +28,7 @@ use raven_abi::types::Rights;
 use spin::Mutex;
 
 use crate::process::Process;
+use crate::sched::thread::Thread;
 use crate::sched::wait::WaitQueue;
 
 use self::capture::Capture;
@@ -156,6 +157,13 @@ pub struct PendingRequest {
     pub status: AtomicI32,
     /// Result length reported by the server.
     pub result_len: AtomicU64,
+    /// Thread that submitted the request (`0` when there is no thread context).
+    pub client_tid: u32,
+    /// Server thread that received the request (`0` until delivery).
+    ///
+    /// Non-zero exactly while the client -> server donation edge exists, so it is both the edge
+    /// owner marker and the id to remove on completion.
+    pub server_tid: AtomicU32,
     /// Client waiters.
     pub waiters: WaitQueue,
 }
@@ -171,6 +179,12 @@ impl PendingRequest {
         packet: SchemePacket,
         buffers: RequestBuffers,
     ) -> Arc<Self> {
+        // Register the submitting thread's base priority now; a later delivery opens the call
+        // edge from this client to the receiving server thread (L6).
+        let client_tid = crate::sched::current_thread().map_or(0, |thread| {
+            crate::sync::register_thread(&thread);
+            thread.tid
+        });
         Arc::new(Self {
             id: packet.request_id,
             client,
@@ -184,6 +198,8 @@ impl PendingRequest {
             cancelled: AtomicBool::new(false),
             status: AtomicI32::new(0),
             result_len: AtomicU64::new(0),
+            client_tid,
+            server_tid: AtomicU32::new(0),
             waiters: WaitQueue::new(),
         })
     }
@@ -239,6 +255,9 @@ impl PendingRequest {
         {
             return;
         }
+        // The call is over (reply, cancellation or either side's death): the client's priority no
+        // longer donates to the server.
+        self.end_donation();
         // Drop the completed request from the client's outstanding list. One-way requests
         // (CLOSE/DUP) have no waiter to remove them, so without this a long-lived client would
         // accumulate every completed notification in kernel memory.
@@ -269,6 +288,36 @@ impl PendingRequest {
         self.cancelled.store(true, Ordering::Release);
         self.fail(Errno::EIO);
         self.server.scheme_waiters.wake_all();
+    }
+
+    /// Open the client -> server donation edge once `server` receives this request.
+    ///
+    /// Called from the router's delivery path, where both the client's tid (captured at submit)
+    /// and the receiving server thread are known. One-way notifications (CLOSE/DUP) have no
+    /// blocked client and get no edge. Completion removes the edge, so a request that finishes
+    /// between the delivery check and the store is cleaned up by the post-store `done` check.
+    pub fn begin_donation(&self, server: &Arc<Thread>) {
+        if self.client_tid == 0
+            || self.server_tid.load(Ordering::Acquire) != 0
+            || matches!(self.opcode, Opcode::Close | Opcode::Dup)
+        {
+            return;
+        }
+        if !crate::sync::donation_begin_call(self.client_tid, server) {
+            return;
+        }
+        self.server_tid.store(server.tid, Ordering::Release);
+        if self.done.load(Ordering::Acquire) {
+            self.end_donation();
+        }
+    }
+
+    /// Remove the donation edge, if one exists (reply, cancel, client death or server death).
+    pub fn end_donation(&self) {
+        let server = self.server_tid.swap(0, Ordering::AcqRel);
+        if server != 0 {
+            crate::sync::donation_end_call(self.client_tid, server);
+        }
     }
 }
 

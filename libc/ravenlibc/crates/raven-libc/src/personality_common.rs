@@ -881,10 +881,14 @@ pub(crate) static UNVEIL_STATE: Global<raven_libc_pledge::unveil::UnveilTable> =
 pub(crate) static TITLE_CACHE: Global<raven_libc_personality_bsd::setproctitle::Cache> =
     Global::new(raven_libc_personality_bsd::setproctitle::Cache::new());
 
-/// The retained auxv values this branch can answer (`AT_PAGESZ`, `AT_CLKTCK`, `AT_RANDOM`,
-/// `AT_SECURE`). C61's start does not publish the full table yet.
+/// The retained auxv values this branch can answer (`AT_PHDR`, `AT_PHENT`, `AT_PHNUM`,
+/// `AT_PAGESZ`, `AT_CLKTCK`, `AT_RANDOM`, `AT_SECURE`). The loader publishes the program-header
+/// values (`PG-50`); C61's start retains them for `getauxval`.
 pub(crate) fn aux_lookup(key: u64) -> Option<u64> {
     match key {
+        3 => Some(u64::try_from(crate::start::phdr()).unwrap_or(0)),
+        4 => Some(u64::try_from(crate::start::phent()).unwrap_or(0)),
+        5 => Some(u64::try_from(crate::start::phnum()).unwrap_or(0)),
         6 => Some(u64::try_from(crate::start::page_size()).unwrap_or(0)),
         17 => Some(u64::try_from(crate::start::clk_tck()).unwrap_or(0)),
         23 => Some(0),

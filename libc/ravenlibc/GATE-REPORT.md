@@ -3,11 +3,12 @@
 
 # ravenlibc libc gate report
 
-Evaluated by `libc-gate` on 2026-11-17 from the C74b tree (origin/master `1eed3518`). Every
+Evaluated by `libc-gate` on 2026-11-17 from the C74c tree (origin/master `5eb0e578`). Every
 status below has an evidence file under `build/libc-gate/`; the table is
-`cargo run -q -p libc-gate -- table`. C74b closes the `libc-lint` row and makes `libc-pack`
-stage `build/<arch>/sysroot` repeatably; the remaining NOT MET rows are outside C74b's Owns and
-are listed with their owning lane.
+`cargo run -q -p libc-gate -- table`. C74b closed `libc-lint` and made `libc-pack` stage
+`build/<arch>/sysroot`; C74c publishes `AT_PHNUM` and stages the linked `libc.so.1`/
+`ld-elf.so.1` into the sysroot. The remaining NOT MET rows are outside C74c's Owns and are
+listed with their owning lane.
 
 ## 1. Gate table
 
@@ -77,10 +78,10 @@ Each row is a direct `cargo xtask qtest --case <case> --arch x86_64` run.
 
 | Case | Result | Evidence and exact gap |
 |---|---|---|
-| libc-hello | FAIL | `libc-hello: FAIL auxv` (line 191) and `FAIL string` (line 195); the auxv check is the PG-50 startup block, the string check is the shell string routines. |
+| libc-hello | FAIL | `libc-hello: auxv ok` after C74c publishes `AT_PHNUM`; the only failure is `FAIL string` (line 195), a P1b string routine. |
 | libc-stdio | FAIL | `libc-stdio: printf ok`, then `process: child killed by page fault at 0x3`; the first stdio file/stream check after printf. |
 | libc-time | ERROR (build) | The C fixture does not link: `rust-lld: undefined symbol: usleep`, `sleep`, `tzname`. These are genuinely absent from `libc.a` (`nm` shows only `nanosleep`); `sleep`/`usleep` are unistd and `tzname` is time (P1b), all outside C74b's Owns. C74b makes the sysroot repeatable but does not add these symbols. |
-| libc-threads | FAIL (timeout) | Last line `libc-threads: barrier ok`; `detach`, `stack`, `c11`, `exit value`, `timedwait` and `done` never print; the 300 s case timeout fires and `svcd: settled` / `init exited (0)` are absent. |
+| libc-threads | FAIL (build) | With the C74b sysroot wrapper headers removed, the case **passes** on this master (C77 fixed the hang). The default `libc-pack` sysroot stages `stdatomic.h`/`stddef.h`/`stdbool.h`/`stdarg.h`/`float.h`, whose `#include_next` cannot resolve under `--sysroot`; the fix belongs to `libc_pack.rs` (C74b), outside C74c's Owns. |
 | libc-signals | PASS | `cargo xtask qtest --case libc-signals --arch x86_64` exit 0. |
 | libc-dynamic | ERROR (build) | `shape: FAIL partial file tail at 0x0000000000000000 (offset 0x000000 + size 0x000ae4)`. The loader shape check rejects the produced file. |
 | libc-spawn | PASS | `cargo xtask qtest --case libc-spawn --arch x86_64` exit 0. |
@@ -103,6 +104,14 @@ archives, base/arch/generated headers, and `libc.so.1`/`ld-elf.so.1` when produc
 `libc/ravenlibc/abi/Symbols.list`. This removes the manual sysroot staging step; it does not
 change the missing `sleep`/`usleep`/`tzname` exports or the thread/dynamic/hello failures, which
 live in crates and linker paths outside C74b's Owns.
+
+C74c publishes `AT_PHDR`/`AT_PHENT`/`AT_PHNUM` from the retained startup auxv, so
+`getauxval(AT_PHNUM)` is nonzero and `libc-hello: auxv ok`; `libc-link` now stages the freshly
+linked `libc.so.1`/`ld-elf.so.1` into the sysroot. The `libc-threads` runtime now passes (C77
+fixed the hang) once the C74b wrapper headers are removed; the remaining blocker for a clean
+gate run is the `libc-pack` header staging. The `libc-dynamic` failure is the C test's interim
+`shape-check.sh` rejecting lld's unpadded first LOAD (`offset 0, size 0xae4`), which is in the
+C test build script, not `libc_link`.
 
 ## 5. Other rows
 

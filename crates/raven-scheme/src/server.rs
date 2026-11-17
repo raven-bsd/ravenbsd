@@ -134,6 +134,8 @@ pub struct Ctx {
     pub response_len: u64,
     /// Caller credentials attached by the kernel.
     pub credentials: Credentials,
+    /// Trace id stamped on the request by the kernel; zero means "not traced" (`R-OBS-6`).
+    pub trace_id: u64,
 }
 
 /// A scheme server handler.
@@ -469,6 +471,7 @@ impl<K: Kernel> Server<K> {
                 packet.packet.groups,
                 packet.packet.group_count,
             ),
+            trace_id: packet.packet.trace_id,
         };
         match self.handle(packet.packet, handler, &ctx) {
             Ok(()) => Ok(()),
