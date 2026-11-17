@@ -550,6 +550,33 @@ macro_rules! lda_binary {
 }
 
 #[cfg(target_arch = "aarch64")]
+macro_rules! lda_sincos {
+    ($name:ident, $inner:path) => {
+        /// `long double` sincos entry point: the value in `q0`, the two output pointers in
+        /// `x0`/`x1`; nothing is returned.
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #48",
+                "str x30, [sp, #32]",
+                "str q0, [sp, #16]",
+                "add x2, sp, #16",
+                "bl {inner}",
+                "ldr x30, [sp, #32]",
+                "add sp, sp, #48",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
 macro_rules! lda_scalbn_i32 {
     ($name:ident, $inner:path) => {
         /// `long double` scaling entry point with a C `int` exponent.

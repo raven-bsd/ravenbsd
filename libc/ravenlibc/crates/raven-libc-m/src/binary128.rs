@@ -398,7 +398,8 @@ impl LongDouble128 {
         if self.is_zero() {
             return Self::one();
         }
-        let k = self.div(Self::ln2_hi()).round();
+        let ln2 = Self::ln2_hi().add(Self::ln2_lo());
+        let k = self.div(ln2).round();
         let Some(k) = k.to_i64() else {
             return if self.sign_bit() {
                 Self::zero(false)
@@ -413,8 +414,12 @@ impl LongDouble128 {
             return Self::zero(false);
         }
         let kf = Self::from_i64(k);
-        // r = x - k*ln2, split so the multiplication does not lose the low bits of ln2.
-        let r = self.sub(kf.mul(Self::ln2_hi())).sub(kf.mul(Self::ln2_lo()));
+        // r = x - k*ln2 with the 40-bit parts (exact products) and the residual; the series
+        // stays accurate even if the rounded quotient puts |r| a little above ln2/2.
+        let r = self
+            .sub(kf.mul(Self::ln2_1()))
+            .sub(kf.mul(Self::ln2_2()))
+            .sub(kf.mul(Self::ln2_3()));
         let scale = i32::try_from(k).unwrap_or(0);
         Self::exp_series(r).scalbn(scale)
     }
@@ -531,6 +536,28 @@ impl LongDouble128 {
         }
     }
 
+    /// The first 40-bit part of `ln 2`; `k*LN2_1` is exact for every `|k| < 2^73`, which is
+    /// what keeps `expl`'s range reduction accurate for large arguments.
+    pub const fn ln2_1() -> Self {
+        Self {
+            bits: 0x3ffe_62e4_2fef_a400_0000_0000_0000_0000,
+        }
+    }
+
+    /// The second 40-bit part of `ln 2`.
+    pub const fn ln2_2() -> Self {
+        Self {
+            bits: 0xbfd4_8432_a1b0_e200_0000_0000_0000_0000,
+        }
+    }
+
+    /// The residual `ln 2 - LN2_1 - LN2_2`.
+    pub const fn ln2_3() -> Self {
+        Self {
+            bits: 0xbfaa_8cff_81a1_2a17_e197_9b31_ace9_3a4f,
+        }
+    }
+
     /// `ln 10`, rounded to binary128 (0.5 ULP).
     pub const fn ln10() -> Self {
         Self {
@@ -538,10 +565,572 @@ impl LongDouble128 {
         }
     }
 
-    /// `sum_{n=0..27} r^n / n!`, evaluated backwards for stability.
+    /// `pi/2`, split into seven 50-bit parts for the trigonometric reduction.
+    ///
+    /// Every part keeps at most 50 significant bits, so `n*part` is exact for every `|n| < 2^63`
+    /// (the whole quadrant-index range): 50 + 63 = 113 bits. The seven parts sum to `pi/2` with
+    /// an absolute residual below `2^-360` (500-digit decimal pi, round-to-nearest-even), so the
+    /// reduction keeps its relative accuracy next to the zeros of `sin`/`cos` as well.
+    pub const fn pio2_1() -> Self {
+        Self {
+            bits: 0x3fff_921f_b544_42d1_8000_0000_0000_0000,
+        }
+    }
+
+    /// The second 50-bit part of `pi/2`.
+    pub const fn pio2_2() -> Self {
+        Self {
+            bits: 0x3fc9_1a62_6331_45c0_8000_0000_0000_0000,
+        }
+    }
+
+    /// The third 50-bit part of `pi/2`.
+    pub const fn pio2_3() -> Self {
+        Self {
+            bits: 0xbf95_1f19_76b7_ed8f_8000_0000_0000_0000,
+        }
+    }
+
+    /// The fourth 50-bit part of `pi/2`.
+    pub const fn pio2_4() -> Self {
+        Self {
+            bits: 0xbf62_dd66_0ce2_ff7d_0000_0000_0000_0000,
+        }
+    }
+
+    /// The fifth 50-bit part of `pi/2`.
+    pub const fn pio2_5() -> Self {
+        Self {
+            bits: 0xbf2e_0567_13b1_9376_8000_0000_0000_0000,
+        }
+    }
+
+    /// The sixth 50-bit part of `pi/2`.
+    pub const fn pio2_6() -> Self {
+        Self {
+            bits: 0xbefb_d6be_f0ce_397f_8000_0000_0000_0000,
+        }
+    }
+
+    /// The seventh 50-bit part of `pi/2` (what remains is below `2^-360`).
+    pub const fn pio2_7() -> Self {
+        Self {
+            bits: 0x3ec7_bbdf_2a33_679a_8000_0000_0000_0000,
+        }
+    }
+
+    /// `pi/2` rounded to binary128.
+    pub const fn pio2_hi() -> Self {
+        Self {
+            bits: 0x3fff_921f_b544_42d1_8469_898c_c517_01b8,
+        }
+    }
+
+    /// The residual `pi/2 - PIO2_HI`.
+    pub const fn pio2_lo() -> Self {
+        Self {
+            bits: 0x3f8c_cd12_9024_e088_a67c_c740_20bb_ea64,
+        }
+    }
+
+    /// `pi` rounded to binary128.
+    pub const fn pi_hi() -> Self {
+        Self {
+            bits: 0x4000_921f_b544_42d1_8469_898c_c517_01b8,
+        }
+    }
+
+    /// The residual `pi - PI_HI`.
+    pub const fn pi_lo() -> Self {
+        Self {
+            bits: 0x3f8d_cd12_9024_e088_a67c_c740_20bb_ea64,
+        }
+    }
+
+    /// `sin x`, in radians.
+    ///
+    /// The reduction is `n = round(x/(pi/2))` and `r = x - n*(PIO2_1 + ... + PIO2_7)`, with
+    /// `|r| <= pi/4`. Every part keeps 50 significant bits, so each `n*PIO2_i` is exact for the
+    /// whole `|n| < 2^63` index range, and each subtraction is a Sterbenz cancellation; the
+    /// seven parts carry `pi/2` to `2^-360`, so `r` keeps the input's bits even next to a zero of
+    /// `sin` at a large quadrant index. The series truncates after `r^33/33!`, whose first
+    /// omitted term is below `2^-128` for `|r| <= pi/4`.
+    ///
+    /// Accuracy: at most 4 ULP (measured maxima: `sin` 3, `cos` 3, `tan` 4) for every `|x|`
+    /// whose quadrant index fits an `i64` (`|x| < 2^63 * pi/2`, about `1.45e19`). Beyond that,
+    /// and for `+-inf`, `sin`/`cos`/`tan` return NaN: no Payne-Hanek reduction is implemented.
+    pub fn sin(self) -> Self {
+        let (sine, _) = self.sincos();
+        sine
+    }
+
+    /// `cos x`, in radians; the same reduction and bound as [`Self::sin`].
+    pub fn cos(self) -> Self {
+        let (_, cosine) = self.sincos();
+        cosine
+    }
+
+    /// `sin x` and `cos x` from one reduction.
+    pub fn sincos(self) -> (Self, Self) {
+        if self.is_nan() || self.is_infinite() {
+            return (Self::nan(), Self::nan());
+        }
+        if self.is_zero() {
+            return (self, Self::one());
+        }
+        let Some((quadrant, r)) = self.reduce_half_pi() else {
+            return (Self::nan(), Self::nan());
+        };
+        let sine = Self::sin_series(r);
+        let cosine = Self::cos_series(r);
+        match quadrant {
+            0 => (sine, cosine),
+            1 => (cosine, Self::zero(false).sub(sine)),
+            2 => (Self::zero(false).sub(sine), Self::zero(false).sub(cosine)),
+            _ => (Self::zero(false).sub(cosine), sine),
+        }
+    }
+
+    /// `tan x = sin x / cos x`; accurate wherever `cos` is not zero, which the `pi/4` bound
+    /// on the reduced argument guarantees cannot happen exactly.
+    pub fn tan(self) -> Self {
+        let (sine, cosine) = self.sincos();
+        sine.div(cosine)
+    }
+
+    /// `atan x`.
+    ///
+    /// `|x| > 1` uses `pi/2 - atan(1/x)`. The remaining `|v| <= 1` is halved three times with
+    /// `atan(v) = 2 atan(v/(1 + sqrt(1 + v^2)))`, which brings `|v|` below `tan(pi/32)`, and
+    /// the alternating Taylor series runs to `v^61/61` (first omitted term below `2^-200`).
+    /// Values at or below `2^-4` skip the halving (the series converges there without help).
+    pub fn atan(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        if self.is_zero() {
+            return self;
+        }
+        if self.is_infinite() {
+            return Self::pio2_hi().add(Self::pio2_lo()).copysign(self);
+        }
+        let negative = self.sign_bit();
+        let magnitude = self.abs();
+        let (value, reciprocal) =
+            if magnitude.total_cmp(Self::one()) == core::cmp::Ordering::Greater {
+                (Self::one().div(magnitude), true)
+            } else {
+                (magnitude, false)
+            };
+        let angle = Self::atan_kernel(value);
+        let result = if reciprocal {
+            Self::pio2_hi().add(Self::pio2_lo()).sub(angle)
+        } else {
+            angle
+        };
+        if negative {
+            Self::zero(false).sub(result)
+        } else {
+            result
+        }
+    }
+
+    /// `atan2(y, x)` with `self = y` and the quadrant from the signs of both arguments.
+    pub fn atan2(self, x: Self) -> Self {
+        if self.is_nan() || x.is_nan() {
+            return Self::nan();
+        }
+        let pi_value = Self::pi_hi().add(Self::pi_lo());
+        if self.is_zero() {
+            return if x.sign_bit() {
+                pi_value.copysign(self)
+            } else {
+                self
+            };
+        }
+        if x.is_zero() {
+            return Self::pio2_hi().add(Self::pio2_lo()).copysign(self);
+        }
+        if self.is_infinite() && x.is_infinite() {
+            let magnitude = if x.sign_bit() {
+                pi_value.mul(Self::from_f64(0.75))
+            } else {
+                pi_value.mul(Self::from_f64(0.25))
+            };
+            return magnitude.copysign(self);
+        }
+        let base = self.div(x).atan();
+        if x.sign_bit() {
+            if self.sign_bit() {
+                base.sub(pi_value)
+            } else {
+                base.add(pi_value)
+            }
+        } else {
+            base
+        }
+    }
+
+    /// `asin x` for `|x| <= 1`, as `atan2(x, sqrt((1-x)*(1+x)))`.
+    pub fn asin(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        let magnitude = self.abs();
+        if magnitude.total_cmp(Self::one()) == core::cmp::Ordering::Greater {
+            return Self::nan();
+        }
+        if magnitude.bits == Self::one().bits {
+            return Self::pio2_hi().add(Self::pio2_lo()).copysign(self);
+        }
+        if self.is_zero() {
+            return self;
+        }
+        let root = Self::one().sub(self).mul(Self::one().add(self)).sqrt();
+        self.atan2(root)
+    }
+
+    /// `acos x` for `|x| <= 1`, as `atan2(sqrt((1-x)*(1+x)), x)`; the ratio form keeps the
+    /// relative accuracy next to `x = 1` that `pi/2 - asin x` would lose.
+    pub fn acos(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        let magnitude = self.abs();
+        if magnitude.total_cmp(Self::one()) == core::cmp::Ordering::Greater {
+            return Self::nan();
+        }
+        if magnitude.bits == Self::one().bits {
+            return if self.sign_bit() {
+                Self::pi_hi().add(Self::pi_lo())
+            } else {
+                Self::zero(false)
+            };
+        }
+        let root = Self::one().sub(self).mul(Self::one().add(self)).sqrt();
+        root.atan2(self)
+    }
+
+    /// `sinh x`.
+    ///
+    /// `|x| < 1` uses the Maclaurin series (the first omitted term is below `2^-160` at
+    /// `|x| = 1`). Above that, `exp(x - ln2) - exp(-x - ln2)` halves the argument inside
+    /// `exp`, so both the accuracy and the overflow threshold are `sinh`'s own; the
+    /// subtraction `x - ln2` is carried as an exact two-sum pair and re-applied through
+    /// `exp(hi)*(1 + lo)`, because a plain subtraction would round at `ulp(x)` and lose
+    /// `log2(x)` bits of `ln 2`.
+    pub fn sinh(self) -> Self {
+        if self.is_nan() || self.is_infinite() || self.is_zero() {
+            return self;
+        }
+        let negative = self.sign_bit();
+        let magnitude = self.abs();
+        let value = if magnitude.total_cmp(Self::one()) == core::cmp::Ordering::Less {
+            Self::sinh_series(magnitude)
+        } else {
+            let half_exp = Self::exp_shifted(magnitude);
+            let ln2 = Self::ln2_hi().add(Self::ln2_lo());
+            half_exp.sub(Self::zero(false).sub(magnitude).sub(ln2).exp())
+        };
+        if negative {
+            Self::zero(false).sub(value)
+        } else {
+            value
+        }
+    }
+
+    /// `cosh x`; the same series and shifted-exponential split as [`Self::sinh`].
+    pub fn cosh(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        if self.is_infinite() {
+            return Self::infinity(false);
+        }
+        if self.is_zero() {
+            return Self::one();
+        }
+        let magnitude = self.abs();
+        if magnitude.total_cmp(Self::one()) == core::cmp::Ordering::Less {
+            Self::cosh_series(magnitude)
+        } else {
+            let half_exp = Self::exp_shifted(magnitude);
+            let ln2 = Self::ln2_hi().add(Self::ln2_lo());
+            half_exp.add(Self::zero(false).sub(magnitude).sub(ln2).exp())
+        }
+    }
+
+    /// `tanh x`: the series ratio below 1 and `1 - 2/(exp(2x) + 1)` above it. The subtraction
+    /// form avoids the cancellation in `(exp(2x) - 1)/(exp(2x) + 1)` for large `x`.
+    pub fn tanh(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        if self.is_infinite() {
+            return Self::one().copysign(self);
+        }
+        if self.is_zero() {
+            return self;
+        }
+        let negative = self.sign_bit();
+        let magnitude = self.abs();
+        let value = if magnitude.total_cmp(Self::one()) == core::cmp::Ordering::Less {
+            Self::sinh_series(magnitude).div(Self::cosh_series(magnitude))
+        } else {
+            let exponential = magnitude.add(magnitude).exp();
+            Self::one().sub(Self::from_f64(2.0).div(exponential.add(Self::one())))
+        };
+        if negative {
+            Self::zero(false).sub(value)
+        } else {
+            value
+        }
+    }
+
+    /// `asinh x`.
+    ///
+    /// `|x| <= 0.5` uses the Maclaurin series (64 terms; the first omitted term is below
+    /// `2^-128`), `|x| >= 2^8000` uses `ln(2x)` (the correction is below `2^-16000`), and the
+    /// rest uses `ln(x + sqrt(x^2 + 1))`.
+    pub fn asinh(self) -> Self {
+        if self.is_nan() || self.is_infinite() || self.is_zero() {
+            return self;
+        }
+        let negative = self.sign_bit();
+        let magnitude = self.abs();
+        let value = if magnitude.total_cmp(Self::from_f64(0.5)) != core::cmp::Ordering::Greater {
+            Self::asinh_series(magnitude)
+        } else if magnitude.ilogb() > 8000 {
+            magnitude.add(magnitude).ln()
+        } else {
+            magnitude
+                .add(magnitude.mul(magnitude).add(Self::one()).sqrt())
+                .ln()
+        };
+        if negative {
+            Self::zero(false).sub(value)
+        } else {
+            value
+        }
+    }
+
+    /// `acosh x`, as `2 ln(sqrt((x+1)/2) + sqrt((x-1)/2))`; the half-angle form keeps the
+    /// accuracy next to `x = 1` that `ln(x + sqrt(x^2 - 1))` would lose.
+    pub fn acosh(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        if self.total_cmp(Self::one()) == core::cmp::Ordering::Less {
+            return Self::nan();
+        }
+        if self.bits == Self::one().bits {
+            return Self::zero(false);
+        }
+        if self.is_infinite() {
+            return self;
+        }
+        let half = Self::from_f64(0.5);
+        let lower = self.sub(Self::one()).mul(half).sqrt();
+        let upper = self.add(Self::one()).mul(half).sqrt();
+        lower.add(upper).ln().mul(Self::from_f64(2.0))
+    }
+
+    /// `atanh x`.
+    ///
+    /// `|x| <= 0.125` uses the `atanh` series (26 odd terms, first omitted below `2^-158`);
+    /// above that, `0.5 ln((1+x)/(1-x))`.
+    pub fn atanh(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        let magnitude = self.abs();
+        match magnitude.total_cmp(Self::one()) {
+            core::cmp::Ordering::Greater => return Self::nan(),
+            core::cmp::Ordering::Equal => {
+                return Self::infinity(true).copysign(self);
+            }
+            core::cmp::Ordering::Less => {}
+        }
+        if self.is_zero() {
+            return self;
+        }
+        let value = if magnitude.total_cmp(Self::from_f64(0.125)) != core::cmp::Ordering::Greater {
+            Self::atanh_series(magnitude).mul(Self::from_f64(0.5))
+        } else {
+            Self::one()
+                .add(magnitude)
+                .div(Self::one().sub(magnitude))
+                .ln()
+                .mul(Self::from_f64(0.5))
+        };
+        if self.sign_bit() {
+            Self::zero(false).sub(value)
+        } else {
+            value
+        }
+    }
+
+    /// `(quadrant, r)` with `x = quadrant*(pi/2) + r` and `|r| <= pi/4`, or `None` when the
+    /// quadrant index does not fit an `i64`.
+    fn reduce_half_pi(self) -> Option<(i64, Self)> {
+        let quotient = self.div(Self::pio2_hi()).round();
+        let n = quotient.to_i64()?;
+        let nf = Self::from_i64(n);
+        let r = self
+            .sub(nf.mul(Self::pio2_1()))
+            .sub(nf.mul(Self::pio2_2()))
+            .sub(nf.mul(Self::pio2_3()))
+            .sub(nf.mul(Self::pio2_4()))
+            .sub(nf.mul(Self::pio2_5()))
+            .sub(nf.mul(Self::pio2_6()))
+            .sub(nf.mul(Self::pio2_7()));
+        Some((n & 3, r))
+    }
+
+    /// `atan` on `|v| <= 1`; the halving only runs when the series would need more terms.
+    fn atan_kernel(value: Self) -> Self {
+        let mut v = value;
+        let mut scale = 1i32;
+        if v.total_cmp(Self::from_f64(0.0625)) == core::cmp::Ordering::Greater {
+            for _ in 0..3 {
+                v = v.div(Self::one().add(Self::one().add(v.mul(v)).sqrt()));
+                scale *= 2;
+            }
+        }
+        let v2 = v.mul(v);
+        let mut term = v;
+        let mut sum = v;
+        let mut index: i64 = 3;
+        while index <= 61 {
+            term = term.mul(v2);
+            let contribution = term.div(Self::from_i64(index));
+            sum = if (index / 2) % 2 == 1 {
+                sum.sub(contribution)
+            } else {
+                sum.add(contribution)
+            };
+            index += 2;
+        }
+        let mut result = sum;
+        let mut step = 1i32;
+        while step < scale {
+            result = result.add(result);
+            step *= 2;
+        }
+        result
+    }
+
+    /// `sum r^(2n+1)/(2n+1)!` up to `n = 16`; the first omitted term is below `2^-128` at
+    /// `|r| = pi/4`.
+    fn sin_series(r: Self) -> Self {
+        let r2 = r.mul(r);
+        let mut term = r;
+        let mut sum = r;
+        let mut index: i64 = 3;
+        while index <= 33 {
+            term = term.mul(r2).div(Self::from_i64(index * (index - 1)));
+            sum = if (index / 2) % 2 == 1 {
+                sum.sub(term)
+            } else {
+                sum.add(term)
+            };
+            index += 2;
+        }
+        sum
+    }
+
+    /// `sum r^(2n)/(2n)!` up to `n = 17`.
+    fn cos_series(r: Self) -> Self {
+        let r2 = r.mul(r);
+        let mut term = Self::one();
+        let mut sum = Self::one();
+        let mut index: i64 = 2;
+        while index <= 34 {
+            term = term.mul(r2).div(Self::from_i64(index * (index - 1)));
+            sum = if (index / 2) % 2 == 1 {
+                sum.sub(term)
+            } else {
+                sum.add(term)
+            };
+            index += 2;
+        }
+        sum
+    }
+
+    /// `sum x^(2n+1)/(2n+1)!` up to `n = 22`.
+    fn sinh_series(x: Self) -> Self {
+        let x2 = x.mul(x);
+        let mut term = x;
+        let mut sum = x;
+        let mut n: i64 = 1;
+        while n <= 22 {
+            term = term.mul(x2).div(Self::from_i64((2 * n) * (2 * n + 1)));
+            sum = sum.add(term);
+            n += 1;
+        }
+        sum
+    }
+
+    /// `sum x^(2n)/(2n)!` up to `n = 22`.
+    fn cosh_series(x: Self) -> Self {
+        let x2 = x.mul(x);
+        let mut term = Self::one();
+        let mut sum = Self::one();
+        let mut n: i64 = 1;
+        while n <= 22 {
+            term = term.mul(x2).div(Self::from_i64((2 * n - 1) * (2 * n)));
+            sum = sum.add(term);
+            n += 1;
+        }
+        sum
+    }
+
+    /// `exp(x - ln2)` for `x >= 1`, accurate even though a plain `x - ln2` rounds at
+    /// `ulp(x)`: the difference is carried as the exact pair `(shift, tail)` from
+    /// [`Self::two_sum`] and the tail is applied as `exp(shift)*(1 + tail)`.
+    fn exp_shifted(x: Self) -> Self {
+        let (first, first_tail) = Self::two_sum(x, Self::zero(false).sub(Self::ln2_hi()));
+        let (shift, tail) = Self::two_sum(first, first_tail.sub(Self::ln2_lo()));
+        let exponential = shift.exp();
+        exponential.mul(Self::one().add(tail))
+    }
+
+    /// Knuth's two-sum: `(s, e)` with `s = round(a + b)` and `s + e = a + b` exactly.
+    fn two_sum(a: Self, b: Self) -> (Self, Self) {
+        let s = a.add(b);
+        let b_virtual = s.sub(a);
+        let a_virtual = s.sub(b_virtual);
+        let b_round = b.sub(b_virtual);
+        let a_round = a.sub(a_virtual);
+        (s, a_round.add(b_round))
+    }
+
+    /// `x - x^3/6 + 3x^5/40 - ...`, 64 terms; the ratio test keeps the truncation below
+    /// `2^-128` for `|x| <= 0.5`.
+    fn asinh_series(x: Self) -> Self {
+        let x2 = x.mul(x);
+        let mut term = x;
+        let mut sum = x;
+        let mut n: i64 = 1;
+        while n <= 64 {
+            let odd = 2 * n - 1;
+            term = Self::zero(false).sub(
+                term.mul(x2)
+                    .mul(Self::from_i64(odd * odd))
+                    .div(Self::from_i64(2 * n * (2 * n + 1))),
+            );
+            sum = sum.add(term);
+            n += 1;
+        }
+        sum
+    }
+
+    /// `sum_{n=0..30} r^n / n!`, evaluated backwards for stability; the first omitted term is
+    /// below `2^-128` for `|r| <= 0.7` (a rounded quotient can leave `|r|` a little above
+    /// `ln2/2`).
     fn exp_series(r: Self) -> Self {
         let mut acc = Self::one();
-        let mut n: i64 = 27;
+        let mut n: i64 = 30;
         while n >= 1 {
             acc = Self::one().add(acc.mul(r).div(Self::from_i64(n)));
             n = n.saturating_sub(1);

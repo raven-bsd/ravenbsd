@@ -782,3 +782,310 @@ fn cbrt_and_hypot_match_the_f64_oracle_over_a_deterministic_sweep() {
         checked = checked.saturating_add(1);
     }
 }
+
+#[test]
+fn trig_edges_domain_and_sincos_consistency() {
+    let zero = LongDouble128::from_f64(0.0);
+    let negative_zero = LongDouble128::from_f64(-0.0);
+    // sin(±0) = ±0, cos(±0) = 1, tan(±0) = ±0.
+    assert_eq!(zero.sin().to_bits(), 0);
+    assert_eq!(negative_zero.sin().to_bits(), SIGN);
+    assert_eq!(zero.cos().to_bits(), LongDouble128::one().to_bits());
+    assert_eq!(
+        negative_zero.cos().to_bits(),
+        LongDouble128::one().to_bits()
+    );
+    assert_eq!(zero.tan().to_bits(), 0);
+    assert_eq!(negative_zero.tan().to_bits(), SIGN);
+    // NaN and the infinite domain errors.
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let x = LongDouble128::from_f64(value);
+        assert!(x.sin().is_nan(), "sin({value})");
+        assert!(x.cos().is_nan(), "cos({value})");
+        assert!(x.tan().is_nan(), "tan({value})");
+        assert!(x.asin().is_nan(), "asin({value})");
+        assert!(x.acos().is_nan(), "acos({value})");
+        assert!(x.atanh().is_nan(), "atanh({value})");
+        let (sine, cosine) = x.sincos();
+        assert!(sine.is_nan() && cosine.is_nan(), "sincos({value})");
+    }
+    // atan(±inf) = ±π/2.
+    let half_pi = LongDouble128::pio2_hi().add(LongDouble128::pio2_lo());
+    let atan_inf = LongDouble128::from_f64(f64::INFINITY).atan();
+    assert_eq!(atan_inf.to_bits(), half_pi.to_bits());
+    assert_eq!(
+        LongDouble128::from_f64(f64::NEG_INFINITY).atan().to_bits(),
+        half_pi.to_bits() | SIGN
+    );
+    // Reduction-domain edge: the quadrant index fits an i64 below ~1.45e19.
+    let inside = LongDouble128::from_f64(2f64.powi(62));
+    let sine = inside.sin();
+    assert!(sine.is_finite() && sine.abs().to_f64() <= 1.0);
+    assert!(inside.cos().is_finite());
+    let outside = LongDouble128::from_f64(2.0e19);
+    assert!(outside.sin().is_nan());
+    assert!(outside.cos().is_nan());
+    assert!(outside.tan().is_nan());
+    // Inverse-trig domains.
+    assert!(LongDouble128::from_f64(1.5).asin().is_nan());
+    assert!(LongDouble128::from_f64(-1.5).acos().is_nan());
+    assert_eq!(
+        LongDouble128::from_f64(1.0).asin().to_bits(),
+        half_pi.to_bits()
+    );
+    assert_eq!(LongDouble128::from_f64(1.0).acos().to_bits(), 0);
+    assert!(
+        f64_ulp(
+            LongDouble128::from_f64(-1.0).acos().to_f64(),
+            core::f64::consts::PI
+        ) <= 1
+    );
+    // atan2 edge table (C23 F.10.1.4): zeros, infinities and the quadrants.
+    let one = LongDouble128::one();
+    assert_eq!(zero.atan2(one).to_bits(), 0);
+    assert_eq!(negative_zero.atan2(one).to_bits(), SIGN);
+    assert!(
+        f64_ulp(
+            zero.atan2(LongDouble128::from_f64(-1.0)).to_f64(),
+            core::f64::consts::PI
+        ) <= 1
+    );
+    assert!(
+        f64_ulp(
+            negative_zero.atan2(LongDouble128::from_f64(-1.0)).to_f64(),
+            -core::f64::consts::PI
+        ) <= 1
+    );
+    assert_eq!(one.atan2(zero).to_bits(), half_pi.to_bits());
+    assert_eq!(
+        LongDouble128::zero(false)
+            .sub(LongDouble128::one())
+            .atan2(zero)
+            .to_bits(),
+        half_pi.to_bits() | SIGN
+    );
+    assert!(
+        f64_ulp(
+            LongDouble128::from_f64(f64::INFINITY)
+                .atan2(LongDouble128::from_f64(f64::NEG_INFINITY))
+                .to_f64(),
+            3.0 * core::f64::consts::FRAC_PI_4
+        ) <= 2
+    );
+    // sincos agrees with the separate calls and the Pythagorean identity holds.
+    for &value in &[0.3f64, -1.0, 2.5, 12.0, 1.0e6, 4.0e18] {
+        let x = LongDouble128::from_f64(value);
+        let (sine, cosine) = x.sincos();
+        assert_eq!(sine.to_bits(), x.sin().to_bits(), "sincos sin({value})");
+        assert_eq!(cosine.to_bits(), x.cos().to_bits(), "sincos cos({value})");
+        assert_eq!(
+            x.tan().to_bits(),
+            sine.div(cosine).to_bits(),
+            "tan({value})"
+        );
+        let norm = sine.mul(sine).add(cosine.mul(cosine));
+        assert!(
+            norm.to_bits().abs_diff(LongDouble128::one().to_bits()) <= 8,
+            "sin^2+cos^2 at {value}"
+        );
+    }
+}
+
+#[test]
+fn hyperbolic_edges_and_identities() {
+    let zero = LongDouble128::from_f64(0.0);
+    let negative_zero = LongDouble128::from_f64(-0.0);
+    assert_eq!(zero.sinh().to_bits(), 0);
+    assert_eq!(negative_zero.sinh().to_bits(), SIGN);
+    assert_eq!(zero.cosh().to_bits(), LongDouble128::one().to_bits());
+    assert_eq!(
+        negative_zero.cosh().to_bits(),
+        LongDouble128::one().to_bits()
+    );
+    assert_eq!(zero.tanh().to_bits(), 0);
+    assert_eq!(negative_zero.tanh().to_bits(), SIGN);
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let x = LongDouble128::from_f64(value);
+        assert!(x.sinh().is_nan() || x.sinh().is_infinite());
+        assert!(x.cosh().is_infinite() || x.cosh().is_nan());
+        assert!(x.asinh().is_infinite() || x.asinh().is_nan());
+        assert!(x.acosh().is_nan() || x.acosh().is_infinite());
+    }
+    assert_eq!(
+        LongDouble128::from_f64(f64::INFINITY).sinh().to_f64(),
+        f64::INFINITY
+    );
+    assert_eq!(
+        LongDouble128::from_f64(f64::NEG_INFINITY).sinh().to_f64(),
+        f64::NEG_INFINITY
+    );
+    assert_eq!(
+        LongDouble128::from_f64(f64::NEG_INFINITY).cosh().to_f64(),
+        f64::INFINITY
+    );
+    assert_eq!(LongDouble128::from_f64(f64::INFINITY).tanh().to_f64(), 1.0);
+    assert_eq!(
+        LongDouble128::from_f64(f64::NEG_INFINITY).tanh().to_f64(),
+        -1.0
+    );
+    // The true sinh/cosh overflow edge: exp overflows first, the halves must survive.
+    let large = LongDouble128::from_f64(11357.0);
+    assert!(large.exp().is_infinite(), "exp already overflows here");
+    assert!(large.sinh().is_finite(), "sinh(11357) must still be finite");
+    assert!(large.cosh().is_finite(), "cosh(11357) must still be finite");
+    assert!(LongDouble128::from_f64(12000.0).sinh().is_infinite());
+    assert_eq!(LongDouble128::from_f64(12000.0).tanh().to_f64(), 1.0);
+    // Inverse-hyperbolic domains.
+    assert_eq!(LongDouble128::from_f64(1.0).acosh().to_bits(), 0);
+    assert!(LongDouble128::from_f64(0.5).acosh().is_nan());
+    assert!(LongDouble128::from_f64(1.25).atanh().is_nan());
+    assert_eq!(LongDouble128::from_f64(1.0).atanh().to_f64(), f64::INFINITY);
+    assert_eq!(
+        LongDouble128::from_f64(-1.0).atanh().to_f64(),
+        f64::NEG_INFINITY
+    );
+    // asinh/acosh stay finite far outside the f64 range.
+    let huge = LongDouble128::from_f64(1.0e300);
+    assert!(huge.asinh().is_finite());
+    assert!(huge.acosh().is_finite());
+    assert!(f64_ulp(huge.asinh().to_f64(), 1.0e300f64.asinh()) <= 1);
+    // cosh^2 - sinh^2 = 1 at small arguments (larger ones lose the 1 to cancellation in the
+    // identity itself, not in the kernels).
+    for &value in &[0.25f64, 1.0] {
+        let x = LongDouble128::from_f64(value);
+        let difference = x.cosh().mul(x.cosh()).sub(x.sinh().mul(x.sinh()));
+        assert!(
+            difference
+                .to_bits()
+                .abs_diff(LongDouble128::one().to_bits())
+                <= 16,
+            "cosh^2-sinh^2 at {value}"
+        );
+    }
+}
+
+#[test]
+fn trig_and_inverse_match_the_f64_oracle_over_a_deterministic_sweep() {
+    let mut state: u64 = 0x0123_4567_89ab_cdef;
+    let mut checked = 0u32;
+    while checked < 2_000 {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let raw = f64::from_bits(state);
+        if !raw.is_finite() || raw == 0.0 {
+            continue;
+        }
+        // Moderate arguments: the binary128 result must round to the same f64.
+        let x = raw % 1.0e6;
+        let value = LongDouble128::from_f64(x);
+        assert!(f64_ulp(value.sin().to_f64(), x.sin()) <= 2, "sin({x})");
+        assert!(f64_ulp(value.cos().to_f64(), x.cos()) <= 2, "cos({x})");
+        if x.cos().abs() > 1e-4 {
+            assert!(f64_ulp(value.tan().to_f64(), x.tan()) <= 4, "tan({x})");
+        }
+        // Large arguments exercise the four-part reduction.
+        let large = raw % 4.0e18;
+        let big = LongDouble128::from_f64(large);
+        assert!(
+            f64_ulp(big.sin().to_f64(), large.sin()) <= 2,
+            "sin({large})"
+        );
+        assert!(
+            f64_ulp(big.cos().to_f64(), large.cos()) <= 2,
+            "cos({large})"
+        );
+        // atan over the whole line, atan2 in the plane.
+        assert!(f64_ulp(value.atan().to_f64(), x.atan()) <= 2, "atan({x})");
+        assert!(
+            f64_ulp(big.atan().to_f64(), large.atan()) <= 2,
+            "atan({large})"
+        );
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let other = f64::from_bits(state) % 1.0e6;
+        if other.is_finite() && other != 0.0 {
+            assert!(
+                f64_ulp(
+                    LongDouble128::from_f64(x)
+                        .atan2(LongDouble128::from_f64(other))
+                        .to_f64(),
+                    x.atan2(other)
+                ) <= 2,
+                "atan2({x}, {other})"
+            );
+        }
+        // asin/acos on [-1, 1].
+        let unit = x % 1.0;
+        let unit_value = LongDouble128::from_f64(unit);
+        assert!(
+            f64_ulp(unit_value.asin().to_f64(), unit.asin()) <= 2,
+            "asin({unit})"
+        );
+        assert!(
+            f64_ulp(unit_value.acos().to_f64(), unit.acos()) <= 2,
+            "acos({unit})"
+        );
+        checked = checked.saturating_add(1);
+    }
+}
+
+#[test]
+fn hyperbolic_match_the_f64_oracle_over_a_deterministic_sweep() {
+    let mut state: u64 = 0xdead_beef_0bad_f00d;
+    let mut checked = 0u32;
+    while checked < 2_000 {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let raw = f64::from_bits(state);
+        if !raw.is_finite() || raw == 0.0 {
+            continue;
+        }
+        let x = raw % 700.0;
+        let value = LongDouble128::from_f64(x);
+        assert!(f64_ulp(value.sinh().to_f64(), x.sinh()) <= 4, "sinh({x})");
+        assert!(f64_ulp(value.cosh().to_f64(), x.cosh()) <= 4, "cosh({x})");
+        assert!(f64_ulp(value.tanh().to_f64(), x.tanh()) <= 4, "tanh({x})");
+        // asinh everywhere, acosh on [1, inf), atanh on (-1, 1). The oracle is the composed
+        // `f64` identity rather than `f64::asinh`/`acosh`/`atanh`, whose last-place accuracy in
+        // the running toolchain is not reliable enough for a ULP assertion.
+        let wide = raw % 1.0e6;
+        assert!(
+            f64_ulp(LongDouble128::from_f64(wide).asinh().to_f64(), wide.asinh()) <= 4,
+            "asinh({wide})"
+        );
+        let above = 1.0 + (raw % 1.0e6).abs();
+        assert!(
+            f64_ulp(
+                LongDouble128::from_f64(above).acosh().to_f64(),
+                above.acosh()
+            ) <= 4,
+            "acosh({above})"
+        );
+        // `f64::atanh` in the running toolchain loses several ULP near +-1, so the oracle is
+        // the series below 0.125 and the composed logarithm above it.
+        let small = (raw % 0.99) / 1.01;
+        let atanh_oracle = if small.abs() <= 0.125 {
+            let x2 = small * small;
+            let mut term = small;
+            let mut sum = small;
+            for k in 1..=9u32 {
+                term *= x2;
+                sum += term / f64::from(2 * k + 1);
+            }
+            sum
+        } else {
+            0.5 * ((1.0 + small) / (1.0 - small)).ln()
+        };
+        assert!(
+            f64_ulp(
+                LongDouble128::from_f64(small).atanh().to_f64(),
+                atanh_oracle
+            ) <= 4,
+            "atanh({small})"
+        );
+        checked = checked.saturating_add(1);
+    }
+}
