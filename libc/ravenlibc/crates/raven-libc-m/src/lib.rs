@@ -125,8 +125,8 @@ pub use complex::{
 };
 pub use fenv::{
     Femode, FenvT, FexceptT, feclearexcept, fedisableexcept, feenableexcept, fegetenv, fegetexcept,
-    fegetexceptflag, fegetmode, fegetround, feholdexcept, feraiseexcept, fesetenv, fesetexceptflag,
-    fesetmode, fesetround, fetestexcept, feupdateenv,
+    fegetexceptflag, fegetmode, fegetround, feholdexcept, feraiseexcept, fesetenv, fesetexcept,
+    fesetexceptflag, fesetmode, fesetround, fetestexcept, fetestexceptflag, feupdateenv,
 };
 pub use fp::{flt_rounds, raise};
 pub use fp::{

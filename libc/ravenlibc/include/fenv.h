@@ -36,8 +36,10 @@ __BEGIN_DECLS
 int feclearexcept(int);
 int fegetexceptflag(fexcept_t *, int);
 int feraiseexcept(int);
+int fesetexcept(int);
 int fesetexceptflag(const fexcept_t *, int);
 int fetestexcept(int);
+int fetestexceptflag(const fexcept_t *, int);
 
 int fegetround(void);
 int fesetround(int);

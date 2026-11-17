@@ -80,6 +80,30 @@ __BEGIN_DECLS
 #define FP_FAST_FMAL 1
 #endif
 
+/* RavenBSD: addressable predicate declarations. The POSIX gate takes the
+ * address of every interface name; a function-like macro alone leaves the bare
+ * identifier undeclared, so declare the function before the macro. Ordinary
+ * calls keep the type-generic built-ins below. */
+int fpclassify(double);
+int isinf(double);
+int isnan(double);
+int isnormal(double);
+int isfinite(double);
+int signbit(double);
+int isunordered(double, double);
+int isless(double, double);
+int islessequal(double, double);
+int islessgreater(double, double);
+int isgreater(double, double);
+int isgreaterequal(double, double);
+
+/* C23 classification predicates (raven-libc-m c23/c23x). */
+int iscanonical(double);
+int iseqsig(double, double);
+int issignaling(double);
+int issubnormal(double);
+int iszero(double);
+
 /* RavenBSD: compiler built-ins, per doc 14 3.B.2. */
 #define fpclassify(x) __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, (x))
 #define isinf(x)      __builtin_isinf(x)
@@ -355,7 +379,8 @@ double      y1(double);
 double      yn(int, double);
 #endif
 
-#if __BSD_VISIBLE
+/* RavenBSD: the POSIX-2024 census requires the BSD math extras; declare them
+ * unconditionally so the header compiles under strict POSIX/XSI selects. */
 #define HUGE            3.40282346638528859812e+38F
 
 /* RavenBSD: BSD math extras declared from doc 05 (FreeBSD msun headers are
@@ -386,9 +411,7 @@ float       jnf(int, float);
 float       y0f(float);
 float       y1f(float);
 float       ynf(int, float);
-#endif
 
-#if __BSD_VISIBLE
 long double lgammal_r(long double, int*);
 
 void        sincos(double, double*, double*);
@@ -402,7 +425,6 @@ long double exp10l(long double);
 double      pow10(double);
 float       pow10f(float);
 long double pow10l(long double);
-#endif
 
 /* C23 additions (RavenBSD P1b). */
 double      acospi(double);

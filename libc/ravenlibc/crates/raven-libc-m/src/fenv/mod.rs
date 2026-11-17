@@ -27,8 +27,8 @@ mod imp;
 
 pub use imp::{
     Femode, FenvT, FexceptT, feclearexcept, fedisableexcept, feenableexcept, fegetenv, fegetexcept,
-    fegetexceptflag, fegetmode, fegetround, feholdexcept, feraiseexcept, fesetenv, fesetexceptflag,
-    fesetmode, fesetround, fetestexcept, feupdateenv,
+    fegetexceptflag, fegetmode, fegetround, feholdexcept, feraiseexcept, fesetenv, fesetexcept,
+    fesetexceptflag, fesetmode, fesetround, fetestexcept, fetestexceptflag, feupdateenv,
 };
 
 #[cfg(all(
