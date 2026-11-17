@@ -588,11 +588,14 @@ pub extern "C" fn __tls_get_addr(index: *mut usize) -> *mut u8 {
         core::hint::spin_loop();
     }
     // Re-check under the lock: another thread may have grown this DTV.
+    // SAFETY: `tp + 8` is the `dtv` field of the live TCB.
     let dtv = unsafe { *((tp + 8) as *const usize) };
     let mut result = core::ptr::null_mut();
     if dtv != 0 {
+        // SAFETY: word 0 of a published DTV is its module count.
         let count = unsafe { *(dtv as *const usize) };
         if module <= count {
+            // SAFETY: the DTV has `count` entries after word 0.
             let entry = unsafe { *((dtv as *const usize).add(module)) };
             if entry != 0 {
                 result = entry.wrapping_add(offset) as *mut u8;
