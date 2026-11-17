@@ -38,6 +38,12 @@ const AT_PAGESZ: usize = 6;
 const AT_CLKTCK: usize = 17;
 /// `AT_RANDOM`: 16 random bytes.
 const AT_RANDOM: usize = 25;
+/// `AT_PHDR`: the program-header table address (`PG-50` publishes it).
+const AT_PHDR: usize = 3;
+/// `AT_PHENT`: the size of one program-header entry.
+const AT_PHENT: usize = 4;
+/// `AT_PHNUM`: the number of program headers.
+const AT_PHNUM: usize = 5;
 /// `AT_HWCAP`: CPU feature bits (the AArch64/RISC-V IFUNC argument and C67 `getisax`).
 const AT_HWCAP: usize = 16;
 /// `AT_HWCAP2`: the second CPU feature word (C67 `getisax`).
@@ -90,6 +96,12 @@ static SAVED_EXECFN: AtomicUsize = AtomicUsize::new(0);
 static SAVED_HWCAP: AtomicUsize = AtomicUsize::new(0);
 /// `AT_HWCAP2` from the auxiliary vector.
 static SAVED_HWCAP2: AtomicUsize = AtomicUsize::new(0);
+/// `AT_PHDR` from the auxiliary vector (`PG-50`).
+static SAVED_PHDR: AtomicUsize = AtomicUsize::new(0);
+/// `AT_PHENT` from the auxiliary vector (`PG-50`).
+static SAVED_PHENT: AtomicUsize = AtomicUsize::new(0);
+/// `AT_PHNUM` from the auxiliary vector (`PG-50`).
+static SAVED_PHNUM: AtomicUsize = AtomicUsize::new(0);
 /// Presence bits for `AT_EXECFN`, `AT_HWCAP` and `AT_HWCAP2` (a present zero is not absent).
 static SAVED_AUX_MASK: AtomicUsize = AtomicUsize::new(0);
 
@@ -109,6 +121,21 @@ pub(crate) fn clk_tck() -> usize {
 #[allow(dead_code)] // consumed by the random and stack-protector crates
 pub(crate) fn random_pointer() -> usize {
     RANDOM_POINTER.load(Ordering::Relaxed)
+}
+
+/// The program-header table address recorded at start, or 0 (`AT_PHDR`).
+pub(crate) fn phdr() -> usize {
+    SAVED_PHDR.load(Ordering::Relaxed)
+}
+
+/// The size of one program-header entry recorded at start, or 0 (`AT_PHENT`).
+pub(crate) fn phent() -> usize {
+    SAVED_PHENT.load(Ordering::Relaxed)
+}
+
+/// The program-header count recorded at start, or 0 (`AT_PHNUM`).
+pub(crate) fn phnum() -> usize {
+    SAVED_PHNUM.load(Ordering::Relaxed)
 }
 
 /// One saved auxiliary value for the Solaris identity calls (C67 `getexecname`/`getisax`).
@@ -262,6 +289,9 @@ pub unsafe extern "C" fn __raven_libc_start(
     SAVED_EXECFN.store(aux_value(&aux, AT_EXECFN), Ordering::Relaxed);
     SAVED_HWCAP.store(aux_value(&aux, AT_HWCAP), Ordering::Relaxed);
     SAVED_HWCAP2.store(aux_value(&aux, AT_HWCAP2), Ordering::Relaxed);
+    SAVED_PHDR.store(aux_value(&aux, AT_PHDR), Ordering::Relaxed);
+    SAVED_PHENT.store(aux_value(&aux, AT_PHENT), Ordering::Relaxed);
+    SAVED_PHNUM.store(aux_value(&aux, AT_PHNUM), Ordering::Relaxed);
     SAVED_AUX_MASK.store(aux_present, Ordering::Release);
     let mut canary = 0usize;
     if aux_value(&aux, AT_RANDOM) != 0 {
