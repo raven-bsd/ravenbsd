@@ -69,6 +69,8 @@ mod readv_host;
 mod writev_host;
 // C64d's `realpath` path walk and the no-unwinder ABI surface are host-tested even though
 // their C exports are target-only.
+pub(crate) mod complex;
+pub(crate) mod fenv;
 pub(crate) mod ffi;
 #[cfg(target_os = "none")]
 pub(crate) mod fts;
