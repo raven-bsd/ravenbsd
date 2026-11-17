@@ -1,0 +1,7 @@
+Reason: fix missing header for the fixture
+Class: libc
+--- a/a.c
++++ b/a.c
+@@ -1 +1 @@
+-#include <gone.h>
++#include <stdio.h>
