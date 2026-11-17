@@ -3815,6 +3815,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "uucp"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "uudecode"
 version = "0.1.0"
 dependencies = [
@@ -3830,6 +3839,24 @@ version = "0.1.0"
 dependencies = [
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "uustat"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+ "uucp",
+]
+
+[[package]]
+name = "uux"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+ "uucp",
 ]
 
 [[package]]
