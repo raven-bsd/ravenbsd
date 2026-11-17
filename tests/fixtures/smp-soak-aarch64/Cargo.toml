@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-smp-soak-aarch64"
+version = "0.1.0"
+description = "S76c aarch64 four-core user-SMP soak: futex ring, pipe, TLB churn, FP/SIMD, latency."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_smp_soak_aarch64"
+path = "src/lib.rs"
+
+[[bin]]
+name = "smp-soak-aarch64-init"
+path = "src/bin/on.rs"
+
+[[bin]]
+name = "smp-soak-off-aarch64-init"
+path = "src/bin/off.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true
