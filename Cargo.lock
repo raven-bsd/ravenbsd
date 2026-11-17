@@ -2016,7 +2016,10 @@ name = "raven-mesg"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]

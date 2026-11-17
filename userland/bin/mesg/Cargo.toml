@@ -12,6 +12,9 @@ rust-version.workspace = true
 
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-proto-tty = { path = "../../../crates/raven-proto-tty" }
+raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 raven-rt = { path = "../../rt" }

@@ -7,13 +7,17 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+extern crate alloc;
+
+use alloc::string::{String, ToString};
+
 /// The synopsis printed after `usage: mesg`.
-pub const USAGE: &str = "[y | n]";
+pub const USAGE: &str = "[-t path] [y | n]";
 
 /// The group-write mode bit that POSIX `mesg` controls.
 pub const WRITE_BIT: u32 = 0o020;
 
-/// A parsed `mesg` command line.
+/// A requested operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     /// Print the current permission.
@@ -22,24 +26,35 @@ pub enum Action {
     Set(bool),
 }
 
+/// A parsed `mesg` command line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Options {
+    /// Terminal path; the default is `tty:console`.
+    pub target: Option<String>,
+    /// Requested operation.
+    pub action: Action,
+}
+
 /// Why a `mesg` command line is invalid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UsageError;
 
-/// Parse `mesg [y | n]`.
-pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Action, UsageError> {
-    let mut result = Action::Query;
-    for argument in args {
-        if result != Action::Query {
-            return Err(UsageError);
-        }
-        result = match argument {
-            "y" | "yes" => Action::Set(true),
-            "n" | "no" => Action::Set(false),
+/// Parse `mesg [-t path] [y | n]`.
+pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Options, UsageError> {
+    let mut target = None;
+    let mut action = Action::Query;
+    let mut args = args.into_iter();
+    while let Some(argument) = args.next() {
+        match argument {
+            "-t" | "--tty" => {
+                target = Some(args.next().ok_or(UsageError)?.to_string());
+            }
+            "y" | "yes" if action == Action::Query => action = Action::Set(true),
+            "n" | "no" if action == Action::Query => action = Action::Set(false),
             _ => return Err(UsageError),
-        };
+        }
     }
-    Ok(result)
+    Ok(Options { target, action })
 }
 
 /// True when the terminal mode allows group writes.

@@ -37,6 +37,10 @@ pub const OP_SET_MODE: u16 = 1;
 pub const OP_GET_MODE: u16 = 2;
 /// `FLUSH`.
 pub const OP_FLUSH: u16 = 3;
+/// `GET_WRITE`.
+pub const OP_GET_WRITE: u16 = 4;
+/// `SET_WRITE(allowed)`.
+pub const OP_SET_WRITE: u16 = 5;
 
 const CANONICAL: u32 = 0;
 const RAW: u32 = 1;
@@ -80,6 +84,8 @@ pub enum TtyError {
     InvalidMode(u32),
     /// The echo value is neither 0 nor 1.
     InvalidEcho(u32),
+    /// The write-permission value is neither 0 nor 1.
+    InvalidWrite(u32),
 }
 
 impl TtyError {
@@ -91,7 +97,61 @@ impl TtyError {
             Self::UnknownOp(_) => "unknown control operation",
             Self::InvalidMode(_) => "invalid terminal mode",
             Self::InvalidEcho(_) => "invalid echo switch",
+            Self::InvalidWrite(_) => "invalid write-permission switch",
         }
+    }
+}
+
+/// A terminal write-permission request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WriteRequest {
+    /// Ask for the current permission.
+    Get,
+    /// Allow or refuse terminal writes.
+    Set {
+        /// Requested write permission.
+        allowed: bool,
+    },
+}
+
+/// Encode a write-permission request.
+pub fn encode_write_request(request: WriteRequest, out: &mut [u8; CALL_LEN]) {
+    let (op, arg0) = match request {
+        WriteRequest::Get => (OP_GET_WRITE, 0),
+        WriteRequest::Set { allowed } => (OP_SET_WRITE, u32::from(allowed)),
+    };
+    out[..2].copy_from_slice(&VERSION.to_le_bytes());
+    out[2..4].copy_from_slice(&op.to_le_bytes());
+    out[4..8].copy_from_slice(&arg0.to_le_bytes());
+    out[8..12].copy_from_slice(&0u32.to_le_bytes());
+}
+
+/// Decode a write-permission request.
+pub fn decode_write_request(input: &[u8]) -> Result<WriteRequest, TtyError> {
+    let (op, arg0, _) = header(input)?;
+    match op {
+        OP_GET_WRITE => Ok(WriteRequest::Get),
+        OP_SET_WRITE => Ok(WriteRequest::Set {
+            allowed: write_value(arg0)?,
+        }),
+        other => Err(TtyError::UnknownOp(other)),
+    }
+}
+
+/// Encode a write-permission response.
+pub fn encode_write_response(allowed: bool, out: &mut [u8; CALL_LEN]) {
+    out[..2].copy_from_slice(&VERSION.to_le_bytes());
+    out[2..4].copy_from_slice(&OP_GET_WRITE.to_le_bytes());
+    out[4..8].copy_from_slice(&u32::from(allowed).to_le_bytes());
+    out[8..12].copy_from_slice(&0u32.to_le_bytes());
+}
+
+/// Decode a write-permission response.
+pub fn decode_write_response(input: &[u8]) -> Result<bool, TtyError> {
+    let (op, arg0, _) = header(input)?;
+    match op {
+        OP_GET_WRITE | OP_SET_WRITE => write_value(arg0),
+        other => Err(TtyError::UnknownOp(other)),
     }
 }
 
@@ -163,6 +223,14 @@ fn header(input: &[u8]) -> Result<(u16, u32, u32), TtyError> {
     let arg0 = u32::from_le_bytes([input[4], input[5], input[6], input[7]]);
     let arg1 = u32::from_le_bytes([input[8], input[9], input[10], input[11]]);
     Ok((op, arg0, arg1))
+}
+
+fn write_value(value: u32) -> Result<bool, TtyError> {
+    match value {
+        0 => Ok(false),
+        1 => Ok(true),
+        other => Err(TtyError::InvalidWrite(other)),
+    }
 }
 
 fn settings_from(mode: u32, echo: u32) -> Result<Settings, TtyError> {
