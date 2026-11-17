@@ -4,13 +4,23 @@
 //! Tests for the per-CPU frame magazine layer.
 
 use super::*;
-use crate::buddy::{BuddyAllocator, BuddyError, NoPager, Pager};
+use crate::buddy::{Block, BuddyAllocator, BuddyError, NoPager, Pager};
 use std::collections::BTreeSet;
 
 /// 128-frame buddy: orders 0..=7.
-type Buddy = BuddyAllocator<8, 128, NoPager>;
+type Buddy<'a> = BuddyAllocator<'a, 8, NoPager>;
 /// 4 CPUs, 32-frame caches, 16-frame remote queues.
 type Cache = FrameCache<4, 32, 16>;
+
+/// Declare the descriptor storage and the allocator over it in the caller's scope.
+macro_rules! buddy {
+    ($storage:ident, $allocator:ident) => {
+        let mut $storage = [Block::empty(); 128];
+        let mut $allocator =
+            BuddyAllocator::<8, NoPager>::with_pager(&mut $storage, 0, 128, NoPager)
+                .expect("buddy");
+    };
+}
 
 /// A pager whose `back` always fails.
 struct FailingPager;
@@ -24,7 +34,7 @@ impl Pager for FailingPager {
 }
 
 /// `free (buddy) + cached + remote + live + reserved == total`.
-fn assert_conserved(buddy: &Buddy, cache: &Cache, live: &BTreeSet<u64>) {
+fn assert_conserved(buddy: &Buddy<'_>, cache: &Cache, live: &BTreeSet<u64>) {
     let stats = buddy.stats();
     assert_eq!(
         stats.free
@@ -44,7 +54,7 @@ fn assert_conserved(buddy: &Buddy, cache: &Cache, live: &BTreeSet<u64>) {
 
 #[test]
 fn fast_path_hits_and_refill_stats() {
-    let mut buddy = Buddy::new(0, 128).expect("buddy");
+    buddy!(storage, buddy);
     let mut cache = Cache::new(1, 0, 24, 16, 16);
     // First allocation misses and refills a batch; the rest hit the cache.
     let first = cache.alloc(&mut buddy, 0).expect("alloc");
@@ -61,7 +71,7 @@ fn fast_path_hits_and_refill_stats() {
 
 #[test]
 fn high_watermark_drains_a_batch() {
-    let mut buddy = Buddy::new(0, 128).expect("buddy");
+    buddy!(storage, buddy);
     let mut cache = Cache::new(1, 4, 8, 16, 4);
     // Free 12 frames: the cache crosses the high watermark (8) and drains batches.
     let frames: Vec<u64> = (0..12)
@@ -80,7 +90,7 @@ fn high_watermark_drains_a_batch() {
 
 #[test]
 fn remote_free_is_bounded_and_reused() {
-    let mut buddy = Buddy::new(0, 128).expect("buddy");
+    buddy!(storage, buddy);
     let mut cache = Cache::new(2, 8, 24, 16, 8);
     let frame = cache.alloc(&mut buddy, 0).expect("alloc");
     cache.remote_free(&mut buddy, 1, frame);
@@ -93,8 +103,10 @@ fn remote_free_is_bounded_and_reused() {
 
 #[test]
 fn pager_failure_returns_a_typed_error() {
+    let mut storage = [Block::empty(); 128];
     let mut buddy =
-        BuddyAllocator::<8, 128, FailingPager>::with_pager(0, 128, FailingPager).expect("buddy");
+        BuddyAllocator::<8, FailingPager>::with_pager(&mut storage, 0, 128, FailingPager)
+            .expect("buddy");
     let mut cache = Cache::new(1, 4, 8, 16, 4);
     assert_eq!(cache.alloc(&mut buddy, 0), Err(BuddyError::Pager));
     assert_eq!(buddy.free_frames(), 128, "nothing leaked");
@@ -103,7 +115,7 @@ fn pager_failure_returns_a_typed_error() {
 
 #[test]
 fn deterministic_drain_order() {
-    let mut buddy = Buddy::new(0, 128).expect("buddy");
+    buddy!(storage, buddy);
     let mut cache = Cache::new(1, 0, 32, 4, 4);
     let a = cache.alloc(&mut buddy, 0).expect("a");
     let b = cache.alloc(&mut buddy, 0).expect("b");
@@ -120,7 +132,7 @@ fn deterministic_drain_order() {
 
 #[test]
 fn single_cpu_baseline() {
-    let mut buddy = Buddy::new(0, 128).expect("buddy");
+    buddy!(storage, buddy);
     let mut cache = Cache::new(1, 8, 24, 16, 8);
     let mut live = BTreeSet::new();
     for _ in 0..64 {
@@ -154,7 +166,7 @@ impl Rng {
 }
 
 fn run_model(cpus: usize, ops: usize) {
-    let mut buddy = Buddy::new(0, 128).expect("buddy");
+    buddy!(storage, buddy);
     let mut cache = Cache::new(cpus, 8, 24, 16, 8);
     let mut rng = Rng(0x0ddc_0ffe_e123_4567 ^ cpus as u64);
     let mut live: BTreeSet<u64> = BTreeSet::new();
