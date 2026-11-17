@@ -11,6 +11,7 @@ pub mod model;
 pub mod overlay;
 pub mod render;
 pub mod seed;
+pub mod sweep;
 
 #[cfg(test)]
 #[path = "gate_ut.rs"]
@@ -23,3 +24,7 @@ mod model_tests;
 #[cfg(test)]
 #[path = "overlay_ut.rs"]
 mod overlay_tests;
+
+#[cfg(test)]
+#[path = "sweep_ut.rs"]
+mod sweep_tests;
