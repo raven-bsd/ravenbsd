@@ -7,6 +7,12 @@ Status: host image and transcript checker OBSERVED. No Pi 4 board transcript exi
 gate below is UNVERIFIED. The release session uses `/bin/rsh`; `/bin/login` and getty provide the
 login prompt. brush is staged but cannot spawn a session yet.
 
+Host verification (rev 42): the release image builds reproducibly from the external firmware tree,
+`scripts/pi4-release.sh --check` passes, `scripts/pi4-release.sh --repro` reports the same SHA-256
+for both builds (`257adad5873677c74fa947d78235c6e374a6073a042e3ab88af010005ce0a829`), and
+`cargo xtask qtest --case release-login --arch x86_64` passes as the QEMU control. The board
+remains UNVERIFIED: the serial adapter is not connected and the root BAR/DMA/IRQ policy is open.
+
 ## 1. Profile
 
 `profiles/pi4-release.toml` extends `base` (the loader permits one level and `pi4` already extends
@@ -29,6 +35,12 @@ Build:
 RAVEN_RPI_FIRMWARE=/path/to/rpi-firmware/boot \
     cargo xtask image --arch aarch64 --platform pi4 --profile pi4-release
 ```
+
+The firmware is external and never committed. The rev-42 host run used
+`RAVEN_RPI_FIRMWARE=/home/bo/work/ravenos-workspace/ravenbsd-resources/rpi-firmware/boot` (the
+workspace `ravenbsd-resources/rpi-firmware/boot` checkout). `scripts/pi4-release.sh` also probes
+that path relative to the repository when the variable is unset, but only the variable or a real
+firmware directory produces an image; the repository carries no firmware blobs.
 
 ## 2. Host check
 
@@ -95,6 +107,26 @@ The host fixture DTB is the P8b platd tree with the three-window node; it is sta
 `/etc/pi4.dtb`. The live firmware DTB, the real window mapping, the GENET link/DHCP lease and the
 gateway ping remain UNVERIFIED without the owner's serial log. A missing board transcript is not a
 pass, and the platd/genet service entries are not duplicated by svcd.
+
+## 4.1 Remaining board blockers
+
+The host checks prove the image contents, not a Pi 4 boot. The exact open items are:
+
+1. **No serial capture.** The hardware UART adapter is not connected, so there is no
+   `/dev/ttyUSB0` transcript. Every gate below stays UNVERIFIED until the owner captures the
+   PL011 console at 115200 8N1.
+2. **Root BAR/DMA/IRQ policy is open.** P10 supplies the `platform-root` grant to `devd`, but the
+   kernel root device capability is not range-scoped: `devd` could create MMIO, DMA and IRQ
+   handles outside the windows decoded from the device tree (`docs/grants.md`, residual risks).
+   Closing that needs a range-limited platform capability in `crates/raven-abi`/the kernel and is
+   outside REL3, so the board security claim stays open.
+3. **Live firmware DTB.** The release stages the host P8b fixture as `/etc/pi4.dtb`; the board
+   firmware's own DTB and the real BAR/window mapping have not been compared on hardware.
+4. **GENET hardware.** The driver is compiled and the handle/token handoff is proven by the
+   `pi4-devd` fixture, but no GENET register access, PHY/link result, DHCP lease or gateway ping
+   exists without the board log.
+5. **PL011 login.** The QEMU `release-login` case proves the x86_64 release session; the Pi 4
+   `ttyAMA0` getty/login path still needs board evidence.
 
 ## 5. Board checklist (UNVERIFIED)
 
