@@ -365,7 +365,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     unsafe { stage2(stack.argc, stack.argv, stack.envp, rtld_fini, entry) }
 }
 
-/// Install every strong hook of the shell.
+/// Install every strong hook of the shell, then the optional float plug-in.
 ///
 /// `__raven_libc_start` calls this once before the constructors. Programs that bring their own
 /// `_start` (the hostrun fixtures) call it directly. The hook cells are function pointers, so no
@@ -373,9 +373,38 @@ pub unsafe extern "C" fn __raven_libc_start(
 #[unsafe(no_mangle)]
 pub extern "C" fn __raven_libc_init() {
     crate::hooks::install_all();
+    install_float_hook();
     // The C `stdin`/`stdout`/`stderr` data symbols must be valid before the program's
     // constructors run; attaching the static buffers does not allocate or open a file.
     crate::stdio::streams::init();
+}
+
+// The float-digit plug-in is an optional member (R-13, mechanism M2): a program requests it
+// with `-u __rl_fmt_float_impl` (or through a float conversion API), and the link pulls the
+// strong member. This weak reference is zero on the bare floor, so the start path installs the
+// hook when it is present without forcing `raven-libc-dtoa` into every program.
+core::arch::global_asm!(".weak __rl_fmt_float_impl");
+
+unsafe extern "C" {
+    fn __rl_fmt_float_impl();
+}
+
+/// Install the optional float-digit hook when the program linked its strong member.
+#[inline(never)]
+fn install_float_hook() {
+    let entry = __rl_fmt_float_impl as *const ();
+    if entry.is_null() {
+        return;
+    }
+    // SAFETY: a non-null entry means the linker pulled `hooks/fmt_float.rs`; its
+    // `__rl_fmt_float_impl` has the Rust ABI and argument layout of the hook type, and the
+    // weak reference only resolves to that definition.
+    let hook = unsafe {
+        core::mem::transmute::<*const (), crate::stdio::vprintf::__rl_fmt_float::Hook>(entry)
+    };
+    // Call the cell directly: routing through a `hooks/fmt_float.rs` helper would pull that
+    // optional member (and dtoa) whenever the start object is linked.
+    crate::stdio::vprintf::__rl_fmt_float::install(Some(hook));
 }
 
 /// Steps 12-15: constructors, `errno`, `main`, `exit`.
