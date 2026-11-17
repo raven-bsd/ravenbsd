@@ -1,0 +1,194 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! Unit tests for the IPC priority donation layer.
+
+use super::*;
+use alloc::vec;
+
+fn prio(level: u8) -> Priority {
+    Priority::new(level)
+}
+
+fn next_random(state: &mut u64) -> u64 {
+    let mut s = *state;
+    s ^= s << 13;
+    s ^= s >> 7;
+    s ^= s << 17;
+    *state = s;
+    s
+}
+
+#[test]
+fn call_donates_priority_to_server() {
+    let mut d = Donation::new();
+    d.register(0, prio(10)).unwrap(); // server
+    d.register(1, prio(2)).unwrap(); // client (higher)
+    d.begin_call(1, 0).unwrap();
+    assert_eq!(d.effective_priority(0), Some(prio(2)));
+    assert_eq!(d.effective_priority(1), Some(prio(2))); // client keeps its own priority
+    d.check_invariants().expect("invariant");
+}
+
+#[test]
+fn call_and_lock_donation_flow_transitively() {
+    // C (high) calls S; S waits on O's lock; O inherits C's priority through both edges.
+    let mut d = Donation::new();
+    d.register(0, prio(20)).unwrap(); // O, low
+    d.register(1, prio(10)).unwrap(); // S
+    d.register(2, prio(0)).unwrap(); // C, high
+    d.acquire(0, 0).unwrap();
+    d.begin_call(2, 1).unwrap();
+    assert_eq!(d.effective_priority(1), Some(prio(0)));
+    d.block(0, 1).unwrap();
+    assert_eq!(d.effective_priority(0), Some(prio(0)));
+    d.check_invariants().expect("invariant");
+}
+
+#[test]
+fn inversion_case_owner_runs_at_clients_priority_then_restores() {
+    let mut d = Donation::new();
+    d.register(0, prio(20)).unwrap(); // low-priority lock owner O
+    d.register(1, prio(10)).unwrap(); // server S
+    d.register(2, prio(0)).unwrap(); // high-priority client C
+    d.acquire(0, 0).unwrap();
+
+    d.begin_call(2, 1).unwrap();
+    d.block(0, 1).unwrap(); // S waits on O's lock
+    // No inversion: the low-priority owner runs at the client's priority.
+    assert_eq!(d.effective_priority(0), Some(prio(0)));
+
+    // O releases the lock (hands it to S).
+    assert_eq!(d.wake_one(0), Some(1));
+    assert_eq!(d.effective_priority(0), Some(prio(20)));
+
+    // The call completes; the server returns to its base priority.
+    d.end_call(2, 1).unwrap();
+    assert_eq!(d.effective_priority(1), Some(prio(10)));
+    assert_eq!(d.effective_priority(0), Some(prio(20)));
+    d.check_invariants().expect("invariant");
+}
+
+#[test]
+fn call_edges_are_managed_exactly() {
+    let mut d = Donation::new();
+    d.register(0, prio(10)).unwrap();
+    d.register(1, prio(10)).unwrap();
+    d.register(2, prio(10)).unwrap();
+
+    assert_eq!(d.begin_call(0, 1), Ok(()));
+    assert_eq!(d.call_edges(), vec![(0, 1)]);
+    // Duplicate (client already calling).
+    assert_eq!(d.begin_call(0, 2), Err(DonationError::DuplicateCall));
+    // Unknown thread.
+    assert_eq!(d.begin_call(99, 1), Err(DonationError::UnknownThread));
+    // end_call with a mismatched server is stale.
+    assert_eq!(d.end_call(0, 2), Err(DonationError::StaleCall));
+    // cancel removes the call.
+    assert_eq!(d.cancel_call(0), Ok(()));
+    assert_eq!(d.cancel_call(0), Err(DonationError::StaleCall));
+    assert!(d.call_edges().is_empty());
+}
+
+#[test]
+fn client_and_server_death_remove_right_edges() {
+    let mut d = Donation::new();
+    for i in 0..6 {
+        d.register(i as ThreadId, prio(10)).unwrap();
+    }
+    d.begin_call(0, 1).unwrap(); // client 0 -> server 1
+    d.begin_call(2, 1).unwrap(); // client 2 -> server 1
+    d.begin_call(3, 4).unwrap(); // client 3 -> server 4
+
+    // Client death removes exactly that client's edge.
+    assert_eq!(d.client_death(0), 1);
+    assert_eq!(d.call_edges(), vec![(2, 1), (3, 4)]);
+
+    // Server death removes every call to it.
+    assert_eq!(d.server_death(1), 1);
+    assert_eq!(d.call_edges(), vec![(3, 4)]);
+
+    // Idempotent.
+    assert_eq!(d.client_death(0), 0);
+    assert_eq!(d.server_death(1), 0);
+    d.check_invariants().expect("invariant");
+}
+
+#[test]
+fn server_inherits_max_over_multiple_clients() {
+    let mut d = Donation::new();
+    d.register(0, prio(30)).unwrap(); // server
+    d.register(1, prio(10)).unwrap(); // client (lower number = higher priority)
+    d.register(2, prio(20)).unwrap(); // client
+    d.begin_call(1, 0).unwrap();
+    d.begin_call(2, 0).unwrap();
+    // Server inherits the most urgent client (10).
+    assert_eq!(d.effective_priority(0), Some(prio(10)));
+}
+
+#[test]
+fn donation_model_million_ops() {
+    const SERVERS: u64 = 3;
+    const CLIENTS: u64 = 64;
+    const LOCKS: u64 = 16;
+    const OPS: u64 = 1_000_000;
+    const TOTAL: u64 = SERVERS + CLIENTS;
+
+    let mut d = Donation::new();
+    for i in 0..TOTAL {
+        d.register(i as ThreadId, prio((i % 7) as u8)).unwrap();
+    }
+
+    let mut rng = 0x2545_f491_4f6c_dd1du64;
+    for step in 0..OPS {
+        let roll = next_random(&mut rng) % 100;
+        let client = (next_random(&mut rng) % CLIENTS + SERVERS) as ThreadId;
+        let server = (next_random(&mut rng) % SERVERS) as ThreadId;
+        let lock = (next_random(&mut rng) % LOCKS) as ObjectId;
+        let thread = (next_random(&mut rng) % TOTAL) as ThreadId;
+
+        match roll {
+            0..=19 => {
+                let _ = d.begin_call(client, server);
+            }
+            20..=29 => {
+                let _ = d.end_call(client, server);
+            }
+            30..=34 => {
+                let _ = d.cancel_call(client);
+            }
+            35..=37 => {
+                let _ = d.client_death(client);
+            }
+            38..=39 => {
+                let _ = d.server_death(server);
+            }
+            40..=54 => {
+                let _ = d.acquire(lock, thread);
+            }
+            55..=69 => {
+                let _ = d.block(lock, thread);
+            }
+            70..=79 => {
+                let _ = d.wake_one(lock);
+            }
+            80..=89 => {
+                let _ = d.wake_all(lock);
+            }
+            _ => {
+                let _ = d.cancel(lock, thread);
+            }
+        }
+
+        if step.is_multiple_of(512) {
+            d.check_invariants().expect("donation invariant violation");
+        }
+    }
+    d.check_invariants()
+        .expect("final donation invariant violation");
+    assert!(
+        d.max_chain_depth() <= TOTAL as usize,
+        "depth bound exceeded: {}",
+        d.max_chain_depth()
+    );
+}
