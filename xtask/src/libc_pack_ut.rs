@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use super::{Arch, build_spec, parse};
+use super::{Arch, build_spec, copy_headers, parse};
 use crate::process::CommandSpec;
 
 fn args(values: &[&str]) -> Vec<String> {
@@ -186,6 +186,27 @@ fn riscv64_build_spec_targets_the_bare_metal_triple() {
     assert!(flags.contains("embed-bitcode=yes"));
     assert_eq!(spec.program, "cargo");
     assert_eq!(spec.cwd, Path::new("/repo"));
+}
+
+#[test]
+fn copy_headers_creates_nested_destination_directories() {
+    let root = std::env::temp_dir().join(format!(
+        "c74b-copy-headers-{}-{}",
+        std::process::id(),
+        line!()
+    ));
+    let source = root.join("source");
+    let target = root.join("target");
+    std::fs::create_dir_all(source.join("arpa")).expect("source dir");
+    std::fs::write(source.join("arpa/inet.h"), b"#pragma once\n").expect("nested header");
+    std::fs::write(source.join("top.h"), b"#pragma once\n").expect("top header");
+    std::fs::create_dir_all(&target).expect("target dir");
+
+    copy_headers(&source, &target).expect("copy headers");
+
+    assert!(target.join("arpa/inet.h").is_file());
+    assert!(target.join("top.h").is_file());
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]
