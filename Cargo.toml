@@ -28,6 +28,7 @@ members = [
     "tests/fixtures/perm",
     "tests/posix/fs/posix-fs",
     "tests/posix/utility/crontab/fixture",
+    "tests/posix/utility/misc2/evidence",
     "tests/fixtures/setuid",
     "tests/fixtures/proc-handle-info",
     "tests/fixtures/proc-registry",
