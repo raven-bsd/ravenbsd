@@ -32,6 +32,7 @@ struct OpenFile {
     data: Vec<u8>,
     cursor: usize,
     index: Option<usize>,
+    generation: bool,
 }
 
 /// The `svc:` server thread.
@@ -93,9 +94,23 @@ impl SvcHandler {
         Ok(data)
     }
 
-    fn service(&self, name: &str) -> HandlerResult<OpenFile> {
+    fn service(&self, name: &str, generation: bool) -> HandlerResult<OpenFile> {
         let guard = self.core.lock();
         let index = guard.supervisor.find(name).ok_or(Errno::ENOENT)?;
+        if generation {
+            let generation = guard
+                .supervisor
+                .runtime()
+                .get(index)
+                .map(|runtime| runtime.generation)
+                .ok_or(Errno::ENOENT)?;
+            return Ok(OpenFile {
+                data: alloc::format!("{generation}\n").into_bytes(),
+                cursor: 0,
+                index: Some(index),
+                generation: true,
+            });
+        }
         let status = guard.supervisor.status(index).ok_or(Errno::ENOENT)?;
         let mut line = [0u8; MAX_LINE];
         let length = status.encode(&mut line).map_err(|_| Errno::EPROTO)?;
@@ -103,6 +118,7 @@ impl SvcHandler {
             data: line.get(..length).ok_or(Errno::EPROTO)?.to_vec(),
             cursor: 0,
             index: Some(index),
+            generation: false,
         })
     }
 }
@@ -123,13 +139,18 @@ impl Handler for SvcHandler {
                 data: self.directory()?,
                 cursor: 0,
                 index: None,
+                generation: false,
             }
         } else {
             let name = path.strip_prefix('/').ok_or(Errno::EINVAL)?;
             if name.is_empty() || name.contains('/') {
                 return Err(Errno::ENOENT.into());
             }
-            self.service(name)?
+            let (service_name, generation) = match name.strip_suffix(".gen") {
+                Some(base) if !base.is_empty() => (base, true),
+                _ => (name, false),
+            };
+            self.service(service_name, generation)?
         };
         self.files.insert(file_id, file);
         Ok(Opened::File(file_id))
@@ -181,6 +202,9 @@ impl Handler for SvcHandler {
         let Some(index) = open.index else {
             return Err(Errno::EISDIR.into());
         };
+        if open.generation {
+            return Err(Errno::EINVAL.into());
+        }
         let operation = Op::decode(request).map_err(|_| Errno::EINVAL)?;
         let now = boot::now_ms();
         let mut guard = self.core.lock();
