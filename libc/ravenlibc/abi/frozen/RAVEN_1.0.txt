@@ -119,6 +119,7 @@ clearenv F 68 x86_64
 clearerr F 19 x86_64
 clearerr_unlocked F 13 x86_64
 clock F 8 x86_64
+clock_getcpuclockid F 83 x86_64
 clock_getres F 129 x86_64
 clock_gettime F 147 x86_64
 clock_nanosleep F 129 x86_64

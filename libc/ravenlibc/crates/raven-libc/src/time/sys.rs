@@ -44,4 +44,16 @@ impl TimeSys for ShellTime {
     fn issetugid(&self) -> bool {
         false
     }
+
+    fn process_times(&self) -> Result<(u64, u64), Errno> {
+        let mut values = [0u64; 4];
+        // SAFETY: PROC_TIMES writes the four u64 words into the caller's 32-byte buffer.
+        let result = unsafe {
+            raven_libc_sys::arch::syscall2(0x4C, values.as_mut_ptr() as usize, values.len())
+        };
+        if result < 0 {
+            return Err(Errno(u16::try_from(-result).unwrap_or(5)));
+        }
+        Ok((values[0], values[1]))
+    }
 }

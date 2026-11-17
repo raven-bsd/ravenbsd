@@ -121,6 +121,7 @@ clearenv
 clearerr
 clearerr_unlocked
 clock
+clock_getcpuclockid
 clock_getres
 clock_gettime
 clock_nanosleep

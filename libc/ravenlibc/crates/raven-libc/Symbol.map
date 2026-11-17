@@ -821,6 +821,7 @@ RAVEN_1.0 {
 		# --- time (C60b) ---
 		asctime;
 		clock;
+		clock_getcpuclockid;
 		clock_getres;
 		clock_gettime;
 		clock_nanosleep;

@@ -2242,3 +2242,10 @@ id = "interface.pclose"
 status = "present"
 evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
 notes = "P1 batch B: pclose over the kernel raw PIPE2 call, posix_spawn and waitpid; libc.a symbol"
+
+# P1 batch B time: the process CPU clock id.
+[[row]]
+id = "interface.clock_getcpuclockid"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: clock_getcpuclockid returns CLOCK_PROCESS_CPUTIME_ID for pid 0/the caller; other pids return ESRCH. raven-libc-time suite and libc.a symbol"

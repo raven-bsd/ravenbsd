@@ -1580,7 +1580,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.clock_getcpuclockid"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.clock_getres"

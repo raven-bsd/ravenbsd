@@ -74,6 +74,7 @@ fn utc() -> raven_libc_time::TzState {
 }
 
 mod asctime;
+mod clock_getcpuclockid;
 mod clock_nanosleep;
 mod clock_settime;
 mod getdate;

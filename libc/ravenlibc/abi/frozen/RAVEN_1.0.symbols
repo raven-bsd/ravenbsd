@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1477
+# records: 1478
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -120,6 +120,7 @@ clearenv F - all 1 stdlib.h
 clearerr F - all 0 stdio.h
 clearerr_unlocked F - all 1 stdio.h
 clock F - all 0 time.h
+clock_getcpuclockid F - all 0 -
 clock_getres F - all 0 time.h
 clock_gettime F - all 0 time.h
 clock_nanosleep F - all 0 time.h
