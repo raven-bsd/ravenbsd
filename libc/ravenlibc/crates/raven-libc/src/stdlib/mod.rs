@@ -15,6 +15,7 @@ pub(crate) mod atoi;
 pub(crate) mod bsearch;
 pub(crate) mod clearenv;
 pub(crate) mod div;
+pub(crate) mod ecvt_r;
 pub(crate) mod drand48;
 pub(crate) mod env_support;
 pub(crate) mod environ;

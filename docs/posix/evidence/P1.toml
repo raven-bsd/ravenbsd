@@ -2091,3 +2091,72 @@ id = "interface.wcstofNx"
 status = "waived"
 evidence = ""
 notes = "ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands."
+
+# P1 batch B stdlib: the ecvt/fcvt digit buffers.
+[[row]]
+id = "interface.ecvt_r"
+status = "present"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
+notes = "P1 batch B: ecvt_r over the C42 digit generator; stdlib suite and libc.a symbol"
+
+[[row]]
+id = "interface.fcvt_r"
+status = "present"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
+notes = "P1 batch B: fcvt_r over the C42 digit generator; stdlib suite and libc.a symbol"
+
+# P1 batch B wchar numeric: the wide strto* bridge.
+
+[[row]]
+id = "interface.wcstod"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstod over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstof"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstof over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstold"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstold over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstol"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstol over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoll"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoll over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoul"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoul over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoull"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoull over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoimax"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoimax over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+[[row]]
+id = "interface.wcstoumax"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wcstoumax over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"

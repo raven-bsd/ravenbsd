@@ -157,7 +157,16 @@ RAVEN_1.0 {
 		wcscoll_l;
 		wcsncasecmp_l;
 		wcsnlen;
+		wcstod;
+		wcstof;
+		wcstoimax;
 		wcstok;
+		wcstol;
+		wcstold;
+		wcstoll;
+		wcstoul;
+		wcstoull;
+		wcstoumax;
 		wcsxfrm;
 		wcsxfrm_l;
 		wctob;
@@ -207,7 +216,9 @@ RAVEN_1.0 {
 		atol;
 		atoll;
 		div;
+		ecvt_r;
 		exit;
+		fcvt_r;
 		imaxabs;
 		imaxdiv;
 		labs;

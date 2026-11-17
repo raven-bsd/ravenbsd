@@ -187,6 +187,7 @@ dremf F 6 x86_64
 dup F 72 x86_64
 dup2 F 87 x86_64
 duplocale F 5 x86_64
+ecvt_r F 477 x86_64
 elf_aux_info F 259 x86_64
 endgrent F 5 x86_64
 endhostent F 5 x86_64
@@ -255,6 +256,7 @@ fchmodat F 22 x86_64
 fchownat F 22 x86_64
 fclose F 5 x86_64
 fcntl F 336 x86_64
+fcvt_r F 695 x86_64
 fdim F 67 x86_64
 fdimf F 64 x86_64
 fdiml F 31 x86_64
@@ -1425,8 +1427,17 @@ wcspbrk F 5 x86_64
 wcsrchr F 5 x86_64
 wcsspn F 5 x86_64
 wcsstr F 5 x86_64
+wcstod F 143 x86_64
+wcstof F 138 x86_64
+wcstoimax F 6 x86_64
 wcstok F 135 x86_64
+wcstol F 146 x86_64
+wcstold F 27 x86_64
+wcstoll F 6 x86_64
 wcstombs F 120 x86_64
+wcstoul F 146 x86_64
+wcstoull F 6 x86_64
+wcstoumax F 6 x86_64
 wcswidth F 23 x86_64
 wcsxfrm F 92 x86_64
 wcsxfrm_l F 92 x86_64

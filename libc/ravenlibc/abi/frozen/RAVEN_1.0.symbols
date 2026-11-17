@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1453
+# records: 1464
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -188,6 +188,7 @@ dremf F - all 1 -
 dup F - all 0 unistd.h
 dup2 F - all 0 unistd.h
 duplocale F - all 1 -
+ecvt_r F - all 2 stdlib.h
 elf_aux_info F - all 2 -
 endgrent F - all 1 grp.h
 endhostent F - all 1 netdb.h
@@ -256,6 +257,7 @@ fchmodat F - all 0 -
 fchownat F - all 0 -
 fclose F - all 0 stdio.h
 fcntl F - all 0 fcntl.h
+fcvt_r F - all 2 stdlib.h
 fdim F - all 1 -
 fdimf F - all 1 -
 fdiml F - all 1 -
@@ -1426,8 +1428,17 @@ wcspbrk F - all 0 wchar.h
 wcsrchr F - all 0 wchar.h
 wcsspn F - all 0 wchar.h
 wcsstr F - all 0 wchar.h
+wcstod F - all 0 -
+wcstof F - all 0 -
+wcstoimax F - all 0 wchar.h
 wcstok F - all 0 wchar.h
+wcstol F - all 0 wchar.h
+wcstold F - all 0 -
+wcstoll F - all 0 wchar.h
 wcstombs F - all 0 stdlib.h
+wcstoul F - all 0 wchar.h
+wcstoull F - all 0 wchar.h
+wcstoumax F - all 0 wchar.h
 wcswidth F - all 1 -
 wcsxfrm F - all 0 wchar.h
 wcsxfrm_l F - all 1 -

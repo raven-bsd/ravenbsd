@@ -24,7 +24,7 @@ for symbol in \
     fgetwc_unlocked fgetws fputwc fputwc_unlocked fputws fputws_unlocked fwide getwc \
     getwc_unlocked getwchar getwchar_unlocked putwc putwc_unlocked putwchar putwchar_unlocked \
     ungetwc wprintf fwprintf swprintf wscanf fwscanf swscanf vwprintf vfwprintf vswprintf \
-    vwscanf vfwscanf vswscanf
+    vwscanf vfwscanf vswscanf wcstod wcstof wcstold wcstol wcstoll wcstoul wcstoull wcstoimax wcstoumax
 do
     if ! nm -g --defined-only "$archive" 2>/dev/null | grep -Eq " $symbol$"; then
         echo "posix wchar: missing libc.a symbol $symbol" >&2
