@@ -1564,6 +1564,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-kmem"
+version = "0.1.0"
+dependencies = [
+ "raven-vmem",
+]
+
+[[package]]
 name = "raven-libc"
 version = "0.1.0"
 dependencies = [
