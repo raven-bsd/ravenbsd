@@ -83,7 +83,13 @@ The kernel does not map or resolve `libc.so.1`; that remains the loader's job.
 
 The aarch64 path uses the same generic exec code; its trap-frame installer writes the new
 `elr` and `sp` and clears `x0`-`x30`. The parity case is `dynamic-exec-aarch64`, with an
-`aarch64-unknown-none-softfloat` static launcher and the same auxv contract.
+`aarch64-unknown-none-softfloat` static launcher and the same auxv contract. It passes against
+the real `build/aarch64/sysroot` (`libc.so.1` and `ld-elf.so.1` from `cargo xtask libc-pack`
+and `libc-link`), with serial `dynamic-exec: launching`, `svcd: settled`, `init exited (0)`.
+The aarch64 dlopen path is covered by `libc-dynamic --arch aarch64` (`libc ok`, `tls ok`,
+`iterate ok`, `dlclose ok`, `version ok`), and the 5.1 C cases by `libc-hello`, `libc-stdio`
+and `libc-time --arch aarch64`. The Pi 4 board remains UNVERIFIED; K97c owns the Pi 4 dynamic
+boot.
 
 ## Identity and handles
 
@@ -120,6 +126,11 @@ Applying executable setuid/setgid bits on exec is a follow-up (the spawn path us
 cargo xtask qtest --case proc-exec --arch x86_64
 cargo xtask qtest --case proc-exec --arch aarch64
 cargo xtask qtest --case dynamic-exec --arch x86_64
+cargo xtask qtest --case dynamic-exec-aarch64 --arch aarch64
+cargo xtask qtest --case libc-dynamic --arch aarch64
+cargo xtask qtest --case libc-hello --arch aarch64
+cargo xtask qtest --case libc-stdio --arch aarch64
+cargo xtask qtest --case libc-time --arch aarch64
 ```
 
 `dynamic-exec` builds a normally linked PIE with `PT_INTERP` and `DT_NEEDED libc.so.1`, embeds it
@@ -127,7 +138,10 @@ in a static launcher, and runs the launcher as a `libc-test` service. The launch
 through `PROC_EXEC`; the expected serial is `dynamic-exec: launching`, `svcd: settled`,
 `init exited (0)`. The fixture's shape check fails if the target is not `ET_DYN`, has no
 `PT_INTERP /libexec/ld-elf.so.1`, or does not need `libc.so.1`. `dynamic-exec-aarch64` is the
-same check for the aarch64 sysroot (`cargo xtask libc-pack/libc-link --arch aarch64`).
+same check for the aarch64 sysroot (`cargo xtask libc-pack/libc-link --arch aarch64`). The
+real-libc aarch64 plugin transcript is `libc-dynamic: libc ok`, `libc-dynamic: tls ok`,
+`libc-dynamic: iterate ok`, `libc-dynamic: plug fini`, `libc-dynamic: dlclose ok`,
+`libc-dynamic: version ok`, `init exited (0)`.
 
 The fixture creates a plain pipe, an `O_CLOEXEC` pipe and a pipe named in the explicit close
 list, records its identity in the environment, runs a bad image and an oversized raw request
