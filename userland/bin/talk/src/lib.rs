@@ -472,6 +472,61 @@ pub fn sanitize_display(text: &str) -> String {
         .collect()
 }
 
+/// Return the other end of a registered pty tty path.
+///
+/// `pty:1/slave` yields `pty:1/master`; pair `0` keeps the historical `pty:master` name only when
+/// it is written explicitly as `pty:0/slave`.
+#[must_use]
+pub fn opposite_endpoint(tty: &str) -> Option<String> {
+    let rest = tty.strip_prefix("pty:")?;
+    let (pair, role) = rest.split_once('/')?;
+    if pair.is_empty() || !pair.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let opposite = match role {
+        "master" => "slave",
+        "slave" => "master",
+        _ => return None,
+    };
+    Some(format!("pty:{pair}/{opposite}"))
+}
+
+/// Bounded accumulator for newline-terminated protocol frames read from a pty.
+#[derive(Clone, Debug, Default)]
+pub struct FrameReader {
+    buffer: Vec<u8>,
+}
+
+impl FrameReader {
+    /// An empty reader.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { buffer: Vec::new() }
+    }
+
+    /// Append bytes read from the transport.
+    ///
+    /// An unterminated buffer larger than two maximum frames is rejected and cleared.
+    pub fn push(&mut self, bytes: &[u8]) -> Result<(), ProtocolError> {
+        if self.buffer.len().saturating_add(bytes.len()) > MAX_FRAME.saturating_mul(2) {
+            self.buffer.clear();
+            return Err(ProtocolError::TooLong);
+        }
+        self.buffer.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    /// Pop one complete line and decode it.
+    pub fn next_frame(&mut self) -> Option<Result<Frame, ProtocolError>> {
+        let position = self.buffer.iter().position(|byte| *byte == b'\n')?;
+        let line: Vec<u8> = self.buffer.drain(..=position).collect();
+        Some(match core::str::from_utf8(&line) {
+            Ok(text) => decode_frame(text),
+            Err(_) => Err(ProtocolError::BadText),
+        })
+    }
+}
+
 /// Run the built-in local loopback and return a readable transcript.
 ///
 /// This exercises the same encoded frames and state machine as a real peer, but both endpoints
@@ -576,14 +631,18 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Options, Usa
         operands.push(argument);
     }
     if listen {
-        let terminal = match operands.as_slice() {
-            [] => None,
-            [terminal] => Some(validate_terminal(terminal)?),
+        let (address, terminal) = match operands.as_slice() {
+            [] => return Err(UsageError::MissingAddress),
+            [address] => (parse_address(address)?, None),
+            [address, terminal] => (parse_address(address)?, Some(validate_terminal(terminal)?)),
             _ => return Err(UsageError::ExtraOperand),
         };
+        if address.host.is_some() {
+            return Err(UsageError::BadAddress);
+        }
         return Ok(Options {
             listen: true,
-            address: None,
+            address: Some(address),
             terminal,
         });
     }

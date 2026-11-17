@@ -22,7 +22,7 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_proto_fs::{S_IFCHR, Stat};
     use raven_proto_tty::{self, Request, Response, decode_request, encode_response};
-    use raven_ptyd::{Pty, SignalSink};
+    use raven_ptyd::{Pairs, SignalSink};
     use raven_rt::entry;
     use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
 
@@ -33,6 +33,7 @@ mod program {
     const OP_GET_FG: u16 = 0x11;
     const OP_HANGUP: u16 = 0x12;
 
+    #[derive(Default)]
     struct TargetSignal;
 
     impl SignalSink for TargetSignal {
@@ -52,22 +53,28 @@ mod program {
         Slave,
     }
 
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct FileEntry {
+        pair: u64,
+        role: Role,
+    }
+
     struct HandlerImpl {
-        pty: Pty<TargetSignal>,
-        files: BTreeMap<u64, Role>,
+        pairs: Pairs<TargetSignal>,
+        files: BTreeMap<u64, FileEntry>,
         next: u64,
     }
 
     impl HandlerImpl {
         fn new() -> Self {
             Self {
-                pty: Pty::new(TargetSignal),
+                pairs: Pairs::new(),
                 files: BTreeMap::new(),
                 next: 1,
             }
         }
 
-        fn role(&self, file: u64) -> Result<Role, Errno> {
+        fn file(&self, file: u64) -> Result<FileEntry, Errno> {
             self.files.get(&file).copied().ok_or(Errno::EBADF)
         }
     }
@@ -81,43 +88,56 @@ mod program {
             _ctx: &Ctx,
         ) -> HandlerResult<Opened> {
             let path = path.strip_prefix('/').unwrap_or(path);
-            let role = match path {
-                "master" => Role::Master,
-                "slave" => Role::Slave,
-                _ => return Err(Errno::ENOENT.into()),
+            let (pair, role) = match path {
+                "master" => (0u64, Role::Master),
+                "slave" => (0u64, Role::Slave),
+                _ => {
+                    let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
+                        (Role::Master, rest)
+                    } else if let Some(rest) = path.strip_prefix("slave/") {
+                        (Role::Slave, rest)
+                    } else {
+                        return Err(Errno::ENOENT.into());
+                    };
+                    (id.parse::<u64>().map_err(|_| Errno::ENOENT)?, role)
+                }
             };
             let readable = flags & 1 != 0;
             let writable = flags & 2 != 0;
             if !readable && !writable {
                 return Err(Errno::EACCES.into());
             }
+            self.pairs.open(pair);
             let id = self.next;
             self.next = self.next.wrapping_add(1);
-            self.files.insert(id, role);
+            self.files.insert(id, FileEntry { pair, role });
             Ok(Opened::File(id))
         }
 
         fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
-            let role = self.role(file)?;
-            let count = match role {
-                Role::Master => self.pty.read_master(buffer),
-                Role::Slave => self.pty.read_slave(buffer),
+            let entry = self.file(file)?;
+            let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+            let count = match entry.role {
+                Role::Master => pty.read_master(buffer),
+                Role::Slave => pty.read_slave(buffer),
             }
             .map_err(raven_scheme::HandlerError::Errno)?;
             Ok(count)
         }
 
         fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
-            let role = self.role(file)?;
-            match role {
-                Role::Master => self.pty.write_master(buffer),
-                Role::Slave => self.pty.write_slave(buffer),
+            let entry = self.file(file)?;
+            let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+            match entry.role {
+                Role::Master => pty.write_master(buffer),
+                Role::Slave => pty.write_slave(buffer),
             }
             Ok(buffer.len())
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
-            let _ = self.role(file)?;
+            let entry = self.file(file)?;
+            let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
             if request.len() < raven_proto_tty::CALL_LEN
                 || response.len() < raven_proto_tty::CALL_LEN
             {
@@ -138,13 +158,11 @@ mod program {
                         .map_err(|_| Errno::EINVAL)?;
                     let reply = match request {
                         Request::SetMode { settings } => {
-                            self.pty.set_settings(settings);
-                            Response::Mode(self.pty.settings())
+                            pty.set_settings(settings);
+                            Response::Mode(pty.settings())
                         }
-                        Request::GetMode => Response::Mode(self.pty.settings()),
-                        Request::Flush => Response::Flushed {
-                            bytes: self.pty.flush(),
-                        },
+                        Request::GetMode => Response::Mode(pty.settings()),
+                        Request::Flush => Response::Flushed { bytes: pty.flush() },
                     };
                     let mut body = [0u8; raven_proto_tty::CALL_LEN];
                     encode_response(reply, &mut body);
@@ -152,12 +170,12 @@ mod program {
                     Ok(body.len())
                 }
                 OP_SET_FG => {
-                    self.pty.set_fg(arg0 as i32);
-                    write_custom(response, OP_SET_FG, self.pty.fg() as u32, 0)
+                    pty.set_fg(arg0 as i32);
+                    write_custom(response, OP_SET_FG, pty.fg() as u32, 0)
                 }
-                OP_GET_FG => write_custom(response, OP_GET_FG, self.pty.fg() as u32, 0),
+                OP_GET_FG => write_custom(response, OP_GET_FG, pty.fg() as u32, 0),
                 OP_HANGUP => {
-                    self.pty.hangup();
+                    pty.hangup();
                     write_custom(response, OP_HANGUP, 0, 0)
                 }
                 _ => {

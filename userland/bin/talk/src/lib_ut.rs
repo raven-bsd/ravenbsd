@@ -22,13 +22,20 @@ fn parses_a_caller_address_and_terminal() {
 
 #[test]
 fn parses_a_listener_with_and_without_a_terminal() {
-    let options = parse_args(["-l"].map(String::from)).unwrap();
+    let options = parse_args(["-l", "bob"].map(String::from)).unwrap();
     assert!(options.listen);
-    assert_eq!(options.address, None);
+    assert_eq!(
+        options.address.map(|address| address.user),
+        Some("bob".to_string())
+    );
     assert_eq!(options.terminal, None);
 
-    let options = parse_args(["--listen", "tty:console"].map(String::from)).unwrap();
+    let options = parse_args(["--listen", "bob", "tty:console"].map(String::from)).unwrap();
     assert!(options.listen);
+    assert_eq!(
+        options.address.map(|address| address.user),
+        Some("bob".to_string())
+    );
     assert_eq!(options.terminal.as_deref(), Some("tty:console"));
 }
 
@@ -60,8 +67,16 @@ fn rejects_bad_addresses_and_terminals() {
         Err(UsageError::ExtraOperand)
     );
     assert_eq!(
-        parse_args(["-l", "a", "b"].map(String::from)),
+        parse_args(["-l", "a", "b", "c"].map(String::from)),
         Err(UsageError::ExtraOperand)
+    );
+    assert_eq!(
+        parse_args(["-l"].map(String::from)),
+        Err(UsageError::MissingAddress)
+    );
+    assert_eq!(
+        parse_args(["-l", "a@host"].map(String::from)),
+        Err(UsageError::BadAddress)
     );
     assert_eq!(
         parse_args([""].map(String::from)),
@@ -171,6 +186,49 @@ fn split_screen_labels_both_panes() {
 fn remote_text_is_sanitized() {
     assert_eq!(sanitize_display("ok\r\n\x07no\t"), "okno");
     assert_eq!(sanitize_display("h\u{e9}llo"), "hllo");
+}
+
+#[test]
+fn opposite_pty_endpoint_is_switched() {
+    assert_eq!(
+        opposite_endpoint("pty:1/slave").as_deref(),
+        Some("pty:1/master")
+    );
+    assert_eq!(
+        opposite_endpoint("pty:0/master").as_deref(),
+        Some("pty:0/slave")
+    );
+    assert_eq!(opposite_endpoint("tty:console"), None);
+    assert_eq!(opposite_endpoint("pty:master"), None);
+    assert_eq!(opposite_endpoint("pty:x/slave"), None);
+}
+
+#[test]
+fn frame_reader_handles_partial_and_multiple_frames() {
+    let mut reader = FrameReader::new();
+    let invite = encode_frame(&Frame::Invite {
+        caller: alice(),
+        terminal: None,
+    })
+    .unwrap();
+    let accept = encode_frame(&Frame::Accept).unwrap();
+    let partial = &accept[..3];
+    let rest = &accept[3..];
+    reader
+        .push(format!("{invite}\n{partial}").as_bytes())
+        .unwrap();
+    assert_eq!(
+        reader.next_frame(),
+        Some(Ok(Frame::Invite {
+            caller: alice(),
+            terminal: None
+        }))
+    );
+    assert_eq!(reader.next_frame(), None);
+    reader.push(format!("{rest}\n").as_bytes()).unwrap();
+    assert_eq!(reader.next_frame(), Some(Ok(Frame::Accept)));
+    assert_eq!(reader.next_frame(), None);
+    assert!(reader.push(&vec![b'x'; MAX_FRAME * 2 + 1]).is_err());
 }
 
 #[test]
