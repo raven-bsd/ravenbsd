@@ -55,6 +55,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "at"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
+name = "atd"
+version = "0.1.0"
+dependencies = [
+ "at",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "audio-client"
 version = "0.1.0"
 dependencies = [
@@ -88,6 +107,14 @@ name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+
+[[package]]
+name = "batch"
+version = "0.1.0"
+dependencies = [
+ "at",
+ "raven-rt",
+]
 
 [[package]]
 name = "bench-host"
@@ -805,6 +832,16 @@ dependencies = [
 [[package]]
 name = "raven-abi"
 version = "0.1.0"
+
+[[package]]
+name = "raven-at-fixture"
+version = "0.1.0"
+dependencies = [
+ "at",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+]
 
 [[package]]
 name = "raven-atf-run"
