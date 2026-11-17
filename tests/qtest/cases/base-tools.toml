@@ -3,11 +3,15 @@
 #
 # Draft only: copy to tests/qtest/cases/base-tools.toml after the Raven target build of
 # userland/uutils is unblocked and the profile installs build/x86_64/uutils/* at /bin/*.
+#
+# K26k budget (shell-test image, 84 MB initfs): measured boot ~33 s and whole case ~48 s.
+# Boot wait 120 s (3.6x), per-step 15 s (each command is sub-second), case 150 s (3.1x).
+# A regression to a full-image initfs scan pushes the first command past 30 s.
 
 name = "base-tools"
 arch = "x86_64"
 profile = "shell-test"
-timeout_secs = 600
+timeout_secs = 150
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
@@ -23,7 +27,7 @@ regex = '(?i)panic|EXCEPTION|command not found'
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 600
+timeout_secs = 120
 
 [[step]]
 send = "mkdir /tmp/bt\n"
@@ -31,7 +35,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "echo hello > /tmp/bt/a\n"
@@ -39,7 +43,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "cp /tmp/bt/a /tmp/bt/b\n"
@@ -47,7 +51,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "mv /tmp/bt/b /tmp/bt/c\n"
@@ -55,7 +59,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "cat /tmp/bt/c\n"
@@ -63,11 +67,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^hello$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "echo b > /tmp/bt/s\n"
@@ -75,7 +79,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "echo a >> /tmp/bt/s\n"
@@ -83,7 +87,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "sort /tmp/bt/s\n"
@@ -91,15 +95,15 @@ delay_ms = 100
 
 [[step]]
 wait = '^a$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^b$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "echo 1 > /tmp/bt/n\n"
@@ -107,7 +111,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "echo 2 >> /tmp/bt/n\n"
@@ -115,7 +119,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "echo 3 >> /tmp/bt/n\n"
@@ -123,7 +127,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "head -n 2 /tmp/bt/n\n"
@@ -131,15 +135,15 @@ delay_ms = 100
 
 [[step]]
 wait = '^1$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^2$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "tail -n 1 /tmp/bt/n\n"
@@ -147,11 +151,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^3$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "stat -c %s /tmp/bt/c\n"
@@ -159,11 +163,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^6$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "rm /tmp/bt/c\n"
@@ -171,7 +175,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "false\n"
@@ -179,7 +183,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "echo $?\n"
@@ -187,11 +191,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^1$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "exit 0\n"
@@ -199,4 +203,4 @@ delay_ms = 100
 
 [[step]]
 wait = '^init exited \(0\)$'
-timeout_secs = 60
+timeout_secs = 30
