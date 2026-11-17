@@ -6,6 +6,11 @@
 //! The host allocation is three pages: two readable/writable and one `PROT_NONE` guard. Strings
 //! are placed so their last byte is the last byte before the guard, so a word loop that reads past
 //! the terminator would fault instead of silently passing.
+//!
+//! Under Miri the tests return early with a printed reason: the raw backend uses x86_64 inline
+//! assembly (`src/raw/arch/x86_64/mem.rs:62`) and the guard page uses `mmap`/`mprotect`, both
+//! unsupported by Miri. The real target tests are unchanged and run under nextest; Miri records
+//! the documented capability exclusion instead of a false UB finding.
 
 #![allow(
     clippy::expect_used,
@@ -82,8 +87,24 @@ impl Drop for Guard {
     }
 }
 
+/// True under Miri, where the inline-assembly backend and guard-page mapping cannot execute.
+/// Prints the exact capability exclusion and lets the test pass without the unsupported path.
+fn miri_skip(test: &str) -> bool {
+    if cfg!(miri) {
+        eprintln!(
+            "alignment: {test} skipped under Miri: x86_64 inline assembly \
+             (src/raw/arch/x86_64/mem.rs:62) and mmap guard pages are unsupported"
+        );
+        return true;
+    }
+    false
+}
+
 #[test]
 fn strlen_stops_at_the_guard_page() {
+    if miri_skip("strlen_stops_at_the_guard_page") {
+        return;
+    }
     let guard = Guard::new();
     for length in 0usize..=255 {
         let start = guard.tail(length + 1);
@@ -100,6 +121,9 @@ fn strlen_stops_at_the_guard_page() {
 
 #[test]
 fn strnlen_never_reads_past_the_nul() {
+    if miri_skip("strnlen_never_reads_past_the_nul") {
+        return;
+    }
     let guard = Guard::new();
     for length in 0usize..=200 {
         let start = guard.tail(length + 1);
@@ -116,6 +140,9 @@ fn strnlen_never_reads_past_the_nul() {
 
 #[test]
 fn scanning_functions_stop_at_the_nul_before_the_guard() {
+    if miri_skip("scanning_functions_stop_at_the_nul_before_the_guard") {
+        return;
+    }
     let guard = Guard::new();
     for length in 0usize..=128 {
         let start = guard.tail(length + 1);
@@ -150,6 +177,9 @@ fn scanning_functions_stop_at_the_nul_before_the_guard() {
 
 #[test]
 fn copy_functions_write_up_to_but_not_past_the_guard() {
+    if miri_skip("copy_functions_write_up_to_but_not_past_the_guard") {
+        return;
+    }
     let guard = Guard::new();
     for length in 0usize..=128 {
         let destination = guard.tail(length);
@@ -174,6 +204,9 @@ fn copy_functions_write_up_to_but_not_past_the_guard() {
 
 #[test]
 fn memmove_overlaps_both_directions() {
+    if miri_skip("memmove_overlaps_both_directions") {
+        return;
+    }
     for distance in [1usize, 2, 7, 8, 15, 16, 17, 63, 64, 65, 129] {
         for length in 0usize..=300 {
             let mut buffer = vec![0u8; length + distance + 8];
@@ -210,6 +243,9 @@ fn memmove_overlaps_both_directions() {
 
 #[test]
 fn alignment_sweep_for_block_and_string_operations() {
+    if miri_skip("alignment_sweep_for_block_and_string_operations") {
+        return;
+    }
     let mut source_storage = [0u8; 512];
     let mut destination_storage = [0u8; 512];
     for (index, slot) in source_storage.iter_mut().enumerate() {
