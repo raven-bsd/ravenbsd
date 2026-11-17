@@ -385,3 +385,88 @@ fn the_dtoa_byte_image_is_the_binary128_pattern() {
             == 1.5
     );
 }
+
+#[test]
+fn frexp_splits_into_a_half_open_mantissa_and_exponent() {
+    for &(value, want_mantissa, want_exponent) in &[
+        (1.0, 0.5, 1),
+        (8.0, 0.5, 4),
+        (-8.0, -0.5, 4),
+        (0.5, 0.5, 0),
+        (0.75, 0.75, 0),
+        (3.0, 0.75, 2),
+    ] {
+        let (mantissa, exponent) = LongDouble128::from_f64(value).frexp();
+        assert_eq!(mantissa.to_f64(), want_mantissa, "frexp({value}) mantissa");
+        assert_eq!(exponent, want_exponent, "frexp({value}) exponent");
+    }
+    let (mantissa, exponent) = LongDouble128::from_f64(0.0).frexp();
+    assert!(mantissa.is_zero());
+    assert_eq!(exponent, 0);
+    let (mantissa, exponent) = LongDouble128::from_f64(f64::INFINITY).frexp();
+    assert!(mantissa.is_infinite());
+    assert_eq!(exponent, 0);
+    // A value built from the smallest f64 subnormal is normal in binary128: 5e-324 = 0.5 * 2^-1073.
+    let (mantissa, exponent) = LongDouble128::from_f64(f64::from_bits(1)).frexp();
+    assert_eq!(mantissa.to_f64(), 0.5);
+    assert_eq!(exponent, -1073);
+}
+
+#[test]
+fn ilogb_and_logb_report_the_unbiased_exponent() {
+    assert_eq!(LongDouble128::from_f64(1.0).ilogb(), 0);
+    assert_eq!(LongDouble128::from_f64(8.0).ilogb(), 3);
+    assert_eq!(LongDouble128::from_f64(0.5).ilogb(), -1);
+    assert_eq!(
+        LongDouble128::from_f64(0.0).ilogb(),
+        crate::consts::FP_ILOGB0
+    );
+    assert_eq!(
+        LongDouble128::from_f64(f64::INFINITY).ilogb(),
+        crate::consts::FP_ILOGBNAN
+    );
+    assert_eq!(
+        LongDouble128::from_f64(f64::NAN).ilogb(),
+        crate::consts::FP_ILOGBNAN
+    );
+    assert_eq!(LongDouble128::from_f64(8.0).logb().to_f64(), 3.0);
+    let zero_logb = LongDouble128::from_f64(0.0).logb();
+    assert!(zero_logb.is_infinite() && zero_logb.sign_bit());
+    let negative_infinity_logb = LongDouble128::from_f64(f64::NEG_INFINITY).logb();
+    assert!(negative_infinity_logb.is_infinite() && negative_infinity_logb.sign_bit());
+    assert!(LongDouble128::from_f64(f64::NAN).logb().is_nan());
+}
+
+#[test]
+fn significand_scales_into_one_to_two() {
+    assert_eq!(LongDouble128::from_f64(1.0).significand().to_f64(), 1.0);
+    assert_eq!(LongDouble128::from_f64(8.0).significand().to_f64(), 1.0);
+    assert_eq!(LongDouble128::from_f64(0.75).significand().to_f64(), 1.5);
+    assert_eq!(LongDouble128::from_f64(-0.75).significand().to_f64(), -1.5);
+    assert!(LongDouble128::from_f64(0.0).significand().is_zero());
+    assert!(
+        LongDouble128::from_f64(f64::INFINITY)
+            .significand()
+            .is_infinite()
+    );
+}
+
+#[test]
+fn modf_returns_the_fraction_and_the_truncated_integral() {
+    let (fraction, integral) = LongDouble128::from_f64(3.75).modf();
+    assert_eq!(fraction.to_f64(), 0.75);
+    assert_eq!(integral.to_f64(), 3.0);
+    let (fraction, integral) = LongDouble128::from_f64(-3.75).modf();
+    assert_eq!(fraction.to_f64(), -0.75);
+    assert_eq!(integral.to_f64(), -3.0);
+    let (fraction, integral) = LongDouble128::from_f64(5.0).modf();
+    assert!(fraction.is_zero());
+    assert_eq!(integral.to_f64(), 5.0);
+    let (fraction, integral) = LongDouble128::from_f64(0.25).modf();
+    assert_eq!(fraction.to_f64(), 0.25);
+    assert!(integral.is_zero());
+    let (fraction, integral) = LongDouble128::from_f64(f64::INFINITY).modf();
+    assert!(fraction.is_zero() && integral.is_infinite());
+    let (fraction, integral) = LongDouble128::from_f64(f64::NAN).modf();
+    assert!(fraction.is_nan() && integral.is_nan());
+}
