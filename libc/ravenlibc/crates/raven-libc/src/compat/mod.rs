@@ -232,6 +232,8 @@ pub mod vis;
 // P1c-ipc-tty: one module per exported symbol or alias group. The archive check K4 limits a
 // member to four global text symbols, so the AIO `64` spellings share their base module and
 // every other family is split one symbol per file.
+pub mod __raven_va_mq_open;
+pub mod __raven_va_semctl;
 pub mod aio_cancel;
 pub mod aio_error;
 pub mod aio_fsync;
@@ -252,7 +254,6 @@ pub mod lio_listio;
 pub mod mq_close;
 pub mod mq_getattr;
 pub mod mq_notify;
-pub mod mq_open;
 pub mod mq_receive;
 pub mod mq_send;
 pub mod mq_setattr;
@@ -264,7 +265,6 @@ pub mod msgget;
 pub mod msgrcv;
 pub mod msgsnd;
 pub mod putmsg;
-pub mod semctl;
 pub mod semget;
 pub mod semop;
 pub mod semtimedop;
