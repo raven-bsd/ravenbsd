@@ -71,15 +71,17 @@ if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
     builtins=1
 fi
 if [ -n "$builtins" ]; then
-    "$CC" --target=aarch64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+    "$CC" --target=aarch64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld -Wl,-m,aarch64linux \
         -nostdlib -nostartfiles -pie -Wl,-dynamic-linker,/libexec/ld-elf.so.1 \
+        -Wl,--allow-shlib-undefined \
         -Wl,--image-base=0x400000 -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
         "$sysroot/usr/lib/Scrt1.o" "$sysroot/usr/lib/crti.o" "$out/dynamic-exec.o" \
         -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
         "$sysroot/usr/lib/crtn.o" -o "$out/dynamic-exec"
 else
-    "$CC" --target=aarch64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+    "$CC" --target=aarch64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld -Wl,-m,aarch64linux \
         -nostdlib -nostartfiles -pie -Wl,-dynamic-linker,/libexec/ld-elf.so.1 \
+        -Wl,--allow-shlib-undefined \
         -Wl,--image-base=0x400000 -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
         "$sysroot/usr/lib/Scrt1.o" "$sysroot/usr/lib/crti.o" "$out/dynamic-exec.o" \
         -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc \

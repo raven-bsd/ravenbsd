@@ -372,3 +372,16 @@ fn the_binary128_exact_class_helpers() {
         1.0
     );
 }
+
+#[test]
+fn the_dtoa_byte_image_is_the_binary128_pattern() {
+    let bits = ONE | 0x1234;
+    let bytes = LongDouble128::from_bits(bits).to_dtoa_bytes();
+    assert_eq!(u128::from_le_bytes(bytes), bits);
+    assert_eq!(LongDouble128::from_dtoa_bytes(bytes).to_bits(), bits);
+    assert_eq!(LongDouble128::from_dtoa_bytes([0; 16]).to_bits(), 0);
+    assert!(
+        LongDouble128::from_dtoa_bytes(LongDouble128::from_f64(1.5).to_dtoa_bytes()).to_f64()
+            == 1.5
+    );
+}
