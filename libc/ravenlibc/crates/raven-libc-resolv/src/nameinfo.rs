@@ -5,7 +5,6 @@
 
 use alloc::string::String;
 
-use raven_libc_abi::errno::{EACCES, ENOENT, ENOTDIR};
 use raven_libc_nss::Source;
 
 use crate::conf::parse_resolv_conf;
@@ -13,12 +12,13 @@ use crate::consts::{
     NI_DGRAM, NI_NAMEREQD, NI_NOFQDN, NI_NUMERICHOST, NI_NUMERICSCOPE, NI_NUMERICSERV, RR_PTR,
 };
 use crate::errors::Eai;
+use crate::hosts;
 use crate::inet::inet_ntop;
-use crate::linereader::{LineReader, strip_comment, words};
 use crate::literal;
 use crate::lookup::HostOrder;
 use crate::msg::{dns_parse_offset, res_mkquery};
 use crate::name::{dn_expand, is_valid_hostname};
+use crate::netdb::{self, Proto};
 use crate::traits::Env;
 use crate::types::{Family, IpAddr, SockAddr};
 
@@ -31,39 +31,7 @@ fn target16(addr: &SockAddr) -> [u8; 16] {
 
 fn reverse_hosts(addr: &SockAddr, env: &Env) -> Option<String> {
     let file = env.read("/etc/hosts").ok()?;
-    let target = target16(addr);
-    let mut reader = LineReader::new(&file, crate::consts::HOSTS_LINE_MAX);
-    while let Some(line) = reader.next_line() {
-        let line = strip_comment(line);
-        let mut tokens = words(line);
-        let Some(text) = tokens.next() else {
-            continue;
-        };
-        let Ok(text) = core::str::from_utf8(text) else {
-            continue;
-        };
-        let Ok(Some(literal)) =
-            literal::lookup_ipliteral(text.as_bytes(), crate::consts::AF_UNSPEC, env.ifnames)
-        else {
-            continue;
-        };
-        let candidate = literal.ip();
-        let bytes = match candidate {
-            IpAddr::V4(v4) => IpAddr::V4(v4).to_v4_mapped().octets16(),
-            IpAddr::V6(v6) => v6,
-        };
-        if bytes != target || literal.scope != addr.scope {
-            continue;
-        }
-        if let Some(name) = tokens.next()
-            && let Ok(name) = core::str::from_utf8(name)
-            && !name.is_empty()
-            && name.len() <= crate::consts::NI_MAXHOST
-        {
-            return Some(String::from(name));
-        }
-    }
-    None
+    hosts::reverse(&file, &target16(addr), addr.scope, env.ifnames)
 }
 
 /// The PTR name of an address; a v4-mapped IPv6 address uses the v4 name.
@@ -152,49 +120,8 @@ fn ptr_lookup(addr: &SockAddr, env: &Env) -> Option<String> {
 }
 
 fn reverse_services(port: u16, dgram: bool, env: &Env) -> Option<String> {
-    let file = match env.read("/etc/services") {
-        Ok(bytes) => bytes,
-        Err(errno) if errno == ENOENT || errno == ENOTDIR || errno == EACCES => return None,
-        Err(_) => return None,
-    };
-    let mut reader = LineReader::new(&file, crate::consts::DB_LINE_MAX);
-    while let Some(line) = reader.next_line() {
-        let line = strip_comment(line);
-        let mut tokens = words(line);
-        let Some(name) = tokens.next() else {
-            continue;
-        };
-        let Some(port_proto) = tokens.next() else {
-            continue;
-        };
-        let mut parts = port_proto.split(|byte| *byte == b'/');
-        let Some(port_text) = parts.next() else {
-            continue;
-        };
-        let Some(proto) = parts.next() else {
-            continue;
-        };
-        let Ok(port_text) = core::str::from_utf8(port_text) else {
-            continue;
-        };
-        let Ok(value) = port_text.parse::<u32>() else {
-            continue;
-        };
-        if value != u32::from(port) {
-            continue;
-        }
-        let wanted = if dgram { b"udp" } else { b"tcp" };
-        if proto != wanted {
-            continue;
-        }
-        let (Ok(text), true) = (core::str::from_utf8(name), name.len() <= 32) else {
-            continue;
-        };
-        if !text.is_empty() {
-            return Some(String::from(text));
-        }
-    }
-    None
+    let proto = if dgram { Proto::Udp } else { Proto::Tcp };
+    netdb::service_name(env.files, port, proto)
 }
 
 fn numeric_host(addr: &SockAddr, flags: i32, env: &Env) -> String {

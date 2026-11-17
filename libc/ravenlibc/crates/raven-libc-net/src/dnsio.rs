@@ -18,11 +18,19 @@ use crate::msg::{bare_path, socket_path};
 use crate::{Net, NetBackend, NetEnv, Sock, SocketFds, UnixBackend, WaitItem};
 
 /// Per-`Net` DNS socket bookkeeping.
+///
+/// One map for both transports: keying two separate `BTreeMap`s by the same `u32` made the
+/// compiler instantiate the whole node machinery twice, which was several kilobytes of the P5
+/// resolver graph. The tag costs one compare and keeps the ids unique across both families.
 #[derive(Default)]
 pub struct DnsState {
     next: u32,
-    udp: BTreeMap<u32, UdpGroup>,
-    tcp: BTreeMap<u32, TcpEntry>,
+    entries: BTreeMap<u32, DnsEntry>,
+}
+
+enum DnsEntry {
+    Udp(UdpGroup),
+    Tcp(TcpEntry),
 }
 
 struct UdpGroup {
@@ -36,9 +44,11 @@ struct TcpEntry {
 
 impl DnsState {
     fn next_id(&mut self) -> u32 {
-        let value = self.next;
+        // The counter is shared by both transports now, and an id must never be handed out
+        // twice while an entry is live: the old "return the previous value" form returned 1 for
+        // both the first and second socket, which the two separate maps hid by accident.
         self.next = self.next.wrapping_add(1).max(1);
-        value.max(1)
+        self.next
     }
 }
 
@@ -87,20 +97,20 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> DnsIo for NetDns<'_
                     }),
                 )
                 .map_err(errno)?;
-            state.udp.insert(
+            state.entries.insert(
                 id,
-                UdpGroup {
+                DnsEntry::Udp(UdpGroup {
                     members: Vec::new(),
                     bare: Some(sock),
-                },
+                }),
             );
         } else {
-            state.udp.insert(
+            state.entries.insert(
                 id,
-                UdpGroup {
+                DnsEntry::Udp(UdpGroup {
                     members: Vec::new(),
                     bare: None,
-                },
+                }),
             );
         }
         Ok(UdpSock(id))
@@ -109,7 +119,9 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> DnsIo for NetDns<'_
     fn send_to(&self, s: UdpSock, buf: &[u8], to: &SockAddr) -> Result<usize, i32> {
         let endpoint = endpoint_of(to).ok_or(i32::from(Errno::EAFNOSUPPORT.0))?;
         let mut state = self.net.dns.borrow_mut();
-        let group = state.udp.get_mut(&s.0).ok_or(i32::from(Errno::EBADF.0))?;
+        let Some(DnsEntry::Udp(group)) = state.entries.get_mut(&s.0) else {
+            return Err(i32::from(Errno::EBADF.0));
+        };
         if let Some(sock) = group.bare {
             return self
                 .net
@@ -129,7 +141,9 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> DnsIo for NetDns<'_
 
     fn recv_from(&self, s: UdpSock, buf: &mut [u8]) -> Result<Recv, i32> {
         let mut state = self.net.dns.borrow_mut();
-        let group = state.udp.get_mut(&s.0).ok_or(i32::from(Errno::EBADF.0))?;
+        let Some(DnsEntry::Udp(group)) = state.entries.get_mut(&s.0) else {
+            return Err(i32::from(Errno::EBADF.0));
+        };
         if let Some(sock) = group.bare {
             match self.net.backend.read(sock, buf) {
                 Ok(done) => {
@@ -174,19 +188,23 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> DnsIo for NetDns<'_
         let sock = self.net.backend.open(path).map_err(errno)?;
         let mut state = self.net.dns.borrow_mut();
         let id = state.next_id();
-        state.tcp.insert(id, TcpEntry { sock });
+        state.entries.insert(id, DnsEntry::Tcp(TcpEntry { sock }));
         Ok(TcpSock(id))
     }
 
     fn tcp_send(&self, s: TcpSock, buf: &[u8]) -> Result<usize, i32> {
         let state = self.net.dns.borrow();
-        let entry = state.tcp.get(&s.0).ok_or(i32::from(Errno::EBADF.0))?;
+        let Some(DnsEntry::Tcp(entry)) = state.entries.get(&s.0) else {
+            return Err(i32::from(Errno::EBADF.0));
+        };
         self.net.backend.write(entry.sock, buf, None).map_err(errno)
     }
 
     fn tcp_recv(&self, s: TcpSock, buf: &mut [u8]) -> Result<usize, i32> {
         let state = self.net.dns.borrow();
-        let entry = state.tcp.get(&s.0).ok_or(i32::from(Errno::EBADF.0))?;
+        let Some(DnsEntry::Tcp(entry)) = state.entries.get(&s.0) else {
+            return Err(i32::from(Errno::EBADF.0));
+        };
         match self.net.backend.read(entry.sock, buf) {
             Ok(done) => Ok(done.len),
             Err(Errno::EAGAIN) => Err(i32::from(Errno::EAGAIN.0)),
@@ -201,7 +219,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> DnsIo for NetDns<'_
             for (index, interest) in interests.iter().enumerate() {
                 match interest.kind {
                     InterestKind::Udp(sock) => {
-                        if let Some(group) = state.udp.get(&sock.0) {
+                        if let Some(DnsEntry::Udp(group)) = state.entries.get(&sock.0) {
                             if let Some(bare) = group.bare {
                                 items.push((
                                     index,
@@ -227,7 +245,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> DnsIo for NetDns<'_
                         }
                     }
                     InterestKind::Tcp(sock) => {
-                        if let Some(entry) = state.tcp.get(&sock.0) {
+                        if let Some(DnsEntry::Tcp(entry)) = state.entries.get(&sock.0) {
                             items.push((
                                 index,
                                 WaitItem {
@@ -267,7 +285,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> DnsIo for NetDns<'_
 
     fn close_udp(&self, s: UdpSock) {
         let mut state = self.net.dns.borrow_mut();
-        if let Some(group) = state.udp.remove(&s.0) {
+        if let Some(DnsEntry::Udp(group)) = state.entries.remove(&s.0) {
             if let Some(sock) = group.bare {
                 self.net.backend.close(sock);
             }
@@ -279,7 +297,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> DnsIo for NetDns<'_
 
     fn close_tcp(&self, s: TcpSock) {
         let mut state = self.net.dns.borrow_mut();
-        if let Some(entry) = state.tcp.remove(&s.0) {
+        if let Some(DnsEntry::Tcp(entry)) = state.entries.remove(&s.0) {
             self.net.backend.close(entry.sock);
         }
     }
