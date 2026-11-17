@@ -586,26 +586,26 @@ RAVEN_1.0 {
 		acosf;
 		acosh;
 		acoshf;
-		acoshl; # x86_64
-		acosl; # x86_64
+		acoshl; # x86_64 aarch64
+		acosl; # x86_64 aarch64
 		acospi;
 		asin;
 		asinf;
 		asinh;
 		asinhf;
-		asinhl; # x86_64
-		asinl; # x86_64
+		asinhl; # x86_64 aarch64
+		asinl; # x86_64 aarch64
 		asinpi;
 		atan;
 		atan2;
 		atan2f;
-		atan2l; # x86_64
+		atan2l; # x86_64 aarch64
 		atan2pi;
 		atanf;
 		atanh;
 		atanhf;
-		atanhl; # x86_64
-		atanl; # x86_64
+		atanhl; # x86_64 aarch64
+		atanl; # x86_64 aarch64
 		atanpi;
 		canonicalize;
 		canonicalizef;
@@ -624,8 +624,8 @@ RAVEN_1.0 {
 		cosf;
 		cosh;
 		coshf;
-		coshl; # x86_64
-		cosl; # x86_64
+		coshl; # x86_64 aarch64
+		cosl; # x86_64 aarch64
 		cospi;
 		drem;
 		dremf;
@@ -835,12 +835,12 @@ RAVEN_1.0 {
 		sin;
 		sincos;
 		sincosf;
-		sincosl; # x86_64
+		sincosl; # x86_64 aarch64
 		sinf;
 		sinh;
 		sinhf;
-		sinhl; # x86_64
-		sinl; # x86_64
+		sinhl; # x86_64 aarch64
+		sinl; # x86_64 aarch64
 		sinpi;
 		sinpif;
 		sqrt;
@@ -854,8 +854,8 @@ RAVEN_1.0 {
 		tanf;
 		tanh;
 		tanhf;
-		tanhl; # x86_64
-		tanl; # x86_64
+		tanhl; # x86_64 aarch64
+		tanl; # x86_64 aarch64
 		tanpi;
 		tgamma;
 		tgammaf;

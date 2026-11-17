@@ -414,7 +414,7 @@ pub mod g10 {
     lda_unary!(log2l, log2l_inner);
 }
 
-/// `log10l`.
+/// `log10l`, `sinl`, `cosl`, `tanl`.
 pub mod g11 {
     use raven_libc_m::LongDouble;
 
@@ -425,5 +425,141 @@ pub mod g11 {
         }
     }
 
+    extern "C" fn sinl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::sinl(*x);
+        }
+    }
+
+    extern "C" fn cosl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::cosl(*x);
+        }
+    }
+
+    extern "C" fn tanl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::tanl(*x);
+        }
+    }
+
     lda_unary!(log10l, log10l_inner);
+    lda_unary!(sinl, sinl_inner);
+    lda_unary!(cosl, cosl_inner);
+    lda_unary!(tanl, tanl_inner);
+}
+
+/// hyperbolic exports: `sinhl`, `coshl`, `tanhl`.
+pub mod g12 {
+    use raven_libc_m::LongDouble;
+
+    extern "C" fn sinhl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::sinhl(*x);
+        }
+    }
+
+    extern "C" fn coshl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::coshl(*x);
+        }
+    }
+
+    extern "C" fn tanhl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::tanhl(*x);
+        }
+    }
+
+    extern "C" fn asinl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::asinl(*x);
+        }
+    }
+
+    lda_unary!(sinhl, sinhl_inner);
+    lda_unary!(coshl, coshl_inner);
+    lda_unary!(tanhl, tanhl_inner);
+    lda_unary!(asinl, asinl_inner);
+}
+
+/// inverse exports: `acosl`, `atanl`, `asinhl`, `acoshl`.
+pub mod g13 {
+    use raven_libc_m::LongDouble;
+
+    extern "C" fn acosl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::acosl(*x);
+        }
+    }
+
+    extern "C" fn atanl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::atanl(*x);
+        }
+    }
+
+    extern "C" fn asinhl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::asinhl(*x);
+        }
+    }
+
+    extern "C" fn acoshl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::acoshl(*x);
+        }
+    }
+
+    lda_unary!(acosl, acosl_inner);
+    lda_unary!(atanl, atanl_inner);
+    lda_unary!(asinhl, asinhl_inner);
+    lda_unary!(acoshl, acoshl_inner);
+}
+
+/// `atanhl`, `atan2l`, `sincosl`.
+pub mod g14 {
+    use raven_libc_m::LongDouble;
+
+    extern "C" fn atanhl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::atanhl(*x);
+        }
+    }
+
+    extern "C" fn atan2l_inner(out: *mut LongDouble, y: *const LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::atan2l(*y, *x);
+        }
+    }
+
+    extern "C" fn sincosl_inner(
+        sin_out: *mut LongDouble,
+        cos_out: *mut LongDouble,
+        x: *const LongDouble,
+    ) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            let (sine, cosine) = raven_libc_m::sincosl(*x);
+            *sin_out = sine;
+            *cos_out = cosine;
+        }
+    }
+
+    lda_unary!(atanhl, atanhl_inner);
+    lda_binary!(atan2l, atan2l_inner);
+    lda_sincos!(sincosl, sincosl_inner);
 }
