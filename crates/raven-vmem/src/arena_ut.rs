@@ -5,7 +5,7 @@
 
 use super::*;
 
-fn assert_tiles(arena: &Vmem, start: u64, end: u64) {
+fn assert_tiles<const N: usize>(arena: &VmemGeneric<N>, start: u64, end: u64) {
     let mut cursor = start;
     let mut previous_free = false;
     let mut count = 0usize;
@@ -40,7 +40,7 @@ fn sorted(mut ranges: Vec<(u64, u64)>) -> Vec<(u64, u64)> {
     ranges
 }
 
-fn check_all(arena: &Vmem, start: u64, end: u64, live: &[(u64, u64)]) {
+fn check_all<const N: usize>(arena: &VmemGeneric<N>, start: u64, end: u64, live: &[(u64, u64)]) {
     assert_tiles(arena, start, end);
     assert_no_overlap(live);
     let allocated: Vec<(u64, u64)> = arena
@@ -119,7 +119,7 @@ fn import_errors_are_rejected() {
     assert_eq!(Vmem::new(0, 0).err(), Some(VmemError::ZeroLength));
     assert_eq!(Vmem::new(u64::MAX - 1, 2).err(), Some(VmemError::Overflow));
     assert_eq!(
-        Vmem::with_capacity(0, 0x100, 0).err(),
+        VmemGeneric::<0>::new(0, 0x100).err(),
         Some(VmemError::NoTags)
     );
 }
@@ -290,7 +290,7 @@ fn coalescing_merges_three_neighbours() {
 
 #[test]
 fn tag_exhaustion_is_transactional() {
-    let mut arena = Vmem::with_capacity(0x1000, 0x100, 2).expect("arena");
+    let mut arena = VmemGeneric::<2>::new(0x1000, 0x100).expect("arena");
     assert_eq!(arena.tag_capacity(), 2);
     let first = arena.alloc(0x10, 1).expect("first split");
     assert_eq!(arena.span_count(), 2);
@@ -306,7 +306,7 @@ fn tag_exhaustion_is_transactional() {
 
 #[test]
 fn import_coalesces_without_a_new_tag() {
-    let mut arena = Vmem::with_capacity(0x1000, 0x100, 1).expect("arena");
+    let mut arena = VmemGeneric::<1>::new(0x1000, 0x100).expect("arena");
     arena
         .import(0x1100, 0x100)
         .expect("adjacent import reuses the free tag");
@@ -372,8 +372,8 @@ const ACTIONS: [Op; 10] = [
     Op::Free(3),
 ];
 
-fn apply(
-    arena: &mut Vmem,
+fn apply<const N: usize>(
+    arena: &mut VmemGeneric<N>,
     slots: &mut [Option<(u64, u64)>; 4],
     live: &mut Vec<(u64, u64)>,
     op: Op,
@@ -413,7 +413,7 @@ fn exhaustive_alloc_free_coalesce() {
     const DEPTH: u32 = 4;
     let total = (ACTIONS.len() as u32).pow(DEPTH);
     for code in 0..total {
-        let mut arena = Vmem::with_capacity(START, END - START, 32).expect("arena");
+        let mut arena = VmemGeneric::<32>::new(START, END - START).expect("arena");
         let mut slots: [Option<(u64, u64)>; 4] = [None; 4];
         let mut live: Vec<(u64, u64)> = Vec::new();
         let mut value = code;
@@ -448,7 +448,7 @@ fn property_no_overlapping_live_segments() {
     const START: u64 = 0x10_0000;
     const SIZE: u64 = 0x4000;
     const ROUNDS: usize = 4000;
-    let mut arena = Vmem::with_capacity(START, SIZE, 256).expect("arena");
+    let mut arena = Vmem::new(START, SIZE).expect("arena");
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
     let mut live: Vec<(u64, u64)> = Vec::new();
 

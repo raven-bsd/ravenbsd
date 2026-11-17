@@ -26,7 +26,7 @@ _start:
     .balign 16
     .global __boot_stack_bottom
 __boot_stack_bottom:
-    .skip 65536
+    .skip 8388608
     .global __boot_stack_top
 __boot_stack_top:
     .size __boot_stack_bottom, __boot_stack_top - __boot_stack_bottom

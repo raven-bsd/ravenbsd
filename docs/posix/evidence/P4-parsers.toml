@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P42 parser-generator evidence: the two first-party host tools. Each row runs the fixtures that
+# generate C, build it with the host compiler and execute the resulting scanner/parser.
+
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.lex"
+status = "present"
+evidence = "test:tests/posix/utility/parsers/lex/test.sh"
+notes = "P42: lex fixture builds a word scanner with start conditions and longest-match rules"
+
+[[row]]
+id = "util.yacc"
+status = "present"
+evidence = "test:tests/posix/utility/parsers/yacc/test.sh"
+notes = "P42: yacc + lex calculate precedence/associativity and recover through the error token"

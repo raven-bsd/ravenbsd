@@ -1,0 +1,60 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt CXREF 1
+.Os RavenBSD
+.Sh NAME
+.Nm cxref
+.Nd print a C cross-reference table
+.Sh SYNOPSIS
+.Nm
+.Op Fl x
+.Op Fl o Ar file
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility scans C source files and prints one cross-reference row per definition:
+.Ar name Ns \t Ns Ar kind Ns \t Ns Ar file : Ns Ar line Ns \t Ns Ar refs .
+.Ar refs
+is a comma-separated list of
+.Ar file : Ns Ar line
+occurrences, or
+.Ar -
+when there are none. The definition line is not repeated.
+.Pp
+Recognized kinds are
+.Cm function ,
+.Cm global ,
+.Cm macro ,
+.Cm struct
+and
+.Cm enum .
+References are lexical identifier matches, so a same-named local can appear.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl o Ar file
+Write the table to
+.Ar file .
+.Ar -
+writes to standard output.
+.It Fl x
+Select the cross-reference table; this is the only mode and the default.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for a file or output error, 2 for usage.
+.Sh SEE ALSO
+.Xr cflow 1 ,
+.Xr ctags 1
+.Sh STANDARDS
+A documented subset of POSIX
+.Nm cxref .
+Preprocessor evaluation, C++, typedef aliases, struct members, enum constants and the
+.Fl c ,
+.Fl s ,
+.Fl t
+and
+.Fl u
+options are unsupported.

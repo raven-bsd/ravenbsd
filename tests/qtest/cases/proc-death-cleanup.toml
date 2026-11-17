@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "proc-death-cleanup"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 900
+pre = ["sh tests/fixtures/proc-death-cleanup/build.sh"]
+initfs = "build/fixtures/proc-death-cleanup/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s69-cleanupcheck s36-stackcheck"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^s69: server ready$'
+
+# Baseline drain: no live timer, DMA, IRQ, MMIO, event, capture or pager object, and no waiter
+# or request left by the server.
+[[expect]]
+regex = '^s69: exit s69-drain processes=\d+ zombies=\d+ handles=0 lineage=\d+ timers=0 timers_live=0 dma=0 dma_live=0 irq=0 mmio=0 events=0 captures=0 pager=0 wait=0 childwait=0 sigwait=0 schemewait=0 client=0 active=0 queued=0 stack_fresh=\d+ stack_cached=\d+ heap=\d+$'
+
+[[expect]]
+regex = '^s69: baseline ok$'
+
+# Ten thousand process kills: the first hundred have a main thread blocked on a futex, the rest
+# are created-but-never-started process objects.
+[[expect]]
+regex = '^s69: victims done=10000$'
+
+[[expect]]
+regex = '^s69: owner ready$'
+
+# A resource owner exits with no handle, timer, DMA byte, IRQ, MMIO window, event queue or
+# pager object.  Its two captures are the in-flight WRITE and reply attachment the server still
+# holds; the final drain below proves the server retires them.
+[[expect]]
+regex = '^s69: exit s69-owner processes=\d+ zombies=\d+ handles=0 lineage=\d+ timers=0 timers_live=0 dma=0 dma_live=0 irq=0 mmio=0 events=0 captures=[12] pager=0 wait=0 childwait=0 sigwait=0 schemewait=0 client=0 active=0 queued=0 stack_fresh=\d+ stack_cached=\d+ heap=\d+$'
+
+[[expect]]
+regex = '^s69: server sync drained=1 replied=0$'
+
+[[expect]]
+regex = '^s69: cycle 0$'
+
+[[expect]]
+regex = '^s69: cycle 25$'
+
+[[expect]]
+regex = '^s69: cycle 50$'
+
+[[expect]]
+regex = '^s69: cycle 75$'
+
+[[expect]]
+regex = '^s69: cycles done=100$'
+
+# The client blocked in WRITE sees EIO when its server is killed and survives.
+[[expect]]
+regex = '^s69: client eio ok$'
+
+[[expect]]
+regex = '^s69: server death client ok$'
+
+# The dead server's name is free immediately, and the replacement server answers.
+[[expect]]
+regex = '^s69: server ready$'
+
+[[expect]]
+regex = '^s69: server reregistered$'
+
+# Final drain after every killed helper was reaped: all global resource counters are zero.
+[[expect]]
+regex = '^s69: exit s69-drain processes=\d+ zombies=\d+ handles=0 lineage=\d+ timers=0 timers_live=0 dma=0 dma_live=0 irq=0 mmio=0 events=0 captures=0 pager=0 wait=0 childwait=0 sigwait=0 schemewait=0 client=0 active=0 queued=0 stack_fresh=\d+ stack_cached=\d+ heap=\d+$'
+
+[[expect]]
+regex = '^s69: cleanup ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|s69: failed|s69: cycle error|s69: owner event wait returned'

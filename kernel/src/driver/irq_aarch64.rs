@@ -27,6 +27,14 @@ pub const IRQ_MSI: u32 = 2;
 /// `IRQ_CREATE` kinds.
 pub const IRQ_MSIX: u32 = 3;
 
+/// Live interrupt objects (S69 cleanup evidence).
+static LIVE_IRQS: AtomicU64 = AtomicU64::new(0);
+
+/// Number of live interrupt objects across all processes.
+pub fn live_objects() -> u64 {
+    LIVE_IRQS.load(Ordering::Acquire)
+}
+
 /// Highest SPI id the GICv2 distributor can carry.
 const MAX_SPI: u32 = 1020;
 /// Registry slots (one per possible interrupt id).
@@ -58,6 +66,8 @@ impl SpiState {
 /// One interrupt source a driver can wait on.
 pub struct Irq {
     state: Arc<SpiState>,
+    /// Resource release already happened (explicit process-exit retire or `Drop`).
+    retired: AtomicBool,
 }
 
 impl Irq {
@@ -65,10 +75,29 @@ impl Irq {
     pub fn pending(&self) -> u64 {
         self.state.pending.load(Ordering::Acquire)
     }
-}
 
-impl Drop for Irq {
-    fn drop(&mut self) {
+    /// Process-exit wait sweeper.
+    ///
+    /// aarch64 `IRQ_WAIT` polls with interrupts enabled instead of blocking on a wait queue, so
+    /// there is no queue entry to remove; the socket still exists for the shared process-exit
+    /// sweep.
+    pub(crate) fn wake_process(&self, process_id: u64) {
+        let _ = process_id;
+    }
+
+    /// Release the SPI claim once.
+    ///
+    /// aarch64 `IRQ_WAIT` polls and keeps only an `Arc<SpiState>`, but a process-exit sweep still
+    /// retires the claim so a line is immediately reusable even if a stale object reference
+    /// survives on an abandoned stack.
+    pub(crate) fn retire(&self) {
+        if !self.retired.swap(true, Ordering::AcqRel) {
+            self.release_resources();
+            LIVE_IRQS.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
+
+    fn release_resources(&self) {
         let spi = self.state.spi;
         self.state.closed.store(true, Ordering::Release);
         let _ = gic::disable(spi);
@@ -83,6 +112,12 @@ impl Drop for Irq {
                 let _ = slot.compare_exchange(published, 0, Ordering::AcqRel, Ordering::Acquire);
             }
         }
+    }
+}
+
+impl Drop for Irq {
+    fn drop(&mut self) {
+        self.retire();
     }
 }
 
@@ -169,7 +204,11 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 closed: AtomicBool::new(false),
             });
             slot.store(Arc::as_ptr(&state) as u64, Ordering::Release);
-            let irq = Arc::new(Irq { state });
+            let irq = Arc::new(Irq {
+                state,
+                retired: AtomicBool::new(false),
+            });
+            LIVE_IRQS.fetch_add(1, Ordering::AcqRel);
             let rights = Rights::READ.union(Rights::DUP).union(Rights::TRANSFER);
             Ok(caller.handles.lock().insert(Object::Irq(irq), rights)?.0 as usize)
         }

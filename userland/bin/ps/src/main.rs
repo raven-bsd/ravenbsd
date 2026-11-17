@@ -14,7 +14,7 @@ extern crate alloc;
 #[cfg(target_os = "none")]
 mod program {
     use alloc::format;
-    use alloc::string::ToString;
+    use alloc::string::{String, ToString};
     use alloc::vec::Vec;
     use core::fmt;
 
@@ -31,6 +31,7 @@ mod program {
 
     const TOOL: &str = "ps";
     const PROC_PID_INFO: usize = 0x3A;
+    const INFO_WORDS: usize = 41;
 
     struct Console;
 
@@ -67,10 +68,10 @@ mod program {
         Ok(formatted)
     }
 
-    fn pid_info(pid: i32) -> Result<[u64; 8], Errno> {
-        let mut words = [0u64; 8];
-        // SAFETY: PROC_PID_INFO takes a scalar pid and a live eight-word array owned by the
-        // caller; the kernel validates the pid and writes exactly eight u64 values.
+    fn pid_info(pid: i32) -> Result<[u64; INFO_WORDS], Errno> {
+        let mut words = [0u64; INFO_WORDS];
+        // SAFETY: PROC_PID_INFO takes a scalar pid and a live 41-word array owned by the
+        // caller; the kernel validates the pid and writes the identity plus the command name.
         let raw = unsafe {
             raven_rt::sys::syscall3(
                 PROC_PID_INFO,
@@ -83,23 +84,39 @@ mod program {
         Ok(words)
     }
 
+    fn command_name(words: &[u64; INFO_WORDS]) -> String {
+        let mut bytes = Vec::new();
+        for word in &words[8..] {
+            for byte in word.to_le_bytes() {
+                if byte == 0 {
+                    return if bytes.is_empty() {
+                        "?".to_string()
+                    } else {
+                        String::from_utf8_lossy(&bytes).into_owned()
+                    };
+                }
+                bytes.push(byte);
+            }
+        }
+        if bytes.is_empty() {
+            "?".to_string()
+        } else {
+            String::from_utf8_lossy(&bytes).into_owned()
+        }
+    }
+
     fn posix_table() -> i32 {
         let mut rows = Vec::new();
         for pid in 1..=4096 {
             let Ok(words) = pid_info(pid) else {
                 continue;
             };
-            let command = if pid == 1 {
-                "init".to_string()
-            } else {
-                "?".to_string()
-            };
             rows.push(ProcessRow {
                 pid: i32::try_from(words[0]).unwrap_or(pid),
                 ppid: i32::try_from(words[1]).unwrap_or(0),
                 uid: u32::try_from(words[4]).unwrap_or(0),
                 gid: u32::try_from(words[6]).unwrap_or(0),
-                cmd: command,
+                cmd: command_name(&words),
             });
         }
         let mut console = Console;

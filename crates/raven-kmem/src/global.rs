@@ -7,22 +7,27 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::cell::RefCell;
 use core::ptr;
 
-use crate::kmem::{Kmem, KmemStats};
+use raven_vmem::DEFAULT_TAG_CAPACITY;
+
+use crate::kmem::{DEFAULT_MAX_SLABS, KmemGeneric, KmemStats};
 use crate::size::classify;
 
-/// A [`GlobalAlloc`] backed by a caller-owned [`Kmem`].
+/// A [`GlobalAlloc`] backed by a caller-owned [`KmemGeneric`].
 ///
-/// There is no global static and no cross-thread sharing: the shim owns its [`Kmem`] behind a
+/// There is no global static and no cross-thread sharing: the shim owns its allocator behind a
 /// [`RefCell`] and is driven directly, so it stays single-threaded. This module is the only place
 /// in the crate that uses `unsafe`: the [`GlobalAlloc`] methods carry the raw-pointer contract the
 /// trait itself defines, and `realloc` copies bytes between two allocations.
-pub struct KmemAlloc {
-    kmem: RefCell<Kmem>,
+pub struct KmemAllocGeneric<const MAX_SLABS: usize, const TAGS: usize> {
+    kmem: RefCell<KmemGeneric<MAX_SLABS, TAGS>>,
 }
 
-impl KmemAlloc {
-    /// Wrap a freshly built [`Kmem`] as a [`GlobalAlloc`].
-    pub fn new(kmem: Kmem) -> Self {
+/// The host-tested shim: default slab and tag capacities.
+pub type KmemAlloc = KmemAllocGeneric<DEFAULT_MAX_SLABS, DEFAULT_TAG_CAPACITY>;
+
+impl<const MAX_SLABS: usize, const TAGS: usize> KmemAllocGeneric<MAX_SLABS, TAGS> {
+    /// Wrap a freshly built allocator as a [`GlobalAlloc`].
+    pub fn new(kmem: KmemGeneric<MAX_SLABS, TAGS>) -> Self {
         Self {
             kmem: RefCell::new(kmem),
         }
@@ -33,17 +38,19 @@ impl KmemAlloc {
         self.kmem.borrow().stats()
     }
 
-    /// Recover the owned [`Kmem`].
-    pub fn into_inner(self) -> Kmem {
+    /// Recover the owned allocator.
+    pub fn into_inner(self) -> KmemGeneric<MAX_SLABS, TAGS> {
         self.kmem.into_inner()
     }
 }
 
-// SAFETY: the shim owns its `Kmem` behind a `RefCell` and is driven by a single thread (there is
+// SAFETY: the shim owns its allocator behind a `RefCell` and is driven by a single thread (there is
 // no global static and no sharing), so `borrow_mut` cannot panic and the single-threaded invariant
 // the `GlobalAlloc` trait assumes holds. Every returned pointer is an address inside the
 // caller-provided arena and is released with a matching `dealloc`.
-unsafe impl GlobalAlloc for KmemAlloc {
+unsafe impl<const MAX_SLABS: usize, const TAGS: usize> GlobalAlloc
+    for KmemAllocGeneric<MAX_SLABS, TAGS>
+{
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         if layout.size() == 0 {
             // A zero-size allocation still needs a non-null, aligned address.

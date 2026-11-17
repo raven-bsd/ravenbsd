@@ -76,6 +76,35 @@ impl PipeEnd {
     pub const fn is_cloexec(&self) -> bool {
         self.cloexec
     }
+
+    /// Wake and remove every pipe waiter owned by `process_id`.
+    ///
+    /// A thread blocked in `read`/`write` holds this endpoint's `Arc` and a wait-queue entry;
+    /// process teardown must wake it with `EIO`, otherwise the entry, the thread and its kernel
+    /// stack survive the process.  The other end of the pipe is untouched.
+    pub fn wake_process(&self, process_id: u64) {
+        let _ = self.pipe.readers.wake_process(process_id);
+        let _ = self.pipe.writers.wake_process(process_id);
+    }
+
+    /// True when both handles refer to the same pipe ring.
+    pub fn same_pipe(&self, other: &PipeEnd) -> bool {
+        Arc::ptr_eq(&self.pipe, &other.pipe)
+    }
+
+    /// Release the 64 KiB ring when no live process holds either end.
+    ///
+    /// A blocked reader/writer leaves an endpoint `Arc` on an abandoned kernel stack.  The
+    /// endpoint structure itself is small, but the ring must not stay allocated after the last
+    /// live process reference is gone.
+    pub fn retire(&self) {
+        let mut state = self.pipe.state.lock();
+        state.read_ends = 0;
+        state.write_ends = 0;
+        if let Some(empty) = ring::Ring::new(1) {
+            state.ring = empty;
+        }
+    }
 }
 
 impl Drop for PipeEnd {

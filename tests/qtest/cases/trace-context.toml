@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Q3 trace-context: the raven-proto-trace codec round-trips on the target (both archs) and the
+# scheme call/reply path is green. The trace-id stamping on the kernel header is the deferred
+# kernel-integration part (S69 owns kernel/src/ipc/**).
+
+name = "trace-context"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/trace-context/build.sh"]
+initfs = "build/fixtures/trace-context/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^trace: codec ok$'
+
+[[expect]]
+regex = '^trace: server ready$'
+
+[[expect]]
+regex = '^trace: scheme ok$'
+
+[[expect]]
+regex = '^trace: ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|trace: failed'

@@ -1,0 +1,56 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt CFLOW 1
+.Os RavenBSD
+.Sh NAME
+.Nm cflow
+.Nd print a C call graph
+.Sh SYNOPSIS
+.Nm
+.Op Fl r
+.Op Fl o Ar file
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility scans C source files and prints the direct call graph.
+A root function is printed as
+.Ql name: line ;
+direct callees are indented by four spaces and expanded recursively. A call back to a function
+already on the current path is printed with a
+.Dq (cycle)
+marker. Only calls to functions defined in the input are shown.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl o Ar file
+Write the graph to
+.Ar file .
+.Ar -
+writes to standard output.
+.It Fl r
+Print the reverse graph: callers instead of callees.
+.El
+.Pp
+Functions called by another function are printed nested, not again as a top-level root.
+Functions with no callers are roots; after them, any remaining functions are printed so that a
+call cycle is still visible.
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for a file or output error, 2 for usage.
+.Sh SEE ALSO
+.Xr ctags 1 ,
+.Xr cxref 1
+.Sh STANDARDS
+A documented subset of POSIX
+.Nm cflow .
+Preprocessor evaluation, function-pointer calls, calls to undefined functions and the
+.Fl d ,
+.Fl D ,
+.Fl i ,
+.Fl I ,
+.Fl U
+and
+.Fl f
+options are unsupported.

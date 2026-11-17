@@ -1,0 +1,8 @@
+ID:abc123
+NUM:42
+CHAR:"
+ID:x
+CHAR:"
+ID:ifx
+NUM:123
+ID:abc

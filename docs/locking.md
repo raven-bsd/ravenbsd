@@ -70,6 +70,28 @@ The search reports a reproducible state count and fails on the first violated in
 counterexample trace. Two seeded-bug tests prove the checker flags a planted `EffectiveMismatch`
 and a planted `WaiterOrdering` (R-ADD-28 style).
 
+## Lock statistics (`lockstat` feature)
+
+`crates/raven-turnstile` has an off-by-default `lockstat` feature. When enabled, each turnstile
+carries per-object counters (`Turnstiles::stats(object) -> LockStats`) that the kernel `lockstat`
+probes will publish (L5). The default build has no counters and no extra cost or layout.
+
+| Counter | Meaning |
+|---|---|
+| `wait_entries` | successful `block` calls |
+| `immediate_acquisitions` | successful `acquire` calls |
+| `wakes` | threads woken (`wake_one` + `wake_all`) |
+| `cancels` | waiters removed by `cancel` |
+| `timeouts` | reserved for the kernel timeout path; always `0` here |
+| `max_queue_depth` | largest number of simultaneous waiters |
+| `max_inheritance_depth` | longest inheritance chain observed (the block hop plus the owner's own wait-for chain) |
+| `inherited_priority_changes` | number of times an operation changed an owner's effective priority |
+
+Every counter is saturating (never wraps silently). Equality/hashing of the model state ignores the
+counters, so the exhaustive model check still deduplicates on the logical state; the same model
+additionally asserts `timeouts == 0`, `max_queue_depth >= current waiters` and
+`wait_entries >= current waiters` on every reachable state under the feature.
+
 ## Kernel integration (later)
 
 The kernel hosts the real threads and calls these operations from the blocking mutex/rwlock/condvar

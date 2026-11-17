@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-spawn-test"
+version = "0.1.0"
+description = "Host regressions for the libc spawn descriptor, eventfd and binary write paths."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+raven-libc-abi = { path = "../../../libc/ravenlibc/crates/raven-libc-abi" }
+raven-libc-personality-linux = { path = "../../../libc/ravenlibc/crates/raven-libc-personality-linux" }
+raven-libc-platform = { path = "../../../libc/ravenlibc/crates/raven-libc-platform" }

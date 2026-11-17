@@ -13,5 +13,11 @@ rust-version.workspace = true
 [dependencies]
 raven-vmem = { path = "../raven-vmem" }
 
+[features]
+default = []
+# Opt-in debug allocator: redzones, freed-pattern poison and an allocation audit ring.
+# The default build carries no per-allocation debug cost.
+debug = []
+
 [lints]
 workspace = true

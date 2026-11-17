@@ -120,6 +120,33 @@ fn explore(scenario: &Scenario, max_depth: u32) -> (u64, u32) {
                     depth + 1
                 );
             }
+            #[cfg(feature = "lockstat")]
+            for &object in &scenario.objects {
+                let stats = next.stats(object);
+                let waiters = next.waiter_count(object) as u64;
+                if stats.timeouts != 0 {
+                    panic!(
+                        "lockstat: timeouts nonzero at depth {}; trace: {trace:?}",
+                        depth + 1
+                    );
+                }
+                if stats.max_queue_depth < waiters {
+                    panic!(
+                        "lockstat: max_queue_depth {} < current waiters {waiters} at depth {}",
+                        stats.max_queue_depth,
+                        depth + 1
+                    );
+                }
+                if waiters > 0 && stats.max_inheritance_depth == 0 {
+                    panic!("lockstat: max_inheritance_depth 0 with {waiters} waiters");
+                }
+                if stats.wait_entries < waiters {
+                    panic!(
+                        "lockstat: wait_entries {} < current waiters {waiters}",
+                        stats.wait_entries
+                    );
+                }
+            }
             if visited.insert(next.clone()) {
                 let mut full = trace.clone();
                 full.push(act);

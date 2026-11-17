@@ -181,6 +181,14 @@ syscalls! {
     IRQ_ACK = 0x76;
 }
 
+/// `trace_set(id: u64) -> 0`.
+///
+/// Sets the calling thread's current trace id (`R-OBS-6`); zero clears it. Unprivileged: a thread
+/// may only set its own context, and the kernel stamps that id on its scheme requests and lets a
+/// server inherit it for the duration of the call. A raw constant, not a [`Syscall`] variant, so
+/// existing exhaustive matches downstream stay intact.
+pub const TRACE_SET: usize = 0x08;
+
 /// `msync(proc: Handle, addr: usize, len: usize, flags: usize) -> 0`.
 ///
 /// Writes dirty pages of a shared file-backed mapping back through the pager without unmapping

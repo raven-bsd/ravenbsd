@@ -1,0 +1,88 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt UUCP 1
+.Os RavenBSD
+.Sh NAME
+.Nm uucp
+.Nd copy files or queue them for a configured uucp peer
+.Sh SYNOPSIS
+.Nm
+.Op Fl cCdfjmrR
+.Op Fl g Ar grade
+.Op Fl n Ar user
+.Op Fl x Ar debug
+.Ar source ...
+.Ar destination
+.Sh DESCRIPTION
+The
+.Nm
+utility copies local files or queues a bounded copy/fetch job for a configured peer.
+A local destination is copied immediately.
+A destination of the form
+.Ql system!path
+is queued under
+.Pa /var/spool/uucp
+because this image has no transport.
+.Pp
+A source may also use
+.Ql system!path
+to queue a fetch to a local destination.
+Remote-to-remote copies are rejected.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl c
+Accept the spool-copy compatibility flag. The queue always embeds the payload.
+.It Fl C
+Same as
+.Fl c .
+.It Fl d
+Create missing local destination directories.
+.It Fl f
+Do not create local destination directories (the default).
+.It Fl j
+Print each queued job id.
+.It Fl m
+Accept the mail-completion flag; no mail transport exists.
+.It Fl r
+Accept the no-start flag; jobs are always queued.
+.It Fl R
+Accept the restart flag; jobs are always queued.
+.It Fl g Ar grade
+Set the one-byte job grade (default
+.Ql n ) .
+.It Fl n Ar user
+Set the requesting user name.
+.It Fl x Ar debug
+Parse and ignore a debug level.
+.El
+.Pp
+A destination with multiple local sources must already be a directory.
+The default peer and spool settings come from
+.Pa /etc/uucp/config ;
+see
+.Xr uustat 1
+and
+.Xr uux 1 .
+.Sh FILES
+.Bl -tag -width /var/spool/uucp -compact
+.It Pa /etc/uucp/config
+Peer and spool configuration.
+.It Pa /var/spool/uucp/queue
+Queued job records.
+.It Pa /var/spool/uucp/seq
+Next queue sequence number.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A file, peer or queue error exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr uustat 1 ,
+.Xr uux 1
+.Sh STANDARDS
+RavenBSD implements a bounded POSIX uucp file-transfer subset. No transport, modem or remote
+execution is claimed; the local queue is the durable surface.
+.Sh LIMITATIONS
+Remote-to-remote copies, mail notification, debug transcripts and actual peer transmission are
+not implemented.

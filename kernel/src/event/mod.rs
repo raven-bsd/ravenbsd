@@ -31,6 +31,8 @@ pub struct EventQueue {
     pub waiters: WaitQueue,
     /// Only one thread may block in one wait call.
     pub waiting: AtomicBool,
+    /// Set by the process-exit hook; the queue no longer represents a live event source.
+    retired: AtomicBool,
 }
 
 impl EventQueue {
@@ -41,6 +43,7 @@ impl EventQueue {
             state: Mutex::new(evq_core::Queue::new()),
             waiters: WaitQueue::new(),
             waiting: AtomicBool::new(false),
+            retired: AtomicBool::new(false),
         }
     }
 
@@ -58,9 +61,18 @@ pub struct Timer {
     quota: Arc<core::sync::atomic::AtomicU32>,
 }
 
+/// Live timer objects (S69 cleanup evidence).
+static LIVE_TIMERS: AtomicU64 = AtomicU64::new(0);
+
+/// Number of live timer objects across all processes.
+pub fn live_timers() -> u64 {
+    LIVE_TIMERS.load(Ordering::Acquire)
+}
+
 impl Timer {
     /// Construct a disarmed timer.
     pub fn new(quota: Arc<core::sync::atomic::AtomicU32>) -> Self {
+        LIVE_TIMERS.fetch_add(1, Ordering::AcqRel);
         Self {
             deadline: AtomicU64::new(0),
             interval: AtomicU64::new(0),
@@ -122,6 +134,7 @@ impl Timer {
 impl Drop for Timer {
     fn drop(&mut self) {
         self.quota.fetch_sub(1, Ordering::AcqRel);
+        LIVE_TIMERS.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
@@ -150,6 +163,27 @@ pub fn register_queue(queue: &Arc<EventQueue>) -> Result<(), Errno> {
     }
     queues.push(Arc::downgrade(queue));
     Ok(())
+}
+
+/// Remove the dead queue's weak registration.
+///
+/// A blocked `EVQ_WAIT` keeps an `Arc<EventQueue>` on a kernel stack that thread exit abandons
+/// without unwinding, so the object can outlive the process.  The registration table must still
+/// drop the entry: otherwise `MAX_QUEUES` dead queues eventually reject a live `EVQ_CREATE`.
+fn unregister_queue(queue: &Arc<EventQueue>) {
+    QUEUES
+        .lock()
+        .retain(|weak| !weak.upgrade().is_some_and(|item| Arc::ptr_eq(&item, queue)));
+}
+
+/// Number of event queues whose owner still holds a strong reference (S69 evidence).
+pub fn live_queues() -> u64 {
+    QUEUES
+        .lock()
+        .iter()
+        .filter_map(alloc::sync::Weak::upgrade)
+        .filter(|queue| !queue.retired.load(Ordering::Acquire))
+        .count() as u64
 }
 
 /// Wake event-queue waiters after a source transition. The ready scan filters queues that do not
@@ -297,6 +331,8 @@ pub fn on_process_exit(process: &Arc<crate::process::Process>) {
             *state = evq_core::Queue::new();
             count
         };
+        queue.retired.store(true, Ordering::Release);
+        unregister_queue(queue);
         events = events.saturating_add(registrations);
         cleared = cleared.saturating_add(1);
         waiters = waiters.saturating_add(usize::from(queue.waiting.swap(false, Ordering::AcqRel)));
