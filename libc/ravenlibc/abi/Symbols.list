@@ -91,6 +91,7 @@ bcopy
 bind
 bind_textdomain_codeset
 bindtextdomain
+brk
 bsearch
 btowc
 bzero
@@ -264,7 +265,9 @@ drem
 dremf
 dup
 dup2
+dup3
 duplocale
+eaccess
 ecvt_r
 elf_aux_info
 endgrent
@@ -297,6 +300,7 @@ error_at_line
 error_message_count
 error_one_per_line
 error_print_progname
+euidaccess
 eventfd
 eventfd_read
 eventfd_write
@@ -329,12 +333,15 @@ expm1l
 fabs
 fabsf
 fabsl
+faccessat
+fchdir
 fchmod
 fchmodat
 fchownat
 fclose
 fcntl
 fcvt_r
+fdatasync
 fdim
 fdimf
 fdiml
@@ -428,6 +435,7 @@ fopen64
 fork
 forkpty
 fparseln
+fpathconf
 fpclassify
 fprintf
 fputc
@@ -463,11 +471,13 @@ fstat
 fstat64
 fstatat
 fstatfs
+fstatvfs
 fsync
 ftell
 ftello
 ftello64
 ftruncate
+ftruncate64
 ftrylockfile
 fts_children
 fts_close
@@ -504,7 +514,9 @@ getcontext
 getcwd
 getdate
 getdelim
+getdents
 getegid
+getentropy
 getenv
 getenv_r
 geteuid
@@ -542,6 +554,7 @@ getnetent
 getopt
 getopt_long
 getopt_long_only
+getpagesize
 getpayload
 getpayloadf
 getpeername
@@ -565,6 +578,7 @@ getpwuid_r
 getresgid
 getresuid
 getrlimit
+getrlimit64
 getrusage
 gets
 getservbyname
@@ -732,6 +746,7 @@ kqueue
 kqueue1
 l64a
 labs
+lchmod
 lckpwdf
 lcong48
 ldexp
@@ -761,6 +776,7 @@ llroundl
 localeconv
 localtime
 localtime_r
+lockf
 log
 log10
 log10f
@@ -795,6 +811,7 @@ lseek64
 lstat
 lstat64
 lutimes
+madvise
 makecontext
 malloc
 malloc_usable_size
@@ -823,10 +840,14 @@ memset_explicit
 memset_s
 mergesort
 mkdir
+mkdirat
 mkfifo
 mknod
 mkstemp
 mktime
+mlock
+mlock2
+mlockall
 mmap
 mmap64
 modf
@@ -834,12 +855,15 @@ modff
 modfl
 mprotect
 mrand48
+msync
 mtx_destroy
 mtx_init
 mtx_lock
 mtx_timedlock
 mtx_trylock
 mtx_unlock
+munlock
+munlockall
 munmap
 mutex_destroy
 mutex_init
@@ -891,10 +915,12 @@ opterr
 optind
 optopt
 optreset
+pathconf
 pclose
 perror
 personality
 pidfile
+pipe
 pipe2
 pledge
 poll
@@ -906,7 +932,11 @@ port_dissociate
 port_get
 port_getn
 port_send
+posix_close
+posix_fadvise
+posix_fallocate
 posix_getdents
+posix_madvise
 posix_memalign
 posix_openpt
 posix_spawn
@@ -943,13 +973,17 @@ pown
 pownf
 powr
 powrf
+ppoll
 prctl
 pread
 pread64
+preadv
+preadv2
 printf
 prlimit
 program_invocation_name
 program_invocation_short_name
+pselect
 pthread_atfork
 pthread_attr_destroy
 pthread_attr_getdetachstate
@@ -1082,6 +1116,8 @@ putwchar
 putwchar_unlocked
 pwrite
 pwrite64
+pwritev
+pwritev2
 qsort
 qsort_r
 quick_exit
@@ -1095,6 +1131,7 @@ readdir
 readdir64
 readdir_r
 readlink
+readlinkat
 readpassphrase
 readv
 realloc
@@ -1169,6 +1206,7 @@ sched_yield
 secure_getenv
 seed48
 seekdir
+select
 sem_clockwait
 sem_close
 sem_destroy
@@ -1202,6 +1240,7 @@ setgrent
 setgroupent
 setgroups
 sethostent
+sethostname
 setjmp
 setlinebuf
 setlocale
@@ -1282,6 +1321,7 @@ sl_add
 sl_find
 sl_free
 sl_init
+sleep
 snprintf
 snvis
 sockatmark
@@ -1383,6 +1423,7 @@ swscanf
 symlink
 symlinkat
 sync
+syncfs
 syscall
 sysconf
 sysctl
@@ -1471,6 +1512,8 @@ towlower_l
 towupper
 towupper_l
 trunc
+truncate
+truncate64
 truncf
 truncl
 tsearch
@@ -1478,6 +1521,7 @@ tss_create
 tss_delete
 tss_get
 tss_set
+ttyname
 ttyname_r
 twalk
 tzset
@@ -1499,6 +1543,7 @@ unvis
 updwtmpx
 uselocale
 user_from_uid
+usleep
 utimensat
 utimes
 utmpxname

@@ -19,9 +19,6 @@ crate-type = ["staticlib", "rlib"]
 
 [features]
 default = ["base"]
-# P1c's ABI-ready exports. Off until the ABI window updates Symbol.map; the module is host-tested
-# in the normal build.
-p1c-exports = []
 tiny = ["tiny-malloc"]
 base = ["hardened-malloc", "float-printf", "wide-stdio", "locale-data", "resolver", "personality-linux", "personality-bsd"]
 server = ["base", "dlopen", "personality-solaris"]
