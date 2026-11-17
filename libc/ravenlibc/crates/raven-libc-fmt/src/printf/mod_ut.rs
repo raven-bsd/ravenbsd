@@ -884,6 +884,18 @@ fn stub_float_prints_the_literal_and_continues() {
     assert_eq!(sink.data, b" *float*|42");
 }
 
+#[cfg(not(all(feature = "float", not(feature = "tiny"))))]
+#[test]
+fn tiny_profile_ignores_the_hook_and_prints_the_literal() {
+    let mut va = SliceVa::new();
+    va.dbl(1.5).int(42);
+    let mut sink = VecSink::<u8>::new();
+    let opts = FmtOptions::default();
+    let r = vformat(&mut sink, b"%8f|%d", &mut va, &opts, &NoFloat).unwrap();
+    assert_eq!(r, 11);
+    assert_eq!(sink.data, b" *float*|42");
+}
+
 #[test]
 fn no_float_is_an_error() {
     let mut va = SliceVa::new();

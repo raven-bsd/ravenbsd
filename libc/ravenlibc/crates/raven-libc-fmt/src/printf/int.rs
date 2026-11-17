@@ -142,6 +142,7 @@ pub(crate) fn ujtoa(val: u64, out: &mut [u8; 64], base: u32, octzero: bool, uppe
 /// The donor's `exponent`: write `e+NN`/`p-N` into `out`, returning the length.
 ///
 /// Decimal exponents are at least two digits; hexadecimal exponents may be one digit.
+#[cfg_attr(not(all(feature = "float", not(feature = "tiny"))), allow(dead_code))]
 pub(crate) fn exponent(out: &mut [u8; 8], exp: i32, fmtch: u8) -> usize {
     let mut p = 0usize;
     out[p] = fmtch;
