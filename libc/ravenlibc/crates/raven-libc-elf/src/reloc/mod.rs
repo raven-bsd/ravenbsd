@@ -163,6 +163,18 @@ pub trait RelocApplier {
     /// `dlopen` assigns the block before relocating, so the applier can resolve a `TLSDESC`
     /// or `TPOFF64` in the new object immediately.
     fn set_tls_offset(&mut self, _obj: ObjId, _offset: usize) {}
+    /// Copy a newly loaded module's initial TLS image into the current thread's static block.
+    ///
+    /// `dlopen` calls this after [`RelocApplier::set_tls_offset`] and before the new object's
+    /// constructors run. The default is a no-op for host appliers that do not model live TLS.
+    fn init_static_tls(
+        &mut self,
+        _obj: ObjId,
+        _image: u64,
+        _filesz: u64,
+    ) -> Result<(), ApplyError> {
+        Ok(())
+    }
     /// Allocate the descriptor for a `TLSDESC` relocation.
     fn tls_desc_alloc(
         &mut self,
