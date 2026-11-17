@@ -120,11 +120,37 @@ RAVEN_1.0 {
 		wctype;
 		# --- wchar ---
 		btowc;
+		fgetwc_unlocked;
+		fgetws;
+		fputwc;
+		fputwc_unlocked;
+		fputws;
+		fputws_unlocked;
+		fwide;
+		fwprintf;
+		fwscanf;
+		getwc;
+		getwc_unlocked;
+		getwchar;
+		getwchar_unlocked;
 		mblen;
 		mbrlen;
 		mbrtowc;
 		mbsinit;
 		mbtowc;
+		putwc;
+		putwc_unlocked;
+		putwchar;
+		putwchar_unlocked;
+		swprintf;
+		swscanf;
+		ungetwc;
+		vfwprintf;
+		vfwscanf;
+		vswprintf;
+		vswscanf;
+		vwprintf;
+		vwscanf;
 		wcrtomb;
 		wcscasecmp_l;
 		wcscoll;
@@ -137,6 +163,8 @@ RAVEN_1.0 {
 		wctob;
 		wctomb;
 		wcwidth;
+		wprintf;
+		wscanf;
 		# --- wctype ---
 		iswalnum;
 		iswalnum_l;
@@ -173,6 +201,7 @@ RAVEN_1.0 {
 		abort;
 		abs;
 		arc4random_buf;
+		at_quick_exit;
 		atof;
 		atoi;
 		atol;
@@ -186,9 +215,12 @@ RAVEN_1.0 {
 		llabs;
 		lldiv;
 		mbstowcs;
+		mkstemp;
+		quick_exit;
 		strtod;
 		strtoimax;
 		strtol;
+		strtold;
 		strtoll;
 		strtoul;
 		strtoull;
@@ -208,21 +240,27 @@ RAVEN_1.0 {
 		realloc;
 		reallocarray;
 		# --- stdio ---
+		cuserid;
+		dprintf;
 		fgetln;
 		fgetwc;
 		fprintf;
-		fwprintf;
 		getdelim;
 		getline;
+		gets;
 		printf;
 		remove;
 		rewind;
 		snprintf;
 		sprintf;
+		tmpfile;
+		tmpfile64;
+		tmpnam;
+		vdprintf;
 		vfprintf;
-		vfwprintf;
 		vprintf;
 		vsnprintf;
+		vsnprintf_l;
 		vsprintf;
 		# --- stdio aliases (P1b) ---
 		clearerr_unlocked;
@@ -733,6 +771,7 @@ RAVEN_1.0 {
 		sqrt;
 		sqrtf;
 		sqrtl;
+		statvfs;
 		strfromd;
 		strfromf;
 		strtof;
@@ -1458,6 +1497,7 @@ RAVEN_1.0 {
 		pipe2;
 		readlink;
 		rename;
+		renameat2;
 		renameat;
 		rmdir;
 		statfs;

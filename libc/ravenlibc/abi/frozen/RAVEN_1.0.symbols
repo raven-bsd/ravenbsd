@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1413
+# records: 1453
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -64,6 +64,7 @@ asinhf F - all 1 -
 asinhl F - all 1 -
 asinl F - all 1 -
 asinpi F - all 0 -
+at_quick_exit F - all 0 -
 atan F - all 1 -
 atan2 F - all 1 -
 atan2f F - all 1 -
@@ -160,6 +161,7 @@ crypt F - x86_64 1 -
 crypt_r F - x86_64 1 -
 ctermid F - all 0 stdio.h
 ctime F - all 0 time.h
+cuserid F - all 0 stdio.h
 daemon F - all 1 -
 dcgettext F - all 0 libintl.h
 dcngettext F - all 0 libintl.h
@@ -179,6 +181,7 @@ dlvsym F - all 1 -
 dn_expand F - all 1 -
 dn_skipname F - all 1 -
 dngettext F - all 0 libintl.h
+dprintf F - all 0 stdio.h
 drand48 F - all 1 stdlib.h
 drem F - all 1 -
 dremf F - all 1 -
@@ -277,6 +280,8 @@ fgets F - all 0 stdio.h
 fgets_unlocked F - all 2 stdio.h
 fgetspent F - all 1 -
 fgetwc F - all 0 wchar.h
+fgetwc_unlocked F - all 2 wchar.h
+fgetws F - all 0 wchar.h
 fileno F - all 0 stdio.h
 fileno_unlocked F - all 1 stdio.h
 finite F - all 1 -
@@ -334,6 +339,10 @@ fputc F - all 0 stdio.h
 fputc_unlocked F - all 0 stdio.h
 fputs F - all 0 stdio.h
 fputs_unlocked F - all 1 stdio.h
+fputwc F - all 0 wchar.h
+fputwc_unlocked F - all 0 wchar.h
+fputws F - all 0 wchar.h
+fputws_unlocked F - all 2 wchar.h
 fread F - all 0 stdio.h
 fread_unlocked F - all 1 stdio.h
 free F - all 0 malloc.h
@@ -374,9 +383,11 @@ fts_set F - all 1 -
 ftw F - all 1 ftw.h
 funlockfile F - all 0 stdio.h
 futimens F - all 0 sys/stat.h
+fwide F - all 0 wchar.h
 fwprintf F - all 0 wchar.h
 fwrite F - all 0 stdio.h
 fwrite_unlocked F - all 1 stdio.h
+fwscanf F - all 0 wchar.h
 gai_strerror F - all 1 -
 gamma F - all 1 -
 gammaf F - all 1 -
@@ -458,6 +469,7 @@ getresgid F - all 1 -
 getresuid F - all 1 -
 getrlimit F - all 1 sys/resource.h
 getrusage F - all 1 sys/resource.h
+gets F - all 0 stdio.h
 getservbyname F - all 1 netdb.h
 getservbyname_r F - all 1 -
 getservbyport F - all 1 netdb.h
@@ -480,6 +492,10 @@ getutxent F - x86_64 0 utmpx.h
 getutxid F - x86_64 0 utmpx.h
 getutxline F - x86_64 0 utmpx.h
 getw F - all 1 stdio.h
+getwc F - all 0 wchar.h
+getwc_unlocked F - all 2 wchar.h
+getwchar F - all 0 wchar.h
+getwchar_unlocked F - all 2 wchar.h
 gid_from_group F - all 2 -
 glob F - all 0 glob.h
 globfree F - all 0 glob.h
@@ -693,6 +709,7 @@ mergesort F - all 2 -
 mkdir F - all 0 sys/stat.h
 mkfifo F - all 0 sys/stat.h
 mknod F - all 0 sys/stat.h
+mkstemp F - all 0 stdlib.h
 mktime F - all 0 time.h
 mmap F - all 0 sys/mman.h
 mmap64 F - all 1 sys/mman.h
@@ -936,10 +953,15 @@ puts F - all 0 stdio.h
 putspent F - all 1 -
 pututxline F - x86_64 0 utmpx.h
 putw F - all 1 stdio.h
+putwc F - all 0 wchar.h
+putwc_unlocked F - all 2 wchar.h
+putwchar F - all 0 wchar.h
+putwchar_unlocked F - all 2 wchar.h
 pwrite F - all 0 unistd.h
 pwrite64 F - all 0 unistd.h
 qsort F - all 0 stdlib.h
 qsort_r F - all 1 -
+quick_exit F - all 0 -
 raise F - all 0 signal.h
 rand F - all 0 stdlib.h
 rand_r F - all 0 stdlib.h
@@ -973,6 +995,7 @@ remquof F - all 1 -
 remquol F - all 1 -
 rename F - all 0 stdio.h
 renameat F - all 0 stdio.h
+renameat2 F - all 1 -
 res_init F - all 1 -
 rewind F - all 0 stdio.h
 rewinddir F - all 0 dirent.h
@@ -1149,6 +1172,7 @@ sscanf F - all 0 stdio.h
 stat F - all 0 sys/stat.h
 stat64 F - all 0 sys/stat.h
 statfs F - all 1 -
+statvfs F - all 0 -
 stderr D 8 all 0 stdio.h
 stdin D 8 all 0 stdio.h
 stdout D 8 all 0 stdio.h
@@ -1209,6 +1233,7 @@ strtoimax F - all 0 inttypes.h
 strtok F - all 0 string.h
 strtok_r F - all 0 string.h
 strtol F - all 0 stdlib.h
+strtold F - all 0 stdlib.h
 strtoll F - all 0 stdlib.h
 strtonum F - all 1 -
 strtoul F - all 0 stdlib.h
@@ -1225,6 +1250,8 @@ suboptarg F - all 3 -
 svis F - x86_64 2 -
 swab F - all 1 -
 swapcontext F - all 1 ucontext.h
+swprintf F - all 0 wchar.h
+swscanf F - all 0 wchar.h
 symlink F - all 0 unistd.h
 symlinkat F - all 0 -
 sync F - all 0 unistd.h
@@ -1291,6 +1318,9 @@ timespec_get F - all 0 time.h
 timespec_getres F - all 0 time.h
 timingsafe_bcmp F - all 2 -
 timingsafe_memcmp F - all 2 -
+tmpfile F - all 0 stdio.h
+tmpfile64 F - all 0 stdio.h
+tmpnam F - all 0 stdio.h
 toascii F - all 1 ctype.h
 tolower F - all 0 ctype.h
 tolower_l F - all 1 -
@@ -1324,6 +1354,7 @@ ulckpwdf F - all 1 -
 umask F - all 0 sys/stat.h
 uname F - all 0 sys/utsname.h
 ungetc F - all 0 stdio.h
+ungetwc F - all 0 wchar.h
 unlink F - all 0 unistd.h
 unlinkat F - all 0 unistd.h
 unlockpt F - x86_64 0 stdlib.h
@@ -1347,17 +1378,24 @@ uuid_from_string F - x86_64 2 -
 uuid_hash F - x86_64 2 -
 uuid_is_nil F - x86_64 2 -
 uuid_to_string F - x86_64 2 -
+vdprintf F - all 0 stdio.h
 versionsort F - all 1 dirent.h
 vfork F - all 1 unistd.h
 vfprintf F - all 0 stdio.h
 vfscanf F - all 0 stdio.h
 vfwprintf F - all 0 wchar.h
+vfwscanf F - all 0 wchar.h
 vis F - x86_64 2 -
 vprintf F - all 0 stdio.h
 vscanf F - all 0 stdio.h
 vsnprintf F - all 1 stdio.h
+vsnprintf_l F - all 2 -
 vsprintf F - all 0 stdio.h
 vsscanf F - all 0 stdio.h
+vswprintf F - all 0 wchar.h
+vswscanf F - all 0 wchar.h
+vwprintf F - all 0 wchar.h
+vwscanf F - all 0 wchar.h
 wait F - all 0 sys/wait.h
 wait3 F - all 1 sys/wait.h
 wait4 F - all 1 sys/wait.h
@@ -1407,8 +1445,10 @@ wmemmove F - all 0 wchar.h
 wmemset F - all 0 wchar.h
 wordexp F - all 0 wordexp.h
 wordfree F - all 0 wordexp.h
+wprintf F - all 0 wchar.h
 write F - all 0 unistd.h
 writev F - all 0 sys/uio.h
+wscanf F - all 0 wchar.h
 y0 F - all 1 -
 y0f F - all 1 -
 y1 F - all 1 -

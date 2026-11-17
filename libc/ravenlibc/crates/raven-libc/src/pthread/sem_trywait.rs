@@ -8,7 +8,10 @@ pub extern "C" fn sem_trywait(sem: *mut s::Sem) -> c_int {
     if sem.is_null() {
         return super::common::sem_err(raven_libc_thread::limits::EINVAL);
     }
-    match s::trywait(unsafe { &*sem }) {
+    match s::trywait(
+        // SAFETY: the null check above and the caller's sem_t contract.
+        unsafe { &*sem },
+    ) {
         Ok(()) => 0,
         Err(e) => super::common::sem_err(e),
     }

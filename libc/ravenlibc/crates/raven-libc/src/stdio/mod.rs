@@ -20,6 +20,14 @@ pub(crate) mod vfwprintf;
 pub(crate) mod vprintf;
 pub(crate) mod vsnprintf;
 pub(crate) mod vsprintf;
+pub(crate) mod gets;
+pub(crate) mod tmpfile;
+pub(crate) mod trampolines_wide;
+pub(crate) mod trampolines_wide_scan;
+pub(crate) mod vdprintf;
 pub(crate) mod vsscanf;
+pub(crate) mod vswscanf;
+pub(crate) mod vwprintf;
+pub(crate) mod wide_ops;
 #[path = "fgetwc.rs"]
 pub(crate) mod wide;

@@ -65,6 +65,7 @@ asinhf
 asinhl
 asinl
 asinpi
+at_quick_exit
 atan
 atan2
 atan2f
@@ -161,6 +162,7 @@ crypt
 crypt_r
 ctermid
 ctime
+cuserid
 daemon
 dcgettext
 dcngettext
@@ -180,6 +182,7 @@ dlvsym
 dn_expand
 dn_skipname
 dngettext
+dprintf
 drand48
 drem
 dremf
@@ -278,6 +281,8 @@ fgets
 fgets_unlocked
 fgetspent
 fgetwc
+fgetwc_unlocked
+fgetws
 fileno
 fileno_unlocked
 finite
@@ -335,6 +340,10 @@ fputc
 fputc_unlocked
 fputs
 fputs_unlocked
+fputwc
+fputwc_unlocked
+fputws
+fputws_unlocked
 fread
 fread_unlocked
 free
@@ -375,9 +384,11 @@ fts_set
 ftw
 funlockfile
 futimens
+fwide
 fwprintf
 fwrite
 fwrite_unlocked
+fwscanf
 gai_strerror
 gamma
 gammaf
@@ -459,6 +470,7 @@ getresgid
 getresuid
 getrlimit
 getrusage
+gets
 getservbyname
 getservbyname_r
 getservbyport
@@ -481,6 +493,10 @@ getutxent
 getutxid
 getutxline
 getw
+getwc
+getwc_unlocked
+getwchar
+getwchar_unlocked
 gid_from_group
 glob
 globfree
@@ -694,6 +710,7 @@ mergesort
 mkdir
 mkfifo
 mknod
+mkstemp
 mktime
 mmap
 mmap64
@@ -937,10 +954,15 @@ puts
 putspent
 pututxline
 putw
+putwc
+putwc_unlocked
+putwchar
+putwchar_unlocked
 pwrite
 pwrite64
 qsort
 qsort_r
+quick_exit
 raise
 rand
 rand_r
@@ -974,6 +996,7 @@ remquof
 remquol
 rename
 renameat
+renameat2
 res_init
 rewind
 rewinddir
@@ -1150,6 +1173,7 @@ sscanf
 stat
 stat64
 statfs
+statvfs
 stderr
 stdin
 stdout
@@ -1210,6 +1234,7 @@ strtoimax
 strtok
 strtok_r
 strtol
+strtold
 strtoll
 strtonum
 strtoul
@@ -1226,6 +1251,8 @@ suboptarg
 svis
 swab
 swapcontext
+swprintf
+swscanf
 symlink
 symlinkat
 sync
@@ -1292,6 +1319,9 @@ timespec_get
 timespec_getres
 timingsafe_bcmp
 timingsafe_memcmp
+tmpfile
+tmpfile64
+tmpnam
 toascii
 tolower
 tolower_l
@@ -1325,6 +1355,7 @@ ulckpwdf
 umask
 uname
 ungetc
+ungetwc
 unlink
 unlinkat
 unlockpt
@@ -1348,17 +1379,24 @@ uuid_from_string
 uuid_hash
 uuid_is_nil
 uuid_to_string
+vdprintf
 versionsort
 vfork
 vfprintf
 vfscanf
 vfwprintf
+vfwscanf
 vis
 vprintf
 vscanf
 vsnprintf
+vsnprintf_l
 vsprintf
 vsscanf
+vswprintf
+vswscanf
+vwprintf
+vwscanf
 wait
 wait3
 wait4
@@ -1408,8 +1446,10 @@ wmemmove
 wmemset
 wordexp
 wordfree
+wprintf
 write
 writev
+wscanf
 y0
 y0f
 y1

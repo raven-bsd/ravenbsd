@@ -63,6 +63,7 @@ asinhf F 6 x86_64
 asinhl F 26 x86_64
 asinl F 26 x86_64
 asinpi F 6 x86_64
+at_quick_exit F 22 x86_64
 atan F 6 x86_64
 atan2 F 6 x86_64
 atan2f F 6 x86_64
@@ -159,6 +160,7 @@ crypt F 323 x86_64
 crypt_r F 360 x86_64
 ctermid F 34 x86_64
 ctime F 276 x86_64
+cuserid F 93 x86_64
 daemon F 119 x86_64
 dcgettext F 5 x86_64
 dcngettext F 80 x86_64
@@ -178,6 +180,7 @@ dlvsym F 35 x86_64
 dn_expand F 5 x86_64
 dn_skipname F 5 x86_64
 dngettext F 80 x86_64
+dprintf F 150 x86_64
 drand48 F 152 x86_64
 drem F 6 x86_64
 dremf F 6 x86_64
@@ -276,6 +279,8 @@ fgets F 5 x86_64
 fgets_unlocked F 5 x86_64
 fgetspent F 850 x86_64
 fgetwc F 113 x86_64
+fgetwc_unlocked F 50 x86_64
+fgetws F 101 x86_64
 fileno F 104 x86_64
 fileno_unlocked F 68 x86_64
 finite F 18 x86_64
@@ -333,6 +338,10 @@ fputc F 5 x86_64
 fputc_unlocked F 5 x86_64
 fputs F 5 x86_64
 fputs_unlocked F 5 x86_64
+fputwc F 57 x86_64
+fputwc_unlocked F 57 x86_64
+fputws F 91 x86_64
+fputws_unlocked F 6 x86_64
 fread F 5 x86_64
 fread_unlocked F 5 x86_64
 free F 33 x86_64
@@ -373,9 +382,11 @@ fts_set F 99 x86_64
 ftw F 294 x86_64
 funlockfile F 1 x86_64
 futimens F 22 x86_64
+fwide F 60 x86_64
 fwprintf F 336 x86_64
 fwrite F 5 x86_64
 fwrite_unlocked F 5 x86_64
+fwscanf F 150 x86_64
 gai_strerror F 25 x86_64
 gamma F 6 x86_64
 gammaf F 6 x86_64
@@ -457,6 +468,7 @@ getresgid F 291 x86_64
 getresuid F 290 x86_64
 getrlimit F 306 x86_64
 getrusage F 100 x86_64
+gets F 73 x86_64
 getservbyname F 328 x86_64
 getservbyname_r F 627 x86_64
 getservbyport F 280 x86_64
@@ -479,6 +491,10 @@ getutxent F 19 x86_64
 getutxid F 19 x86_64
 getutxline F 19 x86_64
 getw F 50 x86_64
+getwc F 50 x86_64
+getwc_unlocked F 50 x86_64
+getwchar F 77 x86_64
+getwchar_unlocked F 6 x86_64
 gid_from_group F 855 x86_64
 glob F 1089 x86_64
 globfree F 134 x86_64
@@ -692,6 +708,7 @@ mergesort F 281 x86_64
 mkdir F 260 x86_64
 mkfifo F 22 x86_64
 mknod F 22 x86_64
+mkstemp F 398 x86_64
 mktime F 610 x86_64
 mmap F 281 x86_64
 mmap64 F 6 x86_64
@@ -935,10 +952,15 @@ puts F 5 x86_64
 putspent F 4355 x86_64
 pututxline F 4 x86_64
 putw F 82 x86_64
+putwc F 57 x86_64
+putwc_unlocked F 57 x86_64
+putwchar F 79 x86_64
+putwchar_unlocked F 79 x86_64
 pwrite F 328 x86_64
 pwrite64 F 328 x86_64
 qsort F 97 x86_64
 qsort_r F 119 x86_64
+quick_exit F 84 x86_64
 raise F 69 x86_64
 rand F 19 x86_64
 rand_r F 39 x86_64
@@ -972,6 +994,7 @@ remquof F 6 x86_64
 remquol F 34 x86_64
 rename F 321 x86_64
 renameat F 353 x86_64
+renameat2 F 140 x86_64
 res_init F 3 x86_64
 rewind F 56 x86_64
 rewinddir F 115 x86_64
@@ -1148,6 +1171,7 @@ sscanf F 336 x86_64
 stat F 345 x86_64
 stat64 F 6 x86_64
 statfs F 548 x86_64
+statvfs F 139 x86_64
 stderr D 8 x86_64
 stdin D 8 x86_64
 stdout D 8 x86_64
@@ -1208,6 +1232,7 @@ strtoimax F 6 x86_64
 strtok F 25 x86_64
 strtok_r F 6 x86_64
 strtol F 310 x86_64
+strtold F 27 x86_64
 strtoll F 6 x86_64
 strtonum F 292 x86_64
 strtoul F 310 x86_64
@@ -1224,6 +1249,8 @@ suboptarg D 8 x86_64
 svis F 272 x86_64
 swab F 57 x86_64
 swapcontext F 5 x86_64
+swprintf F 150 x86_64
+swscanf F 150 x86_64
 symlink F 359 x86_64
 symlinkat F 342 x86_64
 sync F 49 x86_64
@@ -1290,6 +1317,9 @@ timespec_get F 84 x86_64
 timespec_getres F 82 x86_64
 timingsafe_bcmp F 21 x86_64
 timingsafe_memcmp F 21 x86_64
+tmpfile F 62 x86_64
+tmpfile64 F 6 x86_64
+tmpnam F 164 x86_64
 toascii F 6 x86_64
 tolower F 21 x86_64
 tolower_l F 21 x86_64
@@ -1323,6 +1353,7 @@ ulckpwdf F 137 x86_64
 umask F 48 x86_64
 uname F 265 x86_64
 ungetc F 5 x86_64
+ungetwc F 57 x86_64
 unlink F 258 x86_64
 unlinkat F 307 x86_64
 unlockpt F 22 x86_64
@@ -1346,17 +1377,24 @@ uuid_from_string F 372 x86_64
 uuid_hash F 53 x86_64
 uuid_is_nil F 148 x86_64
 uuid_to_string F 553 x86_64
+vdprintf F 242 x86_64
 versionsort F 596 x86_64
 vfork F 22 x86_64
 vfprintf F 601 x86_64
 vfscanf F 548 x86_64
 vfwprintf F 601 x86_64
+vfwscanf F 263 x86_64
 vis F 98 x86_64
 vprintf F 663 x86_64
 vscanf F 598 x86_64
 vsnprintf F 617 x86_64
+vsnprintf_l F 6 x86_64
 vsprintf F 68 x86_64
 vsscanf F 601 x86_64
+vswprintf F 232 x86_64
+vswscanf F 298 x86_64
+vwprintf F 43 x86_64
+vwscanf F 43 x86_64
 wait F 22 x86_64
 wait3 F 22 x86_64
 wait4 F 22 x86_64
@@ -1406,8 +1444,10 @@ wmemmove F 54 x86_64
 wmemset F 49 x86_64
 wordexp F 913 x86_64
 wordfree F 64 x86_64
+wprintf F 150 x86_64
 write F 312 x86_64
 writev F 823 x86_64
+wscanf F 150 x86_64
 y0 F 6 x86_64
 y0f F 6 x86_64
 y1 F 6 x86_64
