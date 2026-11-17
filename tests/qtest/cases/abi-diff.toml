@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S74: the native ABI table is generated, current and machine-checkable. The host-side check runs
+# `abi-diff.sh --self-test` in `pre`; the kernel then boots to prove the tooling left the build
+# intact.
+
+name = "abi-diff"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+pre = ["sh scripts/abi-diff.sh --self-test"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[forbid]]
+regex = '(?i)panic|abi-diff: FAIL'
