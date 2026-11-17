@@ -45,6 +45,7 @@
 use crate::types::NL_ARGMAX;
 
 /// The default float precision (donor `DEFPREC`).
+#[cfg_attr(not(all(feature = "float", not(feature = "tiny"))), allow(dead_code))]
 pub(crate) const DEFPREC: i32 = 6;
 
 /// Space for a `uintmax_t` in base 2 (donor `BUF`).
@@ -71,6 +72,7 @@ pub(crate) const SHORTINT: u32 = 0x040;
 /// `ZEROPAD`: zero padding.
 pub(crate) const ZEROPAD: u32 = 0x080;
 /// `FPT`: the conversion is floating point.
+#[cfg_attr(not(all(feature = "float", not(feature = "tiny"))), allow(dead_code))]
 pub(crate) const FPT: u32 = 0x100;
 /// `GROUPING`: the `'` flag.
 pub(crate) const GROUPING: u32 = 0x200;

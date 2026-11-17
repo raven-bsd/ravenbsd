@@ -46,9 +46,11 @@
 //! so an integer-only instantiation keeps a small frame.
 
 #![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
+#![cfg_attr(not(all(feature = "float", not(feature = "tiny"))), allow(dead_code))] // the tiny build keeps the CGU in the archive but never references it
 // The donor's field arithmetic is mirrored; every output-size addition has its INT_MAX
 // check, and the buffers are sized by DEC_BUF_F64/DEC_BUF_LD.
 
+use crate::printf::FloatConv;
 use crate::printf::group::{Grouping, write_ascii, write_mb};
 use crate::printf::int::exponent;
 use crate::printf::spec::{ALT, DEFPREC, FPT, GROUPING, LADJUST, ZEROPAD};
@@ -56,20 +58,6 @@ use crate::traits::{CharUnit, FloatFmt, Sink};
 use crate::types::{
     DEC_BUF_F64, DEC_BUF_LD, DigitsOut, FloatBits, FloatClass, FloatKind, FmtErr, FmtOptions,
 };
-
-/// One parsed floating-point conversion.
-pub(crate) struct FloatConv {
-    /// The conversion character (`a A e E f F g G`).
-    pub(crate) ch: u32,
-    /// The collected flag bits.
-    pub(crate) flags: u32,
-    /// The field width.
-    pub(crate) width: i32,
-    /// The precision; negative means absent.
-    pub(crate) prec: i32,
-    /// The sign character already selected by `+`/space.
-    pub(crate) sign: u8,
-}
 
 const INT_MAX: i64 = i32::MAX as i64;
 
