@@ -9,7 +9,8 @@
 .Sh SYNOPSIS
 .Fn timer_create clock_id flags
 .Sh DESCRIPTION
-Only CLOCK_MONOTONIC and zero flags are accepted.  The returned timer is an
+Only CLOCK_MONOTONIC and zero flags are accepted.
+The returned timer is an
 event source and is armed by
 .Xr timer_set 2 .
 At most 1024 live timer objects may be created by one process.

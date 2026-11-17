@@ -20,7 +20,8 @@ four 64-bit probe arguments, a 32-bit syscall number, a 32-bit thread
 identifier, a 16-bit CPU index and a 16-bit probe identifier.
 .Pp
 Rings are drop-on-full: a producer never overwrites a record the consumer has
-not seen.  The drop count is reported by
+not seen.
+The drop count is reported by
 .Xr dtrace_stats 2 .
 .Sh ERRORS
 .Bl -tag -width Er

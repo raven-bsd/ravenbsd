@@ -34,10 +34,12 @@ and provide exactly one attachment (see
 In that form,
 .Nm
 returns the transferred client-table attachment directly and discards the provisional SchemeFile
-handle.  Subsequent operations apply to the returned object; they are not routed through the
+handle.
+Subsequent operations apply to the returned object; they are not routed through the
 opening scheme server.
 .Pp
-The attachment must be transferable by the replying server.  Its rights are reduced by the
+The attachment must be transferable by the replying server.
+Its rights are reduced by the
 attachment rights mask, with a zero mask retaining all of the server's current rights.
 .Sh OPEN FLAGS
 The protocol
@@ -63,13 +65,16 @@ Require
 .Dv WIRE_OPEN_CREATE
 and fail with
 .Er EEXIST
-when the path exists.  The test and the create are one server operation.
+when the path exists.
+The test and the create are one server operation.
 .It Dv WIRE_OPEN_TRUNC
-Truncate a regular file to zero length.  Requires write access and is
+Truncate a regular file to zero length.
+Requires write access and is
 incompatible with
 .Dv WIRE_OPEN_DIRECTORY .
 .It Dv WIRE_OPEN_APPEND
-Place every write at the current end of the file.  Requires write access and
+Place every write at the current end of the file.
+Requires write access and
 is atomic at the server.
 .It Dv WIRE_OPEN_DIRECTORY
 Require the resolved path to be a directory; a non-directory returns
@@ -77,7 +82,8 @@ Require the resolved path to be a directory; a non-directory returns
 .It Dv WIRE_OPEN_NOFOLLOW
 Fail with
 .Er ELOOP
-when the final component is a symbolic link.  Intermediate links are still
+when the final component is a symbolic link.
+Intermediate links are still
 followed.
 .El
 .Pp
@@ -85,7 +91,8 @@ At least one of
 .Dv WIRE_OPEN_READ
 and
 .Dv WIRE_OPEN_WRITE
-is required.  Unknown bits and invalid combinations are rejected with
+is required.
+Unknown bits and invalid combinations are rejected with
 .Er EINVAL .
 A creation with
 .Dv WIRE_OPEN_CREATE
@@ -99,7 +106,8 @@ The kernel carries all eight wire bits, rejects unknown bits with
 .Er EINVAL ,
 and derives the new handle's
 .Dv READ / WRITE / DUP / TRANSFER
-rights from the access bits only.  Combination checks and the atomic
+rights from the access bits only.
+Combination checks and the atomic
 .Dv O_EXCL / O_APPEND / O_TRUNC
 operations are the server's.  The successful reply's server file id (the
 .Va server_cookie )
@@ -130,15 +138,16 @@ Servers receive the path relative to their mount root and must reject
 and
 .Ql ..\&
 components.
+.Sh RETURN VALUES
+A non-negative SchemeFile handle on success.
+The protocol status is a positive
+errno on failure.
 .Sh FILES
-The open-file description, cursor and reference count are server state.  A
-successful
+The open-file description, cursor and reference count are server state.
+A successful
 .Xr dup 2
 shares them; the server releases the description only at the last
 .Xr close 2 .
-.Sh RETURN VALUES
-A non-negative SchemeFile handle on success.  The protocol status is a positive
-errno on failure.
 .Sh ERRORS
 .Bl -tag -width Er -offset indent
 .It Er EINVAL

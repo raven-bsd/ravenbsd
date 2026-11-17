@@ -18,11 +18,14 @@ and
 .Pp
 Filesystem
 .Nm
-is sequential.  The server writes at the cursor in the open-file description and
-advances it by the number of bytes written.  The wire offset must be zero; a
+is sequential.
+The server writes at the cursor in the open-file description and
+advances it by the number of bytes written.
+The wire offset must be zero; a
 server returns
 .Er EINVAL
-for a nonzero offset.  The kernel has no offset argument for this syscall and
+for a nonzero offset.
+The kernel has no offset argument for this syscall and
 always sends zero.
 .Pp
 With
@@ -30,12 +33,14 @@ With
 (see
 .Xr open 2 )
 each write is placed at the file's length at the time of that write, atomically
-at the server even when other descriptions write concurrently.  The writing
+at the server even when other descriptions write concurrently.
+The writing
 description's cursor is left at the end of the write.
 .Pp
 A
 .Xr dup 2
-or a transferred reference shares the description and its cursor.  The server
+or a transferred reference shares the description and its cursor.
+The server
 releases unlinked data only at the last
 .Xr close 2 .
 .Sh RETURN VALUES

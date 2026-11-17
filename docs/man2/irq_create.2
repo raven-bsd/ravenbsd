@@ -23,7 +23,8 @@ capability with
 .Dv LEGACY (1):
 .Fa number
 is the ISA IRQ; the kernel translates it through the MADT interrupt-source
-overrides and honours the polarity and trigger the override declares.  The
+overrides and honours the polarity and trigger the override declares.
+The
 redirection entry is programmed masked and stays masked until the first
 .Xr irq_wait 2
 or
@@ -47,7 +48,8 @@ at the user pointer given in
 The driver programs the returned address and data into its device's MSI
 capability or MSI-X table entry; MSI and MSI-X share one encoding.
 .El
-The message always targets the boot processor's APIC.  For destination ids
+The message always targets the boot processor's APIC.
+For destination ids
 0..255 the encoding is
 .Sy address_lo = 0xFEE00000 | (id << 12)
 and
