@@ -7,23 +7,21 @@
 #![no_std]
 #![no_main]
 
-use raven_abi::types::{Handle, clock};
+use raven_abi::types::clock;
 use raven_rt::entry;
 use raven_rt::println;
+use raven_rt::trace::{SINK_HANDLE, Sink};
 use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
-use raven_trace_core::{Span, SpanKind, SpanRing};
-use raven_trace_demo::{map_sink, sink_refs};
+use raven_trace_core::{Span, SpanKind};
 
 entry!(main);
 
-/// The sink memory object transferred to this process before its first thread.
-const SINK_HANDLE: Handle = Handle::new(3, 0);
 /// Logical pid reported for the fixture server.
 const SERVER_PID: u32 = 2;
 
 /// The server handler: one span per open/read/close, then a byte for read.
 struct TraceHandler {
-    ring: SpanRing<'static>,
+    sink: Sink,
     sequence: u64,
 }
 
@@ -45,7 +43,7 @@ impl TraceHandler {
             kind: SpanKind::Server,
             opcode,
         };
-        let _ = self.ring.emit(0, self.sequence, &span);
+        let _ = self.sink.emit(span);
         self.sequence = self.sequence.saturating_add(1);
     }
 }
@@ -81,19 +79,11 @@ impl Handler for TraceHandler {
 }
 
 fn main(_args: raven_rt::Args) -> i32 {
-    if map_sink(Handle::SELF_PROC, SINK_HANDLE).is_err() {
-        println!("demo: sink map failed");
+    let sink = Sink::attach(SINK_HANDLE, 0);
+    if !sink.enabled() {
+        println!("demo: sink attach failed");
         return 1;
     }
-    // SAFETY: the sink was mapped above at the shared fixed address.
-    let (header, records) = unsafe { sink_refs() };
-    let ring = match SpanRing::new(header, records) {
-        Ok(ring) => ring,
-        Err(_) => {
-            println!("demo: sink header failed");
-            return 1;
-        }
-    };
     let mut server = match Server::register("trace-demo") {
         Ok(server) => server,
         Err(_) => {
@@ -102,5 +92,5 @@ fn main(_args: raven_rt::Args) -> i32 {
         }
     };
     println!("demo: server ready");
-    server.run(&mut TraceHandler { ring, sequence: 0 });
+    server.run(&mut TraceHandler { sink, sequence: 0 });
 }
