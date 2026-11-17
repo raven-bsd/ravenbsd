@@ -407,6 +407,11 @@ fn build_spec(
         // implementations instead of the H-16 link-time failing stubs.
         flags.push_str(" --cfg raven_va_verified_aarch64");
     }
+    if arch == Arch::Riscv64 {
+        // The riscv64 psABI reader has passed the host model/golden sweep; link the real
+        // variadic implementations instead of the H-16 link-time failing stubs.
+        flags.push_str(" --cfg raven_va_verified_riscv64");
+    }
     flags.push_str(&format!(
         " --remap-path-prefix={}=/ravenbsd",
         root.display()
