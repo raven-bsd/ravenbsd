@@ -1089,3 +1089,173 @@ fn hyperbolic_match_the_f64_oracle_over_a_deterministic_sweep() {
         checked = checked.saturating_add(1);
     }
 }
+
+#[test]
+fn subtraction_keeps_the_cancelled_bits_across_a_one_bit_exponent_gap() {
+    // Regression: the alignment in `add_bits` used to fold the shifted-out bits into a whole
+    // guard unit with only three guard bits, so `(1 - 2^-113) - 1` lost ~5 decimal digits.
+    let one = LongDouble128::one();
+    for k in 1..=12u32 {
+        let delta = one.scalbn(-(k as i32));
+        let below = one.sub(delta);
+        assert_eq!(
+            below.sub(one).to_bits(),
+            LongDouble128::zero(false).sub(delta).to_bits(),
+            "1 - 2^-{k}"
+        );
+        assert_eq!(
+            below.sub(one).to_f64(),
+            -2f64.powi(-(k as i32)),
+            "1 - 2^-{k} value"
+        );
+    }
+}
+
+#[test]
+fn erf_and_erfc_edges_identities_and_known_values() {
+    let zero = LongDouble128::from_f64(0.0);
+    assert_eq!(zero.erf().to_bits(), 0);
+    assert_eq!(LongDouble128::from_f64(-0.0).erf().to_bits(), SIGN);
+    assert_eq!(zero.erfc().to_bits(), LongDouble128::one().to_bits());
+    assert_eq!(LongDouble128::from_f64(f64::INFINITY).erf().to_f64(), 1.0);
+    assert_eq!(
+        LongDouble128::from_f64(f64::NEG_INFINITY).erf().to_f64(),
+        -1.0
+    );
+    assert_eq!(LongDouble128::from_f64(f64::INFINITY).erfc().to_bits(), 0);
+    assert_eq!(
+        LongDouble128::from_f64(f64::NEG_INFINITY).erfc().to_f64(),
+        2.0
+    );
+    assert!(LongDouble128::from_f64(f64::NAN).erf().is_nan());
+    assert!(LongDouble128::from_f64(f64::NAN).erfc().is_nan());
+    // Known values.
+    let at_one = LongDouble128::from_f64(1.0);
+    assert!(f64_ulp(at_one.erf().to_f64(), 0.8427007929497149) <= 2);
+    assert!(f64_ulp(at_one.erfc().to_f64(), 0.15729920705028513) <= 2);
+    // Odd symmetry and erf + erfc = 1.
+    for &value in &[0.1f64, 0.25, 0.6, 1.0, 2.5, 5.0, 12.0] {
+        let x = LongDouble128::from_f64(value);
+        assert_eq!(
+            LongDouble128::from_f64(-value).erf().to_bits(),
+            LongDouble128::zero(false).sub(x.erf()).to_bits(),
+            "erf(-{value})"
+        );
+        let sum = x.erf().add(x.erfc());
+        assert!(
+            sum.to_bits().abs_diff(LongDouble128::one().to_bits()) <= 8,
+            "erf+erfc at {value}"
+        );
+        // erfc(x) and 2 - erfc(-x) are the same function.
+        let difference = LongDouble128::from_f64(2.0)
+            .sub(LongDouble128::from_f64(-value).erfc())
+            .sub(x.erfc());
+        assert!(difference.abs().to_f64() < 1e-15);
+    }
+    // The tail: erfc stays positive while representable, then underflows cleanly.
+    let far = LongDouble128::from_f64(40.0);
+    assert!(far.erfc().is_finite() && !far.erfc().is_zero());
+    assert!(far.erfc().to_f64() < 1e-300);
+    assert_eq!(LongDouble128::from_f64(120.0).erfc().to_bits(), 0);
+    assert_eq!(LongDouble128::from_f64(1.0e10).erfc().to_bits(), 0);
+    assert_eq!(LongDouble128::from_f64(1.0e10).erf().to_f64(), 1.0);
+}
+
+#[test]
+fn lgamma_and_gamma_edges_and_functional_equations() {
+    let one = LongDouble128::one();
+    let two = LongDouble128::from_f64(2.0);
+    assert_eq!(one.lgamma().to_bits(), 0);
+    assert_eq!(two.lgamma().to_bits(), 0);
+    for pole in [0.0, -0.0, -1.0, -2.0, -3.0] {
+        let value = LongDouble128::from_f64(pole).lgamma();
+        assert!(value.is_infinite() && !value.sign_bit(), "lgamma({pole})");
+    }
+    assert!(
+        LongDouble128::from_f64(f64::INFINITY)
+            .lgamma()
+            .is_infinite()
+    );
+    assert!(
+        LongDouble128::from_f64(f64::NEG_INFINITY)
+            .lgamma()
+            .is_infinite()
+    );
+    assert!(LongDouble128::from_f64(f64::NAN).lgamma().is_nan());
+    // lgamma(1/2) = ln(sqrt(pi)).
+    let half = LongDouble128::from_f64(0.5);
+    let expected = 0.5 * core::f64::consts::PI.ln();
+    assert!(f64_ulp(half.lgamma().to_f64(), expected) <= 4);
+    // The functional equation lgamma(x+1) = lgamma(x) + ln(x).
+    for &value in &[0.75f64, 0.9, 1.1, 1.5, 2.5, 5.0, 10.0, 100.0] {
+        let x = LongDouble128::from_f64(value);
+        let left = x.add(one).lgamma().sub(x.lgamma());
+        assert!(
+            f64_ulp(left.to_f64(), value.ln()) <= 32,
+            "lgamma({value}+1)-lgamma({value})"
+        );
+    }
+    // The reflection sign: Gamma(-1/2) < 0, Gamma(-3/2) > 0, Gamma(-5/2) < 0.
+    assert_eq!(LongDouble128::from_f64(-0.5).lgamma_r().1, -1);
+    assert_eq!(LongDouble128::from_f64(-1.5).lgamma_r().1, 1);
+    assert_eq!(LongDouble128::from_f64(-2.5).lgamma_r().1, -1);
+    assert_eq!(LongDouble128::from_f64(2.5).lgamma_r().1, 1);
+    // Gamma edges.
+    assert_eq!(one.gamma().to_f64(), 1.0);
+    assert_eq!(two.gamma().to_f64(), 1.0);
+    assert_eq!(
+        LongDouble128::from_f64(6.0).gamma().to_bits(),
+        LongDouble128::from_f64(120.0).to_bits()
+    );
+    assert_eq!(
+        LongDouble128::from_f64(10.0).gamma().to_bits(),
+        LongDouble128::from_f64(362_880.0).to_bits()
+    );
+    assert!(f64_ulp(half.gamma().to_f64(), core::f64::consts::PI.sqrt()) <= 4);
+    assert!(
+        f64_ulp(
+            LongDouble128::from_f64(1.5).gamma().to_f64(),
+            0.5 * core::f64::consts::PI.sqrt()
+        ) <= 4
+    );
+    assert!(
+        f64_ulp(
+            LongDouble128::from_f64(-0.5).gamma().to_f64(),
+            -2.0 * core::f64::consts::PI.sqrt()
+        ) <= 8
+    );
+    // Poles and domains.
+    let positive_zero_inf = LongDouble128::from_f64(0.0).gamma();
+    assert!(positive_zero_inf.is_infinite() && !positive_zero_inf.sign_bit());
+    let negative_zero_inf = LongDouble128::from_f64(-0.0).gamma();
+    assert!(negative_zero_inf.is_infinite() && negative_zero_inf.sign_bit());
+    assert!(LongDouble128::from_f64(-1.0).gamma().is_nan());
+    assert!(LongDouble128::from_f64(-2.0).gamma().is_nan());
+    assert_eq!(
+        LongDouble128::from_f64(f64::INFINITY).gamma().to_f64(),
+        f64::INFINITY
+    );
+    assert!(LongDouble128::from_f64(f64::NEG_INFINITY).gamma().is_nan());
+    assert!(LongDouble128::from_f64(f64::NAN).gamma().is_nan());
+    // Gamma(x+1) = x*Gamma(x) away from the poles.
+    for &value in &[0.75f64, 1.3, 2.5, 5.0, 42.0] {
+        let x = LongDouble128::from_f64(value);
+        let left = x.add(one).gamma();
+        let right = x.mul(x.gamma());
+        let relative = left.sub(right).div(right).abs().to_f64();
+        assert!(
+            relative <= 1e-30,
+            "Gamma recurrence at {value}: {relative:e}"
+        );
+    }
+    // Reflection: Gamma(x)*Gamma(1-x) = pi/sin(pi x).
+    for &value in &[-0.3f64, -1.5, -2.5, -5.5] {
+        let x = LongDouble128::from_f64(value);
+        let product = x.gamma().mul(LongDouble128::one().sub(x).gamma());
+        let sine = core::f64::consts::PI * value;
+        assert!(
+            f64_ulp(product.to_f64(), core::f64::consts::PI / sine.sin()) <= 256,
+            "reflection at {value}"
+        );
+    }
+}

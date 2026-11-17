@@ -528,7 +528,7 @@ pub mod g13 {
     lda_unary!(acoshl, acoshl_inner);
 }
 
-/// `atanhl`, `atan2l`, `sincosl`.
+/// `atanhl`, `atan2l`, `sincosl`, `erfl`.
 pub mod g14 {
     use raven_libc_m::LongDouble;
 
@@ -559,7 +559,69 @@ pub mod g14 {
         }
     }
 
+    extern "C" fn erfl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::erfl(*x);
+        }
+    }
+
     lda_unary!(atanhl, atanhl_inner);
     lda_binary!(atan2l, atan2l_inner);
     lda_sincos!(sincosl, sincosl_inner);
+    lda_unary!(erfl, erfl_inner);
+}
+
+/// `erfcl`, `gammal`, `lgammal`, `tgammal`.
+pub mod g15 {
+    use raven_libc_m::LongDouble;
+
+    extern "C" fn erfcl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::erfcl(*x);
+        }
+    }
+
+    extern "C" fn gammal_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::gammal(*x);
+        }
+    }
+
+    extern "C" fn lgammal_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::lgammal(*x);
+        }
+    }
+
+    extern "C" fn tgammal_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::tgammal(*x);
+        }
+    }
+
+    lda_unary!(erfcl, erfcl_inner);
+    lda_unary!(gammal, gammal_inner);
+    lda_unary!(lgammal, lgammal_inner);
+    lda_unary!(tgammal, tgammal_inner);
+}
+
+/// `lgammal_r`.
+pub mod g16 {
+    use raven_libc_m::LongDouble;
+
+    extern "C" fn lgammal_r_inner(out: *mut LongDouble, sign: *mut i32, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots and an `int` slot.
+        unsafe {
+            let (value, gamma_sign) = raven_libc_m::lgammal_r(*x);
+            *out = value;
+            *sign = gamma_sign;
+        }
+    }
+
+    lda_lgamma_r!(lgammal_r, lgammal_r_inner);
 }
