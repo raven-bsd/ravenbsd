@@ -23,35 +23,40 @@ is followed by a read-only check on the resulting image.
 
 ## Fault matrix (golden `ufs2-b4096`, 157 writes, 158 cuts)
 
-| Stage | Cuts | Recovered (clean or repaired) | Unresolved |
+| Stage | Cuts | Recovered (clean or repaired) | Refused |
 |---|---:|---:|---:|
-| mkdir | 10 | 9 | 1 |
-| create | 5 | 4 | 1 |
+| mkdir | 10 | 10 | 0 |
+| create | 5 | 5 | 0 |
 | write | 3 | 3 | 0 |
 | link | 3 | 3 | 0 |
-| symlink | 6 | 5 | 1 |
-| mkdir-sub | 10 | 9 | 1 |
-| write-indirect | 50 | 49 | 1 |
+| symlink | 6 | 6 | 0 |
+| mkdir-sub | 10 | 10 | 0 |
+| write-indirect | 50 | 50 | 0 |
 | rename | 6 | 6 | 0 |
-| unlink | 17 | 13 | 4 |
-| unlink-large | 26 | 23 | 3 |
-| rmdir | 18 | 10 | 8 |
+| unlink | 17 | 17 | 0 |
+| unlink-large | 26 | 26 | 0 |
+| rmdir | 18 | 18 | 0 |
 | mount (budget 0..2) | 3 | 0 | 3 |
 | none (golden, no writes) | 1 | 1 | 0 |
-| **total** | **158** | **135** | **23** |
+| **total** | **158** | **155** | **3** |
 
-* 2 cuts were already clean; 133 additional cuts were repaired by `check(Mode::Repair)` and
+* 2 cuts were already clean; 153 additional cuts were repaired by `check(Mode::Repair)` and
   passed a second read-only check.
-* 3 cuts (0..2) could not complete the initial writable mount and therefore failed closed.
-* 20 cuts have a residual `repair-incomplete` finding after the preen repair: 11, 16, 27, 38,
-  43, 100, 101, 108, 109, 114, 115, 116, 140, 141, 142, 143, 149, 150, 151, 152.
+* 3 cuts (0..2) could not complete the initial writable mount and therefore failed closed; they
+  are refused, not mounted.
+* The previous 20 `repair-incomplete` cuts are now repaired: `check(Mode::Repair)` recreates a
+  missing `/lost+found` and reconnects orphaned directories and unreferenced inodes, fixes the
+  root link count it changes, and releases indirect data blocks by their true fragment count so
+  the cylinder-group and superblock summaries reconcile.
 
 The on-target `fsd-ufs-rw` checkpoint reports:
 
 ```
 fsd-ufs-rw: probe crash findings=1 clean=false
-fsd-ufs-rw: probe crash replay=fail-closed
+fsd-ufs-rw: probe crash replay=mounted
 fsd-ufs-rw: probe crash ok
+fsd-ufs-rw: probe refuse ok
+fsd-ufs-rw: probe refuse-clean ok
 ```
 
 ## Guarantees
@@ -61,19 +66,18 @@ fsd-ufs-rw: probe crash ok
   uninitialized inode; namespace operations remove the entry before freeing the target.
 * `check(Mode::ReadOnly)` detects the remaining inconsistencies in every non-clean cut; the
   matrix does not label a findings cut as clean.
+* `fsd-ufs` now runs the mount-time recovery policy in `ufs_core::check::recover`: read-only
+  check, then the preen repair, and it refuses to serve an image whose follow-up check is not
+  clean. A clean image still mounts.
 * WAPBL remains available as an existing on-disk journal; it is not enabled for the golden
   image or the `fsd-ufs-rw` profile (`journal=none`).
 
 ## Exact remaining recovery gap
 
-`fsd-ufs` does **not** run `check(Mode::Repair)` on mount, does not automatically replay a dirty
-WAPBL log in this non-journaled qtest, and does not refuse a non-journaled dirty image that
-`check` finds inconsistent. After a crash, the server may restart and serve an image that the
-read-only check flags; the on-target qtest observes that case as `replay=fail-closed` when the
-remount itself fails, but the general policy is not implemented.
+The only unresolved cuts are the three budget-0..2 cases that cannot even perform the initial
+writable mount; they fail closed and are refused. Every cut that produces a mountable image is
+now either clean after a read-only check or repaired to clean by `check(Mode::Repair)`, so
+`fsd-ufs` never serves a repair-incomplete image.
 
-The required follow-up is a mount-time recovery policy: detect the unclean flag/WAPBL log, run
-the preen repair (or a journal replay for a journaled image), refuse to serve if the second
-read-only check is not clean, and report the residual findings. The 20 `repair-incomplete`
-cuts are the exact cases that need the stronger repair policy; the current preen repair is not
-sufficient.
+A journaled (WAPBL) image still needs automatic log replay on mount; that remains a later
+ticket, and `fsd-ufs` continues to refuse a read-only mount whose journal is dirty.
