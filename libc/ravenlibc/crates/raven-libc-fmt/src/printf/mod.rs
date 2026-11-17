@@ -76,6 +76,8 @@ use crate::types::{FloatKind, FmtErr, FmtOptions, PctN, StoreSize};
 const INT_MAX: i64 = i32::MAX as i64;
 
 /// One parsed floating-point conversion.
+#[cfg(not(all(feature = "float", not(feature = "tiny"))))]
+#[allow(dead_code)] // the tiny stub reads only `width` and `flags`
 pub(crate) struct FloatConv {
     /// The conversion character (`a A e E f F g G`).
     pub(crate) ch: u32,
@@ -651,15 +653,15 @@ fn vformat_dyn<C: CharUnit>(
                 } else {
                     (FloatKind::F64, u128::from(reader.f64_bits(argpos)?))
                 };
-                let conv = FloatConv {
-                    ch: x,
-                    flags,
-                    width,
-                    prec,
-                    sign,
-                };
                 #[cfg(all(feature = "float", not(feature = "tiny")))]
                 {
+                    let conv = float_layout::FloatConv {
+                        ch: x,
+                        flags,
+                        width,
+                        prec,
+                        sign,
+                    };
                     ret = float_layout::emit(
                         sink,
                         &conv,
@@ -671,6 +673,13 @@ fn vformat_dyn<C: CharUnit>(
                 }
                 #[cfg(not(all(feature = "float", not(feature = "tiny"))))]
                 {
+                    let conv = FloatConv {
+                        ch: x,
+                        flags,
+                        width,
+                        prec,
+                        sign,
+                    };
                     let _ = (kind, bits, floats);
                     ret = float_stub(sink, &conv, ret)?;
                 }

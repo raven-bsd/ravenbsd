@@ -50,7 +50,6 @@
 // The donor's field arithmetic is mirrored; every output-size addition has its INT_MAX
 // check, and the buffers are sized by DEC_BUF_F64/DEC_BUF_LD.
 
-use crate::printf::FloatConv;
 use crate::printf::group::{Grouping, write_ascii, write_mb};
 use crate::printf::int::exponent;
 use crate::printf::spec::{ALT, DEFPREC, FPT, GROUPING, LADJUST, ZEROPAD};
@@ -60,6 +59,20 @@ use crate::types::{
 };
 
 const INT_MAX: i64 = i32::MAX as i64;
+
+/// One parsed floating-point conversion.
+pub(crate) struct FloatConv {
+    /// The conversion character (`a A e E f F g G`).
+    pub(crate) ch: u32,
+    /// The collected flag bits.
+    pub(crate) flags: u32,
+    /// The field width.
+    pub(crate) width: i32,
+    /// The precision; negative means absent.
+    pub(crate) prec: i32,
+    /// The sign character already selected by `+`/space.
+    pub(crate) sign: u8,
+}
 
 /// Render one float conversion and return the updated output count.
 ///
