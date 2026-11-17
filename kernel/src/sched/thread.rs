@@ -21,6 +21,8 @@ use spin::Mutex;
 use raven_abi::errno::Errno;
 use raven_rmm::VirtAddr;
 
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::fpu::FpuArea;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::fpu::FpuArea;
 use crate::memory::paging;
@@ -140,8 +142,7 @@ pub struct Thread {
     /// Top of the mapped kernel stack.
     pub kernel_stack_top: u64,
     saved_rsp: core::cell::UnsafeCell<u64>,
-    /// Architectural FP/SIMD save area (x86-64).
-    #[cfg(target_arch = "x86_64")]
+    /// Architectural FP/SIMD save area.
     pub fpu: core::cell::UnsafeCell<FpuArea>,
     /// True while the user FP state is parked in `fpu` (thread is inside a syscall).
     #[cfg(target_arch = "x86_64")]
@@ -293,14 +294,12 @@ impl Thread {
     ///
     /// `FpuArea` is `repr(C)` with the byte array as its first field, so the area address is the
     /// struct address. Callers must own the thread's FP/SIMD state (scheduler critical section).
-    #[cfg(target_arch = "x86_64")]
     #[inline]
     pub fn fpu_area_ptr(&self) -> *mut u8 {
         self.fpu.get() as *mut u8
     }
 
     /// Raw const pointer to the thread's FP/SIMD save area.
-    #[cfg(target_arch = "x86_64")]
     #[inline]
     pub fn fpu_area_const_ptr(&self) -> *const u8 {
         self.fpu.get() as *const u8
@@ -331,7 +330,6 @@ impl Thread {
             kernel_stack_base: base,
             kernel_stack_top: top,
             saved_rsp: core::cell::UnsafeCell::new(0),
-            #[cfg(target_arch = "x86_64")]
             fpu: core::cell::UnsafeCell::new(FpuArea::new()),
             #[cfg(target_arch = "x86_64")]
             fpu_saved: AtomicBool::new(false),
@@ -429,7 +427,6 @@ impl Thread {
             kernel_stack_base: 0,
             kernel_stack_top: current_rsp & !0xf,
             saved_rsp: core::cell::UnsafeCell::new(0),
-            #[cfg(target_arch = "x86_64")]
             fpu: core::cell::UnsafeCell::new(FpuArea::new()),
             #[cfg(target_arch = "x86_64")]
             fpu_saved: AtomicBool::new(false),
@@ -467,7 +464,6 @@ impl Thread {
     /// The AP is already executing on the returned kernel stack when this object is published, so
     /// the stack is not prepared with [`crate::sched::context::prepare_stack`]: the first
     /// `sched_switch` saves the live stack pointer.
-    #[cfg(target_arch = "x86_64")]
     pub fn new_idle_ap(process: Arc<Process>, cr3: u64) -> Result<Arc<Thread>, Errno> {
         let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
         Ok(Arc::new(Thread {
@@ -483,7 +479,6 @@ impl Thread {
             kernel_stack_base: base,
             kernel_stack_top: top,
             saved_rsp: core::cell::UnsafeCell::new(0),
-            #[cfg(target_arch = "x86_64")]
             fpu: core::cell::UnsafeCell::new(FpuArea::new()),
             #[cfg(target_arch = "x86_64")]
             fpu_saved: AtomicBool::new(false),

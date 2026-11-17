@@ -77,9 +77,7 @@ long           telldir(DIR *);
 int getdents(int, struct dirent *, size_t);
 #endif
 
-#if __BSD_VISIBLE
 int versionsort(const struct dirent **, const struct dirent **);
-#endif
 
 __END_DECLS
 

@@ -34,12 +34,9 @@ __BEGIN_DECLS
 #include <sys/time.h>
 
 #define __NEED_id_t
+#define __NEED_pid_t
 /* RavenBSD: rlim_t is not in the committed C37 alltypes.h; declared here. */
 typedef unsigned long rlim_t;
-
-#if __BSD_VISIBLE
-#define __NEED_pid_t
-#endif
 
 #include <bits/alltypes.h>
 #include <bits/resource.h>
@@ -79,11 +76,8 @@ int getrusage (int, struct rusage *);
 int getpriority (int, id_t);
 int setpriority (int, id_t, int);
 
-#if __BSD_VISIBLE
 int prlimit(pid_t, int, const struct rlimit *, struct rlimit *);
 #define prlimit64 prlimit
-#endif
-
 #ifndef RLIMIT_RSS
 #endif
 

@@ -83,7 +83,31 @@ off in arrival order).
 
 `crates/raven-turnstile` has an off-by-default `lockstat` feature. When enabled, each turnstile
 carries per-object counters (`Turnstiles::stats(object) -> LockStats`) that the kernel `lockstat`
-probes will publish (L5). The default build has no counters and no extra cost or layout.
+probes publish (L5). The crate's default build has no counters and no extra cost or layout.
+
+Kernel build mechanism (L5, OBSERVED): `kernel/Cargo.toml` declares a `lockstat` feature that is
+**on by default** (`default = ["lockstat"]`). The kernel includes the pure model by `#[path]`, so
+that feature cfg reaches the same `#[cfg(feature = "lockstat")]` counters the host suite tests;
+no second flag and no `raven-turnstile` dependency edge is needed. `--no-default-features` drops
+the counters, `sync::lockstat()` and the `selftest=lockstat` arm (both arches compile clean that
+way). Cost: with the feature on, each model object carries eight `u64` saturating counters and each
+lock operation performs one saturating add plus, for `block`, the queue/depth maximum update. The
+byte and cycle overhead is **UNMEASURED** (no timed kernel benchmark in this ticket).
+
+`sync::lockstat()` returns `Vec<(ObjectId, LockStats)>` over every object the graph has touched.
+`selftest=lockstat` runs a bounded workload (one owner, two waiters at higher priority, one
+inherited boost, two handoffs) and prints one machine-readable line; the `lockstat` qtest asserts
+it. Observed QEMU line:
+
+```
+lockstat: ok object=3 wait_entries=2 wakes=2 cancels=0 timeouts=0 boosts=1 max_queue=2 owner_boost=0 restored=ok
+```
+
+`boosts` is `inherited_priority_changes` (how often an operation changed an owner's effective
+priority), `max_queue` is `max_queue_depth`; `timeouts` is always `0` because the pure model has no
+timeout path. The counter counts the blocking edge that actually raised the owner and any handoff
+that changes the incoming owner's priority; the bounded two-waiter run above observes `1` (the
+second waiter has lower priority than the first and does not raise the owner again).
 
 | Counter | Meaning |
 |---|---|

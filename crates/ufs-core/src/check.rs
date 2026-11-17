@@ -201,6 +201,104 @@ pub fn check<D: BlockIo>(disk: &mut D, mode: Mode) -> Result<Report, UfsError> {
     })
 }
 
+/// The outcome of the mount-time recovery policy in [`recover`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Recovery {
+    /// The read-only check was clean; the image may mount.
+    Clean,
+    /// A dirty WAPBL journal was replayed; the image may mount.
+    Replayed {
+        /// Number of findings the repair pass fixed after replay.
+        repaired: usize,
+    },
+    /// The repair pass fixed every finding; the image may mount.
+    Repaired {
+        /// Number of findings the repair pass fixed.
+        fixed: usize,
+    },
+    /// The image still reports findings; the mount must be refused.
+    Refused {
+        /// Number of findings that remain after the repair attempt.
+        findings: usize,
+    },
+}
+
+impl Recovery {
+    /// Whether the image may mount.
+    #[must_use]
+    pub fn mounts(self) -> bool {
+        !matches!(self, Self::Refused { .. })
+    }
+}
+
+/// The mount-time recovery policy: replay a dirty journal, then refuse an image that still
+/// reports findings.
+///
+/// A dirty WAPBL journal is replayed first on a writable mount; a read-only mount refuses it with
+/// [`UfsError::Unsupported`]. The read-only [`check`] then runs; a clean image mounts. A dirty
+/// read-write mount runs the existing [`Mode::Repair`] preen pass and mounts only when the
+/// follow-up verification is clean; otherwise it is refused with the residual count. This is the
+/// policy that keeps `fsd-ufs` from serving a known-dirty image.
+pub fn recover<D: BlockIo>(disk: &mut D, read_only: bool) -> Result<Recovery, UfsError> {
+    let replayed = replay_journal(disk, read_only)?;
+    let first = check(disk, Mode::ReadOnly)?;
+    if first.clean_after {
+        return Ok(if replayed {
+            Recovery::Replayed { repaired: 0 }
+        } else {
+            Recovery::Clean
+        });
+    }
+    if read_only {
+        return Ok(Recovery::Refused {
+            findings: first.findings.len(),
+        });
+    }
+    let repaired = check(disk, Mode::Repair)?;
+    if repaired.clean_after {
+        if replayed {
+            Ok(Recovery::Replayed {
+                repaired: repaired.fixed.len(),
+            })
+        } else {
+            Ok(Recovery::Repaired {
+                fixed: repaired.fixed.len(),
+            })
+        }
+    } else {
+        Ok(Recovery::Refused {
+            findings: repaired.findings.len(),
+        })
+    }
+}
+
+/// Replay a dirty WAPBL log in place. Returns whether a log was replayed.
+///
+/// A read-only mount cannot write the log and returns the same typed error as [`crate::Ufs::mount`].
+/// After replay the log is reset; the following check repairs any inode the aborted transaction left.
+fn replay_journal<D: BlockIo>(disk: &mut D, read_only: bool) -> Result<bool, UfsError> {
+    let fs = ffs_vfsops::probe(disk)?;
+    if !fs.has_journal() {
+        return Ok(false);
+    }
+    let Some(mut journal) = crate::wapbl::Journal::from_super(&fs, disk.size_bytes())? else {
+        return Ok(false);
+    };
+    if !journal.is_dirty(disk)? {
+        return Ok(false);
+    }
+    if read_only {
+        return Err(UfsError::Unsupported("dirty journal on read-only mount"));
+    }
+    let fs_bytes = fs
+        .size
+        .checked_mul(u64::from(fs.fsize))
+        .ok_or(UfsError::BadSuperblock("filesystem size"))?;
+    let _ = journal.replay(disk, fs_bytes)?;
+    disk.flush().map_err(|_| UfsError::Io)?;
+    Ok(true)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum InoState {
     Free,
@@ -697,6 +795,7 @@ impl<'a, D: BlockIo> Checker<'a, D> {
         level: u8,
         block: u64,
         needed: u64,
+        size: u64,
         next_lbn: &mut u64,
     ) -> Result<(), UfsError> {
         if !self.valid_fragment(block) {
@@ -715,10 +814,11 @@ impl<'a, D: BlockIo> Checker<'a, D> {
             let child_needed = remaining.min(child_capacity);
             if ptr != 0 {
                 if level == 1 {
-                    self.release_block(ptr);
+                    self.release_extent(ptr, self.block_frags(size, *next_lbn));
                     *next_lbn = next_lbn.saturating_add(1);
                 } else {
-                    self.walk_indirect_release(level - 1, ptr, child_needed, next_lbn)?;
+                    self.release_extent(ptr, self.fs.frag);
+                    self.walk_indirect_release(level - 1, ptr, child_needed, size, next_lbn)?;
                 }
             } else if level == 1 {
                 *next_lbn = next_lbn.saturating_add(1);
@@ -1349,8 +1449,88 @@ impl<'a, D: BlockIo> Checker<'a, D> {
             self.lf = Some(ino);
             return Ok(Some(ino));
         }
-        self.finding(3, Problem::LostFoundMissing, Some(UFS_ROOTINO), None);
-        Ok(None)
+        let finding = self.finding(3, Problem::LostFoundMissing, Some(UFS_ROOTINO), None);
+        if !self.repair {
+            return Ok(None);
+        }
+        let created = self.create_lost_found()?;
+        if created.is_some() {
+            self.mark_fixed(&finding);
+        }
+        Ok(created)
+    }
+
+    /// Allocate a free inode and a free fragment, build the `.`/`..` directory block and link
+    /// `lost+found` from the root directory. The cylinder-group bitmaps and superblock summary
+    /// are rebuilt from the updated owner/state tables in [`Self::rebuild_metadata`].
+    fn create_lost_found(&mut self) -> Result<Option<Ino>, UfsError> {
+        let mut ino = None;
+        for candidate in UFS_ROOTINO..self.maxino {
+            if self.states[candidate as usize].state == InoState::Free {
+                ino = Some(candidate);
+                break;
+            }
+        }
+        let Some(ino) = ino else {
+            return Ok(None);
+        };
+        let mut frag = None;
+        for candidate in 1..self.fs.size {
+            if self.is_reserved(candidate) {
+                continue;
+            }
+            if self.owners.get(candidate as usize).copied().unwrap_or(0) != 0 {
+                continue;
+            }
+            frag = Some(candidate);
+            break;
+        }
+        let Some(frag) = frag else {
+            return Ok(None);
+        };
+        self.reserve_block(frag);
+
+        let data = crate::dirwrite::dot_entries(ino, UFS_ROOTINO)?;
+        self.write_extent(frag, &data)?;
+
+        let mut db = [0u64; UFS_NDADDR];
+        db[0] = frag;
+        let inode = RawInode {
+            mode: 0o040755,
+            nlink: 2,
+            uid: 0,
+            gid: 0,
+            size: UFS_DIRBLKSIZ as u64,
+            blocks: u64::from(self.fs.fsize / 512),
+            flags: 0,
+            db,
+            ib: [0u64; UFS_NIADDR],
+        };
+        self.write_inode(ino, &inode)?;
+        self.states[ino as usize] = InodeState {
+            state: InoState::Dir,
+            kind: FileType::Directory,
+            nlink: 2,
+        };
+        self.refs[ino as usize] = 2;
+        self.parents[ino as usize] = UFS_ROOTINO;
+        self.dotdots[ino as usize] = UFS_ROOTINO;
+
+        let root_inode = self.read_inode(UFS_ROOTINO)?;
+        if !self.insert_entry(
+            UFS_ROOTINO,
+            &root_inode,
+            b"lost+found",
+            ino,
+            dtype(FileType::Directory),
+        )? {
+            return Ok(None);
+        }
+        if let Some(slot) = self.refs.get_mut(UFS_ROOTINO as usize) {
+            *slot = slot.saturating_add(1);
+        }
+        self.lf = Some(ino);
+        Ok(Some(ino))
     }
 
     fn attach_to_lost_found(&mut self, ino: Ino) -> Result<bool, UfsError> {
@@ -1397,6 +1577,17 @@ impl<'a, D: BlockIo> Checker<'a, D> {
     // --- phase 4 -----------------------------------------------------------
 
     fn fix_links_and_clear(&mut self) -> Result<(), UfsError> {
+        // Any inode that will be reconnected needs `lost+found` to exist before the link-count
+        // pass, otherwise the root directory's nlink is fixed before the new `..` entry is added.
+        if self.repair
+            && (UFS_ROOTINO..self.maxino).any(|ino| {
+                let state = self.states[ino as usize];
+                (state.state == InoState::File || state.state == InoState::Dir)
+                    && self.refs[ino as usize] == 0
+            })
+        {
+            let _ = self.ensure_lost_found()?;
+        }
         for ino in 2..self.maxino {
             let state = self.states[ino as usize];
             if state.state == InoState::Free || state.state == InoState::Clear {
@@ -1490,7 +1681,13 @@ impl<'a, D: BlockIo> Checker<'a, D> {
                 self.release_extent(inode.ib[index], self.fs.frag);
                 let child_capacity = self.fs.nindir().saturating_pow(u32::from(level));
                 let child_needed = remaining.min(child_capacity);
-                self.walk_indirect_release(level, inode.ib[index], child_needed, &mut next_lbn)?;
+                self.walk_indirect_release(
+                    level,
+                    inode.ib[index],
+                    child_needed,
+                    inode.size,
+                    &mut next_lbn,
+                )?;
                 remaining = remaining.saturating_sub(child_needed);
             } else {
                 let child_capacity = self.fs.nindir().saturating_pow(u32::from(level));

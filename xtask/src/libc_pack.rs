@@ -294,6 +294,9 @@ fn stage_sysroot(root: &Path, options: &Options) -> Result<()> {
         }
     }
 
+    // A rebuilt sysroot must not keep a wrapper from an older `libc-pack`: the compiler header
+    // is not staged, and a stale copy would still shadow the compiler's own header.
+    clean_compiler_headers(&usr_include);
     copy_headers(&root.join("libc/ravenlibc/include"), &usr_include)?;
     copy_headers(
         &root
@@ -347,10 +350,40 @@ fn copy_headers(source: &Path, target: &Path) -> Result<()> {
                 .with_context(|| format!("cannot create {}", destination.display()))?;
             copy_headers(&path, &destination)?;
         } else {
+            if name.to_str().is_some_and(is_compiler_header) {
+                continue;
+            }
             copy_if_exists(&path, &destination)?;
         }
     }
     Ok(())
+}
+
+/// Headers that the C compiler owns and that use `#include_next`.
+///
+/// They are wrappers over the compiler resource directory. Staging them into the sysroot makes
+/// `--sysroot` find the wrapper first and the compiler header second, so `#include_next` has no
+/// later copy to include. The sysroot must leave them to the compiler.
+const COMPILER_HEADERS: [&str; 5] = [
+    "stddef.h",
+    "stdbool.h",
+    "stdatomic.h",
+    "stdarg.h",
+    "float.h",
+];
+
+fn is_compiler_header(name: &str) -> bool {
+    COMPILER_HEADERS.contains(&name)
+}
+
+/// Remove a stale compiler wrapper from a previously staged sysroot.
+fn clean_compiler_headers(directory: &Path) {
+    for name in COMPILER_HEADERS {
+        let path = directory.join(name);
+        if path.is_file() {
+            let _ = std::fs::remove_file(path);
+        }
+    }
 }
 
 /// The exact `cargo rustc` command vector of step 1, without spawning it.

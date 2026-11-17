@@ -4,7 +4,7 @@
 name = "fsd-ufs-rw"
 arch = "x86_64"
 profile = "fsd-ufs-rw-test"
-timeout_secs = 300
+timeout_secs = 420
 pre = ["sh tests/fixtures/k55-ufs/build.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
@@ -80,10 +80,25 @@ regex = '^fsd-ufs-rw: probe remount ok$'
 regex = '^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true|false)$'
 
 [[expect]]
-regex = '^fsd-ufs-rw: probe crash replay=(mounted|fail-closed)$'
+regex = '^fsd-ufs: repaired [0-9]+ findings on block:0$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe crash replay=mounted$'
 
 [[expect]]
 regex = '^fsd-ufs-rw: probe crash ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe refuse ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe refuse-clean ok$'
+
+[[expect]]
+regex = '^fsd-ufs: mode=rw journal=active$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe journal mount ok$'
 
 [[expect]]
 regex = '^fsd-ufs-rw: probe ok$'

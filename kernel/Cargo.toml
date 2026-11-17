@@ -14,6 +14,14 @@ rust-version.workspace = true
 name = "raven-kernel"
 path = "src/main.rs"
 
+[features]
+# L5 lockstat probes: per-object turnstile counters compiled into the kernel. On by default so
+# every kernel build and qtest carries the diagnostic surface; `--no-default-features` drops the
+# counters and the `sync::lockstat()` / `selftest=lockstat` entries. The included pure model reads
+# this same cfg, so no second feature flag is needed.
+default = ["lockstat"]
+lockstat = []
+
 [dependencies]
 raven-abi = { path = "../crates/raven-abi" }
 raven-bootinfo = { path = "../crates/raven-bootinfo" }

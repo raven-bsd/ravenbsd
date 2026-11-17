@@ -52,9 +52,10 @@ The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 * BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
-`build/libc-gate/`. `libc-signals` and `libc-spawn` pass. C74c makes `libc-hello`'s auxv check
-pass (only the P1b `string` check remains), and `libc-threads` passes at runtime when the C74b
-`libc-pack` wrapper headers (`stdatomic.h` and the other `#include_next` files) are removed; that
-header staging is a `libc_pack.rs` defect outside C74c's Owns. `libc-dynamic` fails the C test's
-interim `shape-check.sh` (`partial file tail at 0x0`), which is in the C test build script, not
-`libc_link`. `libc-time` needs P1b `sleep`/`usleep`/`tzname`; `libc-stdio` faults at `0x3` (P1b).
+`build/libc-gate/`. `libc-signals`, `libc-spawn` and `libc-threads` pass. C74c makes
+`libc-hello`'s auxv check pass (only the P1b `string` check remains), makes `libc-pack` skip the
+five compiler wrappers (`stddef.h`, `stdbool.h`, `stdatomic.h`, `stdarg.h`, `float.h`) that broke
+the target C build, and makes `libc-dynamic` pass the test shape check (`shape: ok`). The
+`libc-dynamic` case then fails at runtime with `svcd: libc-test failed: invalid argument` in the
+`ld-elf.so.1` loader path, outside this ticket. `libc-time` needs P1b `sleep`/`usleep`/`tzname`;
+`libc-stdio` faults at `0x3` (P1b).

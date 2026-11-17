@@ -81,9 +81,9 @@ Each row is a direct `cargo xtask qtest --case <case> --arch x86_64` run.
 | libc-hello | FAIL | `libc-hello: auxv ok` after C74c publishes `AT_PHNUM`; the only failure is `FAIL string` (line 195), a P1b string routine. |
 | libc-stdio | FAIL | `libc-stdio: printf ok`, then `process: child killed by page fault at 0x3`; the first stdio file/stream check after printf. |
 | libc-time | ERROR (build) | The C fixture does not link: `rust-lld: undefined symbol: usleep`, `sleep`, `tzname`. These are genuinely absent from `libc.a` (`nm` shows only `nanosleep`); `sleep`/`usleep` are unistd and `tzname` is time (P1b), all outside C74b's Owns. C74b makes the sysroot repeatable but does not add these symbols. |
-| libc-threads | FAIL (build) | With the C74b sysroot wrapper headers removed, the case **passes** on this master (C77 fixed the hang). The default `libc-pack` sysroot stages `stdatomic.h`/`stddef.h`/`stdbool.h`/`stdarg.h`/`float.h`, whose `#include_next` cannot resolve under `--sysroot`; the fix belongs to `libc_pack.rs` (C74b), outside C74c's Owns. |
+| libc-threads | PASS | `cargo xtask qtest --case libc-threads --arch x86_64` exit 0 after `libc-pack` skips the five compiler wrappers. |
 | libc-signals | PASS | `cargo xtask qtest --case libc-signals --arch x86_64` exit 0. |
-| libc-dynamic | ERROR (build) | `shape: FAIL partial file tail at 0x0000000000000000 (offset 0x000000 + size 0x000ae4)`. The loader shape check rejects the produced file. |
+| libc-dynamic | FAIL (runtime) | `shape-check.sh` now passes (`--image-base=0x400000` on the test PIE; the check validates the file range instead of a page-rounded `p_filesz`). The case then fails before `libc-dynamic: start` with `svcd: libc-test failed: invalid argument`; that is the runtime loader/`ld-elf.so.1` path, outside C74c's Owns. |
 | libc-spawn | PASS | `cargo xtask qtest --case libc-spawn --arch x86_64` exit 0. |
 
 Supporting acceptance:
@@ -106,12 +106,14 @@ change the missing `sleep`/`usleep`/`tzname` exports or the thread/dynamic/hello
 live in crates and linker paths outside C74b's Owns.
 
 C74c publishes `AT_PHDR`/`AT_PHENT`/`AT_PHNUM` from the retained startup auxv, so
-`getauxval(AT_PHNUM)` is nonzero and `libc-hello: auxv ok`; `libc-link` now stages the freshly
-linked `libc.so.1`/`ld-elf.so.1` into the sysroot. The `libc-threads` runtime now passes (C77
-fixed the hang) once the C74b wrapper headers are removed; the remaining blocker for a clean
-gate run is the `libc-pack` header staging. The `libc-dynamic` failure is the C test's interim
-`shape-check.sh` rejecting lld's unpadded first LOAD (`offset 0, size 0xae4`), which is in the
-C test build script, not `libc_link`.
+`getauxval(AT_PHNUM)` is nonzero and `libc-hello: auxv ok`; `libc-link` stages the freshly linked
+`libc.so.1`/`ld-elf.so.1` into the sysroot, and `libc-pack` skips the five compiler wrappers
+(`stddef.h`, `stdbool.h`, `stdatomic.h`, `stdarg.h`, `float.h`) when staging headers. With that,
+`libc-threads` **passes**. The dynamic test now links at `--image-base=0x400000` and the shape
+check accepts it (`shape: ok`); the case then fails before `libc-dynamic: start` with
+`svcd: libc-test failed: invalid argument`, which is the runtime loader/`ld-elf.so.1` path
+outside C74c's Owns. The remaining libc failures are P1b (`libc-hello` string, `libc-stdio`,
+`libc-time` `sleep`/`usleep`/`tzname`).
 
 ## 5. Other rows
 

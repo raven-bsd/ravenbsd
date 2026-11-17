@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S76: aarch64 kernel-thread SMP proof. Four QEMU virt CPUs, the `selftest=smp` kernel
+# workload pins one kernel worker per CPU and proves that every application processor ran its
+# worker (each yields 2000 times, so it must keep resuming after its timer interrupts).
+# User-thread SMP is the follow-up slice; this case does not claim it.
+name = "smp-user-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 300
+pre = []
+boot_cmdline = "console=ttyAMA0 test-exit=1 selftest=smp"
+qemu_extra = ["-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: [1-9][0-9]* cpus online$'
+
+[[expect]]
+regex = '^aarch64-smp: online cpus=4$'
+
+# Every application processor ran its kernel worker and kept resuming after its timer IRQs.
+[[expect]]
+regex = '^aarch64-smp: worker cpu=1 runs=[1-9][0-9]*$'
+unordered = true
+
+[[expect]]
+regex = '^aarch64-smp: worker cpu=2 runs=[1-9][0-9]*$'
+unordered = true
+
+[[expect]]
+regex = '^aarch64-smp: worker cpu=3 runs=[1-9][0-9]*$'
+unordered = true
+
+[[expect]]
+regex = '^aarch64-smp: fpu ok rounds=200$'
+
+[[expect]]
+regex = '^aarch64-smp: ok cpus=4 counter=8000$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|aarch64-smp: .*failed|aarch64-smp: timeout'

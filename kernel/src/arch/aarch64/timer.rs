@@ -90,11 +90,19 @@ pub fn interrupt() -> u32 {
 
 /// Timer interrupt handler: re-arm for the next period and account the tick.
 pub fn handle() {
+    rearm();
+    crate::time::on_tick();
+}
+
+/// Re-arm the current CPU's timer without advancing the boot CPU's wall clock.
+///
+/// Application processors use this in their timer interrupt: only the BSP owns `time::on_tick`
+/// and the cyclic/wall-clock state (matching the x86-64 AP timer vector).
+pub fn rearm() {
     let reload = RELOAD.load(Ordering::Acquire);
     if reload != 0 {
         arm(reload);
     }
-    crate::time::on_tick();
 }
 
 fn arm(reload: u64) {

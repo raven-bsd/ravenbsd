@@ -25,6 +25,7 @@ fn ctx() -> Ctx {
         buffer_len: 0,
         response_len: 0,
         credentials: Credentials::ROOT,
+        trace_id: 0,
     }
 }
 
