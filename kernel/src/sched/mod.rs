@@ -198,13 +198,11 @@ fn global() -> Option<&'static Global> {
 }
 
 /// Kernel process used by kernel threads.
-#[cfg(target_arch = "x86_64")]
 pub fn kernel_process() -> Option<Arc<Process>> {
     global().map(|global| Arc::clone(&global.kernel_process))
 }
 
 /// Kernel page-table root used by kernel threads.
-#[cfg(target_arch = "x86_64")]
 pub fn kernel_cr3() -> Option<u64> {
     global().map(|global| global.kernel_cr3)
 }
@@ -219,7 +217,6 @@ fn lock_cpu(cpu: usize) -> SpinMutexGuard<'static, Option<CpuSched>> {
 }
 
 /// Initialise the per-CPU scheduler slot for an application processor.
-#[cfg(target_arch = "x86_64")]
 pub fn init_cpu(cpu: usize, idle: Arc<Thread>) -> Result<(), Errno> {
     if cpu == 0 || cpu >= MAX_CPUS {
         return Err(Errno::EINVAL);
@@ -233,7 +230,6 @@ pub fn init_cpu(cpu: usize, idle: Arc<Thread>) -> Result<(), Errno> {
 }
 
 /// Allocate an idle thread (and its kernel stack) for an application processor.
-#[cfg(target_arch = "x86_64")]
 pub fn new_ap_idle() -> Result<Arc<Thread>, Errno> {
     let process = kernel_process().ok_or(Errno::EINVAL)?;
     let cr3 = kernel_cr3().ok_or(Errno::EINVAL)?;
@@ -241,7 +237,6 @@ pub fn new_ap_idle() -> Result<Arc<Thread>, Errno> {
 }
 
 /// Adopt the AP's already-running stack as its idle thread and enter the idle loop.
-#[cfg(target_arch = "x86_64")]
 pub fn ap_main(cpu: usize) -> ! {
     let idle = {
         let slot = lock_cpu(cpu);
@@ -250,6 +245,15 @@ pub fn ap_main(cpu: usize) -> ! {
     if let Some(idle) = idle {
         smp::percpu::set_current_thread(Arc::as_ptr(&idle) as u64);
         smp::percpu::set_kernel_rsp(idle.kernel_stack_top);
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        smp::percpu::mark_online(cpu);
+        // SAFETY: the AP now has its current idle thread and per-CPU slot installed; IRQs are
+        // safe to take. The BSP waits for `mark_online` before it queues any AP work.
+        unsafe {
+            sync::enable_interrupts();
+        }
     }
     idle::run()
 }
@@ -281,9 +285,10 @@ pub fn enqueue(thread: Arc<Thread>) -> bool {
         return false;
     }
     // User threads spread across the online CPUs when `smp_user=on`; otherwise they stay on the
-    // boot processor. Kernel threads stay local.
+    // boot processor. S76's first aarch64 slice is kernel-thread only: aarch64 user threads stay
+    // on CPU 0 until the per-CPU EL0/syscall and FP/SIMD slice lands. Kernel threads stay local.
     let cpu = if thread.user {
-        if user_smp_enabled() {
+        if user_smp_enabled() && cfg!(target_arch = "x86_64") {
             pick_user_cpu()
         } else {
             0
@@ -342,7 +347,6 @@ pub fn spawn_kernel(name: &str, entry: fn()) -> Result<Arc<Thread>, Errno> {
 
 /// Spawn a kernel thread directly on `cpu` (the SMP self-test uses this to place one worker per
 /// CPU before the scheduler starts).
-#[cfg(target_arch = "x86_64")]
 pub fn spawn_kernel_on(cpu: usize, name: &str, entry: fn()) -> Result<Arc<Thread>, Errno> {
     if cpu >= smp::online_cpus() {
         return Err(Errno::EINVAL);
@@ -910,8 +914,9 @@ fn target_cpu(thread: &Thread) -> usize {
     let cpu = usize::try_from(thread.last_cpu.load(Ordering::Acquire)).unwrap_or(0);
     let online = smp::online_cpus();
     // A user thread resumes on the CPU it last ran on when user SMP is enabled; otherwise it
-    // stays on the boot processor.
-    if cpu < online && (!thread.user || user_smp_enabled()) {
+    // stays on the boot processor. aarch64 user SMP is the follow-up slice.
+    let user_smp = thread.user && user_smp_enabled() && cfg!(target_arch = "x86_64");
+    if cpu < online && (!thread.user || user_smp) {
         cpu
     } else {
         0

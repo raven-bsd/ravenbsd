@@ -467,7 +467,6 @@ impl Thread {
     /// The AP is already executing on the returned kernel stack when this object is published, so
     /// the stack is not prepared with [`crate::sched::context::prepare_stack`]: the first
     /// `sched_switch` saves the live stack pointer.
-    #[cfg(target_arch = "x86_64")]
     pub fn new_idle_ap(process: Arc<Process>, cr3: u64) -> Result<Arc<Thread>, Errno> {
         let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
         Ok(Arc::new(Thread {

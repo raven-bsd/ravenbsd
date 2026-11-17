@@ -24,6 +24,7 @@ const GICD_ICACTIVER: u64 = 0x380;
 const GICD_IPRIORITYR: u64 = 0x400;
 const GICD_ITARGETSR: u64 = 0x800;
 const GICD_ICFGR: u64 = 0xc00;
+const GICD_SGIR: u64 = 0xf00;
 // CPU interface registers.
 const GICC_CTLR: u64 = 0x000;
 const GICC_PMR: u64 = 0x004;
@@ -101,6 +102,42 @@ pub fn init(distributor_phys: u64, cpu_interface_phys: u64) -> Result<(), GicErr
 
     GICD.store(distributor, Ordering::Release);
     GICC.store(cpu_interface, Ordering::Release);
+    Ok(())
+}
+
+/// Configure this CPU's banked CPU interface and SGI lines.
+///
+/// The distributor frames are global, but `GICC_*` and the SGI/PPI enable, priority and group
+/// registers are banked per CPU. Application processors call this before entering the scheduler.
+pub fn init_cpu() -> Result<(), GicError> {
+    let distributor = base(&GICD)?;
+    let cpu_interface = base(&GICC)?;
+    write32(cpu_interface, GICC_PMR, 0xff);
+    write32(cpu_interface, GICC_BPR, 0);
+    write32(cpu_interface, GICC_CTLR, 0b11);
+    // SGIs 0..2: priority, Group 1 and enable for this CPU. The writes are banked.
+    let priority_word = u32::from(PRIORITY).saturating_mul(0x0101_0101);
+    write32(distributor, GICD_IPRIORITYR, priority_word);
+    write32(distributor, GICD_IGROUPR, 0x7);
+    write32(distributor, GICD_ISENABLER, 0x7);
+    barrier();
+    Ok(())
+}
+
+/// Send software interrupt `irq` (0..15) to `cpu`'s CPU interface.
+///
+/// GICv2's target list has one bit per CPU interface; the QEMU `virt` and Pi 4 topologies use
+/// that numbering. CPUs above the 8-bit list are not addressable and return an error.
+pub fn send_sgi(cpu: usize, irq: u32) -> Result<(), GicError> {
+    let distributor = base(&GICD)?;
+    if irq >= 16 || cpu >= 8 {
+        return Err(GicError::NotInitialised);
+    }
+    // NSATT (bit 15) selects a non-secure SGI for the Group-1 SGI we configure; without it a
+    // secure-only Group-0 SGI is not delivered to EL1.
+    let value = (1u32 << 15) | ((1u32 << cpu) << 16) | (irq & 0xf);
+    write32(distributor, GICD_SGIR, value);
+    barrier();
     Ok(())
 }
 

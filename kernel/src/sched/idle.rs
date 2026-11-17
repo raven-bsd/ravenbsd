@@ -8,6 +8,13 @@
 
 /// Run the idle loop forever.
 pub fn run() -> ! {
+    #[cfg(target_arch = "aarch64")]
+    {
+        let cpu = crate::sched::smp::percpu::this_cpu();
+        if cpu != 0 {
+            crate::kprintln!("aarch64-smp: idle cpu={cpu}");
+        }
+    }
     loop {
         if super::need_resched() {
             let _guard = crate::sync::critical();
@@ -19,9 +26,6 @@ pub fn run() -> ! {
             core::arch::asm!("sti", "hlt", "cli", options(nomem, nostack),);
         }
         #[cfg(target_arch = "aarch64")]
-        // SAFETY: `wfi` is valid at EL1 with IRQs enabled; the timer is armed before idle runs.
-        unsafe {
-            core::arch::asm!("wfi", options(nomem, nostack, preserves_flags));
-        }
+        core::hint::spin_loop();
     }
 }
