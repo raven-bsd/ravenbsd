@@ -9,6 +9,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use common::VecDisk;
+use ufs_core::check::{Mode, Recovery, check, recover};
 use ufs_core::mkfs::{MkfsOptions, format, format_journaled};
 use ufs_core::{BlockIo, Ino, IoError, MountOptions, Ufs, UfsError};
 
@@ -625,5 +626,46 @@ fn missing_journal_space_is_reported() {
     assert!(matches!(
         ufs.enable_journal(),
         Err(UfsError::Unsupported("no journal space in superblock"))
+    ));
+}
+
+fn dirty_cut_image() -> Vec<u8> {
+    let base = base_journaled_image();
+    let writes = transaction_writes(&base);
+    for cut in 1..writes {
+        let image = run_with_cut(&base, cut);
+        let (head, tail) = journal_head_tail(&image);
+        if head != 0 || tail != 0 {
+            return image;
+        }
+    }
+    panic!("no cut produced a dirty journal");
+}
+
+#[test]
+fn recover_replays_a_dirty_journal() {
+    let image = dirty_cut_image();
+    let mut disk = CutDisk::new(image);
+    let recovery = recover(&mut disk, false).expect("recover");
+    assert!(
+        matches!(recovery, Recovery::Replayed { .. }),
+        "recover returned {recovery:?}"
+    );
+    let data = disk.into_data();
+    let mut verify = CutDisk::new(data);
+    let report = check(&mut verify, Mode::ReadOnly).expect("check");
+    assert!(report.clean_after, "{:?}", report.findings);
+    let mut ufs = Ufs::mount(verify, MountOptions { read_only: true }).expect("mount ro");
+    let stable = ufs.lookup(ufs.root(), b"stable").expect("stable");
+    assert_eq!(read_all(&mut ufs, stable, 6), b"stable");
+}
+
+#[test]
+fn recover_refuses_a_dirty_journal_read_only() {
+    let image = dirty_cut_image();
+    let mut disk = CutDisk::new(image);
+    assert!(matches!(
+        recover(&mut disk, true),
+        Err(UfsError::Unsupported("dirty journal on read-only mount"))
     ));
 }

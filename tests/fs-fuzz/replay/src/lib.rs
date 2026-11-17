@@ -23,6 +23,7 @@ use std::sync::OnceLock;
 
 use flate2::read::GzDecoder;
 use ufs_core::check::{Mode, Report, check};
+use ufs_core::mkfs::{MkfsOptions, format_journaled};
 use ufs_core::{BlockIo, IoError, MountOptions, Ufs};
 
 /// Fuzz targets implemented by this harness.
@@ -549,6 +550,221 @@ pub fn crash_matrix() -> Result<CrashReport, String> {
         });
     }
     Ok(CrashReport { total_writes, cuts })
+}
+
+/// One journaled crash cut.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct JournalCut {
+    /// Number of writes allowed before the device fails.
+    pub cut: u64,
+    /// Operation stage that was running at the cut.
+    pub stage: String,
+    /// Result of the write sequence.
+    pub operation: String,
+    /// Replay result (`replayed`, `refused`, or `failed: ...`).
+    pub replay: String,
+}
+
+/// The journaled crash matrix.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct JournalReport {
+    /// Number of writes in the uncut sequence.
+    pub total_writes: u64,
+    /// One row per write budget.
+    pub cuts: Vec<JournalCut>,
+    /// Cuts whose journal replayed and whose post-replay image was fsck-clean.
+    pub replayed: u64,
+    /// Cuts whose remount was refused with a typed error.
+    pub refused: u64,
+    /// Cuts that mounted but failed the data/allocation/fsck check.
+    pub failed: u64,
+}
+
+fn journal_options() -> MkfsOptions<'static> {
+    MkfsOptions {
+        size: 17 * 1024 * 1024,
+        version: 2,
+        block_size: 4096,
+        fragment_size: 512,
+        bytes_per_inode: 4096,
+        minfree: 5,
+        label: "p5f-journal",
+        timestamp: 1_767_225_600,
+    }
+}
+
+fn journal_base_image() -> Result<Vec<u8>, String> {
+    let options = journal_options();
+    let disk = CrashVecDisk {
+        data: vec![0u8; options.size as usize],
+    };
+    let mut ufs = format_journaled(disk, &options, 1024 * 1024)
+        .map_err(|error| format!("format journaled: {error:?}"))?;
+    let root = ufs.root();
+    let file = ufs
+        .create(root, b"stable", 0o644, 0, 0)
+        .map_err(|error| format!("create stable: {error:?}"))?;
+    ufs.write(file, 0, b"stable")
+        .map_err(|error| format!("write stable: {error:?}"))?;
+    ufs.sync()
+        .map_err(|error| format!("sync stable: {error:?}"))?;
+    Ok(ufs
+        .unmount()
+        .map_err(|error| format!("unmount base: {error:?}"))?
+        .data)
+}
+
+/// Run the deterministic crash sequence on a journaled image and replay every cut.
+pub fn journal_crash_matrix() -> Result<JournalReport, String> {
+    let base = journal_base_image()?;
+
+    let probe_budget = Rc::new(Cell::new(u64::MAX));
+    let probe_writes = Rc::new(Cell::new(0));
+    let probe_stage = Rc::new(Cell::new("none"));
+    let probe_stages = Rc::new(RefCell::new(Vec::new()));
+    let disk = crash_disk(
+        &base,
+        probe_budget,
+        probe_writes.clone(),
+        probe_stage,
+        probe_stages,
+    );
+    let mut ufs = Ufs::mount(disk, MountOptions { read_only: false })
+        .map_err(|error| format!("journal probe mount: {error:?}"))?;
+    let stage = Rc::new(Cell::new("none"));
+    crash_sequence(&mut ufs, &stage)
+        .map_err(|error| format!("journal probe sequence: {error:?}"))?;
+    let total_writes = probe_writes.get();
+
+    let mut cuts = Vec::new();
+    let mut replayed = 0u64;
+    let mut refused = 0u64;
+    let mut failed = 0u64;
+    for cut in 0..=total_writes {
+        let budget = Rc::new(Cell::new(cut));
+        let writes = Rc::new(Cell::new(0));
+        let stage = Rc::new(Cell::new("none"));
+        let stages = Rc::new(RefCell::new(Vec::new()));
+        let disk = crash_disk(&base, budget, writes, stage.clone(), stages.clone());
+        let mut ufs = match Ufs::mount(disk, MountOptions { read_only: false }) {
+            Ok(ufs) => ufs,
+            Err(error) => {
+                refused += 1;
+                cuts.push(JournalCut {
+                    cut,
+                    stage: "mount".to_string(),
+                    operation: format!("mount: {error:?}"),
+                    replay: "refused".to_string(),
+                });
+                continue;
+            }
+        };
+        let operation = match crash_sequence(&mut ufs, &stage) {
+            Ok(()) => "completed".to_string(),
+            Err(error) => format!("{error:?}"),
+        };
+        let stages = stages.borrow();
+        let stage_name = stages.last().copied().unwrap_or("none").to_string();
+        drop(stages);
+        let image = ufs.into_inner().data;
+
+        let mut replay = match Ufs::mount(
+            CrashVecDisk {
+                data: image.clone(),
+            },
+            MountOptions { read_only: false },
+        ) {
+            Ok(ufs) => ufs,
+            Err(error) => {
+                refused += 1;
+                cuts.push(JournalCut {
+                    cut,
+                    stage: stage_name,
+                    operation,
+                    replay: format!("refused: {error:?}"),
+                });
+                continue;
+            }
+        };
+        let root = replay.root();
+        let stable = match replay.lookup(root, b"stable") {
+            Ok(ino) => {
+                let mut data = [0u8; 6];
+                matches!(replay.read(ino, 0, &mut data), Ok(6)) && data == *b"stable"
+            }
+            Err(_) => false,
+        };
+        if !stable {
+            failed += 1;
+            cuts.push(JournalCut {
+                cut,
+                stage: stage_name,
+                operation,
+                replay: "failed: stable data missing".to_string(),
+            });
+            continue;
+        }
+        if replay.verify_allocation().is_err() || replay.sync().is_err() {
+            failed += 1;
+            cuts.push(JournalCut {
+                cut,
+                stage: stage_name,
+                operation,
+                replay: "failed: allocation or sync".to_string(),
+            });
+            continue;
+        }
+        let data = match replay.unmount() {
+            Ok(disk) => disk.data,
+            Err(error) => {
+                failed += 1;
+                cuts.push(JournalCut {
+                    cut,
+                    stage: stage_name,
+                    operation,
+                    replay: format!("failed: unmount {error:?}"),
+                });
+                continue;
+            }
+        };
+        let mut check_disk = CrashVecDisk { data };
+        match check(&mut check_disk, Mode::ReadOnly) {
+            Ok(report) if report.clean_after => {
+                replayed += 1;
+                cuts.push(JournalCut {
+                    cut,
+                    stage: stage_name,
+                    operation,
+                    replay: "replayed".to_string(),
+                });
+            }
+            Ok(report) => {
+                failed += 1;
+                cuts.push(JournalCut {
+                    cut,
+                    stage: stage_name,
+                    operation,
+                    replay: format!("failed: fsck {} findings", report.findings.len()),
+                });
+            }
+            Err(error) => {
+                failed += 1;
+                cuts.push(JournalCut {
+                    cut,
+                    stage: stage_name,
+                    operation,
+                    replay: format!("failed: fsck {error:?}"),
+                });
+            }
+        }
+    }
+    Ok(JournalReport {
+        total_writes,
+        cuts,
+        replayed,
+        refused,
+        failed,
+    })
 }
 
 /// Compact, deterministic description of the residual findings that keep a cut refused.

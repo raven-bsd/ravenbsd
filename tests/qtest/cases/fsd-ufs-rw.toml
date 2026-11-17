@@ -95,6 +95,12 @@ regex = '^fsd-ufs-rw: probe refuse ok$'
 regex = '^fsd-ufs-rw: probe refuse-clean ok$'
 
 [[expect]]
+regex = '^fsd-ufs: mode=rw journal=active$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe journal mount ok$'
+
+[[expect]]
 regex = '^fsd-ufs-rw: probe ok$'
 
 [[expect]]
