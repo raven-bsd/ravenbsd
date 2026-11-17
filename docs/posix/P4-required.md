@@ -3,10 +3,10 @@
 
 # P4 required utility acceptance
 
-Status: OBSERVED (P4a11, base `origin/master` `1939ae69`). P4a7 leaves exactly seven required
-utilities. This note is the single acceptance surface for them; P4a10 added the booted-image
-target gate and P4a11 fixed the localedef target main. No profile, seed or evidence-toml code is
-changed here.
+Status: OBSERVED (P4a11 x86_64, P4a12 aarch64; base `origin/master` `445f78fb`). P4a7 leaves
+exactly seven required utilities. This note is the single acceptance surface for them; P4a10 added
+the booted-image target gate, P4a11 fixed the localedef target main and P4a12 extended the same
+fixture/case to aarch64. No profile, seed or evidence-toml code is changed here.
 
 ## Host runner
 
@@ -95,6 +95,47 @@ The `ulimit` set case is accepted per process; a later `ulimit -n` in a new proc
 the inherited default, not the previous process's setting. `localedef` reads `/etc/locale` and
 `/etc/charmap` through `file:` and writes `/tmp/catalog`; the fixture checks the catalog starts
 with `ff88ff89` before it counts the row as PASS.
+
+## aarch64 target gate (P4a12)
+
+```sh
+cargo xtask qtest --case required-utils --arch aarch64
+```
+
+The case is shared. The qtest `--arch aarch64` override passes `RAVEN_QT_ARCH=aarch64` to the
+fixture pre-build, which cross-builds the seven tools, the minimal `required-utils` init/shell/true
+and `initfsd`/`ramfsd`/`vfsd` for `aarch64-unknown-none-softfloat` with
+`userland/linker/aarch64.ld`. The same bounded expectations then run against the booted aarch64
+image.
+
+Observed on `445f78fb`: `required-utils: pass` (54.5 s), with all ten cases passing:
+
+| Utility | aarch64 target | Notes |
+|---|---|---|
+| `time` | pass | `real`/`user`/`sys` output |
+| `times` | pass | two `XmY.ZZs` lines |
+| `tput` | pass | prints `80` |
+| `ulimit` | pass | default, set and get cases |
+| `lp` | pass | no-destination diagnostic, exit 1 |
+| `localedef` | pass | catalog magic `ff88ff89`, 211 bytes |
+| `newgrp` | pass | shell reports `uid=0 gid=100` |
+
+AArch64 serial excerpt:
+
+```
+required-utils: services ok
+...
+required-utils: localedef start
+required-utils: localedef exit=0 PASS
+required-utils: localedef catalog magic=ff88ff89 bytes=211 PASS
+required-utils: newgrp start
+required-utils: shell uid=0 gid=100
+required-utils: newgrp exit=0 PASS
+required-utils: 10 cases, 10 pass, 0 fail
+init exited (0)
+```
+
+No utility code was changed; the fixture build script selects the target from `RAVEN_QT_ARCH`.
 
 ## Self-test
 
