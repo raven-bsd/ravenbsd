@@ -1609,6 +1609,10 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     process.exiting.store(true, Ordering::Release);
     process.stop_signal.store(0, Ordering::Release);
     process.continued.store(false, Ordering::Release);
+    // A user thread of this process may still be running on another CPU. Ask every other CPU to
+    // reschedule so it observes `exiting` at its next scheduling point instead of returning to
+    // user mode. The local CPU handles its own threads through the normal exit path.
+    crate::sched::request_reschedule_all(crate::sched::smp::percpu::this_cpu());
     reparent_children(process);
     robust::walk_process(process);
     wake_process_waiters(process);

@@ -53,7 +53,7 @@ pub mod smp;
 pub mod smp;
 
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use alloc::format;
 use alloc::string::String;
@@ -118,6 +118,51 @@ unsafe impl Sync for GlobalCell {}
 static GLOBAL: GlobalCell = GlobalCell(UnsafeCell::new(None));
 static CPUS: [SpinMutex<Option<CpuSched>>; MAX_CPUS] = [const { SpinMutex::new(None) }; MAX_CPUS];
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
+/// `smp_user=on`: schedule user threads on application processors.  Off is the default until the
+/// soak gate passes, and the off mode is exercised by `smp-user-off`.
+static USER_SMP: AtomicBool = AtomicBool::new(false);
+/// `smp-user-trace`: print the first user thread on each CPU and cross-CPU wakeups.
+static USER_TRACE: AtomicBool = AtomicBool::new(false);
+/// One-shot per-CPU marker for the first user thread (trace evidence only).
+static USER_RAN: [AtomicBool; MAX_CPUS] = [const { AtomicBool::new(false) }; MAX_CPUS];
+
+/// Read the `smp_user` and `smp-user-trace` boot flags once.
+fn read_user_smp_flags() {
+    let cmdline = crate::memory::paging::cmdline();
+    for token in cmdline.split_ascii_whitespace() {
+        if token == "smp_user=on" {
+            USER_SMP.store(true, Ordering::Release);
+        } else if token == "smp-user-trace" {
+            USER_TRACE.store(true, Ordering::Release);
+        }
+    }
+}
+
+/// True when user threads may be scheduled on application processors.
+pub fn user_smp_enabled() -> bool {
+    USER_SMP.load(Ordering::Acquire)
+}
+
+/// True when the S75 evidence trace is enabled.
+fn user_trace() -> bool {
+    USER_TRACE.load(Ordering::Acquire)
+}
+
+/// Ask every online CPU except `excluding` to reschedule.
+///
+/// Used by process teardown so a user thread running on another CPU observes `process.exiting` at
+/// its next scheduling point instead of continuing to run user code.
+pub fn request_reschedule_all(excluding: usize) {
+    let online = smp::online_cpus();
+    let mut cpu = 0usize;
+    while cpu < online {
+        if cpu != excluding {
+            set_need_resched(cpu);
+            smp::bringup::send_reschedule(cpu);
+        }
+        cpu = cpu.saturating_add(1);
+    }
+}
 
 /// Initialise the scheduler and adopt the boot context as CPU 0's idle thread.
 ///
@@ -126,6 +171,7 @@ pub fn init() -> Result<(), Errno> {
     if INITIALIZED.load(Ordering::Acquire) {
         return Ok(());
     }
+    read_user_smp_flags();
     #[cfg(target_arch = "x86_64")]
     if !context::init_fpu() {
         return Err(Errno::EINVAL);
@@ -234,9 +280,29 @@ pub fn enqueue(thread: Arc<Thread>) -> bool {
     if !INITIALIZED.load(Ordering::Acquire) {
         return false;
     }
-    // User threads need a per-CPU TSS for ring-3 entry; S10 keeps them on the boot processor.
-    let cpu = if thread.user { 0 } else { this_cpu() };
+    // User threads spread across the online CPUs when `smp_user=on`; otherwise they stay on the
+    // boot processor. Kernel threads stay local.
+    let cpu = if thread.user {
+        if user_smp_enabled() {
+            pick_user_cpu()
+        } else {
+            0
+        }
+    } else {
+        this_cpu()
+    };
     enqueue_on(cpu, thread)
+}
+
+/// Select-CPU policy for a new user thread: round-robin across the online CPUs.
+///
+/// Round-robin spreads the first threads of a process across every core, which is what the S75
+/// soak measures. A load-aware policy can replace it once a real affinity API exists.
+fn pick_user_cpu() -> usize {
+    let online = smp::online_cpus();
+    static NEXT_USER_CPU: AtomicUsize = AtomicUsize::new(0);
+    let next = NEXT_USER_CPU.fetch_add(1, Ordering::Relaxed);
+    next.checked_rem(online).unwrap_or(0)
 }
 
 fn enqueue_on(cpu: usize, thread: Arc<Thread>) -> bool {
@@ -370,6 +436,7 @@ pub fn start() -> ! {
 /// the incoming thread by `context::switch`).
 fn schedule_locked() {
     let cpu = this_cpu();
+    let mut first_user: Option<(usize, u64, u32)> = None;
     let (from, to) = {
         let mut slot = lock_cpu(cpu);
         let Some(state) = slot.as_mut() else {
@@ -411,11 +478,22 @@ fn schedule_locked() {
         next.slice_ticks.store(SLICE_TICKS, Ordering::Relaxed);
         next.last_cpu
             .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
+        let first_run = next.user
+            && user_trace()
+            && USER_RAN
+                .get(cpu)
+                .is_some_and(|flag| !flag.swap(true, Ordering::AcqRel));
+        if first_run {
+            first_user = Some((cpu, next.process.id, next.tid));
+        }
         state.switches = state.switches.saturating_add(1);
         state.current = Some(Arc::clone(&next));
         (current, next)
     };
 
+    if let Some((cpu, pid, tid)) = first_user {
+        kprintln!("smp-user: cpu {cpu} first user thread pid={pid} tid={tid}");
+    }
     // SAFETY: the critical section is live; both `Arc`s keep the threads alive across the switch.
     unsafe {
         context::switch(&from, &to);
@@ -816,6 +894,9 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
             state.need_resched = true;
             drop(slot);
             if cpu != this_cpu() {
+                if thread.user && user_trace() {
+                    kprintln!("smp-user: wake tid {} -> cpu {}", thread.tid, cpu);
+                }
                 smp::bringup::send_reschedule(cpu);
             }
             true
@@ -828,7 +909,9 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
 fn target_cpu(thread: &Thread) -> usize {
     let cpu = usize::try_from(thread.last_cpu.load(Ordering::Acquire)).unwrap_or(0);
     let online = smp::online_cpus();
-    if cpu < online && (!thread.user || cpu == 0) {
+    // A user thread resumes on the CPU it last ran on when user SMP is enabled; otherwise it
+    // stays on the boot processor.
+    if cpu < online && (!thread.user || user_smp_enabled()) {
         cpu
     } else {
         0
