@@ -1,0 +1,75 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt YACC 1
+.Os RavenBSD
+.Sh NAME
+.Nm yacc
+.Nd generate a C LALR(1) parser (bounded POSIX core)
+.Sh SYNOPSIS
+.Nm
+.Op Fl dv
+.Op Fl o Ar file
+.Ar grammar
+.Sh DESCRIPTION
+.Nm
+reads a yacc grammar and writes a C parser.
+The declarations support
+.Li %token ,
+.Li %left ,
+.Li %right ,
+.Li %nonassoc ,
+.Li %start
+and
+.Li %prec .
+The parser uses LALR(1) tables, resolves shift/reduce conflicts with precedence and
+associativity, and implements the
+.Li error
+token with panic-mode recovery.
+Semantic values are
+.Li int ;
+.Li %union
+and typed actions are outside this bounded core.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl d
+Write the token header as
+.Pa y.tab.h
+(or the output name with a
+.Pa .h
+suffix).
+.It Fl v
+Write the rule and conflict counts to standard error.
+.It Fl o Ar file
+Write the parser to
+.Ar file
+instead of
+.Pa y.tab.c .
+.El
+.Sh FILES
+.Bl -tag -width y.tab.h
+.It Pa y.tab.c
+Default parser output.
+.It Pa y.tab.h
+Token header with
+.Fl d .
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr lex 1
+.Sh BUGS
+.Li %union ,
+.Li %type ,
+.Li $<field>
+references, mid-rule actions,
+.Li %destructor ,
+.Li %locations ,
+.Li %expect
+and
+.Li %define
+are not supported.
+The generated parser uses an
+.Li int
+semantic value.
