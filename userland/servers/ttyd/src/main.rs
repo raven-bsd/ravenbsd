@@ -20,7 +20,7 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_proto_fs::{S_IFCHR, Stat};
     use raven_rt::entry;
-    use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
+    use raven_scheme::{CallReply, Ctx, Handler, HandlerResult, Opened, Server};
     use raven_ttyd::Sessions;
 
     entry!(main);
@@ -34,6 +34,8 @@ mod program {
     const OP_SET_SID: u16 = 0x24;
     const OP_GET_SID: u16 = 0x25;
     const OP_SESSION_ID: u16 = 0x26;
+    const OP_GET_WRITE: u16 = 0x27;
+    const OP_SET_WRITE: u16 = 0x28;
     const HUNG_BIT: u32 = 0x8000_0000;
 
     struct HandlerImpl {
@@ -131,6 +133,22 @@ mod program {
                 }
                 OP_GET_SID => (OP_GET_SID, self.sessions.sid(session) as u32, 0),
                 OP_SESSION_ID => (OP_SESSION_ID, u32::try_from(file).unwrap_or(0), 0),
+                OP_GET_WRITE => (
+                    OP_GET_WRITE,
+                    u32::from(self.sessions.write_allowed(session)),
+                    0,
+                ),
+                OP_SET_WRITE => {
+                    let allowed = match arg0 {
+                        0 => false,
+                        1 => true,
+                        _ => return Err(Errno::EINVAL.into()),
+                    };
+                    if !self.sessions.set_write_allowed(session, allowed) {
+                        return Err(Errno::ESRCH.into());
+                    }
+                    (OP_SET_WRITE, u32::from(allowed), 0)
+                }
                 _ => return Err(Errno::ENOSYS.into()),
             };
             response[..2].copy_from_slice(&VERSION.to_le_bytes());
@@ -138,6 +156,22 @@ mod program {
             response[4..8].copy_from_slice(&reply0.to_le_bytes());
             response[8..12].copy_from_slice(&reply1.to_le_bytes());
             Ok(CALL_LEN)
+        }
+
+        fn call_with(
+            &mut self,
+            file: u64,
+            request: &[u8],
+            response: &mut [u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<CallReply> {
+            if request.len() >= 4 {
+                let op = u16::from_le_bytes([request[2], request[3]]);
+                if op == OP_SET_WRITE && ctx.credentials.euid != 0 {
+                    return Err(Errno::EPERM.into());
+                }
+            }
+            Ok(CallReply::new(self.call(file, request, response)?))
         }
 
         fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
@@ -156,11 +190,30 @@ mod program {
             Ok(buffer.len())
         }
 
+        fn write_with(
+            &mut self,
+            file: u64,
+            offset: u64,
+            buffer: &[u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<usize> {
+            let session = self.session(file)?;
+            if !self.sessions.write_allowed(session) && ctx.credentials.euid != 0 {
+                return Err(Errno::EACCES.into());
+            }
+            self.write(file, offset, buffer)
+        }
+
         fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
-            self.session(file)?;
+            let session = self.session(file)?;
+            let mode = if self.sessions.write_allowed(session) {
+                0o620
+            } else {
+                0o600
+            };
             Ok(Stat {
                 ino: file,
-                mode: S_IFCHR | 0o666,
+                mode: S_IFCHR | mode,
                 nlink: 1,
                 ..Stat::default()
             })

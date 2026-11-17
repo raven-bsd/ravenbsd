@@ -1,0 +1,80 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt NM 1
+.Os RavenBSD
+.Sh NAME
+.Nm nm
+.Nd write the name list of an ELF object
+.Sh SYNOPSIS
+.Nm
+.Op Fl agunpr
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility reads the
+.Dq .symtab
+section of ELF32 and ELF64 little-endian relocatable objects and executables and writes one
+symbol per line:
+.D1 Ar value type name
+The value is printed as eight hexadecimal digits for ELF32 and sixteen for ELF64.
+An undefined symbol has a blank value field.
+.Pp
+The type field is a single letter.
+Local symbols use the lowercase form and external symbols the uppercase form:
+.Bl -tag -width Ds -compact
+.It Cm A , a
+Absolute symbol.
+.It Cm B , b
+Uninitialized data (bss).
+.It Cm C , c
+Common symbol.
+.It Cm D , d
+Initialized data.
+.It Cm N , n
+Other section, including debug data.
+.It Cm R , r
+Read-only allocated data.
+.It Cm T , t
+Text (executable) symbol.
+.It Cm U
+Undefined symbol.
+.It Cm V , v
+Weak object.
+.It Cm W , w
+Weak function or other weak symbol.
+.El
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl a
+Include file and section symbols.
+.It Fl g
+Write only external (global and weak) symbols.
+.It Fl u
+Write only undefined symbols.
+.It Fl n
+Sort by symbol value instead of symbol name.
+.It Fl p
+Preserve symbol table order; do not sort.
+.It Fl r
+Reverse the selected order.
+.El
+.Pp
+When more than one file operand is given, each file's symbols are preceded by a line containing
+the file name and a colon.
+If a valid object contains no symbols,
+.Nm
+reports that fact on standard error and still exits successfully.
+.Sh EXIT STATUS
+.Ex -std
+A missing or malformed input exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr ar 1 ,
+.Xr strip 1
+.Sh STANDARDS
+RavenBSD implements the POSIX
+.Nm
+interface with the documented sorting and selection extensions.
+The dynamic symbol table and archive members are not listed.

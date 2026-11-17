@@ -5,9 +5,9 @@ Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # raven-libc-proc
 
-Pure process logic for ravenlibc. The kernel has no `fork`, `exec`, pids or signals on Raven,
-so the C process API is a thin client of the `procd` userspace server; this crate holds the
-parts that are pure logic and host-testable.
+Pure process logic for ravenlibc. The kernel owns pids, parentage, groups/sessions, credentials,
+signals, wait, spawn and `execve`; this crate holds the parts of the C process API that are pure
+logic and host-testable.
 
 The crate is `no_std` plus `alloc`, class P (`#![forbid(unsafe_code)]`), layer L1, and depends
 only on `raven-libc-abi`. It has no statics, locks, clocks or environment reads: every effect
@@ -27,9 +27,8 @@ enters through a trait or an argument.
 * `rlimit_model`, `ids` - the 16-resource table and the `SETCRED` builders.
 * `startup`, `auxv`, `getauxval`, `procinfo` - the C8 stack parser, auxv table, `getauxval` and
   the procinfo seqlock reader.
-* `wire` - the proposed `procd` protocol encoder and response decoder.
-* `backend`, `local_backend`, `fake` - the `ProcBackend` seam, the pre-procd backend and a
-  deterministic fake.
+* `request` - the spawn, fork and exec request models passed to the backend seam.
+* `backend`, `local_backend` - the `ProcBackend` seam and the early fallback backend.
 
 ## Checks
 

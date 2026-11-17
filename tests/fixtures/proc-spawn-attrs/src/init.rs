@@ -15,8 +15,10 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
+    use alloc::format;
     use alloc::string::String;
 
+    use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
     use raven_initfs::Initfs;
     use raven_rt::entry;
@@ -25,6 +27,7 @@ mod program {
 
     const PROC_HANDLE_INFO: usize = 0x3E;
     const PROC_PID_INFO: usize = 0x3A;
+    const PROC_SELF_INFO: usize = 0x35;
     const PROC_WAIT: usize = 0x31;
     const PROC_SETPGID: usize = 0x36;
     const INFO_WORDS: usize = 41;
@@ -90,6 +93,68 @@ mod program {
             return Err("attrs1 exit");
         }
 
+        let parent_pgid = self_pgid()?;
+        let join_pgid = format!("{parent_pgid}");
+        let join = spawn(
+            &initfs,
+            "/bin/proc-attrs-child",
+            &SpawnOptions {
+                args: &["proc-attrs-child", "join", join_pgid.as_str()],
+                env: &[],
+            },
+        )
+        .map_err(|_| "spawn-join")?;
+        let join_pid = handle_pid(join)?;
+        setpgid(join_pid, 0)?;
+        setpgid(join_pid, parent_pgid)?;
+        let code = wait(join)?;
+        let _ = raven_rt::sys::handle_close(join);
+        if code != 0 {
+            return Err("join exit");
+        }
+        println!("proc-attrs: join=1");
+
+        let session = spawn(
+            &initfs,
+            "/bin/proc-attrs-child",
+            &SpawnOptions {
+                args: &["proc-attrs-child", "session"],
+                env: &[],
+            },
+        )
+        .map_err(|_| "spawn-session")?;
+        let session_pid = handle_pid(session)?;
+        if !wait_session(session_pid) {
+            return Err("setsid");
+        }
+        println!("proc-attrs: session=1");
+
+        let idle = spawn(
+            &initfs,
+            "/bin/proc-attrs-child",
+            &SpawnOptions {
+                args: &["proc-attrs-child", "idle"],
+                env: &[],
+            },
+        )
+        .map_err(|_| "spawn-idle")?;
+        let idle_pid = handle_pid(idle)?;
+        let raw = setpgid_raw(idle_pid, session_pid);
+        if raw != -(Errno::EPERM.0 as isize) {
+            return Err("cross-session");
+        }
+        println!("proc-attrs: cross-session=1");
+        let code = wait(idle)?;
+        let _ = raven_rt::sys::handle_close(idle);
+        if code != 0 {
+            return Err("idle exit");
+        }
+        let code = wait(session)?;
+        let _ = raven_rt::sys::handle_close(session);
+        if code != 0 {
+            return Err("session exit");
+        }
+
         let exec_child = spawn(
             &initfs,
             "/bin/proc-attrs-child",
@@ -121,12 +186,55 @@ mod program {
     }
 
     fn setpgid(pid: i32, pgid: i32) -> Result<(), &'static str> {
-        // SAFETY: PROC_SETPGID takes the target pid and the new group.
-        let result = unsafe { raven_rt::sys::syscall2(PROC_SETPGID, pid as usize, pgid as usize) };
+        let result = setpgid_raw(pid, pgid);
         if result < 0 {
             return Err("setpgid");
         }
         Ok(())
+    }
+
+    fn setpgid_raw(pid: i32, pgid: i32) -> isize {
+        // SAFETY: PROC_SETPGID takes the target pid and the new group.
+        unsafe { raven_rt::sys::syscall2(PROC_SETPGID, pid as usize, pgid as usize) }
+    }
+
+    fn self_pgid() -> Result<i32, &'static str> {
+        let mut words = [0u64; 8];
+        // SAFETY: PROC_SELF_INFO writes eight u64 identity words to the live caller array.
+        let raw = unsafe {
+            raven_rt::sys::syscall2(PROC_SELF_INFO, words.as_mut_ptr() as usize, words.len())
+        };
+        if raw < 0 {
+            return Err("self info");
+        }
+        i32::try_from(words[2]).map_err(|_| "pgid range")
+    }
+
+    fn wait_session(pid: i32) -> bool {
+        for _ in 0..100 {
+            if let Some(ids) = ids_of(pid)
+                && ids[2] == u64::try_from(pid).unwrap_or(0)
+                && ids[3] == u64::try_from(pid).unwrap_or(0)
+            {
+                return true;
+            }
+            let _ = raven_rt::nanosleep(10_000_000);
+        }
+        false
+    }
+
+    fn ids_of(pid: i32) -> Option<[u64; 8]> {
+        let mut words = [0u64; 8];
+        // SAFETY: PROC_PID_INFO writes eight identity words to the live caller array.
+        let raw = unsafe {
+            raven_rt::sys::syscall3(
+                PROC_PID_INFO,
+                pid as isize as usize,
+                words.as_mut_ptr() as usize,
+                words.len(),
+            )
+        };
+        if raw < 0 { None } else { Some(words) }
     }
 
     fn wait(child: Handle) -> Result<i32, &'static str> {

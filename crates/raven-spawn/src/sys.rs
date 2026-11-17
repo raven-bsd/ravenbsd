@@ -450,6 +450,29 @@ pub fn wait_process(handle: u32) -> Result<i32, Errno> {
     Ok(code)
 }
 
+/// Raw `PROC_WAIT_EX` (0x48): idtype/id/options select a child and return pid + status.
+#[cfg(target_os = "none")]
+pub const PROC_WAIT_EX: usize = 0x48;
+
+/// Wait for a child with `idtype`/`id`/`options`; a `WNOHANG` miss returns pid 0.
+#[cfg(target_os = "none")]
+pub fn wait_ex(idtype: u32, id: i32, options: u32) -> Result<(i32, i32), Errno> {
+    let mut status = 0i32;
+    // SAFETY: PROC_WAIT_EX takes scalar selectors and a writable i32 status pointer.
+    let raw = unsafe {
+        syscall4(
+            PROC_WAIT_EX,
+            idtype as usize,
+            id as isize as usize,
+            options as usize,
+            &mut status as *mut i32 as usize,
+        )
+    };
+    let pid = Errno::from_ret(raw)?;
+    let pid = i32::try_from(pid).map_err(|_| Errno::EINVAL)?;
+    Ok((pid, status))
+}
+
 /// Close one process handle.
 #[cfg(target_os = "none")]
 pub fn close_handle(handle: u32) -> Result<(), Errno> {

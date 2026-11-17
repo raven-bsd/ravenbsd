@@ -1,0 +1,80 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt AT 1
+.Os RavenBSD
+.Sh NAME
+.Nm at
+.Nd queue a command for a later time
+.Sh SYNOPSIS
+.Nm
+.Op Fl l | Fl r
+.Op Fl f Ar file
+.Ar time
+.Op Ar command ...
+.Sh DESCRIPTION
+The
+.Nm
+utility validates a time expression and one command line and queues it under
+.Pa /var/at .
+Without
+.Fl l
+or
+.Fl r
+it schedules a job.
+.Pp
+The supported time expressions are:
+.Bl -tag -width "YYYY-MM-DD HH:MM" -offset indent
+.It Cm now
+Queue immediately.
+.It Cm now Li + Ar N Cm minutes|hours|days
+Queue after the given offset.
+.Cm + Ar N Cm unit
+is accepted as a shorthand. A count of zero is valid.
+.It Ar HH:MM
+Queue at the next occurrence of that clock time: today if it is still ahead, otherwise tomorrow.
+.It Ar YYYY-MM-DD HH:MM
+Queue at the exact UTC date and time.
+.Ar YYYY-MM-DDTHH:MM
+is also accepted.
+.El
+.Pp
+The command is one program plus arguments. If no command words are given, it is read from
+standard input on the host; the target needs
+.Fl f Ar file
+or command words. Multi-line scripts and shell metacharacters are unsupported because the
+target has no shell runner.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl l
+List job id, due Unix time and command.
+.It Fl r Ar id ...
+Remove the named jobs; a missing id is an error.
+.It Fl f Ar file
+Read the command line from
+.Ar file .
+.Aq -
+means standard input on the host.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width AT_SPOOL
+.It Ev AT_SPOOL
+Override the spool directory. Used by the host tests.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for a validation or spool error, 2 for usage.
+.Sh SEE ALSO
+.Xr batch 1 ,
+.Xr atd 1
+.Sh STANDARDS
+A documented subset of POSIX
+.Nm at .
+.Nm noon ,
+.Nm midnight ,
+compact date/time forms, month names, timezone suffixes,
+.Fl m
+and
+.Fl q
+are unsupported.

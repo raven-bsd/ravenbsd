@@ -75,6 +75,12 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
 static PID_REGISTRY: Mutex<BTreeMap<u64, Weak<Process>>> = Mutex::new(BTreeMap::new());
+/// Exited processes retained until a wait consumes their status.
+///
+/// The pid registry is weak so a process that is done and has no handles disappears; a zombie
+/// must remain visible to `PROC_WAIT_EX` by pid even when the parent closed its process handle
+/// (and after its parent exits and it is reparented to init).
+static ZOMBIES: Mutex<Vec<Arc<Process>>> = Mutex::new(Vec::new());
 
 /// Process lifecycle state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -683,6 +689,29 @@ impl Process {
     }
 }
 
+/// Reparent every live child of `parent` to PID 1 (init).
+///
+/// Called once from the dying parent's exit path; the child keeps its own pid, group and
+/// session, but its next `PROC_WAIT_EX` notification goes to init. A dying PID 1 does not
+/// reparent (the system is ending).
+pub fn reparent_children(parent: &Process) -> usize {
+    if parent.id == 1 {
+        return 0;
+    }
+    let mut count = 0usize;
+    for child in processes() {
+        if child.id == parent.id {
+            continue;
+        }
+        let mut ids = child.ids.lock();
+        if ids.ppid == parent.id {
+            ids.ppid = 1;
+            count = count.saturating_add(1);
+        }
+    }
+    count
+}
+
 /// Wake a parent waiting for a child event and optionally queue `SIGCHLD`.
 ///
 /// The caller must not hold `process.state`; exit accounting reads the child's
@@ -712,6 +741,7 @@ pub fn reap_pid(process: &Process) -> Result<(), Errno> {
     if process.reaped.swap(true, Ordering::AcqRel) {
         return Err(Errno::ECHILD);
     }
+    ZOMBIES.lock().retain(|zombie| zombie.id != process.id);
     unregister_pid(process.id);
     Ok(())
 }
@@ -1400,11 +1430,15 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     if *state == ProcessState::Exited {
         return false;
     }
+    // Publish the strong zombie reference before `Exited` becomes visible, so a wait that sees
+    // the state can always find the status even if the parent already closed its handle.
+    ZOMBIES.lock().push(Arc::clone(process));
     *state = ProcessState::Exited;
     process.exit_code.store(code, Ordering::Release);
     process.exiting.store(true, Ordering::Release);
     process.stop_signal.store(0, Ordering::Release);
     process.continued.store(false, Ordering::Release);
+    reparent_children(process);
     robust::walk_process(process);
     crate::syscall::futex::remove_process(process.id);
     let _ = process.waiters.wake_all();

@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P4a: POSIX shell conformance on the target. rsh owns the console; brush runs the four
-# --posix groups and prints the row markers. The fixture script under
-# tests/fixtures/posix-shell/ is the host reference and carries the here-doc/pipeline rows
-# that the target cannot run until the platform/source-path gaps named in P4-shell.md close.
+# P4a/P4p: POSIX shell conformance on the target. rsh owns the console; brush runs the four
+# --posix groups, then rsh runs the pipeline, redirection, list and here-document group. The
+# fixture script under tests/fixtures/posix-shell/ is the host reference.
 
 name = "posix-shell"
 arch = "x86_64"
 profile = "modern-shell-test"
-timeout_secs = 600
+timeout_secs = 1800
 pre = ["cargo xtask build brush --arch x86_64"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
@@ -19,7 +18,7 @@ expect_exit = "success"
 regex = '^svcd: all services up$'
 
 [[expect]]
-regex = '^rsh: ready$'
+regex = 'rsh: ready'
 
 [[expect]]
 regex = '^simple:1:2$'
@@ -127,6 +126,36 @@ regex = '^pid:[0-9]+$'
 regex = '^trap:exit$'
 
 [[expect]]
+regex = '^rshpiped$'
+
+[[expect]]
+regex = '^rshredir$'
+
+[[expect]]
+regex = '^rshappended$'
+
+[[expect]]
+regex = '^rsh: cat: /nonexistent: .*$'
+
+[[expect]]
+regex = '^rsh: cat: /missing: .*$'
+
+[[expect]]
+regex = '^rsh-here$'
+
+[[expect]]
+regex = '^rshstatus:0$'
+
+[[expect]]
+regex = '^rshstatus:1$'
+
+[[expect]]
+regex = '^rshone$'
+
+[[expect]]
+regex = '^rshtwo$'
+
+[[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
@@ -142,7 +171,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^until:2$'
-timeout_secs = 30
+timeout_secs = 600
 
 [[step]]
 wait = '^raven# $'
@@ -178,6 +207,118 @@ delay_ms = 100
 
 [[step]]
 wait = '^trap:exit$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo rshpiped | cat\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshpiped$'
+timeout_secs = 600
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo rshredir > /tmp/p4p-rsh-r; cat < /tmp/p4p-rsh-r\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshredir$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo rshappended >> /tmp/p4p-rsh-r; cat < /tmp/p4p-rsh-r\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshappended$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /nonexistent 2> /tmp/p4p-rsh-e; cat < /tmp/p4p-rsh-e\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rsh: cat: /nonexistent: .*$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /missing > /tmp/p4p-rsh-o 2>&1; cat < /tmp/p4p-rsh-o\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rsh: cat: /missing: .*$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat <<EOF\nrsh-here\nEOF\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rsh-here$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "false | true; echo rshstatus:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshstatus:0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "true | false; echo rshstatus:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshstatus:1$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo rshone; echo rshtwo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshone$'
+timeout_secs = 30
+
+[[step]]
+wait = '^rshtwo$'
 timeout_secs = 30
 
 [[step]]

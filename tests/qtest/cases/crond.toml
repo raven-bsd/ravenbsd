@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P4y: minimal crond reads one spool and runs one job through the kernel spawn path.
+
+name = "crond"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/posix/utility/crontab/build-qtest.sh"]
+initfs = "build/fixtures/crontab/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^crontab: services ok$'
+
+[[expect]]
+regex = '^crontab: spool ok$'
+
+[[expect]]
+regex = '^crond: ready spool=/var/cron$'
+
+[[expect]]
+regex = '^crond: start user=root command=echo cron-ok$'
+
+[[expect]]
+regex = '^crond: exit user=root status=0$'
+
+[[expect]]
+regex = '^crontab: fixture ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|crontab: fail'

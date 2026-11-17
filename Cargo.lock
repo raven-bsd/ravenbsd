@@ -55,6 +55,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "at"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
+name = "atd"
+version = "0.1.0"
+dependencies = [
+ "at",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "audio-client"
 version = "0.1.0"
 dependencies = [
@@ -88,6 +107,14 @@ name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+
+[[package]]
+name = "batch"
+version = "0.1.0"
+dependencies = [
+ "at",
+ "raven-rt",
+]
 
 [[package]]
 name = "bench-host"
@@ -187,6 +214,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b929dd2a135771f40afabd1073f85eed59c800b7c61901e5c254270497dad64"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "crond"
+version = "0.1.0"
+dependencies = [
+ "crontab",
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "crontab"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -640,6 +687,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nm"
+version = "0.1.0"
+dependencies = [
+ "raven-elf",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "passwd"
 version = "0.1.0"
 dependencies = [
@@ -695,6 +751,15 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "posix-misc2-evidence"
+version = "0.1.0"
+dependencies = [
+ "man",
+ "raven-date",
+ "raven-echo",
 ]
 
 [[package]]
@@ -767,6 +832,16 @@ dependencies = [
 [[package]]
 name = "raven-abi"
 version = "0.1.0"
+
+[[package]]
+name = "raven-at-fixture"
+version = "0.1.0"
+dependencies = [
+ "at",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+]
 
 [[package]]
 name = "raven-atf-run"
@@ -967,6 +1042,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-chan"
+version = "0.1.0"
+
+[[package]]
 name = "raven-cli"
 version = "0.1.0"
 dependencies = [
@@ -1048,6 +1127,15 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "raven-crontab-fixture"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -1531,6 +1619,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-kmem"
+version = "0.1.0"
+dependencies = [
+ "raven-vmem",
+]
+
+[[package]]
 name = "raven-libc"
 version = "0.1.0"
 dependencies = [
@@ -1808,7 +1903,9 @@ dependencies = [
 name = "raven-libc-proc"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-libc-abi",
+ "raven-libc-sys",
  "raven-spawn",
 ]
 
@@ -2016,7 +2113,10 @@ name = "raven-mesg"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -3179,6 +3279,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-turnstile"
+version = "0.1.0"
+
+[[package]]
 name = "raven-umount"
 version = "0.1.0"
 dependencies = [
@@ -3313,6 +3417,10 @@ dependencies = [
 
 [[package]]
 name = "raven-vma"
+version = "0.1.0"
+
+[[package]]
+name = "raven-vmem"
 version = "0.1.0"
 
 [[package]]
@@ -3490,6 +3598,15 @@ name = "spin"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
+
+[[package]]
+name = "strip"
+version = "0.1.0"
+dependencies = [
+ "raven-elf",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "su"

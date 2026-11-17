@@ -200,6 +200,27 @@ pub fn proc_create(flags: usize) -> Result<Handle, Errno> {
     handle_from_ret(unsafe { arch::syscall1(Syscall::PROC_CREATE as usize, flags) })
 }
 
+/// Raw `proc_set_command(proc, name, len)` number (P2o/P2r).
+pub const PROC_SET_COMMAND: usize = 0x45;
+
+/// Set the kernel command name for `proc_`.
+///
+/// The name is UTF-8 without NUL and at most 256 bytes; the kernel truncates at a UTF-8
+/// boundary. The target is `SELF_PROC` or a process handle with `ADMIN`.
+pub fn proc_set_command(proc_: Handle, name: &[u8]) -> Result<(), Errno> {
+    // SAFETY: PROC_SET_COMMAND reads `name.len()` bytes from the valid slice; the kernel
+    // validates the process handle.
+    crate::errno::ret(unsafe {
+        arch::syscall3(
+            PROC_SET_COMMAND,
+            proc_.0 as usize,
+            name.as_ptr() as usize,
+            name.len(),
+        )
+    })
+    .map(|_| ())
+}
+
 /// Wait for `proc_` to exit and return its exit code.
 pub fn proc_wait(proc_: Handle) -> Result<i32, Errno> {
     let mut code = 0i32;

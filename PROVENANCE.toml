@@ -9138,7 +9138,7 @@ license = "MIT"
 tier = "A"
 copied = "2026-11-14"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; raise uses the libc-only direct entry; kill/sigqueue are procd RPCs (PG-44)"
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; raise uses the libc-only direct entry; kill/sigqueue use the kernel process interface (PG-44)"
 
 [[import]]
 path = "libc/ravenlibc/crates/raven-libc-signal/src/wait.rs"

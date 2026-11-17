@@ -40,6 +40,18 @@ pub(crate) unsafe fn slice_n<'a>(pointer: *const c_char, n: usize) -> &'a [u8] {
     unsafe { core::slice::from_raw_parts(pointer.cast::<u8>(), length) }
 }
 
+/// The first `n` bytes of a binary buffer, regardless of its contents.
+///
+/// # Safety
+/// `pointer` is NULL or points to at least `n` readable bytes.
+pub(crate) unsafe fn bytes_n<'a>(pointer: *const c_char, n: usize) -> &'a [u8] {
+    if pointer.is_null() || n == 0 {
+        return &[];
+    }
+    // SAFETY: the caller promises `n` readable bytes; embedded NULs are data.
+    unsafe { core::slice::from_raw_parts(pointer.cast::<u8>(), n) }
+}
+
 /// A caller's writable buffer.
 ///
 /// # Safety

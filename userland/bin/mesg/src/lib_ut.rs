@@ -7,11 +7,22 @@ use super::*;
 
 #[test]
 fn parses_query_and_both_answers() {
-    assert_eq!(parse_args(Vec::<&str>::new()), Ok(Action::Query));
-    assert_eq!(parse_args(["y"]), Ok(Action::Set(true)));
-    assert_eq!(parse_args(["yes"]), Ok(Action::Set(true)));
-    assert_eq!(parse_args(["n"]), Ok(Action::Set(false)));
-    assert_eq!(parse_args(["no"]), Ok(Action::Set(false)));
+    assert_eq!(
+        parse_args(Vec::<&str>::new()).unwrap().action,
+        Action::Query
+    );
+    assert_eq!(parse_args(["y"]).unwrap().action, Action::Set(true));
+    assert_eq!(parse_args(["yes"]).unwrap().action, Action::Set(true));
+    assert_eq!(parse_args(["n"]).unwrap().action, Action::Set(false));
+    assert_eq!(parse_args(["no"]).unwrap().action, Action::Set(false));
+}
+
+#[test]
+fn parses_an_explicit_target() {
+    let options = parse_args(["-t", "/tmp/notty", "n"]).unwrap();
+    assert_eq!(options.target.as_deref(), Some("/tmp/notty"));
+    assert_eq!(options.action, Action::Set(false));
+    assert_eq!(parse_args(["--tty"]), Err(UsageError));
 }
 
 #[test]
