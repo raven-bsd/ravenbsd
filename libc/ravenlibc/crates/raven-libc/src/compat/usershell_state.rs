@@ -36,9 +36,12 @@ pub(crate) fn shell_buffer() -> &'static mut [u8; 4096] {
     // SAFETY: the C API is not re-entrant; the pointer is published once and never freed.
     unsafe {
         let slot = &raw mut SHELL_BUF;
+        // SAFETY: the slot is private and null until this first write.
         if (*slot).is_null() {
+            // SAFETY: the allocation is leaked for the process lifetime.
             *slot = alloc::boxed::Box::into_raw(alloc::boxed::Box::new([0u8; 4096]));
         }
+        // SAFETY: the slot was just initialised and is never freed.
         &mut **slot
     }
 }

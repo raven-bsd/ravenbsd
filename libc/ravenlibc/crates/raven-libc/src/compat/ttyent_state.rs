@@ -118,7 +118,9 @@ pub(crate) unsafe fn fill(entry: &TtyEnt) -> *mut CTtyEnt {
     // SAFETY: ARENA and CURRENT are private statics; the C API is not re-entrant.
     let arena = unsafe { &raw mut ARENA };
     let current = unsafe { &raw mut CURRENT };
+    // SAFETY: ARENA is a private static and the C API is not re-entrant.
     if unsafe { (*arena).is_null() } {
+        // SAFETY: the slot is private and null until this first write; the allocation is leaked.
         unsafe {
             *arena = alloc::boxed::Box::into_raw(alloc::boxed::Box::new([0u8; 8192]));
         }
