@@ -75,6 +75,7 @@ struct State {
     events: Vec<Event>,
     debug: Vec<u8>,
     tls_offsets: Vec<(u32, usize)>,
+    tls_inits: Vec<(u32, u64, u64)>,
 }
 
 type Shared = Rc<RefCell<State>>;
@@ -414,6 +415,29 @@ pub struct HostApplier {
     state: Shared,
 }
 
+impl HostApplier {
+    /// The last `init_static_tls` image and size recorded for `id`.
+    pub fn tls_init(&self, id: u32) -> Option<(u64, u64)> {
+        self.state
+            .borrow()
+            .tls_inits
+            .iter()
+            .rev()
+            .find(|(object, _, _)| *object == id)
+            .map(|(_, image, filesz)| (*image, *filesz))
+    }
+
+    /// How many times `init_static_tls` was called for `id`.
+    pub fn tls_init_count(&self, id: u32) -> usize {
+        self.state
+            .borrow()
+            .tls_inits
+            .iter()
+            .filter(|(object, _, _)| *object == id)
+            .count()
+    }
+}
+
 impl RelocApplier for HostApplier {
     fn write64(&mut self, addr: u64, val: u64) -> Result<(), ApplyError> {
         self.write(addr, &val.to_le_bytes())
@@ -473,6 +497,19 @@ impl RelocApplier for HostApplier {
         } else {
             state.tls_offsets.push((obj.0, offset));
         }
+    }
+
+    fn init_static_tls(
+        &mut self,
+        obj: raven_libc_elf::ObjId,
+        image: u64,
+        filesz: u64,
+    ) -> Result<(), ApplyError> {
+        self.state
+            .borrow_mut()
+            .tls_inits
+            .push((obj.0, image, filesz));
+        Ok(())
     }
 
     fn tls_desc_alloc(

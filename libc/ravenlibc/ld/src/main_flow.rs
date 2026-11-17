@@ -189,6 +189,7 @@ pub fn register_main<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf:
         nodelete: false,
         tls_offset: 0,
         tls_size: 0,
+        tls_initialized: false,
         relocated: false,
         ifunc_done: false,
         fini_done: false,

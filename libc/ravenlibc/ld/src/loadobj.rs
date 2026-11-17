@@ -126,6 +126,8 @@ pub struct LoadedObject {
     pub tls_offset: usize,
     /// The static TLS size.
     pub tls_size: usize,
+    /// Whether the current thread's static TLS block was initialised for this object.
+    pub tls_initialized: bool,
     /// `DT_RPATH` string offset, if present.
     pub rpath: Option<u32>,
     /// `DT_RUNPATH` string offset, if present.
@@ -440,6 +442,7 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
             nodelete: false,
             tls_offset: 0,
             tls_size: 0,
+            tls_initialized: false,
             rpath,
             runpath,
             relocated: false,
@@ -563,6 +566,36 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
                 object.tls_size = usize::try_from(tls.memsz).unwrap_or(0);
             }
             self.applier.set_tls_offset(id, offset);
+        }
+        Ok(())
+    }
+
+    /// Initialise a newly loaded object's static TLS image for the current thread.
+    ///
+    /// `dlopen` calls this after [`Self::assign_tls_offsets`] and before the object's
+    /// relocations and constructors. The offset is already recorded by the applier; this copies
+    /// the module's `.tdata` bytes into the current thread's reserved static TLS block. The flag
+    /// keeps a second `dlopen` of the same path from overwriting values the program changed.
+    pub fn init_static_tls(&mut self, id: ObjId) -> Result<(), LoadError> {
+        let Some(object) = self.object(id) else {
+            return Ok(());
+        };
+        if object.tls_initialized || object.tls_size == 0 {
+            return Ok(());
+        }
+        let Some(tls) = object.view.tls else {
+            if let Some(object) = self.object_mut(id) {
+                object.tls_initialized = true;
+            }
+            return Ok(());
+        };
+        if tls.filesz != 0 {
+            self.applier
+                .init_static_tls(id, tls.vaddr, tls.filesz)
+                .map_err(|_| LoadError::Tls(LayoutError::Overflow))?;
+        }
+        if let Some(object) = self.object_mut(id) {
+            object.tls_initialized = true;
         }
         Ok(())
     }

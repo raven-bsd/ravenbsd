@@ -619,6 +619,26 @@ fn dlopen_assigns_static_tls_offsets_before_relocation() {
 }
 
 #[test]
+fn dlopen_initialises_the_current_thread_static_tls_once() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some((mut loader, _dir)) = loader() else {
+        return;
+    };
+    let id = loader.dlopen(b"libtls.so", 0).expect("load");
+    let object = loader.object(id).expect("object");
+    let tls = object.view.tls.expect("tls header");
+    let (image, filesz) = loader.applier.tls_init(id.0).expect("tls init");
+    assert_ne!(image, 0);
+    assert_eq!(filesz, tls.filesz);
+    assert_eq!(loader.applier.tls_init_count(id.0), 1);
+    // A second open of the same path takes the by-name path and must not overwrite values the
+    // program may have changed in the module's TLS block.
+    let again = loader.dlopen(b"libtls.so", 0).expect("second open");
+    assert_eq!(again, id);
+    assert_eq!(loader.applier.tls_init_count(id.0), 1);
+}
+
+#[test]
 fn dlclose_keeps_a_tls_object_after_one_handle_closes() {
     let _guard = HOST_LOCK.lock().expect("lock");
     let Some((mut loader, _dir)) = loader() else {

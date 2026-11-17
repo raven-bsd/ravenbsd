@@ -292,6 +292,7 @@ fn register_loader_object(loader: &mut TargetLoader, base: usize) -> Option<ObjI
         nodelete: true,
         tls_offset: 0,
         tls_size: 0,
+        tls_initialized: true,
         relocated: true,
         ifunc_done: true,
         fini_done: true,

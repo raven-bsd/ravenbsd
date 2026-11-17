@@ -89,6 +89,10 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
             self.error.set(format_args!("dlopen: TLS layout failed"));
             return Err(error);
         }
+        if let Err(error) = self.init_static_tls(id) {
+            self.error.set(format_args!("dlopen: TLS init failed"));
+            return Err(error);
+        }
         if let Some(object) = self.object_mut(id) {
             object.refcount = 1;
             object.dl_open = true;
