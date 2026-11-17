@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Q3 trace-context controller: prove the `raven-proto-trace` codec round-trips on the target and
-//! that the scheme call/reply path is green. The trace-id stamping on the kernel header is the
-//! deferred kernel-integration part (S69 owns `kernel/src/ipc/**`).
+//! Q3b trace-context controller: prove the codec round-trips, then set a non-zero trace id with
+//! `TRACE_SET`, do a scheme call/reply so the server observes it, clear the id and do a second
+//! call/reply the server reports as untraced.
 
 #![no_std]
 #![no_main]
 
 use raven_abi::errno::Errno;
-use raven_abi::syscall::Syscall;
+use raven_abi::syscall::{Syscall, TRACE_SET};
 use raven_abi::types::Handle;
 use raven_initfs::Initfs;
 use raven_proto_trace::{UNTRACED, format, is_untraced, parse};
@@ -23,10 +23,18 @@ entry!(main);
 const O_READ: u32 = 1;
 /// Open retry budget for the server registration.
 const OPEN_RETRIES: usize = 200_000;
+/// The non-zero trace id the controller sets for the traced request.
+const TRACE_ID: u64 = 0xDEAD_BEEF_CAFE_F00D;
 
 fn fail(message: &str) -> i32 {
     println!("trace: failed {message}");
     1
+}
+
+/// `TRACE_SET`: set the calling thread's current trace id (zero clears it).
+fn trace_set(id: u64) -> Result<(), Errno> {
+    // SAFETY: TRACE_SET takes one scalar argument.
+    Errno::from_ret(unsafe { raven_rt::sys::syscall1(TRACE_SET, id as usize) }).map(|_| ())
 }
 
 fn codec_round_trip() -> Result<(), &'static str> {
@@ -58,6 +66,27 @@ fn wait(process: Handle) -> Result<i32, Errno> {
     Errno::from_ret(raw).map(|_| code)
 }
 
+fn open_read_close(path: &str) -> Result<(), &'static str> {
+    let mut attempt = 0usize;
+    let file = loop {
+        match raven_rt::sys::open(path, O_READ) {
+            Ok(file) => break file,
+            Err(Errno::ENOENT) | Err(Errno::EIO) if attempt < OPEN_RETRIES => {
+                core::hint::spin_loop();
+                attempt += 1;
+            }
+            Err(_) => return Err("open"),
+        }
+    };
+    let mut byte = [0u8; 1];
+    match raven_rt::sys::read(file, &mut byte) {
+        Ok(1) if byte[0] == b'R' => {}
+        _ => return Err("read"),
+    }
+    let _ = raven_rt::sys::close(file);
+    Ok(())
+}
+
 fn scheme_round_trip(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     let server = spawn(
         initfs,
@@ -69,24 +98,13 @@ fn scheme_round_trip(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     )
     .map_err(|_| "server spawn")?;
 
-    let mut attempt = 0usize;
-    let file = loop {
-        match raven_rt::sys::open("trace:probe", O_READ) {
-            Ok(file) => break file,
-            Err(Errno::ENOENT) | Err(Errno::EIO) if attempt < OPEN_RETRIES => {
-                core::hint::spin_loop();
-                attempt += 1;
-            }
-            Err(_) => return Err("open"),
-        }
-    };
+    // A traced request: the server must report the id it received.
+    trace_set(TRACE_ID).map_err(|_| "trace_set")?;
+    open_read_close("trace:probe1")?;
 
-    let mut byte = [0u8; 1];
-    match raven_rt::sys::read(file, &mut byte) {
-        Ok(1) if byte[0] == b'R' => {}
-        _ => return Err("read"),
-    }
-    let _ = raven_rt::sys::close(file);
+    // An untraced request after clearing the id.
+    trace_set(0).map_err(|_| "trace_clear")?;
+    open_read_close("trace:probe2")?;
 
     let _ = raven_rt::proc_terminate(server, 0);
     match wait(server) {
