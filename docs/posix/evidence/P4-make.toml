@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4w POSIX make evidence.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.make"
+status = "present"
+evidence = "test:tests/posix/utility/make/test.sh"
+notes = "P4w: default goal, explicit/pattern/suffix rules, variables, $@ $< $^ $?, .PHONY, include, -f/-n/-s/-k/-j1 and failure propagation"

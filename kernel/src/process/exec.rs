@@ -154,6 +154,8 @@ pub fn replace_image(
         let _ = crate::event::close_handle(caller, handle);
     }
     caller.pending_signals.lock().clear();
+    let command = super::command_from_argv(argv, path);
+    *caller.command.lock() = command;
     caller.pending_exec.lock().replace(ExecContext {
         entry: elf.entry(),
         stack,

@@ -162,6 +162,34 @@ impl ProcessIds {
     }
 }
 
+/// Maximum command-name bytes stored in a process record.
+pub const MAX_COMMAND: usize = 256;
+
+/// Truncate a command name to [`MAX_COMMAND`] bytes without splitting UTF-8.
+#[must_use]
+pub fn truncate_command(text: &str) -> String {
+    let mut end = 0usize;
+    for (index, character) in text.char_indices() {
+        let next = index.saturating_add(character.len_utf8());
+        if next > MAX_COMMAND {
+            break;
+        }
+        end = next;
+    }
+    String::from(&text[..end])
+}
+
+/// Pick the command name from `argv[0]`, falling back to the image path.
+#[must_use]
+pub fn command_from_argv(argv: &[alloc::vec::Vec<u8>], path: &[u8]) -> String {
+    let bytes = argv.first().map_or(path, alloc::vec::Vec::as_slice);
+    let text = core::str::from_utf8(bytes)
+        .ok()
+        .or_else(|| core::str::from_utf8(path).ok())
+        .unwrap_or("?");
+    truncate_command(text)
+}
+
 /// A process.
 pub struct Process {
     /// Process id (PID 1 for the first process).
@@ -170,6 +198,8 @@ pub struct Process {
     pub ids: Mutex<ProcessIds>,
     /// Path used to start the process.
     pub path: String,
+    /// Command name shown to `ps` (argv[0], replaced by exec and copied by fork).
+    pub command: Mutex<String>,
     /// POSIX nice value (`-20..19`); inherited by `PROC_FORK` and preserved by exec.
     pub nice: AtomicI32,
     /// Controlling terminal acquired by this process, if any.
@@ -353,6 +383,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
         path: String::from("/kernel"),
+        command: Mutex::new(String::from("/kernel")),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
         address_space: Mutex::new(None),
@@ -409,6 +440,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: String::from("child"),
+        command: Mutex::new(String::from("child")),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
@@ -464,6 +496,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: source.path.clone(),
+        command: Mutex::new(source.command.lock().clone()),
         nice: AtomicI32::new(source.nice()),
         ctty: Mutex::new(source.ctty.lock().clone()),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
@@ -732,6 +765,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         id,
         ids: Mutex::new(ids),
         path: String::from(path),
+        command: Mutex::new(String::from(path)),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
         address_space: Mutex::new(Some(user_address_space)),
@@ -1516,3 +1550,7 @@ const _: () = {
     assert!(PAGE == 4096);
     assert!(USER_STACK_SIZE == 256 * 1024);
 };
+
+#[cfg(test)]
+#[path = "mod_ut.rs"]
+mod tests;

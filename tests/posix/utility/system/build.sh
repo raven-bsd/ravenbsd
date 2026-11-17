@@ -19,6 +19,7 @@ cargo xtask build user --arch x86_64 --release \
     -p raven-nulld -p raven-initfsd -p raven-ramfsd -p raven-vfsd \
     -p raven-consd -p raven-rsh -p raven-uname -p raven-hostname -p raven-ps \
     -p raven-env -p raven-getconf -p raven-kill -p raven-nice -p raven-nohup \
+    -p raven-mesg -p raven-logger -p raven-renice -p raven-dmesg \
     -p whoami >"$out/build-user.log" 2>&1
 
 for tool in id; do
@@ -51,6 +52,10 @@ cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "/bin/kill=$root/build/x86_64/user/raven-kill:0755" \
     "/bin/nice=$root/build/x86_64/user/raven-nice:0755" \
     "/bin/nohup=$root/build/x86_64/user/raven-nohup:0755" \
+    "/bin/mesg=$root/build/x86_64/user/raven-mesg:0755" \
+    "/bin/logger=$root/build/x86_64/user/raven-logger:0755" \
+    "/bin/renice=$root/build/x86_64/user/raven-renice:0755" \
+    "/bin/dmesg=$root/build/x86_64/user/raven-dmesg:0755" \
     "/etc/services.d/logd.toml=$root/etc/services.d/logd.toml:0644" \
     "/etc/services.d/sysd.toml=$root/etc/services.d/sysd.toml:0644" \
     "/etc/services.d/randd.toml=$root/etc/services.d/randd.toml:0644" \

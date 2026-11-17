@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Kernel process spawn attributes: fd map, signal mask/default/ignore and process group,
+# exercised through the raven-rt spawn path. No userspace process server.
+
+name = "proc-spawn-attrs"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 30
+pre = ["sh tests/fixtures/proc-spawn-attrs/build.sh"]
+initfs = "build/fixtures/proc-spawn-attrs/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-attrs: cmd=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs: exec=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs-child: attrs fd=1 cloexec=1 pgid=1 sig=1 cmd=1 fork=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs-child: exec-cmd=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs-child: ok$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-attrs: fail|proc-attrs-child: fail'

@@ -22,7 +22,7 @@ gate. This document specifies:
 
 Not in 0.2.0: network identity (LDAP/YP), PAM modules, supplementary groups beyond the kernel's
 16 entries, ACLs, capabilities/pledge, per-user resource limits, GUI account management, and
-`master.passwd` as a second database. `procd` is the future owner of identity and session policy;
+`master.passwd` as a second database. Kernel credentials are the identity source; a future job/session manager is policy-only;
 0.2.0 keeps the files authoritative so a single-user recovery shell still works.
 
 ## 2. Current baseline (OBSERVED)
@@ -57,7 +57,7 @@ Not in 0.2.0: network identity (LDAP/YP), PAM modules, supplementary groups beyo
 | identity strings | no NUL, no `:`, no newline in names; max name 31 bytes, GECOS 127 |
 
 The **kernel** owns the live credential tuple and its setuid/setgid rules. The **files** are the
-source of truth for login and tools. `procd`, when it lands, reads and writes the same files (via
+source of truth for login and tools. The kernel credential model and tools read/write the same files (via
 the same `raven-userdb` library) and may cache lookups; it is not a second database. A corrupted
 or missing user database fails closed for non-root login and leaves the root recovery path.
 
@@ -164,9 +164,9 @@ log. Man pages are required before U2 is accepted.
 * **Shadow** is not exposed by ordinary libc. Only a root-owned auth tool or `getspnam` guarded by
   euid 0 may read it; `raven-auth` supplies `verify_password`/`hash_password` and the shadow
   record, and REL1/REL1b's `verify_root_shadow` path stays compatible.
-* **`procd` boundary** (later): `procd` runs as root and is the only writer of record for session
+* **Identity boundary** (later): a privileged job/session manager may be the policy writer for session
   and audit policy; it uses `raven-userdb` in-process or through a narrow IPC API. Tools must not
-  grow a second parser. Until `procd` lands, tools link the library; if `procd` is unavailable at
+  grow a second parser. The kernel owns credentials; tools link the library; if the identity service is unavailable at
   boot, root recovery works from the files.
 
 ## 7. Kernel requirements (U3)
@@ -257,14 +257,14 @@ this ticket writes no product code.
 
 ## 11. Decisions and open questions
 
-* **UM-D1 (PROPOSED):** files are authoritative in 0.2.0; `procd` reads/writes the same files and
+* **UM-D1 (PROPOSED):** files are authoritative in 0.2.0; the identity/job manager reads/writes the same files and
   does not own a second database. This keeps the root recovery path independent of a daemon.
 * **UM-D2 (PROPOSED):** SHA-512-crypt `$6$` remains the 0.2.0 hash for REL1b compatibility;
   Argon2id is a later format decision, not a reason to break the 0.1.0 hash.
 * **UM-D3 (PROPOSED):** the caller credential context is a versioned scheme-request field, not a
   global kernel "current uid" that servers guess. This is the only way `vfsd` can enforce
   permissions for a different process.
-* **Open:** whether 0.2.0 ships a setuid `su` or a root-owned `procd` broker first. The spec
+* **Open:** whether 0.2.0 ships a setuid `su` or a root-owned identity broker first. The spec
   requires the kernel bit path; the release may keep `su` root-only until U3 lands.
 * **Open:** exact `struct passwd`/`group` ABI symbols and NSS `_r` symbols must pass the frozen
   ABI review; U2 lists them but does not edit `crates/raven-abi` without approval.

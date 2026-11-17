@@ -44,14 +44,13 @@ case "$target_dir" in
 esac
 
 RUSTFLAGS="$rustflags" CARGO_TARGET_DIR="$target_dir" \
-	cargo build -p raven-ptyd -p raven-ttyd -p raven-tty-fixture -p raven-initfsd -p raven-procd \
+	cargo build -p raven-ptyd -p raven-ttyd -p raven-tty-fixture -p raven-initfsd \
 	--target "$target" --release
 
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
 	"$out/initfs-$mode.img" \
 	"/init=$target_dir/$target/release/raven-tty-init" \
 	"/sbin/initfsd=$target_dir/$target/release/raven-initfsd:0755" \
-	"/sbin/procd=$target_dir/$target/release/procd:0755" \
 	"/sbin/ptyd=$target_dir/$target/release/ptyd:0755" \
 	"/sbin/ttyd=$target_dir/$target/release/ttyd:0755" \
 	"/bin/tty-child=$target_dir/$target/release/raven-tty-child:0755" \

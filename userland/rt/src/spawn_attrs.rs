@@ -106,16 +106,10 @@ pub fn spawn_with_attributes_with<S: Sys + HandleTransfer>(
     attributes: &SpawnAttributes<'_>,
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
-    if attributes.fdmap.is_empty()
-        && !non_zero(attributes.sigmask)
-        && !non_zero(attributes.sigdefault)
-        && !non_zero(attributes.ignored)
-    {
-        return raven_spawn::spawn_with(initfs, path, options, sys);
-    }
     let mut attributed = AttributeSys {
         inner: sys,
         attributes,
+        command: crate::spawn::command_name(path, options),
         child: None,
         stack_write: None,
         stack_map: None,
@@ -313,6 +307,7 @@ fn read_word(image: &[u8], offset: usize) -> Option<usize> {
 struct AttributeSys<'a, S: Sys + HandleTransfer> {
     inner: &'a mut S,
     attributes: &'a SpawnAttributes<'a>,
+    command: &'a str,
     child: Option<Handle>,
     stack_write: Option<(usize, Vec<u8>)>,
     stack_map: Option<(usize, usize)>,
@@ -448,6 +443,7 @@ impl<S: Sys + HandleTransfer> Sys for AttributeSys<'_, S> {
         };
 
         let result = (|| -> Result<usize, SpawnError> {
+            crate::proc::set_command(child, self.command).map_err(SpawnError::Sys)?;
             let mut transferred = Vec::with_capacity(self.attributes.fdmap.len());
             for (fd, source) in self.attributes.fdmap {
                 let handle = self
