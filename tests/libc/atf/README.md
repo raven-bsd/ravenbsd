@@ -47,6 +47,8 @@ cargo run -q -p raven-atf-run -- gen-suite --all
 cargo run -q -p raven-atf-run -- suite --suite netbsd-libc --mode oracle --jobs 8
 cargo run -q -p raven-atf-run -- suite --suite netbsd-libc --mode target \
     --sysroot build/x86_64/sysroot --run-backend none
+cargo run -q -p raven-atf-run -- suite --suite openbsd-libc --mode target \
+    --sysroot build/x86_64/sysroot --run-backend qemu
 cargo run -q -p raven-atf-run -- table --write
 cargo run -q -p raven-atf-run -- check
 cargo run -q -p raven-atf-run -- gate --g1
@@ -61,7 +63,11 @@ required host tool is missing.
   body; a program that does not build is `fail` with the classified reason. This is the only
   backend C71 can prove.
 * `host-linux`: refused with exit 2 while `raven-libc-sys` has no Linux backend (O-B5).
-* `qemu`: an interface only; exit 2, the on-target ATF run is C73's later ticket.
+* `qemu`: exit-status suites only. Each built program is packed as `/init` in a generated
+  initfs, booted on the x86_64 kernel with `console=ttyS0 test-exit=1`, and judged from the
+  kernel's `init exited (N)` line (N = 0 is QEMU status 33, any other N is 35). A program that
+  needs arguments is `not-run: qemu-no-argv`, because the kernel starts `/init` with only
+  `argv[0]`. ATF suites are refused: their `-l`/`-r` protocol needs a guest driver (C73).
 
 The target build consumes only the sysroot C60/C37/C61 install. A missing file makes every body
 `not-run` with `sysroot-incomplete:<path>`; a target run is never faked.

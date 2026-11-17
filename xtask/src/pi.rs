@@ -115,7 +115,7 @@ fn build_kernel_elf(root: &Path, workspace: &Workspace) -> Result<Vec<u8>> {
         .clone();
     let target = build::target_for(Component::Kernel, Arch::Aarch64)?;
     let target_dir = root.join("build/cargo/kernel-aarch64-pi4");
-    let flags = build::rustflags_string(Component::Kernel, Arch::Aarch64, root, None);
+    let flags = build::rustflags_string(Component::Kernel, Arch::Aarch64, root, None, false);
     let head = repo::head_info(root)?;
     let build_id = if head.dirty {
         format!("{}-dirty", head.short)

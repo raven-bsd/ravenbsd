@@ -17,6 +17,10 @@
 #![cfg_attr(not(test), no_std)]
 #![allow(unexpected_cfgs)] // `raven_va_softfloat` is a documented build-profile cfg
 
+// `va/table_ut.rs` is included by path below and uses `alloc::format!` in a test; the shell
+// crate declares `extern crate alloc` at its root, but this harness needs its own declaration.
+extern crate alloc;
+
 #[path = "../../../../libc/ravenlibc/crates/raven-libc/src/va/mod.rs"]
 pub mod va;
 

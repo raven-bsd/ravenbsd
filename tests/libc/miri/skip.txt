@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Miri bounded-run skips. Format: <crate> <test-name-substring> <reason>.
+# These are deterministic host vectors whose loop count makes the interpreted run take hours;
+# they are not UB findings and are covered by nextest on every change. Do not add skips for
+# failing unsafe code; report a real Miri finding instead.
+raven-libc-str  one_hundred_thousand_values        100k itoa vector; interpreted time only
+raven-libc-str  access_count_is_exactly_two_n       20k swept memcmp cases
+raven-libc-str  u64_random                          20k random stdbit vectors
+raven-libc-dtoa binary128_property_moderate_range   100k ld128 round-trip cases
+raven-libc-dtoa bigint_ops_vs_model                 100k bigint model cases

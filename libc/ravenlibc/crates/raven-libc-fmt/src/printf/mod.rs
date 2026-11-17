@@ -75,8 +75,8 @@ use crate::types::{FloatBits, FloatKind, FmtErr, FmtOptions, PctN, StoreSize};
 const INT_MAX: i64 = i32::MAX as i64;
 
 /// One argument source: the positional table or the sequential reader.
-struct ArgReader<'a, A: FmtEnv> {
-    args: &'a mut A,
+struct ArgReader<'a> {
+    args: &'a mut dyn FmtEnv,
     table: Option<&'a (
         [ArgVal; crate::types::NL_ARGMAX + 1],
         [ArgTag; crate::types::NL_ARGMAX + 1],
@@ -84,7 +84,7 @@ struct ArgReader<'a, A: FmtEnv> {
     next: u32,
 }
 
-impl<A: FmtEnv> ArgReader<'_, A> {
+impl ArgReader<'_> {
     fn index(&mut self, pos: Option<u32>) -> Result<usize, FmtErr> {
         if let Some(table) = self.table {
             let n = pos.ok_or(FmtErr::Invalid)?;
@@ -224,9 +224,24 @@ pub fn vformat<C: CharUnit, S: Sink<C>, A: FmtEnv, F: FloatFmt>(
     opts: &FmtOptions<'_>,
     floats: &F,
 ) -> Result<i32, FmtErr> {
+    // Clone the reader once, then erase the sink/env/float types so the whole conversion loop
+    // is instantiated once per character unit instead of once per call site.
+    let mut clone = args.clone_state();
+    vformat_dyn(sink, fmt, args, &mut clone, opts, floats)
+}
+
+/// The type-erased conversion loop behind [`vformat`].
+fn vformat_dyn<C: CharUnit>(
+    sink: &mut dyn Sink<C>,
+    fmt: &[C],
+    args: &mut dyn FmtEnv,
+    clone: &mut dyn FmtEnv,
+    opts: &FmtOptions<'_>,
+    floats: &dyn FloatFmt,
+) -> Result<i32, FmtErr> {
     let analysis = pos::analyse(fmt)?;
     let values = match analysis.table {
-        Some(table) => Some(pos::fetch(&table, &mut args.clone_state())?),
+        Some(table) => Some(pos::fetch(&table, clone)?),
         None => None,
     };
     let mut reader = ArgReader {
@@ -864,7 +879,7 @@ fn unsigned_arg(v: u64, flags: u32) -> u64 {
 
 /// The donor's common emission tail, returning the new output count.
 #[allow(clippy::too_many_arguments)] // mirrors the donor's conversion state list
-fn emit_common<C: CharUnit, S: Sink<C>, A: FmtEnv>(
+fn emit_common<C: CharUnit, S: Sink<C> + ?Sized, A: FmtEnv + ?Sized>(
     sink: &mut S,
     args: &mut A,
     ret: i64,
@@ -919,7 +934,6 @@ fn emit_common<C: CharUnit, S: Sink<C>, A: FmtEnv>(
     }
     let lead = i64::from(dprec).saturating_sub(size);
     if lead > 0 {
-        let _ = args;
         sink.pad(C::from_ascii(b'0'), lead as usize)
             .map_err(|_| FmtErr::Sink)?;
     }

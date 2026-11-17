@@ -5,11 +5,14 @@
 # `modern-shell-test` profile; `/bin/brush -c` exercises the shell builtins and sources the
 # opt-in `/etc/brush/brushrc` to check the Raven Violet prompt, history and completion.
 # The interactive login assertion is `modern-shell-login.toml`, blocked on P9a.
+#
+# K26k budget (modern-shell-test image, 33 MB initfs): measured whole case ~28 s.
+# Boot wait 90 s, per-step 15 s, case 120 s (4.3x).
 
 name = "modern-shell"
 arch = "x86_64"
 profile = "modern-shell-test"
-timeout_secs = 600
+timeout_secs = 120
 pre = ["cargo xtask build brush --arch x86_64"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
@@ -17,9 +20,11 @@ expect_exit = "success"
 
 [[expect]]
 regex = '^svcd: all services up$'
+unordered = true
 
 [[expect]]
 regex = '^rsh: ready$'
+unordered = true
 
 [[expect]]
 regex = '^echo:ok$'
@@ -62,7 +67,7 @@ regex = '(?i)panic|EXCEPTION|Function not implemented|error:'
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 300
+timeout_secs = 90
 
 [[step]]
 send = "/bin/brush -c 'echo echo:ok; printf \"printf:%s\\n\" ok; test 1 -eq 1 && echo test:ok; [[ a == a ]] && echo cond:ok; echo arith:$((2+3))'\n"
@@ -70,11 +75,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^arith:5$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "/bin/brush -c '. /etc/brush/brushrc; case \"$PS1\" in *\"38;5;183\"*) echo theme:ok;; *) echo theme:missing;; esac; case \"$PS1\" in *root@raven*) echo prompt:ok;; esac; echo hist:$HISTFILE:$HISTCONTROL:$HISTTIMEFORMAT; complete -p raven-test'\n"
@@ -82,11 +87,11 @@ delay_ms = 100
 
 [[step]]
 wait = "^complete -W 'help exit' raven-test$"
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "/bin/brush -c 'NO_COLOR=1; export NO_COLOR; . /etc/brush/brushrc; case \"$PS1\" in *\"38;5;\"*) echo nocolor:bad;; *) echo nocolor:ok;; esac; case \"$PS1\" in *root@raven*) echo nocolor:prompt;; esac'\n"
@@ -94,15 +99,15 @@ delay_ms = 100
 
 [[step]]
 wait = '^nocolor:ok$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^nocolor:prompt$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "exit 0\n"
@@ -110,4 +115,4 @@ delay_ms = 100
 
 [[step]]
 wait = '^init exited \(0\)$'
-timeout_secs = 60
+timeout_secs = 30

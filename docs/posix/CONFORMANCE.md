@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T17:29:53Z
+- Date: 2026-11-17T20:14:11Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: host-only
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 1649 pass, 59 fail, 105 skip
+- Counts: 1679 pass, 29 fail, 105 skip
 
 ## Summary
 
@@ -21,14 +21,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | external | 0 | 0 | 3 |
 | filesystem | 2 | 0 | 18 |
 | header | 73 | 13 | 0 |
-| interface | 1380 | 45 | 0 |
+| interface | 1410 | 15 | 0 |
 | link | 1 | 0 | 0 |
 | process | 3 | 0 | 14 |
 | shell | 3 | 0 | 22 |
 | target | 0 | 0 | 7 |
 | tty | 5 | 0 | 7 |
 | utility | 182 | 1 | 34 |
-| **all** | **1649** | **59** | **105** |
+| **all** | **1679** | **29** | **105** |
 
 ## Rows
 
@@ -154,7 +154,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.abs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_8.c` |  |
 | `interface.accept` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_9.c` |  |
 | `interface.access` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_10.c` |  |
-| `interface.acct` | interface | fail | `profile` | profile status missing |
+| `interface.acct` | interface | pass | `waiver` | owner waiver: P1f: acct is not in the POSIX.1-2024 Issue 8 XSH function index (BSD process-accounting extension); kept under its extension macro, waived as an extension. |
 | `interface.acos` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_12.c` |  |
 | `interface.acosf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_13.c` |  |
 | `interface.acosfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
@@ -164,7 +164,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.acoshl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.acosl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.acospi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.adjtime` | interface | fail | `profile` | profile status missing |
+| `interface.adjtime` | interface | pass | `waiver` | owner waiver: P1f: adjtime is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.aio_cancel` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_22.c` |  |
 | `interface.aio_cancel64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_23.c` |  |
 | `interface.aio_error` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_24.c` |  |
@@ -218,7 +218,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.bind` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_72.c` |  |
 | `interface.bind_textdomain_codeset` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_73.c` |  |
 | `interface.bindtextdomain` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_74.c` |  |
-| `interface.brk` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.brk` | interface | pass | `waiver` | owner waiver: P1f: brk is not in the POSIX.1-2024 Issue 8 XSH function index (BSD/legacy extension); kept under its extension macro, waived as an extension. |
 | `interface.bsearch` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_76.c` |  |
 | `interface.btowc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_77.c` |  |
 | `interface.bzero` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_78.c` |  |
@@ -393,7 +393,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.dup2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_247.c` |  |
 | `interface.dup3` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
 | `interface.duplocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_249.c` |  |
-| `interface.eaccess` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.eaccess` | interface | pass | `waiver` | owner waiver: P1f: eaccess is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.ecvt_r` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.endgrent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_252.c` |  |
 | `interface.endhostent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_253.c` |  |
@@ -410,7 +410,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.erfcl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.erff` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_265.c` |  |
 | `interface.erfl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.euidaccess` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.euidaccess` | interface | pass | `waiver` | owner waiver: P1f: euidaccess is not in the POSIX.1-2024 Issue 8 XSH function index (GNU/BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.execl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_268.c` |  |
 | `interface.execle` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_269.c` |  |
 | `interface.execlp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_270.c` |  |
@@ -442,7 +442,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fabsfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fabsl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.faccessat` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
-| `interface.fallocate` | interface | fail | `profile` | profile status missing |
+| `interface.fallocate` | interface | pass | `waiver` | owner waiver: P1f: fallocate is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.fattach` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_300.c` |  |
 | `interface.fchdir` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
 | `interface.fchmod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_302.c` |  |
@@ -571,14 +571,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ftello64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.ftok` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_426.c` |  |
 | `interface.ftruncate` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_427.c` |  |
-| `interface.ftruncate64` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.ftruncate64` | interface | pass | `waiver` | owner waiver: P1f: ftruncate64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension (_LARGEFILE64_SOURCE)); kept under its extension macro, waived as an extension. |
 | `interface.ftrylockfile` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.ftw` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_430.c` |  |
 | `interface.ftw64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_431.c` |  |
 | `interface.funlockfile` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.futimens` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_433.c` |  |
-| `interface.futimes` | interface | fail | `profile` | profile status missing |
-| `interface.futimesat` | interface | fail | `profile` | profile status missing |
+| `interface.futimes` | interface | pass | `waiver` | owner waiver: P1f: futimes is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
+| `interface.futimesat` | interface | pass | `waiver` | owner waiver: P1f: futimesat is not in the POSIX.1-2024 Issue 8 XSH function index (GNU/BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.fwide` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.fwprintf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.fwrite` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_438.c` |  |
@@ -594,9 +594,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getcwd` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_448.c` |  |
 | `interface.getdate` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.getdelim` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
-| `interface.getdents` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
-| `interface.getdomainname` | interface | fail | `profile` | profile status missing |
-| `interface.getdtablesize` | interface | fail | `profile` | profile status missing |
+| `interface.getdents` | interface | pass | `waiver` | owner waiver: P1f: getdents is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
+| `interface.getdomainname` | interface | pass | `waiver` | owner waiver: P1f: getdomainname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
+| `interface.getdtablesize` | interface | pass | `waiver` | owner waiver: P1f: getdtablesize is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.getegid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_454.c` |  |
 | `interface.getentropy` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
 | `interface.getenv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_456.c` |  |
@@ -612,14 +612,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.gethostbyname_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_466.c` |  |
 | `interface.gethostid` | interface | fail | `profile` | profile status missing |
 | `interface.gethostname` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_468.c` |  |
-| `interface.getitimer` | interface | fail | `profile` | profile status missing |
+| `interface.getitimer` | interface | pass | `waiver` | owner waiver: P1f: getitimer is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
 | `interface.getline` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_470.c` |  |
 | `interface.getlogin` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_471.c` |  |
 | `interface.getlogin_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_472.c` |  |
 | `interface.getmsg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_473.c` |  |
 | `interface.getnameinfo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_474.c` |  |
 | `interface.getopt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_475.c` |  |
-| `interface.getpagesize` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.getpagesize` | interface | pass | `waiver` | owner waiver: P1f: getpagesize is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.getpayloadfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.getpeername` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_478.c` |  |
 | `interface.getpgid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_479.c` |  |
@@ -636,7 +636,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getresgid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_490.c` |  |
 | `interface.getresuid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_491.c` |  |
 | `interface.getrlimit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_492.c` |  |
-| `interface.getrlimit64` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.getrlimit64` | interface | pass | `waiver` | owner waiver: P1f: getrlimit64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension. |
 | `interface.getrusage` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_494.c` |  |
 | `interface.gets` | interface | pass | `test:tests/libc/posix/stdio/check-stdio2.sh` |  |
 | `interface.getservbyname_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_496.c` |  |
@@ -646,7 +646,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getsockopt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_500.c` |  |
 | `interface.getsubopt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_501.c` |  |
 | `interface.gettext` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_502.c` |  |
-| `interface.gettid` | interface | fail | `profile` | profile status missing |
+| `interface.gettid` | interface | pass | `waiver` | owner waiver: P1f: gettid is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.gettimeofday` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_504.c` |  |
 | `interface.getuid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_505.c` |  |
 | `interface.getutxent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_506.c` |  |
@@ -774,7 +774,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.kill` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_628.c` |  |
 | `interface.killpg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_629.c` |  |
 | `interface.labs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_630.c` |  |
-| `interface.lchmod` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.lchmod` | interface | pass | `waiver` | owner waiver: P1f: lchmod is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.lchown` | interface | fail | `profile` | profile status missing |
 | `interface.lcong48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_633.c` |  |
 | `interface.ldexp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_634.c` |  |
@@ -845,8 +845,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.lseek64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_699.c` |  |
 | `interface.lstat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_700.c` |  |
 | `interface.lstat64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_701.c` |  |
-| `interface.lutimes` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_702.c` | declaration did not compile |
-| `interface.madvise` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.lutimes` | interface | pass | `waiver` | owner waiver: P1f: lutimes is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
+| `interface.madvise` | interface | pass | `waiver` | owner waiver: P1f: madvise is not in the POSIX.1-2024 Issue 8 XSH function index (Linux/BSD extension (POSIX has posix_madvise)); kept under its extension macro, waived as an extension. |
 | `interface.malloc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_704.c` |  |
 | `interface.mblen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_705.c` |  |
 | `interface.mbrlen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_706.c` |  |
@@ -862,12 +862,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.memchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_716.c` |  |
 | `interface.memcmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_717.c` |  |
 | `interface.memcpy` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_718.c` |  |
-| `interface.memfd_create` | interface | fail | `profile` | profile status missing |
+| `interface.memfd_create` | interface | pass | `waiver` | owner waiver: P1f: memfd_create is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.memmem` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_720.c` |  |
 | `interface.memmove` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_721.c` |  |
 | `interface.memset` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_722.c` |  |
 | `interface.memset_explicit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_723.c` |  |
-| `interface.mincore` | interface | fail | `profile` | profile status missing |
+| `interface.mincore` | interface | pass | `waiver` | owner waiver: P1f: mincore is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension. |
 | `interface.mkdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_725.c` |  |
 | `interface.mkdirat` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
 | `interface.mkfifo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_727.c` |  |
@@ -877,7 +877,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.mkstemp` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.mktime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_732.c` |  |
 | `interface.mlock` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
-| `interface.mlock2` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.mlock2` | interface | pass | `waiver` | owner waiver: P1f: mlock2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension (POSIX has mlock)); kept under its extension macro, waived as an extension. |
 | `interface.mlockall` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
 | `interface.mmap` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_736.c` |  |
 | `interface.modf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_737.c` |  |
@@ -910,7 +910,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.munlock` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
 | `interface.munlockall` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
 | `interface.munmap` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_766.c` |  |
-| `interface.name_to_handle_at` | interface | fail | `profile` | profile status missing |
+| `interface.name_to_handle_at` | interface | pass | `waiver` | owner waiver: P1f: name_to_handle_at is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.nan` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nanf` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.nanfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
@@ -940,7 +940,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.offsetof` | interface | fail | `profile` | profile status missing |
 | `interface.open` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_795.c` |  |
 | `interface.open64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_796.c` |  |
-| `interface.open_by_handle_at` | interface | fail | `profile` | profile status missing |
+| `interface.open_by_handle_at` | interface | pass | `waiver` | owner waiver: P1f: open_by_handle_at is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.open_wmemstream` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.openat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_799.c` |  |
 | `interface.opendir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_800.c` |  |
@@ -991,8 +991,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ppoll` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
 | `interface.pread` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_846.c` |  |
 | `interface.pread64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_847.c` |  |
-| `interface.preadv` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
-| `interface.preadv2` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.preadv` | interface | pass | `waiver` | owner waiver: P1f: preadv is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension. |
+| `interface.preadv2` | interface | pass | `waiver` | owner waiver: P1f: preadv2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.printf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_850.c` |  |
 | `interface.prlimit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_851.c` |  |
 | `interface.pselect` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
@@ -1120,8 +1120,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.putwchar_unlocked` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.pwrite` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_975.c` |  |
 | `interface.pwrite64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_976.c` |  |
-| `interface.pwritev` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
-| `interface.pwritev2` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.pwritev` | interface | pass | `waiver` | owner waiver: P1f: pwritev is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension. |
+| `interface.pwritev2` | interface | pass | `waiver` | owner waiver: P1f: pwritev2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.qsort` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_979.c` |  |
 | `interface.quick_exit` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib2.sh` |  |
 | `interface.raise` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_981.c` |  |
@@ -1129,7 +1129,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.rand_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_983.c` |  |
 | `interface.random` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_984.c` |  |
 | `interface.read` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_985.c` |  |
-| `interface.readahead` | interface | fail | `profile` | profile status missing |
+| `interface.readahead` | interface | pass | `waiver` | owner waiver: P1f: readahead is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.readdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_987.c` |  |
 | `interface.readdir_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_988.c` |  |
 | `interface.readlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_989.c` |  |
@@ -1217,7 +1217,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sendto` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1071.c` |  |
 | `interface.setbuf` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.setbuffer` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
-| `interface.setdomainname` | interface | fail | `profile` | profile status missing |
+| `interface.setdomainname` | interface | pass | `waiver` | owner waiver: P1f: setdomainname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.setegid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1075.c` |  |
 | `interface.setenv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1076.c` |  |
 | `interface.seteuid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1077.c` |  |
@@ -1226,8 +1226,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.setgroupent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1080.c` |  |
 | `interface.setgroups` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1081.c` |  |
 | `interface.sethostent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1082.c` |  |
-| `interface.sethostname` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
-| `interface.setitimer` | interface | fail | `profile` | profile status missing |
+| `interface.sethostname` | interface | pass | `waiver` | owner waiver: P1f: sethostname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
+| `interface.setitimer` | interface | pass | `waiver` | owner waiver: P1f: setitimer is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
 | `interface.setjmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1085.c` |  |
 | `interface.setlinebuf` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.setlocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1087.c` |  |
@@ -1237,7 +1237,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.setpayloadfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.setpayloadsigfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.setpgid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1093.c` |  |
-| `interface.setpgrp` | interface | fail | `profile` | profile status missing |
+| `interface.setpgrp` | interface | pass | `waiver` | owner waiver: P1f: setpgrp is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (setpgid is the POSIX name)); kept under its extension macro, waived as an extension. |
 | `interface.setpriority` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1095.c` |  |
 | `interface.setprotoent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1096.c` |  |
 | `interface.setpwent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1097.c` |  |
@@ -1246,11 +1246,11 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.setresuid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1100.c` |  |
 | `interface.setreuid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1101.c` |  |
 | `interface.setrlimit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1102.c` |  |
-| `interface.setrlimit64` | interface | fail | `profile` | profile status missing |
+| `interface.setrlimit64` | interface | pass | `waiver` | owner waiver: P1f: setrlimit64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension. |
 | `interface.setservent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1104.c` |  |
 | `interface.setsid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1105.c` |  |
 | `interface.setsockopt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1106.c` |  |
-| `interface.settimeofday` | interface | fail | `profile` | profile status missing |
+| `interface.settimeofday` | interface | pass | `waiver` | owner waiver: P1f: settimeofday is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
 | `interface.setuid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1108.c` |  |
 | `interface.setusershell` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1109.c` |  |
 | `interface.setutxent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1110.c` |  |
@@ -1307,7 +1307,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sockatmark` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1161.c` |  |
 | `interface.socket` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1162.c` |  |
 | `interface.socketpair` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1163.c` |  |
-| `interface.splice` | interface | fail | `profile` | profile status missing |
+| `interface.splice` | interface | pass | `waiver` | owner waiver: P1f: splice is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.sprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1165.c` |  |
 | `interface.sqrt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1166.c` |  |
 | `interface.sqrtf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1167.c` |  |
@@ -1320,7 +1320,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.stat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1174.c` |  |
 | `interface.stat64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1175.c` |  |
 | `interface.statvfs` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.statx` | interface | fail | `profile` | profile status missing |
+| `interface.statx` | interface | pass | `waiver` | owner waiver: P1f: statx is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.stime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.strcasecmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1179.c` |  |
 | `interface.strcasecmp_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1180.c` |  |
@@ -1374,8 +1374,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.symlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1228.c` |  |
 | `interface.symlinkat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1229.c` |  |
 | `interface.sync` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1230.c` |  |
-| `interface.sync_file_range` | interface | fail | `profile` | profile status missing |
-| `interface.syncfs` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.sync_file_range` | interface | pass | `waiver` | owner waiver: P1f: sync_file_range is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
+| `interface.syncfs` | interface | pass | `waiver` | owner waiver: P1f: syncfs is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.syscall` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1233.c` |  |
 | `interface.sysconf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1234.c` |  |
 | `interface.syslog` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1235.c` |  |
@@ -1400,7 +1400,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.tcsetattr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1254.c` |  |
 | `interface.tcsetpgrp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1255.c` |  |
 | `interface.tcsetwinsize` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1256.c` |  |
-| `interface.tee` | interface | fail | `profile` | profile status missing |
+| `interface.tee` | interface | pass | `waiver` | owner waiver: P1f: tee is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.telldir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1258.c` |  |
 | `interface.textdomain` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1259.c` |  |
 | `interface.tgamma` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1260.c` |  |
@@ -1415,7 +1415,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.thrd_sleep` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1269.c` |  |
 | `interface.thrd_yield` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1270.c` |  |
 | `interface.time` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1271.c` |  |
-| `interface.timegm` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1272.c` | declaration did not compile |
+| `interface.timegm` | interface | pass | `waiver` | owner waiver: P1f: timegm is not in the POSIX.1-2024 Issue 8 XSH function index (BSD/GNU extension); kept under its extension macro, waived as an extension. |
 | `interface.timer_create` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.timer_delete` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
 | `interface.timer_getoverrun` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
@@ -1440,7 +1440,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.towupper_l` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.trunc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1295.c` |  |
 | `interface.truncate` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
-| `interface.truncate64` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
+| `interface.truncate64` | interface | pass | `waiver` | owner waiver: P1f: truncate64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension. |
 | `interface.truncf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1298.c` |  |
 | `interface.truncfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.truncl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
@@ -1452,11 +1452,11 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ttyname_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1306.c` |  |
 | `interface.twalk` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1307.c` |  |
 | `interface.tzset` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
-| `interface.ualarm` | interface | fail | `profile` | profile status missing |
+| `interface.ualarm` | interface | pass | `waiver` | owner waiver: P1f: ualarm is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
 | `interface.ufromfp` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ufromfpx` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.ufromfpxfNx` | interface | pass | `waiver` | owner waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.ulimit` | interface | fail | `profile` | profile status missing |
+| `interface.ulimit` | interface | pass | `waiver` | owner waiver: P1f: ulimit is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (getrlimit/setrlimit are the POSIX names)); kept under its extension macro, waived as an extension. |
 | `interface.umask` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1314.c` |  |
 | `interface.umaxabs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1315.c` |  |
 | `interface.uname` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1316.c` |  |
@@ -1468,8 +1468,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.unsetenv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1322.c` |  |
 | `interface.updwtmpx` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1323.c` |  |
 | `interface.uselocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1324.c` |  |
-| `interface.usleep` | interface | pass | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` |  |
-| `interface.utime` | interface | fail | `profile` | profile status missing |
+| `interface.usleep` | interface | pass | `waiver` | owner waiver: P1f: usleep is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
+| `interface.utime` | interface | pass | `waiver` | owner waiver: P1f: utime is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (utimensat/utimes are the POSIX names)); kept under its extension macro, waived as an extension. |
 | `interface.utimensat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1327.c` |  |
 | `interface.utimes` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1328.c` |  |
 | `interface.utmpxname` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1329.c` |  |
@@ -1484,8 +1484,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.vfscanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1338.c` |  |
 | `interface.vfwprintf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
 | `interface.vfwscanf` | interface | pass | `test:tests/libc/posix/wchar/check-wchar.sh` |  |
-| `interface.vhangup` | interface | fail | `profile` | profile status missing |
-| `interface.vmsplice` | interface | fail | `profile` | profile status missing |
+| `interface.vhangup` | interface | pass | `waiver` | owner waiver: P1f: vhangup is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
+| `interface.vmsplice` | interface | pass | `waiver` | owner waiver: P1f: vmsplice is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.vprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1343.c` |  |
 | `interface.vscanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1344.c` |  |
 | `interface.vsnprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1345.c` |  |

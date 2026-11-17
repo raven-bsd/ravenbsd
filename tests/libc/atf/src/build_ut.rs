@@ -265,3 +265,86 @@ fn a_target_build_without_a_sysroot_is_an_error() {
         .expect_err("must fail");
     assert!(error.to_string().contains("--sysroot"));
 }
+
+#[test]
+fn target_link_args_use_lld_without_the_clang_driver() {
+    let sysroot = PathBuf::from("/sysroot");
+    let binary = PathBuf::from("/out/program");
+    let objects = [PathBuf::from("/out/one.o"), PathBuf::from("/out/two.o")];
+    let args = target_link_args(
+        &sysroot,
+        &binary,
+        &objects,
+        Framework::ExitStatus,
+        Path::new("/out"),
+        &[],
+    );
+    assert_eq!(args[0], "-flavor");
+    assert_eq!(args[1], "gnu");
+    assert_eq!(args[2], "--sysroot=/sysroot");
+    assert!(args.contains(&"-static".to_string()));
+    assert!(args.windows(2).any(|pair| pair == ["-o", "/out/program"]));
+    let crt1 = args
+        .iter()
+        .position(|arg| arg == "/sysroot/usr/lib/crt1.o")
+        .expect("crt1");
+    let obj = args
+        .iter()
+        .position(|arg| arg == "/out/one.o")
+        .expect("object");
+    let libc = args.iter().position(|arg| arg == "-lc").expect("-lc");
+    let crtn = args
+        .iter()
+        .position(|arg| arg == "/sysroot/usr/lib/crtn.o")
+        .expect("crtn");
+    assert!(crt1 < obj && obj < libc && libc < crtn);
+    assert!(!args.iter().any(|arg| arg == "-fuse-ld=lld"));
+    assert!(
+        !args
+            .iter()
+            .any(|arg| arg == "--target=x86_64-unknown-ravenbsd")
+    );
+}
+
+#[test]
+fn target_link_args_add_libatf_for_atf_only() {
+    let sysroot = PathBuf::from("/sysroot");
+    let binary = PathBuf::from("/out/program");
+    let objects = [PathBuf::from("/out/one.o")];
+    let atf = target_link_args(
+        &sysroot,
+        &binary,
+        &objects,
+        Framework::Atf,
+        Path::new("/out"),
+        &[],
+    );
+    assert!(
+        atf.iter()
+            .any(|arg| arg == "/out/libatf-c/target/libatf-c.a")
+    );
+    let plain = target_link_args(
+        &sysroot,
+        &binary,
+        &objects,
+        Framework::ExitStatus,
+        Path::new("/out"),
+        &[],
+    );
+    assert!(
+        !plain
+            .iter()
+            .any(|arg| arg == "/out/libatf-c/target/libatf-c.a")
+    );
+}
+
+#[test]
+fn rust_lld_is_discovered_when_rustc_is_present() {
+    if Command::new("rustc").arg("--version").output().is_err() {
+        eprintln!("SKIP: rustc not found");
+        return;
+    }
+    let path = rust_lld().expect("rust-lld");
+    assert!(path.is_file(), "{}", path.display());
+    assert!(path.file_name().is_some_and(|name| name == "rust-lld"));
+}

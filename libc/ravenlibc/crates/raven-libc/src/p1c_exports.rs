@@ -70,45 +70,63 @@ unsafe fn iovec_ref<'a>(iovs: *const Iovec, count: c_int) -> Vec<&'a [u8]> {
     bufs
 }
 
-mod access;
-mod dir;
-mod fd;
-mod file_adv;
-mod mem;
-mod mem_sync;
-mod path;
-mod poll_select;
-mod proc;
-mod time;
-mod tty;
-mod uio;
+macro_rules! export_modules {
+    ($($name:ident),* $(,)?) => {
+        $(
+            mod $name;
+            #[allow(unused_imports)]
+            pub(crate) use $name::*;
+        )*
+    };
+}
 
-// Re-exported for the host tests in `p1c_exports_ut.rs`; the target build exports the same
-// names directly from their submodules.
-#[allow(unused_imports)]
-pub(crate) use access::*;
-#[allow(unused_imports)]
-pub(crate) use dir::*;
-#[allow(unused_imports)]
-pub(crate) use fd::*;
-#[allow(unused_imports)]
-pub(crate) use file_adv::*;
-#[allow(unused_imports)]
-pub(crate) use mem::*;
-#[allow(unused_imports)]
-pub(crate) use mem_sync::*;
-#[allow(unused_imports)]
-pub(crate) use path::*;
-#[allow(unused_imports)]
-pub(crate) use poll_select::*;
-#[allow(unused_imports)]
-pub(crate) use proc::*;
-#[allow(unused_imports)]
-pub(crate) use time::*;
-#[allow(unused_imports)]
-pub(crate) use tty::*;
-#[allow(unused_imports)]
-pub(crate) use uio::*;
+export_modules!(
+    brk,
+    dup3,
+    eaccess,
+    euidaccess,
+    faccessat,
+    fchdir,
+    fdatasync,
+    fpathconf,
+    fstatvfs,
+    ftruncate64,
+    getdents,
+    getentropy,
+    getpagesize,
+    getrlimit64,
+    lchmod,
+    lockf,
+    madvise,
+    mkdirat,
+    mlock,
+    mlock2,
+    mlockall,
+    msync,
+    munlock,
+    munlockall,
+    pathconf,
+    pipe,
+    posix_close,
+    posix_fadvise,
+    posix_fallocate,
+    posix_madvise,
+    ppoll,
+    preadv,
+    preadv2,
+    pselect,
+    pwritev,
+    pwritev2,
+    readlinkat,
+    select,
+    sethostname,
+    sleep,
+    syncfs,
+    truncate,
+    truncate64,
+    ttyname,
+    usleep,
+);
 
 #[cfg(test)]
 #[path = "p1c_exports_ut.rs"]

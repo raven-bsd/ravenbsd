@@ -50,7 +50,13 @@ fn loader_has_no_riscv64_target() {
 
 #[test]
 fn kernel_rustflags_match_c2() {
-    let flags = rustflags_for(Component::Kernel, Arch::X86_64, Path::new("/r"), None);
+    let flags = rustflags_for(
+        Component::Kernel,
+        Arch::X86_64,
+        Path::new("/r"),
+        None,
+        false,
+    );
     assert_eq!(
         flags,
         vec![
@@ -66,7 +72,13 @@ fn kernel_rustflags_match_c2() {
 #[test]
 fn user_rustflags_include_small_code_model_on_x86_64() {
     let linker = Path::new("/r/userland/linker/x86_64.ld");
-    let flags = rustflags_for(Component::User, Arch::X86_64, Path::new("/r"), Some(linker));
+    let flags = rustflags_for(
+        Component::User,
+        Arch::X86_64,
+        Path::new("/r"),
+        Some(linker),
+        false,
+    );
     assert_eq!(
         flags,
         vec![
@@ -76,6 +88,8 @@ fn user_rustflags_include_small_code_model_on_x86_64() {
             "relocation-model=static",
             "-C",
             "force-frame-pointers=yes",
+            "--cfg",
+            "sha2_backend=\"soft\"",
             "-C",
             "link-arg=-T/r/userland/linker/x86_64.ld",
             "--remap-path-prefix=/r=/ravenbsd",
@@ -85,14 +99,74 @@ fn user_rustflags_include_small_code_model_on_x86_64() {
 
 #[test]
 fn user_rustflags_omit_missing_linker() {
-    let flags = rustflags_for(Component::User, Arch::Aarch64, Path::new("/r"), None);
+    let flags = rustflags_for(Component::User, Arch::Aarch64, Path::new("/r"), None, false);
     assert!(!flags.iter().any(|flag| flag.contains("link-arg")));
     assert!(!flags.iter().any(|flag| flag == "code-model=small"));
 }
 
 #[test]
+fn dynamic_supported_is_x86_64_and_aarch64() {
+    assert!(dynamic_supported(Arch::X86_64));
+    assert!(dynamic_supported(Arch::Aarch64));
+    assert!(!dynamic_supported(Arch::Riscv64));
+}
+
+#[test]
+fn aarch64_dynamic_user_rustflags_are_pie() {
+    let flags = rustflags_for(Component::User, Arch::Aarch64, Path::new("/r"), None, true);
+    assert!(
+        flags
+            .windows(2)
+            .any(|pair| pair == ["-C", "relocation-model=pic"])
+    );
+    assert!(!flags.iter().any(|flag| flag == "code-model=small"));
+    assert!(
+        flags
+            .iter()
+            .any(|flag| flag == "linker=/r/userland/linker/rust-lld-dynamic.sh")
+    );
+    for arg in [
+        "link-arg=-pie",
+        "link-arg=-Bdynamic",
+        "link-arg=-dynamic-linker",
+        "link-arg=/libexec/ld-elf.so.1",
+        "link-arg=--image-base=0x400000",
+        "link-arg=-z",
+        "link-arg=max-page-size=4096",
+        "link-arg=-L/r/build/aarch64/sysroot/lib",
+        "link-arg=-L/r/build/aarch64/sysroot/usr/lib",
+        "link-arg=--allow-shlib-undefined",
+        "link-arg=--no-as-needed",
+        "link-arg=-lc",
+    ] {
+        assert!(flags.iter().any(|flag| flag == arg), "missing {arg}");
+    }
+}
+
+#[test]
+fn x86_64_dynamic_user_rustflags_keep_the_small_model() {
+    let flags = rustflags_for(Component::User, Arch::X86_64, Path::new("/r"), None, true);
+    assert!(
+        flags
+            .windows(2)
+            .any(|pair| pair == ["-C", "code-model=small"])
+    );
+    assert!(
+        flags
+            .windows(2)
+            .any(|pair| pair == ["-C", "relocation-model=pic"])
+    );
+}
+
+#[test]
 fn loader_rustflags_only_remap() {
-    let flags = rustflags_for(Component::Loader, Arch::X86_64, Path::new("/r"), None);
+    let flags = rustflags_for(
+        Component::Loader,
+        Arch::X86_64,
+        Path::new("/r"),
+        None,
+        false,
+    );
     assert_eq!(flags, vec!["--remap-path-prefix=/r=/ravenbsd"]);
 }
 

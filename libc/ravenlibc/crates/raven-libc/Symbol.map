@@ -486,6 +486,9 @@ RAVEN_1.0 {
 		optopt;
 		optreset;
 		suboptarg;
+		tzname;
+		timezone;
+		daylight;
 		# --- compat (C65; generic, x86_64 and aarch64) ---
 		addmntent;
 		utmpxname;
@@ -583,32 +586,32 @@ RAVEN_1.0 {
 		acosf;
 		acosh;
 		acoshf;
-		acoshl; # x86_64
-		acosl; # x86_64
+		acoshl; # x86_64 aarch64
+		acosl; # x86_64 aarch64
 		acospi;
 		asin;
 		asinf;
 		asinh;
 		asinhf;
-		asinhl; # x86_64
-		asinl; # x86_64
+		asinhl; # x86_64 aarch64
+		asinl; # x86_64 aarch64
 		asinpi;
 		atan;
 		atan2;
 		atan2f;
-		atan2l; # x86_64
+		atan2l; # x86_64 aarch64
 		atan2pi;
 		atanf;
 		atanh;
 		atanhf;
-		atanhl; # x86_64
-		atanl; # x86_64
+		atanhl; # x86_64 aarch64
+		atanl; # x86_64 aarch64
 		atanpi;
 		canonicalize;
 		canonicalizef;
 		cbrt;
 		cbrtf;
-		cbrtl; # x86_64
+		cbrtl; # x86_64 aarch64
 		ceil;
 		ceilf;
 		ceill; # x86_64 aarch64
@@ -621,8 +624,8 @@ RAVEN_1.0 {
 		cosf;
 		cosh;
 		coshf;
-		coshl; # x86_64
-		cosl; # x86_64
+		coshl; # x86_64 aarch64
+		cosl; # x86_64 aarch64
 		cospi;
 		drem;
 		dremf;
@@ -640,11 +643,11 @@ RAVEN_1.0 {
 		exp10m1f;
 		exp2;
 		exp2f;
-		exp2l; # x86_64
+		exp2l; # x86_64 aarch64
 		exp2m1;
 		exp2m1f;
 		expf;
-		expl; # x86_64
+		expl; # x86_64 aarch64
 		expm1;
 		expm1f;
 		expm1l; # x86_64
@@ -704,7 +707,7 @@ RAVEN_1.0 {
 		getpayloadf;
 		hypot;
 		hypotf;
-		hypotl; # x86_64
+		hypotl; # x86_64 aarch64
 		ilogb;
 		ilogbf;
 		ilogbl; # x86_64 aarch64
@@ -749,7 +752,7 @@ RAVEN_1.0 {
 		log;
 		log10;
 		log10f;
-		log10l; # x86_64
+		log10l; # x86_64 aarch64
 		log10p1;
 		log10p1f;
 		log1p;
@@ -757,14 +760,14 @@ RAVEN_1.0 {
 		log1pl; # x86_64
 		log2;
 		log2f;
-		log2l; # x86_64
+		log2l; # x86_64 aarch64
 		log2p1;
 		log2p1f;
 		logb;
 		logbf;
 		logbl; # x86_64 aarch64
 		logf;
-		logl; # x86_64
+		logl; # x86_64 aarch64
 		lrint;
 		lrintf;
 		lrintl; # x86_64 aarch64
@@ -832,17 +835,17 @@ RAVEN_1.0 {
 		sin;
 		sincos;
 		sincosf;
-		sincosl; # x86_64
+		sincosl; # x86_64 aarch64
 		sinf;
 		sinh;
 		sinhf;
-		sinhl; # x86_64
-		sinl; # x86_64
+		sinhl; # x86_64 aarch64
+		sinl; # x86_64 aarch64
 		sinpi;
 		sinpif;
 		sqrt;
 		sqrtf;
-		sqrtl; # x86_64
+		sqrtl; # x86_64 aarch64
 		statvfs;
 		strfromd;
 		strfromf;
@@ -851,8 +854,8 @@ RAVEN_1.0 {
 		tanf;
 		tanh;
 		tanhf;
-		tanhl; # x86_64
-		tanl; # x86_64
+		tanhl; # x86_64 aarch64
+		tanl; # x86_64 aarch64
 		tanpi;
 		tgamma;
 		tgammaf;

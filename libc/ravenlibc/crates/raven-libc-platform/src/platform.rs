@@ -840,17 +840,20 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Err(Errno::ENOSYS)
     }
 
-    /// `lseek`: `ENOSYS` until PG-22; `ESPIPE` on pipes, `EINVAL` on ttys.
-    pub fn lseek(&self, fd: i32, _offset: i64, whence: i32) -> Result<i64, Errno> {
+    /// `lseek`: move the server cursor and return the new offset.
+    pub fn lseek(&self, fd: i32, offset: i64, whence: i32) -> Result<i64, Errno> {
         if !matches!(whence, 0..=2) {
             return Err(Errno::EINVAL);
         }
         let reference = self.get(fd)?;
-        match reference.kind() {
-            OfdKind::Pipe => Err(Errno::ESPIPE),
-            OfdKind::Tty => Err(Errno::ESPIPE),
-            _ => Err(Errno::ENOSYS),
+        if matches!(reference.kind(), OfdKind::Pipe | OfdKind::Tty) {
+            return Err(Errno::ESPIPE);
         }
+        let handle = reference.handle();
+        drop(reference);
+        let whence = u32::try_from(whence).map_err(|_| Errno::EINVAL)?;
+        let value = self.backend.seek(handle, offset, whence)?;
+        i64::try_from(value).map_err(|_| Errno::EOVERFLOW)
     }
 
     // ----------------------------------------------------------------- metadata

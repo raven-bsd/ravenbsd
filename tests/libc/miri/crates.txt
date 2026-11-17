@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The bounded Miri crate set for libc gate 1.6. One package name per line.
+# These are the pure host-testable libc crates named by tests/libc/gate/rows.toml row 1.6.
+raven-libc-str
+raven-libc-fmt
+raven-libc-dtoa
+raven-libc-regex
+raven-libc-glob

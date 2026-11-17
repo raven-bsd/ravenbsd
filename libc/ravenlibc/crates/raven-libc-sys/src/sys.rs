@@ -594,6 +594,23 @@ pub fn record_lock(handle: Handle, command: u32, lock: &mut RecordLock) -> Resul
     .map(|_| ())
 }
 
+/// Move a file handle's cursor and return the new offset (`SEEK`, raw number `0x6D`).
+pub fn seek(handle: Handle, offset: i64, whence: u32) -> Result<u64, Errno> {
+    // SAFETY: SEEK takes a scalar handle, a signed offset and a scalar whence.
+    let result = crate::errno::ret(unsafe {
+        arch::syscall6(
+            0x6D,
+            handle.0 as usize,
+            offset as isize as usize,
+            whence as usize,
+            0,
+            0,
+            0,
+        )
+    })?;
+    u64::try_from(result).map_err(|_| Errno::EOVERFLOW)
+}
+
 /// Send a typed `CALL` request and return the response length.
 pub fn call(handle: Handle, request: &[u8], response: &mut [u8]) -> Result<usize, Errno> {
     // SAFETY: CALL reads the request slice and writes at most `response.len()` bytes.

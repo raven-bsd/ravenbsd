@@ -19,10 +19,10 @@ fn regenerated_table_is_byte_identical() {
     assert!(first.text == committed, "committed tables.rs is stale");
     let second = ucdgen::generate(&ucd()).expect("generator run 2");
     assert!(first.text == second.text, "generator is not deterministic");
-    assert_eq!(first.table_bytes, 33_304);
-    assert_eq!(first.props_blocks, 157);
-    assert_eq!(first.props_stage2_bytes, 20_096);
-    assert_eq!(first.case_blocks, 27);
+    assert_eq!(first.table_bytes, 19_996);
+    assert_eq!(first.props_ranges, 1_756);
+    assert_eq!(first.props_range_bytes, 12_292);
+    assert_eq!(first.case_blocks, 66);
     assert_eq!(first.case_pairs, 179);
     assert_eq!(first.hashes.len(), 6);
 }

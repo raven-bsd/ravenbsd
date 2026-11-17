@@ -323,7 +323,7 @@ fn target_clippy_step(
         .join("userland/linker")
         .join(format!("{}.ld", arch.as_str()));
     let linker = linker.is_file().then_some(linker);
-    let flags = build::rustflags_string(component, arch, &workspace.root, linker.as_deref());
+    let flags = build::rustflags_string(component, arch, &workspace.root, linker.as_deref(), false);
     let mut args = vec!["clippy".to_string()];
     for package in packages {
         args.push("-p".to_string());

@@ -13,6 +13,25 @@ static LIMIT: AtomicUsize = AtomicUsize::new(0);
 /// Static TLS TPOFF bases indexed by object id.
 static TLS_OFFSETS: [AtomicUsize; 64] = [const { AtomicUsize::new(0) }; 64];
 
+/// One aarch64 dynamic `TLSDESC` argument: the `__tls_get_addr` `{module, offset}` pair.
+#[repr(C)]
+struct TlsDescIndex {
+    module: AtomicUsize,
+    offset: AtomicUsize,
+}
+
+impl TlsDescIndex {
+    const fn new() -> Self {
+        Self {
+            module: AtomicUsize::new(0),
+            offset: AtomicUsize::new(0),
+        }
+    }
+}
+
+static TLS_DESC_INDICES: [TlsDescIndex; 64] = [const { TlsDescIndex::new() }; 64];
+static TLS_DESC_NEXT: AtomicUsize = AtomicUsize::new(0);
+
 // A trivial `TLSDESC` resolver: the descriptor's second word is the TP-relative offset the
 // caller adds to the thread pointer. The ABI passes the descriptor address in `x0` (aarch64)
 // or `rdi` (x86_64), so load and return the argument word.
@@ -27,6 +46,31 @@ core::arch::global_asm!(
     ".size __rl_tlsdesc_return, .-__rl_tlsdesc_return",
     ".section .note.GNU-stack,\"\",%progbits",
 );
+
+// The aarch64 dynamic `TLSDESC` resolver: the descriptor argument points at a
+// `{module, offset}` pair. `__tls_get_addr` allocates and initialises the calling thread's block
+// (copying the module's `.tdata` on first use); the caller then adds TP to the returned offset.
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    ".text",
+    ".globl __rl_tlsdesc_dynamic",
+    ".type __rl_tlsdesc_dynamic,%function",
+    "__rl_tlsdesc_dynamic:",
+    "stp x29, x30, [sp, #-16]!",
+    "ldr x0, [x0, #8]",
+    "bl __tls_get_addr",
+    "mrs x1, tpidr_el0",
+    "sub x0, x0, x1",
+    "ldp x29, x30, [sp], #16",
+    "ret",
+    ".size __rl_tlsdesc_dynamic, .-__rl_tlsdesc_dynamic",
+    ".section .note.GNU-stack,\"\",%progbits",
+);
+
+#[cfg(target_arch = "aarch64")]
+unsafe extern "C" {
+    fn __rl_tlsdesc_dynamic(descriptor: *const u64) -> u64;
+}
 
 #[cfg(target_arch = "x86_64")]
 core::arch::global_asm!(
@@ -103,6 +147,41 @@ impl MemView for LiveMem {
     }
 }
 
+/// The current thread's TLS base (`%fs:0`, `TPIDR_EL0` or `tp`).
+fn thread_pointer() -> usize {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let value: usize;
+        // SAFETY: `%fs:0` is the current thread's TCB pointer.
+        unsafe {
+            core::arch::asm!(
+                "mov {value}, qword ptr fs:[0]",
+                value = out(reg) value,
+                options(nostack, preserves_flags)
+            );
+        }
+        value
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        let value: usize;
+        // SAFETY: `TPIDR_EL0` is the current thread's TLS base.
+        unsafe {
+            core::arch::asm!("mrs {}, tpidr_el0", out(reg) value, options(nostack));
+        }
+        value
+    }
+    #[cfg(target_arch = "riscv64")]
+    {
+        let value: usize;
+        // SAFETY: the thread pointer register is the TLS base.
+        unsafe {
+            core::arch::asm!("mv {}, tp", out(reg) value, options(nostack));
+        }
+        value
+    }
+}
+
 /// A `RelocApplier` over live memory.
 pub struct LiveApplier;
 
@@ -157,18 +236,70 @@ impl RelocApplier for LiveApplier {
         crate::raw::memview::set_tls_offset(obj, offset);
     }
 
+    fn init_static_tls(
+        &mut self,
+        obj: raven_libc_elf::ObjId,
+        image: u64,
+        filesz: u64,
+    ) -> Result<(), ApplyError> {
+        if image == 0 || filesz == 0 {
+            return Ok(());
+        }
+        let offset = self.tls_static_offset(obj)?;
+        if offset == 0 {
+            return Ok(());
+        }
+        let thread_pointer = thread_pointer();
+        if thread_pointer == 0 {
+            return Ok(());
+        }
+        let offset = usize::try_from(offset).map_err(|_| ApplyError::OutOfRange)?;
+        let block = raven_libc_tls::layout::block_start(
+            raven_libc_tls::consts::TARGET_ABI,
+            thread_pointer,
+            offset,
+        );
+        let len = usize::try_from(filesz).map_err(|_| ApplyError::OutOfRange)?;
+        // SAFETY: `image` is this module's mapped TLS template and `filesz` is its validated
+        // initialised size; `block` is the current thread's reserved static TLS block at the
+        // offset the loader just assigned. No other thread shares this TLS block.
+        unsafe {
+            core::ptr::copy_nonoverlapping(image as *const u8, block as *mut u8, len);
+        }
+        Ok(())
+    }
+
     fn tls_desc_alloc(
         &mut self,
         obj: raven_libc_elf::ObjId,
         sym_value: u64,
         addend: i64,
     ) -> Result<raven_libc_elf::TlsDesc, ApplyError> {
-        let offset = self.tls_static_offset(obj)?;
-        let arg = crate::tls::desc_argument(crate::arch::target_arch(), sym_value, addend, offset);
-        Ok(raven_libc_elf::TlsDesc {
-            resolver: __rl_tlsdesc_return as *const () as u64,
-            arg,
-        })
+        #[cfg(target_arch = "aarch64")]
+        {
+            let index = TLS_DESC_NEXT.fetch_add(1, Ordering::Relaxed);
+            let slot = TLS_DESC_INDICES.get(index).ok_or(ApplyError::OutOfRange)?;
+            let module =
+                usize::try_from(self.tls_module_id(obj)).map_err(|_| ApplyError::OutOfRange)?;
+            let offset = usize::try_from(sym_value.wrapping_add_signed(addend))
+                .map_err(|_| ApplyError::OutOfRange)?;
+            slot.module.store(module, Ordering::Release);
+            slot.offset.store(offset, Ordering::Release);
+            return Ok(raven_libc_elf::TlsDesc {
+                resolver: __rl_tlsdesc_dynamic as *const () as u64,
+                arg: core::ptr::addr_of!(slot.module) as u64,
+            });
+        }
+        #[cfg(not(target_arch = "aarch64"))]
+        {
+            let offset = self.tls_static_offset(obj)?;
+            let arg =
+                crate::tls::desc_argument(crate::arch::target_arch(), sym_value, addend, offset);
+            Ok(raven_libc_elf::TlsDesc {
+                resolver: __rl_tlsdesc_return as *const () as u64,
+                arg,
+            })
+        }
     }
 
     fn copy(&mut self, dst: u64, src: u64, len: u64) -> Result<(), ApplyError> {

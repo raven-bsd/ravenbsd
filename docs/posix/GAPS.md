@@ -13,12 +13,12 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 0 | 0 | 20 | 0 |
 | headers | 86 | 2 | 11 | 73 | 0 |
-| interfaces | 1425 | 43 | 0 | 1300 | 82 |
+| interfaces | 1425 | 15 | 0 | 1280 | 130 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
 | utilities | 217 | 0 | 1 | 180 | 36 |
-| **all** | **1802** | **45** | **12** | **1616** | **129** |
+| **all** | **1802** | **17** | **12** | **1596** | **177** |
 
 Traceability rows: 1802; profile rows: 1802.
 
@@ -128,7 +128,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.abs` | `abs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.accept` | `accept` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.access` | `access` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.acct` | `acct` | missing | P1 | `none` | unistd.h |
+| `interface.acct` | `acct` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: acct is not in the POSIX.1-2024 Issue 8 XSH function index (BSD process-accounting extension); kept under its extension macro, waived as an extension. |
 | `interface.acos` | `acos` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.acosf` | `acosf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.acosfNx` | `acosfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
@@ -138,7 +138,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.acoshl` | `acoshl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.acosl` | `acosl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.acospi` | `acospi` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.adjtime` | `adjtime` | missing | P1 | `none` | sys/time.h |
+| `interface.adjtime` | `adjtime` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/time.h; waiver: P1f: adjtime is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.aio_cancel` | `aio_cancel` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | aio.h |
 | `interface.aio_cancel64` | `aio_cancel64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | aio.h |
 | `interface.aio_error` | `aio_error` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | aio.h |
@@ -192,7 +192,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.bind` | `bind` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.bind_textdomain_codeset` | `bind_textdomain_codeset` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libintl.h |
 | `interface.bindtextdomain` | `bindtextdomain` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libintl.h |
-| `interface.brk` | `brk` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.brk` | `brk` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: brk is not in the POSIX.1-2024 Issue 8 XSH function index (BSD/legacy extension); kept under its extension macro, waived as an extension. |
 | `interface.bsearch` | `bsearch` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.btowc` | `btowc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.bzero` | `bzero` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | strings.h |
@@ -367,7 +367,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.dup2` | `dup2` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.dup3` | `dup3` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.duplocale` | `duplocale` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | locale.h |
-| `interface.eaccess` | `eaccess` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.eaccess` | `eaccess` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: eaccess is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.ecvt_r` | `ecvt_r` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib2.sh` | stdlib.h |
 | `interface.endgrent` | `endgrent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | grp.h |
 | `interface.endhostent` | `endhostent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
@@ -384,7 +384,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.erfcl` | `erfcl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.erff` | `erff` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.erfl` | `erfl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.euidaccess` | `euidaccess` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.euidaccess` | `euidaccess` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: euidaccess is not in the POSIX.1-2024 Issue 8 XSH function index (GNU/BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.execl` | `execl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.execle` | `execle` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.execlp` | `execlp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
@@ -416,7 +416,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.fabsfNx` | `fabsfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fabsl` | `fabsl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.faccessat` | `faccessat` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
-| `interface.fallocate` | `fallocate` | missing | P1 | `none` | fcntl.h |
+| `interface.fallocate` | `fallocate` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: fallocate is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.fattach` | `fattach` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stropts.h |
 | `interface.fchdir` | `fchdir` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.fchmod` | `fchmod` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
@@ -545,14 +545,14 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.ftello64` | `ftello64` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.ftok` | `ftok` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/ipc.h |
 | `interface.ftruncate` | `ftruncate` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.ftruncate64` | `ftruncate64` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.ftruncate64` | `ftruncate64` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: ftruncate64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension (_LARGEFILE64_SOURCE)); kept under its extension macro, waived as an extension. |
 | `interface.ftrylockfile` | `ftrylockfile` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.ftw` | `ftw` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ftw.h |
 | `interface.ftw64` | `ftw64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ftw.h |
 | `interface.funlockfile` | `funlockfile` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.futimens` | `futimens` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
-| `interface.futimes` | `futimes` | missing | P1 | `none` | sys/time.h |
-| `interface.futimesat` | `futimesat` | missing | P1 | `none` | sys/time.h |
+| `interface.futimes` | `futimes` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/time.h; waiver: P1f: futimes is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
+| `interface.futimesat` | `futimesat` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/time.h; waiver: P1f: futimesat is not in the POSIX.1-2024 Issue 8 XSH function index (GNU/BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.fwide` | `fwide` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.fwprintf` | `fwprintf` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.fwrite` | `fwrite` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
@@ -568,9 +568,9 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.getcwd` | `getcwd` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getdate` | `getdate` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.getdelim` | `getdelim` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
-| `interface.getdents` | `getdents` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | dirent.h |
-| `interface.getdomainname` | `getdomainname` | missing | P1 | `none` | unistd.h |
-| `interface.getdtablesize` | `getdtablesize` | missing | P1 | `none` | unistd.h |
+| `interface.getdents` | `getdents` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | dirent.h; waiver: P1f: getdents is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
+| `interface.getdomainname` | `getdomainname` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: getdomainname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
+| `interface.getdtablesize` | `getdtablesize` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: getdtablesize is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.getegid` | `getegid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getentropy` | `getentropy` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
 | `interface.getenv` | `getenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
@@ -586,14 +586,14 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.gethostbyname_r` | `gethostbyname_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
 | `interface.gethostid` | `gethostid` | missing | P1 | `none` | unistd.h |
 | `interface.gethostname` | `gethostname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.getitimer` | `getitimer` | missing | P1 | `none` | sys/time.h |
+| `interface.getitimer` | `getitimer` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/time.h; waiver: P1f: getitimer is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
 | `interface.getline` | `getline` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.getlogin` | `getlogin` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getlogin_r` | `getlogin_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getmsg` | `getmsg` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stropts.h |
 | `interface.getnameinfo` | `getnameinfo` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
 | `interface.getopt` | `getopt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.getpagesize` | `getpagesize` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.getpagesize` | `getpagesize` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: getpagesize is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.getpayloadfNx` | `getpayloadfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.getpeername` | `getpeername` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.getpgid` | `getpgid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
@@ -610,7 +610,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.getresgid` | `getresgid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getresuid` | `getresuid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getrlimit` | `getrlimit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
-| `interface.getrlimit64` | `getrlimit64` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/resource.h |
+| `interface.getrlimit64` | `getrlimit64` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/resource.h; waiver: P1f: getrlimit64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension. |
 | `interface.getrusage` | `getrusage` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
 | `interface.gets` | `gets` | present | P1 | `test:tests/libc/posix/stdio/check-stdio2.sh` | stdio.h |
 | `interface.getservbyname_r` | `getservbyname_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
@@ -620,7 +620,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.getsockopt` | `getsockopt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.getsubopt` | `getsubopt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.gettext` | `gettext` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libintl.h |
-| `interface.gettid` | `gettid` | missing | P1 | `none` | unistd.h |
+| `interface.gettid` | `gettid` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: gettid is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.gettimeofday` | `gettimeofday` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/time.h |
 | `interface.getuid` | `getuid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.getutxent` | `getutxent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
@@ -748,7 +748,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.kill` | `kill` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.killpg` | `killpg` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.labs` | `labs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
-| `interface.lchmod` | `lchmod` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/stat.h |
+| `interface.lchmod` | `lchmod` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/stat.h; waiver: P1f: lchmod is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.lchown` | `lchown` | missing | P1 | `none` | sys/stat.h |
 | `interface.lcong48` | `lcong48` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.ldexp` | `ldexp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -819,8 +819,8 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.lseek64` | `lseek64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.lstat` | `lstat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.lstat64` | `lstat64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
-| `interface.lutimes` | `lutimes` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/time.h |
-| `interface.madvise` | `madvise` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
+| `interface.lutimes` | `lutimes` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/time.h; waiver: P1f: lutimes is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
+| `interface.madvise` | `madvise` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/mman.h; waiver: P1f: madvise is not in the POSIX.1-2024 Issue 8 XSH function index (Linux/BSD extension (POSIX has posix_madvise)); kept under its extension macro, waived as an extension. |
 | `interface.malloc` | `malloc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.mblen` | `mblen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.mbrlen` | `mbrlen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
@@ -836,12 +836,12 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.memchr` | `memchr` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
 | `interface.memcmp` | `memcmp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
 | `interface.memcpy` | `memcpy` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
-| `interface.memfd_create` | `memfd_create` | missing | P1 | `none` | sys/mman.h |
+| `interface.memfd_create` | `memfd_create` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/mman.h; waiver: P1f: memfd_create is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.memmem` | `memmem` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
 | `interface.memmove` | `memmove` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
 | `interface.memset` | `memset` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
 | `interface.memset_explicit` | `memset_explicit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
-| `interface.mincore` | `mincore` | missing | P1 | `none` | sys/mman.h |
+| `interface.mincore` | `mincore` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/mman.h; waiver: P1f: mincore is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension. |
 | `interface.mkdir` | `mkdir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.mkdirat` | `mkdirat` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/stat.h |
 | `interface.mkfifo` | `mkfifo` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
@@ -851,7 +851,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.mkstemp` | `mkstemp` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib2.sh` | stdlib.h |
 | `interface.mktime` | `mktime` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
 | `interface.mlock` | `mlock` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
-| `interface.mlock2` | `mlock2` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
+| `interface.mlock2` | `mlock2` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/mman.h; waiver: P1f: mlock2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension (POSIX has mlock)); kept under its extension macro, waived as an extension. |
 | `interface.mlockall` | `mlockall` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
 | `interface.mmap` | `mmap` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
 | `interface.modf` | `modf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -884,7 +884,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.munlock` | `munlock` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
 | `interface.munlockall` | `munlockall` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/mman.h |
 | `interface.munmap` | `munmap` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
-| `interface.name_to_handle_at` | `name_to_handle_at` | missing | P1 | `none` | fcntl.h |
+| `interface.name_to_handle_at` | `name_to_handle_at` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: name_to_handle_at is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.nan` | `nan` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.nanf` | `nanf` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.nanfNx` | `nanfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
@@ -914,7 +914,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.offsetof` | `offsetof` | missing | P1 | `none` | stddef.h |
 | `interface.open` | `open` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.open64` | `open64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
-| `interface.open_by_handle_at` | `open_by_handle_at` | missing | P1 | `none` | fcntl.h |
+| `interface.open_by_handle_at` | `open_by_handle_at` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: open_by_handle_at is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.open_wmemstream` | `open_wmemstream` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.openat` | `openat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.opendir` | `opendir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
@@ -965,8 +965,8 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.ppoll` | `ppoll` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | poll.h |
 | `interface.pread` | `pread` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.pread64` | `pread64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.preadv` | `preadv` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/uio.h |
-| `interface.preadv2` | `preadv2` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/uio.h |
+| `interface.preadv` | `preadv` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/uio.h; waiver: P1f: preadv is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension. |
+| `interface.preadv2` | `preadv2` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/uio.h; waiver: P1f: preadv2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.printf` | `printf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.prlimit` | `prlimit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
 | `interface.pselect` | `pselect` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/select.h |
@@ -1094,8 +1094,8 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.putwchar_unlocked` | `putwchar_unlocked` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.pwrite` | `pwrite` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.pwrite64` | `pwrite64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.pwritev` | `pwritev` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/uio.h |
-| `interface.pwritev2` | `pwritev2` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | sys/uio.h |
+| `interface.pwritev` | `pwritev` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/uio.h; waiver: P1f: pwritev is not in the POSIX.1-2024 Issue 8 XSH function index (not in the Issue 8 XSH function index); kept under its extension macro, waived as an extension. |
+| `interface.pwritev2` | `pwritev2` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/uio.h; waiver: P1f: pwritev2 is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.qsort` | `qsort` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.quick_exit` | `quick_exit` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib2.sh` | stdlib.h |
 | `interface.raise` | `raise` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
@@ -1103,7 +1103,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.rand_r` | `rand_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.random` | `random` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.read` | `read` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.readahead` | `readahead` | missing | P1 | `none` | fcntl.h |
+| `interface.readahead` | `readahead` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: readahead is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.readdir` | `readdir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.readdir_r` | `readdir_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.readlink` | `readlink` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
@@ -1191,7 +1191,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.sendto` | `sendto` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.setbuf` | `setbuf` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.setbuffer` | `setbuffer` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
-| `interface.setdomainname` | `setdomainname` | missing | P1 | `none` | unistd.h |
+| `interface.setdomainname` | `setdomainname` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: setdomainname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
 | `interface.setegid` | `setegid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.setenv` | `setenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.seteuid` | `seteuid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
@@ -1200,8 +1200,8 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.setgroupent` | `setgroupent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | grp.h |
 | `interface.setgroups` | `setgroups` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | grp.h |
 | `interface.sethostent` | `sethostent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
-| `interface.sethostname` | `sethostname` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
-| `interface.setitimer` | `setitimer` | missing | P1 | `none` | sys/time.h |
+| `interface.sethostname` | `sethostname` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: sethostname is not in the POSIX.1-2024 Issue 8 XSH function index (BSD extension); kept under its extension macro, waived as an extension. |
+| `interface.setitimer` | `setitimer` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/time.h; waiver: P1f: setitimer is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
 | `interface.setjmp` | `setjmp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | setjmp.h |
 | `interface.setlinebuf` | `setlinebuf` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.setlocale` | `setlocale` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | locale.h |
@@ -1211,7 +1211,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.setpayloadfNx` | `setpayloadfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.setpayloadsigfNx` | `setpayloadsigfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.setpgid` | `setpgid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.setpgrp` | `setpgrp` | missing | P1 | `none` | unistd.h |
+| `interface.setpgrp` | `setpgrp` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: setpgrp is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (setpgid is the POSIX name)); kept under its extension macro, waived as an extension. |
 | `interface.setpriority` | `setpriority` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
 | `interface.setprotoent` | `setprotoent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
 | `interface.setpwent` | `setpwent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | pwd.h |
@@ -1220,11 +1220,11 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.setresuid` | `setresuid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.setreuid` | `setreuid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.setrlimit` | `setrlimit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/resource.h |
-| `interface.setrlimit64` | `setrlimit64` | missing | P1 | `none` | sys/resource.h |
+| `interface.setrlimit64` | `setrlimit64` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/resource.h; waiver: P1f: setrlimit64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension. |
 | `interface.setservent` | `setservent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | netdb.h |
 | `interface.setsid` | `setsid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.setsockopt` | `setsockopt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
-| `interface.settimeofday` | `settimeofday` | missing | P1 | `none` | sys/time.h |
+| `interface.settimeofday` | `settimeofday` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/time.h; waiver: P1f: settimeofday is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
 | `interface.setuid` | `setuid` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.setusershell` | `setusershell` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.setutxent` | `setutxent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
@@ -1281,7 +1281,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.sockatmark` | `sockatmark` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.socket` | `socket` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.socketpair` | `socketpair` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
-| `interface.splice` | `splice` | missing | P1 | `none` | fcntl.h |
+| `interface.splice` | `splice` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: splice is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.sprintf` | `sprintf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.sqrt` | `sqrt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.sqrtf` | `sqrtf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -1294,7 +1294,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.stat` | `stat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.stat64` | `stat64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.statvfs` | `statvfs` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.statx` | `statx` | missing | P1 | `none` | sys/stat.h |
+| `interface.statx` | `statx` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | sys/stat.h; waiver: P1f: statx is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.stime` | `stime` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.strcasecmp` | `strcasecmp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | strings.h |
 | `interface.strcasecmp_l` | `strcasecmp_l` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | strings.h |
@@ -1348,8 +1348,8 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.symlink` | `symlink` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.symlinkat` | `symlinkat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.sync` | `sync` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.sync_file_range` | `sync_file_range` | missing | P1 | `none` | fcntl.h |
-| `interface.syncfs` | `syncfs` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.sync_file_range` | `sync_file_range` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: sync_file_range is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
+| `interface.syncfs` | `syncfs` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: syncfs is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.syscall` | `syscall` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.sysconf` | `sysconf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.syslog` | `syslog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
@@ -1374,7 +1374,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.tcsetattr` | `tcsetattr` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | termios.h |
 | `interface.tcsetpgrp` | `tcsetpgrp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.tcsetwinsize` | `tcsetwinsize` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | termios.h |
-| `interface.tee` | `tee` | missing | P1 | `none` | fcntl.h |
+| `interface.tee` | `tee` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: tee is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.telldir` | `telldir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.textdomain` | `textdomain` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | libintl.h |
 | `interface.tgamma` | `tgamma` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -1389,7 +1389,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.thrd_sleep` | `thrd_sleep` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.thrd_yield` | `thrd_yield` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.time` | `time` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
-| `interface.timegm` | `timegm` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
+| `interface.timegm` | `timegm` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | time.h; waiver: P1f: timegm is not in the POSIX.1-2024 Issue 8 XSH function index (BSD/GNU extension); kept under its extension macro, waived as an extension. |
 | `interface.timer_create` | `timer_create` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.timer_delete` | `timer_delete` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.timer_getoverrun` | `timer_getoverrun` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
@@ -1414,7 +1414,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.towupper_l` | `towupper_l` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wctype.h |
 | `interface.trunc` | `trunc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.truncate` | `truncate` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
-| `interface.truncate64` | `truncate64` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
+| `interface.truncate64` | `truncate64` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: truncate64 is not in the POSIX.1-2024 Issue 8 XSH function index (LFS extension); kept under its extension macro, waived as an extension. |
 | `interface.truncf` | `truncf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.truncfNx` | `truncfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.truncl` | `truncl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
@@ -1426,11 +1426,11 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.ttyname_r` | `ttyname_r` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.twalk` | `twalk` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | search.h |
 | `interface.tzset` | `tzset` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
-| `interface.ualarm` | `ualarm` | missing | P1 | `none` | unistd.h |
+| `interface.ualarm` | `ualarm` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: ualarm is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
 | `interface.ufromfp` | `ufromfp` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.ufromfpx` | `ufromfpx` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.ufromfpxfNx` | `ufromfpxfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.ulimit` | `ulimit` | missing | P1 | `none` | ulimit.h |
+| `interface.ulimit` | `ulimit` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | ulimit.h; waiver: P1f: ulimit is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (getrlimit/setrlimit are the POSIX names)); kept under its extension macro, waived as an extension. |
 | `interface.umask` | `umask` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.umaxabs` | `umaxabs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | inttypes.h |
 | `interface.uname` | `uname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/utsname.h |
@@ -1442,8 +1442,8 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.unsetenv` | `unsetenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.updwtmpx` | `updwtmpx` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
 | `interface.uselocale` | `uselocale` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | locale.h |
-| `interface.usleep` | `usleep` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
-| `interface.utime` | `utime` | missing | P1 | `none` | utime.h |
+| `interface.usleep` | `usleep` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: usleep is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8); kept under its extension macro, waived as an extension. |
+| `interface.utime` | `utime` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | utime.h; waiver: P1f: utime is not in the POSIX.1-2024 Issue 8 XSH function index (removed/obsolescent, absent from Issue 8 (utimensat/utimes are the POSIX names)); kept under its extension macro, waived as an extension. |
 | `interface.utimensat` | `utimensat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.utimes` | `utimes` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/time.h |
 | `interface.utmpxname` | `utmpxname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
@@ -1458,8 +1458,8 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.vfscanf` | `vfscanf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.vfwprintf` | `vfwprintf` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.vfwscanf` | `vfwscanf` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
-| `interface.vhangup` | `vhangup` | missing | P1 | `none` | unistd.h |
-| `interface.vmsplice` | `vmsplice` | missing | P1 | `none` | fcntl.h |
+| `interface.vhangup` | `vhangup` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | unistd.h; waiver: P1f: vhangup is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
+| `interface.vmsplice` | `vmsplice` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: vmsplice is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
 | `interface.vprintf` | `vprintf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.vscanf` | `vscanf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.vsnprintf` | `vsnprintf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
@@ -1889,7 +1889,7 @@ Traceability rows: 1802; profile rows: 1802.
 
 ## Current tree
 
-- frozen exported symbols: 1736
+- frozen exported symbols: 1739
 - `userland/bin` directories: 102
 - headers under `libc/ravenlibc/include`: 228
 - utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, localedef, logger, login, lp, ls, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, newgrp, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, time, times, touch, tput, trace, ulimit, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
@@ -1911,10 +1911,10 @@ Traceability rows: 1802; profile rows: 1802.
 | header | `unistd.h` | `libc/ravenlibc/include` |
 | header | `utime.h` | `libc/ravenlibc/include` |
 | header | `wchar.h` | `libc/ravenlibc/include` |
-| interface | `acct` | `none` |
+| interface | `acct` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 | interface | `acosfNx` | `none` |
 | interface | `acoshfNx` | `none` |
-| interface | `adjtime` | `none` |
+| interface | `adjtime` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 | interface | `alarm` | `none` |
 | interface | `asinfNx` | `none` |
 | interface | `asinhfNx` | `none` |
@@ -1922,6 +1922,7 @@ Traceability rows: 1802; profile rows: 1802.
 | interface | `atan2fNx` | `none` |
 | interface | `atanfNx` | `none` |
 | interface | `atanhfNx` | `none` |
+| interface | `brk` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 | interface | `cabsfNx` | `none` |
 | interface | `cacosfNx` | `none` |
 | interface | `cacoshfNx` | `none` |
@@ -1950,12 +1951,14 @@ Traceability rows: 1802; profile rows: 1802.
 | interface | `csqrtfNx` | `none` |
 | interface | `ctanfNx` | `none` |
 | interface | `ctanhfNx` | `none` |
+| interface | `eaccess` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `euidaccess` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 | interface | `exp10fNx` | `none` |
 | interface | `exp2fNx` | `none` |
 | interface | `expfNx` | `none` |
 | interface | `expm1fNx` | `none` |
 | interface | `fabsfNx` | `none` |
-| interface | `fallocate` | `none` |
+| interface | `fallocate` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 | interface | `fchown` | `none` |
 | interface | `fdimfNx` | `none` |
 | interface | `floorfNx` | `none` |
@@ -1966,17 +1969,14 @@ Traceability rows: 1802; profile rows: 1802.
 | interface | `fminmagfNx` | `none` |
 | interface | `fmodfNx` | `none` |
 | interface | `frexpfNx` | `none` |
-| interface | `futimes` | `none` |
-| interface | `futimesat` | `none` |
-| interface | `getdomainname` | `none` |
-| interface | `getdtablesize` | `none` |
+| interface | `ftruncate64` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `futimes` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `futimesat` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `getdents` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `getdomainname` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `getdtablesize` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 | interface | `gethostid` | `none` |
-| interface | `getitimer` | `none` |
-| interface | `getpayloadfNx` | `none` |
-| interface | `gettid` | `none` |
-| interface | `hypotfNx` | `none` |
-| interface | `lchown` | `none` |
-| interface | `ldexpfNx` | `none` |
-| interface | `llogbfNx` | `none` |
+| interface | `getitimer` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `getpagesize` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 
-186 gap rows are listed in full in the tables above; this short table is a review aid.
+206 gap rows are listed in full in the tables above; this short table is a review aid.

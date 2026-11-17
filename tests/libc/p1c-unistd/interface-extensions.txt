@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# POSIX interface extension list (the P1f7 waiver list).
+#
+# Each name is a present profile interface row that is a non-POSIX or extension-only symbol and
+# does not compile under the POSIX gate feature macros on either architecture. The committed
+# interface sweep reports these rows as EXTENSION and does not fail on them. A failure for a name
+# not in this list is a required-declaration regression and fails the sweep.
+#
+# Classification source: absent from the Open Group Issue 8 XSH function index
+# (https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html) or an extension family:
+# BSD/legacy (brk, eaccess, euidaccess, getpagesize, lchmod, lutimes, sethostname, timegm),
+# Linux (getdents, madvise, mlock2, preadv2, pwritev2, renameat2, syncfs),
+# LFS *_64 aliases, stdio *_unlocked/getw/putw/setbuffer/setlinebuf, C11 strfrom*, and the
+# removed/obsolescent stime/usleep/cuserid/timespec_getres.
+#
+# Run: cargo run -q -p posix-conform -- sweep --arch x86_64
+brk
+clearerr_unlocked
+cuserid
+eaccess
+euidaccess
+feof_unlocked
+ferror_unlocked
+fflush_unlocked
+fgetc_unlocked
+fgetpos64
+fgetwc_unlocked
+fileno_unlocked
+fopen64
+fputc_unlocked
+fputs_unlocked
+fputwc_unlocked
+fputws_unlocked
+fread_unlocked
+freopen64
+fseeko64
+fsetpos64
+ftello64
+ftruncate64
+fwrite_unlocked
+getdents
+getpagesize
+getrlimit64
+getw
+getwchar_unlocked
+getwc_unlocked
+lchmod
+lutimes
+madvise
+mlock2
+preadv
+preadv2
+putw
+putwchar_unlocked
+putwc_unlocked
+pwritev
+pwritev2
+renameat2
+setbuffer
+sethostname
+setlinebuf
+stime
+strfromd
+strfromf
+strptime_l
+syncfs
+timegm
+timespec_getres
+tmpfile64
+truncate64
+usleep
+vsnprintf_l
+wcsftime_l

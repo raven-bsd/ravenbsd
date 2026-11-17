@@ -834,7 +834,9 @@ mod program {
                 return Some(initfs);
             }
             let image = raven_rt::map_initfs().ok()?;
-            let initfs = Initfs::parse(image).ok()?;
+            // The kernel validated the whole image before /init, so the shell only needs the
+            // structure here; `Initfs::get` verifies each file's CRC when it is spawned.
+            let initfs = Initfs::parse_unchecked(image).ok()?;
             *INITFS.lock() = Some(initfs);
             Some(initfs)
         }

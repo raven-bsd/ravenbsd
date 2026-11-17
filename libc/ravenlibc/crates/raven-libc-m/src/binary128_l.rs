@@ -163,6 +163,111 @@ pub fn significandl(x: LongDouble) -> LongDouble {
     x.significand()
 }
 
+/// `cbrtl`: the real cube root.
+pub fn cbrtl(x: LongDouble) -> LongDouble {
+    x.cbrt()
+}
+
+/// `hypotl`: `sqrt(x^2 + y^2)` without intermediate overflow.
+pub fn hypotl(x: LongDouble, y: LongDouble) -> LongDouble {
+    x.hypot(y)
+}
+
+/// `expl`.
+pub fn expl(x: LongDouble) -> LongDouble {
+    x.exp()
+}
+
+/// `logl`: the natural logarithm.
+pub fn logl(x: LongDouble) -> LongDouble {
+    x.ln()
+}
+
+/// `exp2l`.
+pub fn exp2l(x: LongDouble) -> LongDouble {
+    x.exp2()
+}
+
+/// `log2l`.
+pub fn log2l(x: LongDouble) -> LongDouble {
+    x.log2()
+}
+
+/// `log10l`.
+pub fn log10l(x: LongDouble) -> LongDouble {
+    x.log10()
+}
+
+/// `sinl`.
+pub fn sinl(x: LongDouble) -> LongDouble {
+    x.sin()
+}
+
+/// `cosl`.
+pub fn cosl(x: LongDouble) -> LongDouble {
+    x.cos()
+}
+
+/// `tanl`.
+pub fn tanl(x: LongDouble) -> LongDouble {
+    x.tan()
+}
+
+/// `sincosl`: `sin` and `cos` from one argument reduction.
+pub fn sincosl(x: LongDouble) -> (LongDouble, LongDouble) {
+    x.sincos()
+}
+
+/// `asinl`.
+pub fn asinl(x: LongDouble) -> LongDouble {
+    x.asin()
+}
+
+/// `acosl`.
+pub fn acosl(x: LongDouble) -> LongDouble {
+    x.acos()
+}
+
+/// `atanl`.
+pub fn atanl(x: LongDouble) -> LongDouble {
+    x.atan()
+}
+
+/// `atan2l`.
+pub fn atan2l(y: LongDouble, x: LongDouble) -> LongDouble {
+    y.atan2(x)
+}
+
+/// `sinhl`.
+pub fn sinhl(x: LongDouble) -> LongDouble {
+    x.sinh()
+}
+
+/// `coshl`.
+pub fn coshl(x: LongDouble) -> LongDouble {
+    x.cosh()
+}
+
+/// `tanhl`.
+pub fn tanhl(x: LongDouble) -> LongDouble {
+    x.tanh()
+}
+
+/// `asinhl`.
+pub fn asinhl(x: LongDouble) -> LongDouble {
+    x.asinh()
+}
+
+/// `acoshl`.
+pub fn acoshl(x: LongDouble) -> LongDouble {
+    x.acosh()
+}
+
+/// `atanhl`.
+pub fn atanhl(x: LongDouble) -> LongDouble {
+    x.atanh()
+}
+
 /// `nanl`.
 pub fn nanl() -> LongDouble {
     LongDouble::nan()

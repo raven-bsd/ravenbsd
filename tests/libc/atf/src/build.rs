@@ -289,37 +289,15 @@ impl Builder {
                 self.build_atf()?;
             }
         }
-        let mut args = vec![
-            "--target=x86_64-unknown-ravenbsd".to_string(),
-            format!("--sysroot={}", sysroot.display()),
-            "-fuse-ld=lld".to_string(),
-            "-nostdlib".to_string(),
-            "-nostartfiles".to_string(),
-            "-static".to_string(),
-            "-Wl,--error-limit=0".to_string(),
-            "-Wl,-z,max-page-size=4096".to_string(),
-            sysroot.join("usr/lib/crt1.o").display().to_string(),
-            sysroot.join("usr/lib/crti.o").display().to_string(),
-        ];
-        args.extend(object_list.iter().map(|path| path.display().to_string()));
-        if framework == Framework::Atf {
-            args.push(
-                self.out
-                    .join("libatf-c/target/libatf-c.a")
-                    .display()
-                    .to_string(),
-            );
-        }
-        args.extend(program.ldadd.iter().cloned());
-        args.extend([
-            "-L".to_string(),
-            sysroot.join("usr/lib").display().to_string(),
-            "-lc".to_string(),
-            sysroot.join("usr/lib/crtn.o").display().to_string(),
-            "-o".to_string(),
-            binary.display().to_string(),
-        ]);
-        let output = run(self.target_compiler(), &args, self.root())?;
+        let args = target_link_args(
+            sysroot,
+            &binary,
+            &object_list,
+            framework,
+            &self.out,
+            &program.ldadd,
+        );
+        let output = run(self.linker()?, &args, self.root())?;
         log.push_str(&output.text);
         if output.success {
             Ok(BuildReport {
@@ -402,6 +380,32 @@ impl Builder {
         } else {
             self.cc.clone()
         }
+    }
+
+    /// The linker for the ravenbsd target.
+    ///
+    /// clang's driver for `x86_64-unknown-ravenbsd` falls back to the host gcc `collect2`, which
+    /// cannot find a linker for the target even with `-fuse-ld=lld`. Link with lld directly:
+    /// `RAVEN_LLD` wins (a rust-lld path is convenient), then the `rust-lld` beside the active
+    /// toolchain, then `ld.lld` from `PATH`.
+    fn linker(&self) -> Result<String> {
+        if let Ok(path) = std::env::var("RAVEN_LLD") {
+            if Path::new(&path).is_file() {
+                return Ok(path);
+            }
+            bail!("RAVEN_LLD is not a file: {path}");
+        }
+        if let Some(path) = rust_lld() {
+            return Ok(path.display().to_string());
+        }
+        if Command::new("ld.lld")
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+        {
+            return Ok("ld.lld".to_string());
+        }
+        bail!("target link needs lld: set RAVEN_LLD to rust-lld or install ld.lld")
     }
 
     fn root(&self) -> &Path {
@@ -527,6 +531,63 @@ fn run_checked(program: &str, args: &[String], cwd: &Path) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// Locate `rust-lld` from the active toolchain.
+fn rust_lld() -> Option<PathBuf> {
+    let output = Command::new("rustc")
+        .args(["--print", "sysroot"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let sysroot = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+    let entries = fs::read_dir(sysroot.join("lib/rustlib")).ok()?;
+    for entry in entries.flatten() {
+        let candidate = entry.path().join("bin/rust-lld");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+/// Arguments for the direct-lld target link (no clang driver in the path).
+fn target_link_args(
+    sysroot: &Path,
+    binary: &Path,
+    objects: &[PathBuf],
+    framework: Framework,
+    out: &Path,
+    ldadd: &[String],
+) -> Vec<String> {
+    let mut args = vec![
+        // `rust-lld` is the generic driver; the symlink names (`ld.lld`, `ld`) also accept it.
+        "-flavor".to_string(),
+        "gnu".to_string(),
+        format!("--sysroot={}", sysroot.display()),
+        "-static".to_string(),
+        "-z".to_string(),
+        "max-page-size=4096".to_string(),
+        "--error-limit=0".to_string(),
+        "-o".to_string(),
+        binary.display().to_string(),
+        sysroot.join("usr/lib/crt1.o").display().to_string(),
+        sysroot.join("usr/lib/crti.o").display().to_string(),
+    ];
+    args.extend(objects.iter().map(|path| path.display().to_string()));
+    if framework == Framework::Atf {
+        args.push(out.join("libatf-c/target/libatf-c.a").display().to_string());
+    }
+    args.extend(ldadd.iter().cloned());
+    args.extend([
+        "-L".to_string(),
+        sysroot.join("usr/lib").display().to_string(),
+        "-lc".to_string(),
+        sysroot.join("usr/lib/crtn.o").display().to_string(),
+    ]);
+    args
 }
 
 fn atf_sources(atf: &Path) -> Result<Vec<PathBuf>> {

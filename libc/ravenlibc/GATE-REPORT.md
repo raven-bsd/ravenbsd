@@ -25,7 +25,7 @@ with their owning lane.
 | 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 17 violations: 3 in `ld/src/raw/exports.rs` (C74g SAFETY comments), 14 pre-existing |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate/2.1.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate/2.2.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate/3.1.txt | exit 1: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z/3.1.txt | exit 1: 7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only; C74z budget data + shrink plan in `tests/libc/size/TRIAGE.md` |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate/4.1.txt | exit 0 |
 | 4 hardening | 4.2 fuzz soak (C10) | NOT MET | build/libc-gate/4.2.txt | inet_text has no soak duration; inet_text has 1 crash(es); inet_text has no executions |
@@ -33,7 +33,7 @@ with their owning lane.
 | 4 hardening | 4.4 ENTROPY_WEAK status (H-5) | INFO | build/libc-gate/4.4.txt | ENTROPY_WEAK CLEAR; PG-52 release blocker, not a libc-gate blocker |
 | 5 on-target | 5.1 on-target libc cases (C12) | NOT MET | build/libc-gate/5.1.txt | 7 qtest cases: dynamic, threads, signals, spawn pass; hello/stdio/time fail (P1b) |
 | 5 on-target | 5.2.core-servers core-servers regression | MET | build/libc-gate/5.2.core-servers.txt | exit 0: minimal `core-servers` profile (36-77 s), 300 s case limit |
-| 5 on-target | 5.2.file-tools file-tools regression | NOT MET | build/libc-gate/5.2.file-tools.txt | tooltest starts and reaches `df`, which exits 1 (`df: no file systems processed`); owner: uutils mount list (`userland/uutils/src/uucore/src/lib/features/fsext/mod.rs:421`) |
+| 5 on-target | 5.2.file-tools file-tools regression | MET | build/libc-gate/5.2.file-tools.txt | exit 0: minimal `core-servers-files` profile; `df` reports `/`, `/tmp` and the device mounts from `/etc/mounts`; `tooltest: ok` |
 | 5 on-target | 5.3 second architecture | INFO | build/libc-gate/5.3.txt | aarch64: not delivered (C73 open item); owner decides whether G1 closes on x86_64 alone |
 | 6 documentation | 6.1 page coverage | MET | build/libc-gate/6.1.txt | exit 0 |
 | 6 documentation | 6.2 render lint | BLOCKED | build/libc-gate/6.2.txt | preflight command failed |
@@ -74,20 +74,17 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   pre-existing `one-symbol`/`std-path`/`abi-freeze` findings in the libc crate. Owner: C74g
   follow-up plus the P1e/P1h/P1i lanes.
 * 2.1/2.2 world: BLOCKED. `tools/libc-world/Cargo.toml` and the C72 outputs are absent.
-* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `4 pass, 48 fail, 25 known,
-  282 skipped, 40 budget-only`; budgets were not lowered.
+* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `7 pass, 56 fail, 69 known,
+  105 skipped, 0 budget-only`; C74z corrected the P9/arm-riscv B data and added the shrink plan
+  in `tests/libc/size/TRIAGE.md`; S/F and boot budgets were not raised.
 * 4.2 soak: NOT MET. `tests/libc/fuzz/SOAK.md` records `inet_text` crashing before one hour; the
   other 13 targets completed 3600 s with 0 crashes. Owner: test/fuzz lane.
 * 5.1: `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello`,
   `libc-stdio` and `libc-time` remain P1b. Section 4 has the exact output.
-* 5.2: `core-servers` is **MET**. C74n replaced the shell-inheriting `core-test` profile with a
-  minimal `core-servers` profile (init, five scheme servers, consd, coretest) and set the case
-  timeout to 300 s; the in-tree case passes in 36-77 s. `file-tools` is still NOT MET: C74n
-  replaced the shell profile with a minimal `core-servers-files` profile (file servers, uutils
-  slice, tooltest) and the service now starts, but `tooltest` fails at `df` because the uutils
-  `read_fs_list` returns an empty list on RavenBSD
-  (`userland/uutils/src/uucore/src/lib/features/fsext/mod.rs:421`), so `df: no file systems
-  processed` / `tooltest: df exited 1`. Owner: uutils/P1f, not libc.
+* 5.2: **MET**. C74n replaced the shell-inheriting profiles with minimal `core-servers` and
+  `core-servers-files` profiles. C74v implemented the RavenBSD `read_fs_list` from the real
+  `/etc/mounts` table, so `df` reports `/`, `/tmp` and the device schemes; `core-servers` and
+  `file-tools` both exit 0 (`tooltest: ok`, `svcd: settled`, `init exited (0)`).
 * 6.2 mandoc: BLOCKED. `which mandoc` exits 1; the render lint cannot run.
 
 ## 4. Seven-case matrix (OBSERVED, 2026-11-17, C74h)
@@ -143,11 +140,12 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 * 1.7 lints: NOT MET, `build/libc-gate/1.7.txt`; 17 violations (3 C74g SAFETY comments, 14
   pre-existing).
 * 2.1/2.2: BLOCKED, `tools/libc-world/Cargo.toml`, C72 outputs and H-11 tarballs are absent.
-* 3.1: NOT MET, `libc-size check: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only`.
+* 3.1: NOT MET, `libc-size check: 7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only`;
+  C74z budget data + shrink plan in `tests/libc/size/TRIAGE.md`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
 * 6.2: BLOCKED, `which mandoc` exits 1.
 
-## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`)
+## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z on `1bfeaafa`)
 
 | Row | Command | Result |
 |---|---|---|
@@ -158,10 +156,10 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → BLOCKED |
 | 1.7 lints | `cargo xtask libc-lint all` | exit 1; 17 violations (3 C74g SAFETY comments, 14 pre-existing) → NOT MET |
 | 2.1/2.2 world | missing files | `tools/libc-world/Cargo.toml` and C72 outputs absent → BLOCKED |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
+| 3.1 size | `cargo xtask libc-size --check` | exit 1; 7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only; C74z budget data + shrink plan in `tests/libc/size/TRIAGE.md` |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
-| 5.2 kernel | `qtest core-servers` / `qtest file-tools` | core-servers MET (minimal profile, 300 s case, 36-77 s); file-tools NOT MET: tooltest starts but `df` exits 1 (`no file systems processed`), uutils `read_fs_list` empty on RavenBSD |
+| 5.2 kernel | `qtest core-servers` / `qtest file-tools` | both MET: minimal profiles; `df` reads `/etc/mounts`; `tooltest: ok`, `init exited (0)` |
 | 6.2 mandoc | `which mandoc` | exit 1; not installed → BLOCKED |
 
 `cargo run -q -p libc-gate -- eval` evaluated 90 checks; `table` and `verdict` exit 1 with

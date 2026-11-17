@@ -81,18 +81,74 @@ pub(crate) fn target_for(component: Component, arch: Arch) -> Result<&'static st
 
 /// The RUSTFLAGS token list for a component (CONTRACTS C2).
 ///
+/// Whether `Component::User` has a dynamic (PIE) link mode for this arch.
+///
+/// K97 wired the Rust PIE path for x86_64; K97a extends it to aarch64. Other arches keep the
+/// static linker script until their loader/libc start ABI is ready.
+pub(crate) fn dynamic_supported(arch: Arch) -> bool {
+    matches!(arch, Arch::X86_64 | Arch::Aarch64)
+}
+
 /// `user_linker` is passed only when the linker script exists; K06 creates it later.
 pub(crate) fn rustflags_for(
     component: Component,
     arch: Arch,
     root: &Path,
     user_linker: Option<&Path>,
+    dynamic: bool,
 ) -> Vec<String> {
     let mut flags = Vec::new();
     match component {
         Component::Kernel => {
             flags.extend(["-C".to_string(), "relocation-model=static".to_string()]);
             flags.extend(["-C".to_string(), "force-frame-pointers=yes".to_string()]);
+        }
+        Component::User if dynamic && dynamic_supported(arch) => {
+            let wrapper = root.join("userland/linker/rust-lld-dynamic.sh");
+            // `small` is the x86_64 user-program model K06 established; aarch64's default is
+            // already the small model, so leaving it unset keeps its static flag set unchanged.
+            if arch == Arch::X86_64 {
+                flags.extend(["-C".to_string(), "code-model=small".to_string()]);
+            }
+            flags.extend(["-C".to_string(), "relocation-model=pic".to_string()]);
+            flags.extend(["-C".to_string(), "force-frame-pointers=yes".to_string()]);
+            flags.extend(["-C".to_string(), format!("linker={}", wrapper.display())]);
+            for arg in [
+                "-pie",
+                "-Bdynamic",
+                "-dynamic-linker",
+                "/libexec/ld-elf.so.1",
+                "--image-base=0x400000",
+                "-z",
+                "max-page-size=4096",
+                "-z",
+                "common-page-size=4096",
+            ] {
+                flags.push("-C".to_string());
+                flags.push(format!("link-arg={arg}"));
+            }
+            // The precompiled aarch64 `libcore` is not PIC: its anonymous rodata carries
+            // `R_AARCH64_ABS64` records. lld accepts those in a PIE only with `notext`, which
+            // leaves `DF_TEXTREL` set. The loader rejects text relocations, so this is a build
+            // proof only until a PIC libcore or an equivalent build-side fix lands (K97a report).
+            if arch == Arch::Aarch64 {
+                flags.push("-C".to_string());
+                flags.push("link-arg=-z".to_string());
+                flags.push("-C".to_string());
+                flags.push("link-arg=notext".to_string());
+            }
+            for path in ["sysroot/lib", "sysroot/usr/lib"] {
+                flags.push("-C".to_string());
+                flags.push(format!(
+                    "link-arg=-L{}",
+                    root.join("build").join(arch.as_str()).join(path).display()
+                ));
+            }
+            for arg in ["--allow-shlib-undefined", "--no-as-needed", "-lc"] {
+                flags.push("-C".to_string());
+                flags.push(format!("link-arg={arg}"));
+            }
+            flags.extend(["--cfg".to_string(), "sha2_backend=\"soft\"".to_string()]);
         }
         Component::User => {
             if arch == Arch::X86_64 {
@@ -119,8 +175,9 @@ pub(crate) fn rustflags_string(
     arch: Arch,
     root: &Path,
     user_linker: Option<&Path>,
+    dynamic: bool,
 ) -> String {
-    rustflags_for(component, arch, root, user_linker).join(" ")
+    rustflags_for(component, arch, root, user_linker, dynamic).join(" ")
 }
 
 /// A non-default code model for a component/target (CONTRACTS C2), if the target uses one.
@@ -206,6 +263,7 @@ pub(crate) fn run(
     arch: Arch,
     release: bool,
     selected: &[String],
+    dynamic: bool,
 ) -> Result<u8> {
     let packages = select_packages(workspace, component, selected)?;
     let target = target_for(component, arch)?;
@@ -218,8 +276,12 @@ pub(crate) fn run(
         .root
         .join("userland/linker")
         .join(format!("{}.ld", arch.as_str()));
-    let linker = linker.is_file().then_some(linker);
-    let flags = rustflags_string(component, arch, &workspace.root, linker.as_deref());
+    let linker = if dynamic {
+        None
+    } else {
+        linker.is_file().then_some(linker)
+    };
+    let flags = rustflags_string(component, arch, &workspace.root, linker.as_deref(), dynamic);
     let head = crate::repo::head_info(&workspace.root)?;
 
     let mut args = vec!["build".to_string()];

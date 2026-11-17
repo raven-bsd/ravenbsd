@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S82: aarch64 parity for the S81 dynamic-exec case. The static service binary execs a normally
+# linked aarch64 PIE; the kernel must load the main image and its PT_INTERP and enter
+# ld-elf.so.1, which resolves libc.so.1 through DT_NEEDED.
+
+name = "dynamic-exec-aarch64"
+arch = "aarch64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/dynamic-exec-aarch64/build.sh"]
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^dynamic-exec: launching$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|dynamic-exec: exec failed|ld-elf.so.1: no direct target start|cannot load a needed library'

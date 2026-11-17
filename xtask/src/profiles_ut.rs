@@ -383,7 +383,7 @@ fn violations(tree: &Tree) -> Vec<String> {
 fn the_repository_is_covered_by_the_gate() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let profiles = one_shot_shell_profiles(root).unwrap();
-    for profile in ["core-test", "initfsd-test", "ramfsd-test"] {
+    for profile in ["blockd-test", "initfsd-test", "ramfsd-test"] {
         assert!(profiles.contains(&profile.to_string()), "{profiles:?}");
     }
     let services = shell_services(root).unwrap();

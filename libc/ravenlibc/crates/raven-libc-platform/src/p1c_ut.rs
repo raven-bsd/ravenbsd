@@ -59,3 +59,16 @@ fn hostid_and_domainname_round_trip() {
     assert_eq!(platform.getdomainname(&mut buffer), Ok(()));
     assert_eq!(&buffer[..6], b"other\0");
 }
+
+#[test]
+fn lseek_moves_the_fake_cursor() {
+    let platform = platform();
+    let fd = platform.open(b"/a", 0, 0).expect("open");
+    assert_eq!(platform.lseek(fd, 0, 2), Ok(1));
+    assert_eq!(platform.lseek(fd, -1, 1), Ok(0));
+    assert_eq!(platform.lseek(fd, 3, 0), Ok(3));
+    assert_eq!(platform.lseek(fd, 0, 1), Ok(3));
+    assert_eq!(platform.lseek(fd, 0, 9), Err(Errno::EINVAL));
+    assert_eq!(platform.lseek(99, 0, 0), Err(Errno::EBADF));
+    let _ = platform.close(fd);
+}

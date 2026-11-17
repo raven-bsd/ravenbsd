@@ -27,3 +27,33 @@ fn the_largest_named_count_fits_x86_64() {
     // the x86_64 bound (5), otherwise the shell cannot place `&va_list`.
     assert!(4 <= crate::va::MAX_NAMED_X86_64);
 }
+
+#[test]
+fn scanf_trampolines_use_the_canonical_named_counts() {
+    // The scanf family is expanded by hand in `stdio/trampolines_*`; a named count that
+    // differs from `for_each_variadic!` shifts the `va_list` and makes the target write
+    // through the next argument (C74u: `sscanf` declared 3 instead of 2).
+    let narrow = include_str!("../stdio/trampolines_scanf.rs");
+    let wide = include_str!("../stdio/trampolines_wide_scan.rs");
+    let expected = [
+        ("scanf", 1usize),
+        ("fscanf", 2),
+        ("sscanf", 2),
+        ("wscanf", 1),
+        ("fwscanf", 2),
+        ("swscanf", 2),
+    ];
+    for (export, named) in expected {
+        let needle = alloc::format!("export: \"{export}\"");
+        let line = narrow
+            .lines()
+            .chain(wide.lines())
+            .find(|line| line.contains(needle.as_str()))
+            .unwrap_or_else(|| panic!("missing trampoline for {export}"));
+        let wanted = alloc::format!("named: {named}");
+        assert!(
+            line.contains(wanted.as_str()),
+            "{export}: expected `{wanted}` in `{line}`"
+        );
+    }
+}

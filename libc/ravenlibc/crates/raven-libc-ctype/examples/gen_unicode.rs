@@ -40,8 +40,8 @@ fn main() -> host::process::ExitCode {
         eprintln!("gen_unicode: cannot write {out}: {error}");
         return host::process::ExitCode::FAILURE;
     }
-    println!("property blocks: {}", generated.props_blocks);
-    println!("property stage2 bytes: {}", generated.props_stage2_bytes);
+    println!("property ranges: {}", generated.props_ranges);
+    println!("property range bytes: {}", generated.props_range_bytes);
     println!("case blocks: {}", generated.case_blocks);
     println!("case pairs: {}", generated.case_pairs);
     println!("TABLE_BYTES: {}", generated.table_bytes);
