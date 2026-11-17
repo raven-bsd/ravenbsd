@@ -4,9 +4,10 @@
 #
 # Reproducible mandoc check for libc gate 6.2.
 #
-# The page list mirrors the `cases` of the 6.2 row in tests/libc/gate/rows.toml. The gate runs
-# `mandoc -Tlint -Wwarning`; this script additionally renders every page with `-Tutf8` so a
-# parse/render failure is visible even when the lint level is quiet.
+# The lint list mirrors the `cases` of the 6.2 row in tests/libc/gate/rows.toml; the gate runs
+# `mandoc -Tlint -Wwarning` on those pages. The script additionally renders every shipped page
+# (`docs/man[1-9]/*.[1-9]`) with `-Tutf8`, so a parse/render failure is visible even when the
+# lint level is quiet.
 #
 # Usage: sh scripts/check-mandoc.sh
 #   MANDOC=/path/to/mandoc  use an explicit tool instead of PATH.
@@ -62,4 +63,17 @@ for page in "$@"; do
     fi
 done
 
-echo "check-mandoc: ok ($# pages, lint + utf8 render)"
+rendered=$(find docs/man1 docs/man2 docs/man3 docs/man7 docs/man8 -type f 2>/dev/null | sort)
+if [ -z "$rendered" ]; then
+    echo "check-mandoc: no shipped man pages found" >&2
+    exit 1
+fi
+render_count=$(printf '%s\n' "$rendered" | wc -l)
+for page in $rendered; do
+    if ! "$mandoc" -Tutf8 "$page" >/dev/null; then
+        echo "check-mandoc: render FAILED: $page" >&2
+        exit 1
+    fi
+done
+
+echo "check-mandoc: ok ($# gate pages linted, $render_count rendered)"
