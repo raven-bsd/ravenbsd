@@ -475,11 +475,15 @@ def smp_soak_gate(
     if notes_result:
         kvm, tcg, extra_failures = notes_result
         source = "docs/releases/0.1.0-notes.md (S107 round 5)"
+        evidence_path = notes
+        evidence_sha = sha256(notes)
         campaign = ""
     else:
         kvm, tcg, section = table
         extra_failures = []
         source = "docs/smp-boot-soak.md"
+        evidence_path = soak
+        evidence_sha = sha256(soak)
         campaign = re.search(r"Campaign at `([0-9a-f]{7,40})`", section)
     parts, failures = campaign_parts(kvm, tcg)
     failures.extend(extra_failures)
@@ -502,8 +506,8 @@ def smp_soak_gate(
         note += f"; campaign {campaign.group(1)}"
     note += f"; source {source}"
     return Gate(
-        "smp-soak", status, "read docs/smp-boot-soak.md", utc(), utc(), "",
-        str(soak.relative_to(ROOT)), sha256(soak), note
+        "smp-soak", status, f"read {evidence_path.relative_to(ROOT)}", utc(), utc(), "",
+        str(evidence_path.relative_to(ROOT)), evidence_sha, note
     )
 
 
