@@ -1,0 +1,49 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 18, 2026
+.Dt PI4-XHCI 8
+.Os RavenBSD
+.Sh NAME
+.Nm pi4-xhci
+.Nd Raspberry Pi 4 VL805 xHCI boot-keyboard driver
+.Sh SYNOPSIS
+.Nm
+.Op Ar bar Ns = Ns Ar n
+.Op Ar bar_size Ns = Ns Ar bytes
+.Op Ar dma Ns = Ns Ar bytes
+.Op Ar irq Ns = Ns Ar line
+.Op Ar test
+.Sh DESCRIPTION
+.Nm
+drives the Pi 4 VL805 USB 3 host function through the first-party xHCI
+controller and the USB-core boot-keyboard path.
+In the board mode the launcher passes the BAR, configuration page, DMA and
+legacy IRQ handles in that order.
+The driver reads the vendor and device IDs, maps BAR0, starts the controller,
+resets the root port, addresses the device, selects the HID boot protocol and
+decodes boot reports.
+Decoded ASCII bytes are pushed to the
+.Dq kbd:
+queue served by
+.Nm usb-hid ;
+a missing queue is not a driver failure.
+.Pp
+With
+.Ar test
+the driver uses the synthetic D1 ring and a synthetic boot keyboard.
+No PCI or MMIO resource is touched on that path.
+The
+.Ar pi4-usb
+qtest exercises it.
+.Pp
+The VL805 BAR size, IRQ routing and real board enumeration are UNVERIFIED
+until the UI1 board run.
+A missing controller, keyboard or resource must fail without blocking the UART
+console.
+.Sh FILES
+.Bl -tag -width /etc/services.d/usb-xhci.toml -compact
+.It Pa /etc/services.d/usb-xhci.toml
+Optional one-shot boot probe service.
+.It Pa /etc/drivers.toml
+PCI entry for vendor 0x1106 and device 0x3483.
+.El
