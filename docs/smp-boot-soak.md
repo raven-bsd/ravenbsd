@@ -74,6 +74,28 @@ timeout without login is a failure, not a pass. The login prompt is never synthe
 Per-mode p50/p90/worst are written to `build/smp-boot-soak/<UTC>/summary.txt`; every boot keeps
 `<mode>/run-N.log` and `run-N.stamped.log`. KVM and TCG are reported separately.
 
+## Per-run host telemetry
+
+Every boot writes one row to `host.tsv` in the campaign directory. The columns are `mode`, `run`,
+`start_utc`, `end_utc`, `load1_before`, `qemu_before`, `jobs_before`, `load1_after`,
+`qemu_after`, `jobs_after`, `status` and `login_s`. The before sample is taken immediately
+before the QEMU helper starts; the after sample immediately after it returns. `qemu` counts live
+`qemu-system-*` processes; `jobs` counts live `xtask`/`cargo`/`rustc`/`clippy-driver`/`rustdoc`
+processes, ignoring zombie, dead, stopped and traced processes (the same class as the preflight).
+A failed boot is still recorded with `status=fail` and an empty `login_s` before the runner
+exits. `boots` in the summary line is the number of recorded rows (attempts), including a failed
+boot.
+
+The samples are best-effort and never change the pass/fail decision, timeout or login detection.
+At exit the runner prints one summary line:
+
+```text
+smp-boot-soak: host telemetry boots=N max_load1_before=... max_load1_after=... max_qemu_before=... max_qemu_after=... max_jobs_before=... max_jobs_after=... file=...
+```
+
+The artifact is not a substitute for `host-state.txt`: the latter is the single start-gate
+snapshot, while `host.tsv` is the per-boot time series.
+
 ## Round 1 results
 
 Campaign at `94648948` (release image built on the clean tree), run `20261118T133430Z`:
@@ -114,7 +136,7 @@ The preflight is doing its job: it prevents another contaminated matrix. The 50/
 20/20 KVM2, 20/20 KVM1 and 10/10 TCG4 matrix remains **not run** in round 2 because the host
 never became idle; the round-1 first failure remains preserved and is not retried.
 
-## Round 3 matrix (2026-11-18)
+## Round 3 matrix (2026-11-18, historical)
 
 The exclusive-window rerun was taken after the S113 merge (`2972e15b` kernel; the release image
 was built there) and the gate fix `f00328ea` (executable-name matching). The preflight at
@@ -165,11 +187,18 @@ TCG4 run 5 reached `smp: 4 cpus online` and `svcd: all services up` at 22.03 s, 
 30 s timeout; the log ends at 22.03 s (3,773 bytes). Passing TCG4 runs printed the banner at
 about 8-10 s. Raw/stamped logs:
 `build/smp-boot-soak/20261118T201237Z/tcg4/run-5.log` and `.stamped.log`. This is a real
-TCG4 boot-to-login failure, preserved and not retried; it needs the TCG/getty owner. The round-3
-clean TCG4 10/10 remains a separate prior run, not a substitute for this failure.
+TCG4 boot-to-login failure, preserved and not retried; it needs the TCG/getty owner. The earlier
+round-3 TCG4 10/10 is **historical**; the latest campaign is TCG4 **4/10**. The clean
+exclusive-host rerun belongs to **S126-r1 (Otto)**, using this instrumented runner; S107 does
+not retry the failure away.
 
 ## Reproduction and ownership
 
-The runner and helper are owned by S107 (`scripts/smp-boot-soak.sh`, `tests/smp/boot/**`,
-`docs/smp-boot-soak.md`). The KVM AP fix is S83/Stuart; this ticket is evidence, not a kernel
-change. The TLB/lock stress remains S85b/S85a/S102 and is not replaced by this boot-loop matrix.
+The runner, helper and telemetry are owned by S107 (`scripts/smp-boot-soak.sh`,
+`tests/smp/boot/**`, `docs/smp-boot-soak.md`). The KVM AP fix is S83/Stuart; this ticket is
+evidence, not a kernel change. The TLB/lock stress remains S85b/S85a/S102 and is not replaced by
+this boot-loop matrix.
+
+The round-5 TCG4 failure is a TCG/getty boot-to-login issue, not a reason to retry the matrix
+in S107. The clean exclusive-host rerun is **S126-r1 (Otto)**, using this instrumented runner
+and its per-boot `host.tsv`.

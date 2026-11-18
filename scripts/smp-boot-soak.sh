@@ -34,6 +34,48 @@ default_max_load() {
 max_load=$(default_max_load)
 out_root=build/smp-boot-soak
 
+# Per-boot host telemetry (S107 rev 49). A sample is best-effort and never changes a boot's
+# pass/fail, timeout or login detection. `jobs` is the live xtask/cargo/rustc/clippy/rustdoc
+# class; zombie, dead, stopped and traced processes are ignored, matching the preflight.
+host_sample() {
+    load1=$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo 0)
+    counts=$(ps -eo stat=,comm= 2>/dev/null | awk '
+        $1 !~ /^[ZXTt]/ {
+            if ($2 ~ /^qemu-system-/) q++
+            else if ($2 ~ /^(xtask|cargo|rustc|clippy-driver|rustdoc)$/) j++
+        }
+        END { printf "%d %d", q+0, j+0 }')
+    printf '%s %s\n' "$load1" "$counts"
+}
+
+record_host_row() {
+    # mode run start end before after status login_s
+    _mode=$1; _run=$2; _start=$3; _end=$4; _before=$5; _after=$6; _status=$7; _login=${8:-}
+    _lb=${_before%% *}; _rest=${_before#* }; _qb=${_rest%% *}; _jb=${_rest#* }
+    _la=${_after%% *}; _rest=${_after#* }; _qa=${_rest%% *}; _ja=${_rest#* }
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$_mode" "$_run" "$_start" "$_end" "$_lb" "$_qb" "$_jb" "$_la" "$_qa" "$_ja" "$_status" "$_login" \
+        >> "$host_tsv" 2>/dev/null || true
+}
+
+print_host_summary() {
+    [ -f "$host_tsv" ] || return 0
+    _rows=$(awk 'END { print NR }' "$host_tsv" 2>/dev/null || echo 1)
+    case "$_rows" in ''|*[!0-9]*) _rows=1 ;; esac
+    _rows=$((_rows - 1))
+    [ "$_rows" -lt 0 ] && _rows=0
+    _tab=$(printf '\t')
+    awk -F "$_tab" -v rows="$_rows" -v file="$host_tsv" '
+        NR > 1 {
+            if ($5+0 > lb) lb=$5+0; if ($8+0 > la) la=$8+0;
+            if ($6+0 > qb) qb=$6+0; if ($9+0 > qa) qa=$9+0;
+            if ($7+0 > jb) jb=$7+0; if ($10+0 > ja) ja=$10+0;
+        }
+        END {
+            printf "smp-boot-soak: host telemetry boots=%d max_load1_before=%d max_load1_after=%d max_qemu_before=%d max_qemu_after=%d max_jobs_before=%d max_jobs_after=%d file=%s\n", rows, lb, la, qb, qa, jb, ja, file
+        }' "$host_tsv" 2>/dev/null || echo "smp-boot-soak: host telemetry boots=$_rows file=$host_tsv"
+}
+
 usage() {
     cat <<'EOF'
 usage: sh scripts/smp-boot-soak.sh [options]
@@ -79,6 +121,10 @@ done
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 out=$out_root/$stamp
 mkdir -p "$out"
+host_tsv=$out/host.tsv
+printf 'mode\trun\tstart_utc\tend_utc\tload1_before\tqemu_before\tjobs_before\tload1_after\tqemu_after\tjobs_after\tstatus\tlogin_s\n' > "$host_tsv"
+trap print_host_summary EXIT
+
 sh tests/smp/boot/host-idle.sh \
     --context "smp-boot-soak" \
     --wait "$wait_idle" \
@@ -129,9 +175,11 @@ run_one() {
             accel=
         fi
         echo "smp-boot-soak: $mode run $i/$count smp=$smp timeout=${timeout_secs}s"
+        host_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        host_before=$(host_sample)
         # The helper is a foreground QEMU supervisor: it reads the serial pty, timestamps lines,
         # and terminates QEMU as soon as the login prompt arrives (or at the timeout).
-        if ! login_out=$(python3 tests/smp/boot/soak_boot.py \
+        if login_out=$(python3 tests/smp/boot/soak_boot.py \
             --timeout "$timeout_secs" --raw "$raw" --stamped "$stamped" -- \
             qemu-system-x86_64 \
                 -machine q35 -m 512M -smp "$smp" $accel \
@@ -142,27 +190,36 @@ run_one() {
                 -nic none -netdev user,id=n0 \
                 -device virtio-net-pci,netdev=n0,disable-legacy=on \
                 -device isa-debug-exit,iobase=0xf4,iosize=0x04); then
+            host_end=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            host_after=$(host_sample)
             rm -rf "$work"
+        else
+            host_end=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            host_after=$(host_sample)
+            rm -rf "$work"
+            record_host_row "$mode" "$i" "$host_start" "$host_end" "$host_before" "$host_after" fail ""
             echo "smp-boot-soak: FAIL $mode run $i: $login_out" >&2
             echo "smp-boot-soak: log=$raw" >&2
             tail -n 40 "$raw" >&2 || true
             exit 1
         fi
-        rm -rf "$work"
 
         if ! grep -q "smp: $smp cpus online" "$raw"; then
+            record_host_row "$mode" "$i" "$host_start" "$host_end" "$host_before" "$host_after" fail ""
             echo "smp-boot-soak: FAIL $mode run $i: no 'smp: $smp cpus online'" >&2
             echo "smp-boot-soak: log=$raw" >&2
             tail -n 40 "$raw" >&2
             exit 1
         fi
         if ! grep -q 'login:' "$raw"; then
+            record_host_row "$mode" "$i" "$host_start" "$host_end" "$host_before" "$host_after" fail ""
             echo "smp-boot-soak: FAIL $mode run $i: no login prompt" >&2
             echo "smp-boot-soak: log=$raw" >&2
             tail -n 40 "$raw" >&2
             exit 1
         fi
         if grep -qiE 'CPU Reset|triple fault|KERNEL PANIC' "$raw"; then
+            record_host_row "$mode" "$i" "$host_start" "$host_end" "$host_before" "$host_after" fail ""
             echo "smp-boot-soak: FAIL $mode run $i: reset/panic marker" >&2
             echo "smp-boot-soak: log=$raw" >&2
             tail -n 40 "$raw" >&2
@@ -171,8 +228,13 @@ run_one() {
 
         elapsed=${login_out#login_s=}
         case $elapsed in
-            ''|*[!0-9.]*) echo "smp-boot-soak: FAIL $mode run $i: bad timing '$login_out'" >&2; exit 1 ;;
+            ''|*[!0-9.]*)
+                record_host_row "$mode" "$i" "$host_start" "$host_end" "$host_before" "$host_after" fail ""
+                echo "smp-boot-soak: FAIL $mode run $i: bad timing '$login_out'" >&2
+                exit 1
+                ;;
         esac
+        record_host_row "$mode" "$i" "$host_start" "$host_end" "$host_before" "$host_after" pass "$elapsed"
         printf '%s\n' "$elapsed" >> "$durations"
         echo "smp-boot-soak: PASS $mode run $i login_s=$elapsed"
         i=$((i + 1))
