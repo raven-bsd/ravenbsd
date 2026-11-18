@@ -112,12 +112,29 @@ fn inserting_a_thread_sets_the_next_back_link() {
 fn create_before_init_is_enosys() {
     let _serial = crate::test_support::serial();
     let kernel = crate::test_support::MockKernel::new();
+    crate::libc_state::LIBC.reset(0);
+    let start: StartFn = |_| 0;
+    let result = create(&kernel, None, start, 0);
     crate::libc_state::LIBC.reset(kernel.tcb());
-    // Module count is process-global and was set by another test; this assertion only holds if
-    // no init ran before. Use a fresh process state is impossible, so assert the code path via a
-    // zero module count recorded explicitly.
-    let saved = module_count();
-    let _ = saved;
+    assert_eq!(result, Err(ENOSYS));
+}
+
+#[test]
+fn create_after_init_with_no_modules_reaches_the_kernel() {
+    let _serial = crate::test_support::serial();
+    let kernel = crate::test_support::MockKernel::new();
+    let tcb = init_main_thread(&kernel, &[], 0x100_0000, 0x1_0000).unwrap();
+    assert_ne!(tcb, 0);
+    assert_eq!(module_count(), 0);
+    let mut attr = crate::thread::attr::init();
+    attr.set_stacksize_raw(crate::limits::PTHREAD_STACK_MIN);
+    let start: StartFn = |_| 0;
+    // The mock kernel cannot map a stack, so the call now reaches ENOMEM. The point is that a
+    // zero-module main TCB no longer returns ENOSYS before the thread machinery runs.
+    assert_eq!(
+        create(&kernel, Some(&attr), start, 0),
+        Err(crate::limits::ENOMEM)
+    );
 }
 
 #[test]

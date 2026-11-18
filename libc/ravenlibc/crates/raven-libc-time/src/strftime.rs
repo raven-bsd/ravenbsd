@@ -46,7 +46,6 @@ use crate::timefmt::{FormatIter, Item, Pad, composite, day_name, month_name};
 use crate::tz::consts::{
     DAYSPERNYEAR, DAYSPERWEEK, HOURSPERDAY, MONSPERYEAR, SECSPERMIN, TM_YEAR_BASE,
 };
-use crate::tz::mktime::timeoff;
 use crate::tz::overflow::isleap;
 use crate::tz::{NO_ZONE, Tm, TzState};
 
@@ -127,7 +126,12 @@ fn append_format(
             b'a' => piece.push_str(day_name(locale, tm.tm_wday, true)),
             b'B' => piece.push_str(month_name(locale, tm.tm_mon, false)),
             b'b' | b'h' => piece.push_str(month_name(locale, tm.tm_mon, true)),
-            b'C' => piece.push_str(&yconv(tm.tm_year, TM_YEAR_BASE, true, false)),
+            b'C' => {
+                // Picolibc/glibc: century = year/100 - (year%100 < 0), width 1.
+                let year = i64::from(tm.tm_year) + i64::from(TM_YEAR_BASE);
+                let century = year / 100 - i64::from(year % 100 < 0);
+                push_num(&mut piece, century, pad, 1, Pad::Zero);
+            }
             b'd' => push_num(&mut piece, i64::from(tm.tm_mday), pad, 2, Pad::Zero),
             b'e' => push_num(&mut piece, i64::from(tm.tm_mday), pad, 2, Pad::Space),
             b'H' => push_num(&mut piece, i64::from(tm.tm_hour), pad, 2, Pad::Zero),
@@ -163,8 +167,23 @@ fn append_format(
             }
             b'S' => push_num(&mut piece, i64::from(tm.tm_sec), pad, 2, Pad::Zero),
             b's' => {
+                // Two consumers disagree when `tm_gmtoff` is zero. The NetBSD donor and the
+                // 1.4 oracle call `strftime` directly with `timeoff(tm, tm_gmtoff)`, so a zero
+                // field means UTC. The C ABI process-zone call (the picolibc static `tm` with
+                // `TZ=EST5EDT`) must use the process zone like glibc's `mktime(tm)`. The
+                // context's zone names are the evidence: a real process zone is non-empty and
+                // not the GMT pointer pair; a direct/oracle or `gmtime` call has empty or GMT
+                // names and keeps `timeoff`.
+                let process_zone = !ctx.tzname[0].is_empty() && ctx.tzname[0] != b"GMT".as_slice();
                 let mut copy = *tm;
-                let value = timeoff(&mut copy, tm.tm_gmtoff).unwrap_or(-1);
+                let value = if tm.tm_gmtoff != 0 {
+                    // A meaningful field is authoritative for both consumers.
+                    crate::tz::mktime::timeoff(&mut copy, tm.tm_gmtoff).unwrap_or(-1)
+                } else if process_zone {
+                    crate::tz::mktime::mktime(state, &mut copy).unwrap_or(-1)
+                } else {
+                    crate::tz::mktime::timeoff(&mut copy, 0).unwrap_or(-1)
+                };
                 push_i64(&mut piece, value);
             }
             b't' => piece.push('\t'),
@@ -203,8 +222,19 @@ fn append_format(
             }
             // The donor formats `%w` with "%d": no padding, regardless of flags.
             b'w' => push_i64(&mut piece, i64::from(tm.tm_wday)),
-            b'y' => piece.push_str(&yconv(tm.tm_year, TM_YEAR_BASE, false, true)),
-            b'Y' => piece.push_str(&yconv(tm.tm_year, TM_YEAR_BASE, true, true)),
+            b'y' => {
+                // Picolibc/glibc: tm_year % 100, adjusted into 0..=99.
+                let mut year = tm.tm_year % 100;
+                if year < 0 {
+                    year += 100;
+                }
+                push_num(&mut piece, i64::from(year), pad, 2, Pad::Zero);
+            }
+            b'Y' => {
+                // Picolibc/glibc: the full year, no minimum width and no zero padding.
+                let year = i64::from(tm.tm_year) + i64::from(TM_YEAR_BASE);
+                push_i64(&mut piece, year);
+            }
             b'Z' => {
                 let index = usize::try_from(tm.tm_isdst).ok().filter(|value| *value < 2);
                 let zone = if let Some(index) = index

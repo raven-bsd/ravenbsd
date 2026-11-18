@@ -268,6 +268,7 @@ pub mod putmsg;
 pub mod semget;
 pub mod semop;
 pub mod semtimedop;
+pub mod shm_open;
 pub mod shm_unlink;
 pub mod shmat;
 pub mod shmctl;

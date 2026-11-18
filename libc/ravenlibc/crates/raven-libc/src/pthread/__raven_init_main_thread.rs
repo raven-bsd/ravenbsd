@@ -10,7 +10,7 @@ use core::mem::size_of;
 
 use raven_libc_thread::thread::init_main_thread;
 use raven_libc_tls::TlsModuleIn;
-use raven_libc_tls::tcb::{Pthread, tp_to_pthread};
+use raven_libc_tls::tcb::Pthread;
 
 use super::startup_kernel::StartupKernel;
 
@@ -124,10 +124,13 @@ pub unsafe extern "C" fn __raven_init_main_thread(auxv: *const usize, canary: us
     };
     let modules = module.into_iter().collect::<heapless_vec::Vec1>();
     let kernel = StartupKernel::new();
-    let Ok(tp) = init_main_thread(&kernel, modules.as_slice(), 0, 0) else {
+    let Ok(tcb_address) = init_main_thread(&kernel, modules.as_slice(), 0, 0) else {
         return;
     };
-    let tcb = tp_to_pthread(tp) as *mut Pthread;
+    // `init_main_thread` returns the TCB address, not the thread pointer. Converting it with
+    // `tp_to_pthread` subtracts sizeof(Pthread) on variant-I targets and writes the canary before
+    // the mapping. The TCB is already the address we need.
+    let tcb = tcb_address as *mut Pthread;
     if !tcb.is_null() {
         // SAFETY: `init_main_thread` returned the TCB address it just built for this thread.
         unsafe { (*tcb).canary = canary };

@@ -35,10 +35,15 @@ extern crate alloc;
 extern crate std;
 
 // C65's wrappers were x86_64-only while their `c_char` handling assumed `i8`. The generic
-// compat/IPC exports now build on aarch64 too; the only assembly in the tree (backtrace) has
-// its own per-arch `#[cfg]`, so the wrappers themselves stay portable. `c_char` is `u8` on
-// aarch64, which the path buffers below spell as `c_char` rather than `i8`.
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+// compat/IPC exports now build on aarch64 and riscv64 too; the only assembly in the tree
+// (backtrace) has its own per-arch `#[cfg]`, so the wrappers themselves stay portable.
+// `c_char` is `u8` on aarch64/riscv64, which the path buffers below spell as `c_char` rather
+// than `i8`.
+#[cfg(any(
+    target_arch = "x86_64",
+    target_arch = "aarch64",
+    target_arch = "riscv64"
+))]
 pub mod compat;
 #[cfg(target_os = "none")]
 pub(crate) mod ctype;

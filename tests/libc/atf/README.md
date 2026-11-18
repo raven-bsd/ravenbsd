@@ -63,11 +63,16 @@ required host tool is missing.
   body; a program that does not build is `fail` with the classified reason. This is the only
   backend C71 can prove.
 * `host-linux`: refused with exit 2 while `raven-libc-sys` has no Linux backend (O-B5).
-* `qemu`: exit-status suites only. Each built program is packed as `/init` in a generated
-  initfs, booted on the x86_64 kernel with `console=ttyS0 test-exit=1`, and judged from the
-  kernel's `init exited (N)` line (N = 0 is QEMU status 33, any other N is 35). A program that
-  needs arguments is `not-run: qemu-no-argv`, because the kernel starts `/init` with only
-  `argv[0]`. ATF suites are refused: their `-l`/`-r` protocol needs a guest driver (C73).
+* `qemu`: boots the x86_64 kernel with `console=ttyS0 test-exit=1`. With no arguments a built
+  program is packed as `/init` and judged from the kernel's `init exited (N)` line (N = 0 is
+  QEMU status 33, any other N is 35). With arguments, or for an ATF body, the runner packs
+  `raven-init`, the bootstrap services, `/sbin/g1wrap` and `/g1/manifest`; the wrapper execs the
+  program with the manifest argv/env, captures the result file through the `g1-read` service, and
+  prints `G1-OUTPUT`/`G1-RESULT`/`G1-EXIT` markers. The guest artifacts come from
+  `sh tests/fixtures/g1/build-guest.sh`. ATF `-l` is read from the serial listing; each body runs
+  with `-r /tmp/atf-result -s /tests <case>`.
+* The target link uses `rust-lld --gc-sections`; the kernel `PROC_EXEC` path has a 1 MiB image
+  limit, so the runner strips a copy before packing an exec-mode program.
 
 The target build consumes only the sysroot C60/C37/C61 install. A missing file makes every body
 `not-run` with `sysroot-incomplete:<path>`; a target run is never faked.

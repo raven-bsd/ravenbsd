@@ -84,11 +84,18 @@ pub fn c8rtomb(
     c8: u8,
     out: &mut [u8; 4],
 ) -> Result<usize, MbError> {
+    let mut utf8_state = (state.opaque1 >> 24) as u8;
+    // A null code unit completes a character only from the initial state; while a sequence is
+    // pending it is an invalid continuation (the picolibc uchar test expects EILSEQ).
     if c8 == 0 {
+        // In the UTF-8 locale a null code unit cannot complete a pending sequence; the
+        // single-byte C locale discards it, as the existing C-locale vectors require.
+        if matches!(mode, MbMode::Utf8) && utf8_state != UTF8_ACCEPT {
+            return Err(MbError::Ilseq);
+        }
         state.opaque1 = 0;
         return c32rtomb(mode, 0, out);
     }
-    let mut utf8_state = (state.opaque1 >> 24) as u8;
     let mut c32 = state.opaque1 & 0x00ff_ffff;
     utf8_state = decode_step(utf8_state, c8, &mut c32);
     if utf8_state == UTF8_REJECT {

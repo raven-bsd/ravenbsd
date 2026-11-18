@@ -28,8 +28,10 @@ pub unsafe extern "C" fn strftime(
     // SAFETY: the C contract gives a readable `tm`.
     let source = unsafe { &*tm };
     let value = read_abi_tm(source);
-    let gmt = source.tm_zone.is_null()
-        || source.tm_zone == zone::gmt_pointer().cast::<core::ffi::c_void>();
+    // A null `tm_zone` is a caller-built `tm` with no zone pointer (the picolibc test uses
+    // static `tm` values); it must use the process TZ cache, not GMT. Only the explicit GMT
+    // pointer from `gmtime` selects GMT.
+    let gmt = source.tm_zone == zone::gmt_pointer().cast::<core::ffi::c_void>();
     // SAFETY: the caller granted `max` writable bytes.
     let buffer = unsafe { core::slice::from_raw_parts_mut(out.cast::<u8>(), max) };
     zone::with_cache(|cache| {

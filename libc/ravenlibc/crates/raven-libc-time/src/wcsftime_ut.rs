@@ -38,7 +38,11 @@ fn formatted(format: &str, capacity: usize) -> Vec<u32> {
         &tm(),
         &StrftimeCtx::default(),
     );
-    out.get(..length).unwrap_or(&[]).to_vec()
+    let mut text = out.get(..length).unwrap_or(&[]).to_vec();
+    if length > 0 {
+        text.push(0);
+    }
+    text
 }
 
 #[test]
@@ -81,7 +85,7 @@ fn the_percent_and_tab_conversions_work() {
 }
 
 #[test]
-fn the_buffer_length_includes_the_nul() {
+fn the_buffer_length_excludes_the_nul() {
     let state = TzState::utc();
     let format = wide("%Y");
     let mut out = vec![0u32; 5];
@@ -94,7 +98,7 @@ fn the_buffer_length_includes_the_nul() {
             &tm(),
             &StrftimeCtx::default()
         ),
-        5
+        4
     );
 }
 

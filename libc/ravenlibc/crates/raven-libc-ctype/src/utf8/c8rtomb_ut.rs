@@ -29,11 +29,13 @@ fn invalid_continuation_is_ilseq_and_writes_nothing() {
 }
 
 #[test]
-fn nul_discards_pending_input_and_writes_nul() {
+fn nul_while_incomplete_is_ilseq() {
     let mut state = MbState::INITIAL;
     let mut out = [0xccu8; 4];
     assert_eq!(c8rtomb(&mut state, MbMode::Utf8, 0xf0, &mut out), Ok(0));
-    assert_eq!(c8rtomb(&mut state, MbMode::Utf8, 0, &mut out), Ok(1));
-    assert_eq!(out[0], 0);
-    assert_eq!(out[1], 0xcc);
+    assert_eq!(
+        c8rtomb(&mut state, MbMode::Utf8, 0, &mut out),
+        Err(MbError::Ilseq)
+    );
+    assert_eq!(out[0], 0xcc);
 }

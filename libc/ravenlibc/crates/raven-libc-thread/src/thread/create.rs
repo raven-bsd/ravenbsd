@@ -226,7 +226,9 @@ pub fn create<K: ThreadKernel>(
     start: StartFn,
     arg: usize,
 ) -> Result<usize, Errno> {
-    if MOD_COUNT.load(Ordering::Acquire) == 0 {
+    // The main TCB proves that `init_main_thread` ran. A program with no PT_TLS has zero
+    // modules but still owns a valid TCB, so `MOD_COUNT` must not be the readiness gate.
+    if crate::libc_state::LIBC.main_tcb() == 0 {
         return Err(ENOSYS);
     }
     let default_attr;

@@ -22,7 +22,8 @@ use crate::result::parse_result;
 use crate::runner::{self, RunOptions};
 use crate::table;
 use crate::{
-    BuildStatus, Case, Framework, Mode, Outcome, RunBackend, SuiteRun, TpCase, Verdict, glob_match,
+    BuildStatus, Case, Framework, Mode, Outcome, ProcessStatus, RunBackend, SuiteRun, TpCase,
+    Verdict, glob_match,
 };
 
 /// A suite description (`tests/libc-oracle/suites/<suite>.toml`).
@@ -423,15 +424,7 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
             RunBackend::HostLinux => {
                 bail!("host-linux: raven-libc-sys has no Linux backend (O-B5)");
             }
-            RunBackend::Qemu => {
-                if config.suite.framework == Framework::Atf {
-                    bail!(
-                        "qemu backend: on-target ATF listing/execution is a later ticket (C73); \
-                         exit-status suites are supported"
-                    );
-                }
-            }
-            RunBackend::None => {}
+            RunBackend::Qemu | RunBackend::None => {}
         }
         let Some(_sysroot) = &config.sysroot else {
             bail!("target mode needs --sysroot DIR");
@@ -536,6 +529,17 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
         }
     }
 
+    if config.mode == Mode::Target
+        && config.backend == RunBackend::Qemu
+        && suite.framework == Framework::Atf
+        && incomplete.is_none()
+    {
+        run_atf_qemu(&builder, &suite, &program_jobs, config, &owners, &mut run)?;
+        run.sort();
+        write_run(config, &run, &suite)?;
+        return Ok(run);
+    }
+
     let results = process_programs(
         &builder,
         &suite,
@@ -558,6 +562,150 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
     run.sort();
     write_run(config, &run, &suite)?;
     Ok(run)
+}
+
+/// Target+qemu ATF: build every program, then run all eligible bodies in batched boots.
+fn run_atf_qemu(
+    builder: &Builder,
+    suite: &SuiteFile,
+    programs: &[Program],
+    config: &RunConfig,
+    owners: &Owners,
+    run: &mut SuiteRun,
+) -> Result<()> {
+    let mut batch = Vec::new();
+    let mut cases_by_program: BTreeMap<String, Vec<TpCase>> = BTreeMap::new();
+    for program in programs {
+        let ticket = owners.ticket(&suite.suite, &program.name);
+        let report = builder.build(&suite.suite, &suite.root, suite.framework, program)?;
+        let log = report.log.clone();
+        let missing_headers = report.missing_headers.clone();
+        let missing_symbols = report.missing_symbols.clone();
+        let status = report.status.clone();
+        let cases_for_outcomes: Vec<TpCase>;
+        match &status {
+            BuildStatus::Failed(_) => {
+                let cases = cached_cases(config, suite, program);
+                let reason = status.reason().to_string();
+                for case in &cases {
+                    run.outcomes.push(Outcome::new(
+                        Case::new(&suite.suite, &program.name, &case.ident),
+                        Verdict::Fail,
+                        reason.clone(),
+                        &ticket,
+                    ));
+                }
+                cases_for_outcomes = cases;
+            }
+            BuildStatus::Built => {
+                let cases = cached_cases(config, suite, program);
+                let usable =
+                    !cases.is_empty() && !cases.iter().any(|case| case.ident == "unknown-bodies");
+                if usable {
+                    let Some(binary) = report.binary.clone() else {
+                        bail!("program {} has no binary", program.name);
+                    };
+                    for case in &cases {
+                        batch.push(qemu::AtfBatchCase {
+                            program_path: binary.clone(),
+                            program_name: program.name.clone(),
+                            ident: case.ident.clone(),
+                        });
+                    }
+                    cases_by_program.insert(program.name.clone(), cases.clone());
+                    cases_for_outcomes = cases;
+                } else {
+                    let case = TpCase {
+                        ident: "unknown-bodies".to_string(),
+                        meta: BTreeMap::new(),
+                    };
+                    run.outcomes.push(Outcome::new(
+                        Case::new(&suite.suite, &program.name, &case.ident),
+                        Verdict::NotRun,
+                        "oracle-no-case-list",
+                        &ticket,
+                    ));
+                    cases_for_outcomes = vec![case];
+                }
+            }
+            BuildStatus::Needs(_) | BuildStatus::Unparsed(_) => unreachable!(),
+        }
+        run.builds.insert(program.name.clone(), status.clone());
+        let result = ProgramResult {
+            program: program.name.clone(),
+            outcomes: Vec::new(),
+            status,
+            log,
+            missing_headers,
+            missing_symbols,
+            cases: Some(cases_for_outcomes),
+        };
+        write_program_log(config, suite, &result)?;
+        write_missing(config, suite, &result)?;
+    }
+
+    let work = config.out.join("work").join(&suite.suite).join("batch");
+    let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
+    let guest = qemu::Guest::new(&config.root);
+    let mut results = Vec::with_capacity(batch.len());
+    // `raven-svc-manifest` caps a graph at 256 services; each case uses a run/read pair and the
+    // bootstrap services take eight slots, so 100 cases (208 services) stay under the cap.
+    for (chunk_index, chunk) in batch.chunks(100).enumerate() {
+        let chunk_work = work.join(format!("chunk-{chunk_index}"));
+        results.extend(qemu::run_atf_batch(
+            &qemu,
+            &guest,
+            chunk,
+            &chunk_work,
+            config.keep,
+        )?);
+    }
+
+    let mut index = 0usize;
+    for program in programs {
+        let Some(cases) = cases_by_program.get(&program.name) else {
+            continue;
+        };
+        let ticket = owners.ticket(&suite.suite, &program.name);
+        for case in cases {
+            let result = results.get(index).ok_or_else(|| {
+                anyhow::anyhow!("missing batch result for {} {}", program.name, case.ident)
+            })?;
+            index += 1;
+            let observation = judge_batch(result, config.max_timeout);
+            run.outcomes.push(Outcome::new(
+                Case::new(&suite.suite, &program.name, &case.ident),
+                observation.verdict,
+                observation.reason,
+                &ticket,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn judge_batch(result: &qemu::AtfBatchResult, timeout: u64) -> runner::Observation {
+    let status = result
+        .exit
+        .map_or(ProcessStatus::Signaled(0), ProcessStatus::Exited);
+    if let Some(bytes) = &result.result {
+        return match crate::result::parse_result(&String::from_utf8_lossy(bytes)) {
+            Ok(expect) => {
+                let (verdict, reason) = crate::result::judge(&expect, status, false, timeout);
+                runner::Observation { verdict, reason }
+            }
+            Err(_) => {
+                let (verdict, reason) = crate::result::judge_unparsable(bytes, status);
+                runner::Observation { verdict, reason }
+            }
+        };
+    }
+    let (verdict, reason) = crate::result::judge_missing(status, false, timeout);
+    let reason = match &result.missing {
+        Some(missing) => format!("{reason}: {missing}"),
+        None => reason,
+    };
+    runner::Observation { verdict, reason }
 }
 
 fn process_programs(
@@ -696,13 +844,12 @@ fn process_program(
     let mut outcomes = Vec::new();
     match suite.framework {
         Framework::Atf => {
-            let cases_list = match runner::list(
-                report
-                    .binary
-                    .as_deref()
-                    .expect("built program has a binary"),
-                Some(&source_dir),
-                config.max_timeout,
+            let cases_list = match list_cases(
+                config,
+                suite,
+                program,
+                report.binary.as_deref(),
+                &source_dir,
             ) {
                 Ok(cases) => cases,
                 Err(error) => {
@@ -829,6 +976,31 @@ fn process_program(
     })
 }
 
+fn list_cases(
+    config: &RunConfig,
+    suite: &SuiteFile,
+    program: &Program,
+    binary: Option<&Path>,
+    source_dir: &Path,
+) -> Result<Vec<TpCase>> {
+    let Some(binary) = binary else {
+        bail!("program {} has no binary", program.name);
+    };
+    if config.mode == Mode::Target && config.backend == RunBackend::Qemu {
+        let work_root = config
+            .out
+            .join("work")
+            .join(&suite.suite)
+            .join(&program.name);
+        fs::create_dir_all(&work_root)
+            .with_context(|| format!("cannot create {}", work_root.display()))?;
+        let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
+        let guest = qemu::Guest::new(&config.root);
+        return qemu::list_atf(&qemu, &guest, binary, &work_root, config.keep);
+    }
+    runner::list(binary, Some(source_dir), config.max_timeout)
+}
+
 fn run_case(
     config: &RunConfig,
     suite: &SuiteFile,
@@ -851,7 +1023,8 @@ fn run_case(
         return match config.backend {
             RunBackend::Qemu => {
                 let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
-                qemu::run_init_program(&qemu, binary, 0, &work_root, config.keep)
+                let guest = qemu::Guest::new(&config.root);
+                qemu::run_atf_case(&qemu, &guest, binary, case, &work_root, config.keep)
             }
             _ => Ok(runner::Observation {
                 verdict: Verdict::NotRun,
@@ -886,16 +1059,39 @@ fn run_exit(
     if config.mode == Mode::Target {
         return match config.backend {
             RunBackend::Qemu => {
-                if !program.args.is_empty() {
-                    // The kernel starts `/init` with only argv[0] (`kernel/src/process/mod.rs`);
-                    // a program that needs arguments is honestly not run, not a false failure.
-                    return Ok(runner::Observation {
-                        verdict: Verdict::NotRun,
-                        reason: "qemu-no-argv".to_string(),
-                    });
-                }
                 let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
-                qemu::run_init_program(&qemu, binary, program.expect_exit, &work_root, config.keep)
+                // A debug switch for capturing a program's stdout through the guest tty.
+                let force_services = std::env::var_os("RAVEN_ATF_GUEST_SERVICES").is_some();
+                if program.args.is_empty() && !force_services {
+                    qemu::run_init_program(
+                        &qemu,
+                        binary,
+                        program.expect_exit,
+                        &work_root,
+                        config.keep,
+                    )
+                } else {
+                    let guest = qemu::Guest::new(&config.root);
+                    let env = qemu::target_env();
+                    let observation = qemu::run_guest(
+                        &qemu,
+                        &guest,
+                        &qemu::GuestJob {
+                            program: binary,
+                            mode: qemu::GuestMode::Exec,
+                            args: &program.args,
+                            env: &env,
+                            result: None,
+                            workdir: &work_root,
+                            keep: config.keep,
+                        },
+                    )?;
+                    Ok(qemu::judge_guest(
+                        &observation,
+                        program.expect_exit,
+                        config.max_timeout,
+                    ))
+                }
             }
             _ => Ok(runner::Observation {
                 verdict: Verdict::NotRun,

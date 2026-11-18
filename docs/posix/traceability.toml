@@ -860,7 +860,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.alarm"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.alphasort"
@@ -1526,7 +1526,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.chown"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.chroot"
@@ -2468,7 +2468,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fchown"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.fchownat"
@@ -3446,7 +3446,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.gethostid"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.gethostname"
@@ -4436,7 +4436,7 @@ evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
 id = "interface.lchown"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.lcong48"
@@ -5012,7 +5012,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.mkfifoat"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.mknod"
@@ -5024,7 +5024,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.mknodat"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.mkstemp"
@@ -5462,7 +5462,7 @@ evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 id = "interface.pause"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.pclose"
@@ -7316,7 +7316,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.shm_open"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.shm_unlink"

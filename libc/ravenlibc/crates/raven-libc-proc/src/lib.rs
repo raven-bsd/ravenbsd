@@ -37,6 +37,7 @@
 
 extern crate alloc;
 
+pub mod alarm;
 pub mod atfork;
 pub mod auxv;
 pub mod backend;

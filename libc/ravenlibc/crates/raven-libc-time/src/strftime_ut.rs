@@ -170,7 +170,7 @@ fn empty_output_is_zero() {
 }
 
 #[test]
-fn percent_s_clears_a_daylight_saving_flag() {
+fn percent_s_uses_a_nonzero_tm_gmtoff() {
     let tm = Tm {
         tm_sec: 0,
         tm_min: 0,
@@ -180,11 +180,45 @@ fn percent_s_clears_a_daylight_saving_flag() {
         tm_year: 123,
         tm_wday: 6,
         tm_yday: 181,
-        tm_isdst: 1,
+        tm_isdst: 0,
         tm_gmtoff: -4 * 3600,
         tm_zone: crate::tz::NO_ZONE,
     };
+    // The donor differential supplies a meaningful field; `timeoff` uses it (+4h from UTC).
     assert_eq!(format(&tm, "%s"), b"1688184000");
+}
+
+#[test]
+fn percent_s_uses_the_process_zone_when_tm_gmtoff_is_zero() {
+    // The picolibc tm0: Tue Dec 30 09:53:47 EST 2008, with a static zero tm_gmtoff and
+    // TZ=EST5EDT. The process-zone path must produce the EST epoch.
+    let state = crate::tz::posix_tz::tzparse(b"EST5EDT", None).expect("EST5EDT");
+    let tm = Tm {
+        tm_sec: 47,
+        tm_min: 53,
+        tm_hour: 9,
+        tm_mday: 30,
+        tm_mon: 11,
+        tm_year: 108,
+        tm_wday: 2,
+        tm_yday: 364,
+        tm_isdst: 0,
+        tm_gmtoff: 0,
+        tm_zone: crate::tz::NO_ZONE,
+    };
+    let mut out = [0u8; 128];
+    let length = strftime(
+        &state,
+        &CLocale,
+        &mut out,
+        b"%s",
+        &tm,
+        &StrftimeCtx {
+            tzname: [b"EST", b"EDT"],
+            localtime: None,
+        },
+    );
+    assert_eq!(&out[..length], b"1230648827");
 }
 
 #[test]

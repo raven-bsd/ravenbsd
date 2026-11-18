@@ -68,6 +68,7 @@ aio_suspend
 aio_suspend64
 aio_write
 aio_write64
+alarm
 aligned_alloc
 alphasort
 arc4random_buf
@@ -176,6 +177,7 @@ cgetstr
 cgetustr
 chdir
 chmod
+chown
 chroot
 cimag
 cimagf
@@ -358,6 +360,7 @@ fattach
 fchdir
 fchmod
 fchmodat
+fchown
 fchownat
 fclose
 fcntl
@@ -561,6 +564,7 @@ gethostbyname2
 gethostbyname2_r
 gethostbyname_r
 gethostent
+gethostid
 gethostname
 getisax
 getline
@@ -773,6 +777,7 @@ kqueue1
 l64a
 labs
 lchmod
+lchown
 lckpwdf
 lcong48
 ldexp
@@ -870,7 +875,9 @@ mergesort
 mkdir
 mkdirat
 mkfifo
+mkfifoat
 mknod
+mknodat
 mkstemp
 mktime
 mlock
@@ -958,6 +965,7 @@ optind
 optopt
 optreset
 pathconf
+pause
 pclose
 perror
 personality
@@ -1323,6 +1331,7 @@ setuid
 setusershell
 setutxent
 setvbuf
+shm_open
 shm_unlink
 shmat
 shmctl
@@ -1589,6 +1598,7 @@ ttyname_r
 twalk
 tzname
 tzset
+ualarm
 ufromfp
 ufromfpx
 uid_from_user
