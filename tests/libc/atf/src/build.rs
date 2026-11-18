@@ -258,6 +258,16 @@ impl Builder {
                 "-D_GNU_SOURCE".to_string(),
                 "-include".to_string(),
                 shim.display().to_string(),
+                "-include".to_string(),
+                self.root
+                    .join("tests/libc/atf/shim/rl_target_prelude.h")
+                    .display()
+                    .to_string(),
+                format!("-I{}", self.root.join("tests/libc/atf/shim").display()),
+                format!(
+                    "-I{}",
+                    self.root.join("tests/libc/atf/shim/netbsd").display()
+                ),
                 format!("-I{}", sysroot.join("usr/include").display()),
                 format!("-I{}", root.display()),
                 "-I".to_string(),

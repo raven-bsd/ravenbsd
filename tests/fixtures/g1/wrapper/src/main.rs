@@ -21,6 +21,7 @@ use alloc::vec::Vec;
 
 use raven_abi::types::Handle;
 use raven_initfs::Initfs;
+use raven_proto_svc::{State, Status};
 use raven_rt::entry;
 use raven_rt::spawn::{RtSys, SpawnOptions, spawn_image_with_fdmap};
 use raven_scheme::Client;
@@ -81,13 +82,18 @@ impl Manifest {
 
 fn main(args: raven_rt::Args) -> i32 {
     let mut read = false;
+    let mut case = None;
     for index in 0..args.len() {
-        if args.get(index) == Some("read") {
-            read = true;
-            break;
+        if let Some(value) = args.get(index) {
+            if value == "read" {
+                read = true;
+            }
+            if let Ok(number) = value.parse::<usize>() {
+                case = Some(number);
+            }
         }
     }
-    let result = if read { read_result() } else { run() };
+    let result = if read { read_result(case) } else { run(case) };
     match result {
         Ok(()) => 0,
         Err(error) => {
@@ -97,36 +103,85 @@ fn main(args: raven_rt::Args) -> i32 {
     }
 }
 
-fn read_result() -> Result<(), String> {
+fn manifest_path(case: Option<usize>) -> String {
+    match case {
+        Some(index) => format!("/g1/manifest-{index}"),
+        None => MANIFEST.to_string(),
+    }
+}
+
+fn read_result(case: Option<usize>) -> Result<(), String> {
     let image = raven_rt::map_initfs().map_err(|error| format!("initfs: {error:?}"))?;
     let initfs = Initfs::parse(image).map_err(|error| format!("initfs parse: {error:?}"))?;
+    let path = manifest_path(case);
     let entry = initfs
-        .get(MANIFEST)
-        .ok_or_else(|| "manifest missing".to_string())?;
+        .get(&path)
+        .ok_or_else(|| format!("manifest missing: {path}"))?;
     let text = core::str::from_utf8(entry.data).map_err(|_| "manifest is not UTF-8".to_string())?;
     let manifest = Manifest::parse(text)?;
     let Some(result) = manifest.result else {
-        raven_rt::println!("G1-RESULT-ERROR no result path");
+        raven_rt::println!("G1-RESULT-MISSING {case:?} no result path");
         return Ok(());
     };
-    match read_file(&result) {
-        Ok(bytes) => emit("G1-RESULT-BEGIN", &bytes, "G1-RESULT-END"),
-        Err(error) => raven_rt::println!("G1-RESULT-ERROR {error}"),
+    for attempt in 0..1000 {
+        match read_file(&result) {
+            Ok(bytes) if !bytes.is_empty() => {
+                emit(case, "G1-RESULT", &bytes);
+                return Ok(());
+            }
+            Ok(_) | Err(_) => {
+                if attempt % 50 == 0 && run_finished(case) {
+                    if let Ok(bytes) = read_file(&result) {
+                        if !bytes.is_empty() {
+                            emit(case, "G1-RESULT", &bytes);
+                            return Ok(());
+                        }
+                    }
+                    raven_rt::println!("G1-RESULT-MISSING {case:?} run finished without result");
+                    return Ok(());
+                }
+                let _ = raven_rt::nanosleep(10_000_000);
+            }
+        }
     }
+    raven_rt::println!("G1-RESULT-MISSING {case:?} {result}");
     Ok(())
 }
 
-fn run() -> Result<(), String> {
+fn run_finished(case: Option<usize>) -> bool {
+    let Some(index) = case else {
+        return false;
+    };
+    let client = Client::new();
+    let path = format!("svc:/g1-run-{index}");
+    let Ok(handle) = client.open(&path, OPEN_READ) else {
+        return false;
+    };
+    let mut buffer = [0u8; 128];
+    let state = client
+        .read(handle, 0, &mut buffer)
+        .ok()
+        .and_then(|read| Status::decode(&buffer[..read]).ok())
+        .map(|status| status.state);
+    let _ = client.close(handle);
+    matches!(state, Some(State::Failed | State::GaveUp | State::Stopped))
+}
+
+fn run(case: Option<usize>) -> Result<(), String> {
     let image = raven_rt::map_initfs().map_err(|error| format!("initfs: {error:?}"))?;
     let initfs = Initfs::parse(image).map_err(|error| format!("initfs parse: {error:?}"))?;
+    let path = manifest_path(case);
     let entry = initfs
-        .get(MANIFEST)
-        .ok_or_else(|| "manifest missing".to_string())?;
+        .get(&path)
+        .ok_or_else(|| format!("manifest missing: {path}"))?;
     let text = core::str::from_utf8(entry.data).map_err(|_| "manifest is not UTF-8".to_string())?;
     let manifest = Manifest::parse(text)?;
     if manifest.mode == "exec" {
         // The kernel's `PROC_EXEC` loader copies the file tail; `raven-spawn`'s userland
         // image path is strict, so an EXEC wrapper is the portable way to pass argv/env.
+        if let Some(index) = case {
+            raven_rt::println!("G1-RUN {index}");
+        }
         let argv: Vec<&[u8]> = manifest.args.iter().map(|arg| arg.as_bytes()).collect();
         let envp: Vec<&[u8]> = manifest.env.iter().map(|item| item.as_bytes()).collect();
         return match raven_rt::exec::execve(manifest.program.as_bytes(), &argv, &envp, &[]) {
@@ -164,25 +219,37 @@ fn run() -> Result<(), String> {
         .proc_wait(child, &mut code)
         .map_err(|error| format!("wait: {error:?}"))?;
     let output = read_pipe(read)?;
-    emit("G1-OUTPUT-BEGIN", &output, "G1-OUTPUT-END");
+    emit(None, "G1-OUTPUT", &output);
     raven_rt::println!("G1-EXIT {code}");
 
     if let Some(result) = &manifest.result {
         match read_file(result) {
-            Ok(bytes) => emit("G1-RESULT-BEGIN", &bytes, "G1-RESULT-END"),
+            Ok(bytes) => emit(None, "G1-RESULT", &bytes),
             Err(error) => raven_rt::println!("G1-RESULT-ERROR {error}"),
         }
     }
     Ok(())
 }
 
-fn emit(begin: &str, bytes: &[u8], end: &str) {
-    raven_rt::println!("{begin}");
-    let _ = raven_rt::debug_write(bytes);
-    if !bytes.ends_with(b"\n") {
-        let _ = raven_rt::debug_write(b"\n");
+fn emit(case: Option<usize>, label: &str, bytes: &[u8]) {
+    match case {
+        Some(index) => {
+            raven_rt::println!("{label}-BEGIN {index}");
+            let _ = raven_rt::debug_write(bytes);
+            if !bytes.ends_with(b"\n") {
+                let _ = raven_rt::debug_write(b"\n");
+            }
+            raven_rt::println!("{label}-END {index}");
+        }
+        None => {
+            raven_rt::println!("{label}-BEGIN");
+            let _ = raven_rt::debug_write(bytes);
+            if !bytes.ends_with(b"\n") {
+                let _ = raven_rt::debug_write(b"\n");
+            }
+            raven_rt::println!("{label}-END");
+        }
     }
-    raven_rt::println!("{end}");
 }
 
 fn read_pipe(handle: Handle) -> Result<Vec<u8>, String> {

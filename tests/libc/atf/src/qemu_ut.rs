@@ -164,6 +164,48 @@ fn the_guest_initfs_has_the_services_and_the_program() {
 }
 
 #[test]
+fn the_batch_manifest_uses_the_indexed_image_and_result() {
+    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7");
+    assert!(text.contains("mode=exec\n"));
+    assert!(text.contains("program=/tests/t_foo\n"));
+    assert!(text.contains("arg=-r\narg=/tmp/result-7\n"));
+    assert!(text.contains("arg=-s\narg=/tests\narg=a_case\n"));
+    assert!(text.contains("result=/tmp/result-7\n"));
+}
+
+#[test]
+fn the_batch_parser_reads_exit_and_result_by_index() {
+    let text = "boot\n\
+G1-RUN 0\n\
+process: child exited (0)\n\
+G1-RESULT-BEGIN 0\n\
+passed\n\
+G1-RESULT-END 0\n\
+G1-RUN 1\n\
+process: child exited (134)\n\
+G1-RESULT-MISSING 1 run finished without result\n";
+    let results = parse_batch(text, 2);
+    assert_eq!(results[0].exit, Some(0));
+    assert_eq!(results[0].result, Some(b"passed".to_vec()));
+    assert!(results[0].missing.is_none());
+    assert_eq!(results[1].exit, Some(134));
+    assert!(results[1].result.is_none());
+    assert_eq!(
+        results[1].missing.as_deref(),
+        Some("run finished without result")
+    );
+}
+
+#[test]
+fn the_batch_parser_keeps_a_missing_case_empty() {
+    let results = parse_batch("boot\n", 1);
+    assert_eq!(results.len(), 1);
+    assert!(results[0].exit.is_none());
+    assert!(results[0].result.is_none());
+    assert!(results[0].missing.is_none());
+}
+
+#[test]
 fn exec_read_adds_the_result_reader_service() {
     let (service, reader, svcd) = guest_service(GuestMode::ExecRead);
     assert!(service.contains("args = [\"g1wrap\", \"run\"]"));

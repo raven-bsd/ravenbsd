@@ -9,6 +9,7 @@
 //! image, and reads N from the serial log. The program's output stays beside the log for
 //! diagnosis; the 320 MiB boot image is removed after the run.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -30,8 +31,8 @@ const OVMF_VARS: &str = "/usr/share/OVMF/OVMF_VARS_4M.fd";
 const CMDLINE: &str = "console=ttyS0 test-exit=1";
 /// Poll interval while waiting for QEMU.
 const POLL: Duration = Duration::from_millis(50);
-/// Largest serial prefix kept for the reason/error text.
-const SERIAL_LIMIT: usize = 64 * 1024;
+/// Largest serial log kept; a batch of hundreds of ATF bodies can exceed a few megabytes.
+const SERIAL_LIMIT: usize = 32 * 1024 * 1024;
 
 /// Where the target kernel and the QEMU tools come from.
 #[derive(Clone, Debug)]
@@ -120,6 +121,28 @@ pub struct GuestObservation {
     pub timed_out: bool,
     /// The full serial log (used to read an ATF `-l` listing printed to the tty).
     pub serial: String,
+}
+
+/// One ATF case in a batched guest boot.
+#[derive(Clone, Debug)]
+pub struct AtfBatchCase {
+    /// The built target executable.
+    pub program_path: PathBuf,
+    /// The suite program name (used for the image name and diagnostics).
+    pub program_name: String,
+    /// The ATF case ident.
+    pub ident: String,
+}
+
+/// One batched ATF result, in the input case order.
+#[derive(Clone, Debug)]
+pub struct AtfBatchResult {
+    /// The test process exit status parsed from the serial log.
+    pub exit: Option<i32>,
+    /// The ATF result file bytes.
+    pub result: Option<Vec<u8>>,
+    /// The reason the reader did not find a result.
+    pub missing: Option<String>,
 }
 
 /// The environment the host runner gives a target program.
@@ -365,6 +388,256 @@ pub fn run_atf_case(
     }
 }
 
+/// Run a batch of ATF cases in one boot.
+///
+/// Each case is a `g1-run-<i>` service that execs the test with `-r /tmp/result-<i>`, followed
+/// by a `g1-read-<i>` service that polls the result file and prints an indexed marker. The
+/// services form a chain, so failures do not stop the next case.
+pub fn run_atf_batch(
+    config: &QemuConfig,
+    guest: &Guest,
+    cases: &[AtfBatchCase],
+    workdir: &Path,
+    keep: bool,
+) -> Result<Vec<AtfBatchResult>> {
+    if cases.is_empty() {
+        return Ok(Vec::new());
+    }
+    guest.require()?;
+    fs::create_dir_all(workdir).with_context(|| format!("cannot create {}", workdir.display()))?;
+    let initfs = workdir.join("initfs.img");
+    let image = workdir.join("boot.img");
+    let vars = workdir.join("OVMF_VARS.fd");
+    let serial_path = workdir.join("serial.log");
+    let error_path = workdir.join("qemu.err");
+    for stale in [&initfs, &image, &vars, &serial_path, &error_path] {
+        let _ = fs::remove_file(stale);
+    }
+
+    let programs_dir = workdir.join("programs");
+    fs::create_dir_all(&programs_dir)
+        .with_context(|| format!("cannot create {}", programs_dir.display()))?;
+    let mut image_paths: BTreeMap<PathBuf, String> = BTreeMap::new();
+    let mut used: BTreeMap<String, usize> = BTreeMap::new();
+    for case in cases {
+        if image_paths.contains_key(&case.program_path) {
+            continue;
+        }
+        let mut base: String = case
+            .program_name
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                    character
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        if base.is_empty() {
+            base.push_str("program");
+        }
+        let count = used.entry(base.clone()).or_insert(0);
+        let unique = if *count == 0 {
+            base.clone()
+        } else {
+            format!("{base}-{count}")
+        };
+        *count += 1;
+        let destination = programs_dir.join(&unique);
+        strip_to(&case.program_path, &destination)?;
+        image_paths.insert(case.program_path.clone(), format!("/tests/{unique}"));
+    }
+
+    let mut specs = service_specs(config, guest);
+    for (index, case) in cases.iter().enumerate() {
+        let image_path = image_paths
+            .get(&case.program_path)
+            .expect("program image was registered");
+        let result = format!("/tmp/result-{index}");
+        let manifest = workdir.join(format!("manifest-{index}"));
+        fs::write(&manifest, batch_manifest(&case.ident, image_path, &result))
+            .with_context(|| format!("cannot write {}", manifest.display()))?;
+        let run = workdir.join(format!("g1-run-{index}.toml"));
+        let read = workdir.join(format!("g1-read-{index}.toml"));
+        let needs = if index == 0 {
+            "[\"scheme:file\", \"scheme:tty\"]".to_string()
+        } else {
+            format!("[\"g1-read-{}\"]", index - 1)
+        };
+        // The reader must not depend on the run service: a failing test exits nonzero, and a
+        // dependency on a failed service would stall the whole chain. Both services wait for the
+        // previous reader and then run concurrently; the reader polls the result file.
+        fs::write(
+            &run,
+            format!(
+                "name = \"g1-run-{index}\"\nexec = \"/sbin/g1wrap\"\n\
+args = [\"g1wrap\", \"run\", \"{index}\"]\nneeds = {needs}\nreadiness = \"none\"\n\
+restart = \"never\"\nmax_restarts = 0\nrequired = false\n"
+            ),
+        )
+        .with_context(|| format!("cannot write {}", run.display()))?;
+        fs::write(
+            &read,
+            format!(
+                "name = \"g1-read-{index}\"\nexec = \"/sbin/g1wrap\"\n\
+args = [\"g1wrap\", \"read\", \"{index}\"]\nneeds = {needs}\n\
+namespace = [\"svc\", \"file\"]\n\
+readiness = \"exit\"\nrestart = \"never\"\nmax_restarts = 0\nrequired = false\n"
+            ),
+        )
+        .with_context(|| format!("cannot write {}", read.display()))?;
+        specs.push(format!("/g1/manifest-{index}={}", manifest.display()));
+        specs.push(format!(
+            "/etc/services.d/g1-run-{index}.toml={}",
+            run.display()
+        ));
+        specs.push(format!(
+            "/etc/services.d/g1-read-{index}.toml={}",
+            read.display()
+        ));
+    }
+    let svcd = workdir.join("svcd.conf");
+    fs::write(
+        &svcd,
+        format!("exit_when_exits = \"g1-read-{}\"\n", cases.len() - 1),
+    )
+    .with_context(|| format!("cannot write {}", svcd.display()))?;
+    specs.push(format!("/etc/svcd.conf={}", svcd.display()));
+    for image_path in image_paths.values() {
+        let name = image_path.strip_prefix("/tests/").unwrap_or(image_path);
+        specs.push(format!(
+            "/tests/{name}={}:0755",
+            programs_dir.join(name).display()
+        ));
+    }
+
+    run_tool(
+        "cargo",
+        &mkinitfs_with(&initfs, &specs),
+        &config.root,
+        "cannot build the batch initfs",
+    )?;
+    make_image(config, &initfs, &image)?;
+    copy_firmware_vars(&vars)?;
+    let mut batch = config.clone();
+    batch.timeout_secs = batch.timeout_secs.max(1800);
+    let (_, timed_out) = boot(&batch, &image, &vars, &serial_path, &error_path)?;
+    let serial = read_prefix(&serial_path);
+    let text = String::from_utf8_lossy(&serial);
+    let mut results = parse_batch(&text, cases.len());
+    if timed_out {
+        for result in &mut results {
+            if result.result.is_none() && result.missing.is_none() {
+                result.missing = Some("batch timeout".to_string());
+            }
+        }
+    }
+    if !keep {
+        for transient in [&initfs, &image, &vars] {
+            let _ = fs::remove_file(transient);
+        }
+    }
+    Ok(results)
+}
+
+fn service_specs(config: &QemuConfig, guest: &Guest) -> Vec<String> {
+    let mut specs = vec![
+        format!("/init={}", guest.path("init").display()),
+        format!("/sbin/g1wrap={}", guest.path("g1wrap").display()),
+    ];
+    for name in [
+        "logd", "consd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "vfsd",
+    ] {
+        specs.push(format!("/sbin/{name}={}", guest.path(name).display()));
+        specs.push(format!(
+            "/etc/services.d/{name}.toml={}",
+            config
+                .root
+                .join(format!("etc/services.d/{name}.toml"))
+                .display()
+        ));
+    }
+    specs
+}
+
+fn strip_to(program: &Path, destination: &Path) -> Result<()> {
+    fs::copy(program, destination).with_context(|| {
+        format!(
+            "cannot copy {} to {}",
+            program.display(),
+            destination.display()
+        )
+    })?;
+    let _ = Command::new("strip")
+        .arg("--strip-all")
+        .arg(destination)
+        .status();
+    Ok(())
+}
+
+fn batch_manifest(ident: &str, image_path: &str, result: &str) -> String {
+    let mut text = format!(
+        "mode=exec\nprogram={image_path}\narg={image_path}\narg=-r\narg={result}\n\
+arg=-s\narg=/tests\narg={ident}\n"
+    );
+    for item in target_env() {
+        text.push_str("env=");
+        text.push_str(&item);
+        text.push('\n');
+    }
+    text.push_str("result=");
+    text.push_str(result);
+    text.push('\n');
+    text
+}
+
+fn parse_batch(text: &str, count: usize) -> Vec<AtfBatchResult> {
+    (0..count)
+        .map(|index| {
+            let run_marker = format!("G1-RUN {index}");
+            let run_position = text.find(&run_marker);
+            let exit = run_position.and_then(|position| {
+                let rest = text.get(position..)?;
+                let marker = "process: child exited (";
+                let start = rest.find(marker)? + marker.len();
+                let end = rest.get(start..)?.find(')')?;
+                rest.get(start..start + end)?.trim().parse().ok()
+            });
+            let begin = format!("G1-RESULT-BEGIN {index}");
+            let end = format!("G1-RESULT-END {index}");
+            let result = text.find(&begin).and_then(|position| {
+                let rest = text.get(position + begin.len()..)?;
+                let rest = rest
+                    .strip_prefix("\r\n")
+                    .or_else(|| rest.strip_prefix('\n'))
+                    .unwrap_or(rest);
+                let stop = rest.find(&end)?;
+                let mut bytes = rest.get(..stop)?.as_bytes().to_vec();
+                while bytes.ends_with(b"\n") || bytes.ends_with(b"\r") {
+                    bytes.pop();
+                }
+                Some(bytes)
+            });
+            let missing_marker = format!("G1-RESULT-MISSING {index}");
+            let missing = text.find(&missing_marker).map(|position| {
+                text.get(position + missing_marker.len()..)
+                    .unwrap_or("")
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string()
+            });
+            AtfBatchResult {
+                exit,
+                result,
+                missing,
+            }
+        })
+        .collect()
+}
+
 fn extract_atf_list(serial: &str) -> Option<String> {
     let start = serial.find("Content-Type: application/X-atf-tp")?;
     let rest = &serial[start..];
@@ -472,29 +745,14 @@ fn guest_initfs_specs(
     reader: Option<&Path>,
     svcd: &Path,
 ) -> Vec<String> {
-    let mut specs = vec![
-        format!("/init={}", guest.path("init").display()),
-        format!("/sbin/g1wrap={}", guest.path("g1wrap").display()),
-        format!("/tests/program={}:0755", program.display()),
-        format!("/g1/manifest={}", manifest.display()),
-        format!("/etc/services.d/g1.toml={}", service.display()),
-        format!("/etc/svcd.conf={}", svcd.display()),
-    ];
+    let mut specs = service_specs(config, guest);
+    specs.push(format!("/tests/program={}:0755", program.display()));
+    specs.push(format!("/g1/manifest={}", manifest.display()));
+    specs.push(format!("/etc/services.d/g1.toml={}", service.display()));
     if let Some(reader) = reader {
         specs.push(format!("/etc/services.d/g1-read.toml={}", reader.display()));
     }
-    for name in [
-        "logd", "consd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "vfsd",
-    ] {
-        specs.push(format!("/sbin/{name}={}", guest.path(name).display()));
-        specs.push(format!(
-            "/etc/services.d/{name}.toml={}",
-            config
-                .root
-                .join(format!("etc/services.d/{name}.toml"))
-                .display()
-        ));
-    }
+    specs.push(format!("/etc/svcd.conf={}", svcd.display()));
     specs
 }
 
