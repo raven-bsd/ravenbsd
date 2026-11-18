@@ -41,20 +41,19 @@ cargo xtask qtest --case libc-spawn --arch x86_64
 
 The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
-## Current verdict (2026-11-18, C74hj audit on `b89e291b`; 3.1 re-evaluated by C74ia; C74ib size study)
+## Current verdict (2026-11-18, C74da round 3 on `02152587`)
 
-**NOT MET.** `cargo run -q -p libc-gate -- verdict --out build/libc-gate-audit` exits 1.
+**NOT MET.** `cargo run -q -p libc-gate -- verdict --out build/libc-gate` exits 1.
 
-* MET: 1.1, 1.1.pack, 1.1.audit, 1.4, 1.5, 1.6, 1.7, 4.1, 4.2, 4.3, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4.
-  5.1/5.2 are MET per the committed C74u/C74ae/C74n/C74v evidence; they were not re-run in this
-  audit (no QEMU) and no local evidence file is present.
-* NOT MET: 1.2 (G1 0/4; C2-C5 not run, C6 unvendored), 3.1 (C74ia on `fb65ec96`: 64 pass,
-  13 fail, 65 known, 99 skipped, 0 budget-only; all three `libc.so.1` budgets pass, the three
-  `INV-LIBC-SO-NEEDED` rows are known rule exceptions, and the 10 static invariants, the real
-  aarch64 `libc.so.1` S ceiling and two riscv64 P9 static rows remain; C74ib found no safe
-  in-Owns aarch64 reduction).
-* BLOCKED: 2.1/2.2 (the harness and list are present; `results/x86_64/world.json` plus the
-  H-11 tarballs and H-12 freeze are absent).
+* MET: 1.1, 1.1.pack, 1.1.audit, 1.4, 1.5, 1.6, 1.7, 4.1, 4.2, 4.3, 6.1, 6.2, 6.3, 6.4.
+  1.4 is the 27/27 oracle run with `RAVENBSD_RESOURCES` and the C74ij `strftime %s` fix.
+* NOT MET: 1.2 (G1 **1/4**: C2 51.7 %, C3 34.4 %, C4 40.0 %, C5 94.7 % MET, C6 unvendored),
+  3.1 (63 pass, 13 fail, 65 known, 99 skipped, 0 budget-only; all three `libc.so.1` budgets
+  pass, the 10 static invariants, the P7 riscv64 server B row and two riscv64 P9 static rows
+  remain; no budget raised).
+* BLOCKED: 2.1/2.2 (`results/x86_64/world.json`, H-11 tarballs and H-12 freeze absent).
+* STALE this round: 5.1, 5.2, 5.3 (no QEMU; the 24 h soak owns it). The committed
+  C74u/C74ae/C74n/C74v evidence remains green but was not re-run.
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
 `build/libc-gate/`. C74h re-ran the full gate on `beedfbbd`: the symbol audit is now MET (66/66,
@@ -65,7 +64,8 @@ per the committed evidence). C74i then added the three missing loader SAFETY
 comments: `libc-lint` now reports 26 violations, all outside the loader files (P1f/phil 14,
 P1h/otto 8, P1i/tim 3, ABI/contract 1; C74l/C74i reduced that to 15, P1f 14 and ABI 1).
 C74n closed 5.2.core-servers, C74v closed 5.2.file-tools with the real `/etc/mounts` list, and
-C74u closed 5.1 (`sscanf`, `tzname`). C74q closed 1.4 (27/27) and C74k recorded the one-hour
+C74u closed 5.1 (`sscanf`, `tzname`). C74ij reconciled `strftime %s`; C74da round 3 re-ran 1.4
+on `02152587` with `RAVENBSD_RESOURCES` (27/27 MET) and C74k recorded the one-hour
 `inet_text` soak. C74cw wired row 1.6 to the bounded Miri runner and C74fx re-ran
 `cargo run -q -p libc-gate -- eval --only 1.6 --out build/libc-gate-c74fx`: exit 0, **MET**
 (721 Miri tests: 715 library + 6 alignment, 6/6 pass, explicit integration exclusions).
@@ -76,36 +76,37 @@ and `verdict --out build/libc-gate-audit`: 1.7 (4267 files clean), 4.2 (14 targe
 count moved from 10 fail/102 skip to 12 fail/101 skip; C74ht then rebuilt the x86_64/aarch64
 `libc.so.1` rows and reconciled the dynamic budgets on `6cb10821`: 65 pass / 11 fail / 64 known /
 100 skipped. C74ia added the riscv64 `libc.so.1` budget and the third NEEDED known row on
-`fb65ec96`: 64 pass / 13 fail / 65 known / 99 skipped. All three DSO budgets pass; the remaining
-13 are the 10 static invariants, the real aarch64 `libc.so.1` S overrun, and two riscv64 P9
-static S/F rows grown by the C74hs compat exports (not budgeted by C74ia). C74ib then tested
-aarch64 DSO reductions on `07054226`: `--icf=all` alone reaches 1,306,012 (still 6,012 over),
-and `--icf=all` + `opt-level=z` + `--strip-debug` reaches 1,255,136 / F 2,451,200 but needs
-`xtask/src/libc_link.rs` and `Cargo.toml` profile changes outside Owns plus qtests. No safe
-in-Owns reduction exists; the aarch64 S row remains. The gate cannot close until G1, the
-invariant/S decision and the blocked world rows are resolved by their owners.
+`fb65ec96`: 64 pass / 13 fail / 65 known / 99 skipped. C74da round 3 re-ran the full gate on
+`02152587`: **63 pass / 13 fail / 65 known / 99 skipped**; all three DSO budgets pass, and the
+13 are the 10 static invariants, the P7 riscv64 server **B** row and two riscv64 P9 static S/F
+rows. C74ib's aarch64 DSO study is historical (C74id/C74ij brought aarch64 S to 990,615); no
+budget was raised. The gate cannot close until G1, the invariant/P7-riscv B decision and the
+blocked world rows are resolved by their owners.
 
-## 3.1 size triage (C74w/C74z/C74z-S17/C74ht/C74ia/C74ib; OBSERVED on `07054226`)
+## 3.1 size triage (C74da round 3 on `02152587`; C74w/C74z/C74z-S17/C74ht/C74ia/C74ib historical)
 
-`cargo xtask libc-size --check` reports `64 pass, 13 fail, 65 known, 99 skipped, 0 budget-only`
-after C74ia added the riscv64 `libc.so.1` budget. The 17 static budget/layout rows are the
-C74z-S17 re-freeze; no invariant ceiling is changed.
+`cargo xtask libc-size --check` reports **63 pass, 13 fail, 65 known, 99 skipped, 0
+budget-only** on `02152587`. The 17 static budget/layout rows are the C74z-S17 re-freeze; no
+invariant ceiling is changed.
 
-* **Dynamic `libc.so.1` budgets:** all three pass. x86_64 S 1,286,594 / F 3,009,232 (budget
-  1,325,192 / 3,099,509); aarch64 S 1,363,752 / F 2,501,104 (budget 1,404,682 / 2,576,138);
-  riscv64 S 1,010,867 / F 2,490,256 (budget 1,041,194 / 2,564,964). All carry
+* **Dynamic `libc.so.1` budgets:** all three pass. x86_64 S 1,290,274 / F 3,015,272 (budget
+  1,325,192 / 3,099,509); aarch64 S 990,615 / F 1,851,600 (budget 1,404,682 / 2,576,138);
+  riscv64 S 765,115 / F 1,867,768 (budget 1,041,194 / 2,564,964). All carry
   `SONAME libc.so.1`, `FLAGS BIND_NOW`, `FLAGS_1 NOW NODELETE` and **0 `DT_NEEDED`**.
 * **`INV-LIBC-SO-NEEDED` rule bug:** the hard-coded rule expects `needed == 1`, but a
   self-contained `libc.so.1` has 0; `readelf -d` shows no self-NEEDED entry. The source is
   outside the ticket Owns (no source edits), so all three rows are reviewed known exceptions. A
   follow-up tooling ticket must change the expectation to 0; these rows are not passes.
-* **C74ib aarch64 size study:** baseline S 1,363,752 / F 2,501,104; `.text` 1,013,616 and
-  `.eh_frame` 167,204 dominate. `--icf=all` alone reaches 1,306,012 (still 6,012 over);
-  `--icf=all` + `opt-level=z` reaches 1,255,136 but F grows to 2,893,064; adding `--strip-debug`
-  gives F 2,451,200. The only S-passing safe-ish candidate needs `xtask/src/libc_link.rs` and
-  `Cargo.toml`/`libc_pack` changes outside Owns plus qtests. `force-unwind-tables=no` (S
-  1,200,188) is rejected because it removes `.eh_frame`/backtrace. The exact section, symbol,
-  candidate and riscv P9 budget-review tables are in the C74ib TRIAGE section.
+* **Current 13 fails:** the 10 static `INV-S-P2-P0`/`INV-S-P3-P2` invariants, the P7 riscv64
+  server B row (15,488 > 12,385), and the two riscv64 P9 static S/F rows.
+* **C74ib aarch64 size study (historical):** baseline S 1,363,752 / F 2,501,104; `.text`
+  1,013,616 and `.eh_frame` 167,204 dominate. `--icf=all` alone reaches 1,306,012 (still 6,012
+  over); `--icf=all` + `opt-level=z` reaches 1,255,136 but F grows to 2,893,064; adding
+  `--strip-debug` gives F 2,451,200. The only S-passing safe-ish candidate needed
+  `xtask/src/libc_link.rs` and `Cargo.toml`/`libc_pack` changes outside Owns plus qtests; C74id
+  later landed the DSO-only change. `force-unwind-tables=no` (S 1,200,188) is rejected because
+  it removes `.eh_frame`/backtrace. The exact section, symbol, candidate and riscv P9 budget
+  tables are in the C74ib TRIAGE section.
 * **13 real fails remain:** the 10 `INV-S-P2-P0`/`INV-S-P3-P2` static invariants, the real
   aarch64 `INV-LIBC-SO-S` overrun (1,363,752 > 1,300,000; ceiling not raised), and the two
   riscv64 P9 static rows grown by the C74hs compat exports (tiny S 904,084 > 868,494 / F
