@@ -13,6 +13,10 @@ rust-version.workspace = true
 [dependencies]
 raven-http = { path = "../raven-http" }
 
+[[bin]]
+name = "http-fetch"
+path = "src/bin/http-fetch.rs"
+
 [target.'cfg(target_os = "none")'.dependencies]
 raven-abi = { path = "../raven-abi" }
 raven-proto-net = { path = "../raven-proto-net" }

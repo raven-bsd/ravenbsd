@@ -498,6 +498,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-fetch-patch"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+]
+
+[[package]]
 name = "hw-sound-client"
 version = "0.1.0"
 dependencies = [

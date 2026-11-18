@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# E3a live gate: the release image boots with the patched initfs and fetches a fixed local page
+# through raven_http + raven_http_net. The host side is a one-shot server on 127.0.0.1:18080;
+# QEMU user networking exposes it as 10.0.2.2. No external network, no TLS, no fake socket.
+
+name = "http-fetch"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+pre = ["sh tests/fixtures/http-fetch/build.sh"]
+initfs = "build/fixtures/http-fetch/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^http-fetch: status=200$'
+
+[[expect]]
+regex = '^http-fetch: content-length=15$'
+
+[[expect]]
+regex = '^http-fetch: body=known-http-body$'
+
+[[expect]]
+regex = '^http-fetch: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/http-fetch http://10.0.2.2:18080/known.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^http-fetch: status=200$'
+timeout_secs = 60
+
+[[step]]
+wait = '^http-fetch: content-length=15$'
+timeout_secs = 30
+
+[[step]]
+wait = '^http-fetch: body=known-http-body$'
+timeout_secs = 30
+
+[[step]]
+wait = '^http-fetch: ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)http-fetch: (error|status-mismatch|length-mismatch|body-mismatch)|panic|EXCEPTION'
