@@ -448,6 +448,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpart"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "gpt-core"
 version = "0.1.0"
 
@@ -697,6 +708,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lsblk"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "mail"
 version = "0.1.0"
 
@@ -791,6 +813,19 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "newfs"
+version = "0.1.0"
+dependencies = [
+ "fsd-ufs",
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tool-core",
+ "ufs-core",
 ]
 
 [[package]]
