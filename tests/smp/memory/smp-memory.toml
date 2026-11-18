@@ -24,6 +24,9 @@ regex = '^smp-memory: start workers=3$'
 regex = '^smp-memory: tlb map=0x[0-9a-f]+ alias=0x[0-9a-f]+$'
 
 [[expect]]
+regex = '^smp-memory: concurrent-shootdown waiters=4$'
+
+[[expect]]
 regex = '^smp-memory: workers ready$'
 
 [[expect]]
