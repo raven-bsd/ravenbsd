@@ -57,6 +57,7 @@ static GO: AtomicU32 = AtomicU32::new(0);
 static STARTED: [AtomicBool; WORKERS] = [const { AtomicBool::new(false) }; WORKERS];
 static FINISHED: [AtomicBool; WORKERS] = [const { AtomicBool::new(false) }; WORKERS];
 static FAIL_INFO: [AtomicUsize; WORKERS] = [const { AtomicUsize::new(0) }; WORKERS];
+static CURRENT: [AtomicUsize; WORKERS] = [const { AtomicUsize::new(0) }; WORKERS];
 static FAILURES: AtomicUsize = AtomicUsize::new(0);
 static RACE_READY: [AtomicUsize; ITERATIONS] = [const { AtomicUsize::new(0) }; ITERATIONS];
 static RACE_DONE: [AtomicUsize; ITERATIONS] = [const { AtomicUsize::new(0) }; ITERATIONS];
@@ -93,7 +94,8 @@ fn now_ns() -> u64 {
 }
 
 fn note_failure(worker: usize, phase: u16, error: Errno) {
-    let packed = (usize::from(phase) << 16) | usize::from(error.0);
+    let iteration = CURRENT[worker].load(Ordering::Relaxed);
+    let packed = (iteration << 32) | (usize::from(phase) << 16) | usize::from(error.0);
     let _ = FAIL_INFO[worker].compare_exchange(0, packed, Ordering::AcqRel, Ordering::Relaxed);
     FAILURES.fetch_add(1, Ordering::Relaxed);
 }
@@ -341,6 +343,7 @@ extern "C" fn file_worker(index: usize) -> ! {
     }
     let mut failed = false;
     for iteration in 0..ITERATIONS {
+        CURRENT[index].store(iteration, Ordering::Relaxed);
         if !failed && let Err((phase, error)) = file_cycle(index, iteration) {
             note_failure(index, phase, error);
             failed = true;
@@ -403,6 +406,7 @@ extern "C" fn mount_worker(index: usize) -> ! {
     }
     let mut failed = false;
     for iteration in 0..ITERATIONS {
+        CURRENT[slot].store(iteration, Ordering::Relaxed);
         let start = now_ns();
         if !failed {
             if let Err((phase, error)) = mount_cycle(index, iteration) {
@@ -541,10 +545,11 @@ fn report_failures() -> Result<(), String> {
         if packed == 0 {
             continue;
         }
-        let phase = packed >> 16;
+        let iteration = packed >> 32;
+        let phase = (packed >> 16) & 0xffff;
         let errno = Errno(u16::try_from(packed & 0xffff).unwrap_or(0));
         println!(
-            "smp-fs: failed worker={worker} phase={phase} errno={}",
+            "smp-fs: failed worker={worker} iter={iteration} phase={phase} errno={}",
             errno.description()
         );
     }
