@@ -37,19 +37,19 @@ generated = true
 
 [[initfs.files]]
 src = "build/fixtures/disk-tools/tools/disk-tool-svcctl"
-path = "/bin/disk-tool-svcctl"
+path = "/sbin/disk-tool-svcctl"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
 src = "build/fixtures/disk-tools/tools/disk-tool-mount"
-path = "/bin/disk-tool-mount"
+path = "/sbin/disk-tool-mount"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
 src = "build/fixtures/disk-tools/tools/disk-tool-umount"
-path = "/bin/disk-tool-umount"
+path = "/sbin/disk-tool-umount"
 mode = 0o755
 generated = true
 

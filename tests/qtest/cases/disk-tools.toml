@@ -75,7 +75,7 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
-send = "/bin/disk-tool-svcctl start blockd\n"
+send = "/sbin/disk-tool-svcctl start blockd\n"
 delay_ms = 100
 
 [[step]]
@@ -111,7 +111,7 @@ wait = '^newfs: block:0 UFS2 block=4096 frag=512 size=16777216 label=$'
 timeout_secs = 120
 
 [[step]]
-send = "/bin/disk-tool-svcctl start fsd-ufs\n"
+send = "/sbin/disk-tool-svcctl start fsd-ufs\n"
 delay_ms = 100
 
 [[step]]
@@ -119,7 +119,7 @@ wait = 'fsd-ufs: started'
 timeout_secs = 120
 
 [[step]]
-send = "/bin/disk-tool-mount ufs: /mnt\n"
+send = "/sbin/disk-tool-mount ufs: /mnt\n"
 delay_ms = 100
 
 [[step]]
@@ -151,7 +151,7 @@ wait = 'read:s110-disk-ok$'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/disk-tool-umount /mnt\n"
+send = "/sbin/disk-tool-umount /mnt\n"
 delay_ms = 100
 
 [[step]]
