@@ -1601,6 +1601,17 @@ name = "raven-http"
 version = "0.1.0"
 
 [[package]]
+name = "raven-http-net"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-http",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-ifconfig"
 version = "0.1.0"
 dependencies = [
