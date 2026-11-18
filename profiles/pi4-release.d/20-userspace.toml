@@ -221,6 +221,11 @@ path = "/etc/profile"
 mode = 0o644
 
 [[initfs.files]]
+src = "etc/brush/brushrc"
+path = "/etc/brush/brushrc"
+mode = 0o644
+
+[[initfs.files]]
 src = "etc/motd"
 path = "/etc/motd"
 mode = 0o644

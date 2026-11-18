@@ -39,6 +39,10 @@ pub const DEFAULT_HOME: &str = "/";
 pub const DEFAULT_TERM: &str = "vt100";
 /// Default login name; the release image has the root account only.
 pub const ROOT_USER: &str = "root";
+/// Authentication succeeded; getty starts the session shell.
+pub const LOGIN_OK: i32 = 0;
+/// Authentication failed; getty re-prompts instead of starting a shell.
+pub const LOGIN_RETRY: i32 = 1;
 /// Default session shell for the root login. Both getty release images stage brush.
 pub const DEFAULT_SHELL: &str = "/bin/brush";
 /// Longest accepted account/profile field.
@@ -172,6 +176,19 @@ pub fn root_shadow_line(text: &str) -> Option<&str> {
 #[must_use]
 pub fn verify_root_password(shadow_text: &str, password: &str) -> bool {
     root_shadow_line(shadow_text).is_some_and(|line| raven_auth::verify_root_shadow(line, password))
+}
+
+/// The exit status for one login attempt.
+///
+/// Only the root account can authenticate; an unknown account, a locked record or a wrong
+/// password all return [`LOGIN_RETRY`] so getty prints `Login incorrect` and prompts again.
+#[must_use]
+pub fn login_status(shadow_text: &str, username: &str, password: &str) -> i32 {
+    if is_root_user(username) && verify_root_password(shadow_text, password) {
+        LOGIN_OK
+    } else {
+        LOGIN_RETRY
+    }
 }
 
 /// Normalise a login name: trim ASCII whitespace, accept 1..=32 account characters.

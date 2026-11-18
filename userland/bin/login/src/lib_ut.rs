@@ -55,6 +55,14 @@ fn the_rel1b_default_hash_verifies_raven() {
 }
 
 #[test]
+fn login_status_returns_retry_for_a_wrong_password_and_ok_for_raven() {
+    assert_eq!(login_status(ROOT_SHADOW, "root", "raven"), LOGIN_OK);
+    assert_eq!(login_status(ROOT_SHADOW, "root", "wrong"), LOGIN_RETRY);
+    assert_eq!(login_status(ROOT_SHADOW, "nobody", "raven"), LOGIN_RETRY);
+    assert_eq!(login_status(ROOT_SHADOW, "root", ""), LOGIN_RETRY);
+}
+
+#[test]
 fn other_accounts_and_locked_hashes_never_verify() {
     let other = "nobody:$6$rounds=5000$salt$hash:0:0:99999:7:0:0:0";
     assert!(!verify_root_password(other, "raven"));
