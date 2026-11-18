@@ -71,6 +71,7 @@ members = [
     "tests/fixtures/dynamic-exec",
     "tests/fixtures/irq-dist",
     "tests/fixtures/smp-soak",
+    "tests/smp/memory",
     "tests/fixtures/s16-rights",
     "tests/fixtures/cap-revoke",
     "tests/fixtures/trace-context",
