@@ -46,6 +46,19 @@ impl<T> SpinMutex<T> {
         }
         SpinGuard { mutex: self }
     }
+
+    /// Try to acquire the lock without spinning.
+    pub fn try_lock(&self) -> Option<SpinGuard<'_, T>> {
+        if self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
+            Some(SpinGuard { mutex: self })
+        } else {
+            None
+        }
+    }
 }
 
 /// Guard returned by [`SpinMutex::lock`].
@@ -79,6 +92,15 @@ static SERIAL: SpinMutex<Serial> = SpinMutex::new(Serial);
 static LEVEL: AtomicU8 = AtomicU8::new(LogLevel::Info as u8);
 static TEST_EXIT: AtomicBool = AtomicBool::new(false);
 
+/// Deliberately hold the log lock for the exception-fallback injection.
+///
+/// Only reached when the `log-lock-fault` boot flag selects the injection in
+/// `arch/x86_64/exception.rs`; the guard is intentionally leaked so the fault path sees a held
+/// lock. The machine halts after the exception transcript.
+pub fn hold_lock_for_test() {
+    core::mem::forget(SERIAL.lock());
+}
+
 /// Set the log level parsed from the command line.
 pub fn init(level: LogLevel) {
     LEVEL.store(level as u8, Ordering::Release);
@@ -111,6 +133,23 @@ pub fn _print_line(args: fmt::Arguments<'_>) {
     let _ = serial.write_str("\n");
 }
 
+/// Write one emergency line without waiting for the log lock.
+///
+/// The exception path uses this path so a held/corrupted log lock cannot hang the fault handler.
+/// Normal logging remains serialized; this fallback may interleave with another CPU's output but
+/// always produces the diagnostic.
+pub fn _print_line_emergency(args: fmt::Arguments<'_>) {
+    if let Some(mut serial) = SERIAL.try_lock() {
+        let _ = serial.write_fmt(args);
+        let _ = serial.write_str("\n");
+        return;
+    }
+    crate::arch::serial::init();
+    let mut serial = Serial;
+    let _ = serial.write_fmt(args);
+    let _ = serial.write_str("\n");
+}
+
 /// Write one line when `level` is enabled.
 pub fn _print_level(level: LogLevel, args: fmt::Arguments<'_>) {
     if level_enabled(level) {
@@ -126,6 +165,17 @@ macro_rules! kprintln {
     };
     ($($arg:tt)*) => {
         $crate::log::_print_line(core::format_args!($($arg)*))
+    };
+}
+
+/// Write one line from exception context without waiting for the log lock.
+#[macro_export]
+macro_rules! kprintln_emergency {
+    () => {
+        $crate::log::_print_line_emergency(core::format_args!(""))
+    };
+    ($($arg:tt)*) => {
+        $crate::log::_print_line_emergency(core::format_args!($($arg)*))
     };
 }
 
