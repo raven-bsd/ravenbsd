@@ -913,6 +913,7 @@ dependencies = [
  "raven-driver",
  "raven-pi4-xhci",
  "raven-rt",
+ "raven-scheme",
  "raven-usb-core",
  "raven-usb-hid",
  "raven-xhci",
@@ -4285,7 +4286,9 @@ checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 name = "usb-hid"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-rt",
+ "raven-scheme",
  "raven-usb-hid",
 ]
 
