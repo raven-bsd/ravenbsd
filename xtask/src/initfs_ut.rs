@@ -335,3 +335,45 @@ fn missing_fixtures_skips_existing_sources() {
     let profile = profile(&[("build/fixtures/pi4-release/one.dtb", "/one")]);
     assert!(missing_fixtures(&profile, |_| true).is_empty());
 }
+
+#[test]
+fn release_userspace_paths_cover_staged_and_target_caches() {
+    let root = Path::new("/repo");
+    assert_eq!(
+        release_userspace_paths(root, Arch::X86_64),
+        [
+            PathBuf::from("/repo/build/x86_64/brush"),
+            PathBuf::from("/repo/build/x86_64/uutils"),
+            PathBuf::from("/repo/build/cargo/brush-x86_64"),
+            PathBuf::from("/repo/build/cargo/uutils-x86_64"),
+        ]
+    );
+    assert_eq!(
+        release_userspace_paths(root, Arch::Aarch64),
+        [
+            PathBuf::from("/repo/build/aarch64/brush"),
+            PathBuf::from("/repo/build/aarch64/uutils"),
+            PathBuf::from("/repo/build/cargo/brush-aarch64"),
+            PathBuf::from("/repo/build/cargo/uutils-aarch64"),
+        ]
+    );
+}
+
+#[test]
+fn release_purge_removes_staged_and_target_caches() {
+    let root = std::env::temp_dir().join(format!("raven-s122-purge-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("build/x86_64/uutils")).unwrap();
+    std::fs::create_dir_all(root.join("build/cargo/brush-x86_64")).unwrap();
+    std::fs::create_dir_all(root.join("build/cargo/uutils-x86_64")).unwrap();
+    std::fs::write(root.join("build/x86_64/brush"), b"stale").unwrap();
+    std::fs::write(root.join("build/x86_64/uutils/ls"), b"stale").unwrap();
+    std::fs::write(root.join("build/cargo/brush-x86_64/artifact"), b"stale").unwrap();
+    std::fs::write(root.join("build/cargo/uutils-x86_64/artifact"), b"stale").unwrap();
+
+    purge_release_userspace(&root, Arch::X86_64).unwrap();
+    for path in release_userspace_paths(&root, Arch::X86_64) {
+        assert!(!path.exists(), "{} still exists", path.display());
+    }
+    std::fs::remove_dir_all(&root).unwrap();
+}
