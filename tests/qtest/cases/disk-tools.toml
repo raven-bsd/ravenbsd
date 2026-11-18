@@ -75,7 +75,7 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
-send = "svcctl start blockd\n"
+send = "/bin/svcctl start blockd\n"
 delay_ms = 100
 
 [[step]]
@@ -83,7 +83,7 @@ wait = '^blockd running [0-9]+$'
 timeout_secs = 120
 
 [[step]]
-send = "lsblk\n"
+send = "/bin/lsblk\n"
 delay_ms = 100
 
 [[step]]
@@ -91,7 +91,7 @@ wait = '^block0p1 [0-9]+ 32768 part ufs-root$'
 timeout_secs = 30
 
 [[step]]
-send = "gpart show\n"
+send = "/sbin/gpart show\n"
 delay_ms = 100
 
 [[step]]
@@ -103,7 +103,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "newfs block:0\n"
+send = "/sbin/newfs block:0\n"
 delay_ms = 100
 
 [[step]]
@@ -111,7 +111,7 @@ wait = '^newfs: block:0 UFS2 block=4096 frag=512 size=0 label=$'
 timeout_secs = 120
 
 [[step]]
-send = "svcctl start fsd-ufs\n"
+send = "/bin/svcctl start fsd-ufs\n"
 delay_ms = 100
 
 [[step]]
@@ -119,7 +119,7 @@ wait = '^fsd-ufs running [0-9]+$'
 timeout_secs = 120
 
 [[step]]
-send = "mkdir -p /mnt\n"
+send = "/bin/mkdir -p /mnt\n"
 delay_ms = 100
 
 [[step]]
@@ -127,7 +127,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "mount ufs: /mnt\n"
+send = "/sbin/mount ufs: /mnt\n"
 delay_ms = 100
 
 [[step]]
@@ -151,7 +151,7 @@ wait = '^s110-disk-ok$'
 timeout_secs = 30
 
 [[step]]
-send = "umount /mnt\n"
+send = "/sbin/umount /mnt\n"
 delay_ms = 100
 
 [[step]]
