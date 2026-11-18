@@ -27,5 +27,7 @@ pub use mailbox::{
     TAG_GET_POWERSTATE,
 };
 pub use platform::{FakePlatform, Platform};
-pub use protocol::{GPIO_LEVEL, GPIO_SET_FUNCTION, GPIO_SET_PULL, Resource, parse_resource};
+pub use protocol::{
+    GPIO_LEVEL, GPIO_SET_FUNCTION, GPIO_SET_LEVEL, GPIO_SET_PULL, Resource, parse_resource,
+};
 pub use rng::{FakeRng, MAX_RNG_BYTES, Registers, Rng, Rng200};

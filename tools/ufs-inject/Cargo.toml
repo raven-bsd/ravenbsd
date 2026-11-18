@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "ufs-inject"
+version = "0.1.0"
+description = "Host-side in-place UFS1/UFS2 image and partition writer."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ufs-core = { path = "../../crates/ufs-core" }
+ufs-mkfs = { path = "../ufs-mkfs" }
+
+[[bin]]
+name = "ufs-inject"
+path = "src/main.rs"
+
+[lints]
+workspace = true

@@ -18,6 +18,8 @@ extern crate alloc;
 #[cfg(target_os = "none")]
 mod fake;
 #[cfg(target_os = "none")]
+mod kbd;
+#[cfg(target_os = "none")]
 mod real;
 
 #[cfg(target_os = "none")]

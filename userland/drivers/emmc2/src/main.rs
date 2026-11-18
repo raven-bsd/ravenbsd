@@ -27,10 +27,11 @@ mod program {
     use alloc::vec::Vec;
 
     use emmc2::block::{BlockDevice, BlockError, BlockPlan, BlockService, MemoryDisk};
+    use emmc2::options::Options;
     use emmc2::pattern::{self, Hasher, SECTOR_SIZE};
     use emmc2::{CardReady, DriverError, Host, init_card};
     use raven_abi::errno::Errno;
-    use raven_abi::types::{Handle, clock};
+    use raven_abi::types::clock;
     use raven_driver::{DmaRegion, Irq, MmioRegion};
     use raven_pi4::dma::{DmaError, plan_sdma};
     use raven_pi4::fdt::DmaWindow;
@@ -50,10 +51,6 @@ mod program {
 
     entry!(main);
 
-    /// Register window size from the Pi 4 device tree.
-    const MMIO_SIZE: usize = 0x100;
-    /// DMA window used by the real path.
-    const DMA_BYTES: usize = 128 * SECTOR_SIZE;
     /// Memory-disk size used by the test mode.
     const TEST_SECTORS: usize = 8192;
     /// First sector of the deterministic pattern.
@@ -67,38 +64,6 @@ mod program {
     /// The S11 `OPEN` opcode.
     const OPEN_OPCODE: u16 = 1;
 
-    /// Program options parsed from the service arguments.
-    struct Options {
-        mmio: Handle,
-        dma: Handle,
-        irq: Handle,
-        mmio_size: usize,
-        dma_size: usize,
-        clock_hz: Option<u32>,
-        window: DmaWindow,
-        disk: Option<String>,
-    }
-
-    impl Default for Options {
-        fn default() -> Self {
-            Self {
-                mmio: Handle::new(3, 0),
-                dma: Handle::new(4, 0),
-                irq: Handle::new(5, 0),
-                mmio_size: MMIO_SIZE,
-                dma_size: DMA_BYTES,
-                clock_hz: None,
-                // The Pi 4 `emmc2bus` view; the platform launcher overrides this from the DTB.
-                window: DmaWindow {
-                    bus_base: 0xc000_0000,
-                    cpu_base: 0,
-                    size: 0x4000_0000,
-                },
-                disk: None,
-            }
-        }
-    }
-
     fn main(args: raven_rt::Args) -> i32 {
         match run(args) {
             Ok(()) => 0,
@@ -110,67 +75,12 @@ mod program {
     }
 
     fn run(args: raven_rt::Args) -> Result<(), String> {
-        let mut test = false;
-        let mut options = Options::default();
-        for (index, argument) in args.iter().enumerate() {
-            // svcd passes the manifest args directly, so argv[0] is the first option; devd-like
-            // launchers prepend the program path. Skip a path-shaped argv[0] in that case.
-            if index == 0 && (argument.contains('/') || argument == "emmc2") {
-                continue;
-            }
-            if argument == "test" {
-                test = true;
-            } else if let Some(value) = argument.strip_prefix("mmio_handle=") {
-                options.mmio = parse_handle(value)?;
-            } else if let Some(value) = argument.strip_prefix("dma_handle=") {
-                options.dma = parse_handle(value)?;
-            } else if let Some(value) = argument.strip_prefix("irq_handle=") {
-                options.irq = parse_handle(value)?;
-            } else if let Some(value) = argument.strip_prefix("mmio_size=") {
-                options.mmio_size = parse_usize(value)?;
-            } else if let Some(value) = argument.strip_prefix("dma_size=") {
-                options.dma_size = parse_usize(value)?;
-            } else if let Some(value) = argument.strip_prefix("clock=") {
-                options.clock_hz = Some(parse_u32(value)?);
-            } else if let Some(value) = argument.strip_prefix("window_bus=") {
-                options.window.bus_base = parse_u64(value)?;
-            } else if let Some(value) = argument.strip_prefix("window_cpu=") {
-                options.window.cpu_base = parse_u64(value)?;
-            } else if let Some(value) = argument.strip_prefix("window_size=") {
-                options.window.size = parse_u64(value)?;
-            } else if let Some(value) = argument.strip_prefix("disk=") {
-                options.disk = Some(value.to_string());
-            } else {
-                return Err(format!("unknown argument `{argument}`"));
-            }
-        }
-        if test {
+        let args: Vec<&str> = args.iter().collect();
+        let options = Options::parse(&args)?;
+        if options.test {
             run_test(&options)
         } else {
             run_real(options)
-        }
-    }
-
-    fn parse_handle(value: &str) -> Result<Handle, String> {
-        let raw = value
-            .parse::<u32>()
-            .map_err(|_| format!("bad handle `{value}`"))?;
-        Ok(Handle::new(raw, 0))
-    }
-
-    fn parse_usize(value: &str) -> Result<usize, String> {
-        value.parse().map_err(|_| format!("bad number `{value}`"))
-    }
-
-    fn parse_u32(value: &str) -> Result<u32, String> {
-        value.parse().map_err(|_| format!("bad number `{value}`"))
-    }
-
-    fn parse_u64(value: &str) -> Result<u64, String> {
-        if let Some(hex) = value.strip_prefix("0x") {
-            u64::from_str_radix(hex, 16).map_err(|_| format!("bad number `{value}`"))
-        } else {
-            value.parse().map_err(|_| format!("bad number `{value}`"))
         }
     }
 
@@ -214,7 +124,7 @@ mod program {
 
         let disk = MemoryDisk::new(&mut data, false).map_err(describe)?;
         let service = BlockService::new(disk).map_err(describe_block)?;
-        let mut handler = DiskHandler::new(service, true);
+        let mut handler = DiskHandler::new(service, !options.persist);
         serve(&mut handler)
     }
 
@@ -509,17 +419,17 @@ mod program {
         service: BlockService<D>,
         opens: OpenTable<()>,
         pending: Option<(u64, String)>,
-        test: bool,
+        shutdown_on_flush: bool,
         shutdown: bool,
     }
 
     impl<D: BlockDevice> DiskHandler<D> {
-        fn new(service: BlockService<D>, test: bool) -> Self {
+        fn new(service: BlockService<D>, shutdown_on_flush: bool) -> Self {
             Self {
                 service,
                 opens: OpenTable::new(),
                 pending: None,
-                test,
+                shutdown_on_flush,
                 shutdown: false,
             }
         }
@@ -592,7 +502,7 @@ mod program {
                 .service
                 .handle(request, response)
                 .map_err(|_| HandlerError::from(Errno::EPROTO))?;
-            if self.test
+            if self.shutdown_on_flush
                 && let Ok(decoded) = decoded
                 && decoded.op == Op::Flush
             {

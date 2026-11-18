@@ -146,6 +146,9 @@ pub extern "C" fn pi4_main(dtb_phys: u64, bias: u64) -> ! {
         BOOT_INFO.0.get().write(info);
     }
     let boot = HHDM_BASE.wrapping_add(bootinfo_phys) as *const BootInfo;
+    // HDMI1: the mailbox needs the physical address of kernel statics and of the firmware
+    // framebuffer, so publish the higher-half to physical offset before `kmain`.
+    super::fb::set_kernel_offset(kernel_offset);
     crate::arch::aarch64::kmain::kmain(boot)
 }
 

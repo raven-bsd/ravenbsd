@@ -26,7 +26,9 @@
 //! Memory ordering: the shooter stores the range and the per-CPU pending sequence with
 //! `SeqCst` before sending the IPI; the handler loads the pending sequence and the range with
 //! `SeqCst`, executes `invlpg`, then stores the acknowledgement with `SeqCst`. The shooter's
-//! acknowledgement load is `SeqCst`, so the flush happens before the page tables are reused.
+//! acknowledgement/flush-generation load is `SeqCst`, so the flush happens before the page
+//! tables are reused. The handler publishes `LAST` immediately after the invalidation and the
+//! explicit `ACKED` after it; the shooter accepts either as completion.
 //!
 //! # Fault injection
 //!
@@ -146,15 +148,26 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
     cpu = 0;
     while cpu < online {
         if cpu != me {
-            while ACKED[cpu].load(Ordering::SeqCst) != sequence {
+            while ACKED[cpu].load(Ordering::SeqCst) != sequence
+                && LAST[cpu].load(Ordering::SeqCst) != sequence
+            {
                 if time::now_ns() > deadline {
                     // Reset the mailbox so a late IPI is ignored instead of acknowledging a
                     // stale sequence; the next shootdown publishes a fresh one.
                     PENDING[cpu].store(0, Ordering::SeqCst);
+                    let (state, last_irq, last_state) = percpu::snapshot(cpu);
+                    let (in_syscall, user_flags, syscall_number) = percpu::syscall_state(cpu);
+                    let page_fault = percpu::page_fault_active(cpu);
+                    let page_fault_phase = percpu::page_fault_phase(cpu);
+                    let wait_phase = percpu::wait_phase(cpu);
+                    let now = time::now_ns();
                     kprintln!(
-                        "smp: tlb shootdown timeout on cpu {cpu} seq={sequence} last={} flushes={}",
+                        "smp: tlb shootdown timeout on cpu {cpu} seq={sequence} last={} flushes={} state={state} syscall={in_syscall} pf={page_fault} pfp={page_fault_phase} wq={wait_phase} nr={syscall_number:#x} user_if={} irq_age_ms={} state_age_ms={}",
                         LAST[cpu].load(Ordering::SeqCst),
-                        flush_count(cpu)
+                        flush_count(cpu),
+                        (user_flags >> 9) & 1,
+                        now.saturating_sub(last_irq) / 1_000_000,
+                        now.saturating_sub(last_state) / 1_000_000
                     );
                     all_acked = false;
                     break;

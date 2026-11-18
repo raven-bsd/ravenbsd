@@ -498,6 +498,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-fetch-patch"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+]
+
+[[package]]
 name = "hw-sound-client"
 version = "0.1.0"
 dependencies = [
@@ -881,6 +888,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pi4-root-rw-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "pi4-xhci"
 version = "0.1.0"
 dependencies = [
@@ -888,6 +904,7 @@ dependencies = [
  "raven-driver",
  "raven-pi4-xhci",
  "raven-rt",
+ "raven-scheme",
  "raven-usb-core",
  "raven-usb-hid",
  "raven-xhci",
@@ -1449,6 +1466,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-fb"
+version = "0.1.0"
+
+[[package]]
 name = "raven-fdt-lite"
 version = "0.1.0"
 
@@ -1583,6 +1604,21 @@ dependencies = [
  "raven-abi",
  "raven-proto-fs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-http"
+version = "0.1.0"
+
+[[package]]
+name = "raven-http-net"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-http",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -2315,6 +2351,13 @@ dependencies = [
  "raven-abi",
  "raven-proto-fs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-login"
+version = "0.1.0"
+dependencies = [
+ "login",
 ]
 
 [[package]]
@@ -3397,6 +3440,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sntp"
+version = "0.1.0"
+
+[[package]]
 name = "raven-spawn"
 version = "0.1.0"
 dependencies = [
@@ -4178,6 +4225,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufs-inject"
+version = "0.1.0"
+dependencies = [
+ "ufs-core",
+ "ufs-mkfs",
+]
+
+[[package]]
 name = "ufs-mkfs"
 version = "0.1.0"
 dependencies = [
@@ -4233,7 +4288,9 @@ checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 name = "usb-hid"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-rt",
+ "raven-scheme",
  "raven-usb-hid",
 ]
 

@@ -514,6 +514,8 @@ pub fn tick() {
     if !INITIALIZED.load(Ordering::Acquire) {
         return;
     }
+    #[cfg(target_arch = "x86_64")]
+    crate::sched::smp::percpu::note_irq();
     let cpu = this_cpu();
     let _guard = sync::critical();
     let now = time::now_ns();

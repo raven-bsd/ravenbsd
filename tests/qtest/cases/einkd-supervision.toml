@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# E1e/S85 BSP supervision gate (aarch64). The fixture initfs stages the separate ravenbsd-rpi
+# einkd binary at /sbin/einkd and a tiny /init wrapper starts it with --dry-run --once. No login,
+# service supervisor or x86 release image is involved; the boot/getty path is unchanged.
+name = "einkd-supervision"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/einkd-supervision/build.sh"]
+initfs = "build/fixtures/einkd-supervision/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^einkd: start mode=dry-run once=true$'
+
+[[expect]]
+regex = '^einkd: fetch static text$'
+
+[[expect]]
+regex = '^einkd: dry-run refresh black=[0-9]+$'
+
+[[expect]]
+regex = '^einkd: refreshed next_at=[0-9]+$'
+
+[[expect]]
+regex = '^einkd: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|einkd: .*failed|einkd-supervision: exec failed'

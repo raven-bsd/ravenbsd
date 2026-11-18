@@ -38,6 +38,7 @@ const FILE_WORKERS: usize = 4;
 const MOUNT_WORKERS: usize = 4;
 const WORKERS: usize = FILE_WORKERS + MOUNT_WORKERS;
 const ITERATIONS: usize = 50;
+const TRACE: bool = false;
 const STACK_SIZE: usize = 128 * 1024;
 /// Headroom below the slot top for the deepest call frame and its buffers.
 const STACK_GUARD: usize = 16 * 1024;
@@ -127,6 +128,24 @@ fn first16(data: &[u8]) -> [u8; 16] {
     let take = data.len().min(first.len());
     first[..take].copy_from_slice(&data[..take]);
     first
+}
+
+fn step<T>(
+    worker: usize,
+    iteration: usize,
+    name: &str,
+    result: Result<T, Errno>,
+) -> Result<T, Errno> {
+    if TRACE {
+        match &result {
+            Ok(_) => println!("smp-fs: step worker={worker} iter={iteration} {name}=ok"),
+            Err(error) => println!(
+                "smp-fs: step worker={worker} iter={iteration} {name}={}",
+                error.description()
+            ),
+        }
+    }
+    result
 }
 
 fn record(op: usize, worker: usize, iteration: usize, start: u64) {
@@ -261,15 +280,36 @@ fn mmap_cycle(worker: usize, iteration: usize, path: &str) -> Result<(), Errno> 
     let (object, source) = attach_mmap(path, 0, PAGE as u64, true)?;
     phase(worker, iteration, "mmap attach");
     let result = (|| {
-        let address = sys::map_object(object, 0, PAGE, (prot::READ | prot::WRITE) as usize, true)?;
+        let address = step(
+            worker,
+            iteration,
+            "map_object",
+            sys::map_object(object, 0, PAGE, (prot::READ | prot::WRITE) as usize, true),
+        )?;
         phase(worker, iteration, "mmap map");
         let marker = [0x53u8, 0x4d, 0x50, 0x2d, 0x4d];
         sys::copy_to_mapping(address, &marker);
         phase(worker, iteration, "mmap copy");
-        sys::msync(Handle::SELF_PROC, address, PAGE, MS_SYNC)?;
+        step(
+            worker,
+            iteration,
+            "msync",
+            sys::msync(Handle::SELF_PROC, address, PAGE, MS_SYNC),
+        )?;
         phase(worker, iteration, "mmap sync");
         let contents = fs::read_to_vec(&file_path(path))?;
-        sys::unmap(Handle::SELF_PROC, address, PAGE)?;
+        if TRACE {
+            println!(
+                "smp-fs: mmap read worker={worker} iter={iteration} path={path} len={}",
+                contents.len()
+            );
+        }
+        step(
+            worker,
+            iteration,
+            "unmap",
+            sys::unmap(Handle::SELF_PROC, address, PAGE),
+        )?;
         phase(worker, iteration, "mmap unmap");
         if contents.get(..marker.len()) != Some(&marker) {
             return Err(Errno::EIO);
@@ -283,7 +323,23 @@ fn mmap_cycle(worker: usize, iteration: usize, path: &str) -> Result<(), Errno> 
 
 fn attach_mmap(path: &str, offset: u64, len: u64, shared: bool) -> Result<(Handle, Handle), Errno> {
     let client = Client::new();
-    let handle = client.open(&format!("file:{path}"), READ_WRITE)?;
+    let handle = match client.open(&format!("file:{path}"), READ_WRITE) {
+        Ok(handle) => {
+            if TRACE {
+                println!("smp-fs: attach path={path} open={}", handle.0);
+            }
+            handle
+        }
+        Err(error) => {
+            if TRACE {
+                println!(
+                    "smp-fs: attach path={path} open-err={}",
+                    error.description()
+                );
+            }
+            return Err(error);
+        }
+    };
     let request = CallRequest::new(Call::Mmap {
         offset,
         len,
@@ -295,6 +351,15 @@ fn attach_mmap(path: &str, offset: u64, len: u64, shared: bool) -> Result<(Handl
         .map_err(|error| error.errno())?;
     let mut response = [0u8; 8];
     let result = client.call(handle, &encoded[..encoded_len], &mut response);
+    if TRACE {
+        match &result {
+            Ok(count) => println!("smp-fs: attach path={path} call={count}"),
+            Err(error) => println!(
+                "smp-fs: attach path={path} call-err={}",
+                error.description()
+            ),
+        }
+    }
     let count = match result {
         Ok(count) => count,
         Err(error) => {
@@ -310,6 +375,11 @@ fn attach_mmap(path: &str, offset: u64, len: u64, shared: bool) -> Result<(Handl
     if count < 8 {
         let _ = client.close(handle);
         return Err(Errno::EPROTO);
+    }
+    if TRACE {
+        let object = u32::from_le_bytes(response[..4].try_into().unwrap_or([0u8; 4]));
+        let rights = u32::from_le_bytes(response[4..8].try_into().unwrap_or([0u8; 4]));
+        println!("smp-fs: attach path={path} object={object} rights={rights:#x}");
     }
     Ok((
         Handle(u32::from_le_bytes(
@@ -416,16 +486,29 @@ fn mount_cycle(worker: usize, iteration: usize) -> Result<(), (u16, Errno)> {
         return Err((25, Errno::EIO));
     }
 
-    // Remount gets a fresh ramfs; the previous file must not survive.
+    // `ramfs:` is one shared in-memory server in this build, not a fresh instance per mount.
+    // Remounting the same scheme at the same path therefore restores that backing tree: the
+    // file written before the umount must reappear with its content. This still checks that
+    // the mount table detaches the path on umount and resolves it back to the same server on
+    // remount.
     set_phase(slot, 35);
     fs::mount(&mount, "ramfs:").map_err(|e| (26, e))?;
     set_phase(slot, 36);
-    if fs::stat(&file_path(&file)) != Err(Errno::ENOENT) {
+    let remounted = fs::read_to_vec(&file_path(&file)).map_err(|e| (27, e))?;
+    if remounted != data {
+        println!(
+            "smp-fs: mismatch worker={slot} iter={iteration} phase=27 path={file} expected={:?} got={:?}",
+            first16(&data),
+            first16(&remounted)
+        );
         return Err((27, Errno::EIO));
     }
     set_phase(slot, 37);
     fs::umount(&mount).map_err(|e| (28, e))?;
     set_phase(slot, 38);
+    if fs::stat(&file_path(&file)) != Err(Errno::ENOENT) {
+        return Err((29, Errno::EIO));
+    }
     Ok(())
 }
 
@@ -461,15 +544,17 @@ fn start_services() -> Result<(), String> {
     let image = raven_rt::map_initfs().map_err(|_| "initfs map".to_string())?;
     let initfs = Initfs::parse(image).map_err(|_| "initfs parse".to_string())?;
     for path in ["/sbin/initfsd", "/sbin/ramfsd", "/sbin/vfsd"] {
-        spawn(
-            &initfs,
-            path,
-            &SpawnOptions {
-                args: &[],
-                env: &[],
-            },
-        )
-        .map_err(|_| format!("spawn {path}"))?;
+        let env: &[&str] = if TRACE {
+            match path {
+                "/sbin/ramfsd" => &["RAMFSD_TRACE=1"],
+                "/sbin/vfsd" => &["VFSD_TRACE=1"],
+                _ => &[],
+            }
+        } else {
+            &[]
+        };
+        spawn(&initfs, path, &SpawnOptions { args: &[], env })
+            .map_err(|_| format!("spawn {path}"))?;
         let scheme = match path {
             "/sbin/initfsd" => "initfs:",
             "/sbin/ramfsd" => "ramfs:",

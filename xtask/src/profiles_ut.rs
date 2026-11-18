@@ -156,6 +156,30 @@ fn generated_files_must_live_under_build() {
 }
 
 #[test]
+fn external_bsp_generated_source_is_allowed() {
+    let tree = Tree::new();
+    tree.profile("base", BASE);
+    tree.write(
+        "profiles/base.d/bsp.toml",
+        "[[initfs.files]]\nsrc = \"../ravenbsd-rpi/build/aarch64/einkd\"\npath = \"/sbin/einkd\"\nmode = 493\ngenerated = true\n",
+    );
+    let profile = Profile::load(&tree.root, "base").unwrap();
+    assert!(profile.initfs.files[0].generated);
+}
+
+#[test]
+fn external_bsp_traversal_is_rejected() {
+    let tree = Tree::new();
+    tree.profile("base", BASE);
+    tree.write(
+        "profiles/base.d/bsp.toml",
+        "[[initfs.files]]\nsrc = \"../ravenbsd-rpi/build/../../etc/passwd\"\npath = \"/x\"\ngenerated = true\n",
+    );
+    let error = Profile::load(&tree.root, "base").unwrap_err().to_string();
+    assert!(error.contains("not repo-relative"));
+}
+
+#[test]
 fn regular_file_source_is_still_required() {
     let tree = Tree::new();
     tree.profile("base", BASE);

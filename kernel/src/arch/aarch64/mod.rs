@@ -4,6 +4,8 @@
 //! aarch64 architecture support.
 
 pub mod ap_start;
+#[cfg(raven_pi4)]
+pub mod fb;
 pub mod fdt;
 pub mod fpu;
 pub mod gic;

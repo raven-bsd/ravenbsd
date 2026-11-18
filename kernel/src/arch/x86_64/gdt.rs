@@ -238,8 +238,19 @@ pub fn init() {
 }
 
 /// Load `cpu`'s GDT and TSS on that CPU.
+///
+/// The CPU sets the TSS descriptor's busy bit when `ltr` loads it. An AP that is restarted (a
+/// SIPI retry after a late start) must load the same TSS again; rebuilding the descriptor from
+/// the available type clears that busy bit, otherwise `ltr` raises #GP.
 pub fn load(cpu: usize) {
+    let tss = tss_cell(cpu).0.get();
+    let table = build_gdt(tss as usize as u64);
     let gdt = gdt_cell(cpu).0.get();
+    // SAFETY: the owning CPU writes its own GDT immediately before `lgdt`; no other CPU reads
+    // this per-CPU table.
+    unsafe {
+        core::ptr::copy_nonoverlapping(table.as_ptr(), gdt.cast::<u64>(), GDT_ENTRIES);
+    }
     let pointer = DescriptorTablePointer {
         limit: size_of::<[u64; GDT_ENTRIES]>().saturating_sub(1) as u16,
         base: gdt as usize as u64,

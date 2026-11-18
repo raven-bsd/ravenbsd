@@ -48,8 +48,13 @@ pub const WUNTRACED: u32 = 2;
 pub const WSTOPPED: u32 = 2;
 /// Report exited children.
 pub const WEXITED: u32 = 4;
-/// Report continued children.
+/// Report continued children (`sys/wait.h` / musl public value).
 pub const WCONTINUED: u32 = 8;
+/// Raw `PROC_WAIT_EX` continued bit.
+///
+/// The kernel wait ABI uses 4, while the public `sys/wait.h` keeps the musl/Linux value 8.
+/// [`crate::wait_status::kernel_wait_options`] translates one to the other.
+pub const KERNEL_WCONTINUED: u32 = 4;
 /// Leave the child waitable.
 pub const WNOWAIT: u32 = 0x0100_0000;
 /// BSD compatibility bit, accepted and ignored.

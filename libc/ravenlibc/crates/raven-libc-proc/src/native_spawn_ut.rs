@@ -4,7 +4,7 @@
 //! Host tests for the P9a native spawner.
 
 use super::*;
-use crate::consts::{P_ALL, P_PID, WNOHANG};
+use crate::consts::{KERNEL_WCONTINUED, P_ALL, P_PID, WCONTINUED, WNOHANG};
 use crate::errors::{EBADF, ECHILD};
 
 use core::cell::{Cell, RefCell};
@@ -18,6 +18,7 @@ struct FakeLoader {
     code: i32,
     close_calls: Cell<usize>,
     waited: Cell<bool>,
+    last_options: Cell<u32>,
 }
 
 impl FakeLoader {
@@ -31,6 +32,7 @@ impl FakeLoader {
             code,
             close_calls: Cell::new(0),
             waited: Cell::new(false),
+            last_options: Cell::new(0),
         }
     }
 }
@@ -57,6 +59,7 @@ impl Loader for FakeLoader {
     }
 
     fn wait_ex(&self, _idtype: u32, id: i32, options: u32) -> Result<(i32, i32), Errno> {
+        self.last_options.set(options);
         if id != 42 && id != 0 {
             return Err(ECHILD);
         }
@@ -246,6 +249,23 @@ fn wnohang_does_not_reap_and_wait_any_uses_the_kernel_seam() {
     let ready = spawner.wait(P_ALL, 0, 0).expect("wait any");
     assert_eq!(ready.pid, 42);
     assert_eq!(spawner.loader.close_calls.get(), 1);
+}
+
+#[test]
+fn wait_translates_public_continued_to_the_kernel_word() {
+    let loader = FakeLoader::new(7, 0);
+    let spawner = NativeSpawner::new(
+        loader,
+        FakeInfo {
+            pid: 42,
+            fail: false,
+        },
+    );
+    spawner
+        .spawn(&request(b"/bin/ls", b"/", &[]))
+        .expect("spawn");
+    spawner.wait(P_PID, 42, WCONTINUED).expect("wait");
+    assert_eq!(spawner.loader.last_options.get(), KERNEL_WCONTINUED);
 }
 
 #[test]

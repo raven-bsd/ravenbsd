@@ -215,17 +215,26 @@ impl EntrySet {
     fn validate_files(&self, root: &Path, name: &str) -> Result<()> {
         for file in &self.files {
             let source = Path::new(&file.src);
+            // The separate ravenbsd-rpi BSP repo is staged by the pi4-eink profile. It lives
+            // beside this checkout, so exactly one `..` is allowed before the BSP build output;
+            // any further traversal is still rejected.
+            let external_bsp = file.src.starts_with("../ravenbsd-rpi/build/")
+                && !source
+                    .components()
+                    .skip(3)
+                    .any(|part| matches!(part, PathComponent::ParentDir));
             if source.is_absolute()
-                || source
+                || (source
                     .components()
                     .any(|part| matches!(part, PathComponent::ParentDir))
+                    && !external_bsp)
             {
                 bail!(
                     "profile `{name}` file source `{}` is not repo-relative",
                     file.src
                 );
             }
-            if file.generated && !source.starts_with("build") {
+            if file.generated && !source.starts_with("build") && !external_bsp {
                 bail!(
                     "profile `{name}` generated file source `{}` is not under build/",
                     file.src

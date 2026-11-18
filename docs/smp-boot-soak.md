@@ -36,7 +36,7 @@ sh scripts/smp-boot-soak.sh --kvm4 50 --kvm2 20 --kvm1 20 --tcg4 10
 ```
 
 Useful options: `--timeout-kvm SEC` (default 15), `--timeout-tcg SEC` (default 30), `--image PATH`,
-`--out DIR`, `--build`, `--wait-for-idle SEC`, `--max-load LOAD`.
+`--out DIR`, `--build`, `--wait-for-idle SEC`, `--max-load LOAD` (default `max(2, nproc/4)`; 5.0 on a 20-CPU host).
 
 ## Exclusive-host preflight
 

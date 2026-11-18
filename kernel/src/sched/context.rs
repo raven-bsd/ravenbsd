@@ -192,6 +192,16 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
     unsafe {
         sync::set_preempt_count(to.preempt_count.load(Ordering::SeqCst));
     }
+    #[cfg(target_arch = "x86_64")]
+    {
+        crate::sched::smp::percpu::note_switch(to.user);
+        // The per-CPU diagnostic follows the incoming thread: a blocked syscall thread keeps
+        // `fpu_saved` set even after it leaves the CPU, so do not carry its marker over.
+        crate::sched::smp::percpu::note_syscall(to.user && to.fpu_saved.load(Ordering::Acquire));
+        crate::sched::smp::percpu::note_page_fault(false);
+        crate::sched::smp::percpu::note_page_fault_phase(0);
+        crate::sched::smp::percpu::note_wait_phase(0);
+    }
 
     ap_start::set_kernel_rsp(to.kernel_stack_top);
     ap_start::set_current_thread(to as *const Thread as u64);
@@ -402,6 +412,7 @@ fn idle_forever() -> ! {
 #[cfg(target_arch = "x86_64")]
 unsafe fn enter_user(entry: u64, stack: u64, arg: u64) -> ! {
     let percpu = ap_start::percpu_address(crate::sched::smp::percpu::this_cpu());
+    crate::sched::smp::percpu::note_user_flags(0x202);
     let gs_base = rdmsr(IA32_GS_BASE);
     if gs_base == percpu {
         // The kernel arrived from ring 3 through a syscall/trap and is in swapped state.
@@ -592,7 +603,16 @@ pub(crate) fn read_rsp() -> u64 {
 /// before any Rust syscall code runs. Kernel threads are ignored.
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
-pub extern "C" fn sched_syscall_enter() {
+pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapframe::TrapFrame) {
+    crate::sched::smp::percpu::note_syscall(true);
+    if !frame.is_null() {
+        // SAFETY: the syscall stub passes its live trap frame in `rdi`.
+        let flags = unsafe { (*frame).rflags };
+        // SAFETY: the same live trap frame is valid; the stub still owns it for this call.
+        let number = unsafe { (*frame).rax };
+        crate::sched::smp::percpu::note_user_flags(flags);
+        crate::sched::smp::percpu::note_syscall_number(number);
+    }
     let Some(thread) = crate::sched::current_thread() else {
         return;
     };
@@ -605,12 +625,53 @@ pub extern "C" fn sched_syscall_enter() {
             fpu::save(thread.fpu_area_ptr());
         }
     }
+    // syscall entry masks IF. The memory, scheme IPC and futex syscalls can be long; keep only
+    // those interruptible so a target CPU can take an SMP TLB IPI while the other syscall paths
+    // stay non-preemptible. Router/wait-queue state uses IRQ-safe locks, so the wake graph
+    // remains protected even with IF enabled here. `sched_syscall_exit` masks again before the
+    // final swapgs/sysretq pair.
+    if !frame.is_null() {
+        // SAFETY: the syscall stub passes its live trap frame in `rdi`.
+        let number = unsafe { (*frame).rax as usize };
+        let interruptible = matches!(
+            raven_abi::syscall::Syscall::from_usize(number),
+            Some(
+                raven_abi::syscall::Syscall::MAP
+                    | raven_abi::syscall::Syscall::UNMAP
+                    | raven_abi::syscall::Syscall::PROTECT
+                    | raven_abi::syscall::Syscall::THREAD_CREATE
+                    | raven_abi::syscall::Syscall::THREAD_EXIT
+                    | raven_abi::syscall::Syscall::EXIT
+                    | raven_abi::syscall::Syscall::FUTEX
+                    | raven_abi::syscall::Syscall::SCHEME_REGISTER
+                    | raven_abi::syscall::Syscall::OPEN
+                    | raven_abi::syscall::Syscall::READ
+                    | raven_abi::syscall::Syscall::WRITE
+                    | raven_abi::syscall::Syscall::CLOSE
+                    | raven_abi::syscall::Syscall::DUP
+                    | raven_abi::syscall::Syscall::FSTAT
+                    | raven_abi::syscall::Syscall::CALL
+                    | raven_abi::syscall::Syscall::RECV
+                    | raven_abi::syscall::Syscall::SEND
+            )
+        ) || matches!(
+            number,
+            crate::syscall::ipc::PREAD | crate::syscall::ipc::PWRITE | crate::syscall::ipc::SEEK
+        );
+        if interruptible {
+            ap_start::enable_local_interrupts();
+        }
+    }
 }
 
 /// Restore the current user thread's FP/SIMD state on the syscall return path.
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn sched_syscall_exit() {
+    crate::sched::smp::percpu::note_syscall(false);
+    // Keep the swapgs/sysretq return path non-interruptible: after swapgs the GS pair is in the
+    // user state and a kernel-mode interrupt would read the wrong per-CPU block.
+    ap_start::disable_local_interrupts();
     let Some(thread) = crate::sched::current_thread() else {
         return;
     };

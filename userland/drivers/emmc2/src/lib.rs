@@ -22,7 +22,10 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+extern crate alloc;
+
 pub mod block;
+pub mod options;
 pub mod pattern;
 
 use raven_pi4::command::{Command, CommandFailure};

@@ -130,7 +130,8 @@ impl Supervisor {
     /// A cycle, a missing dependency or an ambiguous provider is returned unchanged so the caller
     /// can print it as the fatal `svcd: <reason>` line.
     pub fn new(services: Vec<Manifest>) -> Result<Self, GraphError> {
-        let plan = start_order(&services)?;
+        let effective = with_deferred_scheme_needs(&services);
+        let plan = start_order(&effective)?;
         let runtime = services.iter().map(|_| Runtime::default()).collect();
         Ok(Self {
             services,
@@ -168,7 +169,8 @@ impl Supervisor {
             apply_overrides(&mut services, overrides)
                 .map_err(|error| MergeError::UnknownService(error.service))?;
         }
-        let plan = start_order(&services).map_err(MergeError::Graph)?;
+        let plan =
+            start_order(&with_deferred_scheme_needs(&services)).map_err(MergeError::Graph)?;
         self.runtime.resize(services.len(), Runtime::default());
         self.services = services;
         self.plan = plan;
@@ -577,6 +579,76 @@ impl Supervisor {
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.services.iter().map(|service| service.name.as_str())
     }
+
+    /// Scheme prefixes that a runtime provider may register after boot.
+    ///
+    /// A scheme declared by any manifest (`provides`, or a `needs` such as `scheme:disk`) but not
+    /// provided by an enabled service is late: the driver or server that will publish it starts
+    /// later. `svcd` grants these prefixes to each child before its first thread so the child can
+    /// open the scheme once the provider registers, without weakening the exact-name snapshot.
+    pub fn dynamic_scheme_prefixes(&self) -> Vec<String> {
+        let enabled: Vec<&str> = self
+            .services
+            .iter()
+            .filter(|service| service.enable)
+            .flat_map(|service| service.provides.iter().map(String::as_str))
+            .filter_map(|provide| provide.strip_prefix("scheme:"))
+            .collect();
+        let mut prefixes: Vec<String> = Vec::new();
+        for service in &self.services {
+            for scheme in service.provides.iter().chain(service.needs.iter()) {
+                let Some(name) = scheme.strip_prefix("scheme:") else {
+                    continue;
+                };
+                if !valid_scheme_name(name)
+                    || enabled.contains(&name)
+                    || prefixes.iter().any(|prefix| prefix == name)
+                {
+                    continue;
+                }
+                prefixes.push(name.to_string());
+            }
+        }
+        prefixes
+    }
+}
+
+/// Drop a `scheme:` dependency that no enabled service provides.
+///
+/// Such a dependency is satisfied at runtime (a driver publishes `disk:` after `devd` scans PCI,
+/// or an operator starts `blockd`/`fsd-ufs` through `svcctl`), so it must not fail the static
+/// graph. An enabled provider keeps the edge and therefore the existing ordering, missing
+/// non-scheme dependencies still fail, and an ambiguous provider still fails.
+fn with_deferred_scheme_needs(services: &[Manifest]) -> Vec<Manifest> {
+    let provided: Vec<&str> = services
+        .iter()
+        .filter(|service| service.enable)
+        .flat_map(|service| service.provides.iter().map(String::as_str))
+        .filter(|provide| provide.starts_with("scheme:"))
+        .collect();
+    let mut effective = services.to_vec();
+    for service in &mut effective {
+        if !service.enable {
+            continue;
+        }
+        service
+            .needs
+            .retain(|need| !need.starts_with("scheme:") || provided.contains(&need.as_str()));
+    }
+    effective
+}
+
+/// True when `name` is a scheme name the kernel namespace syscall accepts.
+fn valid_scheme_name(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 64
+        && bytes.iter().all(|byte| {
+            matches!(
+                *byte,
+                b'a'..=b'z' | b'0'..=b'9' | b':' | b'_' | b'-'
+            )
+        })
 }
 
 #[cfg(test)]

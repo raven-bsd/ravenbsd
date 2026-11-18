@@ -16,6 +16,15 @@ use raven_proto_block::{BlockInfo, PartitionRecord};
 /// Usage line.
 pub const USAGE: &str = "gpart show [block:0]";
 
+/// A `gpart` argument error.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GpartError {
+    /// The first argument is neither `show` nor absent.
+    UnknownCommand,
+    /// More than one argument follows `show`.
+    TooManyArguments,
+}
+
 /// Render a GPT geometry and partition table.
 pub fn show(name: &str, info: &BlockInfo, parts: &[PartitionRecord]) -> String {
     let mut out = format!(
@@ -37,18 +46,18 @@ pub fn show(name: &str, info: &BlockInfo, parts: &[PartitionRecord]) -> String {
 }
 
 /// Parse `show [device]`.
-pub fn parse_args<'a, I>(args: I) -> Result<Option<&'a str>, ()>
+pub fn parse_args<'a, I>(args: I) -> Result<Option<&'a str>, GpartError>
 where
     I: IntoIterator<Item = &'a str>,
 {
     let mut values = args.into_iter();
     match values.next() {
         Some("show") | None => {}
-        Some(_) => return Err(()),
+        Some(_) => return Err(GpartError::UnknownCommand),
     }
     let device = values.next();
     if values.next().is_some() {
-        return Err(());
+        return Err(GpartError::TooManyArguments);
     }
     Ok(device)
 }

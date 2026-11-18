@@ -45,6 +45,11 @@ pub struct Serial;
 
 impl fmt::Write for Serial {
     fn write_str(&mut self, text: &str) -> fmt::Result {
+        // HDMI1: mirror every kernel line to the HDMI console when it is live. The UART write
+        // below is unconditional, so a missing/failed display console never changes the serial
+        // transcript or the boot/login gate.
+        #[cfg(raven_pi4)]
+        super::fb::write_text(text.as_bytes());
         for &byte in text.as_bytes() {
             if byte == b'\n' {
                 write_byte(b'\r');

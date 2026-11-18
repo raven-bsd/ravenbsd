@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The EMMC2 fake card, blockd over disk:0, read-write fsd-ufs and vfsd.
+
+[[initfs.files]]
+src = "profiles/pi4-root-rw-test.d/emmc2.manifest"
+path = "/etc/services.d/emmc2.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-root-rw-test.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-root-rw-test.d/fsd-ufs-rw.manifest"
+path = "/etc/services.d/fsd-ufs.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-root-rw-test.d/vfsd.manifest"
+path = "/etc/services.d/vfsd.toml"
+
+[[initfs.files]]
+src = "build/fixtures/pi4-root/disk.img"
+path = "/etc/pi4-root.img"
+mode = 0o444
+generated = true

@@ -64,8 +64,18 @@ pub fn partition_name(part: &PartitionRecord) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
+/// The command line contains an unsupported option.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ParseError;
+
+impl core::fmt::Display for ParseError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("unsupported lsblk option")
+    }
+}
+
 /// Parse the optional `-n` flag and explicit device names.
-pub fn parse_args<'a, I>(args: I) -> Result<(bool, Vec<&'a str>), ()>
+pub fn parse_args<'a, I>(args: I) -> Result<(bool, Vec<&'a str>), ParseError>
 where
     I: IntoIterator<Item = &'a str>,
 {
@@ -75,7 +85,7 @@ where
         if arg == "-n" {
             no_header = true;
         } else if arg.starts_with('-') && arg != "-" {
-            return Err(());
+            return Err(ParseError);
         } else {
             devices.push(arg);
         }

@@ -28,7 +28,14 @@ cd "$root" || exit 2
 doc=docs/kernel-gate.md
 log_dir=target/kernel-gate
 wait_idle=${S107_WAIT_FOR_IDLE:-0}
-max_load=${S107_MAX_LOAD:-2.0}
+default_max_load() {
+    n=$(nproc 2>/dev/null || echo 4)
+    case "$n" in ''|*[!0-9]*) n=4 ;; esac
+    m=$((n / 4))
+    [ "$m" -lt 2 ] && m=2
+    echo "$m"
+}
+max_load=${S107_MAX_LOAD:-$(default_max_load)}
 
 # case | arch | owner | subsystem note
 cases='boot-uname|x86_64|stuart|boot/uname

@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# E4 hardware staging: the binary is built by the separate ravenbsd-rpi BSP repo and staged
+# from its build output; the real-mode manifest stays disabled until a launch path supplies the
+# SPI0 handle and platd can drive DC/RST. No panel access at boot.
+[[initfs.files]]
+src = "../ravenbsd-rpi/build/aarch64/einkd"
+path = "/sbin/einkd"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "../ravenbsd-rpi/build/aarch64/spi0d"
+path = "/sbin/spi0d"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/pi4-eink.d/einkd.manifest"
+path = "/etc/services.d/einkd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-eink.d/spi0d.manifest"
+path = "/etc/services.d/spi0d.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-eink.d/einkd.conf"
+path = "/etc/einkd.conf"
+mode = 0o644

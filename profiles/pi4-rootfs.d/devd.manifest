@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Rootfs platform launcher. devd matches the EMMC2 node and spawns the driver
+# with the MMIO/DMA/IRQ grant. `dtb launch` keeps waiting for its children, so
+# it does not register a scheme of its own; blockd starts with a runtime
+# `scheme:disk` prefix and waits for the card.
+name = "devd"
+exec = "/sbin/devd"
+args = ["devd", "dtb", "launch"]
+needs = ["logd", "initfsd"]
+readiness = "none"
+restart = "on-failure"
+max_restarts = 3
+grants = ["platform-root"]

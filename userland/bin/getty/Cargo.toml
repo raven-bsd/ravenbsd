@@ -11,6 +11,10 @@ authors.workspace = true
 rust-version.workspace = true
 publish = false
 
+[lib]
+name = "raven_getty"
+path = "src/lib.rs"
+
 [[bin]]
 name = "getty"
 path = "src/main.rs"
