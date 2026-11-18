@@ -88,8 +88,8 @@ fn start_timer() -> bool {
     }
     TIMER.store(timer.0, Ordering::Release);
     let mut thread = 0usize;
+    // SAFETY: the thread entry is a valid C function and the arg is a scalar handle.
     let result = unsafe {
-        // SAFETY: the thread entry is a valid C function and the arg is a scalar handle.
         pthread_create(
             &mut thread,
             ptr::null(),
@@ -100,8 +100,8 @@ fn start_timer() -> bool {
     if result != 0 {
         return false;
     }
+    // SAFETY: the thread value came from a successful pthread_create.
     unsafe {
-        // SAFETY: the thread value came from a successful pthread_create.
         let _ = pthread_detach(thread);
     }
     true

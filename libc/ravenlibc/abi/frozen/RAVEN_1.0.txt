@@ -66,6 +66,7 @@ aio_suspend F 35 x86_64
 aio_suspend64 F 35 x86_64
 aio_write F 22 x86_64
 aio_write64 F 22 x86_64
+alarm F 5 x86_64
 aligned_alloc F 24 x86_64
 alphasort F 596 x86_64
 arc4random_buf F 41 x86_64
@@ -564,8 +565,8 @@ getisax F 53 x86_64
 getline F 5 x86_64
 getlogin F 19 x86_64
 getlogin_r F 6 x86_64
-getmntent F 854 x86_64
-getmntent_r F 1121 x86_64
+getmntent F 857 x86_64
+getmntent_r F 1124 x86_64
 getmntinfo F 65 x86_64
 getmode F 23 x86_64
 getmsg F 52 x86_64
@@ -621,7 +622,7 @@ gettimeofday F 145 x86_64
 getttyent F 609 x86_64
 getttynam F 775 x86_64
 getuid F 98 x86_64
-getusershell F 280 x86_64
+getusershell F 276 x86_64
 getutxent F 19 x86_64
 getutxid F 19 x86_64
 getutxline F 19 x86_64
@@ -956,6 +957,7 @@ optind D 4 x86_64
 optopt D 4 x86_64
 optreset D 4 x86_64
 pathconf F 306 x86_64
+pause F 96 x86_64
 pclose F 352 x86_64
 perror F 5 x86_64
 personality F 264 x86_64
@@ -1321,7 +1323,8 @@ setuid F 304 x86_64
 setusershell F 5 x86_64
 setutxent F 1 x86_64
 setvbuf F 5 x86_64
-shm_unlink F 38 x86_64
+shm_open F 265 x86_64
+shm_unlink F 137 x86_64
 shmat F 24 x86_64
 shmctl F 22 x86_64
 shmdt F 38 x86_64
@@ -1587,6 +1590,7 @@ ttyname_r F 131 x86_64
 twalk F 85 x86_64
 tzname D 22 x86_64
 tzset F 5 x86_64
+ualarm F 5 x86_64
 ufromfp F 6 x86_64
 ufromfpx F 6 x86_64
 uid_from_user F 855 x86_64
