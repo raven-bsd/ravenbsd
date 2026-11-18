@@ -11,7 +11,14 @@
 set -u
 
 wait_secs=0
-max_load=2.0
+default_max_load() {
+    n=$(nproc 2>/dev/null || echo 4)
+    case "$n" in ''|*[!0-9]*) n=4 ;; esac
+    m=$((n / 4))
+    [ "$m" -lt 2 ] && m=2
+    echo "$m"
+}
+max_load=$(default_max_load)
 state_file=build/host-idle-state.txt
 context=host
 
@@ -20,7 +27,7 @@ usage() {
 usage: sh tests/smp/boot/host-idle.sh [options]
 
   --wait SECONDS      wait up to SECONDS for an idle host (default 0: refuse)
-  --max-load LOAD     maximum 1-minute load average (default 2.0)
+  --max-load LOAD     maximum 1-minute load average (default max(2, nproc/4))
   --state-file PATH   host-state record path (default build/host-idle-state.txt)
   --context NAME      label for the record/log (default host)
   -h, --help          show this help
