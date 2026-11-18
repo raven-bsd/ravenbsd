@@ -76,13 +76,22 @@ pub trait Socket {
     fn close(&mut self) -> Result<(), SocketError>;
 }
 
+/// One resolved IPv4 address and its DNS TTL.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Resolved {
+    /// The IPv4 address.
+    pub address: Ipv4Addr,
+    /// TTL in seconds; zero means the value is not cacheable (for example an IP literal).
+    pub ttl_secs: u32,
+}
+
 /// Resolve one host name to an IPv4 address.
 ///
 /// The real implementation asks `resolvd` over the `resolv:` scheme. `timeout_ms` is the
 /// caller's remaining budget; the resolver service owns the DNS exchange timeout, so the
 /// implementation passes the value through as far as the scheme allows and the service keeps an
-/// outer deadline around the whole fetch.
+/// outer deadline around the whole fetch. The returned TTL is policy input for the service cache.
 pub trait Resolver {
-    /// Resolve `host` to one IPv4 address.
-    fn resolve(&mut self, host: &str, timeout_ms: u32) -> Result<Ipv4Addr, ResolveError>;
+    /// Resolve `host` to one IPv4 address and its TTL.
+    fn resolve(&mut self, host: &str, timeout_ms: u32) -> Result<Resolved, ResolveError>;
 }

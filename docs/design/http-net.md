@@ -21,7 +21,7 @@ add-on process for any HTTPS source.
 
 | Trait | Contract | Host test | Target implementation |
 |---|---|---|---|
-| `Resolver` | `resolve(host, timeout_ms) -> Ipv4Addr` | `MockResolver` returns fixed IPv4 or a failure | `SchemeResolver` over `resolv:` |
+| `Resolver` | `resolve(host, timeout_ms) -> Resolved { address, ttl_secs }` | `MockResolver` returns fixed IPv4 or a failure | `SchemeResolver` over `resolv:` |
 | `Socket` | `connect(Ipv4Addr, port, timeout_ms)`, `send`, `recv`, `close` | `MockSocket` scripts partial reads, timeouts and failures | `SchemeSocket` over `net:` |
 | `HttpTransport<S, R>` | implements `raven_http::Transport`: resolve, connect, write, read | drives the real `raven_http::Client` through mocks | `live_transport()` |
 
@@ -63,10 +63,10 @@ Status `0` with at least one A record yields the first IPv4 address. `NXDOMAIN`,
 a bad version/type/length or a malformed reply maps to `ResolveError::NotFound`/`Io`. A resolution
 timeout (when `resolvd` returns `ETIMEDOUT`) maps to `ResolveError::Timeout`.
 
-IPv4 literals are returned without a DNS query. `raven_http` URLs may carry a bracketed IPv6
-literal, but the current `net:` path is IPv4-only; an IPv6-only name fails closed and is a later
-transport ticket. The adapter does not cache DNS results: the E3b service owns a TTL-bounded cache
-because TTL is policy, not transport.
+IPv4 literals are returned without a DNS query and carry TTL zero. `raven_http` URLs may carry a
+bracketed IPv6 literal, but the current `net:` path is IPv4-only; an IPv6-only name fails closed
+and is a later transport ticket. The adapter itself does not cache DNS results; it returns
+`Resolved { address, ttl_secs }` so the E3b service owns the TTL-bounded cache and refresh policy.
 
 `timeout_ms` is the remaining HTTP budget. The `resolv:` exchange itself is bounded by `resolvd`'s
 resolver; the synchronous scheme `CALL` cannot be preempted from this adapter, so E3b must keep an

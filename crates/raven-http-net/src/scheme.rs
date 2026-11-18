@@ -18,7 +18,7 @@ use raven_scheme::Client;
 
 use crate::resolv::{MAX_NAME, decode_reply, encode_query};
 use crate::transport::HttpTransport;
-use crate::{ResolveError, Resolver, Socket, SocketError};
+use crate::{ResolveError, Resolved, Resolver, Socket, SocketError};
 
 const READ_WRITE: u32 = 3;
 const READ: u32 = 1;
@@ -170,9 +170,12 @@ impl Default for SchemeResolver {
 }
 
 impl Resolver for SchemeResolver {
-    fn resolve(&mut self, host: &str, _timeout_ms: u32) -> Result<Ipv4Addr, ResolveError> {
+    fn resolve(&mut self, host: &str, _timeout_ms: u32) -> Result<Resolved, ResolveError> {
         if let Ok(address) = host.parse::<Ipv4Addr>() {
-            return Ok(address);
+            return Ok(Resolved {
+                address,
+                ttl_secs: 0,
+            });
         }
         let mut query = [0u8; MAX_NAME + 5];
         let query_len = encode_query(host, &mut query)?;

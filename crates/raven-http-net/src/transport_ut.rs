@@ -12,7 +12,7 @@ use core::net::Ipv4Addr;
 use raven_http::{Client, Clock, Error, RequestBuilder};
 
 use super::HttpTransport;
-use crate::{ResolveError, Resolver, Socket, SocketError};
+use crate::{ResolveError, Resolved, Resolver, Socket, SocketError};
 
 struct MockResolver {
     fail: Option<ResolveError>,
@@ -29,15 +29,19 @@ impl MockResolver {
 }
 
 impl Resolver for MockResolver {
-    fn resolve(&mut self, host: &str, _timeout_ms: u32) -> Result<Ipv4Addr, ResolveError> {
+    fn resolve(&mut self, host: &str, _timeout_ms: u32) -> Result<Resolved, ResolveError> {
         self.calls.push(String::from(host));
         if let Some(error) = self.fail {
             return Err(error);
         }
-        Ok(match host {
+        let address = match host {
             "a.test" => Ipv4Addr::new(192, 0, 2, 1),
             "b.test" => Ipv4Addr::new(192, 0, 2, 2),
             _ => Ipv4Addr::new(192, 0, 2, 9),
+        };
+        Ok(Resolved {
+            address,
+            ttl_secs: 60,
         })
     }
 }

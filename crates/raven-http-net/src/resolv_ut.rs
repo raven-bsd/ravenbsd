@@ -4,7 +4,7 @@
 //! Host tests for the fixed `resolv:` query/reply codec.
 
 use super::{MAX_NAME, QTYPE_A, STATUS_OK, VERSION, decode_reply, encode_query};
-use crate::ResolveError;
+use crate::{ResolveError, Resolved};
 use alloc::vec;
 use core::net::Ipv4Addr;
 
@@ -58,7 +58,13 @@ fn rejects_bad_names_and_short_buffers() {
 #[test]
 fn decodes_the_first_a_record() {
     let wire = reply(STATUS_OK, &[[192, 0, 2, 10], [192, 0, 2, 11]]);
-    assert_eq!(decode_reply(&wire), Ok(Ipv4Addr::new(192, 0, 2, 10)));
+    assert_eq!(
+        decode_reply(&wire),
+        Ok(Resolved {
+            address: Ipv4Addr::new(192, 0, 2, 10),
+            ttl_secs: 60,
+        })
+    );
 }
 
 #[test]

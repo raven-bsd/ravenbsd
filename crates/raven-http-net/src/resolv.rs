@@ -9,7 +9,7 @@
 
 use core::net::Ipv4Addr;
 
-use crate::ResolveError;
+use crate::{ResolveError, Resolved};
 
 /// Protocol version.
 pub(crate) const VERSION: u16 = 1;
@@ -47,8 +47,8 @@ pub(crate) fn encode_query(name: &str, out: &mut [u8]) -> Result<usize, ResolveE
     Ok(total)
 }
 
-/// Decode one A reply and return the first address.
-pub(crate) fn decode_reply(input: &[u8]) -> Result<Ipv4Addr, ResolveError> {
+/// Decode one A reply and return the first address and its TTL.
+pub(crate) fn decode_reply(input: &[u8]) -> Result<Resolved, ResolveError> {
     if input.len() < 5 || u16::from_le_bytes([input[0], input[1]]) != VERSION || input[3] != QTYPE_A
     {
         return Err(ResolveError::Io);
@@ -65,7 +65,11 @@ pub(crate) fn decode_reply(input: &[u8]) -> Result<Ipv4Addr, ResolveError> {
     if record[0] != QTYPE_A {
         return Err(ResolveError::Io);
     }
-    Ok(Ipv4Addr::new(record[5], record[6], record[7], record[8]))
+    let ttl_secs = u32::from_le_bytes([record[1], record[2], record[3], record[4]]);
+    Ok(Resolved {
+        address: Ipv4Addr::new(record[5], record[6], record[7], record[8]),
+        ttl_secs,
+    })
 }
 
 #[cfg(test)]

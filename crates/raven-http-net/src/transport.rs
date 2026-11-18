@@ -50,10 +50,12 @@ impl<S: Socket, R: Resolver> Transport for HttpTransport<S, R> {
         // An IPv4 literal is already an address; do not turn it into a DNS query.
         let address = match host.parse::<Ipv4Addr>() {
             Ok(address) => address,
-            Err(_) => self
-                .resolver
-                .resolve(host, timeout_ms)
-                .map_err(map_resolve)?,
+            Err(_) => {
+                self.resolver
+                    .resolve(host, timeout_ms)
+                    .map_err(map_resolve)?
+                    .address
+            }
         };
         match self.socket.connect(address, port, timeout_ms) {
             Ok(()) => {
