@@ -3,10 +3,10 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # Build a release initfs whose dynamic interpreter has the release-image shape: the first
-# PT_LOAD starts at vaddr=0. The pre-S129 raven-spawn parser rejects that shape with
-# SegmentOutsideUserRange; the S129 parser accepts it and applies the non-zero interpreter bias.
-# The staged `build/<arch>/ld-elf.so.1` is restored before this script exits, so the artifact is
-# not left mutated for later cases.
+# PT_LOAD starts at vaddr=0. The interpreter is relinked from the same archive as the normal
+# `ld-elf.so.1` with `--image-base=0`, so its symbols and relative relocations stay consistent.
+# The pre-S129 raven-spawn parser rejects that shape with SegmentOutsideUserRange; S129 accepts
+# it and applies the non-zero interpreter bias. The staged loader is restored before exit.
 
 set -eu
 
@@ -14,15 +14,55 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 
 arch=${1:-x86_64}
-loader="build/$arch/ld-elf.so.1"
-out="build/fixtures/login/release-dynamic-vaddr0.img"
+case "$arch" in
+    x86_64) target=x86_64-unknown-none ;;
+    *)
+        printf 'login fixture: unsupported arch %s\n' "$arch" >&2
+        exit 2
+        ;;
+esac
 
-if [ ! -f "$loader" ]; then
-    printf 'login fixture: missing %s; run cargo xtask libc-link --arch %s first\n' "$loader" "$arch" >&2
+loader="build/$arch/ld-elf.so.1"
+archive="build/$arch/cargo/libc-rtld/$target/libc-so/libraven_libc_rtld.a"
+out="build/fixtures/login/release-dynamic-vaddr0.img"
+vaddr0="build/fixtures/login/ld-elf-vaddr0.so.1"
+
+cargo xtask libc-link --arch "$arch"
+if [ ! -f "$archive" ]; then
+    printf 'login fixture: missing %s\n' "$archive" >&2
+    exit 2
+fi
+
+lld=${LD_LLD:-}
+if [ -z "$lld" ]; then
+    lld="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld"
+fi
+if [ ! -x "$lld" ]; then
+    printf 'login fixture: linker not found: %s\n' "$lld" >&2
     exit 2
 fi
 
 mkdir -p "$(dirname -- "$out")"
+"$lld" -flavor gnu -shared --image-base=0 -e _rtld_start -Bsymbolic --no-undefined \
+    -z now -z relro -z noexecstack -z pack-relative-relocs \
+    -z max-page-size=4096 -z common-page-size=4096 \
+    --hash-style=gnu --gc-sections --soname=ld-elf.so.1 \
+    --version-script=libc/ravenlibc/ld/Symbols.map \
+    -u _rtld_start -u _rtld_error_str -u dlclose -u dlerror -u dlopen -u dlsym \
+    -u dlvsym -u dladdr -u dlinfo -u dl_iterate_phdr -u __tls_get_addr \
+    -u _rtld_allocate_tls -u _rtld_free_tls -u _rtld_get_stack_prot \
+    -u _rtld_set_dlerror_slot -u r_debug_state -u _r_debug_postinit -u _rtld_version \
+    "$archive" -o "$vaddr0"
+
+first_load=$(readelf -lW "$vaddr0" | awk '/^  LOAD / {print; exit}')
+case "$first_load" in
+    *0x0000000000000000*) ;;
+    *)
+        printf 'login fixture: vaddr-0 link failed: %s\n' "$first_load" >&2
+        exit 3
+        ;;
+esac
+
 backup=$(mktemp "${TMPDIR:-/tmp}/ld-elf.XXXXXX")
 cp "$loader" "$backup"
 restore() {
@@ -31,38 +71,6 @@ restore() {
 }
 trap restore EXIT INT TERM HUP
 
-phoff=$(readelf -h "$loader" | awk '/Start of program headers:/ {print $5}')
-phentsize=$(readelf -h "$loader" | awk '/Size of program headers:/ {print $5}')
-phnum=$(readelf -h "$loader" | awk '/Number of program headers:/ {print $5}')
-
-i=0
-patched=0
-while [ "$i" -lt "$phnum" ]; do
-    off=$((phoff + i * phentsize))
-    type=$(od -An -tu4 -j "$off" -N4 "$loader" | tr -d ' ')
-    if [ "$type" = "1" ]; then
-        # ELF64 phdr: p_vaddr at +16, p_paddr at +24.
-        dd if=/dev/zero of="$loader" bs=1 seek=$((off + 16)) count=8 conv=notrunc 2>/dev/null
-        dd if=/dev/zero of="$loader" bs=1 seek=$((off + 24)) count=8 conv=notrunc 2>/dev/null
-        patched=1
-        break
-    fi
-    i=$((i + 1))
-done
-
-if [ "$patched" != "1" ]; then
-    printf 'login fixture: no PT_LOAD in %s\n' "$loader" >&2
-    exit 3
-fi
-
-first_load=$(readelf -lW "$loader" | awk '/^  LOAD / {print; exit}')
-case "$first_load" in
-    *0x0000000000000000*) ;;
-    *)
-        printf 'login fixture: vaddr-0 patch failed: %s\n' "$first_load" >&2
-        exit 4
-        ;;
-esac
-
+cp "$vaddr0" "$loader"
 cargo xtask initfs --arch "$arch" --profile release
 cp "build/$arch/initfs.img" "$out"
