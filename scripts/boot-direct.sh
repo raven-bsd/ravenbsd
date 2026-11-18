@@ -213,6 +213,60 @@ preflight_refuse() {
     exit 2
 }
 
+refuse_with_state() {
+    reason=$1
+    reason=$(printf '%s' "$reason" | tr '"' "'")
+    loadavg=$(awk '{print $1, $2, $3}' /proc/loadavg)
+    load1=${BOOT_DIRECT_LOAD1:-$(printf '%s\n' "$loadavg" | awk '{print $1}')}
+    load5=$(printf '%s\n' "$loadavg" | awk '{print $2}')
+    load15=$(printf '%s\n' "$loadavg" | awk '{print $3}')
+    nproc=${BOOT_DIRECT_NPROC:-$(nproc)}
+    max_load=${BOOT_DIRECT_MAX_LOAD:-$nproc}
+    mem_avail=${BOOT_DIRECT_MEM_AVAIL_KB:-$(awk '/MemAvailable:/ { print $2 }' /proc/meminfo)}
+    disk_avail=${BOOT_DIRECT_DISK_AVAIL_KB:-$(df -Pk "$root" | awk 'NR == 2 { print $4 }')}
+    commit=$(git rev-parse --short HEAD 2>/dev/null || printf 'unknown')
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'unknown')
+    dirty=0
+    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+        dirty=1
+    fi
+    qemu_count=$(printf '%s\n' "${qemu_procs:-}" | grep -c . || true)
+    qtest_count=$(printf '%s\n' "${qtest_procs:-}" | grep -c . || true)
+    if [ "$kvm" = 1 ]; then accel=kvm; else accel=tcg; fi
+    {
+        printf '{\n'
+        printf '  "commit": "%s",\n' "$commit"
+        printf '  "branch": "%s",\n' "$branch"
+        printf '  "dirty": %s,\n' "$dirty"
+        printf '  "utc": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf '  "mode": "%s",\n' "$mode"
+        printf '  "machine": "%s",\n' "$machine"
+        printf '  "smp": %s,\n' "$smp"
+        printf '  "accel": "%s",\n' "$accel"
+        printf '  "qemu_version": "%s",\n' "$qemu_version"
+        printf '  "nproc": %s,\n' "$nproc"
+        printf '  "load1": %s,\n' "$load1"
+        printf '  "load5": %s,\n' "$load5"
+        printf '  "load15": %s,\n' "$load15"
+        printf '  "max_load": %s,\n' "$max_load"
+        printf '  "mem_available_kb": %s,\n' "$mem_avail"
+        printf '  "disk_available_kb": %s,\n' "$disk_avail"
+        printf '  "qemu_processes": %s,\n' "$qemu_count"
+        printf '  "qtest_processes": %s,\n' "$qtest_count"
+        printf '  "refused": true,\n'
+        printf '  "reason": "%s",\n' "$reason"
+        printf '  "sample_count": 0\n'
+        printf '}\n'
+    } > "$state"
+    printf 'boot-direct: exclusive REFUSED: %s\n' "$reason" >&2
+    printf 'boot-direct: host nproc=%s load1=%s load5=%s load15=%s max_load=%s mem_available_kb=%s disk_available_kb=%s\n' \
+        "$nproc" "$load1" "$load5" "$load15" "$max_load" "$mem_avail" "$disk_avail" >&2
+    printf 'boot-direct: host qemu_processes=%s qtest_processes=%s sample_count=0\n' \
+        "$qemu_count" "$qtest_count" >&2
+    printf 'boot-direct: preflight=%s\n' "$state" >&2
+    exit 2
+}
+
 run_preflight() {
     [ "$exclusive" = 1 ] || return 0
     mkdir -p "$out"
@@ -227,11 +281,11 @@ run_preflight() {
 
     qemu_procs=$(process_matches "${BOOT_DIRECT_QEMU_LIST:-}" 'qemu-system-')
     if [ -n "$qemu_procs" ]; then
-        preflight_refuse "busy: QEMU process: $(printf '%s\n' "$qemu_procs" | head -n 1)"
+        refuse_with_state "busy: QEMU process: $(printf '%s\n' "$qemu_procs" | head -n 1)"
     fi
     qtest_procs=$(process_matches "${BOOT_DIRECT_QTEST_LIST:-}" 'xtask.*qtest|raven-qtest')
     if [ -n "$qtest_procs" ]; then
-        preflight_refuse "busy: qtest process: $(printf '%s\n' "$qtest_procs" | head -n 1)"
+        refuse_with_state "busy: qtest process: $(printf '%s\n' "$qtest_procs" | head -n 1)"
     fi
 
     loadavg=$(awk '{print $1, $2, $3}' /proc/loadavg)
@@ -243,7 +297,7 @@ run_preflight() {
     max_load=${BOOT_DIRECT_MAX_LOAD:-$nproc}
     is_uint "$max_load" && [ "$max_load" -gt 0 ] || preflight_refuse "invalid max load: $max_load"
     if awk -v l="$load1" -v m="$max_load" 'BEGIN { exit !(l > m) }'; then
-        preflight_refuse "busy: load average $load1 exceeds $max_load (nproc $nproc)"
+        refuse_with_state "busy: load average $load1 exceeds $max_load (nproc $nproc)"
     fi
     mem_avail=${BOOT_DIRECT_MEM_AVAIL_KB:-$(awk '/MemAvailable:/ { print $2 }' /proc/meminfo)}
     is_uint "$mem_avail" || preflight_refuse "cannot read available memory"
@@ -283,6 +337,7 @@ run_preflight() {
         printf '  "disk_available_kb": %s,\n' "$disk_avail"
         printf '  "qemu_processes": %s,\n' "$qemu_count"
         printf '  "qtest_processes": %s,\n' "$qtest_count"
+        printf '  "refused": false,\n'
         printf '  "sample_count": %s\n' "$samples"
         printf '}\n'
     } > "$state"
