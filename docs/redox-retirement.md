@@ -118,3 +118,10 @@ OBSERVED on `8a591ccf`:
 No code, import, kernel source or `PROVENANCE.toml` entry is changed by S117. The audit's
 classification is the decommission decision; the actual replacement is a per-owner follow-up when
 the item is touched.
+
+## Scope note: desktop exception (DR-54)
+
+This audit covers Redox **core** imports only. The post-0.1.0 desktop/compositor/Wayland track
+may study Redox Orbital/Wayland and Haiku's app_server/Interface Kit with owner/reviewer approval
+(DR-54); that exception does not reopen Redox as a kernel/libc/boot/base donor and does not change
+any classification here.
