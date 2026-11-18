@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# command: /usr/bin/time -p sh scripts/fault-injection.sh --profile release --arch x86_64 --soak 86400
+fault-injection: run pass=1 fail=0 recovery_ms=54000
+fault-injection: run pass=2 fail=0 recovery_ms=61000
+fault-injection: run pass=3 fail=0 recovery_ms=58000
+fault-injection: soak done pass=3 fail=0 first_failure=none
+soak: elapsed_s=86400 crashes=0
+real 86400.42
