@@ -326,14 +326,31 @@ pub struct Capture {
     frames: OwnedFrames,
     /// Client physical frames observed at create; copy-back only touches the same frame.
     client_frames: Vec<u64>,
-    /// Client address-space mapping generation at create.
-    client_generation: u64,
+    /// Client page-table root at create. A new root means exec replaced the address space.
+    client_root: u64,
     /// The server may write the capture and the frames are copied back on completion.
     writable: bool,
     /// Copy-back is still owed (cleared by completion or cancellation).
     copy_back_pending: bool,
     /// The frames are mapped into the server at `base`.
     mapped: bool,
+}
+
+/// True when the client still has the page-table root captured at create.
+///
+/// A normal `MAP`/`UNMAP`/`PROTECT`, including one from another thread in the shared address
+/// space, keeps the root. `exec` installs a new root; exit drops the address space entirely.
+fn address_space_matches(captured_root: u64, current_root: Option<u64>) -> bool {
+    current_root == Some(captured_root)
+}
+
+/// True when a captured page may receive copy-back.
+///
+/// The captured frame must still be the frame translated at the same client address. Unmapped
+/// pages and pages made read-only are skipped; a reused virtual address backed by another frame
+/// is skipped as a replaced mapping.
+fn page_copy_allowed(original_frame: u64, current_frame: Option<u64>, writable: bool) -> bool {
+    writable && current_frame == Some(original_frame)
 }
 
 impl Capture {
@@ -361,9 +378,18 @@ impl Capture {
         let Some(space) = space.as_mut() else {
             return;
         };
-        if space.generation() != self.client_generation {
-            // The client replaced (some of) its mapping while the request was in flight; do not
-            // write the server's bytes into a new mapping that may have reused the frames.
+        if !address_space_matches(self.client_root, Some(space.root().0)) {
+            // Exec installed a new page-table root after the capture started; never copy into
+            // the replacement image. Ordinary MAP/UNMAP/PROTECT on another thread keeps the same
+            // root and is handled per page below.
+            if trace_s125() {
+                crate::kprintln!(
+                    "s125: copy_back root changed captured={:#x} current={:#x} generation={}",
+                    self.client_root,
+                    space.root().0,
+                    space.generation()
+                );
+            }
             return;
         }
         let Ok(mut mapper) = space.mapper() else {
@@ -380,10 +406,6 @@ impl Capture {
                 page = page.saturating_add(1);
                 continue;
             };
-            if !flags.is_writable() {
-                page = page.saturating_add(1);
-                continue;
-            }
             let Some(original) = self
                 .client_frames
                 .get(usize::try_from(page).unwrap_or(usize::MAX))
@@ -392,8 +414,8 @@ impl Capture {
                 page = page.saturating_add(1);
                 continue;
             };
-            if original != physical.0 {
-                // The client replaced the page meanwhile; do not write into the new mapping.
+            if !page_copy_allowed(original, Some(physical.0), flags.is_writable()) {
+                // The page was unmapped, made read-only, or remapped to another frame.
                 page = page.saturating_add(1);
                 continue;
             }
@@ -534,7 +556,7 @@ pub fn create(
             pages: 0,
             frames: OwnedFrames::empty(),
             client_frames: Vec::new(),
-            client_generation: 0,
+            client_root: 0,
             writable: false,
             copy_back_pending: false,
             mapped: false,
@@ -554,7 +576,7 @@ pub fn create(
     }
 
     let mut client_frames = Vec::with_capacity(usize::try_from(pages).unwrap_or(0));
-    let client_generation;
+    let client_root;
     {
         let mut client_space = client.address_space.lock();
         let Some(address_space) = client_space.as_mut() else {
@@ -591,7 +613,7 @@ pub fn create(
             client_frames.push(frame.0);
             page = page.saturating_add(1);
         }
-        client_generation = address_space.generation();
+        client_root = address_space.root().0;
     }
 
     let mut frames = OwnedFrames::allocate(pages)?;
@@ -740,7 +762,7 @@ pub fn create(
         pages,
         frames,
         client_frames,
-        client_generation,
+        client_root,
         writable,
         copy_back_pending: writable,
         mapped: true,

@@ -137,6 +137,9 @@ Lifetime rules:
 * The request capture stays mapped until the server's `SEND` completes the request.
 * The reply capture stays mapped until the reply has been written and `copy_back` has run.
 * Completion copies back writable captures, then releases both ranges exactly once.
+* Copy-back verifies the page-table root and each page's original frame. A normal
+  `MAP`/`UNMAP`/`PROTECT` by another thread in the shared address space does not block an
+  unrelated capture; a changed page-table root (`exec`) or a replaced/unmapped page does.
 * A cancelled client keeps the mapping alive until the server retires or skips the request; a
   late `SEND` releases it.
 * Releasing an already-free range is a no-op, so a double drop cannot hand the same pages to a
