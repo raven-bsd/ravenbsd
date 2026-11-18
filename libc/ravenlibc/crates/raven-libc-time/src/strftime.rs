@@ -167,10 +167,23 @@ fn append_format(
             }
             b'S' => push_num(&mut piece, i64::from(tm.tm_sec), pad, 2, Pad::Zero),
             b's' => {
-                // glibc's `%s` is `mktime(tm)`: it interprets the broken-down time in the
-                // process zone and ignores a caller's `tm_gmtoff`/`tm_zone`.
+                // Two consumers disagree when `tm_gmtoff` is zero. The NetBSD donor and the
+                // 1.4 oracle call `strftime` directly with `timeoff(tm, tm_gmtoff)`, so a zero
+                // field means UTC. The C ABI process-zone call (the picolibc static `tm` with
+                // `TZ=EST5EDT`) must use the process zone like glibc's `mktime(tm)`. The
+                // context's zone names are the evidence: a real process zone is non-empty and
+                // not the GMT pointer pair; a direct/oracle or `gmtime` call has empty or GMT
+                // names and keeps `timeoff`.
+                let process_zone = !ctx.tzname[0].is_empty() && ctx.tzname[0] != b"GMT".as_slice();
                 let mut copy = *tm;
-                let value = crate::tz::mktime::mktime(state, &mut copy).unwrap_or(-1);
+                let value = if tm.tm_gmtoff != 0 {
+                    // A meaningful field is authoritative for both consumers.
+                    crate::tz::mktime::timeoff(&mut copy, tm.tm_gmtoff).unwrap_or(-1)
+                } else if process_zone {
+                    crate::tz::mktime::mktime(state, &mut copy).unwrap_or(-1)
+                } else {
+                    crate::tz::mktime::timeoff(&mut copy, 0).unwrap_or(-1)
+                };
                 push_i64(&mut piece, value);
             }
             b't' => piece.push('\t'),
