@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T23:58:42Z
+- Date: 2026-11-18T01:06:04Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: host-only
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 1694 pass, 14 fail, 105 skip
+- Counts: 1696 pass, 12 fail, 105 skip
 
 ## Summary
 
@@ -20,15 +20,15 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 |---|---:|---:|---:|
 | external | 0 | 0 | 3 |
 | filesystem | 2 | 0 | 18 |
-| header | 82 | 4 | 0 |
+| header | 83 | 3 | 0 |
 | interface | 1416 | 9 | 0 |
 | link | 1 | 0 | 0 |
 | process | 3 | 0 | 14 |
 | shell | 3 | 0 | 22 |
 | target | 0 | 0 | 7 |
 | tty | 5 | 0 | 7 |
-| utility | 182 | 1 | 34 |
-| **all** | **1694** | **14** | **105** |
+| utility | 183 | 0 | 34 |
+| **all** | **1696** | **12** | **105** |
 
 ## Rows
 
@@ -85,7 +85,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.math.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_25.c` |  |
 | `header.monetary.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_26.c` |  |
 | `header.mqueue.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_27.c` |  |
-| `header.ndbm.h` | header | fail | `profile` | profile status missing |
+| `header.ndbm.h` | header | pass | `waiver` | owner waiver: P1f11: Issue 8 <ndbm.h> is marked [XSI] (X/Open System Interfaces option); the base POSIX.1-2024 requirement does not include it. Owner decision requested: waive the optional XSI header; dbm_* are outside the base set. |
 | `header.net-if.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_29.c` |  |
 | `header.netdb.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_30.c` |  |
 | `header.netinet-in.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_31.c` |  |
@@ -1781,7 +1781,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.sed` | utility | pass | `test:tests/posix/utility/text2/sed/test.sh` |  |
 | `util.seq` | utility | pass | `test:tests/posix/utility/misc/seq/test.sh` |  |
 | `util.set` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
-| `util.sh` | utility | fail | `userland/bin/rsh` | profile status partial; no POSIX utility test |
+| `util.sh` | utility | pass | `test:tests/posix/utility/shell/check-sh.sh` |  |
 | `util.sha1sum` | utility | pass | `test:tests/posix/utility/misc/sha1sum/test.sh` |  |
 | `util.sha224sum` | utility | pass | `test:tests/posix/utility/misc/sha224sum/test.sh` |  |
 | `util.sha256sum` | utility | pass | `test:tests/posix/utility/misc/sha256sum/test.sh` |  |

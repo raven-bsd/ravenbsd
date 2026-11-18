@@ -155,3 +155,10 @@ id = "shell.umask"
 status = "present"
 evidence = "qtest:posix-shell"
 notes = "P4a: umask marker in the posix-shell qtest"
+
+# P1f11: brush --posix is the utility shell; rsh remains the rescue shell.
+[[row]]
+id = "util.sh"
+status = "present"
+evidence = "test:tests/posix/utility/shell/check-sh.sh"
+notes = "P1f11: brush --posix host test covers -c, script files, pipelines, functions, case, test and exit status; rsh is not the evidence"
