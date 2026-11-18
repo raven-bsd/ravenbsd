@@ -686,6 +686,13 @@ def self_test() -> int:
     current = parse_kernel_gate(fixtures / "kernel-gate-current.md", head)
     if current.status != "PASS" or "27/27" not in current.note:
         raise AssertionError(f"current kernel gate: {current}")
+    current_stale = parse_kernel_gate(fixtures / "kernel-gate-current-stale.md", head)
+    if (
+        current_stale.status != "STALE"
+        or "222222222222" not in current_stale.note
+        or "111111111111" not in current_stale.note
+    ):
+        raise AssertionError(f"stale current-format kernel gate: {current_stale}")
     partial = parse_kernel_gate(fixtures / "kernel-gate-partial.md", head)
     if partial.status != "FAIL":
         raise AssertionError(f"partial kernel gate: {partial}")
@@ -722,6 +729,14 @@ def self_test() -> int:
     )
     if stale_image.status != "UNPINNED":
         raise AssertionError(f"stale image: {stale_image}")
+    local_mismatch = image_gate(
+        "image-x86_64",
+        fixtures / "board-good.log",
+        head,
+        fixtures / "release-images-good.md",
+    )
+    if local_mismatch.status != "PINNED" or "local build sha256=" not in local_mismatch.note:
+        raise AssertionError(f"local image mismatch: {local_mismatch}")
 
     good_board = board_gate(fixtures / "board-good.log")
     if good_board.status != "MARKERS COMPLETE":
@@ -745,9 +760,9 @@ def self_test() -> int:
         raise AssertionError(f"image hash: {unpinned}")
 
     print(
-        "release-evidence self-test: PASS (kernel good/stale/missing/current/partial, "
-        "posix good/stale/no-stamp/fail, board good/virt/synthetic/incomplete, "
-        "image missing/hash/pinned/stale)"
+        "release-evidence self-test: PASS (kernel good/stale/missing/current/"
+        "current-stale/partial, posix good/stale/no-stamp/fail, "
+        "board good/virt/synthetic/incomplete, image missing/hash/pinned/stale/local-hash)"
     )
     return 0
 
