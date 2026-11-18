@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# S98 disk-tools blockd: enabled at boot so its `block:` scheme is in the login shell's namespace.
-# It waits for the virtio-blk driver's disk:0 and does not gate getty; without a scratch disk the
-# service simply stays waiting and the release boot is unchanged.
+# S98 disk-tools blockd: disabled at boot. svcd rejects a service whose `needs` includes
+# `scheme:disk` because the driver registers it later, and a scheme registered after the login
+# shell is invisible to it (the shell namespace is snapshotted at process creation). The QEMU
+# disk case is blocked on an svcd/service-order or late-namespace-grant change; see the report.
 
 name = "blockd"
 exec = "/sbin/blockd"
@@ -13,7 +14,7 @@ readiness = "scheme"
 ready_timeout_ms = 60_000
 restart = "never"
 max_restarts = 0
-enable = true
+enable = false
 
 [env]
 BLOCKD_DISK = "disk:0"
