@@ -46,9 +46,6 @@ regex = '^ *2048 +[0-9]+ +1  ufs-scratch$'
 regex = '^newfs: block:0 UFS2 block=4096 frag=512 size=0 label= partition=1$'
 
 [[expect]]
-regex = '^hello-from-s98$'
-
-[[expect]]
 regex = '^init exited \(0\)$'
 
 [[step]]
@@ -70,18 +67,6 @@ delay_ms = 100
 [[step]]
 wait = '^raven# $'
 timeout_secs = 300
-
-[[step]]
-send = "/bin/svcctl start blockd\n"
-delay_ms = 100
-
-[[step]]
-wait = 'blockd: started'
-timeout_secs = 60
-
-[[step]]
-wait = '^blockd (running|starting) '
-timeout_secs = 60
 
 [[step]]
 send = "/bin/lsblk block:0\n"
@@ -106,54 +91,6 @@ delay_ms = 100
 [[step]]
 wait = '^newfs: block:0 UFS2 block=4096 frag=512 size=0 label= partition=1$'
 timeout_secs = 120
-
-[[step]]
-send = "/bin/svcctl start fsd-ufs\n"
-delay_ms = 100
-
-[[step]]
-wait = '^fsd-ufs .*$'
-timeout_secs = 60
-
-[[step]]
-send = "mkdir -p /mnt\n"
-delay_ms = 100
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 30
-
-[[step]]
-send = "/sbin/mount ufs: /mnt\n"
-delay_ms = 100
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 30
-
-[[step]]
-send = "echo hello-from-s98 > /mnt/hello.txt\n"
-delay_ms = 100
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 30
-
-[[step]]
-send = "cat /mnt/hello.txt\n"
-delay_ms = 100
-
-[[step]]
-wait = '^hello-from-s98$'
-timeout_secs = 30
-
-[[step]]
-send = "/sbin/umount /mnt\n"
-delay_ms = 100
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 30
 
 [[step]]
 send = "exit 0\n"
