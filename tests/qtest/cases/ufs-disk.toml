@@ -30,6 +30,15 @@ regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 regex = '(?i)^password: ?$'
 
 [[expect]]
+regex = '^lsblk$'
+
+[[expect]]
+regex = '^newfs$'
+
+[[expect]]
+regex = '^gpart$'
+
+[[expect]]
 regex = 'NAME SIZE SECTORS TYPE'
 
 [[expect]]
@@ -72,6 +81,30 @@ delay_ms = 100
 [[step]]
 wait = '^raven# $'
 timeout_secs = 300
+
+[[step]]
+send = "ls /bin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^lsblk$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls /sbin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^gpart$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
 
 [[step]]
 send = "lsblk\n"

@@ -8,6 +8,7 @@ name = "ufs-disk-persist"
 arch = "x86_64"
 profile = "ufs-demo"
 timeout_secs = 420
+pre = ["sh scripts/ufs-demo.sh --prepare-tools"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",

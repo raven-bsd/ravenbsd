@@ -1,19 +1,27 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# S98 guest disk tools used by the demo shell.
+# S98 guest disk tools used by the demo shell. The demo builds them statically
+# so the disk tools do not depend on the dynamic loader; the files are produced
+# by scripts/ufs-demo.sh --prepare-tools.
 
-[[initfs.programs]]
-package = "lsblk"
+[[initfs.files]]
+src = "build/fixtures/ufs-demo/tools/lsblk"
 path = "/bin/lsblk"
+mode = 0o755
+generated = true
 
-[[initfs.programs]]
-package = "newfs"
+[[initfs.files]]
+src = "build/fixtures/ufs-demo/tools/newfs"
 path = "/sbin/newfs"
+mode = 0o755
+generated = true
 
-[[initfs.programs]]
-package = "gpart"
+[[initfs.files]]
+src = "build/fixtures/ufs-demo/tools/gpart"
 path = "/sbin/gpart"
+mode = 0o755
+generated = true
 
 [[initfs.files]]
 src = "docs/man1/lsblk.1"
