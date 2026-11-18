@@ -4,28 +4,32 @@
 # Pi 4 HDMI text console (HDMI1)
 
 Status: **host codec/blitter and firmware configuration OBSERVED; the Pi 4 board output is
-UNVERIFIED and handed to UI1.** This is a firmware linear-framebuffer text console. It is not
-GPU/DRM, has no acceleration and makes no claim about a monitor result.
+UNVERIFIED and handed to UI1.** This is a firmware linear display buffer rendered as a text
+console. It is not GPU/DRM, has no acceleration and makes no claim about a monitor result.
 
 ## 1. Scope and boundary
 
 The owner requires a monitor plugged into the Pi 4 to show boot/login text. HDMI1 delivers:
 
-* a deterministic firmware framebuffer in `config.txt`;
+* a deterministic firmware display buffer in `config.txt`;
 * `crates/raven-fb`, a host-tested mailbox property codec, pixel formats, 8x16 text blitter,
   scrolling and cursor;
-* a Pi 4 kernel early console that asks the firmware for the framebuffer, mirrors every kernel log
-  line to it and keeps the UART output unconditional;
+* a Pi 4 kernel early console that asks the firmware for the display buffer, mirrors every kernel
+  log line to it and keeps the UART output unconditional;
 * the existing `consd` `fb:console` output sink remains the userspace fan-out point (CON1); the
-  userspace server that owns the live framebuffer after boot is a UI1 follow-up.
+  userspace server that owns the live display buffer after boot is a UI1 follow-up.
 
 The kernel early console is the boot path. `getty`/`login` output reaches HDMI only when a
 userspace `fb:console` provider exists and consd opens it; until then the login prompt stays on
 UART and the HDMI screen keeps the last kernel text. This ticket does not fake a login transcript.
 
+E-Ink keeps its `Canvas` terminology in `raven-eink`. The HDMI path uses **display buffer** /
+**HDMI console** and does not reintroduce a Canvas-style model.
+
 ## 2. `config.txt`
 
-`xtask/src/pi.rs` writes the boot partition configuration. HDMI1 adds:
+`xtask/src/pi.rs` writes the boot partition configuration. HDMI1 adds the firmware's own
+`framebuffer_*` configuration keys (the firmware spelling; kept as data-sheet names):
 
 ```
 framebuffer_width=1024
@@ -39,11 +43,11 @@ disable_overscan=1
 ```
 
 `hdmi_group=2`, `hdmi_mode=16` is the DMT 1024x768 60 Hz mode, so the firmware mode and the
-property request agree. `hdmi_force_hotplug=1` keeps the mode when no monitor is sensed at
+display property request agree. `hdmi_force_hotplug=1` keeps the mode when no monitor is sensed at
 power-on. The existing `enable_uart=1`, `uart_2ndstage=1`, `dtoverlay=disable-bt`,
 `init_uart_clock=48000000` and `core_freq=250` lines are unchanged: UART remains the primary boot
 and recovery console. `hdmi_safe=1` is deliberately not used because it forces 640x480 and would
-contradict the fixed framebuffer request.
+contradict the fixed display request.
 
 ## 3. Mailbox property flow
 
@@ -80,13 +84,13 @@ returned allocation.
 
 ## 4. Address mapping and cache/barrier rules
 
-The Pi 4 firmware returns the framebuffer as a VideoCore bus address in the legacy master view.
+The Pi 4 firmware returns the display buffer as a VideoCore bus address in the legacy master view.
 For BCM2838 SDRAM the uncached alias starts at `0xC000_0000`; the kernel subtracts that base to get
 the ARM physical address, then adds the HHDM base. The Pi 4 entry stub maps the low 2 GiB of RAM
 through the HHDM, so the allocation must stay below `0x8000_0000`; otherwise the console logs a
 fallback and stays on UART.
 
-Both the property buffer and the framebuffer are normal cacheable SDRAM:
+Both the property buffer and the display buffer are normal cacheable SDRAM:
 
 1. Build the property message in a static `#[repr(align(16))]` buffer.
 2. Clean that buffer to the point of coherency (`dc cvac`) and execute `dsb sy`, so the VideoCore
@@ -100,7 +104,7 @@ Both the property buffer and the framebuffer are normal cacheable SDRAM:
    are DMA masters.
 
 The cache-line size is 64 bytes (Cortex-A72). The kernel reentrancy guard makes a concurrent panic
-line skip the framebuffer mirror instead of racing the normal console writer; UART output is never
+line skip the HDMI mirror instead of racing the normal console writer; UART output is never
 skipped.
 
 ## 5. Fallback
@@ -110,9 +114,9 @@ skipped.
 | Missing mailbox response / timeout | `fb: mailbox timeout; UART only`, no panic |
 | Non-success or malformed property response | `fb: response rejected: ...`, no panic |
 | Unsupported depth | `fb: depth <n> unsupported`, no panic |
-| Buffer outside the HHDM RAM window | `fb: framebuffer outside the mapped RAM window`, no panic |
-| Surface smaller than pitch × height | `fb: response rejected: SurfaceTooSmall`, no panic |
-| Any later console error | the line was already written to UART; the framebuffer write is dropped |
+| Buffer outside the HHDM RAM window | `fb: display buffer outside the mapped RAM window`, no panic |
+| Allocation smaller than pitch × height | `fb: response rejected: AllocationTooSmall`, no panic |
+| Any later console error | the line was already written to UART; the HDMI write is dropped |
 
 The kernel log writer writes the UART first, then mirrors. A monitor is therefore an extra output,
 never a boot dependency.
@@ -124,11 +128,11 @@ never a boot dependency.
 | Area | Assertions |
 |---|---|
 | mailbox encode | exact 120-byte sequence, tag ids, lengths, terminator |
-| mailbox decode | successful response, firmware error, missing response bit, missing tag, short surface |
+| mailbox decode | successful response, firmware error, missing response bit, missing tag, short allocation |
 | request validation | short buffer, unsupported depth |
 | pixels | depth→format, bytes per pixel, black/white per depth |
 | font | all printable ASCII cells, known glyph, `?` replacement |
-| text | clear, glyph, newline, scroll, wrap, backspace, 16/8-bit white, short surface |
+| text | clear, glyph, newline, scroll, wrap, backspace, 16/8-bit white, short screen |
 
 The Pi 4 kernel (`RAVEN_PI4=1 cargo check -p raven-kernel --target
 aarch64-unknown-none-softfloat`) compiles the shared crate sources through `#[path]`, so the kernel
@@ -158,10 +162,10 @@ donors; no CDDL/GPL code was read or copied. Donor revision: NetBSD
 | Topic | Illumos finding | BSD file/licence | Linux finding | Decision |
 |---|---|---|---|---|
 | Mailbox property protocol | No Pi firmware mailbox; no equivalent service | FreeBSD `sys/arm/broadcom/bcm2835/bcm2835_mbox.c` + `bcm2835_mbox_prop.h` (BSD-2-Clause); NetBSD `bcm2835_mbox.c`/`bcm2835_mbox_subr.c` (BSD-2-Clause) | `drivers/firmware/raspberrypi` property API, read-only | Clean-room Rust codec from the documented tag sequence and the BSD error/response rules; no code copied |
-| Framebuffer allocation | No firmware framebuffer | FreeBSD `bcm2835_fb.c` `bcm2835_mbox_fb_init` (BSD-2-Clause) | `simpledrm`/`simpledrmfb` outcome only | Six-tag one-message request; `ALLOCATE_BUFFER` + `GET_PITCH`; no virtual offset/alpha tags because the contract fixes them at defaults |
+| Display buffer allocation | No firmware display buffer | FreeBSD `bcm2835_fb.c` `bcm2835_mbox_fb_init` (BSD-2-Clause) | `simpledrm`/`simpledrmfb` outcome only | Six-tag one-message request; `ALLOCATE_BUFFER` + `GET_PITCH`; no virtual offset/alpha tags because the contract fixes them at defaults |
 | Bus address translation | No VideoCore bus | FreeBSD `bcm2835_vcbus.c/h` (BSD-2-Clause) | `linux-rpi` legacy master view, read-only | `vcbus - 0xC0000000` for BCM2838 SDRAM, validated against the HHDM window |
 | Text console/blitter | Illumos `wscons`-equivalent terminal is not applicable | NetBSD `bcm2835_genfb.c` (BSD-2-Clause) attaches `genfb`; the 8x16 glyph data is NetBSD `wsfont/bold8x16.h` (public-domain data, BSD-2 file) | fbcon outcome only | First-party blitter/scroll/cursor; glyph table reused from the already-proven E1d font with the same donor notice |
-| Cache ownership | No firmware DMA framebuffer | FreeBSD `pmap_mapdev` maps the buffer uncached (BSD-2-Clause) | DMA coherent mapping outcome | CPU HHDM mapping is cacheable, so explicit `dc cvac`/`dc ivac` + `dsb sy` around mailbox and scanout |
+| Cache ownership | No firmware DMA display buffer | FreeBSD `pmap_mapdev` maps the buffer uncached (BSD-2-Clause) | DMA coherent mapping outcome | CPU HHDM mapping is cacheable, so explicit `dc cvac`/`dc ivac` + `dsb sy` around mailbox and scanout |
 | `consd` sink | SMF/console fan-out outcome | CON1 first-party `ConsoleOutput` in `userland/servers/consd` | systemd-logind/seat outcome only | Reuse the existing `fb:console` sink; provider is UI1 |
 
 ## 9. Open inputs
@@ -170,5 +174,5 @@ donors; no CDDL/GPL code was read or copied. Donor revision: NetBSD
   over; UI1 owns that and the USB keyboard path.
 * Real-panel mode/timing evidence if the monitor rejects DMT 1024x768 60 Hz; the fallback is a
   different fixed `hdmi_mode`.
-* `raven-fb` can later grow a no_std framebuffer-file surface for the provider, but HDMI1 keeps
-  the kernel and crate boundary small.
+* `raven-fb` can later grow a no_std display-file buffer for the provider, but HDMI1 keeps the
+  kernel and crate boundary small.

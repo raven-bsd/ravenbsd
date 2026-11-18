@@ -7,7 +7,7 @@
 //! service. It is transpiled literally from NetBSD `sys/dev/wsfont/bold8x16.h`
 //! (`$NetBSD: bold8x16.h,v 1.13 2008/04/28 20:24:01 martin Exp $`): the font data is explicitly
 //! public domain and the containing file carries the NetBSD Foundation 2-clause BSD notice. We
-//! keep the donor provenance here and in `docs/hdmi-framebuffer.md`; no other donor code is copied.
+//! keep the donor provenance here and in `docs/hdmi-console.md`; no other donor code is copied.
 //!
 //! Each glyph is 8 pixels wide and 16 rows high, MSB first (`0x80` is the leftmost pixel), for the
 //! printable ASCII range `0x20..=0x7e`. Bytes outside that range use the `?` replacement.

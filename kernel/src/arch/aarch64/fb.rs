@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Raspberry Pi 4 firmware framebuffer early console.
+//! Raspberry Pi 4 HDMI display-console early glue.
 //!
-//! The boot path asks the VideoCore firmware for a linear 1024x768x32 framebuffer over mailbox
+//! The boot path asks the VideoCore firmware for a linear 1024x768x32 display buffer over mailbox
 //! channel 8, maps it through the existing HHDM, and mirrors every kernel log line to it. The
 //! UART remains the primary/recovery console: a missing mailbox, a malformed property response or
 //! an unmapped buffer logs one fallback line and leaves serial output untouched.
 //!
-//! The message buffer and the framebuffer are normal cacheable SDRAM. The CPU owns the buffer
-//! before the mailbox write and the firmware owns the framebuffer after it is handed over, so the
-//! glue cleans the property buffer before the doorbell, invalidates it after the response, and
-//! cleans each changed framebuffer row range before the VideoCore scans it out. This is a text
+//! The message buffer and the display buffer are normal cacheable SDRAM. The CPU owns the buffer
+//! before the mailbox write and the firmware owns the display buffer after it is handed over, so
+//! the glue cleans the property buffer before the doorbell, invalidates it after the response, and
+//! cleans each changed display row range before the VideoCore scans it out. This is a text
 //! console; there is no GPU command stream, DRM or mode-set beyond the firmware property call.
 
 use core::cell::UnsafeCell;
@@ -19,7 +19,7 @@ use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::arch::HHDM_BASE;
 
-// The crate source is shared with `crates/raven-fb`, where host tests exercise the full surface
+// The crate source is shared with `crates/raven-fb`, where host tests exercise the full screen
 // that the early console does not use yet.
 #[path = "../../../../crates/raven-fb/src/font.rs"]
 #[allow(dead_code, clippy::arithmetic_side_effects, clippy::indexing_slicing)]
@@ -34,9 +34,9 @@ mod pixel;
 #[allow(dead_code, clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 mod text;
 
-use mailbox::FbRequest;
+use mailbox::DisplayRequest;
 use pixel::PixelFormat;
-use text::{Surface, TextConsole};
+use text::{ScreenBuffer, TextConsole};
 
 /// Pi 4 mailbox register window (peripheral base `0xFE00_0000` + `0xB880`).
 const MAILBOX_PHYS: u64 = 0xFE00_B880;
@@ -68,7 +68,7 @@ struct AlignedBuffer([u8; mailbox::MAX_PROPERTY_BYTES]);
 struct BufferCell(UnsafeCell<AlignedBuffer>);
 
 // SAFETY: the buffer is used only under the kernel log lock or during single-threaded boot; the
-// framebuffer console also rejects reentrant writes with an atomic guard.
+// HDMI console also rejects reentrant writes with an atomic guard.
 unsafe impl Sync for BufferCell {}
 
 static BUFFER: BufferCell = BufferCell(UnsafeCell::new(AlignedBuffer(
@@ -97,12 +97,12 @@ static KERNEL_OFFSET: AtomicU64 = AtomicU64::new(0);
 /// Record the kernel's virtual-to-physical offset.
 ///
 /// Called by the Pi 4 boot path before `kmain`, because the mailbox needs the physical address of
-/// the property buffer and of the returned framebuffer.
+/// the property buffer and of the returned display buffer.
 pub fn set_kernel_offset(offset: u64) {
     KERNEL_OFFSET.store(offset, Ordering::Release);
 }
 
-/// Query the firmware framebuffer and start mirroring kernel log output to it.
+/// Query the firmware display buffer and start mirroring kernel log output to it.
 ///
 /// A failure is logged once and leaves the UART-only path in place.
 pub fn init() {
@@ -114,8 +114,9 @@ pub fn init() {
         crate::kprintln!("fb: no Pi 4 kernel offset; UART only");
         return;
     }
-    let request = FbRequest::default();
-    // SAFETY: boot calls `init` once, before any other framebuffer user; the buffer is owned here.
+    let request = DisplayRequest::default();
+    // SAFETY: boot calls `init` once, before any other display-buffer user; the buffer is owned
+    // here.
     let buffer = unsafe { &mut (*BUFFER.0.get()).0 };
     let length = match mailbox::encode_request(buffer, &request) {
         Ok(length) => length,
@@ -160,37 +161,37 @@ pub fn init() {
         info.address
     };
     let Some(required) = u64::from(info.pitch).checked_mul(u64::from(info.height)) else {
-        crate::kprintln!("fb: framebuffer size overflow; UART only");
+        crate::kprintln!("fb: display size overflow; UART only");
         return;
     };
     let end = u64::from(physical).saturating_add(required);
     if u64::from(physical) < 0x1000 || end > HHDM_RAM_END {
-        crate::kprintln!("fb: framebuffer outside the mapped RAM window");
+        crate::kprintln!("fb: display buffer outside the mapped RAM window");
         return;
     }
     let base = (HHDM_BASE.wrapping_add(u64::from(physical))) as *mut u8;
     let Some(length) = usize::try_from(required).ok() else {
-        crate::kprintln!("fb: framebuffer too large");
+        crate::kprintln!("fb: display buffer too large");
         return;
     };
-    // SAFETY: the framebuffer is inside the HHDM RAM window and the firmware has handed ownership
+    // SAFETY: the display buffer is inside the HHDM RAM window and the firmware has handed ownership
     // of the allocation to the ARM core.
     let pixels = unsafe { core::slice::from_raw_parts_mut(base, length) };
-    let mut surface = Surface {
+    let mut screen = ScreenBuffer {
         pixels,
         width: info.width,
         height: info.height,
         pitch: info.pitch,
         format,
     };
-    let mut console = match TextConsole::new(&surface) {
+    let mut console = match TextConsole::new(&screen) {
         Ok(console) => console,
         Err(error) => {
             crate::kprintln!("fb: console geometry rejected: {error:?}");
             return;
         }
     };
-    match console.clear(&mut surface) {
+    match console.clear(&mut screen) {
         Ok(dirty) => clean_rows(base, info.pitch, dirty.first, dirty.last),
         Err(error) => {
             crate::kprintln!("fb: clear failed: {error:?}; UART only");
@@ -220,7 +221,7 @@ pub fn init() {
     );
 }
 
-/// Mirror one formatted log string to the framebuffer, if the console is live.
+/// Mirror one formatted log string to the HDMI console, if it is live.
 pub fn write_text(bytes: &[u8]) {
     if !ACTIVE.load(Ordering::Acquire)
         || WRITING
@@ -245,14 +246,14 @@ pub fn write_text(bytes: &[u8]) {
     };
     // SAFETY: the buffer was validated against the HHDM RAM window in `init`.
     let pixels = unsafe { core::slice::from_raw_parts_mut(console.base, length) };
-    let mut surface = Surface {
+    let mut screen = ScreenBuffer {
         pixels,
         width: console.width,
         height: console.height,
         pitch: console.pitch,
         format: console.format,
     };
-    if let Ok(dirty) = console.text.write(&mut surface, bytes) {
+    if let Ok(dirty) = console.text.write(&mut screen, bytes) {
         clean_rows(console.base, console.pitch, dirty.first, dirty.last);
     }
     WRITING.store(false, Ordering::Release);
@@ -332,7 +333,7 @@ fn clean_dcache(address: usize, length: usize) {
     let mut current = start;
     while current < end {
         // SAFETY: `dc cvac` cleans the line containing a mapped normal-memory address; the range
-        // is inside the kernel image or the validated HHDM framebuffer.
+        // is inside the kernel image or the validated HHDM display buffer.
         unsafe {
             core::arch::asm!("dc cvac, {address}", address = in(reg) current, options(nostack));
         }

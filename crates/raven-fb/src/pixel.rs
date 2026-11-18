@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Monochrome pixel encoding for the firmware framebuffer depths we support.
+//! Monochrome pixel encoding for the firmware display-buffer depths we support.
 //!
 //! The console only needs black and white, so a depth's colour layout reduces to "all bits set"
 //! (white) or "all bits clear" (black). The 16-bit and 8-bit forms are still modelled explicitly
@@ -16,7 +16,7 @@ pub enum Color {
     White,
 }
 
-/// A linear framebuffer pixel format.
+/// A linear display-buffer pixel format.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PixelFormat {
     /// 32 bits per pixel, one padding byte plus 8 bits per primary.

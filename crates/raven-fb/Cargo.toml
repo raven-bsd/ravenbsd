@@ -4,7 +4,7 @@
 [package]
 name = "raven-fb"
 version = "0.1.0"
-description = "First-party VideoCore mailbox property codec and HDMI text framebuffer console."
+description = "First-party VideoCore mailbox property codec and HDMI text console."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
