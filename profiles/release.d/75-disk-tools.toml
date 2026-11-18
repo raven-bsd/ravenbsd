@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S98 guest disk tools: lsblk, newfs and gpart with their man pages. The virtio-blk/blockd
+# scratch-disk stack is not staged here: `/etc/drivers.toml` is owned by 20-net and the QEMU
+# disk case/fixture paths are outside this ticket's Owns (reported as the remaining gap).
+
+[[initfs.programs]]
+package = "lsblk"
+path = "/bin/lsblk"
+
+[[initfs.programs]]
+package = "newfs"
+path = "/sbin/newfs"
+
+[[initfs.programs]]
+package = "gpart"
+path = "/sbin/gpart"
+
+[[initfs.files]]
+src = "docs/man1/lsblk.1"
+path = "/usr/share/man/man1/lsblk.1"
+
+[[initfs.files]]
+src = "docs/man8/newfs.8"
+path = "/usr/share/man/man8/newfs.8"
+
+[[initfs.files]]
+src = "docs/man8/gpart.8"
+path = "/usr/share/man/man8/gpart.8"
