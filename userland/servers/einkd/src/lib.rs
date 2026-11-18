@@ -22,12 +22,16 @@ extern crate std;
 mod config;
 mod content;
 mod error;
+mod font;
 mod service;
+mod text;
 
 pub use config::{Config, PanelProfile};
 pub use content::{Content, Font, Page};
 pub use error::Error;
+pub use font::{BasicFont, FIRST_ASCII, GLYPH_HEIGHT, GLYPH_WIDTH, LAST_ASCII, REPLACEMENT};
 pub use service::{Action, Clock, Panel, Service, State, Uc8179Panel};
+pub use text::{Align, Layout, LayoutError, TextStyle, render_text};
 
 /// Service name used by the initfs manifest and the supervision graph.
 pub const SERVICE_NAME: &str = "einkd";

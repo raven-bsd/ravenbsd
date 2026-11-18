@@ -85,12 +85,37 @@ The service `Uc8179Panel` adapter initialises the E1 encoder once and reuses it.
 `Content::fetch(&mut self) -> Result<Page<'_>, Error>` is the only fetch seam:
 
 * E3 implements HTTP/HTTPS (TLS decision) and returns either a 1-bit bitmap or `Page::Text`.
-* `Page::Text` is rendered through `Font::glyph(u8)`; the glyph table and its licensing are an
-  explicit E3 input, not a hidden asset in the service.
+* `Page::Text` is rendered through `Font::glyph(u8)`. E1d supplies the built-in `BasicFont`
+  (public-domain donor provenance in §5a); an E3 provider may substitute another font only with
+  documented licence/provenance.
 * A provider owns its page buffer; the service copies it into the framebuffer during `tick`, so
   the buffer can be reused after rendering.
 * The `Config::source` name is passed to the E3 provider; it is not interpreted by the core.
 * No network/HTTP/TLS claim is made by E1c.
+
+## 5a. Built-in font and text layout
+
+E1d supplies a real 8x16 ASCII font and a layout helper in `einkd`:
+
+* **Font source:** the glyph table is transpiled literally from NetBSD
+  `sys/dev/wsfont/bold8x16.h` (`$NetBSD: bold8x16.h,v 1.13 2008/04/28 20:24:01 martin Exp $`).
+  That file states the font data is **public domain**; the containing file carries the NetBSD
+  Foundation 2-clause BSD notice. `font.rs` records the provenance. No copyleft or unclear font
+  data is used.
+* **Charset:** printable ASCII `0x20..=0x7e`, 95 glyphs, each 8 pixels wide and 16 rows high,
+  MSB first. Bytes outside the range (including UTF-8 continuation bytes) render the `?`
+  replacement glyph; the layout is byte-oriented and does not decode Unicode.
+* **Layout:** `text::render_text(frame, text, font, style)` clears the frame, handles `\n`, wraps
+  at the panel width, aligns each visual line left/centre/right, clips at the panel edge, and
+  supports glyph scale 1 or 2. A 1x/2x glyph block is drawn pixel-by-pixel through the E1
+  framebuffer; unsupported scale returns `LayoutError::UnsupportedScale`, never a panic.
+* **Limits:** fixed 8x16 cells, no kerning, anti-aliasing, proportional widths, bidi, Unicode
+  shaping or font fallback. Margins/line gap are style values; wrapping is at glyph boundaries.
+  The `Layout` result reports visual lines, glyphs drawn and whether clipping occurred.
+* **Integration:** `BasicFont` implements the existing `Font` seam, so the service can be
+  constructed with the real font. `text::render_text` is the full layout API for E3 pages; the
+  service's text page path already uses `Font::glyph` for newline/wrap/clip, and E3 can call the
+  layout helper when it needs alignment/scale before producing a bitmap page.
 
 ## 6. platd / GPIO contract
 
@@ -150,7 +175,7 @@ E-Ink service disposition.
 
 ## 10. Open inputs
 
-* E3 HTTP/HTTPS/TLS source and the real `Font` glyph table/licensing.
+* E3 HTTP/HTTPS/TLS source; an alternative font only with documented provenance.
 * einkd service manifest/profile and its post-login supervision Graph (no getty dependency).
 * E2 SPI/GPIO transport and E4 panel SKU/timing/current evidence.
 * Whether the panel needs a board-specific reset/power sequence beyond the E1 UC8179 encoder.
