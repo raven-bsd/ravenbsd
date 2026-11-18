@@ -482,6 +482,9 @@ fn main(_args: raven_rt::Args) -> i32 {
     let _ = sys::unmap(Handle::SELF_PROC, sampled, PAGE);
     let _ = sys::unmap(Handle::SELF_PROC, keep, 2usize.saturating_mul(PAGE));
     let _ = sys::handle_close(object);
+    // Let the child-exit console lines drain before the one-line summary; the console is a
+    // shared byte stream and the qtest matches the summary as a whole line.
+    let _ = sys::nanosleep(100_000_000);
 
     let stale = TLB_STALE.load(Ordering::Acquire);
     println!(
