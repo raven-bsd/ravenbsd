@@ -47,8 +47,8 @@ dynamic number in this directory is measured or invented.
 
 `reconcile.py` reads two `libc-size` JSON runs, matches the static Rust rows by
 `(arch, linkage, set, lang, probe)`, and prints the C74z-S12 legitimate-growth rows with the
-proposed `ceil(current * 103 / 100)` budgets. Shrink-first rows (P2/P5/P7 and riscv64 P3) are
-listed with `HOLD` and never auto-raised. It does not read or write `BUDGETS.toml`.
+proposed `ceil(current * 103 / 100)` budgets. Rows it cannot classify (P2/P5/P7 and riscv64 P3)
+are listed with `HOLD` and never auto-raised. It does not read or write `BUDGETS.toml`.
 
 ```sh
 python3 tests/libc/size/reconcile.py --before old.json --after build/size/libc-size.json
@@ -57,6 +57,28 @@ python3 tests/libc/size/reconcile.py --self-test
 
 The helper bounds each input to 8 MiB and 10,000 rows. `--self-test` checks the empty diff, a
 P0 shrink (+3% budget diff), the P2 hold, the P3 arch split and missing/added rows.
+
+## C74dl residual audit
+
+C74dl audited the 28-row 3.1 residual on `origin/master` `94d35d15` (C74cx was not present):
+`cargo xtask libc-size --check` reports **46 pass / 28 fail / 69 known / 105 skipped / 0
+budget-only**. The exact matrix is in `TRIAGE.md`; the short result is:
+
+* **17 budget/layout rows, 0 shrink-first.** The B overruns are `.relro_padding` (B includes all
+  NOBITS; `.bss` is 11.4-11.6k everywhere). The P2/P3 S/F rows are the real `vformat_dyn`/
+  `dtoa` path after S14/S13 and the P7 S/F rows are the real `tzload`/`tzparse` code after S6.
+  Their budgets are stale (x86_64 P2 even passes on a pre-S14 budget), so the reviewer
+  re-freezes them at measured + 3 percent.
+* **1 rule/probe bug: `P7-R-14`.** The `raven_libc_iconv` codegen unit is pulled only for
+  `<alloc::raw_vec::RawVecInner>::deallocate` and drop glue (plus 0x14 `.eh_frame`); there is no
+  iconv conversion symbol. The rule matches the member name, so it false-positives. Fix the
+  matcher (symbols, or exclude allocator-only instantiations), do not weaken the iconv rule.
+* **10 stale invariant ceilings.** The `INV-S-P2-P0` 5,120 and `INV-S-P3-P2` 10,240 limits are
+  hard-coded `PROPOSED` constants, below the real printf/dtoa deltas on every arch. The x86_64
+  P2-P0 rows are already `KNOWN`; the reviewer raises the ceilings or adds the equivalent
+  known-violation rows.
+
+C74dl applies no budget, rule or source change; **3.1 remains NOT MET** at 46/28.
 
 ## B1-B3 seeds
 
