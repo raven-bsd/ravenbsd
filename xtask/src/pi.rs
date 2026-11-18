@@ -39,7 +39,7 @@ const FIRMWARE_FILES: [&str; 5] = [
 ];
 /// The boot configuration: the K35 contract lines, the real-Pi UART setup from `docs/pi4.md`
 /// (free the PL011 from Bluetooth and pin its 48 MHz clock), and the HDMI1 deterministic
-/// firmware framebuffer. A fixed 1024x768 60 Hz DMT mode plus forced hotplug gives the same
+/// firmware display buffer. A fixed 1024x768 60 Hz DMT mode plus forced hotplug gives the same
 /// scanout with or without a monitor sensed at power-on; `enable_uart` stays on, so the UART
 /// boot/login gate is unchanged and remains the recovery console.
 const CONFIG_TXT: &str = "arm_64bit=1\n\

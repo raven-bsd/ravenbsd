@@ -23,8 +23,8 @@ use crate::{boot, kprintln, log, memory, sync, time};
 #[unsafe(no_mangle)]
 pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
     crate::arch::serial::init();
-    // HDMI1: start the firmware-framebuffer console before the first banner line. It fails closed
-    // to UART-only when the mailbox or the firmware property response is unavailable.
+    // HDMI1: start the HDMI display console before the first banner line. It fails closed to
+    // UART-only when the mailbox or the firmware property response is unavailable.
     #[cfg(raven_pi4)]
     crate::arch::aarch64::fb::init();
 

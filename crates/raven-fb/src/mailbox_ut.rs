@@ -19,7 +19,7 @@ fn read_u32(bytes: &[u8], offset: usize) -> u32 {
 }
 
 /// Turn an encoded request into the firmware's success response.
-fn respond(buffer: &mut [u8], len: usize, info: &FbInfo) {
+fn respond(buffer: &mut [u8], len: usize, info: &DisplayInfo) {
     put_u32(buffer, 4, RESPONSE_SUCCESS);
     let mut cursor = HEADER_BYTES;
     while cursor < len {
@@ -45,8 +45,8 @@ fn respond(buffer: &mut [u8], len: usize, info: &FbInfo) {
     }
 }
 
-fn info() -> FbInfo {
-    FbInfo {
+fn info() -> DisplayInfo {
+    DisplayInfo {
         address: 0xc000_0000,
         size: 1024 * 768 * 4,
         pitch: 4096,
@@ -60,7 +60,7 @@ fn info() -> FbInfo {
 #[test]
 fn encodes_the_documented_tag_sequence() {
     let mut buffer = [0u8; MAX_PROPERTY_BYTES];
-    let len = encode_request(&mut buffer, &FbRequest::default()).expect("encode");
+    let len = encode_request(&mut buffer, &DisplayRequest::default()).expect("encode");
     assert_eq!(len, 120);
     assert_eq!(read_u32(&buffer, 0), 120);
     assert_eq!(read_u32(&buffer, 4), 0);
@@ -75,7 +75,7 @@ fn encodes_the_documented_tag_sequence() {
 #[test]
 fn decodes_a_successful_response() {
     let mut buffer = [0u8; MAX_PROPERTY_BYTES];
-    let len = encode_request(&mut buffer, &FbRequest::default()).expect("encode");
+    let len = encode_request(&mut buffer, &DisplayRequest::default()).expect("encode");
     let expected = info();
     respond(&mut buffer, len, &expected);
     assert_eq!(decode_response(&buffer[..len]), Ok(expected));
@@ -84,7 +84,7 @@ fn decodes_a_successful_response() {
 #[test]
 fn rejects_a_firmware_error_code() {
     let mut buffer = [0u8; MAX_PROPERTY_BYTES];
-    let len = encode_request(&mut buffer, &FbRequest::default()).expect("encode");
+    let len = encode_request(&mut buffer, &DisplayRequest::default()).expect("encode");
     let expected = info();
     respond(&mut buffer, len, &expected);
     put_u32(&mut buffer, 4, 0x8000_0001);
@@ -97,7 +97,7 @@ fn rejects_a_firmware_error_code() {
 #[test]
 fn rejects_a_tag_without_the_response_bit() {
     let mut buffer = [0u8; MAX_PROPERTY_BYTES];
-    let len = encode_request(&mut buffer, &FbRequest::default()).expect("encode");
+    let len = encode_request(&mut buffer, &DisplayRequest::default()).expect("encode");
     let expected = info();
     respond(&mut buffer, len, &expected);
     put_u32(&mut buffer, 16, 8);
@@ -110,7 +110,7 @@ fn rejects_a_tag_without_the_response_bit() {
 #[test]
 fn rejects_a_missing_tag() {
     let mut buffer = [0u8; MAX_PROPERTY_BYTES];
-    let len = encode_request(&mut buffer, &FbRequest::default()).expect("encode");
+    let len = encode_request(&mut buffer, &DisplayRequest::default()).expect("encode");
     let expected = info();
     respond(&mut buffer, len, &expected);
     // Overwrite the first tag with the zero terminator.
@@ -122,15 +122,15 @@ fn rejects_a_missing_tag() {
 }
 
 #[test]
-fn rejects_a_surface_smaller_than_pitch_times_height() {
+fn rejects_an_allocation_smaller_than_pitch_times_height() {
     let mut buffer = [0u8; MAX_PROPERTY_BYTES];
-    let len = encode_request(&mut buffer, &FbRequest::default()).expect("encode");
+    let len = encode_request(&mut buffer, &DisplayRequest::default()).expect("encode");
     let mut expected = info();
     expected.size = 4096;
     respond(&mut buffer, len, &expected);
     assert_eq!(
         decode_response(&buffer[..len]),
-        Err(MailboxError::SurfaceTooSmall)
+        Err(MailboxError::AllocationTooSmall)
     );
 }
 
@@ -138,13 +138,13 @@ fn rejects_a_surface_smaller_than_pitch_times_height() {
 fn rejects_a_short_buffer_and_unsupported_depth() {
     let mut small = [0u8; 16];
     assert_eq!(
-        encode_request(&mut small, &FbRequest::default()),
+        encode_request(&mut small, &DisplayRequest::default()),
         Err(MailboxError::BufferTooSmall)
     );
     let mut buffer = [0u8; MAX_PROPERTY_BYTES];
-    let request = FbRequest {
+    let request = DisplayRequest {
         depth: 24,
-        ..FbRequest::default()
+        ..DisplayRequest::default()
     };
     assert_eq!(
         encode_request(&mut buffer, &request),

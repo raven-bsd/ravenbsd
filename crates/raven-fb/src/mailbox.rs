@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! VideoCore mailbox property-buffer codec for a linear firmware framebuffer.
+//! VideoCore mailbox property-buffer codec for a linear firmware display buffer.
 //!
 //! A property buffer is `{size, code}` followed by tags and a zero terminator. Each tag is
 //! `{tag, buffer_bytes, request_bytes}` plus `buffer_bytes` of value space. The firmware replies
@@ -41,9 +41,9 @@ const TAG_HEADER_BYTES: usize = 12;
 /// Number of tags checked by [`decode_response`].
 const TAG_COUNT: u8 = 6;
 
-/// A framebuffer request sent in one property message.
+/// A display request sent in one property message.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FbRequest {
+pub struct DisplayRequest {
     /// Physical and virtual width in pixels.
     pub width: u32,
     /// Physical and virtual height in pixels.
@@ -56,7 +56,7 @@ pub struct FbRequest {
     pub alignment: u32,
 }
 
-impl Default for FbRequest {
+impl Default for DisplayRequest {
     fn default() -> Self {
         Self {
             width: 1024,
@@ -68,9 +68,9 @@ impl Default for FbRequest {
     }
 }
 
-/// The firmware's answer to an [`FbRequest`].
+/// The firmware's answer to an [`DisplayRequest`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct FbInfo {
+pub struct DisplayInfo {
     /// VideoCore bus address of the allocated buffer.
     pub address: u32,
     /// Allocated buffer length in bytes.
@@ -101,14 +101,14 @@ pub enum MailboxError {
     /// A tag did not set its response bit.
     TagFailed(u32),
     /// Allocated buffer is too small for the returned pitch and height.
-    SurfaceTooSmall,
+    AllocationTooSmall,
 }
 
-/// Encode one framebuffer request; returns the message length in bytes.
+/// Encode one display request; returns the message length in bytes.
 ///
 /// The caller must place the buffer at a 16-byte-aligned, physically contiguous address and send
 /// that physical address on mailbox channel 8.
-pub fn encode_request(buffer: &mut [u8], request: &FbRequest) -> Result<usize, MailboxError> {
+pub fn encode_request(buffer: &mut [u8], request: &DisplayRequest) -> Result<usize, MailboxError> {
     if request.width == 0
         || request.height == 0
         || !matches!(request.depth, 8 | 16 | 32)
@@ -131,8 +131,8 @@ pub fn encode_request(buffer: &mut [u8], request: &FbRequest) -> Result<usize, M
     Ok(writer.cursor)
 }
 
-/// Decode a firmware framebuffer response into [`FbInfo`].
-pub fn decode_response(buffer: &[u8]) -> Result<FbInfo, MailboxError> {
+/// Decode a firmware display response into [`DisplayInfo`].
+pub fn decode_response(buffer: &[u8]) -> Result<DisplayInfo, MailboxError> {
     let size = usize::try_from(get_u32(buffer, 0)?).map_err(|_| MailboxError::MalformedResponse)?;
     if size < HEADER_BYTES + 4 || size > buffer.len() || size > MAX_PROPERTY_BYTES {
         return Err(MailboxError::MalformedResponse);
@@ -143,7 +143,7 @@ pub fn decode_response(buffer: &[u8]) -> Result<FbInfo, MailboxError> {
 
     let mut cursor = HEADER_BYTES;
     let mut seen = 0u8;
-    let mut info = FbInfo::default();
+    let mut info = DisplayInfo::default();
     loop {
         let tag = get_u32(buffer, cursor)?;
         if tag == 0 {
@@ -228,7 +228,7 @@ pub fn decode_response(buffer: &[u8]) -> Result<FbInfo, MailboxError> {
         .checked_mul(u64::from(info.height))
         .ok_or(MailboxError::MalformedResponse)?;
     if required > u64::from(info.size) {
-        return Err(MailboxError::SurfaceTooSmall);
+        return Err(MailboxError::AllocationTooSmall);
     }
     Ok(info)
 }
