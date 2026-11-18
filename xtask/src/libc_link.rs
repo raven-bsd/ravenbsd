@@ -85,7 +85,13 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     }
     let out = root.join(&options.out);
     std::fs::create_dir_all(&out).with_context(|| format!("cannot create {}", out.display()))?;
-    let libc_archive = out.join("libc.a");
+    let libc_archive = if options.arch == Arch::Aarch64 {
+        // C74id: the DSO links the opt-level=z archive; the static `libc.a` stays opt-level=s so
+        // the aarch64 static P9 rows are unchanged.
+        out.join("dso/libc.a")
+    } else {
+        out.join("libc.a")
+    };
     let libc_map = out.join("libc.map");
     let canonical = root.join("libc/ravenlibc/abi/Symbols.list");
     let per_arch = out.join("Symbols.list");
@@ -442,6 +448,14 @@ fn link_libc(
         "-o".to_string(),
         output.display().to_string(),
     ];
+    if options.arch == Arch::Aarch64 {
+        // C74id: aarch64 DSO only. ICF folds duplicate function bodies; strip-debug keeps the
+        // debug sections out of the F budget. The exported symbol set and version script are
+        // unchanged.
+        args.push("--icf=all".to_string());
+        args.push("--strip-debug".to_string());
+        args.push("--discard-all".to_string());
+    }
     for path in &forced {
         args.push(path.display().to_string());
     }

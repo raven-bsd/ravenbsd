@@ -219,6 +219,10 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
         members.len()
     );
 
+    if options.arch == Arch::Aarch64 && options.set == "server" {
+        pack_dso_archive(root, &options, features, &tools, &options.out.join("dso"))?;
+    }
+
     // 4. symbols
     let versions = root.join("libc/ravenlibc/abi/Versions.def");
     let symbol_map = root.join("libc/ravenlibc/crates/raven-libc/Symbol.map");
@@ -544,6 +548,44 @@ fn walk(dir: &Path, found: &mut Option<PathBuf>) {
             *found = Some(path);
         }
     }
+}
+
+/// Build the aarch64 DSO-only archive at `libc-a-server-z`.
+///
+/// The static `libc.a` and the x86_64/riscv64 server archives stay on `libc-a-server`
+/// (opt-level `s`); only the archive linked into `libc.so.1` is optimized for size so the
+/// unchanged `INV-LIBC-SO-S` ceiling is met without moving the static P9 rows.
+fn pack_dso_archive(
+    root: &Path,
+    options: &Options,
+    features: &str,
+    tools: &Tools,
+    out: &Path,
+) -> Result<()> {
+    std::fs::create_dir_all(out).with_context(|| format!("cannot create {}", out.display()))?;
+    let target_dir = options.out.join("cargo/libc-a-z");
+    let archive = std::fs::canonicalize(build(
+        root,
+        options,
+        "libc-a-server-z",
+        features,
+        &target_dir,
+    )?)
+    .context("cannot canonicalise the aarch64 DSO archive")?;
+    let members_dir = out.join("members");
+    let _ = std::fs::remove_dir_all(&members_dir);
+    std::fs::create_dir_all(&members_dir)
+        .with_context(|| format!("cannot create {}", members_dir.display()))?;
+    let mut members = tools.extract(&archive, &members_dir)?;
+    members.sort_by_key(|member| !member.contains("raven_libc"));
+    let packed = out.join("libc.a");
+    let _ = std::fs::remove_file(&packed);
+    tools.pack(&packed, &members, &members_dir)?;
+    println!(
+        "libc-pack: dso: ok ({} members, aarch64 opt-level=z)",
+        members.len()
+    );
+    Ok(())
 }
 
 /// R-3: at least 0.9 members per `no_mangle` source file.
