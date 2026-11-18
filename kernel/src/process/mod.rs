@@ -1723,7 +1723,7 @@ pub fn exit_current(code: i32) -> ! {
 /// exception entry uses [`handle_page_fault_access`] so a read-only VMA write is rejected
 /// instead of paged in.
 pub fn handle_page_fault(cr2: u64) -> bool {
-    resolve_page_fault(cr2, true)
+    resolve_page_fault(cr2, true, false)
 }
 
 /// Resolve a user page fault with the faulting access kind.
@@ -1732,25 +1732,79 @@ pub fn handle_page_fault(cr2: u64) -> bool {
 /// re-acquires it after the supply to map the page.
 #[cfg(target_arch = "x86_64")]
 pub fn handle_page_fault_access(cr2: u64, write: bool) -> bool {
-    resolve_page_fault(cr2, write)
+    resolve_page_fault(cr2, write, true)
 }
 
-fn resolve_page_fault(cr2: u64, write: bool) -> bool {
+/// Page-fault handlers run through an interrupt gate, so the CPU clears IF on entry. The
+/// address-space lock is a blocking mutex and may wait for another CPU; keep the handler
+/// interruptible so a target CPU can still take an SMP TLB IPI. The original IF state is
+/// restored when the handler returns, and the per-CPU diagnostic is cleared on every exit.
+#[cfg(target_arch = "x86_64")]
+struct PageFaultGuard(u64);
+
+#[cfg(target_arch = "x86_64")]
+impl PageFaultGuard {
+    fn new() -> Self {
+        let flags = crate::arch::x86_64::ap_start::save_and_disable_local_interrupts();
+        crate::arch::x86_64::ap_start::enable_local_interrupts();
+        crate::sched::smp::percpu::note_page_fault(true);
+        Self(flags)
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+impl Drop for PageFaultGuard {
+    fn drop(&mut self) {
+        crate::sched::smp::percpu::note_page_fault(false);
+        crate::arch::x86_64::ap_start::restore_local_interrupts(self.0);
+    }
+}
+
+fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
+    let _ = interruptible;
+    #[cfg(target_arch = "x86_64")]
+    let _fault = if interruptible {
+        Some(PageFaultGuard::new())
+    } else {
+        // A usercopy fixup still holds the kernel-side critical state; keep it non-preemptible.
+        None
+    };
+    crate::sched::smp::percpu::note_page_fault_phase(1);
     let Some(process) = current() else {
         return false;
     };
     let outcome = {
-        let mut address_space = process.address_space.lock();
-        let Some(address_space) = address_space.as_mut() else {
-            return false;
+        crate::sched::smp::percpu::note_page_fault_phase(2);
+        let mut guard = process.address_space.lock();
+        crate::sched::smp::percpu::note_page_fault_phase(3);
+        // Only the lock wait needs to be interruptible. Keep the actual fault resolution
+        // non-preemptible while the address-space state is locked, then restore IF after the
+        // lock is released.
+        let hold = crate::sync::critical();
+        let outcome = match guard.as_mut() {
+            Some(address_space) => {
+                crate::sched::smp::percpu::note_page_fault_phase(4);
+                address_space.handle_fault(cr2, write)
+            }
+            None => {
+                drop(guard);
+                drop(hold);
+                return false;
+            }
         };
-        address_space.handle_fault(cr2, write)
+        drop(guard);
+        drop(hold);
+        outcome
     };
+    crate::sched::smp::percpu::note_page_fault_phase(5);
     match outcome {
         Ok(()) => true,
         #[cfg(target_arch = "x86_64")]
         Err(crate::memory::uspace::FaultError::Pager(fault)) => {
-            crate::memory::pager::service(&process, fault)
+            crate::sched::smp::percpu::note_page_fault_phase(6);
+            let resolved = crate::memory::pager::service(&process, fault);
+            crate::sched::smp::percpu::note_page_fault_phase(7);
+            resolved
         }
         #[cfg(not(target_arch = "x86_64"))]
         Err(crate::memory::uspace::FaultError::Pager(_)) => false,

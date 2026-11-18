@@ -157,9 +157,12 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
                     PENDING[cpu].store(0, Ordering::SeqCst);
                     let (state, last_irq, last_state) = percpu::snapshot(cpu);
                     let (in_syscall, user_flags, syscall_number) = percpu::syscall_state(cpu);
+                    let page_fault = percpu::page_fault_active(cpu);
+                    let page_fault_phase = percpu::page_fault_phase(cpu);
+                    let wait_phase = percpu::wait_phase(cpu);
                     let now = time::now_ns();
                     kprintln!(
-                        "smp: tlb shootdown timeout on cpu {cpu} seq={sequence} last={} flushes={} state={state} syscall={in_syscall} nr={syscall_number:#x} user_if={} irq_age_ms={} state_age_ms={}",
+                        "smp: tlb shootdown timeout on cpu {cpu} seq={sequence} last={} flushes={} state={state} syscall={in_syscall} pf={page_fault} pfp={page_fault_phase} wq={wait_phase} nr={syscall_number:#x} user_if={} irq_age_ms={} state_age_ms={}",
                         LAST[cpu].load(Ordering::SeqCst),
                         flush_count(cpu),
                         (user_flags >> 9) & 1,
