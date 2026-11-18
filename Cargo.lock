@@ -341,6 +341,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "einkd"
+version = "0.1.0"
+dependencies = [
+ "raven-eink",
+]
+
+[[package]]
 name = "emmc2"
 version = "0.1.0"
 dependencies = [
