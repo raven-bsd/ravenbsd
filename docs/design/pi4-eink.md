@@ -16,7 +16,7 @@ claim a hardware pass. The Pi 4 transport, service and measured refresh evidence
 | Refresh | Full refresh only in E1; no partial-update LUT | E1 scope; partial refresh is a later optimization |
 | Alternative rejected for 0.1.0 | IT8951 1872x1404 panels (higher resolution, more power/price, different protocol) | PROPOSED; revisit after 0.1.0 |
 
-The command tables in `crates/raven-eink` are the UC8179 full-refresh constants for this panel
+The command tables in `ravenbsd-rpi/crates/eink` (`ravenbsd-eink`) are the UC8179 full-refresh constants for this panel
 class. They are hardware register values from the vendor documentation, not copied software. The
 encoder is proven against a recording mock, not against a panel (UNVERIFIED).
 
@@ -97,7 +97,7 @@ The panel is not opened during boot or login. `einkd` starts after login and the
 in its own process. The S84 boot-time gate therefore measures the same kernel/getty path with and
 without `einkd`; the expected delta is zero before the first scheduled refresh. E2/E3 must record:
 
-* host: `cargo nextest run -p raven-eink`, `make check-fast` (E1);
+* host: `cargo nextest run` in `ravenbsd-rpi`, `make check-fast` (E1);
 * Pi 4: SPI loopback, DC/RST/BUSY timing, BUSY high duration and full-refresh wall time;
 * Pi 4: last-good-frame after a failed fetch and a clean einkd restart;
 * boot/login: the S84/S89 boot script with `einkd` disabled and enabled, reporting the delta
