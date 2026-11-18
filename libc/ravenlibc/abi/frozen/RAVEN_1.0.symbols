@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1709
+# records: 1715
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -175,6 +175,7 @@ cgetstr F - all 2 -
 cgetustr F - all 2 -
 chdir F - all 0 unistd.h
 chmod F - all 0 sys/stat.h
+chown F - all 0 unistd.h
 chroot F - all 1 -
 cimag F - all 0 -
 cimagf F - all 1 -
@@ -357,6 +358,7 @@ fattach F - all 1 -
 fchdir F - all 0 unistd.h
 fchmod F - all 0 sys/stat.h
 fchmodat F - all 0 -
+fchown F - all 0 unistd.h
 fchownat F - all 0 -
 fclose F - all 0 stdio.h
 fcntl F - all 0 fcntl.h
@@ -560,6 +562,7 @@ gethostbyname2 F - all 1 netdb.h
 gethostbyname2_r F - all 1 netdb.h
 gethostbyname_r F - all 1 netdb.h
 gethostent F - all 1 netdb.h
+gethostid F - all 1 unistd.h
 gethostname F - all 0 unistd.h
 getisax F - all 2 -
 getline F - all 0 stdio.h
@@ -772,6 +775,7 @@ kqueue1 F - all 2 -
 l64a F - all 1 stdlib.h
 labs F - all 1 -
 lchmod F - all 1 -
+lchown F - all 0 -
 lckpwdf F - all 1 -
 lcong48 F - all 1 stdlib.h
 ldexp F - all 1 -
@@ -869,7 +873,9 @@ mergesort F - all 2 -
 mkdir F - all 0 sys/stat.h
 mkdirat F - all 0 sys/stat.h
 mkfifo F - all 0 sys/stat.h
+mkfifoat F - all 0 -
 mknod F - all 0 sys/stat.h
+mknodat F - all 0 -
 mkstemp F - all 0 stdlib.h
 mktime F - all 0 time.h
 mlock F - all 0 sys/mman.h

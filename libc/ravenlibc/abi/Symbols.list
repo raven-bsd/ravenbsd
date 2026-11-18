@@ -176,6 +176,7 @@ cgetstr
 cgetustr
 chdir
 chmod
+chown
 chroot
 cimag
 cimagf
@@ -358,6 +359,7 @@ fattach
 fchdir
 fchmod
 fchmodat
+fchown
 fchownat
 fclose
 fcntl
@@ -561,6 +563,7 @@ gethostbyname2
 gethostbyname2_r
 gethostbyname_r
 gethostent
+gethostid
 gethostname
 getisax
 getline
@@ -773,6 +776,7 @@ kqueue1
 l64a
 labs
 lchmod
+lchown
 lckpwdf
 lcong48
 ldexp
@@ -870,7 +874,9 @@ mergesort
 mkdir
 mkdirat
 mkfifo
+mkfifoat
 mknod
+mknodat
 mkstemp
 mktime
 mlock
