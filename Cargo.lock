@@ -1590,6 +1590,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-http"
+version = "0.1.0"
+
+[[package]]
 name = "raven-ifconfig"
 version = "0.1.0"
 dependencies = [
