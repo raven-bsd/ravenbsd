@@ -44,6 +44,8 @@ sys/resource.h prlimit
 sys/stat.h fchownat
 sys/stat.h fstat64
 sys/stat.h lstat64
+sys/stat.h mkfifoat
+sys/stat.h mknodat
 sys/stat.h stat64
 sys/wait.h wait3
 sys/wait.h wait4
@@ -53,14 +55,18 @@ stdlib.h strtof
 sys/statvfs.h statvfs
 wchar.h wcsftime
 unistd.h chroot
+unistd.h chown
 unistd.h copy_file_range
 unistd.h daemon
 unistd.h endusershell
 unistd.h execvpe
+unistd.h fchown
+unistd.h gethostid
 unistd.h getentropy
 unistd.h getresgid
 unistd.h getresuid
 unistd.h issetugid
+unistd.h lchown
 unistd.h lockf
 unistd.h lseek64
 unistd.h pread64

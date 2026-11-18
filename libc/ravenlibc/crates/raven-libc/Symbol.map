@@ -1682,6 +1682,12 @@ RAVEN_1.0 {
 		chroot;
 		fchmodat;
 		fchownat;
+		chown;
+		fchown;
+		lchown;
+		gethostid;
+		mkfifoat;
+		mknodat;
 		futimens;
 		getaudit;
 		isatty;

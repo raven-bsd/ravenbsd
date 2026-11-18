@@ -86,6 +86,7 @@ int mkdir(const char *, mode_t);
 int mkfifo(const char *, mode_t);
 int mkdirat(int, const char *, mode_t);
 int mkfifoat(int, const char *, mode_t);
+int lchown(const char *, uid_t, gid_t);
 int fchownat(int, const char *, uid_t, gid_t, int);
 int stat64(const char *__restrict, struct stat *__restrict);
 int fstat64(int, struct stat *);
