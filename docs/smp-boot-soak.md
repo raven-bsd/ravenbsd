@@ -95,6 +95,21 @@ failure under the same load: `irq-dist-off` logged `smp: cpu 3 did not start` an
 sensitive SMP failures, not a clean boot-loop pass. A clean matrix must be rerun on an exclusive
 host after the S83/AP issue is resolved.
 
+## Rework round 2 preflight
+
+The exclusive-host preflight was added and exercised. On the shared host it refused both gates
+without booting anything:
+
+- soak, `20261118T141132Z`: waited 900 s; load fell only from 84.56 to 22.80, with other
+  `qemu-system`, xtask/cargo/rustc jobs still present; `host-idle: TIMEOUT`; no boot was run.
+  State: `build/smp-boot-soak/20261118T141132Z/host-state.txt`.
+- kernel gate: `host-idle: REFUSE load(27.86>2.0) qemu xtask/cargo/rustc`; exit 2; no case ran.
+  State: `target/kernel-gate/host-state.txt`.
+
+The preflight is doing its job: it prevents another contaminated matrix. The 50/50 KVM4,
+20/20 KVM2, 20/20 KVM1 and 10/10 TCG4 matrix remains **not run** in round 2 because the host
+never became idle; the round-1 first failure remains preserved and is not retried.
+
 ## Reproduction and ownership
 
 The runner and helper are owned by S107 (`scripts/smp-boot-soak.sh`, `tests/smp/boot/**`,
