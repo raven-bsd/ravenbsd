@@ -201,7 +201,8 @@ fn sleep_slice(remaining: &mut u32) -> bool {
     if *remaining == 0 {
         return false;
     }
-    let _ = raven_rt::nanosleep(u64::from(POLL_MS) * 1_000_000);
-    *remaining = remaining.saturating_sub(POLL_MS);
+    let slice = (*remaining).min(POLL_MS);
+    let _ = raven_rt::nanosleep(u64::from(slice) * 1_000_000);
+    *remaining -= slice;
     true
 }
