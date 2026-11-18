@@ -291,7 +291,7 @@ summary="$OUT/summary.txt"
                     idx = int((9 * n + 9) / 10);
                     if (idx > n) idx = n;
                     if (idx < 1) idx = 1;
-                    printf "%s %s %s %s", value[1], p50, value[idx], value[n];
+                    printf "%s\t%s\t%s\t%s", value[1], p50, value[idx], value[n];
                 }')
             printf '%s\t%s\t%s\t%s\t%s\n' \
                 "$summary_case" "$summary_arch" "$samples" "$failures" "$stats"
