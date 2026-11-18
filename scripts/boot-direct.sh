@@ -200,11 +200,14 @@ process_matches() {
     if [ -n "$list" ]; then
         cat "$list"
     else
-        pgrep -af "$pattern" 2>/dev/null |
-            grep -v 'boot-direct.sh' |
-            grep -v 'boot-time.sh' |
-            grep -v "^$$ " |
-            grep -v "^$PPID " || true
+        # Match the executable name, not a shell command line that happens to mention QEMU:
+        # a host-idle watcher or an editor running `ps | awk /qemu-system-/` is not a QEMU
+        # overlap. The xtask qtest runner has comm "xtask" and the harness "raven-qtest".
+        ps -eo pid=,comm=,args= 2>/dev/null |
+            awk -v pattern="$pattern" '
+                $2 ~ pattern { print; next }
+                $2 == "xtask" && $0 ~ /(^|[[:space:]])qtest([[:space:]]|$)/ { print }
+            ' || true
     fi
 }
 
