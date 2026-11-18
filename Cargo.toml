@@ -73,6 +73,8 @@ members = [
     "tests/fixtures/irq-dist",
     "tests/fixtures/smp-soak",
     "tests/smp/memory",
+    "tests/smp/aarch64",
+    "tests/smp/x86_64",
     "tests/fixtures/s16-rights",
     "tests/fixtures/cap-revoke",
     "tests/fixtures/trace-context",

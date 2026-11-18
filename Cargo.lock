@@ -3340,6 +3340,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-smp-aarch64"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-smp-memory"
 version = "0.1.0"
 dependencies = [
@@ -3377,6 +3385,14 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-smp-x86-concurrent"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 
