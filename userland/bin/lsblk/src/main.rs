@@ -34,7 +34,7 @@ mod program {
     fn main(args: raven_rt::Args) -> i32 {
         let (no_header, devices) = match parse_args(args.iter().skip(1)) {
             Ok(parsed) => parsed,
-            Err(()) => {
+            Err(_) => {
                 raven_rt::eprintln!("{}", usage("lsblk", "[-n] [device ...]"));
                 return EXIT_USAGE;
             }
