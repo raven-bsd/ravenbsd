@@ -14,10 +14,10 @@ pre = ["sh tests/fixtures/disk-tools/build.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
-    "-netdev", "user,id=n0",
-    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     "-drive", "if=none,id=scratch,format=raw,file=build/fixtures/disk-tools/scratch.img",
     "-device", "virtio-blk-pci,drive=scratch,disable-legacy=on",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
 expect_exit = "success"
 
