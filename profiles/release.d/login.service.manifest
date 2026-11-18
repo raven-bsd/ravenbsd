@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# One getty on the console. It needs the tty scheme from consd and the file namespace for the
-# dynamic loader, /bin/login and the account files. The network is deliberately not in these
-# dependencies; the release netd manifest starts after getty instead.
+# One getty on the console. It needs the tty scheme from consd and the
+# initfs/ramfs/vfs services for the account files and /bin/login.
 
 name = "getty"
 exec = "/bin/getty"

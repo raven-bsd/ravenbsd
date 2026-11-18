@@ -134,6 +134,7 @@ esac
 [ -r "$ovmf_code" ] || fail "OVMF code not found: $ovmf_code (set RAVEN_OVMF_CODE)"
 [ -r "$ovmf_vars" ] || fail "OVMF vars not found: $ovmf_vars (set RAVEN_OVMF_VARS)"
 command -v qemu-system-x86_64 >/dev/null 2>&1 || fail "qemu-system-x86_64 is not installed"
+command -v python3 >/dev/null 2>&1 || fail "python3 is required for the byte-level serial reader"
 if [ "$kvm" -eq 1 ]; then
     [ -r /dev/kvm ] || fail "/dev/kvm is not readable; use --tcg for a software run"
 fi
@@ -184,84 +185,153 @@ p90() {
 
 run=1
 while [ "$run" -le "$runs" ]; do
-    serial=$tmpdir/serial-$run.log
     vars=$tmpdir/vars-$run.fd
     cp "$ovmf_vars" "$vars"
-    : >"$serial"
+    log=$out/run-$run.log
 
-    start_ns=$(date +%s%N)
-    if [ "$kvm" -eq 1 ]; then
-        timeout "$timeout_s" qemu-system-x86_64 \
-            -machine q35 -m 512M -smp "$smp" -serial "file:$serial" \
-            -display none -monitor none -no-reboot \
-            -enable-kvm -cpu host \
-            -drive "if=pflash,format=raw,readonly=on,file=$ovmf_code" \
-            -drive "if=pflash,format=raw,file=$vars" \
-            -drive "format=raw,file=$image" \
-            -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
-            -nic none -netdev user,id=n0 \
-            -device virtio-net-pci,netdev=n0,disable-legacy=on \
-            </dev/null >/dev/null 2>&1 &
-    else
-        timeout "$timeout_s" qemu-system-x86_64 \
-            -machine q35 -m 512M -smp "$smp" -serial "file:$serial" \
-            -display none -monitor none -no-reboot \
-            -drive "if=pflash,format=raw,readonly=on,file=$ovmf_code" \
-            -drive "if=pflash,format=raw,file=$vars" \
-            -drive "format=raw,file=$image" \
-            -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
-            -nic none -netdev user,id=n0 \
-            -device virtio-net-pci,netdev=n0,disable-legacy=on \
-            </dev/null >/dev/null 2>&1 &
+    # Read QEMU's serial stream as bytes, not lines: the `login:` prompt has no trailing newline,
+    # so a line reader (or a `-serial file:` poll) can miss it until QEMU exits. The reader stops
+    # the VM as soon as the prompt appears and prints the elapsed timestamps.
+    if ! result=$(python3 - "$image" "$vars" "$log" "$timeout_s" "$smp" "$kvm" "$ovmf_code" "$tmpdir/serial-$run.sock" <<'PY'
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
+
+image, vars_file, serial_log, timeout_s, smp, kvm, ovmf_code, sock_path = sys.argv[1:9]
+try:
+    os.unlink(sock_path)
+except FileNotFoundError:
+    pass
+# A Unix-socket serial backend is unbuffered. `-serial stdio` and `-serial file:` can hold the
+# unterminated `login: ` prompt until a later newline, which turns a sub-second boot into a
+# minute-long "measurement".
+args = [
+    "qemu-system-x86_64",
+    "-machine", "q35",
+    "-m", "512M",
+    "-smp", smp,
+    "-serial", f"unix:{sock_path},server=on,wait=off",
+    "-display", "none",
+    "-monitor", "none",
+    "-no-reboot",
+]
+if kvm == "1":
+    args.extend(["-enable-kvm", "-cpu", "host"])
+args.extend([
+    "-drive", f"if=pflash,format=raw,readonly=on,file={ovmf_code}",
+    "-drive", f"if=pflash,format=raw,file={vars_file}",
+    "-drive", f"format=raw,file={image}",
+    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
+    "-nic", "none", "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+])
+
+with open(serial_log, "wb") as log:
+    start = time.monotonic_ns()
+    try:
+        proc = subprocess.Popen(
+            args,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError as error:
+        print(f"boot-time reader: cannot start QEMU: {error}", file=sys.stderr)
+        sys.exit(1)
+    sock = None
+    for _ in range(2000):
+        try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(sock_path)
+            break
+        except OSError:
+            sock = None
+            if proc.poll() is not None:
+                break
+            time.sleep(0.005)
+    if sock is None:
+        proc.terminate()
+        proc.wait()
+        print("boot-time reader: cannot connect to the QEMU serial socket", file=sys.stderr)
+        sys.exit(1)
+
+    sock.settimeout(0.01)
+    deadline = start + int(timeout_s) * 1_000_000_000
+    data = b""
+    kernel_ns = None
+    kernel_id = None
+    login_ns = None
+    reason = "no login prompt"
+    while True:
+        now = time.monotonic_ns()
+        if now >= deadline:
+            reason = "timeout"
+            break
+        try:
+            chunk = sock.recv(8192)
+        except socket.timeout:
+            continue
+        except OSError:
+            reason = "QEMU serial closed"
+            break
+        if not chunk:
+            reason = "QEMU exited"
+            break
+        log.write(chunk)
+        log.flush()
+        data += chunk
+        if kernel_ns is None:
+            match = re.search(
+                rb"RavenBSD kernel 0\.1 \(x86_64\) ([0-9a-f]+) ([0-9-]+)",
+                data,
+            )
+            if match:
+                kernel_ns = time.monotonic_ns()
+                kernel_id = match.group(1).decode("ascii")
+        if b"login:" in data:
+            login_ns = time.monotonic_ns()
+            break
+
+    sock.close()
+    if proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+    if kernel_ns is None:
+        print("boot-time reader: no RavenBSD kernel banner", file=sys.stderr)
+        sys.exit(1)
+    if login_ns is None:
+        print(f"boot-time reader: {reason} before login", file=sys.stderr)
+        sys.exit(1)
+    print(f"firmware_ms={(kernel_ns - start) // 1_000_000}")
+    print(f"kernel_ms={(login_ns - kernel_ns) // 1_000_000}")
+    print(f"total_ms={(login_ns - start) // 1_000_000}")
+    print(f"kernel_id={kernel_id}")
+PY
+    ); then
+        [ -f "$log" ] && tail -20 "$log" >&2
+        fail "run $run: boot timing failed (log $log)"
     fi
-    qemu_pid=$!
 
-    kernel_ns=
-    login_ns=
-    kernel_line=
-    deadline_ns=$((start_ns + timeout_s * 1000000000))
-    while :; do
-        if [ -z "$kernel_ns" ] && grep -aqE 'RavenBSD kernel 0\.1 \(x86_64\) [0-9a-f]+ [0-9-]+' "$serial" 2>/dev/null; then
-            kernel_ns=$(date +%s%N)
-            kernel_line=$(grep -aE 'RavenBSD kernel 0\.1 \(x86_64\) [0-9a-f]+ [0-9-]+' "$serial" | head -1)
-        fi
-        if grep -aq 'login:' "$serial" 2>/dev/null; then
-            login_ns=$(date +%s%N)
-            break
-        fi
-        if ! kill -0 "$qemu_pid" 2>/dev/null; then
-            break
-        fi
-        now_ns=$(date +%s%N)
-        [ "$now_ns" -lt "$deadline_ns" ] || break
-        sleep 0.005
-    done
+    firmware_ms=$(printf '%s\n' "$result" | sed -n 's/^firmware_ms=//p')
+    kernel_ms=$(printf '%s\n' "$result" | sed -n 's/^kernel_ms=//p')
+    total_ms=$(printf '%s\n' "$result" | sed -n 's/^total_ms=//p')
+    kernel_id=$(printf '%s\n' "$result" | sed -n 's/^kernel_id=//p')
+    case $firmware_ms in '' | *[!0-9]*) fail "run $run: invalid firmware_ms";; esac
+    case $kernel_ms in '' | *[!0-9]*) fail "run $run: invalid kernel_ms";; esac
+    case $total_ms in '' | *[!0-9]*) fail "run $run: invalid total_ms";; esac
+    [ "$kernel_id" = "$commit" ] ||
+        fail "run $run: guest kernel id $kernel_id does not match HEAD $commit"
 
-    kill "$qemu_pid" 2>/dev/null || true
-    wait "$qemu_pid" 2>/dev/null || true
-    qemu_pid=
-    cp "$serial" "$out/run-$run.log"
-
-    [ -n "$kernel_ns" ] || {
-        tail -20 "$serial" >&2
-        fail "run $run: no RavenBSD kernel banner within ${timeout_s}s (log $out/run-$run.log)"
-    }
-    [ -n "$login_ns" ] || {
-        tail -20 "$serial" >&2
-        fail "run $run: no login prompt within ${timeout_s}s (log $out/run-$run.log)"
-    }
-    case $kernel_line in
-        *"$commit"*) ;;
-        *)
-            fail "run $run: guest kernel id does not match HEAD $commit: $kernel_line"
-            ;;
-    esac
-
-    firmware_ms=$(((kernel_ns - start_ns) / 1000000))
-    kernel_ms=$(((login_ns - kernel_ns) / 1000000))
-    total_ms=$(((login_ns - start_ns) / 1000000))
     printf 'boot-time: run=%s firmware_ms=%s kernel_ms=%s total_ms=%s kernel_id=%s\n' \
-        "$run" "$firmware_ms" "$kernel_ms" "$total_ms" "$commit"
+        "$run" "$firmware_ms" "$kernel_ms" "$total_ms" "$kernel_id"
     printf '%s\n' "$firmware_ms" >>"$firmware_file"
     printf '%s\n' "$kernel_ms" >>"$kernel_file"
     printf '%s\n' "$total_ms" >>"$total_file"

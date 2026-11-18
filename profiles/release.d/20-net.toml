@@ -3,9 +3,7 @@
 #
 # The release network stack from profiles/server.toml: pcid/devd find the QEMU virtio-net
 # function, devd launches it in serve mode, netd gets the DHCP lease, resolvd follows the lease
-# DNS, and the ping/route/netstat tools are available in the shell. The release netd manifest
-# names getty as a boot-order dependency so the login prompt is not held by the DHCP/readiness
-# wait; netd and resolvd still start, stay required, and keep their readiness checks.
+# DNS, and the ping/route/netstat tools are available in the shell.
 
 [[initfs.programs]]
 package = "raven-pcid"
@@ -52,7 +50,7 @@ src = "profiles/server.d/drivers.conf"
 path = "/etc/drivers.toml"
 
 [[initfs.files]]
-src = "profiles/release.d/netd.manifest"
+src = "rootfs/server/etc/services.d/netd.toml"
 path = "/etc/services.d/netd.toml"
 
 [[initfs.files]]
