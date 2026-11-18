@@ -175,6 +175,7 @@ cgetstr F 531 x86_64
 cgetustr F 531 x86_64
 chdir F 277 x86_64
 chmod F 294 x86_64
+chown F 279 x86_64
 chroot F 22 x86_64
 cimag F 4 x86_64
 cimagf F 8 x86_64
@@ -357,6 +358,7 @@ fattach F 40 x86_64
 fchdir F 68 x86_64
 fchmod F 103 x86_64
 fchmodat F 22 x86_64
+fchown F 114 x86_64
 fchownat F 22 x86_64
 fclose F 5 x86_64
 fcntl F 336 x86_64
@@ -560,6 +562,7 @@ gethostbyname2 F 295 x86_64
 gethostbyname2_r F 5 x86_64
 gethostbyname_r F 50 x86_64
 gethostent F 144 x86_64
+gethostid F 24 x86_64
 gethostname F 264 x86_64
 getisax F 53 x86_64
 getline F 5 x86_64
@@ -772,6 +775,7 @@ kqueue1 F 99 x86_64
 l64a F 264 x86_64
 labs F 17 x86_64
 lchmod F 293 x86_64
+lchown F 279 x86_64
 lckpwdf F 137 x86_64
 lcong48 F 88 x86_64
 ldexp F 6 x86_64
@@ -869,7 +873,9 @@ mergesort F 281 x86_64
 mkdir F 260 x86_64
 mkdirat F 272 x86_64
 mkfifo F 22 x86_64
+mkfifoat F 279 x86_64
 mknod F 22 x86_64
+mknodat F 343 x86_64
 mkstemp F 920 x86_64
 mktime F 528 x86_64
 mlock F 87 x86_64
