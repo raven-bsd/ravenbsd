@@ -45,7 +45,7 @@ E3 input; the service never opens a network socket itself.
 
 * **Waiting** — login/network/NTP is not ready. No fetch and no panel access.
 * **Fetching** — call `Content::fetch`; the page borrows the provider buffer.
-* **Rendering** — clear the working framebuffer and draw the page (bitmap or text via `Font`).
+* **Rendering** — clear the working Canvas and draw the page (bitmap or text via `Font`).
 * **Refreshing** — call `Panel::refresh`; the UC8179 adapter initialises once, packs the frame and
   requests a full refresh.
 * **Idle** — a successful frame is displayed; wait until `next_refresh_at`.
@@ -73,8 +73,8 @@ scheduler supplies `Clock::now_secs()` (NTP-corrected wall time).
 1. Configure the SPI clock/CS and GPIO DC/RST/BUSY (E2 transport).
 2. Reset the panel; power on; wait BUSY.
 3. Load panel setting, booster, PLL, resolution, VCOM and full-refresh LUTs (E1 encoder).
-4. Render the page into the 800x480 framebuffer with the configured rotation.
-5. Pack to the panel row format (1=black in the framebuffer → 1=white in panel RAM).
+4. Render the page into the 800x480 Canvas with the configured rotation.
+5. Pack to the panel row format (1=black in the Canvas → 1=white in panel RAM).
 6. `DATA_START`, send the 48,000-byte frame, `DISPLAY_REFRESH`, wait BUSY.
 7. Keep the frame as last-good; deep sleep between long intervals, reset/wake next time.
 
@@ -89,7 +89,7 @@ The service `Uc8179Panel` adapter initialises the E1 encoder once and reuses it.
 * `Page::Text` is rendered through `Font::glyph(u8)`. E1d supplies the built-in `BasicFont`
   (public-domain donor provenance in §5a); an E3 provider may substitute another font only with
   documented licence/provenance.
-* A provider owns its page buffer; the service copies it into the framebuffer during `tick`, so
+* A provider owns its page buffer; the service copies it into the Canvas during `tick`, so
   the buffer can be reused after rendering.
 * The `Config::source` name is passed to the E3 provider; it is not interpreted by the core.
 * No network/HTTP/TLS claim is made by E1c.
@@ -109,7 +109,7 @@ E1d supplies a real 8x16 ASCII font and a layout helper in `einkd`:
 * **Layout:** `text::render_text(frame, text, font, style)` clears the frame, handles `\n`, wraps
   at the panel width, aligns each visual line left/centre/right, clips at the panel edge, and
   supports glyph scale 1 or 2. A 1x/2x glyph block is drawn pixel-by-pixel through the E1
-  framebuffer; unsupported scale returns `LayoutError::UnsupportedScale`, never a panic.
+  Canvas; unsupported scale returns `LayoutError::UnsupportedScale`, never a panic.
 * **Limits:** fixed 8x16 cells, no kerning, anti-aliasing, proportional widths, bidi, Unicode
   shaping or font fallback. Margins/line gap are style values; wrapping is at glyph boundaries.
   The `Layout` result reports visual lines, glyphs drawn and whether clipping occurred.
