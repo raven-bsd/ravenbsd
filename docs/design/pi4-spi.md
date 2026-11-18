@@ -4,7 +4,7 @@
 # Pi 4 SPI0 master core and E-Ink transport plan
 
 Status: **host core implemented and tested (OBSERVED); Pi 4 SPI/panel hardware UNVERIFIED.**
-`crates/raven-spi` is the first-party BCM2711 SPI0/PL022-class register and transfer core. It
+`ravenbsd-rpi/crates/pi-spi` (`ravenbsd-pi-spi`) is the first-party BCM2711 SPI0/PL022-class register and transfer core. It
 has no MMIO implementation, no GPIO access and no hardware claim. E2 supplies the mapped window
 and the Pi 4 evidence.
 

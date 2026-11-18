@@ -341,15 +341,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "einkd"
-version = "0.1.0"
-dependencies = [
- "raven-abi",
- "raven-eink",
- "raven-rt",
-]
-
-[[package]]
 name = "emmc2"
 version = "0.1.0"
 dependencies = [
@@ -1439,10 +1430,6 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
 ]
-
-[[package]]
-name = "raven-eink"
-version = "0.1.0"
 
 [[package]]
 name = "raven-elf"
@@ -3466,10 +3453,6 @@ dependencies = [
  "raven-proto-fs",
  "raven-scheme",
 ]
-
-[[package]]
-name = "raven-spi"
-version = "0.1.0"
 
 [[package]]
 name = "raven-stat"

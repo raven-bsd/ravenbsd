@@ -4,7 +4,8 @@
 # einkd service core and Pi 4 integration plan
 
 Status: **host core implemented and tested (OBSERVED); Pi 4 SPI/GPIO/panel and network fetch are
-UNVERIFIED.** `userland/servers/einkd` owns the fetch→render→refresh state machine. It is
+UNVERIFIED.** `ravenbsd-rpi/apps/einkd` (the separate Pi 4 BSP repo) owns the
+fetch→render→refresh state machine. It is
 `no_std`, has no threads, sleeps, HTTP, SPI or GPIO access; every effect is an injected seam.
 
 ## 1. Configuration
@@ -119,7 +120,7 @@ E1d supplies a real 8x16 ASCII font and a layout helper in `einkd`:
 
 ## 5b. Executable, modes and supervision (E1e)
 
-`userland/servers/einkd/src/main.rs` is the target executable:
+`ravenbsd-rpi/apps/einkd/src/main.rs` is the target executable:
 
 * `--dry-run --once` uses a static `Content` page, `BasicFont`, a `DryRunPanel` that only counts
   and logs the rendered frame, and the realtime wall `Clock`; it performs one fetch/render/
@@ -171,7 +172,7 @@ cannot stall the platform daemon or getty.
 
 Host (OBSERVED):
 
-* `cargo nextest run -p einkd` covers readiness, successful refresh, fetch failure/last-good,
+* `cargo nextest run` in `ravenbsd-rpi` covers readiness, successful refresh, fetch failure/last-good,
   panel failure/backoff, interval scheduling, text rendering, clean shutdown and the recorded
   UC8179 command/data sequence.
 * `make check-fast` is the ticket gate.
@@ -204,7 +205,7 @@ E-Ink service disposition.
 | NetBSD/FreeBSD service layering | Explicit start gate, retry/backoff, last-good state | `Service` state machine and `Action` results | E3 supervision/restart integration |
 | Linux fbtft/panel services | Fetch→render→refresh separation, full-refresh policy | `Content`/`Panel` seams, full refresh only | Panel timing and image validation (E4) |
 | Illumos/SMF design | Dependency-aware start after network/time | `tick(ready)` gate; NTP-corrected `Clock`; E1e manifest after getty/netd | E4 hardware adapter |
-| `raven-eink` / `raven-spi` (first-party) | UC8179 encoder + BCM SPI transport | `Uc8179Panel` adapter and host mocks | E2 mapped SPI/GPIO transport |
+| `ravenbsd-eink` / `ravenbsd-pi-spi` (first-party, ravenbsd-rpi) | UC8179 encoder + BCM SPI transport | `Uc8179Panel` adapter and host mocks | E2 mapped SPI/GPIO transport |
 | `platd` GPIO design | DC/RST/BUSY ownership, no slow work in platd | Documented contract; no platd edit | E2/E3 GPIO client decision |
 | E1e service integration | Disabled-by-default service, explicit after-login start, dry-run panel | `einkd.toml`, `--dry-run --once`, `einkd-supervision` qtest | E4 SPI/GPIO/panel evidence |
 
