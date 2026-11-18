@@ -11,10 +11,12 @@ budgets to the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows. The C74dl a
 **17 legitimate budget/layout rows (0 shrink-first), 1 rule/probe bug (P7-R-14), and 10 stale
 invariant ceilings**; C74z-S17 applied the 17 re-freezes and C74cx fixed the P7-R-14 matcher.
 C74ht rebuilt the real x86_64/aarch64 `libc.so.1` rows and applied their measured+3% budgets.
-C74ia adds the riscv64 `libc.so.1` budget and the third NEEDED known row. **3.1 remains NOT
+C74ia adds the riscv64 `libc.so.1` budget and the third NEEDED known row. C74ib tested aarch64
+DSO size reductions; no safe reduction is implementable inside its Owns, so the aarch64 S row
+remains 1,363,752 / 1,300,000 and the riscv64 P9 growth is permanent parity. **3.1 remains NOT
 MET**: 64 pass / 13 fail / 65 known / 99 skipped / 0 budget-only; the 13 are the 10 static
-invariants, the real aarch64 `libc.so.1` S overrun (1,363,768 > 1,300,000), and two riscv64 P9
-static S/F rows grown by the C74hs compat exports (not budgeted here).
+invariants, the real aarch64 `libc.so.1` S overrun, and two riscv64 P9 static S/F rows grown by
+the C74hs compat exports (not budgeted).
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -884,6 +886,93 @@ remain FAIL. They need a C74hs-lane owner decision or a dedicated budget ticket.
 
 **3.1 remains NOT MET** with 13 real fails. The three dynamic `libc.so.1` budgets pass and the
 three NEEDED rows are documented rule exceptions.
+
+## C74ib aarch64 DSO size options (OBSERVED, `07054226`)
+
+C74ib measured the real aarch64 `libc.so.1` (**S 1,363,752 / F 2,501,104**) and tested reductions
+on scratch copies with `LD_LLD`/`RUSTC` wrappers. No tracked build file was changed: all candidate
+flags are outside this ticket's Owns.
+
+### Section breakdown
+
+S = text 1,331,520 + data 32,232. The largest allocated sections:
+
+| Section | Bytes | Share of S |
+|---|---:|---:|
+| `.text` | 1,013,616 | 74.3% |
+| `.eh_frame` | 167,204 | 12.3% |
+| `.rodata` | 74,452 | 5.5% |
+| `.dynsym` | 41,088 | 3.0% |
+| `.data.rel.ro` | 24,224 | 1.8% |
+| `.dynstr` | 18,288 | 1.3% |
+| `.gnu.hash` | 12,652 | 0.9% |
+| `.data` | 7,000 | 0.5% |
+| `.gnu.version` | 3,424 | 0.3% |
+| `.relro_padding` | 2,592 | 0.2% |
+
+The remaining allocated sections are `.got` 616, `.relr.dyn` 432, `.dynamic` 352, `.rela.dyn`
+168, `.gnu.version_d` 84, `.plt` 64, `.rela.plt` 48 and `.got.plt` 40. The non-allocated debug
+sections (F only) are `.debug_str` 66,982, `.debug_info` 53,377, `.debug_line` 42,288,
+`.debug_ranges` 20,848, `.debug_abbrev` 7,938 and `.debug_aranges` 3,280.
+
+### Large symbol groups
+
+| Group | Bytes | | Group | Bytes |
+|---|---:|---|---|---:|
+| `raven_libc_m` (fdlibm) | 129,248 | | `raven_libc_resolv` | 43,136 |
+| `raven_libc` | 113,119 | | `raven_libc_compat` | 41,628 |
+| `alloc` | 96,236 | | `raven_libc_platform` | 33,576 |
+| `raven_libc_fmt` | 66,540 | | `raven_libc_time` | 32,536 |
+| `raven_libc_regex` | 48,948 | | `raven_libc_ctype` | 26,728 |
+| `raven_libc_dtoa` | 45,676 | | `core` | 24,679 |
+
+The largest single functions are `strtodg` 10,196, `strtod` 8,788, `dtoa` 6,860, regex `p_re`
+6,128, and the two `vformat_dyn` monomorphizations 5,868 / 5,616. `.eh_frame` is the only single
+section large enough to clear the 63,752-byte gap by itself, but it is the unwind/backtrace table
+and cannot be removed without changing behavior.
+
+### Candidate deltas (scratch copies)
+
+| Candidate | S | F | ΔS | Under 1,300,000? | `libc-link` | Assessment |
+|---|---:|---:|---:|---|---|---|
+| Baseline | 1,363,752 | 2,501,104 | 0 | no (+63,752) | ok | current |
+| `--icf=all` | 1,306,012 | 2,443,360 | -57,740 | no (+6,012) | ok | insufficient; ICF may fold address-distinct functions |
+| `opt-level=z` alone | 1,330,512 | 2,968,440 | -33,240 | no (+30,512) | ok | insufficient; F grows with debug info |
+| `--icf=safe` + `opt-level=z` | 1,330,512 | 2,968,440 | -33,240 | no (+30,512) | ok | safe ICF folded nothing |
+| `--icf=all` + `opt-level=z` | 1,255,136 | 2,893,064 | -108,616 | **yes** (-44,864) | ok | F over the 2,576,138 budget by 316,926 |
+| `--icf=all` + `opt-level=z` + `--strip-debug` | 1,255,136 | 2,451,200 | -108,616 | **yes** (-44,864) | ok | F under budget by 124,938; needs qtests |
+| `force-unwind-tables=no` | 1,200,188 | 2,398,568 | -163,564 | yes (-99,812) | ok | **rejected**: `.eh_frame` 167,204 -> 3,860, breaks backtrace/unwind |
+
+`cargo xtask libc-abi check` is **ok (1713 records)**; it checks the symbol lists, not the DSO
+runtime. Qtests were not run (the ticket forbids QEMU), so the `--icf=all` function-pointer
+identity and the `opt-level=z` runtime behavior are unverified.
+
+### In-Owns feasibility
+
+None of the S-passing candidates can be enabled from `tests/libc/size/**`: the DSO is built by
+`xtask/src/libc_link.rs` (linker flags and strip) and `Cargo.toml` `[profile.libc-so]` /
+`xtask/src/libc_pack.rs` (`opt-level=z`). Those paths are outside C74ib's Owns. Editing a size
+fixture to wrap the linker would fake the build, not reduce the product DSO. **No safe reduction
+is implementable in C74ib.** A follow-up tooling ticket should add `--icf=all` and
+`--strip-debug` in `libc_link.rs`, switch the libc-so profile to `opt-level=z`, and then run the
+qtests; the measured candidate is S 1,255,136 / F 2,451,200.
+
+### riscv64 P9 growth: permanent parity
+
+The two riscv64 P9 static rows are the full `-u` link; C74hs enabled the same `compat` exports
+that x86_64/aarch64 already carry. A static full link necessarily includes every export, so the
++35,590/+39,384 S growth is **permanent parity**, not a C74hs defect. Avoiding it would require
+excluding `compat` from the static archive (an API/ABI break) or weakening the P9 `-u` probe (not
+allowed). The reviewer budget values at current + 3 percent are:
+
+| Row | S measured/budget | B measured/budget | F measured/budget |
+|---|---|---|---|
+| P9 riscv64 tiny | 904,084 / **931,207** | 35,268 / **36,327** | 905,672 / **932,843** |
+| P9 riscv64 server | 964,226 / **993,153** | 32,596 / **33,574** | 965,816 / **994,791** |
+
+These are reviewer options only; C74ib changes no budget, invariant or ceiling. The aarch64
+`INV-LIBC-SO-S` row remains FAIL and **3.1 remains NOT MET** at 64 pass / 13 fail / 65 known /
+99 skipped.
 
 ## Budget actions
 

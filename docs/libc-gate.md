@@ -41,7 +41,7 @@ cargo xtask qtest --case libc-spawn --arch x86_64
 
 The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
-## Current verdict (2026-11-18, C74hj audit on `b89e291b`; 3.1 re-evaluated by C74ia)
+## Current verdict (2026-11-18, C74hj audit on `b89e291b`; 3.1 re-evaluated by C74ia; C74ib size study)
 
 **NOT MET.** `cargo run -q -p libc-gate -- verdict --out build/libc-gate-audit` exits 1.
 
@@ -51,7 +51,8 @@ The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 * NOT MET: 1.2 (G1 0/4; C2-C5 not run, C6 unvendored), 3.1 (C74ia on `fb65ec96`: 64 pass,
   13 fail, 65 known, 99 skipped, 0 budget-only; all three `libc.so.1` budgets pass, the three
   `INV-LIBC-SO-NEEDED` rows are known rule exceptions, and the 10 static invariants, the real
-  aarch64 `libc.so.1` S ceiling and two riscv64 P9 static rows remain).
+  aarch64 `libc.so.1` S ceiling and two riscv64 P9 static rows remain; C74ib found no safe
+  in-Owns aarch64 reduction).
 * BLOCKED: 2.1/2.2 (the harness and list are present; `results/x86_64/world.json` plus the
   H-11 tarballs and H-12 freeze are absent).
 
@@ -77,32 +78,44 @@ count moved from 10 fail/102 skip to 12 fail/101 skip; C74ht then rebuilt the x8
 100 skipped. C74ia added the riscv64 `libc.so.1` budget and the third NEEDED known row on
 `fb65ec96`: 64 pass / 13 fail / 65 known / 99 skipped. All three DSO budgets pass; the remaining
 13 are the 10 static invariants, the real aarch64 `libc.so.1` S overrun, and two riscv64 P9
-static S/F rows grown by the C74hs compat exports (not budgeted by C74ia). The gate cannot close
-until G1, the invariant/S decision and the blocked world rows are resolved by their owners.
+static S/F rows grown by the C74hs compat exports (not budgeted by C74ia). C74ib then tested
+aarch64 DSO reductions on `07054226`: `--icf=all` alone reaches 1,306,012 (still 6,012 over),
+and `--icf=all` + `opt-level=z` + `--strip-debug` reaches 1,255,136 / F 2,451,200 but needs
+`xtask/src/libc_link.rs` and `Cargo.toml` profile changes outside Owns plus qtests. No safe
+in-Owns reduction exists; the aarch64 S row remains. The gate cannot close until G1, the
+invariant/S decision and the blocked world rows are resolved by their owners.
 
-## 3.1 size triage (C74w/C74z/C74z-S17/C74ht/C74ia; OBSERVED on `fb65ec96`)
+## 3.1 size triage (C74w/C74z/C74z-S17/C74ht/C74ia/C74ib; OBSERVED on `07054226`)
 
 `cargo xtask libc-size --check` reports `64 pass, 13 fail, 65 known, 99 skipped, 0 budget-only`
 after C74ia added the riscv64 `libc.so.1` budget. The 17 static budget/layout rows are the
 C74z-S17 re-freeze; no invariant ceiling is changed.
 
 * **Dynamic `libc.so.1` budgets:** all three pass. x86_64 S 1,286,594 / F 3,009,232 (budget
-  1,325,192 / 3,099,509); aarch64 S 1,363,768 / F 2,501,104 (budget 1,404,682 / 2,576,138);
+  1,325,192 / 3,099,509); aarch64 S 1,363,752 / F 2,501,104 (budget 1,404,682 / 2,576,138);
   riscv64 S 1,010,867 / F 2,490,256 (budget 1,041,194 / 2,564,964). All carry
   `SONAME libc.so.1`, `FLAGS BIND_NOW`, `FLAGS_1 NOW NODELETE` and **0 `DT_NEEDED`**.
 * **`INV-LIBC-SO-NEEDED` rule bug:** the hard-coded rule expects `needed == 1`, but a
   self-contained `libc.so.1` has 0; `readelf -d` shows no self-NEEDED entry. The source is
   outside the ticket Owns (no source edits), so all three rows are reviewed known exceptions. A
   follow-up tooling ticket must change the expectation to 0; these rows are not passes.
+* **C74ib aarch64 size study:** baseline S 1,363,752 / F 2,501,104; `.text` 1,013,616 and
+  `.eh_frame` 167,204 dominate. `--icf=all` alone reaches 1,306,012 (still 6,012 over);
+  `--icf=all` + `opt-level=z` reaches 1,255,136 but F grows to 2,893,064; adding `--strip-debug`
+  gives F 2,451,200. The only S-passing safe-ish candidate needs `xtask/src/libc_link.rs` and
+  `Cargo.toml`/`libc_pack` changes outside Owns plus qtests. `force-unwind-tables=no` (S
+  1,200,188) is rejected because it removes `.eh_frame`/backtrace. The exact section, symbol,
+  candidate and riscv P9 budget-review tables are in the C74ib TRIAGE section.
 * **13 real fails remain:** the 10 `INV-S-P2-P0`/`INV-S-P3-P2` static invariants, the real
-  aarch64 `INV-LIBC-SO-S` overrun (1,363,768 > 1,300,000; ceiling not raised), and the two
+  aarch64 `INV-LIBC-SO-S` overrun (1,363,752 > 1,300,000; ceiling not raised), and the two
   riscv64 P9 static rows grown by the C74hs compat exports (tiny S 904,084 > 868,494 / F
-  905,672 > 870,128; server S 964,226 > 924,842 / F 965,816 > 926,473). The P9 growth is real
-  and is not budgeted by C74ia; it needs a C74hs-lane owner decision or a dedicated budget ticket.
+  905,672 > 870,128; server S 964,226 > 924,842 / F 965,816 > 926,473). The P9 growth is
+  permanent parity; the reviewer values are in TRIAGE, not applied.
 * Boot rows pass. `B` is the Berkeley `llvm-size` bss field (all NOBITS, including
   `.relro_padding`), not only the `.bss` section. `build/size/libc-size.json`/`.md` are run
   artifacts and leave `budget_* = 0` and `status = ok`; the console and
-  `build/libc-gate-c74ia/3.1.txt` are the check evidence.
+  `build/libc-gate-c74ib/3.1.txt` are the check evidence.
 
 3.1 stays NOT MET with exactly 13 real fails. The exact dynamic budget diff is in the C74ia
-section of `tests/libc/size/TRIAGE.md` and the C74ia report.
+section of `tests/libc/size/TRIAGE.md`; the aarch64 candidate evidence and riscv P9 review values
+are in the C74ib section. The C74ib report records the infeasibility inside Owns.
