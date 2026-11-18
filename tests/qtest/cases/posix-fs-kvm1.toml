@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P5: POSIX filesystem behaviour through `file:` -> vfsd -> ramfsd.
+# The fixture starts the core services, then asserts directory, path, stat,
+# symlink, truncate, rename, hard-link, ownership, timestamp, special-file and
+# statvfs semantics. Access and permission are covered by the `perm` case.
+
+# S112: the same case under KVM -smp 1. The appended -smp 1 overrides the harness's fixed -smp 4.
+name = "posix-fs-kvm1"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/posix/fs/posix-fs/build.sh"]
+initfs = "build/fixtures/posix-fs/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "1"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^posix-fs: services ok$'
+
+[[expect]]
+regex = '^posix-fs: mount ok$'
+
+[[expect]]
+regex = '^posix-fs: mkdir-rmdir ok$'
+
+[[expect]]
+regex = '^posix-fs: directory ok$'
+
+[[expect]]
+regex = '^posix-fs: path-resolution ok$'
+
+[[expect]]
+regex = '^posix-fs: stat-family ok$'
+
+[[expect]]
+regex = '^posix-fs: symlink ok$'
+
+[[expect]]
+regex = '^posix-fs: truncate ok$'
+
+[[expect]]
+regex = '^posix-fs: rename ok$'
+
+[[expect]]
+regex = '^posix-fs: hard-link ok$'
+
+[[expect]]
+regex = '^posix-fs: ownership ok$'
+
+[[expect]]
+regex = '^posix-fs: timestamp ok$'
+
+[[expect]]
+regex = '^posix-fs: special-file ok$'
+
+[[expect]]
+regex = '^posix-fs: statvfs ok$'
+
+[[expect]]
+regex = '^posix-fs: mmap-file ok$'
+
+[[expect]]
+regex = '^posix-fs: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
