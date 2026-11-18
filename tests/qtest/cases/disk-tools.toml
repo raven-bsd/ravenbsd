@@ -49,7 +49,7 @@ regex = '^\s*34\s+32768\s+1\s+ufs-root$'
 regex = '^newfs: block:0 UFS2 block=4096 frag=512 size=16777216 label=$'
 
 [[expect]]
-regex = '^s110-disk-ok$'
+regex = 'read:s110-disk-ok$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -155,7 +155,7 @@ send = "read line < /mnt/hello.txt; echo read:$line\n"
 delay_ms = 100
 
 [[step]]
-wait = '^read:s110-disk-ok$'
+wait = 'read:s110-disk-ok$'
 timeout_secs = 30
 
 [[step]]
