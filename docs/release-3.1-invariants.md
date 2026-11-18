@@ -3,28 +3,47 @@
 
 # RavenBSD 0.1.0 libc gate 3.1 — invariant decision paper
 
-- Date: 2026-11-18
-- Product base: `10d8c9dd` (merge of `origin/lance/C74dl`)
-- Author: mark (size/3.1 audit)
+- Date: 2026-11-18 (C74hw refresh)
+- Product base: `6cb10821` (origin/master; C74hp/C74hr measured here)
+- Authors: mark (C74du original), jerry (C74hw refresh)
 - Status: **3.1 NOT MET.** This is a decision paper, not a gate claim and not a rule edit.
-- Scope: the 10 `INV-S-P2-P0`/`INV-S-P3-P2` rows. No QEMU; no tag.
+- Scope: the 10 `INV-S-P2-P0`/`INV-S-P3-P2` invariants, the `libc.so.1` dynamic rows exposed by
+  C74hp/C74hr, and the riscv64 blocker (C74hs). No QEMU; no tag.
+- Evidence: counts and measured values are **OBSERVED** from the commands in Reproduction on
+  `6cb10821`; the A1/A2 ceilings are **PROPOSED** and not applied.
 
 ## Decision requested
 
-The reviewer and owner must choose one of:
+Two decisions are needed; the gate stays NOT MET until both and the other libc-gate rows close.
 
-- **A. Approve a reviewed ceiling update** with the measured values below (global measured+3% or
-  per-arch/set measured+3%), so the 10 invariant rows pass while the invariants remain regression
-  detectors; the size lane implements the rule/BUDGETS change in a separate approved action.
-- **B. Keep the current 5,120/10,240 ceilings**: the 10 rows stay FAIL, 3.1 stays NOT MET, and
-  0.1.0 remains NO-GO unless the P2/P3 paths are shrunk below the old ceilings.
+1. **The ten static invariants** (the C74du decision):
+   - **A. Approve a reviewed ceiling update** with the measured values below (A1 global
+     measured+3% or A2 per-arch/set measured+3%), so the 10 invariant rows pass while the
+     invariants remain regression detectors; the size lane implements the rule change in a
+     separate approved action.
+   - **B. Keep the current 5,120/10,240 ceilings**: the 10 rows stay FAIL, 3.1 stays NOT MET, and
+     0.1.0 remains NO-GO unless the P2/P3 paths are shrunk below the old ceilings.
+2. **The dynamic `libc.so.1` rows** (new in C74hp/C74hr):
+   - **D1. Keep the dynamic libc out of the 3.1 count** until C62/C74hs lands: state that the gate
+     measures the C62 state (no `build/<arch>/libc.so.1`), where the dynamic rows skip and only
+     the ten invariants fail.
+   - **D2. Put the dynamic libc under the gate now**: approve real `libc_so` S/F budgets, resolve
+     the `DT_NEEDED` semantic (`INV-LIBC-SO-NEEDED` = 1 vs `libc-link` requiring 0), address the
+     aarch64 S row, and have C74hs enable or explicitly waive riscv64.
 
-`cargo xtask libc-size --check` on `10d8c9dd`: **46 pass, 30 fail, 62 known, 101 skipped, 0
-budget-only**. The 10 invariants are 10 of the 30 fails. The C74dl audit classified the
-`94d35d15` residual as 17 budget + 1 rule + 10 invariants; the current base has two additional
-non-invariant rows from later merges, outside this paper's decision.
+`cargo xtask libc-size --check` on `6cb10821` (C74hp/C74hr/C74hw):
 
-## The 10 invariant rows (measured on `10d8c9dd`)
+- with the C74hr refreshed artifacts in `build/`: **63 pass, 15 fail, 62 known, 100 skipped, 0
+  budget-only** (the ten invariants + five dynamic rows);
+- in the C62 state (no `build/<arch>/libc.so.1`): **63 pass, 10 fail, 62 known, 102 skipped, 0
+  budget-only** (exactly the ten invariants).
+
+The C74du baseline (`10d8c9dd`: 46 pass, 30 fail, 62 known, 101 skipped) is historical. C74z-S17
+re-froze the 17 legitimate budget rows and C74cx fixed `P7-R-14`; on `6cb10821` the only static
+fails are the ten invariants. The dynamic rows appear only when `build/` contains linked
+`libc.so.1` artifacts, which is why C74du did not see them.
+
+## The 10 invariant rows (measured on `6cb10821`; unchanged from C74du)
 
 The ceilings are hard-coded at `tools/libc-size/src/rules.rs:298` (`INV-S-P2-P0` = 5,120) and
 `:300` (`INV-S-P3-P2` = 10,240). Both were `PROPOSED` stub-era values, not frozen measured
@@ -79,6 +98,50 @@ The invariants are **relative** checks (P2 vs P0, P3 vs P2), so they remain usef
 detectors even after an absolute data/stdio growth: a new copy or subsystem still changes the
 difference.
 
+## Dynamic `libc.so.1` rows (C74hp/C74hr)
+
+C74hp found one stale x86_64 `libc.so.1` (built before the ticket, `DT_NEEDED = 0`); C74hr
+refreshed x86_64 and aarch64 with `cargo xtask libc-link --arch ...`. The refreshed artifacts are
+x86_64 3,009,232 B and aarch64 2,501,104 B, both `SONAME libc.so.1`, `DT_NEEDED = 0`; riscv64
+produces no artifact (C74hs). The x86_64 refresh did not clear the C74hp rows: they still fail
+for the rule/budget reasons below. With the artifacts present, `libc-size --check` adds five
+rows:
+
+| # | Row | Arch | Measured / limit | Class |
+|---|---|---|---|---|
+| 11 | `INV-LIBC-SO-NEEDED` | x86_64 | 0 / 1 | rule/artifact conflict |
+| 12 | `INV-LIBC-SO-NEEDED` | aarch64 | 0 / 1 | rule/artifact conflict |
+| 13 | `INV-LIBC-SO-S` | aarch64 | 1,363,768 / 1,300,000 | real size invariant |
+| 14 | `libc.so.1` budget | x86_64 | S 1,286,594 / F 3,009,232, budget 0 | missing budget |
+| 15 | `libc.so.1` budget | aarch64 | S 1,363,768 / F 2,501,104, budget 0 | missing budget |
+
+- **Rows 11/12 are a rule conflict, not a code regression.** `tools/libc-size/src/rules.rs:382`
+  requires `DT_NEEDED == 1` on the `libc.so.1` row, while `xtask/src/libc_link.rs` (`gate_text`,
+  lines 663-665) fails the ELF gate if the libc has any `DT_NEEDED`; the link adds no dependency
+  library, so the artifact is `NEEDED = 0` by construction. One of the two must change.
+- **Rows 14/15 have no budget.** `tests/libc/size/BUDGETS.toml` `[[libc_so]]` entries carry
+  `budget_s = 0`, `budget_f = 0` and `status = "skipped: libc.so.1 absent (C62 not landed)"`;
+  the check ignores the status, so any present artifact fails the `budget 0` row.
+- **Row 13 is a real result.** The fresh aarch64 `libc.so.1` S is 1,363,768 > the 1,300,000
+  `INV-LIBC-SO-S` ceiling (x86_64 1,286,594 passes). This needs an approved ceiling/budget or a
+  code shrink; it is not artifact staleness.
+- **The dynamic `P*` probe rows stay skipped.** `tools/libc-size/src/main.rs:278` tests
+  `libc.so.1` in the per-set staging dir, and `prepare_set` copies only the static set (`libc.a`,
+  crt objects), so the refreshed artifacts feed only the `libc_so` rows: 30 dynamic-server rows
+  are still skipped.
+
+### riscv64 blocker (C74hs, kevin)
+
+`cargo xtask libc-link --arch riscv64` exits 1 with `libc.so.1: FAILED` and `version script
+assignment ... symbol not defined`. The complete gap is 151 symbols listed in
+`build/riscv64/Symbols.list` but absent from `build/riscv64/libc.a`; all are the `compat` shell.
+Root cause: `libc/ravenlibc/crates/raven-libc/src/lib.rs:41` gates the module to
+`#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]`, while the symbol map lists the
+exports for every arch. C74hs (kevin) owns the fix: enable the generic compat exports for
+riscv64 after checking each module for arch-specific asm/syscalls, or explicitly mark riscv64
+dynamic libc unsupported with a gate rule and the exact missing primitive. Until then the
+riscv64 `libc.so.1` row is correctly skipped; no symbol may be faked.
+
 ## Option A: reviewed ceiling update
 
 Two implementation choices; the reviewer/owner picks one.
@@ -107,29 +170,39 @@ Two implementation choices; the reviewer/owner picks one.
   name); it preserves the tight riscv64/aarch64 P3-P2 detection. The x86_64 P2-P0 KNOWN rows can
   remain known or receive their own measured+3% rows (22,710 / 28,379) in the same action.
 
-**Release consequence of A:** the 10 invariant FAIL rows pass, but **3.1 remains NOT MET** until
-the other current size rows (17 budget + `P7-R-14` + the two extra rows on this base) are
-re-frozen/matcher-fixed, and until the other libc-gate rows (`1.2`, `1.6`, `2.1/2.2`) close.
+**Release consequence of A:** the 10 invariant FAIL rows pass, but **3.1 remains NOT MET** while
+the dynamic rows (11-15) or the C74hs riscv64 gap are open, and until the other libc-gate rows
+(`1.2`, `2.1/2.2`; 1.6/1.7 are MET) close. If the owner also takes D1 (measure the C62 state),
+the size row is green for the static set but the riscv64 dynamic libc remains undelivered.
 The 0.1.0 release remains **NO-GO** for POSIX, libc, kernel, qtests, images and the Pi 4 board;
 the tag is not issued by this decision.
 
+**If A is approved without D2**, the gate still sees 15 fails whenever `build/` holds the linked
+artifacts; the owner should therefore state which build state the 3.1 row measures. **If D2 is
+approved**, the size lane must add real `libc_so` budgets and settle the `DT_NEEDED` rule in the
+same action, and the aarch64 S row needs the approved ceiling or a shrink.
+
 ## Option B: keep NOT MET
 
-Leave the hard-coded 5,120/10,240 ceilings. The 10 rows stay FAIL; 3.1 stays **NOT MET**; the
-0.1.0 tag stays withheld. Passing under the old ceilings would require shrinking the legitimate
-integer printf/float plug-in paths by ~1-2× (or adding a special build split), which is a code
-project, not a policy decision. The owner/reviewer would explicitly accept the NO-GO.
+Leave the hard-coded 5,120/10,240 ceilings and the zero `libc_so` budgets. The 10 rows stay
+FAIL; with linked artifacts the five dynamic rows also fail (15 total); 3.1 stays **NOT MET**;
+the 0.1.0 tag stays withheld. Passing under the old ceilings would require shrinking the
+legitimate integer printf/float plug-in paths by ~1-2× (or adding a special build split), which
+is a code project, not a policy decision. The owner/reviewer would explicitly accept the NO-GO.
 
 ## Exact approval needed
 
 - **Reviewer** (size rules/allowlist and architecture): approve A1 or A2 and the concrete
-  ceiling values, and the cleanup of the x86_64 P2-P0 KNOWN rows.
+  ceiling values, the D1/D2 dynamic-row treatment, the `INV-LIBC-SO-NEEDED` semantic, the
+  aarch64 `INV-LIBC-SO-S` row, and the cleanup of the x86_64 P2-P0 KNOWN rows.
 - **Owner** (Bo Maryniuk; release/tag policy): accept the ceiling update (A) or the continued
-  NO-GO (B). The owner's decision is the release-policy decision; the reviewer's is the size
-  rule approval.
+  NO-GO (B), and D1 or D2. The owner's decision is the release-policy decision; the reviewer's
+  is the size rule approval.
 - **Size lane (lance/C74dl)** implements the approved change in
-  `tools/libc-size/src/rules.rs` (and the BUDGETS/known rows if A1), then re-runs
-  `cargo xtask libc-size --check`.
+  `tools/libc-size/src/rules.rs` and `tests/libc/size/BUDGETS.toml` (rules, `libc_so` budgets,
+  known rows), then re-runs `cargo xtask libc-size --check`.
+- **kevin/C74hs** enables the riscv64 compat shell or explicitly records the unsupported
+  dynamic-libc waiver with the exact missing primitive; no faked symbols.
 - **3.1 gate owner (carl/C74c/lane)** records the 3.1 row; the release evidence packet is
   regenerated after the gate is MET. This paper edits no rule, BUDGET, source or gate file; no
   minion may treat it as the approval.
@@ -137,10 +210,21 @@ project, not a policy decision. The owner/reviewer would explicitly accept the N
 ## Reproduction
 
 ```sh
-cargo xtask libc-size --check       # 46 pass, 30 fail, 62 known, 101 skipped; the 10 rows above
+# C62 state (no build/<arch>/libc.so.1): exactly the ten invariants
+cargo xtask libc-size --check       # 63 pass, 10 fail, 62 known, 102 skipped
+# after the C74hr refresh (x86_64 + aarch64 artifacts present): adds the five dynamic rows
+cargo xtask libc-pack --arch x86_64
+cargo xtask libc-pack --arch aarch64
+cargo xtask libc-link --arch x86_64
+cargo xtask libc-link --arch aarch64
+cargo xtask libc-size --check       # 63 pass, 15 fail, 62 known, 100 skipped
+# riscv64 still fails until C74hs:
+cargo xtask libc-link --arch riscv64   # exit 1: 151 compat symbols
 sed -n '288,310p' tools/libc-size/src/rules.rs
 ```
 
 C74dl's audit (`tickets/lance/reports/C74dl.md`, `tests/libc/size/TRIAGE.md`) has the
-`94d35d15` classification and the `P7-R-14` false-positive note; the current measured values
-differ by at most ~200 B on the aarch64/riscv server rows. No QEMU or board run is involved.
+`94d35d15` classification and the `P7-R-14` false-positive note. C74hp/C74hr
+(`tickets/jerry/reports/C74hp.md`, `C74hr.md`) produced the dynamic rows and the 151-symbol
+riscv64 gap; C74hs (kevin) owns that fix. The ten invariant values match the C74du table on
+`10d8c9dd`. No QEMU or board run is involved.
