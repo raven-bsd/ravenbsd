@@ -184,3 +184,11 @@ them, and gates the loader contract. It copies no donor code and implements no d
 | Build cache freshness | Not applicable. | Not applicable. | Not applicable. | A release profile purges the dynamic pair and requires a matching manifest; no cached-artifact shortcut. |
 | Manifest hash | Not applicable. | Not applicable. | Not applicable. | Record revision, base, interpreter, size, CRC-32 and SHA-256 beside the loader; compare before reuse. |
 
+## 7. Merge state (K131 rework round 1)
+
+The K131 implementation (`d48b0eac`) merged into `origin/master` as `8ae3fc95`; the release-notes
+commit `e22c15df` pins the x86_64 image at `d48b0eac` with SHA-256 `90e8ca12…`. Rework round 1
+adds this record on the `kevin/K131` branch after fast-forwarding it to that master state; no
+product or image byte changes. The loader freshness contract above remains the build gate, and the
+Pi 4 `pi4-rootfs` baseline remains `6d1b1bde`, not rebuilt after K131.
+
