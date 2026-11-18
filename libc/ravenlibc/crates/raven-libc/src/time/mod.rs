@@ -76,6 +76,7 @@ fn read_abi_tm(src: &AbiTm) -> raven_libc_time::Tm {
     }
 }
 
+pub(crate) mod alarm;
 mod asctime;
 mod clock_getcpuclockid;
 mod clock_nanosleep;

@@ -9,14 +9,16 @@
 set -eu
 
 printf '%-24s %-10s %-16s %s\n' ROW CLASS STATE OWNER/EVIDENCE
-printf '%-24s %-10s %-16s %s\n' 'interface.alarm' required blocked \
-    'C58 PG-17: TIMER_CREATE/TIMER_SET deliver event-queue events only (kernel/src/syscall/event.rs:289); no SIGALRM delivery'
-printf '%-24s %-10s %-16s %s\n' 'interface.pause' required blocked \
-    'C58 PG-7/PG-44: sigsuspend exists, production SysKernel::sig_setup/proc_kill return ENOSYS (raven-libc-signal/src/kernel.rs:200)'
-printf '%-24s %-10s %-16s %s\n' 'interface.shm_open' '[SHM]' seam \
-    'raven-libc-platform/src/mem/shm.rs: file-backed /tmp namespace implemented; shell/ABI export pending (frozen ABI/P1f9)'
+printf '%-24s %-10s %-16s %s\n' 'interface.alarm' required implemented \
+    'raven-libc/src/unistd/alarm.rs: libc timer table + detached TIMER_CREATE thread delivering SIGALRM via PROC_SIGNAL (kernel/src/syscall/process_ctl.rs:0x4A); Symbol.map RAVEN_1.0'
+printf '%-24s %-10s %-16s %s\n' 'interface.pause' required implemented \
+    'raven-libc/src/unistd/pause.rs: blocks in PROC_SIGRECV (kernel/src/syscall/process_ctl.rs:0x4B), returns EINTR; Symbol.map RAVEN_1.0'
+printf '%-24s %-10s %-16s %s\n' 'interface.shm_open' '[SHM]' implemented \
+    'raven-libc/src/compat/shm_open.rs over raven-libc-platform/src/mem/shm.rs file-backed /tmp namespace; Symbol.map RAVEN_1.0'
+printf '%-24s %-10s %-16s %s\n' 'interface.shm_unlink' '[SHM]' implemented \
+    'raven-libc/src/compat/shm_unlink.rs over raven-libc-platform/src/mem/shm.rs file-backed /tmp namespace; Symbol.map RAVEN_1.0'
 printf '%-24s %-10s %-16s %s\n' 'interface.ualarm' 'not Issue8' waived \
-    'P1f7 profile waiver; same C58 PG-17 timer/signal gap as alarm'
+    'P1f7 profile waiver (extension row); implemented as an extension in raven-libc/src/unistd/ualarm.rs over the same timer table'
 printf '%-24s %-10s %-16s %s\n' 'interface.acct' 'not Issue8' waived \
     'P1f7 profile waiver; BSD process-accounting extension; owner C58'
 printf '%-24s %-10s %-16s %s\n' 'interface.mincore' 'not Issue8' waived \

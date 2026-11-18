@@ -48,6 +48,7 @@ pub mod fake;
 pub mod macros;
 pub mod pages;
 pub mod pending;
+pub mod signal;
 pub mod sys;
 pub mod tp;
 pub mod unimpl;
