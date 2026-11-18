@@ -3397,6 +3397,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sntp"
+version = "0.1.0"
+
+[[package]]
 name = "raven-spawn"
 version = "0.1.0"
 dependencies = [
