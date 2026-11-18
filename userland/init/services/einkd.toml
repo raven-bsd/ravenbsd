@@ -7,7 +7,7 @@
 # network readiness, never on the boot/getty path.
 name = "einkd"
 exec = "/sbin/einkd"
-args = ["--dry-run", "--once"]
+args = ["einkd", "--dry-run", "--once"]
 needs = ["getty", "netd"]
 readiness = "none"
 restart = "never"
