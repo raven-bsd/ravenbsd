@@ -7,9 +7,9 @@ Evaluated by `libc-gate` on 2026-11-18 from the C74hj audit tree (origin/master 
 C74hj re-evaluated every non-QEMU row into `build/libc-gate-audit/`; the table is
 `cargo run -q -p libc-gate -- table --out build/libc-gate-audit`. The remaining NOT MET rows are
 G1 donor data (1.2) and the size-budget lane (3.1); the world rows (2.1/2.2) are BLOCKED by the
-missing `results/x86_64/world.json` and H-11/H-12 data. C74ht re-evaluated row 3.1 on
-`6cb10821` and wrote `build/libc-gate-c74ht/3.1.txt`; the 3.1 row uses that evidence. The
-earlier C74h/C74z-S17 evidence remains in the historical sections below.
+missing `results/x86_64/world.json` and H-11/H-12 data. C74ia re-evaluated row 3.1 on
+`fb65ec96` and wrote `build/libc-gate-c74ia/3.1.txt`; the 3.1 row uses that evidence. The
+earlier C74h/C74z-S17/C74ht evidence remains in the historical sections below.
 
 ## 1. Gate table
 
@@ -26,7 +26,7 @@ earlier C74h/C74z-S17 evidence remains in the historical sections below.
 | 1 correctness | 1.7 lints (C16) | MET | build/libc-gate-audit/1.7.txt | `libc-lint: ok (4267 files scanned)` (C74hj) |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate-audit/2.1.txt | harness/list present; blocked on missing `results/x86_64/world.json` plus H-11 tarballs and the H-12 freeze (C74hj; the rows.toml note still names the absent `Cargo.toml`, stale) |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate-audit/2.2.txt | harness present; the gate cannot run without `results/x86_64/world.json`, H-11 tarballs and the H-12 freeze; no synthetic results (C74hj) |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74ht/3.1.txt | exit 1: 65 pass, 11 fail, 64 known, 100 skipped, 0 budget-only; C74ht applied the real libc.so.1 measured+3% budgets; 2 INV-LIBC-SO-NEEDED rows are known rule exceptions; 10 static invariants + aarch64 libc.so.1 S remain |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74ia/3.1.txt | exit 1: 64 pass, 13 fail, 65 known, 99 skipped, 0 budget-only; C74ia added the riscv64 libc.so.1 measured+3% budget; 3 INV-LIBC-SO-NEEDED rows are known rule exceptions; 10 static invariants + aarch64 libc.so.1 S + 2 riscv64 P9 static rows remain |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate-audit/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable (C74hj) |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate-audit/4.1.txt | exit 0 (C74hj) |
 | 4 hardening | 4.2 fuzz soak (C10) | MET | build/libc-gate-audit/4.2.txt | 14 targets soaked >= 3600 s with zero crashes; `inet_text` 3601 s, 261,966,448 runs (C74k/C74hj) |
@@ -54,8 +54,8 @@ MET checks: symbol coverage, the packed symbol list, the target-case symbol audi
 unit-test crates, the bounded Miri row (721 tests, 6/6 pass), the lint sweep (4267 files clean),
 fuzz replay and the 14-target soak, the hardened allocator default, page coverage, the render
 lint, the existing docs gate and `libc(7)`.
-The gate cannot close because of G1 (1.2), the size-budget lane (3.1; C74ht: 65 pass, 11 fail,
-64 known, 100 skipped) and the blocked world rows (2.1/2.2).
+The gate cannot close because of G1 (1.2), the size-budget lane (3.1; C74ia: 64 pass, 13 fail,
+65 known, 99 skipped) and the blocked world rows (2.1/2.2).
 
 `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` are green. The historical C74h
 target failures were P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tzname);
@@ -81,14 +81,16 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
   entry are absent (H-11) and every `world.toml` row is `PLACEHOLDER` (H-12), so the smoke5 probe
   produces 5/5 `placeholder` (`version not frozen (H-12)`) and 0 of 100 built. Owner: the tarball
   freeze/fetch (H-11/H-12); no result JSON was invented.
-* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `65 pass, 11 fail, 64 known,
-  100 skipped, 0 budget-only` after C74ht rebuilt the x86_64/aarch64 `libc.so.1` rows on
-  `6cb10821` and applied their measured+3% budgets. The two `INV-LIBC-SO-NEEDED` rows are known
-  rule exceptions: the self-contained DSO has 0 `DT_NEEDED` (`readelf -d`), while the hard-coded
-  rule expects a self-NEEDED entry; a follow-up tooling ticket must change the expectation. The
-  remaining 11 real fails are the 10 static invariants and the aarch64 `libc.so.1` S overrun
-  (1,363,768 > 1,300,000; ceiling not raised). riscv64 stays skipped (C74hs). The exact table is
-  in the C74ht report and `tests/libc/size/TRIAGE.md`.
+* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `64 pass, 13 fail, 65 known,
+  99 skipped, 0 budget-only` after C74ia added the riscv64 `libc.so.1` budget on `fb65ec96`.
+  All three `libc.so.1` budgets pass (x86_64, aarch64, riscv64); the three
+  `INV-LIBC-SO-NEEDED` rows are known rule exceptions: each self-contained DSO has 0
+  `DT_NEEDED` (`readelf -d`), while the hard-coded rule expects a self-NEEDED entry; a follow-up
+  tooling ticket must change the expectation. The remaining 13 real fails are the 10 static
+  invariants, the aarch64 `libc.so.1` S overrun (1,363,768 > 1,300,000; ceiling not raised), and
+  two riscv64 P9 static S/F rows grown by the C74hs compat exports (tiny 904,084/905,672 vs
+  868,494/870,128; server 964,226/965,816 vs 924,842/926,473; not budgeted by C74ia). The exact
+  table is in the C74ia report and `tests/libc/size/TRIAGE.md`.
 * 4.2 soak: MET. The 2026-11-17 `inet_text` one-hour soak completed 3601 s with
   261,966,448 runs and 0 crashes; the other 13 targets completed 3600 s with 0 crashes (14
   targets total, C74k/C74hj).
@@ -159,10 +161,10 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
 * 2.1/2.2: BLOCKED, harness/list present; `results/x86_64/world.json` plus the H-11
   `world-src`/`donors.lock` entry and the H-12 freeze are absent. The stale rows.toml note still
   names `tools/libc-world/Cargo.toml`, which now exists (flagged by C74hj).
-* 3.1: NOT MET, `libc-size check: 65 pass, 11 fail, 64 known, 100 skipped, 0 budget-only`;
-  C74ht applied the real `libc.so.1` measured+3% budgets and recorded the two NEEDED rule
-  exceptions; the 10 static invariants and the aarch64 `libc.so.1` S ceiling remain; table in
-  `tests/libc/size/TRIAGE.md`.
+* 3.1: NOT MET, `libc-size check: 64 pass, 13 fail, 65 known, 99 skipped, 0 budget-only`;
+  C74ia applied the riscv64 `libc.so.1` measured+3% budget and recorded the third NEEDED rule
+  exception; all three DSO budgets pass; the 10 static invariants, the aarch64 `libc.so.1` S
+  ceiling and the 2 riscv64 P9 static rows remain; table in `tests/libc/size/TRIAGE.md`.
 * 4.2: MET, 14 targets soaked >= 3600 s with zero crashes (`inet_text` 3601 s, 261,966,448
   runs); C74k/C74hj.
 * 5.1/5.2: MET per the committed C74u/C74ae/C74n/C74v evidence; C74hj did not re-run the qtests
@@ -170,7 +172,7 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
 * 6.2: MET, `build/libc-gate-audit/6.2.txt` reader plus the C74ai mandoc 1.14.6-1 transcript
   (the local transcript is absent).
 
-## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74ht on `6cb10821`)
+## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74ia on `fb65ec96`)
 
 | Row | Command | Result |
 |---|---|---|
@@ -181,7 +183,7 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
 | 1.6 Miri | `cargo run -q -p libc-gate -- eval --only 1.6 --out build/libc-gate-c74fx` | exit 0; 721 tests (715 library + 6 alignment), 6/6 pass, 0 UB; explicit integration exclusions → MET (C74cw/C74fx) |
 | 1.7 lints | `cargo xtask libc-lint` | exit 0; clean after C74i/P1f5/ABI sync → MET |
 | 2.1/2.2 world | `libc-world check` / `build --subset smoke5` / `gate` | check exit 0 (200 packages, 197.5 weighted); smoke5 5/5 `placeholder` (H-12), 0/100 built; H-11 `world-src`/`donors.lock` absent → BLOCKED |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 65 pass, 11 fail, 64 known, 100 skipped, 0 budget-only; C74ht applied the real libc.so.1 measured+3% budgets; 2 NEEDED rule exceptions; 10 static invariants + aarch64 libc.so.1 S remain |
+| 3.1 size | `cargo xtask libc-size --check` | exit 1; 64 pass, 13 fail, 65 known, 99 skipped, 0 budget-only; C74ia added the riscv64 libc.so.1 measured+3% budget; 3 NEEDED rule exceptions; 10 static invariants + aarch64 libc.so.1 S + 2 riscv64 P9 static rows remain |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | MET: 2026-11-17 one-hour `inet_text` soak, 3601 s, 261,966,448 runs, 0 crashes (C74k) |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads, hello, stdio and time pass (C74u/C74ae) → MET |
 | 5.2 kernel | `qtest core-servers` / `qtest file-tools` | both MET: minimal profiles; `df` reads `/etc/mounts`; `tooltest: ok`, `init exited (0)` |
@@ -207,19 +209,19 @@ Result: `libc gate: NOT MET` (exit 1).
 Stale items flagged (gate-row/source edits are out of scope):
 
 * `rows.toml` notes still say 1.4 cannot start (current 27/27), 1.7 has 26 violations (current
-  clean, 4267 files), 3.1 is the C74z-S11 17/48/69/105 run (current 63/12/62/101), 4.2 has an
+  clean, 4267 files), 3.1 is the C74z-S11 17/48/69/105 run (current 64/13/65/99), 4.2 has an
   `inet_text` crash (current 14 targets/0 crashes), 5.1 has P1b failures (current MET per
   committed evidence), 6.2 has no mandoc (current reader MET), and 2.1/2.2 name a missing
   `tools/libc-world/Cargo.toml` (the file exists; the missing item is `results/x86_64/world.json`).
 * 5.1/5.2 and the C74ai 6.2 transcript have no local evidence file; 6.2's audit evidence is a
   reader status without a command line.
-* 3.1 moved from 10 fail/102 skip to 12 fail/101 skip in the C74hj audit; C74ht rebuilt the
-  dynamic rows and now reports 65 pass/11 fail/64 known/100 skipped. The remaining 11 are the 10
-  static invariants and the real aarch64 `libc.so.1` S overrun; the 2 NEEDED rows are known rule
-  exceptions.
+* 3.1 moved from 10 fail/102 skip to 12 fail/101 skip in the C74hj audit; C74ht then rebuilt the
+  dynamic rows, and C74ia added the riscv64 DSO budget: 64 pass/13 fail/65 known/99 skipped. The
+  remaining 13 are the 10 static invariants, the real aarch64 `libc.so.1` S overrun, and the 2
+  riscv64 P9 static rows grown by C74hs; the 3 NEEDED rows are known rule exceptions.
 * 4.4 reports ENTROPY_WEAK UNVERIFIED (the old note said CLEAR).
 * The C74h section header commit `beedfbbd` and the 3.1 C74z-S17 `10d8c9dd` are historical; this
-  audit is on `b89e291b`, and the C74ht 3.1 evidence is on the newer `6cb10821`.
+  audit is on `b89e291b`, and the C74ia 3.1 evidence is on the newer `fb65ec96`.
 
 `cargo run -q -p libc-gate -- eval` evaluated 90 checks; `table` and `verdict` exit 1 with
 `NOT MET`. `scripts/libc-symbol-audit.sh` and `cargo xtask libc-audit` both exit 0. The blockers
