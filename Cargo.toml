@@ -176,6 +176,7 @@ members = [
     "userland/bin/netstat",
     "userland/bin/hostname",
     "userland/bin/login",
+    "userland/bin/login/raven-login",
     "userland/bin/getty",
     "userland/bin/sleep",
     "userland/bin/play",

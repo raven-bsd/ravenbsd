@@ -2367,6 +2367,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-login"
+version = "0.1.0"
+dependencies = [
+ "login",
+]
+
+[[package]]
 name = "raven-ls"
 version = "0.1.0"
 dependencies = [

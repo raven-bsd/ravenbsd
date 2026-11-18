@@ -1,14 +1,22 @@
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 HOME=/root
-TERM=${TERM:-vt100}
+TERM=vt100
 USER=root
 LOGNAME=root
 SHELL=/bin/brush
-PS1='raven# '
-export PATH HOME TERM USER LOGNAME SHELL PS1
+# Raven Violet (K80): the visible text stays `raven# ` so the serial transcripts are stable.
+PS1='\[\e[38;5;183m\]raven# \[\e[0m\]'
+RAVEN_PROFILE=loaded
+export PATH HOME TERM USER LOGNAME SHELL PS1 RAVEN_PROFILE
 umask 022
 
 # The release login is brush; register a deterministic completion spec for the transcript
 # gate. TAB completion itself is interactive, so the scripted proof is `complete -p`. A
 # non-brush shell that sources this profile ignores the missing builtin.
 complete -W 'help exit' raven-test || true
+
+# The Pi 4 release stages the full brush rc (history and the user@host prompt). The x86_64
+# release keeps this profile-only prompt; both paths load /etc/profile first.
+if [ -r /etc/brush/brushrc ]; then
+    . /etc/brush/brushrc
+fi
