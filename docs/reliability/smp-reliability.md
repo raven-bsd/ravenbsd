@@ -1,112 +1,92 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# SMP reliability evidence (S85g)
+# SMP reliability evidence (S85g, rework round 2)
 
 - Date: 2026-11-18
-- Product base: `a0fe2765` (origin/master)
-- Host: 12th Gen Intel(R) Core(TM) i7-12700H, Linux 5.19.0-50-generic
-- QEMU: `qemu-system-x86_64` 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31); OVMF 2022.02-3ubuntu0.22.04.7
-- KVM: `/dev/kvm` present, `kvm_intel` loaded; `kvm-ok` reports acceleration usable
-- Image: `build/x86_64/ravenbsd-x86_64.img`, 320 MiB, SHA-256
-  `0dab48c0b0c266bcc42c5c3c94e708147cb7a054558093082f1a3d761ea57e82`, built at `a0fe2765` with
-  `cargo xtask image --arch x86_64 --platform generic --profile release` (exit 0)
-- Status: **BLOCKED.** No stress campaign can be aggregated at this tree.
+- Product base: `6ff7c106` (origin/master `94648948` merged into `jerry/S85g`)
+- Host: i7-12700H, Linux 5.19.0-50-generic, QEMU 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31),
+  OVMF 2022.02-3ubuntu0.22.04.7, `/dev/kvm` + `kvm_intel`
+- Image: `build/boot-time/release.img`, 320 MiB, SHA-256
+  `7987e189325dc55208fb8da4966faa62ffa2ea035bcd8bc6dc16eb4f412578f9`, banner `6ff7c106`
+- Status: **BLOCKED** for the S85 matrix. The harnesses exist; the campaigns are red.
 
-## Required matrix vs. what exists
+## Stress matrix (the S85a-f reports)
 
-The S85 umbrella requires each of S85a-f to run its subsystem stress harness under TCG `-smp 4`
-and, once S83 lands, KVM `-smp 2/4`, with at least 50 iterations or a documented time-box, and
-worst-case/p90. At `a0fe2765`:
+Each row is the owning lane's committed harness/report at this tree; failures are kept, not
+retried into a pass.
 
-| Sub-ticket | Harness path | Committed matrix | State |
-|---|---|---|---|
-| S85a locks/time/IPIs | `tests/smp/lock-time/**` (S85a Owns) | none | report WORKING, started 11:52Z |
-| S85b memory/paging/TLB | `tests/smp/memory/**` (S85b Owns) | none | report WORKING, started 11:53Z |
-| S85c IPC/rings/tracing | S85c Owns | none | report WORKING, started 04:10Z |
-| S85d POSIX/pthread/libc | S85d Owns | none | report WORKING, started 11:55Z |
-| S85e VFS/filesystem | S85e Owns | none | report WORKING, started 04:05Z |
-| S85f aarch64/TCG | S85f Owns | none | report WORKING, started 11:53Z |
+| Sub-ticket | Harness | Mode / runs | Result | Measured failure / key number | Owner / file |
+|---|---|---|---|---|---|
+| S85a | `tests/smp/lock-time/**` | TCG `-smp 4`, three 50-iteration samples | **BLOCKED** (1 pass, 2 fail) | pass: p90 1,085,771 ns, max 11,688,178 ns, 4,480 hops; fails at iter 39 and iter 4: `smp: tlb shootdown timeout on cpu 0/2`, no latency samples | lance; stuart / `kernel/src/smp/shootdown.rs:122` |
+| S85b | `tests/smp/memory/**` | TCG `-smp 4`, 3 runs | **BLOCKED** (3/3 fail) | 88/85/90 forbidden TLB-timeout lines; durations 15,150/24,790/13,947 ms; `shootdown.rs:81` IrqSpinLock masked interrupts while a second caller spins | mark; stuart / `kernel/src/smp/shootdown.rs:81` |
+| S85c | `tests/smp/ipc/**` | TCG `-smp 4`, 5 consecutive passes | **BLOCKED** (KVM legs pre-S83; TCG green) | 12,800 calls, 25,600 ring descriptors, 12,000 trace spans; p90 31.6 ms-2.887 s, worst 88.1 ms-4.061 s; KVM 2/4 stopped at `timer: 1000 Hz` at its base | tim |
+| S85d | `tests/libc/target/**`, qtest cases | TCG `-smp 4`, 20-iteration time-box + 300 s case | **BLOCKED** | `libc-threads` 20/20 timeouts (60.8-66.5 s; hang at start/mutex/cond/once/tls/barrier); malloc/stdio concurrency 3/3 fail (`fputs` EOF, errno 0); `posix-alarm` 6/6 pass; KVM legs pre-S83 | otto; libc-thread/stdio lanes |
+| S85e | `tests/posix/fs/posix-fs/**` | TCG `-smp 4`, 50 iterations | **BLOCKED** | EBADF mmap (workers 0/1 phase 9), read-after-write mismatch, rename/mount ENOMEM, remount stale state, workers stuck; one-worker control 50/50 pass; mount p90 89 µs / max 1.36 s | mel; vfsd/ramfsd + stuart/tim kernel IPC |
+| S85f | `scripts/smp-aarch64.sh`, `build/qtest/smp-aarch64/` | aarch64 TCG `-smp 4`, 23 runs | **BLOCKED** | `smp-tlb-aarch64` 20/23 (3 TLB flake, 10 %; `kernel/src/sched/smp_shim.rs:225`), `smp-user-aarch64` 23/23; x86 `libc-threads` hang 2/2; aarch64 KVM unavailable in QEMU 6.2 | carl; dave/C57, S83 |
 
-`tests/smp/` does not exist in the tree. There is no campaign log, iteration count, worst-case or
-p90 to quote. Reporting a pass from a one-shot boot would violate the S85 contract; none is
-claimed.
+The KVM legs in S85a/b/d/e were measured on the pre-S83 base; S83 now passes KVM `-smp 1/2/4`
+(see below), so those legs must be rerun on this tree before they can be green. The TCG failures
+above are independent of the KVM AP fix.
 
-## Local boot/SMP measurements (OBSERVED)
+## KVM AP bring-up (S83) — now PASS
 
-These are S85g's own measurements, useful as the harness baseline, not as the missing campaigns.
+`sh scripts/qemu-kvm.sh --no-build --image build/boot-time/release.img --timeout 120`:
 
-### TCG `-smp 4` release image (10 runs)
-
-Command (per run, 60 s foreground timeout, serial timestamps taken at the QEMU output line):
-
-```sh
-timeout 60 qemu-system-x86_64 -machine q35 -m 512M -smp 4 -serial stdio -display none \
-  -monitor none -no-reboot -nic none -netdev user,id=n0 \
-  -device virtio-net-pci,netdev=n0,disable-legacy=on \
-  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-  -drive if=pflash,format=raw,file=build/x86_64/OVMF_VARS.fd \
-  -drive format=raw,file=build/x86_64/ravenbsd-x86_64.img \
-  -device isa-debug-exit,iobase=0xf4,iosize=0x04
+```
+qemu-kvm: PASS -smp 1
+qemu-kvm: PASS -smp 2
+qemu-kvm: PASS -smp 4
+qemu-kvm: PASSED -smp 1/2/4 with login
 ```
 
-| Run | start→loader (s) | start→kernel banner (s) | start→`login:` (s) |
-|---:|---:|---:|---:|
-| 1 | 4.026 | 9.699 | 59.990 |
-| 2 | 7.099 | 14.514 | 59.993 |
-| 3 | 12.053 | 26.362 | 59.980 |
-| 4 | 5.913 | 15.435 | 60.001 |
-| 5 | 14.596 | 39.445 | 59.983 |
-| 6 | 17.316 | 35.882 | not before 60 s |
-| 7 | 5.780 | 14.466 | 59.965 |
-| 8 | 15.428 | 37.362 | 59.973 |
-| 9 | 4.280 | 9.466 | 59.995 |
-| 10 | 4.220 | 9.490 | 59.997 |
-| **p50** | **6.506** | **14.974** | — |
-| **p90** | **15.428** | **37.362** | — |
-| **max** | **17.316** | **39.445** | — |
+KVM `-smp 2/4` reaches `smp: N cpus online` and login on the current release image; the earlier
+`timer: 1000 Hz` stop is fixed by S83. This removes the old KVM blocker for the benchmark, but
+not the stress campaigns' TCG failures.
 
-`login:` at ~59.97-60.00 s in 9/10 runs (immediately before the 60 s kill) and absent in run 6;
-the services all report up, but the getty/login path is delayed. The qtest `release-login`
-(scripted login + commands + ping) passes in 31,932 ms total; it is not a start→login split and
-uses the case's own image/cmdline, so it is not substituted for the table above.
+## Boot-time samples (Raven-side)
 
-### KVM SMP reproduction
+`sh scripts/boot-time.sh --smp 4` (KVM 4 CPU, 3 runs per sample):
 
-```sh
-# Same command with -enable-kvm -cpu host and -smp 1|2|4
+| Sample | firmware (ms) | kernel→login (ms) | total (ms) | Gate |
+|---|---|---:|---:|---|
+| A run 1/2/3 | 8,489 / 19,114 / 10,474 | 1,085 / 2,021 / 1,532 | 9,575 / 21,135 / 12,007 | **FAIL** (median 1,532 ms) |
+| B run 1/2/3 | 10,500 / 6,648 / 5,086 | 1,081 / 534 / 426 | 11,582 / 7,182 / 5,512 | **PASS** (median 534 ms, p90 1,081 ms) |
+
+The committed S84 table at `4ceb76b3` records kernel→login median **409 ms** / p90 425 ms. The
+two samples here differ by ~3× on the kernel segment while the firmware also varies by ~4×; the
+host was running other minion QEMUs. The gate is therefore **flaky** on this host and is not
+reported as a clean pass. `--tcg --runs 1` reports kernel→login 3,689 ms / total 12,362 ms
+(report only). The full QEMU start→login is far above 1 s because OVMF is 5-19 s; the S89 direct
+path is the only way to the full gate and is blocked (below).
+
+## Direct boot (S89)
+
+`sh scripts/boot-direct.sh --arch x86_64` exits 2:
+
+```
+boot-direct: QEMU exit=1 in 11 ms
+boot-direct: qemu-system-x86_64: Error loading uncompressed kernel without PVH ELF Note
+boot-direct: BLOCKED: the kernel ELF has no PVH note (XEN_ELFNOTE_PHYS32_ENTRY)
+  required: a 32-bit PVH entry ... or a first-stage multiboot/PVH loader.
+  owner: Stuart (kernel entry/S83 lane)
 ```
 
-| KVM run | Result | Last serial evidence |
-|---|---|---|
-| `-smp 1` | kernel + services up; **no `login:` in 60 s** | `smp: 1 cpus online`; getty/services later; timeout 124 |
-| `-smp 2` | **stops before APs** | last line `timer: 1000 Hz`; no `smp: 2 cpus online`; QEMU exits 0 |
-| `-smp 4` | **stops before APs** | last line `timer: 1000 Hz`; no `smp: 4 cpus online`; QEMU exits 0 |
-
-This reproduces the S83 report: the AP bring-up path fails under KVM before the APs are online, so
-KVM `-smp 2/4` stress and the DR-49 KVM gate cannot run. S83 owns the fix; the exact path is the
-kernel SMP/AP bring-up, not this ticket's Owns.
-
-## Classification and owners
-
-| Finding | Class | Owner |
-|---|---|---|
-| KVM `-smp 2/4` stops at `timer: 1000 Hz`, APs never online | blocker | stuart, S83 |
-| Direct release image needs ~60 s to print `login:`; `scripts/boot-time.sh` absent | blocker | dave, S84 |
-| No direct-boot path/script | blocker | kevin, S89 |
-| Network/login/no-rsh path not landed | blocker | bob/phil, S95/S96 |
-| No S85a-f stress harness/matrix | missing evidence | lance/mark/tim/otto/mel/carl |
-| No frozen BSD/Linux benchmark images | missing evidence | owner/reviewer |
-
-A known flake or an unexplained failure is a blocker; none is retried away. There is no
-"eventually passed" row in this document.
+No direct-boot number exists; the full QEMU <1 s gate fails on firmware.
 
 ## Reproduction
 
-The image build and the qtest command are in `docs/reliability/README.md`. The KVM command is the
-same QEMU line with `-enable-kvm -cpu host` and `-smp 1`, `-smp 2` or `-smp 4`; capture the serial
-log and the exit status, never a retry that hides the stop. The full logs for these runs are under
-`/tmp/opencode/s85g-*.log` on the measuring host (not committed).
+```sh
+sh scripts/boot-time.sh --smp 4
+sh scripts/qemu-kvm.sh --no-build --image build/boot-time/release.img --timeout 120
+sh scripts/boot-direct.sh --arch x86_64
+sh tests/smp/lock-time/run.sh tcg            # S85a; keep the serial log on failure
+sh tests/smp/memory/run.sh tcg --iterations 1 # S85b
+sh tests/smp/ipc/run.sh tcg 4                 # S85c
+sh tests/libc/target/build-smp.sh             # S85d fixture
+cargo xtask qtest --case posix-fs-smp --arch x86_64  # S85e
+sh scripts/smp-aarch64.sh --tcg               # S85f
+```
 
-Verdict: **BLOCKED** — KVM SMP is broken, the six stress campaigns are not available, and the
-release boot path is not yet at the measured gate. No reliability pass is claimed.
+No test was weakened and no failure was retried into a pass. The umbrella remains BLOCKED until
+the TLB/pthread/VFS owners land fixes and every campaign passes 50/50 or the documented time-box.

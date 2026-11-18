@@ -1,100 +1,116 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# RavenBSD release boot benchmark (DR-49)
+# RavenBSD release boot benchmark (DR-49) — rework round 2
 
 - Date: 2026-11-18
-- Product base: `a0fe2765` (origin/master)
-- Status: **BLOCKED / NOT VERIFIABLE.** No Raven-vs-BSD/Linux claim is made; DR-49 is not met
-  on this tree.
-- Rule: measured numbers only, same harness, no borrowed numbers, no marketing.
+- Product base: `6ff7c106` (origin/master `94648948` merged into `jerry/S85g`)
+- Status: **PARTIAL / DR-49 NOT MET.** The Raven-side is measured on the current tree; the
+  BSD/Linux comparison is blocked on the owner/reviewer image set. No marketing claim.
+- Rule: measured numbers only, same harness, no borrowed numbers.
 
 ## What DR-49 requires
 
 Raven must reach a usable brush login, with completion and working network (not rsh), in **under
-one second including firmware**, under **KVM `-smp 4`**, and must beat BSD/Linux in the **same**
-QEMU/KVM harness. TCG is reported, not gated (S84 contract).
+one second including firmware**, under **KVM `-smp 4`**, and beat BSD/Linux in the **same**
+QEMU/KVM harness. TCG is reported, not gated.
 
-## Environment (exact)
+## Environment
 
 | Item | Value |
 |---|---|
-| Host CPU | 12th Gen Intel(R) Core(TM) i7-12700H |
-| Host kernel | 5.19.0-50-generic |
-| QEMU | `qemu-system-x86_64` 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31) |
-| Firmware | OVMF 2022.02-3ubuntu0.22.04.7 (`/usr/share/OVMF/OVMF_CODE_4M.fd`) |
-| KVM | `/dev/kvm` present; `kvm_intel` loaded; `kvm-ok` acceleration usable |
-| Raven commit | `a0fe2765` |
-| Raven image | `build/x86_64/ravenbsd-x86_64.img`, 320 MiB, SHA-256 `0dab48c0b0c266bcc42c5c3c94e708147cb7a054558093082f1a3d761ea57e82` |
-| Image command | `cargo xtask image --arch x86_64 --platform generic --profile release` (exit 0) |
+| Host | i7-12700H, Linux 5.19.0-50-generic |
+| QEMU | 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31) |
+| Firmware | OVMF 2022.02-3ubuntu0.22.04.7 |
+| KVM | `/dev/kvm`, `kvm_intel`; aarch64 KVM unavailable in this QEMU build |
+| Raven commit | `6ff7c106` (origin/master `94648948` merged) |
+| Raven image | `build/boot-time/release.img`, 320 MiB, SHA-256 `7987e189325dc55208fb8da4966faa62ffa2ea035bcd8bc6dc16eb4f412578f9` |
+| Image command | `sh scripts/boot-time.sh --smp 4` builds from HEAD and verifies the banner commit |
 
 ## Raven measurements (OBSERVED)
 
-### KVM (the DR-49 harness) — BLOCKED
+### KVM SMP path — PASS
 
-| Run | Result |
-|---|---|
-| KVM `-smp 1` | kernel + services up (`smp: 1 cpus online`); **no `login:` within 60 s**; timeout |
-| KVM `-smp 2` | **stops at `timer: 1000 Hz`**; no `smp: 2 cpus online`; no login; QEMU exit 0 |
-| KVM `-smp 4` | **stops at `timer: 1000 Hz`**; no `smp: 4 cpus online`; no login; QEMU exit 0 |
+`sh scripts/qemu-kvm.sh --no-build --image build/boot-time/release.img --timeout 120`:
 
-The KVM SMP failure is the S83 AP bring-up blocker (reproduced in
-`docs/reliability/smp-reliability.md`). There is no KVM boot-to-login number to compare, so the
-DR-49 gate is **not measurable**.
+```
+qemu-kvm: PASS -smp 1
+qemu-kvm: PASS -smp 2
+qemu-kvm: PASS -smp 4
+qemu-kvm: PASSED -smp 1/2/4 with login
+```
 
-### TCG `-smp 4` baseline (reported, not gated)
+### Boot-time split (KVM 4 CPU, 3 runs per sample)
 
-10 runs, release image with the qtest network device (details/table in
-`docs/reliability/smp-reliability.md`):
+| Sample | firmware (ms) | kernel→login (ms) | total (ms) | Gate |
+|---|---|---:|---:|---|
+| A | 8,489 / 19,114 / 10,474 | 1,085 / 2,021 / 1,532 | 9,575 / 21,135 / 12,007 | **FAIL** (median 1,532 ms) |
+| B | 10,500 / 6,648 / 5,086 | 1,081 / 534 / 426 | 11,582 / 7,182 / 5,512 | **PASS** (median 534 ms, p90 1,081 ms) |
 
-| Metric | p50 | p90 | max |
-|---|---:|---:|---:|
-| start → loader | 6.506 s | 15.428 s | 17.316 s |
-| start → kernel banner | 14.974 s | 37.362 s | 39.445 s |
-| start → `login:` | ~59.97 s (9/10; 1/10 not before 60 s) | — | — |
+Committed S84 table at `4ceb76b3`: kernel→login median **409 ms**, p90 425 ms; firmware ~4.34 s.
+The two fresh samples vary by ~3× on the kernel segment and ~4× on firmware while other minion
+QEMUs ran on the host. The OS gate (kernel→login < 1 s) is therefore **flaky** on this host, not
+a clean pass; the full QEMU start→login is 5.5-21.1 s because OVMF dominates.
 
-The getty/login delay on the direct release image is the S84 service-ordering issue. The
-`release-login` qtest (scripted login, `ls`, `uname`, `ping 10.0.2.2`, exit 0) passes once in
-**31,932 ms total**; it is not a start→login split and is not substituted for the table.
+TCG `sh scripts/boot-time.sh --tcg --runs 1`: kernel→login 3,689 ms, total 12,362 ms (report
+only, no gate).
 
-### BSD/Linux comparison — BLOCKED
+### Direct boot — BLOCKED
 
-- **No FreeBSD image** is present in the workspace or the searched host paths; no BSD boot number
-  exists.
-- Candidate host Linux qcow2 files (not a frozen, documented benchmark set):
-  - `/home/bo/Downloads/openSUSE-Leap-Micro.x86_64-Default-qcow.qcow2`, virtual 20 GiB,
-    SHA-256 `a276909e1ef16260b82f172ba8e990e917eb3f214b762c826f8c18fca40a9015`
-  - `/home/bo/Downloads/openSUSE-MicroOS.x86_64-ContainerHost-kvm-and-xen.qcow2`, virtual 20 GiB,
-    SHA-256 `1feea5640c8298f6296c057af07ec94179195a922b25191c16deb79739c44126`
-  - `/home/bo/Downloads/qemu_minimal_image.x86_64-1.1.0-0.qcow2`, virtual 3 GiB,
-    SHA-256 `17bbc74ba30921e89376e8c96e9288405e9ab756f28e8bab6eb8a2ac9ea69b0d`
-  - `/home/bo/Downloads/basic-image.aarch64-1.0.2-RW-Build1.qcow2`, virtual 580 MiB,
-    SHA-256 `6a9b842c343386944db864d06a4e2f799e76800d6ba95d72b7c181e89b680a14` (not x86_64)
-  These are not used for a comparison: the Raven KVM side is broken, and the images have no
-  frozen provenance (source URL/version) or identical-harness contract.
-- **No Linux boot time was measured** in this ticket. No borrowed or vendor-quoted number is
-  used.
+`sh scripts/boot-direct.sh --arch x86_64` exits 2:
+
+```
+qemu-system-x86_64: Error loading uncompressed kernel without PVH ELF Note
+BLOCKED: the kernel ELF has no PVH note (XEN_ELFNOTE_PHYS32_ENTRY)
+required: a 32-bit PVH entry ... or a first-stage multiboot/PVH loader.
+owner: Stuart (kernel entry/S83 lane)
+```
+
+No firmware-free number exists; the full <1 s including firmware gate **fails**. The brush login
+and network path itself is green (`qemu-kvm` login; S84/S95 reports; `release-login` in the 27-case
+TCG kernel gate).
+
+### BSD/Linux comparison — exact blocker
+
+- **No frozen BSD or Linux image set exists in the repo.** The owner/reviewer must supply the
+  exact images with names, versions, download URLs and SHA-256 checksums; the host has some
+  unrelated qcow2 files, but they are not a documented benchmark set and were **not used**.
+- **No Linux or BSD boot number is measured** in this ticket; none is borrowed from a vendor.
+- The comparison cannot start until the KVM Raven side is stable on the same harness (the boot
+  samples above are flaky) and S89 removes the firmware path (or the owner explicitly redefines
+  the full-boot gate).
+
+## DR-52 donor reconciliation
+
+| Topic | Illumos finding | BSD file/licence | Linux finding | Decision |
+|---|---|---|---|---|
+| Boot-time measurement harness | SMF boot phases/milestones (`boot`, `svc.startd`); design-only | FreeBSD `usr.sbin/bhyve` (BSD-2) is a VMM, not a timing harness; no permissive boot-time comparator | systemd boot-phase timing (`systemd-analyze`) and `perf` outcomes; read-only | First-party `scripts/boot-time.sh` with QEMU/serial markers; no donor code |
+| Boot-phase split (firmware/kernel/login) | boot stages and milestones; no code | FreeBSD loader/rc phases (BSD-2) as naming reference | systemd-analyze phase split; read-only | First-principles markers; firmware, kernel→login and total reported separately |
+| KVM SMP AP bring-up | `mp_startup`, `xcalls`, TLB ack; design-only | FreeBSD `mp_machdep.c`/NetBSD `cpu.c` (per-file BSD; reference only) inform behaviour; S83 is clean-room | `smpboot.c`/`tlb.c` outcomes; read-only | S83 clean-room kernel fix; no donor code; see S83 |
+| BSD/Linux comparator images | not applicable | FreeBSD release image would be the BSD comparator | Linux distro image would be the Linux comparator | **Blocked:** owner/reviewer must freeze the image set/checksums; no comparison yet |
+
+No donor source was copied or translated for this benchmark.
 
 ## What closes the benchmark
 
-1. **S83** fixes KVM `-smp 2/4` AP bring-up; re-run the exact KVM commands with the release image.
-2. **S84/S89/S95/S96** provide `scripts/boot-time.sh`, the direct-boot path, working network and
-   the brush/no-rsh login; measure QEMU start → brush login (median of 3, plus worst case) and the
-   S89 sub-metrics.
-3. **Freeze a BSD/Linux image set** with exact names, versions, download URLs and SHA-256 values,
-   and run the same QEMU/KVM command line (CPU, memory, SMP, firmware, disk, network) against each.
-4. Record at least the median and worst case for each system; the DR-49 comparison is valid only
-   on one harness with one dataset.
+1. **S89**: add the PVH/multiboot entry (owner Stuart) or an approved first-stage loader; then
+   measure direct QEMU start → brush login on KVM `-smp 4`.
+2. **S84/host**: get a stable 3-run KVM gate on an unloaded host (the committed 409 ms and the
+   fresh 534 ms pass are the references; the 1,532 ms sample is a measured flake).
+3. **Owner/reviewer**: freeze the exact BSD and Linux images (names, versions, URLs, SHA-256) and
+   the identical QEMU/KVM command line; then run the same harness and report median/worst case.
+4. **S85a-f**: the stress matrix must be green before a release reliability claim; its current
+   failures are in `docs/reliability/smp-reliability.md`.
 
 ## Reproduction
 
 ```sh
-cargo xtask image --arch x86_64 --platform generic --profile release
-cargo xtask qtest --case release-login --arch x86_64   # TCG scripted path
-# KVM SMP: same QEMU line as docs/reliability/README.md with
-#   -enable-kvm -cpu host -smp 1|2|4
+sh scripts/boot-time.sh --smp 4
+sh scripts/qemu-kvm.sh --no-build --image build/boot-time/release.img --timeout 120
+sh scripts/boot-direct.sh --arch x86_64
+sh scripts/boot-time.sh --tcg --runs 1
 ```
 
-Verdict: **BLOCKED.** DR-49 (<1 s KVM boot) is not measured; the KVM SMP path, the boot-time
-service path, the direct-boot path and the frozen BSD/Linux images are missing. No Raven-vs-BSD/
-Linux claim, no release PASS and no tag are made from this document.
+Verdict: **PARTIAL** for the documented Raven-side evidence; **DR-49 NOT MET** (full boot
+including firmware > 1 s; direct path blocked; OS gate flaky on this host). The BSD/Linux
+comparison is blocked on the owner/reviewer image set. No tag or release PASS is claimed.
