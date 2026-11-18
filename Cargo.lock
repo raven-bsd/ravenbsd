@@ -4225,6 +4225,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufs-inject"
+version = "0.1.0"
+dependencies = [
+ "ufs-core",
+ "ufs-mkfs",
+]
+
+[[package]]
 name = "ufs-mkfs"
 version = "0.1.0"
 dependencies = [
