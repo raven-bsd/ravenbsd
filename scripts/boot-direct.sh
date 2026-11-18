@@ -24,7 +24,6 @@ cd "$root"
 
 arch=x86_64
 machine=
-machine_set=0
 profile=release
 mode=probe
 runs=3
@@ -48,7 +47,6 @@ while [ $# -gt 0 ]; do
             ;;
         --machine)
             machine=${2:?--machine needs a value}
-            machine_set=1
             shift 2
             ;;
         --profile)
@@ -120,8 +118,6 @@ if [ -z "$machine" ]; then
     else
         machine=microvm
     fi
-else
-    machine_set=1
 fi
 if [ "$mode" = full ] && [ "$machine" != q35 ]; then
     echo "boot-direct: full mode needs --machine q35 (PCI virtio-net)" >&2
