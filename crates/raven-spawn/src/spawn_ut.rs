@@ -770,6 +770,25 @@ fn interpreter_at_zero_parses_before_biasing() {
     }
 }
 
+#[test]
+fn zero_based_exec_is_rejected_after_the_parse_fix() {
+    let mut elf = child_elf(false, false);
+    put_u64(&mut elf, 24, 0x100);
+    put_u64(&mut elf, 80, 0);
+
+    // The raw parse accepts zero now, but an ET_EXEC has no bias to move it: the post-bias
+    // USER_MIN check must still reject it, so page 0 is never mapped.
+    assert!(
+        Elf::parse(&elf, target_machine(), 0..USER_END).is_ok(),
+        "the raw zero-based ET_EXEC is inside 0..USER_END"
+    );
+    let error = match plan_image(&elf, false) {
+        Ok(_) => panic!("a zero-based ET_EXEC without a bias must not plan"),
+        Err(error) => error,
+    };
+    assert_eq!(error, SpawnError::BadElf(ElfError::SegmentOutsideUserRange));
+}
+
 fn two_file_initfs(main: &[u8], interpreter: &[u8]) -> Vec<u8> {
     let mut builder = raven_initfs::InitfsBuilder::new();
     builder.add_file("/child", main, 0o755).unwrap();
