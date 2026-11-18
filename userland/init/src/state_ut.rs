@@ -667,3 +667,24 @@ fn skips_invalid_and_duplicate_scheme_names() {
     let supervisor = supervisor(vec![odd, other]);
     assert_eq!(supervisor.dynamic_scheme_prefixes(), Vec::<String>::new());
 }
+
+#[test]
+fn release_disk_manifests_defer_the_late_disk_need() {
+    let mut blockd = Manifest::parse(include_str!("../services/blockd.toml")).expect("blockd");
+    blockd.enable = true;
+    let supervisor = supervisor(vec![blockd]);
+    // `scheme:disk` has no enabled provider (devd publishes it at runtime) but must not fail the
+    // graph, and the service still starts in the first wave.
+    assert_eq!(supervisor.plan().waves, vec![vec![0]]);
+}
+
+#[test]
+fn release_disk_manifests_grant_block_ufs_and_disk_prefixes() {
+    let blockd = Manifest::parse(include_str!("../services/blockd.toml")).expect("blockd");
+    let fsd = Manifest::parse(include_str!("../services/fsd-ufs.toml")).expect("fsd-ufs");
+    let supervisor = supervisor(vec![blockd, fsd]);
+    assert_eq!(
+        supervisor.dynamic_scheme_prefixes(),
+        vec!["block".to_string(), "disk".to_string(), "ufs".to_string()]
+    );
+}
