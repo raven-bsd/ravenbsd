@@ -1775,13 +1775,26 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
     };
     let outcome = {
         crate::sched::smp::percpu::note_page_fault_phase(2);
-        let mut address_space = process.address_space.lock();
+        let mut guard = process.address_space.lock();
         crate::sched::smp::percpu::note_page_fault_phase(3);
-        let Some(address_space) = address_space.as_mut() else {
-            return false;
+        // Only the lock wait needs to be interruptible. Keep the actual fault resolution
+        // non-preemptible while the address-space state is locked, then restore IF after the
+        // lock is released.
+        let hold = crate::sync::critical();
+        let outcome = match guard.as_mut() {
+            Some(address_space) => {
+                crate::sched::smp::percpu::note_page_fault_phase(4);
+                address_space.handle_fault(cr2, write)
+            }
+            None => {
+                drop(guard);
+                drop(hold);
+                return false;
+            }
         };
-        crate::sched::smp::percpu::note_page_fault_phase(4);
-        address_space.handle_fault(cr2, write)
+        drop(guard);
+        drop(hold);
+        outcome
     };
     crate::sched::smp::percpu::note_page_fault_phase(5);
     match outcome {

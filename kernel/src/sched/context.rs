@@ -200,6 +200,7 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
         crate::sched::smp::percpu::note_syscall(to.user && to.fpu_saved.load(Ordering::Acquire));
         crate::sched::smp::percpu::note_page_fault(false);
         crate::sched::smp::percpu::note_page_fault_phase(0);
+        crate::sched::smp::percpu::note_wait_phase(0);
     }
 
     ap_start::set_kernel_rsp(to.kernel_stack_top);
@@ -623,11 +624,11 @@ pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapfra
             fpu::save(thread.fpu_area_ptr());
         }
     }
-    // syscall entry masks IF. The memory and scheme IPC syscalls can be long; keep only those
-    // interruptible so a target CPU can take an SMP TLB IPI without making the scheduler/futex
-    // paths preemptible. Router/wait-queue state uses IRQ-safe locks, so the wake graph remains
-    // protected even with IF enabled here. `sched_syscall_exit` masks again before the final
-    // swapgs/sysretq pair.
+    // syscall entry masks IF. The memory, scheme IPC and futex syscalls can be long; keep only
+    // those interruptible so a target CPU can take an SMP TLB IPI while the other syscall paths
+    // stay non-preemptible. Router/wait-queue state uses IRQ-safe locks, so the wake graph
+    // remains protected even with IF enabled here. `sched_syscall_exit` masks again before the
+    // final swapgs/sysretq pair.
     if !frame.is_null() {
         // SAFETY: the syscall stub passes its live trap frame in `rdi`.
         let number = unsafe { (*frame).rax as usize };
@@ -640,6 +641,7 @@ pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapfra
                     | raven_abi::syscall::Syscall::THREAD_CREATE
                     | raven_abi::syscall::Syscall::THREAD_EXIT
                     | raven_abi::syscall::Syscall::EXIT
+                    | raven_abi::syscall::Syscall::FUTEX
                     | raven_abi::syscall::Syscall::SCHEME_REGISTER
                     | raven_abi::syscall::Syscall::OPEN
                     | raven_abi::syscall::Syscall::READ
