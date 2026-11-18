@@ -62,6 +62,13 @@ mod program {
     /// S11 `Opcode::Read` wire value.
     const READ_OPCODE: u16 = 2;
 
+    fn head(bytes: &[u8]) -> [u8; 8] {
+        let mut prefix = [0u8; 8];
+        let length = bytes.len().min(prefix.len());
+        prefix[..length].copy_from_slice(&bytes[..length]);
+        prefix
+    }
+
     #[derive(Clone, Copy)]
     struct PagerRegion {
         target: Handle,
@@ -158,6 +165,35 @@ mod program {
         }
 
         fn mmap_call(
+            &mut self,
+            file: u64,
+            offset: u64,
+            len: u64,
+            shared: bool,
+        ) -> HandlerResult<CallReply> {
+            if self.trace {
+                println!(
+                    "vfsd-trace: mmap file={file} offset={offset} len={len} shared={shared} open={}",
+                    self.opens.get(file).is_some()
+                );
+            }
+            let result = self.mmap_call_inner(file, offset, len, shared);
+            if self.trace {
+                match &result {
+                    Ok(_) => println!("vfsd-trace: mmap-reply file={file} ok"),
+                    Err(HandlerError::Errno(error)) => println!(
+                        "vfsd-trace: mmap-reply file={file} errno={}",
+                        error.description()
+                    ),
+                    Err(HandlerError::Defer(token)) => {
+                        println!("vfsd-trace: mmap-reply file={file} defer={token}")
+                    }
+                }
+            }
+            result
+        }
+
+        fn mmap_call_inner(
             &mut self,
             file: u64,
             offset: u64,
@@ -856,17 +892,19 @@ mod program {
             }
             let target = self.opens.get(file).map_or(0, |entry| entry.file.target.0);
             println!(
-                "vfsd-trace: read file={file} target={target} off={offset} len={} ptr={:p} trace={} req={}",
+                "vfsd-trace: read file={file} target={target} off={offset} len={} ptr={:p} head={:?} trace={} req={}",
                 buffer.len(),
                 buffer.as_ptr(),
+                head(buffer),
                 ctx.trace_id,
                 ctx.request.0
             );
             let result = self.read(file, offset, buffer);
             match &result {
-                Ok(bytes) => {
-                    println!("vfsd-trace: read-reply file={file} target={target} bytes={bytes}")
-                }
+                Ok(bytes) => println!(
+                    "vfsd-trace: read-reply file={file} target={target} bytes={bytes} head={:?}",
+                    head(buffer)
+                ),
                 Err(HandlerError::Errno(error)) => println!(
                     "vfsd-trace: read-reply file={file} target={target} errno={}",
                     error.description()
@@ -898,17 +936,19 @@ mod program {
             }
             let target = self.opens.get(file).map_or(0, |entry| entry.file.target.0);
             println!(
-                "vfsd-trace: write file={file} target={target} off={offset} len={} ptr={:p} trace={} req={}",
+                "vfsd-trace: write file={file} target={target} off={offset} len={} ptr={:p} head={:?} trace={} req={}",
                 buffer.len(),
                 buffer.as_ptr(),
+                head(buffer),
                 ctx.trace_id,
                 ctx.request.0
             );
             let result = self.write(file, offset, buffer);
             match &result {
-                Ok(bytes) => {
-                    println!("vfsd-trace: write-reply file={file} target={target} bytes={bytes}")
-                }
+                Ok(bytes) => println!(
+                    "vfsd-trace: write-reply file={file} target={target} bytes={bytes} head={:?}",
+                    head(buffer)
+                ),
                 Err(HandlerError::Errno(error)) => println!(
                     "vfsd-trace: write-reply file={file} target={target} errno={}",
                     error.description()
@@ -1059,8 +1099,19 @@ mod program {
                     let path = bytes_to_string(path)?;
                     let path = normalized(&path)?;
                     let scheme = bytes_to_string(scheme)?;
-                    self.table.mount(&path, &scheme)?;
+                    let before = self.mount_generation;
+                    let result = self.table.mount(&path, &scheme);
+                    if self.trace {
+                        println!(
+                            "vfsd-trace: mount path={path} scheme={scheme} gen={before} result={}",
+                            result.is_ok()
+                        );
+                    }
+                    result?;
                     self.bump_mounts();
+                    if self.trace {
+                        println!("vfsd-trace: mount-bump gen={}", self.mount_generation);
+                    }
                     status(response, Ok(()))
                 }
                 Call::Umount { path } => {
@@ -1069,8 +1120,19 @@ mod program {
                     }
                     let path = bytes_to_string(path)?;
                     let path = normalized(&path)?;
-                    self.table.umount(&path, 0)?;
+                    let before = self.mount_generation;
+                    let result = self.table.umount(&path, 0);
+                    if self.trace {
+                        println!(
+                            "vfsd-trace: umount path={path} gen={before} result={}",
+                            result.is_ok()
+                        );
+                    }
+                    result?;
                     self.bump_mounts();
+                    if self.trace {
+                        println!("vfsd-trace: umount-bump gen={}", self.mount_generation);
+                    }
                     status(response, Ok(()))
                 }
                 Call::Sync => {

@@ -22,6 +22,13 @@ use raven_scheme::{CallReply, Ctx, Handler, HandlerError, HandlerResult, OpenTab
 /// Aggregate open-file-description budget.
 pub const MAX_OPEN_FILES: usize = 256;
 
+fn head(bytes: &[u8]) -> [u8; 8] {
+    let mut prefix = [0u8; 8];
+    let length = bytes.len().min(prefix.len());
+    prefix[..length].copy_from_slice(&bytes[..length]);
+    prefix
+}
+
 /// One open-file description's server state.
 struct OpenState {
     ino: u64,
@@ -308,9 +315,10 @@ impl Handler for RamfsHandler {
     ) -> HandlerResult<usize> {
         if self.trace {
             self.trace(core::format_args!(
-                "ramfs-trace: read file={file} off={offset} len={} ptr={:p} req={} trace={}",
+                "ramfs-trace: read file={file} off={offset} len={} ptr={:p} head={:?} req={} trace={}",
                 buffer.len(),
                 buffer.as_ptr(),
+                head(buffer),
                 ctx.request.0,
                 ctx.trace_id
             ));
@@ -318,7 +326,8 @@ impl Handler for RamfsHandler {
         let result = self.read(file, offset, buffer);
         match &result {
             Ok(bytes) => self.trace(core::format_args!(
-                "ramfs-trace: read-reply file={file} bytes={bytes}"
+                "ramfs-trace: read-reply file={file} bytes={bytes} head={:?}",
+                head(buffer)
             )),
             Err(HandlerError::Errno(error)) => self.trace(core::format_args!(
                 "ramfs-trace: read-reply file={file} errno={}",
@@ -364,9 +373,10 @@ impl Handler for RamfsHandler {
     ) -> HandlerResult<usize> {
         if self.trace {
             self.trace(core::format_args!(
-                "ramfs-trace: write file={file} off={offset} len={} ptr={:p} req={} trace={}",
+                "ramfs-trace: write file={file} off={offset} len={} ptr={:p} head={:?} req={} trace={}",
                 buffer.len(),
                 buffer.as_ptr(),
+                head(buffer),
                 ctx.request.0,
                 ctx.trace_id
             ));
@@ -374,7 +384,8 @@ impl Handler for RamfsHandler {
         let result = self.write(file, offset, buffer);
         match &result {
             Ok(bytes) => self.trace(core::format_args!(
-                "ramfs-trace: write-reply file={file} bytes={bytes}"
+                "ramfs-trace: write-reply file={file} bytes={bytes} head={:?}",
+                head(buffer)
             )),
             Err(HandlerError::Errno(error)) => self.trace(core::format_args!(
                 "ramfs-trace: write-reply file={file} errno={}",
