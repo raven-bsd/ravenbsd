@@ -115,8 +115,12 @@ send = "/bin/disk-tool-svcctl start fsd-ufs\n"
 delay_ms = 100
 
 [[step]]
-wait = '^fsd-ufs running [0-9]+$'
+wait = 'fsd-ufs: started'
 timeout_secs = 120
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
 
 [[step]]
 send = "/bin/mkdir -p /mnt\n"
