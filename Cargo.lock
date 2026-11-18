@@ -1312,6 +1312,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-direct"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-bootinfo",
+ "raven-elf",
+ "raven-loader",
+]
+
+[[package]]
 name = "raven-dmesg"
 version = "0.1.0"
 dependencies = [

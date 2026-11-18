@@ -16,6 +16,7 @@ members = [
     "crates/*",
     "kernel",
     "boot/loader",
+    "boot/direct",
     "tests/fixtures/s08-init",
     "tests/fixtures/audio/client",
     "tests/fixtures/audio-tools/gen",

@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-direct"
+version = "0.1.0"
+description = "RavenBSD first-stage PVH loader for direct QEMU boot."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+loader = []
+
+[lib]
+name = "raven_direct"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-direct"
+path = "src/main.rs"
+required-features = ["loader"]
+
+[dependencies]
+raven-abi = { path = "../../crates/raven-abi" }
+raven-bootinfo = { path = "../../crates/raven-bootinfo" }
+raven-elf = { path = "../../crates/raven-elf" }
+raven-loader = { path = "../loader" }
+
+[lints]
+workspace = true

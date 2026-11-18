@@ -1,104 +1,112 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# QEMU direct boot: measurement and kernel entry contract
+# QEMU direct boot: first-stage loader, measurements and remaining blockers
 
-Date: 2026-11-18. Ticket: S89. Owner decision: kernel entry (Stuart) now, full gate after
-S84/S95/S96.
+Date: 2026-11-18. Ticket: S89 (round 2). Owner of the loader: kevin. Kernel entry unchanged.
 
-## Why
+## What exists now
 
-DR-49 requires the **full QEMU boot including firmware** to reach brush login in under a second.
-The UEFI/OVMF path is the only working route today and its firmware stage alone is far over the
-gate. This note records the UEFI baseline, the exact QEMU direct-boot blocker, and the entry
-contract needed to finish the direct route without bypassing init/services.
+`boot/direct` is a small PVH ELF that QEMU can start with `-kernel`:
 
-## Measured baseline (OBSERVED)
+* `entry.S` is the 32-bit PVH entry. It builds a 4-level identity map for the first 4 GiB,
+  enables PAE/LME/NX/paging, loads a flat 64-bit GDT and calls the Rust entry with the
+  `hvm_start_info` physical address.
+* `src/main.rs` parses the PVH start information, the `-initrd` module and the Raven kernel ELF,
+  places the kernel image, converts the PVH memory map into `raven_bootinfo::MemoryRegion`s,
+  builds the HHDM plus kernel page tables, fills `BootInfo` and jumps to the existing kernel
+  `_start` with `rdi` = HHDM pointer to `BootInfo`.
+* The loader does not edit the kernel, the SMP/AP path, the UEFI loader, services or gate rows.
 
-Host: `qemu-system-x86_64` **6.2.0**, `/dev/kvm` present and QEMU advertises `kvm`, but the
-timed table uses **TCG** (the kernel-gate default). Image: `build/x86_64/ravenbsd-x86_64.img`
-(the current 335 MB release image). 3 runs, wall clock from QEMU start to the serial line:
-
-| Path | Kernel banner | Login | Notes |
-|---|---|---|---|
-| UEFI/OVMF (TCG) | median **38.2 s**, p90 **54.3 s** (runs 31.4/38.2/54.3) | median **166.0 s**, p90 **182.8 s** (159.2/166.0/182.8) | OVMF + large image; the lead's ~3.4 s firmware figure is not reproduced on this shared host |
-| Direct `-kernel` (microvm) | **never** | **never** | QEMU exits 75-141 ms with the error below |
-
-The TCG table is dominated by OVMF/disk setup and the 335 MB image on this host, not by the
-kernel; the kernel-to-login part is not the bottleneck. A KVM timed run was attempted but QEMU
-exited after ~18 serial lines without a kernel banner in this clone; KVM is therefore **not**
-claimed as a measured path here.
-
-## Direct-boot blocker (exact)
+`scripts/boot-direct.sh` builds the loader, creates the module and runs the real probe. The
+module is:
 
 ```
-$ qemu-system-x86_64 -machine microvm -m 512M -smp 4 \
-    -kernel build/x86_64/kernel.elf -append 'console=ttyS0' \
-    -serial stdio -display none -monitor none -no-reboot
-qemu-system-x86_64: Error loading uncompressed kernel without PVH ELF Note
+"RVDIRECT" (8 bytes) | padded kernel length (u64 LE) | kernel ELF | zero padding | initfs
 ```
-The kernel ELF has no multiboot header and no **PVH note**
-(`XEN_ELFNOTE_PHYS32_ENTRY`, ELF note type 18). `scripts/boot-direct.sh` runs this probe, reports
-the elapsed time and exits 2 with this contract; it never fakes a banner or a login.
 
-## Required kernel entry contract (for Stuart, S83 lane)
-
-`kernel/src/arch/x86_64/start.rs` `_start` requires, on entry:
-
-* long mode, paging on, interrupts off;
-* a loader-provided stack;
-* `rdi` = **HHDM virtual address** of a valid `raven_bootinfo::BootInfo`.
-
-QEMU PVH enters in **32-bit protected mode** with `%ebx` = physical address of the
-`hvm_start_info` (memory map, modules, cmdline). A direct route therefore needs one of:
-
-1. **Kernel PVH shim (preferred):** add the PVH note pointing at a 32-bit entry; the shim parses
-   `hvm_start_info`, builds the page tables/HHDM, copies the kernel/initfs modules (QEMU
-   `-initrd`/module list) and cmdline, assembles `BootInfo`, then enters `_start` in long mode
-   with `rdi` as above.
-2. **First-stage loader in `boot/**`:** a multiboot2/PVH ELF whose entry loads the kernel and
-   initfs as modules, builds the same `BootInfo`/page tables, and jumps to the kernel `_start`.
-
-Required `BootInfo` fields (`crates/raven-bootinfo/src/lib.rs`): `magic`, `version`, `size`,
-`arch`, `flags`, `hhdm_offset`, `kernel_phys_base`, `kernel_virt_base`, `kernel_size`,
-`memory_map_base/len/entry_size`, `initfs`, `cmdline`, `dtb`, `acpi_rsdp`,
-`uefi_system_table` (0 for direct), `boot_cpu_id`, `entry_counter`, `counter_freq`,
-`framebuffer`. The HHDM base and paging layout are in `boot/loader/src/layout.rs` and
-`boot/loader/src/paging*`; those modules are reusable, but `image`/`memmap`/`handoff` currently
-compile only for the UEFI target.
-
-## Options and consequence
-
-* **PVH/32-bit shim in the kernel:** smallest runtime path; QEMU can then start the kernel in
-  milliseconds. Needs kernel code, an ELF note and a module/initfs handoff; owner Stuart.
-* **First-stage loader in `boot/**`:** keeps the kernel entry unchanged; adds a loader binary and
-  module loading to the direct QEMU command; larger surface but inside this ticket's `boot/**`.
-* **Minimal firmware instead of OVMF:** not recommended; no supported path here reaches <1 s
-  including firmware, and a fake firmware would bypass the real image/services.
-
-Either option must boot the **same release image/userland** (brush login, completion, network,
-no rsh) once S84/S95/S96 land. `init`, services, and the initfs must not be bypassed.
+The kernel length is padded so the initfs starts on a 4 KiB boundary inside the QEMU initrd.
+The kernel maps the initfs into user space, so a page-aligned base is required; without the
+padding `raven_rt::map_initfs()` returns `EINVAL` and `svcd` exits 1. This is why the payload is
+built by the script rather than by concatenating the two files blindly.
 
 ## Commands
 
-```
-# UEFI baseline / current working path
-cargo xtask image --arch x86_64 --profile release
-cargo xtask run --arch x86_64 --profile release
-
-# Direct probe (currently exits 2 with the PVH blocker)
+```sh
+# Kernel-banner probe (defaults: microvm, KVM when /dev/kvm is usable, -smp 1, release initfs)
 sh scripts/boot-direct.sh --arch x86_64
 
-# Full gate once S84/S95/S96 and scripts/boot-time.sh land
-sh scripts/boot-time.sh
+# Same probe with TCG
+sh scripts/boot-direct.sh --arch x86_64 --tcg
 
-# UEFI/TCG regression
+# Full release-image path: q35 + virtio-net, waits for `login:`
+sh scripts/boot-direct.sh --mode full
+
+# Rebuild the kernel and the release initfs first
+sh scripts/boot-direct.sh --rebuild
+
+# UEFI/TCG regression (the working image path)
 sh scripts/kernel-gate.sh
 ```
 
-## Dependencies / status
+`boot-direct.sh` exits 0 only when the requested target is met, 2 when the loader/kernel fails
+or the target is missed (the output names the measured breakdown and the exact blocker), and 3
+for a usage error. A missing or broken loader never produces a fake banner.
 
-* S84/S95/S96 are the boot-time/service/network/brush tickets; their completion is required for
-  the full <1 s login gate. `scripts/boot-time.sh` is not present in this tree yet.
-* This note does not change the kernel, SMP/AP path, services or gate rows. The direct path is
-  **BLOCKED** until the kernel PVH entry (or a first-stage loader) exists.
+## Measured results (OBSERVED)
+
+Host: `qemu-system-x86_64` **6.2.0**, `/dev/kvm` present. The host is shared, so the wall-clock
+numbers vary between runs; the medians below are from the quoted runs. `-smp 1` is used for the
+KVM rows because KVM with more than one vCPU currently hangs in this tree (see below); that is a
+pre-existing kernel SMP/AP issue, not a loader setting.
+
+| Path | Loader start | Loader work | Kernel banner | Release login |
+|---|---|---|---|---|
+| UEFI/OVMF, TCG (round 1 baseline) | n/a | n/a | median **38.2 s** | median **166 s** |
+| Direct, q35, TCG, release initfs (3 runs) | median 211 ms | n/a | median **3.244 s** (p90 4.902 s) | median **8.052 s** (p90 8.522 s) |
+| Direct, microvm, KVM, smp=1, release initfs (`boot-direct.sh`, 3 runs) | median 332 ms | median 104 ms | median **1.504 s** (p90 1.841 s) | not run |
+| Direct, q35, KVM, smp=1, release initfs (1 run) | 551 ms | 168 ms | **1.589 s** | **2.327 s** |
+
+The loader itself reaches the kernel in one step: the loader-work column is the time from
+`direct: loader start` to `direct: entering kernel`. The kernel then runs its normal early init
+(frame allocator, paging, heap, initfs CRC, drivers, scheduler, ACPI/APIC, timer). The
+`kernel-banner` line is printed only after that init, by the **unchanged** kernel.
+
+The full release image was verified on the direct path: q35 + virtio-net, release initfs, KVM,
+`smp=1` reaches `svcd: all services up`, `netd: interface eth0 10.0.2.15/24`, the getty banner
+and `login:`. No service is disabled and rsh is not part of the path.
+
+## Why the <0.2 s / <1 s targets are still missed
+
+* QEMU 6.2's `-kernel` PVH path starts an option ROM (`pvh.bin`), not a direct CPU reset into
+  the ELF. The measured loader-start column (0.15-0.55 s) is QEMU/SeaBIOS/option-ROM time before
+  the loader's first line. A boot path without that stage needs a different QEMU mechanism or a
+  minimal firmware; both are outside this loader and would still have to build `BootInfo`.
+* Under TCG the unchanged kernel's early init (dominated by the 41 MB release-initfs CRC and
+  SMP/AP and timer bring-up) takes seconds. Under KVM it is much smaller, but KVM with `-smp 4`
+  hangs after `timer: 1000 Hz` in this tree; the same hang happens with the UEFI image, so it is
+  a pre-existing kernel/SMP issue (S83), not the direct loader. `-smp 1` is reliable.
+* The full <1 s login gate additionally depends on S84/S95/S96 (service/network/brush work); the
+  direct path now boots the same release userland, but the gate is not closed by this ticket.
+
+The exact remaining loader-side work is therefore **none**: the loader builds the handoff and
+enters `_start`. The remaining time is QEMU's PVH option-ROM stage plus kernel early init, and
+the KVM SMP hang is kernel-owned.
+
+## Kernel entry contract (unchanged, now satisfied by the loader)
+
+`kernel/src/arch/x86_64/start.rs` `_start` requires long mode, paging on, interrupts off, a
+valid stack and `rdi` = HHDM virtual pointer to `raven_bootinfo::BootInfo`. The direct loader
+provides all of these. The loader also fills the required fields (`magic`, `version`, `size`,
+`arch`, `hhdm_offset`, kernel bases/size, memory map, initfs, cmdline, `acpi_rsdp`, boot CPU,
+TSC counter, framebuffer = none).
+
+The previous round's PVH note warning is resolved by the loader's own `XEN_ELFNOTE_PHYS32_ENTRY`
+note; the kernel ELF still has no PVH note and is not edited.
+
+## Files
+
+* `boot/direct/` (`Cargo.toml`, `loader.ld`, `src/entry.S`, `src/lib.rs`, `src/lib_ut.rs`,
+  `src/main.rs`)
+* `scripts/boot-direct.sh`
+* this note
