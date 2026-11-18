@@ -36,8 +36,9 @@ The profile is `profiles/pi4-rootfs.toml`; its fragments are the release userlan
 (`profiles/pi4-rootfs.d/*`), and `profiles/pi4-rootfs/rootfs.toml` fixes the UFS size and adds
 `/root/.keep`. The rootfs staging tree is `build/aarch64/rootfs-staging`.
 
-Determinism: two clean builds with the same `SOURCE_DATE_EPOCH` produced the same image hash
-`da9bf2a0d856b3cf0a42fee0199290f3cecd980dd38b7ff95b9420291d229e1f` (500,187,648 bytes,
+Determinism: two builds from the committed HEAD (`e951fc5b`) with the same `SOURCE_DATE_EPOCH`
+produced the same image hash
+`6c5b82f6592ebba3a97f3e761836f2ae0afd00ca8ab73ba72d9b397b5e3162b0` (500,187,648 bytes,
 976,929 sectors).
 
 ## Check and flash
