@@ -24,10 +24,14 @@
 
 set -eu
 
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+
 arch=x86_64
 runs=3
 smp=1
 kvm=1
+exclusive=0
 timeout_s=300
 image=
 out=build/boot-time
@@ -39,12 +43,13 @@ tmpdir=
 usage() {
     cat <<'EOF'
 usage: sh scripts/boot-time.sh [--arch x86_64] [--smp N] [--runs N] [--tcg]
-                               [--image FILE] [--out DIR] [--timeout SECONDS]
+                               [--exclusive] [--image FILE] [--out DIR] [--timeout SECONDS]
 
   --arch x86_64  only the x86_64 release gate is supported.
   --smp N        QEMU CPU count (default 1; the gate is 4 after S83).
   --runs N       measured runs (default 3).
   --tcg          disable KVM; report only, no gate.
+  --exclusive    refuse a busy host and record the host state before measuring.
   --image FILE   use an existing image instead of building one; its banner commit is checked.
   --out DIR      serial logs and summary (default build/boot-time).
   --timeout N    per-run wall-clock limit (default 300 s).
@@ -105,6 +110,10 @@ while [ "$#" -gt 0 ]; do
             kvm=0
             shift
             ;;
+        --exclusive)
+            exclusive=1
+            shift
+            ;;
         --help | -h)
             usage
             exit 0
@@ -157,6 +166,18 @@ fi
 [ -f "$image" ] || fail "image not found: $image"
 image_sha=$(sha256sum "$image" | awk '{print $1}')
 
+if [ "$exclusive" -eq 1 ]; then
+    printf 'boot-time: exclusive preflight\n'
+    if ! sh scripts/boot-direct.sh --exclusive --preflight-only --mode probe --out "$out" \
+        >"$out/preflight.log" 2>&1; then
+        cat "$out/preflight.log" >&2
+        fail "exclusive preflight refused the host"
+    fi
+    cat "$out/preflight.log"
+    preflight_json=$(sed -n 's/^boot-direct: preflight=//p' "$out/preflight.log")
+    printf 'boot-time: exclusive preflight=%s\n' "$preflight_json"
+fi
+
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/boot-time.XXXXXX")
 kernel_file=$tmpdir/kernel-ms
 total_file=$tmpdir/total-ms
@@ -181,6 +202,10 @@ p90() {
         if (idx > NR) idx = NR
         print value[idx]
     }'
+}
+
+maximum() {
+    sort -n "$1" | tail -n 1
 }
 
 run=1
@@ -344,14 +369,19 @@ median_total=$(median "$total_file")
 p90_firmware=$(p90 "$firmware_file")
 p90_kernel=$(p90 "$kernel_file")
 p90_total=$(p90 "$total_file")
+max_firmware=$(maximum "$firmware_file")
+max_kernel=$(maximum "$kernel_file")
+max_total=$(maximum "$total_file")
 
 if [ "$kvm" -eq 1 ]; then accel=kvm; else accel=tcg; fi
 printf 'boot-time: commit=%s arch=%s accel=%s smp=%s runs=%s image=%s sha256=%s\n' \
     "$commit" "$arch" "$accel" "$smp" "$runs" "$image" "$image_sha"
-printf 'boot-time: median firmware_ms=%s kernel_ms=%s total_ms=%s\n' \
+printf 'boot-time: p50 firmware_ms=%s kernel_ms=%s total_ms=%s\n' \
     "$median_firmware" "$median_kernel" "$median_total"
 printf 'boot-time: p90 firmware_ms=%s kernel_ms=%s total_ms=%s\n' \
     "$p90_firmware" "$p90_kernel" "$p90_total"
+printf 'boot-time: max firmware_ms=%s kernel_ms=%s total_ms=%s\n' \
+    "$max_firmware" "$max_kernel" "$max_total"
 
 if [ "$kvm" -eq 1 ] && [ "$smp" -eq 4 ]; then
     if [ "$median_kernel" -lt 1000 ]; then
