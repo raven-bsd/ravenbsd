@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S98 disk-tools fsd-ufs: disabled at boot and started by the qtest after newfs formats
+# partition 1. It mounts block:0 partition 1 as ufs: for the mount/write/read step.
+
+name = "fsd-ufs"
+exec = "/sbin/fsd-ufs"
+needs = ["scheme:block"]
+provides = ["scheme:ufs"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+enable = false
+
+[env]
+FSD_UFS_DEVICE = "block:0"
+FSD_UFS_PARTITION = "1"
+FSD_UFS_SCHEME = "ufs"

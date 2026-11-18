@@ -14,7 +14,8 @@ extern crate alloc;
 use alloc::string::String;
 
 /// Usage line.
-pub const USAGE: &str = "newfs [-O 1|2] [-b block] [-f frag] [-s size] [-L label] [block:0]";
+pub const USAGE: &str =
+    "newfs [-O 1|2] [-b block] [-f frag] [-s size] [-L label] [-p partition] [block:0]";
 
 /// Argument errors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,6 +47,8 @@ pub struct Options<'a> {
     pub size: u64,
     /// Volume label.
     pub label: &'a str,
+    /// GPT partition to format (0 means the whole device).
+    pub partition: u32,
 }
 
 /// Parse `newfs` arguments (without `argv[0]`).
@@ -58,6 +61,7 @@ where
     let mut fragment_size = 512u32;
     let mut size = 0u64;
     let mut label = "";
+    let mut partition = 0u32;
     let mut device = "block:0";
     let mut iter = args.into_iter();
     while let Some(arg) = iter.next() {
@@ -89,6 +93,13 @@ where
             "-L" => {
                 label = iter.next().ok_or(ParseError::MissingValue)?;
             }
+            "-p" => {
+                partition = iter
+                    .next()
+                    .ok_or(ParseError::MissingValue)?
+                    .parse()
+                    .map_err(|_| ParseError::BadValue)?;
+            }
             other if other.starts_with('-') && other != "-" => {
                 return Err(ParseError::UnknownOption);
             }
@@ -114,6 +125,7 @@ where
         fragment_size,
         size,
         label,
+        partition,
     })
 }
 
@@ -134,13 +146,14 @@ fn parse_size(text: &str) -> Result<u64, ParseError> {
 /// Render a one-line summary for the target binary.
 pub fn summary(options: &Options<'_>) -> String {
     alloc::format!(
-        "newfs: {} UFS{} block={} frag={} size={} label={}",
+        "newfs: {} UFS{} block={} frag={} size={} label={} partition={}",
         options.device,
         options.version,
         options.block_size,
         options.fragment_size,
         options.size,
-        options.label
+        options.label,
+        options.partition
     )
 }
 

@@ -16,7 +16,7 @@ fn defaults_to_ufs2_block0() {
 #[test]
 fn parses_geometry_and_label() {
     let options = parse_args([
-        "-O", "1", "-b", "8192", "-f", "1024", "-s", "64m", "-L", "scratch", "block:0",
+        "-O", "1", "-b", "8192", "-f", "1024", "-s", "64m", "-L", "scratch", "-p", "1", "block:0",
     ])
     .expect("options");
     assert_eq!(options.version, 1);
@@ -24,6 +24,7 @@ fn parses_geometry_and_label() {
     assert_eq!(options.fragment_size, 1024);
     assert_eq!(options.size, 64 * 1024 * 1024);
     assert_eq!(options.label, "scratch");
+    assert_eq!(options.partition, 1);
 }
 
 #[test]
@@ -49,6 +50,6 @@ fn summary_is_one_line() {
     let options = parse_args(["-L", "x"]).expect("options");
     assert_eq!(
         summary(&options),
-        "newfs: block:0 UFS2 block=4096 frag=512 size=0 label=x"
+        "newfs: block:0 UFS2 block=4096 frag=512 size=0 label=x partition=0"
     );
 }

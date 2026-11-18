@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2026, Bo Maryniuk and RavenBSD Contributors
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! The RavenBSD `newfs` utility.
 
@@ -25,13 +25,13 @@ mod program {
                     "{}",
                     usage(
                         "newfs",
-                        "[-O 1|2] [-b block] [-f frag] [-s size] [-L label] [block:0]"
+                        "[-O 1|2] [-b block] [-f frag] [-s size] [-L label] [-p partition] [block:0]"
                     )
                 );
                 return EXIT_USAGE;
             }
         };
-        let disk = match fsd_ufs::block::open_partition(options.device, 0) {
+        let disk = match fsd_ufs::block::open_partition(options.device, options.partition) {
             Ok(disk) => disk,
             Err(error) => {
                 raven_rt::eprintln!("newfs: {error}");

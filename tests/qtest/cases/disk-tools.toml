@@ -1,0 +1,163 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S98: the release image boots with a virtio-blk scratch disk. The guest lists the disk and its
+# GPT partition, formats partition 1 as UFS2 with newfs, starts blockd/fsd-ufs, mounts the UFS
+# filesystem, writes and reads a file, and unmounts. The disk is a real 64 MiB GPT image; no
+# fake device or format result is used.
+
+name = "disk-tools"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+pre = ["sh tests/fixtures/disk-tools/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=scratch,format=raw,file=build/fixtures/disk-tools/scratch.img",
+    "-device", "virtio-blk-pci,drive=scratch,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^block0 [0-9]+ [0-9]+ disk$'
+
+[[expect]]
+regex = '^block0p1 [0-9]+ [0-9]+ part ufs-scratch$'
+
+[[expect]]
+regex = '^Scheme: GPT$'
+
+[[expect]]
+regex = '^ *2048 +[0-9]+ +1  ufs-scratch$'
+
+[[expect]]
+regex = '^newfs: block:0 UFS2 block=4096 frag=512 size=0 label= partition=1$'
+
+[[expect]]
+regex = '^hello-from-s98$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/sbin/lsblk\n"
+delay_ms = 100
+
+[[step]]
+wait = '^block0p1 [0-9]+ [0-9]+ part ufs-scratch$'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/gpart show\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ *2048 +[0-9]+ +1  ufs-scratch$'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/newfs -p 1 block:0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^newfs: block:0 UFS2 block=4096 frag=512 size=0 label= partition=1$'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/svcctl start blockd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^blockd .*$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/svcctl start fsd-ufs\n"
+delay_ms = 100
+
+[[step]]
+wait = '^fsd-ufs .*$'
+timeout_secs = 60
+
+[[step]]
+send = "mkdir -p /mnt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mount ufs: /mnt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo hello-from-s98 > /mnt/hello.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /mnt/hello.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^hello-from-s98$'
+timeout_secs = 30
+
+[[step]]
+send = "umount /mnt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|newfs: .*failed|mount: .*failed|umount: .*failed|no such file'

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S98 disk-tools blockd: disabled at boot so a release image without a scratch disk boots
+# normally; the qtest starts it after the virtio-blk driver has published disk:0.
+
+name = "blockd"
+exec = "/sbin/blockd"
+needs = ["scheme:disk"]
+provides = ["scheme:block"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+enable = false
+
+[env]
+BLOCKD_DISK = "disk:0"
