@@ -3,8 +3,9 @@
 
 # QEMU direct boot: first-stage loader, measurements and remaining blockers
 
-Date: 2026-11-18. Ticket: S89 (round 3). Owner of the loader: kevin. Kernel entry unchanged.
-Donor reconciliation and the external kernel/init items: `docs/dr52-direct-boot-reconciliation.md`.
+Date: 2026-11-18. Ticket: S116 (exclusive boot-time gate); loader from S89. Owner: kevin. Kernel
+entry unchanged. Donor reconciliation and the external kernel/init items:
+`docs/dr52-direct-boot-reconciliation.md`.
 
 ## What exists now
 
@@ -44,18 +45,66 @@ sh scripts/boot-direct.sh --mode full
 # A/B the old default-device set (no -nodefaults)
 sh scripts/boot-direct.sh --mode full --defaults
 
+# Exclusive gate: refuse a busy host, then run 10 full boots
+sh scripts/boot-direct.sh --mode full --exclusive
+sh scripts/boot-direct.sh --mode probe --exclusive
+
+# Host state only, or the synthetic busy/idle preflight cases
+sh scripts/boot-direct.sh --exclusive --preflight-only --mode full
+sh scripts/boot-direct.sh --exclusive --self-test
+
 # Force TCG or KVM explicitly; rebuild the kernel and the release initfs first
 sh scripts/boot-direct.sh --arch x86_64 --tcg
 sh scripts/boot-direct.sh --mode full --rebuild
 
-# UEFI/TCG regression (the working image path)
+# UEFI image gate with the same exclusive preflight; TCG/regression paths stay available
+sh scripts/boot-time.sh --exclusive
 sh scripts/kernel-gate.sh
 ```
 
-`boot-direct.sh` exits 0 only when the requested target is met, 2 when the loader/kernel fails
-or the target is missed (the output names the measured breakdown and the exact blocker), and 3
-for a usage error. A missing or broken loader never produces a fake banner. The full mode
-requires the real `svcd: getty up`, `svcd: netd up` and `netd: interface eth0` markers.
+`boot-direct.sh` exits 0 only when the requested target is met, 2 when the loader/kernel fails,
+the exclusive preflight refuses a busy host, or the target is missed (the output names the
+measured breakdown and the exact blocker), and 3 for a usage error. A missing or broken loader
+never produces a fake banner. The full mode requires the real `svcd: getty up`,
+`svcd: netd up` and `netd: interface eth0` markers.
+
+## Exclusive host preflight (S116)
+
+`--exclusive` runs before the QEMU samples, after the loader/payload are built:
+
+* refuses when a `qemu-system-*` process, an `xtask qtest`/`raven-qtest` process, or another
+  exclusive gate is already running;
+* refuses when the 1-minute load average exceeds `nproc` (override with
+  `BOOT_DIRECT_MAX_LOAD`, mainly for tests);
+* records the commit, branch, dirty flag, UTC time, `nproc`, load1/5/15, available memory/disk,
+  QEMU/qtest process counts, accelerator, SMP count and planned sample count in
+  `build/boot-direct/preflight-<utc>-<pid>.json`;
+* prints `boot-direct: exclusive READY` and the host state, or
+  `boot-direct: exclusive REFUSED: <reason>` and exits 2. It never starts QEMU on a refused host.
+
+`--exclusive` defaults to **10 runs** (`--runs` overrides). `--preflight-only` records the host
+state and exits without building or booting. `--self-test` runs synthetic busy-QEMU, busy-qtest,
+high-load and idle cases; it is not used by the real gate. The same preflight is called by
+`boot-time.sh --exclusive`; the UEFI measurement remains available with `--tcg` and `--smp`.
+
+The timing split is measured from the host wall clock at the point each serial line is read:
+`firmware` = QEMU start -> `direct: loader start`; `loader` = loader start -> `direct: entering
+kernel`; `kernel` = entering kernel -> `RavenBSD kernel`; `login` = kernel banner -> `login:`.
+`boot-direct.sh` prints per-run values and p50/p90/max for each phase; `boot-time.sh` prints
+firmware/kernel/total p50/p90/max for the UEFI image.
+
+### Donor reconciliation for the timing gate (DR-52)
+
+| Topic | Illumos | BSD | Linux | Decision |
+|---|---|---|---|---|
+| Phase timestamps | `usr/src/cmd/svc/startd/log.c:608` reads the `boot_time` kstat for service-log records (CDDL, design only) | NetBSD `sys/arch/x86/x86/tsc.c:489-496` `boot_duration_timer` and `sys/kern/init_main.c:759-760` print kernel boot time under `BOOT_DURATION` (`sys/arch/x86/conf/MICROVM.common:69`) | `init/main.c:812` `initcall_debug` and `kernel/printk/printk.c:2249` `local_clock()` timestamp init phases (GPL, read-only) | Host-side QEMU/loader/kernel/login timestamps; no donor code copied |
+| Idle-host gate | SMF orders services by dependencies; no host-load gate | NetBSD has no host-load boot gate | Linux boot-time tools assume a controlled measurement host (sparse checkout; no source copied) | Soak-style shell preflight: QEMU/qtest, load/nproc, memory/disk; record JSON |
+| Sample statistics | n/a | n/a | repeated boot timing / `initcall_debug` | 10 runs, p50/p90/max, no best-of; refused host is not a sample |
+
+Donor revisions: illumos-gate `586678ac1bcbd77644a6ec4dac7f79d676cfb4ec`, NetBSD
+`36eddebcc36cb0775aa2962005b9c05419a6ff01`, Linux `adc218676eef25575469234709c2d87185ca223a`,
+FreeBSD `133344405f532bd54ff3629a77d4c4e062f01fdb` (`stand/efi/loader/main.c` inspected for the
+loader phase; no timing code present). No CDDL/GPL code was copied.
 
 ## Measured results (OBSERVED)
 
