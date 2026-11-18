@@ -11,8 +11,18 @@ mode = 0o755
 generated = true
 
 [[initfs.files]]
+src = "../ravenbsd-rpi/build/aarch64/spi0d"
+path = "/sbin/spi0d"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
 src = "profiles/pi4-eink.d/einkd.manifest"
 path = "/etc/services.d/einkd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-eink.d/spi0d.manifest"
+path = "/etc/services.d/spi0d.toml"
 
 [[initfs.files]]
 src = "profiles/pi4-eink.d/einkd.conf"

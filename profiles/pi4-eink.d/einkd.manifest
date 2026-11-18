@@ -1,16 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 E-Ink demo service. It is ordered after getty and the network/resolver/platform schemes so
-# no panel access happens on the boot/getty path. It remains disabled by default: the launch path
-# must supply the SPI0 MMIO handle and platd must gain a DC/RST level call before the panel can be
-# driven (see docs/eink-demo.md). Once that wiring exists, enable this profile entry.
+# Pi 4 E-Ink demo service. It is ordered after getty and the network/resolver/platform/SPI
+# schemes so no panel access happens on the boot/getty path. The panel BUSY wait stays here, not
+# in platd. `spi0d` is launched by devd and publishes `spi:`; `platd` drives DC/RST/BUSY.
 name = "einkd"
 exec = "/sbin/einkd"
 args = ["einkd", "--config=/etc/einkd.conf"]
-needs = ["getty", "scheme:net", "scheme:resolv", "scheme:plat"]
+needs = ["getty", "scheme:net", "scheme:resolv", "scheme:plat", "scheme:spi"]
 readiness = "none"
 restart = "on-failure"
 max_restarts = 3
 required = false
-enable = false
+enable = true
