@@ -102,6 +102,44 @@ The failure-path self-test used the known-red S125/Mel `posix-fs-smp` case: it s
 `EBADF/OOM/EIO` and 7 worker failures on `3a8fd623`, which is expected while S125/S85e are open.
 That run is a self-test of the runner, not the close-out matrix.
 
+## Host telemetry
+
+While a cell runs, the runner samples the host every 5 s into
+`<out>/<mode>/<qtest>.telemetry.tsv`: `utc`, `load1`, and the QEMU, `xtask`, `cargo` and `rustc`
+process counts. The counts include the cell's own qtest/`xtask`, so another lane's overlap shows
+as QEMU>=2 or xtask>=2 during the cell (or `cargo`/`rustc` outside the cell's build phase).
+`host-per-cell.tsv` keeps the pre-cell snapshot for the same cells.
+
+## Exclusive-window result (2026-11-18, rev 55)
+
+The rework ran only after a genuine window: `host-idle` PASS at load1 **0.19** with no QEMU or
+xtask, and the release image built from `c1e85d4c` (product = `c4f7d748`).
+
+```
+sh scripts/smp-boot-soak.sh --kvm1 0 --kvm2 0 --kvm4 0 --tcg4 10 --wait-for-idle 1200 --max-load 2
+```
+
+- TCG4 **run 1/10 failed**: no `login:` within 30 s. The serial reaches `smp: 4 cpus online`,
+  `/init`, all services and the network, then:
+
+  ```
+  svcd: getty failed: bad ELF: SegmentOutsideUserRange
+  ```
+
+- The soak stopped at the first failure (no retry), so the 5-case TCG4 close-out column was not
+  run and no pass is claimed. Raw log: `build/smp-boot-soak/20261118T220332Z/tcg4/run-1.log`.
+
+Cause (product, outside S126): the release `getty` is dynamically linked (`PT_INTERP
+/libexec/ld-elf.so.1`), and `ld-elf.so.1`'s first `PT_LOAD` is at vaddr `0x0`.
+`crates/raven-spawn/src/lib.rs:1483` (P9a) parses the **interpreter** with `USER_MIN..USER_END`,
+so it rejects the loader (`USER_MIN` is `0x1000`); the kernel's `exec.rs:106` uses `0..USER_END`
+for the interpreter. Trigger: SESSION1's dynamic getty; owner: P9a/carl (`raven-spawn`), with
+SESSION1/phil and K97/K97a (loader) as the other touch points. This is a deterministic release
+boot blocker, reproduced on a quiet host.
+
+This section is the accurate close-out state: runner and telemetry delivered, release gate
+blocked by the getty dynamic-ELF defect.
+
 ## When the full matrix runs
 
 Only after **S125 and Mel/S85e land** and **S116/S107 provide the exclusive window**. Until then
