@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use crate::gate::{GateReport, Verdict, probe_source, render};
+use crate::gate::{GateReport, Verdict, probe_source, render, repository_commit};
 use crate::model::{
     BehaviorRow, InterfaceRow, Meta, PlatformStatus, Profile, STANDARD, Status, TraceFile,
 };
@@ -18,6 +18,7 @@ fn report() -> GateReport {
         arch: "x86_64".to_string(),
         host_only: true,
         date: "2026-11-15T00:00:00Z".to_string(),
+        commit: "0123456789abcdef0123456789abcdef01234567".to_string(),
         tool: "posix-conform test".to_string(),
         rows: vec![
             crate::gate::ResultRow {
@@ -58,6 +59,19 @@ fn report_has_the_contract_header_and_counts() {
     assert!(text.contains("| external | 0 | 0 | 1 |"));
     assert!(text.contains("FAIL (release blocked)"));
     assert!(text.contains("2026-11-15T00:00:00Z"));
+    assert!(text.contains("- Commit: `0123456789abcdef0123456789abcdef01234567`"));
+}
+
+#[test]
+fn explicit_commit_wins_without_touching_git() {
+    let commit = repository_commit(Path::new("/nonexistent"), Some("  abc123  "));
+    assert_eq!(commit, "abc123");
+}
+
+#[test]
+fn missing_git_checkout_records_unknown() {
+    let commit = repository_commit(Path::new("/nonexistent"), None);
+    assert_eq!(commit, "unknown");
 }
 
 #[test]

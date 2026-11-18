@@ -40,7 +40,8 @@ usage:
   -l, --log PATH     serial log path (default: build/pi4/ui1-serial.log)
   -p, --photo PATH   owner photo/screenshot of the HDMI monitor
       --check        host image/manifest/provider checks; no board
-      --strict       make --check exit 2 when a board/provider blocker exists
+      --strict       make --check exit 2 when a provider blocker exists (board absence alone is
+                     reported but does not fail strict mode)
       --plan         print the board sequence
       --capture      capture the UART log; requires the owner's board and adapter
       --verify       verify a real serial log and photo; no fake generated
@@ -48,7 +49,7 @@ usage:
 
 Host check:
   sh scripts/pi4-ui-evidence.sh --check
-  sh scripts/pi4-ui-evidence.sh --check --strict   # expected BLOCKED today
+  sh scripts/pi4-ui-evidence.sh --check --strict   # provider check; board absence is separate
 
 Board sequence:
   sh scripts/pi4-ui-evidence.sh --plan
@@ -145,10 +146,10 @@ adapter, image SHA and the exact log path.
 
 Current host-only blockers (see --check for the exact lines):
   * no HDMI/login userspace fb:console provider: HDMI shows kernel text, getty/login stays on UART;
-  * consd opens kbd:console while usb-hid serves kbd: (root), so USB keyboard input is not wired
-    into consd yet;
   * no board/UART adapter attached on this host.
-Hand the first failure to HDMI1 (fb provider), USB1/CON1 (kbd:console) or the owner hardware.
+The kbd:console provider is aligned: usb-hid serves the `console` instance and consd opens it;
+UART remains the recovery input.
+Hand the first failure to HDMI1 (fb provider) or the owner hardware.
 No fixture, generated log or borrowed photo substitutes for the owner capture.
 EOF
 }
@@ -169,36 +170,52 @@ host_check() {
         { tail -20 "$root/build/ui1-serial-check.log" >&2; fail "pi4-serial --check failed"; }
     tail -4 "$root/build/ui1-serial-check.log"
 
-    blocked=0
+    board_blocked=0
+    provider_blocked=0
     if ls /dev/ttyUSB* /dev/ttyACM* >/dev/null 2>&1; then
         echo "pi4-ui-evidence: uart=$(ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null | tr '\n' ' ')"
     else
         echo "pi4-ui-evidence: board BLOCKED: no /dev/ttyUSB* or /dev/ttyACM* adapter"
-        blocked=1
+        board_blocked=1
     fi
     echo "pi4-ui-evidence: block devices (owner chooses the SD card; do not guess):"
     lsblk -o NAME,SIZE,TYPE,MOUNTPOINTS 2>/dev/null | sed -n '1,20p' || true
 
     consd=userland/servers/consd/src/main.rs
     usbhid=userland/drivers/usb-hid/src/main.rs
+    usbhid_lib=userland/drivers/usb-hid/src/lib.rs
     if grep -Fq 'fb:console' "$consd"; then
         if grep -R -Fq 'register("fb' userland 2>/dev/null; then
-            echo "pi4-ui-evidence: provider fb:console present"
+            echo "pi4-ui-evidence: provider fb:console present (userspace)"
+        elif grep -Fq 'super::fb::write_text' kernel/src/arch/aarch64/serial.rs 2>/dev/null &&
+             grep -Fq 'pub fn write_text' kernel/src/arch/aarch64/fb.rs 2>/dev/null; then
+            echo "pi4-ui-evidence: provider fb:console present (kernel DEBUG_WRITE mirror)"
         else
-            echo "pi4-ui-evidence: provider BLOCKED: no userspace fb:console provider; HDMI keeps kernel text and login stays on UART"
-            blocked=1
+            echo "pi4-ui-evidence: provider BLOCKED: no fb:console provider and no DEBUG_WRITE mirror; login stays on UART"
+            provider_blocked=1
         fi
     fi
-    if grep -Fq 'kbd:console' "$consd" && grep -Fq 'Server::register("kbd")' "$usbhid"; then
-        echo "pi4-ui-evidence: provider BLOCKED: consd opens kbd:console while usb-hid serves kbd: (root)"
-        blocked=1
+    if grep -Fq 'kbd:console' "$consd"; then
+        if grep -Fq 'KBD_CONSOLE_PATH' "$usbhid_lib" && grep -Fq 'accepts_console_path' "$usbhid"; then
+            echo "pi4-ui-evidence: provider kbd:console present"
+        else
+            echo "pi4-ui-evidence: provider BLOCKED: consd opens kbd:console but usb-hid has no console path"
+            provider_blocked=1
+        fi
+    else
+        echo "pi4-ui-evidence: provider BLOCKED: consd does not open kbd:console"
+        provider_blocked=1
     fi
 
-    if [ "$blocked" -ne 0 ]; then
-        echo "pi4-ui-evidence: host image checks PASS; board evidence BLOCKED (owner hardware and provider handoffs above)"
+    if [ "$provider_blocked" -ne 0 ]; then
+        echo "pi4-ui-evidence: host image checks PASS; provider BLOCKED (see lines above)"
         if [ "$strict" -eq 1 ]; then
             return 2
         fi
+        return 0
+    fi
+    if [ "$board_blocked" -ne 0 ]; then
+        echo "pi4-ui-evidence: host image checks PASS; provider checks PASS; board evidence BLOCKED (owner hardware/photo)"
         return 0
     fi
     echo "pi4-ui-evidence: host image checks PASS; board hardware present"

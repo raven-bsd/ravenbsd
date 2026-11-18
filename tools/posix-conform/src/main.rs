@@ -30,6 +30,7 @@ fn run(args: Vec<String>) -> Result<u8> {
     let mut arch = "x86_64".to_string();
     let mut json = false;
     let mut host_only = false;
+    let mut commit = None;
     let mut extensions = PathBuf::from(sweep::DEFAULT_EXTENSIONS);
     let mut strict = false;
     let mut index = 0;
@@ -58,6 +59,14 @@ fn run(args: Vec<String>) -> Result<u8> {
             }
             "--json" => json = true,
             "--host-only" => host_only = true,
+            "--commit" => {
+                index += 1;
+                commit = Some(
+                    args.get(index)
+                        .ok_or_else(|| anyhow::anyhow!("--commit needs a value"))?
+                        .clone(),
+                );
+            }
             "--extensions" => {
                 index += 1;
                 extensions = PathBuf::from(
@@ -113,6 +122,7 @@ fn run(args: Vec<String>) -> Result<u8> {
                 arch,
                 json,
                 host_only,
+                commit,
             };
             let report = gate::run(&root, &profile_doc, &trace, &options)?;
             let text = gate::render(&report);
