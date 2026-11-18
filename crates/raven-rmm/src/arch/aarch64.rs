@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2017 Jeremy Soller
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! aarch64 translation-table constants (4 KiB granule, 48-bit VA).
