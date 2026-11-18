@@ -22,6 +22,10 @@ use crate::boot::{self, Core};
 
 /// One scheme-readiness waiter per service index (the manifest parser caps services at 256).
 const WAIT_SLOT_COUNT: usize = 256;
+/// Scheme-readiness poll interval.
+const READINESS_POLL_MS: u64 = 10;
+/// A poll gap above this is a stall of the worker itself, not service slowness.
+const READINESS_STALL_MS: u64 = 500;
 
 struct WaitSlot {
     handle: AtomicU32,
@@ -268,6 +272,21 @@ fn wait_for_scheme(
     };
     let path = alloc::format!("{scheme}:");
     let client = raven_scheme::Client::new();
+    // First poll timestamp for the diagnostic line; readiness rules are unchanged.
+    let polled_at = boot::now_ms();
+    let spawned_at = {
+        let mut guard = core.lock();
+        let spawned_at = guard
+            .supervisor
+            .runtime()
+            .get(index)
+            .and_then(|runtime| runtime.ready_timing.spawned_ms);
+        guard.supervisor.polled(index, generation, polled_at);
+        spawned_at
+    };
+    // Start the stall accounting at the spawn, so time spent setting up the waiter is credited
+    // too instead of being charged silently before the first poll.
+    let mut last_poll = spawned_at.unwrap_or(polled_at);
     loop {
         if waiter && let Some(code) = waiter_code(index, generation) {
             return ReadinessOutcome::Exited(code);
@@ -279,7 +298,7 @@ fn wait_for_scheme(
             }
             let notices = {
                 let mut guard = core.lock();
-                guard.supervisor.ready(index, generation)
+                guard.supervisor.ready(index, generation, boot::now_ms())
             };
             boot::emit(core, &notices);
             return if notices.is_empty() {
@@ -289,8 +308,19 @@ fn wait_for_scheme(
             };
         }
         let now = boot::now_ms();
+        let gap = now.saturating_sub(last_poll);
+        last_poll = now;
+        // Only observed time counts: credit a gap in which this worker did not run, such as a
+        // TCG guest descheduled by the host, back to the readiness window. A hung child leaves
+        // the worker polling on time, so the deadline still fires.
+        let stalled = gap.saturating_sub(READINESS_STALL_MS);
         let timed_out = {
             let mut guard = core.lock();
+            if stalled > 0 {
+                guard
+                    .supervisor
+                    .extend_readiness(index, generation, stalled);
+            }
             guard.supervisor.readiness_timed_out(index, generation, now)
         };
         if !timed_out.is_empty() {
@@ -310,6 +340,6 @@ fn wait_for_scheme(
         if !alive {
             return ReadinessOutcome::Failed;
         }
-        let _ = raven_rt::nanosleep(10_000_000);
+        let _ = raven_rt::nanosleep(READINESS_POLL_MS * 1_000_000);
     }
 }
