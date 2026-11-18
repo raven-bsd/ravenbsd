@@ -26,10 +26,10 @@ regex = '(?i)^password: ?$'
 regex = '^raven# $'
 
 [[expect]]
-regex = '^zero:(brush|/bin/brush)$'
+regex = '^brush$'
 
 [[expect]]
-regex = '^shell:/bin/brush$'
+regex = '^/bin/brush$'
 
 [[expect]]
 regex = "^complete -W 'help exit' raven-test$"
@@ -71,7 +71,7 @@ send = "echo $0\n"
 delay_ms = 100
 
 [[step]]
-wait = '^zero:(brush|/bin/brush)$'
+wait = '^brush$'
 timeout_secs = 30
 
 [[step]]
@@ -79,7 +79,7 @@ send = "echo $SHELL\n"
 delay_ms = 100
 
 [[step]]
-wait = '^shell:/bin/brush$'
+wait = '^/bin/brush$'
 timeout_secs = 30
 
 [[step]]
