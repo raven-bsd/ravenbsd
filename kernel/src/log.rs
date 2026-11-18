@@ -48,6 +48,10 @@ impl<T> SpinMutex<T> {
     }
 
     /// Try to acquire the lock without spinning.
+    ///
+    /// Only the x86-64 emergency exception writer has a non-blocking caller; aarch64 does not
+    /// compile that path, so keep the helper out of the aarch64 binary instead of warning.
+    #[cfg(target_arch = "x86_64")]
     pub fn try_lock(&self) -> Option<SpinGuard<'_, T>> {
         if self
             .locked
@@ -97,6 +101,7 @@ static TEST_EXIT: AtomicBool = AtomicBool::new(false);
 /// Only reached when the `log-lock-fault` boot flag selects the injection in
 /// `arch/x86_64/exception.rs`; the guard is intentionally leaked so the fault path sees a held
 /// lock. The machine halts after the exception transcript.
+#[cfg(target_arch = "x86_64")]
 pub fn hold_lock_for_test() {
     core::mem::forget(SERIAL.lock());
 }
@@ -138,6 +143,7 @@ pub fn _print_line(args: fmt::Arguments<'_>) {
 /// The exception path uses this path so a held/corrupted log lock cannot hang the fault handler.
 /// Normal logging remains serialized; this fallback may interleave with another CPU's output but
 /// always produces the diagnostic.
+#[cfg(target_arch = "x86_64")]
 pub fn _print_line_emergency(args: fmt::Arguments<'_>) {
     if let Some(mut serial) = SERIAL.try_lock() {
         let _ = serial.write_fmt(args);

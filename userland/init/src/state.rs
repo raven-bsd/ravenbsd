@@ -601,7 +601,7 @@ impl Supervisor {
                     continue;
                 };
                 if !valid_scheme_name(name)
-                    || enabled.iter().any(|provided| *provided == name)
+                    || enabled.contains(&name)
                     || prefixes.iter().any(|prefix| prefix == name)
                 {
                     continue;
@@ -631,9 +631,9 @@ fn with_deferred_scheme_needs(services: &[Manifest]) -> Vec<Manifest> {
         if !service.enable {
             continue;
         }
-        service.needs.retain(|need| {
-            !need.starts_with("scheme:") || provided.iter().any(|provide| *provide == need.as_str())
-        });
+        service
+            .needs
+            .retain(|need| !need.starts_with("scheme:") || provided.contains(&need.as_str()));
     }
     effective
 }
