@@ -53,8 +53,8 @@ job_pattern='^(target/(debug|release)/xtask|cargo (xtask|build|test|run)|rustc|/
 write_state() {
     loadavg=$(cat /proc/loadavg 2>/dev/null || echo 'unknown')
     nproc=$(nproc 2>/dev/null || echo unknown)
-    qemu=$(pgrep -fa "$qemu_pattern" 2>/dev/null || true)
-    jobs=$(pgrep -fa "$job_pattern" 2>/dev/null || true)
+    qemu=$(pgrep -fa "$qemu_pattern" 2>/dev/null | grep -v '<defunct>' || true)
+    jobs=$(pgrep -fa "$job_pattern" 2>/dev/null | grep -v '<defunct>' || true)
     {
         printf 'utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         printf 'context=%s\n' "$context"
@@ -73,8 +73,8 @@ write_state() {
 check_idle() {
     loadavg=$(cat /proc/loadavg 2>/dev/null || echo '0')
     load1=${loadavg%% *}
-    qemu=$(pgrep -fa "$qemu_pattern" 2>/dev/null || true)
-    jobs=$(pgrep -fa "$job_pattern" 2>/dev/null || true)
+    qemu=$(pgrep -fa "$qemu_pattern" 2>/dev/null | grep -v '<defunct>' || true)
+    jobs=$(pgrep -fa "$job_pattern" 2>/dev/null | grep -v '<defunct>' || true)
     idle=1
     busy=    # colon-delimited reasons
     awk -v l="$load1" -v m="$max_load" 'BEGIN { exit !(l <= m) }' || {
