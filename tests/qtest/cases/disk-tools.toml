@@ -151,11 +151,11 @@ wait = 'hello\.txt'
 timeout_secs = 30
 
 [[step]]
-send = "cat /mnt/hello.txt\n"
+send = "read line < /mnt/hello.txt; echo read:$line\n"
 delay_ms = 100
 
 [[step]]
-wait = '^s110-disk-ok$'
+wait = '^read:s110-disk-ok$'
 timeout_secs = 30
 
 [[step]]
