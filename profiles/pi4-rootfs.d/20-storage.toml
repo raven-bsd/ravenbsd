@@ -10,7 +10,7 @@
 # it starts the initfs plan, so the service set and `/etc` can come from the card.
 
 [[initfs.files]]
-src = "profiles/pi4-rootfs.d/drivers.toml"
+src = "userland/init/pi4-rootfs-drivers.conf"
 path = "/etc/drivers.toml"
 
 [[initfs.files]]
