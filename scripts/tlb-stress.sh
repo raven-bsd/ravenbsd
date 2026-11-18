@@ -18,6 +18,8 @@
 #   --case NAME       case to run; repeatable or comma-separated (default: the four TLB cases)
 #   --quick           one iteration per requested case
 #   --no-preflight    skip host-idle.sh (short smoke only)
+#   --max-load LOAD   host-idle max 1-minute load (default host-idle's max(2, nproc/4))
+#   --wait SECONDS    wait up to SECONDS for an idle host (default 0: refuse)
 #   --out DIR         output directory (default build/tlb-stress)
 #   -h, --help        this help
 #
@@ -45,11 +47,13 @@ QUICK=0
 PREFLIGHT=1
 OUT=build/tlb-stress
 REQUESTED=
+MAX_LOAD=
+WAIT_IDLE=0
 
 DEFAULT_CASES="smp-tlb-x86-concurrent smp-tlb-x86-concurrent-kvm2 smp-tlb-x86-concurrent-kvm4 smp-tlb-aarch64-concurrent"
 
 usage() {
-    sed -n '6,38p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '6,35p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 add_cases() {
@@ -82,6 +86,16 @@ while [ "$#" -gt 0 ]; do
         --no-preflight)
             PREFLIGHT=0
             shift
+            ;;
+        --max-load)
+            [ "$#" -ge 2 ] || { echo "tlb-stress: --max-load needs a value" >&2; exit 2; }
+            MAX_LOAD=$2
+            shift 2
+            ;;
+        --wait)
+            [ "$#" -ge 2 ] || { echo "tlb-stress: --wait needs a value" >&2; exit 2; }
+            WAIT_IDLE=$2
+            shift 2
             ;;
         --out)
             [ "$#" -ge 2 ] || { echo "tlb-stress: --out needs a value" >&2; exit 2; }
@@ -186,8 +200,11 @@ if [ "$PREFLIGHT" -eq 1 ]; then
         echo "tlb-stress: tests/smp/boot/host-idle.sh is missing; use --no-preflight for a smoke" >&2
         exit 2
     fi
-    if sh tests/smp/boot/host-idle.sh --context tlb-stress \
-        --state-file "$OUT/host-idle.txt" --max-load 2.0; then
+    set -- --context tlb-stress --state-file "$OUT/host-idle.txt" --wait "$WAIT_IDLE"
+    if [ -n "$MAX_LOAD" ]; then
+        set -- "$@" --max-load "$MAX_LOAD"
+    fi
+    if sh tests/smp/boot/host-idle.sh "$@"; then
         cp "$OUT/host-idle.txt" "$OUT/host-state-before.txt" 2>/dev/null || true
     else
         refused=$?
