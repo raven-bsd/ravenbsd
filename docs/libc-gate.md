@@ -41,16 +41,16 @@ cargo xtask qtest --case libc-spawn --arch x86_64
 
 The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
-## Current verdict (2026-11-18, C74z-S17)
+## Current verdict (2026-11-18, C74z-S17; 1.6 refreshed by C74fx)
 
 **NOT MET.** `cargo run -q -p libc-gate -- verdict` exits 1.
 
-* MET: 1.1, 1.1.pack, 1.1.audit, 1.4, 1.5, 5.1, 5.2, 4.1, 4.3, 6.1, 6.3, 6.4.
+* MET: 1.1, 1.1.pack, 1.1.audit, 1.4, 1.5, 1.6, 5.1, 5.2, 4.1, 4.3, 6.1, 6.3, 6.4.
 * NOT MET: 1.2 (G1 0/4; C74x qemu backend C4 7/15, C5 12/18), 1.7 (15 lint violations:
   P1f 14, ABI 1), 3.1 (C74z-S17: 63 pass, 10 fail, 62 known, 102 skipped, 0 budget-only;
   17 legitimate-row +3% budgets applied; only the 10 invariant ceilings remain),
   4.2 (one-hour `inet_text` soak recorded; row re-eval pending).
-* BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
+* BLOCKED: 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
 `build/libc-gate/`. C74h re-ran the full gate on `beedfbbd`: the symbol audit is now MET (66/66,
@@ -61,8 +61,11 @@ comments: `libc-lint` now reports 26 violations, all outside the loader files (P
 P1h/otto 8, P1i/tim 3, ABI/contract 1; C74l/C74i reduced that to 15, P1f 14 and ABI 1).
 C74n closed 5.2.core-servers, C74v closed 5.2.file-tools with the real `/etc/mounts` list, and
 C74u closed 5.1 (`sscanf`, `tzname`). C74q closed 1.4 (27/27) and C74k recorded the one-hour
-`inet_text` soak. The gate cannot close until G1, the size-budget cluster, the remaining lint
-backlog, and the missing Miri/world/mandoc tooling are resolved by their owners.
+`inet_text` soak. C74cw wired row 1.6 to the bounded Miri runner and C74fx re-ran
+`cargo run -q -p libc-gate -- eval --only 1.6 --out build/libc-gate-c74fx`: exit 0, **MET**
+(721 Miri tests: 715 library + 6 alignment, 6/6 pass, explicit integration exclusions). The gate
+cannot close until G1, the size-budget cluster, the remaining lint backlog, and the missing
+world/mandoc tooling are resolved by their owners.
 
 ## 3.1 size triage (C74w/C74z/C74z-S17; OBSERVED on `10d8c9dd`)
 
