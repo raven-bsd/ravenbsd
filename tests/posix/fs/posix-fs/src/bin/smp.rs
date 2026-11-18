@@ -41,7 +41,11 @@ const ITERATIONS: usize = 50;
 const TRACE: bool = false;
 const STACK_SIZE: usize = 128 * 1024;
 /// Headroom below the slot top for the deepest call frame and its buffers.
+///
+/// `read_to_vec` uses a 4096-byte stack buffer and the kernel capture rounds its range up to
+/// whole pages, so the deepest frame plus two pages must fit inside the slot.
 const STACK_GUARD: usize = 16 * 1024;
+const _: () = assert!(STACK_SIZE > STACK_GUARD + 2 * PAGE);
 const PAGE: usize = 4096;
 const READ_WRITE: u32 = 3;
 const MS_SYNC: usize = 4;
