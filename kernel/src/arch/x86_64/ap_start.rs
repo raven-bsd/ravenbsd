@@ -214,6 +214,37 @@ pub unsafe fn probe_read(address: u64) -> u8 {
     unsafe { core::ptr::read_volatile(address as *const u8) }
 }
 
+/// Save `RFLAGS`, disable maskable interrupts and return the saved flags.
+///
+/// Used by the SMP active-request guards: they mask interrupts only for the publish/clear
+/// critical sections and restore the caller's original IF when the guard is dropped.
+pub fn save_and_disable_local_interrupts() -> u64 {
+    let flags: u64;
+    // SAFETY: `pushfq`/`pop` and `cli` are ring-0 operations; no memory is accessed.
+    unsafe {
+        asm!(
+            "pushfq",
+            "pop {}",
+            "cli",
+            out(reg) flags,
+            options(nomem, nostack),
+        );
+    }
+    flags
+}
+
+/// Restore the interrupt state captured by [`save_and_disable_local_interrupts`].
+pub fn restore_local_interrupts(flags: u64) {
+    // SAFETY: `sti`/`cli` are ring-0; the flags came from `pushfq`.
+    unsafe {
+        if flags & (1 << 9) != 0 {
+            asm!("sti", options(nomem, nostack, preserves_flags));
+        } else {
+            asm!("cli", options(nomem, nostack));
+        }
+    }
+}
+
 /// Enable maskable interrupts on this CPU (used while waiting for a remote TLB acknowledgement).
 pub fn enable_local_interrupts() {
     // SAFETY: the caller is in kernel context and all IDT gates are installed.

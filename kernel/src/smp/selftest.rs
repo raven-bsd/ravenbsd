@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! `selftest=smp`: four-thread counter, per-CPU work stealing and a TLB shootdown check.
+//! `selftest=smp`: four-thread counter, per-CPU work stealing, a TLB shootdown check and a
+//! two-CPU concurrent call-probe check.
 //!
 //! The TLB test uses the architectural Accessed bit: every CPU reads its own test page (setting
 //! A), the boot processor clears A, broadcasts a shootdown and then has every CPU read again. If
 //! the invalidation reached a CPU, its second read walks the page table and sets A in memory; a
 //! stale TLB entry would leave A clear.
+//!
+//! The call-probe test pins one thread to CPU 0 and one to CPU 1 and has both call
+//! `call::probe()` at the other CPU concurrently. This is the S102 proof that the probe wait is
+//! interruptible: a probe waiter must be able to take the other probe's IPI.
 
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
@@ -35,6 +40,12 @@ const TIMEOUT_NS: u64 = 5_000_000_000;
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 static SEEN: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
 static DONE: AtomicU32 = AtomicU32::new(0);
+
+/// Read by both CPUs in the concurrent call-probe test.
+static PROBE_BYTE: u8 = 0x5a;
+static PROBE_DONE: AtomicU32 = AtomicU32::new(0);
+static PROBE_FAIL: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
+const PROBE_ROUNDS: u32 = 200;
 
 /// Run the SMP self-test; on success this never returns.
 pub fn run() -> ! {
@@ -133,11 +144,77 @@ fn monitor() {
         boot::exit_qemu(0x11);
     }
     kprintln!("selftest: smp counter ok cpus={cpus} counter={total}");
+    match call_probe_test(cpus) {
+        Ok(probes) => kprintln!("selftest: smp call ok cpus={} probes={probes}", cpus.min(2)),
+        Err(reason) => {
+            kprintln!("selftest: smp call failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
     kprintln!(
         "selftest: smp ok cpus={cpus} switches={}",
         sched::switch_count()
     );
     boot::exit_qemu(0x10)
+}
+
+fn probe_cpu0() {
+    probe_worker(0);
+}
+
+fn probe_cpu1() {
+    probe_worker(1);
+}
+
+fn probe_worker(cpu: usize) {
+    let target = if cpu == 0 { 1 } else { 0 };
+    let address = core::ptr::addr_of!(PROBE_BYTE) as u64;
+    let mut round = 0u32;
+    while round < PROBE_ROUNDS {
+        if call::probe(target, address) != Some(PROBE_BYTE) {
+            if let Some(failed) = PROBE_FAIL.get(cpu) {
+                failed.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        round = round.saturating_add(1);
+    }
+    PROBE_DONE.fetch_add(1, Ordering::SeqCst);
+    sched::exit_thread(0)
+}
+
+fn call_probe_test(cpus: usize) -> Result<u32, &'static str> {
+    if cpus < 2 {
+        return Ok(0);
+    }
+    PROBE_DONE.store(0, Ordering::SeqCst);
+    for failed in PROBE_FAIL.iter() {
+        failed.store(0, Ordering::SeqCst);
+    }
+    if sched::spawn_kernel_on(0, "smp-probe-0", probe_cpu0).is_err() {
+        return Err("cannot spawn probe CPU 0");
+    }
+    if sched::spawn_kernel_on(1, "smp-probe-1", probe_cpu1).is_err() {
+        return Err("cannot spawn probe CPU 1");
+    }
+    let start = sleep::now_ns();
+    while PROBE_DONE.load(Ordering::SeqCst) < 2 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("concurrent probe timeout");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    let mut failures = 0u32;
+    let mut cpu = 0usize;
+    while cpu < 2 {
+        if let Some(failed) = PROBE_FAIL.get(cpu) {
+            failures = failures.saturating_add(failed.load(Ordering::SeqCst));
+        }
+        cpu = cpu.saturating_add(1);
+    }
+    if failures != 0 {
+        return Err("concurrent probe mismatch");
+    }
+    Ok(PROBE_ROUNDS.saturating_mul(2))
 }
 
 fn tlb_test(cpus: usize) -> Result<(), &'static str> {

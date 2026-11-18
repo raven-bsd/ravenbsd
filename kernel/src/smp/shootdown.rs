@@ -15,10 +15,10 @@
 //! * The caller may hold any address-space lock, but must not hold the scheduler's per-CPU slot
 //!   lock or the wait-queue lock: the IPI handler only touches this module's atomics and executes
 //!   `invlpg`, so it has no dependency on those.
-//! * `LOCK` is an [`IrqSpinLock`]: entry masks interrupts on the shooting CPU.  The wait loop
-//!   re-enables them explicitly (and disables them again before returning) so a target that is
-//!   spinning on an address-space lock can still take the IPI.  On return the guard restores the
-//!   caller's original IF.
+//! * One active request is protected by [`ActiveGuard`], not an IRQ-masked spinlock. A second
+//!   shooter waits with interrupts enabled, so a target that is spinning on an address-space
+//!   lock can still take the TLB IPI. The guard masks interrupts only while publishing/clearing
+//!   the active request and restores the caller's original IF on drop.
 //! * A missing acknowledgement is a timeout after 100 ms.  The per-CPU pending slot is cleared so
 //!   a late IPI is ignored, the timeout is logged, and `false` is returned; the caller decides how
 //!   to react.  No frame or slot is allocated, so a timeout cannot leak.
@@ -36,17 +36,49 @@
 
 #![allow(clippy::indexing_slicing)]
 
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::arch::x86_64::{ap_start, ipi};
 use crate::kprintln;
 use crate::sched::smp::percpu;
-use crate::sync::IrqSpinLock;
 use crate::time;
 
 use super::MAX_CPUS;
 
-static LOCK: IrqSpinLock<()> = IrqSpinLock::new(());
+/// One active shootdown. The shooter waits for it with interrupts enabled.
+static ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Serialises shootdowns without masking interrupts while waiting for the active slot.
+struct ActiveGuard {
+    flags: u64,
+}
+
+impl ActiveGuard {
+    fn acquire() -> Self {
+        let flags = ap_start::save_and_disable_local_interrupts();
+        percpu::preempt_inc();
+        loop {
+            if !ACTIVE.swap(true, Ordering::Acquire) {
+                break;
+            }
+            // A waiter must be able to take the active request's TLB IPI.
+            ap_start::enable_local_interrupts();
+            while ACTIVE.load(Ordering::Acquire) {
+                core::hint::spin_loop();
+            }
+            ap_start::disable_local_interrupts();
+        }
+        Self { flags }
+    }
+}
+
+impl Drop for ActiveGuard {
+    fn drop(&mut self) {
+        ACTIVE.store(false, Ordering::Release);
+        percpu::preempt_dec();
+        ap_start::restore_local_interrupts(self.flags);
+    }
+}
 /// One-shot TLB failure injection (`s34-tlb-fail`): skip one remote IPI.
 static INJECT_FAILURE: AtomicUsize = AtomicUsize::new(0);
 static ADDRESS: AtomicU64 = AtomicU64::new(0);
@@ -78,7 +110,7 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
         return true;
     }
 
-    let _guard = LOCK.lock();
+    let _guard = ActiveGuard::acquire();
     let inject = INJECT_FAILURE.swap(0, Ordering::AcqRel) != 0;
     let sequence = SEQUENCE.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
     ADDRESS.store(addr, Ordering::SeqCst);
@@ -107,7 +139,7 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
 
     // The caller may be inside a syscall or page fault with IF clear. Re-enable interrupts only
     // while waiting so a target that is spinning on the address-space lock can still take the
-    // IPI. The outer `IrqSpinLock` restores the original IF when this function returns.
+    // IPI. `ActiveGuard::drop` restores the caller's original IF.
     let deadline = time::now_ns().saturating_add(100_000_000);
     ap_start::enable_local_interrupts();
     let mut all_acked = true;
@@ -119,7 +151,11 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
                     // Reset the mailbox so a late IPI is ignored instead of acknowledging a
                     // stale sequence; the next shootdown publishes a fresh one.
                     PENDING[cpu].store(0, Ordering::SeqCst);
-                    kprintln!("smp: tlb shootdown timeout on cpu {cpu}");
+                    kprintln!(
+                        "smp: tlb shootdown timeout on cpu {cpu} seq={sequence} last={} flushes={}",
+                        LAST[cpu].load(Ordering::SeqCst),
+                        flush_count(cpu)
+                    );
                     all_acked = false;
                     break;
                 }
