@@ -73,8 +73,7 @@ pub unsafe extern "C" fn wcsftime(
     // SAFETY: the caller granted a readable `tm`.
     let source = unsafe { &*tm };
     let value = read_abi_tm(source);
-    let gmt = source.tm_zone.is_null()
-        || source.tm_zone == zone::gmt_pointer().cast::<core::ffi::c_void>();
+    let gmt = source.tm_zone == zone::gmt_pointer().cast::<core::ffi::c_void>();
     zone::with_cache(|cache| {
         let state = cache.state();
         let names = cache.tzname();

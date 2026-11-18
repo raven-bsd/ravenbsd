@@ -45,7 +45,8 @@ pub fn wcsftime(
     if let Some(last) = out.get_mut(units.len()) {
         *last = 0;
     }
-    units.len() + 1
+    // `wcsftime` returns the number of wide characters excluding the terminator.
+    units.len()
 }
 
 #[cfg(test)]

@@ -1060,7 +1060,9 @@ fn run_exit(
         return match config.backend {
             RunBackend::Qemu => {
                 let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
-                if program.args.is_empty() {
+                // A debug switch for capturing a program's stdout through the guest tty.
+                let force_services = std::env::var_os("RAVEN_ATF_GUEST_SERVICES").is_some();
+                if program.args.is_empty() && !force_services {
                     qemu::run_init_program(
                         &qemu,
                         binary,

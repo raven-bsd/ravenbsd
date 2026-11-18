@@ -170,7 +170,7 @@ fn empty_output_is_zero() {
 }
 
 #[test]
-fn percent_s_clears_a_daylight_saving_flag() {
+fn percent_s_uses_mktime_and_ignores_tm_gmtoff() {
     let tm = Tm {
         tm_sec: 0,
         tm_min: 0,
@@ -180,11 +180,12 @@ fn percent_s_clears_a_daylight_saving_flag() {
         tm_year: 123,
         tm_wday: 6,
         tm_yday: 181,
-        tm_isdst: 1,
+        tm_isdst: 0,
         tm_gmtoff: -4 * 3600,
         tm_zone: crate::tz::NO_ZONE,
     };
-    assert_eq!(format(&tm, "%s"), b"1688184000");
+    // The UTC test state: %s is mktime(tm), so the caller's tm_gmtoff is ignored.
+    assert_eq!(format(&tm, "%s"), b"1688169600");
 }
 
 #[test]
