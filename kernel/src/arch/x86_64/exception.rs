@@ -227,6 +227,13 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
 
     if !from_user && log_lock_fault() && !LOG_LOCK_INJECTED.swap(true, Ordering::AcqRel) {
         crate::log::hold_lock_for_test();
+        // Trigger a nested exception while the log lock is held. The breakpoint stub is
+        // installed and returns; the nested handler must use the emergency log path.
+        // SAFETY: this is the kernel IDT with the breakpoint gate installed, and the stub
+        // returns to this frame.
+        unsafe {
+            core::arch::asm!("int3", options(nomem, nostack));
+        }
     }
 
     let name = NAMES.get(vector).copied().unwrap_or("unknown");
