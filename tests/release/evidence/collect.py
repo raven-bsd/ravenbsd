@@ -31,6 +31,8 @@ RELEASE_IMAGES = ROOT / "docs/release-images.md"
 SMP_SOAK = ROOT / "docs/smp-boot-soak.md"
 SMP_CLOSEOUT = ROOT / "docs/smp-closeout.md"
 RELEASE_NOTES = ROOT / "docs/releases/0.1.0-notes.md"
+LIBC_REPORT = ROOT / "libc/ravenlibc/GATE-REPORT.md"
+LIBC_DECISIONS = ROOT / "docs/releases/0.1.0-libc-decisions.md"
 PI4_DEFAULT = EVIDENCE / "pi4-serial.log"
 IMAGE_X86_DEFAULT = ROOT / "build/x86_64/ravenbsd-x86_64.img"
 IMAGE_AARCH64_DEFAULT = ROOT / "build/aarch64/ravenbsd-pi4.img"
@@ -249,16 +251,47 @@ def parse_posix(path: Path, head: str) -> Gate:
     )
 
 
-def parse_libc(head: str) -> Gate:
-    log = EVIDENCE / "libc-verdict.log"
-    result = run_command(["cargo", "run", "-q", "-p", "libc-gate", "--", "verdict"], log)
+def libc_committed_counts(path: Path) -> tuple[int, int, int] | None:
+    text = read_text(path)
+    match = re.search(r"MET=(\d+)\s+NOT MET=(\d+)\s+BLOCKED=(\d+)", text)
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+
+def libc_gate_from_log(
+    log: Path,
+    result_code: int,
+    started: str,
+    ended: str,
+    report: Path = LIBC_REPORT,
+    decisions: Path = LIBC_DECISIONS,
+) -> Gate:
+    """Classify a libc-gate verdict log, separating absent local evidence from a real verdict."""
     text = read_text(log)
     verdict = re.search(r"^libc gate: (.+)$", text, re.MULTILINE)
     status_text = verdict.group(1) if verdict else ""
     met = len(re.findall(r"\|\s*MET\s*\|", text))
     not_met = len(re.findall(r"\|\s*NOT MET\s*\|", text))
     blocked = len(re.findall(r"\|\s*BLOCKED\s*\|", text))
-    if result.code == 0 and status_text == "MET":
+    missing = text.count("evidence file missing")
+    if missing >= 10 and met == 0 and not_met >= 10:
+        counts = libc_committed_counts(decisions)
+        count_text = (
+            f"MET={counts[0]} NOT MET={counts[1]} BLOCKED={counts[2]}"
+            if counts
+            else "committed counts unavailable"
+        )
+        note = (
+            f"local evidence files missing ({missing} rows); committed GATE-REPORT "
+            f"NOT MET; {count_text} (decision page); rerun with build/libc-gate evidence"
+        )
+        return Gate(
+            "libc-gate", "STALE", "cargo run -q -p libc-gate -- verdict",
+            started, ended, str(result_code),
+            str(report.relative_to(ROOT)), sha256(report), note
+        )
+    if result_code == 0 and status_text == "MET":
         status = "PASS"
     elif status_text in {"NOT MET", "MET"}:
         status = "FAIL" if status_text != "MET" else "PASS"
@@ -267,9 +300,15 @@ def parse_libc(head: str) -> Gate:
     note = f"{status_text or 'no verdict'}; MET={met} NOT MET={not_met} BLOCKED={blocked}"
     return Gate(
         "libc-gate", status, "cargo run -q -p libc-gate -- verdict",
-        result.started, result.ended, str(result.code),
+        started, ended, str(result_code),
         str(log.relative_to(ROOT)), sha256(log), note
     )
+
+
+def parse_libc(head: str) -> Gate:
+    log = EVIDENCE / "libc-verdict.log"
+    result = run_command(["cargo", "run", "-q", "-p", "libc-gate", "--", "verdict"], log)
+    return libc_gate_from_log(log, result.code, result.started, result.ended)
 
 
 def parse_transcript_commit(path: Path) -> str:
@@ -971,6 +1010,35 @@ def self_test() -> int:
         or "S126" not in notes_failure.note
     ):
         raise AssertionError(f"release-notes failure: {notes_failure}")
+    stamp = "2026-11-18T00:00:00Z"
+    missing_libc = libc_gate_from_log(
+        fixtures / "libc-verdict-missing-evidence.log",
+        1,
+        stamp,
+        stamp,
+        fixtures / "libc-gate-report.md",
+        fixtures / "libc-decisions.md",
+    )
+    if (
+        missing_libc.status != "STALE"
+        or "MET=4 NOT MET=20" not in missing_libc.note
+        or "evidence files missing" not in missing_libc.note
+    ):
+        raise AssertionError(f"missing-evidence libc: {missing_libc}")
+    real_libc = libc_gate_from_log(
+        fixtures / "libc-verdict-real.log",
+        1,
+        stamp,
+        stamp,
+        fixtures / "libc-gate-report.md",
+        fixtures / "libc-decisions.md",
+    )
+    if (
+        real_libc.status != "FAIL"
+        or "MET=4 NOT MET=20" not in real_libc.note
+        or "evidence files missing" in real_libc.note
+    ):
+        raise AssertionError(f"real libc verdict: {real_libc}")
 
     good_board = board_gate(fixtures / "board-good.log")
     if good_board.status != "MARKERS COMPLETE":
@@ -997,7 +1065,8 @@ def self_test() -> int:
         "release-evidence self-test: PASS (kernel good/stale/missing/current/"
         "current-stale/partial, posix good/stale/no-stamp/fail, "
         "board good/virt/synthetic/incomplete, image missing/hash/pinned/stale/local-hash, "
-        "smp-soak clean/tcg4-fail/closeout-fail/not-run/missing/ambiguous/notes-fail)"
+        "smp-soak clean/tcg4-fail/closeout-fail/not-run/missing/ambiguous/notes-fail, "
+        "libc missing-evidence/real)"
     )
     return 0
 
