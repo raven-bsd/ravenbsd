@@ -1,0 +1,104 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S95: the release image boots to a brush login with working QEMU user networking. The case uses
+# an explicit virtio-net-pci device (vendor 0x1af4/device 0x1041, the devd driver in
+# profiles/server.d/drivers.conf). netd must publish the static 10.0.2.15/24 address with gateway
+# 10.0.2.2 without waiting for DHCP, and ping must work after login. TCG only here; KVM 4-CPU is
+# S83.
+
+name = "network"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+unordered = true
+
+[[expect]]
+regex = '^netd: ready$'
+unordered = true
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^ifconfig: eth0 .*inet 10\.0\.2\.15 netmask 255\.255\.255\.0$'
+
+[[expect]]
+regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/sbin/ifconfig\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ifconfig: eth0 .*inet 10\.0\.2\.15 netmask 255\.255\.255\.0$'
+timeout_secs = 30
+
+[[step]]
+send = "ping 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+timeout_secs = 60
+
+[[step]]
+wait = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|netd:.*nic:info.*no such file|netd failed|login: .*incorrect|ping: .*timeout'

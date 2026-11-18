@@ -61,13 +61,13 @@ mod program {
             release_ping: false,
             release_unavailable: false,
         };
-        if require_nic {
-            if let Err(error) = handler.try_nic(now) {
-                raven_rt::eprintln!("netd: nic: {error}");
-                return 1;
+        // A `nic:` driver may register a moment after svcd launches netd. Register `net:` for
+        // loopback first and retry the NIC from the main loop so a late driver never fails netd
+        // or delays getty. The service manifest still waits for `scheme:nic` where available.
+        if let Err(error) = handler.try_nic(now) {
+            if require_nic {
+                raven_rt::eprintln!("netd: nic: {error}; waiting for the driver");
             }
-        } else {
-            let _ = handler.try_nic(now);
         }
         handler.publish_and_feed();
         let registered = Rc::new(Cell::new(None));
