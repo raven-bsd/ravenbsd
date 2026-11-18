@@ -172,3 +172,123 @@ fn free_range_avoids_loader_and_module() {
     assert!(found + 0x11_0000 <= 0x1f00_0000);
     assert_eq!(found % 0x20_0000, 0);
 }
+
+fn seal(bytes: &mut [u8], offset: usize, len: usize) {
+    bytes[offset] = 0;
+    let sum = bytes[..len]
+        .iter()
+        .fold(0u8, |sum, byte| sum.wrapping_add(*byte));
+    bytes[offset] = sum.wrapping_neg();
+}
+
+fn synthetic_rsdp(xsdt_paddr: u64) -> [u8; ACPI_RSDP_SIZE] {
+    let mut rsdp = [0u8; ACPI_RSDP_SIZE];
+    rsdp[0..8].copy_from_slice(b"RSD PTR ");
+    rsdp[9..15].copy_from_slice(b"RAVEN ");
+    rsdp[15] = 2;
+    rsdp[16..20].copy_from_slice(&0x1000u32.to_le_bytes());
+    rsdp[20..24].copy_from_slice(&(ACPI_RSDP_SIZE as u32).to_le_bytes());
+    rsdp[24..32].copy_from_slice(&xsdt_paddr.to_le_bytes());
+    seal(&mut rsdp, 8, 20);
+    seal(&mut rsdp, 32, ACPI_RSDP_SIZE);
+    rsdp
+}
+
+fn synthetic_xsdt(entry: u64) -> std::vec::Vec<u8> {
+    let mut xsdt = std::vec![0u8; ACPI_HEADER_SIZE + 8];
+    xsdt[0..4].copy_from_slice(b"XSDT");
+    let length = xsdt.len() as u32;
+    xsdt[4..8].copy_from_slice(&length.to_le_bytes());
+    xsdt[8] = 1;
+    xsdt[10..16].copy_from_slice(b"RAVEN ");
+    xsdt[16..24].copy_from_slice(b"RAVENXSD");
+    xsdt[24..28].copy_from_slice(&1u32.to_le_bytes());
+    xsdt[28..32].copy_from_slice(b"RAVE");
+    xsdt[32..36].copy_from_slice(&1u32.to_le_bytes());
+    xsdt[36..44].copy_from_slice(&entry.to_le_bytes());
+    let length = xsdt.len();
+    seal(&mut xsdt, 9, length);
+    xsdt
+}
+
+#[test]
+fn mcfg_append_builds_a_valid_acpi_set() {
+    let base = 0x30_0000u64;
+    let rsdp = synthetic_rsdp(0x1000);
+    let xsdt = synthetic_xsdt(0x2000);
+    let mut out = [0u8; 512];
+    let offset = append_mcfg(&rsdp, &xsdt, base, 0xE000_0000, &mut out).unwrap();
+    assert_eq!(offset, 0);
+    assert_eq!(&out[..8], b"RSD PTR ");
+    assert_eq!(
+        u64::from_le_bytes(out[24..32].try_into().unwrap()),
+        base + 64
+    );
+    assert_eq!(checksum(&out[..20]), 0);
+    assert_eq!(checksum(&out[..ACPI_RSDP_SIZE]), 0);
+
+    let new_xsdt = &out[64..];
+    assert_eq!(&new_xsdt[..4], b"XSDT");
+    assert_eq!(
+        u32::from_le_bytes(new_xsdt[4..8].try_into().unwrap()),
+        (ACPI_HEADER_SIZE + 16) as u32
+    );
+    assert_eq!(checksum(&new_xsdt[..ACPI_HEADER_SIZE + 16]), 0);
+    assert_eq!(
+        u64::from_le_bytes(new_xsdt[36..44].try_into().unwrap()),
+        0x2000
+    );
+    let mcfg_paddr = u64::from_le_bytes(new_xsdt[44..52].try_into().unwrap());
+
+    let mcfg_offset = 64 + ACPI_HEADER_SIZE + 16;
+    let mcfg_offset = (mcfg_offset + 7) & !7;
+    assert_eq!(mcfg_paddr, base + mcfg_offset as u64);
+    let mcfg = &out[mcfg_offset..mcfg_offset + MCFG_TABLE_SIZE];
+    assert_eq!(&mcfg[..4], b"MCFG");
+    assert_eq!(
+        u32::from_le_bytes(mcfg[4..8].try_into().unwrap()),
+        MCFG_TABLE_SIZE as u32
+    );
+    assert_eq!(checksum(&mcfg[..MCFG_TABLE_SIZE]), 0);
+    assert_eq!(
+        u64::from_le_bytes(mcfg[44..52].try_into().unwrap()),
+        0xE000_0000
+    );
+    assert_eq!(u16::from_le_bytes(mcfg[52..54].try_into().unwrap()), 0);
+    assert_eq!(mcfg[54], 0);
+    assert_eq!(mcfg[55], 255);
+}
+
+#[test]
+fn mcfg_append_rejects_bad_inputs() {
+    let rsdp = synthetic_rsdp(0x1000);
+    let xsdt = synthetic_xsdt(0x2000);
+    let mut out = [0u8; 512];
+    assert_eq!(
+        append_mcfg(&rsdp[..8], &xsdt, 0, 0, &mut out),
+        Err(AcpiError::TooShort)
+    );
+    let mut bad = rsdp;
+    bad[0] = b'X';
+    assert_eq!(
+        append_mcfg(&bad, &xsdt, 0, 0, &mut out),
+        Err(AcpiError::BadRsdpSignature)
+    );
+    let mut bad = xsdt.clone();
+    bad[0] = b'Y';
+    assert_eq!(
+        append_mcfg(&rsdp, &bad, 0, 0, &mut out),
+        Err(AcpiError::BadXsdtSignature)
+    );
+    let mut bad = rsdp;
+    bad[32] = bad[32].wrapping_add(1);
+    assert_eq!(
+        append_mcfg(&bad, &xsdt, 0, 0, &mut out),
+        Err(AcpiError::BadChecksum)
+    );
+    let mut small = [0u8; 32];
+    assert_eq!(
+        append_mcfg(&rsdp, &xsdt, 0, 0, &mut small),
+        Err(AcpiError::OutputTooSmall)
+    );
+}

@@ -405,3 +405,146 @@ fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
 #[cfg(test)]
 #[path = "lib_ut.rs"]
 mod tests;
+
+/// Size of an ACPI RSDP structure (revision 2).
+pub const ACPI_RSDP_SIZE: usize = 36;
+/// Size of an ACPI table header.
+pub const ACPI_HEADER_SIZE: usize = 36;
+/// Size of one MCFG allocation entry.
+pub const MCFG_ALLOCATION_SIZE: usize = 16;
+/// Size of the MCFG table this loader builds (one allocation).
+pub const MCFG_TABLE_SIZE: usize = ACPI_HEADER_SIZE + 8 + MCFG_ALLOCATION_SIZE;
+
+/// Why the MCFG injection could not build a new ACPI set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AcpiError {
+    /// The RSDP or XSDT input is shorter than its header.
+    TooShort,
+    /// The RSDP signature is not `RSD PTR `.
+    BadRsdpSignature,
+    /// The XSDT signature is not `XSDT`.
+    BadXsdtSignature,
+    /// A checksum in the original tables is wrong.
+    BadChecksum,
+    /// The entry count does not fit the output buffer.
+    OutputTooSmall,
+    /// An offset or length overflowed.
+    Overflow,
+}
+
+/// Append an MCFG table to a copy of `xsdt` and return the offset of the new RSDP in `out`.
+///
+/// `out` receives a complete ACPI set: a new revision-2 RSDP at offset 0, a new XSDT at offset
+/// 64 with every original entry plus the MCFG pointer, and the MCFG table. `base_paddr` is the
+/// physical address of `out[0]`; all internal pointers are written as physical addresses.
+///
+/// The caller must copy the existing tables into `xsdt` verbatim. The original RSDP/XSDT are not
+/// modified. Existing MCFG detection is the caller's job (it requires reading the referenced
+/// tables).
+pub fn append_mcfg(
+    rsdp: &[u8],
+    xsdt: &[u8],
+    base_paddr: u64,
+    ecam_base: u64,
+    out: &mut [u8],
+) -> Result<usize, AcpiError> {
+    if rsdp.len() < ACPI_RSDP_SIZE || xsdt.len() < ACPI_HEADER_SIZE {
+        return Err(AcpiError::TooShort);
+    }
+    if rsdp.get(0..8) != Some(b"RSD PTR ") {
+        return Err(AcpiError::BadRsdpSignature);
+    }
+    if xsdt.get(0..4) != Some(b"XSDT") {
+        return Err(AcpiError::BadXsdtSignature);
+    }
+    if checksum(&rsdp[..20]) != 0 || checksum(&rsdp[..ACPI_RSDP_SIZE]) != 0 {
+        return Err(AcpiError::BadChecksum);
+    }
+    let xsdt_len = usize::try_from(read_u32(xsdt, 4).ok_or(AcpiError::TooShort)?)
+        .map_err(|_| AcpiError::Overflow)?;
+    if xsdt_len < ACPI_HEADER_SIZE
+        || xsdt_len > xsdt.len()
+        || !(xsdt_len - ACPI_HEADER_SIZE).is_multiple_of(8)
+    {
+        return Err(AcpiError::TooShort);
+    }
+    if checksum(&xsdt[..xsdt_len]) != 0 {
+        return Err(AcpiError::BadChecksum);
+    }
+    let entries = (xsdt_len - ACPI_HEADER_SIZE) / 8;
+
+    let xsdt_offset = 64usize;
+    let new_xsdt_len = ACPI_HEADER_SIZE
+        .checked_add(
+            entries
+                .checked_add(1)
+                .and_then(|value| value.checked_mul(8))
+                .ok_or(AcpiError::Overflow)?,
+        )
+        .ok_or(AcpiError::Overflow)?;
+    let mcfg_offset = xsdt_offset
+        .checked_add(new_xsdt_len)
+        .and_then(|value| value.checked_add(7).map(|value| value & !7))
+        .ok_or(AcpiError::Overflow)?;
+    let total = mcfg_offset
+        .checked_add(MCFG_TABLE_SIZE)
+        .ok_or(AcpiError::Overflow)?;
+    if out.len() < total {
+        return Err(AcpiError::OutputTooSmall);
+    }
+    out[..total].fill(0);
+
+    let xsdt_paddr = base_paddr
+        .checked_add(xsdt_offset as u64)
+        .ok_or(AcpiError::Overflow)?;
+    let mcfg_paddr = base_paddr
+        .checked_add(mcfg_offset as u64)
+        .ok_or(AcpiError::Overflow)?;
+
+    // RSDP: copy the original identity fields and point at the new XSDT.
+    out[..ACPI_RSDP_SIZE].copy_from_slice(&rsdp[..ACPI_RSDP_SIZE]);
+    out[8] = 0;
+    out[24..32].copy_from_slice(&xsdt_paddr.to_le_bytes());
+    out[32] = 0;
+    let legacy_checksum = checksum(&out[..20]);
+    out[8] = legacy_checksum;
+    let extended_checksum = checksum(&out[..ACPI_RSDP_SIZE]);
+    out[32] = extended_checksum;
+
+    // XSDT: copy the original header, replace length/checksum, copy entries, append MCFG.
+    out[xsdt_offset..xsdt_offset + ACPI_HEADER_SIZE].copy_from_slice(&xsdt[..ACPI_HEADER_SIZE]);
+    out[xsdt_offset + 4..xsdt_offset + 8].copy_from_slice(&(new_xsdt_len as u32).to_le_bytes());
+    out[xsdt_offset + 9] = 0;
+    out[xsdt_offset + ACPI_HEADER_SIZE..xsdt_offset + xsdt_len]
+        .copy_from_slice(&xsdt[ACPI_HEADER_SIZE..xsdt_len]);
+    let last = xsdt_offset + xsdt_len;
+    out[last..last + 8].copy_from_slice(&mcfg_paddr.to_le_bytes());
+    let xsdt_checksum = checksum(&out[xsdt_offset..xsdt_offset + new_xsdt_len]);
+    out[xsdt_offset + 9] = xsdt_checksum;
+
+    // MCFG: one allocation entry for the QEMU microvm GPEX ECAM window.
+    let mcfg = &mut out[mcfg_offset..mcfg_offset + MCFG_TABLE_SIZE];
+    mcfg[..4].copy_from_slice(b"MCFG");
+    mcfg[4..8].copy_from_slice(&(MCFG_TABLE_SIZE as u32).to_le_bytes());
+    mcfg[8] = 1;
+    mcfg[10..16].copy_from_slice(b"RAVEN ");
+    mcfg[16..24].copy_from_slice(b"RAVENMCF");
+    mcfg[24..28].copy_from_slice(&1u32.to_le_bytes());
+    mcfg[28..32].copy_from_slice(b"RAVE");
+    mcfg[32..36].copy_from_slice(&1u32.to_le_bytes());
+    mcfg[44..52].copy_from_slice(&ecam_base.to_le_bytes());
+    mcfg[52..54].copy_from_slice(&0u16.to_le_bytes());
+    mcfg[54] = 0;
+    mcfg[55] = 255;
+    let mcfg_checksum = checksum(&mcfg[..MCFG_TABLE_SIZE]);
+    mcfg[9] = mcfg_checksum;
+
+    Ok(0)
+}
+
+fn checksum(bytes: &[u8]) -> u8 {
+    bytes
+        .iter()
+        .fold(0u8, |sum, byte| sum.wrapping_add(*byte))
+        .wrapping_neg()
+}
