@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone SMP IPC stress fixture for S85c. It is built by tests/smp/ipc/build.sh for the
+# x86_64 bare target and packed as /init; it is not part of the host workspace.
+[workspace]
+
+[package]
+name = "raven-smp-ipc"
+version = "0.1.0"
+description = "S85c SMP IPC stress: multi-producer/consumer channels, rings and trace contexts."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-smp-ipc-init"
+path = "src/bin/init.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-chan = { path = "../../../crates/raven-chan" }
+raven-ring = { path = "../../../crates/raven-ring" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+raven-trace-core = { path = "../../../crates/raven-trace-core" }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
