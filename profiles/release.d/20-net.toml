@@ -2,8 +2,9 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # The release network stack from profiles/server.toml: pcid/devd find the QEMU virtio-net
-# function, devd launches it in serve mode, netd gets the DHCP lease, resolvd follows the lease
-# DNS, and the ping/route/netstat tools are available in the shell.
+# function, devd launches it in serve mode, netd publishes the static QEMU user-network address
+# (10.0.2.15/24, gateway 10.0.2.2) immediately and does not wait for DHCP, resolvd follows the
+# lease/static DNS, and the ifconfig/ping/route/netstat tools are available in the shell.
 
 [[initfs.programs]]
 package = "raven-pcid"
@@ -24,6 +25,10 @@ path = "/sbin/netd"
 [[initfs.programs]]
 package = "resolvd"
 path = "/sbin/resolvd"
+
+[[initfs.programs]]
+package = "raven-ifconfig"
+path = "/sbin/ifconfig"
 
 [[initfs.programs]]
 package = "raven-ping"
