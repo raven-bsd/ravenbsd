@@ -4,7 +4,8 @@
 # SMP close-out matrix runner
 
 Date: 2026-11-18. Ticket: S126 (Otto). Depends: S116, S125, S85e.
-Status: runner implemented and host-self-tested; the release matrix is **not** run yet.
+Status: runner delivered; the release boot gate is **blocked by mid-run host contention** (6/10
+clean TCG4 boots, run 7 timed out when other lanes' jobs appeared). No partial pass is claimed.
 
 ## Why
 
@@ -139,6 +140,52 @@ boot blocker, reproduced on a quiet host.
 
 This section is the accurate close-out state: runner and telemetry delivered, release gate
 blocked by the getty dynamic-ELF defect.
+
+## Rework round 2 (rev 56): S129 and the 6/10 run
+
+Branch `otto/S126` merged `origin/master` `4d3e1576` (no rebase): S129's vaddr-0 interpreter parse
+is in `crates/raven-spawn` (`0..USER_END`), with S127's readiness timing and S107's host
+telemetry.
+
+**Image.** The first clean-tree build packed a **stale** `ld-elf.so.1`: the Nov 16 02:28 stub was
+still in `build/x86_64/` and `xtask initfs` skips `libc-link` when the dynamic outputs already
+exist. That image (sha256 `20396d1a...`) failed run 1 with
+`ld-elf.so.1: no direct target start yet`. `cargo xtask libc-link --arch x86_64` rebuilt the
+runtime (`ld-elf.so.1` 4352 -> 107128 bytes), and the valid image is:
+
+- commit `5aec5fc502816e7a2011abf343ea3bd37c42b179`
+- sha256 `90fa029d863c4ca780fee51637f7da231fdadad7aae696674de3997ecc31b893`
+- size 335544320 bytes
+
+**Window.** Waited for S128's aarch64 matrix to finish (23:21:59Z: fast=50 soak=5 cross=5,
+timed_out=0 failed=0). The soak preflight passed at load1 4.76.
+
+```
+sh scripts/smp-boot-soak.sh --kvm1 0 --kvm2 0 --kvm4 0 --tcg4 10 --wait-for-idle 1200 --max-load 5
+```
+
+| Run | login | host before (load/qemu/jobs) | host after |
+|---|---|---|---|
+| 1 | 11.673 s | 4.76 / 0 / 0 | 4.34 / 0 / 0 |
+| 2 | 10.753 s | 4.34 / 0 / 0 | 4.04 / 0 / 0 |
+| 3 | 10.098 s | 4.04 / 0 / 0 | 3.96 / 0 / 0 |
+| 4 | 10.180 s | 3.96 / 0 / 0 | 4.04 / 0 / 1 |
+| 5 | 10.970 s | 4.04 / 0 / 1 | 4.17 / 0 / 2 |
+| 6 | 13.258 s | 4.17 / 0 / 2 | 5.65 / 0 / 4 |
+| 7 | **FAIL 30 s timeout** | 5.65 / 0 / 4 | **28.32 / 0 / 5** |
+
+Run 7's serial reaches `svcd: all services up` at 27.8 s (clean runs: ~10-13 s to `login:`), with
+the S127 timing lines showing every service ready (getty `ready_at=6123`, netd `5495`, sysd
+`4831`), then no `login:` before the 30 s timeout. Other lanes' jobs appeared during the soak
+(jobs 0 -> 5, load 28.32): the guest was starved after all services were up. Raw log:
+`build/smp-boot-soak/20261118T233016Z/tcg4/run-7.{log,stamped.log}`; telemetry:
+`build/smp-boot-soak/20261118T233016Z/host.tsv`.
+
+**Classification:** host-contention window violation, not a runner or case defect. The first six
+boots are clean with S129; run 7 failed only after competing jobs started. Per the directive the
+soak stopped on the first failure; the 5-case TCG4 column and the KVM modes were not run, and no
+partial pass is claimed. Owner: the S107/S116 exclusive window (other lanes), with S127's login
+banner timing affected by the 30 s bound under starvation.
 
 ## When the full matrix runs
 
