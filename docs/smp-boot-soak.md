@@ -73,6 +73,14 @@ and did not retry it. The raw/stamped logs are preserved at
 `build/smp-boot-soak/20261118T133430Z/kvm4/run-21.log` and `.stamped.log`; KVM1/KVM2 logs and
 the failure's neighbors are in the same run root.
 
+The host was **not exclusive** during this campaign: other lane QEMU processes were running and
+the load average was around 22. The kernel-gate ancillary run also exposed a real AP bring-up
+failure under the same load: `irq-dist-off` logged `smp: cpu 3 did not start` and
+`smp: 3 cpus online` (first gate run had a separate aarch64 `kernel-timer` 134 ms over the
+7-130 ms expectation; a single retry of that timer case passed). These are reported as load-
+sensitive SMP failures, not a clean boot-loop pass. A clean matrix must be rerun on an exclusive
+host after the S83/AP issue is resolved.
+
 ## Reproduction and ownership
 
 The runner and helper are owned by S107 (`scripts/smp-boot-soak.sh`, `tests/smp/boot/**`,
