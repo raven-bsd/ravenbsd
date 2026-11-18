@@ -60,7 +60,9 @@ case is a strict clean gate.
 `lock-time-tcg2.toml` runs the full TLB+timer workload on TCG `-smp 2`; the guest completes
 50/50 with no timeout. It is now a strict clean gate like `lock-time-tcg.toml` (4 CPUs).
 
-The 50/50 TCG and KVM `-smp 2/4` gate is green for S113; see `tickets/stuart/reports/S113.md`.
+The 50/50 TCG and KVM `-smp 2/4` gate was re-verified by S85a on master `6d1b1bde`:
+`sh tests/smp/lock-time/run.sh all` PASSED (six cases, 50/50 each, no TLB timeout); see
+`tickets/lance/reports/S85a.md`.
 
 Expected tail for a clean run:
 
