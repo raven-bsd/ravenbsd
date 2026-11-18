@@ -1469,6 +1469,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-fb"
+version = "0.1.0"
+
+[[package]]
 name = "raven-fdt-lite"
 version = "0.1.0"
 
