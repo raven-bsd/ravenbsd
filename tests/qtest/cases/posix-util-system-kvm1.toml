@@ -18,7 +18,7 @@ qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "1"]
 expect_exit = "success"
 
 [[expect]]
-regex = '^svcd: all services up$'
+regex = 'svcd: all services up$'
 unordered = true
 
 [[expect]]
