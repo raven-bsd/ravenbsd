@@ -4,6 +4,7 @@
 //! `libc-pack`: build `libc.a`, pack its members, emit the symbol map, and run the link-time
 //! checks of `donor-map/16` 3.A.5 / C60 section 4.5.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -49,6 +50,66 @@ impl Arch {
             Self::Riscv64 => "riscv64",
         }
     }
+}
+
+/// riscv64 dynamic exports explicitly waived until the long-double C ABI wrapper exists.
+///
+/// The symbol is removed from the per-arch `Symbols.list` and version script, with this exact
+/// owner/missing-primitive record printed by `libc-pack`; it is not a silent drop and not a fake
+/// definition. x86_64/aarch64 keep the real exports.
+const RISCV64_DYNAMIC_WAIVERS: [(&str, &str); 2] = [
+    (
+        "strtold",
+        "C47m: no riscv64 binary128 long-double C ABI wrapper (only x86_64/aarch64 arms)",
+    ),
+    (
+        "wcstold",
+        "C47m: no riscv64 binary128 long-double C ABI wrapper (only x86_64/aarch64 arms)",
+    ),
+];
+
+/// Remove the per-arch waived names from the generated flat list and version script.
+fn apply_arch_waivers(list: &Path, map: &Path, arch: Arch) -> Result<Vec<String>> {
+    if arch != Arch::Riscv64 {
+        return Ok(Vec::new());
+    }
+    let waived: BTreeSet<&str> = RISCV64_DYNAMIC_WAIVERS
+        .iter()
+        .map(|(name, _)| *name)
+        .collect();
+    let mut removed = BTreeSet::new();
+
+    let text =
+        std::fs::read_to_string(list).with_context(|| format!("cannot read {}", list.display()))?;
+    let mut out = String::new();
+    for line in text.lines() {
+        let name = line.trim();
+        if waived.contains(name) {
+            removed.insert(name.to_string());
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    std::fs::write(list, out).with_context(|| format!("cannot write {}", list.display()))?;
+
+    let text =
+        std::fs::read_to_string(map).with_context(|| format!("cannot read {}", map.display()))?;
+    let mut out = String::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(name) = trimmed.strip_suffix(';')
+            && waived.contains(name)
+        {
+            removed.insert(name.to_string());
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    std::fs::write(map, out).with_context(|| format!("cannot write {}", map.display()))?;
+
+    Ok(removed.into_iter().collect())
 }
 
 /// Parsed command.
@@ -184,6 +245,15 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     if options.check {
         let before = std::fs::read_to_string(&list).unwrap_or_default();
         let _ = before;
+    }
+    let waived = apply_arch_waivers(&list, &libc_map, options.arch)?;
+    for name in &waived {
+        let reason = RISCV64_DYNAMIC_WAIVERS
+            .iter()
+            .find(|(candidate, _)| candidate == name)
+            .map(|(_, reason)| *reason)
+            .unwrap_or("unspecified");
+        println!("libc-pack: riscv64 waiver: {name} not exported ({reason})");
     }
     println!("libc-pack: symbols: ok ({merged})");
 

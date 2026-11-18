@@ -6,7 +6,10 @@
 
 use std::path::Path;
 
-use super::{Arch, build_spec, clean_compiler_headers, copy_headers, is_compiler_header, parse};
+use super::{
+    Arch, apply_arch_waivers, build_spec, clean_compiler_headers, copy_headers, is_compiler_header,
+    parse,
+};
 use crate::process::CommandSpec;
 
 fn args(values: &[&str]) -> Vec<String> {
@@ -270,4 +273,44 @@ fn the_probe_value_is_kept_verbatim() {
     assert_eq!(options.probe.as_deref(), Some("P0"));
     let options = parse(&args(&["--probe", "all"])).expect("probe");
     assert_eq!(options.probe.as_deref(), Some("all"));
+}
+
+#[test]
+fn riscv64_waives_only_the_missing_long_double_parsers() {
+    let root =
+        std::env::temp_dir().join(format!("c74hs-waiver-{}-{}", std::process::id(), line!()));
+    std::fs::create_dir_all(&root).expect("dir");
+    let list = root.join("Symbols.list");
+    let map = root.join("libc.map");
+    std::fs::write(&list, "# header\nprintf\nstrtold\nwcstold\n").expect("list");
+    std::fs::write(
+        &map,
+        "RAVEN_1.0 {\n\tglobal:\n\t\tprintf;\n\t\tstrtold;\n\t\twcstold;\n};\n",
+    )
+    .expect("map");
+
+    let removed = apply_arch_waivers(&list, &map, Arch::Riscv64).expect("waive");
+    assert_eq!(removed, ["strtold", "wcstold"]);
+    let list_text = std::fs::read_to_string(&list).expect("read list");
+    assert!(list_text.contains("printf"));
+    assert!(!list_text.contains("strtold"));
+    assert!(!list_text.contains("wcstold"));
+    let map_text = std::fs::read_to_string(&map).expect("read map");
+    assert!(map_text.contains("printf;"));
+    assert!(!map_text.contains("strtold;"));
+    assert!(!map_text.contains("wcstold;"));
+
+    std::fs::write(&list, "printf\nstrtold\nwcstold\n").expect("list reset");
+    std::fs::write(&map, "\t\tprintf;\n\t\tstrtold;\n\t\twcstold;\n").expect("map reset");
+    assert!(
+        apply_arch_waivers(&list, &map, Arch::X86_64)
+            .expect("x86 no-op")
+            .is_empty()
+    );
+    assert!(
+        std::fs::read_to_string(&list)
+            .expect("read list")
+            .contains("strtold")
+    );
+    let _ = std::fs::remove_dir_all(&root);
 }
