@@ -80,8 +80,12 @@ count moved from 10 fail/102 skip to 12 fail/101 skip; C74ht then rebuilt the x8
 `02152587`: **63 pass / 13 fail / 65 known / 99 skipped**; all three DSO budgets pass, and the
 13 are the 10 static invariants, the P7 riscv64 server **B** row and two riscv64 P9 static S/F
 rows. C74ib's aarch64 DSO study is historical (C74id/C74ij brought aarch64 S to 990,615); no
-budget was raised. The gate cannot close until G1, the invariant/P7-riscv B decision and the
-blocked world rows are resolved by their owners.
+budget was raised. C74in's full three-arch rebuild on `d0429e95` confirms 63/13 and attributes
+the P7 riscv64 server B row to `.relro_padding`, not `.bss`: `.bss` is 11,552 in both builds,
+while C74ij's +246-byte `.text` moved the RELRO start across the `0x22000` page boundary and
+added 3,848 bytes of padding. Owner otto/C74ij; the 15,953 B budget option is not applied. The
+gate cannot close until G1, the invariant/P7-riscv B decision and the blocked world rows are
+resolved by their owners.
 
 ## 3.1 size triage (C74da round 3 on `02152587`; C74w/C74z/C74z-S17/C74ht/C74ia/C74ib historical)
 
@@ -99,6 +103,12 @@ invariant ceiling is changed.
   follow-up tooling ticket must change the expectation to 0; these rows are not passes.
 * **Current 13 fails:** the 10 static `INV-S-P2-P0`/`INV-S-P3-P2` invariants, the P7 riscv64
   server B row (15,488 > 12,385), and the two riscv64 P9 static S/F rows.
+* **C74in P7 B attribution:** `.bss` is 11,552 in both the pre-C74ij and current p7 builds; the
+  current B 15,488 is 11,552 + 3,936 `.relro_padding` (pre-C74ij: 11,552 + 88). C74ij's
+  `strftime.rs` `%s` branch (lines 167-190) grew `.text` 58,110 -> 58,356, moving GNU_RELRO
+  from `0x21698` to `0x21790` and its page end from `0x22000` to `0x23000`. Owner otto/C74ij;
+  this is a layout side effect, not a static buffer. The measured + 3 percent B option is
+  **15,953**; applying it gives 64 pass / 12 fail. No budget is changed.
 * **C74ib aarch64 size study (historical):** baseline S 1,363,752 / F 2,501,104; `.text`
   1,013,616 and `.eh_frame` 167,204 dominate. `--icf=all` alone reaches 1,306,012 (still 6,012
   over); `--icf=all` + `opt-level=z` reaches 1,255,136 but F grows to 2,893,064; adding
@@ -107,16 +117,16 @@ invariant ceiling is changed.
   later landed the DSO-only change. `force-unwind-tables=no` (S 1,200,188) is rejected because
   it removes `.eh_frame`/backtrace. The exact section, symbol, candidate and riscv P9 budget
   tables are in the C74ib TRIAGE section.
-* **13 real fails remain:** the 10 `INV-S-P2-P0`/`INV-S-P3-P2` static invariants, the real
-  aarch64 `INV-LIBC-SO-S` overrun (1,363,752 > 1,300,000; ceiling not raised), and the two
-  riscv64 P9 static rows grown by the C74hs compat exports (tiny S 904,084 > 868,494 / F
-  905,672 > 870,128; server S 964,226 > 924,842 / F 965,816 > 926,473). The P9 growth is
-  permanent parity; the reviewer values are in TRIAGE, not applied.
+* **13 real fails remain:** the 10 `INV-S-P2-P0`/`INV-S-P3-P2` static invariants, the P7
+  riscv64 server B row (`.relro_padding` layout, attributed above), and the two riscv64 P9
+  static rows (current tiny S 906,278 > 868,494 / F 907,864 > 870,128; server S 966,556 >
+  924,842 / F 968,144 > 926,473; permanent C74hs parity; reviewer values in TRIAGE, not
+  applied). The aarch64 `INV-LIBC-SO-S` row passes at S 990,615 (C74id).
 * Boot rows pass. `B` is the Berkeley `llvm-size` bss field (all NOBITS, including
   `.relro_padding`), not only the `.bss` section. `build/size/libc-size.json`/`.md` are run
   artifacts and leave `budget_* = 0` and `status = ok`; the console and
-  `build/libc-gate-c74ib/3.1.txt` are the check evidence.
+  `build/libc-gate-c74in/3.1.txt` are the check evidence.
 
-3.1 stays NOT MET with exactly 13 real fails. The exact dynamic budget diff is in the C74ia
-section of `tests/libc/size/TRIAGE.md`; the aarch64 candidate evidence and riscv P9 review values
-are in the C74ib section. The C74ib report records the infeasibility inside Owns.
+3.1 stays NOT MET with exactly 13 real fails. The exact 13-row table and P7 attribution are in
+the C74in section of `tests/libc/size/TRIAGE.md`; the dynamic budget diff is in C74ia and the
+riscv P9 review values are in C74in.

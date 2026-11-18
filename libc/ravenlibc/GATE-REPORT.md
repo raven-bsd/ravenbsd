@@ -9,7 +9,9 @@ Every host-only row was re-run into `build/libc-gate/` with
 `cargo run -q -p libc-gate -- verdict --out build/libc-gate`. The remaining NOT MET rows are
 G1 donor data (1.2, 1 of 4) and the size-budget lane (3.1, 63/13); the world rows (2.1/2.2) are
 BLOCKED by the missing `results/x86_64/world.json` and H-11/H-12 data; 5.x are stale (no QEMU).
-The earlier C74h/C74z-S17/C74ht/C74ia/C74ib/C74hj evidence remains in the historical sections
+C74in re-ran the full three-arch check on `d0429e95` and wrote `build/libc-gate-c74in/3.1.txt`;
+the 3.1 row uses that evidence. The earlier C74h/C74z-S17/C74ht/C74ia/C74ib/C74hj evidence
+remains in the historical sections
 below.
 
 ## 1. Gate table
@@ -27,7 +29,7 @@ below.
 | 1 correctness | 1.7 lints (C16) | MET | build/libc-gate/1.7.txt | `libc-lint: ok (4288 files scanned)` (C74da round 3) |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate-audit/2.1.txt | harness/list present; blocked on missing `results/x86_64/world.json` plus H-11 tarballs and the H-12 freeze (C74hj; the rows.toml note still names the absent `Cargo.toml`, stale) |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate-audit/2.2.txt | harness present; the gate cannot run without `results/x86_64/world.json`, H-11 tarballs and the H-12 freeze; no synthetic results (C74hj) |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate/3.1.txt | exit 1: 63 pass, 13 fail, 65 known, 99 skipped, 0 budget-only; all three `libc.so.1` budgets pass; 10 static invariants + P7 riscv64 server B + 2 riscv64 P9 static rows (C74da round 3) |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74in/3.1.txt | exit 1: 63 pass, 13 fail, 65 known, 99 skipped, 0 budget-only; all three `libc.so.1` budgets pass; 10 static invariants + P7 riscv64 server B (`.relro_padding` +3,848 from C74ij's +246 `.text`) + 2 riscv64 P9 static rows (C74in) |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate-audit/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable (C74hj) |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate-audit/4.1.txt | exit 0 (C74hj) |
 | 4 hardening | 4.2 fuzz soak (C10) | MET | build/libc-gate-audit/4.2.txt | 14 targets soaked >= 3600 s with zero crashes; `inet_text` 3601 s, 261,966,448 runs (C74k/C74hj) |
@@ -90,9 +92,13 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
   **63 pass, 13 fail, 65 known, 99 skipped, 0 budget-only**. All three `libc.so.1` budgets pass
   (x86_64 S 1,290,274/1,325,192; aarch64 S 990,615/1,404,682; riscv64 S 765,115/1,041,194). The
   13 fails are the 10 static `INV-S-P2-P0`/`INV-S-P3-P2` invariants, the P7 riscv64 server **B**
-  row (15,488 > 12,385), and the two riscv64 P9 static S/F rows. The
-  three `INV-LIBC-SO-NEEDED` rows are known rule exceptions (self-contained DSOs have 0
-  `DT_NEEDED`; the hard-coded rule expects a self-NEEDED entry). No budget is raised.
+  row (15,488 > 12,385), and the two riscv64 P9 static S/F rows. C74in's full three-arch rebuild
+  on `d0429e95` confirms the same 63/13 and attributes the P7 B row to `.relro_padding`, not
+  `.bss`: `.bss` is 11,552 in both builds, while C74ij's +246-byte `.text` moved GNU_RELRO from
+  `0x21698` to `0x21790` and its page end from `0x22000` to `0x23000`, adding 3,848 bytes. The
+  source is `raven-libc-time/src/strftime.rs` `%s` (owner otto/C74ij); the 15,953 B budget option
+  is not applied. The three `INV-LIBC-SO-NEEDED` rows are known rule exceptions (self-contained
+  DSOs have 0 `DT_NEEDED`; the hard-coded rule expects a self-NEEDED entry). No budget is raised.
 * 4.2 soak: MET. The 2026-11-17 `inet_text` one-hour soak completed 3601 s with
   261,966,448 runs and 0 crashes; the other 13 targets completed 3600 s with 0 crashes (14
   targets total, C74k/C74hj).
@@ -163,7 +169,9 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
   names `tools/libc-world/Cargo.toml`, which now exists (flagged by C74hj).
 * 3.1: NOT MET, `libc-size check: 63 pass, 13 fail, 65 known, 99 skipped, 0 budget-only`;
   all three DSO budgets pass. The 13 are the 10 static invariants, the P7 riscv64 server B row
-  and the two riscv64 P9 static rows. No budget was raised.
+  and the two riscv64 P9 static rows. C74in attributes the P7 B row to `.relro_padding` (not
+  `.bss`): C74ij's +246-byte `.text` crossed the `0x22000` page boundary; the 15,953 B option is
+  not applied. No budget was raised.
 * 4.2: MET, 14 targets soaked >= 3600 s with zero crashes (`inet_text` 3601 s, 261,966,448
   runs); C74k/C74hj.
 * 5.1/5.2: **STALE this round** (no QEMU); committed C74u/C74ae/C74n/C74v evidence remains green,
