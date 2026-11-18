@@ -1345,7 +1345,12 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // entry whose process is gone is removed by `lookup_pid`.
     // Fail pending scheme requests and remove the registry entries while the server page tables
     // still exist, so capture mappings can be removed before the address space is released.
-    ipc::on_process_exit(process);
+    // The IPC/router/event teardown takes wait/scheduler locks; mask interrupts for it, but keep
+    // the address-space release interruptible for the TLB shootdown.
+    {
+        let _irq = crate::sync::critical();
+        ipc::on_process_exit(process);
+    }
     let address_space = process.address_space.lock().take();
     if let Some(mut address_space) = address_space {
         if own_context {
@@ -1359,8 +1364,12 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     }
     // A dead process can no longer call syscalls: drop its handle table so DMA buffers and
     // every other object release their resources even while a last reference to the process
-    // survives elsewhere (for example on the abandoned stack of its dead thread).
-    *process.handles.lock() = HandleTable::new();
+    // survives elsewhere (for example on the abandoned stack of its dead thread). Object drops
+    // can wake waiters and take the scheduler lock, so mask interrupts for this section.
+    {
+        let _irq = crate::sync::critical();
+        *process.handles.lock() = HandleTable::new();
+    }
     // S69 cleanup evidence: every kernel-owned resource count plus the process-local waiter and
     // request queues after the table was replaced.  The line is gated to fixture command names so
     // the ten-thousand-exit soak does not flood the serial log; the fixture sets them with
@@ -1611,6 +1620,11 @@ fn irq_held_elsewhere(owner: &Arc<Process>, irq: &Arc<crate::driver::irq::Irq>) 
 ///
 /// Returns false when the process was already terminal (no resurrection, no second teardown).
 fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool {
+    // The state/wake graph takes the per-CPU scheduler lock through `sched::wake`. The syscall
+    // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
+    // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space
+    // release below stays interruptible so a target CPU can take a TLB IPI.
+    let irq = crate::sync::critical();
     let mut state = process.state.lock();
     if *state == ProcessState::Exited {
         return false;
@@ -1635,6 +1649,7 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     crate::process::tty::hangup_session_leader(process);
     notify_parent(process, true);
     crate::event::notify_all();
+    drop(irq);
     teardown(process, code, own_context);
     true
 }
