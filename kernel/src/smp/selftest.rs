@@ -171,10 +171,10 @@ fn probe_worker(cpu: usize) {
     let address = core::ptr::addr_of!(PROBE_BYTE) as u64;
     let mut round = 0u32;
     while round < PROBE_ROUNDS {
-        if call::probe(target, address) != Some(PROBE_BYTE) {
-            if let Some(failed) = PROBE_FAIL.get(cpu) {
-                failed.fetch_add(1, Ordering::SeqCst);
-            }
+        if call::probe(target, address) != Some(PROBE_BYTE)
+            && let Some(failed) = PROBE_FAIL.get(cpu)
+        {
+            failed.fetch_add(1, Ordering::SeqCst);
         }
         round = round.saturating_add(1);
     }

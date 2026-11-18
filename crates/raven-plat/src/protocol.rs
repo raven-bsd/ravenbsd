@@ -11,6 +11,8 @@ pub const GPIO_SET_FUNCTION: u8 = 0;
 pub const GPIO_SET_PULL: u8 = 1;
 /// GPIO call: read the current level (argument ignored).
 pub const GPIO_LEVEL: u8 = 2;
+/// GPIO call: drive the current output level; argument `0` is low, `1` is high.
+pub const GPIO_SET_LEVEL: u8 = 3;
 
 /// One resource a client can open.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

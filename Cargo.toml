@@ -138,6 +138,7 @@ members = [
     "tools/abi-diff",
     "tools/linux-corpus",
     "tools/ufs-fsck",
+    "tools/ufs-inject",
     "tools/ufs-mkfs",
     "tools/integration-inventory",
     "tools/libc-census",

@@ -33,7 +33,7 @@ fn parses_no_header_and_devices() {
 
 #[test]
 fn rejects_unknown_options() {
-    assert_eq!(parse_args(["-x"]), Err(()));
+    assert_eq!(parse_args(["-x"]), Err(ParseError));
 }
 
 #[test]

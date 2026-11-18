@@ -21,7 +21,7 @@ mod program {
 
     use login::tty::Console;
     use login::{Profile, parse_profile, parse_root_passwd};
-    use raven_getty::{Session, run_session};
+    use raven_getty::{Session, SessionError, run_session};
     use raven_initfs::Initfs;
     use raven_rt::entry;
     use raven_rt::fs;
@@ -35,15 +35,15 @@ mod program {
     }
 
     impl Session for ConsoleSession {
-        fn write(&mut self, bytes: &[u8]) -> Result<(), ()> {
-            self.console.write(bytes).map_err(|_| ())
+        fn write(&mut self, bytes: &[u8]) -> Result<(), SessionError> {
+            self.console.write(bytes).map_err(|_| SessionError)
         }
 
-        fn read_line(&mut self) -> Result<String, ()> {
-            self.console.read_line().map_err(|_| ())
+        fn read_line(&mut self) -> Result<String, SessionError> {
+            self.console.read_line().map_err(|_| SessionError)
         }
 
-        fn run_login(&mut self, username: &str) -> Result<i32, ()> {
+        fn run_login(&mut self, username: &str) -> Result<i32, SessionError> {
             let login_args = ["login", username];
             let login_env = [alloc::format!("USER={username}")];
             let login_env: alloc::vec::Vec<&str> = login_env.iter().map(String::as_str).collect();
@@ -54,7 +54,12 @@ mod program {
             spawn_wait(&self.initfs, "/bin/login", &options)
         }
 
-        fn run_shell(&mut self, shell: &str, args: &[&str], env: &[&str]) -> Result<i32, ()> {
+        fn run_shell(
+            &mut self,
+            shell: &str,
+            args: &[&str],
+            env: &[&str],
+        ) -> Result<i32, SessionError> {
             let options = SpawnOptions { args, env };
             spawn_wait(&self.initfs, shell, &options)
         }
@@ -89,12 +94,16 @@ mod program {
         parse_root_passwd(text).map(|entry| entry.shell)
     }
 
-    fn spawn_wait(initfs: &Initfs<'_>, path: &str, options: &SpawnOptions<'_>) -> Result<i32, ()> {
-        let process = raven_rt::spawn::spawn(initfs, path, options).map_err(|_| ())?;
+    fn spawn_wait(
+        initfs: &Initfs<'_>,
+        path: &str,
+        options: &SpawnOptions<'_>,
+    ) -> Result<i32, SessionError> {
+        let process = raven_rt::spawn::spawn(initfs, path, options).map_err(|_| SessionError)?;
         let mut code = 0i32;
         let waited = RtSys.proc_wait(process, &mut code);
         let _ = raven_rt::handle_close(process);
-        waited.map(|()| code).map_err(|_| ())
+        waited.map(|()| code).map_err(|_| SessionError)
     }
 }
 

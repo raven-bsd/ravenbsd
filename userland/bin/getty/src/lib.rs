@@ -46,16 +46,26 @@ pub const LOGIN_ERROR: &[u8] = b"login: unable to start login\n";
 /// The session shell could not be started.
 pub const SHELL_ERROR: &[u8] = b"login: unable to start the session shell\n";
 
+/// A console or spawn operation failed; getty only needs success/failure, not a reason.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SessionError;
+
+impl core::fmt::Display for SessionError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("session operation failed")
+    }
+}
+
 /// Console and spawn operations the loop needs.
 pub trait Session {
     /// Write bytes to the console.
-    fn write(&mut self, bytes: &[u8]) -> Result<(), ()>;
+    fn write(&mut self, bytes: &[u8]) -> Result<(), SessionError>;
     /// Read one canonical line without its terminator.
-    fn read_line(&mut self) -> Result<String, ()>;
+    fn read_line(&mut self) -> Result<String, SessionError>;
     /// Run `/bin/login` for `username` and return its exit status.
-    fn run_login(&mut self, username: &str) -> Result<i32, ()>;
+    fn run_login(&mut self, username: &str) -> Result<i32, SessionError>;
     /// Run the session shell with `args` and the profile `env`.
-    fn run_shell(&mut self, shell: &str, args: &[&str], env: &[&str]) -> Result<i32, ()>;
+    fn run_shell(&mut self, shell: &str, args: &[&str], env: &[&str]) -> Result<i32, SessionError>;
 }
 
 /// The environment handed to the session shell.

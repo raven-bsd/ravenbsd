@@ -9,15 +9,19 @@ use super::*;
 
 struct MockSession {
     lines: VecDeque<String>,
-    logins: VecDeque<Result<i32, ()>>,
-    shell_status: Result<i32, ()>,
+    logins: VecDeque<Result<i32, SessionError>>,
+    shell_status: Result<i32, SessionError>,
     console: Vec<u8>,
     login_users: Vec<String>,
     shell: Option<(String, Vec<String>, Vec<String>)>,
 }
 
 impl MockSession {
-    fn new(lines: &[&str], logins: &[Result<i32, ()>], shell_status: Result<i32, ()>) -> Self {
+    fn new(
+        lines: &[&str],
+        logins: &[Result<i32, SessionError>],
+        shell_status: Result<i32, SessionError>,
+    ) -> Self {
         Self {
             lines: lines.iter().map(|line| String::from(*line)).collect(),
             logins: logins.iter().copied().collect(),
@@ -34,21 +38,21 @@ impl MockSession {
 }
 
 impl Session for MockSession {
-    fn write(&mut self, bytes: &[u8]) -> Result<(), ()> {
+    fn write(&mut self, bytes: &[u8]) -> Result<(), SessionError> {
         self.console.extend_from_slice(bytes);
         Ok(())
     }
 
-    fn read_line(&mut self) -> Result<String, ()> {
+    fn read_line(&mut self) -> Result<String, SessionError> {
         self.lines.pop_front().ok_or(())
     }
 
-    fn run_login(&mut self, username: &str) -> Result<i32, ()> {
+    fn run_login(&mut self, username: &str) -> Result<i32, SessionError> {
         self.login_users.push(String::from(username));
         self.logins.pop_front().unwrap_or(Ok(0))
     }
 
-    fn run_shell(&mut self, shell: &str, args: &[&str], env: &[&str]) -> Result<i32, ()> {
+    fn run_shell(&mut self, shell: &str, args: &[&str], env: &[&str]) -> Result<i32, SessionError> {
         self.shell = Some((
             String::from(shell),
             args.iter().map(|arg| String::from(*arg)).collect(),
@@ -102,7 +106,7 @@ fn an_invalid_user_name_is_answered_without_spawning_login() {
 
 #[test]
 fn a_failed_login_spawn_retries_instead_of_exiting() {
-    let mut session = MockSession::new(&["root", "root"], &[Err(()), Ok(0)], Ok(0));
+    let mut session = MockSession::new(&["root", "root"], &[Err(SessionError), Ok(0)], Ok(0));
     let status = run_session(&mut session, &profile(), "/bin/brush");
 
     assert_eq!(status, 0);
@@ -137,7 +141,7 @@ fn the_shell_status_and_a_spawn_failure_are_returned() {
     let mut session = MockSession::new(&["root"], &[Ok(0)], Ok(7));
     assert_eq!(run_session(&mut session, &profile(), "/bin/brush"), 7);
 
-    let mut session = MockSession::new(&["root"], &[Ok(0)], Err(()));
+    let mut session = MockSession::new(&["root"], &[Ok(0)], Err(SessionError));
     assert_eq!(run_session(&mut session, &profile(), "/bin/brush"), 1);
     assert!(session.text().contains("unable to start the session shell"));
 }
