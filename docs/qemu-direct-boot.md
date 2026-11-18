@@ -79,7 +79,8 @@ The loader itself reaches the kernel in one step: the loader-work column is the 
 The full release image was verified on the direct path: q35 + virtio-net, release initfs, KVM,
 `smp=4` reaches `svcd: getty up`, `svcd: netd up`, `netd: interface eth0 10.0.2.15/24`, the
 getty banner and `login:`. No service is disabled and rsh is not part of the path. With
-`-nodefaults` the **full release login p90 is 551 ms**, meeting the < 1000 ms target; the loaded
+`-nodefaults` the **full release login p90 is 551 ms**, meeting the < 1000 ms target; a later
+final acceptance sample measured median 570 ms / p90 617 ms (also MET). The loaded
 default-device sample is the same code at 1236 ms p90, which is why the kernel CRC and
 service-wave items below matter for margin.
 
