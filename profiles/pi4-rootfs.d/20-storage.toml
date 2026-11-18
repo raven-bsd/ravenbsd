@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# SD2 real storage stack for the Pi 4 UFS root.
+#
+# The parent `pi4-rootfs` profile (SD1) must include `/sbin/devd`, `/sbin/emmc2`,
+# `/sbin/blockd`, `/sbin/fsd-ufs` and `/sbin/vfsd`. devd launches emmc2 from
+# `/etc/drivers.toml`; the three services below consume `disk:`, `block:` and
+# `ufs:`. svcd mounts `ufs:` at `/root` and merges `/root/etc/services.d` before
+# it starts the initfs plan, so the service set and `/etc` can come from the card.
+
+[[initfs.files]]
+src = "profiles/pi4-rootfs.d/drivers.toml"
+path = "/etc/drivers.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-rootfs.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-rootfs.d/fsd-ufs-rw.manifest"
+path = "/etc/services.d/fsd-ufs.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-rootfs.d/vfsd.manifest"
+path = "/etc/services.d/vfsd.toml"

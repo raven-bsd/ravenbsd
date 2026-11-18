@@ -897,6 +897,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pi4-root-rw-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "pi4-xhci"
 version = "0.1.0"
 dependencies = [

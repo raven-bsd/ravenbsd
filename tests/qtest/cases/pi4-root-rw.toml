@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# SD2: the EMMC2 host-backed fake card serves the GPT+UFS image read-write; fsd-ufs mounts
+# partition 1 RW and the one-shot probe writes, unmounts, remounts and reads the data back.
+
+name = "pi4-root-rw"
+arch = "aarch64"
+profile = "pi4-root-rw-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/pi4-root/build-rw.sh"]
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^emmc2: backend=memory image=initfs:/etc/pi4-root\.img sectors=32835$'
+unordered = true
+
+[[expect]]
+regex = '^emmc2: registered disk$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: emmc2 up$'
+unordered = true
+
+[[expect]]
+regex = '^emmc2: serving$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: remote disk=disk:0 sectors=32835 ro=0$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: gpt ok partitions=1$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: part 1 ufs-root 34\.\.32801$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: blockd up$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs: mode=rw journal=(none|active)$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: fsd-ufs up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: vfsd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: root mounted at /root$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-root-rw: mount ok$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-root-rw: write ok$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-root-rw: umount ok$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-root-rw: remount ok$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-root-rw: read back ok$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-root-rw: known file ok$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-root-rw: probe ok$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: fsd-ufs-rw-probe up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pi4-root-rw: probe:'
