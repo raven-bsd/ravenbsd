@@ -98,6 +98,28 @@ pub mod percpu {
     pub fn mark_online(cpu: usize) {
         crate::arch::percpu::mark_online(cpu);
     }
+
+    /// Record a page-fault diagnostic stage (x86-only in this tree).
+    #[inline]
+    pub fn note_page_fault_phase(_phase: u64) {}
+
+    /// Read the page-fault diagnostic stage (x86-only in this tree).
+    #[allow(dead_code)]
+    #[inline]
+    pub fn page_fault_phase(_cpu: usize) -> u64 {
+        0
+    }
+
+    /// Record a wait-queue diagnostic stage.
+    #[inline]
+    pub fn note_wait_phase(_phase: u64) {}
+
+    /// Read the wait-queue diagnostic stage.
+    #[allow(dead_code)]
+    #[inline]
+    pub fn wait_phase(_cpu: usize) -> u64 {
+        0
+    }
 }
 
 /// Application-processor bring-up and cross-CPU wakeups.
