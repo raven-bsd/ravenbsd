@@ -26,9 +26,6 @@ regex = '^smp-fs: services ok$'
 regex = '^smp-fs: setup ok$'
 
 [[expect]]
-regex = '^smp-fs: race successes=50/50$'
-
-[[expect]]
 regex = '^smp-fs: latency create_us p50=\d+ p90=\d+ max=\d+$'
 
 [[expect]]
@@ -48,6 +45,9 @@ regex = '^smp-fs: latency unlink_us p50=\d+ p90=\d+ max=\d+$'
 
 [[expect]]
 regex = '^smp-fs: latency mount_us p50=\d+ p90=\d+ max=\d+$'
+
+[[expect]]
+regex = '^smp-fs: race successes=50/50$'
 
 [[expect]]
 regex = '^smp-fs: done workers=8 iterations=50$'
