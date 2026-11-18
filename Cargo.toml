@@ -269,7 +269,6 @@ members = [
     "userland/servers/ramfsd-probe",
     "userland/servers/ptyd",
     "userland/servers/ttyd",
-    "userland/servers/einkd",
     "userland/servers/platd",
     "userland/servers/blockd",
     "userland/servers/fsd-ufs",
