@@ -3,7 +3,12 @@ HOME=/root
 TERM=${TERM:-vt100}
 USER=root
 LOGNAME=root
-SHELL=/bin/rsh
-PS1='\u@\h:\w# '
+SHELL=/bin/brush
+PS1='raven# '
 export PATH HOME TERM USER LOGNAME SHELL PS1
 umask 022
+
+# The release login is brush; register a deterministic completion spec for the transcript
+# gate. TAB completion itself is interactive, so the scripted proof is `complete -p`. A
+# non-brush shell that sources this profile ignores the missing builtin.
+complete -W 'help exit' raven-test || true

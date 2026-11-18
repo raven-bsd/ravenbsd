@@ -127,9 +127,10 @@ pub mod bringup {
 ///
 /// * The caller may hold any address-space lock, but must not hold the scheduler's per-CPU slot
 ///   lock: the SGI handler only touches this module's atomics and executes `tlbi`/`dsb`.
-/// * [`LOCK`] serialises shootdowns system-wide, so the single shared range is unambiguous. The
-///   shooter waits with interrupts masked; a target that is itself spinning for [`LOCK`] cannot
-///   take the SGI, which costs one reported timeout instead of a deadlock.
+/// * [`ACTIVE`] serialises shootdowns system-wide, so the single shared range is unambiguous.
+///   A second shooter waits with interrupts enabled (preemption stays disabled), so it can take
+///   the active shooter's TLB SGI instead of timing out. The acknowledgement wait also enables
+///   interrupts; the guard restores the caller's original DAIF on every path.
 /// * A missing acknowledgement times out after 100 ms. The target's pending slot is cleared so a
 ///   late SGI acknowledges nothing, the timeout counter is bumped, and `false` is returned.
 ///
@@ -138,11 +139,11 @@ pub mod bringup {
 /// stores the acknowledgement with `SeqCst`. The shooter's `SeqCst` acknowledgement load
 /// therefore observes the flush before the caller reuses the frames.
 pub mod shootdown {
-    use core::sync::atomic::{AtomicU64, Ordering};
+    use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
     use crate::arch::aarch64::gic;
     use crate::kprintln;
-    use crate::sync::IrqSpinLock;
+    use crate::sched::smp::percpu;
     use crate::time;
 
     use super::MAX_CPUS;
@@ -150,7 +151,81 @@ pub mod shootdown {
     /// Acknowledgement deadline. The x86-64 mailbox uses the same bound.
     const TIMEOUT_NS: u64 = 100_000_000;
 
-    static LOCK: IrqSpinLock<()> = IrqSpinLock::new(());
+    /// Save DAIF and mask all interrupts, mirroring `sync::disable_interrupts` without changing
+    /// the shared lock module. The guard restores the exact caller state.
+    fn save_and_disable_interrupts() -> u64 {
+        let flags: u64;
+        // SAFETY: DAIF is an EL1 system register; the paired restore writes the saved value.
+        unsafe {
+            core::arch::asm!(
+                "mrs {flags}, daif",
+                "msr daifset, #0xf",
+                flags = out(reg) flags,
+                options(nomem, nostack, preserves_flags),
+            );
+        }
+        flags
+    }
+
+    fn restore_interrupts(flags: u64) {
+        // SAFETY: the value was captured by `save_and_disable_interrupts` on this CPU.
+        unsafe {
+            core::arch::asm!(
+                "msr daif, {flags}",
+                flags = in(reg) flags,
+                options(nomem, nostack, preserves_flags),
+            );
+        }
+    }
+
+    fn enable_local_interrupts() {
+        // SAFETY: the vectors and GIC are installed before SMP shootdowns run.
+        unsafe {
+            core::arch::asm!("msr daifclr, #2", options(nomem, nostack, preserves_flags));
+        }
+    }
+
+    fn disable_local_interrupts() {
+        // SAFETY: the caller restores the saved DAIF when the active guard drops.
+        unsafe {
+            core::arch::asm!("msr daifset, #2", options(nomem, nostack, preserves_flags));
+        }
+    }
+
+    static ACTIVE: AtomicBool = AtomicBool::new(false);
+
+    /// Serialises the active request. A waiter spins with interrupts enabled so the current
+    /// shooter's SGI can be taken; preemption stays disabled so the request cannot migrate.
+    struct ActiveGuard {
+        flags: u64,
+    }
+
+    impl ActiveGuard {
+        fn acquire() -> Self {
+            let flags = save_and_disable_interrupts();
+            percpu::preempt_inc();
+            loop {
+                if !ACTIVE.swap(true, Ordering::AcqRel) {
+                    break;
+                }
+                enable_local_interrupts();
+                while ACTIVE.load(Ordering::Acquire) {
+                    core::hint::spin_loop();
+                }
+                disable_local_interrupts();
+            }
+            Self { flags }
+        }
+    }
+
+    impl Drop for ActiveGuard {
+        fn drop(&mut self) {
+            ACTIVE.store(false, Ordering::Release);
+            percpu::preempt_dec();
+            restore_interrupts(self.flags);
+        }
+    }
+
     static ADDRESS: AtomicU64 = AtomicU64::new(0);
     static LENGTH: AtomicU64 = AtomicU64::new(0);
     static SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -178,7 +253,7 @@ pub mod shootdown {
             return true;
         }
 
-        let _guard = LOCK.lock();
+        let _guard = ActiveGuard::acquire();
         let sequence = SEQUENCE.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
         ADDRESS.store(start, Ordering::SeqCst);
         LENGTH.store(len, Ordering::SeqCst);
@@ -207,6 +282,9 @@ pub mod shootdown {
         IPIS.fetch_add(sent, Ordering::SeqCst);
         SHOOTDOWNS.fetch_add(1, Ordering::SeqCst);
 
+        // A target that is inside this module waiting for the active slot must be able to take
+        // the SGI. The guard restores the caller's original DAIF when this function returns.
+        enable_local_interrupts();
         let deadline = time::now_ns().saturating_add(TIMEOUT_NS);
         let mut all_acked = true;
         cpu = 0;
@@ -231,6 +309,7 @@ pub mod shootdown {
             }
             cpu = cpu.saturating_add(1);
         }
+        disable_local_interrupts();
         all_acked
     }
 

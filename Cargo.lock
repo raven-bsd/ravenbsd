@@ -448,6 +448,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpart"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "gpt-core"
 version = "0.1.0"
 
@@ -697,6 +708,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lsblk"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "mail"
 version = "0.1.0"
 
@@ -791,6 +813,19 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "newfs"
+version = "0.1.0"
+dependencies = [
+ "fsd-ufs",
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tool-core",
+ "ufs-core",
 ]
 
 [[package]]
@@ -1309,6 +1344,16 @@ version = "0.1.0"
 dependencies = [
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "raven-direct"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-bootinfo",
+ "raven-elf",
+ "raven-loader",
 ]
 
 [[package]]
@@ -3295,6 +3340,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-smp-aarch64"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-smp-memory"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-smp-soak"
 version = "0.1.0"
 dependencies = [
@@ -3324,6 +3385,14 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-smp-x86-concurrent"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 

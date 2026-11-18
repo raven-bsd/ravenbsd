@@ -18,6 +18,8 @@
 #   --list   print the case table and exit (no QEMU run)
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
+# The exclusive-host preflight refuses other QEMU/xtask/cargo/rustc or load > 2.0. Set
+# S107_WAIT_FOR_IDLE=<seconds> to wait for an idle host, or S107_MAX_LOAD to change the bound.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -25,6 +27,8 @@ cd "$root" || exit 2
 
 doc=docs/kernel-gate.md
 log_dir=target/kernel-gate
+wait_idle=${S107_WAIT_FOR_IDLE:-0}
+max_load=${S107_MAX_LOAD:-2.0}
 
 # case | arch | owner | subsystem note
 cases='boot-uname|x86_64|stuart|boot/uname
@@ -68,6 +72,12 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 fi
 
 mkdir -p "$log_dir" || exit 2
+sh tests/smp/boot/host-idle.sh \
+    --context "kernel-gate" \
+    --wait "$wait_idle" \
+    --max-load "$max_load" \
+    --state-file "$log_dir/host-state.txt" || exit 2
+
 commit=$(git rev-parse HEAD 2>/dev/null) || { echo "kernel-gate: not a git checkout" >&2; exit 2; }
 short=$(git rev-parse --short=12 HEAD 2>/dev/null) || short=$commit
 generated=$(date -u +%Y-%m-%dT%H:%M:%SZ)
