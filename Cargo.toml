@@ -361,6 +361,13 @@ opt-level = 3
 [profile.libc-a-server.package."raven-libc-stdlib"]
 opt-level = 3
 
+# C74id: aarch64 DSO-only archive profile. The static archive/set and the x86_64/riscv64
+# server archive keep `libc-a-server` (opt-level = "s"); only the aarch64 DSO source archive
+# is built for size, so its text can meet the unchanged INV-LIBC-SO-S ceiling.
+[profile.libc-a-server-z]
+inherits = "libc-a-server"
+opt-level = "z"
+
 [profile.libc-so]
 inherits = "release"
 opt-level = "s"
