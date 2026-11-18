@@ -61,7 +61,10 @@ cleanup() {
         kill "$qemu_pid" 2>/dev/null || true
         wait "$qemu_pid" 2>/dev/null || true
     fi
-    [ -n "${tmpdir:-}" ] && rm -rf "$tmpdir"
+    if [ -n "${tmpdir:-}" ]; then
+        rm -rf "$tmpdir"
+    fi
+    return 0
 }
 
 trap cleanup EXIT HUP INT TERM
