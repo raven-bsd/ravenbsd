@@ -120,7 +120,12 @@ impl SysFile for ShellEnv {
 
 impl Lock for ShellEnv {
     fn tid(&self) -> i32 {
-        1
+        // The stdio lock stores the owner in the low 30 bits, so a zero or repeated tid turns
+        // every cross-thread acquisition into a false recursive hit. Use the pthread tid that
+        // `raven-libc-thread` assigned to this thread; the main thread before TCB assignment
+        // falls back to 1.
+        let tid = raven_libc_thread::thread::current_tid(&raven_libc_thread::raw::SysKernel);
+        nonzero_tid(tid)
     }
 
     fn wait(&self, word: &AtomicI32, expected: i32) {
@@ -132,9 +137,19 @@ impl Lock for ShellEnv {
     fn wake(&self, _word: &AtomicI32, _n: i32) {}
 
     fn threaded(&self) -> bool {
-        false
+        // `need_locks` flips to non-zero when the first thread is created and back to zero only
+        // when the last one exits; this is the same gate as musl's `__isthreaded`.
+        raven_libc_thread::sync::lock::threaded()
     }
+}
+
+fn nonzero_tid(tid: i32) -> i32 {
+    if tid == 0 { 1 } else { tid }
 }
 
 /// The one stdio environment value.
 pub(crate) const ENV: ShellEnv = ShellEnv;
+
+#[cfg(test)]
+#[path = "env_ut.rs"]
+mod tests;
