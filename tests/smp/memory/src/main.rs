@@ -48,6 +48,10 @@ static READY: [AtomicU32; WORKERS] = [const { AtomicU32::new(0) }; WORKERS];
 static DONE: [AtomicU32; WORKERS] = [const { AtomicU32::new(0) }; WORKERS];
 static SEEN: [AtomicU64; WORKERS] = [const { AtomicU64::new(0) }; WORKERS];
 static WORKER_DONE: [AtomicU32; WORKERS] = [const { AtomicU32::new(0) }; WORKERS];
+static WAITER_PREP: [AtomicU32; WORKERS] = [const { AtomicU32::new(0) }; WORKERS];
+static WAITER_DONE: [AtomicU32; WORKERS] = [const { AtomicU32::new(0) }; WORKERS];
+static WAITER_ADDR: [AtomicUsize; WORKERS] = [const { AtomicUsize::new(0) }; WORKERS];
+static WAITER_GO: AtomicU32 = AtomicU32::new(0);
 static GO: AtomicU32 = AtomicU32::new(0);
 static STOP: AtomicU32 = AtomicU32::new(0);
 static FAILED: AtomicU32 = AtomicU32::new(0);
@@ -175,6 +179,24 @@ extern "C" fn worker(index: usize) -> ! {
     if let Err(error) = alloc_fault_rounds(index) {
         worker_fail(index, "alloc/fault", error);
     }
+
+    // Park a 16-page anonymous mapping and wait for the controller's barrier. All four threads
+    // unmap together, forcing four concurrent flush_range callers (the regression this suite
+    // exists to catch).
+    let barrier_len = MAP_PAGES.saturating_mul(PAGE);
+    let barrier_base = match sys::map_anonymous(barrier_len) {
+        Ok(base) => base,
+        Err(error) => worker_fail(index, "shootdown-waiter map", error),
+    };
+    WAITER_ADDR[index].store(barrier_base, Ordering::Release);
+    WAITER_PREP[index].store(1, Ordering::Release);
+    while WAITER_GO.load(Ordering::Acquire) == 0 {
+        core::hint::spin_loop();
+    }
+    if let Err(error) = sys::unmap(Handle::SELF_PROC, barrier_base, barrier_len) {
+        worker_fail(index, "shootdown-waiter unmap", error);
+    }
+    WAITER_DONE[index].store(1, Ordering::Release);
     READY[index].store(1, Ordering::Release);
 
     let mut last = 0u32;
@@ -203,10 +225,10 @@ fn thread_create(index: usize) -> Result<Handle, Errno> {
     )
 }
 
-fn wait_workers_ready() -> Result<(), Errno> {
-    for ready in &READY {
+fn wait_worker_flags(flags: &[AtomicU32; WORKERS]) -> Result<(), Errno> {
+    for flag in flags {
         let mut spins = 0u32;
-        while ready.load(Ordering::Acquire) == 0 {
+        while flag.load(Ordering::Acquire) == 0 {
             if FAILED.load(Ordering::Acquire) != 0 {
                 return Err(Errno::EIO);
             }
@@ -218,6 +240,10 @@ fn wait_workers_ready() -> Result<(), Errno> {
         }
     }
     Ok(())
+}
+
+fn wait_workers_ready() -> Result<(), Errno> {
+    wait_worker_flags(&READY)
 }
 
 fn tlb_setup() -> Result<(Handle, usize, usize), Errno> {
@@ -394,6 +420,37 @@ fn main(_args: raven_rt::Args) -> i32 {
     if let Err(error) = alloc_fault_rounds(0x20) {
         println!(
             "smp-memory: controller alloc/fault failed errno={}",
+            error.0
+        );
+        return 1;
+    }
+
+    // Four-way concurrent unmap barrier: three workers and the controller. The three workers
+    // have parked distinct 16-page mappings; the controller maps its own before releasing them.
+    if let Err(error) = wait_worker_flags(&WAITER_PREP) {
+        println!("smp-memory: shootdown waiters not ready errno={}", error.0);
+        return 1;
+    }
+    let barrier_len = MAP_PAGES.saturating_mul(PAGE);
+    let controller_map = match sys::map_anonymous(barrier_len) {
+        Ok(base) => base,
+        Err(error) => {
+            println!("smp-memory: controller waiter map errno={}", error.0);
+            return 1;
+        }
+    };
+    println!(
+        "smp-memory: concurrent-shootdown waiters={}",
+        WORKERS.saturating_add(1)
+    );
+    WAITER_GO.store(1, Ordering::Release);
+    if let Err(error) = sys::unmap(Handle::SELF_PROC, controller_map, barrier_len) {
+        println!("smp-memory: controller waiter unmap errno={}", error.0);
+        return 1;
+    }
+    if let Err(error) = wait_worker_flags(&WAITER_DONE) {
+        println!(
+            "smp-memory: shootdown waiters did not finish errno={}",
             error.0
         );
         return 1;
