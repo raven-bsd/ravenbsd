@@ -4,11 +4,11 @@
 .Dt SETLOCALE 3
 .Os RavenBSD
 .Sh NAME
-.Nm setlocale
-.Nm newlocale
-.Nm uselocale
-.Nm duplocale
-.Nm nl_langinfo
+.Nm setlocale ,
+.Nm newlocale ,
+.Nm uselocale ,
+.Nm duplocale ,
+.Nm nl_langinfo ,
 .Nm localeconv
 .Nd set or query the program locale
 .Sh SYNOPSIS
@@ -36,12 +36,13 @@ return a new object or a null pointer. .Fn nl_langinfo returns a pointer to a st
 .Sh ERRORS
 .Er EINVAL is returned for an unknown category. The constructors return a null pointer and set
 .Er ENOMEM when the object cannot be allocated.
+.Sh SEE ALSO
+.Xr locale 7
 .Sh STANDARDS
 ISO C23 and POSIX.1-2024; ring 0. The personality is the C/BSD set.
 .Sh CAVEATS
 Only the C, POSIX and C.UTF-8 locale names, and names ending in .UTF-8 or .utf8, select a
-UTF-8 locale. Any other name is accepted and maps to C.UTF-8. MB_CUR_MAX is 1 in C and 4 in UTF-8.
+UTF-8 locale.
+Any other name is accepted and maps to C.UTF-8.
+MB_CUR_MAX is 1 in C and 4 in UTF-8.
 See H-3 and C48.
-.Sh SEE ALSO
-.Xr setlocale 3
-.Xr locale 7

@@ -15,7 +15,9 @@ publish = false
 workspace = true
 
 [features]
-default = []
+default = ["float"]
+float = []
+tiny = []
 
 [dependencies]
 raven-libc-abi = { path = "../raven-libc-abi" }

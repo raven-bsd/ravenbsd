@@ -4,10 +4,10 @@
 //! Static C records for the legacy `netdb` calls. The lookup logic is C51's; this module owns
 //! the process scratch record and the `/etc/hosts` iteration cursor.
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::cell::UnsafeCell;
 use core::ffi::{c_char, c_int};
-use core::mem::MaybeUninit;
 
 use raven_libc_abi::errno::{ERANGE, Errno};
 use raven_libc_nss::FileSource;
@@ -169,39 +169,28 @@ impl Area {
     }
 }
 
-const UNINIT: u8 = 0;
-const READY: u8 = 2;
+/// The netdb scratch area is allocated on first use: the static keeps only a pointer, so the
+/// process image pays 8 bytes of BSS instead of the 8 KiB `Area`. The C API already allocates
+/// for the parsed database vectors, so this adds no new failure mode.
+struct Cell(UnsafeCell<*mut Area>);
 
-struct Cell(UnsafeCell<MaybeUninit<Area>>);
-
-// SAFETY: access is serialised by `LOCK`; the storage is a static initialised once.
+// SAFETY: access is serialised by `LOCK`; the pointer is written once under the lock and never
+// freed.
 unsafe impl Sync for Cell {}
 
 static LOCK: SpinLock = SpinLock::new();
-static AREA: Cell = Cell(UnsafeCell::new(MaybeUninit::uninit()));
-static INIT: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(UNINIT);
+static AREA: Cell = Cell(UnsafeCell::new(core::ptr::null_mut()));
 
 /// Run `f` over the process netdb scratch area.
 fn with_area<R>(f: impl FnOnce(&mut Area) -> R) -> R {
     LOCK.acquire();
-    if INIT
-        .compare_exchange(
-            UNINIT,
-            1,
-            core::sync::atomic::Ordering::AcqRel,
-            core::sync::atomic::Ordering::Acquire,
-        )
-        .is_ok()
-    {
-        // SAFETY: this caller won the one-shot initialisation.
-        unsafe { (&mut *AREA.0.get()).write(Area::new()) };
-        INIT.store(READY, core::sync::atomic::Ordering::Release);
+    // SAFETY: `LOCK` serialises this cell and the slot is private to this module.
+    let slot = unsafe { &mut *AREA.0.get() };
+    if slot.is_null() {
+        *slot = Box::into_raw(Box::new(Area::new()));
     }
-    while INIT.load(core::sync::atomic::Ordering::Acquire) != READY {
-        core::hint::spin_loop();
-    }
-    // SAFETY: READY was published after the write and `LOCK` excludes other users.
-    let area = unsafe { (&mut *AREA.0.get()).assume_init_mut() };
+    // SAFETY: the pointer was published under `LOCK` and is never freed.
+    let area = unsafe { &mut **slot };
     let result = f(area);
     LOCK.release();
     result

@@ -37,6 +37,7 @@
 //! `tm_gmtoff`/`tm_isdst`; `%P` is the RavenBSD alias of `%p` (RD-28).
 
 use crate::locale::TimeLocale;
+use crate::timefmt::{FormatIter, Item, Pad, composite, find_day, find_month};
 use crate::tz::consts::{HOURSPERDAY, SECSPERHOUR, SECSPERMIN, TM_YEAR_BASE};
 use crate::tz::convert::localtime_r;
 use crate::tz::overflow::isleap_sum;
@@ -158,40 +159,33 @@ fn parse<'a>(
     let mut day_offset = -1i32;
     let mut week_offset = 0i32;
     let mut bp = 0usize;
-    let mut fp = 0usize;
-    while let Some(byte) = format.get(fp).copied() {
-        fp += 1;
-        if is_space(byte) {
-            while buf.get(bp).is_some_and(|byte| is_space(*byte)) {
+    for item in FormatIter::new(format) {
+        let directive = match item {
+            Item::Literal(byte) => {
+                if is_space(byte) {
+                    while buf.get(bp).is_some_and(|byte| is_space(*byte)) {
+                        bp += 1;
+                    }
+                    continue;
+                }
+                if buf.get(bp).copied() != Some(byte) {
+                    return None;
+                }
                 bp += 1;
+                continue;
             }
-            continue;
+            Item::TrailingPercent => return None,
+            Item::Directive(directive) => directive,
+        };
+        if directive.alt_e > 1 || directive.alt_o > 1 {
+            return None;
         }
-        if byte != b'%' {
-            if buf.get(bp).copied() != Some(byte) {
-                return None;
-            }
-            bp += 1;
-            continue;
+        if directive.pad != Pad::Default || directive.upper || directive.swap {
+            return None;
         }
-        let mut alt_e = false;
-        let mut alt_o = false;
-        loop {
-            match format.get(fp).copied() {
-                Some(b'E') if !alt_e => {
-                    alt_e = true;
-                    fp += 1;
-                }
-                Some(b'O') if !alt_o => {
-                    alt_o = true;
-                    fp += 1;
-                }
-                Some(b'E' | b'O') => return None,
-                _ => break,
-            }
-        }
-        let conversion = *format.get(fp)?;
-        fp += 1;
+        let conversion = directive.conversion;
+        let alt_e = directive.alt_e == 1;
+        let alt_o = directive.alt_o == 1;
         let legal = |allowed_e: bool, allowed_o: bool| -> Option<()> {
             if (alt_e && !allowed_e) || (alt_o && !allowed_o) {
                 None
@@ -199,6 +193,24 @@ fn parse<'a>(
                 Some(())
             }
         };
+        if let Some(subformat) = composite(conversion, locale) {
+            if conversion == b'v' || conversion == b'+' {
+                return None;
+            }
+            if conversion == b'c' {
+                legal(true, false)?;
+            } else {
+                legal(false, false)?;
+            }
+            let rest = parse(state, locale, buf.get(bp..)?, subformat, tm, ctx, depth + 1)?;
+            bp = buf.len() - rest.len();
+            match conversion {
+                b'c' => state_bits |= S_WDAY | S_MON | S_MDAY | S_YEAR,
+                b'D' | b'F' | b'x' => state_bits |= S_MON | S_MDAY | S_YEAR,
+                _ => {}
+            }
+            continue;
+        }
         match conversion {
             b'%' => {
                 legal(false, false)?;
@@ -209,64 +221,14 @@ fn parse<'a>(
             }
             b'A' | b'a' => {
                 legal(false, false)?;
-                let (index, length) = find_strings(
-                    buf.get(bp..)?,
-                    &[
-                        locale.day(0),
-                        locale.day(1),
-                        locale.day(2),
-                        locale.day(3),
-                        locale.day(4),
-                        locale.day(5),
-                        locale.day(6),
-                    ],
-                    &[
-                        locale.abday(0),
-                        locale.abday(1),
-                        locale.abday(2),
-                        locale.abday(3),
-                        locale.abday(4),
-                        locale.abday(5),
-                        locale.abday(6),
-                    ],
-                )?;
+                let (index, length) = find_day(buf.get(bp..)?, locale)?;
                 tm.tm_wday = index as i32;
                 bp += length;
                 state_bits |= S_WDAY;
             }
             b'B' | b'b' | b'h' => {
                 legal(false, false)?;
-                let (index, length) = find_strings(
-                    buf.get(bp..)?,
-                    &[
-                        locale.mon(0),
-                        locale.mon(1),
-                        locale.mon(2),
-                        locale.mon(3),
-                        locale.mon(4),
-                        locale.mon(5),
-                        locale.mon(6),
-                        locale.mon(7),
-                        locale.mon(8),
-                        locale.mon(9),
-                        locale.mon(10),
-                        locale.mon(11),
-                    ],
-                    &[
-                        locale.abmon(0),
-                        locale.abmon(1),
-                        locale.abmon(2),
-                        locale.abmon(3),
-                        locale.abmon(4),
-                        locale.abmon(5),
-                        locale.abmon(6),
-                        locale.abmon(7),
-                        locale.abmon(8),
-                        locale.abmon(9),
-                        locale.abmon(10),
-                        locale.abmon(11),
-                    ],
-                )?;
+                let (index, length) = find_month(buf.get(bp..)?, locale)?;
                 tm.tm_mon = index as i32;
                 bp += length;
                 state_bits |= S_MON;
@@ -283,106 +245,6 @@ fn parse<'a>(
                 };
                 split_year = true;
                 state_bits |= S_YEAR;
-            }
-            b'c' => {
-                legal(true, false)?;
-                let rest = parse(
-                    state,
-                    locale,
-                    buf.get(bp..)?,
-                    locale.d_t_fmt().as_bytes(),
-                    tm,
-                    ctx,
-                    depth + 1,
-                )?;
-                bp = buf.len() - rest.len();
-                state_bits |= S_WDAY | S_MON | S_MDAY | S_YEAR;
-            }
-            b'D' => {
-                legal(false, false)?;
-                let rest = parse(
-                    state,
-                    locale,
-                    buf.get(bp..)?,
-                    b"%m/%d/%y",
-                    tm,
-                    ctx,
-                    depth + 1,
-                )?;
-                bp = buf.len() - rest.len();
-                state_bits |= S_MON | S_MDAY | S_YEAR;
-            }
-            b'F' => {
-                legal(false, false)?;
-                let rest = parse(
-                    state,
-                    locale,
-                    buf.get(bp..)?,
-                    b"%Y-%m-%d",
-                    tm,
-                    ctx,
-                    depth + 1,
-                )?;
-                bp = buf.len() - rest.len();
-                state_bits |= S_MON | S_MDAY | S_YEAR;
-            }
-            b'R' => {
-                legal(false, false)?;
-                let rest = parse(state, locale, buf.get(bp..)?, b"%H:%M", tm, ctx, depth + 1)?;
-                bp = buf.len() - rest.len();
-            }
-            b'r' => {
-                legal(false, false)?;
-                let rest = parse(
-                    state,
-                    locale,
-                    buf.get(bp..)?,
-                    locale.t_fmt_ampm().as_bytes(),
-                    tm,
-                    ctx,
-                    depth + 1,
-                )?;
-                bp = buf.len() - rest.len();
-            }
-            b'T' => {
-                legal(false, false)?;
-                let rest = parse(
-                    state,
-                    locale,
-                    buf.get(bp..)?,
-                    b"%H:%M:%S",
-                    tm,
-                    ctx,
-                    depth + 1,
-                )?;
-                bp = buf.len() - rest.len();
-            }
-            b'X' => {
-                legal(false, false)?;
-                let rest = parse(
-                    state,
-                    locale,
-                    buf.get(bp..)?,
-                    locale.t_fmt().as_bytes(),
-                    tm,
-                    ctx,
-                    depth + 1,
-                )?;
-                bp = buf.len() - rest.len();
-            }
-            b'x' => {
-                legal(false, false)?;
-                let rest = parse(
-                    state,
-                    locale,
-                    buf.get(bp..)?,
-                    locale.d_fmt().as_bytes(),
-                    tm,
-                    ctx,
-                    depth + 1,
-                )?;
-                bp = buf.len() - rest.len();
-                state_bits |= S_MON | S_MDAY | S_YEAR;
             }
             b'd' | b'e' => {
                 legal(false, true)?;

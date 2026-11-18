@@ -10,3 +10,66 @@ generated = true
 [[initfs.files]]
 src = "profiles/file-tools-test.d/tooltest.manifest"
 path = "/etc/services.d/tooltest.toml"
+
+# The first-party no_std tools are built for the qtest architecture by the fixture script and
+# staged as static files. The one-shot tooltest spawns them through its granted initfs handle,
+# which does not carry the dynamic loader/libc handles a dynamic `/bin` program would need.
+[[initfs.files]]
+src = "build/fixtures/file-tools/mkdir"
+path = "/bin/mkdir"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/touch"
+path = "/bin/touch"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/cp"
+path = "/bin/cp"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/cat"
+path = "/bin/cat"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/ls"
+path = "/bin/ls"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/stat"
+path = "/bin/stat"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/df"
+path = "/bin/df"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/mv"
+path = "/bin/mv"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/rm"
+path = "/bin/rm"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/rmdir"
+path = "/bin/rmdir"
+mode = 0o755
+generated = true

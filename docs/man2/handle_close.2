@@ -12,20 +12,23 @@
 .Sh DESCRIPTION
 The .Nm system call closes .Fa handle in the caller's handle table.
 .Pp
-A handle packs a 24-bit table index and an 8-bit generation. A successful close increments the
+A handle packs a 24-bit table index and an 8-bit generation.
+A successful close increments the
 generation, so every earlier handle value for that slot fails with
 .Er EBADF .
 When the closing generation is 255 the slot is retired instead of wrapping to generation 0: the
 slot is never reused and stale handles stay invalid permanently.
 .Pp
 Closing also removes .Fa handle from the caller's event-queue registrations, but only after the
-close commits. A close that fails, for example with a stale generation, leaves every registration
+close commits.
+A close that fails, for example with a stale generation, leaves every registration
 intact.
 .Pp
 When a process terminates, every handle it holds is dropped with the same effect as
 .Nm :
 its objects (DMA buffers, interrupt sources, threads) release their resources even though a
-terminated process can no longer call this syscall.  Closing an interrupt-source handle also
+terminated process can no longer call this syscall.
+Closing an interrupt-source handle also
 cancels threads blocked on it (they return
 .Er EIO ) .
 .Pp

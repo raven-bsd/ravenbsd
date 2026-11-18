@@ -4,7 +4,7 @@
 .Dt ASSERT 3
 .Os RavenBSD
 .Sh NAME
-.Nm assert
+.Nm assert ,
 .Nm __assert_fail
 .Nd assertion failure
 .Sh SYNOPSIS
@@ -20,10 +20,11 @@ aborts the process. .Fn __assert_fail is the internal reporting entry used by th
 .Fn assert does not return on failure. .Fn __assert_fail does not return.
 .Sh ERRORS
 No errno value is set; the failure terminates the process.
+.Sh SEE ALSO
+.Xr abort 3 ,
+.Xr libc 7
 .Sh STANDARDS
 ISO C23; ring 0.
 .Sh CAVEATS
-The diagnostic text follows the glibc form, not the historical BSD form. See H-13 and C41.
-.Sh SEE ALSO
-.Xr abort 3
-.Xr libc 7
+The diagnostic text follows the glibc form, not the historical BSD form.
+See H-13 and C41.

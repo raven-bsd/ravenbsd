@@ -268,6 +268,41 @@ pub fn atanhl(x: LongDouble) -> LongDouble {
     x.atanh()
 }
 
+/// `erfl`.
+pub fn erfl(x: LongDouble) -> LongDouble {
+    x.erf()
+}
+
+/// `erfcl`.
+pub fn erfcl(x: LongDouble) -> LongDouble {
+    x.erfc()
+}
+
+/// `lgammal`: `ln|Gamma(x)|`.
+pub fn lgammal(x: LongDouble) -> LongDouble {
+    x.lgamma()
+}
+
+/// `lgammal_r`: `ln|Gamma(x)|` and the sign of `Gamma(x)`.
+pub fn lgammal_r(x: LongDouble) -> (LongDouble, i32) {
+    x.lgamma_r()
+}
+
+/// `gammal` (the GNU alias for `tgammal`).
+pub fn gammal(x: LongDouble) -> LongDouble {
+    x.gamma()
+}
+
+/// `tgammal`.
+pub fn tgammal(x: LongDouble) -> LongDouble {
+    x.gamma()
+}
+
+/// `fmal`: fused multiply-add.
+pub fn fmal(x: LongDouble, y: LongDouble, z: LongDouble) -> LongDouble {
+    x.fma(y, z)
+}
+
 /// `nanl`.
 pub fn nanl() -> LongDouble {
     LongDouble::nan()

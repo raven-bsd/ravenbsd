@@ -43,7 +43,8 @@ and
 must be zero; a nonzero offset returns
 .Er EINVAL .
 .Pp
-Directory reads are sequential.  A buffer smaller than the next packed entry returns
+Directory reads are sequential.
+A buffer smaller than the next packed entry returns
 .Er EINVAL .
 The server records the directory generation at the first read; a create, remove, rename or
 symlink change in that directory invalidates the cursor and the next read returns
@@ -61,7 +62,7 @@ Service manifest.
 .Sh EXIT STATUS
 .Ex -std
 .Sh SEE ALSO
-.Xr init 8 ,
-.Xr svcctl 1
+.Xr svcctl 1 ,
+.Xr init 8
 .Sh STANDARDS
 RavenBSD.

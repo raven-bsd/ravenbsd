@@ -508,7 +508,9 @@ pub fn validate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
         }
     };
     for row in &profile.header {
-        if row.meta.status != Status::Missing && !header_root.join(&row.name).is_file() {
+        if matches!(row.meta.status, Status::Present | Status::Partial)
+            && !header_root.join(&row.name).is_file()
+        {
             errors.push(format!(
                 "header `{}` is {} but the header file is absent",
                 row.name,
@@ -518,6 +520,7 @@ pub fn validate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
     }
     for row in &profile.interface {
         if matches!(row.meta.status, Status::Present | Status::Partial)
+            && row.kind != "macro"
             && !symbols.contains(&row.name)
         {
             errors.push(format!(

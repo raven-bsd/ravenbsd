@@ -34,6 +34,7 @@ pub mod sleep;
 pub mod strftime;
 pub mod strptime;
 pub mod sys;
+pub mod timefmt;
 pub mod timer;
 pub mod tz;
 pub mod utime;

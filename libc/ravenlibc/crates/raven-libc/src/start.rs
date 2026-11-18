@@ -25,9 +25,6 @@ use core::ffi::{c_int, c_void};
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use raven_libc_platform::fd::inherit::{ENTRY_LEN, FdMap, HEADER_LEN};
-use raven_libc_platform::{OfdKind, RealSys, SysBackend};
-
 /// Maximum accepted `argc`; a larger word is a malformed C8 stack.
 const MAX_ARGC: usize = 4096;
 /// Maximum accepted environment entries; a larger array is malformed.
@@ -347,14 +344,16 @@ pub unsafe extern "C" fn __raven_libc_start(
         raven_libc_sys::sys::exit(127)
     }
 
-    // STEP 9b: install the descriptors the spawner transferred into this process. The block is
-    // mapped before the first thread starts; decoding it here keeps the fd table construction in
-    // the ordinary libc state, before std/stdio can run.
-    restore_inherited_fds(&aux);
+    // STEP 9b: record the descriptors the spawner transferred into this process. The block is
+    // mapped before the first thread starts; the platform consumes it, and adopts the standard
+    // descriptors, on the first fd use. Building the fd table and its allocator lazily keeps
+    // them out of the static start graph.
+    crate::ffi::platform::set_startup_fdmap(
+        aux_value(&aux, raven_slot(AT_RAVEN_FDMAP)),
+        aux_value(&aux, raven_slot(AT_RAVEN_FDMAP_N)),
+    );
 
-    // STEP 10: every child adopts the console for fds 0/1/2 (K06c). A process that already has
-    // a descriptor keeps it; a child without a console falls back to `/dev/null`.
-    ensure_standard_fds();
+    // STEP 10: the console adoption is part of the same lazy platform startup.
 
     // STEP 11: stdio, locale, time zone, resolver, nss, the allocator and regex are lazy:
     // nothing runs here (`BP-1`, `R-17`, `R-19`, `R-28`).
@@ -366,7 +365,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     unsafe { stage2(stack.argc, stack.argv, stack.envp, rtld_fini, entry) }
 }
 
-/// Install every strong hook of the shell.
+/// Install every strong hook of the shell, then the optional float plug-in.
 ///
 /// `__raven_libc_start` calls this once before the constructors. Programs that bring their own
 /// `_start` (the hostrun fixtures) call it directly. The hook cells are function pointers, so no
@@ -374,9 +373,38 @@ pub unsafe extern "C" fn __raven_libc_start(
 #[unsafe(no_mangle)]
 pub extern "C" fn __raven_libc_init() {
     crate::hooks::install_all();
+    install_float_hook();
     // The C `stdin`/`stdout`/`stderr` data symbols must be valid before the program's
     // constructors run; attaching the static buffers does not allocate or open a file.
     crate::stdio::streams::init();
+}
+
+// The float-digit plug-in is an optional member (R-13, mechanism M2): a program requests it
+// with `-u __rl_fmt_float_impl` (or through a float conversion API), and the link pulls the
+// strong member. This weak reference is zero on the bare floor, so the start path installs the
+// hook when it is present without forcing `raven-libc-dtoa` into every program.
+core::arch::global_asm!(".weak __rl_fmt_float_impl");
+
+unsafe extern "C" {
+    fn __rl_fmt_float_impl();
+}
+
+/// Install the optional float-digit hook when the program linked its strong member.
+#[inline(never)]
+fn install_float_hook() {
+    let entry = __rl_fmt_float_impl as *const ();
+    if entry.is_null() {
+        return;
+    }
+    // SAFETY: a non-null entry means the linker pulled `hooks/fmt_float.rs`; its
+    // `__rl_fmt_float_impl` has the Rust ABI and argument layout of the hook type, and the
+    // weak reference only resolves to that definition.
+    let hook = unsafe {
+        core::mem::transmute::<*const (), crate::stdio::vprintf::__rl_fmt_float::Hook>(entry)
+    };
+    // Call the cell directly: routing through a `hooks/fmt_float.rs` helper would pull that
+    // optional member (and dtoa) whenever the start object is linked.
+    crate::stdio::vprintf::__rl_fmt_float::install(Some(hook));
 }
 
 /// Steps 12-15: constructors, `errno`, `main`, `exit`.
@@ -528,27 +556,6 @@ fn aux_value(table: &[usize; 64], key: usize) -> usize {
 /// The table slot of a Raven key (`0x7001..=0x7007` -> 57..=63).
 fn raven_slot(key: usize) -> usize {
     key.wrapping_sub(0x7000).wrapping_add(RAVEN_SLOT_BASE)
-}
-
-/// Install the `RFDM` block the spawner mapped into this process.
-fn restore_inherited_fds(aux: &[usize; 64]) {
-    let pointer = aux_value(aux, raven_slot(AT_RAVEN_FDMAP));
-    let count = aux_value(aux, raven_slot(AT_RAVEN_FDMAP_N));
-    if pointer == 0 || count == 0 || count > 1024 {
-        return;
-    }
-    let Some(len) = ENTRY_LEN
-        .checked_mul(count)
-        .and_then(|entries| entries.checked_add(HEADER_LEN))
-    else {
-        return;
-    };
-    // SAFETY: the spawner mapped exactly this header+entry block at `pointer` before the first
-    // thread started; the bounds are the decoded count, and the block has no string table.
-    let bytes = unsafe { core::slice::from_raw_parts(pointer as *const u8, len) };
-    if let Ok(block) = FdMap::decode(bytes) {
-        let _ = crate::ffi::platform::global().restore_fdmap(&block);
-    }
 }
 
 /// Set the five program-name aliases from `argv[0]`, else `AT_EXECFN`, else `""`.
@@ -723,54 +730,5 @@ unsafe fn run_array(
             constructor(argc as c_int, argv, envp);
         }
         cursor = cursor.wrapping_add(1);
-    }
-}
-
-/// Ensure descriptors 0, 1 and 2 are open, preferring the console scheme.
-#[cold]
-#[inline(never)]
-fn ensure_standard_fds() {
-    // The fd table is the platform crate's (C55). A spawned child starts with no descriptors;
-    // adopt the shell's `tty:console` handle for stdin, stdout and stderr so child output reaches
-    // the serial console. A process that already has a descriptor keeps it, and a process whose
-    // console is not available yet falls back to `/dev/null` (K06c).
-    let platform = crate::ffi::platform::global();
-    let wire = raven_libc_platform::xlat::open_flags(raven_libc_abi::fcntl::O_RDWR as u32)
-        .map(|spec| spec.wire)
-        .unwrap_or(0b11);
-    let mut fd = 0i32;
-    while fd < 3 {
-        if platform
-            .fcntl(fd, raven_libc_abi::fcntl::F_GETFD, 0)
-            .is_ok()
-        {
-            fd = fd.wrapping_add(1);
-            continue;
-        }
-        let installed =
-            match raven_libc_platform::scheme::open_scheme_path(&RealSys, b"tty:console", wire) {
-                Ok(handle) => {
-                    match platform.install_at_fd(
-                        fd as u32,
-                        handle,
-                        OfdKind::Tty,
-                        raven_libc_abi::fcntl::O_RDWR as u32,
-                        None,
-                        false,
-                        0,
-                    ) {
-                        Ok(()) => true,
-                        Err(_) => {
-                            let _ = RealSys.close(handle);
-                            false
-                        }
-                    }
-                }
-                Err(_) => false,
-            };
-        if !installed {
-            let _ = platform.open(b"/dev/null", raven_libc_abi::fcntl::O_RDWR as u32, 0);
-        }
-        fd = fd.wrapping_add(1);
     }
 }

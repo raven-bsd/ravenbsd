@@ -54,7 +54,7 @@ required_functions = ["assert"]
 [[header]]
 id = "header.complex.h"
 standard = "posix-2024"
-status = "partial"
+status = "present"
 evidence = "libc/ravenlibc/include"
 owner = "P1"
 waiver = ""
@@ -138,7 +138,7 @@ required_functions = []
 [[header]]
 id = "header.fcntl.h"
 standard = "posix-2024"
-status = "partial"
+status = "present"
 evidence = "libc/ravenlibc/include"
 owner = "P1"
 waiver = ""
@@ -362,7 +362,7 @@ required_functions = ["duplocale", "freelocale", "localeconv", "newlocale", "set
 [[header]]
 id = "header.math.h"
 standard = "posix-2024"
-status = "partial"
+status = "present"
 evidence = "libc/ravenlibc/include"
 owner = "P1"
 waiver = ""
@@ -810,7 +810,7 @@ required_functions = ["msgctl", "msgget", "msgrcv", "msgsnd"]
 [[header]]
 id = "header.sys-resource.h"
 standard = "posix-2024"
-status = "partial"
+status = "present"
 evidence = "libc/ravenlibc/include"
 owner = "P1"
 waiver = ""
@@ -908,7 +908,7 @@ required_functions = ["fstatvfs", "statvfs"]
 [[header]]
 id = "header.sys-time.h"
 standard = "posix-2024"
-status = "partial"
+status = "present"
 evidence = "libc/ravenlibc/include"
 owner = "P1"
 waiver = ""
@@ -1090,11 +1090,11 @@ required_functions = ["asctime", "clock", "clock_getcpuclockid", "clock_getres",
 [[header]]
 id = "header.trace.h"
 standard = "posix-2024"
-status = "missing"
-evidence = "none"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/headers.html"
 owner = "P1"
-waiver = ""
-notes = "header presence is file-level evidence; behavior is P1"
+waiver = "P1f9: POSIX.1-2024 removed trace.h and the posix_trace_* interfaces (Issue 8 header index does not list trace.h); waived as removed"
+notes = ""
 pg = []
 name = "trace.h"
 required_macros = []
@@ -1118,7 +1118,7 @@ required_functions = ["c16rtomb", "c32rtomb", "c8rtomb", "mbrtoc16", "mbrtoc32",
 [[header]]
 id = "header.ulimit.h"
 standard = "posix-2024"
-status = "partial"
+status = "present"
 evidence = "libc/ravenlibc/include"
 owner = "P1"
 waiver = ""
@@ -1146,7 +1146,7 @@ required_functions = ["_Fork", "_exit", "access", "acct", "alarm", "brk", "chdir
 [[header]]
 id = "header.utime.h"
 standard = "posix-2024"
-status = "partial"
+status = "present"
 evidence = "libc/ravenlibc/include"
 owner = "P1"
 waiver = ""
@@ -1174,7 +1174,7 @@ required_functions = ["endutxent", "getutxent", "getutxid", "getutxline", "putut
 [[header]]
 id = "header.wchar.h"
 standard = "posix-2024"
-status = "partial"
+status = "present"
 evidence = "libc/ravenlibc/include"
 owner = "P1"
 waiver = ""
@@ -1936,15 +1936,15 @@ signature = "declared by the named header"
 [[interface]]
 id = "interface.assert"
 standard = "posix-2024"
-status = "missing"
-evidence = "none"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 owner = "P1"
 waiver = ""
-notes = "export presence is file-level evidence; behavior is P1"
+notes = "P1f9: assert is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
 pg = []
 name = "assert"
 header = "assert.h"
-kind = "func"
+kind = "macro"
 required = true
 signature = "declared by the named header"
 
@@ -13126,15 +13126,15 @@ signature = "declared by the named header"
 [[interface]]
 id = "interface.offsetof"
 standard = "posix-2024"
-status = "missing"
-evidence = "none"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 owner = "P1"
 waiver = ""
-notes = "export presence is file-level evidence; behavior is P1"
+notes = "P1f9: offsetof is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
 pg = []
 name = "offsetof"
 header = "stddef.h"
-kind = "func"
+kind = "macro"
 required = true
 signature = "declared by the named header"
 
@@ -21166,60 +21166,60 @@ signature = "declared by the named header"
 [[interface]]
 id = "interface.va_arg"
 standard = "posix-2024"
-status = "missing"
-evidence = "none"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 owner = "P1"
 waiver = ""
-notes = "export presence is file-level evidence; behavior is P1"
+notes = "P1f9: va_arg is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
 pg = []
 name = "va_arg"
 header = "stdarg.h"
-kind = "func"
+kind = "macro"
 required = true
 signature = "declared by the named header"
 
 [[interface]]
 id = "interface.va_copy"
 standard = "posix-2024"
-status = "missing"
-evidence = "none"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 owner = "P1"
 waiver = ""
-notes = "export presence is file-level evidence; behavior is P1"
+notes = "P1f9: va_copy is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
 pg = []
 name = "va_copy"
 header = "stdarg.h"
-kind = "func"
+kind = "macro"
 required = true
 signature = "declared by the named header"
 
 [[interface]]
 id = "interface.va_end"
 standard = "posix-2024"
-status = "missing"
-evidence = "none"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 owner = "P1"
 waiver = ""
-notes = "export presence is file-level evidence; behavior is P1"
+notes = "P1f9: va_end is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
 pg = []
 name = "va_end"
 header = "stdarg.h"
-kind = "func"
+kind = "macro"
 required = true
 signature = "declared by the named header"
 
 [[interface]]
 id = "interface.va_start"
 standard = "posix-2024"
-status = "missing"
-evidence = "none"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 owner = "P1"
 waiver = ""
-notes = "export presence is file-level evidence; behavior is P1"
+notes = "P1f9: va_start is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
 pg = []
 name = "va_start"
 header = "stdarg.h"
-kind = "func"
+kind = "macro"
 required = true
 signature = "declared by the named header"
 

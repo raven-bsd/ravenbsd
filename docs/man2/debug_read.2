@@ -32,15 +32,18 @@ of zero waits forever; otherwise an elapsed timeout returns 0.
 of zero returns 0 without blocking.
 .Pp
 The receive line is ISA IRQ 4, routed through the IOAPIC with the MADT interrupt-source override
-when one exists.  If the IOAPIC is unavailable the kernel polls the UART from the timer tick and
-notes the fallback in the boot log.  If the ring overruns, the oldest bytes are dropped and the
+when one exists.
+If the IOAPIC is unavailable the kernel polls the UART from the timer tick and
+notes the fallback in the boot log.
+If the ring overruns, the oldest bytes are dropped and the
 kernel reports the accumulated count as
 .Ql console: rx dropped N
 from the reader path, at most once per second; the interrupt handler never writes to the log.
 .Sh RETURN VALUES
 The number of bytes copied, or 0 on timeout or when
 .Fa len
-is zero.  Errors are returned as a negative
+is zero.
+Errors are returned as a negative
 .Va errno .
 .Sh ERRORS
 .Bl -tag -width Er

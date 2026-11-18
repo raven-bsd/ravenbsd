@@ -98,7 +98,7 @@ test:
 	@$(XTASK) qtest --all
 
 world:
-	@printf '%s\n' 'not implemented yet (milestone M4)' >&2; exit 1
+	@$(XTASK) libc-world build --all
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .

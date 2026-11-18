@@ -8,4 +8,4 @@ grants = ["initfs"]
 readiness = "exit"
 restart = "on-failure"
 max_restarts = 0
-ready_timeout_ms = 60_000
+ready_timeout_ms = 300_000

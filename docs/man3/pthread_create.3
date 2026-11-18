@@ -4,8 +4,8 @@
 .Dt PTHREAD_CREATE 3
 .Os RavenBSD
 .Sh NAME
-.Nm pthread_create
-.Nm pthread_cancel
+.Nm pthread_create ,
+.Nm pthread_cancel ,
 .Nm pthread_mutex_lock
 .Nd create, cancel and lock threads
 .Sh SYNOPSIS
@@ -17,18 +17,18 @@
 .Ft int
 .Fn pthread_mutex_lock "pthread_mutex_t *mutex"
 .Sh DESCRIPTION
-These functions create a thread, request cancellation and acquire a mutex. A
-.Ft pthread_t is the thread control-block pointer.
+These functions create a thread, request cancellation and acquire a mutex.
+A .Ft pthread_t is the thread control-block pointer.
 .Sh RETURN VALUES
 The functions return 0 on success or an error number.
 .Sh ERRORS
 .Er EAGAIN is returned when a thread cannot be created. .Er EINVAL is returned for an invalid
 attribute or mutex. .Er ESRCH is returned for an unknown thread.
+.Sh SEE ALSO
+.Xr libc 7
 .Sh STANDARDS
 POSIX.1-2024; ring 1.
 .Sh CAVEATS
-The thread id is the 30-bit kernel tid; .Ft pthread_t is the TCB pointer. Cancellation is
-deferred only. See H-19 and C57.
-.Sh SEE ALSO
-.Xr pthread_create 3
-.Xr libc 7
+The thread id is the 30-bit kernel tid; .Ft pthread_t is the TCB pointer.
+Cancellation is deferred only.
+See H-19 and C57.

@@ -2710,3 +2710,48 @@ id = "interface.vmsplice"
 status = "waived"
 evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html"
 notes = "P1f: vmsplice is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension."
+
+# P1f9: language macros are required POSIX names but cannot be libc.a symbols. P1i's
+# check-core.sh exercises each one under the gate's exact feature macros.
+[[row]]
+id = "interface.assert"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
+notes = "P1f9: assert is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
+
+[[row]]
+id = "interface.offsetof"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
+notes = "P1f9: offsetof is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
+
+[[row]]
+id = "interface.va_arg"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
+notes = "P1f9: va_arg is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
+
+[[row]]
+id = "interface.va_copy"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
+notes = "P1f9: va_copy is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
+
+[[row]]
+id = "interface.va_end"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
+notes = "P1f9: va_end is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
+
+[[row]]
+id = "interface.va_start"
+status = "present"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
+notes = "P1f9: va_start is a language macro; P1i check-core.sh exercises the macro under the gate feature macros"
+
+# P1f9: trace.h is not in the Issue 8 header index; the seed still lists it as posix-2024.
+[[row]]
+id = "header.trace.h"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/headers.html"
+notes = "P1f9: POSIX.1-2024 removed trace.h and the posix_trace_* interfaces (Issue 8 header index does not list trace.h); waived as removed"

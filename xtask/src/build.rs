@@ -148,6 +148,13 @@ pub(crate) fn rustflags_for(
                 flags.push("-C".to_string());
                 flags.push(format!("link-arg={arg}"));
             }
+            // The float plug-in is an optional member (R-13/M2): a dynamic program that uses
+            // `%f`/`strfrom*` must pull the strong `__rl_fmt_float_impl`, or the libc hook keeps
+            // the `*float*` dummy. A weak reference cannot pull it from `libc.so.1` by itself.
+            for arg in ["-u", "__rl_fmt_float_impl"] {
+                flags.push("-C".to_string());
+                flags.push(format!("link-arg={arg}"));
+            }
             flags.extend(["--cfg".to_string(), "sha2_backend=\"soft\"".to_string()]);
         }
         Component::User => {
@@ -256,6 +263,101 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
     )
 }
 
+/// True when the image profile is a release artifact whose kernel must carry the clean HEAD id.
+///
+/// The profile name is matched explicitly: `pi4-release` does not enable `[initfs] release`, so
+/// the release flag cannot be the trigger. Debug and test profiles keep their current behavior.
+pub(crate) fn is_release_image_profile(arch: Arch, profile_name: &str) -> bool {
+    matches!(
+        (arch, profile_name),
+        (Arch::X86_64, "release") | (Arch::Aarch64, "pi4-release")
+    )
+}
+
+/// True when `data` contains `short` as a standalone build-id token.
+///
+/// The embedded id is `<short>[-dirty][ <date>]`. A longer hash that merely contains `short`
+/// (preceded by another hex digit) and a `short-dirty` id are not a clean match.
+pub(crate) fn contains_clean_build_id(data: &[u8], short: &str) -> bool {
+    let needle = short.as_bytes();
+    if needle.is_empty() {
+        return false;
+    }
+    data.windows(needle.len())
+        .enumerate()
+        .any(|(index, window)| {
+            if window != needle {
+                return false;
+            }
+            let before_ok = index == 0 || !data[index - 1].is_ascii_hexdigit();
+            let after_ok = data
+                .get(index + needle.len())
+                .is_none_or(|byte| *byte != b'-' && !byte.is_ascii_hexdigit());
+            before_ok && after_ok
+        })
+}
+
+/// True when `data` contains the dirty form of `short` (`<short>-dirty`).
+pub(crate) fn contains_dirty_build_id(data: &[u8], short: &str) -> bool {
+    let needle = format!("{short}-dirty");
+    data.windows(needle.len())
+        .any(|window| window == needle.as_bytes())
+}
+
+/// Reject a release kernel that does not carry the clean HEAD build id.
+pub(crate) fn verify_release_build_id(data: &[u8], short: &str, dirty: bool) -> Result<()> {
+    if short.is_empty() || !short.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        bail!("invalid HEAD short id `{short}`");
+    }
+    if dirty {
+        bail!(
+            "release image requires a clean worktree, but HEAD is {short}-dirty; commit or stash the changes"
+        );
+    }
+    if contains_dirty_build_id(data, short) {
+        bail!("release kernel was built from a dirty tree ({short}-dirty)");
+    }
+    if !contains_clean_build_id(data, short) {
+        bail!(
+            "release kernel does not embed the clean HEAD id {short}; the artifact is stale or was built from another commit"
+        );
+    }
+    Ok(())
+}
+
+/// Inspect the kernel artifact that the image embeds and require the clean HEAD id.
+///
+/// The caller passes the file the image builder actually consumes, so a cached copy from
+/// another commit or a dirty tree is rejected instead of trusted.
+pub(crate) fn verify_release_kernel(root: &Path, kernel: &Path, profile_name: &str) -> Result<()> {
+    let head = crate::repo::head_info(root)?;
+    let data = fs::read(kernel)
+        .with_context(|| format!("cannot read release kernel {}", kernel.display()))?;
+    verify_release_build_id(&data, &head.short, head.dirty)
+        .with_context(|| format!("{profile_name} image build rejected"))
+}
+
+/// Fail before building a release image from a dirty worktree.
+pub(crate) fn require_clean_release_head(root: &Path, profile_name: &str) -> Result<()> {
+    let head = crate::repo::head_info(root)?;
+    if head.dirty {
+        bail!(
+            "{profile_name} image requires a clean worktree, but HEAD is {}-dirty; commit or stash the changes",
+            head.short
+        );
+    }
+    Ok(())
+}
+
+/// The Pi 4 kernel artifact that the image flattens into `kernel8.img`.
+pub(crate) fn pi4_kernel_artifact(root: &Path) -> Result<PathBuf> {
+    Ok(root
+        .join("build/cargo/kernel-aarch64-pi4")
+        .join(target_for(Component::Kernel, Arch::Aarch64)?)
+        .join("debug")
+        .join("raven-kernel"))
+}
+
 /// Build one component and copy its artifacts into `build/<arch>/`.
 pub(crate) fn run(
     workspace: &Workspace,
@@ -350,10 +452,11 @@ pub(crate) fn run(
         Component::User => {
             for package in &packages {
                 let binary = user_binary(workspace, package)?;
-                copy_artifact(
-                    &artifact_dir.join(&binary),
-                    &artifact_path(&workspace.root, arch, Component::User, package),
-                )?;
+                let destination = artifact_path(&workspace.root, arch, Component::User, package);
+                copy_artifact(&artifact_dir.join(&binary), &destination)?;
+                if dynamic && arch == Arch::Aarch64 {
+                    patch_aarch64_textrel(&destination)?;
+                }
             }
         }
     }
@@ -442,6 +545,280 @@ fn copy_artifact(source: &Path, destination: &Path) -> Result<()> {
     })?;
     println!("    {}", destination.display());
     Ok(())
+}
+
+/// ELF program-header types and flags used by the aarch64 textrel post-link pass.
+const PT_LOAD: u32 = 1;
+const PT_DYNAMIC: u32 = 2;
+const PF_X: u32 = 1;
+const PF_W: u32 = 2;
+const PF_R: u32 = 4;
+const DT_NULL: i64 = 0;
+const DT_RELA: i64 = 7;
+const DT_RELASZ: i64 = 8;
+const DT_RELAENT: i64 = 9;
+const DT_TEXTREL: i64 = 22;
+const DT_FLAGS: i64 = 30;
+const DF_TEXTREL: u64 = 0x4;
+const EM_AARCH64: u16 = 183;
+
+#[derive(Clone, Copy)]
+struct ProgramHeader {
+    offset: usize,
+    kind: u32,
+    flags: u32,
+    file_offset: u64,
+    vaddr: u64,
+    filesz: u64,
+    memsz: u64,
+}
+
+fn read_u16(data: &[u8], offset: usize) -> Option<u16> {
+    Some(u16::from_le_bytes(
+        data.get(offset..offset.checked_add(2)?)?.try_into().ok()?,
+    ))
+}
+
+fn read_u32(data: &[u8], offset: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(
+        data.get(offset..offset.checked_add(4)?)?.try_into().ok()?,
+    ))
+}
+
+fn read_u64(data: &[u8], offset: usize) -> Option<u64> {
+    Some(u64::from_le_bytes(
+        data.get(offset..offset.checked_add(8)?)?.try_into().ok()?,
+    ))
+}
+
+fn read_i64(data: &[u8], offset: usize) -> Option<i64> {
+    Some(i64::from_le_bytes(
+        data.get(offset..offset.checked_add(8)?)?.try_into().ok()?,
+    ))
+}
+
+fn write_u32(data: &mut [u8], offset: usize, value: u32) -> Option<()> {
+    data.get_mut(offset..offset.checked_add(4)?)?
+        .copy_from_slice(&value.to_le_bytes());
+    Some(())
+}
+
+fn write_u64(data: &mut [u8], offset: usize, value: u64) -> Option<()> {
+    data.get_mut(offset..offset.checked_add(8)?)?
+        .copy_from_slice(&value.to_le_bytes());
+    Some(())
+}
+
+fn write_i64(data: &mut [u8], offset: usize, value: i64) -> Option<()> {
+    data.get_mut(offset..offset.checked_add(8)?)?
+        .copy_from_slice(&value.to_le_bytes());
+    Some(())
+}
+
+/// Rewrite an aarch64 PIE so the segment holding the non-PIC core's relative relocations is
+/// writable, and drop `DT_TEXTREL`/`DF_TEXTREL`.
+///
+/// The precompiled `aarch64-unknown-none-softfloat` `libcore` is `RelocModel::Static`; linking
+/// a PIE needs `-z notext`, which leaves `DF_TEXTREL` and makes the loader reject the object
+/// (`DigestError::TextRel`). The relocations are in the read-only data segment, not code, so
+/// marking that segment `R|W` (the text segment stays `R|E`) removes the text-relocation
+/// condition without weakening the loader's W^X or genuine-textrel checks.
+fn patch_aarch64_textrel(path: &Path) -> Result<()> {
+    let mut data = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    if data.len() < 64 || data.get(..4) != Some(b"\x7fELF") {
+        return Ok(());
+    }
+    let class = *data.get(4).unwrap_or(&0);
+    let encoding = *data.get(5).unwrap_or(&0);
+    if class != 2 || encoding != 1 {
+        return Ok(());
+    }
+    let machine = read_u16(&data, 18).unwrap_or(0);
+    if machine != EM_AARCH64 {
+        return Ok(());
+    }
+    let phoff = read_u64(&data, 0x20).unwrap_or(0);
+    let phentsize = usize::from(read_u16(&data, 0x36).unwrap_or(0));
+    let phnum = usize::from(read_u16(&data, 0x38).unwrap_or(0));
+    if phentsize < 56 {
+        bail!("aarch64 ELF {} has a short program header", path.display());
+    }
+    let phoff = usize::try_from(phoff).context("program header offset")?;
+    let mut headers = Vec::new();
+    for index in 0..phnum {
+        let offset = phoff
+            .checked_add(index.checked_mul(phentsize).context("program header")?)
+            .context("program header")?;
+        let kind = read_u32(&data, offset).unwrap_or(0);
+        let flags = read_u32(&data, offset + 4).unwrap_or(0);
+        let file_offset = read_u64(&data, offset + 8).unwrap_or(0);
+        let vaddr = read_u64(&data, offset + 16).unwrap_or(0);
+        let filesz = read_u64(&data, offset + 32).unwrap_or(0);
+        let memsz = read_u64(&data, offset + 40).unwrap_or(0);
+        headers.push(ProgramHeader {
+            offset,
+            kind,
+            flags,
+            file_offset,
+            vaddr,
+            filesz,
+            memsz,
+        });
+    }
+    let Some(dynamic) = headers.iter().find(|header| header.kind == PT_DYNAMIC) else {
+        return Ok(());
+    };
+    let dynamic_offset = usize::try_from(dynamic.file_offset).context("dynamic offset")?;
+    let dynamic_len = usize::try_from(dynamic.filesz).context("dynamic size")?;
+    let mut entries = Vec::new();
+    let mut cursor = dynamic_offset;
+    let end = dynamic_offset
+        .checked_add(dynamic_len)
+        .context("dynamic range")?;
+    loop {
+        if cursor.checked_add(16).is_none_or(|next| next > end) {
+            bail!(
+                "aarch64 ELF {} has an unterminated dynamic table",
+                path.display()
+            );
+        }
+        let tag = read_i64(&data, cursor).unwrap_or(0);
+        let value = read_u64(&data, cursor + 8).unwrap_or(0);
+        entries.push((tag, value));
+        cursor += 16;
+        if tag == DT_NULL {
+            break;
+        }
+    }
+    let textrel = entries.iter().any(|(tag, _)| *tag == DT_TEXTREL)
+        || entries
+            .iter()
+            .any(|(tag, value)| *tag == DT_FLAGS && value & DF_TEXTREL != 0);
+    if !textrel {
+        return Ok(());
+    }
+    let mut rela = None;
+    let mut relasz = 0u64;
+    let mut relaent = 24u64;
+    for (tag, value) in &entries {
+        match *tag {
+            DT_RELA => rela = Some(*value),
+            DT_RELASZ => relasz = *value,
+            DT_RELAENT => relaent = *value,
+            _ => {}
+        }
+    }
+    let Some(rela) = rela else {
+        bail!(
+            "aarch64 ELF {} has a textrel flag but no DT_RELA",
+            path.display()
+        );
+    };
+    if relaent < 24 {
+        bail!("aarch64 ELF {} has a short RELA entry", path.display());
+    }
+    let relaent = usize::try_from(relaent).context("rela entry")?;
+    let relasz = usize::try_from(relasz).context("rela size")?;
+    let rela_offset = file_offset(&headers, rela)
+        .with_context(|| format!("aarch64 ELF {} has no RELA segment", path.display()))?;
+    let mut targets = std::collections::BTreeSet::new();
+    for index in 0..relasz / relaent {
+        let offset = rela_offset
+            .checked_add(index.checked_mul(relaent).context("rela entry")?)
+            .context("rela entry")?;
+        let target = read_u64(&data, offset).unwrap_or(0);
+        for header in &headers {
+            if header.kind != PT_LOAD
+                || target < header.vaddr
+                || target >= header.vaddr.saturating_add(header.memsz)
+            {
+                continue;
+            }
+            if header.flags & PF_R != 0 && (header.flags & (PF_W | PF_X)) == 0 {
+                targets.insert(header.offset);
+            }
+            break;
+        }
+    }
+    // Some objects (e.g. `raven-uname`) have all RELATIVE slots in `.data.rel.ro`; the textrel
+    // flag is then spurious and only the dynamic flags need clearing.
+    for offset in &targets {
+        let flags = read_u32(&data, offset + 4).unwrap_or(0) | PF_W;
+        if write_u32(&mut data, offset + 4, flags).is_none() {
+            bail!("cannot set segment flags in {}", path.display());
+        }
+    }
+    let mut rewritten = Vec::new();
+    for (tag, value) in entries {
+        if tag == DT_TEXTREL {
+            continue;
+        }
+        let value = if tag == DT_FLAGS {
+            value & !DF_TEXTREL
+        } else {
+            value
+        };
+        rewritten.push((tag, value));
+    }
+    let needed = rewritten
+        .len()
+        .checked_add(1)
+        .and_then(|count| count.checked_mul(16))
+        .context("dynamic table size")?;
+    if needed > dynamic_len {
+        bail!(
+            "aarch64 ELF {} dynamic table is too small after patch",
+            path.display()
+        );
+    }
+    let mut write = dynamic_offset;
+    for (tag, value) in &rewritten {
+        if write_i64(&mut data, write, *tag).is_none()
+            || write_u64(&mut data, write + 8, *value).is_none()
+        {
+            bail!("cannot rewrite dynamic table in {}", path.display());
+        }
+        write += 16;
+    }
+    if write_i64(&mut data, write, DT_NULL).is_none()
+        || write_u64(&mut data, write + 8, 0).is_none()
+    {
+        bail!("cannot terminate dynamic table in {}", path.display());
+    }
+    write += 16;
+    while write < end {
+        if write_i64(&mut data, write, DT_NULL).is_none()
+            || write_u64(&mut data, write + 8, 0).is_none()
+        {
+            bail!("cannot clear dynamic table tail in {}", path.display());
+        }
+        write += 16;
+    }
+    fs::write(path, data).with_context(|| format!("cannot write {}", path.display()))?;
+    println!(
+        "    patched aarch64 textrel: {} ({} segment(s) made writable)",
+        path.display(),
+        targets.len()
+    );
+    Ok(())
+}
+
+fn file_offset(headers: &[ProgramHeader], address: u64) -> Option<usize> {
+    headers.iter().find_map(|header| {
+        let size = if header.kind == PT_LOAD {
+            header.memsz
+        } else {
+            header.filesz
+        };
+        if header.kind == PT_LOAD
+            && address >= header.vaddr
+            && address < header.vaddr.saturating_add(size)
+        {
+            usize::try_from(header.file_offset.saturating_add(address - header.vaddr)).ok()
+        } else {
+            None
+        }
+    })
 }
 
 /// Path of a copied artifact under `build/<arch>/`.

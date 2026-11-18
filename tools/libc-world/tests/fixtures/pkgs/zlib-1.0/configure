@@ -1,0 +1,22 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+set -eu
+prefix=/usr
+for arg in "$@"; do
+  case $arg in
+    --prefix=*) prefix=${arg#*=} ;;
+  esac
+done
+cat > Makefile <<EOF
+CC = ${CC:-cc}
+AR = ${AR:-ar}
+all: libz.a
+libz.a: zlib.o
+	\$(AR) rcs \$@ zlib.o
+zlib.o: zlib.c
+	\$(CC) -c zlib.c -o zlib.o
+clean:
+	rm -f libz.a zlib.o
+EOF
+echo "configured prefix=$prefix"

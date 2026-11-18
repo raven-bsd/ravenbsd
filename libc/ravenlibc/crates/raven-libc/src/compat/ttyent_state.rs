@@ -40,7 +40,10 @@ pub struct CTtyEnt {
 }
 
 pub(crate) static mut TTYDB: Option<TtyDb> = None;
-static mut ARENA: [u8; 8192] = [0; 8192];
+/// The string arena is allocated on first use; the static holds only a pointer, replacing the
+/// 8 KiB BSS array with one word. `getttyent` already allocates for the parsed `/etc/ttys`, so
+/// this adds no new allocation class.
+static mut ARENA: *mut [u8; 8192] = core::ptr::null_mut();
 static mut CURRENT: CTtyEnt = CTtyEnt {
     ty_name: core::ptr::null_mut(),
     ty_getty: core::ptr::null_mut(),
@@ -115,7 +118,15 @@ pub(crate) unsafe fn fill(entry: &TtyEnt) -> *mut CTtyEnt {
     // SAFETY: ARENA and CURRENT are private statics; the C API is not re-entrant.
     let arena = unsafe { &raw mut ARENA };
     let current = unsafe { &raw mut CURRENT };
-    let arena = unsafe { &mut *arena };
+    // SAFETY: ARENA is a private static and the C API is not re-entrant.
+    if unsafe { (*arena).is_null() } {
+        // SAFETY: the slot is private and null until this first write; the allocation is leaked.
+        unsafe {
+            *arena = alloc::boxed::Box::into_raw(alloc::boxed::Box::new([0u8; 8192]));
+        }
+    }
+    // SAFETY: the pointer was just published and is never freed.
+    let arena = unsafe { &mut **arena };
     let mut offset = 0usize;
     let mut copy = |value: &[u8], arena: &mut [u8; 8192], offset: &mut usize| -> *mut c_char {
         let start = *offset;
@@ -139,3 +150,7 @@ pub(crate) unsafe fn fill(entry: &TtyEnt) -> *mut CTtyEnt {
     pointer.ty_group = copy(&entry.group, arena, &mut offset);
     current.cast()
 }
+
+#[cfg(test)]
+#[path = "ttyent_state_ut.rs"]
+mod tests;

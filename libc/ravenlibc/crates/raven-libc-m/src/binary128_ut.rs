@@ -639,6 +639,11 @@ fn f64_ulp(a: f64, b: f64) -> u64 {
     a.abs().to_bits().abs_diff(b.abs().to_bits())
 }
 
+/// Parse a 32-hex-digit binary128 pattern.
+fn parse_hex(value: &str) -> u128 {
+    u128::from_str_radix(value, 16).expect("a 32-digit hex pattern")
+}
+
 #[test]
 fn exp_and_log_match_the_f64_oracle_over_a_deterministic_sweep() {
     let mut state: u64 = 0x2545_f491_4f6c_dd1d;
@@ -1088,4 +1093,354 @@ fn hyperbolic_match_the_f64_oracle_over_a_deterministic_sweep() {
         );
         checked = checked.saturating_add(1);
     }
+}
+
+#[test]
+fn subtraction_keeps_the_cancelled_bits_across_a_one_bit_exponent_gap() {
+    // Regression: the alignment in `add_bits` used to fold the shifted-out bits into a whole
+    // guard unit with only three guard bits, so `(1 - 2^-113) - 1` lost ~5 decimal digits.
+    let one = LongDouble128::one();
+    for k in 1..=12u32 {
+        let delta = one.scalbn(-(k as i32));
+        let below = one.sub(delta);
+        assert_eq!(
+            below.sub(one).to_bits(),
+            LongDouble128::zero(false).sub(delta).to_bits(),
+            "1 - 2^-{k}"
+        );
+        assert_eq!(
+            below.sub(one).to_f64(),
+            -2f64.powi(-(k as i32)),
+            "1 - 2^-{k} value"
+        );
+    }
+}
+
+#[test]
+fn erf_and_erfc_edges_identities_and_known_values() {
+    let zero = LongDouble128::from_f64(0.0);
+    assert_eq!(zero.erf().to_bits(), 0);
+    assert_eq!(LongDouble128::from_f64(-0.0).erf().to_bits(), SIGN);
+    assert_eq!(zero.erfc().to_bits(), LongDouble128::one().to_bits());
+    assert_eq!(LongDouble128::from_f64(f64::INFINITY).erf().to_f64(), 1.0);
+    assert_eq!(
+        LongDouble128::from_f64(f64::NEG_INFINITY).erf().to_f64(),
+        -1.0
+    );
+    assert_eq!(LongDouble128::from_f64(f64::INFINITY).erfc().to_bits(), 0);
+    assert_eq!(
+        LongDouble128::from_f64(f64::NEG_INFINITY).erfc().to_f64(),
+        2.0
+    );
+    assert!(LongDouble128::from_f64(f64::NAN).erf().is_nan());
+    assert!(LongDouble128::from_f64(f64::NAN).erfc().is_nan());
+    // Known values.
+    let at_one = LongDouble128::from_f64(1.0);
+    assert!(f64_ulp(at_one.erf().to_f64(), 0.8427007929497149) <= 2);
+    assert!(f64_ulp(at_one.erfc().to_f64(), 0.15729920705028513) <= 2);
+    // Odd symmetry and erf + erfc = 1.
+    for &value in &[0.1f64, 0.25, 0.6, 1.0, 2.5, 5.0, 12.0] {
+        let x = LongDouble128::from_f64(value);
+        assert_eq!(
+            LongDouble128::from_f64(-value).erf().to_bits(),
+            LongDouble128::zero(false).sub(x.erf()).to_bits(),
+            "erf(-{value})"
+        );
+        let sum = x.erf().add(x.erfc());
+        assert!(
+            sum.to_bits().abs_diff(LongDouble128::one().to_bits()) <= 8,
+            "erf+erfc at {value}"
+        );
+        // erfc(x) and 2 - erfc(-x) are the same function.
+        let difference = LongDouble128::from_f64(2.0)
+            .sub(LongDouble128::from_f64(-value).erfc())
+            .sub(x.erfc());
+        assert!(difference.abs().to_f64() < 1e-15);
+    }
+    // The tail: erfc stays positive while representable, then underflows cleanly.
+    let far = LongDouble128::from_f64(40.0);
+    assert!(far.erfc().is_finite() && !far.erfc().is_zero());
+    assert!(far.erfc().to_f64() < 1e-300);
+    assert_eq!(LongDouble128::from_f64(120.0).erfc().to_bits(), 0);
+    assert_eq!(LongDouble128::from_f64(1.0e10).erfc().to_bits(), 0);
+    assert_eq!(LongDouble128::from_f64(1.0e10).erf().to_f64(), 1.0);
+}
+
+#[test]
+fn lgamma_and_gamma_edges_and_functional_equations() {
+    let one = LongDouble128::one();
+    let two = LongDouble128::from_f64(2.0);
+    assert_eq!(one.lgamma().to_bits(), 0);
+    assert_eq!(two.lgamma().to_bits(), 0);
+    for pole in [0.0, -0.0, -1.0, -2.0, -3.0] {
+        let value = LongDouble128::from_f64(pole).lgamma();
+        assert!(value.is_infinite() && !value.sign_bit(), "lgamma({pole})");
+    }
+    assert!(
+        LongDouble128::from_f64(f64::INFINITY)
+            .lgamma()
+            .is_infinite()
+    );
+    assert!(
+        LongDouble128::from_f64(f64::NEG_INFINITY)
+            .lgamma()
+            .is_infinite()
+    );
+    assert!(LongDouble128::from_f64(f64::NAN).lgamma().is_nan());
+    // lgamma(1/2) = ln(sqrt(pi)).
+    let half = LongDouble128::from_f64(0.5);
+    let expected = 0.5 * core::f64::consts::PI.ln();
+    assert!(f64_ulp(half.lgamma().to_f64(), expected) <= 4);
+    // The functional equation lgamma(x+1) = lgamma(x) + ln(x).
+    for &value in &[0.75f64, 0.9, 1.1, 1.5, 2.5, 5.0, 10.0, 100.0] {
+        let x = LongDouble128::from_f64(value);
+        let left = x.add(one).lgamma().sub(x.lgamma());
+        assert!(
+            f64_ulp(left.to_f64(), value.ln()) <= 32,
+            "lgamma({value}+1)-lgamma({value})"
+        );
+    }
+    // The reflection sign: Gamma(-1/2) < 0, Gamma(-3/2) > 0, Gamma(-5/2) < 0.
+    assert_eq!(LongDouble128::from_f64(-0.5).lgamma_r().1, -1);
+    assert_eq!(LongDouble128::from_f64(-1.5).lgamma_r().1, 1);
+    assert_eq!(LongDouble128::from_f64(-2.5).lgamma_r().1, -1);
+    assert_eq!(LongDouble128::from_f64(2.5).lgamma_r().1, 1);
+    // Gamma edges.
+    assert_eq!(one.gamma().to_f64(), 1.0);
+    assert_eq!(two.gamma().to_f64(), 1.0);
+    assert_eq!(
+        LongDouble128::from_f64(6.0).gamma().to_bits(),
+        LongDouble128::from_f64(120.0).to_bits()
+    );
+    assert_eq!(
+        LongDouble128::from_f64(10.0).gamma().to_bits(),
+        LongDouble128::from_f64(362_880.0).to_bits()
+    );
+    assert!(f64_ulp(half.gamma().to_f64(), core::f64::consts::PI.sqrt()) <= 4);
+    assert!(
+        f64_ulp(
+            LongDouble128::from_f64(1.5).gamma().to_f64(),
+            0.5 * core::f64::consts::PI.sqrt()
+        ) <= 4
+    );
+    assert!(
+        f64_ulp(
+            LongDouble128::from_f64(-0.5).gamma().to_f64(),
+            -2.0 * core::f64::consts::PI.sqrt()
+        ) <= 8
+    );
+    // Poles and domains.
+    let positive_zero_inf = LongDouble128::from_f64(0.0).gamma();
+    assert!(positive_zero_inf.is_infinite() && !positive_zero_inf.sign_bit());
+    let negative_zero_inf = LongDouble128::from_f64(-0.0).gamma();
+    assert!(negative_zero_inf.is_infinite() && negative_zero_inf.sign_bit());
+    assert!(LongDouble128::from_f64(-1.0).gamma().is_nan());
+    assert!(LongDouble128::from_f64(-2.0).gamma().is_nan());
+    assert_eq!(
+        LongDouble128::from_f64(f64::INFINITY).gamma().to_f64(),
+        f64::INFINITY
+    );
+    assert!(LongDouble128::from_f64(f64::NEG_INFINITY).gamma().is_nan());
+    assert!(LongDouble128::from_f64(f64::NAN).gamma().is_nan());
+    // Gamma(x+1) = x*Gamma(x) away from the poles.
+    for &value in &[0.75f64, 1.3, 2.5, 5.0, 42.0] {
+        let x = LongDouble128::from_f64(value);
+        let left = x.add(one).gamma();
+        let right = x.mul(x.gamma());
+        let relative = left.sub(right).div(right).abs().to_f64();
+        assert!(
+            relative <= 1e-30,
+            "Gamma recurrence at {value}: {relative:e}"
+        );
+    }
+    // Reflection: Gamma(x)*Gamma(1-x) = pi/sin(pi x).
+    for &value in &[-0.3f64, -1.5, -2.5, -5.5] {
+        let x = LongDouble128::from_f64(value);
+        let product = x.gamma().mul(LongDouble128::one().sub(x).gamma());
+        let sine = core::f64::consts::PI * value;
+        assert!(
+            f64_ulp(product.to_f64(), core::f64::consts::PI / sine.sin()) <= 256,
+            "reflection at {value}"
+        );
+    }
+}
+
+#[test]
+fn fma_matches_the_exact_rational_reference_vectors() {
+    // Generated with exact Fraction arithmetic and one round-to-nearest-even. Covers a normal
+    // case, cancellation to zero, a subnormal operand/result, and products that overflow before
+    // the addend cancels them back into range.
+    let cases: [(&str, &str, &str, &str); 8] = [
+        (
+            "2b69e12c16a0d7f6942a77da4c2df007",
+            "54a86518749adb491a21820e923161c0",
+            "8c4f34b8dbd9c1c359ce994580fb373b",
+            "40134f98396dbb97dc332251cafc4771",
+        ),
+        (
+            "1f869865083794109baf85b9a3481d8b",
+            "2068e80de8b600f9446072062c45449a",
+            "800000001d32744d25d239fffe640aac",
+            "00000000a5733db52ba748aaa18c3c7d",
+        ),
+        (
+            "00000000000000000000000000000001",
+            "40000000000000000000000000000000",
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000002",
+        ),
+        (
+            "00000000000000000000000000000003",
+            "40000000000000000000000000000000",
+            "80000000000000000000000000000002",
+            "00000000000000000000000000000004",
+        ),
+        (
+            "40008000000000000000000000000000",
+            "3ffe0000000000000000000000000000",
+            "bfff8000000000000000000000000000",
+            "00000000000000000000000000000000",
+        ),
+        (
+            "40008000000000000000000000000000",
+            "3ffe0000000000000000000000000000",
+            "c0008000000000000000000000000000",
+            "bfff8000000000000000000000000000",
+        ),
+        (
+            "5ffe8000000000000000000000000000",
+            "5fff0000000000000000000000000000",
+            "fffeffffffffffffffffffffffffffff",
+            "fffcfffffffffffffffffffffffffffc",
+        ),
+        (
+            "5ffe8000000000000000000000000000",
+            "5fff0000000000000000000000000000",
+            "fffe0000000000000000000000000000",
+            "7ffd0000000000000000000000000000",
+        ),
+    ];
+    for (x, y, z, expected) in cases {
+        let x = LongDouble128::from_bits(parse_hex(x));
+        let y = LongDouble128::from_bits(parse_hex(y));
+        let z = LongDouble128::from_bits(parse_hex(z));
+        assert_eq!(
+            x.fma(y, z).to_bits(),
+            parse_hex(expected),
+            "fma(0x{:032x}, 0x{:032x}, 0x{:032x})",
+            x.to_bits(),
+            y.to_bits(),
+            z.to_bits()
+        );
+    }
+}
+
+#[test]
+fn fma_zero_addend_equals_the_correctly_rounded_product() {
+    let mut state: u64 = 0x5eed_f00d_dead_beef;
+    let mut checked = 0u32;
+    while checked < 2_000 {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let x = LongDouble128::from_bits((state as u128) << 64 | state as u128);
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let y = LongDouble128::from_bits((state as u128) << 64 | state as u128);
+        if x.is_nan()
+            || x.is_infinite()
+            || x.is_zero()
+            || y.is_nan()
+            || y.is_infinite()
+            || y.is_zero()
+        {
+            continue;
+        }
+        let product = x.mul(y);
+        if product.is_zero() {
+            // fma(x, y, +0) is +0 for a negative zero product, mul keeps the sign.
+            continue;
+        }
+        let fused = x.fma(y, LongDouble128::zero(false));
+        assert_eq!(fused.to_bits(), product.to_bits(), "fma(x,y,0) != x*y");
+        checked = checked.saturating_add(1);
+    }
+}
+
+#[test]
+fn fma_special_values_and_zero_signs() {
+    let zero = LongDouble128::zero(false);
+    let negative_zero = LongDouble128::zero(true);
+    let one = LongDouble128::one();
+    let two = LongDouble128::from_f64(2.0);
+    let infinity = LongDouble128::infinity(false);
+    let negative_infinity = LongDouble128::infinity(true);
+    let nan = LongDouble128::nan();
+    assert!(infinity.fma(zero, one).is_nan());
+    assert!(zero.fma(infinity, one).is_nan());
+    assert!(infinity.fma(one, negative_infinity).is_nan());
+    assert!(nan.fma(one, two).is_nan());
+    assert!(one.fma(nan, two).is_nan());
+    assert!(one.fma(two, nan).is_nan());
+    assert_eq!(infinity.fma(one, two).to_f64(), f64::INFINITY);
+    assert_eq!(negative_infinity.fma(one, two).to_f64(), f64::NEG_INFINITY);
+    assert_eq!(one.fma(two, infinity).to_f64(), f64::INFINITY);
+    assert_eq!(one.fma(two, negative_infinity).to_f64(), f64::NEG_INFINITY);
+    // Signed zeros: the product zero's sign meets the addend zero's sign, IEEE addition rules.
+    assert_eq!(zero.fma(one, negative_zero).to_bits(), 0);
+    assert_eq!(negative_zero.fma(one, negative_zero).to_bits(), SIGN);
+    assert_eq!(
+        negative_zero
+            .fma(LongDouble128::zero(false).sub(one), negative_zero)
+            .to_bits(),
+        0
+    );
+    assert_eq!(negative_zero.fma(one, zero).to_bits(), 0);
+    assert_eq!(
+        negative_zero
+            .fma(LongDouble128::zero(false).sub(one), zero)
+            .to_bits(),
+        0
+    );
+    assert_eq!(zero.fma(one, two).to_f64(), 2.0);
+}
+
+#[test]
+fn subnormal_operands_keep_their_value_in_arithmetic() {
+    // `unpack` used to OR the hidden bit for a subnormal, which turned the smallest values into
+    // a normal number; the fmal work exposed it. All four operations must see the true value.
+    let smallest = LongDouble128::from_bits(1);
+    assert_eq!(smallest.add(smallest).to_bits(), 2);
+    assert_eq!(smallest.mul(LongDouble128::from_f64(2.0)).to_bits(), 2);
+    assert_eq!(
+        LongDouble128::from_bits(3)
+            .mul(LongDouble128::from_f64(2.0))
+            .to_bits(),
+        6
+    );
+    assert_eq!(
+        LongDouble128::from_bits(4)
+            .div(LongDouble128::from_f64(2.0))
+            .to_bits(),
+        2
+    );
+    assert_eq!(
+        LongDouble128::from_bits(3)
+            .sub(LongDouble128::from_bits(2))
+            .to_bits(),
+        1
+    );
+    assert_eq!(
+        LongDouble128::from_bits(2)
+            .add(LongDouble128::one())
+            .to_f64(),
+        1.0
+    );
+    assert_eq!(
+        smallest
+            .fma(LongDouble128::from_f64(2.0), smallest)
+            .to_bits(),
+        3
+    );
 }

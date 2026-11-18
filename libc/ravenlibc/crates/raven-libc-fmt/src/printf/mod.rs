@@ -62,7 +62,6 @@ pub(crate) mod pos;
 pub(crate) mod spec;
 pub(crate) mod str;
 
-use float_layout::FloatConv;
 use group::Grouping;
 use spec::{
     ALT, ArgTag, ArgVal, CHARINT, GROUPING, INTMAX_SIZE, INTMAXT, LADJUST, LLONGINT, LONGDBL,
@@ -70,9 +69,27 @@ use spec::{
 };
 
 use crate::traits::{CharUnit, FloatFmt, FmtEnv, Sink};
-use crate::types::{FloatBits, FloatKind, FmtErr, FmtOptions, PctN, StoreSize};
+#[cfg(all(feature = "float", not(feature = "tiny")))]
+use crate::types::FloatBits;
+use crate::types::{FloatKind, FmtErr, FmtOptions, PctN, StoreSize};
 
 const INT_MAX: i64 = i32::MAX as i64;
+
+/// One parsed floating-point conversion.
+#[cfg(not(all(feature = "float", not(feature = "tiny"))))]
+#[allow(dead_code)] // the tiny stub reads only `width` and `flags`
+pub(crate) struct FloatConv {
+    /// The conversion character (`a A e E f F g G`).
+    pub(crate) ch: u32,
+    /// The collected flag bits.
+    pub(crate) flags: u32,
+    /// The field width.
+    pub(crate) width: i32,
+    /// The precision; negative means absent.
+    pub(crate) prec: i32,
+    /// The sign character already selected by `+`/space.
+    pub(crate) sign: u8,
+}
 
 /// One argument source: the positional table or the sequential reader.
 struct ArgReader<'a> {
@@ -636,14 +653,36 @@ fn vformat_dyn<C: CharUnit>(
                 } else {
                     (FloatKind::F64, u128::from(reader.f64_bits(argpos)?))
                 };
-                let conv = FloatConv {
-                    ch: x,
-                    flags,
-                    width,
-                    prec,
-                    sign,
-                };
-                ret = float_layout::emit(sink, &conv, FloatBits { kind, bits }, floats, opts, ret)?;
+                #[cfg(all(feature = "float", not(feature = "tiny")))]
+                {
+                    let conv = float_layout::FloatConv {
+                        ch: x,
+                        flags,
+                        width,
+                        prec,
+                        sign,
+                    };
+                    ret = float_layout::emit(
+                        sink,
+                        &conv,
+                        FloatBits { kind, bits },
+                        floats,
+                        opts,
+                        ret,
+                    )?;
+                }
+                #[cfg(not(all(feature = "float", not(feature = "tiny"))))]
+                {
+                    let conv = FloatConv {
+                        ch: x,
+                        flags,
+                        width,
+                        prec,
+                        sign,
+                    };
+                    let _ = (kind, bits, floats);
+                    ret = float_stub(sink, &conv, ret)?;
+                }
             }
             x if x == u32::from(b'd')
                 || x == u32::from(b'i')
@@ -875,6 +914,51 @@ fn unsigned_arg(v: u64, flags: u32) -> u64 {
     } else {
         u64::from(v as u32)
     }
+}
+
+/// The R-13 dummy: print `*float*` (width and the generic field rules apply) and continue.
+///
+/// This is the tiny-profile fallback when the float layout is compiled out.
+#[cfg(not(all(feature = "float", not(feature = "tiny"))))]
+pub(crate) fn float_stub<C: CharUnit, S: Sink<C> + ?Sized>(
+    sink: &mut S,
+    conv: &FloatConv,
+    ret: i64,
+) -> Result<i64, FmtErr> {
+    let text = b"*float*";
+    let size = text.len() as i64;
+    let realsz = size;
+    let prsize = if i64::from(conv.width) > realsz {
+        i64::from(conv.width)
+    } else {
+        realsz
+    };
+    if ret.saturating_add(prsize) > INT_MAX {
+        return Err(FmtErr::Overflow);
+    }
+    if conv.flags & (LADJUST | ZEROPAD) == 0 {
+        let n = i64::from(conv.width).saturating_sub(realsz);
+        if n > 0 {
+            sink.pad(C::from_ascii(b' '), n as usize)
+                .map_err(|_| FmtErr::Sink)?;
+        }
+    }
+    if conv.flags & (LADJUST | ZEROPAD) == ZEROPAD {
+        let n = i64::from(conv.width).saturating_sub(realsz);
+        if n > 0 {
+            sink.pad(C::from_ascii(b'0'), n as usize)
+                .map_err(|_| FmtErr::Sink)?;
+        }
+    }
+    group::write_ascii(sink, text)?;
+    if conv.flags & LADJUST != 0 {
+        let n = i64::from(conv.width).saturating_sub(realsz);
+        if n > 0 {
+            sink.pad(C::from_ascii(b' '), n as usize)
+                .map_err(|_| FmtErr::Sink)?;
+        }
+    }
+    Ok(ret.saturating_add(prsize))
 }
 
 /// The donor's common emission tail, returning the new output count.

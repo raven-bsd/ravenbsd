@@ -29,8 +29,10 @@ maps its B39 shared ring and adds a second core for the virtio-net interface
 The optional
 .Ar nic
 argument makes the NIC mandatory: the server exits if the service cannot be
-attached.  Without it the server retries once a second while running so a
-driver that starts later is still picked up.  IPv6 is not configured.
+attached.
+Without it the server retries once a second while running so a
+driver that starts later is still picked up.
+IPv6 is not configured.
 .Pp
 Scheme paths are:
 .Bl -tag -width "net:tcp/<ipv4>:<port>" -compact
@@ -54,7 +56,8 @@ the client uses the S11
 operation with a
 .Xr raven-proto-net 3
 .Dv SocketRequest
-message.  The supported calls are
+message.
+The supported calls are
 .Dv BIND ,
 .Dv LISTEN ,
 .Dv ACCEPT ,
@@ -70,34 +73,40 @@ A successful
 .Dv ACCEPT
 returns a numeric socket id; the client opens
 .Pa net:accept/<id>
-to materialise the SchemeFile handle for that connection.  This is the
+to materialise the SchemeFile handle for that connection.
+This is the
 ABI-v1 substitute for an S25 attachment: there is no server-side file-create
-primitive, so the accepted descriptor is opened explicitly.  B12b may replace
+primitive, so the accepted descriptor is opened explicitly.
+B12b may replace
 it with the standard attachment path when the protocol grows one.
 .Pp
 .Dv READ
 and
 .Dv WRITE
-move stream bytes for TCP.  A typed
+move stream bytes for TCP.
+A typed
 .Dv SocketRequest::Read
 returns a
 .Dv Response::Read
 header followed by the datagram payload and the source endpoint for UDP;
 .Dv SocketRequest::Write
-carries an optional destination endpoint.  A raw UDP write is accepted only
+carries an optional destination endpoint.
+A raw UDP write is accepted only
 after
 .Dv CONNECT
 sets a peer.
 .Pp
 An ICMP file sends
 .Dv SocketRequest::IcmpEcho
-with an identifier, sequence, timeout and bounded payload.  The reply is read
+with an identifier, sequence, timeout and bounded payload.
+The reply is read
 with
 .Dv SocketRequest::Read
 and returns a
 .Dv Response::Icmp
 header carrying the source endpoint, identifier, sequence, measured RTT and
-payload length, followed by the echoed payload.  A pending request past its
+payload length, followed by the echoed payload.
+A pending request past its
 timeout returns
 .Er ETIMEDOUT .
 The source is the requested destination because the native stack does not
@@ -108,12 +117,15 @@ returns an S25
 .Dv UserEvent
 attachment in the
 .Dv CALL
-reply.  The client registers that handle in an S26 event queue and waits for
+reply.
+The client registers that handle in an S26 event queue and waits for
 readable, writable, accepted or closed transitions rather than retrying with
-sleeps.  The server itself blocks in
+sleeps.
+The server itself blocks in
 .Dv EVQ_WAIT
 on the scheme-server handle and uses the stack's next-timer delay as the
-timeout, so stack timers still run without a heartbeat thread.  When
+timeout, so stack timers still run without a heartbeat thread.
+When
 .Dq eth0
 is attached the loop also drains the NIC rings at least every 10 ms; both
 cores are driven by the same loop and there is no per-device thread.
@@ -199,7 +211,8 @@ It obtains a QEMU DHCP lease, pings the gateway, lists and mutates routes, reads
 the socket table and counters, then restarts
 .Nm
 between the two probe runs and checks that the ring is remapped and both
-payloads still echo.  There is no host bridge or external network.
+payloads still echo.
+There is no host bridge or external network.
 .Sh FILES
 .Bl -tag -width /etc/services.d/netd.toml -compact
 .It Pa /etc/services.d/netd.toml
@@ -212,9 +225,9 @@ service manifest
 .Xr init 8 ,
 .Xr vfsd 8 ,
 .Xr virtio-net 8
+.Sh STANDARDS
+RavenBSD ABI v1; `raven-proto-net` protocol version 1.
 .Sh HISTORY
 The
 .Nm
 server first appeared in RavenBSD 0.1.
-.Sh STANDARDS
-RavenBSD ABI v1; `raven-proto-net` protocol version 1.

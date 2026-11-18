@@ -21,7 +21,8 @@ exactly as for
 selects the payload:
 .Bl -tag -width Ds
 .It Dv 1
-The ACPI bundle.  Its first bytes are a header
+The ACPI bundle.
+Its first bytes are a header
 .Sy { magic: u32, version: u16, header_size: u16, rsdp_phys: u64,
 table_count: u32, directory_offset: u32 }
 with magic

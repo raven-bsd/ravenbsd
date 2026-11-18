@@ -4,8 +4,8 @@
 .Dt ICONV 3
 .Os RavenBSD
 .Sh NAME
-.Nm iconv
-.Nm iconv_open
+.Nm iconv ,
+.Nm iconv_open ,
 .Nm iconv_close
 .Nd character-set conversion
 .Sh SYNOPSIS
@@ -17,18 +17,19 @@
 .Ft int
 .Fn iconv_close "iconv_t cd"
 .Sh DESCRIPTION
-The iconv family converts a byte stream between character sets. The converter keeps its
-partial-input state in the descriptor returned by .Fn iconv_open.
+The iconv family converts a byte stream between character sets.
+The converter keeps its partial-input state in the descriptor returned by .Fn iconv_open.
 .Sh RETURN VALUES
 .Fn iconv_open returns a descriptor or .Dv (iconv_t)-1. .Fn iconv returns the number of
 non-reversible conversions or .Dv (size_t)-1. .Fn iconv_close returns 0 or -1.
 .Sh ERRORS
 .Er EINVAL is returned for an unsupported target encoding or an incomplete input sequence.
 .Er E2BIG is returned when the output buffer is full.
+.Sh SEE ALSO
+.Xr locale 7
 .Sh STANDARDS
 POSIX.1-2024; ring 0.
 .Sh CAVEATS
-CJK charsets are decode-only. Using one as a target fails with .Er EINVAL. See H-8 and C48.
-.Sh SEE ALSO
-.Xr iconv 3
-.Xr locale 7
+CJK charsets are decode-only.
+Using one as a target fails with .Er EINVAL.
+See H-8 and C48.

@@ -42,28 +42,40 @@ regex = '^cond:ok$'
 regex = '^arith:5$'
 
 [[expect]]
-regex = '^theme:ok$'
+regex = '^PS1=.*38;5;183.*\\u@\\h.*38;5;231.*\\w.*\\\$'
 
 [[expect]]
-regex = '^prompt:ok$'
-
-[[expect]]
-regex = '^hist:/tmp/brush_history:ignoreboth:%F %T$'
+regex = '^HIST=/tmp/brush_history:ignoreboth:%F %T ?$'
 
 [[expect]]
 regex = "^complete -W 'help exit' raven-test$"
 
 [[expect]]
-regex = '^nocolor:ok$'
+regex = '^PLAIN=.*\\u@\\h.*\\w.*\\\$'
 
 [[expect]]
-regex = '^nocolor:prompt$'
+regex = '^DUMB=.*\\u@\\h.*\\w.*\\\$'
+
+[[expect]]
+regex = '^ok$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|Function not implemented|error:'
+
+[[forbid]]
+regex = '^PLAIN=.*38;5;'
+
+[[forbid]]
+regex = '^PLAIN=.*\\e\['
+
+[[forbid]]
+regex = '^DUMB=.*38;5;'
+
+[[forbid]]
+regex = '^DUMB=.*\\e\['
 
 [[step]]
 wait = '^raven# $'
@@ -82,8 +94,16 @@ wait = '^raven# $'
 timeout_secs = 15
 
 [[step]]
-send = "/bin/brush -c '. /etc/brush/brushrc; case \"$PS1\" in *\"38;5;183\"*) echo theme:ok;; *) echo theme:missing;; esac; case \"$PS1\" in *root@raven*) echo prompt:ok;; esac; echo hist:$HISTFILE:$HISTCONTROL:$HISTTIMEFORMAT; complete -p raven-test'\n"
+send = "/bin/brush -c '. /etc/brush/brushrc; printf \"PS1=%s\\n\" \"$PS1\"; printf \"HIST=%s:%s:%s\\n\" \"$HISTFILE\" \"$HISTCONTROL\" \"$HISTTIMEFORMAT\"; complete -p raven-test'\n"
 delay_ms = 100
+
+[[step]]
+wait = '^PS1=.*38;5;183.*\\u@\\h.*38;5;231.*\\w.*\\\$'
+timeout_secs = 15
+
+[[step]]
+wait = '^HIST=/tmp/brush_history:ignoreboth:%F %T ?$'
+timeout_secs = 15
 
 [[step]]
 wait = "^complete -W 'help exit' raven-test$"
@@ -94,15 +114,35 @@ wait = '^raven# $'
 timeout_secs = 15
 
 [[step]]
-send = "/bin/brush -c 'NO_COLOR=1; export NO_COLOR; . /etc/brush/brushrc; case \"$PS1\" in *\"38;5;\"*) echo nocolor:bad;; *) echo nocolor:ok;; esac; case \"$PS1\" in *root@raven*) echo nocolor:prompt;; esac'\n"
+send = "/bin/brush -c 'NO_COLOR=1; export NO_COLOR; . /etc/brush/brushrc; printf \"PLAIN=%s\\n\" \"$PS1\"'\n"
 delay_ms = 100
 
 [[step]]
-wait = '^nocolor:ok$'
+wait = '^PLAIN=.*\\u@\\h.*\\w.*\\\$'
 timeout_secs = 15
 
 [[step]]
-wait = '^nocolor:prompt$'
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/brush -c 'TERM=dumb; export TERM; . /etc/brush/brushrc; printf \"DUMB=%s\\n\" \"$PS1\"'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^DUMB=.*\\u@\\h.*\\w.*\\\$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/brush -c 'echo ok'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ok$'
 timeout_secs = 15
 
 [[step]]

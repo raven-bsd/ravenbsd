@@ -7,7 +7,7 @@
 
 use core::ffi::{c_char, c_int};
 
-use super::usershell_state::{SHELL_BUF, SHELLS, init};
+use super::usershell_state::{SHELLS, init, shell_buffer};
 
 /// `getusershell`.
 #[unsafe(no_mangle)]
@@ -23,8 +23,8 @@ pub unsafe extern "C" fn getusershell() -> *mut c_char {
     let Some(shell) = shells.next() else {
         return core::ptr::null_mut();
     };
-    // SAFETY: SHELL_BUF is private and larger than any shell line.
-    let buffer = unsafe { &mut *(&raw mut SHELL_BUF) };
+    // SAFETY: shell_buffer is private and larger than any shell line.
+    let buffer = shell_buffer();
     if shell.len().saturating_add(1) > buffer.len() {
         return core::ptr::null_mut();
     }

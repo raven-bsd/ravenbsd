@@ -29,21 +29,24 @@ Run:
 sh scripts/check-miri.sh
 ```
 
-The script is bounded by `tests/libc/miri/crates.txt` (the gate 1.6 crate list), `--lib` only, the
-deterministic skips in `tests/libc/miri/skip.txt`, and `MIRI_TIMEOUT` (default 1800 s per crate).
-Logs and the resolved toolchain are written under `build/libc-miri/`. Exit 77 means cargo-miri is
-not installed.
+The script is bounded by `tests/libc/miri/crates.txt` (the gate 1.6 crate list), the five crate
+library suites (`--lib`), the one `cfg(miri)` alignment integration binary, the deterministic
+skips in `tests/libc/miri/skip.txt`, the explicit `integration-exclusions.txt`, and
+`MIRI_TIMEOUT` (default 1800 s per crate). Logs and the resolved toolchain are written under
+`build/libc-miri/`. Exit 77 means cargo-miri is not installed.
 
 ## Crates and bounded exclusions
 
 The gate crate set: `raven-libc-str`, `raven-libc-fmt`, `raven-libc-dtoa`, `raven-libc-regex`,
 `raven-libc-glob`.
 
-`--lib` excludes integration test binaries. `raven-libc-str/tests/alignment.rs` cannot run under
-Miri: it exercises the x86_64 inline-assembly `memcpy` at
-`libc/ravenlibc/crates/raven-libc-str/src/raw/arch/x86_64/mem.rs:62` and a guard-page `mmap`; Miri
-reports `unsupported operation: inline assembly is not supported`. That is a Miri capability
-limit, not a UB finding. The integration test stays in the normal nextest gate.
+`--lib` bounds the five crate library suites. One integration binary is also in the bounded row:
+`raven-libc-str/tests/alignment.rs` has a `cfg(miri)` path that prints the exact capability
+exclusion (`x86_64 inline assembly (src/raw/arch/x86_64/mem.rs:62)` and guard-page `mmap`) and
+returns without executing the unsupported operations; the real target tests are unchanged and run
+under nextest. The remaining integration binaries are listed explicitly in
+`integration-exclusions.txt` (host toolchain subprocesses, host filesystem fixtures and pure
+fixture/vector suites covered by nextest); none is a Miri UB claim.
 
 The skip list removes deterministic long vectors (100k/20k iterations) that take hours under the
 interpreter. They are not UB findings; nextest runs them on every change. No failing unsafe code
@@ -54,21 +57,27 @@ was skipped.
 | Crate | Tests | Filtered | Result |
 |---|---:|---:|---|
 | `raven-libc-str` | 160 | 3 | pass, 1290.59 s |
+| `raven-libc-str` alignment | 6 | 0 | pass, 0.72 s |
 | `raven-libc-fmt` | 124 | 0 | pass, 21.02 s |
 | `raven-libc-dtoa` | 60 | 2 | pass, 10.31 s |
 | `raven-libc-regex` | 332 | 0 | pass, 83.01 s |
 | `raven-libc-glob` | 39 | 0 | pass, 5.32 s |
 
-Total: **715 Miri tests passed, 0 failed, no UB report**. No Miri suppression flags were used
-(default isolation, stacked borrows and provenance checks).
+Total: **721 Miri tests passed, 0 failed, no UB report** (715 library tests + 6 alignment
+integration tests). No Miri suppression flags were used (default isolation, stacked borrows and
+provenance checks).
 
-Gate row 1.6 result: **PARTIAL**. Miri is installed and the bounded 715-test run is green; the
-row's full `rustup run nightly cargo miri test -p ...` command is not green because of the Miri-unsupported
-inline-asm `alignment` integration test (test/production-asm owner) and the multi-hour
-deterministic vectors. C74w owns `docs/libc-gate.md`/the gate row; this directory is the evidence
-for the bounded row and the exact exclusions.
+Gate row 1.6 result: **MET (bounded, explicit exclusion list)**. The bounded runner is green with
+721 Miri tests and no UB. The only exclusions are the five deterministic long vectors in
+`skip.txt` and the host/subprocess/pure integration binaries in `integration-exclusions.txt`; all
+are covered by nextest. The row's raw five-crate argv without the bounded exclusions would also
+run those host-only binaries (starting with the Miri-isolation `no_recursion` build fixture) and
+the multi-hour vectors; C74w owns `docs/libc-gate.md`/the gate row and can point it at
+`scripts/check-miri.sh` or the explicit exclusion list. The alignment capability exclusion is
+printed by the test itself (`-- --nocapture`).
 
 ## Files
 
 * `crates.txt` — gate crate set, one package per line.
+* `integration-exclusions.txt` — explicit integration-binary exclusions and reasons.
 * `skip.txt` — `<crate> <test-substring> <reason>` deterministic long-vector skips.

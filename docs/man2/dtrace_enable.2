@@ -19,7 +19,8 @@ is
 .Dv Handle::NONE
 or a user-event handle with the
 .Dv SIGNAL
-right.  When a per-CPU ring transitions from empty to non-empty the kernel
+right.
+When a per-CPU ring transitions from empty to non-empty the kernel
 signals that event; a consumer waiting with
 .Xr evq_wait 2
 wakes and drains the rings with

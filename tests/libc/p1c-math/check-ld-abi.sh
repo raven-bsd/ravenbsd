@@ -35,7 +35,7 @@ names='fabsl floorl ceill truncl roundl rintl nearbyintl logbl significandl copy
 fmaxl fminl fmodl remainderl nextafterl nexttowardl scalbnl ldexpl scalblnl frexpl modfl
 remquol ilogbl llogbl lrintl llrintl lroundl llroundl nanl sqrtl cbrtl hypotl
 expl logl exp2l log2l log10l sinl cosl tanl sincosl sinhl coshl tanhl asinl acosl atanl
-atan2l asinhl acoshl atanhl'
+atan2l asinhl acoshl atanhl erfl erfcl gammal lgammal lgammal_r tgammal fmal'
 
 flags="-std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Werror -Wno-unused-value -I $include -I $arch_include"
 
@@ -75,6 +75,29 @@ if ! grep -q 'str[[:space:]]*q0' "$tmp/abi.s" || ! grep -q 'ldr[[:space:]]*q0' "
     exit 1
 fi
 echo "check-ld-abi: ok AAPCS64 long double argument and result are in q0"
+
+# 2b. The ternary contract used by `fmal`: q0/q1/q2 in, q0 out.
+cat > "$tmp/ternary.c" <<'EOF'
+long double c74al_ternary(long double x, long double y, long double z) {
+    volatile long double a = x;
+    volatile long double b = y;
+    volatile long double c = z;
+    return a + b * c;
+}
+EOF
+if ! $cc -O2 -S -o "$tmp/ternary.s" $flags "$tmp/ternary.c"; then
+    echo "check-ld-abi: FAIL ternary probe compile" >&2
+    exit 1
+fi
+if ! grep -q 'str[[:space:]]*q0' "$tmp/ternary.s" ||
+    ! grep -q 'str[[:space:]]*q1' "$tmp/ternary.s" ||
+    ! grep -q 'str[[:space:]]*q2' "$tmp/ternary.s" ||
+    ! grep -q 'ldr[[:space:]]*q0' "$tmp/ternary.s"; then
+    echo "check-ld-abi: FAIL ternary long double arguments are not q0/q1/q2" >&2
+    sed -n '1,60p' "$tmp/ternary.s" >&2
+    exit 1
+fi
+echo "check-ld-abi: ok AAPCS64 ternary long double arguments are q0/q1/q2"
 
 # 3. Archive symbols, when the aarch64 sysroot has been packed.
 archive=$root/build/aarch64/libc.a

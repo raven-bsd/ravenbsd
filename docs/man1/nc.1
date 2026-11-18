@@ -27,11 +27,13 @@ or
 .Dq net:udp/ Ns Ar host : Ns Ar port
 socket through the native
 .Dq net:
-server. In client mode it connects (TCP) or sends a datagram (UDP), optionally writes the
+server.
+In client mode it connects (TCP) or sends a datagram (UDP), optionally writes the
 .Fl s
 payload once, and with
 .Fl n
-reads at most that many bytes and prints them. A UDP client must choose its local port with
+reads at most that many bytes and prints them.
+A UDP client must choose its local port with
 .Fl b .
 .Pp
 In listen mode
@@ -42,7 +44,8 @@ TCP uses
 .Dv LISTEN / ACCEPT ; UDP uses
 .Dv BIND . With
 .Fl e
-the listener echoes one received message back to the sender and exits. Every operation is
+the listener echoes one received message back to the sender and exits.
+Every operation is
 bounded by
 .Fl w
 (seconds, default 5); a refused connection, timeout or malformed option exits non-zero.

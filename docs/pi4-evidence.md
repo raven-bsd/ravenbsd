@@ -123,3 +123,116 @@ EMMC2 provides `disk:`, blockd consumes `disk:0` and provides `block:`. The `emm
 and its MMIO/DMA adapter are the integration step, so the fragment is file-only today and the
 existing `pi4` profile still builds. When the driver service entry lands, the fragment gets the
 two program entries and the capture template's block-path lines become meaningful.
+
+## 7. Board evidence runbook (C74am)
+
+Status: the host image, manifest/FDT check, no-TEXTREL dynamic `/bin` and the QEMU-virt
+`dynamic-userland` qtest are OBSERVED. No Pi 4 board serial/GENET log exists, the USB-TTL
+adapter is still missing, and this host's QEMU has no `raspi4b` machine. The board gates in this
+runbook are UNVERIFIED until the owner captures a log.
+
+### 7.1 Host preflight
+
+Build the release image and record the exact artifact:
+
+```sh
+RAVEN_RPI_FIRMWARE=/path/to/ravenbsd-resources/rpi-firmware/boot \
+    cargo xtask image --arch aarch64 --platform pi4 --profile pi4-release
+sha256sum build/aarch64/ravenbsd-pi4.img
+sh scripts/pi4-release.sh --check
+cargo xtask qtest --case dynamic-userland --arch aarch64
+```
+
+On master `d97f7c1a` the observed image was 335544320 bytes with SHA-256
+`0a3e917d45e80d38c2c2e842639bca77a38a6457c86bfd4b03a254d7cf8c64d4`; the manifest/initfs/FDT
+check passed, the staged dynamic `/bin` had no `DT_TEXTREL`/`DF_TEXTREL`, and
+`dynamic-userland --arch aarch64` passed on QEMU virt. These are host/QEMU results, not a board
+result. Before flashing, confirm the image really stages `/bin/ping` (the release check matches
+the path string; a missing file is a preflight failure, not a ping-gate result).
+
+### 7.2 Flash and capture
+
+The owner writes the SD card and captures the PL011 UART; VCC from the adapter is never
+connected. The adapter is a 3.3 V USB-UART on GPIO14/15 with GND, 115200 8N1, no flow control.
+
+```sh
+# owner only; writes the image to the SD card
+scripts/pi4-release.sh --flash /dev/sdX --device /dev/ttyUSB0
+
+# or capture an already-flashed board
+scripts/pi4-serial.sh -d /dev/ttyUSB0 -i build/aarch64/ravenbsd-pi4.img
+```
+
+Use the log path printed by the capture script (`build/pi4/<image-sha256>.log`). Its header
+records the UTC start, host, commit, image path, image SHA-256, device/baud and manifest check.
+Do not edit the captured log. Stop with Ctrl-C and keep the `# stopped:` footer.
+
+### 7.3 Expected board transcript
+
+Log in as `root`/`raven`; the release shell prompt is `raven#`. Capture these gates exactly:
+
+```text
+login:
+Password:
+raven# /bin/uname -a
+RavenBSD pi4 0.1 ... aarch64
+raven# dmesg | grep -i genet
+genet: link is up ...
+netd: DHCP lease ... gateway ...
+raven# ping -c 3 <gateway>
+64 bytes from <gateway>: icmp_seq=1 ttl=64 ...
+init exited (0)
+```
+
+The release image does not guarantee a staged `readelf`/`ldd`. For the dynamic gate, run the
+host check on the same artifact and append its output to the capture header:
+
+```sh
+llvm-readelf -d build/aarch64/user/raven-rsh | grep NEEDED
+# append: # host dynamic: 0x... (NEEDED) Shared library: [libc.so.1]
+```
+
+If the board has a staged tool, include its `/bin/rsh` output too; otherwise record
+`board-side readelf: NOT OBSERVED` rather than guessing. The image SHA-256 in the header binds
+the host dynamic line to the flashed image.
+
+### 7.4 Transcript checker
+
+```sh
+scripts/board-pi4-check.sh --log build/pi4/<image-sha256>.log
+scripts/board-pi4-check.sh --log build/pi4/<image-sha256>.log --dry-run
+```
+
+Exit 0 means the transcript markers are complete. Exit 1 means a required marker is missing.
+Exit 2 means the log was refused: a QEMU/tcg/emulator marker, a header marking the log
+virt/virtual/synthetic/fixture/sample, or no Pi 4 board marker (`bcm2711`/`raspi4b`/`Raspberry
+Pi 4`). The checker never opens a device and never prints a board PASS; the owner's attestation
+and the hashes remain part of the release packet. `tests/board/pi4-check-selftest.sh` exercises
+the complete, virt, synthetic, no-board and missing-ping cases.
+
+### 7.5 QEMU virt evidence and the raspi4b gap
+
+`dynamic-userland --arch aarch64` runs on QEMU virt with the release `libc.so.1`; it proves the
+aarch64 dynamic userland shape, not a Pi 4 board boot. This host's QEMU has no `raspi4b`
+machine, so a literal raspi4b disk boot cannot be produced here. Do not present the QEMU serial
+as a board log; the checker refuses a QEMU/virt header.
+
+### 7.6 Release packet fields
+
+| Field | Source |
+|---|---|
+| Commit | `git rev-parse HEAD` |
+| Image + SHA-256 | `build/aarch64/ravenbsd-pi4.img`, `sha256sum` |
+| Log + SHA-256 | `build/pi4/<image-sha256>.log`, `sha256sum` |
+| Adapter/device/baud | capture header (`# device:`) |
+| Board model/revision | serial log or board label (`bcm2711`/`raspi4b`) |
+| Firmware revision | `rpi-firmware` entry in `donors.lock` |
+| Gate results | login, uname, dynamic NEEDED, GENET/DHCP, ping, clean exit |
+| First failing line | exact log line, or `none` |
+| Result | owner-attested PASS/FAIL; the checker only reports complete/incomplete/refused |
+
+### 7.7 Blocker
+
+The USB-TTL adapter is still missing, so no board transcript, GENET link/DHCP lease or ping
+reply exists. The board result remains UNVERIFIED; this runbook and checker are host-side
+evidence for the run that the owner performs when the adapter arrives.

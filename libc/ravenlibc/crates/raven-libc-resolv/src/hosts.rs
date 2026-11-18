@@ -69,6 +69,36 @@ pub fn parse_hosts(file: &[u8], ifnames: &dyn IfNames) -> Vec<HostLine> {
     out
 }
 
+/// The first name on the line whose address and scope match `target` (the `getnameinfo`
+/// reverse-search over `/etc/hosts`).
+#[must_use]
+pub fn reverse(
+    file: &[u8],
+    target: &[u8; 16],
+    scope: u32,
+    ifnames: &dyn IfNames,
+) -> Option<String> {
+    let mut reader = LineReader::new(file, HOSTS_LINE_MAX);
+    while let Some(line) = reader.next_line() {
+        let Some(entry) = parse_hosts_line(line, ifnames) else {
+            continue;
+        };
+        let bytes = match entry.addr {
+            IpAddr::V4(v4) => IpAddr::V4(v4).to_v4_mapped().octets16(),
+            IpAddr::V6(v6) => v6,
+        };
+        if &bytes != target || entry.scope != scope {
+            continue;
+        }
+        if let Some(name) = entry.names.first()
+            && name.len() <= crate::consts::NI_MAXHOST
+        {
+            return Some(name.clone());
+        }
+    }
+    None
+}
+
 /// The `gethostent` iterator over a hosts file.
 pub struct HostsIter<'a> {
     reader: LineReader<'a>,

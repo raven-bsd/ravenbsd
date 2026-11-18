@@ -86,6 +86,34 @@ fn duplicate_ids_are_rejected() {
 }
 
 #[test]
+fn waived_header_may_be_absent() {
+    let path = root("waived-header");
+    let mut profile = empty_profile();
+    let mut row = meta("header.trace.h");
+    row.status = Status::Waived;
+    row.waiver = "removed in Issue 8".to_string();
+    profile.header.push(HeaderRow {
+        meta: row,
+        name: "trace.h".to_string(),
+        required_macros: Vec::new(),
+        required_types: Vec::new(),
+        required_functions: Vec::new(),
+    });
+    let trace = TraceFile {
+        schema: 1,
+        standard: STANDARD.to_string(),
+        trace: vec![TraceRow {
+            id: "header.trace.h".to_string(),
+            ticket: "P1".to_string(),
+            test: "none".to_string(),
+            evidence: "removed in Issue 8".to_string(),
+        }],
+    };
+    validate(&path, &profile, &trace).unwrap();
+    cleanup(&path);
+}
+
+#[test]
 fn unknown_owner_and_missing_evidence_are_rejected() {
     let path = root("fields");
     let mut profile = empty_profile();
@@ -191,6 +219,32 @@ fn a_utility_source_directory_does_not_imply_present() {
         }],
     };
     // The source directory is not executable evidence; the evidence overlays own the status.
+    validate(&path, &profile, &trace).unwrap();
+    cleanup(&path);
+}
+
+#[test]
+fn present_macro_does_not_need_a_symbol_export() {
+    let path = root("macro-export");
+    let mut profile = empty_profile();
+    profile.interface.push(InterfaceRow {
+        meta: meta("interface.assert"),
+        name: "assert".to_string(),
+        header: "assert.h".to_string(),
+        kind: "macro".to_string(),
+        required: true,
+        signature: String::new(),
+    });
+    let trace = TraceFile {
+        schema: 1,
+        standard: STANDARD.to_string(),
+        trace: vec![TraceRow {
+            id: "interface.assert".to_string(),
+            ticket: "P1".to_string(),
+            test: "test:tests/libc/p1c-core/check-core.sh".to_string(),
+            evidence: "macro probe".to_string(),
+        }],
+    };
     validate(&path, &profile, &trace).unwrap();
     cleanup(&path);
 }

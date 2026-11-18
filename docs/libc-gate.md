@@ -41,14 +41,15 @@ cargo xtask qtest --case libc-spawn --arch x86_64
 
 The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
-## Current verdict (2026-11-17, C74z)
+## Current verdict (2026-11-17, C74z-S16)
 
 **NOT MET.** `cargo run -q -p libc-gate -- verdict` exits 1.
 
 * MET: 1.1, 1.1.pack, 1.1.audit, 1.4, 1.5, 5.1, 5.2, 4.1, 4.3, 6.1, 6.3, 6.4.
 * NOT MET: 1.2 (G1 0/4; C74x qemu backend C4 7/15, C5 12/18), 1.7 (15 lint violations:
-  P1f 14, ABI 1), 3.1 (C74z corrected data: 7 pass, 56 fail, 69 known, 105 skipped,
-  0 budget-only), 4.2 (one-hour `inet_text` soak recorded; row re-eval pending).
+  P1f 14, ABI 1), 3.1 (C74z-S16 reconciliation: 46 pass, 28 fail, 69 known, 105 skipped, 0
+  budget-only; 28 legitimate-row +3% budgets applied; shrink-first/held/invariant rows remain),
+  4.2 (one-hour `inet_text` soak recorded; row re-eval pending).
 * BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
@@ -63,27 +64,28 @@ C74u closed 5.1 (`sscanf`, `tzname`). C74q closed 1.4 (27/27) and C74k recorded 
 `inet_text` soak. The gate cannot close until G1, the size-budget cluster, the remaining lint
 backlog, and the missing Miri/world/mandoc tooling are resolved by their owners.
 
-## 3.1 size triage (C74w, budget correction C74z; OBSERVED on `1bfeaafa`)
+## 3.1 size triage (C74w/C74z/C74z-S16; OBSERVED on `1355d85c`)
 
-`cargo xtask libc-size --check` reports `7 pass, 56 fail, 69 known, 105 skipped, 0 budget-only`
-after the C74z data correction (C74w had 5/58 before the missing P9 and stale arm/riscv B fixes).
-The full failure table, budget diff, deltas and per-row owners are in
-`tests/libc/size/TRIAGE.md`. The classification:
+`cargo xtask libc-size --check` reports `46 pass, 28 fail, 69 known, 105 skipped, 0 budget-only`
+after the S14/S15a/S5/S6/S13 merges and the C74z-S16 reconciliation. The full three-arch rebuild
+before the budget edit was `31 pass, 43 fail` (the directive's 32/50 last run lacked a full arch
+build); `tests/libc/size/reconcile.py` compared the S12 before run with the rebuild. The 28
+legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 blocks were re-frozen at measured + 3 percent; the
+P2/P5/P7/riscv64 P3 and P8/P9 blocks were left unchanged. The remaining 28 rows:
 
-* 54 budget overruns, 52 with real `S`/`F` growth since the C69 freeze (x86_64 small,
-  aarch64/riscv64 3-12 percent; P9 full link +311k/+328k and +141k/+159k `S`). Two x86_64 P5
-  rows are B-only. Two more fails are boot rows.
-* C74z added the missing x86_64 P9 tiny/server budgets (first `1bfeaafa` measurement + 3 percent)
-  and re-baselined the aarch64/riscv64 B measured/budget fields to the same Berkeley-bss
-  definition as x86_64. S/F and boot budgets were not raised.
-* Boot: x86_64 start instructions 1,245 > 908; aarch64 syscalls 8 > 3 and instructions 3,403 >
-  1,847. Real start/TLS/allocator growth (dave/C57, kevin/C49).
+* **17 budget/rule rows:** P2 aarch64/riscv64 S/F (S14 rework), P3 riscv64 S/F/B (S14/S13),
+  P5 x86_64 server / aarch64 server / riscv64 server B-only (S5 layout), P7 x86_64 tiny/server
+  B-only, P7 aarch64/riscv64 S/F/B (S6), P8 aarch64 tiny/server B-only (held) and the
+  `P7-R-14` iconv member rule.
+* **10 invariants:** `INV-S-P2-P0` aarch64/riscv64 tiny/server and `INV-S-P3-P2` x86_64,
+  aarch64 and riscv64 tiny/server. These are real rule failures, not budget rows; the P2/P3
+  owners and the reviewer for the limit must decide.
+* Boot rows pass; P9 remains green. S15a removed the `dtoa` floor, S6/S5 removed most P7/P5 S
+  growth, S14 made the x86_64 P2 rows pass, and S13 now links the real riscv64 printf path.
 * `B` is the Berkeley `llvm-size` bss field (all NOBITS, including `.relro_padding`), not only
   the `.bss` section. `build/size/libc-size.json`/`.md` are run artifacts and leave `budget_* = 0`
-  and `status = ok`; the console and `build/libc-gate-c74z/3.1.txt` are the check evidence.
+  and `status = ok`; the console and `build/libc-gate-c74z-s16/3.1.txt` are the check evidence.
 
-3.1 stays NOT MET because the 52 real S/F rows and 2 boot rows do not fit. Shrink candidates are
-the ctype Unicode tables (carl/C39), fmt `vformat` monomorphizations (carl/C43), dtoa (carl/C42),
-the compat static buffers (carl/C64d), resolv/net (dave/C51), time (mel/C44), the TLS/pages/
-streams statics (dave/C57/C54, carl/C64d, kevin/C49), and the boot start path. The per-cluster
-follow-up list is C74z-S1 through C74z-S10 in `tests/libc/size/TRIAGE.md`.
+3.1 stays NOT MET because the 17 budget/rule and 10 invariant rows do not fit. The exact
+current/budget table and owners are in the C74z-S16 section of `tests/libc/size/TRIAGE.md` and
+the C74z-S16 report.

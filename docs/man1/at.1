@@ -30,7 +30,8 @@ Queue immediately.
 .It Cm now Li + Ar N Cm minutes|hours|days
 Queue after the given offset.
 .Cm + Ar N Cm unit
-is accepted as a shorthand. A count of zero is valid.
+is accepted as a shorthand.
+A count of zero is valid.
 .It Ar HH:MM
 Queue at the next occurrence of that clock time: today if it is still ahead, otherwise tomorrow.
 .It Ar YYYY-MM-DD HH:MM
@@ -39,10 +40,12 @@ Queue at the exact UTC date and time.
 is also accepted.
 .El
 .Pp
-The command is one program plus arguments. If no command words are given, it is read from
+The command is one program plus arguments.
+If no command words are given, it is read from
 standard input on the host; the target needs
 .Fl f Ar file
-or command words. Multi-line scripts and shell metacharacters are unsupported because the
+or command words.
+Multi-line scripts and shell metacharacters are unsupported because the
 target has no shell runner.
 .Pp
 The options are:
@@ -60,14 +63,15 @@ means standard input on the host.
 .Sh ENVIRONMENT
 .Bl -tag -width AT_SPOOL
 .It Ev AT_SPOOL
-Override the spool directory. Used by the host tests.
+Override the spool directory.
+Used by the host tests.
 .El
 .Sh EXIT STATUS
 .Ex -std
 0 on success, 1 for a validation or spool error, 2 for usage.
 .Sh SEE ALSO
-.Xr batch 1 ,
-.Xr atd 1
+.Xr atd 1 ,
+.Xr batch 1
 .Sh STANDARDS
 A documented subset of POSIX
 .Nm at .

@@ -140,6 +140,7 @@ members = [
     "toolchain/getrandom-probe",
     "tools/libc-size",
     "tools/libc-oracle",
+    "tools/libc-world",
     "libc/ravenlibc/crates/*",
     "libc/ravenlibc/tools/hdrgen",
     "libc/ravenlibc/tools/mkmap",
