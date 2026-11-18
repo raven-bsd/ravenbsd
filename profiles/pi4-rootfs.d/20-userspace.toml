@@ -182,7 +182,7 @@ src = "etc/services.d/pcid.toml"
 path = "/etc/services.d/pcid.toml"
 
 [[initfs.files]]
-src = "profiles/pi4-release.d/devd.manifest"
+src = "profiles/pi4-rootfs.d/devd.manifest"
 path = "/etc/services.d/devd.toml"
 
 [[initfs.files]]

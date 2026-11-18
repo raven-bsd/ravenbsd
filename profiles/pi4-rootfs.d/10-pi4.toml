@@ -1,10 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 rootfs storage declaration. Unlike the release profile, this fragment
-# deliberately does not stage blockd; 20-storage.toml owns the read-write UFS
-# service set for the SD root image.
-
-[[initfs.files]]
-src = "profiles/pi4.d/emmc2.manifest"
-path = "/etc/services.d/emmc2.toml"
+# Pi 4 rootfs storage: devd owns the EMMC2 driver entry in /etc/drivers.toml and
+# launches it with the MMIO/DMA/IRQ grant. No svcd emmc2 manifest is staged, so
+# the real card has exactly one launcher.
