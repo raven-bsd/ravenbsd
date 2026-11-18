@@ -3,15 +3,18 @@
 
 # libc size gate 3.1 triage and budget correction (C74w/C74z/C74z-S10)
 
-Status: OBSERVED (C74z-S17, `origin/master` `10d8c9dd`). C74w classified the C74h/C69 data;
+Status: OBSERVED (C74ht, `origin/master` `6cb10821`). C74w classified the C74h/C69 data;
 C74z corrected the objective budget-data errors; C74z-S10 re-froze the six P9 S/F budgets;
 C74z-S11 rebuilt all three arches and fixed the six B-only/layout rows; C74z-S12 classified the
 S/F residual; C74z-S14/S15a/S5/S6/S13 landed and C74z-S16 applied the reviewed current+3%
 budgets to the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows. The C74dl audit found
 **17 legitimate budget/layout rows (0 shrink-first), 1 rule/probe bug (P7-R-14), and 10 stale
 invariant ceilings**; C74z-S17 applied the 17 re-freezes and C74cx fixed the P7-R-14 matcher.
-**3.1 remains NOT MET**: 63 pass / 10 fail / 62 known / 102 skipped / 0 budget-only; only the
-10 invariant ceilings remain.
+C74ht rebuilt the real x86_64/aarch64 `libc.so.1` rows, applied their measured+3% budgets, and
+recorded the `INV-LIBC-SO-NEEDED` self-NEEDED rule bug with `readelf -d` evidence. **3.1 remains
+NOT MET**: 65 pass / 11 fail / 64 known / 100 skipped / 0 budget-only; the 11 are the 10 static
+invariants plus the real aarch64 `libc.so.1` S overrun (1,363,768 > 1,300,000); riscv64 stays
+skipped by C74hs.
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -784,6 +787,58 @@ The 10 rows are 4 `INV-S-P2-P0` and 6 `INV-S-P3-P2` invariant failures. They are
 relationships, not budgets: the reviewer/owner must raise the hard-coded proposal ceilings or
 add the equivalent known-violation rows. **3.1 remains NOT MET** with exactly these 10 rows.
 
+## C74ht dynamic libc.so.1 rules (OBSERVED, `6cb10821`)
+
+C74ht rebuilt the real linked DSOs on `6cb10821` with
+`cargo xtask libc-pack --arch x86_64|aarch64` and `cargo xtask libc-link --arch x86_64|aarch64`.
+C74hr has no commits on its branch (it is marked done with uncommitted `build/libc-size/**`
+artifacts), so the dynamic evidence is reproduced from the tooling on this base.
+
+### DSO evidence
+
+| Arch | S | F | `.data.rel.ro` | `JUMP_SLOT` | `DT_NEEDED` |
+|---|---:|---:|---:|---:|---:|
+| x86_64 | 1,286,594 | 3,009,232 | 24,600 | 0 | 0 |
+| aarch64 | 1,363,768 | 2,501,104 | 24,224 | 2 | 0 |
+
+`readelf -d` on both DSOs shows `SONAME: [libc.so.1]`, `FLAGS: BIND_NOW`, `FLAGS_1: NOW
+NODELETE`, and **no `DT_NEEDED` entry**. The DSO does not list itself; the loader resolves it by
+SONAME. The riscv64 row stays `skipped: libc.so.1 absent`, blocked by C74hs.
+
+### Zero-budget fix
+
+The two `[[libc_so]]` rows were stub-era zero budgets. They are re-frozen at measured + 3 percent:
+
+| Row | Old budget S/F | Measured S/F | New budget S/F |
+|---|---|---|---|
+| x86_64 `libc.so.1` | 0 / 0 | 1,286,594 / 3,009,232 | 1,325,192 / 3,099,509 |
+| aarch64 `libc.so.1` | 0 / 0 | 1,363,768 / 2,501,104 | 1,404,682 / 2,576,138 |
+
+Both `libc.so.1` budget rows now PASS. The riscv64 row is unchanged and skipped.
+
+### `INV-LIBC-SO-NEEDED` rule bug
+
+`INV-LIBC-SO-NEEDED` is hard-coded in `tools/libc-size/src/rules.rs` as `needed == 1`, but the
+linked DSO has 0. That is the self-`NEEDED` expectation the loader does not emit. The check is
+outside this ticket's Owns (no source edits), so the gate records a reviewed known exception for
+x86_64/aarch64 with the `readelf -d` evidence. Changing the hard-coded expectation to 0 for a
+self-contained `libc.so.1` is a follow-up tooling ticket; this ticket does not claim the rule
+itself is fixed.
+
+### Exact 3.1 residual after the dynamic fix
+
+| Kind | Rows | Status |
+|---|---|---|
+| static `INV-S-P2-P0`/`INV-S-P3-P2` invariants | 10 | FAIL (unchanged) |
+| aarch64 `INV-LIBC-SO-S` | 1 | FAIL: 1,363,768 > 1,300,000 (real S overrun; ceiling not raised) |
+| `INV-LIBC-SO-NEEDED` | 2 | KNOWN (rule bug, `readelf -d` evidence above) |
+| `libc.so.1` budgets | 2 | PASS |
+| riscv64 `libc.so.1` | 1 | SKIPPED (C74hs) |
+| **3.1 total** | | **65 pass / 11 fail / 64 known / 100 skipped / 0 budget-only** |
+
+**3.1 remains NOT MET** with exactly 11 real fails: the 10 static invariants plus the aarch64
+`libc.so.1` S ceiling. The two NEEDED rows are KNOWN rule exceptions, not passes.
+
 ## Budget actions
 
 * C74z added x86_64 P9 tiny/server budgets from the `1bfeaafa` first measurement + 3 percent
@@ -816,6 +871,12 @@ add the equivalent known-violation rows. **3.1 remains NOT MET** with exactly th
   `10d8c9dd` measurement + 3 percent (measured fields and `members` updated); the 10 invariant
   ceilings are unchanged. The `P7-R-14` matcher is fixed by C74cx `e76b1d01`. The gate is
   **63 pass / 10 fail / 62 known / 102 skipped / 0 budget-only**; only the 10 invariants remain.
+  3.1 remains **NOT MET**.
+* C74ht rebuilds the x86_64/aarch64 `libc.so.1` rows and re-freezes their S/F budgets at measured
+  + 3 percent: x86_64 1,286,594/3,009,232 -> 1,325,192/3,099,509; aarch64 1,363,768/2,501,104 ->
+  1,404,682/2,576,138. The two `INV-LIBC-SO-NEEDED` rows are KNOWN rule exceptions (the DSO has
+  0 `DT_NEEDED`, not a self-`NEEDED`); the aarch64 S ceiling and the riscv64 C74hs block are
+  unchanged. The gate is **65 pass / 11 fail / 64 known / 100 skipped / 0 budget-only**.
   3.1 remains **NOT MET**.
 
 ## C39m ctype table shrink (OBSERVED, `e1f252e5`)

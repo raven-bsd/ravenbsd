@@ -18,6 +18,11 @@
 # C74z-S17 (10d8c9dd): the 17 legitimate budget/layout rows from the C74dl audit are re-frozen at
 # the current measurement + 3 percent after C74cx; the 10 invariant ceilings are unchanged. The
 # P7-R-14 matcher fix is C74cx e76b1d01 (forbid_symbols); no rule pattern is changed here.
+# C74ht (6cb10821): the x86_64/aarch64 libc.so.1 rows are frozen from the real linked DSO
+# (measured + 3 percent); riscv64 stays skipped because of C74hs. INV-LIBC-SO-NEEDED is recorded
+# as a reviewed rule exception: the self-contained DSO has 0 DT_NEEDED (readelf -d shows
+# SONAME/FLAGS only), while the hard-coded rule expects 1. The aarch64 S ceiling 1,300,000 is a
+# real overrun and is not raised.
 schema = 1
 metric = "S = Berkeley text+data of the stripped executable; B = bss; F = file bytes"
 headroom_percent = 3
@@ -888,26 +893,26 @@ budget_instructions = 41
 [[libc_so]]
 arch = "x86_64"
 path = "build/x86_64/libc.so.1"
-S = 0
-F = 0
+S = 1286594
+F = 3009232
 relative = 0
 jump_slot = 0
-data_rel_ro = 0
-budget_s = 0
-budget_f = 0
-status = "skipped: libc.so.1 absent (C62 not landed)"
+data_rel_ro = 24600
+budget_s = 1325192
+budget_f = 3099509
+status = "ok"
 
 [[libc_so]]
 arch = "aarch64"
 path = "build/aarch64/libc.so.1"
-S = 0
-F = 0
+S = 1363768
+F = 2501104
 relative = 0
-jump_slot = 0
-data_rel_ro = 0
-budget_s = 0
-budget_f = 0
-status = "skipped: libc.so.1 absent (C62 not landed)"
+jump_slot = 2
+data_rel_ro = 24224
+budget_s = 1404682
+budget_f = 2576138
+status = "ok"
 
 [[libc_so]]
 arch = "riscv64"
@@ -1752,3 +1757,29 @@ measured = 0
 limit = 0
 reason = "first measurement"
 detail = "member `locale*` pulled: raven_libc-c5a58e8bc5f99772.raven_libc_locale-56d2e54edee61431.raven_libc_locale.51ee86089d971a37-cgu.06.rcgu.o.rcgu.o"
+
+[[known-violation]]
+probe = "P9"
+arch = "x86_64"
+linkage = "dynamic"
+set = "server"
+lang = "rust"
+invariant = "INV-LIBC-SO-NEEDED"
+rule = ""
+measured = 0
+limit = 1
+reason = "rule bug: a self-contained libc.so.1 has no DT_NEEDED; readelf -d shows SONAME/FLAGS only and the loader resolves by SONAME (C74ht)"
+detail = "DT_NEEDED = 0; the hard-coded rule expects a self-NEEDED entry the linker does not emit"
+
+[[known-violation]]
+probe = "P9"
+arch = "aarch64"
+linkage = "dynamic"
+set = "server"
+lang = "rust"
+invariant = "INV-LIBC-SO-NEEDED"
+rule = ""
+measured = 0
+limit = 1
+reason = "rule bug: a self-contained libc.so.1 has no DT_NEEDED; readelf -d shows SONAME/FLAGS only and the loader resolves by SONAME (C74ht)"
+detail = "DT_NEEDED = 0; the hard-coded rule expects a self-NEEDED entry the linker does not emit"
