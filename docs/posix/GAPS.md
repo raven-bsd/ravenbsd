@@ -12,13 +12,13 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 0 | 0 | 20 | 0 |
-| headers | 86 | 0 | 3 | 81 | 2 |
-| interfaces | 1425 | 9 | 0 | 1286 | 130 |
+| headers | 86 | 0 | 2 | 82 | 2 |
+| interfaces | 1425 | 6 | 0 | 1289 | 130 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
 | utilities | 217 | 0 | 0 | 181 | 36 |
-| **all** | **1802** | **9** | **3** | **1611** | **179** |
+| **all** | **1802** | **6** | **2** | **1615** | **179** |
 
 Traceability rows: 1802; profile rows: 1802.
 
@@ -81,7 +81,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `header.strings.h` | `strings.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.stropts.h` | `stropts.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-ipc.h` | `sys/ipc.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.sys-mman.h` | `sys/mman.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.sys-mman.h` | `sys/mman.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-msg.h` | `sys/msg.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-resource.h` | `sys/resource.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-select.h` | `sys/select.h` | present | P1 | `libc/ravenlibc/include` |  |
@@ -153,7 +153,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.aio_suspend64` | `aio_suspend64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | aio.h |
 | `interface.aio_write` | `aio_write` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | aio.h |
 | `interface.aio_write64` | `aio_write64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | aio.h |
-| `interface.alarm` | `alarm` | missing | P1 | `none` | unistd.h |
+| `interface.alarm` | `alarm` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.alphasort` | `alphasort` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.asctime` | `asctime` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.asin` | `asin` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -920,7 +920,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.opendir` | `opendir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.openlog` | `openlog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
 | `interface.pathconf` | `pathconf` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
-| `interface.pause` | `pause` | missing | P1 | `none` | unistd.h |
+| `interface.pause` | `pause` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.pclose` | `pclose` | present | P1 | `test:tests/libc/posix/stdio/check-stdio2.sh` | stdio.h |
 | `interface.perror` | `perror` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.pipe` | `pipe` | present | P1 | `test:tests/libc/p1c-unistd/check-p1c-exports.sh` | unistd.h |
@@ -1229,7 +1229,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.setusershell` | `setusershell` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.setutxent` | `setutxent` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
 | `interface.setvbuf` | `setvbuf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
-| `interface.shm_open` | `shm_open` | missing | P1 | `none` | sys/mman.h |
+| `interface.shm_open` | `shm_open` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/mman.h |
 | `interface.shm_unlink` | `shm_unlink` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/shm.h |
 | `interface.shmat` | `shmat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/shm.h |
 | `interface.shmctl` | `shmctl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/shm.h |
@@ -1889,7 +1889,7 @@ Traceability rows: 1802; profile rows: 1802.
 
 ## Current tree
 
-- frozen exported symbols: 1739
+- frozen exported symbols: 1743
 - `userland/bin` directories: 102
 - headers under `libc/ravenlibc/include`: 228
 - utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, localedef, logger, login, lp, ls, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, newgrp, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, time, times, touch, tput, trace, ulimit, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
@@ -1899,7 +1899,6 @@ Traceability rows: 1802; profile rows: 1802.
 | area | name | evidence |
 |---|---|---|
 | header | `ndbm.h` | `https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/ndbm.h.html` |
-| header | `sys/mman.h` | `libc/ravenlibc/include` |
 | header | `sys/stat.h` | `libc/ravenlibc/include` |
 | header | `trace.h` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/headers.html` |
 | header | `unistd.h` | `libc/ravenlibc/include` |
@@ -1907,7 +1906,6 @@ Traceability rows: 1802; profile rows: 1802.
 | interface | `acosfNx` | `none` |
 | interface | `acoshfNx` | `none` |
 | interface | `adjtime` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
-| interface | `alarm` | `none` |
 | interface | `asinfNx` | `none` |
 | interface | `asinhfNx` | `none` |
 | interface | `atan2fNx` | `none` |
@@ -1978,5 +1976,7 @@ Traceability rows: 1802; profile rows: 1802.
 | interface | `ldexpfNx` | `none` |
 | interface | `llogbfNx` | `none` |
 | interface | `llrintfNx` | `none` |
+| interface | `llroundfNx` | `none` |
+| interface | `log10fNx` | `none` |
 
-191 gap rows are listed in full in the tables above; this short table is a review aid.
+187 gap rows are listed in full in the tables above; this short table is a review aid.

@@ -860,7 +860,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.alarm"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.alphasort"
@@ -5462,7 +5462,7 @@ evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 id = "interface.pause"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.pclose"
@@ -7316,7 +7316,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.shm_open"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.shm_unlink"
