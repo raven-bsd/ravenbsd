@@ -39,8 +39,8 @@ pub const DEFAULT_HOME: &str = "/";
 pub const DEFAULT_TERM: &str = "vt100";
 /// Default login name; the release image has the root account only.
 pub const ROOT_USER: &str = "root";
-/// Default session shell when `/etc/passwd` and `/etc/profile` are silent.
-pub const DEFAULT_SHELL: &str = "/bin/rsh";
+/// Default session shell for the root login. Both getty release images stage brush.
+pub const DEFAULT_SHELL: &str = "/bin/brush";
 /// Longest accepted account/profile field.
 pub const MAX_FIELD: usize = 256;
 /// Longest accepted login name.
@@ -68,7 +68,7 @@ pub struct Profile {
     pub term: String,
     /// `USER` value.
     pub user: String,
-    /// `SHELL` value from the profile (the passwd shell still wins for the exec path).
+    /// `SHELL` value from the profile; the root passwd shell resolves to [`DEFAULT_SHELL`].
     pub shell: String,
 }
 
@@ -85,11 +85,18 @@ impl Default for Profile {
 }
 
 /// Find the `root` entry in `/etc/passwd`.
+///
+/// The root session shell is login policy, not the mutable passwd field: both release images
+/// stage brush at [`DEFAULT_SHELL`], and the passwd shell is kept as account metadata.
 #[must_use]
 pub fn parse_root_passwd(text: &str) -> Option<PasswdEntry> {
     text.lines().find_map(|line| {
-        let entry = parse_passwd_line(line)?;
-        (entry.name == ROOT_USER).then_some(entry)
+        let mut entry = parse_passwd_line(line)?;
+        if entry.name != ROOT_USER {
+            return None;
+        }
+        entry.shell = String::from(DEFAULT_SHELL);
+        Some(entry)
     })
 }
 

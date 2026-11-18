@@ -13,7 +13,9 @@ fn root_passwd_entry_is_selected() {
     let entry = parse_root_passwd(text).expect("root entry");
     assert_eq!(entry.name, "root");
     assert_eq!(entry.home, "/");
-    assert_eq!(entry.shell, "/bin/rsh");
+    // The root session shell is login policy; the passwd field stays account metadata.
+    assert_eq!(entry.shell, DEFAULT_SHELL);
+    assert_eq!(entry.shell, "/bin/brush");
 }
 
 #[test]
