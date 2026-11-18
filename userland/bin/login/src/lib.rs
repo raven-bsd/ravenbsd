@@ -262,6 +262,20 @@ pub mod tty {
             }
         }
 
+        /// Discard input buffered before the session shell starts.
+        ///
+        /// The console scheme may retain the tail of a read in its canonical buffer. The login
+        /// process hands the console to getty, which spawns the session shell; without a flush
+        /// the first shell line can inherit stale bytes (observed as NULs before the first
+        /// command). FLUSH is best-effort: a server that does not implement it keeps the old
+        /// behaviour.
+        pub fn flush(&self) {
+            let mut encoded = [0u8; CALL_LEN];
+            encode_request(Request::Flush, &mut encoded);
+            let mut response = [0u8; CALL_LEN];
+            let _ = Client::new().call(self.handle, &encoded, &mut response);
+        }
+
         /// Switch the console echo bit; failures keep the previous setting.
         pub fn set_echo(&self, echo: bool) {
             let request = Request::SetMode {
