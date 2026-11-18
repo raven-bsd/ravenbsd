@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# One getty on the console. It needs the tty scheme from consd and the initfs for /bin/login and
-# the account files; all of those are staged in the initfs, so login does not wait for the
-# ramfs/vfs or network services. This keeps getty ahead of netd/resolvd in the start plan.
+# One getty on the console. It needs the tty scheme from consd and the file namespace for the
+# dynamic loader, /bin/login and the account files. The network is deliberately not in these
+# dependencies; the release netd manifest starts after getty instead.
 
 name = "getty"
 exec = "/bin/getty"
-needs = ["consd", "initfsd"]
+needs = ["consd", "vfsd", "ramfsd", "initfsd"]
 restart = "on-failure"
 grants = ["initfs"]
