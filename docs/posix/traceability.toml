@@ -296,7 +296,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.ndbm.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/ndbm.h.html"
 
 [[trace]]
 id = "header.net-if.h"
@@ -10424,7 +10424,7 @@ evidence = "qtest:posix-shell"
 id = "util.sh"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "test:tests/posix/utility/shell/check-sh.sh"
 
 [[trace]]
 id = "util.sha1sum"

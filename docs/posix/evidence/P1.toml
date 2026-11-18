@@ -2755,3 +2755,11 @@ id = "header.trace.h"
 status = "waived"
 evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/headers.html"
 notes = "P1f9: POSIX.1-2024 removed trace.h and the posix_trace_* interfaces (Issue 8 header index does not list trace.h); waived as removed"
+
+# P1f11: Issue 8 marks <ndbm.h> [XSI] optional; this profile does not claim the XSI database
+# option. This row is the explicit waiver for the owner decision, with the exact Issue 8 basis.
+[[row]]
+id = "header.ndbm.h"
+status = "waived"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/ndbm.h.html"
+notes = "P1f11: Issue 8 <ndbm.h> is marked [XSI] (X/Open System Interfaces option); the base POSIX.1-2024 requirement does not include it. Owner decision requested: waive the optional XSI header; dbm_* are outside the base set."
