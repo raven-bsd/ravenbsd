@@ -11,4 +11,5 @@ umask 022
 # The release login is brush; register a deterministic completion spec for the transcript
 # gate. TAB completion itself is interactive, so the scripted proof is `complete -p`. A
 # non-brush shell that sources this profile ignores the missing builtin.
-complete -W 'help exit' raven-test 2>/dev/null || true
+echo profile-completion
+complete -W 'help exit' raven-test || echo complete-failed
