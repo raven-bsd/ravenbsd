@@ -138,6 +138,36 @@ observed login times on a shared 20-CPU host, not a <1 s boot-time claim (S116 o
 The independent lead integration run in `20261118T194209Z` (13:44 image) also completed
 20/20, 20/20, 50/50 and 10/10; the round-3 campaign above is the branch-local evidence.
 
+## Round 5 matrix (2026-11-18)
+
+The rev-47 rerun used the relaxed shared-host bound while still refusing live QEMU/build jobs:
+
+```sh
+sh scripts/smp-boot-soak.sh --kvm4 50 --kvm2 20 --kvm1 20 --tcg4 10 --wait-for-idle 1800 --max-load 15
+```
+
+The preflight waited from load1 16.76 at 20:12:37Z until load1 3.07 at 20:37:52Z, then
+recorded no other QEMU and no xtask/cargo/rustc job. KVM was clean:
+
+| Mode | Requested | Passed | Failure | p50 | p90 | worst |
+|---|---:|---:|---|---:|---:|---:|
+| KVM `-smp 1` | 20 | 20 | none | 3.402 s | 3.753 s | 3.935 s |
+| KVM `-smp 2` | 20 | 20 | none | 3.429 s | 3.906 s | 3.950 s |
+| KVM `-smp 4` | 50 | 50 | none | 3.512 s | 3.817 s | 3.977 s |
+| TCG `-smp 4` | 10 | 4 | **run 5/10 login timeout** | 8.530 s* | 10.262 s* | 10.262 s* |
+
+`*` partial over the four passing TCG4 runs; the fifth failed, so the runner stopped and did not
+run 6-10. KVM4 run 21 passed with `login_s=3.817`; the old round-1 run-21 failure remains
+preserved. Campaign: `build/smp-boot-soak/20261118T201237Z/`.
+
+TCG4 run 5 reached `smp: 4 cpus online` and `svcd: all services up` at 22.03 s, but the
+`RavenBSD 0.1 (x86_64) (tty:console)` banner and `login:` prompt never appeared before the
+30 s timeout; the log ends at 22.03 s (3,773 bytes). Passing TCG4 runs printed the banner at
+about 8-10 s. Raw/stamped logs:
+`build/smp-boot-soak/20261118T201237Z/tcg4/run-5.log` and `.stamped.log`. This is a real
+TCG4 boot-to-login failure, preserved and not retried; it needs the TCG/getty owner. The round-3
+clean TCG4 10/10 remains a separate prior run, not a substitute for this failure.
+
 ## Reproduction and ownership
 
 The runner and helper are owned by S107 (`scripts/smp-boot-soak.sh`, `tests/smp/boot/**`,
