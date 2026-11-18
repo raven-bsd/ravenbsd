@@ -417,6 +417,31 @@ pub fn on_process_exit(process: &Arc<Process>) {
         );
     }
 
+    // S125 evidence: server slot usage must return to zero, and the global high-water mark
+    // shows whether the pool is sized for two captures per concurrent CALL.
+    if crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s125-capturecheck")
+    {
+        let stats = capture::slot_stats();
+        let pool = process.capture_slots.lock().stats();
+        crate::kprintln!(
+            "s125: exit {} server_captures={} server_capture_peak={} server_pages={} server_page_peak={} active={} global_peak={} page_active={} page_peak={} acquires={} releases={} frames={}",
+            process.path,
+            pool.captures,
+            pool.capture_peak,
+            pool.pages,
+            pool.page_peak,
+            stats.active,
+            stats.peak,
+            stats.pages,
+            stats.page_peak,
+            stats.acquires,
+            stats.releases,
+            capture::frames_in_use()
+        );
+    }
+
     // S32 leak probe: capture frames still owned after the process's requests were drained.
     // Zero means every copy-backed capture was released exactly once.
     if crate::memory::paging::cmdline()
