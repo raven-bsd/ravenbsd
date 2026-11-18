@@ -4,7 +4,7 @@
 # Pi 4 7.5-inch E-Ink core and integration plan
 
 Status: **host core implemented and tested (OBSERVED); Pi 4 panel hardware UNVERIFIED.** E1 adds
-the first-party Rust framebuffer and UC8179 command encoder. It does not open SPI, touch a GPIO or
+the first-party Rust Canvas and UC8179 command encoder. It does not open SPI, touch a GPIO or
 claim a hardware pass. The Pi 4 transport, service and measured refresh evidence are E2/E3 work.
 
 ## 1. Panel decision
@@ -77,7 +77,7 @@ kernel or `platd` change.
 ```
 boot -> login -> einkd starts (after login/network readiness)
      -> fetch content (E3; HTTPS/TLS decision)
-     -> render into Framebuffer (rotation, text/glyphs, lines/rects)
+     -> render into Canvas (rotation, text/glyphs, lines/rects)
      -> pack via PanelProfile -> Uc8179 data + full refresh
      -> keep last-good frame; schedule next refresh
 ```
@@ -125,7 +125,7 @@ constants, not donor code.
 | Donor / area | Idea | Applied in E1 | Remaining work |
 |---|---|---|---|
 | NetBSD/FreeBSD SPI and GPIO frameworks | Separate controller/device layers; busy polling with bounded waits | `Transport`/`Delay` seam; bounded BUSY poll | Pi 4 SPI0/GPIO transport and wiring (E2) |
-| Linux fbtft / E-Ink panel drivers | Framebuffer-to-panel command/data split; rotation and packing at the edge | 1-bit framebuffer, rotation, profile packing, UC8179 encoder | Hardware timing, waveform validation, partial refresh |
+| Linux fbtft / E-Ink panel drivers | Canvas-to-panel command/data split; rotation and packing at the edge | 1-bit Canvas, rotation, profile packing, UC8179 encoder | Hardware timing, waveform validation, partial refresh |
 | Illumos device-driver layering | Explicit device lifecycle and power states | Reset/power-on/refresh/deep-sleep encoder | Service integration and power policy (E3) |
 | Pi 4 BCM2711 documentation | SPI0 CE0/CLK/MOSI mapping | Documented pin plan; no code copied | E2 MMIO/GPIO implementation |
 

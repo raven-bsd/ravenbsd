@@ -197,7 +197,7 @@ einkd
   -> resolv: (A/AAAA via resolvd)       DNS, TTL, fail closed
   -> net:tcp/<ipv4>:<port>              connected Transport
   -> raven-http Client                   GET, headers, body, redirects, timeout
-  -> renderer/Framebuffer                last-good page, refresh schedule
+  -> renderer/Canvas                last-good page, refresh schedule
   -> optional fetchd/tlsd add-on         HTTPS only, OpenSSL + raven-tls (DR-45)
 ```
 
