@@ -12,13 +12,13 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 0 | 0 | 20 | 0 |
-| headers | 86 | 1 | 3 | 81 | 1 |
+| headers | 86 | 0 | 3 | 81 | 2 |
 | interfaces | 1425 | 9 | 0 | 1286 | 130 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
-| utilities | 217 | 0 | 1 | 180 | 36 |
-| **all** | **1802** | **10** | **4** | **1610** | **178** |
+| utilities | 217 | 0 | 0 | 181 | 36 |
+| **all** | **1802** | **9** | **3** | **1611** | **179** |
 
 Traceability rows: 1802; profile rows: 1802.
 
@@ -54,7 +54,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `header.math.h` | `math.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.monetary.h` | `monetary.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.mqueue.h` | `mqueue.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.ndbm.h` | `ndbm.h` | missing | P1 | `none` |  |
+| `header.ndbm.h` | `ndbm.h` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/ndbm.h.html` | waiver: P1f11: Issue 8 <ndbm.h> is marked [XSI] (X/Open System Interfaces option); the base POSIX.1-2024 requirement does not include it. Owner decision requested: waive the optional XSI header; dbm_* are outside the base set. |
 | `header.net-if.h` | `net/if.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.netdb.h` | `netdb.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.netinet-in.h` | `netinet/in.h` | present | P1 | `libc/ravenlibc/include` |  |
@@ -1698,7 +1698,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `util.sed` | `sed` | present | P4 | `test:tests/posix/utility/text2/sed/test.sh` | none |
 | `util.seq` | `seq` | present | P4 | `test:tests/posix/utility/misc/seq/test.sh` | none |
 | `util.set` | `set` | present | P4 | `qtest:posix-shell` | none |
-| `util.sh` | `sh` | partial | P4 | `userland/bin/rsh` | none |
+| `util.sh` | `sh` | present | P4 | `test:tests/posix/utility/shell/check-sh.sh` | none |
 | `util.sha1sum` | `sha1sum` | present | P4 | `test:tests/posix/utility/misc/sha1sum/test.sh` | none |
 | `util.sha224sum` | `sha224sum` | present | P4 | `test:tests/posix/utility/misc/sha224sum/test.sh` | none |
 | `util.sha256sum` | `sha256sum` | present | P4 | `test:tests/posix/utility/misc/sha256sum/test.sh` | none |
@@ -1898,7 +1898,7 @@ Traceability rows: 1802; profile rows: 1802.
 
 | area | name | evidence |
 |---|---|---|
-| header | `ndbm.h` | `none` |
+| header | `ndbm.h` | `https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/ndbm.h.html` |
 | header | `sys/mman.h` | `libc/ravenlibc/include` |
 | header | `sys/stat.h` | `libc/ravenlibc/include` |
 | header | `trace.h` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/headers.html` |
@@ -1979,4 +1979,4 @@ Traceability rows: 1802; profile rows: 1802.
 | interface | `llogbfNx` | `none` |
 | interface | `llrintfNx` | `none` |
 
-192 gap rows are listed in full in the tables above; this short table is a review aid.
+191 gap rows are listed in full in the tables above; this short table is a review aid.

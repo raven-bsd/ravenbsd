@@ -100,10 +100,10 @@ row = 1
 title = "Miri (C11)"
 required = true
 kind = "argv"
-preflight = ["cargo", "+nightly", "miri", "--version"]
-argv = ["cargo", "+nightly", "miri", "test", "-p", "raven-libc-str", "-p", "raven-libc-fmt", "-p", "raven-libc-dtoa", "-p", "raven-libc-regex", "-p", "raven-libc-glob"]
+preflight = ["rustup", "run", "nightly", "cargo", "miri", "--version"]
+argv = ["cargo", "run", "-q", "--manifest-path", "tests/libc/miri/runner/Cargo.toml", "--"]
 blocked_on = { exit = [77] }
-note = "UNAVAILABLE: cargo-miri is not installed for the nightly toolchain"
+note = "bounded runner: 721 Miri tests (715 library + 6 alignment), 6/6 pass; the cargo entry point wraps scripts/check-miri.sh and keeps the explicit integration exclusions in tests/libc/miri/integration-exclusions.txt"
 evidence = "build/libc-gate/1.6.txt"
 source = "16 3.B.2.1"
 

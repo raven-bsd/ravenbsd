@@ -4,11 +4,13 @@
 //! Memory glue (T5).
 
 pub mod mmap;
+pub mod shm;
 
 pub use mmap::{
     brk, getpagesize, madvise, mlock, mlockall, mmap, mprotect, mremap, msync, munlock, munlockall,
     munmap,
 };
+pub use shm::{path as shm_path, shm_open, shm_unlink};
 
 #[cfg(test)]
 #[path = "mem_ut.rs"]

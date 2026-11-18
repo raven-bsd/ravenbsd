@@ -4,9 +4,8 @@
 # Release image reproducibility fixtures
 
 This directory records the host-only two-build check for the 0.1.0 release images. The executable
-check is `scripts/repro-release.sh`; the method, the commit-id input and the diagnosis table are
-in `docs/releases/0.1.0-repro.md`; the recorded hashes for the branch commit are in
-`tickets/dave/reports/C74cs.md`.
+check is `scripts/repro-release.sh`; the method, the commit-id input, the final hashes and the
+diagnosis table are in `docs/releases/0.1.0-repro.md`.
 
 ## Running it
 
@@ -26,7 +25,7 @@ pair.
 
 ## What the self-test covers
 
-`--self-test` creates synthetic files in a temporary directory and checks the three cases the
+`--self-test` creates synthetic files in a temporary directory and checks the three file cases the
 comparison code must classify:
 
 | Case | Fixture | Expected |
@@ -35,14 +34,16 @@ comparison code must classify:
 | same size, different content | `abcdef` vs `abcdeg` | `content`, first differing byte 6 |
 | different size | `abc` vs `abcd` | `size` |
 
-It also checks that SHA-256 returns 64 hex characters. It never touches `build/` and never claims
-an image verdict.
+It also checks that SHA-256 returns 64 hex characters and that the embedded-id classifier accepts
+a clean whole token while rejecting `<short>-dirty`, a stale id, a longer hash and an empty id. It
+never touches `build/` and never claims an image verdict.
 
 ## Recorded run
 
-The recorded pair for the commit that added this check (both images 335544320 bytes, build a =
-build b, all constituent artifacts matching) is in `tickets/dave/reports/C74cs.md`. The hash is
-commit-specific because the kernel carries the git id; do not compare it to a different commit.
+The final pair for `origin/master` `0d7cbd3c` is in `docs/releases/0.1.0-repro.md`: both images
+335544320 bytes, build a = build b, all constituent artifacts matching
+(x86_64 `7c0f2238…`, Pi 4 `dee5de8a…`). The hash is commit-specific because the kernel carries
+the git id; do not compare it to a different commit.
 
 ## Scope
 
