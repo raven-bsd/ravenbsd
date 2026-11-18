@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "miri-row"
+version = "0.1.0"
+description = "Run scripts/check-miri.sh as the libc gate 1.6 cargo argv."
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "miri-row"
+path = "src/main.rs"
+
+# Standalone helper crate: keep it out of the product workspace and its lockfile.
+[workspace]
