@@ -117,6 +117,40 @@ E1d supplies a real 8x16 ASCII font and a layout helper in `einkd`:
   service's text page path already uses `Font::glyph` for newline/wrap/clip, and E3 can call the
   layout helper when it needs alignment/scale before producing a bitmap page.
 
+## 5b. Executable, modes and supervision (E1e)
+
+`userland/servers/einkd/src/main.rs` is the target executable:
+
+* `--dry-run --once` uses a static `Content` page, `BasicFont`, a `DryRunPanel` that only counts
+  and logs the rendered frame, and the realtime wall `Clock`; it performs one fetch/render/
+  refresh and exits 0. No SPI, GPIO, panel or network access.
+* A run without `--dry-run` exits with a clear "hardware adapter not built" error; the SPI/GPIO
+  adapter is E4.
+* `--once` bounds the loop; without it the same core would follow the configured interval. The
+  dry-run output is `einkd: start`, `fetch static text`, `dry-run refresh black=<n>`,
+  `refreshed next_at=<t>` and `done`.
+
+`userland/init/services/einkd.toml` is `enable = false` with `needs = ["getty", "netd"]`,
+`restart = "never"` and `required = false`, so a normal release boot does not touch a missing
+panel and einkd never precedes login/network. The release profile stages the binary and manifest
+but leaves it disabled. The `einkd-supervision` qtest logs in normally, starts einkd explicitly
+via the static `disk-tool-svcctl` test tool, asserts the dry-run lines and exits the login shell;
+the boot/login transcript is unchanged.
+
+`profiles/pi4-eink.toml` is the Pi 4 hardware staging profile (extends `pi4`; the profile loader
+allows one inheritance level, so the full `pi4-release` service stack remains its own profile).
+It stages the same disabled binary/manifest; panel access stays off until E4.
+
+**Hardware adapter boundary:** `Uc8179Panel` expects `raven_eink::Transport`/`Delay`; E4
+implements those over the E1b `raven-spi` core plus the DC/RST/BUSY GPIO client. `einkd` owns the
+service state, font/layout and policy; `platd` remains the GPIO provider (or E4 maps the GPIO
+window in the service). No kernel or `platd` edit is made by E1e.
+
+**E4 evidence plan:** SPI loopback and scope-timed CS/CLK/MOSI/DC; BUSY/full-refresh timing; a
+known page on the real panel; failed fetch and panel timeout preserve the last-good frame; a
+boot/login delta with einkd disabled/enabled. These remain UNVERIFIED; the dry-run qtest proves
+only the service path, not the panel.
+
 ## 6. platd / GPIO contract
 
 `platd` remains the platform GPIO owner unless E2 adds an SPI bus. E1c does not edit it. The E2
@@ -150,7 +184,7 @@ Pi 4 (UNVERIFIED, E4):
 * Fail the fetch and the panel deliberately: the last-good page must remain visible and the
   backoff must not spin the panel.
 * Measure the boot/login delta with `einkd` disabled/enabled; the refresh is post-login only.
-* Record the exact panel SKU/revision; no Pi 4 pass is claimed by E1c.
+* Record the exact panel SKU/revision; no Pi 4 pass is claimed by E1e.
 
 ## 8. BOM (service-side)
 
@@ -169,13 +203,13 @@ E-Ink service disposition.
 |---|---|---|---|
 | NetBSD/FreeBSD service layering | Explicit start gate, retry/backoff, last-good state | `Service` state machine and `Action` results | E3 supervision/restart integration |
 | Linux fbtft/panel services | Fetch→render→refresh separation, full-refresh policy | `Content`/`Panel` seams, full refresh only | Panel timing and image validation (E4) |
-| Illumos/SMF design | Dependency-aware start after network/time | `tick(ready)` gate; NTP-corrected `Clock` | einkd service manifest/profile in E3 |
+| Illumos/SMF design | Dependency-aware start after network/time | `tick(ready)` gate; NTP-corrected `Clock`; E1e manifest after getty/netd | E4 hardware adapter |
 | `raven-eink` / `raven-spi` (first-party) | UC8179 encoder + BCM SPI transport | `Uc8179Panel` adapter and host mocks | E2 mapped SPI/GPIO transport |
 | `platd` GPIO design | DC/RST/BUSY ownership, no slow work in platd | Documented contract; no platd edit | E2/E3 GPIO client decision |
+| E1e service integration | Disabled-by-default service, explicit after-login start, dry-run panel | `einkd.toml`, `--dry-run --once`, `einkd-supervision` qtest | E4 SPI/GPIO/panel evidence |
 
 ## 10. Open inputs
 
 * E3 HTTP/HTTPS/TLS source; an alternative font only with documented provenance.
-* einkd service manifest/profile and its post-login supervision Graph (no getty dependency).
 * E2 SPI/GPIO transport and E4 panel SKU/timing/current evidence.
 * Whether the panel needs a board-specific reset/power sequence beyond the E1 UC8179 encoder.
