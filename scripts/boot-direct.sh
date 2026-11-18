@@ -249,7 +249,9 @@ def run_once(number):
     login_ms = None
     lines = []
     deadline = start + timeout_secs
+    post_deadline = None
     while time.perf_counter() < deadline:
+        now = time.perf_counter() - start
         ready, _, _ = select.select([process.stdout], [], [], 0.05)
         if ready:
             chunk = os.read(process.stdout.fileno(), 65536)
@@ -274,7 +276,12 @@ def run_once(number):
         if mode == "probe" and kernel_ms is not None:
             break
         if mode == "full" and login_ms is not None:
-            break
+            if post_deadline is None:
+                post_deadline = now + 10.0
+            markers = ["svcd: getty up", "svcd: netd up", "netd: interface eth0"]
+            ready = all(any(marker in line for line in lines) for marker in markers)
+            if ready or now >= post_deadline:
+                break
         if process.poll() is not None:
             # Drain whatever the guest wrote before exiting.
             while True:
@@ -335,6 +342,21 @@ kernel_median, kernel_p90 = show([row[2] for row in results], "kernel-banner")
 login_median, login_p90 = show([row[3] for row in results], "login")
 if loader_median is not None and entry_median is not None:
     print("boot-direct: loader-work median=%.1f ms" % ((entry_median - loader_median) * 1000.0))
+
+if mode == "full":
+    required = ["svcd: getty up", "svcd: netd up", "netd: interface eth0"]
+    for number, row in enumerate(results, 1):
+        lines = row[4]
+        missing_service = [marker for marker in required if not any(marker in line for line in lines)]
+        if missing_service:
+            print(
+                "boot-direct: run %d missing release service marker(s): %s"
+                % (number, ", ".join(missing_service))
+            )
+            for line in lines[-25:]:
+                print("boot-direct: | %s" % line)
+            sys.exit(2)
+    print("boot-direct: release getty, netd and the virtio network are up")
 
 missing = [number for number, row in enumerate(results, 1) if row[2] is None]
 if missing:

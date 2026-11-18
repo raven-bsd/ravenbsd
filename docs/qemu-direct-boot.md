@@ -63,9 +63,10 @@ pre-existing kernel SMP/AP issue, not a loader setting.
 | Path | Loader start | Loader work | Kernel banner | Release login |
 |---|---|---|---|---|
 | UEFI/OVMF, TCG (round 1 baseline) | n/a | n/a | median **38.2 s** | median **166 s** |
-| Direct, q35, TCG, release initfs (3 runs) | median 211 ms | n/a | median **3.244 s** (p90 4.902 s) | median **8.052 s** (p90 8.522 s) |
-| Direct, microvm, KVM, smp=1, release initfs (`boot-direct.sh`, 3 runs) | median 332 ms | median 104 ms | median **1.504 s** (p90 1.841 s) | not run |
-| Direct, q35, KVM, smp=1, release initfs (1 run) | 551 ms | 168 ms | **1.589 s** | **2.327 s** |
+| Direct, q35, TCG, smp=4, release initfs (3 runs) | median 211 ms | n/a | median **3.244 s** (p90 4.902 s) | median **8.052 s** (p90 8.522 s) |
+| Direct, microvm, KVM, smp=1, release initfs (`boot-direct.sh --arch x86_64`, 3 runs) | median 111 ms | median 13 ms | median **348 ms** (p90 589 ms) | not run |
+| Direct, q35, KVM, smp=1, release initfs (`boot-direct.sh --mode full`, clean host, 3 runs) | median 191 ms | median 13 ms | median **517 ms** (p90 586 ms) | median **755 ms** (p90 **923 ms**) |
+| Direct, q35, KVM, smp=1, release initfs (later run under shared-host load, 3 runs) | median 160 ms | median 32 ms | median **649 ms** (p90 731 ms) | median **1080 ms** (p90 1081 ms) |
 
 The loader itself reaches the kernel in one step: the loader-work column is the time from
 `direct: loader start` to `direct: entering kernel`. The kernel then runs its normal early init
@@ -74,24 +75,38 @@ The loader itself reaches the kernel in one step: the loader-work column is the 
 
 The full release image was verified on the direct path: q35 + virtio-net, release initfs, KVM,
 `smp=1` reaches `svcd: all services up`, `netd: interface eth0 10.0.2.15/24`, the getty banner
-and `login:`. No service is disabled and rsh is not part of the path.
+and `login:`. `boot-direct.sh --mode full` additionally requires `svcd: getty up`,
+`svcd: netd up` and `netd: interface eth0` before it reports success. No service is disabled and
+rsh is not part of the path. The **full release login target (<1 s) is MET** in the clean
+three-run row (median 755 ms, p90 923 ms). A later three-run sample on the same shared host
+measured median 1080 ms / p90 1081 ms with all services up, so the gate is marginal and
+host-load sensitive; the loader and kernel work are unchanged in both samples.
 
-## Why the <0.2 s / <1 s targets are still missed
+## The remaining <0.2 s kernel-banner gap
+
+The probe target is still missed. The measured breakdown for the microvm/KVM probe is:
+
+```
+firmware + PVH option ROM: 111 ms
+loader work (start -> _start): 13 ms
+kernel early init (_start -> banner): 224 ms
+```
 
 * QEMU 6.2's `-kernel` PVH path starts an option ROM (`pvh.bin`), not a direct CPU reset into
-  the ELF. The measured loader-start column (0.15-0.55 s) is QEMU/SeaBIOS/option-ROM time before
-  the loader's first line. A boot path without that stage needs a different QEMU mechanism or a
-  minimal firmware; both are outside this loader and would still have to build `BootInfo`.
-* Under TCG the unchanged kernel's early init (dominated by the 41 MB release-initfs CRC and
-  SMP/AP and timer bring-up) takes seconds. Under KVM it is much smaller, but KVM with `-smp 4`
-  hangs after `timer: 1000 Hz` in this tree; the same hang happens with the UEFI image, so it is
-  a pre-existing kernel/SMP issue (S83), not the direct loader. `-smp 1` is reliable.
-* The full <1 s login gate additionally depends on S84/S95/S96 (service/network/brush work); the
-  direct path now boots the same release userland, but the gate is not closed by this ticket.
+  the ELF. The loader-start column is QEMU/SeaBIOS/option-ROM time before the loader's first
+  line. A boot path without that stage needs a different QEMU mechanism or a minimal firmware;
+  both are outside this loader and would still have to build `BootInfo`.
+* The unchanged kernel prints the banner only after frame allocation, paging, the heap, the
+  full 41 MB release-initfs CRC, drivers, scheduler, ACPI/APIC and timer bring-up. Under TCG that
+  takes seconds; under KVM it is ~224 ms in the quiet run above. No loader change can remove
+  that work.
+* KVM with `-smp 4` hangs after `timer: 1000 Hz` in this tree; the same hang happens with the
+  UEFI image, so it is a pre-existing kernel/SMP issue (S83), not the direct loader. `-smp 1`
+  is reliable and is what the full <1 s result uses. TCG `-smp 4` works but is far slower.
 
 The exact remaining loader-side work is therefore **none**: the loader builds the handoff and
-enters `_start`. The remaining time is QEMU's PVH option-ROM stage plus kernel early init, and
-the KVM SMP hang is kernel-owned.
+enters `_start` in 13 ms. The remaining time is QEMU's PVH option-ROM stage plus kernel early
+init, and the KVM SMP hang is kernel-owned.
 
 ## Kernel entry contract (unchanged, now satisfied by the loader)
 
