@@ -42,7 +42,9 @@ mod program {
     };
     use raven_rt::entry;
     use raven_rt::println;
-    use raven_scheme::{CallReply, Client, Ctx, Handler, HandlerResult, OpenTable, Opened, Server};
+    use raven_scheme::{
+        CallReply, Client, Ctx, Handler, HandlerError, HandlerResult, OpenTable, Opened, Server,
+    };
     use raven_vfs_core::{DEFAULT_MOUNTS, MountTable, normalized, parse_mounts};
 
     entry!(main);
@@ -81,16 +83,18 @@ mod program {
         pagers: BTreeMap<u32, PagerRegion>,
         mount_generation: u32,
         probe: crate::trace::Probe,
+        trace: bool,
     }
 
     impl VfsHandler {
-        fn new(table: MountTable) -> Self {
+        fn new(table: MountTable, trace: bool) -> Self {
             Self {
                 table,
                 opens: OpenTable::new(),
                 pagers: BTreeMap::new(),
                 mount_generation: 1,
                 probe: crate::trace::Probe::server(),
+                trace,
             }
         }
 
@@ -799,6 +803,12 @@ mod program {
                 let _ = client.close(target);
                 return Err(Errno::EMFILE.into());
             }
+            let target_handle = target.0;
+            let path_for_trace = if self.trace {
+                path.clone()
+            } else {
+                String::new()
+            };
             let id = self.opens.insert(
                 Proxy {
                     target,
@@ -809,6 +819,12 @@ mod program {
                 },
                 flags,
             )?;
+            if self.trace {
+                println!(
+                    "vfsd-trace: open id={id} path={} target={} trace={} req={}",
+                    path_for_trace, target_handle, ctx.trace_id, ctx.request.0
+                );
+            }
             Ok(Opened::File(id))
         }
 
@@ -835,7 +851,31 @@ mod program {
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
             self.probe.record(ctx.trace_id, READ_OPCODE);
-            self.read(file, offset, buffer)
+            if !self.trace {
+                return self.read(file, offset, buffer);
+            }
+            let target = self.opens.get(file).map_or(0, |entry| entry.file.target.0);
+            println!(
+                "vfsd-trace: read file={file} target={target} off={offset} len={} ptr={:p} trace={} req={}",
+                buffer.len(),
+                buffer.as_ptr(),
+                ctx.trace_id,
+                ctx.request.0
+            );
+            let result = self.read(file, offset, buffer);
+            match &result {
+                Ok(bytes) => {
+                    println!("vfsd-trace: read-reply file={file} target={target} bytes={bytes}")
+                }
+                Err(HandlerError::Errno(error)) => println!(
+                    "vfsd-trace: read-reply file={file} target={target} errno={}",
+                    error.description()
+                ),
+                Err(HandlerError::Defer(token)) => {
+                    println!("vfsd-trace: read-reply file={file} target={target} defer={token}")
+                }
+            }
+            result
         }
 
         fn write(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
@@ -844,6 +884,40 @@ mod program {
             }
             let target = self.opens.get(file).ok_or(Errno::EBADF)?.file.target;
             Ok(copy_write(&Client::new(), target, None, buffer)?)
+        }
+
+        fn write_with(
+            &mut self,
+            file: u64,
+            offset: u64,
+            buffer: &[u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<usize> {
+            if !self.trace {
+                return self.write(file, offset, buffer);
+            }
+            let target = self.opens.get(file).map_or(0, |entry| entry.file.target.0);
+            println!(
+                "vfsd-trace: write file={file} target={target} off={offset} len={} ptr={:p} trace={} req={}",
+                buffer.len(),
+                buffer.as_ptr(),
+                ctx.trace_id,
+                ctx.request.0
+            );
+            let result = self.write(file, offset, buffer);
+            match &result {
+                Ok(bytes) => {
+                    println!("vfsd-trace: write-reply file={file} target={target} bytes={bytes}")
+                }
+                Err(HandlerError::Errno(error)) => println!(
+                    "vfsd-trace: write-reply file={file} target={target} errno={}",
+                    error.description()
+                ),
+                Err(HandlerError::Defer(token)) => {
+                    println!("vfsd-trace: write-reply file={file} target={target} defer={token}")
+                }
+            }
+            result
         }
 
         fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
@@ -1127,7 +1201,8 @@ mod program {
         }
     }
 
-    fn main(_args: raven_rt::Args) -> i32 {
+    fn main(args: raven_rt::Args) -> i32 {
+        let trace = args.env_get("VFSD_TRACE").is_some();
         let mounts = match load_mounts() {
             Ok(mounts) => mounts,
             Err(_) => return 1,
@@ -1161,7 +1236,7 @@ mod program {
                 return 4;
             }
         };
-        let mut handler = VfsHandler::new(table);
+        let mut handler = VfsHandler::new(table, trace);
         server.run(&mut handler)
     }
 }

@@ -38,6 +38,7 @@ const FILE_WORKERS: usize = 4;
 const MOUNT_WORKERS: usize = 4;
 const WORKERS: usize = FILE_WORKERS + MOUNT_WORKERS;
 const ITERATIONS: usize = 50;
+const TRACE: bool = false;
 const STACK_SIZE: usize = 128 * 1024;
 const PAGE: usize = 4096;
 const READ_WRITE: u32 = 3;
@@ -430,15 +431,17 @@ fn start_services() -> Result<(), String> {
     let image = raven_rt::map_initfs().map_err(|_| "initfs map".to_string())?;
     let initfs = Initfs::parse(image).map_err(|_| "initfs parse".to_string())?;
     for path in ["/sbin/initfsd", "/sbin/ramfsd", "/sbin/vfsd"] {
-        spawn(
-            &initfs,
-            path,
-            &SpawnOptions {
-                args: &[],
-                env: &[],
-            },
-        )
-        .map_err(|_| format!("spawn {path}"))?;
+        let env: &[&str] = if TRACE {
+            match path {
+                "/sbin/ramfsd" => &["RAMFSD_TRACE=1"],
+                "/sbin/vfsd" => &["VFSD_TRACE=1"],
+                _ => &[],
+            }
+        } else {
+            &[]
+        };
+        spawn(&initfs, path, &SpawnOptions { args: &[], env })
+            .map_err(|_| format!("spawn {path}"))?;
         let scheme = match path {
             "/sbin/initfsd" => "initfs:",
             "/sbin/ramfsd" => "ramfs:",
