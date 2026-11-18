@@ -9,6 +9,7 @@
 //! image, and reads N from the serial log. The program's output stays beside the log for
 //! diagnosis; the 320 MiB boot image is removed after the run.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -18,7 +19,10 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail};
 
 use crate::Verdict;
+use crate::atf_proto;
+use crate::result::{judge as judge_result, judge_missing, judge_unparsable, parse_result};
 use crate::runner::Observation;
+use crate::{ProcessStatus, TpCase};
 
 /// Default x86_64 firmware pair, matching `xtask` and the qtest harness.
 const OVMF_CODE: &str = "/usr/share/OVMF/OVMF_CODE_4M.fd";
@@ -27,8 +31,8 @@ const OVMF_VARS: &str = "/usr/share/OVMF/OVMF_VARS_4M.fd";
 const CMDLINE: &str = "console=ttyS0 test-exit=1";
 /// Poll interval while waiting for QEMU.
 const POLL: Duration = Duration::from_millis(50);
-/// Largest serial prefix kept for the reason/error text.
-const SERIAL_LIMIT: usize = 64 * 1024;
+/// Largest serial log kept; a batch of hundreds of ATF bodies can exceed a few megabytes.
+const SERIAL_LIMIT: usize = 32 * 1024 * 1024;
 
 /// Where the target kernel and the QEMU tools come from.
 #[derive(Clone, Debug)]
@@ -51,6 +55,751 @@ impl QemuConfig {
             timeout_secs,
         }
     }
+}
+
+/// Guest service and wrapper binaries built by `tests/fixtures/g1/build-guest.sh`.
+#[derive(Clone, Debug)]
+pub struct Guest {
+    bin: PathBuf,
+}
+
+impl Guest {
+    /// The stable artifact directory used by the build script.
+    #[must_use]
+    pub fn new(root: &Path) -> Self {
+        Self {
+            bin: root.join("build/fixtures/g1/guest/bin"),
+        }
+    }
+
+    fn path(&self, name: &str) -> PathBuf {
+        self.bin.join(name)
+    }
+
+    fn require(&self) -> Result<()> {
+        for name in [
+            "init", "logd", "consd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "vfsd",
+            "g1wrap",
+        ] {
+            let path = self.path(name);
+            if !path.is_file() {
+                bail!(
+                    "guest binary missing: {} (run sh tests/fixtures/g1/build-guest.sh)",
+                    path.display()
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+/// How the wrapper hands the image to the program.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GuestMode {
+    /// `spawn` with a pipe and result-file capture (the wrapper's own loader).
+    Spawn,
+    /// `execve` the program; the kernel's loader copies the file tail (argv/env only).
+    Exec,
+    /// `execve` the program, then a second service reads the result file.
+    ExecRead,
+}
+
+/// What one service-mode boot observed.
+#[derive(Clone, Debug)]
+pub struct GuestObservation {
+    /// The program's exit code from `G1-EXIT`.
+    pub exit: Option<i32>,
+    /// The captured stdout/stderr bytes.
+    pub output: Vec<u8>,
+    /// The captured result file, when the manifest asked for one.
+    pub result: Option<Vec<u8>>,
+    /// The wrapper's result-file error, when it could not read the file.
+    pub result_error: Option<String>,
+    /// QEMU's own exit status.
+    pub qemu_status: Option<i32>,
+    /// Whether the boot hit the deadline.
+    pub timed_out: bool,
+    /// The full serial log (used to read an ATF `-l` listing printed to the tty).
+    pub serial: String,
+}
+
+/// One ATF case in a batched guest boot.
+#[derive(Clone, Debug)]
+pub struct AtfBatchCase {
+    /// The built target executable.
+    pub program_path: PathBuf,
+    /// The suite program name (used for the image name and diagnostics).
+    pub program_name: String,
+    /// The ATF case ident.
+    pub ident: String,
+}
+
+/// One batched ATF result, in the input case order.
+#[derive(Clone, Debug)]
+pub struct AtfBatchResult {
+    /// The test process exit status parsed from the serial log.
+    pub exit: Option<i32>,
+    /// The ATF result file bytes.
+    pub result: Option<Vec<u8>>,
+    /// The reason the reader did not find a result.
+    pub missing: Option<String>,
+}
+
+/// The environment the host runner gives a target program.
+#[must_use]
+pub fn target_env() -> Vec<String> {
+    [
+        "PATH=/bin:/sbin",
+        "HOME=/tmp",
+        "TZ=UTC",
+        "LANG=C.UTF-8",
+        "LC_ALL=C.UTF-8",
+        "TMPDIR=/tmp",
+    ]
+    .iter()
+    .map(|value| (*value).to_string())
+    .collect()
+}
+
+/// One program invocation in the guest service.
+#[derive(Clone, Copy, Debug)]
+pub struct GuestJob<'a> {
+    /// The target executable.
+    pub program: &'a Path,
+    /// How the wrapper hands the image to the program.
+    pub mode: GuestMode,
+    /// Arguments after `argv[0]`.
+    pub args: &'a [String],
+    /// `KEY=VALUE` environment entries.
+    pub env: &'a [String],
+    /// An optional result path the reader service prints.
+    pub result: Option<&'a str>,
+    /// Per-run work directory.
+    pub workdir: &'a Path,
+    /// Keep the initfs and boot image.
+    pub keep: bool,
+}
+
+/// Run one program through the guest service and wrapper with argv/env.
+pub fn run_guest(
+    config: &QemuConfig,
+    guest: &Guest,
+    job: &GuestJob<'_>,
+) -> Result<GuestObservation> {
+    let GuestJob {
+        program,
+        mode,
+        args,
+        env,
+        result,
+        workdir,
+        keep,
+    } = *job;
+    guest.require()?;
+    fs::create_dir_all(workdir).with_context(|| format!("cannot create {}", workdir.display()))?;
+    let initfs = workdir.join("initfs.img");
+    let image = workdir.join("boot.img");
+    let vars = workdir.join("OVMF_VARS.fd");
+    let serial_path = workdir.join("serial.log");
+    let error_path = workdir.join("qemu.err");
+    for stale in [&initfs, &image, &vars, &serial_path, &error_path] {
+        let _ = fs::remove_file(stale);
+    }
+    let image_program = strip_program(program, workdir)?;
+    let manifest = workdir.join("manifest");
+    let service = workdir.join("g1.toml");
+    let reader = workdir.join("g1-read.toml");
+    let svcd = workdir.join("svcd.conf");
+    let (service_text, reader_text, svcd_text) = guest_service(mode);
+    fs::write(&manifest, guest_manifest(mode, args, env, result))
+        .with_context(|| format!("cannot write {}", manifest.display()))?;
+    fs::write(&service, service_text)
+        .with_context(|| format!("cannot write {}", service.display()))?;
+    let reader_path = match reader_text {
+        Some(text) => {
+            fs::write(&reader, text)
+                .with_context(|| format!("cannot write {}", reader.display()))?;
+            Some(reader.as_path())
+        }
+        None => None,
+    };
+    fs::write(&svcd, svcd_text).with_context(|| format!("cannot write {}", svcd.display()))?;
+    let specs = guest_initfs_specs(
+        config,
+        guest,
+        &image_program,
+        &manifest,
+        &service,
+        reader_path,
+        &svcd,
+    );
+    run_tool(
+        "cargo",
+        &mkinitfs_with(&initfs, &specs),
+        &config.root,
+        "cannot build the guest initfs",
+    )?;
+    make_image(config, &initfs, &image)?;
+    copy_firmware_vars(&vars)?;
+    let (status, timed_out) = boot(config, &image, &vars, &serial_path, &error_path)?;
+    let serial = read_prefix(&serial_path);
+    let text = String::from_utf8_lossy(&serial);
+    let observation = GuestObservation {
+        exit: marker_int(&text, "G1-EXIT ").or_else(|| parse_init_exit(&text)),
+        output: marker_block(&text, "G1-OUTPUT-BEGIN", "G1-OUTPUT-END").unwrap_or_default(),
+        result: marker_block(&text, "G1-RESULT-BEGIN", "G1-RESULT-END"),
+        result_error: marker_string(&text, "G1-RESULT-ERROR "),
+        qemu_status: status,
+        timed_out,
+        serial: text.into_owned(),
+    };
+    if !keep {
+        for transient in [&initfs, &image, &vars] {
+            let _ = fs::remove_file(transient);
+        }
+    }
+    Ok(observation)
+}
+
+/// Judge an exit-status program from a service-mode observation.
+#[must_use]
+pub fn judge_guest(
+    observation: &GuestObservation,
+    expect_exit: i32,
+    timeout_secs: u64,
+) -> Observation {
+    if observation.timed_out {
+        return Observation {
+            verdict: Verdict::Fail,
+            reason: format!("timeout after {timeout_secs}s"),
+        };
+    }
+    match observation.exit {
+        Some(code) if code == expect_exit => Observation {
+            verdict: Verdict::Pass,
+            reason: String::new(),
+        },
+        Some(code) => Observation {
+            verdict: Verdict::Fail,
+            reason: format!("behaviour:expected exit {expect_exit}, got {code}"),
+        },
+        None => Observation {
+            verdict: Verdict::Fail,
+            reason: format!(
+                "crash:no G1-EXIT ({})",
+                match observation.qemu_status {
+                    Some(code) => format!("qemu exit {code}"),
+                    None => "qemu died without a status".to_string(),
+                }
+            ),
+        },
+    }
+}
+
+/// List an ATF program's bodies through the guest `-l` protocol.
+pub fn list_atf(
+    config: &QemuConfig,
+    guest: &Guest,
+    program: &Path,
+    workdir: &Path,
+    keep: bool,
+) -> Result<Vec<TpCase>> {
+    let args = vec!["-l".to_string()];
+    let env = target_env();
+    let observation = run_guest(
+        config,
+        guest,
+        &GuestJob {
+            program,
+            mode: GuestMode::Exec,
+            args: &args,
+            env: &env,
+            result: None,
+            workdir,
+            keep,
+        },
+    )?;
+    if observation.timed_out {
+        bail!("ATF listing timed out after {}s", config.timeout_secs);
+    }
+    let Some(listing) = extract_atf_list(&observation.serial) else {
+        bail!(
+            "ATF listing not found in the serial log for {}",
+            program.display()
+        );
+    };
+    atf_proto::parse_list(&listing).map_err(|error| anyhow::anyhow!("ATF listing: {error}"))
+}
+
+/// Run one ATF body and judge it from the guest result file.
+pub fn run_atf_case(
+    config: &QemuConfig,
+    guest: &Guest,
+    program: &Path,
+    case: &TpCase,
+    workdir: &Path,
+    keep: bool,
+) -> Result<Observation> {
+    let result_path = "/tmp/atf-result";
+    let args = vec![
+        "-r".to_string(),
+        result_path.to_string(),
+        "-s".to_string(),
+        "/tests".to_string(),
+        case.ident.clone(),
+    ];
+    let env = target_env();
+    let observation = run_guest(
+        config,
+        guest,
+        &GuestJob {
+            program,
+            mode: GuestMode::ExecRead,
+            args: &args,
+            env: &env,
+            result: Some(result_path),
+            workdir,
+            keep,
+        },
+    )?;
+    if observation.timed_out {
+        return Ok(Observation {
+            verdict: Verdict::Fail,
+            reason: format!("timeout after {}s", config.timeout_secs),
+        });
+    }
+    let status = parse_service_exit(&observation.serial)
+        .map_or(ProcessStatus::Signaled(0), ProcessStatus::Exited);
+    match observation.result {
+        Some(bytes) => match parse_result(&String::from_utf8_lossy(&bytes)) {
+            Ok(expect) => {
+                let (verdict, reason) = judge_result(&expect, status, false, config.timeout_secs);
+                Ok(Observation { verdict, reason })
+            }
+            Err(_) => {
+                let (verdict, reason) = judge_unparsable(&bytes, status);
+                Ok(Observation { verdict, reason })
+            }
+        },
+        None => {
+            let (verdict, reason) = judge_missing(status, false, config.timeout_secs);
+            Ok(Observation { verdict, reason })
+        }
+    }
+}
+
+/// Run a batch of ATF cases in one boot.
+///
+/// Each case is a `g1-run-<i>` service that execs the test with `-r /tmp/result-<i>`, followed
+/// by a `g1-read-<i>` service that polls the result file and prints an indexed marker. The
+/// services form a chain, so failures do not stop the next case.
+pub fn run_atf_batch(
+    config: &QemuConfig,
+    guest: &Guest,
+    cases: &[AtfBatchCase],
+    workdir: &Path,
+    keep: bool,
+) -> Result<Vec<AtfBatchResult>> {
+    if cases.is_empty() {
+        return Ok(Vec::new());
+    }
+    guest.require()?;
+    fs::create_dir_all(workdir).with_context(|| format!("cannot create {}", workdir.display()))?;
+    let initfs = workdir.join("initfs.img");
+    let image = workdir.join("boot.img");
+    let vars = workdir.join("OVMF_VARS.fd");
+    let serial_path = workdir.join("serial.log");
+    let error_path = workdir.join("qemu.err");
+    for stale in [&initfs, &image, &vars, &serial_path, &error_path] {
+        let _ = fs::remove_file(stale);
+    }
+
+    let programs_dir = workdir.join("programs");
+    fs::create_dir_all(&programs_dir)
+        .with_context(|| format!("cannot create {}", programs_dir.display()))?;
+    let mut image_paths: BTreeMap<PathBuf, String> = BTreeMap::new();
+    let mut used: BTreeMap<String, usize> = BTreeMap::new();
+    for case in cases {
+        if image_paths.contains_key(&case.program_path) {
+            continue;
+        }
+        let mut base: String = case
+            .program_name
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                    character
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        if base.is_empty() {
+            base.push_str("program");
+        }
+        let count = used.entry(base.clone()).or_insert(0);
+        let unique = if *count == 0 {
+            base.clone()
+        } else {
+            format!("{base}-{count}")
+        };
+        *count += 1;
+        let destination = programs_dir.join(&unique);
+        strip_to(&case.program_path, &destination)?;
+        image_paths.insert(case.program_path.clone(), format!("/tests/{unique}"));
+    }
+
+    let mut specs = service_specs(config, guest);
+    for (index, case) in cases.iter().enumerate() {
+        let image_path = image_paths
+            .get(&case.program_path)
+            .expect("program image was registered");
+        let result = format!("/tmp/result-{index}");
+        let manifest = workdir.join(format!("manifest-{index}"));
+        fs::write(&manifest, batch_manifest(&case.ident, image_path, &result))
+            .with_context(|| format!("cannot write {}", manifest.display()))?;
+        let run = workdir.join(format!("g1-run-{index}.toml"));
+        let read = workdir.join(format!("g1-read-{index}.toml"));
+        let needs = if index == 0 {
+            "[\"scheme:file\", \"scheme:tty\"]".to_string()
+        } else {
+            format!("[\"g1-read-{}\"]", index - 1)
+        };
+        // The reader must not depend on the run service: a failing test exits nonzero, and a
+        // dependency on a failed service would stall the whole chain. Both services wait for the
+        // previous reader and then run concurrently; the reader polls the result file.
+        fs::write(
+            &run,
+            format!(
+                "name = \"g1-run-{index}\"\nexec = \"/sbin/g1wrap\"\n\
+args = [\"g1wrap\", \"run\", \"{index}\"]\nneeds = {needs}\nreadiness = \"none\"\n\
+restart = \"never\"\nmax_restarts = 0\nrequired = false\n"
+            ),
+        )
+        .with_context(|| format!("cannot write {}", run.display()))?;
+        fs::write(
+            &read,
+            format!(
+                "name = \"g1-read-{index}\"\nexec = \"/sbin/g1wrap\"\n\
+args = [\"g1wrap\", \"read\", \"{index}\"]\nneeds = {needs}\n\
+namespace = [\"svc\", \"file\"]\n\
+readiness = \"exit\"\nrestart = \"never\"\nmax_restarts = 0\nrequired = false\n"
+            ),
+        )
+        .with_context(|| format!("cannot write {}", read.display()))?;
+        specs.push(format!("/g1/manifest-{index}={}", manifest.display()));
+        specs.push(format!(
+            "/etc/services.d/g1-run-{index}.toml={}",
+            run.display()
+        ));
+        specs.push(format!(
+            "/etc/services.d/g1-read-{index}.toml={}",
+            read.display()
+        ));
+    }
+    let svcd = workdir.join("svcd.conf");
+    fs::write(
+        &svcd,
+        format!("exit_when_exits = \"g1-read-{}\"\n", cases.len() - 1),
+    )
+    .with_context(|| format!("cannot write {}", svcd.display()))?;
+    specs.push(format!("/etc/svcd.conf={}", svcd.display()));
+    for image_path in image_paths.values() {
+        let name = image_path.strip_prefix("/tests/").unwrap_or(image_path);
+        specs.push(format!(
+            "/tests/{name}={}:0755",
+            programs_dir.join(name).display()
+        ));
+    }
+
+    run_tool(
+        "cargo",
+        &mkinitfs_with(&initfs, &specs),
+        &config.root,
+        "cannot build the batch initfs",
+    )?;
+    make_image(config, &initfs, &image)?;
+    copy_firmware_vars(&vars)?;
+    let mut batch = config.clone();
+    batch.timeout_secs = batch.timeout_secs.max(1800);
+    let (_, timed_out) = boot(&batch, &image, &vars, &serial_path, &error_path)?;
+    let serial = read_prefix(&serial_path);
+    let text = String::from_utf8_lossy(&serial);
+    let mut results = parse_batch(&text, cases.len());
+    if timed_out {
+        for result in &mut results {
+            if result.result.is_none() && result.missing.is_none() {
+                result.missing = Some("batch timeout".to_string());
+            }
+        }
+    }
+    if !keep {
+        for transient in [&initfs, &image, &vars] {
+            let _ = fs::remove_file(transient);
+        }
+    }
+    Ok(results)
+}
+
+fn service_specs(config: &QemuConfig, guest: &Guest) -> Vec<String> {
+    let mut specs = vec![
+        format!("/init={}", guest.path("init").display()),
+        format!("/sbin/g1wrap={}", guest.path("g1wrap").display()),
+    ];
+    for name in [
+        "logd", "consd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "vfsd",
+    ] {
+        specs.push(format!("/sbin/{name}={}", guest.path(name).display()));
+        specs.push(format!(
+            "/etc/services.d/{name}.toml={}",
+            config
+                .root
+                .join(format!("etc/services.d/{name}.toml"))
+                .display()
+        ));
+    }
+    specs
+}
+
+fn strip_to(program: &Path, destination: &Path) -> Result<()> {
+    fs::copy(program, destination).with_context(|| {
+        format!(
+            "cannot copy {} to {}",
+            program.display(),
+            destination.display()
+        )
+    })?;
+    let _ = Command::new("strip")
+        .arg("--strip-all")
+        .arg(destination)
+        .status();
+    Ok(())
+}
+
+fn batch_manifest(ident: &str, image_path: &str, result: &str) -> String {
+    let mut text = format!(
+        "mode=exec\nprogram={image_path}\narg={image_path}\narg=-r\narg={result}\n\
+arg=-s\narg=/tests\narg={ident}\n"
+    );
+    for item in target_env() {
+        text.push_str("env=");
+        text.push_str(&item);
+        text.push('\n');
+    }
+    text.push_str("result=");
+    text.push_str(result);
+    text.push('\n');
+    text
+}
+
+fn parse_batch(text: &str, count: usize) -> Vec<AtfBatchResult> {
+    (0..count)
+        .map(|index| {
+            let run_marker = format!("G1-RUN {index}");
+            let run_position = text.find(&run_marker);
+            let exit = run_position.and_then(|position| {
+                let rest = text.get(position..)?;
+                let marker = "process: child exited (";
+                let start = rest.find(marker)? + marker.len();
+                let end = rest.get(start..)?.find(')')?;
+                rest.get(start..start + end)?.trim().parse().ok()
+            });
+            let begin = format!("G1-RESULT-BEGIN {index}");
+            let end = format!("G1-RESULT-END {index}");
+            let result = text.find(&begin).and_then(|position| {
+                let rest = text.get(position + begin.len()..)?;
+                let rest = rest
+                    .strip_prefix("\r\n")
+                    .or_else(|| rest.strip_prefix('\n'))
+                    .unwrap_or(rest);
+                let stop = rest.find(&end)?;
+                let mut bytes = rest.get(..stop)?.as_bytes().to_vec();
+                while bytes.ends_with(b"\n") || bytes.ends_with(b"\r") {
+                    bytes.pop();
+                }
+                Some(bytes)
+            });
+            let missing_marker = format!("G1-RESULT-MISSING {index}");
+            let missing = text.find(&missing_marker).map(|position| {
+                text.get(position + missing_marker.len()..)
+                    .unwrap_or("")
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string()
+            });
+            AtfBatchResult {
+                exit,
+                result,
+                missing,
+            }
+        })
+        .collect()
+}
+
+fn extract_atf_list(serial: &str) -> Option<String> {
+    let start = serial.find("Content-Type: application/X-atf-tp")?;
+    let rest = &serial[start..];
+    let end = rest
+        .find("process: child exited")
+        .or_else(|| rest.find("process: /tests/program exited"))
+        .or_else(|| rest.find("svcd: g1"))
+        .unwrap_or(rest.len());
+    Some(rest.get(..end)?.replace('\r', ""))
+}
+
+fn parse_service_exit(serial: &str) -> Option<i32> {
+    serial.lines().rev().find_map(|line| {
+        let line = line.trim();
+        for prefix in [
+            "process: child exited (",
+            "process: /tests/program exited (",
+        ] {
+            if let Some(rest) = line.strip_prefix(prefix) {
+                return rest.strip_suffix(')')?.trim().parse().ok();
+            }
+        }
+        None
+    })
+}
+
+fn guest_service(mode: GuestMode) -> (&'static str, Option<&'static str>, &'static str) {
+    const RUN: &str = "name = \"g1\"\nexec = \"/sbin/g1wrap\"\nargs = [\"g1wrap\", \"run\"]\n\
+needs = [\"scheme:file\", \"scheme:tty\"]\nreadiness = \"exit\"\nrestart = \"never\"\n\
+max_restarts = 0\nrequired = false\n";
+    match mode {
+        GuestMode::ExecRead => (
+            RUN,
+            Some(
+                "name = \"g1-read\"\nexec = \"/sbin/g1wrap\"\nargs = [\"g1wrap\", \"read\"]\n\
+needs = [\"g1\"]\nreadiness = \"exit\"\nrestart = \"never\"\nmax_restarts = 0\n\
+required = false\n",
+            ),
+            "exit_when_exits = \"g1-read\"\n",
+        ),
+        _ => (RUN, None, "exit_when_exits = \"g1\"\n"),
+    }
+}
+
+fn guest_manifest(
+    mode: GuestMode,
+    args: &[String],
+    env: &[String],
+    result: Option<&str>,
+) -> String {
+    let mode = if matches!(mode, GuestMode::Exec | GuestMode::ExecRead) {
+        "exec"
+    } else {
+        "spawn"
+    };
+    let mut text = format!("mode={mode}\nprogram=/tests/program\narg=/tests/program\n");
+    for arg in args {
+        text.push_str("arg=");
+        text.push_str(arg);
+        text.push('\n');
+    }
+    for item in env {
+        text.push_str("env=");
+        text.push_str(item);
+        text.push('\n');
+    }
+    if let Some(path) = result {
+        text.push_str("result=");
+        text.push_str(path);
+        text.push('\n');
+    }
+    text
+}
+
+/// The kernel `PROC_EXEC` image limit is 1 MiB (`userland/rt/src/exec.rs`); the target link keeps
+/// debug info, so strip a copy before packing. A missing `strip` leaves the original for the
+/// loader to reject with its real reason.
+fn strip_program(program: &Path, workdir: &Path) -> Result<PathBuf> {
+    let stripped = workdir.join("program");
+    fs::copy(program, &stripped).with_context(|| {
+        format!(
+            "cannot copy {} to {}",
+            program.display(),
+            stripped.display()
+        )
+    })?;
+    let stripped_ok = Command::new("strip")
+        .arg("--strip-all")
+        .arg(&stripped)
+        .status()
+        .is_ok_and(|status| status.success());
+    Ok(if stripped_ok {
+        stripped
+    } else {
+        program.to_path_buf()
+    })
+}
+
+fn guest_initfs_specs(
+    config: &QemuConfig,
+    guest: &Guest,
+    program: &Path,
+    manifest: &Path,
+    service: &Path,
+    reader: Option<&Path>,
+    svcd: &Path,
+) -> Vec<String> {
+    let mut specs = service_specs(config, guest);
+    specs.push(format!("/tests/program={}:0755", program.display()));
+    specs.push(format!("/g1/manifest={}", manifest.display()));
+    specs.push(format!("/etc/services.d/g1.toml={}", service.display()));
+    if let Some(reader) = reader {
+        specs.push(format!("/etc/services.d/g1-read.toml={}", reader.display()));
+    }
+    specs.push(format!("/etc/svcd.conf={}", svcd.display()));
+    specs
+}
+
+fn mkinitfs_with(initfs: &Path, specs: &[String]) -> Vec<String> {
+    let mut args = vec![
+        "run".to_string(),
+        "-q".to_string(),
+        "-p".to_string(),
+        "raven-initfs".to_string(),
+        "--features".to_string(),
+        "std".to_string(),
+        "--example".to_string(),
+        "mkinitfs".to_string(),
+        "--".to_string(),
+        initfs.display().to_string(),
+    ];
+    args.extend(specs.iter().cloned());
+    args
+}
+
+fn marker_int(text: &str, prefix: &str) -> Option<i32> {
+    text.lines()
+        .rev()
+        .find_map(|line| line.trim().strip_prefix(prefix)?.trim().parse().ok())
+}
+
+fn marker_string(text: &str, prefix: &str) -> Option<String> {
+    text.lines().rev().find_map(|line| {
+        line.trim()
+            .strip_prefix(prefix)
+            .map(|value| value.trim().to_string())
+    })
+}
+
+fn marker_block(text: &str, begin: &str, end: &str) -> Option<Vec<u8>> {
+    let start = text.rfind(begin)? + begin.len();
+    let rest = text.get(start..)?;
+    let rest = rest
+        .strip_prefix("\r\n")
+        .or_else(|| rest.strip_prefix('\n'))
+        .unwrap_or(rest);
+    let stop = rest.find(end)?;
+    let mut bytes = rest.get(..stop)?.as_bytes().to_vec();
+    while bytes.ends_with(b"\n") || bytes.ends_with(b"\r") {
+        bytes.pop();
+    }
+    Some(bytes)
 }
 
 /// Run one exit-status program as `/init` and judge its exit code.
@@ -283,19 +1032,7 @@ pub fn judge(
 }
 
 fn mkinitfs_args(initfs: &Path, program: &Path) -> Vec<String> {
-    vec![
-        "run".to_string(),
-        "-q".to_string(),
-        "-p".to_string(),
-        "raven-initfs".to_string(),
-        "--features".to_string(),
-        "std".to_string(),
-        "--example".to_string(),
-        "mkinitfs".to_string(),
-        "--".to_string(),
-        initfs.display().to_string(),
-        format!("/init={}", program.display()),
-    ]
+    mkinitfs_with(initfs, &[format!("/init={}", program.display())])
 }
 
 fn image_args(kernel: &Path, initfs: &Path, image: &Path) -> Vec<String> {

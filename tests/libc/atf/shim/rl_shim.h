@@ -11,6 +11,27 @@
 #define __arraycount(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
+/* NetBSD/BSD constants the target headers do not carry yet. */
+#ifndef ALLPERMS
+#define ALLPERMS 07777
+#endif
+
+#ifndef MAXHOSTNAMELEN
+#define MAXHOSTNAMELEN 256
+#endif
+
+#ifndef SEEK_SET
+#define SEEK_SET 0
+#endif
+
+#ifndef SEEK_CUR
+#define SEEK_CUR 1
+#endif
+
+#ifndef SEEK_END
+#define SEEK_END 2
+#endif
+
 #ifndef __unused
 #define __unused __attribute__((__unused__))
 #endif
