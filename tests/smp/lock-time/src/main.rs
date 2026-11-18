@@ -39,7 +39,8 @@ const TIMER_INTERVAL_NS: u64 = 1_000_000;
 const ITER_NS: u64 = 100_000_000;
 const DEFAULT_ITERATIONS: usize = 50;
 const DEFAULT_CPUS: usize = 4;
-const MEM_PERIOD: u64 = 16;
+const DEFAULT_TIMERS: usize = 4;
+const DEFAULT_MEM_PERIOD: u64 = 16;
 const YIELD_PERIOD: u64 = 64;
 /// A wake-to-run latency above this is a lost wake or a stuck CPU.
 const STALL_NS: u64 = 2_000_000_000;
@@ -59,6 +60,7 @@ static TIMER_TID: [AtomicU32; TIMERS] = [const { AtomicU32::new(0) }; TIMERS];
 static HOPS: AtomicU64 = AtomicU64::new(0);
 static DONE: AtomicUsize = AtomicUsize::new(0);
 static STOP: AtomicBool = AtomicBool::new(false);
+static MEM_PERIOD: AtomicU64 = AtomicU64::new(DEFAULT_MEM_PERIOD);
 static PIPE_R: AtomicU32 = AtomicU32::new(u32::MAX);
 static PIPE_W: AtomicU32 = AtomicU32::new(u32::MAX);
 
@@ -170,7 +172,8 @@ extern "C" fn worker(index: usize) -> ! {
             .fetch_add(1, Ordering::Relaxed)
             .saturating_add(1);
         pipe_token(index);
-        if count.checked_rem(MEM_PERIOD) == Some(0) {
+        let mem_period = MEM_PERIOD.load(Ordering::Acquire);
+        if mem_period != 0 && count.checked_rem(mem_period) == Some(0) {
             memory_pressure(index);
         }
         if count.checked_rem(YIELD_PERIOD) == Some(0) {
@@ -219,7 +222,7 @@ fn thread_create(
     Ok(())
 }
 
-fn read_config() -> (usize, usize, bool) {
+fn read_config() -> (usize, usize, bool, u64, usize) {
     let mut line = [0u8; 64];
     let mut length = 0usize;
     let deadline = now_ns().saturating_add(2_000_000_000);
@@ -255,7 +258,22 @@ fn read_config() -> (usize, usize, bool) {
         .and_then(|word| word.parse::<usize>().ok())
         .unwrap_or(DEFAULT_CPUS);
     let mode = words.next().unwrap_or("on");
-    (iterations.max(1), cpus.max(1), mode != "off")
+    let mem_period = words
+        .next()
+        .and_then(|word| word.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_MEM_PERIOD);
+    let timers = words
+        .next()
+        .and_then(|word| word.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_TIMERS)
+        .min(TIMERS);
+    (
+        iterations.max(1),
+        cpus.max(1),
+        mode != "off",
+        mem_period,
+        timers,
+    )
 }
 
 fn inferred_cpu(index: usize, cpus: usize, on: bool) -> usize {
@@ -299,9 +317,9 @@ fn gather_latency() -> Vec<u64> {
     values
 }
 
-fn gather_timers() -> Vec<u64> {
-    let mut values = Vec::with_capacity(TIMERS * MAX_TIMER_SAMPLES);
-    for timer in 0..TIMERS {
+fn gather_timers(timers: usize) -> Vec<u64> {
+    let mut values = Vec::with_capacity(timers.saturating_mul(MAX_TIMER_SAMPLES));
+    for timer in 0..timers {
         let count = TIMER_COUNT[timer]
             .load(Ordering::Acquire)
             .min(MAX_TIMER_SAMPLES);
@@ -324,14 +342,16 @@ fn fail(message: &str) -> ! {
 
 fn main(_args: raven_rt::Args) -> i32 {
     println!("lock-time: ready");
-    let (iterations, cpus, on) = read_config();
+    let (iterations, cpus, on, mem_period, timers) = read_config();
+    MEM_PERIOD.store(mem_period, Ordering::Release);
     println!(
-        "lock-time: workers={} timers={} iterations={} cpus={} mode={}",
+        "lock-time: workers={} timers={} iterations={} cpus={} mode={} mem_period={}",
         WORKERS,
-        TIMERS,
+        timers,
         iterations,
         cpus,
-        if on { "on" } else { "off" }
+        if on { "on" } else { "off" },
+        mem_period
     );
 
     let (reader, writer) = match raven_rt::pipe::pipe2(raven_rt::pipe::O_NONBLOCK) {
@@ -341,7 +361,7 @@ fn main(_args: raven_rt::Args) -> i32 {
     PIPE_R.store(reader.0, Ordering::Release);
     PIPE_W.store(writer.0, Ordering::Release);
 
-    for timer in 0..TIMERS {
+    for timer in 0..timers {
         if thread_create(WORKERS + timer, timer_thread, timer).is_err() {
             fail("timer thread create");
         }
@@ -352,11 +372,12 @@ fn main(_args: raven_rt::Args) -> i32 {
         }
     }
 
-    // Wait for every worker and timer to publish its tid before the ring starts.
+    // Wait for every worker and active timer to publish its tid before the ring starts.
     let deadline = now_ns().saturating_add(5_000_000_000);
     while TID.iter().any(|slot| slot.load(Ordering::Acquire) == 0)
         || TIMER_TID
             .iter()
+            .take(timers)
             .any(|slot| slot.load(Ordering::Acquire) == 0)
     {
         if now_ns() > deadline {
@@ -385,13 +406,13 @@ fn main(_args: raven_rt::Args) -> i32 {
 
         let mut latencies = gather_latency();
         let (p50, p90, p99, max) = stats(&mut latencies);
-        let mut timers = gather_timers();
-        let (t50, t90, _t99, tmax) = stats(&mut timers);
+        let mut timer_values = gather_timers(timers);
+        let (t50, t90, _t99, tmax) = stats(&mut timer_values);
 
         if latencies.is_empty() {
             fail("no latency samples");
         }
-        if timers.is_empty() {
+        if timers > 0 && timer_values.is_empty() {
             fail("no timer samples");
         }
         if hops == 0 {
@@ -420,7 +441,7 @@ fn main(_args: raven_rt::Args) -> i32 {
             t90,
             tmax,
             latencies.len(),
-            timers.len()
+            timer_values.len()
         );
     }
 
@@ -466,15 +487,15 @@ fn main(_args: raven_rt::Args) -> i32 {
         per_cpu.get(3).copied().unwrap_or(0)
     );
     println!(
-        "lock-time: summary iterations={} hops={} worst_p90_ns={} worst_max_ns={} worst_timer_p90_ns={} worst_timer_max_ns={}",
-        iterations, hops, worst_p90, worst_max, worst_timer_p90, worst_timer_max
+        "lock-time: summary iterations={} hops={} worst_p90_ns={} worst_max_ns={} worst_timer_p90_ns={} worst_timer_max_ns={} mem_period={}",
+        iterations, hops, worst_p90, worst_max, worst_timer_p90, worst_timer_max, mem_period
     );
     if DONE.load(Ordering::Acquire) != WORKERS {
         fail("completion count");
     }
     println!(
         "lock-time: complete iterations={} workers={} timers={}",
-        iterations, WORKERS, TIMERS
+        iterations, WORKERS, timers
     );
     println!("lock-time: done");
     0

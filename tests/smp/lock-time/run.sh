@@ -4,7 +4,7 @@
 #
 # S85a lock/time/IPI stress runner.
 #
-# Usage: sh tests/smp/lock-time/run.sh tcg|kvm|all
+# Usage: sh tests/smp/lock-time/run.sh tcg|kvm|nomem|smp2|repro|variants|all
 #
 # The guest itself runs 50 iterations of 100 ms (5 s); the runner never retries a failed case.
 # Every QEMU serial log is kept under build/smp/lock-time/logs/.
@@ -48,13 +48,30 @@ case "$mode" in
         run_one smp-lock-time-kvm4 tests/smp/lock-time/lock-time-kvm4.toml
         run_one smp-lock-time-kvm2 tests/smp/lock-time/lock-time-kvm2.toml
         ;;
+    nomem)
+        run_one smp-lock-time-tcg-nomem tests/smp/lock-time/lock-time-tcg-nomem.toml
+        ;;
+    smp2)
+        run_one smp-lock-time-tcg2 tests/smp/lock-time/lock-time-tcg2.toml
+        ;;
+    repro)
+        run_one smp-lock-time-tlb-repro tests/smp/lock-time/lock-time-tlb-repro.toml
+        ;;
+    variants)
+        run_one smp-lock-time-tcg-nomem tests/smp/lock-time/lock-time-tcg-nomem.toml
+        run_one smp-lock-time-tcg2 tests/smp/lock-time/lock-time-tcg2.toml
+        run_one smp-lock-time-tlb-repro tests/smp/lock-time/lock-time-tlb-repro.toml
+        ;;
     all)
         run_one smp-lock-time-tcg tests/smp/lock-time/lock-time-tcg.toml
         run_one smp-lock-time-kvm4 tests/smp/lock-time/lock-time-kvm4.toml
         run_one smp-lock-time-kvm2 tests/smp/lock-time/lock-time-kvm2.toml
+        run_one smp-lock-time-tcg-nomem tests/smp/lock-time/lock-time-tcg-nomem.toml
+        run_one smp-lock-time-tcg2 tests/smp/lock-time/lock-time-tcg2.toml
+        run_one smp-lock-time-tlb-repro tests/smp/lock-time/lock-time-tlb-repro.toml
         ;;
     *)
-        printf 'usage: %s tcg|kvm|all\n' "$0" >&2
+        printf 'usage: %s tcg|kvm|nomem|smp2|repro|variants|all\n' "$0" >&2
         exit 2
         ;;
 esac
