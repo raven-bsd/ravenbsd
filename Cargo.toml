@@ -103,6 +103,7 @@ members = [
     "tests/fixtures/pi4-devd/driver",
     "tests/fixtures/pi4-platd",
     "tests/fixtures/proc",
+    "tests/fixtures/http-fetch/patch-initfs",
     "tests/fixtures/pipe",
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",

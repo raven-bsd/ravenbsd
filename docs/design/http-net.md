@@ -3,9 +3,10 @@
 
 # HTTP socket and DNS transport
 
-Status: **host-tested adapter (OBSERVED); live-network and Pi 4 behaviour UNVERIFIED.** E3a
-implements the `raven_http::Transport` seam over the platform `net:` socket scheme and the
-`resolv:` DNS scheme. It does not open a device, link C or claim a live fetch. The E3 decision
+Status: **host-tested adapter and local QEMU fetch gate (OBSERVED); external network and Pi 4
+behaviour UNVERIFIED.** E3a implements the `raven_http::Transport` seam over the platform `net:`
+socket scheme and the `resolv:` DNS scheme. The local gate uses a one-shot host server, not the
+external owner URL. It does not open a device, link C or fake a socket. The E3 decision
 (`docs/design/eink-fetch.md`) remains in force: plain HTTP for 0.1.0 and the existing OpenSSL
 add-on process for any HTTPS source.
 
@@ -121,7 +122,21 @@ stack or an unverified mode. The base image remains C-free.
 
 ## 8. Live-test plan for the owner URL
 
-E3a does not run this; it is the acceptance plan for E3b/Pi 4:
+The **local** gate is implemented and OBSERVED:
+
+```
+cargo xtask qtest --case http-fetch --arch x86_64
+```
+
+It boots the release image with a patched initfs containing the static `/bin/http-fetch` probe,
+against a one-shot host server on `127.0.0.1:18080` exposed as `10.0.2.2` by QEMU user networking.
+The probe gets `http://10.0.2.2:18080/known.txt` through `raven_http` + `raven_http_net`, verifies
+status 200, `Content-Length: 15` and the exact body `known-http-body`, prints one marker per fact
+and exits 0. The transcript is `build/qtest/http-fetch.log`; the host server log is
+`build/fixtures/http-fetch/server.log`. The server accepts one connection and exits; it is not a
+service. No external network, TLS or fake socket is involved.
+
+The **external owner/Pi 4** steps remain:
 
 1. Boot the release image on QEMU x86_64 and on the Pi 4 with `netd` and `resolvd` up; record
    `ifconfig`/`route` and the DHCP or static address.
