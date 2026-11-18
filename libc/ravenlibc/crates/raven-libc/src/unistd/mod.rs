@@ -9,6 +9,7 @@
 
 pub(crate) mod __raven_va_fcntl;
 pub(crate) mod _exit;
+pub(crate) mod alarm;
 pub(crate) mod close;
 pub(crate) mod dup;
 pub(crate) mod dup2;
@@ -20,10 +21,12 @@ pub(crate) mod fsync;
 pub(crate) mod isatty;
 pub(crate) mod lseek;
 pub(crate) mod mkdir;
+pub(crate) mod pause;
 pub(crate) mod pread;
 pub(crate) mod pwrite;
 pub(crate) mod read;
 pub(crate) mod readv;
 pub(crate) mod rename;
+pub(crate) mod ualarm;
 pub(crate) mod write;
 pub(crate) mod writev;

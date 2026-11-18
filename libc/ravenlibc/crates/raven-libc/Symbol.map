@@ -454,6 +454,9 @@ RAVEN_1.0 {
 		msync;
 		munlock;
 		munlockall;
+		alarm;
+		pause;
+		ualarm;
 		pathconf;
 		pipe;
 		posix_close;
@@ -1786,6 +1789,7 @@ RAVEN_1.0 {
 		shmctl;
 		shmdt;
 		shmget;
+		shm_open;
 		shm_unlink;
 };
 

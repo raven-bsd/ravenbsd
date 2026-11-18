@@ -68,6 +68,7 @@ aio_suspend
 aio_suspend64
 aio_write
 aio_write64
+alarm
 aligned_alloc
 alphasort
 arc4random_buf
@@ -958,6 +959,7 @@ optind
 optopt
 optreset
 pathconf
+pause
 pclose
 perror
 personality
@@ -1323,6 +1325,7 @@ setuid
 setusershell
 setutxent
 setvbuf
+shm_open
 shm_unlink
 shmat
 shmctl
@@ -1589,6 +1592,7 @@ ttyname_r
 twalk
 tzname
 tzset
+ualarm
 ufromfp
 ufromfpx
 uid_from_user
