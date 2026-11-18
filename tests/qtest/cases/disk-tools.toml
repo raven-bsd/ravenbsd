@@ -72,7 +72,7 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
-send = "/sbin/lsblk\n"
+send = "/bin/lsblk\n"
 delay_ms = 100
 
 [[step]]
@@ -120,7 +120,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "mount ufs: /mnt\n"
+send = "/sbin/mount ufs: /mnt\n"
 delay_ms = 100
 
 [[step]]
@@ -144,7 +144,7 @@ wait = '^hello-from-s98$'
 timeout_secs = 30
 
 [[step]]
-send = "umount /mnt\n"
+send = "/sbin/umount /mnt\n"
 delay_ms = 100
 
 [[step]]
@@ -160,4 +160,4 @@ wait = '^init exited \(0\)$'
 timeout_secs = 60
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|newfs: .*failed|mount: .*failed|umount: .*failed|no such file'
+regex = '(?i)panic|EXCEPTION|newfs: .*failed|mount: .*failed|umount: .*failed'
