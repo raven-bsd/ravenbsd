@@ -46,7 +46,7 @@ regex = '^Scheme: GPT$'
 regex = '^\s*34\s+32768\s+1\s+ufs-root$'
 
 [[expect]]
-regex = '^newfs: block:0 UFS2 block=4096 frag=512 size=0 label=$'
+regex = '^newfs: block:0 UFS2 block=4096 frag=512 size=16777216 label=$'
 
 [[expect]]
 regex = '^s110-disk-ok$'
@@ -103,11 +103,11 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "/sbin/newfs block:0\n"
+send = "/sbin/newfs -s 16m block:0\n"
 delay_ms = 100
 
 [[step]]
-wait = '^newfs: block:0 UFS2 block=4096 frag=512 size=0 label=$'
+wait = '^newfs: block:0 UFS2 block=4096 frag=512 size=16777216 label=$'
 timeout_secs = 120
 
 [[step]]
