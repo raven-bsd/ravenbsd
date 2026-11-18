@@ -84,7 +84,7 @@ wait = '^blockd (running|starting) '
 timeout_secs = 60
 
 [[step]]
-send = "/bin/lsblk\n"
+send = "/bin/lsblk block:0\n"
 delay_ms = 100
 
 [[step]]
