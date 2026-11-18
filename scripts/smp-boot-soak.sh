@@ -23,6 +23,8 @@ tcg4=10
 kvm_timeout=15
 tcg_timeout=30
 force_build=0
+wait_idle=0
+max_load=2.0
 out_root=build/smp-boot-soak
 
 usage() {
@@ -38,11 +40,14 @@ usage: sh scripts/smp-boot-soak.sh [options]
   --image PATH    release image (default build/x86_64/ravenbsd-x86_64.img)
   --build         force a release image build (needs a clean tree)
   --out DIR       log root (default build/smp-boot-soak/<utc>)
+  --wait-for-idle S wait up to S seconds for no other QEMU/xtask/cargo/rustc and load <= 2.0
+  --max-load L    maximum 1-minute load average for the preflight (default 2.0)
   -h, --help      show this help
 
 The release image is built only when missing or --build is given. Every boot is foreground;
-a missing `smp: N cpus online` or `login:` line is a failure. KVM aarch64 is not available on
-this host; the runner is x86_64 only.
+a missing `smp: N cpus online` or `login:` line is a failure. The preflight refuses a busy host
+by default; use --wait-for-idle on a shared machine. KVM aarch64 is not available on this host;
+the runner is x86_64 only.
 EOF
 }
 
@@ -57,10 +62,21 @@ while [ "$#" -gt 0 ]; do
         --image) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; image=$2; shift 2 ;;
         --build) force_build=1; shift ;;
         --out) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; out_root=$2; shift 2 ;;
+        --wait-for-idle) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; wait_idle=$2; shift 2 ;;
+        --max-load) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; max_load=$2; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "smp-boot-soak: unknown argument: $1" >&2; usage >&2; exit 2 ;;
     esac
 done
+
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+out=$out_root/$stamp
+mkdir -p "$out"
+sh tests/smp/boot/host-idle.sh \
+    --context "smp-boot-soak" \
+    --wait "$wait_idle" \
+    --max-load "$max_load" \
+    --state-file "$out/host-state.txt"
 
 if [ "$force_build" -eq 1 ] || [ ! -f "$image" ]; then
     cargo xtask image --arch x86_64 --profile "$profile"
@@ -79,9 +95,6 @@ vars=${RAVEN_OVMF_VARS:-/usr/share/OVMF/OVMF_VARS_4M.fd}
 [ -f "$code" ] || { echo "smp-boot-soak: missing OVMF code $code" >&2; exit 2; }
 [ -f "$vars" ] || { echo "smp-boot-soak: missing OVMF vars $vars" >&2; exit 2; }
 
-stamp=$(date -u +%Y%m%dT%H%M%SZ)
-out=$out_root/$stamp
-mkdir -p "$out"
 echo "smp-boot-soak: image=$image commit=$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 echo "smp-boot-soak: logs=$out"
 echo "smp-boot-soak: counts kvm4=$kvm4 kvm2=$kvm2 kvm1=$kvm1 tcg4=$tcg4"
