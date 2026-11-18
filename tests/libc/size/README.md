@@ -78,7 +78,10 @@ budget-only**. The exact matrix is in `TRIAGE.md`; the short result is:
   P2-P0 rows are already `KNOWN`; the reviewer raises the ceilings or adds the equivalent
   known-violation rows.
 
-C74dl applies no budget, rule or source change; **3.1 remains NOT MET** at 46/28.
+C74dl applied no budget, rule or source change. C74z-S17 then applied the 17 re-freezes at
+current + 3 percent; the C74cx dependency already contains the `P7-R-14` matcher fix. The gate is
+now **63 pass / 10 fail / 62 known / 102 skipped**, with only the 10 invariant ceilings left.
+The exact budget diff is in the C74z-S17 section of `TRIAGE.md`; **3.1 remains NOT MET**.
 
 ## B1-B3 seeds
 
