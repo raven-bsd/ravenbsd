@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "einkd"
+version = "0.1.0"
+description = "Host-testable E-Ink fetch/render/refresh service core for the Pi 4 7.5-inch panel."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-eink = { path = "../../../crates/raven-eink" }
+
+[lints]
+workspace = true
