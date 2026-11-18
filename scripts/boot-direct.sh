@@ -12,6 +12,8 @@
 #   sh scripts/boot-direct.sh                       # probe: QEMU -> kernel banner (microvm)
 #   sh scripts/boot-direct.sh --mode full           # q35 + virtio-net, release login
 #   sh scripts/boot-direct.sh --tcg                 # force TCG instead of KVM
+#   sh scripts/boot-direct.sh --mode full --defaults # old q35 default-device set
+#   sh scripts/boot-direct.sh --mode full --smp 2   # override the full-mode -smp 4
 #   sh scripts/boot-direct.sh --rebuild             # rebuild kernel and initfs first
 #
 # Exit: 0 when the requested target is met; 2 when the loader/kernel fails or the target is
@@ -27,8 +29,9 @@ machine=
 profile=release
 mode=probe
 runs=3
-smp=1
+smp=
 kvm=auto
+nodefaults=1
 rebuild=0
 timeout_secs=120
 cmdline='console=ttyS0 test-exit=1'
@@ -81,6 +84,10 @@ while [ $# -gt 0 ]; do
             kvm=1
             shift
             ;;
+        --defaults)
+            nodefaults=0
+            shift
+            ;;
         --tcg)
             kvm=0
             shift
@@ -130,6 +137,13 @@ case "$machine" in
         exit 3
         ;;
 esac
+if [ -z "$smp" ]; then
+    if [ "$mode" = full ]; then
+        smp=4
+    else
+        smp=1
+    fi
+fi
 if [ "$kvm" = auto ]; then
     if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
         kvm=1
@@ -193,12 +207,12 @@ if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
     kvm_state=present
 fi
 echo "boot-direct: $qemu_version"
-echo "boot-direct: arch=$arch machine=$machine smp=$smp mode=$mode accel=$([ "$kvm" = 1 ] && echo kvm || echo tcg) kvm-device=$kvm_state"
+echo "boot-direct: arch=$arch machine=$machine smp=$smp mode=$mode nodefaults=$nodefaults accel=$([ "$kvm" = 1 ] && echo kvm || echo tcg) kvm-device=$kvm_state"
 echo "boot-direct: loader=$loader"
 echo "boot-direct: payload=$payload ($(wc -c < "$payload") bytes)"
 
 result=0
-python3 - "$qemu" "$machine" "$loader" "$payload" "$cmdline" "$mode" "$kvm" "$timeout_secs" "$runs" "$smp" <<'PY' || result=$?
+python3 - "$qemu" "$machine" "$loader" "$payload" "$cmdline" "$mode" "$kvm" "$timeout_secs" "$runs" "$smp" "$nodefaults" <<'PY' || result=$?
 import os
 import select
 import statistics
@@ -206,11 +220,13 @@ import subprocess
 import sys
 import time
 
-qemu, machine, loader, payload, cmdline, mode, kvm, timeout_text, runs_text, smp = sys.argv[1:]
+qemu, machine, loader, payload, cmdline, mode, kvm, timeout_text, runs_text, smp, nodefaults = sys.argv[1:]
 timeout_secs = float(timeout_text)
 runs = int(runs_text)
 
-args = [qemu, "-machine", machine]
+args = [qemu, "-no-user-config", "-machine", machine]
+if machine == "q35" and nodefaults == "1":
+    args.append("-nodefaults")
 if kvm == "1":
     args.extend(["-enable-kvm", "-cpu", "host"])
 args.extend([

@@ -30,9 +30,9 @@ use raven_bootinfo::{
     BOOTINFO_MAGIC, BOOTINFO_VERSION, BootInfo, MemoryKind, MemoryRegion, PhysRange, arch,
 };
 use raven_direct::{
-    HVM_START_MAGIC, MAX_MEMORY_MAP, MemmapEntry, Module, PAYLOAD_HEADER_SIZE, StartInfo,
-    TrackedRange, build_memory_map, find_free_range, parse_memmap_into, parse_module,
-    parse_payload, parse_start_info,
+    ACPI_HEADER_SIZE, ACPI_RSDP_SIZE, HVM_START_MAGIC, MAX_MEMORY_MAP, MemmapEntry, Module,
+    PAYLOAD_HEADER_SIZE, StartInfo, TrackedRange, append_mcfg, build_memory_map, find_free_range,
+    parse_memmap_into, parse_module, parse_payload, parse_start_info,
 };
 use raven_elf::{Elf, Machine};
 use raven_loader::layout::{HHDM_BASE, KERNEL_RANGE};
@@ -51,6 +51,8 @@ const CMDLINE_MAX: usize = 4096;
 const POOL_SIZE: usize = 2 * 1024 * 1024;
 /// Bump arena for `raven-loader`'s library code; the loader itself never allocates.
 const ARENA_SIZE: usize = 256 * 1024;
+/// ACPI tables the loader may synthesize (RSDP + XSDT + one MCFG).
+const ACPI_BUFFER_SIZE: usize = 4096;
 
 unsafe extern "C" {
     static __loader_start: u8;
@@ -75,6 +77,15 @@ unsafe impl Sync for ArenaCell {}
 
 static ALLOC_ARENA: ArenaCell = ArenaCell(UnsafeCell::new([0; ARENA_SIZE]));
 static ALLOC_NEXT: AtomicUsize = AtomicUsize::new(0);
+
+#[repr(align(16))]
+struct AcpiCell(UnsafeCell<[u8; ACPI_BUFFER_SIZE]>);
+
+// SAFETY: the loader fills this buffer once before the handoff and the kernel only reads it;
+// the page is marked AcpiReclaimable in the memory map.
+unsafe impl Sync for AcpiCell {}
+
+static ACPI_BUFFER: AcpiCell = AcpiCell(UnsafeCell::new([0; ACPI_BUFFER_SIZE]));
 
 struct Bump;
 
@@ -217,12 +228,26 @@ pub extern "C" fn rust_entry(start_info_paddr: u64) -> ! {
         fail("cannot place the kernel image");
     }
 
+    let mut cmdline = [0u8; CMDLINE_MAX];
+    let cmdline_len = read_cmdline(start_info.cmdline_paddr, &mut cmdline);
+    if cmdline_len == cmdline.len() {
+        fail("command line is not NUL terminated");
+    }
+    let acpi_rsdp = inject_mcfg(start_info.rsdp_paddr, &cmdline[..cmdline_len])
+        .unwrap_or(start_info.rsdp_paddr);
+    let acpi_buffer = (&raw const ACPI_BUFFER) as u64;
+
     let mut map = [EMPTY_REGION; MAX_MEMORY_MAP];
     let tracked = [
         TrackedRange {
             base: loader_start,
             len: loader_end.saturating_sub(loader_start),
             kind: MemoryKind::LoaderReclaimable,
+        },
+        TrackedRange {
+            base: acpi_buffer,
+            len: ACPI_BUFFER_SIZE as u64,
+            kind: MemoryKind::AcpiReclaimable,
         },
         TrackedRange {
             base: kernel_phys,
@@ -256,12 +281,6 @@ pub extern "C" fn rust_entry(start_info_paddr: u64) -> ! {
         fail("initfs range leaves the module");
     }
 
-    let mut cmdline = [0u8; CMDLINE_MAX];
-    let cmdline_len = read_cmdline(start_info.cmdline_paddr, &mut cmdline);
-    if cmdline_len == cmdline.len() {
-        fail("command line is not NUL terminated");
-    }
-
     serial_str("direct: bootinfo kernel_phys=");
     serial_hex(kernel_phys);
     serial_str(" size=");
@@ -292,7 +311,7 @@ pub extern "C" fn rust_entry(start_info_paddr: u64) -> ! {
         base: cmdline.as_ptr() as u64,
         len: cmdline_len as u64,
     };
-    boot_info.acpi_rsdp = start_info.rsdp_paddr;
+    boot_info.acpi_rsdp = acpi_rsdp;
     boot_info.boot_cpu_id = boot_cpu_id();
     // SAFETY: RDTSC is available on every x86-64 CPU and has no memory side effects.
     boot_info.entry_counter = unsafe { core::arch::x86_64::_rdtsc() };
@@ -527,6 +546,108 @@ fn read_cmdline(paddr: u64, out: &mut [u8]) -> usize {
         length += 1;
     }
     length
+}
+
+fn inject_mcfg(rsdp_paddr: u64, cmdline: &[u8]) -> Option<u64> {
+    let ecam_base = parse_mcfg_token(cmdline)?;
+    if rsdp_paddr == 0 || !identity_ok(rsdp_paddr, ACPI_RSDP_SIZE as u64) {
+        return None;
+    }
+    let mut rsdp = [0u8; ACPI_RSDP_SIZE];
+    // SAFETY: the RSDP range was checked against the temporary identity map.
+    unsafe {
+        ptr::copy_nonoverlapping(rsdp_paddr as *const u8, rsdp.as_mut_ptr(), rsdp.len());
+    }
+    if rsdp.get(0..8) != Some(b"RSD PTR ") {
+        return None;
+    }
+    let xsdt_paddr = u64::from_le_bytes(rsdp[24..32].try_into().ok()?);
+    if xsdt_paddr == 0 || !identity_ok(xsdt_paddr, ACPI_HEADER_SIZE as u64) {
+        return None;
+    }
+    let mut header = [0u8; ACPI_HEADER_SIZE];
+    // SAFETY: the XSDT header is inside the temporary identity map.
+    unsafe {
+        ptr::copy_nonoverlapping(xsdt_paddr as *const u8, header.as_mut_ptr(), header.len());
+    }
+    if header.get(0..4) != Some(b"XSDT") {
+        return None;
+    }
+    let length = u32::from_le_bytes(header[4..8].try_into().ok()?) as usize;
+    if length < ACPI_HEADER_SIZE || length > 4096 || !identity_ok(xsdt_paddr, length as u64) {
+        return None;
+    }
+    let mut xsdt = [0u8; 4096];
+    // SAFETY: the complete XSDT was checked against the temporary identity map.
+    unsafe {
+        ptr::copy_nonoverlapping(xsdt_paddr as *const u8, xsdt.as_mut_ptr(), length);
+    }
+    let entries = (length - ACPI_HEADER_SIZE) / 8;
+    for index in 0..entries {
+        let offset = ACPI_HEADER_SIZE + index * 8;
+        let table = u64::from_le_bytes(xsdt[offset..offset + 8].try_into().ok()?);
+        if table == 0 || !identity_ok(table, 4) {
+            continue;
+        }
+        let mut signature = [0u8; 4];
+        // SAFETY: the table header is inside the temporary identity map.
+        unsafe {
+            ptr::copy_nonoverlapping(table as *const u8, signature.as_mut_ptr(), 4);
+        }
+        if &signature == b"MCFG" {
+            return None;
+        }
+    }
+
+    let buffer = (&raw const ACPI_BUFFER) as u64;
+    // SAFETY: the ACPI buffer is a loader-owned static and is written once during boot.
+    let out = unsafe {
+        core::slice::from_raw_parts_mut(ACPI_BUFFER.0.get().cast::<u8>(), ACPI_BUFFER_SIZE)
+    };
+    let offset = append_mcfg(&rsdp, &xsdt[..length], buffer, ecam_base, out).ok()?;
+    Some(buffer + offset as u64)
+}
+
+fn parse_mcfg_token(cmdline: &[u8]) -> Option<u64> {
+    for key in [b"raven_mcfg=".as_slice(), b"raven.mcfg=".as_slice()] {
+        let Some(position) = find_subslice(cmdline, key) else {
+            continue;
+        };
+        let mut value = 0u64;
+        let mut digits = 0usize;
+        let rest = &cmdline[position + key.len()..];
+        let rest = if rest.starts_with(b"0x") || rest.starts_with(b"0X") {
+            &rest[2..]
+        } else {
+            rest
+        };
+        for byte in rest {
+            let digit = match byte {
+                b'0'..=b'9' => byte - b'0',
+                b'a'..=b'f' => byte - b'a' + 10,
+                b'A'..=b'F' => byte - b'A' + 10,
+                _ => break,
+            };
+            if digits >= 16 {
+                return None;
+            }
+            value = value.checked_mul(16)?.checked_add(u64::from(digit))?;
+            digits += 1;
+        }
+        if digits != 0 {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || needle.len() > haystack.len() {
+        return None;
+    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 fn boot_info_ptr(boot_info: &BootInfo) -> u64 {
