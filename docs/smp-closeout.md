@@ -69,7 +69,10 @@ invocation (including a missing case file) — zero samples.
   not run and no cell is retried.
 - **Artifacts.** `<out>/<mode>/<qtest>.json`, `.log`, `.out` for every cell; `results.tsv` for
   the whole run; `host-per-cell.tsv` (load1/QEMU count immediately before each cell);
-  `host-idle.txt`, `host-state-before.txt`, `host-state-after.txt`, `libc-pack.log`.
+  `<out>/<mode>/<qtest>.telemetry.tsv` (UTC, load1, QEMU/xtask/cargo/rustc counts every 5 s while
+  the cell runs); `host-idle.txt`, `host-state-before.txt`, `host-state-after.txt`,
+  `libc-pack.log`. The telemetry counts include the cell's own qtest/xtask, so another lane's
+  overlap shows as QEMU>=2 or xtask>=2 during the cell.
 - **Statistics.** `summary.txt` prints `n/min/p50/p90/max` per mode and overall, using the qtest
   JSON `duration_ms` and nearest-rank percentiles (the S120 method). A failure contributes no
   duration.

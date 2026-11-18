@@ -214,6 +214,25 @@ fi
 printf 'mode\tcase\tqtest_case\trc\tresult\tduration_ms\tlog\n' > "$OUT/results.tsv"
 printf 'mode\tqtest_case\tload1\tqemu\tutc\n' > "$OUT/host-per-cell.tsv"
 
+# One telemetry row: UTC, load1, and the count of QEMU, xtask, cargo and rustc processes.
+# The counts include this cell's own processes (the cell's qtest/xtask), so overlap with another
+# lane shows as qemu>=2 or xtask>=2 (and cargo/rustc outside the cell's build phase).
+count_matches() {
+    matches=$(pgrep -c "$@" 2>/dev/null || true)
+    [ -n "$matches" ] || matches=0
+    printf '%s' "$matches"
+}
+
+telemetry_row() {
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        "$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo unknown)" \
+        "$(count_matches -f '^qemu-system-')" \
+        "$(count_matches -f 'target/(debug|release)/xtask')" \
+        "$(count_matches -f 'cargo (xtask|build|test|run|nextest)')" \
+        "$(count_matches -x rustc)"
+}
+
 run_cell() {
     mode=$1
     case_name=$2
@@ -227,11 +246,26 @@ run_cell() {
         "$(pgrep -c -f '^qemu-system-' 2>/dev/null || true)" \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$OUT/host-per-cell.tsv"
 
+    telemetry=$directory/$qtest_case.telemetry.tsv
+    printf 'utc\tload1\tqemu\txtask\tcargo\trustc\n' > "$telemetry"
+    telemetry_row >> "$telemetry"
+    (
+        while :; do
+            sleep 5
+            telemetry_row >> "$telemetry"
+        done
+    ) &
+    sampler=$!
+
     start_ns=$(date +%s%N)
     cargo xtask qtest --case "$qtest_case" --arch x86_64 > "$directory/$qtest_case.out" 2>&1
     rc=$?
     end_ns=$(date +%s%N)
     wall_ms=$(( (end_ns - start_ns) / 1000000 ))
+
+    kill "$sampler" 2>/dev/null || true
+    wait "$sampler" 2>/dev/null || true
+    telemetry_row >> "$telemetry"
 
     # Preserve the harness artifacts before anything else can overwrite them.
     cp "build/qtest/$qtest_case.log" "$directory/$qtest_case.log" 2>/dev/null || true
