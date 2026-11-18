@@ -181,6 +181,7 @@ host_check() {
 
     consd=userland/servers/consd/src/main.rs
     usbhid=userland/drivers/usb-hid/src/main.rs
+    usbhid_lib=userland/drivers/usb-hid/src/lib.rs
     if grep -Fq 'fb:console' "$consd"; then
         if grep -R -Fq 'register("fb' userland 2>/dev/null; then
             echo "pi4-ui-evidence: provider fb:console present"
@@ -190,7 +191,7 @@ host_check() {
         fi
     fi
     if grep -Fq 'kbd:console' "$consd"; then
-        if grep -Fq 'KBD_CONSOLE_PATH' "$usbhid" && grep -Fq 'accepts_console_path' "$usbhid"; then
+        if grep -Fq 'KBD_CONSOLE_PATH' "$usbhid_lib" && grep -Fq 'accepts_console_path' "$usbhid"; then
             echo "pi4-ui-evidence: provider kbd:console present"
         else
             echo "pi4-ui-evidence: provider BLOCKED: consd opens kbd:console but usb-hid has no console path"

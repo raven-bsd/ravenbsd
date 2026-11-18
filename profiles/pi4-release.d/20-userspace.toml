@@ -161,7 +161,7 @@ src = "etc/services.d/vfsd.toml"
 path = "/etc/services.d/vfsd.toml"
 
 [[initfs.files]]
-src = "etc/services.d/consd.toml"
+src = "profiles/pi4-release.d/consd.manifest"
 path = "/etc/services.d/consd.toml"
 
 [[initfs.files]]
