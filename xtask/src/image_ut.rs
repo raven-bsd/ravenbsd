@@ -51,3 +51,33 @@ fn platform_parses_generic_pi4_and_rejects_unknown() {
     assert!(matches!(Platform::parse("pi4"), Ok(Platform::Pi4)));
     assert!(Platform::parse("raspi4b").is_err());
 }
+
+#[test]
+fn fat_with_cmdline_preserves_files_and_adds_the_cmdline() {
+    let mut builder = FatImageBuilder::new(64 * 1024 * 1024).unwrap();
+    builder
+        .add_file("config.txt", b"arm_64bit=1\nkernel=kernel8.img\n")
+        .unwrap();
+    let fat = builder.finish().unwrap();
+    let fat = fat_with_cmdline(&fat, "console=ttyAMA0 loglevel=info", Some(0)).unwrap();
+
+    let mut buffer = fat.clone();
+    let filesystem = fatfs::FileSystem::new(
+        std::io::Cursor::new(buffer.as_mut_slice()),
+        fatfs::FsOptions::new(),
+    )
+    .unwrap();
+    let root = filesystem.root_dir();
+    let mut config = String::new();
+    root.open_file("config.txt")
+        .unwrap()
+        .read_to_string(&mut config)
+        .unwrap();
+    assert_eq!(config, "arm_64bit=1\nkernel=kernel8.img\n");
+    let mut cmdline = String::new();
+    root.open_file("cmdline.txt")
+        .unwrap()
+        .read_to_string(&mut cmdline)
+        .unwrap();
+    assert_eq!(cmdline, "console=ttyAMA0 loglevel=info\n");
+}
