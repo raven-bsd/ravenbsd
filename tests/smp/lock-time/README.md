@@ -51,19 +51,16 @@ lost wake is a blocker, not a retry.
 `lock-time-tcg-nomem.toml` disables the TLB pressure (`mem_period=0`) and keeps the timers and
 futex ring: it passes 50/50, so the lock/timer/IPI path is clean without map/unmap.
 
-`lock-time-tlb-repro.toml` is the deterministic reproducer for
+`lock-time-tlb-repro.toml` is the former deterministic reproducer for
 `kernel/src/smp/shootdown.rs:122`: memory pressure on every hop (`mem_period=1`), no timers
-(`timers=0`), 10 iterations. The guest completes, but the kernel logs
-`smp: tlb shootdown timeout on cpu N`; three consecutive runs reproduced it. The case passes only
-while the timeout appears; once S83/the TLB fix lands, the missing timeout makes the case fail so
-the owner must update/remove the reproducer instead of leaving a stale test.
+(`timers=0`), 10 iterations. S113 fixed target IPI delivery (IPC and user page-fault
+interruptibility); the former `smp: tlb shootdown timeout on cpu N` line is now forbidden, so the
+case is a strict clean gate.
 
 `lock-time-tcg2.toml` runs the full TLB+timer workload on TCG `-smp 2`; the guest completes
-50/50 but logs multiple timeouts (cpu 0/1, timer p90 ~204 ms), so the bug is not specific to the
-four-CPU set. It is a reproducer/control and expects the timeout lines; the strict clean gate is
-`lock-time-tcg.toml` (4 CPUs, no timeout allowed).
+50/50 with no timeout. It is now a strict clean gate like `lock-time-tcg.toml` (4 CPUs).
 
-The 50/50 TCG and KVM `-smp 2/4` gate is still open; see `tickets/lance/reports/S85a.md`.
+The 50/50 TCG and KVM `-smp 2/4` gate is green for S113; see `tickets/stuart/reports/S113.md`.
 
 Expected tail for a clean run:
 

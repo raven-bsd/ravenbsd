@@ -24,6 +24,10 @@ static LAST_STATE: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPU
 static IN_SYSCALL: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 /// Last user RFLAGS observed at the syscall boundary or ring-3 entry.
 static USER_FLAGS: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
+/// One while the CPU is servicing a user page fault (interrupt gate, IF clear).
+static IN_PAGE_FAULT: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
+/// Last completed page-fault stage (diagnostic).
+static PAGE_FAULT_PHASE: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 /// Syscall number currently executing (diagnostic).
 static SYSCALL_NUMBER: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 
@@ -97,6 +101,38 @@ pub fn syscall_state(cpu: usize) -> (u64, u64, u64) {
             .map(|slot| slot.load(Ordering::Relaxed))
             .unwrap_or(0),
     )
+}
+
+/// Note that this CPU entered or left a user page-fault handler.
+pub fn note_page_fault(active: bool) {
+    let cpu = this_cpu();
+    if let Some(slot) = IN_PAGE_FAULT.get(cpu) {
+        slot.store(u64::from(active), Ordering::Relaxed);
+    }
+}
+
+/// Record the page-fault stage reached by this CPU.
+pub fn note_page_fault_phase(phase: u64) {
+    let cpu = this_cpu();
+    if let Some(slot) = PAGE_FAULT_PHASE.get(cpu) {
+        slot.store(phase, Ordering::Relaxed);
+    }
+}
+
+/// Snapshot of the last page-fault stage reached by `cpu`.
+pub fn page_fault_phase(cpu: usize) -> u64 {
+    PAGE_FAULT_PHASE
+        .get(cpu)
+        .map(|slot| slot.load(Ordering::Relaxed))
+        .unwrap_or(0)
+}
+
+/// Snapshot of whether `cpu` is inside a page-fault handler.
+pub fn page_fault_active(cpu: usize) -> u64 {
+    IN_PAGE_FAULT
+        .get(cpu)
+        .map(|slot| slot.load(Ordering::Relaxed))
+        .unwrap_or(0)
 }
 
 /// Snapshot of `(state, last_irq_ns, last_state_ns)` for `cpu`.
