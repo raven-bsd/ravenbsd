@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2026, Bo Maryniuk and RavenBSD Contributors
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! The RavenBSD `gpart` utility.
 
