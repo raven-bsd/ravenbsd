@@ -108,6 +108,10 @@ pub fn write_byte(byte: u8) {
 /// Write raw bytes to the PL011, translating LF to CRLF.
 #[allow(dead_code)] // API parity with x86-64; the S14 DEBUG_WRITE path uses it.
 pub fn write_bytes(bytes: &[u8]) {
+    // FB1: the S14 DEBUG_WRITE path is how consd copies getty/login output. Mirror that stream
+    // to the same HDMI text console as the kernel log; UART remains the unconditional sink.
+    #[cfg(raven_pi4)]
+    super::fb::write_text(bytes);
     for &byte in bytes {
         if byte == b'\n' {
             write_byte(b'\r');

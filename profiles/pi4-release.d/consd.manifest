@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# KBD1 Pi 4 console: consd waits for the `kbd:` provider before it starts its keyboard reader
+# thread, so the USB queue is registered when it opens `kbd:console`. If the keyboard service is
+# absent the scheme need is deferred and UART still owns the console; boot never waits on a
+# keyboard.
+name = "consd"
+exec = "/sbin/consd"
+needs = ["logd", "scheme:kbd"]
+provides = ["scheme:tty"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"

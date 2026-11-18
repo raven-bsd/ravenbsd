@@ -25,6 +25,8 @@ scripts/tlb-stress.sh [--runs N] [--case NAME] [--quick] [--no-preflight] [--out
 | `--case NAME` | case to run; repeatable or comma-separated; default is all four cases below |
 | `--quick` | one iteration per requested case (short smoke) |
 | `--no-preflight` | skip `tests/smp/boot/host-idle.sh`; use only for a short smoke |
+| `--max-load L` | pass `--max-load L` to the preflight (default: host-idle's `max(2, nproc/4)`) |
+| `--wait S` | wait up to S seconds for an idle host before starting (default 0: refuse) |
 | `--out DIR` | output directory (default `build/tlb-stress`); refuses to mix into an existing `results.tsv` |
 
 Default matrix:
@@ -48,9 +50,11 @@ sh scripts/tlb-stress.sh --runs 50 --out build/tlb-stress-s113
 
 ## Host preflight
 
-The default path runs `tests/smp/boot/host-idle.sh --context tlb-stress --max-load 2.0`.
-It refuses when another QEMU, a cargo/xtask/rustc job, or a load average above 2.0 is present.
-**A refused host is not a sample**: the runner exits 2 before the first qtest.
+The default path runs `tests/smp/boot/host-idle.sh --context tlb-stress`. It refuses when another
+QEMU, a cargo/xtask/rustc job, or a load average above the limit is present. The limit is
+host-idle's default `max(2, nproc/4)`; pass `--max-load L` on a shared machine and `--wait S` to
+poll for an idle window. **A refused host is not a sample**: the runner exits 2 before the first
+qtest.
 
 The runner records `host-idle.txt` and `host-state-before.txt`/`host-state-after.txt` with
 `nproc`, the 1-minute load, `/dev/kvm`, both QEMU versions, running `qemu-system-*` processes and

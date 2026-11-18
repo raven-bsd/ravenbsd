@@ -197,14 +197,18 @@ is_uint() {
 process_matches() {
     list=$1
     pattern=$2
+    kind=$3
     if [ -n "$list" ]; then
         cat "$list"
     else
-        pgrep -af "$pattern" 2>/dev/null |
-            grep -v 'boot-direct.sh' |
-            grep -v 'boot-time.sh' |
-            grep -v "^$$ " |
-            grep -v "^$PPID " || true
+        # Match the executable name, not a shell command line that happens to mention QEMU:
+        # a host-idle watcher or an editor running `ps | awk /qemu-system-/` is not a QEMU
+        # overlap. The xtask qtest runner has comm "xtask" and the harness "raven-qtest".
+        ps -eo pid=,comm=,args= 2>/dev/null |
+            awk -v pattern="$pattern" -v kind="$kind" '
+                $2 ~ pattern { print; next }
+                kind == "qtest" && $2 == "xtask" && $0 ~ /(^|[[:space:]])qtest([[:space:]]|$)/ { print }
+            ' || true
     fi
 }
 
@@ -279,11 +283,11 @@ run_preflight() {
         preflight_refuse "qemu-system-x86_64 not found"
     fi
 
-    qemu_procs=$(process_matches "${BOOT_DIRECT_QEMU_LIST:-}" 'qemu-system-')
+    qemu_procs=$(process_matches "${BOOT_DIRECT_QEMU_LIST:-}" 'qemu-system-' qemu)
     if [ -n "$qemu_procs" ]; then
         refuse_with_state "busy: QEMU process: $(printf '%s\n' "$qemu_procs" | head -n 1)"
     fi
-    qtest_procs=$(process_matches "${BOOT_DIRECT_QTEST_LIST:-}" 'xtask.*qtest|raven-qtest')
+    qtest_procs=$(process_matches "${BOOT_DIRECT_QTEST_LIST:-}" 'xtask.*qtest|raven-qtest' qtest)
     if [ -n "$qtest_procs" ]; then
         refuse_with_state "busy: qtest process: $(printf '%s\n' "$qtest_procs" | head -n 1)"
     fi
