@@ -561,11 +561,13 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
             Notice::Up(index) => {
                 if let Some(service) = guard.supervisor.services().get(*index) {
                     raven_rt::println!("svcd: {} up", service.name);
+                    emit_ready_timing(&guard, *index, "ready_at");
                 }
             }
             Notice::Failed(index, reason) => {
                 if let Some(service) = guard.supervisor.services().get(*index) {
                     raven_rt::println!("svcd: {} failed: {}", service.name, reason);
+                    emit_ready_timing(&guard, *index, "finished_at");
                 }
             }
             Notice::CrashLoop(index) => {
@@ -574,6 +576,48 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
                 }
             }
         }
+    }
+}
+
+/// Print the per-service readiness timing on its own line.
+///
+/// The lifecycle lines (`svcd: <name> up`) stay byte-exact because the qtests anchor them with
+/// `^...$`; this diagnostic line follows them and carries the generation, the deadline base and
+/// the spawn, first-poll and finish timestamps in monotonic milliseconds.
+fn emit_ready_timing(guard: &Core, index: usize, finish_label: &str) {
+    let Some(service) = guard.supervisor.services().get(index) else {
+        return;
+    };
+    let Some(timing) = guard
+        .supervisor
+        .runtime()
+        .get(index)
+        .map(|runtime| runtime.ready_timing)
+    else {
+        return;
+    };
+    if timing.spawned_ms.is_none() {
+        return;
+    }
+    raven_rt::println!(
+        "svcd: {} timing: generation={} start={} spawn={} first_poll={} deadline={} stalled={} {}={}",
+        service.name,
+        timing.generation,
+        timing_ms(timing.start_ms),
+        timing_ms(timing.spawned_ms),
+        timing_ms(timing.first_poll_ms),
+        timing_ms(timing.deadline_ms),
+        timing.stalled_ms,
+        finish_label,
+        timing_ms(timing.finished_ms),
+    );
+}
+
+/// Format one optional monotonic millisecond stamp for the readiness diagnostic.
+fn timing_ms(value: Option<u64>) -> String {
+    match value {
+        Some(ms) => alloc::format!("{ms}"),
+        None => "none".to_string(),
     }
 }
 

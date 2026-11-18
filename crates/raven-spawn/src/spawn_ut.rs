@@ -730,6 +730,46 @@ fn interp_elf() -> Vec<u8> {
     elf
 }
 
+/// The release `ld-elf.so.1` shape: an `ET_DYN` interpreter whose first `PT_LOAD` is at
+/// `vaddr=0`. The parser must accept the raw image; `plan_biased` applies `INTERP_BASE`.
+fn interp_elf_at_zero() -> Vec<u8> {
+    let mut elf = child_elf(false, false);
+    put_u16(&mut elf, 16, 3);
+    put_u64(&mut elf, 24, 0x100);
+    put_u64(&mut elf, 80, 0);
+    elf
+}
+
+#[test]
+fn interpreter_at_zero_parses_before_biasing() {
+    let interpreter = interp_elf_at_zero();
+    let raw = Elf::parse(&interpreter, target_machine(), USER_MIN..USER_END);
+    match raw {
+        Err(error) => assert_eq!(
+            error,
+            ElfError::SegmentOutsideUserRange,
+            "the old parse window must reject the raw vaddr-0 interpreter"
+        ),
+        Ok(_) => panic!("the old parse window unexpectedly accepted vaddr=0"),
+    }
+
+    let (_, plan, bias) = plan_image(&interpreter, true).expect("vaddr-0 interpreter must plan");
+    assert_eq!(bias, INTERP_BASE);
+    let mut steps = plan;
+    let first = steps
+        .next()
+        .expect("the interpreter has at least one load step");
+    assert_eq!(
+        first.vaddr, INTERP_BASE,
+        "the first step is the biased base, not page 0"
+    );
+    assert!(first.vaddr >= USER_MIN);
+    for step in steps {
+        assert!(step.vaddr >= USER_MIN);
+        assert!(step.vaddr.saturating_add(step.len) <= USER_END);
+    }
+}
+
 fn two_file_initfs(main: &[u8], interpreter: &[u8]) -> Vec<u8> {
     let mut builder = raven_initfs::InitfsBuilder::new();
     builder.add_file("/child", main, 0o755).unwrap();

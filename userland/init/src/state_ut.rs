@@ -75,10 +75,12 @@ fn start_sets_deadline_and_generation() {
     let mut supervisor = supervisor(vec![manifest]);
     let generation = supervisor.start(0, 100).unwrap();
     assert_eq!(generation, 1);
-    let runtime = &supervisor.runtime()[0];
-    assert_eq!(runtime.state, State::Starting);
-    assert_eq!(runtime.ready_deadline_ms, Some(5_100));
-    assert_eq!(runtime.generation, 1);
+    assert_eq!(supervisor.runtime()[0].state, State::Starting);
+    // The window is armed when the child exists, not when the plan selects it.
+    assert_eq!(supervisor.runtime()[0].ready_deadline_ms, None);
+    assert_eq!(supervisor.runtime()[0].generation, 1);
+    assert!(supervisor.spawned(0, generation, Handle(7), 130).is_empty());
+    assert_eq!(supervisor.runtime()[0].ready_deadline_ms, Some(5_130));
 }
 
 #[test]
@@ -99,7 +101,7 @@ fn scheme_readiness_waits_for_ready() {
     let generation = supervisor.start(0, 0).unwrap();
     assert!(supervisor.spawned(0, generation, Handle(7), 0).is_empty());
     assert_eq!(supervisor.runtime()[0].state, State::Starting);
-    assert_eq!(up_names(&supervisor.ready(0, generation)), ["up 0"]);
+    assert_eq!(up_names(&supervisor.ready(0, generation, 5)), ["up 0"]);
     assert_eq!(supervisor.runtime()[0].state, State::Running);
 }
 
@@ -123,6 +125,7 @@ fn scheme_readiness_without_a_provider_times_out() {
     manifest.readiness = Readiness::Scheme;
     let mut supervisor = supervisor(vec![manifest]);
     let generation = supervisor.start(0, 0).unwrap();
+    supervisor.spawned(0, generation, Handle(7), 0);
     assert!(
         supervisor
             .readiness_timed_out(0, generation, 4_999)
@@ -687,4 +690,171 @@ fn release_disk_manifests_grant_block_ufs_and_disk_prefixes() {
         supervisor.dynamic_scheme_prefixes(),
         vec!["block".to_string(), "disk".to_string(), "ufs".to_string()]
     );
+}
+
+#[test]
+fn ready_timing_records_start_spawn_poll_and_finish() {
+    let mut manifest = service("a");
+    manifest.readiness = Readiness::Scheme;
+    let mut supervisor = supervisor(vec![manifest]);
+    let generation = supervisor.start(0, 1_000).unwrap();
+    assert_eq!(
+        supervisor.runtime()[0].ready_timing,
+        ReadyTiming {
+            generation,
+            start_ms: Some(1_000),
+            spawned_ms: None,
+            first_poll_ms: None,
+            deadline_ms: None,
+            stalled_ms: 0,
+            finished_ms: None,
+        }
+    );
+    supervisor.spawned(0, generation, Handle(7), 1_120);
+    supervisor.polled(0, generation, 1_135);
+    supervisor.polled(0, generation, 1_145);
+    let timing = supervisor.runtime()[0].ready_timing;
+    assert_eq!(timing.spawned_ms, Some(1_120));
+    assert_eq!(timing.first_poll_ms, Some(1_135));
+    assert_eq!(timing.deadline_ms, Some(6_120));
+    assert_eq!(timing.finished_ms, None);
+    supervisor.ready(0, generation, 1_180);
+    assert_eq!(
+        supervisor.runtime()[0].ready_timing.finished_ms,
+        Some(1_180)
+    );
+}
+
+#[test]
+fn ready_timing_keeps_the_deadline_after_a_timeout() {
+    let mut manifest = service("a");
+    manifest.readiness = Readiness::Scheme;
+    manifest.ready_timeout_ms = 100;
+    let mut supervisor = supervisor(vec![manifest]);
+    let generation = supervisor.start(0, 500).unwrap();
+    supervisor.spawned(0, generation, Handle(7), 530);
+    supervisor.polled(0, generation, 540);
+    assert!(
+        supervisor
+            .readiness_timed_out(0, generation, 629)
+            .is_empty()
+    );
+    supervisor.readiness_timed_out(0, generation, 630);
+    let runtime = &supervisor.runtime()[0];
+    assert_eq!(runtime.ready_deadline_ms, None);
+    assert_eq!(runtime.ready_timing.deadline_ms, Some(630));
+    assert_eq!(runtime.ready_timing.spawned_ms, Some(530));
+    assert_eq!(runtime.ready_timing.first_poll_ms, Some(540));
+    assert_eq!(runtime.ready_timing.finished_ms, Some(630));
+}
+
+#[test]
+fn ready_timing_ignores_stale_generations() {
+    let mut manifest = service("a");
+    manifest.readiness = Readiness::Scheme;
+    let mut supervisor = supervisor(vec![manifest]);
+    let generation = supervisor.start(0, 100).unwrap();
+    supervisor.spawned(0, generation, Handle(7), 110);
+    supervisor.polled(0, generation + 1, 120);
+    assert_eq!(supervisor.runtime()[0].ready_timing.first_poll_ms, None);
+    assert!(supervisor.ready(0, generation + 1, 130).is_empty());
+    assert_eq!(supervisor.runtime()[0].ready_timing.finished_ms, None);
+}
+
+#[test]
+fn ready_timing_marks_a_no_readiness_service_at_spawn() {
+    let mut supervisor = supervisor(vec![service("a")]);
+    let generation = supervisor.start(0, 10).unwrap();
+    let notices = supervisor.spawned(0, generation, Handle(7), 42);
+    assert_eq!(up_names(&notices), ["up 0"]);
+    let timing = supervisor.runtime()[0].ready_timing;
+    assert_eq!(timing.start_ms, Some(10));
+    assert_eq!(timing.spawned_ms, Some(42));
+    assert_eq!(timing.deadline_ms, None);
+    assert_eq!(timing.finished_ms, Some(42));
+}
+
+#[test]
+fn begin_restart_resets_ready_timing_for_the_new_generation() {
+    let mut manifest = running_with_restarts("a", 3);
+    manifest.readiness = Readiness::Scheme;
+    let mut supervisor = supervisor(vec![manifest]);
+    let generation = supervisor.start(0, 100).unwrap();
+    supervisor.spawned(0, generation, Handle(7), 110);
+    supervisor.polled(0, generation, 120);
+    let outcome = supervisor.exited(0, generation, 1, 200);
+    let restart = outcome.restart.expect("restart should be scheduled");
+    assert!(supervisor.begin_restart(0, restart.generation, 500));
+    let timing = supervisor.runtime()[0].ready_timing;
+    assert_eq!(timing.generation, restart.generation);
+    assert_eq!(timing.start_ms, Some(500));
+    assert_eq!(timing.spawned_ms, None);
+    assert_eq!(timing.first_poll_ms, None);
+    assert_eq!(timing.deadline_ms, None);
+    assert_eq!(timing.finished_ms, None);
+    assert!(
+        supervisor
+            .spawned(0, restart.generation, Handle(8), 520)
+            .is_empty()
+    );
+    assert_eq!(
+        supervisor.runtime()[0].ready_timing.deadline_ms,
+        Some(5_520)
+    );
+}
+
+#[test]
+fn stalled_poll_gap_extends_the_readiness_deadline() {
+    let mut manifest = service("a");
+    manifest.readiness = Readiness::Scheme;
+    let mut supervisor = supervisor(vec![manifest]);
+    let generation = supervisor.start(0, 0).unwrap();
+    supervisor.spawned(0, generation, Handle(7), 100);
+    supervisor.polled(0, generation, 110);
+    // Spawn armed a 5 000 ms window (deadline 5 100); a 4 000 ms unobserved stall moves it.
+    assert!(supervisor.extend_readiness(0, generation, 4_000));
+    assert_eq!(supervisor.runtime()[0].ready_deadline_ms, Some(9_100));
+    assert_eq!(supervisor.runtime()[0].ready_timing.stalled_ms, 4_000);
+    assert!(
+        supervisor
+            .readiness_timed_out(0, generation, 9_099)
+            .is_empty()
+    );
+    let notices = supervisor.readiness_timed_out(0, generation, 9_100);
+    assert_eq!(up_names(&notices), ["failed 0 readiness timeout"]);
+    assert_eq!(supervisor.runtime()[0].ready_timing.stalled_ms, 4_000);
+}
+
+#[test]
+fn zero_or_stale_stall_extension_leaves_the_deadline_alone() {
+    let mut manifest = service("a");
+    manifest.readiness = Readiness::Scheme;
+    let mut supervisor = supervisor(vec![manifest]);
+    let generation = supervisor.start(0, 0).unwrap();
+    supervisor.spawned(0, generation, Handle(7), 100);
+    assert!(!supervisor.extend_readiness(0, generation, 0));
+    assert!(!supervisor.extend_readiness(0, generation + 1, 4_000));
+    assert_eq!(supervisor.runtime()[0].ready_deadline_ms, Some(5_100));
+    assert_eq!(supervisor.runtime()[0].ready_timing.stalled_ms, 0);
+}
+
+#[test]
+fn a_ready_worker_still_times_out_a_hung_child() {
+    let mut manifest = service("a");
+    manifest.readiness = Readiness::Scheme;
+    manifest.ready_timeout_ms = 5_000;
+    let mut supervisor = supervisor(vec![manifest]);
+    let generation = supervisor.start(0, 0).unwrap();
+    supervisor.spawned(0, generation, Handle(7), 100);
+    // Polls every 10 ms with no stall: the window is not extended and the deadline fires.
+    for poll in 1..499 {
+        supervisor.polled(0, generation, 110 + poll * 10);
+        assert!(
+            supervisor
+                .readiness_timed_out(0, generation, 110 + poll * 10)
+                .is_empty()
+        );
+    }
+    let notices = supervisor.readiness_timed_out(0, generation, 5_100);
+    assert_eq!(up_names(&notices), ["failed 0 readiness timeout"]);
 }

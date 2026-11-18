@@ -18,6 +18,28 @@ use raven_svc_manifest::{
     GraphError, Manifest, Overrides, Plan, Readiness, Restart, apply_overrides, start_order,
 };
 
+/// Readiness timing captured for the per-service diagnostic line.
+///
+/// Diagnostics only: no transition reads this record. It keeps the deadline after
+/// [`Runtime::ready_deadline_ms`] is cleared, so the log still reports what the service raced.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReadyTiming {
+    /// Generation these timestamps belong to.
+    pub generation: u64,
+    /// Monotonic time `start` or `begin_restart` selected this generation.
+    pub start_ms: Option<u64>,
+    /// Monotonic time the worker created the child.
+    pub spawned_ms: Option<u64>,
+    /// Monotonic time of the first scheme-readiness poll.
+    pub first_poll_ms: Option<u64>,
+    /// Absolute readiness deadline for this generation.
+    pub deadline_ms: Option<u64>,
+    /// Wall-clock time credited to observed stalls where the worker did not run.
+    pub stalled_ms: u64,
+    /// Monotonic time readiness succeeded, the service exited, or the deadline fired.
+    pub finished_ms: Option<u64>,
+}
+
 /// Per-service runtime state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Runtime {
@@ -45,6 +67,8 @@ pub struct Runtime {
     pub stop_requested: bool,
     /// Start the service again after the current stop reaches terminal state.
     pub restart_after_stop: bool,
+    /// Readiness timestamps for the per-service diagnostic line; diagnostics only.
+    pub ready_timing: ReadyTiming,
 }
 
 impl Default for Runtime {
@@ -62,6 +86,7 @@ impl Default for Runtime {
             last_exit: None,
             stop_requested: false,
             restart_after_stop: false,
+            ready_timing: ReadyTiming::default(),
         }
     }
 }
@@ -221,7 +246,6 @@ impl Supervisor {
 
     /// Start `index` and return its generation, or `None` for an invalid index.
     pub fn start(&mut self, index: usize, now: u64) -> Option<u64> {
-        let service = self.services.get(index)?;
         let runtime = self.runtime.get_mut(index)?;
         let preserve_ready = runtime.state == State::Restarting;
         runtime.state = State::Starting;
@@ -229,13 +253,21 @@ impl Supervisor {
         runtime.restart_after_stop = false;
         runtime.handle = None;
         runtime.started = true;
-        runtime.ready_deadline_ms = match service.readiness {
-            Readiness::None => None,
-            _ => Some(now.saturating_add(u64::from(service.ready_timeout_ms))),
-        };
+        // The readiness window is armed by `spawned`: the child does not exist yet, and on TCG
+        // the worker's own thread and ELF copy can consume seconds before the first instruction.
+        runtime.ready_deadline_ms = None;
         runtime.restart_at_ms = None;
         runtime.last_exit = None;
         runtime.generation = runtime.generation.wrapping_add(1);
+        runtime.ready_timing = ReadyTiming {
+            generation: runtime.generation,
+            start_ms: Some(now),
+            spawned_ms: None,
+            first_poll_ms: None,
+            deadline_ms: None,
+            stalled_ms: 0,
+            finished_ms: None,
+        };
         if !preserve_ready {
             runtime.ever_ready = false;
         }
@@ -248,7 +280,7 @@ impl Supervisor {
         index: usize,
         generation: u64,
         handle: Handle,
-        _now: u64,
+        now: u64,
     ) -> Vec<Notice> {
         let Some(runtime) = self.runtime.get_mut(index) else {
             return Vec::new();
@@ -257,16 +289,38 @@ impl Supervisor {
             return Vec::new();
         }
         runtime.handle = Some(handle);
+        runtime.ready_timing.spawned_ms = Some(now);
         if self.services[index].readiness == Readiness::None {
             runtime.state = State::Running;
             runtime.ever_ready = true;
+            runtime.ready_timing.finished_ms = Some(now);
             return alloc::vec![Notice::Up(index)];
         }
+        // The readiness budget starts when the child exists, not when the plan selected it.
+        let timeout_ms = self.services[index].ready_timeout_ms;
+        runtime.ready_deadline_ms = Some(now.saturating_add(u64::from(timeout_ms)));
+        runtime.ready_timing.deadline_ms = runtime.ready_deadline_ms;
         Vec::new()
     }
 
+    /// Record the first scheme-readiness poll for the diagnostic line.
+    ///
+    /// Subsequent polls keep the first timestamp; a stale generation or a service that already
+    /// left `Starting` is ignored.
+    pub fn polled(&mut self, index: usize, generation: u64, now: u64) {
+        let Some(runtime) = self.runtime.get_mut(index) else {
+            return;
+        };
+        if runtime.generation != generation || runtime.state != State::Starting {
+            return;
+        }
+        if runtime.ready_timing.first_poll_ms.is_none() {
+            runtime.ready_timing.first_poll_ms = Some(now);
+        }
+    }
+
     /// Record that readiness succeeded.
-    pub fn ready(&mut self, index: usize, generation: u64) -> Vec<Notice> {
+    pub fn ready(&mut self, index: usize, generation: u64, now: u64) -> Vec<Notice> {
         let Some(runtime) = self.runtime.get_mut(index) else {
             return Vec::new();
         };
@@ -276,6 +330,7 @@ impl Supervisor {
         runtime.state = State::Running;
         runtime.ever_ready = true;
         runtime.ready_deadline_ms = None;
+        runtime.ready_timing.finished_ms = Some(now);
         alloc::vec![Notice::Up(index)]
     }
 
@@ -290,6 +345,32 @@ impl Supervisor {
         runtime.state = State::Failed;
         runtime.ready_deadline_ms = None;
         alloc::vec![Notice::Failed(index, reason)]
+    }
+
+    /// Credit an unobserved stall to the readiness window.
+    ///
+    /// The caller passes the wall-clock span in which its own poll loop did not run (for example
+    /// a TCG guest descheduled by the host). That span is not evidence that the child failed to
+    /// become ready, so it is added to both the live deadline and the diagnostic timestamp.
+    /// Returns `true` when the deadline moved.
+    pub fn extend_readiness(&mut self, index: usize, generation: u64, stalled_ms: u64) -> bool {
+        if stalled_ms == 0 {
+            return false;
+        }
+        let Some(runtime) = self.runtime.get_mut(index) else {
+            return false;
+        };
+        if runtime.generation != generation || runtime.state != State::Starting {
+            return false;
+        }
+        let Some(deadline) = runtime.ready_deadline_ms else {
+            return false;
+        };
+        runtime.ready_deadline_ms = Some(deadline.saturating_add(stalled_ms));
+        runtime.ready_timing.deadline_ms = runtime.ready_deadline_ms;
+        runtime.ready_timing.stalled_ms =
+            runtime.ready_timing.stalled_ms.saturating_add(stalled_ms);
+        true
     }
 
     /// Check the readiness deadline. Returns a failure notice and cancels the wait when due.
@@ -308,6 +389,7 @@ impl Supervisor {
         }
         runtime.state = State::Failed;
         runtime.ready_deadline_ms = None;
+        runtime.ready_timing.finished_ms = Some(now);
         alloc::vec![Notice::Failed(index, "readiness timeout".to_string())]
     }
 
@@ -351,6 +433,7 @@ impl Supervisor {
             runtime.state = State::Stopped;
             runtime.ever_ready = true;
             runtime.ready_deadline_ms = None;
+            runtime.ready_timing.finished_ms = Some(now);
             return ExitOutcome {
                 restart: None,
                 start: None,
@@ -367,6 +450,7 @@ impl Supervisor {
             if runtime.state == State::Starting && service.readiness != Readiness::None {
                 runtime.state = State::Failed;
                 runtime.ready_deadline_ms = None;
+                runtime.ready_timing.finished_ms = Some(now);
                 return ExitOutcome {
                     restart: None,
                     start: None,
@@ -390,6 +474,7 @@ impl Supervisor {
         if runtime.restarts >= service.max_restarts {
             runtime.state = State::GaveUp;
             runtime.ready_deadline_ms = None;
+            runtime.ready_timing.finished_ms = Some(now);
             return ExitOutcome {
                 restart: None,
                 start: None,
@@ -485,9 +570,6 @@ impl Supervisor {
     ///
     /// Returns `false` when the generation is stale or a `STOP` cancelled the restart.
     pub fn begin_restart(&mut self, index: usize, generation: u64, now: u64) -> bool {
-        let Some(service) = self.services.get(index) else {
-            return false;
-        };
         let Some(runtime) = self.runtime.get_mut(index) else {
             return false;
         };
@@ -496,9 +578,16 @@ impl Supervisor {
         }
         runtime.state = State::Starting;
         runtime.handle = None;
-        runtime.ready_deadline_ms = match service.readiness {
-            Readiness::None => None,
-            _ => Some(now.saturating_add(u64::from(service.ready_timeout_ms))),
+        // Armed by `spawned`, exactly like the first start.
+        runtime.ready_deadline_ms = None;
+        runtime.ready_timing = ReadyTiming {
+            generation,
+            start_ms: Some(now),
+            spawned_ms: None,
+            first_poll_ms: None,
+            deadline_ms: None,
+            stalled_ms: 0,
+            finished_ms: None,
         };
         runtime.restart_at_ms = None;
         true
