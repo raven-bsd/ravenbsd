@@ -608,6 +608,7 @@ pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapfra
     if !frame.is_null() {
         // SAFETY: the syscall stub passes its live trap frame in `rdi`.
         let flags = unsafe { (*frame).rflags };
+        // SAFETY: the same live trap frame is valid; the stub still owns it for this call.
         let number = unsafe { (*frame).rax };
         crate::sched::smp::percpu::note_user_flags(flags);
         crate::sched::smp::percpu::note_syscall_number(number);
