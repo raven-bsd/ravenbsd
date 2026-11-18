@@ -605,6 +605,7 @@ pub(crate) fn spawn_service(manifest: &Manifest, from_root: bool) -> Result<Hand
         args: &args,
         env: &environment,
     };
+    let prefixes = namespace_prefixes();
 
     if from_root {
         let path = alloc::format!("file:/root{}", manifest.exec);
@@ -612,6 +613,7 @@ pub(crate) fn spawn_service(manifest: &Manifest, from_root: bool) -> Result<Hand
             Ok(image) => {
                 let mut sys = GrantSys {
                     grants: grants.clone(),
+                    prefixes: prefixes.clone(),
                 };
                 return raven_rt::spawn::spawn_image_with(
                     &image,
@@ -633,8 +635,20 @@ pub(crate) fn spawn_service(manifest: &Manifest, from_root: bool) -> Result<Hand
         }
     }
 
-    let mut sys = GrantSys { grants };
+    let mut sys = GrantSys { grants, prefixes };
     raven_rt::spawn::spawn_with(&initfs, &manifest.exec, &options, &mut sys).map_err(describe_spawn)
+}
+
+/// Scheme prefixes to grant to the next child.
+///
+/// The service set names every scheme a provider publishes or needs; a scheme with no enabled
+/// provider is registered at runtime. Granting its prefix before the child's first thread makes
+/// the later `block:`/`ufs:`/`disk:` registration visible without changing the kernel snapshot.
+fn namespace_prefixes() -> Vec<String> {
+    match core_handle() {
+        Some(core) => core.lock().supervisor.dynamic_scheme_prefixes(),
+        None => Vec::new(),
+    }
 }
 
 /// The current monotonic time in milliseconds.
@@ -669,11 +683,19 @@ struct Grant {
 
 struct GrantSys {
     grants: Vec<Grant>,
+    prefixes: Vec<String>,
 }
 
 impl Sys for GrantSys {
     fn proc_create(&mut self) -> Result<Handle, Errno> {
-        RtSys.proc_create()
+        let proc = RtSys.proc_create()?;
+        for prefix in &self.prefixes {
+            if let Err(error) = raven_scheme::namespace::allow_prefix(proc, prefix) {
+                let _ = RtSys.handle_close(proc);
+                return Err(error);
+            }
+        }
+        Ok(proc)
     }
 
     fn memobj_create(&mut self, len: usize) -> Result<Handle, Errno> {

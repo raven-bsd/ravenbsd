@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Release disk-tools fsd-ufs: disabled at boot and started by the disk-tools qtest after newfs.
+# `newfs` on this branch formats the whole `block:0` device (it has no partition selector), so
+# fsd-ufs reads partition 0. A later ticket can select GPT partition 1 once newfs grows `-p`.
+name = "fsd-ufs"
+exec = "/sbin/fsd-ufs"
+needs = ["scheme:block"]
+provides = ["scheme:ufs"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+enable = false
+
+[env]
+FSD_UFS_DEVICE = "block:0"
+FSD_UFS_PARTITION = "0"
+FSD_UFS_SCHEME = "ufs"
+FSD_UFS_READ_ONLY = "0"

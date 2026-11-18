@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# S98 guest disk tools: lsblk, newfs and gpart with their man pages. The virtio-blk/blockd
-# scratch-disk stack is not staged here: `/etc/drivers.toml` is owned by 20-net and the QEMU
-# disk case/fixture paths are outside this ticket's Owns (reported as the remaining gap).
+# S98/S110 guest disk tools: lsblk, newfs and gpart with their man pages, plus the virtio-blk,
+# blockd and fsd-ufs stack. The driver entry lives in the single shared `/etc/drivers.toml`
+# staged by 20-net; this fragment does not stage a second table. blockd and fsd-ufs are
+# `enable = false`, so a release image booted without a scratch disk is unchanged; the
+# disk-tools qtest starts them through svcctl after login now that svcd grants the late scheme
+# prefixes.
 
 [[initfs.programs]]
 package = "lsblk"
@@ -16,6 +19,26 @@ path = "/sbin/newfs"
 [[initfs.programs]]
 package = "gpart"
 path = "/sbin/gpart"
+
+[[initfs.programs]]
+package = "virtio-blk"
+path = "/sbin/virtio-blk"
+
+[[initfs.programs]]
+package = "raven-blockd"
+path = "/sbin/blockd"
+
+[[initfs.programs]]
+package = "fsd-ufs"
+path = "/sbin/fsd-ufs"
+
+[[initfs.files]]
+src = "userland/init/services/blockd.toml"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "userland/init/services/fsd-ufs.toml"
+path = "/etc/services.d/fsd-ufs.toml"
 
 [[initfs.files]]
 src = "docs/man1/lsblk.1"

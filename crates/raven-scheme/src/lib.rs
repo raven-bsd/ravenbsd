@@ -27,6 +27,7 @@ extern crate alloc;
 
 pub mod client;
 pub mod kernel;
+pub mod namespace;
 pub mod ofd;
 pub mod server;
 pub mod service;
