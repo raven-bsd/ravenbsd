@@ -28,6 +28,8 @@ EVIDENCE = ROOT / "build/release" / VERSION
 KERNEL_GATE = ROOT / "docs/kernel-gate.md"
 POSIX_REPORT = ROOT / "docs/posix/CONFORMANCE.md"
 RELEASE_IMAGES = ROOT / "docs/release-images.md"
+SMP_SOAK = ROOT / "docs/smp-boot-soak.md"
+SMP_CLOSEOUT = ROOT / "docs/smp-closeout.md"
 PI4_DEFAULT = EVIDENCE / "pi4-serial.log"
 IMAGE_X86_DEFAULT = ROOT / "build/x86_64/ravenbsd-x86_64.img"
 IMAGE_AARCH64_DEFAULT = ROOT / "build/aarch64/ravenbsd-pi4.img"
@@ -339,6 +341,126 @@ def release_login_gate(head: str, run_qtests: bool) -> Gate:
     )
 
 
+SMP_KVM_ROW = re.compile(
+    r"\|\s*KVM\s*`-smp (\d)`\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*([^|]*)\|"
+)
+SMP_TCG_ROW = re.compile(
+    r"\|\s*TCG\s*`-smp (\d)`\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*([^|]*)\|"
+)
+
+
+def latest_soak_table(
+    text: str,
+) -> tuple[dict[int, tuple[int, int, str]], dict[int, tuple[int, int, str]], str] | None:
+    """Return the last campaign table (KVM, TCG, section) with both row kinds."""
+    latest = None
+    for section in re.split(r"(?m)^## ", text):
+        kvm = {
+            int(match.group(1)): (
+                int(match.group(2)),
+                int(match.group(3)),
+                match.group(4).strip(),
+            )
+            for match in SMP_KVM_ROW.finditer(section)
+        }
+        tcg = {
+            int(match.group(1)): (
+                int(match.group(2)),
+                int(match.group(3)),
+                match.group(4).strip(),
+            )
+            for match in SMP_TCG_ROW.finditer(section)
+        }
+        if kvm and tcg:
+            latest = (kvm, tcg, section)
+    return latest
+
+
+def closeout_result(text: str) -> tuple[str, str]:
+    """Classify the S126 closeout document: pass/fail/not_run/ambiguous/missing."""
+    if not text:
+        return "missing", ""
+    passed = re.search(r"(?im)^\s*Result:\s*\*\*PASS\*\*", text)
+    failed = re.search(r"(?im)^\s*Result:\s*\*\*FAIL[^*]*\*\*(.*)$", text)
+    failed_line = re.search(r"(?im)^\s*FAILED\b(.*)$", text)
+    not_run = re.search(r"(?i)not\s+run\s+yet|matrix is \*\*not\*\* run|zero samples", text)
+    if failed:
+        return "fail", (failed.group(1).strip(" :-—\t") or "closeout result FAIL")
+    if failed_line:
+        return "fail", failing_text(failed_line.group(1))
+    if passed:
+        return "pass", ""
+    if not_run:
+        return "not_run", "closeout matrix has not run"
+    return "ambiguous", "closeout result is missing"
+
+
+def failing_text(text: str) -> str:
+    value = text.strip(" :-—\t")
+    return value or "failure recorded"
+
+
+def smp_soak_gate(soak: Path, closeout: Path, head: str) -> Gate:
+    soak_text = read_text(soak)
+    closeout_text = read_text(closeout)
+    if not soak_text:
+        return Gate(
+            "smp-soak", "MISSING", "read docs/smp-boot-soak.md", utc(), utc(), "",
+            str(soak.relative_to(ROOT)), "", "soak document is missing"
+        )
+    table = latest_soak_table(soak_text)
+    if not table:
+        return Gate(
+            "smp-soak", "STALE", "read docs/smp-boot-soak.md", utc(), utc(), "",
+            str(soak.relative_to(ROOT)), sha256(soak), "soak campaign table is missing or ambiguous"
+        )
+    kvm, tcg, section = table
+    parts = []
+    failures = []
+    kvm_ok = True
+    for mode in (1, 2, 4):
+        if mode not in kvm:
+            kvm_ok = False
+            failures.append(f"KVM{mode} missing")
+            continue
+        requested, passed, failure = kvm[mode]
+        parts.append(f"KVM{mode} {passed}/{requested}")
+        if requested == 0 or passed != requested or failure.lower() not in {"none", "none.", ""}:
+            kvm_ok = False
+            failures.append(f"KVM{mode} {passed}/{requested} {failing_text(failure)}")
+    if 4 not in tcg:
+        tcg_ok = False
+        failures.append("TCG4 missing")
+    else:
+        requested, passed, failure = tcg[4]
+        parts.append(f"TCG4 {passed}/{requested}")
+        tcg_ok = requested == 10 and passed == 10 and failure.lower() in {"none", "none.", ""}
+        if not tcg_ok:
+            failures.append(f"TCG4 {passed}/{requested} {failing_text(failure)}")
+    campaign = re.search(r"Campaign at `([0-9a-f]{7,40})`", section)
+    counts = ", ".join(parts)
+    closeout_state, closeout_failure = closeout_result(closeout_text)
+    if closeout_state == "fail":
+        failures.append(f"closeout: {closeout_failure}")
+    if failures:
+        note = counts + "; " + "; ".join(failures)
+        status = "FAIL"
+    elif closeout_state == "pass":
+        status = "PASS"
+        note = counts + "; closeout clean"
+    else:
+        status = "STALE"
+        note = counts + f"; closeout {closeout_state}" + (
+            f" ({closeout_failure})" if closeout_failure else ""
+        )
+    if campaign:
+        note += f"; campaign {campaign.group(1)}"
+    return Gate(
+        "smp-soak", status, "read docs/smp-boot-soak.md", utc(), utc(), "",
+        str(soak.relative_to(ROOT)), sha256(soak), note
+    )
+
+
 def dynamic_gate(arch: str, head: str, run_qtests: bool) -> Gate:
     name = f"dynamic-userland-{arch}"
     evidence = EVIDENCE / f"{name}.log"
@@ -579,6 +701,7 @@ def collect(args: argparse.Namespace) -> int:
     gates.append(parse_posix(args.posix_report, head))
     gates.append(parse_libc(head))
     gates.append(parse_kernel_gate(args.kernel_gate, head))
+    gates.append(smp_soak_gate(SMP_SOAK, SMP_CLOSEOUT, head))
     gates.append(dynamic_gate("x86_64", head, args.run_qtests))
     gates.append(dynamic_gate("aarch64", head, args.run_qtests))
     gates.append(release_login_gate(head, args.run_qtests))
@@ -738,6 +861,41 @@ def self_test() -> int:
     if local_mismatch.status != "PINNED" or "local build sha256=" not in local_mismatch.note:
         raise AssertionError(f"local image mismatch: {local_mismatch}")
 
+    clean_soak = smp_soak_gate(
+        fixtures / "smp-boot-soak-clean.md", fixtures / "smp-closeout-pass.md", head
+    )
+    if clean_soak.status != "PASS":
+        raise AssertionError(f"clean soak: {clean_soak}")
+    failed_soak = smp_soak_gate(
+        fixtures / "smp-boot-soak-tcg4-fail.md", fixtures / "smp-closeout-pass.md", head
+    )
+    if (
+        failed_soak.status != "FAIL"
+        or "TCG4 4/10" not in failed_soak.note
+        or "run 5/10 login timeout" not in failed_soak.note
+    ):
+        raise AssertionError(f"TCG4 failure soak: {failed_soak}")
+    failed_closeout = smp_soak_gate(
+        fixtures / "smp-boot-soak-clean.md", fixtures / "smp-closeout-fail.md", head
+    )
+    if failed_closeout.status != "FAIL" or "readiness timeout" not in failed_closeout.note:
+        raise AssertionError(f"failed closeout: {failed_closeout}")
+    not_run = smp_soak_gate(
+        fixtures / "smp-boot-soak-clean.md", fixtures / "smp-closeout-not-run.md", head
+    )
+    if not_run.status != "STALE":
+        raise AssertionError(f"not-run closeout: {not_run}")
+    missing_soak = smp_soak_gate(
+        fixtures / "does-not-exist-smp.md", fixtures / "smp-closeout-pass.md", head
+    )
+    if missing_soak.status != "MISSING":
+        raise AssertionError(f"missing soak: {missing_soak}")
+    ambiguous_soak = smp_soak_gate(
+        fixtures / "smp-boot-soak-ambiguous.md", fixtures / "smp-closeout-pass.md", head
+    )
+    if ambiguous_soak.status != "STALE":
+        raise AssertionError(f"ambiguous soak: {ambiguous_soak}")
+
     good_board = board_gate(fixtures / "board-good.log")
     if good_board.status != "MARKERS COMPLETE":
         raise AssertionError(f"good board: {good_board}")
@@ -762,7 +920,8 @@ def self_test() -> int:
     print(
         "release-evidence self-test: PASS (kernel good/stale/missing/current/"
         "current-stale/partial, posix good/stale/no-stamp/fail, "
-        "board good/virt/synthetic/incomplete, image missing/hash/pinned/stale/local-hash)"
+        "board good/virt/synthetic/incomplete, image missing/hash/pinned/stale/local-hash, "
+        "smp-soak clean/tcg4-fail/closeout-fail/not-run/missing/ambiguous)"
     )
     return 0
 
