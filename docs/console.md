@@ -5,7 +5,9 @@
 
 Status: **host-tested only**. No hardware/QEMU claim is made by CON1. UART remains the recovery
 console; HDMI text output and USB keyboard input are wired through the backends below and owned by
-HDMI1/USB1/UI1 for board evidence.
+HDMI1/USB1/UI1 for board evidence. FB1 adds the getty/login output path: the kernel mirrors the
+`DEBUG_WRITE` stream to the Pi 4 HDMI text console, so the existing `consd` UART sink also appears
+on HDMI without a userspace display provider.
 
 ## Contract
 
@@ -19,7 +21,8 @@ kbd:console (USB1) ─┐
                     ├─> Multiplexer -> Discipline -> ready lines -> tty:console readers
 UART DEBUG_READ ────┘                         │
                                               └─ echo/writes -> UART DEBUG_WRITE
-                                                             -> fb:console (HDMI1/UI1 text sink)
+                                                             -> kernel HDMI text mirror (Pi 4)
+                                                             -> fb:console (optional userspace sink)
 ```
 
 ## Backends
@@ -28,7 +31,7 @@ UART DEBUG_READ ────┘                         │
 |---|---|---|---|
 | UART debug | `UartInput` / `UartOutput` | `DEBUG_READ` / `DEBUG_WRITE` via `raven-rt` | base / recovery |
 | USB boot keyboard | `ConsoleInput` over `kbd:console` | byte stream published by the USB HID service | USB1 |
-| HDMI/framebuffer text | `ConsoleOutput` over `fb:console` | byte sink rendered by the framebuffer text console | HDMI1 / UI1 |
+| HDMI/framebuffer text | `ConsoleOutput` over `fb:console` | optional byte sink; the kernel `DEBUG_WRITE` mirror is now the primary getty/login path | HDMI1/FB1 / UI1 |
 
 The keyboard reader thread exits silently when `kbd:console` is absent; the framebuffer sink is
 added only when `fb:console` opens. Both failures leave UART-only operation intact.
@@ -50,6 +53,23 @@ added only when `fb:console` opens. Both failures leave UART-only operation inta
 
 No process-server semantics are involved: pids, wait, signals and credentials remain kernel
 objects. `consd` is still the `tty:` scheme server.
+
+## FB1: getting login output to HDMI
+
+`getty`/`login` write to `tty:console`; `consd` sends those bytes through its `UartOutput`, which
+calls `raven_rt::debug_write`. On a Pi 4 build the kernel `DEBUG_WRITE` path calls
+`arch::aarch64::serial::write_bytes`; that function now mirrors the same byte stream to the
+existing `arch::aarch64::fb` text console **and** writes the UART unconditionally. This is the
+preferred FB1 path: no duplicate sink, no GPU/DRM driver, and the existing `fb:console` scheme
+sink remains optional for a future userspace provider.
+
+The mirror is only active after the HDMI console has successfully queried the firmware display
+buffer. A missing mailbox/display leaves the UART path untouched; the boot/login serial gate does
+not regress. The panel/E-Ink path is not involved.
+
+`scripts/pi4-ui-evidence.sh --check --strict` treats the kernel mirror as the HDMI login provider
+and fails strict mode only for a missing provider, not for the absent board/photo. A board login
+still requires UI1's real HDMI + USB-keyboard evidence.
 
 ## Board evidence hook (UI1)
 

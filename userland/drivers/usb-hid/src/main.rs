@@ -29,7 +29,7 @@ mod program {
     use raven_rt::entry;
     use raven_rt::sync::Mutex;
     use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
-    use usb_hid::ConsoleInput;
+    use usb_hid::{ConsoleInput, accepts_console_path};
 
     entry!(main);
 
@@ -70,7 +70,7 @@ mod program {
             _ctx: &Ctx,
         ) -> HandlerResult<Opened> {
             let path = path.strip_prefix('/').unwrap_or(path);
-            if !path.is_empty() {
+            if !accepts_console_path(path) {
                 return Err(Errno::ENOENT.into());
             }
             let readable = flags & OPEN_READ != 0;

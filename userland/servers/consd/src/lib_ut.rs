@@ -251,3 +251,18 @@ fn interrupt_and_flush_are_visible_to_the_scheme_reader() {
     assert!(console.flush() >= 4);
     assert_eq!(take(&mut console, 8), b"");
 }
+
+#[test]
+fn kbd_console_bytes_reach_the_console_reader() {
+    // The `kbd:console` reader thread uses this same path: a scheme/mock source feeds the
+    // multiplexer and the canonical line is what `tty:console` readers receive.
+    let mut console = Multiplexer::new();
+    let (keyboard, _keyboard_state) = MockInput::new(b"root\n");
+    console.add_input(keyboard);
+    let (output, state) = MockOutput::new(64);
+    console.add_output(output);
+
+    assert_eq!(console.pump(), 5);
+    assert_eq!(take(&mut console, 8), b"root\n");
+    assert_eq!(state.lock().unwrap().log, b"root\r\n");
+}
