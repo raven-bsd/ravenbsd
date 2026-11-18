@@ -1,0 +1,876 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P4d: POSIX system/process utility behaviour in a shell guest. The case builds a
+# minimal initfs (core services plus only the tools under test) so initfsd stays
+# inside its readiness window. This is a host/QEMU test, not a board or release
+# claim.
+
+# S112: the same case under KVM -smp 2. The appended -smp 2 overrides the harness's fixed -smp 4.
+name = "posix-util-system-kvm2"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 840
+boot_cmdline = "console=ttyS0 test-exit=1"
+pre = ["sh tests/posix/utility/system/build.sh"]
+initfs = "build/posix/utility/system/initfs.img"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "2"]
+expect_exit = "success"
+
+[[expect]]
+regex = 'svcd: all services up$'
+unordered = true
+
+[[expect]]
+regex = '^rsh: ready$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|rsh: .*command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 600
+
+[[step]]
+send = "id\n"
+delay_ms = 100
+
+[[step]]
+wait = '^uid=0\(root\) gid=0\(root\) groups=0\(root\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -u\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -un\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -g\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -gn\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -G\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -Gn\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -ru\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -run\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id root\n"
+delay_ms = 100
+
+[[step]]
+wait = '^uid=0\(root\) gid=0\(root\) groups=0\(root\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id nosuchuser\n"
+delay_ms = 100
+
+[[step]]
+wait = "^id: 'nosuchuser': no such user$"
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ps\n"
+delay_ms = 100
+
+[[step]]
+wait = '^logd running [0-9]+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ps -e\n"
+delay_ms = 100
+
+[[step]]
+wait = '^PID PPID UID GID CMD$'
+timeout_secs = 30
+
+[[step]]
+wait = '^1 0 0 0 /init$'
+timeout_secs = 30
+
+[[step]]
+wait = '^[0-9]+ [0-9]+ 0 0 ps$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ps --json\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"process","pid":null,"ppid":null,"uid":null,"gid":null,"state":"[a-z-]+","name":"[a-z0-9-]+","command":null,"threads":null,"rss_bytes":null\}$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ps --selftest\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ps: selftest ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "uname\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "uname -n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "uname -m\n"
+delay_ms = 100
+
+[[step]]
+wait = '^x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "uname -s\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "uname -r\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0\.1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "uname -v\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD 0\.1 \(BASE\) #1: .*$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD raven 0\.1 .* x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "getconf ARG_MAX\n"
+delay_ms = 100
+
+[[step]]
+wait = '^131072$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "getconf PAGESIZE\n"
+delay_ms = 100
+
+[[step]]
+wait = '^4096$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "getconf _POSIX_VERSION\n"
+delay_ms = 100
+
+[[step]]
+wait = '^202405$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "getconf NOPE; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^getconf: NOPE: unrecognized variable$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "hostname\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "hostname --selftest\n"
+delay_ms = 100
+
+[[step]]
+wait = '^hostname: selftest ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "env\n"
+delay_ms = 100
+
+[[step]]
+wait = '^PATH=/bin:/sbin$'
+timeout_secs = 30
+
+[[step]]
+wait = '^HOME=/$'
+timeout_secs = 30
+
+[[step]]
+wait = '^USER=root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^SHELL=/bin/rsh$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/env -i P4D=only\n"
+delay_ms = 100
+
+[[step]]
+wait = '^P4D=only$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/env P4D=outer\n"
+delay_ms = 100
+
+[[step]]
+wait = '^P4D=outer$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/env -i FOO=bar /bin/whoami\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "export P4D=ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "env\n"
+delay_ms = 100
+
+[[step]]
+wait = '^P4D=ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "whoami\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "whoami extra; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^usage: whoami$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=2$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -l\n"
+delay_ms = 100
+
+[[step]]
+wait = '^HUP .*TERM.*SYS$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -l 15\n"
+delay_ms = 100
+
+[[step]]
+wait = '^TERM$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -l TERM\n"
+delay_ms = 100
+
+[[step]]
+wait = '^15$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -0 1; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^status=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -s TERM 9999; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^kill: 9999: no such process$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice -n 5 /bin/nice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice -n 20 /bin/nice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^19$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice -n -5 /bin/nice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^-5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice -n 5 /bin/getconf ARG_MAX\n"
+delay_ms = 100
+
+[[step]]
+wait = '^131072$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nohup /bin/whoami\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nohup /bin/getconf NOPE; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^getconf: NOPE: unrecognized variable$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg\n"
+delay_ms = 100
+
+[[step]]
+wait = '^y$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^n$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg y\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^y$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg -t file:/etc/passwd; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mesg: file:/etc/passwd: not a tty$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "logger -t p4u -p user.info hello\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "dmesg\n"
+delay_ms = 100
+
+[[step]]
+wait = '^.* p4u: <14>hello$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo filemsg > /tmp/p4u.log\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "logger -t p4uf -p user.info -f /tmp/p4u.log\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "dmesg\n"
+delay_ms = 100
+
+[[step]]
+wait = '^.* p4uf: <14>filemsg$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 5 -p 1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^1: 5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 0 -p 1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^1: 0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 5 -g 1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^1: 5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 0 -g 1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^1: 0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 5 -u 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0: 5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 0 -u 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0: 0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 5 -p 9999; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^renice: 9999: no such process$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

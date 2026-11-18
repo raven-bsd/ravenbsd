@@ -14,10 +14,14 @@
 #   sh scripts/boot-direct.sh --tcg                 # force TCG instead of KVM
 #   sh scripts/boot-direct.sh --mode full --defaults # old q35 default-device set
 #   sh scripts/boot-direct.sh --mode full --smp 2   # override the full-mode -smp 4
+#   sh scripts/boot-direct.sh --mode full --exclusive # refuse a busy host; 10 runs
+#   sh scripts/boot-direct.sh --exclusive --preflight-only # host state only, no build/boot
+#   sh scripts/boot-direct.sh --exclusive --self-test # synthetic busy/idle preflight cases
 #   sh scripts/boot-direct.sh --rebuild             # rebuild kernel and initfs first
 #
-# Exit: 0 when the requested target is met; 2 when the loader/kernel fails or the target is
-# missed (the output always names the exact blocker); 3 for a usage error.
+# Exit: 0 when the requested target is met; 2 when the loader/kernel fails, the exclusive
+# preflight refuses a busy host, or the target is missed (the output always names the exact
+# blocker); 3 for a usage error. --exclusive defaults to 10 runs unless --runs is given.
 
 set -eu
 
@@ -29,10 +33,15 @@ machine=
 profile=release
 mode=probe
 runs=3
+runs_set=0
 smp=
 kvm=auto
 nodefaults=1
 rebuild=0
+exclusive=0
+preflight_only=0
+self_test=0
+out=${BOOT_DIRECT_OUT:-build/boot-direct}
 timeout_secs=120
 cmdline='console=ttyS0 test-exit=1'
 kernel="$root/build/x86_64/kernel.elf"
@@ -62,7 +71,26 @@ while [ $# -gt 0 ]; do
             ;;
         --runs)
             runs=${2:?--runs needs a value}
+            runs_set=1
             shift 2
+            ;;
+        --out)
+            out=${2:?--out needs a value}
+            shift 2
+            ;;
+        --exclusive)
+            exclusive=1
+            shift
+            ;;
+        --preflight-only)
+            exclusive=1
+            preflight_only=1
+            shift
+            ;;
+        --self-test)
+            exclusive=1
+            self_test=1
+            shift
             ;;
         --smp)
             smp=${2:?--smp needs a value}
@@ -151,6 +179,253 @@ if [ "$kvm" = auto ]; then
         kvm=0
     fi
 fi
+if [ "$exclusive" = 1 ] && [ "$runs_set" = 0 ]; then
+    runs=10
+fi
+case $runs in
+    '' | *[!0-9]*) echo "boot-direct: invalid --runs value: $runs" >&2; exit 3 ;;
+esac
+[ "$runs" -ge 1 ] || { echo "boot-direct: --runs must be at least 1" >&2; exit 3; }
+
+is_uint() {
+    case $1 in
+        '' | *[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+process_matches() {
+    list=$1
+    pattern=$2
+    if [ -n "$list" ]; then
+        cat "$list"
+    else
+        pgrep -af "$pattern" 2>/dev/null |
+            grep -v 'boot-direct.sh' |
+            grep -v 'boot-time.sh' |
+            grep -v "^$$ " |
+            grep -v "^$PPID " || true
+    fi
+}
+
+preflight_refuse() {
+    printf 'boot-direct: exclusive REFUSED: %s\n' "$*" >&2
+    exit 2
+}
+
+refuse_with_state() {
+    reason=$1
+    reason=$(printf '%s' "$reason" | tr '"' "'")
+    loadavg=$(awk '{print $1, $2, $3}' /proc/loadavg)
+    load1=${BOOT_DIRECT_LOAD1:-$(printf '%s\n' "$loadavg" | awk '{print $1}')}
+    load5=$(printf '%s\n' "$loadavg" | awk '{print $2}')
+    load15=$(printf '%s\n' "$loadavg" | awk '{print $3}')
+    nproc=${BOOT_DIRECT_NPROC:-$(nproc)}
+    max_load=${BOOT_DIRECT_MAX_LOAD:-$nproc}
+    mem_avail=${BOOT_DIRECT_MEM_AVAIL_KB:-$(awk '/MemAvailable:/ { print $2 }' /proc/meminfo)}
+    disk_avail=${BOOT_DIRECT_DISK_AVAIL_KB:-$(df -Pk "$root" | awk 'NR == 2 { print $4 }')}
+    commit=$(git rev-parse --short HEAD 2>/dev/null || printf 'unknown')
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'unknown')
+    dirty=0
+    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+        dirty=1
+    fi
+    qemu_count=$(printf '%s\n' "${qemu_procs:-}" | grep -c . || true)
+    qtest_count=$(printf '%s\n' "${qtest_procs:-}" | grep -c . || true)
+    if [ "$kvm" = 1 ]; then accel=kvm; else accel=tcg; fi
+    {
+        printf '{\n'
+        printf '  "commit": "%s",\n' "$commit"
+        printf '  "branch": "%s",\n' "$branch"
+        printf '  "dirty": %s,\n' "$dirty"
+        printf '  "utc": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf '  "mode": "%s",\n' "$mode"
+        printf '  "machine": "%s",\n' "$machine"
+        printf '  "smp": %s,\n' "$smp"
+        printf '  "accel": "%s",\n' "$accel"
+        printf '  "qemu_version": "%s",\n' "$qemu_version"
+        printf '  "nproc": %s,\n' "$nproc"
+        printf '  "load1": %s,\n' "$load1"
+        printf '  "load5": %s,\n' "$load5"
+        printf '  "load15": %s,\n' "$load15"
+        printf '  "max_load": %s,\n' "$max_load"
+        printf '  "mem_available_kb": %s,\n' "$mem_avail"
+        printf '  "disk_available_kb": %s,\n' "$disk_avail"
+        printf '  "qemu_processes": %s,\n' "$qemu_count"
+        printf '  "qtest_processes": %s,\n' "$qtest_count"
+        printf '  "refused": true,\n'
+        printf '  "reason": "%s",\n' "$reason"
+        printf '  "sample_count": 0\n'
+        printf '}\n'
+    } > "$state"
+    printf 'boot-direct: exclusive REFUSED: %s\n' "$reason" >&2
+    printf 'boot-direct: host nproc=%s load1=%s load5=%s load15=%s max_load=%s mem_available_kb=%s disk_available_kb=%s\n' \
+        "$nproc" "$load1" "$load5" "$load15" "$max_load" "$mem_avail" "$disk_avail" >&2
+    printf 'boot-direct: host qemu_processes=%s qtest_processes=%s sample_count=0\n' \
+        "$qemu_count" "$qtest_count" >&2
+    printf 'boot-direct: preflight=%s\n' "$state" >&2
+    exit 2
+}
+
+run_preflight() {
+    [ "$exclusive" = 1 ] || return 0
+    mkdir -p "$out"
+    stamp=$(date -u +%Y%m%dT%H%M%SZ)
+    state=$out/preflight-$stamp-$$.json
+    qemu_bin=qemu-system-x86_64
+    if command -v "$qemu_bin" >/dev/null 2>&1; then
+        qemu_version=$("$qemu_bin" --version | head -1)
+    else
+        preflight_refuse "qemu-system-x86_64 not found"
+    fi
+
+    qemu_procs=$(process_matches "${BOOT_DIRECT_QEMU_LIST:-}" 'qemu-system-')
+    if [ -n "$qemu_procs" ]; then
+        refuse_with_state "busy: QEMU process: $(printf '%s\n' "$qemu_procs" | head -n 1)"
+    fi
+    qtest_procs=$(process_matches "${BOOT_DIRECT_QTEST_LIST:-}" 'xtask.*qtest|raven-qtest')
+    if [ -n "$qtest_procs" ]; then
+        refuse_with_state "busy: qtest process: $(printf '%s\n' "$qtest_procs" | head -n 1)"
+    fi
+
+    loadavg=$(awk '{print $1, $2, $3}' /proc/loadavg)
+    load1=${BOOT_DIRECT_LOAD1:-$(printf '%s\n' "$loadavg" | awk '{print $1}')}
+    load5=$(printf '%s\n' "$loadavg" | awk '{print $2}')
+    load15=$(printf '%s\n' "$loadavg" | awk '{print $3}')
+    nproc=${BOOT_DIRECT_NPROC:-$(nproc)}
+    is_uint "$nproc" && [ "$nproc" -gt 0 ] || preflight_refuse "invalid CPU count: $nproc"
+    max_load=${BOOT_DIRECT_MAX_LOAD:-$nproc}
+    is_uint "$max_load" && [ "$max_load" -gt 0 ] || preflight_refuse "invalid max load: $max_load"
+    if awk -v l="$load1" -v m="$max_load" 'BEGIN { exit !(l > m) }'; then
+        refuse_with_state "busy: load average $load1 exceeds $max_load (nproc $nproc)"
+    fi
+    mem_avail=${BOOT_DIRECT_MEM_AVAIL_KB:-$(awk '/MemAvailable:/ { print $2 }' /proc/meminfo)}
+    is_uint "$mem_avail" || preflight_refuse "cannot read available memory"
+    disk_avail=${BOOT_DIRECT_DISK_AVAIL_KB:-$(df -Pk "$root" | awk 'NR == 2 { print $4 }')}
+    is_uint "$disk_avail" || preflight_refuse "cannot read free disk space"
+    commit=$(git rev-parse --short HEAD 2>/dev/null || printf 'unknown')
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'unknown')
+    dirty=0
+    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+        dirty=1
+    fi
+    qemu_count=$(printf '%s\n' "$qemu_procs" | grep -c . || true)
+    qtest_count=$(printf '%s\n' "$qtest_procs" | grep -c . || true)
+    samples=$runs
+    if [ "$preflight_only" = 1 ]; then
+        samples=0
+    fi
+    if [ "$kvm" = 1 ]; then accel=kvm; else accel=tcg; fi
+
+    {
+        printf '{\n'
+        printf '  "commit": "%s",\n' "$commit"
+        printf '  "branch": "%s",\n' "$branch"
+        printf '  "dirty": %s,\n' "$dirty"
+        printf '  "utc": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf '  "mode": "%s",\n' "$mode"
+        printf '  "machine": "%s",\n' "$machine"
+        printf '  "smp": %s,\n' "$smp"
+        printf '  "accel": "%s",\n' "$accel"
+        printf '  "qemu_version": "%s",\n' "$qemu_version"
+        printf '  "nproc": %s,\n' "$nproc"
+        printf '  "load1": %s,\n' "$load1"
+        printf '  "load5": %s,\n' "$load5"
+        printf '  "load15": %s,\n' "$load15"
+        printf '  "max_load": %s,\n' "$max_load"
+        printf '  "mem_available_kb": %s,\n' "$mem_avail"
+        printf '  "disk_available_kb": %s,\n' "$disk_avail"
+        printf '  "qemu_processes": %s,\n' "$qemu_count"
+        printf '  "qtest_processes": %s,\n' "$qtest_count"
+        printf '  "refused": false,\n'
+        printf '  "sample_count": %s\n' "$samples"
+        printf '}\n'
+    } > "$state"
+
+    printf 'boot-direct: exclusive READY\n'
+    printf 'boot-direct: host commit=%s branch=%s dirty=%s utc=%s\n' "$commit" "$branch" "$dirty" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'boot-direct: host nproc=%s load1=%s load5=%s load15=%s max_load=%s mem_available_kb=%s disk_available_kb=%s\n' \
+        "$nproc" "$load1" "$load5" "$load15" "$max_load" "$mem_avail" "$disk_avail"
+    printf 'boot-direct: host qemu_processes=%s qtest_processes=%s accel=%s smp=%s runs=%s\n' \
+        "$qemu_count" "$qtest_count" "$accel" "$smp" "$samples"
+    printf 'boot-direct: preflight=%s\n' "$state"
+}
+
+self_test() {
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/boot-direct-selftest.XXXXXX")
+    trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+    : > "$tmp/empty"
+    printf 'qemu-system-x86_64 -machine q35 -m 512M\n' > "$tmp/qemu"
+    printf 'cargo xtask qtest --case release-login --arch x86_64\n' > "$tmp/qtest"
+
+    if BOOT_DIRECT_QEMU_LIST="$tmp/qemu" BOOT_DIRECT_QTEST_LIST="$tmp/empty" \
+        BOOT_DIRECT_LOAD1=0 BOOT_DIRECT_NPROC=4 \
+        sh "$0" --exclusive --preflight-only --mode probe --out "$tmp/out-qemu" \
+        >"$tmp/out-qemu.log" 2>&1; then
+        echo "boot-direct: self-test FAIL: busy QEMU accepted" >&2
+        exit 1
+    fi
+    grep -q 'REFUSED: busy: QEMU process' "$tmp/out-qemu.log" || {
+        cat "$tmp/out-qemu.log" >&2
+        echo "boot-direct: self-test FAIL: busy QEMU reason missing" >&2
+        exit 1
+    }
+
+    if BOOT_DIRECT_QEMU_LIST="$tmp/empty" BOOT_DIRECT_QTEST_LIST="$tmp/qtest" \
+        BOOT_DIRECT_LOAD1=0 BOOT_DIRECT_NPROC=4 \
+        sh "$0" --exclusive --preflight-only --mode probe --out "$tmp/out-qtest" \
+        >"$tmp/out-qtest.log" 2>&1; then
+        echo "boot-direct: self-test FAIL: busy qtest accepted" >&2
+        exit 1
+    fi
+    grep -q 'REFUSED: busy: qtest process' "$tmp/out-qtest.log" || {
+        cat "$tmp/out-qtest.log" >&2
+        echo "boot-direct: self-test FAIL: busy qtest reason missing" >&2
+        exit 1
+    }
+
+    if BOOT_DIRECT_QEMU_LIST="$tmp/empty" BOOT_DIRECT_QTEST_LIST="$tmp/empty" \
+        BOOT_DIRECT_LOAD1=99 BOOT_DIRECT_NPROC=4 \
+        sh "$0" --exclusive --preflight-only --mode probe --out "$tmp/out-load" \
+        >"$tmp/out-load.log" 2>&1; then
+        echo "boot-direct: self-test FAIL: high load accepted" >&2
+        exit 1
+    fi
+    grep -q 'REFUSED: busy: load average' "$tmp/out-load.log" || {
+        cat "$tmp/out-load.log" >&2
+        echo "boot-direct: self-test FAIL: high-load reason missing" >&2
+        exit 1
+    }
+
+    if ! BOOT_DIRECT_QEMU_LIST="$tmp/empty" BOOT_DIRECT_QTEST_LIST="$tmp/empty" \
+        BOOT_DIRECT_LOAD1=0 BOOT_DIRECT_NPROC=4 BOOT_DIRECT_MEM_AVAIL_KB=4194304 \
+        BOOT_DIRECT_DISK_AVAIL_KB=10485760 \
+        sh "$0" --exclusive --preflight-only --mode probe --out "$tmp/out-idle" \
+        >"$tmp/out-idle.log" 2>&1; then
+        cat "$tmp/out-idle.log" >&2
+        echo "boot-direct: self-test FAIL: idle host refused" >&2
+        exit 1
+    fi
+    if ! ls "$tmp/out-idle"/preflight-*.json >/dev/null 2>&1; then
+        echo "boot-direct: self-test FAIL: idle preflight JSON missing" >&2
+        exit 1
+    fi
+    grep -q 'exclusive READY' "$tmp/out-idle.log" || {
+        cat "$tmp/out-idle.log" >&2
+        echo "boot-direct: self-test FAIL: idle READY missing" >&2
+        exit 1
+    }
+    echo "boot-direct: self-test PASS"
+}
+
+if [ "$self_test" = 1 ]; then
+    self_test
+    exit 0
+fi
+if [ "$preflight_only" = 1 ]; then
+    run_preflight
+    exit 0
+fi
 
 if [ ! -f "$kernel" ] || [ "$rebuild" = 1 ]; then
     cargo xtask build kernel --arch "$arch" --release
@@ -210,6 +485,10 @@ echo "boot-direct: $qemu_version"
 echo "boot-direct: arch=$arch machine=$machine smp=$smp mode=$mode nodefaults=$nodefaults accel=$([ "$kvm" = 1 ] && echo kvm || echo tcg) kvm-device=$kvm_state"
 echo "boot-direct: loader=$loader"
 echo "boot-direct: payload=$payload ($(wc -c < "$payload") bytes)"
+
+if [ "$exclusive" = 1 ]; then
+    run_preflight
+fi
 
 result=0
 python3 - "$qemu" "$machine" "$loader" "$payload" "$cmdline" "$mode" "$kvm" "$timeout_secs" "$runs" "$smp" "$nodefaults" <<'PY' || result=$?
@@ -320,14 +599,31 @@ def run_once(number):
         line = raw.decode("utf-8", "replace").rstrip("\r")
         if line:
             lines.append(line)
+    def delta(later, earlier):
+        if later is None or earlier is None:
+            return None
+        return later - earlier
+
+    def fmt(value):
+        return ("%.1f ms" % (value * 1000.0)) if value is not None else "not seen"
+
+    firmware = loader_ms
+    loader_work = delta(entry_ms, loader_ms)
+    kernel_init = delta(kernel_ms, entry_ms)
+    services = delta(login_ms, kernel_ms)
     print(
-        "boot-direct: run %d loader=%.1f ms entry=%s kernel=%s login=%s exit=%s"
+        "boot-direct: run %d loader-start=%s entry=%s kernel=%s login=%s "
+        "firmware=%s loader-work=%s kernel-init=%s services=%s exit=%s"
         % (
             number,
-            (loader_ms or 0.0) * 1000.0,
-            ("%.1f ms" % (entry_ms * 1000.0)) if entry_ms is not None else "not seen",
-            ("%.1f ms" % (kernel_ms * 1000.0)) if kernel_ms is not None else "not seen",
-            ("%.1f ms" % (login_ms * 1000.0)) if login_ms is not None else "not seen",
+            fmt(loader_ms),
+            fmt(entry_ms),
+            fmt(kernel_ms),
+            fmt(login_ms),
+            fmt(firmware),
+            fmt(loader_work),
+            fmt(kernel_init),
+            fmt(services),
             status,
         )
     )
@@ -337,27 +633,42 @@ def run_once(number):
 def stats(values):
     values = [value for value in values if value is not None]
     if not values:
-        return None, None
+        return None, None, None
     ordered = sorted(values)
     median = statistics.median(ordered)
     p90 = ordered[min(len(ordered) - 1, int(round(0.9 * (len(ordered) - 1))))]
-    return median, p90
+    return median, p90, ordered[-1]
 
 
 def show(values, label):
-    median, p90 = stats(values)
+    median, p90, maximum = stats(values)
     if median is not None:
-        print("boot-direct: %s median=%.1f ms p90=%.1f ms" % (label, median * 1000.0, p90 * 1000.0))
-    return median, p90
+        print(
+            "boot-direct: %s p50=%.1f ms p90=%.1f ms max=%.1f ms"
+            % (label, median * 1000.0, p90 * 1000.0, maximum * 1000.0)
+        )
+    return median, p90, maximum
 
 
 results = [run_once(number) for number in range(1, runs + 1)]
-loader_median, loader_p90 = show([row[0] for row in results], "loader-start")
-entry_median, entry_p90 = show([row[1] for row in results], "loader-entry")
-kernel_median, kernel_p90 = show([row[2] for row in results], "kernel-banner")
-login_median, login_p90 = show([row[3] for row in results], "login")
-if loader_median is not None and entry_median is not None:
-    print("boot-direct: loader-work median=%.1f ms" % ((entry_median - loader_median) * 1000.0))
+loader_median, loader_p90, _ = show([row[0] for row in results], "loader-start")
+entry_median, entry_p90, _ = show([row[1] for row in results], "loader-entry")
+kernel_median, kernel_p90, _ = show([row[2] for row in results], "kernel-banner")
+login_median, login_p90, _ = show([row[3] for row in results], "login")
+firmware_values = [row[0] for row in results]
+loader_values = [
+    (row[1] - row[0]) if row[1] is not None and row[0] is not None else None for row in results
+]
+kernel_values = [
+    (row[2] - row[1]) if row[2] is not None and row[1] is not None else None for row in results
+]
+service_values = [
+    (row[3] - row[2]) if row[3] is not None and row[2] is not None else None for row in results
+]
+show(firmware_values, "split-firmware")
+show(loader_values, "split-loader")
+show(kernel_values, "split-kernel")
+show(service_values, "split-login")
 
 if mode == "full":
     required = ["svcd: getty up", "svcd: netd up", "netd: interface eth0"]

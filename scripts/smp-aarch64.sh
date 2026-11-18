@@ -3,6 +3,7 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # S85f: aarch64 TCG -smp 4 boot/stress matrix plus cross-arch libc/threads.
+# S106 adds the four-way concurrent unmap/TLB-shootdown regression to the fast loop.
 #
 # Runs the existing aarch64 SMP cases on QEMU TCG with -smp 4, a documented soak/time-box, the
 # x86_64 counterparts and `libc-threads` on both arches. A failing iteration stops the matrix
@@ -99,10 +100,12 @@ if [ "$KVM" -eq 1 ] && [ "$KVM_STATUS" != "available" ]; then
     KVM_BLOCKED=1
 fi
 
-# TCG aarch64: 50 fast iterations of the user and TLB SMP proofs (time-boxed).
+# TCG aarch64: 50 fast iterations of the user, single-controller TLB and four-way concurrent
+# unmap/TLB-shootdown proofs (time-boxed). S106 adds the four-way waiter regression.
 while [ "$ITER" -lt "$ITERATIONS" ]; do
     run_case smp-user-aarch64 aarch64 "$ITER" || break
     run_case smp-tlb-aarch64 aarch64 "$ITER" || break
+    run_case smp-tlb-aarch64-concurrent aarch64 "$ITER" || break
     ITER=$((ITER + 1))
 done
 
