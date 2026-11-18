@@ -4,8 +4,10 @@
 //! Raw GPT image assembly: loader, kernel and initfs into a FAT32 ESP.
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+
+use fatfs::{FileSystem, FsOptions};
 
 use anyhow::{Context, Result, bail, ensure};
 
@@ -101,6 +103,9 @@ pub(crate) fn run_with_overrides(
     }
 
     if platform == Platform::Pi4 {
+        if crate::rootfs::spec_path(root, profile_name).is_some() {
+            return build_pi4_sd(root, arch, profile_name, cmdline, overrides);
+        }
         let code = crate::pi::build(
             root,
             arch,
@@ -277,6 +282,191 @@ fn build_release_initfs(
         builder.add_file(&file.path, &data, file.mode)?;
     }
     Ok(builder.build())
+}
+
+fn build_pi4_sd(
+    root: &Path,
+    arch: Arch,
+    profile_name: &str,
+    cmdline: Option<&str>,
+    overrides: Overrides<'_>,
+) -> Result<u8> {
+    ensure!(
+        arch == Arch::Aarch64,
+        "the pi4 platform requires --arch aarch64"
+    );
+    let profile = Profile::load(root, profile_name)?;
+    let temp = root
+        .join("build")
+        .join(arch.as_str())
+        .join("pi4-rootfs-boot.img");
+    if let Some(parent) = temp.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+
+    let code = crate::pi::build(
+        root,
+        arch,
+        profile_name,
+        cmdline,
+        overrides.initfs,
+        overrides.kernel,
+        Some(&temp),
+    )?;
+    if code != 0 {
+        bail!("Pi 4 boot-partition build failed with exit code {code}");
+    }
+
+    let fat_offset = ESP_START_LBA * SECTOR_SIZE;
+    let fat_length = ESP_SECTORS * SECTOR_SIZE;
+    let fat = read_at(&temp, fat_offset, fat_length)?;
+    let cmdline = cmdline.unwrap_or(&profile.boot.cmdline);
+    let fat = fat_with_cmdline(&fat, cmdline, source_date_epoch())?;
+
+    let ufs_path = crate::rootfs::build_sd_root(root, arch, profile_name, true)?;
+    let ufs = fs::read(&ufs_path).with_context(|| format!("cannot read {}", ufs_path.display()))?;
+    ensure!(
+        !ufs.is_empty() && ufs.len().is_multiple_of(SECTOR_SIZE as usize),
+        "{} is not a whole number of 512-byte sectors",
+        ufs_path.display()
+    );
+    let ufs_sectors = ufs.len() as u64 / SECTOR_SIZE;
+    let ufs_start = ESP_START_LBA + ESP_SECTORS;
+    let total = ufs_start
+        .checked_add(ufs_sectors)
+        .and_then(|value| value.checked_add(GPT_ENTRY_SECTORS + 1))
+        .ok_or_else(|| anyhow::anyhow!("Pi 4 SD image size overflow"))?;
+    let gpt = GptLayout::new(
+        total,
+        vec![
+            Partition::new(
+                TYPE_ESP,
+                0,
+                ESP_START_LBA,
+                ESP_START_LBA + ESP_SECTORS - 1,
+                "BOOT",
+            ),
+            Partition::new(
+                crate::rootfs::TYPE_FREEBSD_UFS,
+                1,
+                ufs_start,
+                ufs_start + ufs_sectors - 1,
+                "ROOT",
+            ),
+        ],
+    )?;
+
+    let output = overrides.output.map(Path::to_path_buf).unwrap_or_else(|| {
+        root.join("build")
+            .join(arch.as_str())
+            .join("ravenbsd-pi4-sd.img")
+    });
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+    write_sd_image(&output, &gpt, &fat, ufs_start, &ufs)?;
+    let _ = fs::remove_file(&temp);
+    println!("{}", output.display());
+    Ok(0)
+}
+
+fn read_at(path: &Path, offset: u64, length: u64) -> Result<Vec<u8>> {
+    let mut file = File::open(path).with_context(|| format!("cannot open {}", path.display()))?;
+    file.seek(SeekFrom::Start(offset))?;
+    let length = usize::try_from(length).map_err(|_| anyhow::anyhow!("read is too large"))?;
+    let mut data = vec![0u8; length];
+    file.read_exact(&mut data)
+        .with_context(|| format!("cannot read {}", path.display()))?;
+    Ok(data)
+}
+
+fn fat_with_cmdline(esp: &[u8], cmdline: &str, epoch: Option<i64>) -> Result<Vec<u8>> {
+    let mut buffer = esp.to_vec();
+    let mut dirs = Vec::new();
+    let mut files = Vec::new();
+    {
+        let cursor = Cursor::new(buffer.as_mut_slice());
+        let filesystem = FileSystem::new(cursor, FsOptions::new().update_accessed_date(false))?;
+        let root = filesystem.root_dir();
+        collect_fat_dir(&root, "", &mut dirs, &mut files)?;
+        drop(root);
+        drop(filesystem);
+    }
+    let mut builder = FatImageBuilder::new(esp.len())?.with_epoch(epoch);
+    for dir in dirs {
+        builder.add_dir(&dir)?;
+    }
+    for (path, data) in files {
+        builder.add_file(&path, &data)?;
+    }
+    builder.add_file("cmdline.txt", format!("{cmdline}\n").as_bytes())?;
+    builder.finish()
+}
+
+fn collect_fat_dir(
+    dir: &fatfs::Dir<'_, Cursor<&mut [u8]>>,
+    prefix: &str,
+    dirs: &mut Vec<String>,
+    files: &mut Vec<(String, Vec<u8>)>,
+) -> Result<()> {
+    for entry in dir.iter() {
+        let entry = entry?;
+        let name = entry.file_name();
+        if name == "." || name == ".." {
+            continue;
+        }
+        let path = if prefix.is_empty() {
+            name.clone()
+        } else {
+            format!("{prefix}/{name}")
+        };
+        if entry.is_dir() {
+            dirs.push(path.clone());
+            let child = entry.to_dir();
+            collect_fat_dir(&child, &path, dirs, files)?;
+        } else if entry.is_file() {
+            let mut file = entry.to_file();
+            let mut data = Vec::new();
+            file.read_to_end(&mut data)?;
+            files.push((path, data));
+        }
+    }
+    Ok(())
+}
+
+fn write_sd_image(
+    path: &Path,
+    gpt: &GptLayout,
+    fat: &[u8],
+    ufs_start: u64,
+    ufs: &[u8],
+) -> Result<()> {
+    let total = gpt.total_sectors();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)
+        .with_context(|| format!("cannot create {}", path.display()))?;
+    file.set_len(total * SECTOR_SIZE)
+        .with_context(|| format!("cannot size {}", path.display()))?;
+    write_at(&mut file, 0, &gpt.protective_mbr())?;
+    write_at(&mut file, SECTOR_SIZE, &gpt.primary_header())?;
+    write_at(&mut file, 2 * SECTOR_SIZE, &gpt.entry_array())?;
+    let backup_entries_lba = total - 1 - GPT_ENTRY_SECTORS;
+    write_at(
+        &mut file,
+        backup_entries_lba * SECTOR_SIZE,
+        &gpt.entry_array(),
+    )?;
+    write_at(&mut file, (total - 1) * SECTOR_SIZE, &gpt.backup_header())?;
+    write_at(&mut file, ESP_START_LBA * SECTOR_SIZE, fat)?;
+    write_at(&mut file, ufs_start * SECTOR_SIZE, ufs)?;
+    file.flush()
+        .with_context(|| format!("cannot flush {}", path.display()))?;
+    Ok(())
 }
 
 fn default_output(root: &Path, arch: Arch) -> PathBuf {

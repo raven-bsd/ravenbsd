@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Rootfs spec for the Pi 4 SD UFS partition. The programs and files come from the
+# resolved pi4-rootfs profile; this file adds the root home marker and fixes the
+# image size. Keep the size a 4 KiB multiple.
+size = 268435456
+
+[[files]]
+src = "profiles/pi4-rootfs.d/root.keep"
+path = "/root/.keep"
+mode = 0o644
