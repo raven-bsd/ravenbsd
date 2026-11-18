@@ -4,7 +4,7 @@
 # blockd over the EMMC2 driver's `disk:0`; the GPT scan reads the 1 MiB prefix.
 name = "blockd"
 exec = "/sbin/blockd"
-needs = ["scheme:disk"]
+needs = ["scheme:disk", "devd"]
 provides = ["scheme:block"]
 readiness = "scheme"
 ready_timeout_ms = 60_000
