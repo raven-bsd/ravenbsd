@@ -3,8 +3,8 @@
 
 # Kernel QEMU gate
 
-Generated for current master `52a851ca`
-(`52a851cacd07d4c5efbbe0ce3e0b2f07c73273ba`) from the S113 kernel-gate evidence:
+Generated for current master `6d1b1bde`
+(`6d1b1bdedf6803dd328bf142d6d9818276ca37a6`) from the S113 kernel-gate evidence:
 `sh scripts/kernel-gate.sh` ran on S113 at 2026-11-18T18:52:21Z from commit `ed613f72`
 (`ed613f72dc340a1f499dbf1fd3e0177f5b9bd8c1`). This is the S113 run replayed into the document;
 no fresh QEMU run was made for KG1.
