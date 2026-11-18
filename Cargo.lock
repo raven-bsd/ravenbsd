@@ -344,7 +344,9 @@ dependencies = [
 name = "einkd"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-eink",
+ "raven-rt",
 ]
 
 [[package]]

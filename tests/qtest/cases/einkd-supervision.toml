@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# E1e: einkd supervision/dry-run gate. The release image stages einkd disabled; after a normal
+# root login the shell starts it explicitly. `--dry-run --once` fetches a static page, renders it
+# into the raven-eink framebuffer, performs one dry-run panel refresh and exits 0. No panel, SPI,
+# GPIO or network fetch is used, and the boot/getty path is unchanged.
+name = "einkd-supervision"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+pre = ["sh tests/fixtures/disk-tools/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^einkd: start mode=dry-run once=true$'
+
+[[expect]]
+regex = '^einkd: fetch static text$'
+
+[[expect]]
+regex = '^einkd: dry-run refresh black=[0-9]+$'
+
+[[expect]]
+regex = '^einkd: refreshed next_at=[0-9]+$'
+
+[[expect]]
+regex = '^einkd: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|einkd: .*failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/sbin/disk-tool-svcctl start einkd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^einkd: start mode=dry-run once=true$'
+timeout_secs = 60
+
+[[step]]
+wait = '^einkd: dry-run refresh black=[0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^einkd: done$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# E-Ink dry-run service. It is disabled by default so the release image does not touch a missing
+# panel. The qtest starts it after login with `svcctl start einkd`; `--dry-run --once` performs
+# one static fetch/render/refresh and exits 0. `getty`/`netd` ordering keeps it after login and
+# network readiness, never on the boot/getty path.
+name = "einkd"
+exec = "/sbin/einkd"
+args = ["einkd", "--dry-run", "--once"]
+needs = ["getty", "netd"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false
+enable = false
