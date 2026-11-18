@@ -44,6 +44,9 @@ mod program {
         };
         console.set_echo(true);
         let _ = console.write(b"\n");
+        // getty starts the session shell after this process exits; discard any console bytes
+        // buffered across the handoff so the first shell line is clean.
+        console.flush();
         let shadow = fs::read_to_vec("file:/etc/shadow").unwrap_or_default();
         let shadow_text = core::str::from_utf8(&shadow).unwrap_or_default();
         if !verify_root_password(shadow_text, password.trim_end()) {
