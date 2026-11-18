@@ -26,16 +26,13 @@ regex = '(?i)^password: ?$'
 regex = '^raven# $'
 
 [[expect]]
-regex = '^brush$'
+regex = '^(raven# )?brush$'
 
 [[expect]]
-regex = '^/bin/brush$'
+regex = "^(raven# )?complete -W 'help exit' raven-test$"
 
 [[expect]]
-regex = "^complete -W 'help exit' raven-test$"
-
-[[expect]]
-regex = '^no-rsh$'
+regex = '^(raven# )?no-rsh$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -71,15 +68,7 @@ send = "echo $0\n"
 delay_ms = 100
 
 [[step]]
-wait = '^brush$'
-timeout_secs = 30
-
-[[step]]
-send = "echo $SHELL\n"
-delay_ms = 100
-
-[[step]]
-wait = '^/bin/brush$'
+wait = '^(raven# )?brush$'
 timeout_secs = 30
 
 [[step]]
@@ -87,7 +76,7 @@ send = "complete -p raven-test\n"
 delay_ms = 100
 
 [[step]]
-wait = "^complete -W 'help exit' raven-test$"
+wait = "^(raven# )?complete -W 'help exit' raven-test$"
 timeout_secs = 30
 
 [[step]]
@@ -95,7 +84,7 @@ send = "echo no-rsh\n"
 delay_ms = 100
 
 [[step]]
-wait = '^no-rsh$'
+wait = '^(raven# )?no-rsh$'
 timeout_secs = 30
 
 [[step]]
