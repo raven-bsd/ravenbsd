@@ -248,13 +248,13 @@ pub fn vformat<C: CharUnit, S: Sink<C>, A: FmtEnv, F: FloatFmt>(
 }
 
 /// The type-erased conversion loop behind [`vformat`].
-fn vformat_dyn<C: CharUnit>(
+fn vformat_dyn<C: CharUnit, F: FloatFmt + ?Sized>(
     sink: &mut dyn Sink<C>,
     fmt: &[C],
     args: &mut dyn FmtEnv,
     clone: &mut dyn FmtEnv,
     opts: &FmtOptions<'_>,
-    floats: &dyn FloatFmt,
+    floats: &F,
 ) -> Result<i32, FmtErr> {
     let analysis = pos::analyse(fmt)?;
     let values = match analysis.table {
