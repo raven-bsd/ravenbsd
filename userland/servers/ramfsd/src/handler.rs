@@ -17,7 +17,7 @@ use raven_proto_fs::{
     StatFs, StatVfs,
 };
 use raven_ramfs_core::{ROOT_INO, Ramfs, SpecialKind};
-use raven_scheme::{CallReply, Ctx, Handler, HandlerResult, OpenTable, Opened};
+use raven_scheme::{CallReply, Ctx, Handler, HandlerError, HandlerResult, OpenTable, Opened};
 
 /// Aggregate open-file-description budget.
 pub const MAX_OPEN_FILES: usize = 256;
@@ -36,11 +36,17 @@ pub struct RamfsHandler {
     dir_generations: BTreeMap<u64, u32>,
     pending: Option<(u64, String)>,
     now: fn() -> i64,
+    trace: bool,
 }
 
 impl RamfsHandler {
     /// Create a handler over a fresh ramfs.
     pub fn new(now: fn() -> i64) -> Self {
+        Self::with_trace(now, false)
+    }
+
+    /// Create a handler with the optional request trace enabled.
+    pub fn with_trace(now: fn() -> i64, trace: bool) -> Self {
         Self {
             fs: Ramfs::new(now()),
             opens: OpenTable::new(),
@@ -48,7 +54,18 @@ impl RamfsHandler {
             dir_generations: BTreeMap::new(),
             pending: None,
             now,
+            trace,
         }
+    }
+
+    fn trace(&self, args: core::fmt::Arguments<'_>) {
+        if !self.trace {
+            return;
+        }
+        #[cfg(target_os = "none")]
+        raven_rt::println!("{args}");
+        #[cfg(not(target_os = "none"))]
+        let _ = args;
     }
 
     /// Record the kernel file id and path of the next `OPEN`.
@@ -236,6 +253,11 @@ impl Handler for RamfsHandler {
             self.dereference(ino);
             return Err(error.into());
         }
+        self.trace(core::format_args!(
+            "ramfs-trace: open file={file_id} path={path} ino={ino} req={} trace={}",
+            ctx.request.0,
+            ctx.trace_id
+        ));
         Ok(Opened::File(file_id))
     }
 
@@ -277,6 +299,38 @@ impl Handler for RamfsHandler {
         Ok(read)
     }
 
+    fn read_with(
+        &mut self,
+        file: u64,
+        offset: u64,
+        buffer: &mut [u8],
+        ctx: &Ctx,
+    ) -> HandlerResult<usize> {
+        if self.trace {
+            self.trace(core::format_args!(
+                "ramfs-trace: read file={file} off={offset} len={} ptr={:p} req={} trace={}",
+                buffer.len(),
+                buffer.as_ptr(),
+                ctx.request.0,
+                ctx.trace_id
+            ));
+        }
+        let result = self.read(file, offset, buffer);
+        match &result {
+            Ok(bytes) => self.trace(core::format_args!(
+                "ramfs-trace: read-reply file={file} bytes={bytes}"
+            )),
+            Err(HandlerError::Errno(error)) => self.trace(core::format_args!(
+                "ramfs-trace: read-reply file={file} errno={}",
+                error.description()
+            )),
+            Err(HandlerError::Defer(token)) => self.trace(core::format_args!(
+                "ramfs-trace: read-reply file={file} defer={token}"
+            )),
+        }
+        result
+    }
+
     fn write(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
         if offset != 0 {
             return Err(Errno::EINVAL.into());
@@ -299,6 +353,38 @@ impl Handler for RamfsHandler {
             .ok_or(Errno::EBADF)?
             .set_cursor(start.saturating_add(written as u64));
         Ok(written)
+    }
+
+    fn write_with(
+        &mut self,
+        file: u64,
+        offset: u64,
+        buffer: &[u8],
+        ctx: &Ctx,
+    ) -> HandlerResult<usize> {
+        if self.trace {
+            self.trace(core::format_args!(
+                "ramfs-trace: write file={file} off={offset} len={} ptr={:p} req={} trace={}",
+                buffer.len(),
+                buffer.as_ptr(),
+                ctx.request.0,
+                ctx.trace_id
+            ));
+        }
+        let result = self.write(file, offset, buffer);
+        match &result {
+            Ok(bytes) => self.trace(core::format_args!(
+                "ramfs-trace: write-reply file={file} bytes={bytes}"
+            )),
+            Err(HandlerError::Errno(error)) => self.trace(core::format_args!(
+                "ramfs-trace: write-reply file={file} errno={}",
+                error.description()
+            )),
+            Err(HandlerError::Defer(token)) => self.trace(core::format_args!(
+                "ramfs-trace: write-reply file={file} defer={token}"
+            )),
+        }
+        result
     }
 
     fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
