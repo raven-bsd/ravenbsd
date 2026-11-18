@@ -33,8 +33,11 @@ fn parses_show_and_device() {
 
 #[test]
 fn rejects_other_commands() {
-    assert_eq!(parse_args(["list"]), Err(()));
-    assert_eq!(parse_args(["show", "a", "b"]), Err(()));
+    assert_eq!(parse_args(["list"]), Err(GpartError::UnknownCommand));
+    assert_eq!(
+        parse_args(["show", "a", "b"]),
+        Err(GpartError::TooManyArguments)
+    );
 }
 
 #[test]

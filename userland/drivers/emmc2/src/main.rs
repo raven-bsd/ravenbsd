@@ -31,7 +31,7 @@ mod program {
     use emmc2::pattern::{self, Hasher, SECTOR_SIZE};
     use emmc2::{CardReady, DriverError, Host, init_card};
     use raven_abi::errno::Errno;
-    use raven_abi::types::{Handle, clock};
+    use raven_abi::types::clock;
     use raven_driver::{DmaRegion, Irq, MmioRegion};
     use raven_pi4::dma::{DmaError, plan_sdma};
     use raven_pi4::fdt::DmaWindow;
