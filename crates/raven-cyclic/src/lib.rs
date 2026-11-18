@@ -154,6 +154,18 @@ impl<B: Backend> Cyclics<B> {
     /// fired cyclic, in deadline order (equal deadlines in id order). This path performs no
     /// allocation.
     pub fn on_interrupt(&mut self, now: u64, mut fire: impl FnMut(CyclicId)) {
+        self.on_interrupt_with(now, |id, _spec| fire(id));
+    }
+
+    /// Fire every due cyclic and pass its specification to the callback.
+    ///
+    /// This is the level-aware form of [`Cyclics::on_interrupt`]: the entry is popped before the
+    /// callback runs, so a caller that dispatches high/lock/low handlers cannot recover the level
+    /// with [`Cyclics::spec`] afterwards. The callback receives the same [`CyclicSpec`] that was
+    /// live at the firing deadline (including the current `when` for a periodic cyclic). The
+    /// callback runs in deadline order; equal deadlines fire in id order. This path performs no
+    /// allocation.
+    pub fn on_interrupt_with(&mut self, now: u64, mut fire: impl FnMut(CyclicId, CyclicSpec)) {
         while let Some(root) = self.heap.first().copied() {
             if root.cancelled {
                 // Reclaim a lazily-cancelled entry that reached the front.
@@ -164,7 +176,13 @@ impl<B: Backend> Cyclics<B> {
                 break;
             }
             self.heap_pop();
-            fire(root.id);
+            let spec = CyclicSpec {
+                when: root.when,
+                interval: root.interval,
+                level: root.level,
+                slack_ns: root.slack_ns,
+            };
+            fire(root.id, spec);
             if root.interval != 0 {
                 let mut next = root;
                 next.when = next.when.saturating_add(next.interval);
