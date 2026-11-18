@@ -3,14 +3,15 @@
 
 # libc size gate 3.1 triage and budget correction (C74w/C74z/C74z-S10)
 
-Status: OBSERVED (C74dl, `origin/master` `94d35d15`). C74w classified the C74h/C69 data;
+Status: OBSERVED (C74z-S17, `origin/master` `10d8c9dd`). C74w classified the C74h/C69 data;
 C74z corrected the objective budget-data errors; C74z-S10 re-froze the six P9 S/F budgets;
 C74z-S11 rebuilt all three arches and fixed the six B-only/layout rows; C74z-S12 classified the
 S/F residual; C74z-S14/S15a/S5/S6/S13 landed and C74z-S16 applied the reviewed current+3%
-budgets to the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows. **3.1 remains NOT MET**:
-46 pass / 28 fail / 69 known / 105 skipped / 0 budget-only. The C74dl audit of the 28 residual
-rows finds **17 legitimate budget/layout rows (0 shrink-first), 1 rule/probe bug
-(P7-R-14), and 10 stale invariant ceilings**; no budget/rule is applied by the audit.
+budgets to the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows. The C74dl audit found
+**17 legitimate budget/layout rows (0 shrink-first), 1 rule/probe bug (P7-R-14), and 10 stale
+invariant ceilings**; C74z-S17 applied the 17 re-freezes and C74cx fixed the P7-R-14 matcher.
+**3.1 remains NOT MET**: 63 pass / 10 fail / 62 known / 102 skipped / 0 budget-only; only the
+10 invariant ceilings remain.
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -718,9 +719,70 @@ The 28 remaining rows are therefore:
 | **total** | **17 budget + 1 rule + 10 invariant = 28** | **3.1 NOT MET** |
 
 **0 rows are shrink-first.** The 17 budget rows are legitimate feature growth or linker layout;
-they need a reviewer re-freeze at measured + 3 percent, which C74dl does not apply. The rule
-false positive needs a matcher fix, and the invariants need a reviewer ceiling decision. No
-budget, rule, source crate or gate row is edited by C74dl.
+C74dl itself applied no budget. C74z-S17 applies the re-freeze at measured + 3 percent and
+verifies the C74cx rule fix; the invariants still need a reviewer ceiling decision. The details
+are below.
+
+## C74z-S17 budget and rule application (OBSERVED, `10d8c9dd`)
+
+C74z-S17 starts from `origin/master` `10d8c9dd` (C74dl `2eefd5c5` and C74cx `e76b1d01` merged)
+and re-runs the full three-arch check. The pre-budget gate is **46 pass / 27 fail / 62 known /
+102 skipped / 0 budget-only**: exactly the 17 legitimate budget rows plus the 10 invariants. The
+`P7-R-14` false positive is already gone.
+
+### P7-R-14 matcher fix (C74cx `e76b1d01`)
+
+C74cx replaced the P7 `forbid_members` `iconv*` pattern with `forbid_symbols` for the iconv
+lifecycle entry points (`iconv_open`, `iconv_close`, `iconvctl`, `__iconv_open`,
+`__iconv_close`) and kept `locale*`, `collat*`, `langinfo*`, `catopen*` as member patterns. The
+allocator-only `raven_libc_iconv` codegen unit no longer fails the rule. The S17 gate has no
+`P7-R-14` FAIL; the x86_64 `locale*` `KNOWN` rows are the pre-existing first-measurement
+exceptions, not the iconv false positive. No further `rules.toml` change is made by S17.
+
+### Applied budgets
+
+The 17 blocks are re-frozen at `ceil(current * 103 / 100)` from the S17 measurement. The
+measured fields and `members` are updated in the same blocks; no other budget block changes.
+
+| Row | Measured S/B/F | Old budget S/B/F | New budget S/B/F |
+|---|---|---|---|
+| P7 x86_64 tiny | 82,171 / 15,120 / 83,632 | 84,644 / 14,915 / 86,158 | 84,637 / 15,574 / 86,141 |
+| P5 x86_64 server | 124,135 / 13,656 / 125,592 | 155,287 / 13,423 / 156,791 | 127,860 / 14,066 / 129,360 |
+| P7 x86_64 server | 82,437 / 14,880 / 83,904 | 91,316 / 12,509 / 92,816 | 84,911 / 15,327 / 86,422 |
+| P2 aarch64 tiny | 92,979 / 11,896 / 94,440 | 78,235 / 13,531 / 79,731 | 95,769 / 12,253 / 97,274 |
+| P7 aarch64 tiny | 99,812 / 13,872 / 101,264 | 96,071 / 15,986 / 97,570 | 102,807 / 14,289 / 104,302 |
+| P8 aarch64 tiny | 153,008 / 13,312 / 154,464 | 180,904 / 12,393 / 182,401 | 157,599 / 13,712 / 159,098 |
+| P2 aarch64 server | 90,081 / 14,848 / 91,536 | 73,143 / 15,113 / 74,638 | 92,784 / 15,294 / 94,283 |
+| P5 aarch64 server | 139,716 / 14,464 / 141,168 | 160,744 / 11,916 / 162,246 | 143,908 / 14,898 / 145,404 |
+| P7 aarch64 server | 94,438 / 15,176 / 95,896 | 92,659 / 12,550 / 94,159 | 97,272 / 15,632 / 98,773 |
+| P8 aarch64 server | 148,422 / 13,848 / 149,880 | 177,097 / 13,489 / 178,594 | 152,875 / 14,264 / 154,377 |
+| P2 riscv64 tiny | 67,757 / 12,544 / 69,336 | 56,282 / 13,423 / 57,911 | 69,790 / 12,921 / 71,417 |
+| P3 riscv64 tiny | 78,561 / 14,024 / 80,144 | 56,302 / 13,399 / 57,928 | 80,918 / 14,445 / 82,549 |
+| P7 riscv64 tiny | 72,580 / 12,416 / 74,152 | 69,979 / 12,056 / 71,598 | 74,758 / 12,789 / 76,377 |
+| P2 riscv64 server | 68,101 / 12,232 / 69,680 | 52,879 / 15,582 / 54,516 | 70,145 / 12,599 / 71,771 |
+| P3 riscv64 server | 80,501 / 12,112 / 82,088 | 52,899 / 15,558 / 54,533 | 82,917 / 12,476 / 84,551 |
+| P5 riscv64 server | 106,267 / 15,136 / 107,848 | 121,239 / 14,808 / 122,875 | 109,456 / 15,591 / 111,084 |
+| P7 riscv64 server | 68,920 / 12,024 / 70,496 | 67,381 / 13,802 / 69,010 | 70,988 / 12,385 / 72,611 |
+
+The post-budget gate is **63 pass / 10 fail / 62 known / 102 skipped / 0 budget-only**. All 17
+budget/layout rows pass; no rule row fails.
+
+### Exact residual: the 10 invariants
+
+The ceilings are unchanged (`INV-S-P2-P0` 5,120, `INV-S-P3-P2` 10,240) by ticket. The current
+deltas are:
+
+| Invariant | Rows | Measured delta | Limit |
+|---|---|---|---|
+| `INV-S-P2-P0` | aarch64 tiny/server | 26,671 / 29,159 | 5,120 |
+| `INV-S-P2-P0` | riscv64 tiny/server | 19,075 / 23,421 | 5,120 |
+| `INV-S-P3-P2` | x86_64 tiny/server | 17,160 / 23,104 | 10,240 |
+| `INV-S-P3-P2` | aarch64 tiny/server | 16,964 / 18,272 | 10,240 |
+| `INV-S-P3-P2` | riscv64 tiny/server | 10,804 / 12,400 | 10,240 |
+
+The 10 rows are 4 `INV-S-P2-P0` and 6 `INV-S-P3-P2` invariant failures. They are real P2/P3
+relationships, not budgets: the reviewer/owner must raise the hard-coded proposal ceilings or
+add the equivalent known-violation rows. **3.1 remains NOT MET** with exactly these 10 rows.
 
 ## Budget actions
 
@@ -750,6 +812,11 @@ budget, rule, source crate or gate row is edited by C74dl.
   the 32 shrink-first/held blocks are unchanged. The gate moves to **46 pass / 28 fail / 69
   known / 105 skipped / 0 budget-only**; the exact remaining rows and owners are in the
   C74z-S16 section above. 3.1 remains **NOT MET**.
+* C74z-S17 re-freezes the **17 legitimate budget/layout rows** from the C74dl audit at the
+  `10d8c9dd` measurement + 3 percent (measured fields and `members` updated); the 10 invariant
+  ceilings are unchanged. The `P7-R-14` matcher is fixed by C74cx `e76b1d01`. The gate is
+  **63 pass / 10 fail / 62 known / 102 skipped / 0 budget-only**; only the 10 invariants remain.
+  3.1 remains **NOT MET**.
 
 ## C39m ctype table shrink (OBSERVED, `e1f252e5`)
 
