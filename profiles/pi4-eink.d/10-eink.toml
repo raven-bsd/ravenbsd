@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# E1e hardware staging: the binary and manifest are present, but the manifest is disabled until
+# the SPI/GPIO adapter and the panel are wired (E4). No panel access at boot.
+[[initfs.programs]]
+package = "einkd"
+path = "/sbin/einkd"
+
+[[initfs.files]]
+src = "userland/init/services/einkd.toml"
+path = "/etc/services.d/einkd.toml"

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# E1e: stage the einkd executable and its disabled service manifest in the release image. The
+# manifest is `enable = false`, so a normal release boot does not touch a missing panel or add a
+# getty-path dependency. The einkd-supervision qtest starts it after login with `svcctl start`.
+[[initfs.programs]]
+package = "einkd"
+path = "/sbin/einkd"
+
+[[initfs.files]]
+src = "userland/init/services/einkd.toml"
+path = "/etc/services.d/einkd.toml"

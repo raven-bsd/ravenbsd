@@ -13,5 +13,9 @@ rust-version.workspace = true
 [dependencies]
 raven-eink = { path = "../../../crates/raven-eink" }
 
+[target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../rt" }
+
 [lints]
 workspace = true
