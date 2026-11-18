@@ -4,11 +4,17 @@
 # REL2b: the QEMU release gate. Boots the `release` profile, logs in as root with the
 # development password, asserts the brush root prompt, lists /bin and pings the QEMU
 # user-network gateway. The kernel/loader lines remain in the captured transcript.
+#
+# S130: the initfs is built with the release-image interpreter shape (first PT_LOAD vaddr=0) so
+# the case exercises the dynamic getty -> PT_INTERP=/libexec/ld-elf.so.1 -> svcd spawn path.
+# The pre-S129 parser rejects that shape with SegmentOutsideUserRange; S129 accepts it.
 
 name = "release-login"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 420
+pre = ["sh tests/fixtures/login/build-dynamic-vaddr0.sh x86_64"]
+initfs = "build/fixtures/login/release-dynamic-vaddr0.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
@@ -16,6 +22,12 @@ qemu_extra = [
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
 expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: getty up$'
+
+[[expect]]
+regex = '(?i)^.*login: ?$'
 
 [[expect]]
 regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
@@ -110,3 +122,6 @@ timeout_secs = 60
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|ping: .*timeout'
+
+[[forbid]]
+regex = '(?i)SegmentOutsideUserRange|bad ELF|getty failed'
