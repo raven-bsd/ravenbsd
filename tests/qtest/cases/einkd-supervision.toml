@@ -9,6 +9,7 @@ name = "einkd-supervision"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 420
+pre = ["sh tests/fixtures/disk-tools/build.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
@@ -68,7 +69,7 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
-send = "/bin/svcctl start einkd\n"
+send = "/sbin/disk-tool-svcctl start einkd\n"
 delay_ms = 100
 
 [[step]]
