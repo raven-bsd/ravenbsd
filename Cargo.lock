@@ -3389,6 +3389,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-smp-x86-concurrent"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-spawn"
 version = "0.1.0"
 dependencies = [
