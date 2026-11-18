@@ -23,6 +23,7 @@ extern crate alloc;
 extern crate std;
 
 mod donation;
+pub mod ipi_order;
 mod turnstile;
 
 pub use donation::{Donation, DonationError, DonationViolation};

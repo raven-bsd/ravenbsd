@@ -31,7 +31,7 @@ mod program {
         time.tv_sec.max(0)
     }
 
-    fn main(_args: raven_rt::Args) -> i32 {
+    fn main(args: raven_rt::Args) -> i32 {
         let mut server = match Server::register("ramfs") {
             Ok(server) => server,
             Err(error) => {
@@ -40,7 +40,12 @@ mod program {
             }
         };
         log_started("ramfsd");
-        let mut handler = RamfsHandler::new(now_seconds);
+        let trace = args.env_get("RAMFSD_TRACE").is_some();
+        let mut handler = if trace {
+            RamfsHandler::with_trace(now_seconds, true)
+        } else {
+            RamfsHandler::new(now_seconds)
+        };
         loop {
             let Some(packet) = server.poll(None) else {
                 continue;

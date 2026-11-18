@@ -460,6 +460,26 @@ pub fn call(
     packet.buffer_len = request_len;
     packet.response_len = response_len;
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
+    let request_slot = request_capture.as_ref().and_then(|item| item.slot_index());
+    let reply_slot = response_capture.as_ref().and_then(|item| item.slot_index());
+    let request_addr = request_capture.as_ref().map(|item| item.address());
+    let reply_addr = response_capture.as_ref().map(|item| item.address());
+    let near_full = capture::trace_s125()
+        && capture::slot_stats().active.saturating_add(2)
+            >= crate::memory::uspace::capture_window::SLOTS;
+    if near_full {
+        let stats = capture::slot_stats();
+        crate::kprintln!(
+            "s125: call pair id={} req_slot={:?} reply_slot={:?} req_addr={:?} reply_addr={:?} active={} peak={}",
+            packet.request_id,
+            request_slot,
+            reply_slot,
+            request_addr,
+            reply_addr,
+            stats.active,
+            stats.peak
+        );
+    }
     let request = PendingRequest::new(
         Arc::clone(caller),
         Arc::clone(&file.server),
@@ -472,6 +492,19 @@ pub fn call(
         },
     );
     let (status, result) = submit(&request).and_then(|_| wait(caller, &request))?;
+    if near_full {
+        let stats = capture::slot_stats();
+        crate::kprintln!(
+            "s125: call done id={} status={} result={} active={} peak={} acquires={} releases={}",
+            request.id,
+            status,
+            result,
+            stats.active,
+            stats.peak,
+            stats.acquires,
+            stats.releases
+        );
+    }
     if status != 0 {
         return Err(status_errno(status));
     }

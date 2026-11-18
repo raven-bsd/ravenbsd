@@ -341,6 +341,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "einkd"
+version = "0.1.0"
+dependencies = [
+ "raven-eink",
+]
+
+[[package]]
 name = "emmc2"
 version = "0.1.0"
 dependencies = [
@@ -1415,6 +1422,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-eink"
+version = "0.1.0"
+
+[[package]]
 name = "raven-elf"
 version = "0.1.0"
 
@@ -1583,6 +1594,21 @@ dependencies = [
  "raven-abi",
  "raven-proto-fs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-http"
+version = "0.1.0"
+
+[[package]]
+name = "raven-http-net"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-http",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -3397,6 +3423,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sntp"
+version = "0.1.0"
+
+[[package]]
 name = "raven-spawn"
 version = "0.1.0"
 dependencies = [
@@ -3406,6 +3436,10 @@ dependencies = [
  "raven-proto-fs",
  "raven-scheme",
 ]
+
+[[package]]
+name = "raven-spi"
+version = "0.1.0"
 
 [[package]]
 name = "raven-stat"

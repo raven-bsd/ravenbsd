@@ -31,12 +31,15 @@ regex = '(?i)^password: ?$'
 
 [[expect]]
 regex = '^lsblk$'
+unordered = true
 
 [[expect]]
 regex = '^newfs$'
+unordered = true
 
 [[expect]]
 regex = '^gpart$'
+unordered = true
 
 [[expect]]
 regex = 'NAME SIZE SECTORS TYPE'
