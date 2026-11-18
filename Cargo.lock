@@ -3330,6 +3330,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-smp-aarch64"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-smp-memory"
 version = "0.1.0"
 dependencies = [
