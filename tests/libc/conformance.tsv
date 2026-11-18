@@ -49,19 +49,19 @@ freebsd-libc	stdio/print_positional_test	unknown-bodies	oracle-fail	oracle-build
 freebsd-libc	stdio/printbasic_test	int_limits	pass		C56
 freebsd-libc	stdio/printbasic_test	int_within_limits	pass		C56
 freebsd-libc	stdio/printf_test	unknown-bodies	excluded	excluded:refused by vendor gate (REVIEW.txt): source not vendored: stdio/printf_test.c	-
-freebsd-libc	stdio/printfloat_test	alternate_form	pass		C56
-freebsd-libc	stdio/printfloat_test	decimal_rounding	fail	24 checks failed; see output for more details	C56
+freebsd-libc	stdio/printfloat_test	alternate_form	fail	10 checks failed; see output for more details	C56
+freebsd-libc	stdio/printfloat_test	decimal_rounding	fail	32 checks failed; see output for more details	C56
 freebsd-libc	stdio/printfloat_test	float_within_limits	oracle-fail	oracle-behaviour:2 checks failed; see output for more details	-
 freebsd-libc	stdio/printfloat_test	hexadecimal_floating_point	oracle-fail	oracle-behaviour:10 checks failed; see output for more details	-
 freebsd-libc	stdio/printfloat_test	hexadecimal_rounding	oracle-fail	oracle-behaviour:4 checks failed; see output for more details	-
 freebsd-libc	stdio/printfloat_test	hexadecimal_rounding_fullprec	fail	2 checks failed; see output for more details	C56
-freebsd-libc	stdio/printfloat_test	infinities_and_nans	fail	6 checks failed; see output for more details	C56
-freebsd-libc	stdio/printfloat_test	padding	pass		C56
-freebsd-libc	stdio/printfloat_test	padding_and_decimal_point_placement	pass		C56
-freebsd-libc	stdio/printfloat_test	precision_specifiers	pass		C56
-freebsd-libc	stdio/printfloat_test	signed_conversions	pass		C56
+freebsd-libc	stdio/printfloat_test	infinities_and_nans	fail	24 checks failed; see output for more details	C56
+freebsd-libc	stdio/printfloat_test	padding	fail	10 checks failed; see output for more details	C56
+freebsd-libc	stdio/printfloat_test	padding_and_decimal_point_placement	fail	48 checks failed; see output for more details	C56
+freebsd-libc	stdio/printfloat_test	precision_specifiers	fail	12 checks failed; see output for more details	C56
+freebsd-libc	stdio/printfloat_test	signed_conversions	fail	14 checks failed; see output for more details	C56
 freebsd-libc	stdio/printfloat_test	subnormal_double	oracle-fail	oracle-behaviour:8 checks failed; see output for more details	-
-freebsd-libc	stdio/printfloat_test	subnormal_float	fail	8 checks failed; see output for more details	C56
+freebsd-libc	stdio/printfloat_test	subnormal_float	fail	16 checks failed; see output for more details	C56
 freebsd-libc	stdio/printfloat_test	thousands_separator_and_other_locale_tests	oracle-fail	oracle-behaviour:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/libc/stdio/printfloat_test.c:176: setlocale(LC_NUMERIC, "hi_IN.ISCII-DEV") not met	-
 freebsd-libc	stdio/scanf_test	unknown-bodies	excluded	excluded:refused by vendor gate (REVIEW.txt): source not vendored: stdio/scanf_test.c	-
 freebsd-libc	stdio/scanfloat_test	infinities_and_nans	oracle-fail	oracle-behaviour:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/libc/stdio/scanfloat_test.c:175: strcmp(buf, "plugh") == 0 not met	-
@@ -148,7 +148,7 @@ freebsd-msun	casinh_test	unknown-bodies	excluded	excluded:refused by vendor gate
 freebsd-msun	cbrt_test	unknown-bodies	excluded	excluded:refused by vendor gate (REVIEW.txt): source not vendored: cbrt_test.c	-
 freebsd-msun	ceil_test	unknown-bodies	excluded	excluded:refused by vendor gate (REVIEW.txt): source not vendored: ceil_test.c	-
 freebsd-msun	cexp_test	unknown-bodies	oracle-fail	oracle-build:missing-symbol:nitems	-
-freebsd-msun	conj_test	main	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/conj_test.c:94: conjf(0.0 + 0.0I): wrong value	C47
+freebsd-msun	conj_test	main	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/conj_test.c:94: conjf(*float* + *float*I): wrong value	C47
 freebsd-msun	cos_test	unknown-bodies	excluded	excluded:refused by vendor gate (REVIEW.txt): source not vendored: cos_test.c	-
 freebsd-msun	cosh_test	unknown-bodies	excluded	excluded:refused by vendor gate (REVIEW.txt): source not vendored: cosh_test.c	-
 freebsd-msun	csqrt_test	unknown-bodies	oracle-fail	oracle-build:build-other:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/csqrt_test.c:258:17: error: unknown type name ‘uint64_t’	-
@@ -172,7 +172,7 @@ freebsd-msun	fmaximum_fminimum_test	test4	fail	176 checks failed; see output for
 freebsd-msun	fmaximum_fminimum_test	test5	fail	184 checks failed; see output for more details	C47
 freebsd-msun	fmaximum_fminimum_test	test6	fail	184 checks failed; see output for more details	C47
 freebsd-msun	fmaximum_fminimum_test	test7	fail	184 checks failed; see output for more details	C47
-freebsd-msun	fmaximum_fminimum_test	test8	fail	184 checks failed; see output for more details	C47
+freebsd-msun	fmaximum_fminimum_test	test8	fail		C47
 freebsd-msun	fmaximum_fminimum_test	test9	fail	184 checks failed; see output for more details	C47
 freebsd-msun	fmaxmin_test	test1	fail	16 checks failed; see output for more details	C47
 freebsd-msun	fmaxmin_test	test10	fail	16 checks failed; see output for more details	C47
@@ -198,8 +198,8 @@ freebsd-msun	infinity_test	unknown-bodies	excluded	excluded:refused by vendor ga
 freebsd-msun	invctrig_test	unknown-bodies	oracle-fail	oracle-build:missing-symbol:nitems	-
 freebsd-msun	invtrig_test	accuracy	oracle-fail	oracle-behaviour:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/invtrig_test.c:247: (((0x20))) != fetestexcept((0x04 | 0x20 | 0x01 | 0x08 | 0x10)): unexpected exception flags: got 0 not 0x20 for asin((double)((1.0)))	-
 freebsd-msun	invtrig_test	atan_huge	oracle-fail	oracle-behaviour:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/invtrig_test.c:348: (((0x20))) != fetestexcept((0x04 | 0x20 | 0x01 | 0x08 | 0x10)): unexpected exception flags: got 0 not 0x20 for atan((double)((huge)))	-
-freebsd-msun	invtrig_test	inverse	fail		C47
-freebsd-msun	invtrig_test	p2x_atan2	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/invtrig_test.c:286: atan2(_iny, _inx) (-0) ~= _out (-8.879609370492890000267492e+43), diff=-9.41702e+133, maxdiff=0,	C47
+freebsd-msun	invtrig_test	inverse	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/invtrig_test.c:454: ((i == 0 ? 0 : 32)) != fetestexcept((4 | 32 | 1 | 8 | 16)): unexpected exception flags: got 0 not 0x20 for sinasin((double)(i))	C47
+freebsd-msun	invtrig_test	p2x_atan2	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/invtrig_test.c:286: atan2(_iny, _inx) (*float*) ~= _out (*float*), diff=*float*, maxdiff=*float*,	C47
 freebsd-msun	invtrig_test	special	oracle-fail	oracle-behaviour:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/invtrig_test.c:132: (((0x20))) != fetestexcept((0x04 | 0x20 | 0x01 | 0x08 | 0x10)): unexpected exception flags: got 0 not 0x20 for acos((double)((0.0)))	-
 freebsd-msun	invtrig_test	special_atan2	oracle-fail	oracle-behaviour:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/invtrig_test.c:160: (((0x20))) != fetestexcept((0x04 | 0x20 | 0x01 | 0x08 | 0x10)): unexpected exception flags: got 0 not 0x20 for atan2((double)((-0.0)))	-
 freebsd-msun	invtrig_test	tiny	oracle-fail	oracle-behaviour:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/freebsd/msun/invtrig_test.c:313: (((0x20))) != fetestexcept((0x04 | 0x20 | 0x01 | 0x08 | 0x10)): unexpected exception flags: got 0 not 0x20 for asin((double)((tiny)))	-
@@ -480,7 +480,7 @@ netbsd-libc	stdio/t_intr.sh	shell-test	skip	needs sh (O-B2)	C56
 netbsd-libc	stdio/t_open_memstream	test_open_memstream	oracle-fail	oracle-behaviour:1 checks failed; see output for more details	-
 netbsd-libc	stdio/t_popen	popen_zeropad	fail	Check stderr for error details.	C56
 netbsd-libc	stdio/t_printf	snprintf_c99	pass		C56
-netbsd-libc	stdio/t_printf	snprintf_dotzero	pass		C56
+netbsd-libc	stdio/t_printf	snprintf_dotzero	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libc/stdio/t_printf.c:76: s != "0" (*fl != 0)	C56
 netbsd-libc	stdio/t_printf	snprintf_double_a	fail	2 checks failed; see output for more details	C56
 netbsd-libc	stdio/t_printf	snprintf_float	fail	2 checks failed; see output for more details	C56
 netbsd-libc	stdio/t_printf	snprintf_long_double_a	fail	3 checks failed; see output for more details	C56
@@ -606,7 +606,7 @@ netbsd-libc	sys/t_getgroups	getgroups_zero	pass		C55
 netbsd-libc	sys/t_getitimer	unknown-bodies	oracle-fail	oracle-build:missing-header:h_macros.h	-
 netbsd-libc	sys/t_getlogin	unknown-bodies	oracle-fail	oracle-build:build-other:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libc/sys/t_getlogin.c:64:18: error: ‘MAXLOGNAME’ undeclared (first use in this function)	-
 netbsd-libc	sys/t_getpid	getpid_process	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libc/sys/t_getpid.c:69: fpid >= 0 not met	C55
-netbsd-libc	sys/t_getpid	getpid_thread	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libc/sys/t_getpid.c:117: rv == 0 not met	C55
+netbsd-libc	sys/t_getpid	getpid_thread	pass		C55
 netbsd-libc	sys/t_getrandom	unknown-bodies	oracle-fail	oracle-build:build-other:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libc/sys/t_getrandom.c:45:8: error: unknown type name ‘uint8_t’	-
 netbsd-libc	sys/t_getrusage	unknown-bodies	oracle-fail	oracle-build:build-other:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libc/sys/t_getrusage.c:181:12: error: ‘struct sockaddr_in’ has no member named ‘sin_len’	-
 netbsd-libc	sys/t_getsid	getsid_current	pass		C55
@@ -1033,12 +1033,12 @@ netbsd-libpthread	dlopen/t_dso_pthread_create	unknown-bodies	excluded	excluded:r
 netbsd-libpthread	dlopen/t_main_pthread_create	unknown-bodies	excluded	excluded:refused by vendor gate (REVIEW.txt): TESTS_C inside .if/.for	-
 netbsd-libpthread	t_atexit.sh	shell-test	skip	needs sh (O-B2)	C57
 netbsd-libpthread	t_barrier	unknown-bodies	oracle-fail	oracle-build:missing-header:h_common.h	-
-netbsd-libpthread	t_call_once	call_once	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libpthread/t_call_once.c:74: thrd_create(&t[i], co_func, NULL) != thrd_success	C57
+netbsd-libpthread	t_call_once	call_once	pass		C57
 netbsd-libpthread	t_cancel.sh	shell-test	skip	needs sh (O-B2)	C57
 netbsd-libpthread	t_cancellation	unknown-bodies	oracle-fail	oracle-build:missing-header:sys/event.h	-
-netbsd-libpthread	t_cnd	cnd_broadcast	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libpthread/t_cnd.c:96: thrd_create(&t[i], b_func, n) != thrd_success	C57
+netbsd-libpthread	t_cnd	cnd_broadcast	pass		C57
 netbsd-libpthread	t_cnd	cnd_init	pass		C57
-netbsd-libpthread	t_cnd	cnd_signal	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libpthread/t_cnd.c:96: thrd_create(&t[i], b_func, n) != thrd_success	C57
+netbsd-libpthread	t_cnd	cnd_signal	pass		C57
 netbsd-libpthread	t_cnd	cnd_timedwait	pass		C57
 netbsd-libpthread	t_compat_cancel	unknown-bodies	oracle-fail	oracle-build:missing-header:sys/event.h	-
 netbsd-libpthread	t_cond	unknown-bodies	oracle-fail	oracle-build:missing-header:h_common.h	-
@@ -1072,7 +1072,7 @@ netbsd-libpthread	t_thread_local_dtor.sh	shell-test	skip	needs sh (O-B2)	C57
 netbsd-libpthread	t_timedmutex	unknown-bodies	oracle-fail	oracle-build:missing-header:sys/sched.h	-
 netbsd-libpthread	t_tss	tss_create	pass		C57
 netbsd-libpthread	t_tss	tss_destructor_main_thread	pass		C57
-netbsd-libpthread	t_tss	tss_destructor_thread_exit	fail	/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/netbsd/libpthread/t_tss.c:156: thrd_create(&t, t_func, NULL) != thrd_success	C57
+netbsd-libpthread	t_tss	tss_destructor_thread_exit	pass		C57
 netbsd-libpthread	t_tss	tss_set	pass		C57
 netbsd-libpthread	weak/t_pthread_weak_nothread	unknown-bodies	oracle-fail	oracle-build:missing-header:h_pthread_weak.h	-
 netbsd-libpthread	weak/t_pthread_weak_threaded	unknown-bodies	oracle-fail	oracle-build:missing-header:h_pthread_weak.h	-
@@ -1140,7 +1140,7 @@ picolibc	test-crt0-page-table	unknown-bodies	excluded	excluded:board page-table 
 picolibc	test-environ	run	pass		C50
 picolibc	test-except	run	oracle-fail	oracle-behaviour:crash:4	-
 picolibc	test-getdate	run	pass		C50
-picolibc	test-getopt	run	fail	behaviour:expected exit 0, got -11	C50
+picolibc	test-getopt	run	pass		C50
 picolibc	test-hello	run	pass		C50
 picolibc	test-hosted-exit	run	pass		C50
 picolibc	test-hosted-exit-fail	run	pass		C50
@@ -1155,7 +1155,7 @@ picolibc	test-scmpu	unknown-bodies	excluded	excluded:ARM SCMPU board feature, no
 picolibc	test-setjmp	run	pass		C50
 picolibc	test-ssize-max	run	pass		C50
 picolibc	test-stack-smash	unknown-bodies	oracle-fail	oracle-build:missing-header:ssp/ssp.h	-
-picolibc	test-strftime	run	fail	behaviour:expected exit 0, got 1	C44
+picolibc	test-strftime	run	pass		C44
 picolibc	test-thread-safety	unknown-bodies	oracle-fail	oracle-build:build-other:cc: error: unrecognized command-line option ‘-Wthread-safety’	-
 picolibc	test-time	run	pass		C44
 picolibc	test-time-deprecated	unknown-bodies	oracle-fail	oracle-build:missing-symbol:main	-
@@ -1163,7 +1163,7 @@ picolibc	test-time2	run	pass		C44
 picolibc	test-timegm	run	pass		C44
 picolibc	test-tls	unknown-bodies	oracle-fail	oracle-build:missing-header:picotls.h	-
 picolibc	test-ubsan	run	oracle-fail	oracle-behaviour:expected exit 0, got 1	-
-picolibc	test-uchar	run	fail	behaviour:expected exit 0, got 1	C50
+picolibc	test-uchar	run	pass		C50
 picolibc	test-uchar	unknown-bodies	oracle-fail	oracle-build:build-other:/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/libc-oracle/vendor/picolibc/test/test-uchar.c:50:5: error: unknown type name ‘char8_t’	-
-picolibc	test-wcsftime	run	fail	behaviour:expected exit 0, got 1	C44
+picolibc	test-wcsftime	run	pass		C44
 picolibc	test-wctomb	run	pass		C50

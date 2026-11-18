@@ -192,9 +192,19 @@ fn c8rtomb_utf8_vectors() {
         for byte in [0xf0, 0x9f, 0x92, 0xa9].into_iter().take(length) {
             same!(c8rtomb(&mut state, MbMode::Utf8, byte, &mut out), Ok(0));
         }
-        same!(c8rtomb(&mut state, MbMode::Utf8, 0, &mut out), Ok(1));
-        same!(out[0], 0);
-        same!(out[1], 0xcc);
+        if length == 0 {
+            same!(c8rtomb(&mut state, MbMode::Utf8, 0, &mut out), Ok(1));
+            same!(out[0], 0);
+            same!(out[1], 0xcc);
+        } else {
+            // A NUL cannot complete the pending sequence; the picolibc uchar test requires
+            // EILSEQ here (the old vector expected the C-locale discard).
+            same!(
+                c8rtomb(&mut state, MbMode::Utf8, 0, &mut out),
+                Err(MbError::Ilseq)
+            );
+            same!(out[0], 0xcc);
+        }
     }
 }
 

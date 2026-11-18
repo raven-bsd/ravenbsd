@@ -129,8 +129,10 @@ pub(crate) unsafe fn long_result(
         if let Some(option) = unsafe { options.add(index).as_ref() }
             && !option.flag.is_null()
         {
+            // A `flag`-form option stores its `val` in the caller's slot and returns 0; the
+            // engine reports `code = 0` for that form.
             // SAFETY: the caller's writable flag slot.
-            unsafe { *option.flag = step.code };
+            unsafe { *option.flag = option.val };
         }
         return 0;
     }
@@ -182,6 +184,36 @@ pub(crate) unsafe fn write_argv(argv: *mut *mut c_char, pointers: &[usize]) {
     let _ = core::mem::size_of::<c_void>();
 }
 
+/// Write the argv order only when the engine actually permuted it.
+///
+/// The non-permuting `getopt` leaves the vector identical; donor tests pass a read-only
+/// `static const char *const argv[]` cast to `char **`, and an unconditional write faults.
+///
+/// # Safety
+/// `argv` points to `pointers.len()` readable pointer slots.
+pub(crate) unsafe fn write_argv_if_changed(argv: *mut *mut c_char, pointers: &[usize]) {
+    if argv.is_null() {
+        return;
+    }
+    let mut changed = false;
+    let mut index = 0usize;
+    while index < pointers.len() {
+        // SAFETY: the caller's argv slots.
+        let current = unsafe { *argv.add(index) } as usize;
+        if let Some(value) = pointers.get(index)
+            && current != *value
+        {
+            changed = true;
+            break;
+        }
+        index = index.wrapping_add(1);
+    }
+    if changed {
+        // SAFETY: the caller's argv array, now known to accept the permuted order.
+        unsafe { write_argv(argv, pointers) };
+    }
+}
+
 /// The shared `getopt` body.
 ///
 /// # Safety
@@ -202,7 +234,7 @@ pub(crate) unsafe fn short(argv: *mut *mut c_char, argc: c_int, optstring: *cons
     );
     commit(&state, &step, &pointers);
     // SAFETY: the caller's argv array.
-    unsafe { write_argv(argv, &pointers) };
+    unsafe { write_argv_if_changed(argv, &pointers) };
     step.code
 }
 
@@ -237,7 +269,7 @@ pub(crate) unsafe fn long(
     );
     commit(&state, &step, &pointers);
     // SAFETY: the caller's argv array.
-    unsafe { write_argv(argv, &pointers) };
+    unsafe { write_argv_if_changed(argv, &pointers) };
     // SAFETY: the caller's option array.
     unsafe { long_result(&step, options, longindex) }
 }
