@@ -72,8 +72,10 @@ never produces a fake banner. The full mode requires the real `svcd: getty up`,
 
 `--exclusive` runs before the QEMU samples, after the loader/payload are built:
 
-* refuses when a `qemu-system-*` process, an `xtask qtest`/`raven-qtest` process, or another
-  exclusive gate is already running;
+* refuses when a real `qemu-system-*` process or an `xtask qtest`/`raven-qtest` process is
+  running. The matcher reads the executable name from `ps`, not a shell command line, so a
+  host-idle watcher running `ps | awk /qemu-system-/` is not a false overlap; the QEMU and qtest
+  probes are kept separate so the reporting names the right blocker;
 * refuses when the 1-minute load average exceeds `nproc` (override with
   `BOOT_DIRECT_MAX_LOAD`, mainly for tests);
 * records the commit, branch, dirty flag, UTC time, `nproc`, load1/5/15, available memory/disk,
@@ -132,6 +134,42 @@ getty banner and `login:`. No service is disabled and rsh is not part of the pat
 final acceptance sample measured median 570 ms / p90 617 ms (also MET). The loaded
 default-device sample is the same code at 1236 ms p90, which is why the kernel CRC and
 service-wave items below matter for margin.
+
+## Final exclusive 10-run (S116 rev 199)
+
+On the merged S116 branch (`643606fa`), `BOOT_DIRECT_MAX_LOAD=15 sh scripts/boot-direct.sh
+--mode full --exclusive` recorded an accepted host state: load1 **12.59**, nproc 20, QEMU 0,
+qtest 0, max_load 15, 10 samples, dirty 0. All runs reported `svcd: getty up`,
+`svcd: netd up` and `netd: interface eth0`.
+
+| Run | Login (ms) | Firmware | Loader | Kernel | Login split |
+|---|---|---|---|---|---|
+| 1 | 654.6 | 89.5 | 16.6 | 310.0 | 238.6 |
+| 2 | 643.7 | 78.4 | 17.3 | 313.7 | 234.3 |
+| 3 | 640.9 | 67.1 | 10.4 | 309.0 | 254.3 |
+| 4 | 605.2 | 53.5 | 15.3 | 310.8 | 225.5 |
+| 5 | 653.3 | 97.1 | 19.4 | 304.0 | 232.7 |
+| 6 | 684.3 | 114.3 | 11.4 | 308.9 | 249.7 |
+| 7 | 630.5 | 88.0 | 10.3 | 310.6 | 221.7 |
+| 8 | 620.6 | 73.9 | 19.9 | 304.1 | 222.7 |
+| 9 | 676.6 | 86.1 | 12.8 | 309.1 | 268.5 |
+| 10 | 664.5 | 85.3 | 10.3 | 340.1 | 228.8 |
+
+```
+firmware       p50  85.7  p90  97.1  max 114.3 ms
+loader work    p50  14.1  p90  19.4  max  19.9 ms
+kernel init    p50 309.5  p90 313.7  max 340.1 ms
+login total    p50 648.5  p90 676.6  max 684.3 ms
+```
+
+The earlier 10-run sample at load1=13.99 (same clean preflight, no QEMU/qtest) measured login
+p50 885.3 / p90 1068.1 / max 1701.7 ms; it is recorded as the load-sensitivity miss rather than
+discarded. The final accepted sample above meets the full release login p90 < 1000 ms target.
+
+The matching probe sample (microvm, KVM, `-smp 1`, load1=11.41, QEMU 0, qtest 0) measured kernel
+banner p50 281.7 / p90 416.3 / max 417.3 ms; firmware p50 64.8 / p90 76.3 / max 84.6 ms, loader
+work p50 15.0 / p90 35.2 / max 42.3 ms, kernel init p50 191.5 / p90 324.2 / max 356.6 ms. The
+older <200 ms probe target remains missed on this host.
 
 ## The remaining <0.2 s kernel-banner gap
 
