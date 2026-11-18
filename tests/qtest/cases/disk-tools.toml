@@ -143,6 +143,14 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
+send = "/bin/ls -l /mnt\n"
+delay_ms = 100
+
+[[step]]
+wait = 'hello\.txt'
+timeout_secs = 30
+
+[[step]]
 send = "cat /mnt/hello.txt\n"
 delay_ms = 100
 
