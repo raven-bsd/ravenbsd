@@ -137,9 +137,9 @@ but leaves it disabled. The `einkd-supervision` qtest logs in normally, starts e
 via the static `disk-tool-svcctl` test tool, asserts the dry-run lines and exits the login shell;
 the boot/login transcript is unchanged.
 
-`profiles/pi4-eink.toml` is the Pi 4 hardware staging profile (extends `pi4`; the profile loader
-allows one inheritance level, so the full `pi4-release` service stack remains its own profile).
-It stages the same disabled binary/manifest; panel access stays off until E4.
+`profiles/pi4-eink.toml` is the Pi 4 hardware staging profile (extends `base` with the Pi UART;
+the profile loader allows one inheritance level, so the full `pi4-release` service stack remains
+its own profile). It stages the same disabled binary/manifest; panel access stays off until E4.
 
 **Hardware adapter boundary:** `Uc8179Panel` expects `raven_eink::Transport`/`Delay`; E4
 implements those over the E1b `raven-spi` core plus the DC/RST/BUSY GPIO client. `einkd` owns the

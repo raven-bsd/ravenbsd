@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 hardware staging profile for the 7.5-inch E-Ink panel. It extends the Pi boot profile and
-# stages the einkd executable/manifest; the manifest stays `enable = false` so no panel access
-# happens before E4. The full release/network stack is the `pi4-release` profile; this staging
-# profile is the hardware hand-off point, not the x86 dry-run qtest image.
+# Pi 4 hardware staging profile for the 7.5-inch E-Ink panel. The profile loader permits one
+# inheritance level, so this extends `base` (with the Pi UART command line) rather than
+# `pi4`/`pi4-release`; it stages the einkd executable/manifest and leaves it `enable = false`
+# until E4. The full release/network stack remains `pi4-release`; this staging profile is the
+# hardware hand-off point, not the x86 dry-run qtest image.
 name = "pi4-eink"
-extends = "pi4"
+extends = "base"
 
 [boot]
 cmdline = "console=ttyAMA0 loglevel=info"
