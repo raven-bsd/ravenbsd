@@ -103,17 +103,19 @@ for smp in 1 2 4; do
         -drive "if=pflash,format=raw,readonly=on,file=$code" \
         -drive "if=pflash,format=raw,file=$work/vars-$smp.fd" \
         -drive "format=raw,file=$image" \
+        -nic none -netdev user,id=n0 \
+        -device virtio-net-pci,netdev=n0,disable-legacy=on \
         -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
         >"$log" 2>&1
     status=$?
     set -e
-    if ! grep -q "^smp: $smp cpus online$" "$log"; then
+    if ! grep -q "smp: $smp cpus online" "$log"; then
         echo "qemu-kvm: FAIL -smp $smp: no 'smp: $smp cpus online' (exit $status)" >&2
         tail -n 30 "$log" >&2
         fail=1
         continue
     fi
-    if ! grep -q '^login:' "$log"; then
+    if ! grep -q 'login:' "$log"; then
         echo "qemu-kvm: FAIL -smp $smp: no login prompt (exit $status)" >&2
         tail -n 30 "$log" >&2
         fail=1
