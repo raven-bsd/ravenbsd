@@ -33,7 +33,9 @@ forbid_members = [
 [[rule]]
 probe = "P3"
 invariant = "R-13"
-require_members = ["fmt_float*"]
+set = "server"
+# The strong `%f` path is the dtoa hook in the server build; `fmt_float` is not a member name.
+require_members = ["dtoa*"]
 
 [[rule]]
 probe = "P4"
@@ -55,4 +57,8 @@ max_text_over_p0 = 512
 [[rule]]
 probe = "P7"
 invariant = "R-14"
-forbid_members = ["locale*", "collat*", "langinfo*", "catopen*", "iconv*"]
+forbid_members = ["locale*", "collat*", "langinfo*", "catopen*"]
+# The iconv crate also emits generic allocator CGUs; forbid the iconv lifecycle entry points,
+# not the allocator glue (a `RawVec` CGU from that crate is not iconv machinery). `iconv*`
+# cannot be used: the search matches the crate name inside the Rust-mangled allocator symbols.
+forbid_symbols = ["iconv_open", "iconv_close", "iconvctl", "__iconv_open", "__iconv_close"]
