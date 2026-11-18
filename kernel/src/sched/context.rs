@@ -629,8 +629,6 @@ pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapfra
                     | raven_abi::syscall::Syscall::UNMAP
                     | raven_abi::syscall::Syscall::PROTECT
                     | raven_abi::syscall::Syscall::THREAD_CREATE
-                    | raven_abi::syscall::Syscall::THREAD_EXIT
-                    | raven_abi::syscall::Syscall::EXIT
             )
         ) {
             ap_start::enable_local_interrupts();
