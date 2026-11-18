@@ -26,10 +26,10 @@ regex = '(?i)^password: ?$'
 regex = '^raven# $'
 
 [[expect]]
-regex = '^PID PPID UID GID CMD$'
+regex = '^zero:(brush|/bin/brush)$'
 
 [[expect]]
-regex = '^[0-9]+ [0-9]+ 0 0 brush$'
+regex = '^shell:/bin/brush$'
 
 [[expect]]
 regex = "^complete -W 'help exit' raven-test$"
@@ -42,9 +42,6 @@ regex = '^init exited \(0\)$'
 
 [[forbid]]
 regex = '^rsh: ready$'
-
-[[forbid]]
-regex = '^[0-9]+ [0-9]+ 0 0 rsh$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed'
@@ -70,15 +67,19 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
-send = "ps -e\n"
+send = "echo $0\n"
 delay_ms = 100
 
 [[step]]
-wait = '^PID PPID UID GID CMD$'
+wait = '^zero:(brush|/bin/brush)$'
 timeout_secs = 30
 
 [[step]]
-wait = '^[0-9]+ [0-9]+ 0 0 brush$'
+send = "echo $SHELL\n"
+delay_ms = 100
+
+[[step]]
+wait = '^shell:/bin/brush$'
 timeout_secs = 30
 
 [[step]]
