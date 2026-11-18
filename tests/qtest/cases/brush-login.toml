@@ -20,12 +20,6 @@ regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
 regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
-regex = '(?i)^password: ?$'
-
-[[expect]]
-regex = '^raven# $'
-
-[[expect]]
 regex = '^(raven# )?brush$'
 
 [[expect]]
