@@ -47,7 +47,9 @@ mod program {
     const SIGTTIN: u32 = 21;
     const SIGTTOU: u32 = 22;
     const WUNTRACED: u32 = 2;
-    const WCONTINUED: u32 = 8;
+    // Raw `PROC_WAIT_EX` ABI: the kernel continued bit is 4. The public `sys/wait.h` keeps the
+    // musl/Linux value 8 and the libc backend translates it before this syscall.
+    const WCONTINUED: u32 = 4;
 
     const HUNG_BIT: u32 = 0x8000_0000;
     const PROC_HANDLE_INFO: usize = 0x3E;
