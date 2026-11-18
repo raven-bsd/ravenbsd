@@ -25,6 +25,8 @@ image=build/x86_64/ravenbsd-x86_64.img
 profile=release
 no_build=0
 timeout_secs=180
+smp_list=1,2,4
+iterations=1
 
 usage() {
     cat <<'EOF'
@@ -33,6 +35,8 @@ usage: sh scripts/qemu-kvm.sh [options]
   --no-build         use the existing image (do not run cargo xtask image)
   --image PATH       release image (default: build/x86_64/ravenbsd-x86_64.img)
   --timeout SECONDS  per-boot timeout (default: 180)
+  --smp LIST         comma-separated CPU counts (default: 1,2,4)
+  --iterations N     boot the selected set N times (default: 1)
   -h, --help         show this help
 
 Boots -smp 1, 2 and 4 with -enable-kvm -cpu host and requires the SMP online
@@ -54,6 +58,16 @@ while [ "$#" -gt 0 ]; do
         --timeout)
             [ "$#" -ge 2 ] || { usage >&2; exit 2; }
             timeout_secs=$2
+            shift 2
+            ;;
+        --smp)
+            [ "$#" -ge 2 ] || { usage >&2; exit 2; }
+            smp_list=$2
+            shift 2
+            ;;
+        --iterations)
+            [ "$#" -ge 2 ] || { usage >&2; exit 2; }
+            iterations=$2
             shift 2
             ;;
         -h|--help)
@@ -91,41 +105,38 @@ fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/qemu-kvm.XXXXXX")
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 
-fail=0
-for smp in 1 2 4; do
-    log=$work/smp-$smp.log
-    cp "$vars" "$work/vars-$smp.fd"
-    echo "qemu-kvm: booting -smp $smp"
-    set +e
-    timeout "$timeout_secs" qemu-system-x86_64 \
-        -machine q35 -m 512M -smp "$smp" -enable-kvm -cpu host \
-        -serial stdio -display none -monitor none -no-reboot \
-        -drive "if=pflash,format=raw,readonly=on,file=$code" \
-        -drive "if=pflash,format=raw,file=$work/vars-$smp.fd" \
-        -drive "format=raw,file=$image" \
-        -nic none -netdev user,id=n0 \
-        -device virtio-net-pci,netdev=n0,disable-legacy=on \
-        -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
-        >"$log" 2>&1
-    status=$?
-    set -e
-    if ! grep -q "smp: $smp cpus online" "$log"; then
-        echo "qemu-kvm: FAIL -smp $smp: no 'smp: $smp cpus online' (exit $status)" >&2
-        tail -n 30 "$log" >&2
-        fail=1
-        continue
-    fi
-    if ! grep -q 'login:' "$log"; then
-        echo "qemu-kvm: FAIL -smp $smp: no login prompt (exit $status)" >&2
-        tail -n 30 "$log" >&2
-        fail=1
-        continue
-    fi
-    echo "qemu-kvm: PASS -smp $smp"
+smp_set=$(printf '%s' "$smp_list" | tr ',' ' ')
+iteration=1
+while [ "$iteration" -le "$iterations" ]; do
+    for smp in $smp_set; do
+        log=$work/smp-$iteration-$smp.log
+        cp "$vars" "$work/vars-$iteration-$smp.fd"
+        echo "qemu-kvm: boot $iteration/$iterations -smp $smp"
+        set +e
+        timeout "$timeout_secs" qemu-system-x86_64 \
+            -machine q35 -m 512M -smp "$smp" -enable-kvm -cpu host \
+            -serial stdio -display none -monitor none -no-reboot \
+            -drive "if=pflash,format=raw,readonly=on,file=$code" \
+            -drive "if=pflash,format=raw,file=$work/vars-$iteration-$smp.fd" \
+            -drive "format=raw,file=$image" \
+            -nic none -netdev user,id=n0 \
+            -device virtio-net-pci,netdev=n0,disable-legacy=on \
+            -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
+            >"$log" 2>&1
+        status=$?
+        set -e
+        if ! grep -q "smp: $smp cpus online" "$log"; then
+            echo "qemu-kvm: FAIL iteration=$iteration -smp $smp: no 'smp: $smp cpus online' (exit $status)" >&2
+            tail -n 30 "$log" >&2
+            exit 1
+        fi
+        if ! grep -q 'login:' "$log"; then
+            echo "qemu-kvm: FAIL iteration=$iteration -smp $smp: no login prompt (exit $status)" >&2
+            tail -n 30 "$log" >&2
+            exit 1
+        fi
+        echo "qemu-kvm: PASS iteration=$iteration -smp $smp"
+    done
+    iteration=$((iteration + 1))
 done
-
-if [ "$fail" -ne 0 ]; then
-    echo "qemu-kvm: FAILED" >&2
-    exit 1
-fi
-echo "qemu-kvm: PASSED -smp 1/2/4 with login"
+echo "qemu-kvm: PASSED -smp $smp_list iterations=$iterations"
