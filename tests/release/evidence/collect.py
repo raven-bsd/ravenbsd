@@ -105,6 +105,26 @@ def commit_matches(recorded: str, head: str) -> bool:
     return bool(recorded and head) and (recorded.startswith(head) or head.startswith(recorded))
 
 
+def commit_is_current(recorded: str, head: str) -> bool:
+    """Accept the recorded commit when it is HEAD or an ancestor of HEAD.
+
+    A generated report cannot contain the commit that adds it, so the stamp is
+    normally the parent of the commit that ships the file.
+    """
+    if not HEX_COMMIT.match(recorded or "") or not HEX_COMMIT.match(head or ""):
+        return False
+    if commit_matches(recorded, head):
+        return True
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", recorded, head],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def run_command(argv: list[str], log: Path) -> Run:
     log.parent.mkdir(parents=True, exist_ok=True)
     started = utc()
@@ -176,7 +196,7 @@ def parse_kernel_gate(path: Path, head: str) -> Gate:
     )
 
 
-def parse_posix(path: Path) -> Gate:
+def parse_posix(path: Path, head: str) -> Gate:
     text = read_text(path)
     if not text:
         return Gate(
@@ -185,12 +205,31 @@ def parse_posix(path: Path) -> Gate:
         )
     date = re.search(r"^- Date: (\S+)", text, re.MULTILINE)
     result = re.search(r"^- Result: \*\*(.+?)\*\*", text, re.MULTILINE)
-    counts = re.search(r"^- Counts: (.+)$", text, re.MULTILINE)
+    counts = re.search(r"^- Counts: (\d+) pass, (\d+) fail, (\d+) skip", text, re.MULTILINE)
+    commit = re.search(r"^- Commit: `?([0-9a-fA-F]{7,40})`?", text, re.MULTILINE)
     stamp = date.group(1) if date else ""
     verdict = result.group(1) if result else "UNKNOWN"
-    count = counts.group(1) if counts else "unknown"
-    status = "STALE" if "PASS" in verdict else "FAIL"
-    note = f"{count}; {verdict}; report has no commit stamp, rerun required"
+    count = counts.group(0).removeprefix("- Counts: ") if counts else "unknown"
+    recorded = commit.group(1) if commit else ""
+    green_counts = bool(counts) and int(counts.group(2)) == 0 and int(counts.group(1)) > 0
+    if "PASS" not in verdict:
+        status = "FAIL"
+        note = f"{count}; {verdict}"
+    elif not green_counts:
+        status = "STALE"
+        note = f"{count}; {verdict}; counts are not green, rerun required"
+    elif not recorded:
+        status = "STALE"
+        note = f"{count}; {verdict}; report has no commit stamp, rerun required"
+    elif commit_is_current(recorded, head):
+        status = "PASS"
+        note = f"{count}; {verdict}; commit {recorded[:12]} is current"
+    else:
+        status = "STALE"
+        note = (
+            f"{count}; {verdict}; recorded commit {recorded[:12]} is not HEAD "
+            f"{head[:12] or 'unknown'}; rerun required"
+        )
     return Gate(
         "posix", status, "read docs/posix/CONFORMANCE.md", stamp, utc(), "",
         str(path.relative_to(ROOT)), sha256(path), note
@@ -471,7 +510,7 @@ def collect(args: argparse.Namespace) -> int:
     gates = []
     if not args.no_make_check:
         gates.append(run_gate("make-check", ["make", "check"], head, dirty))
-    gates.append(parse_posix(args.posix_report))
+    gates.append(parse_posix(args.posix_report, head))
     gates.append(parse_libc(head))
     gates.append(parse_kernel_gate(args.kernel_gate, head))
     gates.append(dynamic_gate("x86_64", head, args.run_qtests))
@@ -579,6 +618,28 @@ def self_test() -> int:
     if missing.status != "MISSING":
         raise AssertionError(f"missing kernel gate: {missing}")
 
+    good_posix = parse_posix(fixtures / "posix-good.md", head)
+    if good_posix.status != "PASS":
+        raise AssertionError(f"good posix: {good_posix}")
+    stale_posix = parse_posix(fixtures / "posix-stale.md", head)
+    if (
+        stale_posix.status != "STALE"
+        or "222222222222" not in stale_posix.note
+        or "111111111111" not in stale_posix.note
+    ):
+        raise AssertionError(f"stale posix: {stale_posix}")
+    no_commit = parse_posix(fixtures / "posix-no-commit.md", head)
+    if no_commit.status != "STALE" or "no commit stamp" not in no_commit.note:
+        raise AssertionError(f"unstamped posix: {no_commit}")
+    failed_posix = parse_posix(fixtures / "posix-fail.md", head)
+    if failed_posix.status != "FAIL":
+        raise AssertionError(f"failed posix: {failed_posix}")
+    if commit_is_current("2" * 40, head):
+        raise AssertionError("mismatched commits must not be current")
+    parent = git("rev-parse", "HEAD^")
+    if parent and not commit_is_current(parent, head_commit()):
+        raise AssertionError(f"ancestor commit {parent} must be current")
+
     good_board = board_gate(fixtures / "board-good.log")
     if good_board.status != "MARKERS COMPLETE":
         raise AssertionError(f"good board: {good_board}")
@@ -600,7 +661,11 @@ def self_test() -> int:
     if unpinned.status not in {"UNPINNED", "PASS"} or not unpinned.sha256:
         raise AssertionError(f"image hash: {unpinned}")
 
-    print("release-evidence self-test: PASS (kernel good/stale/missing, board good/virt/synthetic/incomplete, image missing/hash)")
+    print(
+        "release-evidence self-test: PASS (kernel good/stale/missing, "
+        "posix good/stale/no-stamp/fail, board good/virt/synthetic/incomplete, "
+        "image missing/hash)"
+    )
     return 0
 
 
