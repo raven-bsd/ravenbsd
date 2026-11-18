@@ -3,18 +3,18 @@
 
 # libc size gate 3.1 triage and budget correction (C74w/C74z/C74z-S10)
 
-Status: OBSERVED (C74ht, `origin/master` `6cb10821`). C74w classified the C74h/C69 data;
+Status: OBSERVED (C74ia, `origin/master` `fb65ec96`). C74w classified the C74h/C69 data;
 C74z corrected the objective budget-data errors; C74z-S10 re-froze the six P9 S/F budgets;
 C74z-S11 rebuilt all three arches and fixed the six B-only/layout rows; C74z-S12 classified the
 S/F residual; C74z-S14/S15a/S5/S6/S13 landed and C74z-S16 applied the reviewed current+3%
 budgets to the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows. The C74dl audit found
 **17 legitimate budget/layout rows (0 shrink-first), 1 rule/probe bug (P7-R-14), and 10 stale
 invariant ceilings**; C74z-S17 applied the 17 re-freezes and C74cx fixed the P7-R-14 matcher.
-C74ht rebuilt the real x86_64/aarch64 `libc.so.1` rows, applied their measured+3% budgets, and
-recorded the `INV-LIBC-SO-NEEDED` self-NEEDED rule bug with `readelf -d` evidence. **3.1 remains
-NOT MET**: 65 pass / 11 fail / 64 known / 100 skipped / 0 budget-only; the 11 are the 10 static
-invariants plus the real aarch64 `libc.so.1` S overrun (1,363,768 > 1,300,000); riscv64 stays
-skipped by C74hs.
+C74ht rebuilt the real x86_64/aarch64 `libc.so.1` rows and applied their measured+3% budgets.
+C74ia adds the riscv64 `libc.so.1` budget and the third NEEDED known row. **3.1 remains NOT
+MET**: 64 pass / 13 fail / 65 known / 99 skipped / 0 budget-only; the 13 are the 10 static
+invariants, the real aarch64 `libc.so.1` S overrun (1,363,768 > 1,300,000), and two riscv64 P9
+static S/F rows grown by the C74hs compat exports (not budgeted here).
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -839,6 +839,52 @@ itself is fixed.
 **3.1 remains NOT MET** with exactly 11 real fails: the 10 static invariants plus the aarch64
 `libc.so.1` S ceiling. The two NEEDED rows are KNOWN rule exceptions, not passes.
 
+## C74ia riscv64 libc.so.1 budget (OBSERVED, `fb65ec96`)
+
+C74hs made `libc-link --arch riscv64` succeed. C74ia built the DSO and measured it:
+
+| Arch | S | F | `.data.rel.ro` | `JUMP_SLOT` | `DT_NEEDED` |
+|---|---:|---:|---:|---:|---:|
+| riscv64 | 1,010,867 | 2,490,256 | 24,776 | 2 | 0 |
+
+`readelf -d` shows `SONAME: [libc.so.1]`, `FLAGS: BIND_NOW`, `FLAGS_1: NOW NODELETE`, and no
+`DT_NEEDED`. The riscv64 `libc.so.1` row is re-frozen at measured + 3 percent:
+
+| Row | Old budget S/F | Measured S/F | New budget S/F |
+|---|---|---|---|
+| riscv64 `libc.so.1` | 0 / 0 (skipped) | 1,010,867 / 2,490,256 | 1,041,194 / 2,564,964 |
+
+The row is now `status = "ok"`; x86_64 and aarch64 rows are unchanged. The riscv64
+`INV-LIBC-SO-NEEDED` row joins the C74ht known exception (0 `DT_NEEDED` vs the hard-coded 1), so
+all three NEEDED rows are KNOWN, not passes.
+
+### P9 riscv64 static growth from C74hs (not budgeted here)
+
+The full-link P9 rows also grew after C74hs added the 151 compat/IPC exports:
+
+| Row | S measured/budget | F measured/budget | Delta |
+|---|---|---|---|
+| P9 riscv64 tiny | 904,084 / 868,494 | 905,672 / 870,128 | +35,590 S / +35,544 F |
+| P9 riscv64 server | 964,226 / 924,842 | 965,816 / 926,473 | +39,384 S / +39,343 F |
+
+These are real S/F growth from the C74hs source change, not a dynamic-row measurement artifact.
+C74ia's contract is the riscv64 `libc_so` budget, so these two rows are **left unbudgeted** and
+remain FAIL. They need a C74hs-lane owner decision or a dedicated budget ticket.
+
+### Exact 3.1 residual
+
+| Kind | Rows | Status |
+|---|---|---|
+| static `INV-S-P2-P0`/`INV-S-P3-P2` invariants | 10 | FAIL (unchanged) |
+| aarch64 `INV-LIBC-SO-S` | 1 | FAIL (real 1,363,768 > 1,300,000; ceiling not raised) |
+| P9 riscv64 static tiny/server | 2 | FAIL (C74hs growth; not budgeted here) |
+| `INV-LIBC-SO-NEEDED` | 3 | KNOWN (rule bug, `readelf -d` evidence) |
+| `libc.so.1` budgets | 3 | PASS (x86_64, aarch64, riscv64) |
+| **3.1 total** | | **64 pass / 13 fail / 65 known / 99 skipped / 0 budget-only** |
+
+**3.1 remains NOT MET** with 13 real fails. The three dynamic `libc.so.1` budgets pass and the
+three NEEDED rows are documented rule exceptions.
+
 ## Budget actions
 
 * C74z added x86_64 P9 tiny/server budgets from the `1bfeaafa` first measurement + 3 percent
@@ -878,6 +924,11 @@ itself is fixed.
   0 `DT_NEEDED`, not a self-`NEEDED`); the aarch64 S ceiling and the riscv64 C74hs block are
   unchanged. The gate is **65 pass / 11 fail / 64 known / 100 skipped / 0 budget-only**.
   3.1 remains **NOT MET**.
+* C74ia adds the riscv64 `libc.so.1` row at measured + 3 percent (S 1,010,867 / F 2,490,256 ->
+  1,041,194 / 2,564,964) and the riscv64 NEEDED known row. The riscv64 P9 static growth from the
+  C74hs compat exports (+35,590/+39,384 S and +35,544/+39,343 F on tiny/server) is **not
+  budgeted** and remains FAIL. The gate is **64 pass / 13 fail / 65 known / 99 skipped / 0
+  budget-only**. 3.1 remains **NOT MET**.
 
 ## C39m ctype table shrink (OBSERVED, `e1f252e5`)
 
