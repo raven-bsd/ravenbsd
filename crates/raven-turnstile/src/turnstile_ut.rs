@@ -272,6 +272,75 @@ fn woken_once_and_never_again() {
 }
 
 #[test]
+fn direct_handoff_stress_never_loses_a_waiter() {
+    // A donor-style direct handoff loop: each round hands the object to every waiter in turn.
+    // A lost wake, a stale owner, or an unrestored boost shows up immediately.
+    let mut t = Turnstiles::new();
+    for thread in 0..8u32 {
+        t.register(thread, prio(4 + (thread % 4) as u8)).unwrap();
+    }
+    for round in 0..200u32 {
+        let object = round;
+        t.acquire(object, 0).unwrap();
+        for waiter in 1..8u32 {
+            t.block(object, waiter).unwrap();
+        }
+        let mut woken = Vec::new();
+        while let Some(thread) = t.wake_one(object) {
+            woken.push(thread);
+        }
+        assert_eq!(woken.len(), 7, "round {round}: waiter lost");
+        for waiter in 1..8u32 {
+            assert!(
+                woken.contains(&waiter),
+                "round {round}: waiter {waiter} not woken"
+            );
+        }
+        assert_eq!(t.owner(object), None, "round {round}: stale owner");
+        assert_eq!(t.waiter_count(object), 0);
+        for thread in 0..8u32 {
+            assert_eq!(
+                t.effective_priority(thread),
+                t.base_priority(thread),
+                "round {round}: thread {thread} boost not restored"
+            );
+        }
+    }
+}
+
+#[test]
+fn canceled_handoff_round_restores_owner_and_never_wakes_the_canceled_thread() {
+    let mut t = Turnstiles::new();
+    t.register(0, prio(10)).unwrap();
+    for thread in 1..6 {
+        t.register(thread, prio(4)).unwrap();
+    }
+    for round in 0..200u32 {
+        let object = 1000 + round;
+        t.acquire(object, 0).unwrap();
+        for waiter in 1..6 {
+            t.block(object, waiter).unwrap();
+        }
+        // The middle waiter is canceled before the handoff; the others must still make progress.
+        let canceled = 3;
+        let outcome = t.cancel(object, canceled);
+        assert!(outcome.removed);
+        let mut woken = Vec::new();
+        while let Some(thread) = t.wake_one(object) {
+            assert_ne!(thread, canceled);
+            woken.push(thread);
+        }
+        assert_eq!(
+            woken.len(),
+            4,
+            "round {round}: canceled round lost a waiter"
+        );
+        assert_eq!(t.owner(object), None);
+        assert_eq!(t.effective_priority(0), Some(prio(10)));
+    }
+}
+
+#[test]
 fn seeded_bug_effective_mismatch_is_detected() {
     let mut t = Turnstiles::new();
     t.register(0, prio(0)).unwrap();

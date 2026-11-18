@@ -145,10 +145,19 @@ fn compose_std_command(command: LaunchRequest) -> std::io::Result<std::process::
 }
 
 /// Takes the file for standard stream `fd` out of `open_files`, for the process
-/// to have as that stream: the null device if it's closed.
+/// to have as that stream.
+///
+/// On RavenBSD the login shell owns the console through the tty scheme, not through entries in
+/// the shell fd table; getty does not duplicate the console onto explicit 0/1/2 descriptors in
+/// `OpenFiles`. Falling back to `Stdio::null()` there opens `/dev/null`, which the release
+/// vfsd currently mounts as a directory, so every external command fails with ENOTDIR. Inherit
+/// the process descriptor instead: the console is already the login shell's stdin/stdout.
 fn take_stdio(open_files: &mut OpenFiles, fd: ShellFd) -> std::io::Result<Stdio> {
     match open_files.remove_fd(fd) {
         Some(file) => commands::stdio_for(file),
+        #[cfg(target_os = "ravenbsd")]
+        None => Ok(Stdio::inherit()),
+        #[cfg(not(target_os = "ravenbsd"))]
         None => Ok(Stdio::null()),
     }
 }
