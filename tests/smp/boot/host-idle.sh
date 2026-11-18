@@ -47,14 +47,24 @@ done
 
 mkdir -p "$(dirname "$state_file")" 2>/dev/null || true
 
-qemu_pattern='^(qemu-system-|/.*qemu-system-)'
-job_pattern='^(target/(debug|release)/xtask|cargo (xtask|build|test|run)|rustc|/.*rustc)'
+# Match the executable name (`comm`), not the full command line. A shell whose command line
+# happens to contain "qemu-system" or "cargo" must not block the gate, and a zombie (<defunct>)
+# is not a competing job. `ps stat` is `Z`/`X` for zombies/dead processes.
+list_qemu() {
+    ps -eo pid=,stat=,comm=,args= 2>/dev/null | awk '$2 !~ /^[ZX]/ && $3 ~ /^qemu-system-/'
+}
+
+list_jobs() {
+    # A stopped (T/t) build is not progressing either; only running/waiting jobs compete.
+    ps -eo pid=,stat=,comm=,args= 2>/dev/null \
+        | awk '$2 !~ /^[ZXTt]/ && $3 ~ /^(xtask|cargo|rustc|clippy-driver|rustdoc)$/'
+}
 
 write_state() {
     loadavg=$(cat /proc/loadavg 2>/dev/null || echo 'unknown')
     nproc=$(nproc 2>/dev/null || echo unknown)
-    qemu=$(pgrep -fa "$qemu_pattern" 2>/dev/null | grep -v '<defunct>' || true)
-    jobs=$(pgrep -fa "$job_pattern" 2>/dev/null | grep -v '<defunct>' || true)
+    qemu=$(list_qemu || true)
+    jobs=$(list_jobs || true)
     {
         printf 'utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         printf 'context=%s\n' "$context"
@@ -73,8 +83,8 @@ write_state() {
 check_idle() {
     loadavg=$(cat /proc/loadavg 2>/dev/null || echo '0')
     load1=${loadavg%% *}
-    qemu=$(pgrep -fa "$qemu_pattern" 2>/dev/null | grep -v '<defunct>' || true)
-    jobs=$(pgrep -fa "$job_pattern" 2>/dev/null | grep -v '<defunct>' || true)
+    qemu=$(list_qemu || true)
+    jobs=$(list_jobs || true)
     idle=1
     busy=    # colon-delimited reasons
     awk -v l="$load1" -v m="$max_load" 'BEGIN { exit !(l <= m) }' || {
