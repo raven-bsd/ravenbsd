@@ -21,6 +21,8 @@
 
 extern crate alloc;
 
+#[cfg_attr(not(any(test, target_os = "none")), allow(dead_code))]
+mod resolv;
 mod transport;
 
 #[cfg(target_os = "none")]
