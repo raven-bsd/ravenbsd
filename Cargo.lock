@@ -1415,6 +1415,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-eink"
+version = "0.1.0"
+
+[[package]]
 name = "raven-elf"
 version = "0.1.0"
 
