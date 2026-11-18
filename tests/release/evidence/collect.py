@@ -323,7 +323,7 @@ def release_login_gate(head: str, run_qtests: bool) -> Gate:
             code, str(transcript.relative_to(ROOT)), sha256(transcript),
             "transcript has no kernel commit banner"
         )
-    if not commit_matches(recorded, head):
+    if not commit_is_current(recorded, head):
         return Gate(
             "release-login", "STALE", "read release-login transcript", utc(), utc(),
             code, str(transcript.relative_to(ROOT)), sha256(transcript),
@@ -540,7 +540,7 @@ def dynamic_gate(arch: str, head: str, run_qtests: bool) -> Gate:
             str(evidence.relative_to(ROOT)), sha256(evidence),
             "log has no kernel commit banner"
         )
-    if not commit_matches(recorded, head):
+    if not commit_is_current(recorded, head):
         return Gate(
             name, "STALE", "read dynamic-userland log", utc(), utc(), code,
             str(evidence.relative_to(ROOT)), sha256(evidence),
