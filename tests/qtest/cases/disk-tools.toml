@@ -72,6 +72,14 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
+send = "/bin/svcctl start blockd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^blockd .*$'
+timeout_secs = 60
+
+[[step]]
 send = "/bin/lsblk\n"
 delay_ms = 100
 
@@ -94,14 +102,6 @@ delay_ms = 100
 [[step]]
 wait = '^newfs: block:0 UFS2 block=4096 frag=512 size=0 label= partition=1$'
 timeout_secs = 120
-
-[[step]]
-send = "/bin/svcctl start blockd\n"
-delay_ms = 100
-
-[[step]]
-wait = '^blockd .*$'
-timeout_secs = 60
 
 [[step]]
 send = "/bin/svcctl start fsd-ufs\n"
