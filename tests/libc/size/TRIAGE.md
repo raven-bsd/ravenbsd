@@ -12,11 +12,12 @@ budgets to the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows. The C74dl a
 invariant ceilings**; C74z-S17 applied the 17 re-freezes and C74cx fixed the P7-R-14 matcher.
 C74ht rebuilt the real x86_64/aarch64 `libc.so.1` rows and applied their measured+3% budgets.
 C74ia adds the riscv64 `libc.so.1` budget and the third NEEDED known row. C74ib tested aarch64
-DSO size reductions; no safe reduction is implementable inside its Owns, so the aarch64 S row
-remains 1,363,752 / 1,300,000 and the riscv64 P9 growth is permanent parity. **3.1 remains NOT
-MET**: 64 pass / 13 fail / 65 known / 99 skipped / 0 budget-only; the 13 are the 10 static
-invariants, the real aarch64 `libc.so.1` S overrun, and two riscv64 P9 static S/F rows grown by
-the C74hs compat exports (not budgeted).
+DSO size reductions; C74id later landed the actual DSO change. C74in's full three-arch rebuild
+exposes one more row: P7 riscv64 static server B 15,488 > 12,385, but the growth is
+`.relro_padding` (not `.bss`) from C74ij's +246-byte `.text` change crossing a page boundary.
+**3.1 remains NOT MET**: 63 pass / 13 fail / 65 known / 99 skipped / 0 budget-only; the 13 are
+the 10 static invariants, the P7 riscv64 server B layout row, and the two riscv64 P9 static S/F
+rows.
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -974,6 +975,65 @@ These are reviewer options only; C74ib changes no budget, invariant or ceiling. 
 `INV-LIBC-SO-S` row remains FAIL and **3.1 remains NOT MET** at 64 pass / 13 fail / 65 known /
 99 skipped.
 
+## C74in full three-arch rebuild and P7 B attribution (OBSERVED, `d0429e95`)
+
+A full pack/link of all three arches on `d0429e95` yields **63 pass / 13 fail / 65 known / 99
+skipped**. The extra row vs the C74ib snapshot is **P7 riscv64 static server B 15,488 > 12,385**.
+
+### Exact 13 fails
+
+| # | Row | Measured / budget | Class |
+|---|---|---|---|
+| 1 | P9 riscv64 tiny | S 906,278 > 868,494; F 907,864 > 870,128 | real C74hs parity |
+| 2 | P7 riscv64 server | B 15,488 > 12,385 | `.relro_padding` layout (C74ij) |
+| 3 | P9 riscv64 server | S 966,556 > 924,842; F 968,144 > 926,473 | real C74hs parity |
+| 4 | `INV-S-P3-P2` x86_64 tiny | 17,160 > 10,240 | stale ceiling |
+| 5 | `INV-S-P3-P2` x86_64 server | 23,088 > 10,240 | stale ceiling |
+| 6 | `INV-S-P2-P0` aarch64 tiny | 26,671 > 5,120 | stale ceiling |
+| 7 | `INV-S-P3-P2` aarch64 tiny | 16,964 > 10,240 | stale ceiling |
+| 8 | `INV-S-P2-P0` aarch64 server | 29,159 > 5,120 | stale ceiling |
+| 9 | `INV-S-P3-P2` aarch64 server | 18,272 > 10,240 | stale ceiling |
+| 10 | `INV-S-P2-P0` riscv64 tiny | 19,067 > 5,120 | stale ceiling |
+| 11 | `INV-S-P3-P2` riscv64 tiny | 10,804 > 10,240 | stale ceiling |
+| 12 | `INV-S-P2-P0` riscv64 server | 23,429 > 5,120 | stale ceiling |
+| 13 | `INV-S-P3-P2` riscv64 server | 12,392 > 10,240 | stale ceiling |
+
+### P7 riscv64 server B attribution
+
+The growth is **`.relro_padding`**, not `.bss`:
+
+| Build | `.text` | `.data.rel.ro` | `.relro_padding` | `.bss` | B |
+|---|---:|---:|---:|---:|---:|
+| pre-C74ij `9a8d8695` | 58,110 | 2,000 | 88 | 11,552 | 11,640 |
+| current `d0429e95` | 58,356 | 2,000 | 3,936 | 11,552 | 15,488 |
+| delta | +246 | 0 | **+3,848** | **0** | **+3,848** |
+
+The p7 map shows no new BSS object: every `.bss` member is the same 11,552-byte set, and the
+only large NOBITS contribution is the linker-created `.relro_padding` (`<internal>`, 0xF60).
+`readelf -lW` confirms the mechanism:
+
+* pre-C74ij: GNU_RELRO at `0x21698`, filesz `0x910`, memsz `0x968` (ends at page `0x22000`);
+* current: GNU_RELRO at `0x21790`, filesz `0x910`, memsz `0x1870` (ends at page `0x23000`).
+
+C74ij's `%s` branch grew `.text` by 246 bytes (plus alignment = 248), moving the RELRO start
+across the `0x22000` page boundary. The RELRO segment then extends to the next page, adding one
+4,096-byte NOBITS page minus the 248-byte shift = **+3,848** padding. The gate's "+3,103 BSS"
+is the over-budget amount (15,488 - 12,385), not a static buffer.
+
+**Owner/file:** the trigger is `libc/ravenlibc/crates/raven-libc-time/src/strftime.rs`, the `%s`
+branch (lines ~167-190), owned by **otto/C74ij** (INDEX row 354). It is an intentional code change
+with an accidental layout side effect, not a stray static buffer. A fix would either shrink
+`.text` back below the page boundary or change the link segment/page alignment; both are outside
+C74in's Owns, so no source edit is made.
+
+**Options:** if the layout is accepted, the reviewer budget is `ceil(15,488 x 1.03) = 15,953`
+B. Applying it would make P7 pass and 3.1 become **64 pass / 12 fail / 65 known / 99 skipped**
+(the 10 invariants + 2 riscv P9 remain). C74in changes no budget.
+
+The current P9 values supersede the earlier C74ib review numbers: tiny S 906,278 / F 907,864
+(budget 868,494 / 870,128); server S 966,556 / F 968,144 (budget 924,842 / 926,473). B is
+33,076 / 34,364 and stays under the existing P9 B budgets.
+
 ## Budget actions
 
 * C74z added x86_64 P9 tiny/server budgets from the `1bfeaafa` first measurement + 3 percent
@@ -1018,6 +1078,11 @@ These are reviewer options only; C74ib changes no budget, invariant or ceiling. 
   C74hs compat exports (+35,590/+39,384 S and +35,544/+39,343 F on tiny/server) is **not
   budgeted** and remains FAIL. The gate is **64 pass / 13 fail / 65 known / 99 skipped / 0
   budget-only**. 3.1 remains **NOT MET**.
+* C74in changes no budget. The full three-arch rebuild is **63 pass / 13 fail / 65 known / 99
+  skipped**; the extra row is P7 riscv64 server B 15,488 > 12,385. The growth is
+  `.relro_padding` (88 -> 3,936), not `.bss` (11,552 unchanged): C74ij's +246-byte `.text`
+  crossed the `0x22000` page boundary. The measured + 3 percent B option is **15,953**; applying
+  it would give **64 pass / 12 fail / 65 known / 99 skipped**. 3.1 remains **NOT MET**.
 
 ## C39m ctype table shrink (OBSERVED, `e1f252e5`)
 
