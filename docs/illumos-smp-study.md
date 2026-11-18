@@ -24,7 +24,7 @@ Donor revisions:
 |---|---|---|
 | illumos-gate | `586678ac1bcbd77644a6ec4dac7f79d676cfb4ec` | `ravenbsd-resources/illumos-gate` (sparse; objects present in `.git`) |
 | NetBSD | `36eddebcc36cb0775aa2962005b9c05419a6ff01` | `ravenbsd-resources/netbsd` |
-| FreeBSD | `133344405f532bd54ff3629a77d4c4e062f01fdb` | `ravenbsd-resources/freebsd` (sparse; **no** `sys/x86/x86` or `sys/amd64/amd64`) |
+| FreeBSD | `133344405f532bd54ff3629a77d4c4e062f01fdb` | `ravenbsd-resources/freebsd` (sparse worktree; locked-revision objects readable with `git show`) |
 
 All line numbers below are against those revisions.
 
@@ -64,7 +64,7 @@ class of problem; the sections below extract the parts Raven does not yet have.
 
 Classification for all Illumos files: **STUDY** (CDDL). None may be copied or translated.
 
-### 2.2 NetBSD (per-file licence)
+### 2.2 NetBSD and FreeBSD (per-file licence)
 
 `$NetBSD$` revision is the exact file revision inside the donor checkout.
 
@@ -92,9 +92,21 @@ Consequence for S83/S85b:
   `apic.c`.
 * The **AP trampoline and MADT enumeration** are 4-clause (`cpu.c`, `mpacpi.c`, `mp.c`,
   `mptramp.S`). Read them for behaviour, but implement from this specification, not by copying.
-* FreeBSD is unusable as a donor today: the sparse checkout has `sys/x86/include`, `sys/x86/linux`
-  etc., but no `sys/x86/x86` and no `sys/amd64/amd64`. Record this in the next donor update; do not
-  invent FreeBSD file revisions.
+FreeBSD worktree is sparse, but the locked revision's objects **are** present in `.git` and can be
+read with `git show` (the S101 study already does this). The worktree lacks `sys/x86/x86` and
+`sys/amd64/amd64`; cite them as `git show 1333444…:<path>`, not as checked-out files.
+
+| File | Lines | Licence | Class |
+|---|---:|---|---|
+| `sys/amd64/amd64/mp_machdep.c` | 1159 | SPDX BSD-2-Clause | **COPY/PORT** |
+| `sys/kern/subr_smp.c` | 1382 | SPDX BSD-2-Clause | **COPY/PORT** |
+| `sys/x86/include/apicvar.h` | 288 | SPDX BSD-2-Clause | **COPY/PORT** |
+| `sys/x86/include/x86_smp.h` | 127 | SPDX Beerware | **COPY/PORT** (keep notice) |
+| `sys/x86/x86/mp_x86.c` | 1794 | 2-clause body + "name of the developer may NOT be used to endorse" | **PORT** (keep notice) |
+| `sys/amd64/amd64/pmap.c` | 12372 | SPDX BSD-4-Clause | **NO-COPY** |
+
+FreeBSD's `smp_targeted_tlb_shootdown_native()` is a per-CPU scoreboard protocol, not a global
+lock (section 9.1). It is the closest donor match to the shape S85b needs.
 
 ---
 
@@ -407,6 +419,35 @@ Differences from Raven worth noting:
   handler; the code re-checks `TP_GET_COUNT(tp)` after `splvm()` (`:371-374`). Raven has no
   equivalent "interrupt flushed my mailbox" path.
 
+### 9.1 FreeBSD: per-CPU scoreboard shootdown (OBSERVED)
+
+`smp_targeted_tlb_shootdown_native()` (`sys/amd64/amd64/mp_machdep.c:636-725`, BSD-2-Clause) is
+the strongest evidence for the protocol S85b needs:
+
+1. **The initiator must have interrupts enabled.** `:671-672` is a `KASSERT` that `PSL_I` is set;
+   the comment at `:629-631` says this prevents deadlock with other IPIs protected by
+   `smp_ipi_mtx`. `critical_enter()` (`:673`) then pins the thread without masking interrupts.
+2. It copies the pmap-active CPU mask, drops the current CPU, and takes a local-only fast path if
+   the mask is empty (`:658-662`, `:720-725`).
+3. It writes the request into **its own** per-CPU `pc_smp_tlb_*` fields, increments a per-CPU
+   generation (never zero), and issues a **release fence** before publishing (`:675-684`).
+4. It zeroes the scoreboard slot `(target, initiator)` for each target (`:686-691`). The IPI is
+   the fence between zeroing and waiting (`:693-697`).
+5. It sends one `IPI_INVLOP` to the selected targets (or all-but-self), runs the local callback,
+   then waits for each target's slot to return to the new generation (`:698-708`).
+6. The scoreboard is an `(mp_maxid+1)²` array; **each CPU can initiate independently** and the
+   comment at `:561-570` describes the protocol in exactly those terms.
+
+Why this matters: the acknowledgement is **per (target, initiator) pair**, not a single global
+`ACKED` array, and the initiator never spins on a lock a target needs. A concurrent initiator
+uses a different scoreboard row and a different generation. This is the concrete donor shape for
+Raven's `shootdown.rs` on x86, and the same idea (per-initiator request state) applies to the
+aarch64 `smp_shim.rs`.
+
+`smp_rendezvous()` (`sys/kern/subr_smp.c:475-...`) adds the separate all-CPU barrier used for
+stop/restart and global actions: setup → action → teardown, with waiter counters and
+`smp_ipi_mtx`. It is useful for panic/stop but should not be used for every TLB flush.
+
 ---
 
 ## 10. NetBSD: AP bring-up donor (OBSERVED; files are NO-COPY)
@@ -532,7 +573,7 @@ hypothesis for S83/S85b.
 
 | # | Divergence | Evidence | Consequence | Label |
 |---|---|---|---|---|
-| D1 | Global `IrqSpinLock` serialises shootdowns; waiters spin with IF masked | `shootdown.rs:81`, `sync.rs:200-207`, `tests/smp/memory/FINDING.md` | concurrent shooters lose each other's acks; 100 timeouts/run | **OBSERVED** |
+| D1 | Global `IrqSpinLock` serialises shootdowns; waiters spin with IF masked | `shootdown.rs:81`, `sync.rs:200-207`, `tests/smp/memory/FINDING.md`; FreeBSD instead `KASSERT`s IF=1 (`mp_machdep.c:671-672`) | concurrent shooters lose each other's acks; 100 timeouts/run | **OBSERVED** |
 | D2 | `online_cpus()` is the only target filter; no `CPU_READY` | `smp/mod.rs:29-39`, `shootdown.rs:89` | IPI to a started-but-not-ready AP times out | **PROPOSED** |
 | D3 | No delayed invalidation for idle/halted CPUs | `shootdown.rs:138-156` vs `hat_i86.c:2596-2605` | a halted target can miss the IPI until it wakes | **PROPOSED** |
 | D4 | Single global mailbox vs per-CPU packet | `shootdown.rs:49-56` vs `x86_tlb.c:84-113` | no batching, no interrupt-flush path, one in-flight request globally | **OBSERVED** |
@@ -621,21 +662,39 @@ baseline.
 `-smp 2` and `-smp 4`, 50 boots each, `-accel kvm -cpu host`; record QEMU exit status and serial.
 A reset is a failure; do not retry. Success: 50/50 both sizes.
 
+### 13.3 Ticket hand-off (S83, S101, S103, S104)
+
+The S85b findings were split after this study started; the experiments above map onto the current
+owners as follows.
+
+| Ticket | Owner | Experiment subset | Exact pointer |
+|---|---|---|---|
+| **S83** (KVM AP bring-up / reset) | stuart | 13.2 E1–E6 (all) | `bringup.rs:74-107`, `arch/x86_64/ap_start.rs` |
+| **S101** (x86 TLB lock protocol) | mark | 13.1 E1–E4, E7 | `shootdown.rs:81-156`; FreeBSD scoreboard shape `mp_machdep.c:561-708`; NetBSD packet shape `x86_tlb.c:240-544` |
+| **S103** (aarch64 TLB lock) | dave | 13.1 E1–E3, E6, E7 | `sched/smp_shim.rs:153` (global lock) and `:215-231` (wait never opens the interrupt window) |
+| **S104** (x86 libc-threads detach hang) | tim | thread-lifecycle part of 13.1 | last marker `barrier ok`; check detach/exit reaping, TLS/stack teardown, and whether the hang coincides with a `tlb shootdown timeout` on the teardown `unmap`; if kernel SMP/TLB, hand back to S83/S103 with the exact line |
+
+S103 is already written against the same diagnosis (`S85f` 3/23, `S102` lock/inversion); this
+study adds the FreeBSD per-initiator scoreboard as a second donor shape and the aarch64 parity
+requirement. S104 is not an AP-donor ticket, but its hang must be classified as scheduler/thread
+lifecycle versus TLB ack loss before either lane patches around it.
+
 ---
 
-## 14. What S83 / S85b / S98 should port
+## 14. What S83 / S101 / S103 / S98 should port
 
 | Consumer | Donor | Class | Action |
 |---|---|---|---|
-| S85b (TLB ack) | NetBSD `x86_tlb.c` rev 1.22, `ipi.c` rev 1.30 | COPY/PORT (2-clause) | Port the per-CPU packet shape, the single in-flight request, the last-arriver `pendcount`/`DONE` rule, and the lazy/stale state. Keep the NetBSD notice. |
-| S85b (cross-call) | NetBSD `subr_xcall.c` rev 1.40, `xcall.h` rev 1.8 | COPY/PORT (2-clause) | Port the ticket-counter + "only running CPUs" target rule if a general cross-call API is wanted; do not port the heavyweight kthread path for TLB. |
+| S85b/S101 (x86 TLB ack) | NetBSD `x86_tlb.c` rev 1.22, `ipi.c` rev 1.30; FreeBSD `mp_machdep.c`, `subr_smp.c`, `apicvar.h` at `1333444…` | COPY/PORT (2-clause) | Port the per-CPU packet shape, the single in-flight request, the last-arriver `pendcount`/`DONE` rule, and the lazy/stale state; or the FreeBSD per-initiator scoreboard/generation shape. Keep the donor notices. |
+| S85b/S101 (cross-call) | NetBSD `subr_xcall.c` rev 1.40, `xcall.h` rev 1.8 | COPY/PORT (2-clause) | Port the ticket-counter + "only running CPUs" target rule if a general cross-call API is wanted; do not port the heavyweight kthread path for TLB. |
+| S103 (aarch64 TLB lock) | NetBSD `x86_tlb.c`, FreeBSD `mp_machdep.c` (shape only) | COPY/PORT (2-clause) | Same protocol with SGIs; the waiter must take the SGI or use per-initiator state. Do not keep the global `IrqSpinLock`. |
 | S83 (AP bring-up) | NetBSD `cpu.c` rev 1.214, `mptramp.S` rev 1.28, `mpacpi.c` rev 1.112 | **NO-COPY (4-clause)** | Implement the `PRESENT`/`GO`/`RUNNING` behaviour from this spec; no code copying. |
 | S83 (LAPIC/IPI) | NetBSD `lapic.c` rev 1.94, `apic.c` rev 1.10, `cpu_topology.c` rev 1.21 | COPY/PORT (2-clause) | Safe to port with notice for timer calibration, EOI, IPI delivery. |
 | S83/S85b (design) | Illumos `x_call.c`, `mp_startup.c`, `hat_i86.c` | STUDY (CDDL) | Use the invariants only: `CPU_READY` gating, no global lock, idle delayed invalidation, base-SPL-until-ready. No code. |
 | S98 (disk tools) | NetBSD `sbin/{newfs,fsck_ffs,gpart,disklabel,dkctl}`, `usr.sbin/{dumpfs,tunefs}` | per-file; check each | Out of scope here; record per-file licence before any port. |
 
-FreeBSD: do not cite file revisions until a donor update actually fetches `sys/x86/x86` and
-`sys/amd64/amd64`. The current sparse tree cannot support the ticket's FreeBSD comparison.
+FreeBSD: the worktree is sparse, so cite `git show 1333444…:<path>`. The BSD-2-Clause files are
+copy/port donors; `sys/amd64/amd64/pmap.c` is BSD-4-Clause and behaviour-only.
 
 ---
 
@@ -652,12 +711,15 @@ FreeBSD: do not cite file revisions until a donor update actually fetches `sys/x
    cause.
 3. **Illumos never waits for a halted CPU.** `TLBIDLE_CPU_HALTED` is CAS'd to a delayed-invalidate
    state and skipped. Raven sends the IPI and waits 100 ms.
-4. **NetBSD's TLB path is the best copy/port donor** (2-clause): per-CPU batched packet, one
-   in-flight request, last-arriver `pendcount`/`DONE`, lazy/stale state. Its AP files are 4-clause
-   and must be implemented from behaviour, not copied.
+4. **NetBSD's TLB path and FreeBSD's targeted shootdown are the best copy/port donors**
+   (BSD-2-Clause): NetBSD gives per-CPU batched packets, one in-flight request and the
+   last-arriver `pendcount`/`DONE` rule; FreeBSD gives the per-initiator scoreboard/generation
+   protocol and requires the initiator to run with interrupts enabled. NetBSD's AP files and
+   FreeBSD's `pmap.c` are 4-clause and must be implemented from behaviour, not copied.
 5. **Raven's immediate experiments** are the two-shooter reproducer, interrupt-state correlation,
-   a per-CPU mailbox without the global lock, a real `ready` state, and aarch64 parity. For KVM,
-   capture the reset, add `PRESENT`/`GO`/`RUNNING` transitions, and park APs until `GO`.
+   a per-CPU/per-initiator mailbox without the global lock, a real `ready` state, and aarch64
+   parity. For KVM, capture the reset, add `PRESENT`/`GO`/`RUNNING` transitions, and park APs
+   until `GO`.
 
 Nothing in this study is a Raven pass claim. The two suites remain red until S83/S85b land the
 fixes and their own gates pass.
