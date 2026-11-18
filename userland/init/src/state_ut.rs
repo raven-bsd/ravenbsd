@@ -4,6 +4,7 @@
 //! Host tests for the pure svcd supervision state machine.
 
 use super::*;
+use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
 
@@ -603,4 +604,87 @@ fn invalid_indices_are_ignored() {
     assert!(supervisor.status(9).is_none());
     assert!(supervisor.request_start(9, 0).is_none());
     assert!(supervisor.exited(9, 1, 0, 0).restart.is_none());
+}
+
+fn with_provides(name: &str, provides: &[&str]) -> Manifest {
+    let mut manifest = service(name);
+    manifest.provides = provides.iter().map(|provide| provide.to_string()).collect();
+    manifest
+}
+
+#[test]
+fn accepts_a_late_scheme_dependency() {
+    let supervisor = supervisor(vec![with_needs("blockd", &["scheme:disk"])]);
+    assert_eq!(supervisor.plan().waves, vec![vec![0]]);
+    assert_eq!(
+        supervisor.dynamic_scheme_prefixes(),
+        vec!["disk".to_string()]
+    );
+}
+
+#[test]
+fn keeps_ordering_for_an_enabled_scheme_provider() {
+    let blockd = with_provides("blockd", &["scheme:block"]);
+    let fsd = with_needs("fsd-ufs", &["scheme:block"]);
+    let supervisor = supervisor(vec![fsd, blockd]);
+    assert_eq!(supervisor.plan().waves, vec![vec![1], vec![0]]);
+    assert!(supervisor.dynamic_scheme_prefixes().is_empty());
+}
+
+#[test]
+fn still_rejects_an_ambiguous_scheme_provider() {
+    let first = with_provides("first", &["scheme:block"]);
+    let second = with_provides("second", &["scheme:block"]);
+    let user = with_needs("user", &["scheme:block"]);
+    assert_eq!(
+        Supervisor::new(vec![first, second, user]).unwrap_err(),
+        GraphError::AmbiguousProvider
+    );
+}
+
+#[test]
+fn dynamic_prefixes_include_disabled_providers_and_late_needs() {
+    let mut blockd = with_provides("blockd", &["scheme:block"]);
+    blockd.enable = false;
+    blockd.needs = alloc::vec!["scheme:disk".to_string()];
+    let mut fsd = with_provides("fsd-ufs", &["scheme:ufs"]);
+    fsd.enable = false;
+    let mut shell = service("getty");
+    shell.provides = alloc::vec!["scheme:file".to_string()];
+    // `file` is provided by the enabled `getty`; `block`, `ufs` and `disk` are not.
+    let supervisor = supervisor(vec![blockd, fsd, shell]);
+    assert_eq!(
+        supervisor.dynamic_scheme_prefixes(),
+        vec!["block".to_string(), "disk".to_string(), "ufs".to_string()]
+    );
+}
+
+#[test]
+fn skips_invalid_and_duplicate_scheme_names() {
+    let mut odd = with_provides("odd", &["scheme:Block", "scheme:net"]);
+    odd.enable = false;
+    let other = with_provides("other", &["scheme:net"]);
+    let supervisor = supervisor(vec![odd, other]);
+    assert_eq!(supervisor.dynamic_scheme_prefixes(), Vec::<String>::new());
+}
+
+#[test]
+fn release_disk_manifests_defer_the_late_disk_need() {
+    let mut blockd = Manifest::parse(include_str!("../services/blockd.toml")).expect("blockd");
+    blockd.enable = true;
+    let supervisor = supervisor(vec![blockd]);
+    // `scheme:disk` has no enabled provider (devd publishes it at runtime) but must not fail the
+    // graph, and the service still starts in the first wave.
+    assert_eq!(supervisor.plan().waves, vec![vec![0]]);
+}
+
+#[test]
+fn release_disk_manifests_grant_block_ufs_and_disk_prefixes() {
+    let blockd = Manifest::parse(include_str!("../services/blockd.toml")).expect("blockd");
+    let fsd = Manifest::parse(include_str!("../services/fsd-ufs.toml")).expect("fsd-ufs");
+    let supervisor = supervisor(vec![blockd, fsd]);
+    assert_eq!(
+        supervisor.dynamic_scheme_prefixes(),
+        vec!["block".to_string(), "disk".to_string(), "ufs".to_string()]
+    );
 }
