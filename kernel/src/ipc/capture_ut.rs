@@ -66,3 +66,37 @@ fn peak_tracks_captures_and_pages() {
     slots.release(second);
     assert_eq!(slots.stats().captures, 0);
 }
+
+#[test]
+fn unrelated_mapping_keeps_root_and_copy_back_per_page() {
+    let captured_root = 0x1000;
+    let captured_frame = 0x7000;
+    // Another thread's MAP/UNMAP changes the mapping generation but not the page-table root.
+    assert!(address_space_matches(captured_root, Some(captured_root)));
+    // The captured page still translates to the same writable frame, so copy-back proceeds.
+    assert!(page_copy_allowed(
+        captured_frame,
+        Some(captured_frame),
+        true
+    ));
+}
+
+#[test]
+fn replaced_capture_mapping_is_skipped() {
+    let captured_frame = 0x7000;
+    let replacement = 0x8000;
+    assert!(!page_copy_allowed(captured_frame, Some(replacement), true));
+    assert!(!page_copy_allowed(captured_frame, None, true));
+    assert!(!page_copy_allowed(
+        captured_frame,
+        Some(captured_frame),
+        false
+    ));
+}
+
+#[test]
+fn process_exit_and_exec_drop_copy_back() {
+    let captured_root = 0x1000;
+    assert!(!address_space_matches(captured_root, None));
+    assert!(!address_space_matches(captured_root, Some(0x2000)));
+}
