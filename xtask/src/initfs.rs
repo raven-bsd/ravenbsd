@@ -233,11 +233,50 @@ pub(crate) fn prerequisite_plan(
     }
 }
 
+/// Staged and target paths that a release image must not inherit from an older build.
+///
+/// `build/<arch>/brush`/`uutils` are copied into the image, and the cargo target directories can
+/// carry a stale feature set, RUSTFLAGS or vendored dependency build. A release image must be
+/// reproducible from the current checkout, not from whichever cache happens to exist.
+pub(crate) fn release_userspace_paths(root: &Path, arch: Arch) -> Vec<PathBuf> {
+    vec![
+        root.join(brush_path(arch)),
+        root.join("build").join(arch.as_str()).join("uutils"),
+        root.join("build")
+            .join("cargo")
+            .join(format!("brush-{}", arch.as_str())),
+        root.join("build")
+            .join("cargo")
+            .join(format!("uutils-{}", arch.as_str())),
+    ]
+}
+
+fn purge_release_userspace(root: &Path, arch: Arch) -> Result<()> {
+    for path in release_userspace_paths(root, arch) {
+        if path.is_dir() {
+            fs::remove_dir_all(&path)
+                .with_context(|| format!("cannot remove {}", path.display()))?;
+        } else if path.exists() {
+            fs::remove_file(&path).with_context(|| format!("cannot remove {}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
 /// Ensure the libc pack, brush and uutils prerequisites exist before packing an initfs.
 ///
 /// Each step runs at most once per call and only when its outputs are missing. libc is checked
-/// first because brush and uutils link against its archive and crt objects.
+/// first because brush and uutils link against its archive and crt objects. A release profile
+/// discards the staged brush/uutils tree and their target caches first, so a stale binary or a
+/// stale feature/RUSTFLAGS target cannot be packed into the image.
 pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
+    let release = release_user_programs(
+        profile.initfs.release,
+        std::env::var("RAVEN_USER_RELEASE").ok().as_deref(),
+    );
+    if release {
+        purge_release_userspace(root, arch)?;
+    }
     let plan = prerequisite_plan(profile, arch, |source| root.join(source).is_file());
     if !plan.libc.is_empty() {
         ensure_libc(
