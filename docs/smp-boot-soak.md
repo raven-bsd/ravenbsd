@@ -41,10 +41,14 @@ Useful options: `--timeout-kvm SEC` (default 15), `--timeout-tcg SEC` (default 3
 ## Exclusive-host preflight
 
 Both the soak and `scripts/kernel-gate.sh` call `tests/smp/boot/host-idle.sh` before starting any
-QEMU. It refuses to run when any other `qemu-system-*`, `target/*/xtask`, `cargo xtask/build/test/
-run` or `rustc` process is present, or when the 1-minute load average exceeds the bound (default
-2.0). The refusal writes the exact host state (load, CPUs, QEMU/job list, KVM, QEMU version,
-memory) to the run's `host-state.txt`; nothing is booted or retried.
+QEMU. It refuses to run when another `qemu-system-*`, `xtask`, `cargo`, `rustc`, `clippy-driver`
+or `rustdoc` process is present, or when the 1-minute load average exceeds the bound (default
+`max(2, nproc/4)`; 5.0 on this 20-CPU host). Processes are matched by executable name (`ps comm`),
+not by the full command line, so a shell that merely mentions `qemu`/`cargo` does not block the
+gate; zombie, dead, stopped and traced build jobs are ignored, while a stopped QEMU is still
+counted because it retains KVM and image resources. The refusal writes the exact host state
+(load, CPUs, QEMU/job list, KVM, QEMU version, memory) to the run's `host-state.txt`; nothing is
+booted or retried.
 
 On a shared host, pass `--wait-for-idle SECONDS` to the soak to poll in the foreground until the
 host is idle. For the kernel gate, set `S107_WAIT_FOR_IDLE=SECONDS` (and optionally
@@ -70,7 +74,7 @@ timeout without login is a failure, not a pass. The login prompt is never synthe
 Per-mode p50/p90/worst are written to `build/smp-boot-soak/<UTC>/summary.txt`; every boot keeps
 `<mode>/run-N.log` and `run-N.stamped.log`. KVM and TCG are reported separately.
 
-## Results
+## Round 1 results
 
 Campaign at `94648948` (release image built on the clean tree), run `20261118T133430Z`:
 
@@ -109,6 +113,30 @@ without booting anything:
 The preflight is doing its job: it prevents another contaminated matrix. The 50/50 KVM4,
 20/20 KVM2, 20/20 KVM1 and 10/10 TCG4 matrix remains **not run** in round 2 because the host
 never became idle; the round-1 first failure remains preserved and is not retried.
+
+## Round 3 matrix (2026-11-18)
+
+The exclusive-window rerun was taken after the S113 merge (`2972e15b` kernel; the release image
+was built there) and the gate fix `f00328ea` (executable-name matching). The preflight at
+19:54:21Z recorded load1 4.26 on 20 CPUs, `max_load=5`, no other QEMU and no build job, then the
+runner executed the full matrix in one foreground campaign:
+
+| Mode | Requested | Passed | Failure | p50 | p90 | worst |
+|---|---:|---:|---|---:|---:|---:|
+| KVM `-smp 1` | 20 | 20 | none | 4.415 s | 8.088 s | 12.653 s |
+| KVM `-smp 2` | 20 | 20 | none | 4.634 s | 5.535 s | 8.551 s |
+| KVM `-smp 4` | 50 | 50 | none | 4.548 s | 6.256 s | 10.714 s |
+| TCG `-smp 4` | 10 | 10 | none | 9.617 s | 11.466 s | 12.387 s |
+
+Campaign: `build/smp-boot-soak/20261118T195421Z/`; state:
+`build/smp-boot-soak/20261118T195421Z/host-state.txt`; summary: `summary.txt`.
+KVM4 run 21 **passed** with `login_s=4.208`, `smp: 4 cpus online` and `login:`; the earlier
+29-byte run-21 timeout in `20261118T133430Z` is preserved and was not retried or overwritten.
+All requested boots reached `smp: N cpus online` and login with no reset/panic marker. These are
+observed login times on a shared 20-CPU host, not a <1 s boot-time claim (S116 owns that).
+
+The independent lead integration run in `20261118T194209Z` (13:44 image) also completed
+20/20, 20/20, 50/50 and 10/10; the round-3 campaign above is the branch-local evidence.
 
 ## Reproduction and ownership
 
