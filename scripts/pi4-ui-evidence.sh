@@ -145,10 +145,10 @@ adapter, image SHA and the exact log path.
 
 Current host-only blockers (see --check for the exact lines):
   * no HDMI/login userspace fb:console provider: HDMI shows kernel text, getty/login stays on UART;
-  * consd opens kbd:console while usb-hid serves kbd: (root), so USB keyboard input is not wired
-    into consd yet;
   * no board/UART adapter attached on this host.
-Hand the first failure to HDMI1 (fb provider), USB1/CON1 (kbd:console) or the owner hardware.
+The kbd:console provider is aligned: usb-hid serves the `console` instance and consd opens it;
+UART remains the recovery input.
+Hand the first failure to HDMI1 (fb provider) or the owner hardware.
 No fixture, generated log or borrowed photo substitutes for the owner capture.
 EOF
 }
@@ -181,6 +181,7 @@ host_check() {
 
     consd=userland/servers/consd/src/main.rs
     usbhid=userland/drivers/usb-hid/src/main.rs
+    usbhid_lib=userland/drivers/usb-hid/src/lib.rs
     if grep -Fq 'fb:console' "$consd"; then
         if grep -R -Fq 'register("fb' userland 2>/dev/null; then
             echo "pi4-ui-evidence: provider fb:console present"
@@ -189,8 +190,15 @@ host_check() {
             blocked=1
         fi
     fi
-    if grep -Fq 'kbd:console' "$consd" && grep -Fq 'Server::register("kbd")' "$usbhid"; then
-        echo "pi4-ui-evidence: provider BLOCKED: consd opens kbd:console while usb-hid serves kbd: (root)"
+    if grep -Fq 'kbd:console' "$consd"; then
+        if grep -Fq 'KBD_CONSOLE_PATH' "$usbhid_lib" && grep -Fq 'accepts_console_path' "$usbhid"; then
+            echo "pi4-ui-evidence: provider kbd:console present"
+        else
+            echo "pi4-ui-evidence: provider BLOCKED: consd opens kbd:console but usb-hid has no console path"
+            blocked=1
+        fi
+    else
+        echo "pi4-ui-evidence: provider BLOCKED: consd does not open kbd:console"
         blocked=1
     fi
 

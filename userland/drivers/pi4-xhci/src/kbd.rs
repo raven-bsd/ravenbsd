@@ -21,7 +21,7 @@ pub(crate) fn push(bytes: &[u8]) {
     }
     let client = Client::new();
     for _ in 0..ATTEMPTS {
-        if let Ok(handle) = client.open("kbd:", OPEN_WRITE) {
+        if let Ok(handle) = client.open("kbd:console", OPEN_WRITE) {
             let _ = client.write(handle, 0, bytes);
             let _ = client.close(handle);
             return;
