@@ -33,6 +33,8 @@ uses the harness's fixed `-smp 4`.
 
 ```
 sh scripts/smp-closeout.sh                 # exclusive: preflight, then 20 cells
+sh scripts/smp-closeout.sh --max-load 15 --wait-for-idle 1800   # close-out window
+sh scripts/smp-closeout.sh --mode tcg4 --max-load 15 --wait-for-idle 600   # one column
 sh scripts/smp-closeout.sh --quick --no-preflight --case posix-alarm   # smoke, 1 cell
 sh scripts/smp-closeout.sh --case posix-shell,posix-fs-smp             # subset, all modes
 sh scripts/smp-closeout.sh --out /tmp/opencode/s126                    # explicit output root
@@ -41,8 +43,11 @@ sh scripts/smp-closeout.sh --out /tmp/opencode/s126                    # explici
 | Option | Effect |
 |---|---|
 | `--case NAME` | base case name, repeatable/comma-separated; defaults to the five release cases |
+| `--mode NAME` | `tcg4`, `kvm1`, `kvm2`, `kvm4`; repeatable/comma-separated; defaults to all four |
 | `--quick` | TCG `-smp 4` column only; smoke, **not** release evidence |
 | `--no-preflight` | skip `host-idle.sh`; records the host state but does not gate; smoke only |
+| `--max-load LOAD` | preflight maximum 1-minute load average; unset uses the `host-idle.sh` default |
+| `--wait-for-idle S` | poll the preflight in the foreground for up to S seconds (default 0: refuse) |
 | `--out DIR` | output root; default `build/smp-closeout/<UTC>` |
 | `-h`, `--help` | usage |
 
@@ -52,16 +57,19 @@ invocation (including a missing case file) — zero samples.
 ## Behaviour
 
 - **Exclusive preflight.** The default runs `tests/smp/boot/host-idle.sh` (S107) before any
-  build or sample. Any other QEMU, `xtask`/`cargo`/`rustc` job, or load1 above 2.0 refuses the
-  host. A refusal is **zero samples**, not a retry and not a partial pass. The close-out window
-  itself is provided by S116/S107; this runner never waits for it.
+  build or sample. Any other QEMU, `xtask`/`cargo`/`rustc` job, or load1 above the bound
+  (`--max-load`, otherwise the host-idle default) refuses the host. `--wait-for-idle S` polls in
+  the foreground instead of refusing immediately. A refusal is **zero samples**, not a retry and
+  not a partial pass. The close-out window itself is provided by S116/S107; this runner never
+  waits forever (the timeout is explicit).
 - **Pinned libc.** `cargo xtask libc-pack --arch x86_64` runs once before the first cell, so the
   matrix cannot silently use a stale `libc.a` (the S119 lesson).
 - **Stop on the first failure.** The runner writes `FAILED` (mode, case, rc, artifact paths),
   prints the last 20 lines of the qtest stdout and serial log, and exits 1. Remaining cells are
   not run and no cell is retried.
 - **Artifacts.** `<out>/<mode>/<qtest>.json`, `.log`, `.out` for every cell; `results.tsv` for
-  the whole run; `host-idle.txt`, `host-state-before.txt`, `host-state-after.txt`, `libc-pack.log`.
+  the whole run; `host-per-cell.tsv` (load1/QEMU count immediately before each cell);
+  `host-idle.txt`, `host-state-before.txt`, `host-state-after.txt`, `libc-pack.log`.
 - **Statistics.** `summary.txt` prints `n/min/p50/p90/max` per mode and overall, using the qtest
   JSON `duration_ms` and nearest-rank percentiles (the S120 method). A failure contributes no
   duration.

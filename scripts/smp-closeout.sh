@@ -15,8 +15,11 @@
 #
 # usage: scripts/smp-closeout.sh [options]
 #   --case NAME       case to run; repeatable or comma-separated (default: the five cases below)
+#   --mode NAME       mode to run (tcg4,kvm1,kvm2,kvm4); repeatable/comma-separated
 #   --quick           TCG -smp 4 column only (smoke; not release evidence)
 #   --no-preflight    skip tests/smp/boot/host-idle.sh (short smoke only)
+#   --max-load LOAD   preflight maximum 1-minute load average (host-idle.sh default otherwise)
+#   --wait-for-idle S wait up to S seconds for an idle host (foreground poll, default 0)
 #   --out DIR         output root (default build/smp-closeout/<UTC>)
 #   -h, --help        this help
 #
@@ -49,11 +52,13 @@ cd "$ROOT" || exit 1
 
 DEFAULT_CASES="posix-shell posix-util-system libc-threads smp-libc-concurrency posix-fs-smp"
 ALL_MODES="tcg4 kvm1 kvm2 kvm4"
-MODES=$ALL_MODES
+MODES=
 CASES=
 QUICK=0
 PREFLIGHT=1
 OUT=build/smp-closeout/$(date -u +%Y%m%dT%H%M%SZ)
+MAX_LOAD=
+WAIT_IDLE=0
 
 usage() {
     sed -n '6,45p' "$0" | sed 's/^# \{0,1\}//'
@@ -69,11 +74,33 @@ add_cases() {
     IFS=$old_ifs
 }
 
+add_modes() {
+    old_ifs=$IFS
+    IFS=,
+    for requested in $1; do
+        [ -n "$requested" ] || continue
+        case $requested in
+            tcg4 | kvm1 | kvm2 | kvm4) ;;
+            *)
+                echo "smp-closeout: unknown mode $requested (tcg4,kvm1,kvm2,kvm4)" >&2
+                exit 2
+                ;;
+        esac
+        MODES="${MODES}${MODES:+ }$requested"
+    done
+    IFS=$old_ifs
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --case)
             [ "$#" -ge 2 ] || { echo "smp-closeout: --case needs a value" >&2; exit 2; }
             add_cases "$2"
+            shift 2
+            ;;
+        --mode)
+            [ "$#" -ge 2 ] || { echo "smp-closeout: --mode needs a value" >&2; exit 2; }
+            add_modes "$2"
             shift 2
             ;;
         --quick)
@@ -83,6 +110,16 @@ while [ "$#" -gt 0 ]; do
         --no-preflight)
             PREFLIGHT=0
             shift
+            ;;
+        --max-load)
+            [ "$#" -ge 2 ] || { echo "smp-closeout: --max-load needs a value" >&2; exit 2; }
+            MAX_LOAD=$2
+            shift 2
+            ;;
+        --wait-for-idle)
+            [ "$#" -ge 2 ] || { echo "smp-closeout: --wait-for-idle needs a value" >&2; exit 2; }
+            WAIT_IDLE=$2
+            shift 2
             ;;
         --out)
             [ "$#" -ge 2 ] || { echo "smp-closeout: --out needs a value" >&2; exit 2; }
@@ -102,7 +139,11 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$CASES" ] || CASES=$DEFAULT_CASES
-[ "$QUICK" -eq 1 ] && MODES=tcg4
+if [ "$QUICK" -eq 1 ]; then
+    MODES=tcg4
+elif [ -z "$MODES" ]; then
+    MODES=$ALL_MODES
+fi
 
 # The caller passes base TCG case names; the runner appends -kvmN. Reject a pre-mapped name so
 # the matrix cannot silently run the wrong case.
@@ -151,7 +192,10 @@ record_host() {
 
 if [ "$PREFLIGHT" -eq 1 ]; then
     echo "smp-closeout: exclusive preflight (tests/smp/boot/host-idle.sh)"
-    if ! sh tests/smp/boot/host-idle.sh --context smp-closeout --state-file "$OUT/host-idle.txt"; then
+    set -- --context smp-closeout --state-file "$OUT/host-idle.txt"
+    [ -n "$MAX_LOAD" ] && set -- "$@" --max-load "$MAX_LOAD"
+    [ "$WAIT_IDLE" -gt 0 ] && set -- "$@" --wait "$WAIT_IDLE"
+    if ! sh tests/smp/boot/host-idle.sh "$@"; then
         echo "smp-closeout: exclusive preflight refused the host; zero samples run" >&2
         echo "smp-closeout: state=$OUT/host-idle.txt" >&2
         exit 2
@@ -168,6 +212,7 @@ if ! cargo xtask libc-pack --arch x86_64 > "$OUT/libc-pack.log" 2>&1; then
 fi
 
 printf 'mode\tcase\tqtest_case\trc\tresult\tduration_ms\tlog\n' > "$OUT/results.tsv"
+printf 'mode\tqtest_case\tload1\tqemu\tutc\n' > "$OUT/host-per-cell.tsv"
 
 run_cell() {
     mode=$1
@@ -175,6 +220,12 @@ run_cell() {
     qtest_case=$3
     directory=$OUT/$mode
     mkdir -p "$directory" || return 2
+
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+        "$mode" "$qtest_case" \
+        "$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo unknown)" \
+        "$(pgrep -c -f '^qemu-system-' 2>/dev/null || true)" \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$OUT/host-per-cell.tsv"
 
     start_ns=$(date +%s%N)
     cargo xtask qtest --case "$qtest_case" --arch x86_64 > "$directory/$qtest_case.out" 2>&1
@@ -265,6 +316,8 @@ awk -F'\t' 'NR > 1 && $4 == 0 { print $6 }' "$OUT/results.tsv" > "$OUT/durations
     printf 'commit=%s\n' "$(git rev-parse HEAD 2>/dev/null || echo unknown)"
     printf 'branch=%s\n' "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
     printf 'preflight=%s\n' "$([ "$PREFLIGHT" -eq 1 ] && echo exclusive || echo skipped)"
+    printf 'max_load=%s\n' "${MAX_LOAD:-host-idle-default}"
+    printf 'wait_for_idle=%s\n' "$WAIT_IDLE"
     printf 'quick=%s\n' "$QUICK"
     printf 'cells=%d\n' "$cells"
     printf 'modes=%s\n' "$MODES"
