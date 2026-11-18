@@ -52,7 +52,7 @@ src = "profiles/server.d/drivers.conf"
 path = "/etc/drivers.toml"
 
 [[initfs.files]]
-src = "profiles/release.d/netd.toml"
+src = "profiles/release.d/netd.manifest"
 path = "/etc/services.d/netd.toml"
 
 [[initfs.files]]
