@@ -39,6 +39,8 @@ const MOUNT_WORKERS: usize = 4;
 const WORKERS: usize = FILE_WORKERS + MOUNT_WORKERS;
 const ITERATIONS: usize = 50;
 const STACK_SIZE: usize = 128 * 1024;
+/// Headroom below the slot top for the deepest call frame and its buffers.
+const STACK_GUARD: usize = 16 * 1024;
 const PAGE: usize = 4096;
 const READ_WRITE: u32 = 3;
 const MS_SYNC: usize = 4;
@@ -83,7 +85,7 @@ fn stack_top(index: usize) -> usize {
     // SAFETY: `index < WORKERS` and the array lives for the whole test, so `base.add(index)` stays
     // within the static; the result is only used as a thread stack pointer, never dereferenced.
     let slot = unsafe { base.add(index) };
-    (slot as usize).saturating_add(STACK_SIZE)
+    (slot as usize).saturating_add(STACK_SIZE.saturating_sub(STACK_GUARD))
 }
 
 fn now_ns() -> u64 {
@@ -118,6 +120,13 @@ fn note_mismatch(iteration: usize, got: &[u8]) {
         second[..take].copy_from_slice(&got[8..8 + take]);
     }
     MISMATCH[2].store(u64::from_le_bytes(second), Ordering::Release);
+}
+
+fn first16(data: &[u8]) -> [u8; 16] {
+    let mut first = [0u8; 16];
+    let take = data.len().min(first.len());
+    first[..take].copy_from_slice(&data[..take]);
+    first
 }
 
 fn record(op: usize, worker: usize, iteration: usize, start: u64) {
@@ -176,6 +185,11 @@ fn file_cycle(worker: usize, iteration: usize) -> Result<(), (u16, Errno)> {
     let _ = reader.close();
     record(OP_READ, worker, iteration, start);
     if contents != data {
+        println!(
+            "smp-fs: mismatch worker={worker} iter={iteration} phase=5 path={path} expected={:?} got={:?}",
+            first16(&data),
+            first16(&contents)
+        );
         note_mismatch(iteration, &contents);
         return Err((5, Errno::EIO));
     }
@@ -184,7 +198,14 @@ fn file_cycle(worker: usize, iteration: usize) -> Result<(), (u16, Errno)> {
     let start = now_ns();
     fs::rename(&path, &renamed).map_err(|e| (6, e))?;
     record(OP_RENAME, worker, iteration, start);
-    if fs::read_to_vec(&file_path(&renamed)).map_err(|e| (7, e))? != data {
+    let renamed_data = fs::read_to_vec(&file_path(&renamed)).map_err(|e| (7, e))?;
+    if renamed_data != data {
+        println!(
+            "smp-fs: mismatch worker={worker} iter={iteration} phase=8 path={renamed} expected={:?} got={:?}",
+            first16(&data),
+            first16(&renamed_data)
+        );
+        note_mismatch(iteration, &renamed_data);
         return Err((8, Errno::EIO));
     }
     phase(worker, iteration, "renamed");
@@ -366,7 +387,10 @@ extern "C" fn file_worker(index: usize) -> ! {
 
 fn mount_cycle(worker: usize, iteration: usize) -> Result<(), (u16, Errno)> {
     let mount = format!("{START}/mnt{worker}");
-    let file = format!("{mount}/probe");
+    // Each mount worker owns a distinct file: all `ramfs:` mounts share one backing
+    // filesystem in this build, so a shared `/probe` would test cross-worker overwrite
+    // instead of mount correctness.
+    let file = format!("{mount}/probe{worker}");
     let data = pattern(worker, iteration, DATA_LEN);
     let slot = FILE_WORKERS + worker;
 
@@ -375,7 +399,14 @@ fn mount_cycle(worker: usize, iteration: usize) -> Result<(), (u16, Errno)> {
     set_phase(slot, 31);
     write_file(&file, &data).map_err(|e| (21, e))?;
     set_phase(slot, 32);
-    if fs::read_to_vec(&file_path(&file)).map_err(|e| (22, e))? != data {
+    let contents = fs::read_to_vec(&file_path(&file)).map_err(|e| (22, e))?;
+    if contents != data {
+        println!(
+            "smp-fs: mismatch worker={slot} iter={iteration} phase=23 path={file} expected={:?} got={:?}",
+            first16(&data),
+            first16(&contents)
+        );
+        note_mismatch(iteration, &contents);
         return Err((23, Errno::EIO));
     }
     set_phase(slot, 33);
