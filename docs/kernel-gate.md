@@ -3,13 +3,14 @@
 
 # Kernel QEMU gate
 
-Generated for current master `52a851ca`
-(`52a851cacd07d4c5efbbe0ce3e0b2f07c73273ba`) from the S113 kernel-gate evidence:
-`sh scripts/kernel-gate.sh` ran on S113 at 2026-11-18T18:52:21Z from commit `ed613f72`
-(`ed613f72dc340a1f499dbf1fd3e0177f5b9bd8c1`). This is the S113 run replayed into the document;
-no fresh QEMU run was made for KG1.
+Status: **BLOCKED — TIMEOUT** on the S140 attempt at current master `f803502a`
+(`f803502af5b03721fec27c87771e2c93792e84f6`). Command: `timeout 500 sh scripts/kernel-gate.sh` (cap 500 s = S113 prior
+441 s + 59 s margin). Host telemetry: load1 1.02, nproc 20, max_load 5, qemu none, jobs none.
+Result: 21 of 22 x86_64 cases passed; `release-login` did not finish before the cap and the
+aarch64 five cases were not reached. Preserved logs: `target/kernel-gate/release-login.x86_64.log`
+and `target/kernel-gate/host-state.txt`. No 27/27 or current-commit PASS is claimed.
 
-Result: **PASS** — 27 cases, 27 passed, 0 failed (0 timed out): x86_64 22/22, aarch64 5/5.
+The table below is the historical S113 run at `ed613f72`; it is not the current-commit result.
 
 Scope: the release-relevant kernel cases below, x86_64 plus the aarch64 cases that exist
 in `tests/qtest/cases/`. Raspberry Pi 4 hardware is **out of scope**; this gate makes no Pi 4
