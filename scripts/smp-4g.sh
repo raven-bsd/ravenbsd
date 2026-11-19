@@ -40,12 +40,13 @@ import subprocess
 import sys
 import time
 
-timeout = float(sys.argv[1])
-raw_path = sys.argv[2]
-stamped_path = sys.argv[3]
-mode = sys.argv[4]
-run = sys.argv[5]
-command = sys.argv[6:]
+boot_timeout = float(sys.argv[1])
+step_timeout = float(sys.argv[2])
+raw_path = sys.argv[3]
+stamped_path = sys.argv[4]
+mode = sys.argv[5]
+run = sys.argv[6]
+command = sys.argv[7:]
 if command and command[0] == "--":
     command = command[1:]
 
@@ -67,13 +68,15 @@ raw = open(raw_path, "wb")
 stamped = open(stamped_path, "w", encoding="utf-8")
 
 
-def pump(until, deadline):
+def pump(until, timeout, stage):
     global buffer, cursor
+    deadline = time.monotonic() + timeout
     while True:
         now = time.monotonic() - start
-        if now >= deadline:
+        if time.monotonic() >= deadline:
+            print(f"stage={stage} elapsed={now:.3f}", file=sys.stderr)
             return None
-        remaining = deadline - now
+        remaining = deadline - time.monotonic()
         ready, _, _ = select.select([master], [], [], min(remaining, 0.2))
         if ready:
             try:
@@ -119,15 +122,15 @@ def finish(ok, detail):
     return 1
 
 
-if not pump(r"(?i).*login:\s*$", timeout):
+if not pump(r"(?i).*login:\s*$", boot_timeout, "boot-login"):
     sys.exit(finish(False, "login prompt timeout"))
 login_at = time.monotonic() - start
 send("root\n")
-if not pump(r"(?i)password:\s*$", timeout):
+if not pump(r"(?i)password:\s*$", step_timeout, "boot-password"):
     sys.exit(finish(False, "password prompt timeout"))
 password_at = time.monotonic() - start
 send("raven\n")
-if not pump(r"(?i)raven#", timeout):
+if not pump(r"(?i)raven#", step_timeout, "boot-prompt"):
     sys.exit(finish(False, "shell prompt timeout"))
 prompt_at = time.monotonic() - start
 
@@ -139,13 +142,13 @@ steps = [
 ]
 for command_text, pattern, label in steps:
     send(command_text)
-    if not pump(pattern, timeout):
+    if not pump(pattern, step_timeout, f"{label}-output"):
         sys.exit(finish(False, f"step {label} timeout"))
-    if not pump(r"(?i)raven#", timeout):
+    if not pump(r"(?i)raven#", step_timeout, f"{label}-prompt"):
         sys.exit(finish(False, f"prompt after {label} timeout"))
 
 send("exit 0\n")
-if not pump(r"^init exited \(0\)$", timeout):
+if not pump(r"^init exited \(0\)$", step_timeout, "exit"):
     sys.exit(finish(False, "clean init exit timeout"))
 
 sys.exit(
@@ -170,8 +173,8 @@ run_one() {
     cp "$vars_template" "$vars"
     load_before=$(cut -d' ' -f1 /proc/loadavg)
     if [ "$mode" = kvm ]; then
-        output=$(python3 "$helper" "$boot_timeout" "$raw" "$stamped" "$mode" "$run" -- \
-            qemu-system-x86_64 -machine q35 -m 512M -smp 4 -serial stdio -display none \
+        output=$(python3 "$helper" "$boot_timeout" 5 "$raw" "$stamped" "$mode" "$run" -- \
+            qemu-system-x86_64 -machine q35 -serial stdio -display none \
             -monitor none -no-reboot \
             -drive if=pflash,format=raw,readonly=on,file="$code" \
             -drive if=pflash,format=raw,file="$vars" \
@@ -181,8 +184,8 @@ run_one() {
             -device virtio-net-pci,netdev=n0,disable-legacy=on \
             -m 4096 -smp 4 -enable-kvm -cpu host)
     else
-        output=$(python3 "$helper" "$boot_timeout" "$raw" "$stamped" "$mode" "$run" -- \
-            qemu-system-x86_64 -machine q35 -m 512M -smp 4 -serial stdio -display none \
+        output=$(python3 "$helper" "$boot_timeout" 5 "$raw" "$stamped" "$mode" "$run" -- \
+            qemu-system-x86_64 -machine q35 -serial stdio -display none \
             -monitor none -no-reboot \
             -drive if=pflash,format=raw,readonly=on,file="$code" \
             -drive if=pflash,format=raw,file="$vars" \
