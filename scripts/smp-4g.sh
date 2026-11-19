@@ -136,7 +136,7 @@ prompt_at = time.monotonic() - start
 
 steps = [
     ("uname -a\n", r"^RavenBSD raven 0\.1 .* x86_64$", "uname"),
-    ("ls /bin\n", r"(?m)^cat$", "ls"),
+    ("ls /bin\n", r"(?m)^uname$", "ls"),
     ("ps --posix\n", r"^PID PPID UID GID CMD$", "ps"),
     ("du /tmp\n", r"^[0-9.]+[KMG]?\s+/tmp$", "du"),
 ]
@@ -197,6 +197,17 @@ run_one() {
     fi
     status=$?
     load_after=$(cut -d' ' -f1 /proc/loadavg)
+    cpu_line=$(grep -aE 'smp: 4 cpus online' "$raw" | tail -n 1 || true)
+    mem_mib=$(sed -n 's/^mem: \([0-9][0-9]*\) MiB usable.*/\1/p' "$raw" | head -n 1)
+    forbidden=$(grep -aEi 'No child process|i/o error|ECHILD|panic|EXCEPTION|out of memory|oom-kill|killed by page fault' "$raw" | head -n 1 || true)
+    if [ -z "$cpu_line" ] || [ -z "$mem_mib" ] || [ "$mem_mib" -lt 3000 ]; then
+        echo "smp-4g: wrong CPU/RAM mode=$mode run=$run cpu=${cpu_line:-missing} mem_mib=${mem_mib:-missing}" >&2
+        status=1
+    fi
+    if [ -n "$forbidden" ]; then
+        echo "smp-4g: forbidden line mode=$mode run=$run: $forbidden" >&2
+        status=1
+    fi
     login=$(printf '%s\n' "$output" | sed -n 's/.*login_s=\([0-9.]*\).*/\1/p')
     prompt=$(printf '%s\n' "$output" | sed -n 's/.*password_to_prompt_s=\([0-9.]*\).*/\1/p')
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \

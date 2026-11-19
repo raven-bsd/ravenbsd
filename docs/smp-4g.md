@@ -5,8 +5,25 @@
 
 Status: **PASS (functional).** The 4 GiB release image boots on four vCPUs, reaches login and the
 brush prompt, and completes `uname -a`, `ls /bin`, `ps --posix`, `du /tmp` and `exit 0` with
-`init exited (0)`. The timing table below was recorded on a loaded shared host, so it is a
-loaded-host sample, not an idle-host timing PASS.
+`init exited (0)`. The timing tables were recorded on a loaded shared host, so they are
+loaded-host samples, not an idle-host timing PASS.
+
+## S158 revalidation (current)
+
+S157 evidence was revalidated at `origin/master` `ffe61c55` after K168/K171/K172. Branch
+`stuart/S158`, image/qtest commit **`67300d84`**:
+
+- Release image build: **228.84 s** (cap 300); embedded id `67300d84`.
+- `timeout 300 cargo xtask qtest --case smp-4g --arch x86_64 --no-build` — **PASS**:
+  `smp: 4 cpus online`, `mem: 3991 MiB usable in 9 regions`, `uname -a`, `ls /bin`,
+  `ps --posix`, `du /tmp`, `init exited (0)`.
+- `timeout 300 sh scripts/smp-4g.sh` — **PASS, 10/10** at
+  `build/smp-4g/20261119T174533Z/`.
+- KVM login 3.890-9.420 s, prompt 0.044-0.238 s. TCG login 7.208-28.411 s,
+  prompt 1.062-10.121 s. Host load 14.5-47.4: loaded samples, not an idle timing claim.
+- Zero `No child process`, `i/o error`, `ECHILD`, panic, OOM, wrong CPU/RAM or command timeout
+  matches; the script fails on any of those.
+- No kernel or loader change in S158.
 
 ## Qtest
 
