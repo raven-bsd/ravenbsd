@@ -1,7 +1,9 @@
 # RavenBSD
 
-A modern BSD: small, portable, coherent. A Rust microkernel (ours, Redox-derived), Rust system servers, a
+A modern BSD: small, portable, coherent. A Rust microkernel (ours), Rust system servers, a
 Rust libc and base utilities, built with `cargo` driven by a `Makefile`, producing an image that boots.
+The only Redox-derived code is the frozen MIT `raven-rmm` page-table mapper, recorded in
+`PROVENANCE.toml`; that is provenance, not the project identity.
 You type `uname -a` and see `RavenBSD`.
 
 - Language: Rust on **stable** only (pinned in `rust-toolchain.toml`). No C in the scaffold.
