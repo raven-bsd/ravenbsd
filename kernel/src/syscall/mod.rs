@@ -10,8 +10,7 @@
 //! register.
 
 pub mod basic;
-/// Console input is a COM1 device path; aarch64 reports `ENOSYS`.
-#[cfg(target_arch = "x86_64")]
+/// Console input is a COM1/PL011 device path.
 pub mod debug_read;
 pub mod driver;
 /// `DTRACE_*` provider control syscalls (S57).
@@ -264,7 +263,6 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
         Some(Syscall::PROC_TERMINATE) => process_ctl::terminate(frame),
         Some(Syscall::PROC_NAMESPACE) => process_ctl::namespace(frame),
         Some(Syscall::FUTEX) => futex::dispatch(frame),
-        #[cfg(target_arch = "x86_64")]
         Some(Syscall::DEBUG_READ) => debug_read::handle(frame),
         Some(Syscall::THREAD_CREATE) => thread::create(frame),
         Some(Syscall::THREAD_EXIT) => thread::exit(frame),

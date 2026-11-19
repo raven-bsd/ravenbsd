@@ -128,10 +128,11 @@ mod program {
                     }
                 }
                 Err(InputError::WouldBlock) => continue,
+                // K166: the UART reader must not mark the console EOF on a transient backend
+                // error. A short backoff keeps getty/login alive until the kernel receive path
+                // has a byte; a real closed console is a boot failure, not an input EOF.
                 Err(InputError::EndOfFile | InputError::Closed | InputError::Io) => {
-                    CONSOLE.lock().mark_eof();
-                    publish();
-                    break;
+                    let _ = raven_rt::nanosleep(10_000_000);
                 }
             }
         }
