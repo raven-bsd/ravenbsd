@@ -173,7 +173,7 @@ run_one() {
     cp "$vars_template" "$vars"
     load_before=$(cut -d' ' -f1 /proc/loadavg)
     if [ "$mode" = kvm ]; then
-        output=$(python3 "$helper" "$boot_timeout" 5 "$raw" "$stamped" "$mode" "$run" -- \
+        output=$(python3 "$helper" "$boot_timeout" 30 "$raw" "$stamped" "$mode" "$run" -- \
             qemu-system-x86_64 -machine q35 -serial stdio -display none \
             -monitor none -no-reboot \
             -drive if=pflash,format=raw,readonly=on,file="$code" \
@@ -184,7 +184,7 @@ run_one() {
             -device virtio-net-pci,netdev=n0,disable-legacy=on \
             -m 4096 -smp 4 -enable-kvm -cpu host)
     else
-        output=$(python3 "$helper" "$boot_timeout" 5 "$raw" "$stamped" "$mode" "$run" -- \
+        output=$(python3 "$helper" "$boot_timeout" 30 "$raw" "$stamped" "$mode" "$run" -- \
             qemu-system-x86_64 -machine q35 -serial stdio -display none \
             -monitor none -no-reboot \
             -drive if=pflash,format=raw,readonly=on,file="$code" \

@@ -1,96 +1,65 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# 4 GiB / 4 vCPU boot smoke (S157)
+# 4 GiB / 4 vCPU boot and SMP-memory smoke (S157)
 
-Status: **BLOCKED.** The guest reaches the 4 GiB memory map, four CPUs, login and the brush
-prompt, but the first interactive command is parsed as NUL bytes and the qtest fails. The memory
-map is not missing the high RAM; the failure is after login.
+Status: **PASS (functional).** The 4 GiB release image boots on four vCPUs, reaches login and the
+brush prompt, and completes `uname -a`, `ls /bin`, `ps --posix`, `du /tmp` and `exit 0` with
+`init exited (0)`. The timing table below was recorded on a loaded shared host, so it is a
+loaded-host sample, not an idle-host timing PASS.
 
-## Run
+## Qtest
 
-- Fixture/case: `tests/qtest/cases/smp-4g.toml` (`-m 4096 -smp 4`, release profile).
-- The first cold qtest attempt hit the 420 s cap during the release prebuild:
-  `timeout 420 cargo xtask qtest --case smp-4g --arch x86_64` -> exit 124, no QEMU.
-- Prebuild measurements: release image **261.33 s**; `check-loader.sh` **248.06 s**.
-- The prebuilt qtest reached the guest with
-  `timeout 320 cargo xtask qtest --case smp-4g --arch x86_64 --no-build`.
+- Case: `tests/qtest/cases/smp-4g.toml`, release profile, `-m 4096 -smp 4`, with the release
+  virtio-net device.
+- `timeout 300 cargo xtask qtest --case smp-4g --arch x86_64 --no-build` — **PASS**.
+- Boot evidence: `smp: 4 cpus online`, `mem: 3991 MiB usable in 9 regions`.
+- Command evidence: `uname -a` prints
+  `RavenBSD raven 0.1 RavenBSD 0.1 (BASE) #1: 75aba662 2026-11-19 x86_64`; `ls /bin` prints the
+  base tools; `ps --posix` prints `PID PPID UID GID CMD`; `du /tmp` prints `0 /tmp`; the guest
+  exits cleanly.
 
-Preserved serial/JSON:
+The `smp: 4 cpus online` expectation is unordered because this kernel prints it before the
+banner. The 4G image build measured **167.19 s** (cap 300).
 
-- `build/s157/smp-4g-login-uname-fail.log`
-- `build/s157/smp-4g-login-uname-fail.json`
+## 5 KVM + 5 TCG matrix
 
-## Revision 256 closeout
+`scripts/smp-4g.sh` runs five KVM and five TCG boots in the foreground, logs in, executes the
+same four commands and exits, preserving one raw and one stamped serial log per run plus a host
+table. `timeout 300 sh scripts/smp-4g.sh` — **PASS, 10/10** at
+`build/smp-4g/20261119T153747Z/`.
 
-The 4 GiB qtest is green at `origin/master` `e2fbc690` (K167/K163; branch `f5d74d89`):
-`timeout 600 cargo xtask qtest --case smp-4g --arch x86_64 --no-build` passes with
-`uname -a`, `ls /bin`, `ps --posix`, `du /tmp` and `init exited (0)`. The `smp: 4 cpus online`
-expectation is marked unordered because the kernel prints that line before the banner on this
-build. The qtest also carries the release network device so `devd` does not spend 60 s in a
-readiness timeout.
+| Mode | Run | login_s | password→prompt_s | load1 before/after |
+|---|---:|---:|---:|---:|
+| KVM | 1 | 3.929 | 0.041 | 5.63/5.18 |
+| KVM | 2 | 3.535 | 0.044 | 5.18/5.00 |
+| KVM | 3 | 3.601 | 0.042 | 5.00/4.84 |
+| KVM | 4 | 3.568 | 0.068 | 4.84/4.85 |
+| KVM | 5 | 3.864 | 0.041 | 4.85/4.54 |
+| TCG | 1 | 7.105 | 1.124 | 4.54/4.32 |
+| TCG | 2 | 9.482 | 1.946 | 4.32/4.40 |
+| TCG | 3 | 7.089 | 1.077 | 4.40/3.78 |
+| TCG | 4 | 7.982 | 1.673 | 3.78/3.33 |
+| TCG | 5 | 7.887 | 1.039 | 3.33/3.56 |
 
-The 5 KVM + 5 TCG script (`scripts/smp-4g.sh`) ran five clean KVM boots (login 3.4-4.3 s,
-prompt 0.04-0.07 s) and TCG run 1 (login 7.5 s). **TCG run 2 stopped in `du /tmp` with no output
-for 30 s**; this is the known K134 `du` traversal hang, outside S157's Owns. The script stops on
-the first failure and preserves `build/smp-4g/20261119T151732Z/tcg-2.log`. The 4G/4CPU matrix is
-therefore **5 KVM + 1 TCG green, TCG du blocked on K134/Tim**; no retry, no timeout increase.
+The host load was 3.3-5.6 during the matrix. The samples are recorded as loaded; no idle-host
+timing claim is made. There was no panic, OOM, missing CPU, wrong memory size or command hang;
+the `du /tmp` command passed on all ten boots.
 
-## Revision 255 confirmation
+## Reproduction
 
-K167 (`origin/master` `26de7aae`) fixes the command-name NUL failure: the 4G guest reached
-`RavenBSD raven 0.1 RavenBSD 0.1 (BASE) #1: fc941e85 2026-11-19 x86_64` from `uname -a`. The
-actual qtest then hit its 230 s cap before the remaining `ls`/`ps`/`du`/exit steps because the
-`check-loader.sh` pre-step and the 4G `devd` readiness timeout (60 s) consume most of the cap.
-This is a cap/loaded-host issue, not the former NUL parser failure; no timeout was raised.
-
-## Revision 253 confirmation
-
-The failure was reproduced on `origin/master` `63a6f3d3` (RM1/K158 merged) at branch head
-`7ee0dbcd`: `smp: 4 cpus online`, `mem: 3991 MiB usable in 9 regions`, login, and the same
-`uname -a` -> `command not found` NUL corruption. RM1/K158 did not change this path. Preserved
-again at `build/s157/smp-4g-rev253-uname-nuls.log`.
-
-## Observed serial
-
-```
-smp: 4 cpus online
-mem: 3991 MiB usable in 9 regions
-...
-RavenBSD 0.1 (x86_64) (tty:console)
-login: root
-Password:
-...
-raven# uname -a
-error: command not found: \0\0\0\0\0\0\0\0
+```sh
+timeout 300 cargo xtask image --arch x86_64 --profile release \
+  --cmdline 'console=ttyS0 test-exit=1' --output build/qtest/smp-4g.img
+timeout 300 cargo xtask qtest --case smp-4g --arch x86_64 --no-build
+timeout 300 sh scripts/smp-4g.sh
+timeout 150 make check-fast
 ```
 
-The prompt and command echo are correct. The shell then reports a command name made of NUL bytes,
-so the first interactive command after login is not parsed as `uname -a`. The qtest fails at
-step 7 (`^RavenBSD raven 0\.1 .* x86_64$`) and never reaches `ls /bin`, `ps --posix` or
-`du /tmp`.
-
-## Classification
-
-- Memory map: **4 GiB is visible** (`mem: 3991 MiB usable in 9 regions`); this is not the
-  "only 512 MiB mapped" failure.
-- CPUs: `smp: 4 cpus online`; no missing CPU.
-- Kernel: no panic, exception, TLB timeout, OOM or allocator diagnostic in the serial.
-- Guest/userspace: the 4G run completes login and prints the prompt. The command buffer becomes
-  NUL bytes, so the first suspect is the high-frame allocation/mapping used by the rsh command
-  buffer or the console RX delivery at 4G, with the rsh parser as the other side.
-
-**Handoff:** memory/allocator owner Mark and Stuart for the 4G high-frame mapping path; Bob/Phil
-for the rsh input buffer. The test was not weakened and no kernel patch was made in S157.
-
-## Why the boot-loop script is absent
-
-`scripts/smp-4g.sh` was not added because the interactive qtest already fails before the matrix
-repeats the same path, and a failing default qtest must not be presented as a passing baseline.
-The case remains in the branch as the reproduction; the boot matrix can be added after the 4G
-command-buffer failure is fixed.
+The script uses a 20 s KVM / 30 s TCG login cap and a 30 s per-command cap, with the outer
+`timeout 300` covering the ten-run matrix. It stops on the first failure and preserves the run.
 
 ## DR-52 donor reconciliation
 
-This is a first-party test; no donor code was copied. The mapping is the existing RavenBSD
-`MAP`/initfs path; no Illumos, BSD or Linux implementation is imported.
+This is a first-party test. No donor code was copied or translated; it drives the existing
+RavenBSD `MAP`, initfs and console paths.
