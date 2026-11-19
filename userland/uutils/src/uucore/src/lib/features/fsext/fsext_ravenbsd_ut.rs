@@ -7,9 +7,7 @@ use super::*;
 
 #[test]
 fn parses_the_real_mount_table_shape() {
-    let mounts = parse_ravenbsd_mounts(
-        "# comment\n/ initfs:\n/tmp ramfs:\n/dev/null null:\n",
-    );
+    let mounts = parse_ravenbsd_mounts("# comment\n/ initfs:\n/tmp ramfs:\n/dev/null null:\n");
     assert_eq!(mounts.len(), 3);
     assert_eq!(mounts[0].mount_dir, OsString::from("/"));
     assert_eq!(mounts[0].dev_name, "initfs:");
@@ -26,4 +24,9 @@ fn empty_and_malformed_lines_are_skipped() {
     assert!(parse_ravenbsd_mounts("").is_empty());
     assert!(parse_ravenbsd_mounts("# only a comment\n").is_empty());
     assert!(parse_ravenbsd_mounts("/\n").is_empty());
+}
+
+#[test]
+fn zero_fs_type_has_a_stable_unknown_label() {
+    assert_eq!("UNKNOWN (0x0)", pretty_fstype(0));
 }
