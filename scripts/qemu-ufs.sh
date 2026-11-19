@@ -27,6 +27,9 @@ disk=build/fixtures/ufs-demo/disk.img
 log=${UFS_DEMO_LOG:-$out/qemu.log}
 stamp=$out/image.ref
 rebuild=${UFS_DEMO_REBUILD:-0}
+# `test-exit=1` is the same serial exit contract as the ufs-disk qtest; without it the guest
+# prints `init exited` but QEMU has no debug-exit reason and keeps the session open.
+cmdline=${UFS_DEMO_CMDLINE:-"console=ttyS0 test-exit=1"}
 
 say() { printf 'qemu-ufs: %s\n' "$*"; }
 die() { printf 'qemu-ufs: %s\n' "$*" >&2; exit 2; }
@@ -43,13 +46,14 @@ fi
 [ -f "$disk" ] || die "missing disk $disk"
 
 head=$(git rev-parse HEAD 2>/dev/null || echo unknown)
+image_key="$head $cmdline"
 if [ "$rebuild" != 1 ] && [ -f "$image" ] && [ -f "$stamp" ] &&
-    [ "$(cat "$stamp")" = "$head" ]; then
+    [ "$(cat "$stamp")" = "$image_key" ]; then
     say "reusing image $image"
 else
     say "building ufs-demo image at $head"
-    cargo xtask image --arch "$arch" --profile ufs-demo --output "$image"
-    printf '%s\n' "$head" > "$stamp"
+    cargo xtask image --arch "$arch" --profile ufs-demo --cmdline "$cmdline" --output "$image"
+    printf '%s\n' "$image_key" > "$stamp"
 fi
 [ -f "$image" ] || die "missing image $image"
 

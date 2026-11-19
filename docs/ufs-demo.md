@@ -77,8 +77,9 @@ exit
 
 `lsblk` must show `block0p1 ... ufs-root`; `gpart show block:0` shows the GPT scheme. Run
 `sh scripts/qemu-ufs.sh` a second time **without** recreating the disk, mount `ufs: /mnt` again
-and `cat /mnt/demo.txt` to show the file survives. The guest `exit 0` maps QEMU's
-`isa-debug-exit` success status 33 to shell status 0; any other status is propagated.
+and `cat /mnt/demo.txt` to show the file survives. The image is built with
+`console=ttyS0 test-exit=1` (the same serial-exit contract as `ufs-disk`); the guest `exit 0`
+maps QEMU's `isa-debug-exit` success status 33 to shell status 0; any other status is propagated.
 
 Environment overrides: `UFS_DEMO_LOG` (default `build/ufs-demo/qemu.log`), `UFS_DEMO_IMAGE`
 (default `build/ufs-demo/ufs-demo.img`), `UFS_DEMO_REBUILD`, `RAVEN_OVMF_CODE`,
