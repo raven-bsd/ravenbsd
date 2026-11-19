@@ -50,11 +50,15 @@ the hexdump makes the NUL count and the echoed line visible side by side.
 | 4G | rsh | 100 ms | TCG | clean (rsh started) | clean | `command not found: uname`, 0 NULs |
 | 4G | brush | 1 s | TCG | clean | clean | `command not found: uname`, 0 NULs |
 | 4G qtest | brush | 100 ms | TCG | clean | clean | `command not found: uname`, 0 NULs |
+| 4G qtest (`uname` first) | brush | 100 ms | TCG | — | — | `command not found: uname`, 0 NULs |
+| 4G + `/bin/uname -a` | brush | 100 ms | TCG | clean | clean | `command not found: /bin/uname`, 0 NULs |
 
 The S157 NULs **did not reproduce** in these samples. `/bin` lists `uname`, but both `uname` and
 `/bin/uname` fail to spawn (`command not found`), so this old image cannot meet the "clean
 `uname -a`" acceptance even though its line input is clean. The 1 s spacing and the rsh control
-rule out the simple qtest/serial-write and brush-editor hypotheses for these samples.
+rule out the simple qtest/serial-write and brush-editor hypotheses for these samples. The
+`uname` binary is the 12.5 KiB dynamic PIE at `build/x86_64/user/raven-uname`; its spawn failure
+is a loader/image issue (the image predates K139), separate from the NUL line corruption.
 
 ## Handoff
 
