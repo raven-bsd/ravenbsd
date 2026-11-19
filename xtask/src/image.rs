@@ -283,7 +283,8 @@ fn build_release_initfs(
             bail!("release user program build failed with exit code {code}");
         }
     }
-    let mut builder = raven_initfs::InitfsBuilder::new();
+    let mut builder =
+        raven_initfs::InitfsBuilder::new().with_image_epoch(crate::initfs::image_epoch(root));
     for program in &profile.initfs.programs {
         let path = build::artifact_path(root, arch, Component::User, &program.package);
         let data = fs::read(&path).with_context(|| {

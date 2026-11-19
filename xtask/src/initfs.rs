@@ -14,6 +14,23 @@ use crate::profiles::{Profile, Program};
 use crate::repo::Workspace;
 use crate::uutils;
 
+/// The reproducible initfs epoch.
+///
+/// `SOURCE_DATE_EPOCH` wins when the caller sets it for an A/B reproducible build; otherwise the
+/// commit timestamp is used. The host clock is never consulted. The last fallback is the
+/// documented default epoch, so an entry never falls back to 1970.
+pub(crate) fn image_epoch(root: &Path) -> u64 {
+    if let Some(epoch) = crate::image::source_date_epoch()
+        && let Ok(value) = u64::try_from(epoch)
+    {
+        return value;
+    }
+    crate::repo::head_info(root)
+        .ok()
+        .and_then(|head| u64::try_from(head.epoch).ok())
+        .unwrap_or(raven_initfs::DEFAULT_EPOCH)
+}
+
 /// Shell-visible first-party `/bin` tools that must be statically linked.
 ///
 /// The release/shell userland links `/bin` programs as dynamic PIE, but libc `posix_spawn`
@@ -97,7 +114,7 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         }
     }
 
-    let mut builder = InitfsBuilder::new();
+    let mut builder = InitfsBuilder::new().with_image_epoch(image_epoch(root));
     for program in &profile.initfs.programs {
         let path = build::artifact_path(root, arch, Component::User, &program.package);
         let data = fs::read(&path).with_context(|| {

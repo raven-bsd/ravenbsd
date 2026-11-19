@@ -3,10 +3,11 @@
 
 use super::{Entry, Initfs, InitfsError};
 use crate::format::{
-    ENTRY_DATA_LEN_OFFSET, ENTRY_DATA_OFF_OFFSET, ENTRY_NAME_OFF_OFFSET, ENTRY_RESERVED_OFFSET,
-    HEADER_ENTRY_COUNT_OFFSET, HEADER_ENTRY_SIZE_OFFSET, HEADER_NAMES_LEN_OFFSET,
-    HEADER_NAMES_OFFSET, HEADER_RESERVED_OFFSET, HEADER_SIZE, HEADER_SIZE_OFFSET,
-    HEADER_TOTAL_SIZE_OFFSET, HEADER_VERSION_OFFSET, PAGE_SIZE,
+    DEFAULT_EPOCH, ENTRY_DATA_LEN_OFFSET, ENTRY_DATA_OFF_OFFSET, ENTRY_MTIME_OFFSET,
+    ENTRY_NAME_OFF_OFFSET, ENTRY_RESERVED_OFFSET, HEADER_ENTRY_COUNT_OFFSET,
+    HEADER_ENTRY_SIZE_OFFSET, HEADER_EPOCH_OFFSET, HEADER_NAMES_LEN_OFFSET, HEADER_NAMES_OFFSET,
+    HEADER_RESERVED_OFFSET, HEADER_SIZE, HEADER_SIZE_OFFSET, HEADER_TOTAL_SIZE_OFFSET,
+    HEADER_VERSION_OFFSET, PAGE_SIZE,
 };
 use crate::testutil::{File, image};
 
@@ -63,7 +64,7 @@ fn parse_rejects_bad_magic() {
 #[test]
 fn parse_rejects_bad_version() {
     let mut image = valid_image();
-    put_u32(&mut image, HEADER_VERSION_OFFSET, 2);
+    put_u32(&mut image, HEADER_VERSION_OFFSET, 99);
     assert_eq!(Initfs::parse(&image).unwrap_err(), InitfsError::BadVersion);
 }
 
@@ -534,4 +535,37 @@ fn get_checks_only_the_requested_entry() {
         2,
         "a good get scanned more than its entry"
     );
+}
+
+#[test]
+fn entries_inherit_the_image_epoch() {
+    let image = valid_image();
+    let initfs = Initfs::parse(&image).unwrap();
+    assert_eq!(initfs.image_epoch(), DEFAULT_EPOCH);
+    assert_eq!(initfs.get("/a").unwrap().mtime, DEFAULT_EPOCH);
+    assert_eq!(initfs.get("/b").unwrap().mtime, DEFAULT_EPOCH);
+}
+
+#[test]
+fn an_explicit_entry_mtime_is_read() {
+    let mut image = one_file(b"x");
+    put_u64(&mut image, HEADER_EPOCH_OFFSET, 1_700_000_000);
+    put_u64(&mut image, HEADER_SIZE + ENTRY_MTIME_OFFSET, 1_650_000_000);
+    let initfs = Initfs::parse(&image).unwrap();
+    assert_eq!(initfs.get("/init").unwrap().mtime, 1_650_000_000);
+}
+
+#[test]
+fn legacy_version_one_uses_the_default_epoch() {
+    let mut image = valid_image();
+    put_u32(&mut image, HEADER_VERSION_OFFSET, 1);
+    for byte in image
+        .get_mut(HEADER_EPOCH_OFFSET..HEADER_EPOCH_OFFSET + 16)
+        .unwrap()
+    {
+        *byte = 0;
+    }
+    let initfs = Initfs::parse(&image).unwrap();
+    assert_eq!(initfs.image_epoch(), DEFAULT_EPOCH);
+    assert_eq!(initfs.get("/a").unwrap().mtime, DEFAULT_EPOCH);
 }
