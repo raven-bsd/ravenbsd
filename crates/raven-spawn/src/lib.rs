@@ -186,23 +186,10 @@ pub fn spawn_with<S: Sys>(
         }
         None => None,
     };
-    // K139: map libc from the initfs zero-copy in the child instead of letting the loader copy
-    // it through the file server. Only dynamic mains need it, and only when the archive carries
-    // the library with a PT_PHDR table the loader can register.
+    // K139: pass the libc archive offset so the loader maps it from the initfs zero-copy
+    // instead of copying it through the file server. Only dynamic mains need it.
     let libc = if interp.is_some() {
-        initfs.get("/lib/libc.so.1").and_then(|entry| {
-            let elf = Elf::parse(entry.data, target_machine(), 0..USER_END).ok()?;
-            elf.phdr_vaddr()?;
-            let steps = plan_biased(&elf, PAGE, LIBC_BASE, LoadMode::Copy).ok()?;
-            Some(LibcImage {
-                elf,
-                steps,
-                source: ImageSource::Initfs {
-                    data_offset: entry.data_offset,
-                },
-                bias: LIBC_BASE,
-            })
-        })
+        initfs.get("/lib/libc.so.1").map(|entry| entry.data_offset)
     } else {
         None
     };
@@ -531,19 +518,6 @@ fn read_image_handle(client: &Client, handle: Handle) -> Result<Vec<u8>, SpawnEr
     }
 }
 
-/// One pre-mapped dynamic library from the initfs (K139: libc cold start).
-#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
-struct LibcImage<'a> {
-    /// The parsed library.
-    elf: Elf<'a>,
-    /// Its biased load plan.
-    steps: BiasedPlan,
-    /// The initfs archive source.
-    source: ImageSource<'a>,
-    /// The fixed library bias.
-    bias: u64,
-}
-
 /// One executable source.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[derive(Clone, Copy)]
@@ -624,7 +598,7 @@ fn spawn_elf<S: Sys>(
     main_source: ImageSource<'_>,
     main_bias: u64,
     interp: Option<(Elf<'_>, BiasedPlan, ImageSource<'_>, u64)>,
-    libc: Option<LibcImage<'_>>,
+    libc: Option<u64>,
     path: &str,
     options: &SpawnOptions<'_>,
     fdmap: &[(i32, u32)],
@@ -690,38 +664,6 @@ fn spawn_elf<S: Sys>(
     }
     if let Some(object) = main_object {
         let _ = sys.handle_close(object);
-    }
-
-    let mut libc_aux = None;
-    if let Some(LibcImage {
-        elf,
-        steps,
-        source,
-        bias,
-    }) = libc
-    {
-        let (map, object) = match prepare_source(source, sys) {
-            Ok(pair) => pair,
-            Err(error) => {
-                let _ = sys.handle_close(child);
-                return Err(error);
-            }
-        };
-        if let Err(error) = map_plan(sys, child, map, steps) {
-            if let Some(object) = object {
-                let _ = sys.handle_close(object);
-            }
-            let _ = sys.handle_close(child);
-            return Err(error);
-        }
-        if let Some(object) = object {
-            let _ = sys.handle_close(object);
-        }
-        let Some(phdr) = bias.checked_add(elf.phdr_vaddr().unwrap_or(0)) else {
-            let _ = sys.handle_close(child);
-            return Err(SpawnError::TooLarge);
-        };
-        libc_aux = Some((phdr, elf.phnum()));
     }
 
     let stack_base = STACK_TOP
@@ -801,7 +743,7 @@ fn spawn_elf<S: Sys>(
         }
         Some((address as usize, entries.len()))
     };
-    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, libc_aux, fdmap_info);
+    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, libc, fdmap_info);
     let random = random_bytes(&auxv as *const _ as usize);
 
     let memobj = match sys.memobj_create(STACK_SIZE) {
@@ -1210,12 +1152,9 @@ const AT_RAVEN_FDMAP: usize = 0x7003;
 /// Raven fd-inheritance entry count.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_FDMAP_N: usize = 0x7004;
-/// Absolute address of the pre-mapped libc program header table (K139).
+/// Initfs archive offset of the libc image (K139); the loader maps it zero-copy.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_LIBC: usize = 0x7007;
-/// Program-header count of the pre-mapped libc (K139).
-#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
-const AT_RAVEN_LIBC_PHNUM: usize = 0x7008;
 /// Raven ABI revision.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_ABI: usize = 0x7006;
@@ -1262,10 +1201,6 @@ const RANDOM_LEN: usize = 16;
 /// Address where an `ET_DYN` main image is based.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const MAIN_PIE_BASE: u64 = 0x0000_1000_0000_0000;
-/// Fixed bias for the pre-mapped libc image (K139), between the interpreter and the loader's
-/// generic library hint.
-#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
-const LIBC_BASE: u64 = 0x0000_3000_0000_0000;
 /// Address where a `PT_INTERP` image is based.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const INTERP_BASE: u64 = 0x0000_2000_0000_0000;
@@ -1626,7 +1561,7 @@ fn build_auxv(
     elf: &Elf<'_>,
     main_bias: u64,
     interp_bias: u64,
-    libc: Option<(u64, usize)>,
+    libc: Option<u64>,
     fdmap: Option<(usize, usize)>,
 ) -> ([(usize, usize); MAX_AUXV], usize) {
     let mut auxv = [(0usize, 0usize); MAX_AUXV];
@@ -1664,9 +1599,8 @@ fn build_auxv(
     push(AT_HWCAP2, 0);
     push(AT_EXECFN, 0);
     push(AT_MINSIGSTKSZ, 8192);
-    if let Some((phdr, phnum)) = libc {
-        push(AT_RAVEN_LIBC, usize::try_from(phdr).unwrap_or_default());
-        push(AT_RAVEN_LIBC_PHNUM, phnum);
+    if let Some(offset) = libc {
+        push(AT_RAVEN_LIBC, usize::try_from(offset).unwrap_or_default());
     }
     if let Some((address, count)) = fdmap {
         push(AT_RAVEN_FDMAP, address);

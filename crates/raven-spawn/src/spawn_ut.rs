@@ -1217,3 +1217,12 @@ fn exec_spawn_failure_closes_the_child_before_a_thread_starts() {
             .any(|call| matches!(call, Call::ThreadCreate { .. }))
     );
 }
+
+#[test]
+fn libc_auxv_carries_the_initfs_offset() {
+    let main = child_elf(false, false);
+    let elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
+    let (auxv, len) = build_auxv(&elf, 0, 0, Some(0x4000), None);
+    let pairs = &auxv[..len];
+    assert!(pairs.contains(&(AT_RAVEN_LIBC, 0x4000)));
+}
