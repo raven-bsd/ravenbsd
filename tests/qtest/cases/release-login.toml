@@ -34,7 +34,7 @@ regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 regex = '^svcd: getty up$'
 
 [[expect]]
-regex = '(?i)^.*login: ?$'
+regex = '(?i)^.*login: ?root$'
 
 [[expect]]
 regex = '(?i)^password: ?$'
