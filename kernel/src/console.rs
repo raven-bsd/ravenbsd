@@ -19,7 +19,7 @@ mod ringbuf;
 #[path = "arch/x86_64/i8042.rs"]
 mod i8042;
 
-use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::arch::x86_64::{acpi, apic, idt, ioapic, serial};
 use crate::kprintln;
@@ -41,6 +41,9 @@ static RX: ringbuf::RxRing = ringbuf::RxRing::new();
 static WAITERS: WaitQueue = WaitQueue::new();
 /// True when the timer tick polls the UART instead of using the IOAPIC line.
 static POLLING: AtomicBool = AtomicBool::new(false);
+/// CPU that owns the COM1 receive line. The RX ring has one producer, so the tick fallback must
+/// drain only on this CPU and never concurrently with the RX ISR.
+static RX_CPU: AtomicUsize = AtomicUsize::new(0);
 /// Monotonic time of the last overrun log line.
 static DROP_LOG_AT: AtomicU64 = AtomicU64::new(0);
 /// Dropped count already reported.
@@ -51,6 +54,7 @@ static DROP_REPORTED: AtomicU64 = AtomicU64::new(0);
 /// Called once at boot, after the IDT and IOAPIC are initialised and before interrupts are
 /// enabled.  The redirection entry is programmed masked by `ioapic::route` and unmasked here.
 pub fn init() {
+    RX_CPU.store(crate::sched::smp::percpu::this_cpu(), Ordering::Release);
     // S59: the PS/2 keyboard shares this ring. It needs the IDT and IOAPIC, which the caller
     // installed before this function runs; a failure keeps the serial console working.
     i8042::init();
@@ -94,6 +98,7 @@ pub fn init() {
 }
 
 /// True when the receive path is polled from the timer tick.
+#[allow(dead_code)] // Public diagnostic; the timer now drains on the RX CPU in both modes.
 pub fn polling() -> bool {
     POLLING.load(Ordering::Acquire)
 }
@@ -134,9 +139,13 @@ fn notify() {
     let _ = WAITERS.wake_one(0, 0);
 }
 
-/// Timer-tick fallback: drain the UART when no IOAPIC route is available.
+/// Timer-tick backup: drain the UART on the RX-owning CPU.
+///
+/// This is the primary path when the IOAPIC route is unavailable, and a safety net in IRQ mode:
+/// if one receive interrupt is lost while a long qtest line is entering the 16-byte FIFO, the
+/// next 1 ms tick drains it instead of leaving brush waiting for the rest of the line.
 pub fn poll() {
-    if !polling() {
+    if crate::sched::smp::percpu::this_cpu() != RX_CPU.load(Ordering::Acquire) {
         return;
     }
     if drain() {
