@@ -37,6 +37,8 @@ const PROT_EXEC: usize = 4;
 const PAGE: usize = 4096;
 /// Fixed libc bias, between the interpreter and the loader's generic library hint.
 const LIBC_BASE: usize = 0x0000_3000_0000_0000;
+/// Scratch page for the archive ELF header; must be outside the libc span.
+const SCRATCH: usize = 0x0000_5000_0000_0000;
 
 type TargetLoader = Loader<RealPlatform, LiveMem, LiveApplier>;
 
@@ -74,6 +76,11 @@ fn protect(addr: usize, len: usize, prot: usize) -> Result<(), ()> {
     if result < 0 { Err(()) } else { Ok(()) }
 }
 
+fn unmap(addr: usize, len: usize) {
+    // SAFETY: UNMAP takes the process handle, range and length.
+    let _ = unsafe { sys::syscall3(sys::UNMAP, SELF, addr, len) };
+}
+
 fn zero(address: usize, len: usize) {
     // SAFETY: the caller mapped `address..address+len` writable for this operation.
     unsafe { ptr::write_bytes(address as *mut u8, 0, len) };
@@ -87,7 +94,7 @@ pub(crate) fn map_premapped(loader: &mut TargetLoader, data_offset: u64) -> bool
     let Ok(data_offset) = usize::try_from(data_offset) else {
         return false;
     };
-    let header_base = LIBC_BASE;
+    let header_base = SCRATCH;
     if map_memobj(
         INITFS,
         data_offset,
@@ -137,6 +144,7 @@ pub(crate) fn map_premapped(loader: &mut TargetLoader, data_offset: u64) -> bool
     let Ok(plan) = plan_segments(&phdrs[..phnum], PAGE as u64) else {
         return false;
     };
+    unmap(SCRATCH, PAGE);
     let Some(bias) = (LIBC_BASE as u64).checked_sub(plan.base_vaddr) else {
         return false;
     };
