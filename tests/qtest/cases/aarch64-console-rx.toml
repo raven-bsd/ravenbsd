@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K166: bounded aarch64 serial-input case. It proves the PL011 receive path end to end without
+# depending on the session shell: the kernel routes the FDT/board UART SPI, getty reads input
+# through DEBUG_READ, login echoes `Password:` and a correct password reaches the motd. It types
+# a burst larger than the 16-byte FIFO and then a one-byte-at-a-time line, so both the RX drain
+# and the receive-timeout path are exercised. The shell/exit contract lives in `login-aarch64`;
+# this case accepts any guest exit status because the staged aarch64 brush is red until K169.
+
+name = "aarch64-console-rx"
+arch = "aarch64"
+profile = "release"
+timeout_secs = 90
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "any"
+
+[[expect]]
+regex = '^console: PL011 rx irq 33 \(level\)$'
+
+[[expect]]
+regex = '^RavenBSD 0\.1 \(aarch64\) \(tty:console\)$'
+
+[[expect]]
+regex = '^Login incorrect$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^RavenBSD 0\.1\.0$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|BadElf|Traceback'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 60
+
+# Burst: 40 bytes in one write is 2.5 FIFO fills, and exceeds MAX_USER so getty rejects it.
+[[step]]
+send = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Login incorrect$'
+timeout_secs = 30
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 30
+
+# Short: a single byte below the FIFO trigger must arrive through the receive-timeout interrupt.
+[[step]]
+send = "r"
+delay_ms = 150
+
+[[step]]
+send = "oot\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD 0\.1\.0$'
+timeout_secs = 30

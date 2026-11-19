@@ -50,6 +50,8 @@ pub enum GicError {
     MapCpuInterface,
     /// The driver was used before [`init`].
     NotInitialised,
+    /// A target CPU index is outside the GICv2 eight-CPU target list.
+    BadTarget,
 }
 
 impl fmt::Display for GicError {
@@ -58,6 +60,7 @@ impl fmt::Display for GicError {
             GicError::MapDistributor => f.write_str("cannot map the GIC distributor"),
             GicError::MapCpuInterface => f.write_str("cannot map the GIC CPU interface"),
             GicError::NotInitialised => f.write_str("GIC is not initialised"),
+            GicError::BadTarget => f.write_str("interrupt target CPU is outside the GICv2 list"),
         }
     }
 }
@@ -201,22 +204,30 @@ pub fn set_priority(irq: u32, priority: u8) -> Result<(), GicError> {
     Ok(())
 }
 
-/// Route a shared peripheral interrupt to the boot CPU.
+/// Route a shared peripheral interrupt to `cpu`, a zero-based CPU index.
 ///
 /// ITARGETSR is banked and read-only for SGIs/PPIs (0..31); setting a target there is ignored by
-/// the architecture, so this is only meaningful for SPIs.
+/// the architecture, so this is only meaningful for SPIs. The register stores one bit per CPU
+/// interface, not a CPU number: CPU 0 is mask `0b0000_0001`, so the index is shifted here and
+/// callers keep passing the same index used by [`send_sgi`]. GICv2 addresses at most eight CPUs.
 pub fn set_target(irq: u32, cpu: u8) -> Result<(), GicError> {
     let distributor = base(&GICD)?;
     if !is_spi(irq) {
         return Err(GicError::NotInitialised);
     }
+    let mask = target_mask(cpu).ok_or(GicError::BadTarget)?;
     let offset = GICD_ITARGETSR.saturating_add(u64::from(irq & !3));
     let shift = (irq & 3) << 3;
     let mut value = read32(distributor, offset);
     value &= !(0xff << shift);
-    value |= u32::from(cpu) << shift;
+    value |= u32::from(mask) << shift;
     write32(distributor, offset, value);
     Ok(())
+}
+
+/// The GICv2 ITARGETSR byte for a zero-based CPU index, or `None` above CPU 7.
+const fn target_mask(cpu: u8) -> Option<u8> {
+    if cpu < 8 { Some(1u8 << cpu) } else { None }
 }
 
 /// Put one interrupt in Group 1, the non-secure group the kernel enables in `init`.

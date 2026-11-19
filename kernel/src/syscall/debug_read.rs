@@ -12,6 +12,9 @@
 use raven_abi::errno::Errno;
 use raven_usercopy::UserSlice;
 
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::console;
+#[cfg(target_arch = "x86_64")]
 use crate::console;
 use crate::sched;
 use crate::syscall::SyscallFrame;

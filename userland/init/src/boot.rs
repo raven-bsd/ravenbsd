@@ -820,6 +820,7 @@ fn describe_spawn(error: SpawnError) -> String {
         SpawnError::BadElf(error) => alloc::format!("bad ELF: {error:?}"),
         SpawnError::HasInterpreter => "ELF interpreter is not supported".to_string(),
         SpawnError::TooLarge => "image is too large".to_string(),
+        SpawnError::BadCwd => "invalid working directory".to_string(),
         SpawnError::Sys(error) => error.description().to_string(),
     }
 }

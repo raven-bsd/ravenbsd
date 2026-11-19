@@ -4,7 +4,7 @@
 //! Initfs packing and uutils staging-detection tests.
 
 use super::*;
-use crate::profiles::{Boot, File, Initfs as InitfsSpec, Profile};
+use crate::profiles::{Boot, File, Initfs as InitfsSpec, Profile, Program};
 use raven_initfs::Initfs;
 
 fn profile(files: &[(&str, &str)]) -> Profile {
@@ -29,6 +29,37 @@ fn profile(files: &[(&str, &str)]) -> Profile {
             log_level: "info".to_string(),
         },
     }
+}
+
+fn program(package: &str, path: &str) -> Program {
+    Program {
+        package: package.to_string(),
+        path: path.to_string(),
+    }
+}
+
+#[test]
+fn shell_bin_tools_link_statically_but_getty_and_login_stay_dynamic() {
+    for package in [
+        "man",
+        "raven-date",
+        "raven-hostname",
+        "raven-ps",
+        "raven-rsh",
+        "raven-sleep",
+        "raven-svcctl",
+        "raven-uname",
+    ] {
+        assert!(
+            program_is_static(&program(package, "/bin/tool")),
+            "{package} must be static"
+        );
+    }
+    assert!(!program_is_static(&program("raven-getty", "/bin/getty")));
+    assert!(!program_is_static(&program("login", "/bin/login")));
+    assert!(!program_is_static(&program("raven-other", "/bin/other")));
+    assert!(program_is_static(&program("raven-vfsd", "/sbin/vfsd")));
+    assert!(program_is_static(&program("raven-init", "/init")));
 }
 
 #[test]

@@ -40,6 +40,35 @@ fn brush_stages_the_arch_path_only() {
 }
 
 #[test]
+fn build_brush_accepts_the_check_only_flag() {
+    let options = parse_build(&args(&["--arch", "aarch64", "--check"])).unwrap();
+    assert_eq!(options.arch, Arch::Aarch64);
+    assert!(options.check);
+}
+
+#[test]
+fn aarch64_and_x86_select_their_brush_linker_scripts() {
+    let aarch64 = linker_for(Arch::Aarch64).unwrap();
+    assert!(aarch64.ends_with("xtask/brush-aarch64.ld"), "{aarch64:?}");
+    let x86 = linker_for(Arch::X86_64).unwrap();
+    assert!(x86.ends_with("xtask/brush-x86_64.ld"), "{x86:?}");
+    assert!(linker_for(Arch::Riscv64).is_none());
+}
+
+#[test]
+fn a_missing_linker_script_fails_instead_of_using_lld_defaults() {
+    let dir = std::env::temp_dir().join(format!("raven-brush-k169-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let error = selected_linker(&dir, Arch::Aarch64).unwrap_err();
+    assert!(
+        error.to_string().contains("missing brush linker script"),
+        "{error}"
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
 fn build_brush_rejects_an_unknown_flag() {
     let error = parse_build(&args(&["--arch", "x86_64", "--wat"])).unwrap_err();
     assert!(error.to_string().contains("--wat"));
