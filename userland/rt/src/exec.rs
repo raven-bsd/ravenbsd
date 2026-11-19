@@ -161,6 +161,7 @@ fn spawn_errno(error: raven_spawn::SpawnError) -> Errno {
         SpawnError::Sys(error) => error,
         SpawnError::NotFound | SpawnError::FileNotFound => Errno::ENOENT,
         SpawnError::BadElf(_) | SpawnError::HasInterpreter => Errno::ENOEXEC,
+        SpawnError::BadCwd => Errno::EINVAL,
         SpawnError::TooLarge => Errno::EFBIG,
     }
 }

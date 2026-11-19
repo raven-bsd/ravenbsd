@@ -14,6 +14,7 @@ struct FakeLoader {
     read_path: RefCell<String>,
     load_path: RefCell<String>,
     argv: RefCell<Vec<String>>,
+    cwd: RefCell<Vec<u8>>,
     handle: u32,
     code: i32,
     close_calls: Cell<usize>,
@@ -28,6 +29,7 @@ impl FakeLoader {
             read_path: RefCell::new(String::new()),
             load_path: RefCell::new(String::new()),
             argv: RefCell::new(Vec::new()),
+            cwd: RefCell::new(Vec::new()),
             handle,
             code,
             close_calls: Cell::new(0),
@@ -49,10 +51,12 @@ impl Loader for FakeLoader {
         path: &str,
         argv: &[&str],
         _env: &[&str],
+        cwd: &[u8],
         _fdmap: &[(i32, u32)],
     ) -> Result<u32, Errno> {
         assert_eq!(image, self.image.borrow().as_slice());
         *self.load_path.borrow_mut() = path.into();
+        *self.cwd.borrow_mut() = cwd.to_vec();
         *self.argv.borrow_mut() = argv.iter().map(|value| (*value).into()).collect();
         self.waited.set(false);
         Ok(self.handle)
@@ -128,9 +132,34 @@ fn spawn_resolves_a_relative_path_and_records_the_pid() {
     assert_eq!(pid, 42);
     assert_eq!(*spawner.loader.read_path.borrow(), "/bin/ls");
     assert_eq!(*spawner.loader.load_path.borrow(), "/bin/ls");
+    assert_eq!(*spawner.loader.cwd.borrow(), b"/bin");
     assert_eq!(
         *spawner.loader.argv.borrow(),
         vec!["/bin/ls".to_string(), "-l".to_string()]
+    );
+}
+
+#[test]
+fn invalid_cwd_is_rejected_before_the_loader() {
+    let spawner = NativeSpawner::new(
+        FakeLoader::new(7, 0),
+        FakeInfo {
+            pid: 1,
+            fail: false,
+        },
+    );
+    assert_eq!(
+        spawner.spawn(&request(b"ls", b"bin", &[])).unwrap_err(),
+        EINVAL
+    );
+    assert_eq!(
+        spawner.spawn(&request(b"ls", b"", &[])).unwrap_err(),
+        EINVAL
+    );
+    let long = vec![b'/'; 4096];
+    assert_eq!(
+        spawner.spawn(&request(b"ls", &long, &[])).unwrap_err(),
+        ENAMETOOLONG
     );
 }
 

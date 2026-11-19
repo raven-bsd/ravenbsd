@@ -146,6 +146,21 @@ impl Args {
         }
         if terminated { matched } else { None }
     }
+
+    /// Return the string named by auxv key `key`, if the pointer is non-null and valid UTF-8.
+    ///
+    /// The loader writes the `AT_RAVEN_*` strings onto the initial stack, so the returned
+    /// slice lives for the whole process.
+    pub fn aux_string(&self, key: usize) -> Option<&'static str> {
+        let pointer = self.auxv(key)?;
+        if pointer == 0 {
+            return None;
+        }
+        // SAFETY: an auxv string value names a NUL-terminated C8 string on the process stack,
+        // which `parse_stack` proved readable; `c_string` bounds the scan.
+        let bytes = unsafe { c_string(pointer as *const usize) }?;
+        core::str::from_utf8(bytes).ok()
+    }
 }
 
 /// Parse the C8 stack at `sp0`.
@@ -238,6 +253,10 @@ impl Iterator for ArgsIter {
         None
     }
 }
+
+#[cfg(test)]
+#[path = "args_cwd_ut.rs"]
+mod args_cwd_ut;
 
 #[cfg(test)]
 mod tests {

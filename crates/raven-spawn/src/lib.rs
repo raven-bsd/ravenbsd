@@ -202,6 +202,7 @@ pub fn spawn_with<S: Sys>(
         main_bias,
         interp,
         libc,
+        b"/",
         path,
         options,
         &[],
@@ -235,6 +236,7 @@ pub fn spawn_image_with<S: Sys>(
             main_bias,
             None,
             None,
+            b"/",
             path,
             options,
             &[],
@@ -270,6 +272,23 @@ pub fn spawn_image_with_fdmap<S: Sys>(
     fdmap: &[(i32, u32)],
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
+    spawn_image_with_fdmap_cwd(image, path, options, b"/", fdmap, sys)
+}
+
+/// Spawn an in-memory image with an explicit child working directory and `fdmap`.
+///
+/// The cwd is written as a NUL-terminated stack string and published as `AT_RAVEN_CWD`; the libc
+/// process start reads it before `main`. An empty, relative, NUL-containing or overlong cwd fails
+/// the spawn instead of silently starting in `/`.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+pub fn spawn_image_with_fdmap_cwd<S: Sys>(
+    image: &[u8],
+    path: &str,
+    options: &SpawnOptions<'_>,
+    cwd: &[u8],
+    fdmap: &[(i32, u32)],
+    sys: &mut S,
+) -> Result<Handle, SpawnError> {
     if image.len() > MAX_FILE_IMAGE {
         return Err(SpawnError::TooLarge);
     }
@@ -284,6 +303,7 @@ pub fn spawn_image_with_fdmap<S: Sys>(
         main_bias,
         None,
         None,
+        cwd,
         path,
         options,
         fdmap,
@@ -328,6 +348,7 @@ pub fn spawn_image_with_interp<S: Sys>(
         main_bias,
         interp,
         None,
+        b"/",
         path,
         options,
         &[],
@@ -370,6 +391,7 @@ pub fn spawn_image_with_exec<S: Sys>(
             main_bias,
             None,
             None,
+            b"/",
             path,
             options,
             &[],
@@ -388,6 +410,7 @@ pub fn spawn_image_with_exec<S: Sys>(
             main_bias,
             Some((elf, steps, ImageSource::Bytes(&interpreter), bias)),
             None,
+            b"/",
             path,
             options,
             &[],
@@ -599,6 +622,7 @@ fn spawn_elf<S: Sys>(
     main_bias: u64,
     interp: Option<(Elf<'_>, BiasedPlan, ImageSource<'_>, u64)>,
     libc: Option<u64>,
+    cwd: &[u8],
     path: &str,
     options: &SpawnOptions<'_>,
     fdmap: &[(i32, u32)],
@@ -778,6 +802,7 @@ fn spawn_elf<S: Sys>(
         path,
         options.args,
         options.env,
+        cwd,
         &auxv[..auxv_len],
         &random,
         platform_name(),
@@ -1135,6 +1160,9 @@ fn handle_from_ret(result: isize) -> Result<Handle, Errno> {
 
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const PAGE: u64 = 4096;
+/// Longest accepted child cwd (including the trailing NUL).
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const MAX_CWD: usize = 4096;
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const WORD: usize = core::mem::size_of::<usize>();
 /// Minimum child stack: `ARG_MAX` (CR-15) plus the C8 arrays and headroom.
@@ -1155,6 +1183,9 @@ const AT_RAVEN_FDMAP_N: usize = 0x7004;
 /// Initfs archive offset of the libc image (K139); the loader maps it zero-copy.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_LIBC: usize = 0x7007;
+/// Child working-directory string pointer (K165).
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const AT_RAVEN_CWD: usize = 0x7005;
 /// Raven ABI revision.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_ABI: usize = 0x7006;
@@ -1599,6 +1630,7 @@ fn build_auxv(
     push(AT_HWCAP2, 0);
     push(AT_EXECFN, 0);
     push(AT_MINSIGSTKSZ, 8192);
+    push(AT_RAVEN_CWD, 0);
     if let Some(offset) = libc {
         push(AT_RAVEN_LIBC, usize::try_from(offset).unwrap_or_default());
     }
@@ -1625,12 +1657,16 @@ fn build_stack(
     path: &str,
     args: &[&str],
     env: &[&str],
+    cwd: &[u8],
     auxv: &[(usize, usize)],
     random: &[u8; RANDOM_LEN],
     platform: &str,
 ) -> Result<(usize, u64), SpawnError> {
     if !stack_top.is_multiple_of(16) || buffer.is_empty() {
         return Err(SpawnError::TooLarge);
+    }
+    if cwd.is_empty() || !cwd.starts_with(b"/") || cwd.len() >= MAX_CWD || cwd.contains(&0) {
+        return Err(SpawnError::BadCwd);
     }
     let argc = if args.is_empty() { 1 } else { args.len() };
     let mut strings_len = 0usize;
@@ -1653,6 +1689,10 @@ fn build_stack(
     }
     strings_len = strings_len
         .checked_add(platform.len())
+        .and_then(|value| value.checked_add(1))
+        .ok_or(SpawnError::TooLarge)?;
+    strings_len = strings_len
+        .checked_add(cwd.len())
         .and_then(|value| value.checked_add(1))
         .ok_or(SpawnError::TooLarge)?;
 
@@ -1761,6 +1801,14 @@ fn build_stack(
         let _ = write_string(buffer, &mut cursor, platform, stack_base)?;
         start
     };
+    let cwd_text = core::str::from_utf8(cwd).map_err(|_| SpawnError::BadCwd)?;
+    let cwd_address = {
+        let start = stack_base
+            .checked_add(u64::try_from(cursor).map_err(|_| SpawnError::TooLarge)?)
+            .ok_or(SpawnError::TooLarge)?;
+        let _ = write_string(buffer, &mut cursor, cwd_text, stack_base)?;
+        start
+    };
     let random_offset =
         usize::try_from(random_start - stack_base).map_err(|_| SpawnError::TooLarge)?;
     let random_end = random_offset
@@ -1778,6 +1826,8 @@ fn build_stack(
             usize::try_from(platform_address).map_err(|_| SpawnError::TooLarge)?
         } else if *key == AT_EXECFN {
             argv_zero
+        } else if *key == AT_RAVEN_CWD {
+            usize::try_from(cwd_address).map_err(|_| SpawnError::TooLarge)?
         } else {
             *value
         };
