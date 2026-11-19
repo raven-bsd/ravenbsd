@@ -49,6 +49,12 @@ regex = '^ls$'
 regex = '^uname$'
 
 [[expect]]
+regex = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
+
+[[expect]]
+regex = '^PID PPID UID GID CMD$'
+
+[[expect]]
 regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
 
 [[expect]]
@@ -98,6 +104,34 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
+send = "/bin/uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/ps -e\n"
+delay_ms = 100
+
+[[step]]
+wait = '^PID PPID UID GID CMD$'
+timeout_secs = 30
+
+[[step]]
+wait = '^[0-9]+ [0-9]+ [0-9]+ [0-9]+ .+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
 send = "ping 10.0.2.2\n"
 delay_ms = 100
 
@@ -122,7 +156,7 @@ wait = '^init exited \(0\)$'
 timeout_secs = 60
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|ping: .*timeout'
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|ping: .*timeout|command not found'
 
 [[forbid]]
 regex = '(?i)SegmentOutsideUserRange|bad ELF|getty failed'
