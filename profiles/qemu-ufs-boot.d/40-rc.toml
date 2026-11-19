@@ -5,7 +5,7 @@
 # condition once the UFS service set is merged.
 
 [[initfs.files]]
-src = "profiles/release.d/rc.conf"
+src = "profiles/qemu-ufs-boot.d/rc.conf"
 path = "/etc/rc.conf"
 
 [[initfs.files]]

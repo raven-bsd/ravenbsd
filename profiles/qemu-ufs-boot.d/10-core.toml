@@ -72,7 +72,7 @@ src = "etc/services.d/ramfsd.toml"
 path = "/etc/services.d/ramfsd.toml"
 
 [[initfs.files]]
-src = "profiles/ufs-demo.d/vfsd-ufs.manifest"
+src = "profiles/qemu-ufs-boot.d/vfsd.manifest"
 path = "/etc/services.d/vfsd.toml"
 
 [[initfs.files]]
