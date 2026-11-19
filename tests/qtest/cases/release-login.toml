@@ -84,6 +84,14 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
+send = "ls -alh /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
 send = "ls /bin\n"
 delay_ms = 100
 
@@ -160,3 +168,7 @@ regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|ping: .*timeout|
 
 [[forbid]]
 regex = '(?i)SegmentOutsideUserRange|bad ELF|getty failed'
+
+# K174: a failed root mount must not leave a dangling /root in the namespace.
+[[forbid]]
+regex = "cannot access '/root'|d\\?{9}"
