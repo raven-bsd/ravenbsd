@@ -21,6 +21,14 @@ Preserved serial/JSON:
 - `build/s157/smp-4g-login-uname-fail.log`
 - `build/s157/smp-4g-login-uname-fail.json`
 
+## Revision 255 confirmation
+
+K167 (`origin/master` `26de7aae`) fixes the command-name NUL failure: the 4G guest reached
+`RavenBSD raven 0.1 RavenBSD 0.1 (BASE) #1: fc941e85 2026-11-19 x86_64` from `uname -a`. The
+actual qtest then hit its 230 s cap before the remaining `ls`/`ps`/`du`/exit steps because the
+`check-loader.sh` pre-step and the 4G `devd` readiness timeout (60 s) consume most of the cap.
+This is a cap/loaded-host issue, not the former NUL parser failure; no timeout was raised.
+
 ## Revision 253 confirmation
 
 The failure was reproduced on `origin/master` `63a6f3d3` (RM1/K158 merged) at branch head
