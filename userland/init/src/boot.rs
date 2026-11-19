@@ -6,7 +6,7 @@
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::types::clock;
@@ -33,6 +33,8 @@ static CORE: Mutex<Option<Arc<Mutex<Core>>>> = Mutex::new(None);
 static SERVER: Mutex<Option<Server>> = Mutex::new(None);
 /// Fallback clock counter when `CLOCK_MONOTONIC` is unavailable.
 static FALLBACK_MS: AtomicU64 = AtomicU64::new(0);
+/// True after a successful root pivot: merged root services execute from `/`, not `/root`.
+static ROOT_PIVOTED: AtomicBool = AtomicBool::new(false);
 
 /// State shared by the boot thread, workers and the `svc:` server.
 pub(crate) struct Core {
@@ -456,6 +458,7 @@ fn activate_pivot_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
     }
     raven_rt::fs::mount("/", "ufs:")
         .map_err(|error| alloc::format!("/ pivot mount failed: {}", error.description()))?;
+    ROOT_PIVOTED.store(true, Ordering::Release);
     raven_rt::println!("svcd: root pivoted to UFS at /");
     let result = activate_mounted_root(core, "");
     if result.is_err() {
@@ -465,6 +468,7 @@ fn activate_pivot_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
                 error.description()
             );
         }
+        ROOT_PIVOTED.store(false, Ordering::Release);
         return result;
     }
     Ok(())
@@ -730,7 +734,11 @@ pub(crate) fn spawn_service(manifest: &Manifest, from_root: bool) -> Result<Hand
     let prefixes = namespace_prefixes();
 
     if from_root {
-        let path = alloc::format!("file:/root{}", manifest.exec);
+        let path = if ROOT_PIVOTED.load(Ordering::Acquire) {
+            manifest.exec.to_string()
+        } else {
+            alloc::format!("file:/root{}", manifest.exec)
+        };
         match raven_rt::spawn::read_file_image(&path) {
             Ok(image) => {
                 let mut sys = GrantSys {
