@@ -71,3 +71,29 @@ case when K165 and the stat handoff bring the KVM 4 GiB run under 0.100 s.
 | `ls -l` stat | `stat`/`fstat` outcomes only. | FreeBSD/NetBSD `ls -l`/`stat` use inode attributes; permissive, not copied. | GNU `ls -l` outcome only. | No algorithm change; buffer the output. |
 | Output buffering | Not applicable. | POSIX stdio line buffering is the reference; no code copied. | `stdout` line buffering outcome only. | First-party `OutputBuffer` in the vendored MIT uutils. |
 | Per-entry stat cost | Not applicable. | Not applicable. | Not applicable. | Handoff to vfsd/initfsd owner with the measured 27 ms/31 calls. |
+
+## 6. PG-31 one-call lstat (later rework)
+
+The 27 ms metadata budget was not 29–31 initfsd `Lstat` calls: libc `stat_at` was the interim
+`open + FSTAT + close` sequence, three Scheme calls per entry. PG-31 now uses one `Call::Lstat`:
+
+- `userland/servers/initfsd`: implements `Call::Lstat { path }` with the model stat.
+- `libc/ravenlibc/crates/raven-libc-platform/src/platform.rs`: `stat_at` sends one `Call::Lstat`
+  on the cached `file:/` root when `AT_SYMLINK_NOFOLLOW` is set. Follow (`stat`) keeps the
+  open+FSTAT+close fallback so symlink semantics are unchanged; an unsupported/failed Lstat also
+  falls back. No cache of file data.
+- `ls -l` uses `lstat` for directory children, so its 29–31 metadata calls become one Scheme call
+  each.
+
+Measured KVM 4 GiB after PG-31:
+
+```text
+ls -l /bin        0.140 -> 0.120 s
+ls -lah /bin      0.146 -> 0.126 s
+stat /bin/ls      0.075-0.077 s
+```
+
+The ~20 ms saving is consistent with 27 ms -> ~7 ms at the metadata stage; the full `ls -lah`
+target remains above 100 ms because spawn/shell is 70-77 ms (K168). No `ls-stat-latency` case is
+added until K168 and this stage are both green; `base-tools` passes (33.8 s) and `make check-fast`
+is green.
