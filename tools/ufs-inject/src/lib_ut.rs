@@ -253,6 +253,17 @@ fn fresh_image_is_clean_and_listable() {
 }
 
 #[test]
+fn repair_keeps_a_clean_image_clean() {
+    let dir = TempDir::new("repair");
+    let image_path = fresh_image(&dir);
+    let source = image(&image_path);
+    let report = repair(&source).expect("repair");
+    assert!(report.clean_after);
+    assert!(report.findings.is_empty());
+    assert!(fsck(&source).expect("fsck after repair").clean_after);
+}
+
+#[test]
 fn remove_file_and_recursive_tree_keep_fsck_clean() {
     let dir = TempDir::new("remove");
     let image_path = fresh_image(&dir);
