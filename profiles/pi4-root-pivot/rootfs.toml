@@ -4,9 +4,9 @@
 # Rootfs spec for the host-backed Pi 4 pivot proof. The programs and files come
 # from the resolved `pi4-root-pivot` profile (the pi4-rootfs release userland);
 # this spec adds the same post-pivot markers as the SD root and uses a smaller
-# 128 MiB image so the fake card fits beside the initfs in QEMU RAM.
+# 48 MiB image so the fake card fits the emmc2 test backend (64 MiB limit).
 
-size = 134217728
+size = 50331648
 
 [[files]]
 src = "profiles/pi4-rootfs.d/root.keep"
