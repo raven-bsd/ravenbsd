@@ -259,6 +259,14 @@ def libc_committed_counts(path: Path) -> tuple[int, int, int] | None:
     return int(match.group(1)), int(match.group(2)), int(match.group(3))
 
 
+def libc_deferred_counts(path: Path) -> tuple[int, int, int] | None:
+    """DR-60 defers the internal libc gate; return its recorded aggregate if present."""
+    text = read_text(path)
+    if "DR-60" not in text or "DEFERRED" not in text:
+        return None
+    return libc_committed_counts(path)
+
+
 def libc_gate_from_log(
     log: Path,
     result_code: int,
@@ -275,6 +283,18 @@ def libc_gate_from_log(
     not_met = len(re.findall(r"\|\s*NOT MET\s*\|", text))
     blocked = len(re.findall(r"\|\s*BLOCKED\s*\|", text))
     missing = text.count("evidence file missing")
+    deferred = libc_deferred_counts(decisions)
+    if deferred:
+        note = (
+            f"DR-60 deferred to 0.2.0; internal gate NOT MET; "
+            f"MET={deferred[0]} NOT MET={deferred[1]} BLOCKED={deferred[2]} "
+            f"(decision page); POSIX is the public libc gate"
+        )
+        return Gate(
+            "libc-gate", "DEFERRED", "read docs/releases/0.1.0-libc-decisions.md",
+            started, ended, str(result_code),
+            str(decisions.relative_to(ROOT)), sha256(decisions), note
+        )
     if missing >= 10 and met == 0 and not_met >= 10:
         counts = libc_committed_counts(decisions)
         count_text = (
@@ -534,8 +554,8 @@ def libc_1cpu_gate(notes: Path, head: str) -> Gate:
             f"{'before malloc ok; ' if before else ''}owner S132/Tim; not SMP"
         )
     elif clean:
-        status = "PASS"
-        note = "S132 1-CPU evidence is clean"
+        status = "MET"
+        note = "S132 1-CPU evidence is MET"
     else:
         status = "STALE"
         note = "S132 1-CPU section is ambiguous; no fault or clean result"
@@ -762,7 +782,11 @@ def packet_text(gates: list[Gate], head: str, dirty: bool, owner_attestation: bo
     required = [gate for gate in gates if gate.required]
     board = next((gate for gate in gates if gate.name == "pi4-board"), None)
     ready = (
-        all(gate.status in {"PASS", "PINNED"} for gate in required if gate.name != "pi4-board")
+        all(
+            gate.status in {"PASS", "PINNED", "MET", "DEFERRED"}
+            for gate in required
+            if gate.name != "pi4-board"
+        )
         and board is not None
         and board.status == "MARKERS COMPLETE"
         and owner_attestation
@@ -803,7 +827,11 @@ def packet_text(gates: list[Gate], head: str, dirty: bool, owner_attestation: bo
             "",
         ]
     )
-    bad = [gate for gate in gates if gate.status not in {"PASS", "PINNED", "MARKERS COMPLETE"}]
+    bad = [
+        gate
+        for gate in gates
+        if gate.status not in {"PASS", "PINNED", "MET", "DEFERRED", "MARKERS COMPLETE"}
+    ]
     if bad:
         for gate in bad:
             lines.append(f"- `{gate.name}`: **{gate.status}** — {gate.note}")
@@ -1091,6 +1119,20 @@ def self_test() -> int:
         or "evidence files missing" in real_libc.note
     ):
         raise AssertionError(f"real libc verdict: {real_libc}")
+    deferred_libc = libc_gate_from_log(
+        fixtures / "libc-verdict-missing-evidence.log",
+        1,
+        stamp,
+        stamp,
+        fixtures / "libc-gate-report.md",
+        fixtures / "libc-decisions-dr60.md",
+    )
+    if (
+        deferred_libc.status != "DEFERRED"
+        or "MET=4 NOT MET=20" not in deferred_libc.note
+        or "DR-60" not in deferred_libc.note
+    ):
+        raise AssertionError(f"deferred libc: {deferred_libc}")
     libc_1cpu_fail = libc_1cpu_gate(fixtures / "libc-1cpu-fail.md", head)
     if (
         libc_1cpu_fail.status != "FAIL"
@@ -1101,7 +1143,7 @@ def self_test() -> int:
     ):
         raise AssertionError(f"1-CPU failure: {libc_1cpu_fail}")
     libc_1cpu_clean = libc_1cpu_gate(fixtures / "libc-1cpu-clean.md", head)
-    if libc_1cpu_clean.status != "PASS":
+    if libc_1cpu_clean.status != "MET":
         raise AssertionError(f"1-CPU clean: {libc_1cpu_clean}")
     libc_1cpu_ambiguous = libc_1cpu_gate(fixtures / "libc-1cpu-ambiguous.md", head)
     if libc_1cpu_ambiguous.status != "STALE":
@@ -1136,7 +1178,7 @@ def self_test() -> int:
         "current-stale/partial, posix good/stale/no-stamp/fail, "
         "board good/virt/synthetic/incomplete, image missing/hash/pinned/stale/local-hash, "
         "smp-soak clean/tcg4-fail/closeout-fail/not-run/missing/ambiguous/notes-fail, "
-        "libc missing-evidence/real, libc-1cpu fail/clean/ambiguous/missing)"
+        "libc missing-evidence/real/deferred, libc-1cpu fail/met/ambiguous/missing)"
     )
     return 0
 

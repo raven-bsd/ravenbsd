@@ -3,7 +3,7 @@
 
 # Release notes (fixture, 1-CPU clean)
 
-### libc thread 1-CPU crash — PASS
+### libc thread 1-CPU crash — MET
 
 S132 DONE: the 1-CPU libc thread case passes 50/50, no page fault and no crash loop.
 
