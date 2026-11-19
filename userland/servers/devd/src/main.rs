@@ -151,16 +151,23 @@ mod program {
         matched: &[Matched<'_>],
     ) -> Result<(), String> {
         let mut children: Vec<(String, Handle)> = Vec::with_capacity(matched.len());
+        let mut failures: Vec<String> = Vec::new();
         for entry in matched {
             match spawn_driver(client, initfs, &entry.device, entry.driver) {
                 Ok(child) => children.push((entry.driver.name.clone(), child)),
                 Err(error) => {
-                    for (_, child) in children.drain(..) {
-                        abort_child(child);
-                    }
-                    return Err(alloc::format!("{}: {error}", entry.driver.name));
+                    // Report every matched function before failing the boot, so a broken entry
+                    // does not hide the launch state of the drivers after it.
+                    raven_rt::println!("devd: driver {} launch failed: {error}", entry.driver.name);
+                    failures.push(alloc::format!("{}: {error}", entry.driver.name));
                 }
             }
+        }
+        if !failures.is_empty() {
+            for (_, child) in children.drain(..) {
+                abort_child(child);
+            }
+            return Err(failures.join("; "));
         }
         let mut remaining = children.into_iter();
         while let Some((name, child)) = remaining.next() {
