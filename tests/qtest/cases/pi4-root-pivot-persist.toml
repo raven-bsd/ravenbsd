@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K182: second boot of the same Pi 4 fake-card image (--no-build). The marker is
+# read from the UFS root written by the first boot. The emmc2 test backend is a
+# RAM disk in this QEMU model; if a build or backend changes the persistence
+# contract this case must fail rather than substitute the initfs.
+#
+# Keep this case after `pi4-root-pivot`; it reuses build/qtest/pi4-root-pivot.img.
+
+name = "pi4-root-pivot-persist"
+arch = "aarch64"
+profile = "pi4-root-pivot"
+timeout_secs = 300
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = ["-m", "1024"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(aarch64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(aarch64\)'
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^k182-persist$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|no UFS root device|pivot mount failed|staying on the initfs'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/cat /persist-marker\n"
+delay_ms = 100
+
+[[step]]
+wait = '^k182-persist$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

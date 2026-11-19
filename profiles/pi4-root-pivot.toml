@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K182: the Pi 4 UFS-root payload profile. It inherits the release Pi 4 userland
+# from `pi4-rootfs` and adds a smaller host-test UFS spec for the fake-card pivot
+# qtest. The real SD image keeps the 256 MiB `pi4-rootfs` spec.
+
+name = "pi4-root-pivot"
+extends = "pi4-rootfs"
+
+[initfs]
+release = true
+
+[image]
+release = true
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"
