@@ -350,7 +350,10 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
     fn statfs(&self) -> StatFs {
         let stat = self.ufs.statfs();
         StatFs {
-            block_size: stat.block_size,
+            // `ufs_core` counts `blocks` in `fragment_size` units; the wire record has one
+            // size field, so report the fragment size or df multiplies every count by the
+            // 8x larger filesystem block size.
+            block_size: stat.fragment_size,
             blocks: stat.blocks,
             free_blocks: stat.blocks_free,
             files: stat.files,
