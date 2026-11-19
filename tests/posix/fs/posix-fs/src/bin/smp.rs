@@ -46,6 +46,12 @@ const PAGE: usize = 4096;
 const READ_WRITE: u32 = 3;
 const MS_SYNC: usize = 4;
 const DATA_LEN: usize = 512;
+/// Bound the setup-to-worker transition so a scheduling stall is reported before the KVM cell
+/// cap hides it behind a silent serial log.
+const WORKER_START_DEADLINE_NS: u64 = 10_000_000_000;
+/// Emit pending worker phases while the run is in progress; a cap kill then preserves where the
+/// workers were instead of only `setup ok`.
+const WORKER_PROGRESS_NS: u64 = 5_000_000_000;
 
 const OP_CREATE: usize = 0;
 const OP_WRITE: usize = 1;
@@ -594,6 +600,24 @@ fn setup() -> Result<(), String> {
     Ok(())
 }
 
+fn pending_started() -> Vec<String> {
+    STARTED
+        .iter()
+        .enumerate()
+        .filter(|(_, flag)| !flag.load(Ordering::Acquire))
+        .map(|(index, _)| format!("{index}:{}", PHASES[index].load(Ordering::Relaxed)))
+        .collect()
+}
+
+fn pending_workers() -> Vec<String> {
+    FINISHED
+        .iter()
+        .enumerate()
+        .filter(|(_, flag)| !flag.load(Ordering::Acquire))
+        .map(|(index, _)| format!("{index}:{}", PHASES[index].load(Ordering::Relaxed)))
+        .collect()
+}
+
 fn start_workers() -> Result<(), String> {
     for index in 0..FILE_WORKERS {
         sys::thread_create(
@@ -613,32 +637,41 @@ fn start_workers() -> Result<(), String> {
         )
         .map_err(|error| format!("mount thread {index}: {}", error.description()))?;
     }
-    for spin in 0..1_000_000usize {
+    let deadline = now_ns().saturating_add(WORKER_START_DEADLINE_NS);
+    loop {
         if STARTED.iter().all(|flag| flag.load(Ordering::Acquire)) {
             GO.store(1, Ordering::Release);
             return Ok(());
         }
-        if spin % 1024 == 0 {
-            let _ = sys::nanosleep(200_000);
+        if now_ns() > deadline {
+            let pending = pending_started();
+            println!("smp-fs: worker start timeout pending={pending:?}");
+            return Err(format!("worker start timeout pending={pending:?}"));
         }
+        let _ = sys::nanosleep(200_000);
     }
-    Err("worker start timeout".to_string())
 }
 
 fn wait_workers() -> Result<(), String> {
     let deadline = now_ns().saturating_add(180_000_000_000);
+    let mut next_progress = now_ns().saturating_add(WORKER_PROGRESS_NS);
     loop {
         if FINISHED.iter().all(|flag| flag.load(Ordering::Acquire)) {
             return Ok(());
         }
-        if now_ns() > deadline {
-            let pending: Vec<String> = FINISHED
-                .iter()
-                .enumerate()
-                .filter(|(_, flag)| !flag.load(Ordering::Acquire))
-                .map(|(index, _)| format!("{index}:{}", PHASES[index].load(Ordering::Relaxed)))
-                .collect();
+        let now = now_ns();
+        if now > deadline {
+            let pending = pending_workers();
             return Err(format!("worker timeout pending={pending:?}"));
+        }
+        if now >= next_progress {
+            let finished = FINISHED
+                .iter()
+                .filter(|flag| flag.load(Ordering::Acquire))
+                .count();
+            let pending = pending_workers();
+            println!("smp-fs: progress finished={finished}/{WORKERS} pending={pending:?}");
+            next_progress = now.saturating_add(WORKER_PROGRESS_NS);
         }
         let _ = sys::nanosleep(10_000_000);
     }
@@ -726,6 +759,7 @@ fn run() -> Result<(), String> {
     start_services()?;
     setup()?;
     start_workers()?;
+    println!("smp-fs: workers started workers={WORKERS}");
     let wait = wait_workers();
     report_latencies();
     if let Err(error) = wait {
