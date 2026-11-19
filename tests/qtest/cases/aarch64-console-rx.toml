@@ -41,9 +41,9 @@ regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|BadElf|Traceback'
 wait = '(?i)^.*login: ?$'
 timeout_secs = 60
 
-# Burst: 32 bytes in one write is two FIFO fills. getty rejects the long name and re-prompts.
+# Burst: 40 bytes in one write is 2.5 FIFO fills, and exceeds MAX_USER so getty rejects it.
 [[step]]
-send = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
+send = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
 delay_ms = 100
 
 [[step]]
