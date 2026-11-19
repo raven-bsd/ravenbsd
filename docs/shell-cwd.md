@@ -56,10 +56,15 @@ timeout 120 cargo xtask qtest --case release-login --arch x86_64
 timeout 240 make check-fast
 ```
 
-**Validation status (K160 report):** the code compiles and `make check-fast` passes. Both qtest
-invocations hit their 120 s caps on a host loaded by other lanes (load 18-22, cargo/xtask active)
-before a boot/log was produced, so the live cwd transcript is pending; no fake transcript is
-claimed. Re-run on an idle host.
+**Validation status (closeout, 2026-11-19):** the case image built in 270 s and
+`timeout 120 cargo xtask qtest --case shell-cwd --arch x86_64 --no-build` ran for 85.8 s and
+failed: `pwd` moved to `/bin`, but the external `ls` child still listed `/`, so the child cwd is
+dropped by the spawn/loader path. The brush-side `change_dir` is necessary but not sufficient.
+Exact handoff: `libc/ravenlibc/crates/raven-libc-proc/src/native_spawn.rs` resolves the image path
+with `request.cwd` but calls `loader.load(...)` with no cwd; `startup.rs` expects `AT_RAVEN_CWD`
+in the auxv, which no loader/kernel code writes. Owner: Kevin/Tim (libc-proc spawn/loader) with
+Stuart (kernel exec auxv). No loader/kernel path was edited. The full transcript is in the K160
+report.
 
 ## Donor reconciliation (DR-52)
 
