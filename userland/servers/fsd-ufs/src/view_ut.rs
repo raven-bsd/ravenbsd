@@ -184,8 +184,14 @@ fn readlink_and_stat_keep_the_link_identity() {
 fn statfs_reports_the_formatted_geometry() {
     let view = view();
     let stat = view.statfs();
-    assert_eq!(stat.block_size, 4096);
+    assert_eq!(stat.block_size, 512);
     assert!(stat.blocks > 0);
+    let capacity = u64::from(stat.block_size) * stat.blocks;
+    let size = options().size;
+    assert!(
+        capacity >= size / 10 * 9 && capacity <= size,
+        "capacity={capacity} size={size}"
+    );
     assert!(stat.files > 0);
     assert!(stat.free_blocks <= stat.blocks);
     assert!(stat.free_files <= stat.files);
