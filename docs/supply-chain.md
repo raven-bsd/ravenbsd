@@ -161,23 +161,32 @@ the base; CDDL only in separate add-on processes. Every copied file keeps its no
 
 ### SC1 vendored snapshot (2026-11-19)
 
-`scripts/release-vendor.sh` creates the snapshot and its evidence:
+`scripts/release-vendor.sh` creates the snapshot and its evidence. The release graph is three
+cargo workspaces — the root product, `userland/brush` and `userland/uutils` — merged into one
+`vendor/` tree:
 
 ```text
-vendor/                 74 registry crates, 47 MiB, cargo checksums per crate
-vendor/manifest.toml    lock sha256 ccf2406f…, 74 crates, SBOM sha256 79b53b6e…
-vendor/sbom.cdx.json    CycloneDX 1.5, 74 components with SHA-256 hashes and licences
+vendor/                 771 crates, 1.2 GiB, cargo checksums per crate (not tracked source)
+vendor/manifest.toml    root/brush/uutils lock sha256, 771 crates, SBOM sha256 80c2994a…
+vendor/sbom.cdx.json    CycloneDX 1.5, 771 components with SHA-256 hashes and licences
+build/release/vendor-full.tar.zst  full snapshot artifact, 131 MiB,
+                                   sha256 16a94b19c3d7ee28091f14482cc3ffea35cc3d674d56bfe0a9c167c3b2acc26d
 .cargo/config.toml      source.crates-io.replace-with = "vendored-sources"
 ```
 
-The manifest and SBOM are generated only by the script; the snapshot is committed so a clean
-checkout builds with no crates.io access:
+The 1.2 GiB snapshot is too large to track and must not receive the project SPDX headers: only
+`vendor/manifest.toml` and `vendor/sbom.cdx.json` are committed. The snapshot is a checksummed
+release artifact (`vendor-full.tar.zst`); upload it to the release evidence store and record the
+URL with the manifest checksum. Materialize it on a fresh checkout before an offline build:
 
 ```sh
 timeout 360 sh scripts/release-vendor.sh
-timeout 300 cargo xtask image --arch x86_64 --profile release \
-  --output build/release/vendor-check.img --offline
+timeout 300 cargo --offline xtask image --arch x86_64 --profile release \
+  --output build/release/vendor-check.img
 ```
+
+Note the offline flag is a **cargo** flag (`cargo --offline xtask ...`); a trailing `--offline` is
+an xtask argument and is rejected.
 
 `.cargo/audit.toml` is a symlink to the reviewed root `audit.toml`; `cargo audit` reads that path.
 `deny.toml` carries the same advisory exceptions plus the bans/licences/sources policy.
