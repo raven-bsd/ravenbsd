@@ -97,3 +97,25 @@ The ~20 ms saving is consistent with 27 ms -> ~7 ms at the metadata stage; the f
 target remains above 100 ms because spawn/shell is 70-77 ms (K168). No `ls-stat-latency` case is
 added until K168 and this stage are both green; `base-tools` passes (33.8 s) and `make check-fast`
 is green.
+
+
+## 7. Per-mount vfsd root handle (post-K168 trace)
+
+After K168/PG-31 the remaining `Lstat` route opened and closed the backing scheme root for every
+directory entry. `vfsd` now keeps one root description per **mount id** and serves
+`forward_one`/`Lstat` through it. The cache is cleared and the handles are closed on
+`Call::Mount` and `Call::Umount`; there is no stale directory or file data cache.
+
+KVM 4 GiB after the cache:
+
+```text
+ls -l /bin        0.118 s
+ls -lah /bin      0.123 s
+ls -lah > file    0.113 s
+ls -1 /bin        0.081 s
+/bin/true         0.070 s
+```
+
+The root open/close saving is modest (~5-10 ms); the remaining gap to 0.100 s is spawn/shell and
+the long-format/console budget, not another vfsd root open. No <100 ms claim is made until that
+budget is green.
