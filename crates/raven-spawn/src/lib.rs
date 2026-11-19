@@ -65,6 +65,14 @@ pub struct SpawnOptions<'a> {
 /// server from making PID 1 allocate without limit.
 pub const MAX_FILE_IMAGE: usize = 8 * 1024 * 1024;
 
+/// Chunk size for reading a `file:` image.
+///
+/// The file servers handle a multi-megabyte read in one request (the kernel capture window is
+/// 4 MiB), so a page-sized loop cost one IPC round trip per 4 KiB and dominated the spawn time:
+/// the 984 KiB `/bin/true` needed 240 round trips. One MiB keeps a 3.3 MiB tool at four reads
+/// while staying well inside both the capture window and [`MAX_FILE_IMAGE`].
+const IMAGE_READ_CHUNK: usize = 1024 * 1024;
+
 /// Raw `PROC_EXEC_CRED`: apply the setuid/setgid policy before the first thread starts.
 ///
 /// P9b moved this call from `0x3E` to `0x3F` so `PROC_HANDLE_INFO` owns `0x3E`.
@@ -431,24 +439,12 @@ pub fn spawn_image_with_exec<S: Sys>(
 #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 pub fn read_file_handle_at(file: Handle) -> Result<Vec<u8>, SpawnError> {
     let client = Client::new();
-    let mut data = Vec::new();
-    let mut buffer = [0u8; 4096];
     let mut offset = 0u64;
-    loop {
-        let read = client
-            .pread(file, offset, &mut buffer)
-            .map_err(SpawnError::Sys)?;
-        if read == 0 {
-            return Ok(data);
-        }
-        let next = data.len().checked_add(read).ok_or(SpawnError::TooLarge)?;
-        if next > MAX_FILE_IMAGE {
-            return Err(SpawnError::TooLarge);
-        }
-        let chunk = buffer.get(..read).ok_or(SpawnError::TooLarge)?;
-        data.extend_from_slice(chunk);
+    collect_image(|buffer| {
+        let read = client.pread(file, offset, buffer)?;
         offset = offset.saturating_add(read as u64);
-    }
+        Ok(read)
+    })
 }
 
 /// Spawn an ELF from an open scheme-file handle.
@@ -523,20 +519,33 @@ pub fn read_file_image(path: &str) -> Result<Vec<u8>, SpawnError> {
 /// Read one open image handle to its end, bounded by [`MAX_FILE_IMAGE`].
 #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 fn read_image_handle(client: &Client, handle: Handle) -> Result<Vec<u8>, SpawnError> {
+    collect_image(|buffer| client.read(handle, 0, buffer))
+}
+
+/// Read an image through `read` in [`IMAGE_READ_CHUNK`] pieces, bounded by [`MAX_FILE_IMAGE`].
+#[cfg(any(
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"),
+    test
+))]
+fn collect_image<F>(mut read: F) -> Result<Vec<u8>, SpawnError>
+where
+    F: FnMut(&mut [u8]) -> Result<usize, Errno>,
+{
     let mut data = Vec::new();
-    let mut buffer = [0u8; 4096];
+    let mut buffer = alloc_crate::vec![0u8; IMAGE_READ_CHUNK];
     loop {
-        let read = client
-            .read(handle, 0, &mut buffer)
-            .map_err(SpawnError::Sys)?;
-        if read == 0 {
+        let read_len = read(&mut buffer).map_err(SpawnError::Sys)?;
+        if read_len == 0 {
             return Ok(data);
         }
-        let next = data.len().checked_add(read).ok_or(SpawnError::TooLarge)?;
+        let next = data
+            .len()
+            .checked_add(read_len)
+            .ok_or(SpawnError::TooLarge)?;
         if next > MAX_FILE_IMAGE {
             return Err(SpawnError::TooLarge);
         }
-        let chunk = buffer.get(..read).ok_or(SpawnError::TooLarge)?;
+        let chunk = buffer.get(..read_len).ok_or(SpawnError::TooLarge)?;
         data.extend_from_slice(chunk);
     }
 }

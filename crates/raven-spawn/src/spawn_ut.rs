@@ -1287,3 +1287,46 @@ fn an_invalid_cwd_is_rejected_by_the_stack_builder() {
         ));
     }
 }
+
+#[test]
+fn a_megabyte_image_is_read_in_a_few_chunks() {
+    let size = 984_000usize;
+    let mut offset = 0usize;
+    let mut calls = 0usize;
+    let data = collect_image(|buffer| {
+        calls += 1;
+        let length = (size - offset).min(buffer.len());
+        buffer.get_mut(..length).expect("chunk").fill(0x5A);
+        offset += length;
+        Ok(length)
+    })
+    .expect("read");
+    assert_eq!(data.len(), size);
+    assert!(calls <= 2, "984 kB image needed {calls} reads");
+    assert!(data.iter().all(|byte| *byte == 0x5A));
+}
+
+#[test]
+fn an_image_larger_than_the_bound_is_rejected() {
+    let mut offset = 0usize;
+    let result = collect_image(|buffer| {
+        offset += buffer.len();
+        Ok(buffer.len())
+    });
+    assert!(matches!(result, Err(SpawnError::TooLarge)));
+    assert!(offset > MAX_FILE_IMAGE);
+}
+
+#[test]
+fn a_short_read_ends_the_image() {
+    let mut calls = 0usize;
+    let data = collect_image(|buffer| {
+        calls += 1;
+        let length = if calls == 1 { 10 } else { 0 };
+        buffer.get_mut(..length).expect("chunk").fill(1);
+        Ok(length)
+    })
+    .expect("read");
+    assert_eq!(data.len(), 10);
+    assert_eq!(calls, 2);
+}
