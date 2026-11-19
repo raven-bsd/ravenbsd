@@ -21,3 +21,10 @@ mode = 0o644
 src = "profiles/qemu-ufs.d/tmp.keep"
 path = "/tmp/.keep"
 mode = 0o644
+
+# The payload's /etc/mounts overlays the shell profile's initfs-root table with the
+# post-pivot root (`/ ufs:`); mount and df read this file.
+[[files]]
+src = "profiles/qemu-ufs.d/mounts"
+path = "/etc/mounts"
+mode = 0o644

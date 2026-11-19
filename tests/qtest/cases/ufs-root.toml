@@ -40,8 +40,10 @@ regex = '^ls$'
 unordered = true
 
 [[expect]]
-regex = '(?i)ufs'
-unordered = true
+regex = '^ufs: +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$'
+
+[[expect]]
+regex = '^ufs: on /$'
 
 [[expect]]
 regex = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
@@ -108,7 +110,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/mount\n"
+send = "/sbin/mount\n"
 delay_ms = 100
 
 [[step]]
