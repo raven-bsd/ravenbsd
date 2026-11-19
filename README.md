@@ -2,13 +2,15 @@
 
 A modern BSD: small, portable, coherent. A Rust microkernel (ours), Rust system servers, a
 Rust libc and base utilities, built with `cargo` driven by a `Makefile`, producing an image that boots.
-The only Redox-derived code is the frozen MIT `raven-rmm` page-table mapper, recorded in
-`PROVENANCE.toml`; that is provenance, not the project identity.
+The remaining Redox-derived code is the frozen MIT `raven-rmm` page-table mapper and the
+frozen vendored target-libc RavenBSD module, recorded in `PROVENANCE.toml`/S117; that is
+provenance, not the project identity.
 You type `uname -a` and see `RavenBSD`.
 
 - Language: Rust on **stable** only (pinned in `rust-toolchain.toml`). No C in the scaffold.
 - Licence: BSD-3-Clause (`LICENSE`). Third-party code: `PROVENANCE.toml`, `NOTICE`.
 - AI-assisted contributions are welcome: `AI_POLICY.md`.
+- Supply-chain policy (vendored graph, selective forks, CVE response): `docs/supply-chain.md` (DR-64).
 - Status: pre-M1. Contract crates exist (`crates/raven-abi`, `crates/raven-bootinfo`); the kernel is being written.
 
 Planning, architecture and tickets live in the separate private `ravenbsd-prjmgmt` repository; donor

@@ -85,9 +85,11 @@ impl PageTable {
 
     /// True when no entry in this table is present.
     pub fn is_empty<M: PhysMemory>(self, memory: &M) -> bool {
-        (0..PAGE_ENTRIES).all(|index| {
-            self.entry(memory, index)
-                .is_none_or(|entry| !entry.is_present())
+        (0..PAGE_ENTRIES).all(|index| match self.entry(memory, index) {
+            Some(entry) => !entry.is_present(),
+            // An unreadable table is not proven empty; never free a frame whose contents we
+            // could not inspect.
+            None => false,
         })
     }
 

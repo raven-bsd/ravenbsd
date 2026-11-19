@@ -95,6 +95,9 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
         if flags.is_write_execute() {
             return Err(MapError::WriteExecute);
         }
+        if flags.is_user() && !E::is_user_half(virt.data()) {
+            return Err(MapError::UserKernelSplit);
+        }
         if size == PageSize::Size1G {
             return Err(MapError::HugePageConflict);
         }
@@ -107,15 +110,24 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
         }
 
         let target_level = size.level();
+        // New intermediate tables are allocated but not linked until the leaf is in place. If a
+        // later allocation or the leaf write fails, they are unlinked and freed, so an OOM does
+        // not leave empty tables reachable from the root.
+        let mut new_tables: [Option<(PhysAddr, u8, usize, PhysAddr)>; 3] = [None; 3];
         let mut table = PageTable::new(self.root, (E::PAGE_LEVELS - 1) as u8);
         loop {
             let index = table.index_of(virt);
-            let entry = table
-                .entry(self.memory, index)
-                .ok_or(MapError::OutOfFrames)?;
+            let entry = match table.entry(self.memory, index) {
+                Some(entry) => entry,
+                None => {
+                    self.free_unlinked(&new_tables);
+                    return Err(MapError::OutOfFrames);
+                }
+            };
 
             if table.level() == target_level {
                 if E::is_present(entry.raw()) {
+                    self.free_unlinked(&new_tables);
                     if target_level > 0 && E::is_table(entry.raw(), target_level) {
                         return Err(MapError::HugePageConflict);
                     }
@@ -123,40 +135,78 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
                 }
                 let new_entry = Entry::from_raw(E::leaf(phys, flags, size));
                 if !table.set_entry(self.memory, index, new_entry) {
+                    self.free_unlinked(&new_tables);
                     return Err(MapError::OutOfFrames);
                 }
-                self.tlb.flush(virt);
-                return Ok(());
+                break;
             }
 
             if E::is_present(entry.raw()) && !E::is_table(entry.raw(), table.level()) {
+                self.free_unlinked(&new_tables);
                 return Err(MapError::HugePageConflict);
             }
 
             table = if E::is_present(entry.raw()) {
                 let child = entry.address();
                 if !child.0.is_multiple_of(crate::PAGE_SIZE) {
+                    self.free_unlinked(&new_tables);
                     return Err(MapError::HugePageConflict);
                 }
                 PageTable::new(child, table.level() - 1)
             } else {
-                let frame = self.allocator.allocate().ok_or(MapError::OutOfFrames)?;
+                let frame = match self.allocator.allocate() {
+                    Some(frame) => frame,
+                    None => {
+                        self.free_unlinked(&new_tables);
+                        return Err(MapError::OutOfFrames);
+                    }
+                };
                 if !frame.0.is_multiple_of(crate::PAGE_SIZE) || frame.0 > E::PHYS_ADDR_MASK {
                     self.allocator.free(frame);
+                    self.free_unlinked(&new_tables);
                     return Err(MapError::NotCanonical);
                 }
                 if let Err(error) = self.zero_frame(frame) {
                     self.allocator.free(frame);
+                    self.free_unlinked(&new_tables);
                     return Err(error);
                 }
-                let new_entry = Entry::from_raw(E::table(frame, flags.is_user()));
-                if !table.set_entry(self.memory, index, new_entry) {
+                let parent = table;
+                let Some(slot) = new_tables.iter_mut().find(|slot| slot.is_none()) else {
                     self.allocator.free(frame);
+                    self.free_unlinked(&new_tables);
                     return Err(MapError::OutOfFrames);
-                }
+                };
+                *slot = Some((parent.phys(), parent.level(), index, frame));
                 PageTable::new(frame, table.level() - 1)
             };
         }
+
+        // Link top-down after the leaf write. Nothing above the leaf can fail on a valid direct
+        // map; if it does, unlink what was linked and free the unlinked frames.
+        let user = flags.is_user();
+        for (linked, slot) in new_tables.iter().flatten().enumerate() {
+            let (parent_phys, parent_level, parent_index, frame) = *slot;
+            let parent = PageTable::new(parent_phys, parent_level);
+            if !parent.set_entry(
+                self.memory,
+                parent_index,
+                Entry::from_raw(E::table(frame, user)),
+            ) {
+                let mut all_unlinked = true;
+                for previous in new_tables[..linked].iter().rev().flatten() {
+                    let (pp, pl, pi, _) = *previous;
+                    all_unlinked &=
+                        PageTable::new(pp, pl).set_entry(self.memory, pi, Entry::from_raw(0));
+                }
+                if all_unlinked {
+                    self.free_unlinked(&new_tables);
+                }
+                return Err(MapError::OutOfFrames);
+            }
+        }
+        self.tlb.flush(virt);
+        Ok(())
     }
 
     /// Unmap the page at `virt` and return its physical base.
@@ -189,6 +239,9 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
     pub fn protect(&mut self, virt: VirtAddr, flags: PageFlags) -> Result<(), MapError> {
         if flags.is_write_execute() {
             return Err(MapError::WriteExecute);
+        }
+        if flags.is_user() && !E::is_user_half(virt.data()) {
+            return Err(MapError::UserKernelSplit);
         }
         let (table, index, entry, size) = self.locate(virt).ok_or(MapError::NotMapped)?;
         if !E::is_present(entry.raw()) {
@@ -281,8 +334,20 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
             self.allocator.free(root);
             return Err(error);
         }
-        let source = self.frame_pointer(copy_kernel_half_from)?;
-        let destination = self.frame_pointer(root)?;
+        let source = match self.frame_pointer(copy_kernel_half_from) {
+            Ok(pointer) => pointer,
+            Err(error) => {
+                self.allocator.free(root);
+                return Err(error);
+            }
+        };
+        let destination = match self.frame_pointer(root) {
+            Ok(pointer) => pointer,
+            Err(error) => {
+                self.allocator.free(root);
+                return Err(error);
+            }
+        };
         for index in crate::PAGE_ENTRIES / 2..crate::PAGE_ENTRIES {
             // SAFETY: both pointers refer to 4 KiB page-table frames returned by the direct map;
             // `index` is in bounds and entries are 8-byte aligned.
@@ -326,10 +391,15 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
         }
         let child = PageTable::new(entry.address(), table.level() - 1);
         self.prune(child, virt);
-        if child.is_empty(self.memory) {
-            let _ = table.set_entry(self.memory, index, Entry::from_raw(0));
+        if child.is_empty(self.memory) && table.set_entry(self.memory, index, Entry::from_raw(0)) {
             self.allocator.free(child.phys());
             self.tlb.flush(virt);
+        }
+    }
+
+    fn free_unlinked(&mut self, tables: &[Option<(PhysAddr, u8, usize, PhysAddr)>; 3]) {
+        for entry in tables.iter().flatten() {
+            self.allocator.free(entry.3);
         }
     }
 
