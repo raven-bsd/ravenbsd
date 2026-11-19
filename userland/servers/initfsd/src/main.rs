@@ -209,6 +209,7 @@ mod program {
             .map(|entry| FileEntry {
                 path: entry.path,
                 mode: entry.mode,
+                mtime: entry.mtime,
                 data: entry.data,
             })
             .collect();

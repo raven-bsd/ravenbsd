@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K162: initfs entries must report the reproducible image epoch instead of Jan 1 1970.
+# Boots the shell-test image, stats /init, /bin/ls and the synthetic /bin directory, and requires
+# the same non-zero epoch for all three.
+
+name = "initfs-time"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^initfs-time PASS [0-9]+ [0-9]+ [0-9]+ [0-9]+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 90
+
+[[step]]
+send = "/bin/brush -c 't1=$(/bin/stat -c %Y /init); t2=$(/bin/stat -c %Y /bin/ls); t4=$(/bin/stat -c %Y /bin); /bin/touch /tmp/k162; t3=$(/bin/stat -c %Y /tmp/k162); if [ $t1 -ge 1600000000 ] && [ $t1 -eq $t2 ] && [ $t1 -eq $t4 ] && [ $t3 -ge $t1 ]; then echo initfs-time PASS $t1 $t2 $t4 $t3; else echo initfs-time FAIL $t1 $t2 $t4 $t3; fi'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^initfs-time PASS [0-9]+ [0-9]+ [0-9]+ [0-9]+$'
+timeout_secs = 20
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/ls -l /init\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
