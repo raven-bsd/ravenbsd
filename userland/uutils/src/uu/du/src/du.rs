@@ -20,6 +20,7 @@ use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::AsRawHandle;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
+#[cfg(not(target_os = "ravenbsd"))]
 use std::thread;
 use std::time::SystemTime;
 use uucore::diagnostics::OptionValue;
@@ -1272,8 +1273,12 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
         );
     }
 
-    // Use separate thread to print output, so we can print finished results while computation is still running
+    // Use a separate thread to print output so results can appear while computation is still
+    // running. On RavenBSD the std mpsc wake between the traversal and the printer thread hangs
+    // after the first send (K148); traverse synchronously and drain the same queue after it. The
+    // mpsc/futex stall is handed to the libc/kernel owner in docs/du-thread-abort.md.
     let (print_tx, rx) = mpsc::channel::<UResult<StatPrintInfo>>();
+    #[cfg(not(target_os = "ravenbsd"))]
     let printing_thread = thread::spawn(move || stat_printer.print_stats(&rx));
 
     // Check existence of path provided in argument
@@ -1376,9 +1381,12 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
 
     drop(print_tx);
 
+    #[cfg(not(target_os = "ravenbsd"))]
     printing_thread
         .join()
         .map_err(|_| USimpleError::new(1, translate!("du-error-printing-thread-panicked")))??;
+    #[cfg(target_os = "ravenbsd")]
+    stat_printer.print_stats(&rx)?;
 
     Ok(())
 }
