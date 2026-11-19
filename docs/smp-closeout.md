@@ -187,6 +187,61 @@ soak stopped on the first failure; the 5-case TCG4 column and the KVM modes were
 partial pass is claimed. Owner: the S107/S116 exclusive window (other lanes), with S127's login
 banner timing affected by the 30 s bound under starvation.
 
+## Rework round 3 (rev 57): S132/S130, 10/10 and the KVM2 console stall
+
+Branch merged `origin/master` `6f6cba1e` (no rebase): S132 thread-list unlink (`b79c2056`) and
+S130 release-login expectation (`6679570b`). Merge commit `8af9dd93`; clean tree.
+
+**Image.** `cargo xtask libc-link --arch x86_64` refreshed the dynamic runtime, then
+`cargo xtask image --arch x86_64 --profile release`:
+
+- commit `8af9dd93be08630846d83b5848e703f7e5721880`
+- sha256 `225bd44e89e3436325de82f9e7b5604a4f815d5abc2d654d7cdeb9fefec32d41`
+- size 335544320 bytes; `ld-elf.so.1` 107128 bytes
+
+**TCG4 boot gate (10/10 PASS).**
+
+```
+sh scripts/smp-boot-soak.sh --kvm1 0 --kvm2 0 --kvm4 0 --tcg4 10 --wait-for-idle 1200 --max-load 5
+```
+
+`login:` p50 **7.990 s**, p90 **8.169 s**, worst **9.155 s**; host telemetry jobs=0 for all ten
+boots, load 3-4, QEMU=0 apart from the boot itself. Logs:
+`build/smp-boot-soak/20261119T003239Z/` (`host.tsv`, `summary.txt`).
+
+**TCG4 close-out column (5/5 PASS).** `--max-load 5 --wait-for-idle 300`; host load 1.6-1.8,
+QEMU/xtask only the cell's own.
+
+| Case | Duration |
+|---|---|
+| `posix-shell` | 24.7 s |
+| `posix-util-system` | 22.1 s |
+| `libc-threads` | 135.3 s |
+| `smp-libc-concurrency` | **48.0 s (S132 confirms the fix)** |
+| `posix-fs-smp` | 111.3 s |
+
+n=5, min 22.076 s, p50 47.974 s, p90 135.262 s, max 135.262 s. Artifacts:
+`build/smp-closeout/r3-tcg4/`.
+
+**KVM columns — stopped on the first failure.**
+
+- KVM `-smp 1`: **5/5 pass** (shell 8.3 s, util 12.5 s, threads 13.4 s, concurrency 13.7 s,
+  fs-smp 23.7 s), including `smp-libc-concurrency-kvm1`.
+- KVM `-smp 2`, `posix-shell-kvm2`: **FAIL**, 379.1 s. The serial stops mid-line at the first
+  brush command (`raven# /bin/brush --posix -c '... case a`) with no shell output, the qtest step
+  for `^until:2$` reports "the process exited before this step finished", and the guest exits 0.
+  Host telemetry for that cell: load 2.26 -> 1.03, QEMU/xtask 0-1 (the cell's own), no external
+  jobs. The same case passes on TCG4 and KVM1. Artifacts:
+  `build/smp-closeout/r3-kvm/kvm2/posix-shell-kvm2.{log,json,out,telemetry.tsv}`.
+- KVM `-smp 2` remaining cells and all KVM `-smp 4` were not run (stop rule); no partial column
+  is claimed.
+
+**Classification:** the KVM2 `posix-shell` stall is in the console/rsh path (the command echo
+never completes and no brush output appears), not the S126 runner, not the shell assertions and
+not S132. S130 only changed `tests/qtest/cases/release-login.toml`, so it is not the code cause.
+Owner: console/rsh (phil/TTY1 or the consd/rsh lane) with the KVM2 console timing. The `smp-libc-concurrency`
+cells prove S132 is fixed (TCG4 48.0 s, KVM1 13.7 s).
+
 ## When the full matrix runs
 
 Only after **S125 and Mel/S85e land** and **S116/S107 provide the exclusive window**. Until then
