@@ -17,13 +17,16 @@ raven-ufs [--yes] [--recursive] rm PATH IMAGE|DEVICE
 raven-ufs [--yes] mkdir PATH IMAGE|DEVICE
 raven-ufs [--yes] [--delete] sync HOST_TREE DEST IMAGE|DEVICE
 raven-ufs [--yes] check IMAGE|DEVICE
+raven-ufs [--yes] repair IMAGE|DEVICE
 ```
 
 `put` preserves the host mode, uid, gid and mtime and replaces an existing regular file.
 `sync` adds/replaces directories, files and symlinks, preserving mode/uid/gid/mtime; `--delete`
 removes destination entries absent from the host tree. `rm --recursive` removes a directory
 tree. Every write operation runs the read-only UFS checker and fails if the result is not clean;
-`check` is the same checker without a write.
+`check` is the same checker without a write. `repair` preens the UFS slice in place (the
+`ufs-fsck` preen phase set) and verifies the result; use it after a guest shutdown left the rw
+root dirty.
 
 `--offset N --size N` overrides auto-detection for a known slice, but both are required together.
 
@@ -33,7 +36,8 @@ tree. Every write operation runs the read-only UFS checker and fails if the resu
 * A **whole Pi 4 image or whole disk** must be a validated GPT with exactly two partitions:
   an ESP/FAT partition followed by a FreeBSD-UFS partition. The protective MBR, primary and
   backup headers, header/entry CRCs, usable range, partition types and overlap are checked.
-  Anything else is refused; the tool does not guess.
+* The **QEMU UFS-root disk** is a validated GPT with exactly one FreeBSD-UFS partition; the same
+  offset/size checks apply. Any other count or type is refused; the tool does not guess.
 * A **partition device** such as `/dev/sdX2` is used at offset 0, but it must pass the UFS check
   before any write.
 * Every block-device operation requires `--yes`. A block device that is mounted, or that is the
@@ -67,6 +71,24 @@ scripts/raven-ufs --delete sync build/pi4-rootfs / "$image"
 
 Use `--delete` only on a tree that is the complete intended root; it removes every destination
 entry outside the tree, including unrelated files.
+
+## 3a. QEMU UFS-root disk
+
+The K176 image build assembles `build/x86_64/qemu-ufs-root.img` as a one-partition GPT with a
+256 MiB UFS2 root. Update it in place after the image build and boot the same root:
+
+```sh
+cargo xtask image --arch x86_64 --profile qemu-ufs --output build/x86_64/qemu-ufs.img
+scripts/raven-ufs check build/x86_64/qemu-ufs-root.img
+scripts/raven-ufs put build/motd /etc/ufs-update.txt build/x86_64/qemu-ufs-root.img
+scripts/raven-ufs check build/x86_64/qemu-ufs-root.img
+```
+
+The ESP (`build/x86_64/qemu-ufs.img`, or the qtest case ESP) is a separate file and is never
+passed to `raven-ufs`. The `ufs-update` qtest hashes the baseline ESP before/after the update; the
+observed value was `160ae00e9dbdbc44a7f25980303cddc0658aa115852335e5cb42fe85e1a2bab6`
+(unchanged), and the boot read `k185-first` through `/`. The `ufs-update-persist` pre step repairs
+the dirty post-boot UFS, replaces the same file, and the next boot reads `k185-second`.
 
 ## 4. `/dev/sdX2` partition
 

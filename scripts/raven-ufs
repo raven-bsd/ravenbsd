@@ -38,6 +38,7 @@ usage:
   raven-ufs [--yes] mkdir PATH IMAGE|DEVICE
   raven-ufs [--yes] [--delete] sync HOST_TREE DEST IMAGE|DEVICE
   raven-ufs [--yes] check IMAGE|DEVICE
+  raven-ufs [--yes] repair IMAGE|DEVICE
 
   --yes        required for any block-device target; never bypasses mount/root checks
   --recursive  rm removes a directory tree
@@ -500,6 +501,16 @@ case "$command" in
         }
         resolve_target "$1"
         check_block_safety
+        ufs_inject check
+        ;;
+    repair)
+        [ "$#" -eq 1 ] || {
+            usage >&2
+            exit 2
+        }
+        resolve_target "$1"
+        check_block_safety
+        ufs_inject repair
         ufs_inject check
         ;;
     *)

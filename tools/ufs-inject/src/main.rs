@@ -15,7 +15,7 @@ use std::process::ExitCode;
 
 use ufs_inject::{
     Image, MkdirOptions, PutOptions, SymlinkOptions, Timespec, cat, fsck, list, lstat, mkdir, put,
-    remove, stat, symlink, type_name,
+    remove, repair, stat, symlink, type_name,
 };
 
 const USAGE: &str = "\
@@ -29,6 +29,7 @@ usage: ufs-inject [--offset BYTES] [--size BYTES] IMAGE COMMAND ...
   list PATH
   stat [--no-follow] PATH
   check
+  repair
 
   --offset BYTES  UFS partition byte offset inside IMAGE (default 0)
   --size BYTES    UFS partition length (default: to the end of the file)
@@ -82,6 +83,7 @@ fn run(args: Vec<String>) -> Result<u8, String> {
         "list" => command_list(&image, rest),
         "stat" => command_stat(&image, rest),
         "check" => command_check(&image, rest),
+        "repair" => command_repair(&image, rest),
         other => Err(format!("unknown command {other}")),
     }
 }
@@ -299,6 +301,38 @@ fn command_check(image: &Image, args: &[String]) -> Result<u8, String> {
             "{}: {} unresolved finding(s)",
             image.path.display(),
             report.findings.len()
+        );
+        Ok(4)
+    }
+}
+
+fn command_repair(image: &Image, args: &[String]) -> Result<u8, String> {
+    if !args.is_empty() {
+        return Err(String::from("repair takes no arguments"));
+    }
+    let report = repair(image)?;
+    for finding in &report.findings {
+        let mut line = format!("phase {}: {:?}", finding.phase, finding.problem);
+        if let Some(inode) = finding.inode {
+            line.push_str(&format!(" inode={inode}"));
+        }
+        if let Some(block) = finding.block {
+            line.push_str(&format!(" block={block}"));
+        }
+        println!("{line}");
+    }
+    if report.clean_after {
+        println!(
+            "{}: repaired {} finding(s), clean",
+            image.path.display(),
+            report.fixed.len()
+        );
+        Ok(0)
+    } else {
+        println!(
+            "{}: {} unresolved finding(s)",
+            image.path.display(),
+            report.findings.len().saturating_sub(report.fixed.len())
         );
         Ok(4)
     }

@@ -775,6 +775,19 @@ pub fn fsck(image: &Image) -> Result<Report, String> {
     check_image(image)
 }
 
+/// Preen the UFS slice in place: repair the checker's normal findings and verify the result.
+///
+/// # Errors
+/// Returns a message when the image cannot be opened or repaired; a report with
+/// `clean_after == false` is returned for findings the checker cannot resolve.
+pub fn repair(image: &Image) -> Result<Report, String> {
+    let mut disk = open_disk(image, true)?;
+    let report = check(&mut disk, Mode::Repair).map_err(|error| format!("fsck repair: {error}"))?;
+    disk.flush()
+        .map_err(|_| format!("flush {}", image.path.display()))?;
+    Ok(report)
+}
+
 /// The four permission bits and type for a `stat` line.
 #[must_use]
 pub fn type_name(kind: FileType) -> &'static str {
