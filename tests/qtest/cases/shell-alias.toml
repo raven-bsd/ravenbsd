@@ -122,11 +122,12 @@ timeout_secs = 15
 wait = '^raven# $'
 timeout_secs = 15
 
+# Run ed from a non-interactive brush: brush -c does not read standard input while the child
+# runs, so ed is the only console reader. This keeps the same release root and /bin/ed.
 [[step]]
-send = "/bin/ed\n"
-delay_ms = 300
+send = "/bin/brush -c '/bin/ed'\n"
+delay_ms = 800
 
-# ed reads its script directly from the serial console and executes it after one idle second.
 [[step]]
 send = "a\nraven ed works\n.\nw /tmp/raven-ed.txt\nq\n"
 delay_ms = 500

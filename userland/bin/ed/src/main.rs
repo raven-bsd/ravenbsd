@@ -79,6 +79,9 @@ mod program {
                     let text = String::from_utf8_lossy(buffer.get(..count).unwrap_or(&[]));
                     script.push_str(&text);
                 }
+                // A console wake can arrive as an interrupt before the read deadline; it is
+                // not end of input. K183: keep reading so the editor survives a blocked read.
+                Err(Errno::EINTR) => continue,
                 Err(_) => break,
             }
         }
