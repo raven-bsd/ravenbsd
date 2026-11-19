@@ -69,6 +69,7 @@ mod program {
     const CONFIG_HANDLE: Handle = Handle::new(4, 0);
     const DMA_HANDLE: Handle = Handle::new(5, 0);
     const IRQ_HANDLE: Handle = Handle::new(6, 0);
+    const MSIX_BAR_HANDLE: Handle = Handle::new(7, 0);
 
     /// The driver table matches `1af4:1042` (modern virtio-blk).
     const VIRTIO_VENDOR: u16 = 0x1AF4;
@@ -83,11 +84,14 @@ mod program {
     /// Legacy INTx wait per completion (one second).
     const IRQ_WAIT_NS: u64 = 1_000_000_000;
 
-    /// MSI-X queue message supplied by `devd` after `IRQ_CREATE(MSIX)`.
+    /// MSI-X queue message and table location supplied by `devd`.
     struct MsixInfo {
         address_lo: u32,
         address_hi: u32,
         data: u32,
+        bar: usize,
+        bar_size: usize,
+        table: usize,
     }
 
     /// qtest fixture layout: a small GPT lives in the first MiB; the pattern covers the data area
@@ -121,6 +125,9 @@ mod program {
         let mut msix_addr_lo = None;
         let mut msix_addr_hi = None;
         let mut msix_data = None;
+        let mut msix_bar = None;
+        let mut msix_bar_size = None;
+        let mut msix_table = None;
         for argument in args.iter().skip(1) {
             if let Some(value) = argument.strip_prefix("bar=") {
                 bar_index = value
@@ -158,6 +165,24 @@ mod program {
                         .parse()
                         .map_err(|_| format!("bad msix_data argument `{argument}`"))?,
                 );
+            } else if let Some(value) = argument.strip_prefix("msix_bar=") {
+                msix_bar = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_bar argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_bar_size=") {
+                msix_bar_size = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_bar_size argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_table=") {
+                msix_table = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_table argument `{argument}`"))?,
+                );
             } else if argument == "test" {
                 test = true;
             }
@@ -169,6 +194,10 @@ mod program {
                 address_hi: msix_addr_hi
                     .ok_or_else(|| "msix requested without msix_addr_hi".to_string())?,
                 data: msix_data.ok_or_else(|| "msix requested without msix_data".to_string())?,
+                bar: msix_bar.ok_or_else(|| "msix requested without msix_bar".to_string())?,
+                bar_size: msix_bar_size
+                    .ok_or_else(|| "msix requested without msix_bar_size".to_string())?,
+                table: msix_table.ok_or_else(|| "msix requested without msix_table".to_string())?,
             })
         } else {
             None
@@ -193,9 +222,17 @@ mod program {
         let (meta, data) = dma_window.split_at_mut(DATA_OFFSET);
         let dma = DmaRegion::new(meta, dma_info.bus_addr);
         let irq = Irq::new(IRQ_HANDLE);
+        let msix_bar = match &msix {
+            Some(info) => {
+                let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)
+                    .map_err(|error| format!("msix bar map: {}", error.description()))?;
+                Some(MmioRegion::new(window))
+            }
+            None => None,
+        };
 
         let mut device = VirtioBlk::open(
-            bar, config, dma, data, irq, bar_index, bar_size, irq_line, msix,
+            bar, config, dma, data, irq, bar_index, bar_size, irq_line, msix, msix_bar,
         )?;
         raven_rt::println!(
             "virtio-blk: capacity={} sector_size={} ro={}",
@@ -482,17 +519,15 @@ mod program {
     /// Entry 0 is the configuration vector and is masked; entry 1 is the shared queue vector the
     /// request queue references. `devd` allocated the kernel vector and passed its message.
     fn configure_msix(
-        bar: &mut MmioRegion,
+        table: &mut MmioRegion,
         config: &mut MmioRegion,
         cap: &MsixCap,
         info: &MsixInfo,
-        bar_index: usize,
-        bar_size: usize,
     ) -> Result<(), String> {
-        if cap.table_bar != bar_index {
+        if cap.table_bar != info.bar || cap.table_offset != info.table {
             return Err(format!(
-                "MSI-X table is on bar{}, driver has bar{bar_index}",
-                cap.table_bar
+                "MSI-X table is bar{} offset {:#x}, devd passed bar{} offset {:#x}",
+                cap.table_bar, cap.table_offset, info.bar, info.table
             ));
         }
         if cap.table_size < 2 {
@@ -501,27 +536,27 @@ mod program {
                 cap.table_size
             ));
         }
-        let queue_entry = cap
-            .table_offset
-            .checked_add(16)
+        let end = info
+            .table
+            .checked_add(32)
             .ok_or_else(|| "MSI-X table offset overflows".to_string())?;
-        let end = queue_entry
-            .checked_add(16)
-            .ok_or_else(|| "MSI-X table offset overflows".to_string())?;
-        if end > bar_size {
+        if end > info.bar_size {
             return Err("MSI-X table is outside the BAR".to_string());
         }
-        bar.write_u32(cap.table_offset, 0).map_err(describe)?;
-        bar.write_u32(cap.table_offset + 4, 0).map_err(describe)?;
-        bar.write_u32(cap.table_offset + 8, 0).map_err(describe)?;
-        bar.write_u32(cap.table_offset + 12, 1).map_err(describe)?;
-        bar.write_u32(queue_entry, info.address_lo)
+        table.write_u32(info.table, 0).map_err(describe)?;
+        table.write_u32(info.table + 4, 0).map_err(describe)?;
+        table.write_u32(info.table + 8, 0).map_err(describe)?;
+        table.write_u32(info.table + 12, 1).map_err(describe)?;
+        table
+            .write_u32(info.table + 16, info.address_lo)
             .map_err(describe)?;
-        bar.write_u32(queue_entry + 4, info.address_hi)
+        table
+            .write_u32(info.table + 20, info.address_hi)
             .map_err(describe)?;
-        bar.write_u32(queue_entry + 8, info.data)
+        table
+            .write_u32(info.table + 24, info.data)
             .map_err(describe)?;
-        bar.write_u32(queue_entry + 12, 0).map_err(describe)?;
+        table.write_u32(info.table + 28, 0).map_err(describe)?;
         let offset = usize::from(cap.offset);
         let control = config.read_u16(offset + 2).map_err(describe)?;
         config
@@ -529,7 +564,11 @@ mod program {
             .map_err(describe)?;
         let command = config.read_u16(0x04).map_err(describe)?;
         config.write_u16(0x04, command | 0x0400).map_err(describe)?;
-        raven_rt::println!("virtio-blk: msix table={:#x} vector=1", cap.table_offset);
+        raven_rt::println!(
+            "virtio-blk: msix table={:#x} bar={} vector=1",
+            info.table,
+            info.bar
+        );
         Ok(())
     }
 
@@ -568,6 +607,7 @@ mod program {
             bar_size: usize,
             _irq_line: u32,
             msix: Option<MsixInfo>,
+            msix_bar: Option<MmioRegion>,
         ) -> Result<Self, String> {
             let vendor = config.read_u16(0x00).map_err(describe)?;
             let device = config.read_u16(0x02).map_err(describe)?;
@@ -586,17 +626,20 @@ mod program {
                 caps.device.offset
             );
             let features = reset_and_negotiate(&mut bar, &caps)?;
-            let msix_vector = match msix {
-                Some(info) => {
+            let msix_vector = match (msix, msix_bar) {
+                (Some(info), Some(mut table)) => {
                     let cap = find_msix(&config)?.ok_or_else(|| {
                         "MSI-X was requested but the function has no MSI-X capability".to_string()
                     })?;
-                    configure_msix(&mut bar, &mut config, &cap, &info, bar_index, bar_size)?;
+                    configure_msix(&mut table, &mut config, &cap, &info)?;
                     bar.write_u16(common(&caps, MSIX_CONFIG), 0)
                         .map_err(describe)?;
                     1
                 }
-                None => 0xFFFF,
+                (Some(_), None) => {
+                    return Err("MSI-X table BAR was not transferred".to_string());
+                }
+                (None, _) => 0xFFFF,
             };
             // The capacity field is 8 bytes at the start of the device configuration; read it as
             // two 32-bit words because the capability only guarantees 4-byte alignment.

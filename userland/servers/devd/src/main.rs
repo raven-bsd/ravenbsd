@@ -613,57 +613,79 @@ mod program {
             }
             let mut msix_done = false;
             if let Some(capability) = msix {
-                if capability.table_bar != options.bar {
-                    raven_rt::println!(
-                        "devd: driver {} msix table is on bar{}, driver uses bar{}",
-                        driver.name,
-                        capability.table_bar,
-                        options.bar
-                    );
-                } else if capability.table_size < 2 {
+                let table_bar = capability.table_bar;
+                let (table_kind, table_bar_size) = match bars.get(table_bar) {
+                    Some(&(kind, bar_size)) => (kind, usize::try_from(bar_size).unwrap_or(0)),
+                    None => ("absent", 0),
+                };
+                let table_fits = table_kind == "memory"
+                    && capability.table_offset.saturating_add(32) <= table_bar_size;
+                if capability.table_size < 2 {
                     raven_rt::println!(
                         "devd: driver {} msix has {} entries; need 2",
                         driver.name,
                         capability.table_size
                     );
-                } else if capability.table_offset.saturating_add(32)
-                    > usize::try_from(size).unwrap_or(0)
-                {
+                } else if !table_fits {
                     raven_rt::println!(
-                        "devd: driver {} msix table is outside bar{}",
+                        "devd: driver {} msix table bar{} is {} size {}; table at {:#x} does not fit",
                         driver.name,
-                        options.bar
+                        table_bar,
+                        table_kind,
+                        table_bar_size,
+                        capability.table_offset
                     );
                 } else {
-                    let mut info = raven_rt::IrqInfo::default();
-                    match raven_rt::irq_create(
-                        Handle::ROOT_DEVICE,
-                        raven_rt::IRQ_MSIX,
-                        0,
-                        Some(&mut info),
-                    ) {
-                        Ok(handle) => {
-                            opened.push(handle);
-                            argv.push(String::from("msix=1"));
-                            argv.push(alloc::format!("msix_addr_lo={}", info.address_lo));
-                            argv.push(alloc::format!("msix_addr_hi={}", info.address_hi));
-                            argv.push(alloc::format!("msix_data={}", info.data));
-                            raven_rt::println!(
-                                "devd: driver {} msix vector={} table={:#x} bar={}",
-                                driver.name,
-                                info.vector,
-                                capability.table_offset,
-                                capability.table_bar
-                            );
-                            msix_done = true;
+                    let table = client
+                        .open(&alloc::format!("pci:/{name}/bar{table_bar}"), READ)
+                        .map_err(|error| {
+                            alloc::format!("msix bar{table_bar}: {}", error.description())
+                        });
+                    match table {
+                        Ok(table_handle) => {
+                            let mut info = raven_rt::IrqInfo::default();
+                            match raven_rt::irq_create(
+                                Handle::ROOT_DEVICE,
+                                raven_rt::IRQ_MSIX,
+                                0,
+                                Some(&mut info),
+                            ) {
+                                Ok(handle) => {
+                                    opened.push(handle);
+                                    opened.push(table_handle);
+                                    argv.push(String::from("msix=1"));
+                                    argv.push(alloc::format!("msix_addr_lo={}", info.address_lo));
+                                    argv.push(alloc::format!("msix_addr_hi={}", info.address_hi));
+                                    argv.push(alloc::format!("msix_data={}", info.data));
+                                    argv.push(alloc::format!("msix_bar={table_bar}"));
+                                    argv.push(alloc::format!("msix_bar_size={table_bar_size}"));
+                                    argv.push(alloc::format!(
+                                        "msix_table={}",
+                                        capability.table_offset
+                                    ));
+                                    raven_rt::println!(
+                                        "devd: driver {} msix vector={} table={:#x} bar={}",
+                                        driver.name,
+                                        info.vector,
+                                        capability.table_offset,
+                                        table_bar
+                                    );
+                                    msix_done = true;
+                                }
+                                Err(error) => {
+                                    let _ = raven_rt::handle_close(table_handle);
+                                    raven_rt::println!(
+                                        "devd: driver {} msix unavailable: {}; using legacy irq",
+                                        driver.name,
+                                        error.description()
+                                    );
+                                }
+                            }
                         }
-                        Err(error) => {
-                            raven_rt::println!(
-                                "devd: driver {} msix unavailable: {}; using legacy irq",
-                                driver.name,
-                                error.description()
-                            );
-                        }
+                        Err(error) => raven_rt::println!(
+                            "devd: driver {} msix table open: {error}",
+                            driver.name
+                        ),
                     }
                 }
             }
