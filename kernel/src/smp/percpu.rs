@@ -7,7 +7,7 @@
 //! and by MSR setup. This module owns the per-CPU preemption depth, which must not be global: a
 //! critical section on one CPU must not suppress preemption on another.
 
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use super::MAX_CPUS;
 use crate::arch::x86_64::ap_start;
@@ -30,6 +30,8 @@ static IN_PAGE_FAULT: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_
 static PAGE_FAULT_PHASE: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 /// Last wait-queue stage reached by the CPU (diagnostic).
 static WAIT_PHASE: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
+/// One while this CPU holds an address-space mutex that may need a TLB shootdown.
+static UNMAP_LOCK_HELD: [AtomicBool; MAX_CPUS] = [const { AtomicBool::new(false) }; MAX_CPUS];
 /// Syscall number currently executing (diagnostic).
 static SYSCALL_NUMBER: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 
@@ -135,6 +137,21 @@ pub fn note_wait_phase(phase: u64) {
     if let Some(slot) = WAIT_PHASE.get(cpu) {
         slot.store(phase, Ordering::Relaxed);
     }
+}
+
+/// Mark whether this CPU holds an address-space mutex across a potential TLB shootdown.
+pub fn note_unmap_lock_held(active: bool) {
+    let cpu = this_cpu();
+    if let Some(slot) = UNMAP_LOCK_HELD.get(cpu) {
+        slot.store(active, Ordering::Relaxed);
+    }
+}
+
+/// True when this CPU holds an address-space mutex across a potential TLB shootdown.
+pub fn unmap_lock_held() -> bool {
+    UNMAP_LOCK_HELD
+        .get(this_cpu())
+        .is_some_and(|slot| slot.load(Ordering::Relaxed))
 }
 
 /// Snapshot of the last wait-queue stage reached by `cpu`.

@@ -281,7 +281,9 @@ fn build_release_initfs(
         })?;
         builder.add_file(&file.path, &data, file.mode)?;
     }
-    Ok(builder.build())
+    let image = builder.build();
+    crate::initfs::verify_dynamic_payload(&image, root, arch, profile.initfs.dynamic)?;
+    Ok(image)
 }
 
 fn build_pi4_sd(
