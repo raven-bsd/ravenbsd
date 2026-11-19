@@ -175,7 +175,7 @@ pub(crate) fn run_with_overrides(
             let path = resolve_override(root, path);
             fs::read(&path).with_context(|| format!("cannot read {}", path.display()))?
         }
-        None if rootfs => build_release_initfs(root, arch, &profile, &workspace)?,
+        None if rootfs && !qemu_ufs => build_release_initfs(root, arch, &profile, &workspace)?,
         None => {
             // K176: the UFS-root image keeps the initfs bootstrap-only; the release
             // userland goes into the root disk below.
