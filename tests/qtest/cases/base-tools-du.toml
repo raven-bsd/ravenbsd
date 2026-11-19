@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K134: `du` is the first base tool that spawns a Rust std thread. It must exit 0 with a size
-# line; the abort `current thread handle already set during thread spawn` is a failure here.
+# K136: `du` is the first base tool that spawns a Rust std thread. The uutils link script must
+# map the ELF/program headers so libc finds PT_TLS through AT_PHDR. This case fails on the
+# thread-spawn abort; a post-fix traversal/join hang is K134, not a K136 regression.
 # Budget: shell-test boot ~33 s, one sub-second command, whole case ~48 s.
 
 name = "base-tools-du"
@@ -20,7 +21,7 @@ regex = '^svcd: all services up$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|command not found|fatal runtime error'
+regex = '(?i)panic|EXCEPTION|command not found|fatal runtime error|failed to spawn thread'
 
 [[step]]
 wait = '^raven# $'
