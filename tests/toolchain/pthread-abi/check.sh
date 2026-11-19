@@ -133,7 +133,7 @@ for spec in "pthread_once_t ONCE $once_size" "pthread_spinlock_t SPINLOCK $spin_
     [ "$uutils_align" = 4 ] || fail "$type uutils align $uutils_align != 4"
 done
 
-copies=$(git grep -l 'const _PTHREAD_ATTR_SIZE' -- . 2>/dev/null |
+copies=$(git grep -l 'const _PTHREAD_ATTR_SIZE' -- '*.rs' 'toolchain/patches/*.patch' 2>/dev/null |
     grep -v -E '/src/unix/redox/mod\.rs$' | wc -l | tr -d ' ')
 echo "target-libc copies with the pthread size table: $copies"
 if [ "$copies" -ne 3 ]; then
