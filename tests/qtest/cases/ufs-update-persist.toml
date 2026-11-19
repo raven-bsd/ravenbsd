@@ -6,7 +6,7 @@
 
 name = "ufs-update-persist"
 arch = "x86_64"
-profile = "qemu-ufs-boot"
+profile = "qemu-ufs"
 timeout_secs = 90
 pre = ["sh tests/fixtures/ufs-update/second.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"

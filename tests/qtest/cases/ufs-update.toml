@@ -2,12 +2,12 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # K185: apply raven-ufs to the assembled qemu-ufs root disk, then boot it. The
-# bootstrap ESP is built by the harness from qemu-ufs-boot; the pre step copies the
-# qemu-ufs root disk and updates /etc/ufs-update.txt in place.
+# release bootstrap ESP and the standard root disk are built by the harness; the
+# pre step copies the assembled root disk and updates /etc/ufs-update.txt in place.
 
 name = "ufs-update"
 arch = "x86_64"
-profile = "qemu-ufs-boot"
+profile = "qemu-ufs"
 timeout_secs = 240
 pre = ["sh tests/fixtures/ufs-update/prepare.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"

@@ -190,20 +190,32 @@ try:
             continue
         begin, end = struct.unpack_from("<QQ", entry, 32)
         parts.append((entry[:16].hex(), begin, end))
-    if len(parts) != 2:
-        raise SystemExit(f"expected 2 GPT partitions, found {len(parts)}")
     fat_type = "28732ac11ff8d211ba4b00a0c93ec93b"
     ufs_type = "b67c6e51cf6ed6118ff800022d09712b"
-    if parts[0][0] != fat_type or parts[1][0] != ufs_type:
-        raise SystemExit("GPT partition types are not FAT-boot + UFS-root")
-    if parts[0][1] < first_usable or parts[1][2] > last_usable:
-        raise SystemExit("a partition is outside the GPT usable range")
-    if parts[0][2] >= parts[1][1]:
-        raise SystemExit("FAT and UFS partitions overlap")
-    print(f"fat_start={parts[0][1]}")
-    print(f"fat_sectors={parts[0][2] - parts[0][1] + 1}")
-    print(f"ufs_start={parts[1][1]}")
-    print(f"ufs_sectors={parts[1][2] - parts[1][1] + 1}")
+    fat_start = 0
+    fat_sectors = 0
+    if len(parts) == 1:
+        if parts[0][0] != ufs_type:
+            raise SystemExit("single GPT partition is not FreeBSD-UFS")
+        if parts[0][1] < first_usable or parts[0][2] > last_usable:
+            raise SystemExit("UFS partition is outside the GPT usable range")
+        ufs_start, ufs_end = parts[0][1], parts[0][2]
+    elif len(parts) == 2:
+        if parts[0][0] != fat_type or parts[1][0] != ufs_type:
+            raise SystemExit("GPT partition types are not FAT-boot + UFS-root")
+        if parts[0][1] < first_usable or parts[1][2] > last_usable:
+            raise SystemExit("a partition is outside the GPT usable range")
+        if parts[0][2] >= parts[1][1]:
+            raise SystemExit("FAT and UFS partitions overlap")
+        fat_start, fat_end = parts[0][1], parts[0][2]
+        fat_sectors = fat_end - fat_start + 1
+        ufs_start, ufs_end = parts[1][1], parts[1][2]
+    else:
+        raise SystemExit(f"expected 1 UFS or ESP+UFS GPT partition, found {len(parts)}")
+    print(f"fat_start={fat_start}")
+    print(f"fat_sectors={fat_sectors}")
+    print(f"ufs_start={ufs_start}")
+    print(f"ufs_sectors={ufs_end - ufs_start + 1}")
     print(f"total_sectors={size // 512}")
 finally:
     os.close(fd)
