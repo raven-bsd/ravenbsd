@@ -26,6 +26,7 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, Rights};
     use raven_devd::dtb;
+    use raven_devd::pci::{Matched, match_drivers};
     use raven_devd::platform;
     use raven_initfs::Initfs;
     use raven_proto_dev::{DEVICE_INFO_LEN, DeviceInfo, DriverSpec, parse_drivers};
@@ -68,55 +69,134 @@ mod program {
         let drivers = load_drivers(&initfs)?;
         let devices = devices(&client)?;
         raven_rt::println!("devd: devices={}", devices.len());
-        let Some((device, driver)) = match_driver(&devices, &drivers) else {
+        let matched = match_drivers(&devices, &drivers);
+        if matched.is_empty() {
             raven_rt::println!("devd: no matching driver");
             if test {
                 return Ok(());
             }
             return serve();
-        };
-        raven_rt::println!(
-            "devd: matched {} vendor={:#06x} device={:#06x} irq_line={} irq_pin={}",
-            device.name(),
-            device.vendor,
-            device.device,
-            device.interrupt_line,
-            device.interrupt_pin
-        );
-        let cycles = if test { driver.cycles } else { 1 };
+        }
+        for entry in &matched {
+            let device = &entry.device;
+            raven_rt::println!(
+                "devd: matched {} vendor={:#06x} device={:#06x} irq_line={} irq_pin={}",
+                device.name(),
+                device.vendor,
+                device.device,
+                device.interrupt_line,
+                device.interrupt_pin
+            );
+        }
+        if test {
+            run_tests(&client, &initfs, &matched)
+        } else {
+            run_production(&client, &initfs, &matched)
+        }
+    }
+
+    /// Test mode: run every matched driver for its declared cycles, then report the first error.
+    ///
+    /// A failing driver does not stop the later matches from being reported; the caller still
+    /// sees a non-zero exit because the first error is returned after the loop.
+    fn run_tests(
+        client: &Client,
+        initfs: &Initfs<'_>,
+        matched: &[Matched<'_>],
+    ) -> Result<(), String> {
+        let mut failure: Option<String> = None;
+        for entry in matched {
+            if let Err(error) = run_test_driver(client, initfs, entry)
+                && failure.is_none()
+            {
+                failure = Some(alloc::format!("{}: {error}", entry.driver.name));
+            }
+        }
+        failure.map_or(Ok(()), Err)
+    }
+
+    fn run_test_driver(
+        client: &Client,
+        initfs: &Initfs<'_>,
+        entry: &Matched<'_>,
+    ) -> Result<(), String> {
+        let driver = entry.driver;
+        let cycles = driver.cycles;
         let mut cycle = 0u32;
         while cycle < cycles {
-            let options = split_driver_arguments(&driver.args)?;
-            let bars = read_bars(&client, &device.name())?;
-            let Some(&(kind, size)) = bars.get(options.bar) else {
-                return Err(alloc::format!("bar{} does not exist", options.bar));
+            let code = match launch_driver(client, initfs, &entry.device, driver) {
+                Ok(code) => code,
+                Err(error) => {
+                    raven_rt::println!("devd: driver {} failed: {error}", driver.name);
+                    return Err(error);
+                }
             };
-            if kind != "memory" || size == 0 {
-                return Err(alloc::format!(
-                    "bar{} is {kind} (size {size}), not a memory BAR",
-                    options.bar
-                ));
-            }
-            // Every handle opened for this launch is closed here, whether the driver ran, the
-            // spawn failed or a resource was missing: a restart cycle cannot leak DMA or IRQ
-            // handles (B13c).
-            let mut opened: Vec<Handle> = Vec::with_capacity(4);
-            let launched = launch_driver(
-                &client,
-                &initfs,
-                &device,
-                driver,
-                &options,
-                size,
-                &mut opened,
-            );
-            close_all(&opened);
-            let code = launched?;
             cycle = cycle.saturating_add(1);
             raven_rt::println!("devd: driver {} cycle {} exit={}", driver.name, cycle, code);
         }
         raven_rt::println!("devd: driver {} cycles={}", driver.name, cycles);
-        if test { Ok(()) } else { serve() }
+        Ok(())
+    }
+
+    /// Production mode: spawn every matched driver before waiting, then supervise them.
+    ///
+    /// Spawning first keeps a long-lived driver (virtio-net, GENET) from starving the functions
+    /// after it. Each function gets its own handles and its own child. A spawn error aborts the
+    /// children that already started and names the driver; a non-zero exit aborts the rest after
+    /// the other launches have been reported. A clean exit from every one-shot driver reaches the
+    /// `dev:` region as before.
+    fn run_production(
+        client: &Client,
+        initfs: &Initfs<'_>,
+        matched: &[Matched<'_>],
+    ) -> Result<(), String> {
+        let mut children: Vec<(String, Handle)> = Vec::with_capacity(matched.len());
+        let mut failures: Vec<String> = Vec::new();
+        for entry in matched {
+            match spawn_driver(client, initfs, &entry.device, entry.driver) {
+                Ok(child) => children.push((entry.driver.name.clone(), child)),
+                Err(error) => {
+                    // Report every matched function before failing the boot, so a broken entry
+                    // does not hide the launch state of the drivers after it.
+                    raven_rt::println!("devd: driver {} launch failed: {error}", entry.driver.name);
+                    failures.push(alloc::format!("{}: {error}", entry.driver.name));
+                }
+            }
+        }
+        if !failures.is_empty() {
+            for (_, child) in children.drain(..) {
+                abort_child(child);
+            }
+            return Err(failures.join("; "));
+        }
+        let mut remaining = children.into_iter();
+        while let Some((name, child)) = remaining.next() {
+            let mut code = -1i32;
+            let waited = RtSys.proc_wait(child, &mut code);
+            let _ = raven_rt::handle_close(child);
+            if let Err(error) = waited {
+                for (_, child) in remaining {
+                    abort_child(child);
+                }
+                return Err(alloc::format!("{name} wait: {error:?}"));
+            }
+            raven_rt::println!("devd: driver {name} exit={code}");
+            if code != 0 {
+                for (_, child) in remaining {
+                    abort_child(child);
+                }
+                return Err(alloc::format!("{name} exited {code}"));
+            }
+        }
+        serve()
+    }
+
+    /// Stop a child spawned before a later launch or wait failed.
+    fn abort_child(child: Handle) {
+        let _ = raven_rt::proc_terminate(child, 1);
+        let mut code = -1i32;
+        let _ = RtSys.proc_wait(child, &mut code);
+        let _ = raven_rt::handle_close(child);
     }
 
     /// Decode the platform device tree and, when `launch` is set, start the matched drivers.
@@ -430,29 +510,68 @@ mod program {
     /// The caller closes everything in `opened` once this returns, so a failed spawn or a failed
     /// wait releases the BAR, configuration page, DMA buffer and IRQ exactly once. The returned
     /// value is the driver's exit status.
-    fn launch_driver(
+    /// One prepared driver launch: the child argv and the handles to transfer.
+    struct Prepared {
+        exec: String,
+        argv: Vec<String>,
+        handles: Vec<Handle>,
+    }
+
+    /// Open one function's resources and build the child argv.
+    ///
+    /// Every handle opened here is transferred to the child by [`spawn_prepared`] and then closed
+    /// in the parent; `opened` is moved into the result on success and closed on error.
+    fn prepare_launch(
         client: &Client,
-        initfs: &Initfs<'_>,
         device: &DeviceInfo,
         driver: &DriverSpec,
-        options: &DriverOptions,
-        bar_size: u64,
+    ) -> Result<Prepared, String> {
+        let mut opened: Vec<Handle> = Vec::with_capacity(4);
+        match prepare_launch_inner(client, device, driver, &mut opened) {
+            Ok(argv) => Ok(Prepared {
+                exec: driver.exec.clone(),
+                argv,
+                handles: opened,
+            }),
+            Err(error) => {
+                close_all(&opened);
+                Err(error)
+            }
+        }
+    }
+
+    fn prepare_launch_inner(
+        client: &Client,
+        device: &DeviceInfo,
+        driver: &DriverSpec,
         opened: &mut Vec<Handle>,
-    ) -> Result<i32, String> {
+    ) -> Result<Vec<String>, String> {
+        let options = split_driver_arguments(&driver.args)?;
         let name = device.name();
-        let bar = open_resource(client, &name, &alloc::format!("bar{}", options.bar), opened)?;
+        let bars = read_bars(client, &name)?;
+        let Some(&(kind, size)) = bars.get(options.bar) else {
+            return Err(alloc::format!("bar{} does not exist", options.bar));
+        };
+        if kind != "memory" || size == 0 {
+            return Err(alloc::format!(
+                "bar{} is {kind} (size {size}), not a memory BAR",
+                options.bar
+            ));
+        }
+        let _ = open_resource(client, &name, &alloc::format!("bar{}", options.bar), opened)?;
         let config = open_resource(client, &name, "config", opened)?;
         raven_rt::println!(
             "devd: driver {} bar={} size={}",
             driver.name,
             options.bar,
-            bar_size
+            size
         );
 
-        let mut dma_token = None;
-        let mut irq_token = None;
-        let mut dma = None;
-        let mut irq = None;
+        let mut argv: Vec<String> = Vec::with_capacity(options.rest.len() + 6);
+        argv.push(driver.name.clone());
+        argv.extend(options.rest.iter().cloned());
+        argv.push(alloc::format!("bar={}", options.bar));
+        argv.push(alloc::format!("bar_size={size}"));
         if options.dma {
             let handle = open_resource(client, &name, "dma", opened)?;
             let info = raven_rt::dma_info(handle)
@@ -463,60 +582,216 @@ mod program {
                 info.bus_addr,
                 info.len
             );
-            dma_token = Some(alloc::format!("dma={}", info.len));
-            dma = Some(handle);
+            argv.push(alloc::format!("dma={}", info.len));
         }
         if options.irq {
-            let handle = open_resource(client, &name, "irq", opened)?;
-            raven_rt::println!(
-                "devd: driver {} irq line={}",
-                driver.name,
-                device.interrupt_line
-            );
-            irq_token = Some(alloc::format!("irq={}", device.interrupt_line));
-            irq = Some(handle);
+            // Prefer one MSI-X vector per function: two functions on the same legacy INTx line
+            // cannot both claim the exclusive GSI. The mapping also proves that the config page
+            // is writable, which the driver needs to set the MSI-X enable bit.
+            let mut msix = None;
+            match raven_rt::map_mmio_mut(config, platform::PLATFORM_PAGE_SIZE) {
+                Ok(view) => match msix_capability(view) {
+                    Some(capability) => {
+                        raven_rt::println!(
+                            "devd: driver {} msix capability table_bar={} table={:#x} entries={}",
+                            driver.name,
+                            capability.table_bar,
+                            capability.table_offset,
+                            capability.table_size
+                        );
+                        msix = Some(capability);
+                    }
+                    None => {
+                        raven_rt::println!("devd: driver {} msix capability absent", driver.name)
+                    }
+                },
+                Err(error) => raven_rt::println!(
+                    "devd: driver {} msix config map: {}",
+                    driver.name,
+                    error.description()
+                ),
+            }
+            let mut msix_done = false;
+            if let Some(capability) = msix {
+                let table_bar = capability.table_bar;
+                let (table_kind, table_bar_size) = match bars.get(table_bar) {
+                    Some(&(kind, bar_size)) => (kind, usize::try_from(bar_size).unwrap_or(0)),
+                    None => ("absent", 0),
+                };
+                let table_fits = table_kind == "memory"
+                    && capability.table_offset.saturating_add(32) <= table_bar_size;
+                if capability.table_size < 2 {
+                    raven_rt::println!(
+                        "devd: driver {} msix has {} entries; need 2",
+                        driver.name,
+                        capability.table_size
+                    );
+                } else if !table_fits {
+                    raven_rt::println!(
+                        "devd: driver {} msix table bar{} is {} size {}; table at {:#x} does not fit",
+                        driver.name,
+                        table_bar,
+                        table_kind,
+                        table_bar_size,
+                        capability.table_offset
+                    );
+                } else {
+                    let table = client
+                        .open(&alloc::format!("pci:/{name}/bar{table_bar}"), READ)
+                        .map_err(|error| {
+                            alloc::format!("msix bar{table_bar}: {}", error.description())
+                        });
+                    match table {
+                        Ok(table_handle) => {
+                            let mut info = raven_rt::IrqInfo::default();
+                            match raven_rt::irq_create(
+                                Handle::ROOT_DEVICE,
+                                raven_rt::IRQ_MSIX,
+                                0,
+                                Some(&mut info),
+                            ) {
+                                Ok(handle) => {
+                                    opened.push(handle);
+                                    opened.push(table_handle);
+                                    argv.push(String::from("msix=1"));
+                                    argv.push(alloc::format!("msix_addr_lo={}", info.address_lo));
+                                    argv.push(alloc::format!("msix_addr_hi={}", info.address_hi));
+                                    argv.push(alloc::format!("msix_data={}", info.data));
+                                    argv.push(alloc::format!("msix_bar={table_bar}"));
+                                    argv.push(alloc::format!("msix_bar_size={table_bar_size}"));
+                                    argv.push(alloc::format!(
+                                        "msix_table={}",
+                                        capability.table_offset
+                                    ));
+                                    raven_rt::println!(
+                                        "devd: driver {} msix vector={} table={:#x} bar={}",
+                                        driver.name,
+                                        info.vector,
+                                        capability.table_offset,
+                                        table_bar
+                                    );
+                                    msix_done = true;
+                                }
+                                Err(error) => {
+                                    let _ = raven_rt::handle_close(table_handle);
+                                    raven_rt::println!(
+                                        "devd: driver {} msix unavailable: {}; using legacy irq",
+                                        driver.name,
+                                        error.description()
+                                    );
+                                }
+                            }
+                        }
+                        Err(error) => raven_rt::println!(
+                            "devd: driver {} msix table open: {error}",
+                            driver.name
+                        ),
+                    }
+                }
+            }
+            if !msix_done {
+                let _ = open_resource(client, &name, "irq", opened)?;
+                raven_rt::println!(
+                    "devd: driver {} irq line={}",
+                    driver.name,
+                    device.interrupt_line
+                );
+                argv.push(alloc::format!("irq={}", device.interrupt_line));
+            }
         }
+        Ok(argv)
+    }
 
-        let mut handles: Vec<Handle> = Vec::with_capacity(4);
-        handles.push(bar);
-        handles.push(config);
-        if let Some(handle) = dma {
-            handles.push(handle);
-        }
-        if let Some(handle) = irq {
-            handles.push(handle);
-        }
+    /// One function's MSI-X table location from the PCI configuration page.
+    struct MsixCapability {
+        table_bar: usize,
+        table_offset: usize,
+        table_size: u16,
+    }
 
-        let mut argv: Vec<&str> = Vec::with_capacity(options.rest.len() + 6);
-        argv.push(driver.name.as_str());
-        argv.extend(options.rest.iter().map(String::as_str));
-        let bar_token = alloc::format!("bar={}", options.bar);
-        let size_token = alloc::format!("bar_size={bar_size}");
-        argv.push(&bar_token);
-        argv.push(&size_token);
-        if let Some(token) = &dma_token {
-            argv.push(token.as_str());
+    /// Walk the PCI capability list for MSI-X (`id 0x11`).
+    ///
+    /// The caller has already mapped the configuration page. A missing or malformed capability
+    /// keeps the legacy INTx path.
+    fn msix_capability(config: &[u8]) -> Option<MsixCapability> {
+        let status = u16::from_le_bytes(config.get(0x06..0x08)?.try_into().ok()?);
+        if status & (1 << 4) == 0 {
+            return None;
         }
-        if let Some(token) = &irq_token {
-            argv.push(token.as_str());
+        let mut pointer = usize::from(*config.get(0x34)? & 0xFC);
+        let mut seen = 0u32;
+        while pointer != 0 && seen < 48 {
+            let id = *config.get(pointer)?;
+            let next = usize::from(*config.get(pointer.saturating_add(1))? & 0xFC);
+            if id == 0x11 {
+                let control = u16::from_le_bytes(
+                    config
+                        .get(pointer.saturating_add(2)..pointer.saturating_add(4))?
+                        .try_into()
+                        .ok()?,
+                );
+                let table = u32::from_le_bytes(
+                    config
+                        .get(pointer.saturating_add(4)..pointer.saturating_add(8))?
+                        .try_into()
+                        .ok()?,
+                );
+                return Some(MsixCapability {
+                    table_bar: usize::try_from(table & 7).ok()?,
+                    table_offset: usize::try_from(table & !7).ok()?,
+                    table_size: (control & 0x7FF).saturating_add(1),
+                });
+            }
+            pointer = next;
+            seen = seen.saturating_add(1);
         }
-        let mut sys = GrantSys { handles };
-        let child = spawn_with(
+        None
+    }
+
+    /// Spawn a driver from a prepared launch and release the parent's handles.
+    ///
+    /// `HANDLE_TRANSFER` copies each handle into the child, so the parent closes its own values
+    /// whether the spawn succeeds or fails. The child owns the transferred copies.
+    fn spawn_prepared(initfs: &Initfs<'_>, prepared: &Prepared) -> Result<Handle, String> {
+        let argv: Vec<&str> = prepared.argv.iter().map(String::as_str).collect();
+        let mut sys = GrantSys {
+            handles: prepared.handles.clone(),
+        };
+        let spawned = spawn_with(
             initfs,
-            &driver.exec,
+            &prepared.exec,
             &SpawnOptions {
                 args: &argv,
                 env: &[],
             },
             &mut sys,
-        )
-        .map_err(|error| alloc::format!("spawn: {error:?}"))?;
+        );
+        close_all(&prepared.handles);
+        spawned.map_err(|error| alloc::format!("spawn: {error:?}"))
+    }
+
+    fn spawn_driver(
+        client: &Client,
+        initfs: &Initfs<'_>,
+        device: &DeviceInfo,
+        driver: &DriverSpec,
+    ) -> Result<Handle, String> {
+        let prepared = prepare_launch(client, device, driver)?;
+        spawn_prepared(initfs, &prepared)
+    }
+
+    /// One launch/exit cycle for test mode.
+    fn launch_driver(
+        client: &Client,
+        initfs: &Initfs<'_>,
+        device: &DeviceInfo,
+        driver: &DriverSpec,
+    ) -> Result<i32, String> {
+        let child = spawn_driver(client, initfs, device, driver)?;
         let mut code = -1i32;
-        if let Err(error) = RtSys.proc_wait(child, &mut code) {
-            let _ = raven_rt::handle_close(child);
-            return Err(format!("wait: {error:?}"));
-        }
+        let waited = RtSys.proc_wait(child, &mut code);
         let _ = raven_rt::handle_close(child);
+        waited.map_err(|error| alloc::format!("wait: {error:?}"))?;
         Ok(code)
     }
 
@@ -615,22 +890,6 @@ mod program {
             result.push(device);
         }
         Ok(result)
-    }
-
-    fn match_driver<'a>(
-        devices: &'a [DeviceInfo],
-        drivers: &'a [DriverSpec],
-    ) -> Option<(DeviceInfo, &'a DriverSpec)> {
-        for device in devices {
-            if let Some(driver) = drivers.iter().find(|driver| {
-                driver.compatible.is_none()
-                    && driver.vendor == device.vendor
-                    && driver.device == device.device
-            }) {
-                return Some((*device, driver));
-            }
-        }
-        None
     }
 
     fn serve() -> Result<(), String> {
