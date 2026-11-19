@@ -63,7 +63,14 @@ pub fn irq_line() -> u32 {
 }
 
 /// Drain the PL011 FIFO into the ring and wake one reader.
+///
+/// The pending RX/RT cause is cleared before the drain so a stale or duplicate interrupt cannot
+/// spin. Bytes that arrive during the drain set the cause again, and the level-triggered GIC
+/// re-enters after EOI. When the FIFO is empty at the end, clear once more to drop a
+/// receive-timeout cause belonging to the bytes just consumed. If the FIFO still holds data
+/// (the drain bound was reached), leave the cause set so the remaining bytes are delivered.
 pub fn handle_irq() {
+    serial::clear_rx_interrupt();
     let mut any = false;
     let mut count = 0usize;
     while count < MAX_DRAIN {
@@ -74,7 +81,9 @@ pub fn handle_irq() {
         any = true;
         count = count.saturating_add(1);
     }
-    serial::clear_rx_interrupt();
+    if !serial::rx_available() {
+        serial::clear_rx_interrupt();
+    }
     if any {
         let _ = WAITERS.wake_one(0, 0);
     }
