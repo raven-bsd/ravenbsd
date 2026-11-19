@@ -253,12 +253,13 @@ impl Multiplexer {
         fed
     }
 
-    /// Write bytes to every live sink, retaining backpressured bytes per sink.
+    /// Enqueue bytes for every live sink.
     ///
-    /// Returns the number of bytes accepted into the output queues; `Closed` when no sink is
-    /// live, `Full` when a sink's bounded queue would overflow.
+    /// The scheme `WRITE` path only appends to the per-sink queues and replies; the flusher
+    /// thread drains them with [`Multiplexer::flush_outputs_budget`]. This keeps a per-line
+    /// `WRITE` from waiting on the UART sink. Returns the number of bytes accepted; `Closed`
+    /// when no sink is live, `Full` when a sink's bounded queue would overflow.
     pub fn write_all(&mut self, bytes: &[u8]) -> Result<usize, OutputError> {
-        let _ = self.flush_outputs();
         if !self.outputs.iter().any(|channel| !channel.closed) {
             return Err(OutputError::Closed);
         }
@@ -275,20 +276,41 @@ impl Multiplexer {
                 channel.pending.extend(bytes.iter().copied());
             }
         }
-        let _ = self.flush_outputs();
         Ok(bytes.len())
     }
 
+    /// Bytes still queued for at least one live sink.
+    pub fn pending_len(&self) -> usize {
+        self.outputs
+            .iter()
+            .filter(|channel| !channel.closed)
+            .map(|channel| channel.pending.len())
+            .sum()
+    }
+
     /// Retry every sink's pending bytes. Full sinks stay queued; closed sinks are removed.
-    pub fn flush_outputs(&mut self) -> Result<(), OutputError> {
+    ///
+    /// `budget` bounds the bytes written to the sinks in this call so the flusher can release
+    /// the console lock between short UART bursts.
+    ///
+    /// Returns true when at least one sink still has pending bytes.
+    pub fn flush_outputs_budget(&mut self, budget: usize) -> Result<bool, OutputError> {
+        let mut remaining = budget;
         let mut first_error = None;
+        let mut more = false;
         for channel in &mut self.outputs {
-            while !channel.closed && !channel.pending.is_empty() {
+            while !channel.closed && !channel.pending.is_empty() && remaining > 0 {
                 channel.pending.make_contiguous();
                 let (slice, _) = channel.pending.as_slices();
-                match channel.sink.write(slice) {
+                let cap = slice.len().min(remaining);
+                let Some(chunk) = slice.get(..cap) else {
+                    break;
+                };
+                match channel.sink.write(chunk) {
                     Ok(count) if count > 0 => {
-                        channel.pending.drain(..count.min(channel.pending.len()));
+                        let count = count.min(channel.pending.len());
+                        channel.pending.drain(..count);
+                        remaining = remaining.saturating_sub(count);
                     }
                     Ok(_) | Err(OutputError::Full) => {
                         if first_error.is_none() {
@@ -301,14 +323,29 @@ impl Multiplexer {
                         if first_error.is_none() {
                             first_error = Some(error);
                         }
+                        break;
                     }
                 }
+            }
+            if !channel.closed && !channel.pending.is_empty() {
+                more = true;
             }
         }
         self.outputs.retain(|channel| !channel.closed);
         match first_error {
             Some(error) => Err(error),
-            None => Ok(()),
+            None => Ok(more),
+        }
+    }
+
+    /// Drain every sink without a budget (host tests and shutdown paths).
+    pub fn flush_outputs(&mut self) -> Result<(), OutputError> {
+        loop {
+            match self.flush_outputs_budget(usize::MAX) {
+                Ok(false) => return Ok(()),
+                Ok(true) => continue,
+                Err(error) => return Err(error),
+            }
         }
     }
 }

@@ -41,6 +41,11 @@ mod program {
     const READ_CHUNK: usize = 256;
     /// Reader thread stack.
     const READER_STACK: usize = 32 * 1024;
+    /// Bytes written to the sinks per flusher lock hold; short bursts keep the scheme `WRITE`
+    /// path from waiting on a slow UART sink.
+    const FLUSH_BUDGET: usize = 64;
+    /// Flusher idle sleep when no output is queued.
+    const FLUSH_IDLE_NS: u64 = 1_000_000;
 
     const OPEN_READ: u32 = 1;
     const OPEN_WRITE: u32 = 2;
@@ -154,6 +159,23 @@ mod program {
                 }
                 Err(InputError::WouldBlock) => continue,
                 Err(InputError::EndOfFile | InputError::Closed | InputError::Io) => break,
+            }
+        }
+    }
+
+    /// Output flusher thread: drain the per-sink queues in short bursts, independent of the
+    /// scheme `WRITE` round trip.
+    fn output_flusher(_argument: usize) {
+        loop {
+            let (more, ok) = {
+                let mut console = CONSOLE.lock();
+                match console.flush_outputs_budget(FLUSH_BUDGET) {
+                    Ok(more) => (more, true),
+                    Err(_) => (true, false),
+                }
+            };
+            if !ok || !more {
+                let _ = raven_rt::nanosleep(FLUSH_IDLE_NS);
             }
         }
     }
@@ -364,6 +386,10 @@ mod program {
         // HDMI1/UI1 may publish a text framebuffer sink; absence keeps UART-only behaviour.
         if let Ok(file) = fs::open("fb:console", O_WRONLY) {
             CONSOLE.lock().add_output(Box::new(SchemeOutput { file }));
+        }
+        if let Err(error) = raven_rt::thread::spawn(output_flusher, 0, READER_STACK) {
+            raven_rt::eprintln!("consd: output flusher thread: {}", error.description());
+            return 1;
         }
         if let Err(error) = raven_rt::thread::spawn(uart_reader, 0, READER_STACK) {
             raven_rt::eprintln!("consd: uart reader thread: {}", error.description());

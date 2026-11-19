@@ -111,6 +111,7 @@ fn uart_only_echoes_and_delivers_a_canonical_line() {
 
     assert_eq!(console.pump(), 3);
     assert_eq!(take(&mut console, 8), b"hi\n");
+    console.flush_outputs().unwrap();
     assert_eq!(state.lock().unwrap().log, b"hi\r\n");
 }
 
@@ -124,6 +125,7 @@ fn keyboard_only_is_the_same_line_source() {
 
     console.pump();
     assert_eq!(take(&mut console, 8), b"kbd\n");
+    console.flush_outputs().unwrap();
     assert_eq!(state.lock().unwrap().log, b"kbd\r\n");
 }
 
@@ -139,6 +141,7 @@ fn both_inputs_feed_one_discipline_in_source_order() {
 
     console.pump();
     assert_eq!(take(&mut console, 8), b"a\nb\n");
+    console.flush_outputs().unwrap();
     assert_eq!(state.lock().unwrap().log, b"a\r\nb\r\n");
 }
 
@@ -166,6 +169,11 @@ fn output_is_fanned_out_once_per_sink() {
     console.add_output(framebuffer);
 
     assert_eq!(console.write_all(b"login: "), Ok(7));
+    assert!(
+        uart_state.lock().unwrap().log.is_empty(),
+        "write defers I/O"
+    );
+    console.flush_outputs().unwrap();
     assert_eq!(uart_state.lock().unwrap().log, b"login: ");
     assert_eq!(framebuffer_state.lock().unwrap().log, b"login: ");
     assert_eq!(
@@ -190,6 +198,7 @@ fn repeated_prompts_are_not_duplicated_by_fanout() {
 
     console.write_all(b"login: ").unwrap();
     console.write_all(b"login: ").unwrap();
+    console.flush_outputs().unwrap();
     assert_eq!(uart_state.lock().unwrap().log, b"login: login: ");
     assert_eq!(framebuffer_state.lock().unwrap().log, b"login: login: ");
 }
@@ -201,10 +210,28 @@ fn backpressure_retains_bytes_until_the_sink_drains() {
     console.add_output(output);
 
     assert_eq!(console.write_all(b"abcdef"), Ok(6));
+    assert!(state.lock().unwrap().log.is_empty(), "write defers I/O");
+    let _ = console.flush_outputs();
     assert_eq!(state.lock().unwrap().log, b"ab");
     state.lock().unwrap().capacity = 16;
     console.flush_outputs().unwrap();
     assert_eq!(state.lock().unwrap().log, b"abcdef");
+}
+
+#[test]
+fn budgeted_flush_drains_short_bursts() {
+    let mut console = Multiplexer::new();
+    let (output, state) = MockOutput::new(64);
+    console.add_output(output);
+
+    assert_eq!(console.write_all(b"abcdef"), Ok(6));
+    assert_eq!(console.pending_len(), 6);
+    assert_eq!(console.flush_outputs_budget(2), Ok(true));
+    assert_eq!(state.lock().unwrap().log, b"ab");
+    assert_eq!(console.pending_len(), 4);
+    assert_eq!(console.flush_outputs_budget(16), Ok(false));
+    assert_eq!(state.lock().unwrap().log, b"abcdef");
+    assert_eq!(console.pending_len(), 0);
 }
 
 #[test]
@@ -217,7 +244,7 @@ fn a_lost_output_is_retired_and_the_other_sink_stays_live() {
     lost_state.lock().unwrap().closed = true;
 
     console.write_all(b"x").unwrap();
-    console.flush_outputs().unwrap();
+    let _ = console.flush_outputs();
     assert_eq!(live_state.lock().unwrap().log, b"x");
     assert_eq!(console.output_count(), 1);
 }
@@ -263,6 +290,7 @@ fn kbd_console_bytes_reach_the_console_reader() {
     console.add_output(output);
 
     assert_eq!(console.pump(), 5);
+    console.flush_outputs().unwrap();
     assert_eq!(take(&mut console, 8), b"root\n");
     assert_eq!(state.lock().unwrap().log, b"root\r\n");
 }
