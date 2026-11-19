@@ -1,0 +1,26 @@
+libc gate: NOT MET
+| 1.1 symbol coverage | NOT MET | no result; evidence file missing |
+| 1.1.pack packed symbols | NOT MET | no result; evidence file missing |
+| 1.1.audit symbol audit | NOT MET | no result; evidence file missing |
+| 1.2 donor suites G1 | NOT MET | no result; evidence file missing |
+| 1.3 LTP and pjdfstest | NOT MET | no result; evidence file missing |
+| 1.4 differential tests | NOT MET | no result; evidence file missing |
+| 1.5 host unit tests | NOT MET | no result; evidence file missing |
+| 1.6 Miri | NOT MET | no result; evidence file missing |
+| 1.7 lints | NOT MET | no result; evidence file missing |
+| 2.1 world check | NOT MET | no result; evidence file missing |
+| 2.2 world build gate | NOT MET | no result; evidence file missing |
+| 3.1 size budgets | NOT MET | no result; evidence file missing |
+| 3.2 boot path | NOT MET | no result; evidence file missing |
+| 4.1 fuzz replay | NOT MET | no result; evidence file missing |
+| 4.2 fuzz soak | NOT MET | no result; evidence file missing |
+| 4.3 hardened malloc | NOT MET | no result; evidence file missing |
+| 4.4 ENTROPY_WEAK | NOT MET | no result; evidence file missing |
+| 5.1 on-target cases | NOT MET | no result; evidence file missing |
+| 5.2.core-servers | NOT MET | no result; evidence file missing |
+| 5.2.file-tools | NOT MET | no result; evidence file missing |
+| 5.3 second architecture | NOT MET | no result; evidence file missing |
+| 6.1 page coverage | NOT MET | no result; evidence file missing |
+| 6.2 render lint | NOT MET | no result; evidence file missing |
+| 6.3 existing docs gate | NOT MET | no result; evidence file missing |
+| 6.4 libc(7) | NOT MET | no result; evidence file missing |
