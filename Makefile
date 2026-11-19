@@ -25,7 +25,7 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast
+	posix-gaps posix-check raven-flash toolchain clean distclean check-fast
 
 help:
 	@$(XTASK) help
@@ -99,6 +99,9 @@ test:
 
 world:
 	@$(XTASK) libc-world build --all
+
+raven-flash:
+	@cargo run -q -p raven-flash -- $(ARGS)
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .
