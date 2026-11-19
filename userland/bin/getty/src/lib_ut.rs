@@ -44,7 +44,7 @@ impl Session for MockSession {
     }
 
     fn read_line(&mut self) -> Result<String, SessionError> {
-        self.lines.pop_front().ok_or(())
+        self.lines.pop_front().ok_or(SessionError)
     }
 
     fn run_login(&mut self, username: &str) -> Result<i32, SessionError> {
@@ -127,6 +127,16 @@ fn the_loop_does_not_start_a_shell_before_login_succeeds() {
     assert!(session.shell.is_none());
     // Three rejected names, the empty line, then the prompt that sees end of input.
     assert_eq!(session.text().matches("login: ").count(), 5);
+}
+
+#[test]
+fn the_banner_names_the_target_arch() {
+    #[cfg(target_arch = "x86_64")]
+    assert!(BANNER.contains("x86_64"));
+    #[cfg(target_arch = "aarch64")]
+    assert!(BANNER.contains("aarch64"));
+    #[cfg(target_arch = "riscv64")]
+    assert!(BANNER.contains("riscv64"));
 }
 
 #[test]
