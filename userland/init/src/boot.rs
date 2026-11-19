@@ -410,10 +410,11 @@ fn activate_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
     }
     raven_rt::fs::mount("/root", "ufs:")
         .map_err(|error| alloc::format!("/root mount failed: {}", error.description()))?;
+    raven_rt::println!("svcd: root mounted at /root");
     let result = activate_mounted_root(core);
-    if result.is_ok() {
-        raven_rt::println!("svcd: root mounted at /root");
-    } else if let Err(error) = raven_rt::fs::umount("/root") {
+    if result.is_err()
+        && let Err(error) = raven_rt::fs::umount("/root")
+    {
         raven_rt::println!(
             "svcd: /root: cannot unmount after a failed activation: {}",
             error.description()
