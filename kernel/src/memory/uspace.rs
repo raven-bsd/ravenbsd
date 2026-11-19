@@ -997,6 +997,15 @@ impl UserAddressSpace {
                     return Err(Errno::EINVAL);
                 };
                 let vma = self.vmas.find(virt.data()).ok_or(Errno::ENOMEM)?;
+                // Initfs pages are an immutable source image. A mapping may start writable
+                // (private COW), but PROTECT must never turn a read-only initfs mapping into a
+                // writable-in-place one: that would bypass the COW copy and expose the archive.
+                if vma.prot() & (prot::WRITE as u8) == 0
+                    && new_prot & (prot::WRITE as u8) != 0
+                    && matches!(vma.backing(), Backing::Initfs { .. })
+                {
+                    return Err(Errno::EACCES);
+                }
                 let Some((physical, _, _)) = mapper.translate(virt) else {
                     let pager_page = self
                         .objects
