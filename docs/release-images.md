@@ -153,7 +153,26 @@ The optional release-content inventory (`sh scripts/release-inventory.sh .../x86
 content/path issue outside IMG1's reproducibility scope; it is recorded here and handed to the
 release/profile owner (REL7c/Kevin). It does **not** indicate a non-deterministic build.
 
-## 5. Result
+## 5. Kernel and loader profile (K170)
+
+"Release image" means release **kernel, loader and user programs**. The `release` and
+`pi4-release` profiles build the kernel and loader with the release profile; test profiles keep the
+debug build. A demo/test profile can request release kernel and loader explicitly:
+
+```toml
+[image]
+release = true
+```
+
+The image builder verifies the build-profile stamp beside the artifact it embeds
+(`build/<arch>/kernel.elf.profile` and `loader.efi.profile`) and rejects a release image whose
+kernel or loader stamp says `debug`. Debug artifacts use `kernel-debug.elf`/`loader-debug.efi`, so a
+debug image build does not overwrite a release `kernel.elf`/`loader.efi`. The release kernel also
+keeps the clean-HEAD build-id check. See `docs/build-image.md` for the full path and stamp table.
+
+The before/after evidence for this change is in `tickets/kevin/reports/K170.md`.
+
+## 6. Result
 
 | Gate | Result |
 |---|---|
@@ -170,7 +189,7 @@ release/profile owner (REL7c/Kevin). It does **not** indicate a non-deterministi
 No board, QEMU, reflash or donor code was used. Both A/B pairs are pinned to `fd394ff3` with
 `SOURCE_DATE_EPOCH=1700000000`; the `/bin/ping` content flag remains a separate release-gate item.
 
-## 6. Donor reconciliation (DR-52)
+## 7. Donor reconciliation (DR-52)
 
 K131 changes first-party build orchestration (`xtask`): it purges stale dynamic outputs, rebuilds
 them, and gates the loader contract. It copies no donor code and implements no donor algorithm.

@@ -91,6 +91,49 @@ leaves the profile's decision. The build-mode decision is host-tested in
 `xtask/src/initfs_ut.rs`. Rootfs profiles (`rootfs/<name>.toml`) keep their unconditional release
 build in `xtask/src/image.rs`.
 
+## Release kernel and loader (K170)
+
+A release image means **release kernel + release loader + release user programs**. Before K170 the
+image path always built the kernel and UEFI loader with `release = false`; `[initfs] release` only
+covered the user programs.
+
+The image build mode now comes from the resolved profile:
+
+* The release image names (`release` on x86_64, `pi4-release` on aarch64) are release by default.
+* Any profile can opt in with:
+
+  ```toml
+  [image]
+  release = true
+  ```
+
+  The field is additive across `extends` and `profiles/<name>.d/*.toml`, like
+  `[initfs] release`. This is the explicit switch for demo and test profiles (for example a
+  `demo-login` profile in the demo workspace); debug and test profiles keep debug builds.
+
+Both the kernel and loader are built with `--release` and the DR-22 LTO settings. Artifacts are
+profile-qualified and stamped:
+
+| Requested | Artifact | Stamp |
+|---|---|---|
+| release kernel | `build/<arch>/kernel.elf` | `kernel.elf.profile` = `release` |
+| release loader | `build/<arch>/loader.efi` | `loader.efi.profile` = `release` |
+| debug kernel | `build/<arch>/kernel-debug.elf` | `kernel-debug.elf.profile` = `debug` |
+| debug loader | `build/<arch>/loader-debug.efi` | `loader-debug.elf.profile` = `debug` |
+
+A release build refreshes the historical `kernel.elf`/`loader.efi` names. A debug build writes only
+the `-debug` names when a release artifact already occupies the historical path, so `make release`
+followed by a debug `make image` does not invalidate the release kernel or loader. The image step
+verifies the stamp of the artifact it actually embeds; a release image whose kernel or loader stamp
+says `debug` (or is missing) is rejected before the image is written. Release kernels also keep the
+clean-HEAD build-id check.
+
+The Pi 4 image path builds the Pi kernel with `RAVEN_PI4=1` in the requested profile and passes that
+ELF to the Pi layout; the Pi boot partition has no UEFI loader.
+
+Host tests cover the profile decision (`[image] release`, additive merge), the profile-qualified
+names and the stamp verify/reject path in `xtask/src/{profiles,build,image}_ut.rs`.
+
 ## Arch-correct staging
 
 `cargo xtask build brush --arch <arch>` stages only `build/<arch>/brush`; it no longer writes a

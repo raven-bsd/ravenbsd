@@ -4,7 +4,7 @@
 //! Initfs packing and uutils staging-detection tests.
 
 use super::*;
-use crate::profiles::{Boot, File, Initfs as InitfsSpec, Profile, Program};
+use crate::profiles::{Boot, File, Image, Initfs as InitfsSpec, Profile, Program};
 use raven_initfs::Initfs;
 
 fn profile(files: &[(&str, &str)]) -> Profile {
@@ -24,6 +24,7 @@ fn profile(files: &[(&str, &str)]) -> Profile {
             release: false,
             dynamic: false,
         },
+        image: Image::default(),
         boot: Boot {
             cmdline: "console=ttyS0".to_string(),
             log_level: "info".to_string(),
