@@ -1,0 +1,188 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K183: interactive listing aliases and the shipped ed editor. The release login is the real
+# interactive brush console: it asserts both aliases, runs them, edits a file with ed (append,
+# write, quit) and reads it back. The same login proves that `brush -c` does not inherit the
+# aliases. The release profile keeps the K177 plain `raven# ` marker, so the transcript stays
+# free of ANSI and Unicode.
+
+name = "shell-alias"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = "^alias l='ls -CF'$"
+
+[[expect]]
+regex = "^alias ll='ls -lah'$"
+
+[[expect]]
+regex = '^alpha\.txt.*sub/$'
+
+[[expect]]
+regex = '^-rw.*alpha\.txt$'
+
+[[expect]]
+regex = '^raven ed works$'
+
+[[expect]]
+regex = '^alias: l: not found$'
+
+[[expect]]
+regex = '^alias: ll: not found$'
+
+[[expect]]
+regex = '^noalias-l=1$'
+
+[[expect]]
+regex = '^noalias-ll=1$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "alias l\n"
+delay_ms = 100
+
+[[step]]
+wait = "^alias l='ls -CF'$"
+timeout_secs = 15
+
+[[step]]
+send = "alias ll\n"
+delay_ms = 100
+
+[[step]]
+wait = "^alias ll='ls -lah'$"
+timeout_secs = 15
+
+[[step]]
+send = "mkdir -p /tmp/aliasdir/sub; echo alpha > /tmp/aliasdir/alpha.txt; cd /tmp/aliasdir\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "l\n"
+delay_ms = 100
+
+[[step]]
+wait = '^alpha\.txt.*sub/$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "ll\n"
+delay_ms = 100
+
+[[step]]
+wait = '^-rw.*alpha\.txt$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/ed\n"
+delay_ms = 300
+
+# ed reads its script directly from the serial console and executes it after one idle second.
+[[step]]
+send = "a\nraven ed works\n.\nw /tmp/raven-ed.txt\nq\n"
+delay_ms = 500
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /tmp/raven-ed.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven ed works$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/brush -c 'alias l; echo noalias-l=$?'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^alias: l: not found$'
+timeout_secs = 15
+
+[[step]]
+wait = '^noalias-l=1$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/brush -c 'alias ll; echo noalias-ll=$?'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^alias: ll: not found$'
+timeout_secs = 15
+
+[[step]]
+wait = '^noalias-ll=1$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
