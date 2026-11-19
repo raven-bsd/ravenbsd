@@ -1445,7 +1445,9 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         }
         crate::arch::halt()
     }
-    kprintln!("process: {} exited ({code})", process.path);
+    // Keep the interactive console quiet for normal child exits: `init exited` above is the
+    // stable test marker. The per-process detail remains available with `log-level=debug`.
+    crate::kdebug!("process: {} exited ({code})", process.path);
     // The per-exit evidence prints belong to the dying thread's own context; a foreign teardown
     // (reaping an unstarted process, terminating another) must return to its caller without
     // them.
