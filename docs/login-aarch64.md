@@ -3,11 +3,35 @@
 
 # aarch64 release login (K153)
 
-Status: **staging fixed; the fresh aarch64 login still exits before `main` — handed to Kevin/K139.**
-The aarch64 release image now builds with arch-correct uutils and a clean libc/userland. The
-fresh `login` has the same ELF/segment shape as x86, but the guest still exits the login child
-with status 1 before `Password:`. No login samples, no `login-aarch64` qtest and no board result
-are claimed.
+Status: **aarch64 login 5/5 PASS (K173, 2026-11-19).** The K166 PL011/DEBUG_READ path now reaches
+`Password:` and `raven#`; K169 fixed the brush link layout. The K153/K139 history below is
+retained as history. No Pi 4 board result is claimed.
+
+## K173 update (2026-11-19)
+
+The K166 run reached `raven#` 5/5 but the harness exited 2 at its summary: dash/bash parsed
+`printf '--- summary ---'` as an option. The fix is `printf '%s\n' '--- summary ---'`; the summary
+awk also now reads fields 6/7 instead of the column names. No product code changed.
+
+Acceptance at image `build/qtest/login-aarch64.img` (SHA-256
+`15f38bcd1ffeda27348f566f60b584e8c3454a9ed4f34cb1d5b5f88af8710fa0`, commit `ffe61c55`):
+
+```
+sample  load1  accel  smp  commit    login_ms  password_ms
+1       27.99  tcg    1    ffe61c55  335       2353
+2       27.99  tcg    1    ffe61c55  369       3088
+3       27.99  tcg    1    ffe61c55  257       1042
+4       27.99  tcg    1    ffe61c55  105       1114
+5       27.99  tcg    1    ffe61c55  199       1191
+
+login_ms    n=5 min=105  median=257 p90=369  max=369
+password_ms n=5 min=1042 median=1191 p90=3088 max=3088
+```
+
+`sh scripts/login-cold-start-aarch64.sh --samples 5 --image build/qtest/login-aarch64.img` exits
+0; `cargo xtask qtest --case login-aarch64 --arch aarch64 --no-build` passes; `make check-fast`
+passes. The host was shared (load1 27.99), so the password-leg times are not an idle-host
+latency claim.
 
 ## 1. Arch staging (fixed)
 
@@ -68,7 +92,7 @@ order; neither login has a `PT_TLS` segment (static TLS is zero). The aarch64 `l
 also AArch64 with the expected R/R E/RW layout. The old "first LOAD RW at offset 0" shape is
 gone.
 
-## 4. Fresh login still blocks before `main`
+## 4. Fresh login still blocks before `main` (K153 history; fixed by K139/K169)
 
 `timeout 300 sh scripts/login-cold-start-aarch64.sh --samples 5` → **exit 3**:
 
@@ -92,7 +116,7 @@ on a throwaway branch printed `K151 login main` **never**; the child exits befor
 `login` instruction, so `Console::open`, the password write and `set_echo` are never reached.
 The fresh, arch-correct, x86-shaped binary reproduces that exact boundary.
 
-## 5. Handoff
+## 5. Handoff (K153 history; closed by K139/K169)
 
 Owner: **Kevin/K139** (aarch64 dynamic interpreter/libc startup), not this ticket:
 
