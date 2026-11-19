@@ -44,10 +44,12 @@ is not retried to hide a sample; the sample table and serial logs are the eviden
 
 ## Baseline and after-fix expectation
 
-At the K143 wave base the dynamic login is expected to be about 1.5-1.6 s per step, so `--check`
-fails. This harness does not register a failing qtest in the default suite. After K139 lands, the
-same command should show 5/5 (target 20/20) samples under 1 s per step; that after-fix run belongs
-to the next wave, not to K143.
+K135 measured the dynamic login at about 1.5-1.6 s per step on its pre-S129 tree. The available
+pre-base `e22c15df` release gate image now measures about **155 ms median** (p90 294 ms) for
+`login:` -> `Password:` and **127 ms median** (p90 228 ms) for `Password:` -> `raven# `, so
+`--check` passes on that image. The exact wave-base image build was blocked by host load; rerun the
+harness at the base before treating the regression as fixed. This harness does not register a
+failing qtest in the default suite. The after-fix 20/20 run belongs to the next wave, not K143.
 
 No donor code is involved; the method is a serial-console timing measurement.
 
