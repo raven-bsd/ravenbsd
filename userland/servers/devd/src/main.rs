@@ -559,7 +559,7 @@ mod program {
             ));
         }
         let _ = open_resource(client, &name, &alloc::format!("bar{}", options.bar), opened)?;
-        let _ = open_resource(client, &name, "config", opened)?;
+        let config = open_resource(client, &name, "config", opened)?;
         raven_rt::println!(
             "devd: driver {} bar={} size={}",
             driver.name,
@@ -585,15 +585,106 @@ mod program {
             argv.push(alloc::format!("dma={}", info.len));
         }
         if options.irq {
-            let _ = open_resource(client, &name, "irq", opened)?;
-            raven_rt::println!(
-                "devd: driver {} irq line={}",
-                driver.name,
-                device.interrupt_line
-            );
-            argv.push(alloc::format!("irq={}", device.interrupt_line));
+            // Prefer one MSI-X vector per function: two functions on the same legacy INTx line
+            // cannot both claim the exclusive GSI. The mapping also proves that the config page
+            // is writable, which the driver needs to set the MSI-X enable bit.
+            let msix = raven_rt::map_mmio_mut(config, platform::PLATFORM_PAGE_SIZE)
+                .ok()
+                .and_then(|view| msix_capability(view));
+            let mut msix_done = false;
+            if let Some(capability) = msix
+                && capability.table_bar == options.bar
+                && capability.table_size >= 2
+                && capability.table_offset.saturating_add(32) <= usize::try_from(size).unwrap_or(0)
+            {
+                let mut info = raven_rt::IrqInfo::default();
+                match raven_rt::irq_create(
+                    Handle::ROOT_DEVICE,
+                    raven_rt::IRQ_MSIX,
+                    0,
+                    Some(&mut info),
+                ) {
+                    Ok(handle) => {
+                        opened.push(handle);
+                        argv.push(String::from("msix=1"));
+                        argv.push(alloc::format!("msix_addr_lo={}", info.address_lo));
+                        argv.push(alloc::format!("msix_addr_hi={}", info.address_hi));
+                        argv.push(alloc::format!("msix_data={}", info.data));
+                        raven_rt::println!(
+                            "devd: driver {} msix vector={} table={:#x} bar={}",
+                            driver.name,
+                            info.vector,
+                            capability.table_offset,
+                            capability.table_bar
+                        );
+                        msix_done = true;
+                    }
+                    Err(error) => {
+                        raven_rt::println!(
+                            "devd: driver {} msix unavailable: {}; using legacy irq",
+                            driver.name,
+                            error.description()
+                        );
+                    }
+                }
+            }
+            if !msix_done {
+                let _ = open_resource(client, &name, "irq", opened)?;
+                raven_rt::println!(
+                    "devd: driver {} irq line={}",
+                    driver.name,
+                    device.interrupt_line
+                );
+                argv.push(alloc::format!("irq={}", device.interrupt_line));
+            }
         }
         Ok(argv)
+    }
+
+    /// One function's MSI-X table location from the PCI configuration page.
+    struct MsixCapability {
+        table_bar: usize,
+        table_offset: usize,
+        table_size: u16,
+    }
+
+    /// Walk the PCI capability list for MSI-X (`id 0x11`).
+    ///
+    /// The caller has already mapped the configuration page. A missing or malformed capability
+    /// keeps the legacy INTx path.
+    fn msix_capability(config: &[u8]) -> Option<MsixCapability> {
+        let status = u16::from_le_bytes(config.get(0x06..0x08)?.try_into().ok()?);
+        if status & (1 << 4) == 0 {
+            return None;
+        }
+        let mut pointer = usize::from(*config.get(0x34)? & 0xFC);
+        let mut seen = 0u32;
+        while pointer != 0 && seen < 48 {
+            let id = *config.get(pointer)?;
+            let next = usize::from(*config.get(pointer.saturating_add(1))? & 0xFC);
+            if id == 0x11 {
+                let control = u16::from_le_bytes(
+                    config
+                        .get(pointer.saturating_add(2)..pointer.saturating_add(4))?
+                        .try_into()
+                        .ok()?,
+                );
+                let table = u32::from_le_bytes(
+                    config
+                        .get(pointer.saturating_add(4)..pointer.saturating_add(8))?
+                        .try_into()
+                        .ok()?,
+                );
+                return Some(MsixCapability {
+                    table_bar: usize::try_from(table & 7).ok()?,
+                    table_offset: usize::try_from(table & !7).ok()?,
+                    table_size: (control & 0x7FF).saturating_add(1),
+                });
+            }
+            pointer = next;
+            seen = seen.saturating_add(1);
+        }
+        None
     }
 
     /// Spawn a driver from a prepared launch and release the parent's handles.
