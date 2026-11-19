@@ -35,6 +35,8 @@ mod program {
     use alloc::vec;
     use alloc::vec::Vec;
 
+    use core::cell::RefCell;
+
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, Rights, prot};
     use raven_pager::{PAGE_IN, PAGE_OUT, PagerPacket};
@@ -95,6 +97,9 @@ mod program {
         table: MountTable,
         opens: OpenTable<Proxy>,
         pagers: BTreeMap<u32, PagerRegion>,
+        /// One long-lived backend root description per mount. `forward_one` serves each
+        /// directory-entry `Lstat` through it instead of opening/closing the scheme root.
+        roots: RefCell<BTreeMap<u32, Handle>>,
         mount_generation: u32,
         probe: crate::trace::Probe,
         trace: bool,
@@ -106,6 +111,7 @@ mod program {
                 table,
                 opens: OpenTable::new(),
                 pagers: BTreeMap::new(),
+                roots: RefCell::new(BTreeMap::new()),
                 mount_generation: 1,
                 probe: crate::trace::Probe::server(),
                 trace,
@@ -139,6 +145,23 @@ mod program {
             let normalized =
                 normalize_request(&absolute, &mut buffer).map_err(|error| error.errno())?;
             Ok((normalized.path.to_string(), normalized.requires_dir))
+        }
+
+        fn root_handle(&self, mount_id: u32, scheme: &str) -> Result<Handle, Errno> {
+            if let Some(handle) = self.roots.borrow().get(&mount_id) {
+                return Ok(*handle);
+            }
+            let handle = Client::new().open(scheme, READ)?;
+            self.roots.borrow_mut().insert(mount_id, handle);
+            Ok(handle)
+        }
+
+        fn clear_roots(&self) {
+            let handles: Vec<Handle> = self.roots.borrow_mut().values().copied().collect();
+            self.roots.borrow_mut().clear();
+            for handle in handles {
+                let _ = Client::new().close(handle);
+            }
         }
 
         fn target_stat(&self, scheme: &str, suffix: &str) -> Result<Stat, Errno> {
@@ -526,11 +549,9 @@ mod program {
                 _ => {}
             }
             let client = Client::new();
-            let root = client.open(&scheme, READ)?;
+            let root = self.root_handle(mount_id, &scheme)?;
             let request = CallRequest::new(rebuild_single(&call, suffix.as_bytes())?);
-            let result = proxy_call(&client, root, &request, response);
-            let _ = client.close(root);
-            result
+            proxy_call(&client, root, &request, response)
         }
 
         fn forward_link(
@@ -1107,6 +1128,7 @@ mod program {
                         );
                     }
                     result?;
+                    self.clear_roots();
                     self.bump_mounts();
                     if self.trace {
                         println!("vfsd-trace: mount-bump gen={}", self.mount_generation);
@@ -1128,6 +1150,7 @@ mod program {
                         );
                     }
                     result?;
+                    self.clear_roots();
                     self.bump_mounts();
                     if self.trace {
                         println!("vfsd-trace: umount-bump gen={}", self.mount_generation);
