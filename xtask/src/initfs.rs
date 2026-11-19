@@ -479,6 +479,8 @@ pub(crate) fn ensure_brush(root: &Path, arch: Arch, profile: &Profile) -> Result
 pub(crate) fn source_path(root: &Path, arch: Arch, source: &str) -> PathBuf {
     if source == "build/brush" {
         root.join(brush_path(arch))
+    } else if let Some(rest) = source.strip_prefix("build/{arch}/") {
+        root.join("build").join(arch.as_str()).join(rest)
     } else {
         root.join(source)
     }
@@ -491,7 +493,7 @@ pub(crate) fn source_path(root: &Path, arch: Arch, source: &str) -> PathBuf {
 /// The slice build is the same one `cargo xtask build uutils` runs; it is skipped when every
 /// referenced staging file already exists so normal image builds stay fast.
 pub(crate) fn ensure_uutils(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
-    let exists = |source: &str| root.join(source).is_file();
+    let exists = |source: &str| source_path(root, arch, source).is_file();
     let missing = uutils_missing(profile, arch, exists);
     if missing.is_empty() {
         return Ok(());
@@ -505,7 +507,7 @@ pub(crate) fn ensure_uutils(root: &Path, arch: Arch, profile: &Profile) -> Resul
     if code != 0 {
         bail!("uutils staging build failed with exit code {code}");
     }
-    let exists = |source: &str| root.join(source).is_file();
+    let exists = |source: &str| source_path(root, arch, source).is_file();
     let missing = uutils_missing(profile, arch, exists);
     if !missing.is_empty() {
         bail!(
@@ -518,8 +520,10 @@ pub(crate) fn ensure_uutils(root: &Path, arch: Arch, profile: &Profile) -> Resul
 
 /// The uutils name in a profile source such as `build/x86_64/uutils/ls`.
 fn uutils_source_name(arch: Arch, source: &str) -> Option<&str> {
-    let prefix = format!("build/{}/uutils/", arch.as_str());
-    let name = source.strip_prefix(&prefix)?;
+    let concrete = format!("build/{}/uutils/", arch.as_str());
+    let name = source
+        .strip_prefix(&concrete)
+        .or_else(|| source.strip_prefix("build/{arch}/uutils/"))?;
     if name.is_empty() || name.contains('/') {
         None
     } else {
