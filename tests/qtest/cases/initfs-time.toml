@@ -20,7 +20,7 @@ regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
 regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
-regex = '^initfs-time PASS [0-9]+ [0-9]+ [0-9]+$'
+regex = '^initfs-time PASS [0-9]+ [0-9]+ [0-9]+ [0-9]+$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -33,11 +33,11 @@ wait = '^raven# $'
 timeout_secs = 90
 
 [[step]]
-send = "/bin/brush -c 't1=$(/bin/stat -c %Y /init); t2=$(/bin/stat -c %Y /bin/ls); t4=$(/bin/stat -c %Y /bin); if [ $t1 -ge 1600000000 ] && [ $t1 -eq $t2 ] && [ $t1 -eq $t4 ]; then echo initfs-time PASS $t1 $t2 $t4; else echo initfs-time FAIL $t1 $t2 $t4; fi'\n"
+send = "/bin/brush -c 't1=$(/bin/stat -c %Y /init); t2=$(/bin/stat -c %Y /bin/ls); t4=$(/bin/stat -c %Y /bin); /bin/touch /tmp/k162; t3=$(/bin/stat -c %Y /tmp/k162); if [ $t1 -ge 1600000000 ] && [ $t1 -eq $t2 ] && [ $t1 -eq $t4 ] && [ $t3 -ge $t1 ]; then echo initfs-time PASS $t1 $t2 $t4 $t3; else echo initfs-time FAIL $t1 $t2 $t4 $t3; fi'\n"
 delay_ms = 100
 
 [[step]]
-wait = '^initfs-time PASS [0-9]+ [0-9]+ [0-9]+$'
+wait = '^initfs-time PASS [0-9]+ [0-9]+ [0-9]+ [0-9]+$'
 timeout_secs = 20
 
 [[step]]
