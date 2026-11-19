@@ -81,3 +81,14 @@ fn fat_with_cmdline_preserves_files_and_adds_the_cmdline() {
         .unwrap();
     assert_eq!(cmdline, "console=ttyAMA0 loglevel=info\n");
 }
+
+#[test]
+fn release_profiles_request_release_kernel_and_loader() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let release = Profile::load(root, "release").unwrap();
+    assert!(build::image_build_release(Arch::X86_64, &release));
+    let base = Profile::load(root, "base").unwrap();
+    assert!(!build::image_build_release(Arch::X86_64, &base));
+    let pi4 = Profile::load(root, "pi4-release").unwrap();
+    assert!(build::image_build_release(Arch::Aarch64, &pi4));
+}

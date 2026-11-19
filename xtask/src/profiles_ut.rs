@@ -604,3 +604,17 @@ fn a_disabled_service_needs_no_pin() {
         Vec::<String>::new()
     );
 }
+
+#[test]
+fn image_release_is_additive_across_extends_and_fragments() {
+    let tree = Tree::new();
+    tree.profile("base", BASE);
+    tree.profile(
+        "demo",
+        "name = \"demo\"\nextends = \"base\"\n[image]\nrelease = true\n[boot]\ncmdline = \"console=ttyS0\"\nlog_level = \"info\"\n",
+    );
+    assert!(Profile::load(&tree.root, "demo").unwrap().image.release);
+    assert!(!Profile::load(&tree.root, "base").unwrap().image.release);
+    tree.write("profiles/base.d/30-image.toml", "[image]\nrelease = true\n");
+    assert!(Profile::load(&tree.root, "base").unwrap().image.release);
+}

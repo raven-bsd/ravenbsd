@@ -91,8 +91,11 @@ pub(crate) fn run_with_overrides(
     platform: Platform,
 ) -> Result<u8> {
     // A release image must embed the kernel built from the clean checked-out HEAD. Reject a
-    // dirty tree up front and a kernel override, which would bypass that guarantee.
-    let release_image = build::is_release_image_profile(arch, profile_name);
+    // dirty tree up front and a kernel override, which would bypass that guarantee. The profile
+    // decides the build mode: release image names default to release, and `[image] release`
+    // is the explicit switch for demo/test profiles.
+    let profile = Profile::load(root, profile_name)?;
+    let release_image = build::image_build_release(arch, &profile);
     if release_image {
         build::require_clean_release_head(root, profile_name)?;
         if overrides.kernel.is_some() {
@@ -104,39 +107,61 @@ pub(crate) fn run_with_overrides(
 
     if platform == Platform::Pi4 {
         if crate::rootfs::spec_path(root, profile_name).is_some() {
-            return build_pi4_sd(root, arch, profile_name, cmdline, overrides);
+            return build_pi4_sd(root, arch, profile_name, cmdline, overrides, release_image);
         }
+        let release_kernel = if release_image {
+            Some(build::run_pi4_kernel(root, true)?)
+        } else {
+            None
+        };
         let code = crate::pi::build(
             root,
             arch,
             profile_name,
             cmdline,
             overrides.initfs,
-            overrides.kernel,
+            release_kernel.as_deref().or(overrides.kernel),
             overrides.output,
         )?;
         if code == 0 && release_image {
-            let kernel = build::pi4_kernel_artifact(root)?;
-            build::verify_release_kernel(root, &kernel, profile_name)?;
+            let kernel = release_kernel
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("release Pi kernel path is missing"))?;
+            build::verify_artifact_profile(kernel, true)?;
+            build::verify_release_kernel(root, kernel, profile_name)?;
         }
         return Ok(code);
     }
-    let profile = Profile::load(root, profile_name)?;
     let workspace = Workspace::load(root)?;
 
     // The loader is always needed. A test kernel override replaces the real kernel, so there is
     // no reason to build it.
-    let code = build::run(&workspace, Component::Loader, arch, false, &[], false)?;
+    let code = build::run(
+        &workspace,
+        Component::Loader,
+        arch,
+        release_image,
+        &[],
+        false,
+    )?;
     if code != 0 {
         bail!("loader build failed with exit code {code}");
     }
     if overrides.kernel.is_none() {
-        let code = build::run(&workspace, Component::Kernel, arch, false, &[], false)?;
+        let code = build::run(
+            &workspace,
+            Component::Kernel,
+            arch,
+            release_image,
+            &[],
+            false,
+        )?;
         if code != 0 {
             bail!("kernel build failed with exit code {code}");
         }
+        let kernel = build::profile_artifact_path(root, arch, Component::Kernel, release_image);
+        build::verify_artifact_profile(&kernel, release_image)?;
         if release_image {
-            let kernel = build::artifact_path(root, arch, Component::Kernel, "");
             build::verify_release_kernel(root, &kernel, profile_name)?;
         }
     }
@@ -157,10 +182,11 @@ pub(crate) fn run_with_overrides(
     };
     let kernel_path = match overrides.kernel {
         Some(path) => resolve_override(root, path),
-        None => build::artifact_path(root, arch, Component::Kernel, ""),
+        None => build::profile_artifact_path(root, arch, Component::Kernel, release_image),
     };
 
-    let loader = build::artifact_path(root, arch, Component::Loader, "");
+    let loader = build::profile_artifact_path(root, arch, Component::Loader, release_image);
+    build::verify_artifact_profile(&loader, release_image)?;
     let loader_bytes =
         fs::read(&loader).with_context(|| format!("cannot read {}", loader.display()))?;
     let kernel_bytes =
@@ -292,12 +318,18 @@ fn build_pi4_sd(
     profile_name: &str,
     cmdline: Option<&str>,
     overrides: Overrides<'_>,
+    release_image: bool,
 ) -> Result<u8> {
     ensure!(
         arch == Arch::Aarch64,
         "the pi4 platform requires --arch aarch64"
     );
     let profile = Profile::load(root, profile_name)?;
+    let release_kernel = if release_image {
+        Some(build::run_pi4_kernel(root, true)?)
+    } else {
+        None
+    };
     let temp = root
         .join("build")
         .join(arch.as_str())
@@ -313,11 +345,18 @@ fn build_pi4_sd(
         profile_name,
         cmdline,
         overrides.initfs,
-        overrides.kernel,
+        release_kernel.as_deref().or(overrides.kernel),
         Some(&temp),
     )?;
     if code != 0 {
         bail!("Pi 4 boot-partition build failed with exit code {code}");
+    }
+    if release_image {
+        let kernel = release_kernel
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("release Pi kernel path is missing"))?;
+        build::verify_artifact_profile(kernel, true)?;
+        build::verify_release_kernel(root, kernel, profile_name)?;
     }
 
     let fat_offset = ESP_START_LBA * SECTOR_SIZE;
