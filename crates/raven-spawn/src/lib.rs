@@ -186,6 +186,13 @@ pub fn spawn_with<S: Sys>(
         }
         None => None,
     };
+    // K139: pass the libc archive offset so the loader maps it from the initfs zero-copy
+    // instead of copying it through the file server. Only dynamic mains need it.
+    let libc = if interp.is_some() {
+        initfs.get("/lib/libc.so.1").map(|entry| entry.data_offset)
+    } else {
+        None
+    };
     spawn_elf(
         &main,
         main_steps,
@@ -194,6 +201,7 @@ pub fn spawn_with<S: Sys>(
         },
         main_bias,
         interp,
+        libc,
         path,
         options,
         &[],
@@ -225,6 +233,7 @@ pub fn spawn_image_with<S: Sys>(
             main_steps,
             ImageSource::Bytes(image),
             main_bias,
+            None,
             None,
             path,
             options,
@@ -274,6 +283,7 @@ pub fn spawn_image_with_fdmap<S: Sys>(
         ImageSource::Bytes(image),
         main_bias,
         None,
+        None,
         path,
         options,
         fdmap,
@@ -317,6 +327,7 @@ pub fn spawn_image_with_interp<S: Sys>(
         ImageSource::Bytes(image),
         main_bias,
         interp,
+        None,
         path,
         options,
         &[],
@@ -358,6 +369,7 @@ pub fn spawn_image_with_exec<S: Sys>(
             ImageSource::Bytes(image),
             main_bias,
             None,
+            None,
             path,
             options,
             &[],
@@ -375,6 +387,7 @@ pub fn spawn_image_with_exec<S: Sys>(
             ImageSource::Bytes(image),
             main_bias,
             Some((elf, steps, ImageSource::Bytes(&interpreter), bias)),
+            None,
             path,
             options,
             &[],
@@ -585,6 +598,7 @@ fn spawn_elf<S: Sys>(
     main_source: ImageSource<'_>,
     main_bias: u64,
     interp: Option<(Elf<'_>, BiasedPlan, ImageSource<'_>, u64)>,
+    libc: Option<u64>,
     path: &str,
     options: &SpawnOptions<'_>,
     fdmap: &[(i32, u32)],
@@ -729,7 +743,7 @@ fn spawn_elf<S: Sys>(
         }
         Some((address as usize, entries.len()))
     };
-    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, fdmap_info);
+    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, libc, fdmap_info);
     let random = random_bytes(&auxv as *const _ as usize);
 
     let memobj = match sys.memobj_create(STACK_SIZE) {
@@ -1138,6 +1152,9 @@ const AT_RAVEN_FDMAP: usize = 0x7003;
 /// Raven fd-inheritance entry count.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_FDMAP_N: usize = 0x7004;
+/// Initfs archive offset of the libc image (K139); the loader maps it zero-copy.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const AT_RAVEN_LIBC: usize = 0x7007;
 /// Raven ABI revision.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_ABI: usize = 0x7006;
@@ -1544,6 +1561,7 @@ fn build_auxv(
     elf: &Elf<'_>,
     main_bias: u64,
     interp_bias: u64,
+    libc: Option<u64>,
     fdmap: Option<(usize, usize)>,
 ) -> ([(usize, usize); MAX_AUXV], usize) {
     let mut auxv = [(0usize, 0usize); MAX_AUXV];
@@ -1581,6 +1599,9 @@ fn build_auxv(
     push(AT_HWCAP2, 0);
     push(AT_EXECFN, 0);
     push(AT_MINSIGSTKSZ, 8192);
+    if let Some(offset) = libc {
+        push(AT_RAVEN_LIBC, usize::try_from(offset).unwrap_or_default());
+    }
     if let Some((address, count)) = fdmap {
         push(AT_RAVEN_FDMAP, address);
         push(AT_RAVEN_FDMAP_N, count);
