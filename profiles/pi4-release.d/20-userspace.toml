@@ -246,10 +246,6 @@ src = "etc/brush/bobtheshell.sh"
 path = "/etc/brush/bobtheshell.sh"
 mode = 0o644
 
-[[initfs.programs]]
-package = "ed"
-path = "/bin/ed"
-
 [[initfs.files]]
 src = "etc/motd"
 path = "/etc/motd"
