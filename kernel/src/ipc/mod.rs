@@ -18,7 +18,25 @@ pub mod protocol;
 pub mod registry;
 pub mod router;
 
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU32, AtomicU64, Ordering};
+
+/// K147 fixed-cost stage trace, enabled by `k147-trace` on the kernel command line.
+///
+/// The first call parses the command line once; every later check is a cached atomic load.
+pub(crate) fn trace_k147() -> bool {
+    static STATE: AtomicU8 = AtomicU8::new(0);
+    match STATE.load(Ordering::Relaxed) {
+        1 => false,
+        2 => true,
+        _ => {
+            let enabled = crate::memory::paging::cmdline()
+                .split_ascii_whitespace()
+                .any(|token| token == "k147-trace");
+            STATE.store(if enabled { 2 } else { 1 }, Ordering::Relaxed);
+            enabled
+        }
+    }
+}
 
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};

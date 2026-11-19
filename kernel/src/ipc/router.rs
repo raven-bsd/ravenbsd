@@ -31,6 +31,11 @@ use super::{next_file_id, next_request_id, registry};
 /// Maximum outstanding client requests one process may hold.
 const MAX_CLIENT_REQUESTS: usize = 1024;
 
+/// K147 router stage-trace counters (first 64 invocations each).
+static K147_RT: AtomicU64 = AtomicU64::new(0);
+static K147_DELIVER: AtomicU64 = AtomicU64::new(0);
+static K147_SEND: AtomicU64 = AtomicU64::new(0);
+
 /// The current thread's trace id, or zero when there is no thread context.
 ///
 /// The disabled (untraced) path is this one branch-free read: an id of zero is stamped unchanged,
@@ -172,8 +177,11 @@ fn read_at(
     if len == 0 {
         return Ok(0);
     }
+    let trace = super::trace_k147() && K147_RT.fetch_add(1, Ordering::Relaxed) < 64;
+    let trace_start = if trace { crate::time::now_ns() } else { 0 };
     ensure_server(&file.server)?;
     let capture = capture::create(caller, &file.server, address, len, true)?;
+    let trace_capture = if trace { crate::time::now_ns() } else { 0 };
     let mut packet = SchemePacket::request(Opcode::Read, next_request_id(), file.server_id());
     packet.trace_id = current_trace_id();
     packet.buffer_len = len;
@@ -195,7 +203,22 @@ fn read_at(
             response: None,
         },
     );
-    let (status, result) = submit(&request).and_then(|_| wait(caller, &request))?;
+    let trace_new = if trace { crate::time::now_ns() } else { 0 };
+    submit(&request)?;
+    let trace_submit = if trace { crate::time::now_ns() } else { 0 };
+    let (status, result) = wait(caller, &request)?;
+    let trace_wait = if trace { crate::time::now_ns() } else { 0 };
+    if trace {
+        crate::kprintln!(
+            "k147 rt op=read len={} capture={} new={} submit={} wait={} total={}",
+            len,
+            trace_capture.saturating_sub(trace_start),
+            trace_new.saturating_sub(trace_capture),
+            trace_submit.saturating_sub(trace_new),
+            trace_wait.saturating_sub(trace_submit),
+            trace_wait.saturating_sub(trace_start)
+        );
+    }
     if status != 0 {
         return Err(status_errno(status));
     }
@@ -432,6 +455,8 @@ pub fn call(
     response_address: u64,
     response_len: u64,
 ) -> Result<usize, Errno> {
+    let trace = super::trace_k147() && K147_RT.fetch_add(1, Ordering::Relaxed) < 64;
+    let trace_start = if trace { crate::time::now_ns() } else { 0 };
     ensure_server(&file.server)?;
     let request_capture = if request_len > 0 {
         Some(capture::create(
@@ -455,6 +480,7 @@ pub fn call(
     } else {
         None
     };
+    let trace_capture = if trace { crate::time::now_ns() } else { 0 };
     let mut packet = SchemePacket::request(Opcode::Call, next_request_id(), file.server_id());
     packet.trace_id = current_trace_id();
     packet.buffer_len = request_len;
@@ -491,7 +517,23 @@ pub fn call(
             response: response_capture,
         },
     );
-    let (status, result) = submit(&request).and_then(|_| wait(caller, &request))?;
+    let trace_new = if trace { crate::time::now_ns() } else { 0 };
+    submit(&request)?;
+    let trace_submit = if trace { crate::time::now_ns() } else { 0 };
+    let (status, result) = wait(caller, &request)?;
+    let trace_wait = if trace { crate::time::now_ns() } else { 0 };
+    if trace {
+        crate::kprintln!(
+            "k147 rt op=call req={} resp={} capture={} new={} submit={} wait={} total={}",
+            request_len,
+            response_len,
+            trace_capture.saturating_sub(trace_start),
+            trace_new.saturating_sub(trace_capture),
+            trace_submit.saturating_sub(trace_new),
+            trace_wait.saturating_sub(trace_submit),
+            trace_wait.saturating_sub(trace_start)
+        );
+    }
     if near_full {
         let stats = capture::slot_stats();
         crate::kprintln!(
@@ -624,6 +666,8 @@ pub fn send(
     if length < PACKET_SIZE as u64 {
         return Err(Errno::EINVAL);
     }
+    let trace = super::trace_k147() && K147_SEND.fetch_add(1, Ordering::Relaxed) < 64;
+    let trace_start = if trace { crate::time::now_ns() } else { 0 };
     let mut bytes = [0u8; PACKET_SIZE];
     let source = UserSlice::new(packet_address, PACKET_SIZE as u64)?;
     copy_from_user(&mut bytes, source)?;
@@ -723,6 +767,15 @@ pub fn send(
     // unless they adopt their own caller.
     if let Some(thread) = sched::current_thread() {
         thread.trace_id.store(0, Ordering::Release);
+    }
+    if trace {
+        crate::kprintln!(
+            "k147 send id={} status={} result={} total={}",
+            request.id,
+            status,
+            result,
+            crate::time::now_ns().saturating_sub(trace_start)
+        );
     }
     Ok(())
 }
@@ -918,6 +971,8 @@ fn deliver(
     request: Arc<PendingRequest>,
     packet_address: u64,
 ) -> Result<Handle, Errno> {
+    let trace = super::trace_k147() && K147_DELIVER.fetch_add(1, Ordering::Relaxed) < 64;
+    let trace_start = if trace { crate::time::now_ns() } else { 0 };
     let packet = request.deliverable_packet();
     // Adopt the caller's trace id for the duration of this call: a nested call the server makes
     // while serving it inherits the caller's trace. Cleared when SEND finishes.
@@ -957,6 +1012,13 @@ fn deliver(
         }
     };
     caller.active_requests.lock().push(Arc::clone(&request));
+    if trace {
+        crate::kprintln!(
+            "k147 deliver id={} total={}",
+            request.id,
+            crate::time::now_ns().saturating_sub(trace_start)
+        );
+    }
     Ok(handle)
 }
 
