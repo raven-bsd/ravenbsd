@@ -12,6 +12,7 @@ name = "pi4-root-pivot-persist"
 arch = "aarch64"
 profile = "pi4-root-pivot"
 timeout_secs = 300
+pre = ["cp -f build/qtest/pi4-root-pivot.img build/qtest/pi4-root-pivot-persist.img"]
 boot_cmdline = "console=ttyAMA0 test-exit=1"
 qemu_extra = ["-m", "1024"]
 expect_exit = "success"
