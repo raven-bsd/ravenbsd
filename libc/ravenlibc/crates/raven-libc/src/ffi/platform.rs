@@ -124,8 +124,7 @@ fn apply_startup_cwd(platform: &Platform<RealSys, ShellLock>) {
         return;
     }
     let bytes = pointer as *const u8;
-    let mut length = 0usize;
-    while length < MAX_CWD {
+    for length in 0..MAX_CWD {
         // SAFETY: the loader wrote a NUL-terminated cwd string on the initial stack; the scan
         // stays below MAX_CWD and stops at the first NUL.
         if unsafe { *bytes.add(length) } == 0 {
@@ -135,7 +134,6 @@ fn apply_startup_cwd(platform: &Platform<RealSys, ShellLock>) {
             platform.init_cwd(Some(cwd));
             return;
         }
-        length += 1;
     }
 }
 
