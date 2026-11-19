@@ -96,6 +96,7 @@ pub(crate) fn run_with_overrides(
     // is the explicit switch for demo/test profiles.
     let profile = Profile::load(root, profile_name)?;
     let release_image = build::image_build_release(arch, &profile);
+    let qemu_ufs = profile_name == "qemu-ufs";
     if release_image {
         build::require_clean_release_head(root, profile_name)?;
         if overrides.kernel.is_some() {
@@ -176,7 +177,14 @@ pub(crate) fn run_with_overrides(
         }
         None if rootfs => build_release_initfs(root, arch, &profile, &workspace)?,
         None => {
-            let path = crate::initfs::build(root, arch, profile_name)?;
+            // K176: the UFS-root image keeps the initfs bootstrap-only; the release
+            // userland goes into the root disk below.
+            let initfs_profile = if qemu_ufs {
+                "qemu-ufs-boot"
+            } else {
+                profile_name
+            };
+            let path = crate::initfs::build(root, arch, initfs_profile)?;
             fs::read(&path).with_context(|| format!("cannot read {}", path.display()))?
         }
     };
@@ -193,13 +201,25 @@ pub(crate) fn run_with_overrides(
         fs::read(&kernel_path).with_context(|| format!("cannot read {}", kernel_path.display()))?;
     // The `hw` profile carries a UFS root. Until virtio-blk lands, blockd serves it from the
     // initfs as a RAM disk, so the one-partition GPT disk is inserted at /etc/blockd.img.
-    let initfs_bytes = match crate::rootfs::build_for_profile(root, arch, profile_name, true)? {
-        Some(disk) => {
-            let data =
-                fs::read(&disk).with_context(|| format!("cannot read {}", disk.display()))?;
-            crate::rootfs::inject_initfs_file(&initfs_bytes, "/etc/blockd.img", &data, 0o444)?
+    let initfs_bytes = if qemu_ufs {
+        // The root disk is a real GPT/UFS2 disk staged from the payload profile; it is
+        // attached to QEMU as a virtio-blk function, never embedded in the initfs.
+        let ufs = crate::rootfs::build_sd_root(root, arch, profile_name, true)?;
+        let disk = root
+            .join("build")
+            .join(arch.as_str())
+            .join("qemu-ufs-root.img");
+        crate::rootfs::build_root_disk(&ufs, &disk)?;
+        initfs_bytes
+    } else {
+        match crate::rootfs::build_for_profile(root, arch, profile_name, true)? {
+            Some(disk) => {
+                let data =
+                    fs::read(&disk).with_context(|| format!("cannot read {}", disk.display()))?;
+                crate::rootfs::inject_initfs_file(&initfs_bytes, "/etc/blockd.img", &data, 0o444)?
+            }
+            None => initfs_bytes,
         }
-        None => initfs_bytes,
     };
 
     let boot_toml = boot_toml(&profile, cmdline);
