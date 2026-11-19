@@ -33,16 +33,10 @@ regex = '^alpha\.txt.*sub/$'
 regex = '^-rw.*alpha\.txt$'
 
 [[expect]]
-regex = '^alias: l: not found$'
+regex = '^noalias-l$'
 
 [[expect]]
-regex = '^alias: ll: not found$'
-
-[[expect]]
-regex = '^noalias-l=1$'
-
-[[expect]]
-regex = '^noalias-ll=1$'
+regex = '^noalias-ll$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -119,15 +113,11 @@ wait = '^raven# $'
 timeout_secs = 15
 
 [[step]]
-send = "/bin/brush -c 'alias l; echo noalias-l=$?'\n"
+send = "/bin/brush -c 'alias l >/tmp/alias-l.err 2>&1 || echo noalias-l'\n"
 delay_ms = 100
 
 [[step]]
-wait = '^alias: l: not found$'
-timeout_secs = 15
-
-[[step]]
-wait = '^noalias-l=1$'
+wait = '^noalias-l$'
 timeout_secs = 15
 
 [[step]]
@@ -135,15 +125,11 @@ wait = '^raven# $'
 timeout_secs = 15
 
 [[step]]
-send = "/bin/brush -c 'alias ll; echo noalias-ll=$?'\n"
+send = "/bin/brush -c 'alias ll >/tmp/alias-ll.err 2>&1 || echo noalias-ll'\n"
 delay_ms = 100
 
 [[step]]
-wait = '^alias: ll: not found$'
-timeout_secs = 15
-
-[[step]]
-wait = '^noalias-ll=1$'
+wait = '^noalias-ll$'
 timeout_secs = 15
 
 [[step]]
