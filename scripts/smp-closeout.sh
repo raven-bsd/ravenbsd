@@ -329,6 +329,46 @@ for case_name in $CASES; do
     fi
 done
 
+# The qtest image build itself also runs `cargo xtask image`; a cold kernel/userland compile is
+# part of the cell time. Warm each selected profile once (never QEMU), so the per-cell caps
+# measure the warmed test. The same 120 s per-command cap applies.
+seen_profiles=
+for case_name in $CASES; do
+    file=tests/qtest/cases/$case_name.toml
+    profile=$(sed -n 's/^profile = "\(.*\)"$/\1/p' "$file" | head -n 1)
+    if [ -z "$profile" ]; then
+        echo "smp-closeout: warmup $case_name: missing profile" >&2
+        exit 2
+    fi
+    case " $seen_profiles " in
+        *" $profile "*) continue ;;
+    esac
+    seen_profiles="$seen_profiles $profile"
+    log=$OUT/warmup/profile-$profile.log
+    start_ns=$(date +%s%N)
+    timeout 120 cargo xtask image --arch x86_64 --profile "$profile" > "$log" 2>&1
+    rc=$?
+    end_ns=$(date +%s%N)
+    ms=$(( (end_ns - start_ns) / 1000000 ))
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "profile:$profile" "image" "$rc" "$ms" 120 \
+        "cargo xtask image --arch x86_64 --profile $profile" >> "$OUT/warmup.tsv"
+    echo "smp-closeout: warmup image $profile rc=$rc ${ms}ms cap=120s"
+    if [ "$rc" -ne 0 ]; then
+        {
+            printf 'warmup=1\n'
+            printf 'case=profile:%s\n' "$profile"
+            printf 'command=cargo xtask image --arch x86_64 --profile %s\n' "$profile"
+            printf 'rc=%s\n' "$rc"
+            printf 'duration_ms=%s\n' "$ms"
+            printf 'cap_s=120\n'
+            printf 'log=%s\n' "$log"
+        } > "$OUT/FAILED"
+        echo "smp-closeout: warmup image FAILED/TIMEOUT for profile $profile; no matrix run" >&2
+        exit 1
+    fi
+done
+
 printf 'mode\tcase\tqtest_case\trc\tresult\tduration_ms\tlog\tcell_cap_s\tcell_timeout\n' > "$OUT/results.tsv"
 printf 'mode\tqtest_case\tload1\tqemu\tutc\n' > "$OUT/host-per-cell.tsv"
 

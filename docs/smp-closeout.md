@@ -4,10 +4,11 @@
 # SMP close-out matrix runner
 
 Date: 2026-11-18. Ticket: S126 (Otto). Depends: S116, S125, S85e.
-Status: runner delivered with a **per-cell cap table** and a measured **warmup stage** (rev 61).
-The full 20-cell attempt passed 13 cells (TCG4 5/5, KVM1 5/5, KVM2 3/5) and stopped when KVM2
-`smp-libc-concurrency` hit its 30 s test cap; the matrix is **not complete** and no close-out is
-claimed. S135's KVM2 `posix-shell` fix is verified (8.3 s).
+Status: runner delivered with the **per-cell cap table**, the measured **warmup of pre commands
+and profile images** (rev 62). The full attempt passed **14/20 cells** (TCG4 5/5, KVM1 5/5, KVM2
+4/5) and stopped when KVM2 `posix-fs-smp` hit its 40 s cap; the matrix is **not complete** and no
+close-out is claimed. S135's KVM2 `posix-shell` (7.8 s) and S138's KVM2 concurrency (5.2 s) are
+verified.
 
 ## Why
 
@@ -402,6 +403,45 @@ the cell's own, no external jobs. Image:
 The runner stopped; KVM2 `posix-fs-smp` and all KVM4 cells were not run. **No partial matrix and
 no full-matrix claim.** Per the rule a cell over its cap is a failure, not a reason to raise it;
 the 30 s KVM concurrency cap is the first expiry and is preserved for the owner.
+
+## Rework round 8 (rev 62): image warmup and the 14/20 matrix
+
+Merged `origin/master` `ec40b545` (S135, S137 qtest reap/no image lock, S138 KVM2 concurrency
+ftrylockfile+yield) into `82c9efa6`; clean tree, host clear (load 1.03, no QEMU/xtask/cargo/rustc).
+
+**Warmup extension.** The rev-61 warmup ran only the case `pre` commands; the first attempt then
+hit the 40 s cell cap during the cold qtest *image* build (telemetry `xtask/cargo/rustc` active,
+`qemu=0`, no serial). The warmup now also builds each selected profile once with
+`cargo xtask image --arch x86_64 --profile <profile>` and its own 120 s cap:
+
+| Warmup item | Duration | Cap |
+|---|---:|---:|
+| `cargo xtask build brush --arch x86_64` | 36198 ms | 120 s |
+| util / threads / concurrency / fs-smp pre | 398-619 ms | 120 s |
+| profile `modern-shell-test` image | 2286 ms | 120 s |
+| profile `base` image | 1401 ms | 120 s |
+| profile `libc-test` image | 1359 ms | 120 s |
+
+Warmup total ~39.2 s; the per-cell caps then measure the warmed test.
+
+**Full matrix attempt 2** (`timeout 900 sh scripts/smp-closeout.sh --max-load 5 --wait-for-idle 300
+--out build/smp-closeout/r8-full2`): preflight PASS, 14 cells passed, first failure at cell 15.
+
+| Mode | Cells |
+|---|---|
+| TCG4 | **5/5 pass** — 20.7 / 20.9 / 123.0 / 14.2 / 104.3 s |
+| KVM1 | **5/5 pass** — 7.7 / 12.1 / 9.6 / 4.9 / 25.8 s |
+| KVM2 | shell 7.8 (S135), util 12.2, threads 9.6, **concurrency 5.2 (S138)**; **`posix-fs-smp` 39.9 s → 40 s cap expired** |
+
+First failure `kvm2:posix-fs-smp-kvm2`: `result=timeout`, `cell_cap_s=40`, `cell_timeout=1`; the
+serial shows `smp-fs: services ok`, `smp-fs: setup ok`, then the cap kill. Host telemetry for the
+cell: load 0.84-1.09, QEMU/xtask only the cell's own, no external jobs. Image
+`build/qtest/posix-fs-smp-kvm2.img` sha256
+`2793805c5edff4734cf08059afe6b4ebab0ba86e6ecfa0c6c782b54827ecb359` (335544320 bytes).
+
+The runner stopped; KVM4 (5 cells) and nothing after cell 15 ran. **No partial or full matrix is
+claimed.** Per the rule the cell over its cap is a failure, not a reason to raise it; KVM2
+`posix-fs-smp` is preserved for the owner.
 
 ## When the full matrix runs
 
