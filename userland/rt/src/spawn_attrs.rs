@@ -498,6 +498,7 @@ fn to_errno(error: SpawnError) -> Errno {
         SpawnError::TooLarge => Errno::E2BIG,
         SpawnError::NotFound | SpawnError::FileNotFound => Errno::ENOENT,
         SpawnError::BadElf(_) | SpawnError::HasInterpreter => Errno::ENOEXEC,
+        SpawnError::BadCwd => Errno::EINVAL,
     }
 }
 
