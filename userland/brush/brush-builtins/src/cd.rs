@@ -86,7 +86,7 @@ impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for CdCommand {
             target_dir = context.shell.absolute_path(target_dir).canonicalize()?;
         }
 
-        context.shell.set_working_dir(&target_dir)?;
+        context.shell.change_dir(&target_dir)?;
 
         // Bash compatibility
         // https://www.gnu.org/software/bash/manual/bash.html#index-cd

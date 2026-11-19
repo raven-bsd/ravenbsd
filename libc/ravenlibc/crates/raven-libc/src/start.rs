@@ -56,6 +56,8 @@ const AT_HWCAP2: usize = 26;
 const AT_RAVEN_FDMAP: usize = 0x7003;
 /// `AT_RAVEN_FDMAP_N`: the number of entries in the inheritance block.
 const AT_RAVEN_FDMAP_N: usize = 0x7004;
+/// `AT_RAVEN_CWD`: the child working-directory string pointer (K165).
+const AT_RAVEN_CWD: usize = 0x7005;
 /// `AT_RAVEN_ABI`: the ABI revision the spawner wrote (`PG-50`).
 const AT_RAVEN_ABI: usize = 0x7006;
 /// First Raven-private key; the eight slots live at `key - 0x7000 + 56`.
@@ -348,6 +350,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     // mapped before the first thread starts; the platform consumes it, and adopts the standard
     // descriptors, on the first fd use. Building the fd table and its allocator lazily keeps
     // them out of the static start graph.
+    crate::ffi::platform::set_startup_cwd(aux_value(&aux, raven_slot(AT_RAVEN_CWD)));
     crate::ffi::platform::set_startup_fdmap(
         aux_value(&aux, raven_slot(AT_RAVEN_FDMAP)),
         aux_value(&aux, raven_slot(AT_RAVEN_FDMAP_N)),

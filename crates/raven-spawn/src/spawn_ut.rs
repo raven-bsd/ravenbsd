@@ -23,6 +23,7 @@ fn build(
         path,
         args,
         env,
+        b"/",
         auxv,
         &[0xAB; RANDOM_LEN],
         "x86_64",
@@ -186,6 +187,7 @@ fn overlong_strings_are_too_large() {
             "/child",
             &[&long],
             &[],
+            b"/",
             &[],
             &[0; 16],
             "x86_64"
@@ -205,6 +207,7 @@ fn too_many_arguments_are_too_large() {
             "/child",
             &names,
             &[],
+            b"/",
             &[],
             &[0; 16],
             "x86_64"
@@ -223,6 +226,7 @@ fn misaligned_stack_top_is_rejected() {
             "/child",
             &[],
             &[],
+            b"/",
             &[],
             &[0; 16],
             "x86_64"
@@ -241,6 +245,7 @@ fn small_buffer_is_rejected() {
             "/child",
             &["a"],
             &[],
+            b"/",
             &[],
             &[0; 16],
             "x86_64"
@@ -258,6 +263,7 @@ fn image_only_touches_the_top_of_the_buffer() {
         "/child",
         &["a"],
         &[],
+        b"/",
         &[],
         &[0; 16],
         "x86_64",
@@ -1225,4 +1231,59 @@ fn libc_auxv_carries_the_initfs_offset() {
     let (auxv, len) = build_auxv(&elf, 0, 0, Some(0x4000), None);
     let pairs = &auxv[..len];
     assert!(pairs.contains(&(AT_RAVEN_LIBC, 0x4000)));
+}
+
+#[test]
+fn cwd_is_published_as_at_raven_cwd() {
+    let mut buffer = vec![0u8; TEST_BUFFER];
+    let (_, sp0) = build_stack(
+        &mut buffer,
+        TEST_TOP,
+        "/child",
+        &[],
+        &[],
+        b"/bin",
+        &[(AT_RAVEN_CWD, 0)],
+        &[0; 16],
+        "x86_64",
+    )
+    .expect("stack image");
+    let argc = word(&buffer, sp0);
+    let word_size = WORD as u64;
+    let auxv0 = sp0 + word_size * (argc as u64 + 3);
+    let mut index = 0u64;
+    let mut cwd = None;
+    loop {
+        let key = word(&buffer, auxv0 + index * 2 * word_size);
+        if key == 0 {
+            break;
+        }
+        if key == AT_RAVEN_CWD {
+            cwd = Some(word(&buffer, auxv0 + (index * 2 + 1) * word_size));
+        }
+        index += 1;
+    }
+    let cwd = cwd.expect("AT_RAVEN_CWD is present");
+    assert_eq!(bytes_at(&buffer, cwd), b"/bin");
+}
+
+#[test]
+fn an_invalid_cwd_is_rejected_by_the_stack_builder() {
+    let mut buffer = vec![0u8; TEST_BUFFER];
+    for cwd in [b"".as_slice(), b"bin".as_slice(), b"/bad\0path".as_slice()] {
+        assert!(matches!(
+            build_stack(
+                &mut buffer,
+                TEST_TOP,
+                "/child",
+                &[],
+                &[],
+                cwd,
+                &[],
+                &[0; 16],
+                "x86_64"
+            ),
+            Err(SpawnError::BadCwd)
+        ));
+    }
 }

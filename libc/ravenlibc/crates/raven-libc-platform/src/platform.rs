@@ -880,10 +880,51 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         self.stat_at(fcntl::AT_FDCWD, path, fcntl::AT_SYMLINK_NOFOLLOW)
     }
 
+    /// One-call `Lstat` on the cached `file:/` root. The server returns the fixed `Stat`
+    /// record; `ENOSYS`/`EPROTO` keeps the old open+FSTAT+close fallback below.
+    fn root_stat(&self, path: &[u8]) -> Result<Stat, Errno> {
+        let mut request = [0u8; raven_proto_fs::CALL_HEADER_LEN + 2 + raven_proto_fs::MAX_PATH];
+        let encoded = CallRequest::new(Call::Lstat { path })
+            .encode(&mut request)
+            .map_err(|error| error.errno())?;
+        let (handle, reopened) = self.root_handle()?;
+        let mut response = [0u8; 128];
+        let count = match self
+            .backend
+            .call(handle, &request[..encoded], &mut response)
+        {
+            Err(Errno::EIO) if !reopened => {
+                self.invalidate_root();
+                let (handle, _) = self.root_handle()?;
+                self.backend
+                    .call(handle, &request[..encoded], &mut response)?
+            }
+            other => other?,
+        };
+        match CallResponse::decode(raven_proto_fs::OP_LSTAT, &response[..count])
+            .map_err(|error| error.errno())?
+        {
+            CallResponse::Stat { status: 0, stat } => {
+                Ok(crate::stat::from_wire(&stat, StatSource::Unknown))
+            }
+            CallResponse::Stat { status, .. } => match xlat::call_status(status) {
+                Err(error) => Err(error),
+                Ok(()) => Err(Errno::EPROTO),
+            },
+            _ => Err(Errno::EPROTO),
+        }
+    }
+
     /// `fstatat`.
     pub fn stat_at(&self, dirfd: i32, path: &[u8], flags: i32) -> Result<Stat, Errno> {
         if path.is_empty() && flags & fcntl::AT_EMPTY_PATH != 0 {
             return self.fstat(dirfd);
+        }
+        if flags & fcntl::AT_SYMLINK_NOFOLLOW != 0 {
+            let absolute = self.absolute_at(dirfd, path)?;
+            if let Ok(stat) = self.root_stat(&absolute) {
+                return Ok(stat);
+            }
         }
         let mut open_flags = fcntl::O_RDONLY as u32;
         if flags & fcntl::AT_SYMLINK_NOFOLLOW != 0 {
