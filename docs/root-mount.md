@@ -38,3 +38,8 @@ d????????? ? ?    ?       ?            ? root/
 The implementation is in `userland/init/src/boot.rs` (`activate_root` / `activate_mounted_root`);
 the reproducer transcript, the fixed serial and the root-capable image evidence are in
 `tickets/kevin/reports/K174.md`.
+
+**OBSERVED** on the release image `96f8b367…`: the serial reports
+`svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan`,
+`release-login` passes with a clean `ls -alh /`, and `hw-boot` still mounts `/root` and runs the
+root services. The full transcript is in the K174 report.
