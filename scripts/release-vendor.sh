@@ -5,10 +5,15 @@
 # SC1: build the vendored release graph, its CycloneDX SBOM and the manifest.
 #
 # The release image and every `--offline` build use `.cargo/config.toml`'s
-# `source.crates-io.replace-with = "vendored-sources"`. This script is the only writer of the
-# snapshot; it pins to Cargo.lock, keeps cargo's per-crate `.cargo-checksum.json`, and records the
-# lock/SBOM hashes. A missing crate fails the vendor command; it is never fetched silently by a
-# release build.
+# `source.crates-io.replace-with = "vendored-sources"`. The release graph is three cargo
+# workspaces: the root product, the in-tree brush shell and the in-tree uutils slice. Each is
+# vendored with its own committed Cargo.lock; the parts are merged into one `vendor/` directory
+# with cargo's per-crate `.cargo-checksum.json`. A missing crate fails the vendor command; it is
+# never fetched silently by a release build.
+#
+# The full snapshot is too large to commit. The script records it as
+# `build/release/vendor-full.tar.zst` with a SHA-256 in `vendor/manifest.toml`; upload that
+# artifact to the release evidence store and record the URL alongside the checksum.
 
 set -eu
 
@@ -16,7 +21,8 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 cd "$root"
 
 vendor_dir=vendor
-lock=Cargo.lock
+parts=build/release/vendor-parts
+artifact=build/release/vendor-full.tar.zst
 sbom=$vendor_dir/sbom.cdx.json
 manifest=$vendor_dir/manifest.toml
 check=0
@@ -36,11 +42,12 @@ esac
 
 command -v cargo >/dev/null 2>&1 || { echo "release-vendor: cargo not found" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "release-vendor: python3 not found" >&2; exit 1; }
-[ -f "$lock" ] || { echo "release-vendor: $lock is missing" >&2; exit 1; }
+[ -f Cargo.lock ] || { echo "release-vendor: Cargo.lock is missing" >&2; exit 1; }
+[ -f userland/brush/Cargo.lock ] || { echo "release-vendor: brush Cargo.lock is missing" >&2; exit 1; }
+[ -f userland/uutils/Cargo.lock ] || { echo "release-vendor: uutils Cargo.lock is missing" >&2; exit 1; }
 
 verify_layout() {
     [ -d "$vendor_dir" ] || { echo "release-vendor: $vendor_dir is missing" >&2; exit 1; }
-    [ -f "$vendor_dir/.cargo-checksum.json" ] || true
     grep -q 'replace-with = "vendored-sources"' .cargo/config.toml || {
         echo "release-vendor: .cargo/config.toml has no vendored-sources replacement" >&2
         exit 1
@@ -62,66 +69,93 @@ if [ "$check" -eq 1 ]; then
 fi
 
 mkdir -p build/release
-echo "==> vendor: cargo vendor --locked --versioned-dirs $vendor_dir"
-cargo vendor --locked --versioned-dirs "$vendor_dir" >build/release/vendor-config.txt
+rm -rf "$parts"
+mkdir -p "$parts/root" "$parts/brush" "$parts/uutils"
+
+echo "==> vendor: root"
+cargo vendor --locked --versioned-dirs "$parts/root" >build/release/vendor-config-root.txt
+echo "==> vendor: brush"
+cargo vendor --locked --versioned-dirs --manifest-path userland/brush/Cargo.toml "$parts/brush" \
+    >build/release/vendor-config-brush.txt
+echo "==> vendor: uutils"
+cargo vendor --locked --versioned-dirs --manifest-path userland/uutils/Cargo.toml "$parts/uutils" \
+    >build/release/vendor-config-uutils.txt
+
+echo "==> merge: $vendor_dir"
+rm -rf "$vendor_dir"
+mkdir -p "$vendor_dir"
+cp -a "$parts/root/." "$vendor_dir/"
+cp -an "$parts/brush/." "$vendor_dir/"
+cp -an "$parts/uutils/." "$vendor_dir/"
 
 echo "==> metadata: cargo metadata --locked --offline"
-cargo metadata --locked --offline --format-version 1 >build/release/vendor-metadata.json
+cargo metadata --locked --offline --format-version 1 >build/release/vendor-metadata-root.json
+cargo metadata --locked --offline --format-version 1 \
+    --manifest-path userland/brush/Cargo.toml >build/release/vendor-metadata-brush.json
+cargo metadata --locked --offline --format-version 1 \
+    --manifest-path userland/uutils/Cargo.toml >build/release/vendor-metadata-uutils.json
 
 echo "==> SBOM: $sbom"
-python3 - "$lock" build/release/vendor-metadata.json "$sbom" <<'PY'
+python3 - "$sbom" \
+    Cargo.lock build/release/vendor-metadata-root.json \
+    userland/brush/Cargo.lock build/release/vendor-metadata-brush.json \
+    userland/uutils/Cargo.lock build/release/vendor-metadata-uutils.json <<'PY'
 import datetime
 import json
 import os
 import sys
 
-lock_path, metadata_path, sbom_path = sys.argv[1:4]
-with open(metadata_path, "r", encoding="utf-8") as handle:
-    metadata = json.load(handle)
-licenses = {
-    package["name"] + "@" + package["version"]: package.get("license")
-    for package in metadata.get("packages", [])
-}
+sbom_path = sys.argv[1]
+pairs = list(zip(sys.argv[2::2], sys.argv[3::2]))
+
+licenses = {}
+components = {}
+for _, metadata_path in pairs:
+    with open(metadata_path, "r", encoding="utf-8") as handle:
+        metadata = json.load(handle)
+    for package in metadata.get("packages", []):
+        key = package["name"] + "@" + package["version"]
+        if package.get("license"):
+            licenses[key] = package["license"]
 
 # Cargo.lock is a simple TOML shape and the release host may have an older Python without
 # tomllib. Parse only the package name/version/source/checksum fields we need.
-lock_packages = []
-current = None
-for raw in open(lock_path, "r", encoding="utf-8"):
-    line = raw.strip()
-    if line == "[[package]]":
-        if current:
-            lock_packages.append(current)
-        current = {}
-        continue
-    if current is None:
-        continue
-    for key in ("name", "version", "source", "checksum"):
-        prefix = key + " = \""
-        if line.startswith(prefix) and line.endswith("\""):
-            current[key] = line[len(prefix):-1]
-if current:
-    lock_packages.append(current)
+for lock_path, _ in pairs:
+    current = None
+    packages = []
+    for raw in open(lock_path, "r", encoding="utf-8"):
+        line = raw.strip()
+        if line == "[[package]]":
+            if current:
+                packages.append(current)
+            current = {}
+            continue
+        if current is None:
+            continue
+        for key in ("name", "version", "source", "checksum"):
+            prefix = key + ' = "'
+            if line.startswith(prefix) and line.endswith('"'):
+                current[key] = line[len(prefix):-1]
+    if current:
+        packages.append(current)
+    for package in packages:
+        source = package.get("source", "")
+        checksum = package.get("checksum")
+        if "registry+https://github.com/rust-lang/crates.io-index" not in source or not checksum:
+            continue
+        key = package["name"] + "@" + package["version"]
+        component = {
+            "type": "library",
+            "name": package["name"],
+            "version": package["version"],
+            "purl": "pkg:cargo/" + package["name"] + "@" + package["version"],
+            "hashes": [{"alg": "SHA-256", "content": checksum}],
+        }
+        if key in licenses:
+            component["licenses"] = [{"expression": licenses[key]}]
+        components[key] = component
 
-components = []
-for package in lock_packages:
-    source = package.get("source", "")
-    checksum = package.get("checksum")
-    if "registry+https://github.com/rust-lang/crates.io-index" not in source or not checksum:
-        continue
-    component = {
-        "type": "library",
-        "name": package["name"],
-        "version": package["version"],
-        "purl": "pkg:cargo/" + package["name"] + "@" + package["version"],
-        "hashes": [{"alg": "SHA-256", "content": checksum}],
-    }
-    license = licenses.get(package["name"] + "@" + package["version"])
-    if license:
-        component["licenses"] = [{"expression": license}]
-    components.append(component)
-components.sort(key=lambda item: (item["name"], item["version"]))
-
+ordered = [components[key] for key in sorted(components)]
 epoch = os.environ.get("SOURCE_DATE_EPOCH")
 timestamp = (
     datetime.datetime.fromtimestamp(int(epoch), datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -135,26 +169,32 @@ bom = {
     "metadata": {
         "timestamp": timestamp,
         "component": {"type": "application", "name": "ravenbsd-release", "version": "0.1.0"},
-        "tools": [{"vendor": "RavenBSD", "name": "release-vendor", "version": "1"}],
+        "tools": [{"vendor": "RavenBSD", "name": "release-vendor", "version": "2"}],
     },
-    "components": components,
+    "components": ordered,
 }
 with open(sbom_path, "w", encoding="utf-8") as handle:
     json.dump(bom, handle, sort_keys=True, separators=(",", ":"))
     handle.write("\n")
-print(f"release-vendor: SBOM components={len(components)}")
+print(f"release-vendor: SBOM components={len(ordered)}")
 PY
 
+echo "==> artifact: $artifact"
+tar --zstd -cf "$artifact" -C "$vendor_dir" .
+
 echo "==> manifest: $manifest"
-python3 - "$lock" "$vendor_dir" "$sbom" "$manifest" <<'PY'
+python3 - Cargo.lock userland/brush/Cargo.lock userland/uutils/Cargo.lock \
+    "$vendor_dir" "$sbom" "$artifact" "$manifest" <<'PY'
 import datetime
 import hashlib
 import os
 import sys
 
-lock_path, vendor_dir, sbom_path, manifest_path = sys.argv[1:5]
-lock_hash = hashlib.sha256(open(lock_path, "rb").read()).hexdigest()
-sbom_hash = hashlib.sha256(open(sbom_path, "rb").read()).hexdigest()
+root_lock, brush_lock, uutils_lock, vendor_dir, sbom_path, artifact_path, manifest_path = sys.argv[1:8]
+
+def sha256(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
 crates = 0
 for entry in os.listdir(vendor_dir):
     path = os.path.join(vendor_dir, entry)
@@ -171,12 +211,17 @@ with open(manifest_path, "w", encoding="utf-8") as handle:
     handle.write("# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors\n")
     handle.write("# Generated by scripts/release-vendor.sh; do not edit by hand.\n\n")
     handle.write(f'generated_utc = "{timestamp}"\n')
-    handle.write(f'lock_sha256 = "{lock_hash}"\n')
+    handle.write(f'root_lock_sha256 = "{sha256(root_lock)}"\n')
+    handle.write(f'brush_lock_sha256 = "{sha256(brush_lock)}"\n')
+    handle.write(f'uutils_lock_sha256 = "{sha256(uutils_lock)}"\n')
     handle.write(f'vendored_crates = {crates}\n')
     handle.write('vendor_directory = "vendor"\n')
     handle.write(f'sbom = "{sbom_path}"\n')
-    handle.write(f'sbom_sha256 = "{sbom_hash}"\n')
-print(f"release-vendor: vendored_crates={crates} lock_sha256={lock_hash}")
+    handle.write(f'sbom_sha256 = "{sha256(sbom_path)}"\n')
+    handle.write(f'artifact = "{artifact_path}"\n')
+    handle.write(f'artifact_sha256 = "{sha256(artifact_path)}"\n')
+    handle.write('artifact_url = "release evidence store: vendor-full.tar.zst"\n')
+print(f"release-vendor: vendored_crates={crates} artifact_sha256={sha256(artifact_path)}")
 PY
 
 verify_layout
