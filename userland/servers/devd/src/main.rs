@@ -588,43 +588,82 @@ mod program {
             // Prefer one MSI-X vector per function: two functions on the same legacy INTx line
             // cannot both claim the exclusive GSI. The mapping also proves that the config page
             // is writable, which the driver needs to set the MSI-X enable bit.
-            let msix = raven_rt::map_mmio_mut(config, platform::PLATFORM_PAGE_SIZE)
-                .ok()
-                .and_then(|view| msix_capability(view));
-            let mut msix_done = false;
-            if let Some(capability) = msix
-                && capability.table_bar == options.bar
-                && capability.table_size >= 2
-                && capability.table_offset.saturating_add(32) <= usize::try_from(size).unwrap_or(0)
-            {
-                let mut info = raven_rt::IrqInfo::default();
-                match raven_rt::irq_create(
-                    Handle::ROOT_DEVICE,
-                    raven_rt::IRQ_MSIX,
-                    0,
-                    Some(&mut info),
-                ) {
-                    Ok(handle) => {
-                        opened.push(handle);
-                        argv.push(String::from("msix=1"));
-                        argv.push(alloc::format!("msix_addr_lo={}", info.address_lo));
-                        argv.push(alloc::format!("msix_addr_hi={}", info.address_hi));
-                        argv.push(alloc::format!("msix_data={}", info.data));
+            let mut msix = None;
+            match raven_rt::map_mmio_mut(config, platform::PLATFORM_PAGE_SIZE) {
+                Ok(view) => match msix_capability(view) {
+                    Some(capability) => {
                         raven_rt::println!(
-                            "devd: driver {} msix vector={} table={:#x} bar={}",
+                            "devd: driver {} msix capability table_bar={} table={:#x} entries={}",
                             driver.name,
-                            info.vector,
+                            capability.table_bar,
                             capability.table_offset,
-                            capability.table_bar
+                            capability.table_size
                         );
-                        msix_done = true;
+                        msix = Some(capability);
                     }
-                    Err(error) => {
-                        raven_rt::println!(
-                            "devd: driver {} msix unavailable: {}; using legacy irq",
-                            driver.name,
-                            error.description()
-                        );
+                    None => {
+                        raven_rt::println!("devd: driver {} msix capability absent", driver.name)
+                    }
+                },
+                Err(error) => raven_rt::println!(
+                    "devd: driver {} msix config map: {}",
+                    driver.name,
+                    error.description()
+                ),
+            }
+            let mut msix_done = false;
+            if let Some(capability) = msix {
+                if capability.table_bar != options.bar {
+                    raven_rt::println!(
+                        "devd: driver {} msix table is on bar{}, driver uses bar{}",
+                        driver.name,
+                        capability.table_bar,
+                        options.bar
+                    );
+                } else if capability.table_size < 2 {
+                    raven_rt::println!(
+                        "devd: driver {} msix has {} entries; need 2",
+                        driver.name,
+                        capability.table_size
+                    );
+                } else if capability.table_offset.saturating_add(32)
+                    > usize::try_from(size).unwrap_or(0)
+                {
+                    raven_rt::println!(
+                        "devd: driver {} msix table is outside bar{}",
+                        driver.name,
+                        options.bar
+                    );
+                } else {
+                    let mut info = raven_rt::IrqInfo::default();
+                    match raven_rt::irq_create(
+                        Handle::ROOT_DEVICE,
+                        raven_rt::IRQ_MSIX,
+                        0,
+                        Some(&mut info),
+                    ) {
+                        Ok(handle) => {
+                            opened.push(handle);
+                            argv.push(String::from("msix=1"));
+                            argv.push(alloc::format!("msix_addr_lo={}", info.address_lo));
+                            argv.push(alloc::format!("msix_addr_hi={}", info.address_hi));
+                            argv.push(alloc::format!("msix_data={}", info.data));
+                            raven_rt::println!(
+                                "devd: driver {} msix vector={} table={:#x} bar={}",
+                                driver.name,
+                                info.vector,
+                                capability.table_offset,
+                                capability.table_bar
+                            );
+                            msix_done = true;
+                        }
+                        Err(error) => {
+                            raven_rt::println!(
+                                "devd: driver {} msix unavailable: {}; using legacy irq",
+                                driver.name,
+                                error.description()
+                            );
+                        }
                     }
                 }
             }
