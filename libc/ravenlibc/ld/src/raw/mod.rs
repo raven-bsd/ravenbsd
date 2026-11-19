@@ -7,6 +7,7 @@ pub mod alloc;
 pub mod applier;
 pub mod arch;
 pub mod exports;
+pub mod libc;
 pub mod lock_futex;
 pub mod mapper_real;
 pub mod mem;

@@ -49,6 +49,8 @@ const AT_BASE: usize = 7;
 const AT_ENTRY: usize = 9;
 /// `AT_EXECFN`.
 const AT_EXECFN: usize = 31;
+/// Initfs archive offset of the libc image (K139).
+const AT_RAVEN_LIBC: usize = 0x7007;
 /// The first `PT_LOAD` virtual address of the loader (`--image-base=0x1000`).
 const SELF_IMAGE_BASE: usize = 0x1000;
 /// The user address-space end.
@@ -61,6 +63,7 @@ struct StartAux<'a> {
     base: usize,
     entry: usize,
     exec_name: &'a [u8],
+    libc_offset: u64,
 }
 
 fn fail(message: &[u8]) -> ! {
@@ -118,6 +121,7 @@ unsafe fn parse_start(sp: usize) -> Option<StartAux<'static>> {
     let mut base = 0usize;
     let mut entry = 0usize;
     let mut execfn = 0usize;
+    let mut libc_offset = 0u64;
     let mut pairs = 0usize;
     loop {
         if pairs >= 128 {
@@ -137,6 +141,7 @@ unsafe fn parse_start(sp: usize) -> Option<StartAux<'static>> {
             AT_BASE => base = value,
             AT_ENTRY => entry = value,
             AT_EXECFN => execfn = value,
+            AT_RAVEN_LIBC => libc_offset = value as u64,
             _ => {}
         }
         aux = aux.checked_add(16)?;
@@ -161,6 +166,7 @@ unsafe fn parse_start(sp: usize) -> Option<StartAux<'static>> {
         base,
         entry,
         exec_name,
+        libc_offset,
     })
 }
 
@@ -324,6 +330,9 @@ pub extern "C" fn _rtld_main(sp: usize) -> ! {
         Ok(id) => id,
         Err(_) => fail(b"ld-elf.so.1: cannot register the main program\n"),
     };
+    if aux.libc_offset != 0 && !crate::raw::libc::map_premapped(loader, aux.libc_offset) {
+        sys::debug_write(b"ld-elf.so.1: libc pre-map failed; using the file server\n");
+    }
     absolutize_dynamic(loader, main);
     if loader.load_needed_objects(main).is_err() {
         fail(b"ld-elf.so.1: cannot load a needed library\n");
