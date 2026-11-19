@@ -20,6 +20,9 @@
 #   --no-preflight    skip tests/smp/boot/host-idle.sh (short smoke only)
 #   --max-load LOAD   preflight maximum 1-minute load average (host-idle.sh default otherwise)
 #   --wait-for-idle S wait up to S seconds for an idle host (foreground poll, default 0)
+#   --cell-timeout S  per-cell wall-clock cap (default 300; 0 disables). On expiry the cell's
+#                     QEMU is terminated so the harness still records the serial, and the cell
+#                     is a bounded timeout failure.
 #   --out DIR         output root (default build/smp-closeout/<UTC>)
 #   -h, --help        this help
 #
@@ -59,6 +62,7 @@ PREFLIGHT=1
 OUT=build/smp-closeout/$(date -u +%Y%m%dT%H%M%SZ)
 MAX_LOAD=
 WAIT_IDLE=0
+CELL_TIMEOUT=300
 
 usage() {
     sed -n '6,45p' "$0" | sed 's/^# \{0,1\}//'
@@ -121,6 +125,11 @@ while [ "$#" -gt 0 ]; do
             WAIT_IDLE=$2
             shift 2
             ;;
+        --cell-timeout)
+            [ "$#" -ge 2 ] || { echo "smp-closeout: --cell-timeout needs a value" >&2; exit 2; }
+            CELL_TIMEOUT=$2
+            shift 2
+            ;;
         --out)
             [ "$#" -ge 2 ] || { echo "smp-closeout: --out needs a value" >&2; exit 2; }
             OUT=$2
@@ -139,6 +148,12 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$CASES" ] || CASES=$DEFAULT_CASES
+case $CELL_TIMEOUT in
+    '' | *[!0-9]*)
+        echo "smp-closeout: --cell-timeout must be a non-negative integer" >&2
+        exit 2
+        ;;
+esac
 if [ "$QUICK" -eq 1 ]; then
     MODES=tcg4
 elif [ -z "$MODES" ]; then
@@ -211,7 +226,7 @@ if ! cargo xtask libc-pack --arch x86_64 > "$OUT/libc-pack.log" 2>&1; then
     exit 2
 fi
 
-printf 'mode\tcase\tqtest_case\trc\tresult\tduration_ms\tlog\n' > "$OUT/results.tsv"
+printf 'mode\tcase\tqtest_case\trc\tresult\tduration_ms\tlog\tcell_timeout\n' > "$OUT/results.tsv"
 printf 'mode\tqtest_case\tload1\tqemu\tutc\n' > "$OUT/host-per-cell.tsv"
 
 # One telemetry row: UTC, load1, and the count of QEMU, xtask, cargo and rustc processes.
@@ -257,11 +272,57 @@ run_cell() {
     ) &
     sampler=$!
 
+    # A stale harness JSON/log from an earlier run must not be mistaken for this cell's result.
+    rm -f "build/qtest/$qtest_case.log" "build/qtest/$qtest_case.json"
+
+    cap_flag=$directory/$qtest_case.cap-fired
+    cap_stop=$directory/$qtest_case.cap-stop
+    cap_log=$directory/$qtest_case.cap.log
+    rm -f "$cap_flag" "$cap_stop" "$cap_log"
+
+    # Per-cell cap: kill only this cell's QEMU, so the harness sees the exit and still writes its
+    # serial log/JSON. If the harness does not exit, the hard timeout below kills it at cap+30 s.
+    if [ "$CELL_TIMEOUT" -gt 0 ]; then
+        (
+            slept=0
+            while [ "$slept" -lt "$CELL_TIMEOUT" ]; do
+                [ -e "$cap_stop" ] && exit 0
+                sleep 5
+                slept=$((slept + 5))
+            done
+            [ -e "$cap_stop" ] && exit 0
+            pids=$(pgrep -f "file=build/qtest/$qtest_case.img" 2>/dev/null || true)
+            if [ -n "$pids" ]; then
+                : > "$cap_flag"
+                {
+                    printf 'smp-closeout: cell cap %ss reached for %s\n' "$CELL_TIMEOUT" "$qtest_case"
+                    printf 'terminating QEMU pids: %s\n' "$pids"
+                } >> "$cap_log"
+                # Word splitting is intended: one TERM per QEMU pid of this cell.
+                kill -TERM $pids 2>/dev/null || true
+            fi
+        ) &
+        cap_pid=$!
+    fi
+
     start_ns=$(date +%s%N)
-    cargo xtask qtest --case "$qtest_case" --arch x86_64 > "$directory/$qtest_case.out" 2>&1
+    if [ "$CELL_TIMEOUT" -gt 0 ]; then
+        timeout --kill-after=10 "$((CELL_TIMEOUT + 30))s" \
+            cargo xtask qtest --case "$qtest_case" --arch x86_64 \
+            > "$directory/$qtest_case.out" 2>&1
+    else
+        cargo xtask qtest --case "$qtest_case" --arch x86_64 \
+            > "$directory/$qtest_case.out" 2>&1
+    fi
     rc=$?
     end_ns=$(date +%s%N)
     wall_ms=$(( (end_ns - start_ns) / 1000000 ))
+
+    if [ "$CELL_TIMEOUT" -gt 0 ]; then
+        : > "$cap_stop"
+        kill "$cap_pid" 2>/dev/null || true
+        wait "$cap_pid" 2>/dev/null || true
+    fi
 
     kill "$sampler" 2>/dev/null || true
     wait "$sampler" 2>/dev/null || true
@@ -273,16 +334,24 @@ run_cell() {
 
     result=missing
     duration_ms=$wall_ms
+    cell_timeout=0
+    if [ -e "$cap_flag" ] || [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+        cell_timeout=1
+        rc=1
+    fi
     if [ -f "$directory/$qtest_case.json" ]; then
         parsed=$(sed -n 's/.*"result": "\([a-z]*\)".*/\1/p' "$directory/$qtest_case.json" | head -n 1)
         [ -n "$parsed" ] && result=$parsed
         parsed=$(sed -n 's/.*"duration_ms": *\([0-9][0-9]*\).*/\1/p' "$directory/$qtest_case.json" | head -n 1)
         [ -n "$parsed" ] && duration_ms=$parsed
     fi
+    if [ "$cell_timeout" -eq 1 ]; then
+        result=timeout
+    fi
 
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$mode" "$case_name" "$qtest_case" "$rc" "$result" "$duration_ms" \
-        "$directory/$qtest_case.log" >> "$OUT/results.tsv"
+        "$directory/$qtest_case.log" "$cell_timeout" >> "$OUT/results.tsv"
 
     if [ "$rc" -ne 0 ]; then
         {
@@ -291,15 +360,22 @@ run_cell() {
             printf 'qtest_case=%s\n' "$qtest_case"
             printf 'rc=%s\n' "$rc"
             printf 'result=%s\n' "$result"
+            printf 'cell_timeout=%s\n' "$cell_timeout"
+            printf 'cell_timeout_s=%s\n' "$CELL_TIMEOUT"
             printf 'log=%s\n' "$directory/$qtest_case.log"
             printf 'json=%s\n' "$directory/$qtest_case.json"
             printf 'out=%s\n' "$directory/$qtest_case.out"
         } > "$OUT/FAILED"
-        echo "smp-closeout: FAIL mode=$mode case=$qtest_case rc=$rc result=$result" >&2
-        echo "--- $directory/$qtest_case.out (tail) ---" >&2
-        tail -n 20 "$directory/$qtest_case.out" >&2 || true
-        echo "--- $directory/$qtest_case.log (tail) ---" >&2
-        tail -n 20 "$directory/$qtest_case.log" >&2 || true
+        echo "smp-closeout: FAIL mode=$mode case=$qtest_case rc=$rc result=$result cell_timeout=$cell_timeout" >&2
+        if [ "$cell_timeout" -eq 1 ]; then
+            echo "--- serial (last 20 lines) ---" >&2
+            tail -n 20 "$directory/$qtest_case.log" >&2 || tail -n 20 "$directory/$qtest_case.out" >&2 || true
+        else
+            echo "--- $directory/$qtest_case.out (tail) ---" >&2
+            tail -n 20 "$directory/$qtest_case.out" >&2 || true
+            echo "--- $directory/$qtest_case.log (tail) ---" >&2
+            tail -n 20 "$directory/$qtest_case.log" >&2 || true
+        fi
         return 1
     fi
     return 0
@@ -352,6 +428,7 @@ awk -F'\t' 'NR > 1 && $4 == 0 { print $6 }' "$OUT/results.tsv" > "$OUT/durations
     printf 'preflight=%s\n' "$([ "$PREFLIGHT" -eq 1 ] && echo exclusive || echo skipped)"
     printf 'max_load=%s\n' "${MAX_LOAD:-host-idle-default}"
     printf 'wait_for_idle=%s\n' "$WAIT_IDLE"
+    printf 'cell_timeout=%s\n' "$CELL_TIMEOUT"
     printf 'quick=%s\n' "$QUICK"
     printf 'cells=%d\n' "$cells"
     printf 'modes=%s\n' "$MODES"

@@ -4,8 +4,9 @@
 # SMP close-out matrix runner
 
 Date: 2026-11-18. Ticket: S126 (Otto). Depends: S116, S125, S85e.
-Status: runner delivered; the release boot gate is **blocked by mid-run host contention** (6/10
-clean TCG4 boots, run 7 timed out when other lanes' jobs appeared). No partial pass is claimed.
+Status: runner delivered with a per-cell cap; TCG4 10/10 and the TCG4 close-out 5/5 and KVM1 5/5
+are preserved evidence. KVM2 `posix-shell` is a console/rsh stall under S135 (FAIL), KVM4 was not
+run; no partial column is claimed.
 
 ## Why
 
@@ -49,6 +50,7 @@ sh scripts/smp-closeout.sh --out /tmp/opencode/s126                    # explici
 | `--no-preflight` | skip `host-idle.sh`; records the host state but does not gate; smoke only |
 | `--max-load LOAD` | preflight maximum 1-minute load average; unset uses the `host-idle.sh` default |
 | `--wait-for-idle S` | poll the preflight in the foreground for up to S seconds (default 0: refuse) |
+| `--cell-timeout S` | per-cell wall-clock cap (default 300 s; 0 disables); a capped cell is a bounded timeout failure |
 | `--out DIR` | output root; default `build/smp-closeout/<UTC>` |
 | `-h`, `--help` | usage |
 
@@ -65,15 +67,22 @@ invocation (including a missing case file) — zero samples.
   waits forever (the timeout is explicit).
 - **Pinned libc.** `cargo xtask libc-pack --arch x86_64` runs once before the first cell, so the
   matrix cannot silently use a stale `libc.a` (the S119 lesson).
-- **Stop on the first failure.** The runner writes `FAILED` (mode, case, rc, artifact paths),
-  prints the last 20 lines of the qtest stdout and serial log, and exits 1. Remaining cells are
-  not run and no cell is retried.
+- **Per-cell cap.** `--cell-timeout S` (default 300 s) starts a watchdog for the cell. On expiry
+  it kills only that cell's QEMU (matched by `file=build/qtest/<case>.img`), so the qtest harness
+  still exits normally and writes its serial log/JSON; a hard `timeout` kills the harness itself
+  at cap+30 s if it does not. The cell is then recorded as `result=timeout`, `cell_timeout=1`,
+  the last 20 serial lines are printed, and the run stops. This bounds a console stall without
+  changing the case or its assertions. `0` disables the cap.
+- **Stop on the first failure.** The runner writes `FAILED` (mode, case, rc, artifact paths,
+  `cell_timeout`), prints the last 20 lines of the qtest stdout and serial log, and exits 1.
+  Remaining cells are not run and no cell is retried.
 - **Artifacts.** `<out>/<mode>/<qtest>.json`, `.log`, `.out` for every cell; `results.tsv` for
   the whole run; `host-per-cell.tsv` (load1/QEMU count immediately before each cell);
   `<out>/<mode>/<qtest>.telemetry.tsv` (UTC, load1, QEMU/xtask/cargo/rustc counts every 5 s while
-  the cell runs); `host-idle.txt`, `host-state-before.txt`, `host-state-after.txt`,
-  `libc-pack.log`. The telemetry counts include the cell's own qtest/xtask, so another lane's
-  overlap shows as QEMU>=2 or xtask>=2 during the cell.
+  the cell runs); `<qtest>.cap-fired`/`<qtest>.cap.log` when the cell cap fired;
+  `host-idle.txt`, `host-state-before.txt`, `host-state-after.txt`, `libc-pack.log`. The
+  telemetry counts include the cell's own qtest/xtask, so another lane's overlap shows as
+  QEMU>=2 or xtask>=2 during the cell.
 - **Statistics.** `summary.txt` prints `n/min/p50/p90/max` per mode and overall, using the qtest
   JSON `duration_ms` and nearest-rank percentiles (the S120 method). A failure contributes no
   duration.
@@ -241,6 +250,56 @@ never completes and no brush output appears), not the S126 runner, not the shell
 not S132. S130 only changed `tests/qtest/cases/release-login.toml`, so it is not the code cause.
 Owner: console/rsh (phil/TTY1 or the consd/rsh lane) with the KVM2 console timing. The `smp-libc-concurrency`
 cells prove S132 is fixed (TCG4 48.0 s, KVM1 13.7 s).
+
+## Rework round 4 (rev 58): per-cell cap
+
+Round 3's KVM2 `posix-shell` cell stalled 379 s while the runner waited on the qtest case timeout
+(1800 s). The runner now bounds every cell; the case and its assertions are unchanged.
+
+**Implementation.**
+
+- `--cell-timeout S` (default **300 s**, `0` disables; non-negative integer only).
+- A 5-second-tick watchdog kills only the cell's QEMU, matched by
+  `file=build/qtest/<case>.img`, so the harness sees the exit and still writes its serial log and
+  JSON. A hard `timeout --kill-after=10` around the qtest kills the harness itself at cap+30 s if
+  it does not exit.
+- A capped cell is recorded as `result=timeout`, `cell_timeout=1`, `cell_timeout_s=S`; the last
+  20 serial lines are printed, `FAILED` is written, and the run stops. `results.tsv` gained a
+  `cell_timeout` column; `<qtest>.cap-fired`/`<qtest>.cap.log` preserve the kill evidence.
+- Stale `build/qtest/<case>.{log,json}` are removed before each cell, so a killed cell cannot be
+  reported from an earlier run's JSON.
+- No case, timeout, expectation or fixture was edited; no retry.
+
+**Shell test without QEMU.** A fake `cargo` under `/tmp/opencode/s126-cap-fake` handles
+`xtask libc-pack` (exit 0) and `xtask qtest` (writes a 30-line fake serial + JSON, spawns a fake
+QEMU whose cmdline contains the image path, then waits). With `--cell-timeout 2`:
+
+```
+$ PATH=/tmp/opencode/s126-cap-fake:$PATH timeout 120 sh scripts/smp-closeout.sh \
+      --quick --no-preflight --case posix-alarm --cell-timeout 2 --out /tmp/opencode/s126-cap-test
+smp-closeout: FAIL mode=tcg4 case=posix-alarm rc=1 result=timeout cell_timeout=1
+--- serial (last 20 lines) ---
+fake serial line 11
+...
+fake serial line 30
+smp-closeout: stopped on the first failure; no retry
+exit 1
+```
+
+`FAILED` has `cell_timeout=1`/`cell_timeout_s=2`; `results.tsv` has `timeout ... 1`; the cap log
+names the killed fake QEMU pid. No QEMU was started by this test.
+
+**Preserved round-3 evidence (unchanged, no close-out claim).**
+
+| Gate | Result |
+|---|---|
+| TCG4 boot loop 10/10 | **PASS** (login p50 7.990 s, p90 8.169 s, worst 9.155 s) |
+| TCG4 close-out column | **5/5 PASS** (shell 24.7, util 22.1, threads 135.3, concurrency 48.0, fs-smp 111.3 s) |
+| KVM1 column | **5/5 PASS** |
+| KVM2 `posix-shell` | **FAIL** — console/rsh input stall, now under S135/Stuart; 379 s |
+| KVM2 rest / KVM4 | not run (stop rule); no partial column |
+
+`make check-fast` (host clear: qemu=0 xtask=0 cargo=0 rustc=0): `check-fast: PASSED`.
 
 ## When the full matrix runs
 
