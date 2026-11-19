@@ -10,6 +10,7 @@ You type `uname -a` and see `RavenBSD`.
 - Language: Rust on **stable** only (pinned in `rust-toolchain.toml`). No C in the scaffold.
 - Licence: BSD-3-Clause (`LICENSE`). Third-party code: `PROVENANCE.toml`, `NOTICE`.
 - AI-assisted contributions are welcome: `AI_POLICY.md`.
+- Supply-chain policy (vendored graph, selective forks, CVE response): `docs/supply-chain.md` (DR-64).
 - Status: pre-M1. Contract crates exist (`crates/raven-abi`, `crates/raven-bootinfo`); the kernel is being written.
 
 Planning, architecture and tickets live in the separate private `ravenbsd-prjmgmt` repository; donor
