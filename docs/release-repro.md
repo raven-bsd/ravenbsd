@@ -60,6 +60,17 @@ acceptance. Record both tables, the commit and `SOURCE_DATE_EPOCH`.
 start. A loaded-host sample is not an idle-host PASS; the A/B comparison itself is CPU-work, not
 a timing gate, so the elapsed times are informational.
 
+## Wave-base attempt (2026-11-19)
+
+At `f382f0a6` (base `d1ad5ca8`), `timeout 360 sh scripts/release-repro.sh` hit the ticket cap:
+
+- build A: **315232 ms**, 335544320 bytes, sha256 `6800ffc260aa484d0813b137324cdf0ab0ca8209c48dc0c61806b15902e343ae`;
+- build B: still compiling when the 360 s cap expired; no `b.img` was produced.
+
+Host state at start: load 10.70/8.92/11.46, one other QEMU. At the cap: load 31.80, two QEMU,
+cargo/rustc active. No A/B conclusion; per the rule the cap expiry is a failure/BLOCKED, not a
+retry. The after-K139 run (below) remains the release evidence.
+
 ## Donor reconciliation
 
 No donor code is involved: this is build evidence and a shell comparison. DR-52 is not applicable
