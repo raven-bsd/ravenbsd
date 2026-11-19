@@ -1,122 +1,79 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# aarch64 release login (K153)
+# aarch64 dynamic login exits before main (K154)
 
-Status: **staging fixed; the fresh aarch64 login still exits before `main` — handed to Kevin/K139.**
-The aarch64 release image now builds with arch-correct uutils and a clean libc/userland. The
-fresh `login` has the same ELF/segment shape as x86, but the guest still exits the login child
-with status 1 before `Password:`. No login samples, no `login-aarch64` qtest and no board result
-are claimed.
+Status: **BLOCKED — the loader reaches `enter`; the first failing stage is the aarch64 Rust
+std/`raven_rt` start path in the login program, not `ld-elf.so.1` or `crates/raven-spawn`.**
 
-## 1. Arch staging (fixed)
+## Reproduction
 
-`profiles/shell.d/72-uutils.toml` used `build/x86_64/uutils/*`. It now uses
-`build/{arch}/uutils/*`; the profile/initfs loader resolves that placeholder through
-`source_path`, and the uutils existence/name checks understand it. A clean aarch64 release build
-therefore stages `build/aarch64/uutils/ls` (AArch64, static) instead of x86_64, with no
-placeholder files.
+`sh scripts/login-cold-start-aarch64.sh --samples 5` on the fresh image
+`build/aarch64/login-cold-start-release.img` (SHA-256 `47108e64…` at the start of this ticket)
+stops at sample 1:
 
-* `timeout 360 cargo xtask image --arch aarch64 --platform generic --profile release --output build/aarch64/login-cold-start-release.img` → exit 0.
-* Image SHA-256 `75a75b1e359585394493f4525bd2ae1516bbe9ca9332fd78c3baf896e26667ab`.
-* `build/aarch64/uutils/ls`: AArch64, statically linked, `9e8cf5d3…`.
-* `timeout 60 cargo nextest run -p xtask` → 547/547 passed.
-
-## 2. Clean aarch64 rebuild (fresh hashes)
-
-Removed `build/aarch64/user`, `build/aarch64/uutils`, `build/aarch64/ld-elf.so.1` and
-`build/aarch64/libc.so.1` before the image build. The rebuilt artifacts are:
-
-| File | Timestamp (local) | SHA-256 |
-|---|---|---|
-| `build/aarch64/user/login` | 2026-11-19 13:04:36 | `0276249510521affc0b37efac18fb6e9ad56b239f1f25a142762c15da89a8d7c` |
-| `build/aarch64/ld-elf.so.1` | 2026-11-19 13:02:11 | `fd566b72855a2579dc2155c70733a52677c495f516c41171892f9192f27d7c25` |
-| `build/aarch64/libc.so.1` | 2026-11-19 13:02:11 | `83a81c3a41031c4496f1f8377bf987314237c1583a054df955813f1128fd01f7` |
-| `build/x86_64/user/login` | 2026-11-18 21:51:51 | `4b02eb76eb1447e581cfd1a3a553eaba9fa8592cb8ab3051aa1c81baad358185` |
-
-The aarch64 hashes are identical to the pre-cleanup artifacts because the build is
-deterministic; the timestamps and the clean build prove no stale x86/Nov-17 file remained.
-
-## 3. readelf comparison
-
-`readelf -lW build/aarch64/user/login`:
-
-```
-PHDR     0x000040 0x400040 ... R 0x8
-INTERP   0x000270 ... /libexec/ld-elf.so.1
-LOAD     0x000000 0x400000 0x400000 0x003c00 0x003c00 R   0x1000
-LOAD     0x003c00 0x404c00 0x404c00 0x00ad84 0x00ad84 R E 0x1000
-LOAD     0x00e988 0x410988 ... 0x000430 0x000678 RW  0x1000
-LOAD     0x00edb8 0x411db8 ... 0x000000 0x000050 RW  0x1000
-DYNAMIC / GNU_RELRO / GNU_EH_FRAME / GNU_STACK
-```
-
-`readelf -lW build/x86_64/user/login`:
-
-```
-PHDR     0x000040 0x400040 ... R 0x8
-INTERP   0x000270 ... /libexec/ld-elf.so.1
-LOAD     0x000000 0x400000 0x400000 0x0039cc 0x0039cc R   0x1000
-LOAD     0x0039d0 0x4049d0 0x4049d0 0x01123f 0x01123f R E 0x1000
-LOAD     0x014c10 0x416c10 ... 0x000e40 0x0013f0 RW  0x1000
-LOAD     0x015a50 0x418a50 ... 0x000000 0x000050 RW  0x1000
-DYNAMIC / GNU_RELRO / GNU_EH_FRAME / GNU_STACK
-```
-
-Both are AArch64/x86-64 PIE (`Type: DYN`), have `PT_PHDR`, an `INTERP`, and the same segment
-order; neither login has a `PT_TLS` segment (static TLS is zero). The aarch64 `ld-elf.so.1` is
-also AArch64 with the expected R/R E/RW layout. The old "first LOAD RW at offset 0" shape is
-gone.
-
-## 4. Fresh login still blocks before `main`
-
-`timeout 300 sh scripts/login-cold-start-aarch64.sh --samples 5` → **exit 3**:
-
-```
-login-cold-start-aarch64: commit=5b3630f6 image=build/aarch64/login-cold-start-release.img sha256=75a75b1e… accel=tcg smp=1 samples=5 load1=12.12
+```text
 login-cold-start-aarch64: BLOCKED stage=login-exit-before-password
-login-cold-start-aarch64: BLOCKED at sample 1; preserved log: build/login-cold-start-aarch64/sample-1.log
-```
-
-The preserved log ends:
-
-```
-svcd: getty up
-RavenBSD 0.1 (aarch64) (tty:console)
 login: root
 process: child exited (1)
 ```
 
-No `Password:` is reached. The banner is now `(aarch64)` (Phil's K151 fix). K151's marker run
-on a throwaway branch printed `K151 login main` **never**; the child exits before the first
-`login` instruction, so `Console::open`, the password write and `set_echo` are never reached.
-The fresh, arch-correct, x86-shaped binary reproduces that exact boundary.
+Fresh binaries: `login` is AArch64 DYN/PIE with `PT_PHDR`, `INTERP=/libexec/ld-elf.so.1`,
+`NEEDED libc.so.1`, entry `0x404cb8`, no `PT_TLS`. `getty` is also AArch64 DYN/PIE with the same
+interpreter and `libc.so.1`; it runs and prints the console banner, so the loader/libc path works
+for a dynamic aarch64 program.
 
-## 5. Handoff
+## Loader stage trace (temporary markers)
 
-Owner: **Kevin/K139** (aarch64 dynamic interpreter/libc startup), not this ticket:
+A diagnostic image with marker writes in the aarch64 loader showed every loader stage:
 
-* `crates/raven-spawn/src/lib.rs` (`spawn_image_with_fdmap`, interpreter/initial thread)
-* `libc/ravenlibc/ld/src/**` (aarch64 self-relocation/libc startup)
-* `libc/ravenlibc/crates/**` aarch64 dynamic startup
+```text
+K154 selfrel
+K154 main
+K154 premap-ok
+K154 needed
+K154 tls
+K154 reloc
+K154 enter
+login: root
+process: child exited (1)
+```
 
-Evidence to use: this doc; the fresh hashes/readelf; image SHA
-`75a75b1e359585394493f4525bd2ae1516bbe9ca9332fd78c3baf896e26667ab`; the preserved
-`build/login-cold-start-aarch64/sample-1.log`; and K151's marker trace (`K151 login main` never
-runs). The aarch64 `login-aarch64.toml` from `origin/phil/K151` is **not landed**: it is red
-until the loader starts `main`, and a failing qtest must not enter the default suite.
+`libc pre-map` succeeded (no fallback), all dependency loads and relocations completed, and the
+loader transferred to `AT_ENTRY`. No `libc start` marker (from `__raven_libc_start`) and no
+`K154 login main` marker appeared.
 
-## 6. Other gates
+## Entry analysis
 
-* x86 `timeout 120 cargo xtask qtest --case login-retry --arch x86_64` → exit **124** (cap
-  expiry; the log `build/qtest/login-retry.log` is empty and the image was not produced). This
-  is recorded as a TIMEOUT, not a pass. A subsequent `--no-build` reports the image is missing.
-* `timeout 240 make check-fast` → exit 0, **`check-fast: PASSED`** (measured 60.56s host tests
-  under load ~7; the 240 cap was not approached).
-* `cargo run -q -p raven-provenance -- check --root .` → 0 violations (after this doc is added).
+`aarch64-linux-gnu-objdump -D --start-address=0x404cb8 build/aarch64/user/login`:
 
-## 7. DR-52
+```text
+404cb8: mov  x0, sp
+404cbc: and  x0, x0, #0xfffffffffffffff0
+404cc0: mov  sp, x0
+404cc4: bl   0x40a760
+404cc8: brk  #0
+```
 
-Build/profile staging only: the placeholder and uutils slice are first-party RavenBSD build code;
-no donor code was read or copied, no C, no CDDL/GPL. The login/loader handoff uses the existing
-first-party aarch64 dynamic path.
+The login uses `raven_rt::entry!(main)`, and this `_start` calls the `raven_rt`/Rust std start at
+`0x40a760`, not the project `Scrt1`/`__raven_libc_start` five-argument path. The loader's
+`enter` is therefore correct; the failure is inside the login program's Rust std/`raven_rt` start
+before `main`.
+
+`getty` uses the same dynamic shape and runs, so a generic loader or libc mapping fault is ruled
+out. The remaining difference is the login binary's start path (or its Rust std/libc startup
+state), outside K154's Owns.
+
+## Handoff
+
+* **K135 / Phil** for the login program's aarch64 start path and `Console::open`/`main` trace.
+* If the std/`raven_rt` start itself is wrong, a separate std/crt ticket owns it; K154's Owns are
+  `libc/ravenlibc/ld/**` and `crates/raven-spawn/**`, and both are proven complete.
+* Preserve `build/login-cold-start-aarch64/sample-1.log` for that trace. Do not use a static login,
+  skipped prompt, raised timeout or fake sample.
+
+## Donor reconciliation (DR-52)
+
+| Topic | Illumos | BSD | Linux | RavenBSD decision |
+|---|---|---|---|---|
+| aarch64 entry and `AT_PHDR` | Runtime linker entry; behaviour only, no code copied. | FreeBSD rtld/aarch64 start; behaviour only, no code copied. | Linux aarch64 `_start`/`AT_PHDR`; idea only. | Keep the first-party loader; the defect is in the login/start path, not donor code. |
