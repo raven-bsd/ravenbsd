@@ -43,7 +43,7 @@ impl InputBackend for MinimalInputBackend {
             // VT/basic line editor so TAB reaches the completion engine; it still
             // draws with backspaces and lists ambiguous candidates one per line.
             #[cfg(feature = "vt")]
-            if std::io::stdin().is_terminal() {
+            if std::io::stdout().is_terminal() || std::io::stdin().is_terminal() {
                 let mut backend = crate::VtInputBackend::default().with_basic_style();
                 return Box::pin(backend.read_line(shell_ref, prompt)).await;
             }
