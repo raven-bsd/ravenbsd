@@ -25,11 +25,14 @@ extern crate alloc;
 #[cfg(target_os = "none")]
 mod trace;
 
+mod chunk;
+
 #[cfg(target_os = "none")]
 mod program {
     use alloc::collections::BTreeMap;
     use alloc::format;
     use alloc::string::{String, ToString};
+    use alloc::vec;
     use alloc::vec::Vec;
 
     use raven_abi::errno::Errno;
@@ -52,7 +55,11 @@ mod program {
     const READ: u32 = 1;
     const RETRIES: usize = 500;
     const RETRY_NS: u64 = 10_000_000;
-    const BUFFER: usize = 4096;
+    /// Directory-page staging buffer; directory entries are small and stay at one page.
+    const DIR_BUFFER: usize = 4096;
+    /// Proxy read/write chunk. The client read size is the upper bound; a 64 KiB chunk removes
+    /// the 4 KiB nested-call storm for large file reads without a 64 KiB stack array.
+    const PROXY_CHUNK: usize = 64 * 1024;
     const PAGE: usize = 4096;
     /// Budget for proxy open-file descriptions.
     const MAX_OPEN_FILES: usize = 256;
@@ -362,7 +369,7 @@ mod program {
         fn build_root_listing(&self, target: Handle) -> Result<Vec<u8>, Errno> {
             let client = Client::new();
             let mut entries: BTreeMap<String, (u64, u8)> = BTreeMap::new();
-            let mut buffer = [0u8; BUFFER];
+            let mut buffer = [0u8; DIR_BUFFER];
             loop {
                 let length = client.read(target, 0, &mut buffer)?;
                 if length == 0 {
@@ -666,27 +673,19 @@ mod program {
         offset: Option<u64>,
         buffer: &mut [u8],
     ) -> Result<usize, Errno> {
-        let mut scratch = [0u8; BUFFER];
-        let mut done = 0usize;
-        while done < buffer.len() {
-            let capacity = (buffer.len() - done).min(scratch.len());
-            let read = match offset {
-                Some(base) => {
-                    let position = base.checked_add(done as u64).ok_or(Errno::EOVERFLOW)?;
-                    client.pread(target, position, &mut scratch[..capacity])?
-                }
-                None => client.read(target, 0, &mut scratch[..capacity])?,
-            };
-            if read > capacity {
-                return Err(Errno::EPROTO);
+        let mut scratch = vec![0u8; PROXY_CHUNK];
+        let result = crate::chunk::copy_chunks(buffer, &mut scratch, |done, chunk| match offset {
+            Some(base) => {
+                let position = base.checked_add(done as u64).ok_or(Errno::EOVERFLOW)?;
+                client.pread(target, position, chunk)
             }
-            buffer[done..done + read].copy_from_slice(&scratch[..read]);
-            done += read;
-            if read < capacity {
-                break;
-            }
+            None => client.read(target, 0, chunk),
+        });
+        match result {
+            Ok(count) => Ok(count),
+            Err(crate::chunk::ChunkError::Io(error)) => Err(error),
+            Err(crate::chunk::ChunkError::Overrun) => Err(Errno::EPROTO),
         }
-        Ok(done)
     }
 
     /// Forward a write through a local buffer; see [`copy_read`].
@@ -696,7 +695,7 @@ mod program {
         offset: Option<u64>,
         buffer: &[u8],
     ) -> Result<usize, Errno> {
-        let mut scratch = [0u8; BUFFER];
+        let mut scratch = vec![0u8; PROXY_CHUNK];
         let mut done = 0usize;
         while done < buffer.len() {
             let capacity = (buffer.len() - done).min(scratch.len());
