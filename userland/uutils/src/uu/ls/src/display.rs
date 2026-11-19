@@ -1184,6 +1184,15 @@ fn display_item_long(
 
 fn indicator_char(path: &PathData, style: Option<IndicatorStyle>) -> Option<char> {
     let style = style?;
+    // `slash` only marks directories. Resolve it from the cached file type instead of
+    // `classify_file`, which calls `is_executable_file` and therefore stats every entry;
+    // a Scheme stat costs tens of milliseconds on RavenBSD.
+    if matches!(style, IndicatorStyle::Slash) {
+        return path
+            .file_type()
+            .filter(|file_type| file_type.is_dir())
+            .map(|_| '/');
+    }
     let sym = classify_file(path);
 
     match style {
