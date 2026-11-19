@@ -99,11 +99,12 @@ pub fn init() {
 /// Pop one received byte when the PL011 RX FIFO is not empty.
 pub fn read_rx() -> Option<u8> {
     let base = BASE.load(Ordering::Acquire);
-    // SAFETY: the PL011 frame is mapped through the HHDM; FR/DR are register accesses.
+    // SAFETY: the PL011 frame is mapped through the HHDM; FR is a register access.
     let flags = unsafe { read32(base, FR_OFFSET) };
     if flags & FR_RXFE != 0 {
         None
     } else {
+        // SAFETY: DR is a register in the same mapped PL011 frame and FR_RXFE is clear.
         Some(unsafe { read32(base, DR_OFFSET) } as u8)
     }
 }

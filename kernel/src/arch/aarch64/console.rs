@@ -9,7 +9,6 @@
 //! (153); the boot path supplies the id and this module configures the level/edge route.
 
 #[path = "../../../../crates/raven-ringbuf/src/lib.rs"]
-#[allow(dead_code)]
 mod ringbuf;
 
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
