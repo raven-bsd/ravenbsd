@@ -76,22 +76,29 @@ That is how a system earns trust.
 
 ## Architecture
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                         userland                             │
-│  brush · uutils · login · getty · base utilities · services  │
-└───────────────┬──────────────────────────────────────────────┘
-                │ capability IPC
-┌───────────────▼──────────────────────────────────────────────┐
-│                    system services                           │
-│  svcd · logd · consd · vfsd · initfsd · ramfsd · blockd      │
-│  fsd-ufs · netd · resolvd · devd · drivers                    │
-└───────────────┬──────────────────────────────────────────────┘
-                │ syscalls
-┌───────────────▼──────────────────────────────────────────────┐
-│                    Raven kernel                              │
-│  scheduler · VM · IPC · capabilities · process/thread model   │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph userland["Userland"]
+        shell["brush shell"]
+        tools["uutils / base tools"]
+        login["login / getty"]
+    end
+
+    subgraph services["System services"]
+        svcd["svcd"]
+        logs["logd / consd"]
+        vfs["vfsd / initfsd / ramfsd"]
+        storage["fsd-ufs / blockd"]
+        network["netd / resolvd"]
+        drivers["devd / drivers"]
+    end
+
+    kernel["Raven kernel<br/>scheduler · VM · IPC · capabilities"]
+    ufs[("UFS2")]
+
+    userland -->|"capability IPC"| services
+    services -->|"syscalls"| kernel
+    storage --> ufs
 ```
 
 The kernel is intentionally small. The operating system is the complete service graph, not one
