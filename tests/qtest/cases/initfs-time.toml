@@ -26,19 +26,27 @@ regex = '^initfs-time PASS [0-9]+ [0-9]+ [0-9]+$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|initfs-time FAIL'
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
 
 [[step]]
 wait = '^raven# $'
 timeout_secs = 90
 
 [[step]]
-send = "t1=$(/bin/stat -c %Y /init); t2=$(/bin/stat -c %Y /bin/ls); t4=$(/bin/stat -c %Y /bin); if [ $t1 -ge 1600000000 ] && [ $t1 -eq $t2 ] && [ $t1 -eq $t4 ]; then echo initfs-time PASS $t1 $t2 $t4; else echo initfs-time FAIL $t1 $t2 $t4; fi\n"
+send = "/bin/brush -c 't1=$(/bin/stat -c %Y /init); t2=$(/bin/stat -c %Y /bin/ls); t4=$(/bin/stat -c %Y /bin); if [ $t1 -ge 1600000000 ] && [ $t1 -eq $t2 ] && [ $t1 -eq $t4 ]; then echo initfs-time PASS $t1 $t2 $t4; else echo initfs-time FAIL $t1 $t2 $t4; fi'\n"
 delay_ms = 100
 
 [[step]]
 wait = '^initfs-time PASS [0-9]+ [0-9]+ [0-9]+$'
 timeout_secs = 20
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/ls -l /init\n"
+delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
