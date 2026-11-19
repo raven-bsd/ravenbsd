@@ -1,0 +1,120 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K175: the mount table names /dev/null, /dev/zero, /dev/random and /dev/urandom, so their parent
+# /dev must exist and the devices must be usable. `df` must not report the initfs 41 MiB capacity
+# for those pseudo-filesystems.
+
+name = "dev-namespace"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 150
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host"]
+expect_exit = "success"
+
+[[expect]]
+regex = 'svcd: all services up$'
+
+[[expect]]
+regex = '^/dev$'
+
+[[expect]]
+regex = '^[1-9][0-9]* /tmp/dev.list$'
+
+[[expect]]
+regex = '^redir-exit=0$'
+
+[[expect]]
+regex = '^df-exit=0$'
+
+[[expect]]
+regex = '^(null|zero|rand):\s+0\s+0\s+0\s+-\s+/dev/(null|zero|random|urandom)$'
+unordered = true
+
+[[expect]]
+regex = '^dfa-exit=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)Not a directory'
+
+[[forbid]]
+regex = '(?i)No such file or directory'
+
+[[forbid]]
+regex = '41M\s+41M\s+100%\s+/dev/'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "cd /dev\n"
+delay_ms = 100
+
+[[step]]
+send = "pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/dev$'
+timeout_secs = 15
+
+[[step]]
+send = "ls /dev > /tmp/dev.list\n"
+delay_ms = 100
+
+[[step]]
+send = "wc -l /tmp/dev.list\n"
+delay_ms = 100
+
+[[step]]
+wait = '^[1-9][0-9]* /tmp/dev.list$'
+timeout_secs = 15
+
+[[step]]
+send = "cd /\n"
+delay_ms = 100
+
+[[step]]
+send = "cat /etc/mounts > /dev/null\n"
+delay_ms = 100
+
+[[step]]
+send = "echo redir-exit=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^redir-exit=0$'
+timeout_secs = 15
+
+[[step]]
+send = "df -h\n"
+delay_ms = 100
+
+[[step]]
+send = "echo df-exit=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^df-exit=0$'
+timeout_secs = 30
+
+[[step]]
+send = "df -a; echo dfa-exit=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^dfa-exit=0$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
