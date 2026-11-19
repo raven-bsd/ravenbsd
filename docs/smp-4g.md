@@ -21,6 +21,13 @@ Preserved serial/JSON:
 - `build/s157/smp-4g-login-uname-fail.log`
 - `build/s157/smp-4g-login-uname-fail.json`
 
+## Revision 253 confirmation
+
+The failure was reproduced on `origin/master` `63a6f3d3` (RM1/K158 merged) at branch head
+`7ee0dbcd`: `smp: 4 cpus online`, `mem: 3991 MiB usable in 9 regions`, login, and the same
+`uname -a` -> `command not found` NUL corruption. RM1/K158 did not change this path. Preserved
+again at `build/s157/smp-4g-rev253-uname-nuls.log`.
+
 ## Observed serial
 
 ```
