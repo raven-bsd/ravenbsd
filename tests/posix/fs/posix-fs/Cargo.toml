@@ -21,6 +21,10 @@ path = "src/main.rs"
 name = "raven-posix-fs-smp"
 path = "src/bin/smp.rs"
 
+[[bin]]
+name = "raven-posix-fs-start"
+path = "src/bin/start.rs"
+
 [dependencies]
 raven-abi = { path = "../../../../crates/raven-abi" }
 raven-initfs = { path = "../../../../crates/raven-initfs" }
