@@ -78,7 +78,7 @@ wait = '^cat$'
 timeout_secs = 2
 
 [[step]]
-send = "\u0007"
+send = "\n"
 delay_ms = 100
 
 [[step]]
