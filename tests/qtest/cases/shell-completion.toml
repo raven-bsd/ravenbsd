@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K161: TAB completion in the release login. A unique prefix (`ec<TAB>`) must become `echo`, and
+# an ambiguous prefix (`c<TAB>`) must list the candidates. The release brush is the vt/basic editor
+# through the Minimal->Vt delegation (RavenBSD default); the qtest is green with that backend.
+
+name = "shell-completion"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 120
+pre = ["cargo xtask build brush --arch x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^x$'
+
+[[expect]]
+regex = '^cat$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 90
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "ec\t"
+delay_ms = 200
+
+[[step]]
+send = "x\n"
+delay_ms = 100
+
+[[step]]
+wait = '^x$'
+timeout_secs = 2
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "c\t"
+delay_ms = 200
+
+[[step]]
+wait = '^cat$'
+timeout_secs = 2
+
+[[step]]
+wait = '^cp$'
+timeout_secs = 2
+
+[[step]]
+send = "\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
