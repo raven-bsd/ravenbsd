@@ -202,6 +202,9 @@ pub(crate) fn run_with_overrides(
     // The `hw` profile carries a UFS root. Until virtio-blk lands, blockd serves it from the
     // initfs as a RAM disk, so the one-partition GPT disk is inserted at /etc/blockd.img.
     let initfs_bytes = if qemu_ufs {
+        // The payload profile stages brush/uutils and other generated files; build those
+        // prerequisites before staging the UFS tree.
+        crate::initfs::ensure_prerequisites(root, arch, &profile)?;
         // The root disk is a real GPT/UFS2 disk staged from the payload profile; it is
         // attached to QEMU as a virtio-blk function, never embedded in the initfs.
         let ufs = crate::rootfs::build_sd_root(root, arch, profile_name, true)?;
