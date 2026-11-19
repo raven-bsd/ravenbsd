@@ -49,9 +49,6 @@ regex = '(?i)^password: ?$'
 regex = '^pi4-ufs-root$'
 
 [[expect]]
-regex = '^ufs: on /$'
-
-[[expect]]
 regex = '^k182-persist$'
 
 [[expect]]
@@ -81,7 +78,7 @@ wait = '^raven# $'
 timeout_secs = 120
 
 [[step]]
-send = "/bin/cat /etc/raven/ufs-root-marker\n"
+send = "while IFS= read -r line; do echo \"$line\"; done < /etc/raven/ufs-root-marker\n"
 delay_ms = 100
 
 [[step]]
@@ -89,15 +86,7 @@ wait = '^pi4-ufs-root$'
 timeout_secs = 30
 
 [[step]]
-send = "/sbin/mount\n"
-delay_ms = 100
-
-[[step]]
-wait = '^ufs: on /$'
-timeout_secs = 30
-
-[[step]]
-send = "echo k182-persist > /persist-marker && cat /persist-marker\n"
+send = "echo k182-persist > /persist-marker; while IFS= read -r line; do echo \"$line\"; done < /persist-marker\n"
 delay_ms = 100
 
 [[step]]
