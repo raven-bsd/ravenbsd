@@ -578,6 +578,60 @@ def libc_1cpu_gate(notes: Path, head: str, freeze: Path | None = None) -> Gate:
     )
 
 
+def cold_start_gate(notes: Path, head: str) -> Gate:
+    """Read the dynamic cold-start/interactive-login row; pending until K139."""
+    text = read_text(notes)
+    if not text:
+        return Gate(
+            "cold-start", "MISSING", "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
+            str(notes.relative_to(ROOT)), "", "release notes are missing"
+        )
+    heading = re.search(r"(?m)^### Dynamic cold start / interactive login.*$", text)
+    section = markdown_section(text, r"(?m)^### Dynamic cold start / interactive login.*$")
+    if not section:
+        section = markdown_section(text, r"(?m)^### Interactive shell.*$")
+    if not section:
+        return Gate(
+            "cold-start", "MISSING", "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
+            str(notes.relative_to(ROOT)), sha256(notes), "cold-start section is missing"
+        )
+    spawn = re.search(
+        r"`?spawn`?\s*(?:→|->)\s*`?main`?\s+takes\s+\**([0-9.]+)\s*(m?s)",
+        section,
+        re.IGNORECASE,
+    )
+    login = re.search(
+        r"`?root`?\s*(?:→|->)\s*`?Password:?`?\s+takes\s+\**([0-9.]+)\s*(m?s)",
+        section,
+        re.IGNORECASE,
+    )
+    pending = "PENDING K139" in section or bool(
+        heading and "PENDING K139" in heading.group(0)
+    )
+    if pending:
+        status = "PENDING K139"
+        before = []
+        if spawn:
+            before.append(f"spawn->main {spawn.group(1)} {spawn.group(2)}")
+        if login:
+            before.append(f"login {login.group(1)} {login.group(2)}")
+        note = (("before " + ", ".join(before) + "; ") if before else "") + (
+            "command scripts/login-cold-start.sh (K143) or "
+            "cargo xtask qtest --case login-latency (K139); sample=0; "
+            "acceptance 5/5 <1 s/step, target 300 ms"
+        )
+    elif re.search(r"\bMET\b", section):
+        status = "MET"
+        note = "after-fix cold-start evidence is MET"
+    else:
+        status = "STALE"
+        note = "cold-start state is ambiguous"
+    return Gate(
+        "cold-start", status, "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
+        str(notes.relative_to(ROOT)), sha256(notes), note
+    )
+
+
 def smp_soak_gate(
     soak: Path,
     closeout: Path,
@@ -906,6 +960,7 @@ def collect(args: argparse.Namespace) -> int:
     gates.append(dynamic_gate("x86_64", head, args.run_qtests))
     gates.append(dynamic_gate("aarch64", head, args.run_qtests))
     gates.append(release_login_gate(head, args.run_qtests))
+    gates.append(cold_start_gate(RELEASE_NOTES, head))
     gates.append(image_gate("image-x86_64", args.image_x86, head))
     gates.append(image_gate("image-aarch64", args.image_aarch64, head))
     board_log = args.board_log or PI4_DEFAULT
@@ -1190,6 +1245,22 @@ def self_test() -> int:
     )
     if libc_1cpu_fixed.status != "MET" or "S132" not in libc_1cpu_fixed.note:
         raise AssertionError(f"1-CPU freeze fix: {libc_1cpu_fixed}")
+    cold_pending = cold_start_gate(fixtures / "cold-start-pending.md", head)
+    if (
+        cold_pending.status != "PENDING K139"
+        or "1.48" not in cold_pending.note
+        or "1.6" not in cold_pending.note
+    ):
+        raise AssertionError(f"cold-start pending: {cold_pending}")
+    cold_met = cold_start_gate(fixtures / "cold-start-met.md", head)
+    if cold_met.status != "MET":
+        raise AssertionError(f"cold-start MET: {cold_met}")
+    cold_ambiguous = cold_start_gate(fixtures / "cold-start-ambiguous.md", head)
+    if cold_ambiguous.status != "STALE":
+        raise AssertionError(f"cold-start ambiguous: {cold_ambiguous}")
+    cold_missing = cold_start_gate(fixtures / "does-not-exist-notes.md", head)
+    if cold_missing.status != "MISSING":
+        raise AssertionError(f"cold-start missing: {cold_missing}")
 
     good_board = board_gate(fixtures / "board-good.log")
     if good_board.status != "MARKERS COMPLETE":
@@ -1218,7 +1289,8 @@ def self_test() -> int:
         "board good/virt/synthetic/incomplete, image missing/hash/pinned/stale/local-hash, "
         "smp-soak clean/tcg4-fail/closeout-fail/not-run/missing/ambiguous/notes-fail, "
         "libc missing-evidence/real/deferred, "
-        "libc-1cpu fail/met/ambiguous/missing/freeze-fixed)"
+        "libc-1cpu fail/met/ambiguous/missing/freeze-fixed, "
+        "cold-start pending/met/ambiguous/missing)"
     )
     return 0
 
