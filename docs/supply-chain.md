@@ -159,6 +159,44 @@ the base; CDDL only in separate add-on processes. Every copied file keeps its no
 * A CVE fix that changes the image invalidates the old image hash and requires a fresh image/gate
   record; it does not reuse the previous evidence.
 
+### SC1 vendored snapshot (2026-11-19)
+
+`scripts/release-vendor.sh` creates the snapshot and its evidence:
+
+```text
+vendor/                 74 registry crates, 47 MiB, cargo checksums per crate
+vendor/manifest.toml    lock sha256 ccf2406f…, 74 crates, SBOM sha256 79b53b6e…
+vendor/sbom.cdx.json    CycloneDX 1.5, 74 components with SHA-256 hashes and licences
+.cargo/config.toml      source.crates-io.replace-with = "vendored-sources"
+```
+
+The manifest and SBOM are generated only by the script; the snapshot is committed so a clean
+checkout builds with no crates.io access:
+
+```sh
+timeout 360 sh scripts/release-vendor.sh
+timeout 300 cargo xtask image --arch x86_64 --profile release \
+  --output build/release/vendor-check.img --offline
+```
+
+`.cargo/audit.toml` is a symlink to the reviewed root `audit.toml`; `cargo audit` reads that path.
+`deny.toml` carries the same advisory exceptions plus the bans/licences/sources policy.
+
+### Audit exceptions
+
+All five current advisories are name/version collisions with the first-party workspace utilities
+`userland/bin/tar` and `userland/bin/time` (both `0.1.0`, `publish = false`). No upstream
+`tar-rs`/`time` crate is linked or shipped. SC2 renames the utilities to `raven-tar`/`raven-time`;
+these exceptions expire 2027-02-28. No blanket ignore.
+
+| ID | Owner | Reachability | Expiry |
+|---|---|---|---|
+| RUSTSEC-2018-0002 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
+| RUSTSEC-2021-0080 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
+| RUSTSEC-2026-0067 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
+| RUSTSEC-2026-0068 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
+| RUSTSEC-2020-0071 | kevin | first-party `time` utility; no time crate code | 2027-02-28 |
+
 ## 11. Metrics
 
 The dashboard tracks:

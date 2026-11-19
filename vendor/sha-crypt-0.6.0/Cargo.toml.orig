@@ -1,0 +1,41 @@
+[package]
+name = "sha-crypt"
+version = "0.6.0"
+description = """
+Pure Rust implementation of the SHA-crypt password hashing algorithm based on SHA-256/SHA-512
+as implemented by the POSIX crypt C library, including support for generating and verifying password
+hash strings in the Modular Crypt Format
+"""
+authors = ["RustCrypto Developers"]
+license = "MIT OR Apache-2.0"
+documentation = "https://docs.rs/sha-crypt"
+homepage = "https://github.com/RustCrypto/password-hashes/tree/master/sha-crypt"
+repository = "https://github.com/RustCrypto/password-hashes"
+keywords = ["crypto", "hashing", "password", "phf"]
+categories = ["authentication", "cryptography", "no-std"]
+readme = "README.md"
+edition = "2024"
+rust-version = "1.85"
+
+[dependencies]
+sha2 = { version = "0.11", default-features = false }
+base64ct = { version = "1.8", default-features = false }
+
+# optional dependencies
+ctutils = { version = "0.4", optional = true }
+mcf = { version = "0.6", optional = true, default-features = false, features = ["base64"] }
+password-hash = { version = "0.6", optional = true, default-features = false }
+
+[features]
+default = ["alloc", "password-hash"]
+alloc = ["base64ct/alloc", "mcf?/alloc"]
+
+getrandom = ["password-hash/getrandom", "password-hash"]
+rand_core = ["password-hash/rand_core"]
+password-hash = ["dep:ctutils", "dep:mcf", "dep:password-hash"]
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+all-features = true

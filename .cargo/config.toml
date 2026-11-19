@@ -6,6 +6,14 @@
 [alias]
 xtask = "run --package xtask --"
 
+# SC1: the release graph is the committed `vendor/` snapshot. A build with `--offline` (or with no
+# network at all) reads exactly these checksummed crates; a missing crate is a hard failure.
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+
 # K19a: getrandom 0.4 selects its custom backend through this cfg. The
 # `raven-getrandom` crate provides the matching `__getrandom_v03_custom`
 # symbol; the kernel entropy primitive (G-7) currently reports UNSUPPORTED.
