@@ -147,6 +147,30 @@ fn check_put_cat_stat_and_mkdir() {
 }
 
 #[test]
+fn rm_and_mtime_override_are_accepted() {
+    let dir = TempDir::new();
+    let image_path = fresh_image(&dir);
+    let image = image_path.to_str().expect("image path");
+    let host = dir.join("stamp.txt");
+    fs::write(&host, b"stamp\n").expect("host file");
+    let host = host.to_str().expect("host path");
+
+    let output = run(&[image, "put", host, "/stamp.txt", "--mtime", "1600000042"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let output = run(&[image, "stat", "/stamp.txt"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(stdout(&output).contains("mtime=1600000042.000000000"));
+
+    let output = run(&[image, "rm", "/stamp.txt"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let output = run(&[image, "list", "/"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(!stdout(&output).contains("stamp.txt"));
+    let output = run(&[image, "check"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+}
+
+#[test]
 fn missing_parent_without_parents_fails() {
     let dir = TempDir::new();
     let image_path = fresh_image(&dir);
