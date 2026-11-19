@@ -1293,7 +1293,7 @@ fn a_megabyte_image_is_read_in_a_few_chunks() {
     let size = 984_000usize;
     let mut offset = 0usize;
     let mut calls = 0usize;
-    let data = collect_image(|buffer| {
+    let data = collect_exact(size, |buffer| {
         calls += 1;
         let length = (size - offset).min(buffer.len());
         buffer.get_mut(..length).expect("chunk").fill(0x5A);
@@ -1302,31 +1302,25 @@ fn a_megabyte_image_is_read_in_a_few_chunks() {
     })
     .expect("read");
     assert_eq!(data.len(), size);
-    assert!(calls <= 2, "984 kB image needed {calls} reads");
+    assert_eq!(calls, 1, "one known-size read must not probe EOF");
     assert!(data.iter().all(|byte| *byte == 0x5A));
 }
 
 #[test]
 fn an_image_larger_than_the_bound_is_rejected() {
-    let mut offset = 0usize;
-    let result = collect_image(|buffer| {
-        offset += buffer.len();
-        Ok(buffer.len())
-    });
+    let result = collect_exact(MAX_FILE_IMAGE + 1, |_buffer| Ok(0));
     assert!(matches!(result, Err(SpawnError::TooLarge)));
-    assert!(offset > MAX_FILE_IMAGE);
 }
 
 #[test]
-fn a_short_read_ends_the_image() {
+fn a_short_read_is_an_io_error() {
     let mut calls = 0usize;
-    let data = collect_image(|buffer| {
+    let result = collect_exact(10, |buffer| {
         calls += 1;
-        let length = if calls == 1 { 10 } else { 0 };
+        let length = if calls == 1 { 4 } else { 0 };
         buffer.get_mut(..length).expect("chunk").fill(1);
         Ok(length)
-    })
-    .expect("read");
-    assert_eq!(data.len(), 10);
+    });
+    assert!(matches!(result, Err(SpawnError::Sys(Errno::EIO))));
     assert_eq!(calls, 2);
 }

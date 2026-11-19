@@ -484,8 +484,9 @@ pub fn spawn_image_with_exec<S: Sys>(
 #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 pub fn read_file_handle_at(file: Handle) -> Result<Vec<u8>, SpawnError> {
     let client = Client::new();
+    let size = image_size(&client, file)?;
     let mut offset = 0u64;
-    collect_image(|buffer| {
+    collect_exact(size, |buffer| {
         let read = client.pread(file, offset, buffer)?;
         offset = offset.saturating_add(read as u64);
         Ok(read)
@@ -564,35 +565,50 @@ pub fn read_file_image(path: &str) -> Result<Vec<u8>, SpawnError> {
 /// Read one open image handle to its end, bounded by [`MAX_FILE_IMAGE`].
 #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 fn read_image_handle(client: &Client, handle: Handle) -> Result<Vec<u8>, SpawnError> {
-    collect_image(|buffer| client.read(handle, 0, buffer))
+    let size = image_size(client, handle)?;
+    collect_exact(size, |buffer| client.read(handle, 0, buffer))
 }
 
-/// Read an image through `read` in [`IMAGE_READ_CHUNK`] pieces, bounded by [`MAX_FILE_IMAGE`].
+/// Return the image length from `FSTAT`, bounded by [`MAX_FILE_IMAGE`].
+///
+/// Knowing the length lets the reader request exactly the image bytes: an EOF probe on a
+/// multi-megabyte buffer otherwise costs the kernel a full capture mapping for no data.
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
+fn image_size(client: &Client, handle: Handle) -> Result<usize, SpawnError> {
+    let stat = client.fstat(handle).map_err(SpawnError::Sys)?;
+    let size = usize::try_from(stat.size).map_err(|_| SpawnError::TooLarge)?;
+    if size > MAX_FILE_IMAGE {
+        return Err(SpawnError::TooLarge);
+    }
+    Ok(size)
+}
+
+/// Read exactly `size` image bytes through `read` in [`IMAGE_READ_CHUNK`] pieces.
 #[cfg(any(
     all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"),
     test
 ))]
-fn collect_image<F>(mut read: F) -> Result<Vec<u8>, SpawnError>
+fn collect_exact<F>(size: usize, mut read: F) -> Result<Vec<u8>, SpawnError>
 where
     F: FnMut(&mut [u8]) -> Result<usize, Errno>,
 {
-    let mut data = Vec::new();
-    let mut buffer = alloc_crate::vec![0u8; IMAGE_READ_CHUNK];
-    loop {
-        let read_len = read(&mut buffer).map_err(SpawnError::Sys)?;
-        if read_len == 0 {
-            return Ok(data);
-        }
-        let next = data
-            .len()
-            .checked_add(read_len)
-            .ok_or(SpawnError::TooLarge)?;
-        if next > MAX_FILE_IMAGE {
-            return Err(SpawnError::TooLarge);
+    if size > MAX_FILE_IMAGE {
+        return Err(SpawnError::TooLarge);
+    }
+    let mut data = Vec::with_capacity(size);
+    let mut buffer = alloc_crate::vec![0u8; IMAGE_READ_CHUNK.min(size)];
+    while data.len() < size {
+        let remaining = size - data.len();
+        let want = remaining.min(buffer.len());
+        let read_len =
+            read(buffer.get_mut(..want).ok_or(SpawnError::TooLarge)?).map_err(SpawnError::Sys)?;
+        if read_len == 0 || read_len > want {
+            return Err(SpawnError::Sys(Errno::EIO));
         }
         let chunk = buffer.get(..read_len).ok_or(SpawnError::TooLarge)?;
         data.extend_from_slice(chunk);
     }
+    Ok(data)
 }
 
 /// One executable source.
