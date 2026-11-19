@@ -904,7 +904,7 @@ fn auxv_has_the_pg50_keys_and_at_base() {
     let interpreter = interp_elf();
     let main = child_elf(true, false);
     let main_elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
-    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE, None);
+    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE, None, None);
     let pairs = &auxv[..len];
     let has = |key: usize, value: Option<usize>| {
         pairs
@@ -927,7 +927,7 @@ fn auxv_has_the_pg50_keys_and_at_base() {
 fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     let main = child_elf(false, false);
     let elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
-    let (auxv, len) = build_auxv(&elf, 0, 0, Some((0x7fff_0000, 2)));
+    let (auxv, len) = build_auxv(&elf, 0, 0, None, Some((0x7fff_0000, 2)));
     let pairs = &auxv[..len];
     let has = |key: usize, value: usize| pairs.iter().any(|(k, v)| *k == key && *v == value);
     assert!(has(0x7003, 0x7fff_0000));

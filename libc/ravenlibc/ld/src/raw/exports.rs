@@ -15,7 +15,7 @@ use raven_libc_elf::{MemView, ObjId, ObjView};
 
 use crate::dlfcn::{RTLD_DEFAULT, RTLD_NEXT};
 use crate::loadobj::{LoadedObject, Loader, MAX_DEPS, MAX_OBJECTS, Name};
-use crate::main_flow::register_main;
+use crate::main_flow::{register_main, register_premapped};
 use crate::mapper::Mapped;
 use crate::raw::applier::LiveApplier;
 use crate::raw::mapper_real::RealPlatform;
@@ -49,6 +49,10 @@ const AT_BASE: usize = 7;
 const AT_ENTRY: usize = 9;
 /// `AT_EXECFN`.
 const AT_EXECFN: usize = 31;
+/// Absolute address of the pre-mapped libc program header table (K139).
+const AT_RAVEN_LIBC: usize = 0x7007;
+/// Program-header count of the pre-mapped libc (K139).
+const AT_RAVEN_LIBC_PHNUM: usize = 0x7008;
 /// The first `PT_LOAD` virtual address of the loader (`--image-base=0x1000`).
 const SELF_IMAGE_BASE: usize = 0x1000;
 /// The user address-space end.
@@ -61,6 +65,8 @@ struct StartAux<'a> {
     base: usize,
     entry: usize,
     exec_name: &'a [u8],
+    libc_phdr: u64,
+    libc_phnum: u16,
 }
 
 fn fail(message: &[u8]) -> ! {
@@ -118,6 +124,8 @@ unsafe fn parse_start(sp: usize) -> Option<StartAux<'static>> {
     let mut base = 0usize;
     let mut entry = 0usize;
     let mut execfn = 0usize;
+    let mut libc_phdr = 0u64;
+    let mut libc_phnum = 0usize;
     let mut pairs = 0usize;
     loop {
         if pairs >= 128 {
@@ -137,6 +145,8 @@ unsafe fn parse_start(sp: usize) -> Option<StartAux<'static>> {
             AT_BASE => base = value,
             AT_ENTRY => entry = value,
             AT_EXECFN => execfn = value,
+            AT_RAVEN_LIBC => libc_phdr = value as u64,
+            AT_RAVEN_LIBC_PHNUM => libc_phnum = value,
             _ => {}
         }
         aux = aux.checked_add(16)?;
@@ -161,6 +171,8 @@ unsafe fn parse_start(sp: usize) -> Option<StartAux<'static>> {
         base,
         entry,
         exec_name,
+        libc_phdr,
+        libc_phnum: u16::try_from(libc_phnum).ok()?,
     })
 }
 
@@ -324,6 +336,11 @@ pub extern "C" fn _rtld_main(sp: usize) -> ! {
         Ok(id) => id,
         Err(_) => fail(b"ld-elf.so.1: cannot register the main program\n"),
     };
+    if aux.libc_phdr != 0
+        && register_premapped(loader, aux.libc_phdr, aux.libc_phnum, b"libc.so.1").is_err()
+    {
+        fail(b"ld-elf.so.1: cannot register the pre-mapped libc\n");
+    }
     absolutize_dynamic(loader, main);
     if loader.load_needed_objects(main).is_err() {
         fail(b"ld-elf.so.1: cannot load a needed library\n");
