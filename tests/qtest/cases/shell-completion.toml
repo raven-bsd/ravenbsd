@@ -25,7 +25,7 @@ regex = '(?i)^.*login: ?root'
 regex = '(?i)^password: ?$'
 
 [[expect]]
-regex = '^raven# echo ?$'
+regex = '^x$'
 
 [[expect]]
 regex = '^cat$'
@@ -58,12 +58,12 @@ send = "ec\t"
 delay_ms = 200
 
 [[step]]
-wait = '^raven# echo ?$'
-timeout_secs = 2
+send = "x\n"
+delay_ms = 100
 
 [[step]]
-send = "\n"
-delay_ms = 100
+wait = '^x$'
+timeout_secs = 2
 
 [[step]]
 wait = '^raven# $'
@@ -78,7 +78,7 @@ wait = '^cat$'
 timeout_secs = 2
 
 [[step]]
-send = "\u0003"
+send = "\u0007"
 delay_ms = 100
 
 [[step]]
