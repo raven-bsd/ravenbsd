@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K136: `du` is the first base tool that spawns a Rust std thread. The uutils link script must
+# map the ELF/program headers so libc finds PT_TLS through AT_PHDR. This case fails on the
+# thread-spawn abort; a post-fix traversal/join hang is K134, not a K136 regression.
+# Budget: shell-test boot ~33 s, one sub-second command, whole case ~48 s.
+
+name = "base-tools-du"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 150
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found|fatal runtime error|failed to spawn thread'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "mkdir /tmp/du\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "echo hello > /tmp/du/a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "du /tmp/du\n"
+delay_ms = 100
+
+[[step]]
+wait = '^[0-9.]+.*\s+/tmp/du$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "echo $?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
