@@ -102,6 +102,10 @@ pub fn set_failure_injection(enabled: bool) {
 /// executing the invalidation. A missing acknowledgement is reported and does not hang the
 /// system forever.
 pub fn flush_range(addr: u64, len: u64) -> bool {
+    debug_assert!(
+        !percpu::unmap_lock_held(),
+        "TLB shootdown while holding the address-space lock"
+    );
     if len == 0 {
         return true;
     }
