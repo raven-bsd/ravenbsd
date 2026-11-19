@@ -1287,3 +1287,40 @@ fn an_invalid_cwd_is_rejected_by_the_stack_builder() {
         ));
     }
 }
+
+#[test]
+fn a_megabyte_image_is_read_in_a_few_chunks() {
+    let size = 984_000usize;
+    let mut offset = 0usize;
+    let mut calls = 0usize;
+    let data = collect_exact(size, |buffer| {
+        calls += 1;
+        let length = (size - offset).min(buffer.len());
+        buffer.get_mut(..length).expect("chunk").fill(0x5A);
+        offset += length;
+        Ok(length)
+    })
+    .expect("read");
+    assert_eq!(data.len(), size);
+    assert_eq!(calls, 1, "one known-size read must not probe EOF");
+    assert!(data.iter().all(|byte| *byte == 0x5A));
+}
+
+#[test]
+fn an_image_larger_than_the_bound_is_rejected() {
+    let result = collect_exact(MAX_FILE_IMAGE + 1, |_buffer| Ok(0));
+    assert!(matches!(result, Err(SpawnError::TooLarge)));
+}
+
+#[test]
+fn a_short_read_is_an_io_error() {
+    let mut calls = 0usize;
+    let result = collect_exact(10, |buffer| {
+        calls += 1;
+        let length = if calls == 1 { 4 } else { 0 };
+        buffer.get_mut(..length).expect("chunk").fill(1);
+        Ok(length)
+    });
+    assert!(matches!(result, Err(SpawnError::Sys(Errno::EIO))));
+    assert_eq!(calls, 2);
+}
