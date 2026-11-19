@@ -21,6 +21,6 @@ RUSTUP_TOOLCHAIN=ravenbsd RUSTFLAGS="--cfg getrandom_backend=\"custom\" -C strip
         --release --target-dir "$target"
 cargo xtask initfs --arch x86_64 --profile shell-test >/dev/null
 cargo run --quiet --manifest-path tests/qtest/cases/mpsc-wake/image/Cargo.toml \
-    --bin mpsc-wake-image -- \
+    --target-dir build/cargo/mpsc-wake-image --bin mpsc-wake-image -- \
     build/x86_64/initfs.img "$out/shell-test-initfs.img" \
     "/bin/mpsc-wake=$target/x86_64-unknown-ravenbsd/release/mpsc-wake"
