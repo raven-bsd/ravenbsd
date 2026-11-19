@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2024 reuben olinsky
 
-use std::io::{BufRead, Write};
-#[cfg(not(target_os = "ravenbsd"))]
-use std::io::IsTerminal;
+use std::io::{BufRead, IsTerminal, Write};
 
 use crate::{
     InputBackend, ShellError,
@@ -40,9 +38,20 @@ impl InputBackend for MinimalInputBackend {
     ) -> Result<ReadResult, ShellError> {
         #[cfg(target_os = "ravenbsd")]
         {
-            // The console scheme is not a POSIX tty and std's stdin buffer lives in a
-            // thread-local that the current-thread runtime tears down early. Read fd 0
-            // directly and always show the prompt: the login shell is interactive.
+            // The login console reports as a terminal (`isatty` maps to the tty
+            // GET_MODE call), but the default RavenBSD backend is `Minimal`. Use the
+            // VT/basic line editor so TAB reaches the completion engine; it still
+            // draws with backspaces and lists ambiguous candidates one per line.
+            #[cfg(feature = "vt")]
+            if std::io::stdin().is_terminal() {
+                let mut backend = crate::VtInputBackend::default().with_basic_style();
+                return backend.read_line(shell_ref, prompt).await;
+            }
+
+            // Fallback: the console scheme is not a POSIX tty and std's stdin buffer
+            // lives in a thread-local that the current-thread runtime tears down
+            // early. Read fd 0 directly and always show the prompt: the login shell
+            // is interactive.
             let mut reader = std::io::BufReader::new(RawStdin);
             return Self::read_program_from(
                 shell_ref,
