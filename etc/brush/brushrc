@@ -4,12 +4,13 @@
 # RavenBSD brush interactive rc. The service starts brush with
 # `--rcfile /etc/brush/brushrc`; non-interactive `brush -c` does not load it.
 
-if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = "dumb" ]; then
-    # Plain prompt: user@host, cwd and the root/non-root marker, no escapes.
+# The default interactive look is bobtheshell. Images that do not stage it keep the
+# previous flat Raven Violet prompt; RAVEN_PROMPT=plain/NO_COLOR/dumb are handled there too.
+if [ -r /etc/brush/bobtheshell.sh ]; then
+    . /etc/brush/bobtheshell.sh
+elif [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = "dumb" ]; then
     PS1='\u@\h:\w\$ '
 else
-    # Raven Violet (K80): user@host accent #b388ff (xterm 183), cwd path #f8f8f2 (231).
-    # `\$` is `#` for root and `$` otherwise, so the root prompt is distinct.
     PS1='\[\e[38;5;183m\]\u@\h\[\e[0m\]:\[\e[38;5;231m\]\w\[\e[0m\]\[\e[38;5;183m\]\$\[\e[0m\] '
 fi
 

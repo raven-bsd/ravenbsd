@@ -25,7 +25,7 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast
+	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest
 
 help:
 	@$(XTASK) help
@@ -43,6 +43,11 @@ check:
 # or the working tree. Seconds, not minutes. The full `make check` stays the checkpoint gate.
 check-fast:
 	@$(XTASK) check --fast --changed
+
+# Host-only UFS image/partition updater proof: GPT/ESP+UFS, put/rm/mkdir/sync,
+# fsck and the safety refusals. No board and no whole-image copy.
+ufs-selftest:
+	@sh scripts/raven-ufs-selftest.sh
 
 # Full allocator stress gate: the 1M-op model runs are ignored by the routine
 # `cargo test` in `check` and are executed here, at merge/release time.

@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K177: bobtheshell prompt probes over the shell-test image. The rsh console runs short brush
+# `-c` scripts so the PS1 segments are deterministic and independent of the interactive backend.
+# Plain has no ANSI; the default has user@host/path/git/root/error; cd updates the path;
+# powerline uses U+E0B0 and the dumb/plain fallbacks stay flat.
+
+name = "shell-prompt"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+unordered = true
+
+[[expect]]
+regex = '^rsh: ready$'
+unordered = true
+
+[[expect]]
+regex = '^plain=raven# $'
+
+[[expect]]
+regex = '^default=root@raven \| ~ # $'
+
+[[expect]]
+regex = '^cd=root@raven \| tmp # $'
+
+[[expect]]
+regex = '^err=root@raven \| tmp !1 # $'
+
+[[expect]]
+regex = '^git=root@raven \| repo main\* # $'
+
+[[expect]]
+regex = '^power=root@raven \u{e0b0} ~ # $'
+
+[[expect]]
+regex = '^dumb=root@raven:~# $'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/brush --norc -c 'export RAVEN_PROMPT=plain; . /etc/brush/bobtheshell.sh; printf \"plain=%s\\n\" \"$RAVEN_PROMPT_TEXT\"'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^plain=raven# $'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/brush --norc -c '. /etc/brush/bobtheshell.sh; printf \"default=%s\\n\" \"$RAVEN_PROMPT_TEXT\"; cd /tmp; raven_prompt; printf \"cd=%s\\n\" \"$RAVEN_PROMPT_TEXT\"; false; raven_prompt; printf \"err=%s\\n\" \"$RAVEN_PROMPT_TEXT\"'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^default=root@raven \| ~ # $'
+timeout_secs = 15
+
+[[step]]
+wait = '^cd=root@raven \| tmp # $'
+timeout_secs = 15
+
+[[step]]
+wait = '^err=root@raven \| tmp !1 # $'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/brush --norc -c 'git() { case \"$1\" in rev-parse) echo true;; symbolic-ref) echo main;; status) echo \" M file\";; esac; }; mkdir -p /tmp/repo; cd /tmp/repo; . /etc/brush/bobtheshell.sh; raven_prompt; printf \"git=%s\\n\" \"$RAVEN_PROMPT_TEXT\"'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^git=root@raven \| repo main\* # $'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/brush --norc -c '. /etc/brush/bobtheshell.sh; RAVEN_PROMPT_POWERLINE=1; raven_prompt; printf \"power=%s\\n\" \"$RAVEN_PROMPT_TEXT\"; TERM=dumb; RAVEN_PROMPT_POWERLINE=0; raven_prompt; printf \"dumb=%s\\n\" \"$RAVEN_PROMPT_TEXT\"'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^power=root@raven \u{e0b0} ~ # $'
+timeout_secs = 15
+
+[[step]]
+wait = '^dumb=root@raven:~# $'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
