@@ -14,6 +14,8 @@ RELEASE ?= 0
 VERBOSE ?= 0
 SETUP_ARGS ?=
 BASE ?= origin/master
+HELP_SCRIPT ?= scripts/make-help.sh
+HELP_MANIFEST ?= scripts/help.txt
 
 export VERBOSE
 
@@ -24,10 +26,13 @@ XTASK = cargo run -q -p xtask --
 -include .raven-env.mk
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
+.PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
 	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest
 
 help:
+	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
+
+help-xtask:
 	@$(XTASK) help
 
 setup:
