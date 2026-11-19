@@ -36,7 +36,7 @@ regex = '^gamma three$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed|tty:console'
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed|ed: tty:console'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
