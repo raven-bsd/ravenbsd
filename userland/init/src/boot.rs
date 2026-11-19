@@ -394,10 +394,37 @@ fn plan_text(supervisor: &Supervisor, selected: Option<&[bool]>) -> String {
 }
 
 /// Mount the root filesystem at `/root`, read and merge its service set.
+///
+/// The `blockd -> fsd-ufs -> vfsd` chain can be present without a real root device (the release
+/// QEMU profile). Mounting `ufs:` in that state leaves a dangling `/root`: readdir lists the
+/// mountpoint while lstat fails. Probe the root scheme first, and if a later step fails, unmount
+/// before falling back to the initfs plan so no dangling entry survives.
 fn activate_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
+    // A root-capable image has `/etc/services.d` on the UFS root; activate_root needs it anyway.
+    // A failed probe means there is no usable root device, so do not create the mountpoint.
+    if let Err(error) = raven_rt::fs::read_dir("ufs:/etc/services.d") {
+        return Err(alloc::format!(
+            "/root: no UFS root device ({})",
+            error.description()
+        ));
+    }
     raven_rt::fs::mount("/root", "ufs:")
         .map_err(|error| alloc::format!("/root mount failed: {}", error.description()))?;
     raven_rt::println!("svcd: root mounted at /root");
+    let result = activate_mounted_root(core);
+    if result.is_err()
+        && let Err(error) = raven_rt::fs::umount("/root")
+    {
+        raven_rt::println!(
+            "svcd: /root: cannot unmount after a failed activation: {}",
+            error.description()
+        );
+    }
+    result
+}
+
+/// Read and merge the mounted root's services. The mount must already have succeeded.
+fn activate_mounted_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
     let services = read_root_services()?;
     let overrides = read_root_overrides()?;
     let root_count = services.len();
