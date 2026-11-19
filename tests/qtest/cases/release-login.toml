@@ -5,16 +5,17 @@
 # development password, asserts the brush root prompt, lists /bin and pings the QEMU
 # user-network gateway. The kernel/loader lines remain in the captured transcript.
 #
-# S130: the release loader contract is --image-base=0x1000. The pre-step rebuilds the loader,
-# verifies that first PT_LOAD base and records its hash, so a stale vaddr-0 loader fails loudly.
-# The case still exercises the dynamic getty -> PT_INTERP=/libexec/ld-elf.so.1 -> svcd spawn path
-# through the release profile; the vaddr-0 parser input remains the S129 unit/negative test.
+# S130: the release loader contract is --image-base=0x1000. The pre-step is K131's release loader
+# check: it plants a stale loader, rebuilds the release initfs, and asserts the fresh 0x1000 base,
+# SONAME, manifest base/interpreter/hash and the loader packed in the initfs. The case still
+# exercises the dynamic getty -> PT_INTERP=/libexec/ld-elf.so.1 -> svcd spawn path through the
+# release profile; the vaddr-0 parser input remains the S129 unit/negative test.
 
 name = "release-login"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 420
-pre = ["sh tests/fixtures/login/check-loader-0x1000.sh x86_64"]
+pre = ["sh tests/release/check-loader.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
