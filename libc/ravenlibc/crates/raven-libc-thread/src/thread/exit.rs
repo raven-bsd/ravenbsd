@@ -65,18 +65,7 @@ pub fn exit<K: ThreadKernel>(kernel: &K, result: usize) -> ! {
     if !kernel.caps().robust {
         process_robust_list(kernel, self_pthread);
     }
-    let previous = raw::prev_thread(self_pthread);
-    let next = raw::next_thread(self_pthread);
-    raw::set_links(
-        previous,
-        raw::prev_thread(previous) as *const raven_libc_tls::Pthread as usize,
-        next as *const raven_libc_tls::Pthread as usize,
-    );
-    raw::set_links(
-        next,
-        previous as *const raven_libc_tls::Pthread as usize,
-        raw::next_thread(next) as *const raven_libc_tls::Pthread as usize,
-    );
+    list::unlink(self_pthread);
     LIBC.remove_thread();
     list::unlock(kernel);
     sched_point!(kernel, "exit_after_unlink");
