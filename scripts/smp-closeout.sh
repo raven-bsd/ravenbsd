@@ -267,6 +267,68 @@ if ! cargo xtask libc-pack --arch x86_64 > "$OUT/libc-pack.log" 2>&1; then
     exit 2
 fi
 
+# Warmup stage (rev 61): run each selected base case's `pre` commands once with a 120 s cap per
+# command, so the per-cell test caps measure the warmed test. A warmup over the cap is a
+# failure/TIMEOUT; it is never a reason to raise the cap and is not retried.
+mkdir -p "$OUT/warmup"
+printf 'case\tindex\trc\tduration_ms\tcap_s\tcommand\n' > "$OUT/warmup.tsv"
+
+warmup_case() {
+    case_name=$1
+    file=tests/qtest/cases/$case_name.toml
+    [ -f "$file" ] || return 0
+    line=$(sed -n 's/^pre = \[\(.*\)\]$/\1/p' "$file" | head -n 1)
+    if [ -z "$line" ]; then
+        echo "smp-closeout: warmup $case_name: no pre commands"
+        return 0
+    fi
+    old_ifs=$IFS
+    IFS=,
+    index=0
+    for item in $line; do
+        index=$((index + 1))
+        cmd=$(printf '%s' "$item" | sed 's/^[[:space:]]*"//; s/"[[:space:]]*$//')
+        [ -n "$cmd" ] || continue
+        log=$OUT/warmup/$case_name-$index.log
+        start_ns=$(date +%s%N)
+        timeout 120 sh -c "$cmd" > "$log" 2>&1
+        rc=$?
+        end_ns=$(date +%s%N)
+        ms=$(( (end_ns - start_ns) / 1000000 ))
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+            "$case_name" "$index" "$rc" "$ms" 120 "$cmd" >> "$OUT/warmup.tsv"
+        echo "smp-closeout: warmup $case_name[$index] rc=$rc ${ms}ms cap=120s $cmd"
+        if [ "$rc" -ne 0 ]; then
+            IFS=$old_ifs
+            {
+                printf 'warmup=1\n'
+                printf 'case=%s\n' "$case_name"
+                printf 'index=%s\n' "$index"
+                printf 'command=%s\n' "$cmd"
+                printf 'rc=%s\n' "$rc"
+                printf 'duration_ms=%s\n' "$ms"
+                printf 'cap_s=120\n'
+                printf 'log=%s\n' "$log"
+            } > "$OUT/FAILED"
+            echo "smp-closeout: warmup FAILED/TIMEOUT for $case_name; no matrix run" >&2
+            return 1
+        fi
+    done
+    IFS=$old_ifs
+    return 0
+}
+
+seen_cases=
+for case_name in $CASES; do
+    case " $seen_cases " in
+        *" $case_name "*) continue ;;
+    esac
+    seen_cases="$seen_cases $case_name"
+    if ! warmup_case "$case_name"; then
+        exit 1
+    fi
+done
+
 printf 'mode\tcase\tqtest_case\trc\tresult\tduration_ms\tlog\tcell_cap_s\tcell_timeout\n' > "$OUT/results.tsv"
 printf 'mode\tqtest_case\tload1\tqemu\tutc\n' > "$OUT/host-per-cell.tsv"
 
@@ -467,6 +529,11 @@ awk -F'\t' 'NR > 1 && $4 == 0 { print $6 }' "$OUT/results.tsv" > "$OUT/durations
     printf 'max_load=%s\n' "${MAX_LOAD:-host-idle-default}"
     printf 'wait_for_idle=%s\n' "$WAIT_IDLE"
     printf 'cell_timeout_override=%s\n' "${CELL_TIMEOUT:-per-case-table}"
+    if [ -s "$OUT/warmup.tsv" ]; then
+        printf 'warmup_cap_s=120\n'
+        awk -F'\t' 'NR > 1 { printf "warmup %s[%s] rc=%s %s ms\n", $1, $2, $3, $4 }' \
+            "$OUT/warmup.tsv"
+    fi
     printf 'quick=%s\n' "$QUICK"
     printf 'cells=%d\n' "$cells"
     printf 'modes=%s\n' "$MODES"

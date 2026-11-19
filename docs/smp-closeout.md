@@ -4,11 +4,10 @@
 # SMP close-out matrix runner
 
 Date: 2026-11-18. Ticket: S126 (Otto). Depends: S116, S125, S85e.
-Status: runner delivered with a **per-cell cap table** (no blanket default). The round-6 full
-closeout attempt stopped at cell 1: its 40 s cap expired during the cold `cargo xtask build brush`
-pre-step (no QEMU ran), so the matrix is **not run** at this commit. TCG4 10/10, TCG4 close-out
-5/5 and KVM1 5/5 from `8af9dd93` remain the preserved evidence; KVM2 `posix-shell` was the S135
-console/rsh stall, now merged but not yet re-exercised by the closeout.
+Status: runner delivered with a **per-cell cap table** and a measured **warmup stage** (rev 61).
+The full 20-cell attempt passed 13 cells (TCG4 5/5, KVM1 5/5, KVM2 3/5) and stopped when KVM2
+`smp-libc-concurrency` hit its 30 s test cap; the matrix is **not complete** and no close-out is
+claimed. S135's KVM2 `posix-shell` fix is verified (8.3 s).
 
 ## Why
 
@@ -364,6 +363,45 @@ timeout 900 sh scripts/smp-closeout.sh --max-load 5 --wait-for-idle 300
   merge.
 
 The matrix remains **not run**; no close-out claim.
+
+## Rework round 7 (rev 61): warmup and the 13/20 matrix
+
+**Warmup stage.** After the exclusive preflight and `libc-pack`, the runner parses each selected
+base case's `pre = [...]` and runs every command once with its own `timeout 120`, recording the
+duration in `warmup.tsv`. The per-cell test caps then measure the warmed test. Measured on
+`6c5ea3a4` (master `d79d7679` + S126):
+
+| Case | Pre command | Duration | Cap |
+|---|---|---:|---:|
+| `posix-shell` | `cargo xtask build brush --arch x86_64` | 48048 ms | 120 s |
+| `posix-util-system` | `sh tests/posix/utility/system/build.sh` | 631 ms | 120 s |
+| `libc-threads` | `sh tests/libc/target/build.sh threads x86_64` | 424 ms | 120 s |
+| `smp-libc-concurrency` | `sh tests/libc/target/build-smp.sh x86_64` | 109 ms | 120 s |
+| `posix-fs-smp` | `sh tests/posix/fs/posix-fs/build-smp.sh` | 438 ms | 120 s |
+
+Warmup total ~49.6 s, all under the 120 s per-command cap; the cold-build failure from rev 60 no
+longer affects the cells.
+
+**Full matrix attempt** (`timeout 900 sh scripts/smp-closeout.sh --max-load 5 --wait-for-idle 300`):
+preflight PASS, then 13 cells passed before the first failure:
+
+| Mode | Result |
+|---|---|
+| TCG4 | **5/5 pass** — 22.7 / 19.5 / 91.1 / 38.1 / 104.6 s |
+| KVM1 | **5/5 pass** — 8.9 / 12.2 / 12.5 / 14.5 / 26.1 s |
+| KVM2 | `posix-shell` 8.3 s (S135 verified), util 12.8 s, threads 13.2 s; **`smp-libc-concurrency` hit its 30 s cap** |
+
+First failure: KVM2 `smp-libc-concurrency-kvm2`, `result=timeout`, `cell_cap_s=30`,
+`cell_timeout=1`. The qtest JSON (written after the harness saw QEMU exit) records `crash`,
+`exit_status=0`, `duration_ms=29857`, matched only `^smp-libc-concurrency: start$`; the serial
+ends at `start` with no `malloc ok`. Host telemetry for the cell: load 1.2-1.3, QEMU/xtask only
+the cell's own, no external jobs. Image:
+`build/qtest/smp-libc-concurrency-kvm2.img`, sha256
+`daf3a664e22a3a16181fb6724e29ab5426c2fde8d5c5eee0a49e5e2df20c94ab`, 335544320 bytes.
+
+The runner stopped; KVM2 `posix-fs-smp` and all KVM4 cells were not run. **No partial matrix and
+no full-matrix claim.** Per the rule a cell over its cap is a failure, not a reason to raise it;
+the 30 s KVM concurrency cap is the first expiry and is preserved for the owner.
 
 ## When the full matrix runs
 
