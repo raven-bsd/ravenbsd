@@ -3,13 +3,13 @@
 #
 # K135: bounded login-latency regression. The target is <300 ms for username->Password and
 # password->shell; the 1 s step caps fail on the multi-second dynamic-loader handoff instead of
-# waiting 30 s like release-login. The K131 pre-step rebuilds/verifies the fresh 0x1000 loader.
+# waiting 30 s like release-login. The K131 release image build already purges and verifies the
+# fresh 0x1000 loader, so the case does not repeat that build step.
 
 name = "login-latency"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 120
-pre = ["sh tests/release/check-loader.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
