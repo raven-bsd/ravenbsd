@@ -494,6 +494,57 @@ def failing_text(text: str) -> str:
     return value or "failure recorded"
 
 
+def markdown_section(text: str, heading: str) -> str:
+    """Return the body after a level-3 heading, up to the next level-3 heading."""
+    match = re.search(heading, text, re.MULTILINE)
+    if not match:
+        return ""
+    rest = text[match.end():]
+    end = re.search(r"(?m)^### ", rest)
+    return rest[: end.start()] if end else rest
+
+
+def libc_1cpu_gate(notes: Path, head: str) -> Gate:
+    """Read the S132 1-CPU libc crash, which is separate from the SMP/TLB rows."""
+    text = read_text(notes)
+    if not text:
+        return Gate(
+            "libc-1cpu", "MISSING", "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
+            str(notes.relative_to(ROOT)), "", "release notes are missing"
+        )
+    section = markdown_section(text, r"(?m)^### libc thread 1-CPU crash.*$")
+    if not section:
+        return Gate(
+            "libc-1cpu", "MISSING", "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
+            str(notes.relative_to(ROOT)), sha256(notes), "S132 1-CPU section is missing"
+        )
+    fault = re.search(r"page fault at (0x[0-9a-fA-F]+)", section)
+    child = re.search(r"child exited \(?(-?\d+)\)?", section)
+    code = re.search(r"exit status (\d+)", section)
+    before = "before `malloc ok`" in section or "before malloc ok" in section
+    clean = "BLOCKED" not in section and bool(
+        re.search(r"(?i)\bS132\b.*\b(DONE|PASS|fixed)\b|\b1-CPU\b.*\b(PASS|DONE|fixed)\b", section)
+    )
+    if fault:
+        status = "FAIL"
+        note = (
+            f"smp-libc-concurrency-kvm1: page fault at {fault.group(1)}; "
+            f"child exited {child.group(1) if child else 'unknown'}; "
+            f"exit {code.group(1) if code else 'unknown'}; "
+            f"{'before malloc ok; ' if before else ''}owner S132/Tim; not SMP"
+        )
+    elif clean:
+        status = "PASS"
+        note = "S132 1-CPU evidence is clean"
+    else:
+        status = "STALE"
+        note = "S132 1-CPU section is ambiguous; no fault or clean result"
+    return Gate(
+        "libc-1cpu", status, "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
+        str(notes.relative_to(ROOT)), sha256(notes), note
+    )
+
+
 def smp_soak_gate(
     soak: Path, closeout: Path, head: str, notes: Path = RELEASE_NOTES
 ) -> Gate:
@@ -791,6 +842,7 @@ def collect(args: argparse.Namespace) -> int:
     gates.append(parse_libc(head))
     gates.append(parse_kernel_gate(args.kernel_gate, head))
     gates.append(smp_soak_gate(SMP_SOAK, SMP_CLOSEOUT, head))
+    gates.append(libc_1cpu_gate(RELEASE_NOTES, head))
     gates.append(dynamic_gate("x86_64", head, args.run_qtests))
     gates.append(dynamic_gate("aarch64", head, args.run_qtests))
     gates.append(release_login_gate(head, args.run_qtests))
@@ -1039,6 +1091,24 @@ def self_test() -> int:
         or "evidence files missing" in real_libc.note
     ):
         raise AssertionError(f"real libc verdict: {real_libc}")
+    libc_1cpu_fail = libc_1cpu_gate(fixtures / "libc-1cpu-fail.md", head)
+    if (
+        libc_1cpu_fail.status != "FAIL"
+        or "0xca3a10" not in libc_1cpu_fail.note
+        or "-11" not in libc_1cpu_fail.note
+        or "35" not in libc_1cpu_fail.note
+        or "not SMP" not in libc_1cpu_fail.note
+    ):
+        raise AssertionError(f"1-CPU failure: {libc_1cpu_fail}")
+    libc_1cpu_clean = libc_1cpu_gate(fixtures / "libc-1cpu-clean.md", head)
+    if libc_1cpu_clean.status != "PASS":
+        raise AssertionError(f"1-CPU clean: {libc_1cpu_clean}")
+    libc_1cpu_ambiguous = libc_1cpu_gate(fixtures / "libc-1cpu-ambiguous.md", head)
+    if libc_1cpu_ambiguous.status != "STALE":
+        raise AssertionError(f"1-CPU ambiguous: {libc_1cpu_ambiguous}")
+    libc_1cpu_missing = libc_1cpu_gate(fixtures / "does-not-exist-notes.md", head)
+    if libc_1cpu_missing.status != "MISSING":
+        raise AssertionError(f"1-CPU missing: {libc_1cpu_missing}")
 
     good_board = board_gate(fixtures / "board-good.log")
     if good_board.status != "MARKERS COMPLETE":
@@ -1066,7 +1136,7 @@ def self_test() -> int:
         "current-stale/partial, posix good/stale/no-stamp/fail, "
         "board good/virt/synthetic/incomplete, image missing/hash/pinned/stale/local-hash, "
         "smp-soak clean/tcg4-fail/closeout-fail/not-run/missing/ambiguous/notes-fail, "
-        "libc missing-evidence/real)"
+        "libc missing-evidence/real, libc-1cpu fail/clean/ambiguous/missing)"
     )
     return 0
 
