@@ -146,26 +146,15 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
         let envp = strings(&request.envp)?;
         let slot = self.reserve()?;
         let result = (|| {
-            #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-            let start = raven_spawn::now_ns();
             let image = self.loader.read_image(&resolved)?;
-            #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-            raven_spawn::trace_mark("read-image", start);
             let fds: Vec<(i32, u32)> = request
                 .fdmap
                 .iter()
                 .map(|entry| (entry.fd, entry.handle))
                 .collect();
-            #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-            let load_start = raven_spawn::now_ns();
             let handle = self
                 .loader
                 .load(&image, &resolved, &argv, &envp, &request.cwd, &fds)?;
-            #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-            {
-                raven_spawn::trace_mark("load", load_start);
-                raven_spawn::trace_mark("native-total", start);
-            }
             let pid = match self.info.pid_for_handle(handle) {
                 Ok(pid) => pid,
                 Err(error) => {
