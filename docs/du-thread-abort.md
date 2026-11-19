@@ -3,9 +3,9 @@
 
 # `du` thread-spawn abort: missing TLS module from `AT_PHDR=0`
 
-Status: **BLOCKED — root cause found; the fix is outside the K134 Owns paths.** The abort is
-reproduced and classified. A tested one-line uutils linker-script change removes it; a second
-`du` traversal hang remains after that change and is handed off separately.
+Status: **PARTIAL — K136 (`d1ad5ca8`) fixes the AT_PHDR/thread-spawn abort; the remaining `du`
+traversal hang is BLOCKED and handed off to Mel.** The abort analysis below is kept as the K136
+history; the post-K136 marker trace is at the end.
 
 ## Reproduction
 
@@ -60,20 +60,48 @@ Owner: **Mel** (uutils) or **Kevin** (toolchain/linker contract). A kernel alter
 the program headers into the startup stack and set `AT_PHDR` there; no kernel edit was made without
 that handoff.
 
-## Second finding after the link fix
+## After K136 (`d1ad5ca8`)
 
-With the tested link-script change, `du` no longer aborts but does not complete: the printer
-thread starts (`K134 child start`) and blocks on its mpsc receiver; the main thread never reaches
-`pthread_join` (`K134 join enter` is absent), so it is stuck in the `du` traversal before the
-join. A temporary QMP run with four vCPUs showed every vCPU `HLT`/idle and no `du` output. That is
-a separate uutils/VFS path, not the thread-handle/TLS abort; hand to **Mel** with this trace (and
-to Stuart if the traversal wait is an IPC/futex kernel stall).
+K136 merged the link-script change (`phdr PT_PHDR PHDRS; text PT_LOAD FILEHDR PHDRS ...`) and
+Kevin's `base-tools-du` case. On the merged tree with `du` relinked, the thread-spawn abort is
+gone. A direct kernel-serial marker trace (temporary, reverted) shows:
+
+```text
+K134D du uumain
+K134 pc enter
+K134 create before kernel
+K134 child start
+K134 child call
+K134D du printer start
+K134 create kernel ok
+K134 pc ok
+K134D du spawned
+K134D du root stat
+K134D du root stat done
+K134D du safe_du enter
+K134D du safe fn
+K134D du initial stat done
+K134D du open dir
+K134D du dir opened
+K134D du read_dir ok
+K134D du entry
+K134D du entry stat done
+```
+
+The pthread path is complete: `pthread_create` returns, the child reaches std's `print_stats` and
+blocks on its mpsc receiver, and the parent proceeds into uutils' `safe_du`/`Stat::new`. The last
+marker is the first entry's `stat_at`; `safe_du done`, `traversal done`, `before join` and `joined`
+never appear. The main thread is inside uutils' directory traversal after the entry stat, before
+the next traversal marker; the child waits on the channel. This is not the libc thread/TLS path
+and not a kernel panic; it is the uutils `safe_du`/VFS path. Hand to **Mel** (uutils `safe_du`)
+with this trace; hand to the filesystem/kernel owner if the post-stat VFS call is the stall.
 
 ## Regression
 
-`tests/qtest/cases/base-tools-du.toml` asserts `du` prints a size line for `/tmp/du` and leaves
-`$?=0`. It currently fails with the exact abort above and should pass once the linker/AT_PHDR fix
-lands. The case is inside the K134 Owns glob `tests/qtest/cases/base-tools*`.
+`tests/qtest/cases/base-tools-du.toml` (K136/Kevin's version) asserts `du` prints a size line for
+`/tmp/du` and leaves `$?=0`. On the merged tree it now fails at step 7 with the traversal hang, not
+the thread-spawn abort; it is the regression for the remaining handoff. The case is inside the
+K134 Owns glob `tests/qtest/cases/base-tools*`.
 
 ## Provenance
 
