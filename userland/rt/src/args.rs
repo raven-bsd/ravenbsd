@@ -255,6 +255,10 @@ impl Iterator for ArgsIter {
 }
 
 #[cfg(test)]
+#[path = "args_cwd_ut.rs"]
+mod args_cwd_ut;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -311,25 +315,6 @@ mod tests {
         assert_eq!(args.len(), 0);
         assert_eq!(args.get(0), None);
         assert_eq!(args.iter().count(), 0);
-    }
-
-    #[test]
-    fn aux_string_reads_a_loader_string() {
-        let mut stack = Stack::new();
-        let text = stack.string(b"/bin\0");
-        stack.word(0);
-        stack.word(0);
-        stack.word(0);
-        stack.word(crate::spawn_attrs::AT_RAVEN_CWD);
-        stack.word(text);
-        stack.word(0);
-        stack.word(0);
-        let args = stack.parse();
-        assert_eq!(
-            args.aux_string(crate::spawn_attrs::AT_RAVEN_CWD),
-            Some("/bin")
-        );
-        assert_eq!(args.aux_string(crate::spawn_attrs::AT_RAVEN_ABI), None);
     }
 
     #[test]
