@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K166: bounded aarch64 serial-input case. It proves the PL011 receive path end to end without
+# depending on the session shell: the kernel routes the FDT/board UART SPI, getty reads `root`
+# through DEBUG_READ, login echoes `Password:` and a correct password reaches the motd. The
+# shell/exit contract lives in `login-aarch64`; this case accepts any guest exit status because
+# the currently staged aarch64 brush cannot be planned by spawn(Strict) (handed off separately).
+
+name = "aarch64-console-rx"
+arch = "aarch64"
+profile = "release"
+timeout_secs = 90
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "any"
+
+[[expect]]
+regex = '^console: PL011 rx irq 33 \(level\)$'
+
+[[expect]]
+regex = '^RavenBSD 0\.1 \(aarch64\) \(tty:console\)$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^RavenBSD 0\.1\.0$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|BadElf|Traceback'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 60
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD 0\.1\.0$'
+timeout_secs = 30
