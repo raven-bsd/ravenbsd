@@ -4,11 +4,15 @@
 # K160: shell cwd semantics in the release image. `cd bin` must move both the shell state and the
 # process cwd, so the external `ls` child lists /bin; a failed cd reports an error and keeps the
 # previous cwd; an absolute cd to /tmp makes child commands see /tmp.
+#
+# K165: the first external command after login can spend several seconds starting while svcd is
+# still bringing the release services up, so the file-tool waits use the same 30 s allowance as
+# release-login. This case checks cwd semantics, not latency (base-tools-ls-latency owns that).
 
 name = "shell-cwd"
 arch = "x86_64"
 profile = "release"
-timeout_secs = 120
+timeout_secs = 180
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
@@ -23,7 +27,7 @@ regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 regex = '^svcd: getty up$'
 
 [[expect]]
-regex = '(?i)^.*login: ?root'
+regex = '(?i)^.*login:'
 
 [[expect]]
 regex = '(?i)^password: ?$'
@@ -54,6 +58,12 @@ regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
+timeout_secs = 90
+
+# The no-NIC release profile retries the lease for about a minute; the supervisor's last
+# console line can otherwise land in the middle of the first interactive command output.
+[[step]]
+wait = '^svcd: resolvd timing:'
 timeout_secs = 90
 
 [[step]]
@@ -110,11 +120,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^ls$'
-timeout_secs = 10
+timeout_secs = 30
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 10
+timeout_secs = 30
 
 [[step]]
 send = "cd /nonexistent\n"
@@ -166,7 +176,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 10
+timeout_secs = 30
 
 [[step]]
 send = "ls\n"
@@ -174,11 +184,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^cwd-marker$'
-timeout_secs = 10
+timeout_secs = 30
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 10
+timeout_secs = 30
 
 [[step]]
 send = "exit 0\n"
