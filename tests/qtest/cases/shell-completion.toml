@@ -11,7 +11,11 @@ profile = "release"
 timeout_secs = 120
 pre = ["cargo xtask build brush --arch x86_64"]
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = []
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
 expect_exit = "success"
 
 [[expect]]
