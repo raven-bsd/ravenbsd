@@ -224,9 +224,11 @@ done
 
 printf 'sample\tload1\taccel\tsmp\tcommit\tlogin_ms\tpassword_ms\n' >"$summary"
 cat "$table" >>"$summary"
-printf '--- summary ---\n'
-for column in login_ms password_ms; do
-    values=$(awk -F '\t' -v c="$column" 'NR>0 {print $c}' "$table" | sort -n)
+printf '%s\n' '--- summary ---'
+for spec in login_ms:6 password_ms:7; do
+    column=${spec%%:*}
+    field=${spec##*:}
+    values=$(awk -F '\t' -v c="$field" 'NF {print $c}' "$table" | sort -n)
     n=$(printf '%s\n' "$values" | awk 'NF{n++} END{print n+0}')
     min=$(printf '%s\n' "$values" | head -n 1)
     max=$(printf '%s\n' "$values" | tail -n 1)
