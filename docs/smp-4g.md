@@ -21,6 +21,21 @@ Preserved serial/JSON:
 - `build/s157/smp-4g-login-uname-fail.log`
 - `build/s157/smp-4g-login-uname-fail.json`
 
+## Revision 256 closeout
+
+The 4 GiB qtest is green at `origin/master` `e2fbc690` (K167/K163; branch `f5d74d89`):
+`timeout 600 cargo xtask qtest --case smp-4g --arch x86_64 --no-build` passes with
+`uname -a`, `ls /bin`, `ps --posix`, `du /tmp` and `init exited (0)`. The `smp: 4 cpus online`
+expectation is marked unordered because the kernel prints that line before the banner on this
+build. The qtest also carries the release network device so `devd` does not spend 60 s in a
+readiness timeout.
+
+The 5 KVM + 5 TCG script (`scripts/smp-4g.sh`) ran five clean KVM boots (login 3.4-4.3 s,
+prompt 0.04-0.07 s) and TCG run 1 (login 7.5 s). **TCG run 2 stopped in `du /tmp` with no output
+for 30 s**; this is the known K134 `du` traversal hang, outside S157's Owns. The script stops on
+the first failure and preserves `build/smp-4g/20261119T151732Z/tcg-2.log`. The 4G/4CPU matrix is
+therefore **5 KVM + 1 TCG green, TCG du blocked on K134/Tim**; no retry, no timeout increase.
+
 ## Revision 255 confirmation
 
 K167 (`origin/master` `26de7aae`) fixes the command-name NUL failure: the 4G guest reached

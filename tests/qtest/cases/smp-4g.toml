@@ -11,7 +11,13 @@ profile = "release"
 timeout_secs = 420
 pre = ["sh tests/release/check-loader.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = ["-m", "4096", "-smp", "4"]
+qemu_extra = [
+    "-m", "4096",
+    "-smp", "4",
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
 expect_exit = "success"
 
 [[expect]]
@@ -22,6 +28,7 @@ regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
 regex = '^smp: 4 cpus online$'
+unordered = true
 
 [[expect]]
 regex = '^mem: [0-9]+ MiB usable'
