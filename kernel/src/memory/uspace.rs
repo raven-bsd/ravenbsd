@@ -161,6 +161,51 @@ pub struct UserAddressSpace {
     mapping_generation: u64,
 }
 
+/// Deferred TLB shootdown and frame recycling after an `unmap`.
+///
+/// `UserAddressSpace::unmap` runs under the caller's address-space mutex. It must not wait for a
+/// remote TLB acknowledgement there: a peer blocked on that mutex would never reach its SGI
+/// handler. The caller drops the mutex and then calls [`UnmapDeferred::finish`].
+pub struct UnmapDeferred {
+    start: u64,
+    len: u64,
+    frames: Vec<u64>,
+}
+
+impl UnmapDeferred {
+    /// Flush every remote TLB, then recycle the frames that were owned by the mapping.
+    ///
+    /// Returns false when a remote CPU timed out; in that case the frames are deliberately
+    /// leaked rather than recycled under a potentially stale translation.
+    pub fn finish(self) -> bool {
+        let flushed = crate::sched::smp::shootdown::flush_range(self.start, self.len);
+        if flushed {
+            for physical in self.frames {
+                let physical = frame::PhysAddr(physical);
+                if frame::is_shared(physical) {
+                    frame::release_shared(physical);
+                } else {
+                    let _ = frame::free_frame(physical);
+                }
+            }
+        }
+        flushed
+    }
+}
+
+/// Deferred TLB shootdown after a `protect` under the address-space mutex.
+pub struct ProtectDeferred {
+    start: u64,
+    len: u64,
+}
+
+impl ProtectDeferred {
+    /// Flush the range after the caller releases the address-space mutex.
+    pub fn finish(self) {
+        let _ = crate::sched::smp::shootdown::flush_range(self.start, self.len);
+    }
+}
+
 /// A normal fault error can be returned from code that still speaks `Errno`.
 impl From<Errno> for FaultError {
     fn from(error: Errno) -> Self {
@@ -836,7 +881,7 @@ impl UserAddressSpace {
     }
 
     /// Remove a fully mapped range, splitting VMAs and releasing object references.
-    pub fn unmap(&mut self, start: u64, len: u64) -> Result<(), Errno> {
+    pub fn unmap(&mut self, start: u64, len: u64) -> Result<UnmapDeferred, Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
             return Err(Errno::EINVAL);
         }
@@ -904,25 +949,23 @@ impl UserAddressSpace {
         self.remove_inherit_range(start, len);
         self.remove_mmio_range(start, len);
         self.remove_dma_range(start, len);
-        // Do not recycle frames until every CPU has dropped its translation: a stale TLB entry
-        // could otherwise reach a frame that was already handed to another address space.
-        let flushed = crate::sched::smp::shootdown::flush_range(start, len);
-        if flushed {
-            for physical in to_free {
-                let physical = frame::PhysAddr(physical);
-                if frame::is_shared(physical) {
-                    frame::release_shared(physical);
-                } else {
-                    let _ = frame::free_frame(physical);
-                }
-            }
-        }
         self.bump_generation();
-        Ok(())
+        // The caller drops the address-space mutex before `finish`; waiting for a remote TLB
+        // acknowledgement under that mutex can starve an aarch64 peer that is blocked on it.
+        Ok(UnmapDeferred {
+            start,
+            len,
+            frames: to_free,
+        })
     }
 
     /// Change protections over a fully mapped range.
-    pub fn protect(&mut self, start: u64, len: u64, new_prot: u8) -> Result<(), Errno> {
+    pub fn protect(
+        &mut self,
+        start: u64,
+        len: u64,
+        new_prot: u8,
+    ) -> Result<ProtectDeferred, Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
             return Err(Errno::EINVAL);
         }
@@ -976,9 +1019,8 @@ impl UserAddressSpace {
             }
         }
         self.vmas.protect(start, len, new_prot).map_err(vma_errno)?;
-        let _ = crate::sched::smp::shootdown::flush_range(start, len);
         self.bump_generation();
-        Ok(())
+        Ok(ProtectDeferred { start, len })
     }
 
     /// Handle a user page fault at `cr2`.

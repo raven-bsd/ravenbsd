@@ -346,6 +346,9 @@ fn release_userspace_paths_cover_staged_and_target_caches() {
             PathBuf::from("/repo/build/x86_64/uutils"),
             PathBuf::from("/repo/build/cargo/brush-x86_64"),
             PathBuf::from("/repo/build/cargo/uutils-x86_64"),
+            PathBuf::from("/repo/build/x86_64/libc.so.1"),
+            PathBuf::from("/repo/build/x86_64/ld-elf.so.1"),
+            PathBuf::from("/repo/build/x86_64/loader-manifest.toml"),
         ]
     );
     assert_eq!(
@@ -355,13 +358,16 @@ fn release_userspace_paths_cover_staged_and_target_caches() {
             PathBuf::from("/repo/build/aarch64/uutils"),
             PathBuf::from("/repo/build/cargo/brush-aarch64"),
             PathBuf::from("/repo/build/cargo/uutils-aarch64"),
+            PathBuf::from("/repo/build/aarch64/libc.so.1"),
+            PathBuf::from("/repo/build/aarch64/ld-elf.so.1"),
+            PathBuf::from("/repo/build/aarch64/loader-manifest.toml"),
         ]
     );
 }
 
 #[test]
-fn release_purge_removes_staged_and_target_caches() {
-    let root = std::env::temp_dir().join(format!("raven-s122-purge-{}", std::process::id()));
+fn release_purge_removes_staged_target_caches_and_the_loader() {
+    let root = std::env::temp_dir().join(format!("raven-k131-purge-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("build/x86_64/uutils")).unwrap();
     std::fs::create_dir_all(root.join("build/cargo/brush-x86_64")).unwrap();
@@ -370,6 +376,10 @@ fn release_purge_removes_staged_and_target_caches() {
     std::fs::write(root.join("build/x86_64/uutils/ls"), b"stale").unwrap();
     std::fs::write(root.join("build/cargo/brush-x86_64/artifact"), b"stale").unwrap();
     std::fs::write(root.join("build/cargo/uutils-x86_64/artifact"), b"stale").unwrap();
+    // The K131 stale shape: a non-ELF loader plus a manifest from another build.
+    std::fs::write(root.join("build/x86_64/ld-elf.so.1"), b"STALE-NOT-ELF").unwrap();
+    std::fs::write(root.join("build/x86_64/libc.so.1"), b"stale libc").unwrap();
+    std::fs::write(root.join("build/x86_64/loader-manifest.toml"), b"stale").unwrap();
 
     purge_release_userspace(&root, Arch::X86_64).unwrap();
     for path in release_userspace_paths(&root, Arch::X86_64) {

@@ -41,6 +41,22 @@ enum MappedObject {
     Dma(Arc<DmaBuffer>),
 }
 
+/// Debug hook: a TLB shootdown must never run while this CPU holds an address-space mutex.
+struct AddressSpaceLockProbe;
+
+impl AddressSpaceLockProbe {
+    fn held() -> Self {
+        crate::sched::smp::percpu::note_unmap_lock_held(true);
+        Self
+    }
+}
+
+impl Drop for AddressSpaceLockProbe {
+    fn drop(&mut self) {
+        crate::sched::smp::percpu::note_unmap_lock_held(false);
+    }
+}
+
 /// `memobj_create(len, flags) -> Handle`.
 pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = frame.rdi;
@@ -186,14 +202,16 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
 
     let mut guard = target.address_space.lock();
+    let probe = AddressSpaceLockProbe::held();
     let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
+    let mut deferred = None;
     let vaddr = if replace {
         // CR-24: REPLACE is the atomic form of FIXED for a PROT_NONE reservation. It refuses a
         // range carrying any real mapping (EEXIST) instead of silently discarding it.
         if !address_space.is_reservation(addr, len) {
             return Err(Errno::EEXIST);
         }
-        address_space.unmap(addr, len)?;
+        deferred = Some(address_space.unmap(addr, len)?);
         addr
     } else if fixed {
         if !address_space.vmas().is_free(addr, len) {
@@ -242,9 +260,19 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
                 );
             }
         }
+        drop(guard);
+        drop(probe);
+        if let Some(deferred) = deferred {
+            deferred.finish();
+        }
         return Err(error);
     }
     address_space.set_inherit(vaddr, len, inherit, identity);
+    drop(guard);
+    drop(probe);
+    if let Some(deferred) = deferred {
+        deferred.finish();
+    }
     Ok(vaddr as usize)
 }
 
@@ -255,17 +283,20 @@ pub fn unmap(frame: &SyscallFrame) -> Result<usize, Errno> {
     let addr = frame.rsi;
     let len = frame.rdx;
     validate_range(addr, len)?;
-    let shared_range = {
+    let (dirty, shared_range, deferred) = {
         let mut guard = target.address_space.lock();
+        let _probe = AddressSpaceLockProbe::held();
         let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
         let shared_range = address_space.shared_futex_range(addr, len);
         // Collect before the mapping disappears; the object Arcs keep the pages alive for the
         // PageOut requests below.
         let dirty = address_space.collect_pager_dirty(addr, len);
-        address_space.unmap(addr, len)?;
-        (dirty, shared_range)
+        let deferred = address_space.unmap(addr, len)?;
+        (dirty, shared_range, deferred)
     };
-    let (dirty, shared_range) = shared_range;
+    // The address-space lock is released above. Wait for the remote TLB acknowledgement and
+    // recycle frames only now, so an aarch64 peer blocked on this mutex can take the TLB SGI.
+    deferred.finish();
     crate::syscall::futex::remove_private_range(target.id, addr, addr.saturating_add(len));
     if let Some((object, start, end)) = shared_range {
         crate::syscall::futex::remove_shared_range(target.id, object, start, end);
@@ -322,9 +353,15 @@ pub fn unmap_current(addr: u64, len: u64) {
     if validate_range(addr, len).is_err() {
         return;
     }
-    let mut guard = caller.address_space.lock();
-    if let Some(address_space) = guard.as_mut() {
-        let _ = address_space.unmap(addr, len);
+    let deferred = {
+        let mut guard = caller.address_space.lock();
+        let _probe = AddressSpaceLockProbe::held();
+        guard
+            .as_mut()
+            .and_then(|address_space| address_space.unmap(addr, len).ok())
+    };
+    if let Some(deferred) = deferred {
+        deferred.finish();
     }
 }
 
@@ -341,9 +378,13 @@ pub fn protect(frame: &SyscallFrame) -> Result<usize, Errno> {
     {
         return Err(Errno::EINVAL);
     }
-    let mut guard = target.address_space.lock();
-    let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
-    address_space.protect(addr, len, protection)?;
+    let deferred = {
+        let mut guard = target.address_space.lock();
+        let _probe = AddressSpaceLockProbe::held();
+        let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
+        address_space.protect(addr, len, protection)?
+    };
+    deferred.finish();
     Ok(0)
 }
 

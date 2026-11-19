@@ -165,3 +165,71 @@ fn the_elf_gate_accepts_a_real_shared_object() {
     // This fixture has no SONAME check for the loader; the gate is a smoke check of the parser.
     let _ = check_elf(&so, "libc");
 }
+
+fn loader_gate_text(base: u64) -> String {
+    let mut text = format!(
+        "Type:                              DYN (Shared object file)\n  \
+         LOAD           0x000000 0x{base:016x} 0x{base:016x} 0x000010 0x000010 R   0x1000\n  \
+         GNU_RELRO      0x000000 0x{base:016x} 0x{base:016x} 0x000010 0x000010 R   0x1\n  \
+         GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x10\n  \
+         0x000000000000001e (FLAGS)              BIND_NOW\n  \
+         0x000000000000000e (SONAME)             Library soname: [ld-elf.so.1]\n\
+         Entry point address:               0x1234\n  \
+         1234: 0000000000001234     0 FUNC    GLOBAL DEFAULT    1 _rtld_start\n\
+         Symbol table '.dynsym' contains 17 entries:\n"
+    );
+    for (index, name) in export_names().iter().enumerate() {
+        text.push_str(&format!(
+            "  {index}: 0000000000001000    10 FUNC    GLOBAL DEFAULT    1 {name}@@RAVEN_1.0\n"
+        ));
+    }
+    text
+}
+
+#[test]
+fn the_loader_gate_requires_the_supported_image_base() {
+    assert!(gate_text(&loader_gate_text(LOADER_IMAGE_BASE), "loader").is_ok());
+    let error = gate_text(&loader_gate_text(0), "loader").expect_err("base zero");
+    assert!(format!("{error}").contains("first PT_LOAD image base"));
+}
+
+#[test]
+fn loader_manifest_renders_and_parses_the_contract() {
+    let bytes = b"loader-bytes";
+    let text = loader_manifest_text("x86_64", "abc1234", bytes, "deadbeef");
+    let manifest = parse_loader_manifest(&text).expect("manifest");
+    assert_eq!(manifest.arch, "x86_64");
+    assert_eq!(manifest.revision, "abc1234");
+    assert_eq!(manifest.image_base, "0x1000");
+    assert_eq!(manifest.interpreter, "/libexec/ld-elf.so.1");
+    assert_eq!(manifest.size, bytes.len() as u64);
+    assert_eq!(
+        manifest.crc32,
+        format!("{:08x}", raven_initfs::crc32(bytes))
+    );
+    assert_eq!(manifest.sha256, "deadbeef");
+}
+
+#[test]
+fn a_stale_loader_or_manifest_does_not_match() {
+    let root = std::env::temp_dir().join(format!("k131-manifest-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let loader = root.join("build/x86_64/ld-elf.so.1");
+    std::fs::create_dir_all(loader.parent().unwrap()).unwrap();
+    std::fs::write(&loader, b"fresh").unwrap();
+    let manifest = loader_manifest_path(&root, "x86_64");
+    let text = loader_manifest_text("x86_64", "rev", b"fresh", "sha");
+    std::fs::write(&manifest, &text).unwrap();
+    assert!(loader_manifest_matches(&root, "x86_64"));
+
+    std::fs::write(&loader, b"stale").unwrap();
+    assert!(!loader_manifest_matches(&root, "x86_64"));
+
+    std::fs::write(&loader, b"fresh").unwrap();
+    std::fs::write(&manifest, text.replace("0x1000", "0x0")).unwrap();
+    assert!(!loader_manifest_matches(&root, "x86_64"));
+
+    std::fs::remove_file(&manifest).unwrap();
+    assert!(!loader_manifest_matches(&root, "x86_64"));
+    std::fs::remove_dir_all(&root).unwrap();
+}
