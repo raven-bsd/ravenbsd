@@ -3,16 +3,18 @@
 
 # Release image reproducibility (IMG1)
 
-Status: **OBSERVED at product commit `ad2c5941`.** The x86_64 `release` image and the Pi 4
-FAT+UFS `pi4-rootfs` SD image are byte-identical across two builds at the same
-`SOURCE_DATE_EPOCH`. Host-only; no board or QEMU run is claimed.
+Status: **OBSERVED at product commit `d48b0eac` for the x86_64 release image.** The A/B pair is
+byte-identical under `SOURCE_DATE_EPOCH=1700000000` and carries the fresh K131 loader. The Pi 4
+`pi4-rootfs` hashes in section 3 are the IMG1 baseline at `6d1b1bde`; they were not rebuilt for
+K131. Host-only; no board or QEMU run is claimed.
 
 ## 1. Inputs
 
 | Item | Value |
 |---|---|
-| Product commit | `ad2c5941` (`origin/master`, clean tree at build time) |
-| Branch | `mel/IMG1` (docs-only; the build used `ad2c5941`) |
+| Product commit (x86_64 K131) | `d48b0eac` (`origin/master` base + `kevin/K131`, clean tree at build time) |
+| Product commit (Pi 4 baseline) | `6d1b1bde` (IMG1; not rebuilt for K131) |
+| Branch | `kevin/K131` |
 | `SOURCE_DATE_EPOCH` | `1700000000` = 2023-11-14T22:13:20Z |
 | Raspberry Pi firmware | `/home/bo/work/ravenos-workspace/ravenbsd-resources/rpi-firmware/boot` |
 | Pi 4 boot config | `xtask/src/pi.rs` (1024x768x32, DMT 16, `enable_uart=1`, `uart_2ndstage=1`) |
@@ -28,28 +30,61 @@ must be clean (the release image builder enforces this).
 
 ## 2. x86_64 release image
 
-Commands (the second build repeats the first after `rm -rf build/fixtures`):
+Commands (each build removes `build/fixtures` and the kernel target directory first):
 
 ```sh
 rm -rf build/fixtures
 cargo clean -p raven-kernel --target-dir build/cargo/kernel-x86_64
 SOURCE_DATE_EPOCH=1700000000 cargo xtask image --arch x86_64 --profile release \
-  --output /tmp/opencode/img1/x86-a.img
+  --output /tmp/opencode/k131-img/x86-a.img
 
 rm -rf build/fixtures
+cargo clean -p raven-kernel --target-dir build/cargo/kernel-x86_64
 SOURCE_DATE_EPOCH=1700000000 cargo xtask image --arch x86_64 --profile release \
-  --output /tmp/opencode/img1/x86-b2.img
+  --output /tmp/opencode/k131-img/x86-b.img
 ```
 
 | Build | Size | SHA-256 |
 |---|---:|---|
-| A | 335,544,320 | `73be359bac8d7dc17cd001e2c24a5812de627ceae6852b776f30451c9fc4f7b1` |
-| B | 335,544,320 | `73be359bac8d7dc17cd001e2c24a5812de627ceae6852b776f30451c9fc4f7b1` |
+| A | 335,544,320 | `90e8ca12431422f69ac88ff89094ff82030b4bfc73bba15f7f9bb658b6ed6674` |
+| B | 335,544,320 | `90e8ca12431422f69ac88ff89094ff82030b4bfc73bba15f7f9bb658b6ed6674` |
 
-`cmp` reports byte-identical. A first B without removing `build/fixtures` also matched; the
-clean-fixture B2 above is the recorded artifact.
+`cmp` reports byte-identical; both builds removed `build/fixtures` and cleaned the kernel target
+directory first.
+
+### K131 loader freshness
+
+The release build purges `build/<arch>/{libc.so.1,ld-elf.so.1}` and
+`build/<arch>/loader-manifest.toml`, so `libc-link` always produces the loader from the current
+sources. It then gates the linked loader and writes `build/x86_64/loader-manifest.toml`:
+
+```text
+arch = "x86_64"
+revision = "d48b0eac"
+image_base = "0x1000"
+interpreter = "/libexec/ld-elf.so.1"
+size = 107128
+crc32 = "08c0f51a"
+sha256 = "7bc53ceceaf31bdc878d31461075ccd3f0a1029028003af1a82f30d3cba46e09"
+```
+
+Extracting the image's initfs (`mtype -i x86-a.img@@1M ::/raven/initfs.img`) and listing it reports
+the same entry:
+
+```text
+/libexec/ld-elf.so.1 107128 0755 08c0f51a
+```
+
+The pre-fix proof is preserved in the K131 report: on `4d3e1576` a 14-byte `STALE-NOT-ELF` file
+was packed unchanged as `/libexec/ld-elf.so.1` (size 14, CRC-32 `8cfdbaec`); the fixed build
+replaces and rejects that shape.
 
 ## 3. Pi 4 FAT+UFS SD image (`pi4-rootfs`)
+
+**IMG1 baseline at `6d1b1bde`; not rebuilt for K131.** The commands and hashes below are retained
+for the Pi 4 release line. K131's loader freshness applies to the same `initfs::build` path, so the
+next Pi 4 image build will also purge and verify the loader; its hash will change with the product
+commit and must be regenerated then.
 
 Commands (the second build repeats the first after `rm -rf build/fixtures`):
 
@@ -59,19 +94,19 @@ cargo clean -p raven-kernel --target-dir build/cargo/kernel-aarch64-pi4
 RAVEN_RPI_FIRMWARE=/home/bo/work/ravenos-workspace/ravenbsd-resources/rpi-firmware/boot \
 SOURCE_DATE_EPOCH=1700000000 \
   cargo xtask image --arch aarch64 --platform pi4 --profile pi4-rootfs \
-  --output /tmp/opencode/img1/pi4-a.img
+  --output /tmp/opencode/img1-r1/pi4-a.img
 
 rm -rf build/fixtures
 RAVEN_RPI_FIRMWARE=/home/bo/work/ravenos-workspace/ravenbsd-resources/rpi-firmware/boot \
 SOURCE_DATE_EPOCH=1700000000 \
   cargo xtask image --arch aarch64 --platform pi4 --profile pi4-rootfs \
-  --output /tmp/opencode/img1/pi4-b.img
+  --output /tmp/opencode/img1-r1/pi4-b.img
 ```
 
 | Build | Size | SHA-256 |
 |---|---:|---|
-| A | 500,187,648 | `2187ed42e7e3e9cb52eee2ccef3b8748c95b11a380c10970075be47d7f1bbd39` |
-| B | 500,187,648 | `2187ed42e7e3e9cb52eee2ccef3b8748c95b11a380c10970075be47d7f1bbd39` |
+| A | 500,187,648 | `7ea6d8b230e02ebae35078df778ef8d708fcf2b3bae1dccd50f6cd6681ef0208` |
+| B | 500,187,648 | `7ea6d8b230e02ebae35078df778ef8d708fcf2b3bae1dccd50f6cd6681ef0208` |
 
 `cmp` reports byte-identical. The GPT (FAT boot + UFS root), FAT firmware/config/kernel/DTB and
 UFS2 root tree are all deterministic under the epoch. The FAT directory timestamp is
@@ -82,7 +117,7 @@ UFS2 root tree are all deterministic under the epoch. The FAT directory timestam
 ### Pi 4
 
 ```sh
-sh scripts/pi4-install.sh --check -i /tmp/opencode/img1/pi4-a.img
+sh scripts/pi4-install.sh --check -i /tmp/opencode/img1-r1/pi4-a.img
 ```
 
 Exit 0:
@@ -93,11 +128,11 @@ pi4-install: FAT config.txt ... config ok
 pi4-install: FAT cmdline.txt ... cmdline ok
 pi4-install: FAT kernel8.img ... kernel ok
 pi4-install: FAT bcm2711-rpi-4-b.dtb ... fdt ok
-pi4-install: image check PASS sha256=2187ed42e7e3e9cb52eee2ccef3b8748c95b11a380c10970075be47d7f1bbd39
+pi4-install: image check PASS sha256=7ea6d8b230e02ebae35078df778ef8d708fcf2b3bae1dccd50f6cd6681ef0208
 pi4-install: board evidence remains UNVERIFIED (SD3)
 ```
 
-The release-content inventory (`sh scripts/release-inventory.sh /tmp/opencode/img1/pi4-a.img`)
+The release-content inventory (`sh scripts/release-inventory.sh /tmp/opencode/img1-r1/pi4-a.img`)
 reports `entries=89 flags=0 warnings=17` and exits 0.
 
 ### x86_64
@@ -106,11 +141,11 @@ The x86 image has no Pi 4 manifest; its FAT boot manifest is the UEFI ESP conten
 offset:
 
 ```sh
-mdir  -i /tmp/opencode/img1/x86-a.img@@1M ::/
-mtype -i /tmp/opencode/img1/x86-a.img@@1M ::/EFI/BOOT/BOOTX64.EFI
-mtype -i /tmp/opencode/img1/x86-a.img@@1M ::/raven/kernel.elf
-mtype -i /tmp/opencode/img1/x86-a.img@@1M ::/raven/initfs.img
-mtype -i /tmp/opencode/img1/x86-a.img@@1M ::/raven/boot.toml
+mdir  -i /tmp/opencode/k131-img/x86-a.img@@1M ::/
+mtype -i /tmp/opencode/k131-img/x86-a.img@@1M ::/EFI/BOOT/BOOTX64.EFI
+mtype -i /tmp/opencode/k131-img/x86-a.img@@1M ::/raven/kernel.elf
+mtype -i /tmp/opencode/k131-img/x86-a.img@@1M ::/raven/initfs.img
+mtype -i /tmp/opencode/k131-img/x86-a.img@@1M ::/raven/boot.toml
 ```
 
 All exit 0; `mdir` shows `EFI` and `RAVEN` directories. This is the x86 image manifest check.
@@ -118,28 +153,34 @@ All exit 0; `mdir` shows `EFI` and `RAVEN` directories. This is the x86 image ma
 The optional release-content inventory (`sh scripts/release-inventory.sh .../x86-a.img`) reports
 `entries=211 flags=1 warnings=22`; the flag is the pre-existing REL7c finding
 `missing-critical path=/bin/ping` (the release stages ping at `/sbin/ping`). That is a release
-content/path issue outside IMG1's reproducibility Owns; it is recorded here and handed to the
+content/path issue outside K131's loader freshness; it is recorded here and handed to the
 release/profile owner (REL7c/Kevin). It does **not** indicate a non-deterministic build.
 
 ## 5. Result
 
 | Gate | Result |
 |---|---|
-| x86_64 release, two clean-fixture builds, same epoch | **byte-identical** |
-| Pi 4 `pi4-rootfs` SD, two clean-fixture builds, same epoch | **byte-identical** |
-| `pi4-install.sh --check` | **PASS** |
-| Pi 4 release inventory | **PASS** (0 flags, 17 host-path warnings) |
+| x86_64 release A/B, clean fixtures + kernel target, same epoch | **byte-identical** (`90e8ca12…`) |
+| x86 loader first `PT_LOAD` base | **0x1000** |
+| x86 loader manifest interpreter/hash | **`/libexec/ld-elf.so.1`; size 107128, CRC-32 `08c0f51a`, SHA-256 `7bc53cec…`** |
+| x86 image initfs loader entry | **matches the fresh loader** (same size/CRC-32) |
+| Stale 14-byte loader | **replaced and rejected** (pre-fix packed it unchanged) |
+| Pi 4 `pi4-rootfs` SD | **IMG1 baseline at `6d1b1bde`; not rebuilt for K131** |
 | x86 FAT manifest (`mdir`/`mtype`) | **PASS** |
-| x86 release inventory | **1 pre-existing `/bin/ping` flag**, outside IMG1 |
+| x86 release inventory | **1 pre-existing `/bin/ping` flag**, outside K131 |
 | `make check-fast` | **PASSED** |
 
-No board, QEMU, reflash or donor code was used. The current release-evidence packet can pin the
-two image hashes to `ad2c5941` with `SOURCE_DATE_EPOCH=1700000000`; the `/bin/ping` content flag
-remains a separate release-gate item.
+No board, QEMU, reflash or donor code was used. The x86 A/B pair is pinned to `d48b0eac` with
+`SOURCE_DATE_EPOCH=1700000000`; the `/bin/ping` content flag remains a separate release-gate item.
 
-## 6. Donor reconciliation (DR-57 / DR-52)
+## 6. Donor reconciliation (DR-52)
 
-IMG1 builds and compares existing artifacts; it changes no algorithm, format or donor-derived code.
-No C and no donor code was copied. Determinism comes from the first-party FAT/GPT/UFS writers and
-`SOURCE_DATE_EPOCH`; the Pi 4 DTB is the committed fixture hex. DR-57/DR-52 are not applicable to
-this evidence-only ticket.
+K131 changes first-party build orchestration (`xtask`): it purges stale dynamic outputs, rebuilds
+them, and gates the loader contract. It copies no donor code and implements no donor algorithm.
+
+| Topic | Illumos | BSD | Linux | RavenBSD decision |
+|---|---|---|---|---|
+| Loader image base | Not consulted; the loader is RavenBSD's `raven-libc-rtld`. | Not consulted. | Not consulted. | Keep the K7 `--image-base=0x1000` contract. |
+| Build cache freshness | Not applicable. | Not applicable. | Not applicable. | A release profile purges the dynamic pair and requires a matching manifest; no cached-artifact shortcut. |
+| Manifest hash | Not applicable. | Not applicable. | Not applicable. | Record revision, base, interpreter, size, CRC-32 and SHA-256 beside the loader; compare before reuse. |
+

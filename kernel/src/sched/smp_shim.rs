@@ -36,11 +36,13 @@ pub fn platform_init() {
 
 /// Per-CPU accessors shared by the scheduler, `sync` and the architecture code.
 pub mod percpu {
-    use core::sync::atomic::{AtomicU32, Ordering};
+    use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
     use super::MAX_CPUS;
 
     static PREEMPT: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
+    /// One while this CPU holds an address-space mutex that may need a TLB shootdown.
+    static UNMAP_LOCK_HELD: [AtomicBool; MAX_CPUS] = [const { AtomicBool::new(false) }; MAX_CPUS];
 
     /// Index of the CPU executing this code.
     #[inline]
@@ -108,6 +110,22 @@ pub mod percpu {
     #[inline]
     pub fn page_fault_phase(_cpu: usize) -> u64 {
         0
+    }
+
+    /// Mark whether this CPU holds an address-space mutex across a potential TLB shootdown.
+    #[inline]
+    pub fn note_unmap_lock_held(active: bool) {
+        if let Some(slot) = UNMAP_LOCK_HELD.get(this_cpu()) {
+            slot.store(active, Ordering::Relaxed);
+        }
+    }
+
+    /// True when this CPU holds an address-space mutex across a potential TLB shootdown.
+    #[inline]
+    pub fn unmap_lock_held() -> bool {
+        UNMAP_LOCK_HELD
+            .get(this_cpu())
+            .is_some_and(|slot| slot.load(Ordering::Relaxed))
     }
 
     /// Record a wait-queue diagnostic stage.
@@ -265,6 +283,10 @@ pub mod shootdown {
     /// executing the invalidation; a missing acknowledgement is counted, logged and reported as
     /// `false` without hanging the system.
     pub fn flush_range(start: u64, len: u64) -> bool {
+        debug_assert!(
+            !crate::sched::smp::percpu::unmap_lock_held(),
+            "TLB shootdown while holding the address-space lock"
+        );
         if len == 0 {
             return true;
         }

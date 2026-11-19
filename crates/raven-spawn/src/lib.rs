@@ -1475,12 +1475,16 @@ fn page_ceil(value: u64) -> Option<u64> {
 
 /// Parse and plan one image. `interpreter` selects the `PT_INTERP` rules: the file must be
 /// `ET_DYN` and is based at [`INTERP_BASE`].
+///
+/// Parse at `0..USER_END`, not `USER_MIN..USER_END`: an `ET_DYN` image (including the release
+/// `ld-elf.so.1` interpreter) may have raw segments at `vaddr=0`. `plan_biased` applies the
+/// non-zero bias and then enforces `USER_MIN..USER_END`, so page 0 is never mapped.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn plan_image<'a>(
     data: &'a [u8],
     interpreter: bool,
 ) -> Result<(Elf<'a>, BiasedPlan, u64), SpawnError> {
-    let elf = Elf::parse(data, target_machine(), USER_MIN..USER_END).map_err(SpawnError::BadElf)?;
+    let elf = Elf::parse(data, target_machine(), 0..USER_END).map_err(SpawnError::BadElf)?;
     if let Some(path) = elf.interp()
         && !path.starts_with('/')
     {
