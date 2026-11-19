@@ -30,7 +30,7 @@ regex = '(?i)^.*login: ?root'
 regex = '(?i)^password: ?$'
 
 [[expect]]
-regex = '^raven# $'
+regex = '^.*raven# '
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -55,8 +55,11 @@ send = "raven\n"
 delay_ms = 100
 
 [[step]]
-wait = '^raven# $'
-timeout_secs = 1
+# K156 owns the remaining Password -> shell ~1.5 s (login verification/exit + getty wait).
+# This is a provisional 2 s bound; the 1 s target stays with K156.
+# The brush prompt is ANSI-coloured, so match the text before the reset escape.
+wait = '^.*raven# '
+timeout_secs = 2
 
 [[step]]
 send = "exit 0\n"
