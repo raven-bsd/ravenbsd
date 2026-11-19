@@ -71,6 +71,10 @@ pub const MAX_FILE_IMAGE: usize = 8 * 1024 * 1024;
 /// 4 MiB), so a page-sized loop cost one IPC round trip per 4 KiB and dominated the spawn time:
 /// the 984 KiB `/bin/true` needed 240 round trips. One MiB keeps a 3.3 MiB tool at four reads
 /// while staying well inside both the capture window and [`MAX_FILE_IMAGE`].
+#[cfg(any(
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"),
+    test
+))]
 const IMAGE_READ_CHUNK: usize = 1024 * 1024;
 
 /// Raw `PROC_EXEC_CRED`: apply the setuid/setgid policy before the first thread starts.
