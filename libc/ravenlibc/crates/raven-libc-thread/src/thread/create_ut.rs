@@ -109,6 +109,96 @@ fn inserting_a_thread_sets_the_next_back_link() {
 }
 
 #[test]
+fn inserting_the_first_thread_links_the_creator_both_ways() {
+    let main = std::boxed::Box::new(Pthread::new(0));
+    let first = std::boxed::Box::new(Pthread::new(0));
+    let main_address = &*main as *const Pthread as usize;
+    let first_address = &*first as *const Pthread as usize;
+    raw::set_links(&main, main_address, main_address);
+    insert_links(
+        &main,
+        &main,
+        &first,
+        first_address,
+        main_address,
+        main_address,
+    );
+    assert_eq!(
+        raw::next_thread(&main) as *const Pthread as usize,
+        first_address
+    );
+    // The fresh list has no separate tail; the creator's back link must name the new node,
+    // not itself (S138: a self back link is stale the moment the thread is inserted).
+    assert_eq!(
+        raw::prev_thread(&main) as *const Pthread as usize,
+        first_address
+    );
+    assert_eq!(
+        raw::prev_thread(&first) as *const Pthread as usize,
+        main_address
+    );
+    assert_eq!(
+        raw::next_thread(&first) as *const Pthread as usize,
+        main_address
+    );
+}
+
+#[test]
+fn sequential_insertions_track_the_live_tail() {
+    let main = std::boxed::Box::new(Pthread::new(0));
+    let first = std::boxed::Box::new(Pthread::new(0));
+    let second = std::boxed::Box::new(Pthread::new(0));
+    let main_address = &*main as *const Pthread as usize;
+    let first_address = &*first as *const Pthread as usize;
+    let second_address = &*second as *const Pthread as usize;
+    raw::set_links(&main, main_address, main_address);
+    // The snapshots are the live links exactly as `create` reads them under the list lock.
+    let previous_prev = raw::prev_thread(&main) as *const Pthread as usize;
+    let next = raw::next_thread(&main) as *const Pthread as usize;
+    let next_next = raw::next_thread(raw::tcb(next)) as *const Pthread as usize;
+    insert_links(
+        &main,
+        raw::tcb(next),
+        &first,
+        first_address,
+        previous_prev,
+        next_next,
+    );
+    let previous_prev = raw::prev_thread(&main) as *const Pthread as usize;
+    let next = raw::next_thread(&main) as *const Pthread as usize;
+    let next_next = raw::next_thread(raw::tcb(next)) as *const Pthread as usize;
+    insert_links(
+        &main,
+        raw::tcb(next),
+        &second,
+        second_address,
+        previous_prev,
+        next_next,
+    );
+    assert_eq!(
+        raw::next_thread(&main) as *const Pthread as usize,
+        second_address
+    );
+    // `first` is the tail after both insertions, so `main.prev` must name it.
+    assert_eq!(
+        raw::prev_thread(&main) as *const Pthread as usize,
+        first_address
+    );
+    assert_eq!(
+        raw::next_thread(&second) as *const Pthread as usize,
+        first_address
+    );
+    assert_eq!(
+        raw::prev_thread(&first) as *const Pthread as usize,
+        second_address
+    );
+    assert_eq!(
+        raw::next_thread(&first) as *const Pthread as usize,
+        main_address
+    );
+}
+
+#[test]
 fn create_before_init_is_enosys() {
     let _serial = crate::test_support::serial();
     let kernel = crate::test_support::MockKernel::new();
