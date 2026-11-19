@@ -20,11 +20,19 @@
 #   --no-preflight    skip tests/smp/boot/host-idle.sh (short smoke only)
 #   --max-load LOAD   preflight maximum 1-minute load average (host-idle.sh default otherwise)
 #   --wait-for-idle S wait up to S seconds for an idle host (foreground poll, default 0)
-#   --cell-timeout S  per-cell wall-clock cap (default 300; 0 disables). On expiry the cell's
-#                     QEMU is terminated so the harness still records the serial, and the cell
-#                     is a bounded timeout failure.
+#   --cell-timeout S  cap override for a SINGLE-CELL invocation only (e.g., a smoke). There is
+#                     no blanket default; every matrix cell uses the table below. A cell over its
+#                     cap is a timeout failure with the last 20 serial lines; it is never retried.
 #   --out DIR         output root (default build/smp-closeout/<UTC>)
 #   -h, --help        this help
+#
+# Per-cell caps in seconds (expected runtime + proportional margin; S126 rev 59):
+#   case                 tcg4  kvm1  kvm2  kvm4
+#   posix-shell            40    20    20    20
+#   posix-util-system      35    25    25    25
+#   libc-threads          170    30    30    30
+#   smp-libc-concurrency   70    30    30    30
+#   posix-fs-smp          140    40    40    40
 #
 # Cases (base name -> qtest case):
 #   tcg4  <case>            KVM1  <case>-kvm1
@@ -37,7 +45,7 @@
 #   host-state-before.txt    host state before the first sample (--no-preflight)
 #   host-state-after.txt     host state after the last sample
 #   libc-pack.log            sysroot/libc build log
-#   results.tsv              mode/case/qtest_case/rc/result/duration_ms/log
+#   results.tsv              mode/case/qtest_case/rc/result/duration_ms/log/cell_cap_s/cell_timeout
 #   summary.txt              commit, host, per-mode and overall min/p50/p90/max
 #   <mode>/<qtest>.json      qtest JSON for that cell
 #   <mode>/<qtest>.log       serial log for that cell
@@ -62,7 +70,7 @@ PREFLIGHT=1
 OUT=build/smp-closeout/$(date -u +%Y%m%dT%H%M%SZ)
 MAX_LOAD=
 WAIT_IDLE=0
-CELL_TIMEOUT=300
+CELL_TIMEOUT=
 
 usage() {
     sed -n '6,45p' "$0" | sed 's/^# \{0,1\}//'
@@ -93,6 +101,25 @@ add_modes() {
         MODES="${MODES}${MODES:+ }$requested"
     done
     IFS=$old_ifs
+}
+
+# Per-cell wall-clock caps in seconds. S126 rev 59: expected runtime plus a proportional margin
+# measured from the round-3 runs. There is no blanket default; a missing entry needs an explicit
+# single-cell --cell-timeout.
+cell_cap() {
+    case "$1:$2" in
+        tcg4:posix-shell) printf '40' ;;
+        tcg4:posix-util-system) printf '35' ;;
+        tcg4:libc-threads) printf '170' ;;
+        tcg4:smp-libc-concurrency) printf '70' ;;
+        tcg4:posix-fs-smp) printf '140' ;;
+        kvm1:posix-shell | kvm2:posix-shell | kvm4:posix-shell) printf '20' ;;
+        kvm1:posix-util-system | kvm2:posix-util-system | kvm4:posix-util-system) printf '25' ;;
+        kvm1:libc-threads | kvm2:libc-threads | kvm4:libc-threads) printf '30' ;;
+        kvm1:smp-libc-concurrency | kvm2:smp-libc-concurrency | kvm4:smp-libc-concurrency) printf '30' ;;
+        kvm1:posix-fs-smp | kvm2:posix-fs-smp | kvm4:posix-fs-smp) printf '40' ;;
+        *) printf '' ;;
+    esac
 }
 
 while [ "$#" -gt 0 ]; do
@@ -149,8 +176,9 @@ done
 
 [ -n "$CASES" ] || CASES=$DEFAULT_CASES
 case $CELL_TIMEOUT in
-    '' | *[!0-9]*)
-        echo "smp-closeout: --cell-timeout must be a non-negative integer" >&2
+    '') ;;
+    0 | *[!0-9]*)
+        echo "smp-closeout: --cell-timeout must be a positive integer" >&2
         exit 2
         ;;
 esac
@@ -172,6 +200,7 @@ for case_name in $CASES; do
 done
 
 # Validate every requested cell before the preflight, so a typo is not reported as a busy host.
+selected_cells=0
 for mode in $MODES; do
     for case_name in $CASES; do
         if [ "$mode" = tcg4 ]; then
@@ -183,8 +212,20 @@ for mode in $MODES; do
             echo "smp-closeout: missing case tests/qtest/cases/$qtest_case.toml" >&2
             exit 2
         fi
+        selected_cells=$((selected_cells + 1))
+        if [ -z "$CELL_TIMEOUT" ]; then
+            cap=$(cell_cap "$mode" "$case_name")
+            if [ -z "$cap" ]; then
+                echo "smp-closeout: no cap table entry for mode=$mode case=$case_name; use --cell-timeout N for a single-cell run" >&2
+                exit 2
+            fi
+        fi
     done
 done
+if [ -n "$CELL_TIMEOUT" ] && [ "$selected_cells" -ne 1 ]; then
+    echo "smp-closeout: --cell-timeout overrides one cell; this invocation selects $selected_cells" >&2
+    exit 2
+fi
 
 mkdir -p "$OUT" || exit 2
 
@@ -226,7 +267,7 @@ if ! cargo xtask libc-pack --arch x86_64 > "$OUT/libc-pack.log" 2>&1; then
     exit 2
 fi
 
-printf 'mode\tcase\tqtest_case\trc\tresult\tduration_ms\tlog\tcell_timeout\n' > "$OUT/results.tsv"
+printf 'mode\tcase\tqtest_case\trc\tresult\tduration_ms\tlog\tcell_cap_s\tcell_timeout\n' > "$OUT/results.tsv"
 printf 'mode\tqtest_case\tload1\tqemu\tutc\n' > "$OUT/host-per-cell.tsv"
 
 # One telemetry row: UTC, load1, and the count of QEMU, xtask, cargo and rustc processes.
@@ -255,6 +296,12 @@ run_cell() {
     directory=$OUT/$mode
     mkdir -p "$directory" || return 2
 
+    if [ -n "$CELL_TIMEOUT" ]; then
+        cell_cap_s=$CELL_TIMEOUT
+    else
+        cell_cap_s=$(cell_cap "$mode" "$case_name")
+    fi
+
     printf '%s\t%s\t%s\t%s\t%s\n' \
         "$mode" "$qtest_case" \
         "$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo unknown)" \
@@ -281,48 +328,39 @@ run_cell() {
     rm -f "$cap_flag" "$cap_stop" "$cap_log"
 
     # Per-cell cap: kill only this cell's QEMU, so the harness sees the exit and still writes its
-    # serial log/JSON. If the harness does not exit, the hard timeout below kills it at cap+30 s.
-    if [ "$CELL_TIMEOUT" -gt 0 ]; then
-        (
-            slept=0
-            while [ "$slept" -lt "$CELL_TIMEOUT" ]; do
-                [ -e "$cap_stop" ] && exit 0
-                sleep 5
-                slept=$((slept + 5))
-            done
+    # serial log/JSON. If the harness does not exit, the hard timeout below kills it at cap+5 s.
+    (
+        slept=0
+        while [ "$slept" -lt "$cell_cap_s" ]; do
             [ -e "$cap_stop" ] && exit 0
-            pids=$(pgrep -f "file=build/qtest/$qtest_case.img" 2>/dev/null || true)
-            if [ -n "$pids" ]; then
-                : > "$cap_flag"
-                {
-                    printf 'smp-closeout: cell cap %ss reached for %s\n' "$CELL_TIMEOUT" "$qtest_case"
-                    printf 'terminating QEMU pids: %s\n' "$pids"
-                } >> "$cap_log"
-                # Word splitting is intended: one TERM per QEMU pid of this cell.
-                kill -TERM $pids 2>/dev/null || true
-            fi
-        ) &
-        cap_pid=$!
-    fi
+            sleep 1
+            slept=$((slept + 1))
+        done
+        [ -e "$cap_stop" ] && exit 0
+        pids=$(pgrep -f "file=build/qtest/$qtest_case.img" 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            : > "$cap_flag"
+            {
+                printf 'smp-closeout: cell cap %ss reached for %s\n' "$cell_cap_s" "$qtest_case"
+                printf 'terminating QEMU pids: %s\n' "$pids"
+            } >> "$cap_log"
+            # Word splitting is intended: one TERM per QEMU pid of this cell.
+            kill -TERM $pids 2>/dev/null || true
+        fi
+    ) &
+    cap_pid=$!
 
     start_ns=$(date +%s%N)
-    if [ "$CELL_TIMEOUT" -gt 0 ]; then
-        timeout --kill-after=10 "$((CELL_TIMEOUT + 30))s" \
-            cargo xtask qtest --case "$qtest_case" --arch x86_64 \
-            > "$directory/$qtest_case.out" 2>&1
-    else
+    timeout --kill-after=5 "$((cell_cap_s + 5))s" \
         cargo xtask qtest --case "$qtest_case" --arch x86_64 \
-            > "$directory/$qtest_case.out" 2>&1
-    fi
+        > "$directory/$qtest_case.out" 2>&1
     rc=$?
     end_ns=$(date +%s%N)
     wall_ms=$(( (end_ns - start_ns) / 1000000 ))
 
-    if [ "$CELL_TIMEOUT" -gt 0 ]; then
-        : > "$cap_stop"
-        kill "$cap_pid" 2>/dev/null || true
-        wait "$cap_pid" 2>/dev/null || true
-    fi
+    : > "$cap_stop"
+    kill "$cap_pid" 2>/dev/null || true
+    wait "$cap_pid" 2>/dev/null || true
 
     kill "$sampler" 2>/dev/null || true
     wait "$sampler" 2>/dev/null || true
@@ -349,9 +387,9 @@ run_cell() {
         result=timeout
     fi
 
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$mode" "$case_name" "$qtest_case" "$rc" "$result" "$duration_ms" \
-        "$directory/$qtest_case.log" "$cell_timeout" >> "$OUT/results.tsv"
+        "$directory/$qtest_case.log" "$cell_cap_s" "$cell_timeout" >> "$OUT/results.tsv"
 
     if [ "$rc" -ne 0 ]; then
         {
@@ -361,7 +399,7 @@ run_cell() {
             printf 'rc=%s\n' "$rc"
             printf 'result=%s\n' "$result"
             printf 'cell_timeout=%s\n' "$cell_timeout"
-            printf 'cell_timeout_s=%s\n' "$CELL_TIMEOUT"
+            printf 'cell_cap_s=%s\n' "$cell_cap_s"
             printf 'log=%s\n' "$directory/$qtest_case.log"
             printf 'json=%s\n' "$directory/$qtest_case.json"
             printf 'out=%s\n' "$directory/$qtest_case.out"
@@ -428,7 +466,7 @@ awk -F'\t' 'NR > 1 && $4 == 0 { print $6 }' "$OUT/results.tsv" > "$OUT/durations
     printf 'preflight=%s\n' "$([ "$PREFLIGHT" -eq 1 ] && echo exclusive || echo skipped)"
     printf 'max_load=%s\n' "${MAX_LOAD:-host-idle-default}"
     printf 'wait_for_idle=%s\n' "$WAIT_IDLE"
-    printf 'cell_timeout=%s\n' "$CELL_TIMEOUT"
+    printf 'cell_timeout_override=%s\n' "${CELL_TIMEOUT:-per-case-table}"
     printf 'quick=%s\n' "$QUICK"
     printf 'cells=%d\n' "$cells"
     printf 'modes=%s\n' "$MODES"

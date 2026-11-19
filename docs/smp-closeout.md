@@ -4,9 +4,9 @@
 # SMP close-out matrix runner
 
 Date: 2026-11-18. Ticket: S126 (Otto). Depends: S116, S125, S85e.
-Status: runner delivered with a per-cell cap; TCG4 10/10 and the TCG4 close-out 5/5 and KVM1 5/5
-are preserved evidence. KVM2 `posix-shell` is a console/rsh stall under S135 (FAIL), KVM4 was not
-run; no partial column is claimed.
+Status: runner delivered with a **per-cell cap table** (no blanket default); TCG4 10/10, the TCG4
+close-out 5/5 and KVM1 5/5 are preserved evidence. KVM2 `posix-shell` is a console/rsh stall under
+S135 (FAIL), KVM4 was not run; no partial column is claimed.
 
 ## Why
 
@@ -37,7 +37,7 @@ uses the harness's fixed `-smp 4`.
 sh scripts/smp-closeout.sh                 # exclusive: preflight, then 20 cells
 sh scripts/smp-closeout.sh --max-load 15 --wait-for-idle 1800   # close-out window
 sh scripts/smp-closeout.sh --mode tcg4 --max-load 15 --wait-for-idle 600   # one column
-sh scripts/smp-closeout.sh --quick --no-preflight --case posix-alarm   # smoke, 1 cell
+sh scripts/smp-closeout.sh --quick --no-preflight --case posix-alarm --cell-timeout 20   # smoke, 1 cell
 sh scripts/smp-closeout.sh --case posix-shell,posix-fs-smp             # subset, all modes
 sh scripts/smp-closeout.sh --out /tmp/opencode/s126                    # explicit output root
 ```
@@ -50,7 +50,7 @@ sh scripts/smp-closeout.sh --out /tmp/opencode/s126                    # explici
 | `--no-preflight` | skip `host-idle.sh`; records the host state but does not gate; smoke only |
 | `--max-load LOAD` | preflight maximum 1-minute load average; unset uses the `host-idle.sh` default |
 | `--wait-for-idle S` | poll the preflight in the foreground for up to S seconds (default 0: refuse) |
-| `--cell-timeout S` | per-cell wall-clock cap (default 300 s; 0 disables); a capped cell is a bounded timeout failure |
+| `--cell-timeout S` | cap override for a **single-cell** invocation (e.g., a smoke); the table below applies otherwise |
 | `--out DIR` | output root; default `build/smp-closeout/<UTC>` |
 | `-h`, `--help` | usage |
 
@@ -67,12 +67,14 @@ invocation (including a missing case file) — zero samples.
   waits forever (the timeout is explicit).
 - **Pinned libc.** `cargo xtask libc-pack --arch x86_64` runs once before the first cell, so the
   matrix cannot silently use a stale `libc.a` (the S119 lesson).
-- **Per-cell cap.** `--cell-timeout S` (default 300 s) starts a watchdog for the cell. On expiry
-  it kills only that cell's QEMU (matched by `file=build/qtest/<case>.img`), so the qtest harness
-  still exits normally and writes its serial log/JSON; a hard `timeout` kills the harness itself
-  at cap+30 s if it does not. The cell is then recorded as `result=timeout`, `cell_timeout=1`,
-  the last 20 serial lines are printed, and the run stops. This bounds a console stall without
-  changing the case or its assertions. `0` disables the cap.
+- **Per-cell cap.** Every matrix cell has an entry in the table below (expected runtime plus a
+  proportional margin); there is no blanket default. A 1 s-tick watchdog kills only that cell's
+  QEMU (matched by `file=build/qtest/<case>.img`), so the qtest harness still exits normally and
+  writes its serial log/JSON; a hard `timeout` kills the harness at cap+5 s if it does not. A
+  cell over its cap is recorded as `result=timeout`, `cell_timeout=1`, the last 20 serial lines
+  are printed, and the run stops. `--cell-timeout S` may override one cell only (a single-cell
+  invocation); any other use is rejected. This bounds a console stall without changing the case
+  or its assertions.
 - **Stop on the first failure.** The runner writes `FAILED` (mode, case, rc, artifact paths,
   `cell_timeout`), prints the last 20 lines of the qtest stdout and serial log, and exits 1.
   Remaining cells are not run and no cell is retried.
@@ -253,6 +255,8 @@ cells prove S132 is fixed (TCG4 48.0 s, KVM1 13.7 s).
 
 ## Rework round 4 (rev 58): per-cell cap
 
+*(Superseded by rev 59's per-cell table; kept as history.)*
+
 Round 3's KVM2 `posix-shell` cell stalled 379 s while the runner waited on the qtest case timeout
 (1800 s). The runner now bounds every cell; the case and its assertions are unchanged.
 
@@ -300,6 +304,41 @@ names the killed fake QEMU pid. No QEMU was started by this test.
 | KVM2 rest / KVM4 | not run (stop rule); no partial column |
 
 `make check-fast` (host clear: qemu=0 xtask=0 cargo=0 rustc=0): `check-fast: PASSED`.
+
+## Per-cell cap table (rev 59)
+
+Caps are seconds: expected runtime + a proportional margin, from the round-3 measurements. There
+is no blanket default. A cell over its cap is FAILED/TIMEOUT with the last 20 serial lines; it is
+never retried.
+
+| Case | TCG4 | KVM1 | KVM2 | KVM4 | Measured (TCG4) |
+|---|---:|---:|---:|---:|---|
+| `posix-shell` | 40 | 20 | 20 | 20 | 24.7 s (KVM 8.3-15 s) |
+| `posix-util-system` | 35 | 25 | 25 | 25 | 22.1 s (KVM 12.5-20 s) |
+| `libc-threads` | 170 | 30 | 30 | 30 | 135.3 s (KVM 13.4-20 s) |
+| `smp-libc-concurrency` | 70 | 30 | 30 | 30 | 48.0 s (KVM 13.7-20 s) |
+| `posix-fs-smp` | 140 | 40 | 40 | 40 | 111.3 s (KVM 23.7-30 s) |
+
+`--cell-timeout S` overrides the cap for a single-cell invocation only; a multi-cell selection
+with an override is rejected, and a case with no table entry (e.g., a custom smoke) requires the
+override. The watchdog ticks every second and kills only the cell's QEMU; the hard `timeout` is
+cap+5 s.
+
+## Rework round 5 (rev 59): proportional caps
+
+- Replaced the blanket 300 s default with the 20-cell table above; the watchdog ticks at 1 s and
+  the hard harness cap is **cap+5 s**, not cap+30 s.
+- Negative shell tests (no QEMU): `--quick --no-preflight --case posix-alarm` (no table entry, no
+  override) exits 2 with "no cap table entry ... use --cell-timeout N for a single-cell run";
+  `--quick --no-preflight --cell-timeout 2` (5 cells) exits 2 with "overrides one cell; this
+  invocation selects 5".
+- Cap shell test with the fake cargo (no QEMU): `--case posix-alarm --cell-timeout 2` exits 1
+  with `result=timeout`, `cell_cap_s=2`, `cell_timeout=1`, serial lines 11-30 printed, `FAILED`
+  preserved.
+- Preserved evidence is unchanged: TCG4 10/10, TCG4 close-out 5/5, KVM1 5/5; KVM2 `posix-shell`
+  FAIL (S135 console/rsh), KVM4 not run. No close-out claim.
+- Session caps are proportional: `timeout 150 make check-fast` (measured ~80 s) and
+  `timeout 30 git commit/push`.
 
 ## When the full matrix runs
 
