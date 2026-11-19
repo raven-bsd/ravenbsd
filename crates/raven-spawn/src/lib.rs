@@ -59,6 +59,51 @@ pub struct SpawnOptions<'a> {
     pub env: &'a [&'a str],
 }
 
+/// K168 temporary: monotonic nanoseconds for spawn stage tracing.
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
+pub fn now_ns() -> u64 {
+    let mut timespec = raven_abi::types::Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: CLOCK_GET writes one Timespec into the valid pointer.
+    let _ = unsafe {
+        crate::sys::syscall2(
+            Syscall::CLOCK_GET as usize,
+            raven_abi::types::clock::MONOTONIC as usize,
+            &mut timespec as *mut raven_abi::types::Timespec as usize,
+        )
+    };
+    (timespec.tv_sec as u64)
+        .saturating_mul(1_000_000_000)
+        .saturating_add(timespec.tv_nsec as u64)
+}
+
+/// K168 temporary: write one stage delta to the kernel debug sink.
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
+pub fn trace_mark(label: &str, since: u64) {
+    use alloc_crate::format;
+    let text = format!("K168 {label} {}\n", now_ns().saturating_sub(since));
+    // SAFETY: DEBUG_WRITE reads the formatted buffer.
+    let _ = unsafe {
+        crate::sys::syscall2(
+            Syscall::DEBUG_WRITE as usize,
+            text.as_ptr() as usize,
+            text.len(),
+        )
+    };
+}
+
+/// K168 temporary: host stub for the stage clock.
+#[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
+pub fn now_ns() -> u64 {
+    0
+}
+
+/// K168 temporary: host stub for the stage tracer.
+#[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
+pub fn trace_mark(_label: &str, _since: u64) {}
+
 /// Largest executable image accepted from a `file:` server.
 ///
 /// Userland binaries are a few MiB even in a debug build; the bound keeps a hostile or corrupt
@@ -638,6 +683,7 @@ fn spawn_elf<S: Sys>(
     exec: Option<(Handle, bool)>,
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
+    let t0 = now_ns();
     let (main_map, main_object) = prepare_source(main_source, sys)?;
     let mut interp_map: Option<(Elf<'_>, BiasedPlan, MapSource, u64, Option<Handle>)> = None;
     if let Some((elf, steps, source, bias)) = interp {
@@ -877,8 +923,10 @@ fn spawn_elf<S: Sys>(
         let _ = sys.handle_close(child);
         return Err(SpawnError::Sys(error));
     }
+    trace_mark("maps", t0);
     match sys.thread_create(child, entry_address, sp0, sp0) {
         Ok(thread) => {
+            trace_mark("thread", t0);
             // The child keeps running; the caller only needs the process handle. Closing the
             // thread handle here ends the leak without unwinding a started child on failure.
             let _ = sys.handle_close(thread);
