@@ -146,6 +146,21 @@ impl Args {
         }
         if terminated { matched } else { None }
     }
+
+    /// Return the string named by auxv key `key`, if the pointer is non-null and valid UTF-8.
+    ///
+    /// The loader writes the `AT_RAVEN_*` strings onto the initial stack, so the returned
+    /// slice lives for the whole process.
+    pub fn aux_string(&self, key: usize) -> Option<&'static str> {
+        let pointer = self.auxv(key)?;
+        if pointer == 0 {
+            return None;
+        }
+        // SAFETY: an auxv string value names a NUL-terminated C8 string on the process stack,
+        // which `parse_stack` proved readable; `c_string` bounds the scan.
+        let bytes = unsafe { c_string(pointer as *const usize) }?;
+        core::str::from_utf8(bytes).ok()
+    }
 }
 
 /// Parse the C8 stack at `sp0`.
@@ -296,6 +311,25 @@ mod tests {
         assert_eq!(args.len(), 0);
         assert_eq!(args.get(0), None);
         assert_eq!(args.iter().count(), 0);
+    }
+
+    #[test]
+    fn aux_string_reads_a_loader_string() {
+        let mut stack = Stack::new();
+        let text = stack.string(b"/bin\0");
+        stack.word(0);
+        stack.word(0);
+        stack.word(0);
+        stack.word(crate::spawn_attrs::AT_RAVEN_CWD);
+        stack.word(text);
+        stack.word(0);
+        stack.word(0);
+        let args = stack.parse();
+        assert_eq!(
+            args.aux_string(crate::spawn_attrs::AT_RAVEN_CWD),
+            Some("/bin")
+        );
+        assert_eq!(args.aux_string(crate::spawn_attrs::AT_RAVEN_ABI), None);
     }
 
     #[test]
