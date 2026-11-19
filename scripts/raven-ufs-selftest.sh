@@ -135,11 +135,14 @@ host_gid=$(stat -c '%g' "$work/tree/etc/motd")
     /opt/update/opt/app/bin/motd | grep -qx 'selftest motd' ||
     fail "synced symlink does not resolve"
 "$inject" --offset "$ufs_off" --size "$ufs_len" "$work/pi4.img" stat \
-    /opt/update/etc/motd | grep -q "uid=$host_uid gid=$host_gid" ||
-    fail "sync did not preserve uid/gid"
+    /opt/update/etc/motd | grep -q "mode=0o640 uid=$host_uid gid=$host_gid" ||
+    fail "sync did not preserve mode/uid/gid"
 "$inject" --offset "$ufs_off" --size "$ufs_len" "$work/pi4.img" stat \
     /opt/update/etc/motd | grep -q 'mtime=1700000123' ||
     fail "sync did not preserve mtime"
+"$inject" --offset "$ufs_off" --size "$ufs_len" "$work/pi4.img" stat \
+    /opt/update/opt/app/bin/tool | grep -q 'mode=0o750' ||
+    fail "sync did not preserve the executable mode"
 "$inject" --offset "$ufs_off" --size "$ufs_len" "$work/pi4.img" stat \
     --no-follow /opt/update/opt/app/bin/motd | grep -q '^symlink ' ||
     fail "sync did not preserve the symlink"
