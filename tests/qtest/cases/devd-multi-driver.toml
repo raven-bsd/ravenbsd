@@ -113,8 +113,18 @@ delay_ms = 100
 wait = '^umount-ok$'
 timeout_secs = 30
 
+# A background job that writes to the controlling tty can be stopped by job control
+# (TOSTOP); redirect netd's console output and print it back from the shell.
 [[step]]
-send = "/sbin/netd netd nic &\n"
+send = "/sbin/netd netd nic > /tmp/netd.log 2>&1 &\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "sleep 3; cat /tmp/netd.log\n"
 delay_ms = 100
 
 [[step]]
