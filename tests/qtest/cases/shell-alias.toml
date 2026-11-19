@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K183: interactive listing aliases and the shipped ed editor. The release login is the real
-# interactive brush console: it asserts both aliases, runs them, edits a file with ed (append,
-# write, quit) and reads it back. The same login proves that `brush -c` does not inherit the
-# aliases. The release profile keeps the K177 plain `raven# ` marker, so the transcript stays
-# free of ANSI and Unicode.
+# K183: interactive listing aliases. The release login is the real interactive brush console:
+# it asserts both aliases and runs them. The same login proves that `brush -c` does not inherit
+# them. The release profile keeps the K177 plain `raven# ` marker, so the transcript stays free
+# of ANSI and Unicode. The shipped `ed` console/stdin I/O is K186 and is not part of this case.
 
 name = "shell-alias"
 arch = "x86_64"
@@ -32,9 +31,6 @@ regex = '^alpha\.txt.*sub/$'
 
 [[expect]]
 regex = '^-rw.*alpha\.txt$'
-
-[[expect]]
-regex = '^raven ed works$'
 
 [[expect]]
 regex = '^alias: l: not found$'
@@ -116,32 +112,6 @@ delay_ms = 100
 
 [[step]]
 wait = '^-rw.*alpha\.txt$'
-timeout_secs = 15
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 15
-
-# Run ed from a non-interactive brush: brush -c does not read standard input while the child
-# runs, so ed is the only console reader. This keeps the same release root and /bin/ed.
-[[step]]
-send = "/bin/brush -c '/bin/ed'\n"
-delay_ms = 800
-
-[[step]]
-send = "a\nraven ed works\n.\nw /tmp/raven-ed.txt\nq\n"
-delay_ms = 500
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 30
-
-[[step]]
-send = "cat /tmp/raven-ed.txt\n"
-delay_ms = 100
-
-[[step]]
-wait = '^raven ed works$'
 timeout_secs = 15
 
 [[step]]

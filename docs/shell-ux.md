@@ -1,15 +1,14 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# Shell UX: listing aliases and the ed workflow (K183)
+# Shell UX: listing aliases (K183)
 
-Status: the aliases are OBSERVED on the release login. The `ed` smoke path is BLOCKED: the
-current `ed` target wrapper reads the raw `DEBUG_READ` ring, while release console input is
-owned by `consd`, so the editor never receives the script (see K183 report).
+Status: OBSERVED on the release login. `ed` is shipped, but its console/stdin I/O is K186 and
+is not part of K183.
 
 ## Listing aliases
 
-`etc/brush/brushrc` defines two aliases when the shell is interactive:
+`etc/profile` defines two aliases when the shell is interactive:
 
 ```sh
 alias l='ls -CF'
@@ -19,8 +18,8 @@ alias ll='ls -lah'
 `l` gives the compact classified listing (`/` for directories, `*` for executables); `ll` gives
 the long listing with hidden files and human-readable sizes.
 
-The aliases exist only in interactive brush sessions. Non-interactive `brush -c` never loads
-`/etc/brush/brushrc`, and the rc also guards on `$-`:
+The aliases exist only in interactive brush login sessions. Non-interactive `brush -c` does not
+read `/etc/profile`, and the block also guards on `$-`:
 
 ```text
 $ brush -c 'alias l; echo no=$?'
@@ -35,39 +34,13 @@ The K177 bobtheshell prompt is unchanged by this ticket. `RAVEN_PROMPT=plain`, `
 
 ## ed
 
-`ed` is the 0.1.0 text editor. It is the POSIX line editor from `userland/bin/ed`, built into
-`/bin/ed` for the shell images. A full-screen editor (`vi`, `nano`, `emacs`) is **not** in this
-ticket and not in 0.1.0.
+`ed` is the 0.1.0 text editor. It is the POSIX line editor from `userland/bin/ed`, already
+shipped in the tree. A full-screen editor (`vi`, `nano`, `emacs`) is **not** in this ticket and
+not in 0.1.0.
 
-**Known blocker (K183).** The target wrapper collects commands with `raven_rt::debug_read`, the
-raw serial ring. In the release/shell images `consd` owns that ring and serves the login console,
-so the editor sees no input, idles out and exits; the queued script then reaches the shell as
-commands. Making `ed` read the inherited console/stdin handle (or a `-c script` file) is a
-separate editor integration change outside K183's Owns; the commands below are the intended
-workflow and the shape of the `shell-alias` case, not a passing gate yet.
-
-Once that I/O is fixed, `ed` reads a newline-separated script and executes it after one idle
-second. Append, write and quit:
-
-```text
-$ ed
-a
-raven ed works
-.
-w /tmp/raven-ed.txt
-q
-```
-
-After the idle pause the editor writes the file and returns to the shell:
-
-```text
-$ cat /tmp/raven-ed.txt
-raven ed works
-```
-
-The `qtest` case `tests/qtest/cases/shell-alias.toml` runs these commands and asserts the file
-content, so a missing alias or a broken `ed` write fails the gate. It currently fails at the
-`ed` step for the reason above; the alias and `l`/`ll` steps pass.
+K183 does not change or prove `ed`. The editor's console/stdin I/O is owned by **K186**; until
+that lands, this ticket makes no claim that an interactive `ed` session works from the release
+shell. The `shell-alias` qtest covers the aliases only.
 
 ## Scope
 
@@ -78,5 +51,5 @@ coloured `--help` or second editor binary is part of K183.
 
 | Topic | Illumos finding | BSD file/licence | Linux finding | Decision |
 |---|---|---|---|---|
-| interactive short aliases | user/site shell configuration; no system-wide `l`/`ll` requirement | NetBSD `etc/profile` (BSD-3-Clause) sets environment only, no aliases | distro `/etc/profile.d` aliases are user convenience, not shell semantics | first-principles two-line alias block in `etc/brush/brushrc`; no donor code copied |
-| line-editor smoke path | `ed` is the historical line editor | NetBSD `bin/ed` (BSD-3-Clause) is the behavioural reference; the Rust editor already exists from P4t | GNU ed is reference only | use the shipped first-party `/bin/ed`; K183 only retries console interrupts, no editor code copied |
+| interactive short aliases | user/site shell configuration; no system-wide `l`/`ll` requirement | NetBSD `etc/profile` (BSD-3-Clause) sets environment only, no aliases | distro `/etc/profile.d` aliases are user convenience, not shell semantics | first-principles two-line alias block in `etc/profile`; no donor code copied |
+| line-editor smoke path | `ed` is the historical line editor | NetBSD `bin/ed` (BSD-3-Clause) is the behavioural reference; the Rust editor already exists from P4t | GNU ed is reference only | not part of K183; the shipped editor's console/stdin I/O is K186 |
