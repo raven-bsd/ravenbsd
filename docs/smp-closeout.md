@@ -4,9 +4,11 @@
 # SMP close-out matrix runner
 
 Date: 2026-11-18. Ticket: S126 (Otto). Depends: S116, S125, S85e.
-Status: runner delivered with a **per-cell cap table** (no blanket default); TCG4 10/10, the TCG4
-close-out 5/5 and KVM1 5/5 are preserved evidence. KVM2 `posix-shell` is a console/rsh stall under
-S135 (FAIL), KVM4 was not run; no partial column is claimed.
+Status: runner delivered with a **per-cell cap table** (no blanket default). The round-6 full
+closeout attempt stopped at cell 1: its 40 s cap expired during the cold `cargo xtask build brush`
+pre-step (no QEMU ran), so the matrix is **not run** at this commit. TCG4 10/10, TCG4 close-out
+5/5 and KVM1 5/5 from `8af9dd93` remain the preserved evidence; KVM2 `posix-shell` was the S135
+console/rsh stall, now merged but not yet re-exercised by the closeout.
 
 ## Why
 
@@ -339,6 +341,29 @@ cap+5 s.
   FAIL (S135 console/rsh), KVM4 not run. No close-out claim.
 - Session caps are proportional: `timeout 150 make check-fast` (measured ~80 s) and
   `timeout 30 git commit/push`.
+
+## Rework round 6 (rev 60): full closeout attempt
+
+Merged `origin/master` `d79d7679` (S135 `d15e4793`, COM1 timer-tick drain; KVM2 posix-shell
+30/30 per S135). Clean tree, host clear (`load1 1.02`, qemu/xtask/cargo/rustc 0). Command:
+
+```
+timeout 900 sh scripts/smp-closeout.sh --max-load 5 --wait-for-idle 300
+```
+
+- Exclusive preflight: **PASS** (`host-idle: PASS load=1.02 max_load=5`).
+- Cell 1, TCG4 `posix-shell`: the **40 s cap expired during the case's pre-step**
+  (`cargo xtask build brush`), not during a QEMU run. The 5 s telemetry shows
+  `xtask=2 cargo=3 rustc=1`, `qemu=0` for the whole cell; no harness JSON/log was written (the
+  hard cap killed the harness at cap+5 s). `FAILED`: `result=timeout`, `cell_timeout=1`,
+  `cell_cap_s=40`.
+- The runner stopped on the first failure; no further cells ran. No image hash exists because no
+  QEMU/image build completed. The S135 KVM2 fix is therefore **not exercised** by this attempt.
+- Per the rule, a cap expiry is a failure, not a reason to raise the cap; there was no retry.
+  The caps are end-to-end (build + run) and assume a warm build; this was a cold build after the
+  merge.
+
+The matrix remains **not run**; no close-out claim.
 
 ## When the full matrix runs
 
