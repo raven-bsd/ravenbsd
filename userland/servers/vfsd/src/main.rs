@@ -26,6 +26,7 @@ extern crate alloc;
 mod trace;
 
 mod chunk;
+mod pivot;
 
 #[cfg(target_os = "none")]
 mod program {
@@ -1105,16 +1106,20 @@ mod program {
                     let path = normalized(&path)?;
                     let scheme = bytes_to_string(scheme)?;
                     let before = self.mount_generation;
-                    let result = self.table.mount(&path, &scheme);
-                    if self.trace {
-                        println!(
-                            "vfsd-trace: mount path={path} scheme={scheme} gen={before} result={}",
-                            result.is_ok()
-                        );
+                    if path == "/" {
+                        // K176: a mount at `/` is the live root pivot. Open files keep their
+                        // targets; the replacement table keeps /dev, /tmp and every other
+                        // non-root mount.
+                        let replacement = crate::pivot::pivot_root(&self.table, &scheme)?;
+                        self.table = replacement;
+                    } else {
+                        self.table.mount(&path, &scheme)?;
                     }
-                    result?;
                     self.bump_mounts();
                     if self.trace {
+                        println!(
+                            "vfsd-trace: mount path={path} scheme={scheme} gen={before} result=true"
+                        );
                         println!("vfsd-trace: mount-bump gen={}", self.mount_generation);
                     }
                     status(response, Ok(()))
