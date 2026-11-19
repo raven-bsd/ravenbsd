@@ -52,4 +52,20 @@ if grep -Eq '^src = "build/(brush|x86_64/uutils)' $fragments; then
     exit 1
 fi
 
+# The K169 acceptance is the actual raven-elf Strict planner, not readelf arithmetic.
+echo "pi4-brush-stage: Strict planner aarch64"
+timeout 30 cargo run -q -p xtask -- build brush --arch aarch64 --check || {
+    echo "pi4-brush-stage: aarch64 brush fails the Strict load planner" >&2
+    exit 1
+}
+
+# The x86_64 control is checked when it is staged (the K169 acceptance builds it).
+if [ -f build/x86_64/brush ]; then
+    echo "pi4-brush-stage: Strict planner x86_64 control"
+    timeout 30 cargo run -q -p xtask -- build brush --arch x86_64 --check || {
+        echo "pi4-brush-stage: x86_64 control fails the Strict load planner" >&2
+        exit 1
+    }
+fi
+
 echo "pi4-brush-stage: PASS ($count aarch64 files)"
