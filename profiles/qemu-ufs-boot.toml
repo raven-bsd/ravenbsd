@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Bootstrap initfs for the QEMU UFS-root image (K176). It stages the scheme servers,
+# the K179 multi-function storage/network driver stack, blockd/fsd-ufs/vfsd and the
+# `/etc/raven/root-mode` pivot marker. The release userland lives on the UFS root
+# built from the qemu-ufs profile.
+
+name = "qemu-ufs-boot"
+extends = "base"
+
+[initfs]
+release = true
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

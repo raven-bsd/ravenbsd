@@ -124,7 +124,23 @@ pub fn spawn(
         inner: raven_spawn::RtSys,
         command: command_name(path, options),
     };
-    raven_spawn::spawn_with(initfs, path, options, &mut sys)
+    match raven_spawn::spawn_with(initfs, path, options, &mut sys) {
+        Err(raven_spawn::SpawnError::NotFound) => {
+            // K176: after a root pivot the service executables (login, the shell and
+            // their children) live on the mounted root, not in the bootstrap initfs.
+            // Fall back to the file server for paths the initfs does not carry.
+            #[cfg(feature = "alloc")]
+            {
+                let image = read_file_image(path)?;
+                raven_spawn::spawn_image_with(&image, path, options, &mut sys)
+            }
+            #[cfg(not(feature = "alloc"))]
+            {
+                Err(raven_spawn::SpawnError::NotFound)
+            }
+        }
+        other => other,
+    }
 }
 
 #[cfg(feature = "alloc")]

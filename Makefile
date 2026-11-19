@@ -27,7 +27,7 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest
+	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs
 
 help:
 	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
@@ -99,6 +99,10 @@ release:
 
 image:
 	@$(XTASK) image --arch $(ARCH) --platform $(PLATFORM) --profile $(PROFILE)
+
+# K176: QEMU UFS-root preflight (ESP bootstrap + a real UFS2 root disk).
+qemu-ufs:
+	@sh scripts/qemu-ufs.sh
 
 run:
 	@$(XTASK) run --arch $(ARCH) --profile $(PROFILE)
