@@ -197,7 +197,7 @@ run_one() {
     fi
     status=$?
     load_after=$(cut -d' ' -f1 /proc/loadavg)
-    cpu_line=$(grep -aE '^smp: 4 cpus online$' "$raw" | tail -n 1 || true)
+    cpu_line=$(grep -aE 'smp: 4 cpus online' "$raw" | tail -n 1 || true)
     mem_mib=$(sed -n 's/^mem: \([0-9][0-9]*\) MiB usable.*/\1/p' "$raw" | head -n 1)
     forbidden=$(grep -aEi 'No child process|i/o error|ECHILD|panic|EXCEPTION|out of memory|oom-kill|killed by page fault' "$raw" | head -n 1 || true)
     if [ -z "$cpu_line" ] || [ -z "$mem_mib" ] || [ "$mem_mib" -lt 3000 ]; then
