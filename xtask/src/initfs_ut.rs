@@ -96,6 +96,10 @@ fn only_the_matching_arch_uutils_tree_is_detected() {
         uutils_source_name(Arch::X86_64, "build/x86_64/uutils/sub/ls"),
         None
     );
+    assert_eq!(
+        uutils_source_name(Arch::Aarch64, "build/{arch}/uutils/ls"),
+        Some("ls")
+    );
     assert_eq!(uutils_source_name(Arch::X86_64, "services/ls.toml"), None);
 }
 
@@ -257,7 +261,7 @@ fn brush_missing_checks_the_arch_path_not_the_legacy_source() {
 }
 
 #[test]
-fn source_path_maps_only_the_legacy_brush_source() {
+fn source_path_maps_the_arch_placeholder_and_legacy_brush() {
     let root = std::path::Path::new("/repo");
     assert_eq!(
         source_path(root, Arch::X86_64, "build/brush"),
@@ -270,6 +274,14 @@ fn source_path_maps_only_the_legacy_brush_source() {
     assert_eq!(
         source_path(root, Arch::X86_64, "build/x86_64/brush"),
         std::path::PathBuf::from("/repo/build/x86_64/brush")
+    );
+    assert_eq!(
+        source_path(root, Arch::Aarch64, "build/{arch}/uutils/ls"),
+        std::path::PathBuf::from("/repo/build/aarch64/uutils/ls")
+    );
+    assert_eq!(
+        source_path(root, Arch::X86_64, "build/{arch}/uutils/ls"),
+        std::path::PathBuf::from("/repo/build/x86_64/uutils/ls")
     );
     assert_eq!(
         source_path(root, Arch::X86_64, "tests/brush/bash-compat.sh"),
