@@ -45,7 +45,7 @@ impl InputBackend for MinimalInputBackend {
             #[cfg(feature = "vt")]
             if std::io::stdin().is_terminal() {
                 let mut backend = crate::VtInputBackend::default().with_basic_style();
-                return backend.read_line(shell_ref, prompt).await;
+                return Box::pin(backend.read_line(shell_ref, prompt)).await;
             }
 
             // Fallback: the console scheme is not a POSIX tty and std's stdin buffer

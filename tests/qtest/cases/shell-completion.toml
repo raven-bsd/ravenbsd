@@ -2,14 +2,13 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # K161: TAB completion in the release login. A unique prefix (`ec<TAB>`) must become `echo`, and
-# an ambiguous prefix (`c<TAB>`) must list the candidates. Skipped until the brush target build
-# and the RavenBSD interactive default are green; see the K161 report.
+# an ambiguous prefix (`c<TAB>`) must list the candidates. The release brush is the vt/basic editor
+# through the Minimal->Vt delegation (RavenBSD default); the qtest is green with that backend.
 
 name = "shell-completion"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 120
-skip = "K161: brush target build fails in vendored nix termios; the RavenBSD default backend is Minimal and TAB never reaches completion"
 pre = ["cargo xtask build brush --arch x86_64"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
