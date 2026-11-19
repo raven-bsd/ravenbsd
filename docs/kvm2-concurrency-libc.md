@@ -3,10 +3,10 @@
 
 # KVM2 `smp-libc-concurrency` start hang: libc audit
 
-Status: **static audit complete; QEMU reproduction is blocked on S137.** No kernel fix or handoff
-is claimed. The closeout cell at `d79d7679` timed out after `smp-libc-concurrency: start`; S136
-could not reproduce that stop from a clean image and then hit a separate qtest/QEMU lifecycle bug
-that S137 owns. S138 does not start QEMU until S137 is green.
+Status: **reproduced on `d379fdd0`, classified as a libc stdio lock-wait starvation, fixed and
+validated 30/30 on KVM2.** The closeout cell at `d79d7679` timed out after
+`smp-libc-concurrency: start`; S136 could not reproduce that stop from a clean image and then hit
+a separate qtest/QEMU lifecycle bug that S137 fixed at `d379fdd0`.
 
 ## Evidence
 
@@ -93,17 +93,57 @@ indistinguishable from an early stop in the serial log.
   stale back link above cannot direct an unlink at the wrong node.
 - **Conclusion:** no use-after-unmap or missed exit store found in the exit path.
 
-## Classification so far
+## Pre-reproduction classification
 
 The libc audit found one real list-invariant defect (fixed with host regressions) and no
-libc-internal lost wakeup. The start-only log can still be the `/tmp` vfsd request, a worker held
-in the descriptor backend, or the join death-confirmation loop waiting on a kernel clear-tid that
-never happens. Those are distinguishable only by a preserved hang: S137 green, then the bounded
-`timeout 30 ... --no-build` iterations in the S138 ticket.
+libc-internal lost wakeup. The start-only log could still have been the `/tmp` vfsd request, a
+worker held in the descriptor backend, or the join death-confirmation loop; the reproduction below
+ruled those out in favour of the stdio lock wait.
 
-If the preserved hang shows the main thread in `pthread_join` with `join_word != 0`, or a worker
-with no runnable state, the evidence goes to Stuart as a kernel scheduling/clear-tid handoff; no
-kernel edit is made here without that trace.
+## Reproduction and fix (`d379fdd0`)
+
+S137 is green at `d379fdd0`; this branch is based on it and the image was rebuilt with
+`libc-pack`, the fixture and the case image. The first bounded run hit the hang:
+
+```text
+run 01 exit 124 elapsed 30s
+smp-libc-concurrency: start
+```
+
+The guest log stops after the banner and `start` (preserved in the S138 report). A second
+diagnostic run used a temporary QMP socket so the still-running guest could be inspected.
+`info registers` showed:
+
+- CPU0: CPL=3, RIP `0x408d07` = `ShellEnv::wait` (the `mov/cmp/pause/jmp` spin), RSI `0x2144`
+  (the FILE lock word), RAX=RDX=`0x400065`/`0x40006c`, i.e. `MAYBE_WAITERS | worker_tid`.
+- CPU1: CPL=0, HLT=1, RIP `0xffffffff80341038` (idle); `info status` = running.
+- Repeated snapshots showed different waiter frames and different owner tids, so the FILE lock is
+  handed over; the guest is not in a hard deadlock, but the eight-thread workload does not finish
+  in 30 s.
+
+Classification: **libc stdio**. The shell's `Lock::wait` is a pure user-space spin
+(`ffi/env.rs::ShellEnv::wait`, outside the S138 Owns), so seven waiters can starve the FILE-lock
+owner on a 2-vCPU guest. There is no kernel panic or stuck vCPU; the trace above is preserved if
+the scheduler side needs a separate follow-up.
+
+Fix (inside Owns): `raven-libc/src/stdio/file/flockfile.rs` no longer calls the blocking generic
+`flockfile` (which enters `ShellEnv::wait`). It polls `ftrylockfile` and calls
+`raven_libc_sys::sys::yield_now()` between attempts, so waiters yield the vCPU and the owner runs.
+`ftrylockfile` keeps the same recursive/lockcount semantics, and the implicit `FileGuard` still
+sees the owner and does not re-lock.
+
+Validation after the fix:
+
+- 30/30 KVM2 `smp-libc-concurrency` runs, each 4-5 s, no hang and no cap expiry.
+- KVM1 `smp-libc-concurrency`: pass.
+- KVM4 `smp-libc-concurrency`: pass.
+- KVM2 `posix-shell`: pass.
+- `timeout 150 make check-fast`: PASSED.
+- Provenance: 0 violations.
+
+The general fix for every stdio caller (a futex `ShellEnv::wait`/`wake`) remains a follow-up: it
+is in `ffi/env.rs`, outside this ticket's Owns. The wrapper fix covers `flockfile` callers,
+including this fixture.
 
 ## Provenance
 
