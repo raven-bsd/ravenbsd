@@ -229,6 +229,7 @@ fn map_spawn_error(error: raven_spawn::SpawnError) -> Errno {
         SpawnError::NotFound | SpawnError::FileNotFound => ENOENT,
         SpawnError::BadElf(_) | SpawnError::HasInterpreter => ENOEXEC,
         SpawnError::TooLarge => E2BIG,
+        SpawnError::BadCwd => EINVAL,
         SpawnError::Sys(error) => i32::from(error.0),
     }
 }
