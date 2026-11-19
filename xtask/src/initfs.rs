@@ -39,6 +39,7 @@ pub(crate) fn image_epoch(root: &Path) -> u64 {
 /// the `/bin` tools the login shell runs. `raven-getty` and `login` stay dynamic so the release
 /// gate keeps exercising the loader and libc startup path.
 const STATIC_SHELL_PACKAGES: &[&str] = &[
+    "ed",
     "man",
     "raven-date",
     "raven-hostname",
