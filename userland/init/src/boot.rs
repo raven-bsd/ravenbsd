@@ -187,12 +187,23 @@ pub fn run() -> i32 {
         if let Some(code) = run_waves(&core, Some(&selected), false, false) {
             return code;
         }
-        match activate_root(&core) {
-            Ok(()) => {
-                core.lock().health = read_root_health();
+        if pivot_requested() {
+            match activate_pivot_root(&core) {
+                Ok(()) => {
+                    core.lock().health = read_health_at("");
+                }
+                Err(reason) => {
+                    raven_rt::println!("svcd: root pivot: {reason}; staying on the initfs");
+                }
             }
-            Err(reason) => {
-                raven_rt::println!("svcd: root: {reason}; starting the initfs plan");
+        } else {
+            match activate_root(&core) {
+                Ok(()) => {
+                    core.lock().health = read_health_at("/root");
+                }
+                Err(reason) => {
+                    raven_rt::println!("svcd: root: {reason}; starting the initfs plan");
+                }
             }
         }
         // Root one-shot services read through vfsd; start them one at a time so the shared
@@ -411,7 +422,7 @@ fn activate_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
     raven_rt::fs::mount("/root", "ufs:")
         .map_err(|error| alloc::format!("/root mount failed: {}", error.description()))?;
     raven_rt::println!("svcd: root mounted at /root");
-    let result = activate_mounted_root(core);
+    let result = activate_mounted_root(core, "/root");
     if result.is_err()
         && let Err(error) = raven_rt::fs::umount("/root")
     {
@@ -423,10 +434,46 @@ fn activate_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
     result
 }
 
+/// True when the bootstrap profile requests the UFS root at `/` instead of `/root`.
+fn pivot_requested() -> bool {
+    match raven_rt::fs::read_to_vec("file:/etc/raven/root-mode") {
+        Ok(bytes) => bytes == b"pivot" || bytes == b"pivot\n",
+        Err(_) => false,
+    }
+}
+
+/// Pivot the namespace root to the UFS root.
+///
+/// The vfsd mount at `/` replaces the initfs root and keeps `/dev`, `/tmp` and every other
+/// non-root mount. The bootstrap services keep their open files; new path resolution (the root
+/// service set, login/getty and the tools) comes from UFS. A failed merge restores the initfs.
+fn activate_pivot_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
+    if let Err(error) = raven_rt::fs::read_dir("ufs:/etc/services.d") {
+        return Err(alloc::format!(
+            "/: no UFS root device ({})",
+            error.description()
+        ));
+    }
+    raven_rt::fs::mount("/", "ufs:")
+        .map_err(|error| alloc::format!("/ pivot mount failed: {}", error.description()))?;
+    raven_rt::println!("svcd: root pivoted to UFS at /");
+    let result = activate_mounted_root(core, "");
+    if result.is_err() {
+        if let Err(error) = raven_rt::fs::mount("/", "initfs:") {
+            raven_rt::println!(
+                "svcd: /: cannot restore the initfs root: {}",
+                error.description()
+            );
+        }
+        return result;
+    }
+    Ok(())
+}
+
 /// Read and merge the mounted root's services. The mount must already have succeeded.
-fn activate_mounted_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
-    let services = read_root_services()?;
-    let overrides = read_root_overrides()?;
+fn activate_mounted_root(core: &Arc<Mutex<Core>>, root: &str) -> Result<(), String> {
+    let services = read_services_at(root)?;
+    let overrides = read_overrides_at(root)?;
     let root_count = services.len();
     let root_names: Vec<String> = services
         .iter()
@@ -449,9 +496,10 @@ fn activate_mounted_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
     Ok(())
 }
 
-fn read_root_services() -> Result<Vec<Manifest>, String> {
-    let entries = raven_rt::fs::read_dir("file:/root/etc/services.d")
-        .map_err(|error| alloc::format!("/root/etc/services.d: {}", error.description()))?;
+fn read_services_at(root: &str) -> Result<Vec<Manifest>, String> {
+    let services_dir = alloc::format!("file:{root}/etc/services.d");
+    let entries = raven_rt::fs::read_dir(&services_dir)
+        .map_err(|error| alloc::format!("{root}/etc/services.d: {}", error.description()))?;
     let mut names: Vec<String> = entries
         .into_iter()
         .map(|entry| entry.name)
@@ -460,14 +508,14 @@ fn read_root_services() -> Result<Vec<Manifest>, String> {
     names.sort();
     let mut services = Vec::new();
     for name in names {
-        let path = alloc::format!("file:/root/etc/services.d/{name}");
+        let path = alloc::format!("file:{root}/etc/services.d/{name}");
         let data = raven_rt::fs::read_to_vec(&path)
             .map_err(|error| alloc::format!("{path}: {}", error.description()))?;
         let text = core::str::from_utf8(&data).map_err(|_| alloc::format!("{path}: not UTF-8"))?;
         match Manifest::parse(text) {
             Ok(manifest) => services.push(manifest),
             Err(error) => raven_rt::println!(
-                "svcd: /root/etc/services.d/{name}: {}",
+                "svcd: {root}/etc/services.d/{name}: {}",
                 describe_parse_error(&error)
             ),
         }
@@ -475,26 +523,29 @@ fn read_root_services() -> Result<Vec<Manifest>, String> {
     Ok(services)
 }
 
-fn read_root_overrides() -> Result<Option<Overrides>, String> {
-    match raven_rt::fs::read_to_vec("file:/root/etc/rc.conf") {
+fn read_overrides_at(root: &str) -> Result<Option<Overrides>, String> {
+    let path = alloc::format!("file:{root}/etc/rc.conf");
+    match raven_rt::fs::read_to_vec(&path) {
         Ok(data) => {
             let text = core::str::from_utf8(&data)
-                .map_err(|_| "/root/etc/rc.conf: not UTF-8".to_string())?;
+                .map_err(|_| alloc::format!("{root}/etc/rc.conf: not UTF-8"))?;
             parse_overrides(text).map(Some).map_err(|error| {
-                alloc::format!("/root/etc/rc.conf: {}", describe_parse_error(&error))
+                alloc::format!("{root}/etc/rc.conf: {}", describe_parse_error(&error))
             })
         }
         Err(raven_abi::errno::Errno::ENOENT) => Ok(None),
-        Err(error) => Err(alloc::format!("/root/etc/rc.conf: {}", error.description())),
+        Err(error) => Err(alloc::format!(
+            "{root}/etc/rc.conf: {}",
+            error.description()
+        )),
     }
 }
 
-/// The health record on the UFS root, read after the root mount.
-const ROOT_HEALTH_PATH: &str = "file:/root/etc/boot-health";
-
-fn read_root_health() -> Option<Health> {
-    match raven_rt::fs::read_to_vec(ROOT_HEALTH_PATH) {
-        Ok(bytes) => parse_health_bytes("/root/etc/boot-health", &bytes),
+/// The health record on the mounted root, read after the mount/pivot.
+fn read_health_at(root: &str) -> Option<Health> {
+    let path = alloc::format!("file:{root}/etc/boot-health");
+    match raven_rt::fs::read_to_vec(&path) {
+        Ok(bytes) => parse_health_bytes(&alloc::format!("{root}/etc/boot-health"), &bytes),
         Err(Errno::ENOENT) => None,
         Err(error) => {
             raven_rt::println!("svcd: /root/etc/boot-health: {}", error.description());
