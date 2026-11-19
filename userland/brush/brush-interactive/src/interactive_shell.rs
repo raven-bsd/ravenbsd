@@ -213,6 +213,8 @@ impl<'a, IB: InputBackend, SE: brush_core::ShellExtensions> InteractiveShell<'a,
 
         drop(shell);
 
+        brush_core::startup_timing::mark("prompt");
+
         // Read input.
         match self.input.read_line(&self.shell, prompt).await? {
             ReadResult::Input(read_result) => {

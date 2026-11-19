@@ -36,6 +36,7 @@ mod regex;
 pub mod results;
 mod shell;
 pub mod sourceinfo;
+pub mod startup_timing;
 pub mod sys;
 pub mod tasks;
 pub mod terminal;

@@ -154,6 +154,8 @@ impl CommandLineArgs {
 
 /// Main entry point for the `brush` shell.
 pub fn run() {
+    brush_core::startup_timing::init();
+
     //
     // Install the bundled-command registry so it's available both for
     // bundled dispatch (handled next) and for builtin shim registration
@@ -207,6 +209,8 @@ pub fn run() {
         }
     };
 
+    brush_core::startup_timing::mark("args");
+
     //
     // Run.
     //
@@ -225,6 +229,8 @@ pub fn run() {
             std::process::exit(1);
         }
     };
+
+    brush_core::startup_timing::mark("runtime");
 
     let result = runtime.block_on(run_async(&args, parsed_args));
 
@@ -301,11 +307,14 @@ async fn run_async(
         .into_config_or_log()
         .map_err(|e| brush_interactive::ShellError::IoError(std::io::Error::other(e)))?;
 
+    brush_core::startup_timing::mark("config");
+
     // Instantiate an appropriately configured shell and wrap it in an `Arc`. Note that we do
     // *not* run any code in the shell yet. We'll delay loading profiles and such until after
     // we've set up everything else (in `run_in_shell`).
     let shell: BrushShell = instantiate_shell(&args, cli_args).await?;
     let shell = Arc::new(Mutex::new(shell));
+    brush_core::startup_timing::mark("shell");
 
     // Run with the selected input backend. Each branch instantiates the concrete
     // backend type and calls `run_in_shell`, preserving static dispatch.
@@ -321,6 +330,7 @@ async fn run_async(
         InputBackendType::Reedline => {
             let mut input_backend =
                 brush_interactive::ReedlineInputBackend::new(&ui_options, &shell)?;
+            brush_core::startup_timing::mark("backend");
             run_in_shell(&shell, args, &mut input_backend, &ui_options).await
         }
         #[cfg(not(reedline_backend))]
@@ -332,6 +342,7 @@ async fn run_async(
             let mut locked_shell = shell.lock().await;
             input_backend.install_key_bindings(&mut locked_shell);
             drop(locked_shell);
+            brush_core::startup_timing::mark("backend");
             run_in_shell(&shell, args, &mut input_backend, &ui_options).await
         }
         #[cfg(not(basic_backend))]
@@ -340,6 +351,7 @@ async fn run_async(
         #[cfg(minimal_backend)]
         InputBackendType::Minimal => {
             let mut input_backend = brush_interactive::MinimalInputBackend;
+            brush_core::startup_timing::mark("backend");
             run_in_shell(&shell, args, &mut input_backend, &ui_options).await
         }
         #[cfg(not(minimal_backend))]
@@ -352,6 +364,7 @@ async fn run_async(
             let mut locked_shell = shell.lock().await;
             input_backend.install_key_bindings(&mut locked_shell);
             drop(locked_shell);
+            brush_core::startup_timing::mark("backend");
             run_in_shell(&shell, args, &mut input_backend, &ui_options).await
         }
         #[cfg(not(vt_backend))]
@@ -405,8 +418,12 @@ async fn run_in_shell(
         )?;
     }
 
+    brush_core::startup_timing::mark("hooks");
+
     // Load profile and rc files as appropriate.
+    brush_core::startup_timing::mark("profile_start");
     initialize_shell(shell_ref, &args).await?;
+    brush_core::startup_timing::mark("profile_done");
 
     // If a command was specified via -c, then run that command and then exit. Its result
     // is also the shell's last exit status, which is what's returned below for every mode.
@@ -416,6 +433,7 @@ async fn run_in_shell(
     // Otherwise read commands interactively: -s was given (positional args become parameters;
     // a script named among them is *not* run), or nothing to run was specified.
     } else if read_commands_from_stdin {
+        brush_core::startup_timing::mark("interactive");
         brush_interactive::InteractiveShell::new(shell_ref, input_backend, &interactive_options)?
             .run_interactively()
             .await?;

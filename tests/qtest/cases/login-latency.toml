@@ -60,6 +60,15 @@ delay_ms = 100
 wait = '^raven# $'
 timeout_secs = 2
 
+# K157: dump the brush startup trace after the prompt (does not affect the measured step).
+[[step]]
+send = "cat /tmp/brush-startup.tsv\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 2
+
 [[step]]
 send = "exit 0\n"
 delay_ms = 100
