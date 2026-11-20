@@ -4,6 +4,7 @@
 //! The OFD slab: one refcounted open-file description per kernel handle.
 
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cell::Cell;
 use core::sync::atomic::{AtomicU32, Ordering};
@@ -48,6 +49,8 @@ pub struct Ofd {
     pub handle: Cell<Handle>,
     /// The notification event a scheme-backed socket uses for `poll` readiness.
     pub event: Cell<Handle>,
+    /// Readiness delivered by the last `poll`, replayed once so a queued level is not lost.
+    pub rearm: Arc<AtomicU32>,
     /// Kind recorded at open time.
     pub kind: OfdKind,
     /// Access mode and the mutable status bits (Linux `F_GETFL` values).
@@ -74,6 +77,7 @@ impl Ofd {
         Self {
             handle: Cell::new(handle),
             event: Cell::new(Handle::NONE),
+            rearm: Arc::new(AtomicU32::new(0)),
             kind,
             status: AtomicU32::new(status),
             refs: AtomicU32::new(1),
@@ -323,6 +327,23 @@ impl<'a, B: SysBackend, L: Lock> OfdRef<'a, B, L> {
         self.snapshot().is_some_and(|ofd| ofd.poll_signaled())
     }
 
+    /// Remember the readiness a completed `poll` delivered.
+    ///
+    /// The kernel event queue consumes a `UserEvent` on delivery, so a scheme socket whose
+    /// queue still holds level-ready data would otherwise go silent after one poll. The next
+    /// poll replays this mask once; a read that drains the queue then blocks normally.
+    pub fn set_poll_rearm(&self, events: u32) {
+        if let Some(ofd) = self.snapshot() {
+            ofd.rearm.fetch_or(events, Ordering::Relaxed);
+        }
+    }
+
+    /// Take the one-shot rearm mask.
+    pub fn take_poll_rearm(&self) -> u32 {
+        self.snapshot()
+            .map_or(0, |ofd| ofd.rearm.swap(0, Ordering::Relaxed))
+    }
+
     /// Change the remembered kind (a successful probe caches it).
     pub fn set_kind(&self, kind: OfdKind) {
         self.platform.set_ofd_kind(self.index, kind);
@@ -345,6 +366,7 @@ impl Clone for Ofd {
         Self {
             handle: Cell::new(self.handle.get()),
             event: Cell::new(self.event.get()),
+            rearm: Arc::clone(&self.rearm),
             kind: self.kind,
             status: AtomicU32::new(self.status.load(Ordering::Relaxed)),
             refs: AtomicU32::new(self.refs.load(Ordering::Relaxed)),
