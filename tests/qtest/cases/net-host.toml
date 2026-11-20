@@ -24,7 +24,7 @@ expect_exit = "success"
 regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
-regex = '^svcd: root mounted at /root'
+regex = '^svcd: getty up$'
 
 [[expect]]
 regex = '^svcd: netd up$'
