@@ -22,6 +22,7 @@ mod network;
 mod node;
 mod schema;
 mod services;
+pub mod users;
 
 pub use config::{Config, ConfigLoader};
 pub use error::ConfigError;

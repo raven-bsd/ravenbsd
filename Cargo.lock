@@ -1270,6 +1270,7 @@ dependencies = [
 name = "raven-config"
 version = "0.1.0"
 dependencies = [
+ "raven-auth",
  "raven-svc-manifest",
  "serde_json",
  "toml",
