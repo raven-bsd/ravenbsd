@@ -9,7 +9,7 @@ name = "libc-forkpty"
 arch = "x86_64"
 profile = "libc-test"
 timeout_secs = 300
-pre = ["sh tests/libc/target/build.sh forkpty x86_64"]
+pre = ["sh tests/libc/target/build.sh forkpty"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 
