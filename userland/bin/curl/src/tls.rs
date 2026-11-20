@@ -326,9 +326,20 @@ impl HttpTransport for TlsTransport {
             .resolve(host)
             .map_err(|()| HttpTransportError::Io)?;
         let mut socket = SchemeSocket::new();
-        socket
-            .connect(address, port, timeout_ms)
-            .map_err(|()| HttpTransportError::Io)?;
+        let mut attempt = 0u32;
+        loop {
+            match socket.connect(address, port, timeout_ms) {
+                Ok(()) => break,
+                Err(()) if attempt < 9 => {
+                    attempt = attempt.saturating_add(1);
+                    // The netd TCP readiness/retransmission race can reset the first connect;
+                    // retry the connect only, never a TLS handshake or verification failure.
+                    sleep_ms(100);
+                    socket = SchemeSocket::new();
+                }
+                Err(()) => return Err(HttpTransportError::Io),
+            }
+        }
         if self.tls {
             let stream = TlsStream { socket, timeout_ms };
             match raven_tls::connect(Box::new(stream), host, &self.ca_file) {
