@@ -11,10 +11,14 @@ release qtest remains one-shot for `test-exit=1`.
 `profiles/qemu-ufs.d/10-session.toml` now stages the demo session files instead of the release
 ones:
 
-- `profiles/qemu-ufs.d/getty.toml` — `getty` has `restart = "always"`, `restart_delay_ms = 200`,
+- `profiles/qemu-ufs.d/getty.manifest` — `getty` has `restart = "always"`, `restart_delay_ms = 200`,
   `max_restarts = 1000` and needs `consd`, `vfsd-ufs`, `ramfsd`, `initfsd`;
 - `profiles/qemu-ufs.d/svcd.conf` — no `exit_when_exits = getty`; svcd stays alive while getty is
   respawned.
+
+The service file uses the established `.manifest` extension: every `.toml` under
+`profiles/qemu-ufs.d/` is a profile fragment, while `.manifest` is staged as the run-time
+`/etc/services.d/getty.toml` (same pattern as the release and ufs-demo profiles).
 
 A normal `exit` from the brush shell is a success; the supervisor restarts getty, and the console
 prints `login:` again. A second login is accepted. The service graph keeps the resident

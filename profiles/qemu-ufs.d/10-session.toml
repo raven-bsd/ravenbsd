@@ -15,7 +15,7 @@ package = "login"
 path = "/bin/login"
 
 [[initfs.files]]
-src = "profiles/qemu-ufs.d/getty.toml"
+src = "profiles/qemu-ufs.d/getty.manifest"
 path = "/etc/services.d/getty.toml"
 
 [[initfs.files]]
