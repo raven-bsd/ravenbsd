@@ -8,7 +8,7 @@
 name = "ufs-logout"
 arch = "x86_64"
 profile = "qemu-ufs"
-timeout_secs = 120
+timeout_secs = 90
 pre = ["sh scripts/ufs-demo.sh --prepare-tools"]
 boot_cmdline = "console=ttyS0"
 qemu_extra = [
