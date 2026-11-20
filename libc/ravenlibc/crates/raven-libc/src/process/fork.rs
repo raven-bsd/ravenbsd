@@ -42,8 +42,8 @@ fn handle_from(value: usize) -> Result<Handle, AbiErrno> {
 /// The child process handle is closed by the caller whether or not the thread starts; the
 /// kernel keeps the child alive through its own self handle and the scheduler's reference.
 fn start_child(child: Handle, entry: u64, sp: u64, tp: u64) -> Result<c_int, AbiErrno> {
+    // SAFETY: PROC_HANDLE_INFO takes one live process handle owned by the caller.
     let pid = raven_libc_sys::errno::ret_i32(unsafe {
-        // SAFETY: PROC_HANDLE_INFO takes one live process handle owned by the caller.
         raven_libc_sys::arch::syscall1(PROC_HANDLE_INFO, child.0 as usize)
     })?;
     let extended = ThreadCreateEx {
@@ -51,9 +51,9 @@ fn start_child(child: Handle, entry: u64, sp: u64, tp: u64) -> Result<c_int, Abi
         tid_out: 0,
         clear_tid_addr: 0,
     };
+    // SAFETY: THREAD_CREATE_EX reads the 24-byte `extended` payload for this call and starts the
+    // child on the caller-provided entry and stack in the child's address space.
     let thread = handle_from(raven_libc_sys::errno::ret(unsafe {
-        // SAFETY: THREAD_CREATE_EX reads the 24-byte `extended` payload for this call and
-        // starts the child on the caller-provided entry and stack in the child's address space.
         raven_libc_sys::arch::syscall6(
             Syscall::THREAD_CREATE as usize,
             child.0 as usize,
@@ -72,10 +72,10 @@ fn start_child(child: Handle, entry: u64, sp: u64, tp: u64) -> Result<c_int, Abi
 /// Fork with an explicit resume frame; used by the naked entry below.
 fn fork_at(entry: u64, sp: u64) -> Result<c_int, AbiErrno> {
     check_request(entry, sp, 0)?;
+    // SAFETY: PROC_FORK takes the caller's self-process handle and an explicit zero flags word;
+    // `syscall1` would leave the second argument register unspecified and the kernel rejects a
+    // non-zero flag word with EINVAL. It returns a new handle owned by the caller.
     let child = handle_from(raven_libc_sys::errno::ret(unsafe {
-        // SAFETY: PROC_FORK takes the caller's self-process handle and an explicit zero flags
-        // word; `syscall1` would leave the second argument register unspecified and the kernel
-        // rejects a non-zero flag word with EINVAL. It returns a new handle owned by the caller.
         raven_libc_sys::arch::syscall2(PROC_FORK, Handle::SELF_PROC.0 as usize, 0)
     })?)?;
     let result = start_child(
