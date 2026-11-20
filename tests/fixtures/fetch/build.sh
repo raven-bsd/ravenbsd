@@ -59,8 +59,17 @@ build_http_tools() {
 }
 
 ensure_addon() {
-    if [ -f "$addon/lib/libssl.a" ] && [ -f "$addon/lib/libcrypto.a" ] &&
-        [ -f "$sysroot/usr/lib/libc.a" ] && [ -f "$root/build/tls/tls_compat.o" ]; then
+    stale=0
+    if [ ! -f "$addon/lib/libssl.a" ] || [ ! -f "$addon/lib/libcrypto.a" ] ||
+        [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$root/build/tls/tls_compat.o" ]; then
+        stale=1
+    elif [ -n "$(find "$root/libc/ravenlibc/crates" "$root/libc/ravenlibc/abi" \
+        "$root/libc/ravenlibc/crt" -newer "$sysroot/usr/lib/libc.a" -print -quit 2>/dev/null)" ]; then
+        # The add-on sysroot carries its own libc copy. A stale copy makes the TLS client run
+        # against an older fd/stdio/net stack than the shell and kernel; rebuild the add-on.
+        stale=1
+    fi
+    if [ "$stale" -eq 0 ]; then
         return 0
     fi
     log "building the OpenSSL add-on (host clang 14 ordering workaround)"
