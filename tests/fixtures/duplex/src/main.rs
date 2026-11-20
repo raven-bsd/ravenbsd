@@ -14,9 +14,10 @@ use raven_rt::entry;
 use raven_rt::event::{
     EventQueue, EvqEvent, HUP, READABLE, WRITABLE,
 };
+use raven_rt::pipe::pipe;
 use raven_rt::println;
 use raven_rt::sys::{
-    handle_close, handle_dup, handle_transfer, read, syscall6, write,
+    close, handle_close, handle_dup, handle_transfer, read, syscall6, write,
 };
 
 entry!(main);
@@ -183,6 +184,27 @@ fn readiness() -> Result<bool, Errno> {
     Ok(writable && readable && hup)
 }
 
+fn close_paths() -> Result<bool, Errno> {
+    let mut buffer = [0u8; 4];
+
+    let (left, right) = pair(0)?;
+    close(left)?;
+    let eof = read(right, &mut buffer) == Ok(0);
+    let epipe = write(right, b"x") == Err(Errno::EPIPE);
+    close(right)?;
+    let left_stale = handle_close(left) == Err(Errno::EBADF);
+    let right_stale = handle_close(right) == Err(Errno::EBADF);
+    let closed_io = write(left, b"x") == Err(Errno::EBADF);
+
+    let (read_end, write_end) = pipe()?;
+    close(read_end)?;
+    let pipe_epipe = write(write_end, b"x") == Err(Errno::EPIPE);
+    close(write_end)?;
+    let pipe_stale = handle_close(write_end) == Err(Errno::EBADF);
+
+    Ok(eof && epipe && left_stale && right_stale && closed_io && pipe_epipe && pipe_stale)
+}
+
 fn run() -> Result<(), Errno> {
     let both = both_directions()?;
     let bad_flags = flags();
@@ -191,6 +213,7 @@ fn run() -> Result<(), Errno> {
     let datagram_ok = datagrams()?;
     let handles_ok = dup_transfer()?;
     let evq_ok = readiness()?;
+    let close_ok = close_paths()?;
     println!(
         "duplex: both={} flags={}",
         u8::from(both),
@@ -207,7 +230,16 @@ fn run() -> Result<(), Errno> {
         u8::from(handles_ok),
         u8::from(evq_ok)
     );
-    if !(both && bad_flags && eof_epipe && shutdown_ok && datagram_ok && handles_ok && evq_ok) {
+    println!("duplex: close={}", u8::from(close_ok));
+    if !(both
+        && bad_flags
+        && eof_epipe
+        && shutdown_ok
+        && datagram_ok
+        && handles_ok
+        && evq_ok
+        && close_ok)
+    {
         println!("duplex: FAIL checks");
         return Err(Errno::EINVAL);
     }
