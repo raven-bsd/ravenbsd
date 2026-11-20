@@ -6,8 +6,8 @@
 
 Runs three sessions as the unprivileged demo account and prints the wall time for each:
 
-* `ssh luser@<guest> ls` returns success;
-* `ssh -tt luser@<guest>` reaches the shell, runs `pwd`, and exits;
+* `ssh raven@<guest> ls` returns success;
+* `ssh -tt raven@<guest>` reaches the shell, runs `echo raven-ok`, and exits;
 * a wrong password is refused and never reaches a shell.
 """
 
@@ -21,7 +21,7 @@ import pexpect
 
 HOST = os.environ.get("SSH_GUEST_HOST", "")
 PORT = os.environ.get("SSH_GUEST_PORT", "22")
-USER = "luser"
+USER = "raven"
 PASSWORD = "raven"
 
 
@@ -68,8 +68,8 @@ def interactive_session() -> None:
     child.expect(r"(?i)password:\s*")
     child.sendline(PASSWORD)
     child.expect(r"raven[# ]")
-    child.sendline("echo luser-ok")
-    child.expect(r"luser-ok")
+    child.sendline("echo raven-ok")
+    child.expect(r"raven-ok")
     child.sendline("exit")
     child.expect(pexpect.EOF)
     child.close()

@@ -70,6 +70,6 @@ path = "/var/empty/.keep"
 mode = 0o644
 
 [[initfs.files]]
-src = "profiles/ssh.d/home-luser.keep"
-path = "/home/luser/.keep"
+src = "profiles/ssh.d/home-raven.keep"
+path = "/home/raven/.keep"
 mode = 0o644
