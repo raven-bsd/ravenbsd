@@ -69,12 +69,20 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "if [ -x /usr/sbin/raven ]; then echo raven-present; fi; if [ -e /bin/raven ]; then echo bin-raven-present; else echo bin-raven-absent; fi\n"
+send = "[ -x /usr/sbin/raven ] && echo raven-present\n"
 delay_ms = 100
 
 [[step]]
 wait = '^raven-present$'
 timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "[ -e /bin/raven ] || echo bin-raven-absent\n"
+delay_ms = 100
 
 [[step]]
 wait = '^bin-raven-absent$'
