@@ -467,6 +467,9 @@ pub struct Netd<D: Device> {
     nic_dns: Vec<[u8; 4]>,
     release_ping: Option<ReleasePing>,
     files: BTreeMap<u64, File>,
+    /// Open-file reference count per file id. `open`/`accept` starts at one, `dup`/fork adds
+    /// one, `close` drops one; the File/socket is released only at zero.
+    file_refs: BTreeMap<u64, u32>,
     next_file: u64,
     accepted: BTreeMap<u32, Accepted>,
     next_accept: u32,
@@ -489,6 +492,7 @@ impl<D: Device> Netd<D> {
             nic_dns: Vec::new(),
             release_ping: None,
             files: BTreeMap::new(),
+            file_refs: BTreeMap::new(),
             next_file: 1,
             accepted: BTreeMap::new(),
             next_accept: 1,
@@ -796,6 +800,7 @@ impl<D: Device> Netd<D> {
         let id = self.next_file;
         self.next_file = self.next_file.checked_add(1).ok_or(Errno::ENFILE)?;
         self.files.insert(id, file);
+        self.file_refs.insert(id, 1);
         Ok(id)
     }
 
@@ -886,20 +891,30 @@ impl<D: Device> Netd<D> {
         }
     }
 
-    /// Close `file` and its socket.
-    pub fn close(&mut self, file: u64) -> Result<(), Errno> {
+    /// Drop one reference to `file`; return `true` when this was the last one.
+    ///
+    /// The File, its core socket and its readiness event stay alive while any descriptor,
+    /// including a fork-inherited one, still names the file.
+    pub fn close(&mut self, file: u64) -> Result<bool, Errno> {
+        let refs = self.file_refs.get_mut(&file).ok_or(Errno::EBADF)?;
+        if *refs > 1 {
+            *refs -= 1;
+            return Ok(false);
+        }
+        self.file_refs.remove(&file);
         let file = self.files.remove(&file).ok_or(Errno::EBADF)?;
         if let File::Socket(socket) = file
             && let Some(id) = socket.socket
         {
             let _ = self.core_mut(socket.interface).close(id);
         }
-        Ok(())
+        Ok(true)
     }
 
-    /// Duplicate a file description; the kernel owns the handle duplication.
+    /// Account for a duplicate/fork-inherited reference to `file`.
     pub fn dup(&mut self, file: u64) -> Result<u64, Errno> {
-        self.files.get(&file).ok_or(Errno::EBADF)?;
+        let refs = self.file_refs.get_mut(&file).ok_or(Errno::EBADF)?;
+        *refs = refs.checked_add(1).ok_or(Errno::EMFILE)?;
         Ok(file)
     }
 
