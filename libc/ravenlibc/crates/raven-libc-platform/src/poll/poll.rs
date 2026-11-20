@@ -24,7 +24,6 @@ struct Registration<'a, B: SysBackend, L: Lock> {
     reference: OfdRef<'a, B, L>,
     events: u32,
     entries: Vec<usize>,
-    rearm: u32,
 }
 
 /// `poll`.
@@ -85,25 +84,11 @@ pub fn poll<B: SysBackend, L: Lock>(
                 {
                     registration.events |= wanted | EV_HUP;
                     registration.entries.push(index);
-                    let revents = delivered_revents(registration.rearm, events);
-                    if revents != 0 {
-                        entry.revents = revents;
-                        ready = ready.saturating_add(1);
-                    }
                 } else {
-                    // The kernel consumes the scheme event on delivery. Replay the last
-                    // delivered level once so data still queued is not lost.
-                    let rearm = reference.take_poll_rearm();
-                    let revents = delivered_revents(rearm, events);
-                    if revents != 0 {
-                        entry.revents = revents;
-                        ready = ready.saturating_add(1);
-                    }
                     registrations.push(Registration {
                         reference,
                         events: wanted | EV_HUP,
                         entries: Vec::from([index]),
-                        rearm,
                     });
                 }
             }
@@ -164,7 +149,6 @@ pub fn poll<B: SysBackend, L: Lock>(
         let Some(registration) = registrations.get(event.cookie as usize) else {
             continue;
         };
-        registration.reference.set_poll_rearm(event.events);
         for &index in &registration.entries {
             let Some(entry) = fds.get_mut(index) else {
                 continue;
