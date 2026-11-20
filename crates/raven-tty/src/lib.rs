@@ -122,6 +122,8 @@ pub enum Error {
     GetMode,
     /// The console scheme rejected `SET_MODE`.
     SetMode,
+    /// Reading the console handle failed.
+    Read,
     /// Another raw-mode guard is already active.
     Busy,
 }
@@ -131,9 +133,10 @@ impl fmt::Display for Error {
         formatter.write_str(match self {
             Self::GetAttr => "tcgetattr failed",
             Self::SetAttr => "tcsetattr failed",
-            Self::NoConsole => "RSH_FD0 is not a console handle",
+            Self::NoConsole => "cannot open tty:console",
             Self::GetMode => "console GET_MODE failed",
             Self::SetMode => "console SET_MODE failed",
+            Self::Read => "console read failed",
             Self::Busy => "raw mode is already active",
         })
     }
@@ -239,7 +242,7 @@ extern "C" fn restore_on_signal(signum: c_int) {
 mod scheme;
 
 #[cfg(target_os = "ravenbsd")]
-pub use scheme::SchemeRawMode;
+pub use scheme::{Console, SchemeRawMode};
 
 #[cfg(test)]
 #[path = "lib_ut.rs"]

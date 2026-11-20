@@ -13,6 +13,7 @@ use core::ffi::c_int;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use raven_abi::types::Handle;
+use raven_proto_fs::{WIRE_OPEN_READ, WIRE_OPEN_WRITE};
 use raven_proto_tty::{
     CALL_LEN, Mode, Request, Response, Settings, decode_response, encode_request,
 };
@@ -48,34 +49,12 @@ pub struct SchemeRawMode {
     handle: Handle,
     original: Settings,
     handlers: [(c_int, usize); 4],
-    owned: bool,
 }
 
 impl SchemeRawMode {
-    /// Open `tty:console` and switch it to raw/echo-off.
-    ///
-    /// The console is opened with read+write flags exactly like `login`; the scheme handle is
-    /// closed when the guard is dropped.
-    pub fn open_console() -> Result<Self, Error> {
-        let flags = u32::from(raven_proto_fs::WIRE_OPEN_READ | raven_proto_fs::WIRE_OPEN_WRITE);
-        let handle = Client::new()
-            .open("tty:console", flags)
-            .map_err(|_| Error::NoConsole)?;
-        match Self::enable_handle(handle, true) {
-            Ok(guard) => Ok(guard),
-            Err(error) => {
-                let _ = Client::new().close(handle);
-                Err(error)
-            }
-        }
-    }
-
     /// Save the console settings and switch an existing handle to raw/echo-off.
     pub fn enable(handle: u32) -> Result<Self, Error> {
-        Self::enable_handle(Handle(handle), false)
-    }
-
-    fn enable_handle(handle: Handle, owned: bool) -> Result<Self, Error> {
+        let handle = Handle(handle);
         if ACTIVE
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_err()
@@ -116,7 +95,6 @@ impl SchemeRawMode {
             handle,
             original,
             handlers,
-            owned,
         })
     }
 
@@ -140,9 +118,6 @@ impl Drop for SchemeRawMode {
                 settings: self.original,
             },
         );
-        if self.owned {
-            let _ = Client::new().close(self.handle);
-        }
         ACTIVE.store(false, Ordering::SeqCst);
     }
 }
@@ -173,5 +148,51 @@ extern "C" fn restore_on_signal(signum: c_int) {
             let _ = request(handle, Request::SetMode { settings });
         }
         _exit(128 + signum);
+    }
+}
+
+/// The `tty:console` handle used for TUI input and raw-mode control.
+pub struct Console {
+    client: Client,
+    handle: Handle,
+    raw: Option<SchemeRawMode>,
+}
+
+impl Console {
+    /// Open `tty:console` for reading and raw-mode calls.
+    pub fn open() -> Result<Self, Error> {
+        let flags = u32::from(WIRE_OPEN_READ | WIRE_OPEN_WRITE);
+        let handle = Client::new()
+            .open("tty:console", flags)
+            .map_err(|_| Error::NoConsole)?;
+        Ok(Self {
+            client: Client::new(),
+            handle,
+            raw: None,
+        })
+    }
+
+    /// Read console bytes.
+    pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Error> {
+        self.client
+            .read(self.handle, 0, buffer)
+            .map_err(|_| Error::Read)
+    }
+
+    /// Switch the console to raw/echo-off for the lifetime of this handle.
+    pub fn enable_raw(&mut self) -> Result<(), Error> {
+        if self.raw.is_none() {
+            self.raw = Some(SchemeRawMode::enable(self.handle.0)?);
+        }
+        Ok(())
+    }
+}
+
+impl Drop for Console {
+    fn drop(&mut self) {
+        if let Some(raw) = self.raw.take() {
+            drop(raw);
+        }
+        let _ = self.client.close(self.handle);
     }
 }
