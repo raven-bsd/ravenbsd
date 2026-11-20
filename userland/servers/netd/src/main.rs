@@ -302,28 +302,9 @@ mod program {
                     | raven_netcore::Event::Error(socket, _) => socket,
                     raven_netcore::Event::Accepted { listener, .. } => listener,
                 };
-                let files = self.netd.files_for_socket(ready.interface, socket);
-                if matches!(ready.event, raven_netcore::Event::Accepted { .. }) {
-                    raven_rt::println!(
-                        "netd: accepted event iface={:?} socket={} files={}",
-                        ready.interface,
-                        socket.0,
-                        files.len()
-                    );
-                }
-                for file in files {
+                for file in self.netd.files_for_socket(ready.interface, socket) {
                     if let Some(event) = self.events.get(&file) {
-                        let signal = event_signal(*event, 1);
-                        if matches!(ready.event, raven_netcore::Event::Accepted { .. }) {
-                            raven_rt::println!(
-                                "netd: accepted signal file={} event={} ok={}",
-                                file,
-                                event.0,
-                                signal.is_ok()
-                            );
-                        }
-                    } else if matches!(ready.event, raven_netcore::Event::Accepted { .. }) {
-                        raven_rt::println!("netd: accepted event without a registered file");
+                        let _ = event_signal(*event, 1);
                     }
                 }
             }

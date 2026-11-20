@@ -59,9 +59,6 @@ impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
 
     fn event(&self, ofd: u32, s: Sock) {
         if let Ok(event) = crate::backend_platform::event_handle(self.platform.backend(), s) {
-            let _ = raven_libc_sys::sys::debug_write(
-                alloc::format!("ke:attach ofd={} ev={}\n", ofd, event.0).as_bytes(),
-            );
             let _ = self.platform.set_ofd_event(ofd, event);
         }
     }

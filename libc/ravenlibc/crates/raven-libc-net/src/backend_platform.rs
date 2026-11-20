@@ -53,10 +53,8 @@ pub(crate) fn event_handle<B: SysBackend>(backend: &B, sock: Sock) -> Result<Han
         .map_err(|_| Errno::EPROTO)?;
     let value = u32::from_le_bytes(bytes);
     if value == 0 || value == u32::MAX {
-        let _ = raven_libc_sys::sys::debug_write(b"ke:bad\n");
         return Err(Errno::EPROTO);
     }
-    let _ = raven_libc_sys::sys::debug_write(b"ke:ok\n");
     Ok(Handle(value))
 }
 

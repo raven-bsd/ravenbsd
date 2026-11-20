@@ -25,18 +25,5 @@ pub unsafe extern "C" fn read(fd: c_int, buffer: *mut c_void, count: usize) -> i
         }));
     }
     let result = crate::ffi::platform::global().read(fd, slice);
-    if fd == 4 {
-        let _ = raven_libc_sys::sys::debug_write(
-            alloc::format!(
-                "rd4 pid={} ok={} n={} err={}\n",
-                // SAFETY: the C `getpid` export takes no arguments and reads no memory.
-                unsafe { crate::compat::getpid() },
-                result.is_ok(),
-                result.as_ref().map_or(0, |n| *n),
-                result.as_ref().err().map_or(0, |e| e.0)
-            )
-            .as_bytes(),
-        );
-    }
     crate::ffi::ret::platform_ssize(result)
 }

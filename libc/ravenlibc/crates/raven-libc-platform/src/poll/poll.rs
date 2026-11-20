@@ -63,15 +63,6 @@ pub fn poll<B: SysBackend, L: Lock>(
                 if reference.poll_signaled() {
                     // A scheme-backed socket reports through its attached notification event,
                     // not through the data handle's level.
-                    let _ = raven_libc_sys::sys::debug_write(
-                        alloc::format!(
-                            "kp:add fd={} ofd={} ev={}\n",
-                            entry.fd,
-                            reference.index(),
-                            reference.poll_handle().0
-                        )
-                        .as_bytes(),
-                    );
                     wanted |= EV_SIGNALED;
                 }
                 if wanted == 0 {
@@ -102,30 +93,16 @@ pub fn poll<B: SysBackend, L: Lock>(
     let queue = platform.event_queue()?;
     let backend = platform.backend();
     for (index, handle, events) in &registrations {
-        let added = backend.evq_ctl(
+        backend.evq_ctl(
             queue,
             EVQ_ADD,
             *handle,
             *events,
             u64::try_from(*index).unwrap_or(0),
-        );
-        if let Err(error) = added {
-            let _ = raven_libc_sys::sys::debug_write(
-                alloc::format!("kp:ctl err={}\n", error.0).as_bytes(),
-            );
-            return Err(error);
-        }
+        )?;
     }
     let mut events = [EvqEvent::default(); MAX_POLL_FDS];
     let waited = backend.evq_wait(queue, &mut events, timeout_ns);
-    let _ = raven_libc_sys::sys::debug_write(
-        alloc::format!(
-            "kp:wait ok={} n={}\n",
-            waited.is_ok(),
-            waited.as_ref().map_or(0, |n| *n)
-        )
-        .as_bytes(),
-    );
     for (_, handle, _) in &registrations {
         let _ = backend.evq_ctl(queue, EVQ_DEL, *handle, 0, 0);
     }
@@ -138,10 +115,6 @@ pub fn poll<B: SysBackend, L: Lock>(
             let mut revents = 0i16;
             if event.events & EV_SIGNALED != 0 {
                 // The notification event is level-only: report the caller's requested bits.
-                let fired_fd = entry.fd;
-                let _ = raven_libc_sys::sys::debug_write(
-                    alloc::format!("kp:fired fd={fired_fd}\n").as_bytes(),
-                );
                 if requested & (POLLIN | POLLPRI) != 0 {
                     revents |= POLLIN as i16;
                 }
