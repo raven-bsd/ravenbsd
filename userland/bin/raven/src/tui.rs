@@ -73,6 +73,7 @@ pub(crate) fn request(args: &[OsString], is_tty: bool) -> Option<Request> {
 
 /// A target console guard, kept alive for the whole TUI session.
 #[cfg(target_os = "ravenbsd")]
+#[allow(dead_code)] // the fields hold the guards alive; their Drop restores the console
 enum RawGuard {
     Scheme(raven_tty::SchemeRawMode),
     Termios(raven_tty::RawMode),
@@ -84,22 +85,15 @@ pub(crate) fn run<W: Write>(writer: &mut W, request: &Request) -> i32 {
     // scheme guard saves the canonical/echo settings and switches raw through consd. A plain
     // POSIX tty uses the termios guard instead; a non-TTY qtest keeps the canonical parser.
     #[cfg(target_os = "ravenbsd")]
-    let raw = {
-        let scheme = std::env::var("RSH_FD0")
-            .ok()
-            .and_then(|value| value.parse::<u32>().ok())
-            .ok_or(raven_tty::Error::NoConsole)
-            .and_then(raven_tty::SchemeRawMode::enable);
-        match scheme {
-            Ok(guard) => Some(RawGuard::Scheme(guard)),
-            Err(error) => {
-                let _ = writeln!(writer, "raven config: console raw mode: {error}");
-                match raven_tty::RawMode::enable(0) {
-                    Ok(guard) => Some(RawGuard::Termios(guard)),
-                    Err(error) => {
-                        let _ = writeln!(writer, "raven config: termios raw mode: {error}");
-                        None
-                    }
+    let raw = match raven_tty::SchemeRawMode::open_console() {
+        Ok(guard) => Some(RawGuard::Scheme(guard)),
+        Err(error) => {
+            let _ = writeln!(writer, "raven config: console raw mode: {error}");
+            match raven_tty::RawMode::enable(0) {
+                Ok(guard) => Some(RawGuard::Termios(guard)),
+                Err(error) => {
+                    let _ = writeln!(writer, "raven config: termios raw mode: {error}");
+                    None
                 }
             }
         }

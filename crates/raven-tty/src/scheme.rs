@@ -48,18 +48,40 @@ pub struct SchemeRawMode {
     handle: Handle,
     original: Settings,
     handlers: [(c_int, usize); 4],
+    owned: bool,
 }
 
 impl SchemeRawMode {
-    /// Save the console settings and switch `handle` (the `RSH_FD0` handle) to raw/echo-off.
+    /// Open `tty:console` and switch it to raw/echo-off.
+    ///
+    /// The console is opened with read+write flags exactly like `login`; the scheme handle is
+    /// closed when the guard is dropped.
+    pub fn open_console() -> Result<Self, Error> {
+        let flags = u32::from(raven_proto_fs::WIRE_OPEN_READ | raven_proto_fs::WIRE_OPEN_WRITE);
+        let handle = Client::new()
+            .open("tty:console", flags)
+            .map_err(|_| Error::NoConsole)?;
+        match Self::enable_handle(handle, true) {
+            Ok(guard) => Ok(guard),
+            Err(error) => {
+                let _ = Client::new().close(handle);
+                Err(error)
+            }
+        }
+    }
+
+    /// Save the console settings and switch an existing handle to raw/echo-off.
     pub fn enable(handle: u32) -> Result<Self, Error> {
+        Self::enable_handle(Handle(handle), false)
+    }
+
+    fn enable_handle(handle: Handle, owned: bool) -> Result<Self, Error> {
         if ACTIVE
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_err()
         {
             return Err(Error::Busy);
         }
-        let handle = Handle(handle);
         let original = match request(handle, Request::GetMode) {
             Ok(settings) => settings,
             Err(()) => {
@@ -94,6 +116,7 @@ impl SchemeRawMode {
             handle,
             original,
             handlers,
+            owned,
         })
     }
 
@@ -117,6 +140,9 @@ impl Drop for SchemeRawMode {
                 settings: self.original,
             },
         );
+        if self.owned {
+            let _ = Client::new().close(self.handle);
+        }
         ACTIVE.store(false, Ordering::SeqCst);
     }
 }

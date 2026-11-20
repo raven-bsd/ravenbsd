@@ -13,6 +13,7 @@ publish = false
 
 [target.'cfg(target_os = "ravenbsd")'.dependencies]
 raven-abi = { path = "../raven-abi" }
+raven-proto-fs = { path = "../raven-proto-fs" }
 raven-proto-tty = { path = "../raven-proto-tty" }
 raven-scheme = { path = "../raven-scheme" }
 

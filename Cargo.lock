@@ -3691,6 +3691,7 @@ name = "raven-tty"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-proto-fs",
  "raven-proto-tty",
  "raven-scheme",
 ]
