@@ -404,9 +404,14 @@ mod program {
         }
 
         fn write(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
-            self.netd
-                .write(file, offset, buffer)
-                .map_err(HandlerError::Errno)
+            let result = self.netd.write(file, offset, buffer);
+            raven_rt::println!(
+                "netd: write file={} len={} result={:?}",
+                file,
+                buffer.len(),
+                result
+            );
+            result.map_err(HandlerError::Errno)
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
