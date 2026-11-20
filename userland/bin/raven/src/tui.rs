@@ -73,6 +73,11 @@ pub(crate) fn request(args: &[OsString], is_tty: bool) -> Option<Request> {
 
 /// Run the TUI and map its outcome to a process exit code.
 pub(crate) fn run<W: Write>(writer: &mut W, request: &Request) -> i32 {
+    // The real console keeps the canonical line discipline until we clear ICANON/ECHO. The
+    // first-party guard restores the saved termios on drop and on HUP/INT/QUIT/TERM. A qtest
+    // that is not a terminal falls back to the canonical line parser.
+    #[cfg(target_os = "ravenbsd")]
+    let _raw = raven_tty::RawMode::enable(0).ok();
     let stdin = std::io::stdin();
     let mut input = stdin.lock();
     let options = raven_tui::Options {

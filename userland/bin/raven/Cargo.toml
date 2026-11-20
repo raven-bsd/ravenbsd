@@ -21,6 +21,7 @@ raven-tui = { path = "../../../crates/raven-tui" }
 # `raven-rt` is not usable here: its entry object defines `_start`, which conflicts with the std
 # crt. The scheme client and the directory-entry decoder are enough for the admin backends.
 raven-libc-sys = { path = "../../../libc/ravenlibc/crates/raven-libc-sys" }
+raven-tty = { path = "../../../crates/raven-tty" }
 raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
 raven-scheme = { path = "../../../crates/raven-scheme" }
 
