@@ -97,6 +97,7 @@ pub(crate) fn run_with_overrides(
     let profile = Profile::load(root, profile_name)?;
     let release_image = build::image_build_release(arch, &profile);
     let qemu_ufs = profile_name == "qemu-ufs";
+    let pi4_pivot = profile_name == "pi4-root-pivot";
     if release_image {
         build::require_clean_release_head(root, profile_name)?;
         if overrides.kernel.is_some() {
@@ -175,12 +176,16 @@ pub(crate) fn run_with_overrides(
             let path = resolve_override(root, path);
             fs::read(&path).with_context(|| format!("cannot read {}", path.display()))?
         }
-        None if rootfs && !qemu_ufs => build_release_initfs(root, arch, &profile, &workspace)?,
+        None if rootfs && !qemu_ufs && !pi4_pivot => {
+            build_release_initfs(root, arch, &profile, &workspace)?
+        }
         None => {
             // K176: the UFS-root image keeps the initfs bootstrap-only; the release
             // userland goes into the root disk below.
             let initfs_profile = if qemu_ufs {
                 "qemu-ufs-boot"
+            } else if pi4_pivot {
+                "pi4-root-pivot-boot"
             } else {
                 profile_name
             };
@@ -201,7 +206,20 @@ pub(crate) fn run_with_overrides(
         fs::read(&kernel_path).with_context(|| format!("cannot read {}", kernel_path.display()))?;
     // The `hw` profile carries a UFS root. Until virtio-blk lands, blockd serves it from the
     // initfs as a RAM disk, so the one-partition GPT disk is inserted at /etc/blockd.img.
-    let initfs_bytes = if qemu_ufs {
+    let initfs_bytes = if pi4_pivot {
+        // K182: the Pi 4 fake card loads the GPT/UFS image from the initfs. Build the
+        // release payload with the Pi 4 profile and wrap it in the same one-partition
+        // GPT disk the emmc2 test backend serves.
+        crate::initfs::ensure_prerequisites(root, arch, &profile)?;
+        let ufs = crate::rootfs::build_sd_root(root, arch, profile_name, true)?;
+        let disk = root
+            .join("build")
+            .join(arch.as_str())
+            .join("pi4-root-pivot-root.img");
+        crate::rootfs::build_root_disk(&ufs, &disk)?;
+        let data = fs::read(&disk).with_context(|| format!("cannot read {}", disk.display()))?;
+        crate::rootfs::inject_initfs_file(&initfs_bytes, "/etc/pi4-root.img", &data, 0o444)?
+    } else if qemu_ufs {
         // The payload profile stages brush/uutils and other generated files; build those
         // prerequisites before staging the UFS tree.
         crate::initfs::ensure_prerequisites(root, arch, &profile)?;
