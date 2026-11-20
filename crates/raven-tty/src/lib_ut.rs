@@ -28,7 +28,7 @@ fn make_raw_matches_the_netbsd_cfmakeraw_flags() {
     };
     termios.make_raw();
     // IMAXBEL|IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON are clear.
-    assert_eq!(termios.c_iflag & 0o227_53, 0);
+    assert_eq!(termios.c_iflag & 0o022_753, 0);
     // OPOST is clear.
     assert_eq!(termios.c_oflag & 0o000_001, 0);
     // ECHO|ECHONL|ICANON|ISIG|IEXTEN are clear.
