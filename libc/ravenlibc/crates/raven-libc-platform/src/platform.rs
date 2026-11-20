@@ -248,9 +248,15 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     }
 
     fn close_handles(&self, handles: [Handle; 2]) -> Result<(), Errno> {
-        let mut first = Ok(());
-        for handle in handles {
-            let result = self.close_handle(handle);
+        let [data, event] = handles;
+        let mut first = self.close_handle(data);
+        // The second handle is a socket's readiness doorbell (a `UserEvent`). `CLOSE` answers
+        // `EBADF` for it and leaves it open; only `HANDLE_CLOSE` releases it.
+        if event != Handle::NONE {
+            let result = match self.backend.handle_close(event) {
+                Err(Errno::EINTR) => Ok(()),
+                other => other,
+            };
             if first.is_ok() && result.is_err() {
                 first = result;
             }
@@ -754,12 +760,41 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             return Err(Errno::EBADF);
         }
         let handle = reference.handle();
-        crate::intr::cancellable(|| {
-            crate::intr::run(
-                crate::intr::CallClass::Restartable,
-                crate::intr::restart_wanted(),
-                || self.backend.read(handle, buf),
-            )
+        let blocking = reference.status() & fcntl::O_NONBLOCK as u32 == 0;
+        let doorbell = reference.kind() == OfdKind::Socket && reference.poll_signaled();
+        loop {
+            let result = crate::intr::cancellable(|| {
+                crate::intr::run(
+                    crate::intr::CallClass::Restartable,
+                    crate::intr::restart_wanted(),
+                    || self.backend.read(handle, buf),
+                )
+            });
+            match result {
+                Err(Errno::EAGAIN) if blocking && doorbell => {
+                    // The doorbell is a hint: netd may have drained the queue before this read.
+                    // POSIX requires a blocking socket read to wait, so wait for the next
+                    // readable event and retry instead of leaking EAGAIN to the caller.
+                    let ready = crate::poll::wait_readable(self, fd, -1)?;
+                    if ready == 0 {
+                        continue;
+                    }
+                }
+                other => return other,
+            }
+        }
+    }
+
+    /// The fd currently attached to a socket handle, if any.
+    ///
+    /// The net adapter receives a kernel `Sock` (handle), while `poll` is fd-based. This lookup
+    /// closes that gap for `accept`/`recv` waits without exposing the whole table.
+    pub fn fd_for_socket_handle(&self, handle: Handle) -> Option<i32> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        entries.into_iter().find_map(|(fd, entry)| {
+            let ofd = arena.get(entry.ofd)?;
+            (ofd.kind == OfdKind::Socket && ofd.handle.get() == handle).then_some(fd)
         })
     }
 
