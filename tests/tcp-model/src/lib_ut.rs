@@ -285,6 +285,15 @@ fn sack_scoreboard_matches_the_byte_set_reference_and_reports_divergences() {
             }
         }
         if scoreboard.is_lost(point) != reference.is_lost(point, 64, 3) {
+            assert_eq!(
+                product_bytes,
+                reference_bytes + 1,
+                "step {step}: is_lost delta without a byte-count delta"
+            );
+            assert_eq!(
+                reference_bytes, 128,
+                "step {step}: is_lost delta away from the byte threshold"
+            );
             predicates = predicates.saturating_add(1);
         }
         if scoreboard.pipe() != reference.pipe(0, 64, 3) {
