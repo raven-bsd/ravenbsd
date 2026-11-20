@@ -105,7 +105,12 @@ mod program {
     fn write_output(options: &Options, bytes: &[u8]) -> Result<(), i32> {
         match options.output.as_deref() {
             None | Some("-") => write_stdout(bytes).map_err(|_| EXIT_ERROR),
-            Some(path) => write_file(path, bytes).map_err(|_| EXIT_ERROR),
+            Some(path) => write_file(path, bytes).map_err(|error| {
+                if !options.silent {
+                    raven_rt::eprintln!("curl: write {path}: {error:?}");
+                }
+                EXIT_ERROR
+            }),
         }
     }
 

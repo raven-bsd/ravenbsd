@@ -63,6 +63,18 @@ wait = '^curl-body=0$'
 timeout_secs = 30
 
 [[step]]
+send = "touch /tmp/probe; echo touch=$?; printf x > /tmp/probe2; echo redir=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^touch=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^redir=0$'
+timeout_secs = 30
+
+[[step]]
 send = "curl -o /tmp/curl-known.txt http://10.0.2.2:18081/known.txt; echo curl-o=$?; cat /tmp/curl-known.txt; echo\n"
 delay_ms = 100
 
