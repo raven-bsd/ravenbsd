@@ -54,7 +54,11 @@ class Handler(socketserver.BaseRequestHandler):
         except OSError as error:
             print(f"tls-server: request failed: {error}", flush=True)
         finally:
-            connection.close()
+            try:
+                plain = connection.unwrap()
+                plain.close()
+            except (ssl.SSLError, OSError):
+                connection.close()
 
 
 class Server(socketserver.ThreadingTCPServer):
