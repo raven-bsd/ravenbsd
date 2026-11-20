@@ -24,10 +24,10 @@ expect_exit = "success"
 regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
-regex = '^svcd: getty up$'
+regex = '^svcd: netd up$'
 
 [[expect]]
-regex = '^svcd: netd up$'
+regex = '^svcd: getty up$'
 
 [[expect]]
 regex = '^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$'
