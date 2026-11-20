@@ -404,10 +404,14 @@ mod program {
         }
 
         fn write(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
+            let sid = self.netd.socket_id(file).map(|id| id.0);
+            let iface = self.netd.socket_interface(file);
             let result = self.netd.write(file, offset, buffer);
             raven_rt::println!(
-                "netd: write file={} len={} result={:?}",
+                "netd: write file={} sid={:?} iface={:?} len={} result={:?}",
                 file,
+                sid,
+                iface,
                 buffer.len(),
                 result
             );
