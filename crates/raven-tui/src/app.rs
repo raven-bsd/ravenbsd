@@ -109,15 +109,16 @@ impl Tui {
     pub fn new(root: &Path, options: Options) -> Self {
         let (network, warning) = model::load_network(root);
         let (accounts, accounts_warning) = model::load_accounts(root);
-        let status = warning
-            .or(accounts_warning)
-            .unwrap_or_else(|| {
-                String::from("Type / or a letter to filter; Enter opens the module")
-            });
+        let status = warning.or(accounts_warning).unwrap_or_else(|| {
+            String::from("Type / or a letter to filter; Enter opens the module")
+        });
         Self {
             root: root.to_path_buf(),
             options,
-            modules: model::modules(&Current { network, accounts: accounts.clone() }),
+            modules: model::modules(&Current {
+                network,
+                accounts: accounts.clone(),
+            }),
             accounts,
             active: 0,
             selected: 0,

@@ -115,7 +115,9 @@ pub fn parse_passwd(text: &str) -> Vec<PasswdEntry> {
 /// Find one account in `/etc/passwd`.
 #[must_use]
 pub fn find_passwd(text: &str, name: &str) -> Option<PasswdEntry> {
-    parse_passwd(text).into_iter().find(|entry| entry.name == name)
+    parse_passwd(text)
+        .into_iter()
+        .find(|entry| entry.name == name)
 }
 
 /// Persisted console autologin.

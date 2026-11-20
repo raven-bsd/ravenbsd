@@ -12,9 +12,7 @@ use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use raven_config::users::{
-    Accounts, UserAction, UserSpec, apply, render_plan, validate_action,
-};
+use raven_config::users::{Accounts, UserAction, UserSpec, apply, render_plan, validate_action};
 
 /// The dedicated network drop-in, relative to the configuration root.
 pub const NETWORK_FILE: &str = "etc/raven/conf.d/network.toml";
@@ -309,10 +307,14 @@ fn users_edit_module(accounts: &Accounts, user: &raven_config::users::UserRecord
                 label: &'static str,
                 help: &'static str,
                 value: String,
-                kind: FieldKind| {
-        Field::new(key, label, help, kind, value)
+                kind: FieldKind| { Field::new(key, label, help, kind, value) };
+    let field_kind = || {
+        if root {
+            FieldKind::Info
+        } else {
+            FieldKind::Text
+        }
     };
-    let field_kind = || if root { FieldKind::Info } else { FieldKind::Text };
     Module {
         id: format!("users:{}", user.name),
         title: format!("Users: {}", user.name),

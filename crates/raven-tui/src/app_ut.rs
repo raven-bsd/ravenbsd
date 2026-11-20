@@ -47,11 +47,7 @@ fn seed_accounts(root: &Path) {
         fs::write(&path, text).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
     };
-    write(
-        "etc/passwd",
-        "root:x:0:0:root:/root:/bin/rsh\n",
-        0o644,
-    );
+    write("etc/passwd", "root:x:0:0:root:/root:/bin/rsh\n", 0o644);
     write(
         "etc/shadow",
         "root:$6$rounds=5000$G3aRZtaEHFI9mxqPo3H6$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.:0:0:99999:7:0:0:0\n",
@@ -143,7 +139,9 @@ fn static_without_address_is_a_validation_error() {
     let action = tui.handle(Event::CtrlSave);
     assert!(matches!(action, Action::Validation(_)));
     assert!(!network_path(root.path()).exists());
-    let error = tui.selected_field().and_then(|field| field.error.as_deref());
+    let error = tui
+        .selected_field()
+        .and_then(|field| field.error.as_deref());
     assert!(error.is_some());
 }
 
@@ -235,5 +233,9 @@ fn users_dry_run_names_the_passwd_target_and_hides_the_password() {
     assert!(target.ends_with("etc/passwd"));
     assert!(!text.contains("secret-pass"));
     assert!(text.contains("password = \"<set>\""));
-    assert!(!fs::read_to_string(root.path().join("etc/passwd")).unwrap().contains("musicbox"));
+    assert!(
+        !fs::read_to_string(root.path().join("etc/passwd"))
+            .unwrap()
+            .contains("musicbox")
+    );
 }

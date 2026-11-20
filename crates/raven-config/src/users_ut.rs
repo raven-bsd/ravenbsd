@@ -236,24 +236,12 @@ fn duplicate_name_and_uid_are_rejected() {
     add(&root, "alice", 1000, "alice-pass");
     let duplicate_name = apply(
         root.path(),
-        &UserAction::Add(spec(
-            "alice",
-            1001,
-            1001,
-            "/bin/tui-demo",
-            Some("other"),
-        )),
+        &UserAction::Add(spec("alice", 1001, 1001, "/bin/tui-demo", Some("other"))),
     );
     assert!(duplicate_name.is_err());
     let duplicate_uid = apply(
         root.path(),
-        &UserAction::Add(spec(
-            "bob",
-            1000,
-            1001,
-            "/bin/tui-demo",
-            Some("other"),
-        )),
+        &UserAction::Add(spec("bob", 1000, 1001, "/bin/tui-demo", Some("other"))),
     );
     assert!(duplicate_uid.is_err());
 }
@@ -278,7 +266,10 @@ fn root_cannot_be_deleted_or_reassigned() {
         },
     );
     assert!(reassign.is_err());
-    assert!(root.read("etc/passwd").contains("root:x:0:0:root:/root:/bin/rsh"));
+    assert!(
+        root.read("etc/passwd")
+            .contains("root:x:0:0:root:/root:/bin/rsh")
+    );
 }
 
 #[test]
@@ -286,25 +277,13 @@ fn missing_or_non_executable_shell_is_rejected() {
     let root = TempRoot::new();
     let missing = apply(
         root.path(),
-        &UserAction::Add(spec(
-            "musicbox",
-            1000,
-            1000,
-            "/bin/missing",
-            Some("pass"),
-        )),
+        &UserAction::Add(spec("musicbox", 1000, 1000, "/bin/missing", Some("pass"))),
     );
     assert!(missing.is_err());
     root.write("bin/plain", "not executable\n", 0o644);
     let not_executable = apply(
         root.path(),
-        &UserAction::Add(spec(
-            "musicbox",
-            1000,
-            1000,
-            "/bin/plain",
-            Some("pass"),
-        )),
+        &UserAction::Add(spec("musicbox", 1000, 1000, "/bin/plain", Some("pass"))),
     );
     assert!(not_executable.is_err());
     assert!(!root.exists("etc/passwd.tmp"));
@@ -360,10 +339,13 @@ fn autologin_round_trips_and_malformed_input_is_disabled() {
     };
     let text = render_autologin(&autologin);
     assert_eq!(parse_autologin(&text), autologin);
-    assert_eq!(parse_autologin("[console]\nuser = \"musicbox\"\nenabled = false\n"), Autologin {
-        enabled: false,
-        user: "musicbox".to_string(),
-    });
+    assert_eq!(
+        parse_autologin("[console]\nuser = \"musicbox\"\nenabled = false\n"),
+        Autologin {
+            enabled: false,
+            user: "musicbox".to_string(),
+        }
+    );
     assert_eq!(
         parse_autologin("user = \"bad:name\"\nenabled = true\n"),
         Autologin::default()
@@ -376,13 +358,7 @@ fn a_locked_database_is_reported_busy() {
     fs::write(root.path().join("etc/.pwd.lock"), "other\n").unwrap();
     let result = apply(
         root.path(),
-        &UserAction::Add(spec(
-            "musicbox",
-            1000,
-            1000,
-            "/bin/tui-demo",
-            Some("pass"),
-        )),
+        &UserAction::Add(spec("musicbox", 1000, 1000, "/bin/tui-demo", Some("pass"))),
     );
     assert!(matches!(result, Err(super::UserError::Busy)));
     assert!(!root.read("etc/passwd").contains("musicbox:"));

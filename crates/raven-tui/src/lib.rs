@@ -73,10 +73,7 @@ pub fn run<R: Read, W: Write>(
                     } else {
                         "absent"
                     };
-                    writeln!(
-                        output,
-                        "raven config: dry-run plan={target} file={state}"
-                    )?;
+                    writeln!(output, "raven config: dry-run plan={target} file={state}")?;
                     write!(output, "{text}")?;
                     return Ok(Outcome::DryRun(text));
                 }

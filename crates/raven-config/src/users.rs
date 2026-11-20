@@ -130,7 +130,11 @@ impl UserRecord {
         let home = fields.get(5).copied().unwrap_or_default();
         let shell = fields.get(6).copied().unwrap_or_default();
         if !valid_path(home) || !valid_path(shell) {
-            return Err(parse_error(PASSWD_FILE, line_number, "invalid home or shell"));
+            return Err(parse_error(
+                PASSWD_FILE,
+                line_number,
+                "invalid home or shell",
+            ));
         }
         Ok(Self {
             name: name.to_string(),
@@ -279,7 +283,11 @@ impl GroupRecord {
             return Err(parse_error(GROUP_FILE, line_number, "invalid name"));
         }
         if !matches!(fields.get(1).copied(), Some("x") | Some("*")) {
-            return Err(parse_error(GROUP_FILE, line_number, "invalid password field"));
+            return Err(parse_error(
+                GROUP_FILE,
+                line_number,
+                "invalid password field",
+            ));
         }
         let gid = parse_id(fields.get(2).copied(), GROUP_FILE, line_number, "gid")?;
         let mut members = Vec::new();
@@ -303,12 +311,7 @@ impl GroupRecord {
     }
 
     fn render(&self) -> String {
-        format!(
-            "{}:x:{}:{}",
-            self.name,
-            self.gid,
-            self.members.join(",")
-        )
+        format!("{}:x:{}:{}", self.name, self.gid, self.members.join(","))
     }
 }
 
@@ -365,9 +368,7 @@ impl Accounts {
         }
         for (index, line) in shadow.lines().enumerate() {
             if !line.is_empty() {
-                accounts
-                    .shadows
-                    .push(ShadowRecord::parse(line, index + 1)?);
+                accounts.shadows.push(ShadowRecord::parse(line, index + 1)?);
             }
         }
         for (index, line) in group.lines().enumerate() {
@@ -615,10 +616,7 @@ fn validate_spec(
             errors.push(error("username", "the user does not exist"));
         }
         if existing == ROOT_USER && (spec.uid != 0 || spec.gid != 0 || spec.home != "/root") {
-            errors.push(error(
-                "uid",
-                "root must keep uid 0, gid 0 and home /root",
-            ));
+            errors.push(error("uid", "root must keep uid 0, gid 0 and home /root"));
         }
     }
     if adding && accounts.user(&spec.name).is_some() {
@@ -629,10 +627,7 @@ fn validate_spec(
             errors.push(error("uid", "uid 0 is reserved for root"));
         }
         if spec.uid < MIN_REGULAR_ID || spec.uid > MAX_REGULAR_ID {
-            errors.push(error(
-                "uid",
-                "regular uid must be between 1000 and 59999",
-            ));
+            errors.push(error("uid", "regular uid must be between 1000 and 59999"));
         }
         if accounts
             .users
@@ -645,10 +640,7 @@ fn validate_spec(
             errors.push(error("gid", "gid 0 is reserved for root"));
         }
         if spec.gid < MIN_REGULAR_ID || spec.gid > MAX_REGULAR_ID {
-            errors.push(error(
-                "gid",
-                "regular gid must be between 1000 and 59999",
-            ));
+            errors.push(error("gid", "regular gid must be between 1000 and 59999"));
         }
     }
     let home = effective_home(spec);
@@ -711,7 +703,9 @@ pub fn apply(root: &Path, action: &UserAction) -> Result<ApplyOutcome, UserError
             let password = spec.password.as_deref().unwrap_or_default();
             let hash = hash_password(password)?;
             accounts.users.push(user.clone());
-            accounts.shadows.push(ShadowRecord::hashed(&user.name, &hash));
+            accounts
+                .shadows
+                .push(ShadowRecord::hashed(&user.name, &hash));
             if spec.autologin {
                 accounts.autologin = Autologin {
                     enabled: true,
@@ -777,23 +771,25 @@ pub fn apply(root: &Path, action: &UserAction) -> Result<ApplyOutcome, UserError
         }
         UserAction::Delete { name } => {
             if name == ROOT_USER {
-                return Err(validation(String::from("the root account cannot be deleted")));
+                return Err(validation(String::from(
+                    "the root account cannot be deleted",
+                )));
             }
             let Some(index) = accounts.users.iter().position(|user| &user.name == name) else {
                 return Err(validation(format!("user `{name}` does not exist")));
             };
-            let removed = accounts
-                .users
-                .remove(index);
-            accounts.shadows.retain(|shadow| shadow.name != removed.name);
+            let removed = accounts.users.remove(index);
+            accounts
+                .shadows
+                .retain(|shadow| shadow.name != removed.name);
             for group in &mut accounts.groups {
                 group.members.retain(|member| member != name);
             }
             let group_used = accounts.users.iter().any(|user| user.gid == removed.gid);
             if !group_used {
-                accounts.groups.retain(|group| {
-                    !(group.gid == removed.gid && group.name == removed.name)
-                });
+                accounts
+                    .groups
+                    .retain(|group| !(group.gid == removed.gid && group.name == removed.name));
             }
             if accounts.is_autologin(name) {
                 accounts.autologin = Autologin::default();
@@ -845,21 +841,17 @@ pub fn check(root: &Path) -> Result<CheckReport, UserError> {
             Ok(metadata) => {
                 let mode = metadata.permissions().mode() & 0o777;
                 if mode != expected {
-                    report.errors.push(format!(
-                        "{file}: mode {mode:o}, expected {expected:o}"
-                    ));
+                    report
+                        .errors
+                        .push(format!("{file}: mode {mode:o}, expected {expected:o}"));
                 }
             }
-            Err(error) => report
-                .errors
-                .push(format!("{file}: cannot stat: {error}")),
+            Err(error) => report.errors.push(format!("{file}: cannot stat: {error}")),
         }
     }
     for user in &accounts.users {
         if user.shell.is_empty() {
-            report
-                .errors
-                .push(format!("{}: empty shell", user.name));
+            report.errors.push(format!("{}: empty shell", user.name));
         } else if !shell_executable(root, &user.shell) {
             report.errors.push(format!(
                 "{}: shell {} is not executable",
@@ -923,9 +915,7 @@ pub fn render_plan(action: &UserAction) -> String {
             text.push_str(&format!("autologin = {}\n", spec.autologin));
         }
         UserAction::Delete { name } => {
-            text.push_str(&format!(
-                "action = \"delete\"\nname = \"{name}\"\n"
-            ));
+            text.push_str(&format!("action = \"delete\"\nname = \"{name}\"\n"));
         }
     }
     text
@@ -1019,8 +1009,7 @@ fn write_accounts(root: &Path, accounts: &Accounts) -> Result<ApplyOutcome, User
 
 fn write_autologin(path: &Path, autologin: &Autologin) -> Result<(), UserError> {
     if let Some(directory) = path.parent() {
-        fs::create_dir_all(directory)
-            .map_err(|error| io_error(directory, error))?;
+        fs::create_dir_all(directory).map_err(|error| io_error(directory, error))?;
     }
     let temp = temp_path(path);
     let mut file = OpenOptions::new()
@@ -1077,7 +1066,8 @@ fn stage(path: &Path, data: &[u8], mode: u32) -> Result<(), UserError> {
         .map_err(|error| io_error(&temp, error))?;
     file.set_permissions(fs::Permissions::from_mode(mode))
         .map_err(|error| io_error(&temp, error))?;
-    file.write_all(data).map_err(|error| io_error(&temp, error))?;
+    file.write_all(data)
+        .map_err(|error| io_error(&temp, error))?;
     file.sync_all().map_err(|error| io_error(&temp, error))?;
     Ok(())
 }
@@ -1183,12 +1173,7 @@ fn error(key: &'static str, message: &str) -> SpecError {
     }
 }
 
-fn parse_id(
-    field: Option<&str>,
-    file: &str,
-    line: usize,
-    name: &str,
-) -> Result<u32, UserError> {
+fn parse_id(field: Option<&str>, file: &str, line: usize, name: &str) -> Result<u32, UserError> {
     field
         .unwrap_or_default()
         .parse::<u32>()

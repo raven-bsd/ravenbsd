@@ -110,7 +110,11 @@ mod program {
     fn read_passwd() -> String {
         fs::read_to_vec("file:/etc/passwd")
             .ok()
-            .and_then(|bytes| core::str::from_utf8(&bytes).ok().map(alloc::string::String::from))
+            .and_then(|bytes| {
+                core::str::from_utf8(&bytes)
+                    .ok()
+                    .map(alloc::string::String::from)
+            })
             .unwrap_or_default()
     }
 

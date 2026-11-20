@@ -173,13 +173,15 @@ fn users_root() -> PathBuf {
     );
     write(
         "etc/shadow",
-        &format!(
-            "root:{ROOT_HASH}:0:0:99999:7:0:0:0\nalice:{ROOT_HASH}:0:0:99999:7:0:0:0\n"
-        ),
+        &format!("root:{ROOT_HASH}:0:0:99999:7:0:0:0\nalice:{ROOT_HASH}:0:0:99999:7:0:0:0\n"),
         0o600,
     );
     write("etc/group", "root:x:0:root\nalice:x:1000:\n", 0o644);
-    write("etc/raven/autologin.toml", "[console]\nuser = \"alice\"\nenabled = true\n", 0o644);
+    write(
+        "etc/raven/autologin.toml",
+        "[console]\nuser = \"alice\"\nenabled = true\n",
+        0o644,
+    );
     for directory in ["root", "home/alice"] {
         fs::create_dir_all(root.join(directory)).unwrap();
     }

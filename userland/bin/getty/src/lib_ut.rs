@@ -157,8 +157,11 @@ fn the_loop_does_not_start_a_shell_before_login_succeeds() {
 
 #[test]
 fn autologin_skips_the_prompt_and_runs_the_account_shell() {
-    let mut session = MockSession::new(&[], &[], Ok(0))
-        .with_account("musicbox", "/home/musicbox", "/bin/tui-demo");
+    let mut session = MockSession::new(&[], &[], Ok(0)).with_account(
+        "musicbox",
+        "/home/musicbox",
+        "/bin/tui-demo",
+    );
     let status = run_session(&mut session, &profile(), "/bin/brush", Some("musicbox"));
 
     assert_eq!(status, 0);
@@ -175,8 +178,11 @@ fn autologin_skips_the_prompt_and_runs_the_account_shell() {
 
 #[test]
 fn an_authenticated_regular_account_uses_its_passwd_shell() {
-    let mut session = MockSession::new(&["alice"], &[Ok(0)], Ok(0))
-        .with_account("alice", "/home/alice", "/bin/tui-demo");
+    let mut session = MockSession::new(&["alice"], &[Ok(0)], Ok(0)).with_account(
+        "alice",
+        "/home/alice",
+        "/bin/tui-demo",
+    );
     let status = run_session(&mut session, &profile(), "/bin/brush", None);
 
     assert_eq!(status, 0);
@@ -191,12 +197,7 @@ fn an_authenticated_regular_account_uses_its_passwd_shell() {
 #[test]
 fn an_unknown_autologin_account_falls_back_to_the_prompt() {
     let mut session = MockSession::new(&["root"], &[Ok(0)], Ok(0));
-    let status = run_session(
-        &mut session,
-        &profile(),
-        "/bin/brush",
-        Some("missing"),
-    );
+    let status = run_session(&mut session, &profile(), "/bin/brush", Some("missing"));
 
     assert_eq!(status, 0);
     assert_eq!(session.login_users, ["root"]);

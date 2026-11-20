@@ -83,7 +83,8 @@ fn any_account_with_a_shadow_record_can_authenticate() {
 
 #[test]
 fn passwd_entries_are_looked_up_by_name() {
-    let text = "root:x:0:0:root:/root:/bin/rsh\nalice:x:1000:1000:Alice:/home/alice:/bin/tui-demo\n";
+    let text =
+        "root:x:0:0:root:/root:/bin/rsh\nalice:x:1000:1000:Alice:/home/alice:/bin/tui-demo\n";
     let entries = parse_passwd(text);
     assert_eq!(entries.len(), 2);
     let alice = find_passwd(text, "alice").expect("alice");
@@ -102,7 +103,10 @@ fn autologin_is_parsed_and_invalid_users_disable_it() {
         }
     );
     assert!(!parse_autologin("user = \"musicbox\"\nenabled = false\n").enabled);
-    assert_eq!(parse_autologin("user = \"bad:name\"\nenabled = true\n"), Autologin::default());
+    assert_eq!(
+        parse_autologin("user = \"bad:name\"\nenabled = true\n"),
+        Autologin::default()
+    );
     assert_eq!(parse_autologin(""), Autologin::default());
 }
 
