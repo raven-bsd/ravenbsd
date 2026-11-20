@@ -427,6 +427,8 @@ pub enum Object {
     SchemeRequest(Arc<PendingRequest>),
     /// One end of an in-kernel pipe (`PIPE`/`PIPE2`).
     Pipe(Arc<crate::process::pipe::PipeEnd>),
+    /// One end of a kernel duplex endpoint pair (`DUPLEX_PAIR`).
+    Duplex(Arc<crate::process::duplex::DuplexEnd>),
 }
 
 /// The kernel's handle table type.
