@@ -3,6 +3,7 @@
 
 //! Scheme IPC syscalls (`0x60..0x69`).
 
+use alloc::string::String;
 use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
@@ -73,8 +74,21 @@ fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let path = router::user_string(frame.rdi, frame.rsi, PATH_MAX)?;
     let (scheme, suffix) = model::split_path(&path).map_err(|_| Errno::EINVAL)?;
     let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    // A per-process root only affects the file namespace. Lexical `.`/`..` resolution clamps at
+    // the root before the request leaves the process boundary; symlink resolution remains a
+    // vfsd responsibility (K224).
+    let effective = if matches!(scheme, "file" | "vfs") {
+        let root = caller.root.lock().clone();
+        if root == "/" {
+            String::from(suffix)
+        } else {
+            process::resolve_root_path(&root, suffix)
+        }
+    } else {
+        String::from(suffix)
+    };
     let server = registry::lookup(caller, scheme)?;
-    let handle = router::open(caller, server, suffix, flags)?;
+    let handle = router::open(caller, server, &effective, flags)?;
     Ok(handle.0 as usize)
 }
 

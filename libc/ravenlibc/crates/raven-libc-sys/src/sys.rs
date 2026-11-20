@@ -21,6 +21,20 @@ use crate::arch;
 /// Number of typed wrappers in this module; must equal `Syscall::ALL.len()`.
 pub const WRAPPER_COUNT: usize = 47;
 
+/// Raw `PROC_CHROOT` (`0x0D`): set the calling process's root from a bounded path.
+pub fn proc_chroot(path: &[u8]) -> Result<(), Errno> {
+    // SAFETY: `path` is a live byte slice; the kernel copies it through the fault-safe user
+    // layer and validates the length before resolving it.
+    let raw = unsafe {
+        arch::syscall2(
+            raven_abi::syscall::PROC_CHROOT,
+            path.as_ptr() as usize,
+            path.len(),
+        )
+    };
+    crate::errno::ret(raw).map(|_| ())
+}
+
 /// Raw `PROC_EXEC` (`0x6a`): replace the caller's image from an 88-byte flat request.
 ///
 /// The request layout is owned by the kernel/`raven-libc-proc`; this wrapper only checks the
