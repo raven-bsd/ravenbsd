@@ -40,11 +40,22 @@ impl InputBackend for MinimalInputBackend {
         {
             // The login console reports as a terminal (`isatty` maps to the tty
             // GET_MODE call), but the default RavenBSD backend is `Minimal`. Use the
-            // VT/basic line editor so TAB reaches the completion engine; it still
-            // draws with backspaces and lists ambiguous candidates one per line.
+            // VT line editor so TAB reaches the completion menu and the semantic
+            // highlighter. The plain switches keep drawn input free of escapes.
             #[cfg(feature = "vt")]
             if std::io::stdout().is_terminal() || std::io::stdin().is_terminal() {
-                let mut backend = crate::VtInputBackend::default().with_basic_style();
+                let plain = std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty())
+                    || std::env::var("TERM").is_ok_and(|term| term == "dumb")
+                    || std::env::var("RAVEN_PLAIN_PROMPT").is_ok_and(|value| value == "1");
+                let options = crate::UIOptions {
+                    disable_color: plain,
+                    disable_highlighting: plain,
+                    ..Default::default()
+                };
+                let mut backend = crate::VtInputBackend::default().with_ui_options(&options);
+                if plain {
+                    backend = backend.with_basic_style();
+                }
                 return Box::pin(backend.read_line(shell_ref, prompt)).await;
             }
 

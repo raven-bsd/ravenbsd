@@ -12,6 +12,7 @@ fn spec(script: &str, timeout: Duration) -> RunSpec {
         program: "sh".to_string(),
         args: vec!["-c".to_string(), script.to_string()],
         timeout,
+        keep_ansi: false,
     }
 }
 

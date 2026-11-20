@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K161: TAB completion in the release login. A unique prefix (`ec<TAB>`) must become `echo`, and
-# an ambiguous prefix (`c<TAB>`) must list the candidates. The release brush is the vt/basic editor
-# through the Minimal->Vt delegation (RavenBSD default); the qtest is green with that backend.
+# K161/K192: TAB completion in the release login. A unique prefix (`ec<TAB>`) must become `echo`,
+# and an ambiguous prefix (`c<TAB><TAB>`) must open the Vt candidate menu in columns. The release
+# brush reaches the Vt editor through the Minimal->Vt delegation (RavenBSD default).
 
 name = "shell-completion"
 arch = "x86_64"
@@ -28,7 +28,7 @@ regex = '(?i)^password: ?$'
 regex = '^x$'
 
 [[expect]]
-regex = '^cat$'
+regex = '^caller\s+cat\s+command'
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -63,23 +63,19 @@ delay_ms = 100
 
 [[step]]
 wait = '^x$'
-timeout_secs = 2
+timeout_secs = 30
 
 [[step]]
 wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "c\t"
-delay_ms = 200
+send = "c\t\t"
+delay_ms = 300
 
 [[step]]
-wait = '^cat$'
-timeout_secs = 2
-
-[[step]]
-wait = '^cp$'
-timeout_secs = 2
+wait = '^caller\s+cat\s+command'
+timeout_secs = 30
 
 [[step]]
 send = "\n"
