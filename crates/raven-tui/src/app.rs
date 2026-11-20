@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::model::{self, Field, FieldKind, Module};
+use crate::model::{self, Current, Field, FieldKind, Module, ModuleKind};
 
 /// A terminal-independent input event.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,7 +42,12 @@ pub enum Action {
     /// The plan was written.
     Saved(PathBuf),
     /// The dry-run plan was produced and nothing was written.
-    DryRun(String),
+    DryRun {
+        /// Target path shown to the operator.
+        target: String,
+        /// Plan text; never contains a password.
+        text: String,
+    },
     /// The user cancelled.
     Cancelled,
     /// Validation failed; keep the TUI open with field errors.
@@ -86,6 +91,7 @@ pub struct Tui {
     pub(crate) root: PathBuf,
     pub(crate) options: Options,
     pub(crate) modules: Vec<Module>,
+    pub(crate) accounts: raven_config::users::Accounts,
     pub(crate) active: usize,
     pub(crate) selected: usize,
     pub(crate) filter: String,
@@ -101,14 +107,19 @@ impl Tui {
     /// a failure to open.
     #[must_use]
     pub fn new(root: &Path, options: Options) -> Self {
-        let (current, warning) = model::load_network(root);
-        let status = warning.unwrap_or_else(|| {
+        let (network, warning) = model::load_network(root);
+        let (accounts, accounts_warning) = model::load_accounts(root);
+        let status = warning.or(accounts_warning).unwrap_or_else(|| {
             String::from("Type / or a letter to filter; Enter opens the module")
         });
         Self {
             root: root.to_path_buf(),
             options,
-            modules: model::modules(&current),
+            modules: model::modules(&Current {
+                network,
+                accounts: accounts.clone(),
+            }),
+            accounts,
             active: 0,
             selected: 0,
             filter: String::new(),
@@ -209,7 +220,7 @@ impl Tui {
                     self.active = index;
                     self.focus = Focus::Form;
                     self.field = 0;
-                    let title = self.modules[index].title;
+                    let title = self.modules[index].title.clone();
                     self.status = format!("Module: {title}");
                     self.notice = Some(format!("raven config: module={title}"));
                 }
@@ -259,7 +270,7 @@ impl Tui {
                         .modules
                         .get_mut(self.active)
                         .and_then(|module| module.fields.get_mut(self.field))
-                    && field.kind == FieldKind::Text
+                    && matches!(field.kind, FieldKind::Text | FieldKind::Secret)
                 {
                     field.value.pop();
                     field.error = None;
@@ -274,14 +285,21 @@ impl Tui {
                         .and_then(|module| module.fields.get_mut(self.field))
                 {
                     match field.kind {
-                        FieldKind::Text if character.is_ascii_graphic() || character == ' ' => {
+                        FieldKind::Text | FieldKind::Secret
+                            if character.is_ascii_graphic() || character == ' ' =>
+                        {
                             field.value.push(character);
                             field.error = None;
                         }
-                        FieldKind::Choice(choices) if character == 'd' || character == 's' => {
-                            let wanted = if character == 'd' { "dhcp" } else { "static" };
-                            if choices.contains(&wanted) {
-                                field.value = wanted.to_string();
+                        FieldKind::Choice(choices) => {
+                            let wanted = character.to_ascii_lowercase();
+                            if let Some(choice) = choices.iter().find(|choice| {
+                                choice
+                                    .chars()
+                                    .next()
+                                    .is_some_and(|first| first.to_ascii_lowercase() == wanted)
+                            }) {
+                                field.value = (*choice).to_string();
                                 field.error = None;
                             }
                         }
@@ -366,38 +384,33 @@ impl Tui {
     }
 
     fn save(&mut self) -> Action {
-        let Some(module) = self.modules.get(self.active) else {
+        let Some(module) = self.modules.get(self.active).cloned() else {
             return Action::Error(String::from("no active module"));
         };
         if !module.writable {
             self.status = String::from("Read-only module; no save");
             return Action::Continue;
         }
-        let fields = module.fields.clone();
-        match model::plan_from_fields(&fields) {
-            Err(errors) => {
-                for field in &mut self.modules[self.active].fields {
-                    field.error = None;
-                }
-                let mut messages = Vec::with_capacity(errors.len());
-                for error in errors {
-                    messages.push(error.message.clone());
-                    if let Some(field) = self.modules[self.active]
-                        .fields
-                        .iter_mut()
-                        .find(|field| field.key == error.key)
-                    {
-                        field.error = Some(error.message);
-                    }
-                }
-                self.status = format!("Validation failed: {} field(s)", messages.len());
-                self.notice = Some(String::from("raven config: validation failed"));
-                Action::Validation(messages)
+        match module.kind {
+            ModuleKind::Network => self.save_network(&module),
+            ModuleKind::UsersAdd | ModuleKind::UsersEdit => self.save_user(&module),
+            ModuleKind::Info => {
+                self.status = String::from("Read-only module; no save");
+                Action::Continue
             }
+        }
+    }
+
+    fn save_network(&mut self, module: &Module) -> Action {
+        match model::plan_from_fields(&module.fields) {
+            Err(errors) => self.validation(errors),
             Ok(plan) => {
                 if self.options.dry_run {
                     self.status = String::from("Dry run: nothing written");
-                    Action::DryRun(plan.to_toml())
+                    Action::DryRun {
+                        target: model::network_path(&self.root).display().to_string(),
+                        text: plan.to_toml(),
+                    }
                 } else {
                     match model::write_atomic(&self.root, &plan) {
                         Ok(path) => Action::Saved(path),
@@ -407,4 +420,48 @@ impl Tui {
             }
         }
     }
+
+    fn save_user(&mut self, module: &Module) -> Action {
+        let fields = module.fields.clone();
+        let action = match model::plan_user(&self.root, module, &fields, &self.accounts) {
+            Ok(action) => action,
+            Err(errors) => return self.validation(errors),
+        };
+        if self.options.dry_run {
+            self.status = String::from("Dry run: nothing written");
+            Action::DryRun {
+                target: self.root.join(model::PASSWD_FILE).display().to_string(),
+                text: model::user_plan(&action),
+            }
+        } else {
+            match model::apply_user(&self.root, &action) {
+                Ok(outcome) => Action::Saved(outcome.passwd),
+                Err(error) => Action::Error(error),
+            }
+        }
+    }
+
+    fn validation(&mut self, errors: Vec<model::ValidationError>) -> Action {
+        for field in &mut self.modules[self.active].fields {
+            field.error = None;
+        }
+        let mut messages = Vec::with_capacity(errors.len());
+        for error in errors {
+            messages.push(error.message.clone());
+            if let Some(field) = self.modules[self.active]
+                .fields
+                .iter_mut()
+                .find(|field| field.key == error.key)
+            {
+                field.error = Some(error.message);
+            }
+        }
+        self.status = format!("Validation failed: {} field(s)", messages.len());
+        self.notice = Some(String::from("raven config: validation failed"));
+        Action::Validation(messages)
+    }
 }
+
+#[cfg(test)]
+#[path = "app_ut.rs"]
+mod tests;
