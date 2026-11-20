@@ -72,6 +72,8 @@ pub enum ParseError {
     BadPayload,
     /// The destination is not a dotted-quad IPv4 address.
     BadAddress,
+    /// The destination is empty or otherwise unusable as a host.
+    BadHost,
 }
 
 impl ParseError {
@@ -85,6 +87,7 @@ impl ParseError {
             Self::BadInterval => "invalid interval",
             Self::BadPayload => "invalid payload size",
             Self::BadAddress => "invalid IPv4 address",
+            Self::BadHost => "invalid host",
         }
     }
 }
@@ -177,8 +180,8 @@ pub fn parse<'a>(args: &[&'a str]) -> Result<Options<'a>, ParseError> {
         index += 1;
     }
     let host = host.ok_or(ParseError::Usage)?;
-    if !valid_ipv4(host) {
-        return Err(ParseError::BadAddress);
+    if host.is_empty() {
+        return Err(ParseError::BadHost);
     }
     Ok(Options {
         host,

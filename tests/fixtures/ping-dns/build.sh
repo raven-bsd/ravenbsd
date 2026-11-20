@@ -37,6 +37,9 @@ RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=
 cp "$out/target/x86_64-unknown-none/release/raven-ping-dnsd" "$out/ping-dns-dnsd"
 
 echo "ping-dns: building the release initfs"
+# The image builder can reuse a cached build/x86_64/initfs.img; force the initfs so the current
+# raven-ping binary is packed when this script rebuilds.
+rm -f build/x86_64/initfs.img
 cargo xtask image --arch x86_64 --profile release --output "$out/base.img"
 
 echo "ping-dns: patching the initfs (fixture + test resolv.conf)"
