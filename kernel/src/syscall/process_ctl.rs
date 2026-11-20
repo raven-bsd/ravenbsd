@@ -27,6 +27,28 @@ use crate::syscall::linux::install_handler;
 use crate::usercopy::{copy_from_user, copy_to_user};
 
 /// `proc_create(flags) -> Handle`.
+/// `proc_reboot(how)` powers off, halts or resets the machine. Root-only.
+pub fn reboot(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    if caller.ids.lock().euid != 0 {
+        return Err(Errno::EPERM);
+    }
+    let how = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    if how & !raven_abi::syscall::RB_FLAGS != 0 {
+        return Err(Errno::EINVAL);
+    }
+    if how & raven_abi::syscall::RB_POWER_OFF != 0 {
+        crate::kprintln!("power: poweroff");
+        crate::arch::poweroff()
+    } else if how & raven_abi::syscall::RB_HALT != 0 {
+        crate::kprintln!("power: halt");
+        crate::arch::halt()
+    } else {
+        crate::kprintln!("power: reboot");
+        crate::arch::reset()
+    }
+}
+
 pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let flags = usize::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
     if flags & !CREATE_LINUX != 0 {

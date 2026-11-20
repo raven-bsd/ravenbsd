@@ -84,6 +84,10 @@ syscalls! {
     /// `SELF_PROC` or a process handle with `ADMIN`. Child prefixes must be inside the caller's namespace (`ADMIN` root may
     /// grant any valid prefix). `op` is `types::namespace::{ADD,REMOVE,CLEAR}`; see contract C17.
     PROC_NAMESPACE = 0x33;
+    /// `proc_reboot(how: u32) -> !` powers off, halts or reboots the machine. Root-only
+    /// (`euid == 0`); `how` is a mask of [`RB_HALT`], [`RB_POWER_OFF`] and [`RB_AUTOBOOT`].
+    /// Returns `-EPERM` for a non-root caller and `-EINVAL` for unknown bits.
+    PROC_REBOOT = 0x46;
 
     /// `map(proc: Handle, memobj: Handle, offset: usize, addr: usize, len: usize, flags: usize) -> addr`
     /// maps `len` bytes (page multiple) of `memobj` (or fresh zeroed memory when `memobj ==
@@ -180,6 +184,15 @@ syscalls! {
     /// `irq_ack(irq: Handle) -> 0` re-enables (unmasks) the interrupt after the driver handled it. Ticket S21c.
     IRQ_ACK = 0x76;
 }
+
+/// Reboot to the normal multi-user state.
+pub const RB_AUTOBOOT: u32 = 0;
+/// Halt without powering off.
+pub const RB_HALT: u32 = 0x0000_0008;
+/// Power off if the platform supports it.
+pub const RB_POWER_OFF: u32 = 0x0000_4000;
+/// Mask of reboot flags accepted by [`Syscall::PROC_REBOOT`].
+pub const RB_FLAGS: u32 = RB_HALT | RB_POWER_OFF;
 
 /// `trace_set(id: u64) -> 0`.
 ///
