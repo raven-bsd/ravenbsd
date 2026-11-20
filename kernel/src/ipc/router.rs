@@ -320,12 +320,17 @@ pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
     let file = {
         let handles = caller.handles.lock();
         match handles.get(handle, Rights::NONE)? {
-            Object::SchemeFile(file) => Arc::clone(file),
+            Object::SchemeFile(file) => Some(Arc::clone(file)),
+            // In-kernel endpoints have no userspace server to notify. `close_handle` drops the
+            // last Arc; the endpoint's Drop then wakes its peer and releases the side lifetime.
+            Object::Pipe(_) | Object::Duplex(_) => None,
             _ => return Err(Errno::EBADF),
         }
     };
     crate::event::close_handle(caller, handle)?;
-    if Arc::strong_count(&file) == 1 {
+    if let Some(file) = file
+        && Arc::strong_count(&file) == 1
+    {
         // No other handle, transfer or in-flight request references this open-file description.
         // Build the CLOSE requests here, in the shallow close-syscall context, so they are
         // queued before the caller's next request.
