@@ -36,6 +36,9 @@ fi
 [ -f "$baseline_disk" ] || fail "missing baseline root disk $baseline_disk"
 [ -f "$baseline_esp" ] || fail "missing baseline ESP $baseline_esp"
 
+# A prior guest boot in the same acceptance run can leave the rw root dirty.
+scripts/raven-ufs repair "$baseline_disk" >> "$log" 2>&1 ||
+    fail "cannot preen the baseline root disk"
 cp "$baseline_disk" "$target" || fail "cannot copy the baseline root disk"
 printf 'k185-first\n' > "$payload" || fail "cannot create the first payload"
 
