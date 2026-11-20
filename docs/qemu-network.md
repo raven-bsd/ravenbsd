@@ -71,12 +71,21 @@ tap, and proves:
 - host `dig @10.0.2.3 example.com` — **PASS** (`104.20.23.154`);
 - `down` leaves no bridge, tap, dnsmasq or NAT rule — **PASS**.
 
-Known limit: the release image's `ping` is numeric-only, and its static `/etc/resolv.conf` has no
-`nameserver` line (resolvd normally gets DNS from the QEMU user-mode DHCP lease). A tap has no such
-lease because netd keeps the fixed address, so the guest cannot currently look up a name from the
-shell. The DNS server itself is proven by the host query and the guest can reach `10.0.2.3`. A
-guest-side name lookup needs a release-image resolver line or a resolv-test guest; that is outside
-K194's helper scope and is reported rather than hidden.
+### K203 handoff: guest name resolution
+
+This ticket does **not** claim that the guest resolves a name. The exact handoff to K203 is:
+
+- `raven-ping` is numeric-only; `ping -c 3 example.com` fails with `ping: invalid IPv4 address`.
+- The release image's static `/etc/resolv.conf` has no `nameserver` line, so the guest resolver
+  has no server to query.
+- `resolvd` normally takes DNS from the QEMU user-mode DHCP lease; with the tap, `netd` keeps the
+  fixed `10.0.2.15/24` and no lease is consumed, so resolvd does not write `/etc/resolv.conf`.
+- The DNS server itself is real and proven: the guest reaches `10.0.2.3`, and host
+  `dig @10.0.2.3 example.com` returns `104.20.23.154`.
+
+K203 must add a guest resolver path (a static nameserver line in the release image, a
+resolv-test guest, or an equivalent first-party client) and re-run the name lookup. K194 makes no
+netd or `resolv.conf` change.
 
 No Pi 4 board is involved. The original S95 slirp user-network gate remains available by running
 `scripts/qemu-net.sh` without a subcommand.

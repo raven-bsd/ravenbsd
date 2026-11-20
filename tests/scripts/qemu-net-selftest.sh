@@ -190,10 +190,8 @@ guest("ping -c 3 10.0.2.2", r"0% packet loss")
 guest("ping -c 3 1.1.1.1", r"0% packet loss")
 # The guest ping binary is numeric-only and the release image's static
 # /etc/resolv.conf has no nameserver line (resolvd waits for a DHCP lease); the
-# guest can reach the DNS address, and the host dig below proves name lookup
-# through the same dnsmasq instance.
+# guest can reach the DNS address, and the host dig below proves the DNS server.
 guest("ping -c 3 10.0.2.3", r"0% packet loss")
-guest("cat /etc/resolv.conf", r".*")
 send("exit 0\n")
 read_until(r"init exited \(0\)", 30)
 try:
@@ -202,7 +200,7 @@ except subprocess.TimeoutExpired:
     proc.terminate()
     proc.wait(timeout=5)
 log.close()
-print("PASS guest: host, internet and DNS")
+print("PASS guest: host and internet; DNS server reachable")
 PY
 status=$?
 if [ "$status" -ne 0 ]; then
@@ -238,4 +236,5 @@ if [ -s /run/raven-qemu-net-dnsmasq.pid ]; then
     exit 1
 fi
 
-echo "qemu-net-selftest: PASS (host/guest ping, internet, DNS, cleanup)"
+echo "qemu-net-selftest: PASS (host/guest ping, internet, DNS server reachable, cleanup)"
+echo "qemu-net-selftest: K203: guest name resolution is not claimed (numeric-only raven-ping, no nameserver; see docs/qemu-network.md)"
