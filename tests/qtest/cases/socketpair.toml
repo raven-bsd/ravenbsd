@@ -11,13 +11,24 @@ initfs = "build/fixtures/socketpair/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
-# K206 BLOCKED: the kernel has no duplex endpoint ABI. PIPE/PIPE2 (0x6e/0x6f) is half-duplex
-# (read on the writer and write on the reader are EBADF), raven-chan is a pure model with no
-# syscall, and the one-handle-per-OFD fd table cannot represent two pipes as one endpoint.
-# Remove this line when CHANNEL_CREATE/socketpair lands; the fixture then checks both directions,
-# EOF, EPIPE and datagram boundaries.
-skip = "needs the kernel duplex endpoint ABI (no CHANNEL_CREATE/socketpair; PIPE/PIPE2 is half-duplex); enabling this case prints 'socketpair: socketpair errno=97'"
+# K206 is implemented over the K208 pair, but libc close(2) still goes through CLOSE (0x64),
+# whose kernel router only recognises Object::SchemeFile (kernel/src/ipc/router.rs:319-326).
+# A duplex endpoint close returns EBADF, so this case is skipped until that kernel path handles
+# Object::Duplex. Removing the skip reproduces `socketpair: close first errno=9`.
+skip = "needs the kernel CLOSE(0x64) path for Object::Duplex (router::close returns EBADF for non-SchemeFile handles); enabling this case prints 'socketpair: close first errno=9'"
 pre = ["sh tests/qtest/cases/socketpair-fixture/build.sh"]
+
+[[expect]]
+regex = '^socketpair: dgram ok$'
+
+[[expect]]
+regex = '^socketpair: shutdown-read ok$'
+
+[[expect]]
+regex = '^socketpair: shutdown-both ok$'
+
+[[expect]]
+regex = '^socketpair: close ok$'
 
 [[expect]]
 regex = '^socketpair: a-to-b ok$'
@@ -30,9 +41,6 @@ regex = '^socketpair: eof ok$'
 
 [[expect]]
 regex = '^socketpair: peer-close ok$'
-
-[[expect]]
-regex = '^socketpair: dgram ok$'
 
 [[expect]]
 regex = '^socketpair: ok$'

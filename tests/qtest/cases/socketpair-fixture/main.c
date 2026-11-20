@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
-// K206 target fixture: exercise the real libc socketpair(AF_UNIX) path. It prints a single
-// diagnostic line per check on the RavenBSD debug console, so the qtest can match it without a
-// tty. The fixture is staged for the kernel duplex-endpoint primitive; on the current tree the
-// first socketpair call returns EAFNOSUPPORT (97).
+// K206 target fixture: exercise the real libc socketpair(AF_UNIX) path over the kernel duplex
+// endpoint pair (K208). It prints a single diagnostic line per check on the RavenBSD debug
+// console, so the qtest can match it without a tty.
 
 #include <errno.h>
 #include <stddef.h>
@@ -45,6 +44,22 @@ static int fail(const char *what) {
     say_errno(what, errno);
     say("socketpair: fail\n");
     return 1;
+}
+
+static int close_pair(void) {
+    int sv[2];
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("close socketpair");
+    }
+    if (close(sv[0]) != 0) {
+        return fail("close first");
+    }
+    if (close(sv[1]) != 0) {
+        return fail("close second");
+    }
+    say("socketpair: close ok\n");
+    return 0;
 }
 
 static int stream_pair(void) {
@@ -98,6 +113,56 @@ static int stream_pair(void) {
     return 0;
 }
 
+static int shutdown_read_pair(void) {
+    int sv[2];
+    char buffer[4];
+    ssize_t count;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("shutdown-read socketpair");
+    }
+    if (shutdown(sv[0], SHUT_RD) != 0) {
+        return fail("shutdown read");
+    }
+    count = read(sv[0], buffer, sizeof(buffer));
+    if (count != 0) {
+        return fail("shutdown read eof");
+    }
+    count = send(sv[1], "x", 1, MSG_NOSIGNAL);
+    if (count != -1 || errno != EPIPE) {
+        return fail("shutdown read peer epipe");
+    }
+    say("socketpair: shutdown-read ok\n");
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    return 0;
+}
+
+static int shutdown_both_pair(void) {
+    int sv[2];
+    char buffer[4];
+    ssize_t count;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("shutdown-both socketpair");
+    }
+    if (shutdown(sv[0], SHUT_RDWR) != 0) {
+        return fail("shutdown both");
+    }
+    count = read(sv[0], buffer, sizeof(buffer));
+    if (count != 0) {
+        return fail("shutdown both eof");
+    }
+    count = send(sv[0], "x", 1, MSG_NOSIGNAL);
+    if (count != -1 || errno != EPIPE) {
+        return fail("shutdown both epipe");
+    }
+    say("socketpair: shutdown-both ok\n");
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    return 0;
+}
+
 static int datagram_pair(void) {
     int sv[2];
     char buffer[16];
@@ -124,10 +189,19 @@ static int datagram_pair(void) {
 }
 
 int main(void) {
-    if (stream_pair() != 0) {
+    if (datagram_pair() != 0) {
         return 1;
     }
-    if (datagram_pair() != 0) {
+    if (shutdown_read_pair() != 0) {
+        return 1;
+    }
+    if (shutdown_both_pair() != 0) {
+        return 1;
+    }
+    if (close_pair() != 0) {
+        return 1;
+    }
+    if (stream_pair() != 0) {
         return 1;
     }
     say("socketpair: ok\n");
