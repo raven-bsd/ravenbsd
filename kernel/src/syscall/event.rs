@@ -316,6 +316,7 @@ fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result
     match process.handles.lock().get(handle, Rights::READ)? {
         Object::Timer(_) | Object::UserEvent(_) | Object::Process(_) => Ok(()),
         Object::Irq(_) => Ok(()),
+        Object::Duplex(_) => Ok(()),
         #[cfg(target_arch = "x86_64")]
         Object::SchemeFile(_) | Object::SchemeServer(_) => Ok(()),
         _ => Err(Errno::EBADF),
@@ -331,6 +332,7 @@ fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
         Ok(Object::Process(target)) if *target.state.lock() == ProcessState::Exited => {
             event::SIGNALED
         }
+        Ok(Object::Duplex(end)) => end.readiness(),
         #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeServer(server)) if !server.is_live() => event::HUP,
         #[cfg(target_arch = "x86_64")]

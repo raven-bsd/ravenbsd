@@ -145,6 +145,7 @@ fn clone_for_copy(object: &Object) -> Result<Object, Errno> {
         Object::SchemeFile(file) => Ok(Object::SchemeFile(Arc::clone(file))),
         Object::SchemeServer(server) => Ok(Object::SchemeServer(Arc::clone(server))),
         Object::Pipe(end) => Ok(Object::Pipe(Arc::clone(end))),
+        Object::Duplex(end) => Ok(Object::Duplex(Arc::clone(end))),
         _ => Err(Errno::EINVAL),
     }
 }
@@ -177,6 +178,7 @@ pub fn clone_transferable(
         Object::SchemeFile(object) => Object::SchemeFile(Arc::clone(object)),
         Object::SchemeServer(object) => Object::SchemeServer(Arc::clone(object)),
         Object::Pipe(object) => Object::Pipe(Arc::clone(object)),
+        Object::Duplex(object) => Object::Duplex(Arc::clone(object)),
         _ => return Err(Errno::EBADF),
     };
     Ok((object, rights, node))

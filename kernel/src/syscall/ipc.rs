@@ -92,6 +92,13 @@ fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
             raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
         );
     }
+    if let Object::Duplex(end) = object {
+        caller.handles.lock().get(handle, Rights::READ)?;
+        return crate::process::duplex::read(
+            &end,
+            raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
+        );
+    }
     let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
     crate::process::tty::check_access(caller, &file, false)?;
     router::read(caller, &file, frame.rsi, frame.rdx)
@@ -106,6 +113,13 @@ fn write(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
         }
         caller.handles.lock().get(handle, Rights::WRITE)?;
         return crate::process::pipe::write(
+            &end,
+            raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
+        );
+    }
+    if let Object::Duplex(end) = object {
+        caller.handles.lock().get(handle, Rights::WRITE)?;
+        return crate::process::duplex::write(
             &end,
             raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
         );
