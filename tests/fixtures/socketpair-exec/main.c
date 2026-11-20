@@ -71,7 +71,8 @@ int main(void) {
     char data_fd[16];
     char count[16];
     char cloexec_fd[16];
-    char *reader_argv[5];
+    char shared_fd[16];
+    char *reader_argv[6];
     char *reader_envp[1] = {NULL};
     pid_t child;
     ssize_t written;
@@ -95,12 +96,14 @@ int main(void) {
     if (child == 0) {
         int inherited;
         int duplicate;
+        int shared;
 
         (void)close(data[0]);
         (void)close(close_on_exec[0]);
         inherited = data[1];
         duplicate = dup(inherited);
-        if (duplicate < 0) {
+        shared = dup(inherited);
+        if (duplicate < 0 || shared < 0) {
             return fail("child dup");
         }
         if (close(inherited) != 0) {
@@ -108,14 +111,16 @@ int main(void) {
         }
         if (decimal(data_fd, sizeof(data_fd), duplicate) != 0 ||
             decimal(count, sizeof(count), BYTE_COUNT) != 0 ||
-            decimal(cloexec_fd, sizeof(cloexec_fd), close_on_exec[1]) != 0) {
+            decimal(cloexec_fd, sizeof(cloexec_fd), close_on_exec[1]) != 0 ||
+            decimal(shared_fd, sizeof(shared_fd), shared) != 0) {
             return fail("child argv");
         }
         reader_argv[0] = (char *)"socketpair-exec-reader";
         reader_argv[1] = data_fd;
         reader_argv[2] = count;
         reader_argv[3] = cloexec_fd;
-        reader_argv[4] = NULL;
+        reader_argv[4] = shared_fd;
+        reader_argv[5] = NULL;
         execve("/bin/libc-child", reader_argv, reader_envp);
         return fail("child execve");
     }

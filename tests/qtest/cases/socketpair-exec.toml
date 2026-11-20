@@ -20,6 +20,9 @@ regex = '^socketpair-exec: exact bytes ok$'
 regex = '^socketpair-exec: eof ok$'
 
 [[expect]]
+regex = '^socketpair-exec: shared fd survives close$'
+
+[[expect]]
 regex = '^socketpair-exec: cloexec closed$'
 
 [[expect]]

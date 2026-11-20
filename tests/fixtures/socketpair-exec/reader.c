@@ -64,17 +64,20 @@ int main(int argc, char **argv) {
     unsigned char buffer[754];
     int data_fd;
     int cloexec_fd;
+    int shared_fd;
     int expected;
     size_t total = 0;
     ssize_t count;
 
-    if (argc != 4) {
+    if (argc != 5) {
         return fail("reader argv");
     }
     data_fd = parse(argv[1]);
     expected = parse(argv[2]);
     cloexec_fd = parse(argv[3]);
-    if (data_fd < 0 || expected <= 0 || (size_t)expected > sizeof(buffer) || cloexec_fd < 0) {
+    shared_fd = parse(argv[4]);
+    if (data_fd < 0 || expected <= 0 || (size_t)expected > sizeof(buffer) ||
+        cloexec_fd < 0 || shared_fd < 0) {
         return fail("reader args");
     }
     while (total < (size_t)expected) {
@@ -96,6 +99,18 @@ int main(int argc, char **argv) {
         return fail("reader eof");
     }
     say("socketpair-exec: eof ok\n");
+
+    // data_fd and shared_fd were dup'd from one handle before exec. Closing the first must not
+    // close the shared OFD; the second still sees the same stream and its EOF.
+    if (close(data_fd) != 0) {
+        return fail("reader close data");
+    }
+    errno = 0;
+    count = read(shared_fd, buffer, sizeof(buffer));
+    if (count != 0) {
+        return fail("reader shared fd");
+    }
+    say("socketpair-exec: shared fd survives close\n");
 
     errno = 0;
     count = read(cloexec_fd, buffer, 1);
