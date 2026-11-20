@@ -52,9 +52,9 @@ impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
     }
 
     fn attach(&self, ofd: u32, s: Sock) {
-        if self.platform.attach_handle(ofd, Handle(s.0)).is_ok() {
-            self.event(ofd, s);
-        }
+        // The event is attached after bind/listen/connect: the scheme rejects `Call::Event`
+        // before the socket exists, and a second attach would replace the event the fd polls.
+        let _ = self.platform.attach_handle(ofd, Handle(s.0));
     }
 
     fn event(&self, ofd: u32, s: Sock) {
