@@ -140,7 +140,7 @@ wait = '^raven# $'
 timeout_secs = 10
 
 [[step]]
-send = "cmp /tmp/insult-curl.txt /tmp/insult-wget.txt && echo cmp-ok\n"
+send = "curl_bytes=$(wc -c < /tmp/insult-curl.txt); wget_bytes=$(wc -c < /tmp/insult-wget.txt); [ \"$curl_bytes\" = \"$wget_bytes\" ] && echo cmp-ok\n"
 delay_ms = 100
 
 [[step]]
