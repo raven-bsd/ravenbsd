@@ -17,5 +17,5 @@ AuthorizedKeysFile none
 StrictModes no
 PrintMotd no
 UseDNS no
-LogLevel VERBOSE
+LogLevel DEBUG1
 Subsystem sftp internal-sftp
