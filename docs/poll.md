@@ -45,3 +45,8 @@ A forked child inherits its parent's cached event queue handle. Because a queue 
 `poll` treats `EVQ_WAIT` `EBUSY` as that inherited-queue case: it drops the cached handle, creates
 a fresh queue for the child and retries once. The parent keeps its own queue; neither waiter sees
 `EBUSY`.
+
+The exec `FdMap` duplicates each inherited socket event handle (`HANDLE_DUP`) and records the
+child's handle, so a parent that closes its accepted fd/event immediately after fork cannot
+invalidate the child's readiness source. If the duplicate is unavailable, the original handle is
+kept so the data fds still inherit.
