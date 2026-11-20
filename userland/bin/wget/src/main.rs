@@ -193,6 +193,7 @@ mod tls_program {
         fn free(pointer: *mut c_void);
         fn posix_memalign(pointer: *mut *mut c_void, alignment: usize, size: usize) -> c_int;
         fn clock_gettime(clock_id: c_int, time: *mut TimeSpec) -> c_int;
+        fn write(fd: c_int, buffer: *const c_void, count: usize) -> isize;
     }
 
     #[panic_handler]
@@ -324,33 +325,15 @@ mod tls_program {
     fn write_stdout(bytes: &[u8]) -> Result<(), ()> {
         let mut offset = 0usize;
         while offset < bytes.len() {
-            let written = debug_write(bytes.get(offset..).unwrap_or(&[]));
-            if written == 0 {
+            let slice = bytes.get(offset..).unwrap_or(&[]);
+            // SAFETY: fd 1 is the process stdout and `slice` is a live readable buffer.
+            let written = unsafe { write(1, slice.as_ptr().cast(), slice.len()) };
+            if written <= 0 {
                 return Err(());
             }
-            offset = offset.saturating_add(written);
+            offset = offset.saturating_add(usize::try_from(written).unwrap_or(0));
         }
         Ok(())
-    }
-
-    fn debug_write(bytes: &[u8]) -> usize {
-        // raven-abi Syscall::DEBUG_WRITE (0x03), matching the runtime's console sink.
-        let mut number: usize = 3;
-        let pointer = bytes.as_ptr() as usize;
-        let length = bytes.len();
-        // SAFETY: DEBUG_WRITE reads `length` bytes from the live slice and returns the count.
-        unsafe {
-            core::arch::asm!(
-                "syscall",
-                inlateout("rax") number,
-                in("rdi") pointer,
-                in("rsi") length,
-                lateout("rcx") _,
-                lateout("r11") _,
-                options(nostack),
-            );
-        }
-        number
     }
 
     fn output(text: &str) {
