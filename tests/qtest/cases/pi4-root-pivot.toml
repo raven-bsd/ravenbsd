@@ -49,13 +49,28 @@ regex = '(?i)^password: ?$'
 regex = '^pi4-ufs-root$'
 
 [[expect]]
+regex = '^cat=0$'
+
+[[expect]]
+regex = '^uname=0$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^mount=0$'
+
+[[expect]]
 regex = '^k182-persist$'
+
+[[expect]]
+regex = '^persist=0$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|no UFS root device|pivot mount failed|staying on the initfs|fsd-ufs: .*failed|blockd: .*failed'
+regex = '(?i)panic|EXCEPTION|no UFS root device|pivot mount failed|staying on the initfs|fsd-ufs: .*failed|blockd: .*failed|bad file descriptor|ebadf'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
@@ -78,7 +93,7 @@ wait = '^raven# $'
 timeout_secs = 120
 
 [[step]]
-send = "while IFS= read -r line; do echo \"$line\"; done < /etc/raven/ufs-root-marker\n"
+send = "/bin/cat /etc/raven/ufs-root-marker; echo cat=$?\n"
 delay_ms = 100
 
 [[step]]
@@ -86,11 +101,39 @@ wait = '^pi4-ufs-root$'
 timeout_secs = 30
 
 [[step]]
-send = "echo k182-persist > /persist-marker; while IFS= read -r line; do echo \"$line\"; done < /persist-marker\n"
+wait = '^cat=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/uname -a; echo uname=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^uname=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/mount; echo mount=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^mount=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/echo k182-persist > /persist-marker && /bin/cat /persist-marker; echo persist=$?\n"
 delay_ms = 100
 
 [[step]]
 wait = '^k182-persist$'
+timeout_secs = 30
+
+[[step]]
+wait = '^persist=0$'
 timeout_secs = 30
 
 [[step]]
