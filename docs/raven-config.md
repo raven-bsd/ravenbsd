@@ -14,19 +14,21 @@ with no subcommand exits 2 with a usage message and never tries to draw.
 ```
 Modules                 Network  (Hostname, DHCP or static IPv4 address)
 > Network                Hostname: raven
-  Services              Mode: dhcp
-  Logging                Address: (not set)
-  Theme                  Prefix: 24
-  About                  Gateway: (not set)
-                         DNS: (not set)
-                         [ Save ]  [ Cancel ]
+  Users (add)            Mode: dhcp
+  Users: root            Address: (not set)
+  Users: raven           Prefix: 24
+  Services              Gateway: (not set)
+  Logging                DNS: (not set)
+  Theme                  [ Save ]  [ Cancel ]
+  About
 status: ...
 ```
 
-Modules: **Network** (the writable form), **Services**, **Logging**, **Theme** and **About**
-(read-only current values/help in this ticket; K198/K76 own their apply paths). The registry is
-data-driven in `crates/raven-tui/src/model.rs`; adding a module is a registry entry, not a new
-renderer.
+Modules: **Network** and the **Users** forms (writable), **Services**, **Logging**, **Theme**
+and **About** (read-only current values/help; K198/K76 own their apply paths). The Users add
+form and one form per account are generated from the files-backed account model; see
+[`docs/users.md`](users.md). The registry is data-driven in `crates/raven-tui/src/model.rs`;
+adding a module is a registry entry, not a new renderer.
 
 ## Keys
 
@@ -37,7 +39,7 @@ renderer.
 | Enter | open the selected module; in the form, validate and save |
 | Tab / Down | next form field |
 | Up | previous form field |
-| Left/Right | toggle the `mode` choice (`dhcp`/`static`) |
+| Left/Right or the first letter | cycle a choice (`dhcp`/`static`, `no`/`yes`) |
 | Backspace | delete one character from a text field |
 | Ctrl-S | validate and save (same as Enter in the form) |
 | Esc | leave the form (back to list); from the list, cancel |
@@ -83,11 +85,31 @@ dns = ["10.0.2.3"]
 `crates/raven-tui/src/model.rs`; K198 owns netd's apply and the strict `raven-config` schema. The
 form does not hard-code a shell command, `eval` or a vendor TUI framework.
 
+## Users module (K229)
+
+The Users forms edit the real account database: `/etc/passwd`, `/etc/shadow`, `/etc/group` and
+`/etc/raven/autologin.toml`. The add form takes username, uid/gid, home, shell, password and
+confirmation (both masked), console autologin and, on an existing account, a delete choice.
+Passwords are hashed with `raven-auth` SHA-512-crypt `$6$`; the shadow file is written atomically
+with mode 0600. A save creates `/home/<name>` with the account's uid/gid and mode 0755 (the
+admin runs as root), preserves root/uid 0 and leaves unrelated accounts intact.
+
+`--dry-run` on a Users form names the `/etc/passwd` target, reports `file=present` when it
+exists, and prints the plan with `password = "<set>"` or `"<unchanged>"`; it never prints a
+secret. The scriptable surface is `raven users list|show|check` (JSON with `--json`). Details,
+the base `raven` account and the musicbox/TUI-shell pattern are in [`docs/users.md`](users.md).
+
 ## Tests
 
-* Host state-machine/model tests: `cargo nextest run -p raven-tui` (search, selection, editing,
-  validation, atomic write, dry-run, read-only modules, non-TTY guard) and
-  `cargo nextest run -p raven` (the binary invocation guard).
+* Host state-machine/model tests: `cargo nextest run -p raven-tui -p raven-config` (search,
+  selection, editing, validation, atomic writes, Users add/edit/delete, the `$6$` hash, dry-run,
+  read-only modules, non-TTY guard) and `cargo nextest run -p raven` (the binary invocation
+  guard and `users list/show/check` JSON). `cargo nextest run -p login -p raven-getty` covers
+  multi-account authentication, the passwd shell and console autologin.
+* `raven-users` (`tests/qtest/cases/raven-users.toml`): boots the one-disk UFS demo, adds
+  `musicbox` with a stub `/bin/tui-demo` through the TUI, verifies passwd/shadow/group, the home,
+  the `$6$` hash and the autologin file, authenticates with `/bin/login`, runs the passwd shell
+  locally, and checks `raven users list/show/check` JSON. The `ssh musicbox@` proof remains K195.
 * `raven-config-tui` qtest (`tests/qtest/cases/raven-config-tui.toml`): boots the
   `raven-admin-test` profile, sets `NO_COLOR=1`, `RAVEN_TUI=1` and
   `RAVEN_CONFIG_ROOT=/tmp/raven-config-test`, drives `raven config --dry-run` and the real save
