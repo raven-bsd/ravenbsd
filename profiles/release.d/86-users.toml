@@ -10,6 +10,6 @@ path = "/home/raven/.keep"
 mode = 0o644
 
 [[initfs.files]]
-src = "profiles/release.d/autologin.toml"
+src = "profiles/release.d/autologin.conf"
 path = "/etc/raven/autologin.toml"
 mode = 0o644
