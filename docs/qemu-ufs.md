@@ -93,6 +93,27 @@ The boot transcript still contains `svcd: root pivoted to UFS at /`, `ufs: 240M 
 `scripts/qemu-ufs.sh --build-only`, then the harness reads the qcow2 from the case `image`
 field instead of rebuilding the profile.
 
+## 2a. Session policy and logout (K234)
+
+The demo uses its own session policy, not the release one-shot:
+
+- `profiles/qemu-ufs.d/getty.manifest`: `restart = "always"`, `restart_delay_ms = 200`,
+  `max_restarts = 1000`, needs `vfsd`;
+- `profiles/qemu-ufs.d/svcd.conf`: no `exit_when_exits = getty`;
+- `profiles/qemu-ufs.d/10-session.toml` stages those two files.
+
+A normal `exit` returns to `login:` and accepts a second login. The release profile keeps
+`exit_when_exits = getty` and `release-login` remains the one-shot `test-exit=1` gate. Evidence:
+
+```sh
+cargo xtask qtest --case ufs-logout --arch x86_64   # login, exit, login again; timeout end
+cargo xtask qtest --case release-login --arch x86_64 # unchanged one-shot
+```
+
+The bounded `ufs-logout` case boots without `test-exit`, requires a second `login:` and a second
+successful login, and ends at the harness timeout (K235 will add a clean shutdown). It does not
+fake an init exit. See `docs/session.md` for the donor map.
+
 ## 3. Evidence
 
 Observed one-disk build (K193 rework):

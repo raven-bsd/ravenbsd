@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K234: the UFS demo must return to `login:` after a normal shell exit and
+# accept a second login. The case boots without test-exit and ends at the
+# harness timeout (K235 provides a clean shutdown).
+
+name = "ufs-logout"
+arch = "x86_64"
+profile = "qemu-ufs"
+timeout_secs = 90
+pre = ["sh scripts/ufs-demo.sh --prepare-tools"]
+boot_cmdline = "console=ttyS0"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/x86_64/qemu-ufs-root.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "timeout"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
+
+# A normal shell exit must never end init in the demo.
+[[forbid]]
+regex = '^init exited'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 90
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 60
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 60
