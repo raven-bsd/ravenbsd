@@ -33,7 +33,9 @@ pub(crate) fn run(
     let backend = crate::ffi::procbackend::backend();
     let cwd = crate::ffi::platform::global().cwd();
     if !search {
+        let _ = raven_libc_sys::sys::debug_write(b"ex:begin\n");
         let value = crate::ffi::map_proc::exec(&backend, &cwd, path, &argv, &envp, fd);
+        let _ = raven_libc_sys::sys::debug_write(alloc::format!("ex:end {value}\n").as_bytes());
         return crate::ffi::ret::int(Err(crate::ffi::map_proc::error(value)));
     }
     let mut diag = |_message: &[u8]| {};
