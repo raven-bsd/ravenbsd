@@ -63,13 +63,13 @@ mod program {
                 return Err(alloc::format!("cannot resolve {}: timed out", options.host));
             }
             Err(ResolveError::Io) => {
-                return Err(alloc::format!("cannot resolve {}: resolver error", options.host));
+                return Err(alloc::format!(
+                    "cannot resolve {}: resolver error",
+                    options.host
+                ));
             }
         };
-        let address = alloc::format!(
-            "{}.{}.{}.{}",
-            target[0], target[1], target[2], target[3]
-        );
+        let address = alloc::format!("{}.{}.{}.{}", target[0], target[1], target[2], target[3]);
         let id = echo_id()?;
         let client = Client::new();
         let path = alloc::format!("net:icmp/{address}");
