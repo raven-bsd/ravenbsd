@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K230 socket-inet service: runs after netd publishes the net scheme, binds the AF_INET listener
+# and echoes one hostfwd connection. The test-only svcd.conf exits init with this service status.
+
+name = "socket-inet"
+exec = "/bin/socket-inet"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
