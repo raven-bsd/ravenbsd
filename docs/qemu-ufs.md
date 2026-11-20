@@ -4,7 +4,8 @@
 # QEMU UFS root preflight (K176)
 
 A QEMU image whose `/` is a real UFS2 partition staged from the release rootfs payload, with the
-initfs as bootstrap only. **OBSERVED** on image `ebfce46b…`, root disk `af2f9e63…`.
+initfs as bootstrap only. **OBSERVED** on image `ebfce46b…`, root disk `af2f9e63…` (K176); K193
+adds the full interactive disk-tool demo and the `ufs-full` qtest.
 
 ## Image layout
 
@@ -33,12 +34,39 @@ initfs as bootstrap only. **OBSERVED** on image `ebfce46b…`, root disk `af2f9e
 A failed probe or activation keeps the initfs root and reports the reason; no fake root and no
 initfs-embedded UFS is used.
 
+## Full demo (K193)
+
+The bootable image is the full demo, not only a root pivot. The UFS payload carries the release
+login/network userland (`brush`, `ed`, `df`, `mount`, `ping`, `ls`, `cat`), `/root`, and the same
+static `lsblk`/`gpart`/`newfs` fixtures used by the S99 `ufs-demo`, plus their man pages.
+`scripts/qemu-ufs.sh` runs `scripts/ufs-demo.sh --prepare-tools` before the image build.
+
+```sh
+make qemu-ufs                    # interactive: tools, ESP, 256 MiB UFS2 root, QEMU
+```
+
+At the `login: root` / `password: raven` prompt:
+
+```text
+cd /root
+pwd                              # /root
+lsblk                            # block0 ... disk; block0p1 ... part ufs-root
+gpart show block:0
+df -h /                          # ufs: 240M ...
+mount                            # ufs: on /
+ping 10.0.2.2
+```
+
+`newfs -h` prints its usage without formatting a disk. The K192 interactive prompt profile is
+inherited-pending: `etc/brush/**` is owned by K192 and is not edited here.
+
 ## Commands
 
 ```sh
-make qemu-ufs                    # build the ESP + root disk and boot QEMU
-cargo xtask image --arch x86_64 --profile qemu-ufs
-cargo xtask qtest --case ufs-root --arch x86_64
+sh scripts/ufs-demo.sh --prepare-tools   # static disk-tool fixtures
+cargo xtask image --arch x86_64 --profile qemu-ufs --output build/qtest/ufs-full.img
+cargo xtask qtest --case ufs-full --arch x86_64 --no-build
+cargo xtask qtest --case ufs-root --arch x86_64 --no-build
 cargo xtask qtest --case ufs-root-persist --arch x86_64 --no-build   # after ufs-root
 ```
 

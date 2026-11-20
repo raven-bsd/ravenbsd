@@ -16,6 +16,11 @@ image=build/$arch/qemu-ufs.img
 disk=build/$arch/qemu-ufs-root.img
 vars=build/qemu-ufs.vars.fd
 
+# K193: the bootable UFS root carries the same static disk tools as the S99 demo.
+if [ "${QEMU_UFS_SKIP_TOOLS:-0}" != 1 ]; then
+    sh scripts/ufs-demo.sh --prepare-tools
+fi
+
 cargo xtask image --arch "$arch" --profile qemu-ufs --output "$image"
 test -f "$disk" || { echo "qemu-ufs: missing root disk $disk" >&2; exit 1; }
 
