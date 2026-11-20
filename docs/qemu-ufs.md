@@ -51,6 +51,9 @@ The GPT layout is:
 - UFS2 root: partition 2, LBA 452608, 524288 sectors (256 MiB);
 - the bootstrap `fsd-ufs` manifest selects partition 2 for the one-disk demo.
 
+The target-built `raven` admin client is staged at `/usr/sbin/raven`; `/usr/sbin` is in the
+root PATH and `/bin/raven` is not staged.
+
 Guest recipe:
 
 ```text

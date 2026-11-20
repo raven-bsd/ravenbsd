@@ -143,10 +143,11 @@ the base `raven` account and the musicbox/TUI-shell pattern are in [`docs/users.
 
 ## Release/UFS staging (K209)
 
-The release profile extends `shell` and gets a target-built `raven` at `/bin/raven` from
+The release profile extends `shell` and gets a target-built `raven` at `/usr/sbin/raven` from
 `profiles/release.d/90-raven.toml`. The artifact is produced by
 `tests/fixtures/modern-admin/build.sh` (a target build, not the host binary); the
-`raven-release` qtest runs that builder before the image.
+`raven-release` qtest runs that builder before the image. `/usr/sbin` is in the root PATH
+(`/etc/profile`), so `raven ...` and `/usr/sbin/raven ...` are equivalent.
 
 The release image's root is the read-only initfs: a default `/etc/raven/conf.d` save fails
 cleanly with `Read-only file system` and returns to the login prompt. The qtest exercises that
@@ -156,16 +157,16 @@ on a writable UFS root.
 
 The UFS payload (`qemu-ufs`, which extends `shell`) gets the same target-built binary from
 `profiles/qemu-ufs.d/90-raven.toml`, plus the K198 default drop-in at
-`/etc/raven/conf.d/network.toml`. No `shell.d` fragment is used: a `/bin/raven` staging there
+`/etc/raven/conf.d/network.toml`. No `shell.d` fragment is used: a `/usr/sbin/raven` staging there
 would collide with the fixture-only `profiles/raven-admin-test.d/20-raven.toml`, and the profile
 merge rejects duplicate paths. The UFS root is writable, so `raven config --dry-run` reports
 `file=present` there and a validated save lands on the UFS root.
 
 `raven-release` (`tests/qtest/cases/raven-release.toml`) boots the release profile, logs in,
-asserts `/bin/raven` is executable, runs `raven net if/route/status` and `raven --json status`,
+asserts `/usr/sbin/raven` is executable, runs `raven net if/route/status` and `raven --json status`,
 then drives the dry-run, the clean read-only failure and the test-root save, and reads the
 drop-in back. `raven-ufs` (`tests/qtest/cases/raven-ufs.toml`) builds and boots the one-disk
-demo qcow2, logs in, asserts `/bin/raven`, `raven net if/route/status` and `raven --json status`,
+demo qcow2, logs in, asserts `/usr/sbin/raven`, `raven net if/route/status` and `raven --json status`,
 runs `raven config check`/`get`, then drives the dry-run (`file=present`) and a real atomic save
 on UFS and reads the saved drop-in back. `release-login`, `modern-admin` and `modern-net` remain
 green.

@@ -2700,6 +2700,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-poweroff"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-shutdown",
+]
+
+[[package]]
 name = "raven-prng"
 version = "0.1.0"
 
@@ -2902,6 +2910,14 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-reboot"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-shutdown",
 ]
 
 [[package]]
@@ -3395,6 +3411,17 @@ dependencies = [
 [[package]]
 name = "raven-shell-core"
 version = "0.1.0"
+
+[[package]]
+name = "raven-shutdown"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-sleep"

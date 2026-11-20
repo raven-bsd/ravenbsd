@@ -60,7 +60,7 @@ ready: yes
   - `raven net route` has the `default ... 10.0.2.2` route;
   - `raven net status` exits 0.
   The pre step builds the target `raven` binary and the current `raven-init`, then repacks the
-  release initfs with `/bin/raven` (and the current `/init`).
+  release initfs with `/usr/sbin/raven` (and the current `/init`).
 
 Observed (K202 rework round 1, QEMU x86_64):
 

@@ -2,7 +2,7 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # K209: the release/UFS administration gate. Boot the real release profile, log in, assert the
-# target /bin/raven is executable, run the read-only net/status commands, then exercise the
+# target /usr/sbin/raven is executable, run the read-only net/status commands, then exercise the
 # config TUI dry-run and a real atomic save on the writable root. The TUI is the K197 first-party
 # implementation; this case does not fake a login or synthesize the drop-in.
 name = "raven-release"
@@ -42,7 +42,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 300
 
 [[step]]
-send = "if [ -x /bin/raven ]; then echo raven-present; fi\n"
+send = "[ -x /usr/sbin/raven ] && echo raven-present\n"
 delay_ms = 100
 
 [[step]]
@@ -54,7 +54,19 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven --json net if\n"
+send = "[ -e /bin/raven ] || echo bin-raven-absent\n"
+delay_ms = 100
+
+[[step]]
+wait = '^bin-raven-absent$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json net if\n"
 delay_ms = 100
 
 [[step]]
@@ -66,7 +78,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven net route\n"
+send = "/usr/sbin/raven net route\n"
 delay_ms = 100
 
 [[step]]
@@ -78,7 +90,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven net status && echo net-status-ok\n"
+send = "/usr/sbin/raven net status && echo net-status-ok\n"
 delay_ms = 100
 
 [[step]]
@@ -90,7 +102,19 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven --json status\n"
+send = "/usr/sbin/raven --json status\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "raven --json status\n"
 delay_ms = 100
 
 [[step]]
@@ -110,7 +134,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config --dry-run\n"
+send = "/usr/sbin/raven config --dry-run\n"
 delay_ms = 100
 
 [[step]]
@@ -138,7 +162,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config\n"
+send = "/usr/sbin/raven config\n"
 delay_ms = 100
 
 [[step]]
@@ -174,7 +198,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config --dry-run\n"
+send = "/usr/sbin/raven config --dry-run\n"
 delay_ms = 100
 
 [[step]]
@@ -202,7 +226,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config\n"
+send = "raven config\n"
 delay_ms = 100
 
 [[step]]
