@@ -70,27 +70,76 @@ mod program {
                 return EXIT_ERROR;
             }
         }
-        let mut script = String::new();
+        // consd owns the serial input; reading the tty session lets the editor share that
+        // input without ever touching the kernel debug ring. Commands are processed as
+        // complete lines arrive, so `q` exits without an end-of-input marker.
+        let mut console = match fs::open("tty:console", 0) {
+            Ok(file) => file,
+            Err(error) => {
+                raven_rt::eprintln!("ed: tty:console: {}", error.description());
+                return EXIT_ERROR;
+            }
+        };
         let mut buffer = [0u8; 1024];
+        let mut partial = String::new();
         loop {
-            match raven_rt::debug_read(&mut buffer, 1_000_000_000) {
+            if editor.quit() {
+                break;
+            }
+            let count = match console.read(&mut buffer) {
                 Ok(0) => break,
-                Ok(count) => {
-                    let text = String::from_utf8_lossy(buffer.get(..count).unwrap_or(&[]));
-                    script.push_str(&text);
+                Ok(count) => count,
+                Err(Errno::EINTR) => continue,
+                Err(error) => {
+                    raven_rt::eprintln!("ed: tty:console: {}", error.description());
+                    return EXIT_ERROR;
                 }
-                Err(_) => break,
+            };
+            partial.push_str(&String::from_utf8_lossy(buffer.get(..count).unwrap_or(&[])));
+            while let Some(index) = partial.find('\n') {
+                let line = trim_carriage(&partial[..index]);
+                partial = partial[index + 1..].to_string();
+                if let Err(error) = editor.feed_line(&line, &mut io) {
+                    flush_output(&mut editor);
+                    let _ = write_stdout("?\n");
+                    raven_rt::eprintln!("ed: {error:?}");
+                    return EXIT_ERROR;
+                }
+                flush_output(&mut editor);
+                if editor.quit() {
+                    break;
+                }
             }
         }
-        if let Err(error) = editor.execute(&script, &mut io) {
+        if !editor.quit() && !partial.is_empty() {
+            let line = trim_carriage(&partial);
+            if let Err(error) = editor.feed_line(&line, &mut io) {
+                flush_output(&mut editor);
+                let _ = write_stdout("?\n");
+                raven_rt::eprintln!("ed: {error:?}");
+                return EXIT_ERROR;
+            }
+            flush_output(&mut editor);
+        }
+        if editor.input_pending() {
             let _ = write_stdout("?\n");
-            raven_rt::eprintln!("ed: {error:?}");
+            raven_rt::eprintln!("ed: MissingTerminator");
             return EXIT_ERROR;
         }
         let _silent = options.silent;
-        let output = editor.take_output();
-        let _ = write_stdout(&output);
+        flush_output(&mut editor);
         EXIT_OK
+    }
+
+    fn trim_carriage(line: &str) -> String {
+        line.strip_suffix('\r').unwrap_or(line).to_string()
+    }
+
+    fn flush_output(editor: &mut Editor) {
+        let output = editor.take_output();
+        if !output.is_empty() {
+            let _ = write_stdout(&output);
+        }
     }
 
     fn write_stdout(text: &str) -> Result<(), Errno> {
