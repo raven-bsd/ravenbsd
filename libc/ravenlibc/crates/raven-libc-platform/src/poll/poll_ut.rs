@@ -263,28 +263,21 @@ fn poll_recovers_from_a_foreign_waiting_event_queue() {
 }
 
 #[test]
-fn a_delivered_scheme_event_rearms_once() {
+fn a_stored_readiness_mask_is_not_a_poll_verdict() {
     let platform = Platform::new(FakeSys::new());
     let fd = platform
         .install(Handle(7), OfdKind::Socket, 2, None, false)
         .expect("install");
     let ofd = platform.get(fd).expect("fd").index();
     platform.set_ofd_event(ofd, Handle(9)).expect("event");
-    platform.backend().ready(Handle(9), EV_SIGNALED);
+    // A previous event/replay is only a wake hint. With nothing currently ready, poll must
+    // time out instead of reporting the stored mask as POLLIN.
+    platform.get(fd).expect("fd").set_poll_rearm(EV_SIGNALED);
     let mut fds = [Pollfd {
         fd,
         events: POLLIN as i16,
         revents: 0,
     }];
-    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
-    assert_eq!(fds[0].revents as i32, POLLIN);
-    // The kernel consumed the event, but the socket may still hold queued level-ready data.
-    // The next poll replays the delivered level once.
-    fds[0].revents = 0;
-    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
-    assert_eq!(fds[0].revents as i32, POLLIN);
-    // No busy loop: a third poll with no new event and no rearm times out.
-    fds[0].revents = 0;
     assert_eq!(poll(&platform, &mut fds, 1), Ok(0));
     assert_eq!(fds[0].revents, 0);
 }
