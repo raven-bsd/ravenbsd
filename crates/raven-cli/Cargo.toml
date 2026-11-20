@@ -16,6 +16,12 @@ raven-config = { path = "../raven-config" }
 raven-output = { path = "../raven-output" }
 raven-theme = { path = "../raven-theme", features = ["config"] }
 
+[target.'cfg(target_os = "ravenbsd")'.dependencies]
+raven-abi = { path = "../raven-abi" }
+raven-proto-fs = { path = "../raven-proto-fs" }
+raven-proto-net = { path = "../raven-proto-net" }
+raven-scheme = { path = "../raven-scheme" }
+
 [dev-dependencies]
 serde_json = "1"
 
