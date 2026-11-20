@@ -6,13 +6,17 @@
 # fetches it with curl and wget, writes the same bytes with -o/-O, sees a 404 and curl -f
 # failure, and follows the redirect. No external network and no panel/hardware claim.
 #
-# The release client tools come from K199 (curl/wget staged at /bin by profiles/shell.d).
+# K199 stages the clients at /bin/curl and /bin/wget, but as dynamic PIE; the login shell cannot
+# spawn an interpreter image. The pre overlays statically linked builds of the same clients into
+# the test initfs (the K199 fetch gate uses the same pattern). The production staging finding is
+# outside K201's Owns.
 
 name = "eink-insult"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 280
 pre = ["sh tests/fixtures/insult-server/build.sh"]
+initfs = "build/fixtures/insult-server/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
