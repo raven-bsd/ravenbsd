@@ -26,7 +26,21 @@ pub unsafe extern "C" fn write(fd: c_int, buffer: *const c_void, count: usize) -
             .map(|()| 8)
         }));
     }
-    crate::ffi::ret::platform_ssize(crate::ffi::platform::global().write(fd, slice))
+    let result = crate::ffi::platform::global().write(fd, slice);
+    if fd == 9 {
+        let _ = raven_libc_sys::sys::debug_write(
+            alloc::format!(
+                "wr9 pid={} ok={} n={} err={}\n",
+                // SAFETY: the C `getpid` export takes no arguments and reads no memory.
+                unsafe { crate::compat::getpid() },
+                result.is_ok(),
+                result.as_ref().map_or(0, |n| *n),
+                result.as_ref().err().map_or(0, |e| e.0)
+            )
+            .as_bytes(),
+        );
+    }
+    crate::ffi::ret::platform_ssize(result)
 }
 
 /// The 64-bit little-endian value of one `eventfd` write.
