@@ -1,0 +1,198 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K233: raw-key console gate. The UFS demo carries the target `/bin/raven`; the TUI is forced on
+# with RAVEN_TUI=1. Arrows/Tab/Enter/Esc are sent as raw bytes WITHOUT a trailing newline, so a
+# canonical line discipline would never deliver them; the waits on the selected module/form prove
+# raw mode and the `>` selection marker. A second run uses the canonical `/users\n` line path.
+name = "raven-tui-keys"
+arch = "x86_64"
+profile = "qemu-ufs"
+timeout_secs = 300
+pre = [
+    "sh tests/fixtures/modern-admin/build.sh",
+    "sh scripts/qemu-ufs.sh --build-only",
+]
+image = "build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2"
+disk_if = "virtio"
+disk_format = "qcow2"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-global", "virtio-blk-pci.disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|EUNAVAILABLE|command not found'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 240
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 120
+
+[[step]]
+send = "mount\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "export NO_COLOR=1 RAVEN_TUI=1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+wait = '> Network'
+timeout_secs = 30
+
+[[step]]
+send = "\u001b[B"
+delay_ms = 150
+
+[[step]]
+wait = '> Users \(add\)'
+timeout_secs = 30
+
+[[step]]
+send = "\u001b[B"
+delay_ms = 150
+
+[[step]]
+wait = '> Users: root'
+timeout_secs = 30
+
+[[step]]
+send = "\r"
+delay_ms = 150
+
+[[step]]
+wait = 'raven config: module=Users: root'
+timeout_secs = 30
+
+[[step]]
+send = "\t"
+delay_ms = 150
+
+[[step]]
+wait = '> UID:'
+timeout_secs = 30
+
+[[step]]
+send = "\u001b"
+delay_ms = 150
+
+[[step]]
+wait = 'status: Module list'
+timeout_secs = 30
+
+[[step]]
+send = "q"
+delay_ms = 150
+
+[[step]]
+wait = '^raven config: cancelled$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/users\n"
+delay_ms = 100
+
+[[step]]
+wait = 'raven config: module=Users \(add\)'
+timeout_secs = 30
+
+[[step]]
+send = "q\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: cancelled$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/raven --color always config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "q"
+delay_ms = 150
+
+[[step]]
+wait = '^raven config: cancelled$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
