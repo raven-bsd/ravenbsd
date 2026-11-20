@@ -74,3 +74,39 @@ fn default_data_operations_use_the_net_backend() {
     assert_eq!(done.len, 4);
     assert_eq!(&buffer[..4], b"ping");
 }
+
+#[test]
+fn default_control_and_peercred_are_unsupported() {
+    let fake = FakeNetd::new();
+    let (left, _right) = fake.pair(SOCK_STREAM).expect("pair");
+    assert_eq!(
+        UnixBackend::unix_sendmsg(&fake, &fake, left, b"x", &[], 0),
+        Err(Errno::EOPNOTSUPP)
+    );
+    let mut buffer = [0u8; 1];
+    assert_eq!(
+        UnixBackend::unix_recvmsg(&fake, &fake, left, &mut buffer, 0, 0),
+        Err(Errno::EOPNOTSUPP)
+    );
+    assert_eq!(fake.peercred(left), Err(Errno::EOPNOTSUPP));
+}
+
+#[test]
+fn getpeereid_rejects_non_unix_sockets() {
+    let fake = FakeNetd::new();
+    let net = crate::Net::with_unix(fake.clone(), fake.clone(), fake.clone(), Some(fake.clone()));
+    let fd = net
+        .socket(raven_libc_abi::socket::AF_INET, SOCK_STREAM, 0)
+        .expect("socket");
+    assert_eq!(net.getpeereid(fd), Err(Errno::EOPNOTSUPP));
+    let mut credential = [0u8; 12];
+    assert_eq!(
+        net.getsockopt(
+            fd,
+            raven_libc_abi::socket::SOL_SOCKET,
+            raven_libc_abi::socket::SO_PEERCRED,
+            &mut credential
+        ),
+        Err(Errno::EOPNOTSUPP)
+    );
+}

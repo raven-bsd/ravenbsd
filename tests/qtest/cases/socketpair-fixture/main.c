@@ -48,6 +48,66 @@ static int fail(const char *what) {
     return 1;
 }
 
+static int send_fd(int sock, int fd, const void *data, size_t len) {
+    struct msghdr message;
+    struct iovec iov;
+    union {
+        struct cmsghdr header;
+        char buffer[CMSG_SPACE(sizeof(int))];
+    } control;
+    struct cmsghdr *cmsg;
+
+    memset(&message, 0, sizeof(message));
+    memset(&control, 0, sizeof(control));
+    iov.iov_base = (void *)data;
+    iov.iov_len = len;
+    message.msg_iov = &iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control.buffer;
+    message.msg_controllen = sizeof(control.buffer);
+    cmsg = CMSG_FIRSTHDR(&message);
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
+    return (int)sendmsg(sock, &message, 0);
+}
+
+static int recv_fd(int sock, void *data, size_t capacity, size_t *used) {
+    struct msghdr message;
+    struct iovec iov;
+    union {
+        struct cmsghdr header;
+        char buffer[CMSG_SPACE(sizeof(int))];
+    } control;
+    struct cmsghdr *cmsg;
+    ssize_t count;
+    int fd = -1;
+
+    memset(&message, 0, sizeof(message));
+    memset(&control, 0, sizeof(control));
+    iov.iov_base = data;
+    iov.iov_len = capacity;
+    message.msg_iov = &iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control.buffer;
+    message.msg_controllen = sizeof(control.buffer);
+    count = recvmsg(sock, &message, 0);
+    if (count < 0) {
+        return -1;
+    }
+    *used = (size_t)count;
+    cmsg = CMSG_FIRSTHDR(&message);
+    if (cmsg == NULL || cmsg->cmsg_level != SOL_SOCKET ||
+        cmsg->cmsg_type != SCM_RIGHTS ||
+        cmsg->cmsg_len != CMSG_LEN(sizeof(int))) {
+        errno = EPROTO;
+        return -1;
+    }
+    memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
+    return fd;
+}
+
 static int dup_pair(void) {
     int sv[2];
     int duplicate;
@@ -123,6 +183,231 @@ static int fork_pair(void) {
         return fail("fork close");
     }
     say("socketpair: fork ok\n");
+    return 0;
+}
+
+static int control_pair(void) {
+    int sv[2];
+    int passed[2];
+    int received;
+    char byte = 'B';
+    char buffer[8];
+    size_t used = 0;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM, 0, passed) != 0) {
+        return fail("control socketpair");
+    }
+    if (send_fd(sv[0], passed[0], &byte, 1) != 1) {
+        return fail("control sendmsg");
+    }
+    received = recv_fd(sv[1], buffer, sizeof(buffer), &used);
+    if (received < 0) {
+        return fail("control recvmsg");
+    }
+    if (used != 1 || buffer[0] != 'B') {
+        return fail("control bytes");
+    }
+    if (close(passed[0]) != 0) {
+        return fail("control close original");
+    }
+    if (write(received, "ok", 2) != 2) {
+        return fail("control write received");
+    }
+    if (read(passed[1], buffer, 2) != 2 || memcmp(buffer, "ok", 2) != 0) {
+        return fail("control read peer");
+    }
+    if (close(received) != 0) {
+        return fail("control close received");
+    }
+    if (read(passed[1], buffer, sizeof(buffer)) != 0) {
+        return fail("control eof");
+    }
+    (void)close(passed[1]);
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    say("socketpair-control: fd ok\n");
+    return 0;
+}
+
+static int control_datagram(void) {
+    int sv[2];
+    int passed[2];
+    int received;
+    char byte = 'D';
+    char buffer[8];
+    size_t used = 0;
+
+    if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sv) != 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM, 0, passed) != 0) {
+        return fail("control dgram socketpair");
+    }
+    if (send_fd(sv[0], passed[0], &byte, 1) != 1) {
+        return fail("control dgram sendmsg");
+    }
+    received = recv_fd(sv[1], buffer, sizeof(buffer), &used);
+    if (received < 0) {
+        return fail("control dgram recvmsg");
+    }
+    if (used != 1 || buffer[0] != 'D') {
+        return fail("control dgram bytes");
+    }
+    (void)close(passed[0]);
+    if (write(received, "dg", 2) != 2) {
+        return fail("control dgram write");
+    }
+    if (read(passed[1], buffer, 2) != 2 || memcmp(buffer, "dg", 2) != 0) {
+        return fail("control dgram read");
+    }
+    (void)close(received);
+    (void)close(passed[1]);
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    say("socketpair-control: dgram ok\n");
+    return 0;
+}
+
+static int control_negative(void) {
+    int sv[2];
+    int passed[2];
+    int dups[17];
+    int index;
+    char byte = 'N';
+    char buffer[8];
+    size_t used = 0;
+    struct msghdr message;
+    struct iovec iov;
+    union {
+        struct cmsghdr header;
+        char buffer[CMSG_SPACE(17 * sizeof(int))];
+    } control;
+    struct cmsghdr *cmsg;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM, 0, passed) != 0) {
+        return fail("control negative socketpair");
+    }
+
+    memset(&message, 0, sizeof(message));
+    memset(&control, 0, sizeof(control));
+    iov.iov_base = &byte;
+    iov.iov_len = 1;
+    message.msg_iov = &iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control.buffer;
+    message.msg_controllen = 8;
+    if (sendmsg(sv[0], &message, 0) != -1 || errno != EINVAL) {
+        return fail("control malformed");
+    }
+
+    memset(&control, 0, sizeof(control));
+    message.msg_control = control.buffer;
+    message.msg_controllen = sizeof(control.buffer);
+    cmsg = CMSG_FIRSTHDR(&message);
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS + 1;
+    memcpy(CMSG_DATA(cmsg), &passed[0], sizeof(int));
+    if (sendmsg(sv[0], &message, 0) != -1 || errno != EOPNOTSUPP) {
+        return fail("control unsupported type");
+    }
+
+    for (index = 0; index < 17; index++) {
+        dups[index] = dup(passed[0]);
+        if (dups[index] < 0) {
+            return fail("control dup");
+        }
+    }
+    memset(&control, 0, sizeof(control));
+    message.msg_control = control.buffer;
+    message.msg_controllen = sizeof(control.buffer);
+    cmsg = CMSG_FIRSTHDR(&message);
+    cmsg->cmsg_len = CMSG_LEN(17 * sizeof(int));
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    memcpy(CMSG_DATA(cmsg), dups, 17 * sizeof(int));
+    if (sendmsg(sv[0], &message, 0) != -1 || errno != EMSGSIZE) {
+        return fail("control oversized");
+    }
+    for (index = 0; index < 17; index++) {
+        (void)close(dups[index]);
+    }
+
+    if (send_fd(sv[0], passed[0], &byte, 1) != 1) {
+        return fail("control retry send");
+    }
+    memset(&message, 0, sizeof(message));
+    memset(&control, 0, sizeof(control));
+    iov.iov_base = buffer;
+    iov.iov_len = sizeof(buffer);
+    message.msg_iov = &iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control.buffer;
+    message.msg_controllen = 8;
+    if (recvmsg(sv[1], &message, 0) != -1 || errno != EMSGSIZE) {
+        return fail("control small buffer");
+    }
+    {
+        int received = recv_fd(sv[1], buffer, sizeof(buffer), &used);
+        if (received < 0) {
+            return fail("control retry recv");
+        }
+        (void)close(received);
+    }
+    (void)close(passed[0]);
+    (void)close(passed[1]);
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    say("socketpair-control: negative ok\n");
+    return 0;
+}
+
+static int peercred_pair(void) {
+    int sv[2];
+    int inet;
+    struct ucred first;
+    struct ucred second;
+    socklen_t length;
+    uid_t uid = 0;
+    gid_t gid = 0;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("peercred socketpair");
+    }
+    memset(&first, 0, sizeof(first));
+    length = sizeof(first);
+    if (getsockopt(sv[0], SOL_SOCKET, SO_PEERCRED, &first, &length) != 0) {
+        return fail("peercred getsockopt");
+    }
+    if (length != sizeof(first) || first.pid != getpid() ||
+        first.uid != getuid() || first.gid != getgid()) {
+        return fail("peercred values");
+    }
+    memset(&second, 0, sizeof(second));
+    length = sizeof(second);
+    if (getsockopt(sv[1], SOL_SOCKET, SO_PEERCRED, &second, &length) != 0 ||
+        memcmp(&first, &second, sizeof(first)) != 0) {
+        return fail("peercred both ends");
+    }
+    if (getpeereid(sv[0], &uid, &gid) != 0 || uid != getuid() || gid != getgid()) {
+        return fail("getpeereid");
+    }
+    inet = socket(AF_INET, SOCK_STREAM, 0);
+    if (inet >= 0) {
+        memset(&first, 0, sizeof(first));
+        length = sizeof(first);
+        if (getsockopt(inet, SOL_SOCKET, SO_PEERCRED, &first, &length) != -1 ||
+            errno != EOPNOTSUPP) {
+            return fail("peercred inet");
+        }
+        if (getpeereid(inet, &uid, &gid) != -1 || errno != EOPNOTSUPP) {
+            return fail("getpeereid inet");
+        }
+        (void)close(inet);
+    }
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    say("socketpair-control: cred ok\n");
     return 0;
 }
 
@@ -290,6 +575,19 @@ int main(void) {
     if (stream_pair() != 0) {
         return 1;
     }
+    if (control_pair() != 0) {
+        return 1;
+    }
+    if (control_datagram() != 0) {
+        return 1;
+    }
+    if (control_negative() != 0) {
+        return 1;
+    }
+    if (peercred_pair() != 0) {
+        return 1;
+    }
+    say("socketpair-control: ok\n");
     say("socketpair: ok\n");
     return 0;
 }

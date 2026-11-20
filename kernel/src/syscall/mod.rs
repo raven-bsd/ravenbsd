@@ -120,6 +120,15 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == duplex::DUPLEX_SHUTDOWN {
         return duplex::shutdown(frame);
     }
+    if number == duplex::DUPLEX_SENDMSG {
+        return duplex::sendmsg(frame);
+    }
+    if number == duplex::DUPLEX_RECVMSG {
+        return duplex::recvmsg(frame);
+    }
+    if number == duplex::DUPLEX_PEERCRED {
+        return duplex::peercred(frame);
+    }
     if number == pipe::PIPE {
         return pipe::pipe(frame);
     }

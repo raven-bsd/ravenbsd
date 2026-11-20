@@ -6,11 +6,33 @@
 //! The kernel supplies a duplex endpoint pair (K208); this seam owns the libc-side policy:
 //! socket-type flags at pair time, the shutdown selector, and the data/readiness operations that
 //! are selected only for `AF_UNIX` records.
+use alloc::vec::Vec;
+
 use crate::ErrnoExt;
 
 use raven_libc_abi::errno::Errno;
 
 use crate::{NetBackend, ReadDone, Sock, WaitItem};
+
+/// The kernel-stamped creator credentials of one duplex endpoint.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct UnixCred {
+    /// Creator pid.
+    pub pid: u64,
+    /// Creator real uid.
+    pub uid: u32,
+    /// Creator real gid.
+    pub gid: u32,
+}
+
+/// One received AF_UNIX message with its already-marshalled C control buffer.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct UnixRecv {
+    /// Data bytes copied into the caller's iovecs.
+    pub len: usize,
+    /// C `cmsghdr` records (already installed fds in `SCM_RIGHTS` payloads).
+    pub control: Vec<u8>,
+}
 
 /// The POSIX `shutdown(2)` selector.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -112,6 +134,42 @@ pub trait UnixBackend {
         timeout_ms: Option<u64>,
     ) -> Result<usize, Errno> {
         backend.wait(items, timeout_ms)
+    }
+
+    /// Send data plus a C `msghdr` control buffer.
+    ///
+    /// The target backend parses the C `SCM_RIGHTS` records, resolves each descriptor to a kernel
+    /// handle and calls the K210 control send. The fake has no hardware path and rejects control.
+    fn unix_sendmsg(
+        &self,
+        _backend: &dyn NetBackend,
+        _sock: Sock,
+        _data: &[u8],
+        _control: &[u8],
+        _flags: i32,
+    ) -> Result<usize, Errno> {
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Receive one message plus its C control records.
+    ///
+    /// The target backend installs the kernel-returned handles as descriptors with `adopt`, then
+    /// returns a ready-to-copy C `cmsghdr` buffer. `control_capacity` is the caller's
+    /// `msg_controllen`.
+    fn unix_recvmsg(
+        &self,
+        _backend: &dyn NetBackend,
+        _sock: Sock,
+        _data: &mut [u8],
+        _control_capacity: usize,
+        _flags: i32,
+    ) -> Result<UnixRecv, Errno> {
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// The kernel-stamped credentials of the connected endpoint.
+    fn peercred(&self, _sock: Sock) -> Result<UnixCred, Errno> {
+        Err(Errno::EOPNOTSUPP)
     }
 }
 

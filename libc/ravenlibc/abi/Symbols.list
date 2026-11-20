@@ -589,6 +589,7 @@ getopt_long_only
 getpagesize
 getpayload
 getpayloadf
+getpeereid
 getpeername
 getpgid
 getpgrp
