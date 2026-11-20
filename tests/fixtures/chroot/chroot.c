@@ -123,8 +123,25 @@ int main(void) {
     if (notdir < 0)
         return fail("not-a-dir", -1);
     close(notdir);
+    if (symlink("inside", "/tmp/chroot-root/good") != 0)
+        return fail("symlink good", -1);
+    if (symlink("/tmp/outside", "/tmp/chroot-root/escape") != 0)
+        return fail("symlink escape", -1);
+    if (symlink("../../outside", "/tmp/chroot-root/rel-escape") != 0)
+        return fail("symlink rel-escape", -1);
+    if (symlink("/inside", "/tmp/chroot-root/abs") != 0)
+        return fail("symlink abs", -1);
+    if (symlink("/missing", "/tmp/chroot-root/dangling") != 0)
+        return fail("symlink dangling", -1);
     if (copy_file("/bin/libc-child", "/tmp/chroot-root/bin/libc-child") != 0)
         return fail("copy child", -1);
+
+    errno = 0;
+    int unrooted = open("/tmp/chroot-root/good", O_RDONLY);
+    if (unrooted < 0)
+        return fail("unrooted symlink", errno);
+    close(unrooted);
+    printf("chroot: unrooted good=1\n");
 
     if (nonroot_check() != 0)
         return fail("nonroot", -1);
@@ -164,6 +181,26 @@ int main(void) {
     if (escaped >= 0)
         return fail("dotdot2 opened", escaped);
     printf("chroot: dotdot=0\n");
+
+    int good = open("/good", O_RDONLY);
+    int absolute = open("/abs", O_RDONLY);
+    if (good < 0 || absolute < 0)
+        return fail("rooted symlink inside", errno);
+    close(good);
+    close(absolute);
+    errno = 0;
+    int symlink_escape = open("/escape", O_RDONLY);
+    if (symlink_escape >= 0)
+        return fail("symlink escape opened", symlink_escape);
+    errno = 0;
+    int rel_escape = open("/rel-escape", O_RDONLY);
+    if (rel_escape >= 0)
+        return fail("symlink rel-escape opened", rel_escape);
+    errno = 0;
+    int dangling = open("/dangling", O_RDONLY);
+    if (dangling >= 0)
+        return fail("symlink dangling opened", dangling);
+    printf("chroot: symlink inside=1 abs=1 escape=0 rel=0 dangling=0\n");
 
     errno = 0;
     if (chroot("/not-a-dir") != -1 || errno != ENOTDIR)

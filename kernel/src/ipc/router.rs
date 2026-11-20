@@ -76,6 +76,7 @@ pub fn open(
     caller: &Arc<Process>,
     server: Arc<Process>,
     path: &str,
+    root: Option<&str>,
     flags: u32,
 ) -> Result<Handle, Errno> {
     if flags & !WIRE_OPEN_MASK != 0 {
@@ -106,6 +107,14 @@ pub fn open(
         file.server_refs.store(0, Ordering::Release);
         let _ = crate::event::close_handle(caller, handle);
         return Err(Errno::ENAMETOOLONG);
+    }
+    if let Some(root) = root {
+        if !path.starts_with(root) {
+            file.server_refs.store(0, Ordering::Release);
+            let _ = crate::event::close_handle(caller, handle);
+            return Err(Errno::ENOENT);
+        }
+        packet.root_len = u32::try_from(root.len()).map_err(|_| Errno::ENAMETOOLONG)?;
     }
     let request = PendingRequest::new(
         Arc::clone(caller),

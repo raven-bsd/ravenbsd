@@ -42,7 +42,7 @@ mod program {
     use raven_proto_fs::{
         ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
         DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
-        OpenFlags, S_IFDIR, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, normalize_request,
+        OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, normalize_request,
     };
     use raven_rt::entry;
     use raven_rt::println;
@@ -170,6 +170,166 @@ mod program {
                 | Ok(CallResponse::StatVfs { status, .. }) => Err(errno_from_status(status)),
                 Err(_) => Err(Errno::EPROTO),
             }
+        }
+
+        fn target_readlink(&self, scheme: &str, suffix: &str) -> Result<String, Errno> {
+            let client = Client::new();
+            let root = client.open(scheme, READ)?;
+            let request = CallRequest::new(Call::Readlink {
+                path: suffix.as_bytes(),
+            });
+            let mut response = [0u8; MAX_PATH + 8];
+            let result = client.call_typed(root, &request, &mut response);
+            let _ = client.close(root);
+            let length = result?;
+            match CallResponse::decode(request.op(), &response[..length]) {
+                Ok(CallResponse::Readlink { status: 0, target }) => core::str::from_utf8(target)
+                    .map(String::from)
+                    .map_err(|_| Errno::EINVAL),
+                Ok(CallResponse::Status(status))
+                | Ok(CallResponse::Stat { status, .. })
+                | Ok(CallResponse::Readlink { status, .. })
+                | Ok(CallResponse::StatFs { status, .. })
+                | Ok(CallResponse::StatVfs { status, .. }) => Err(errno_from_status(status)),
+                Err(_) => Err(Errno::EPROTO),
+            }
+        }
+
+        fn normalize_under_root(
+            &self,
+            root: &str,
+            base: &str,
+            target: &str,
+        ) -> Result<String, Errno> {
+            if root == "/" {
+                return Ok(target.to_string());
+            }
+            let combined = if target.starts_with('/') {
+                format!("{root}{target}")
+            } else if base == "/" {
+                format!("/{target}")
+            } else {
+                format!("{base}/{target}")
+            };
+            if combined != root && !combined.starts_with(&format!("{root}/")) {
+                return Err(Errno::ENOENT);
+            }
+            let root_parts: Vec<&str> = root.split('/').filter(|part| !part.is_empty()).collect();
+            let mut parts: Vec<String> = root_parts.iter().map(|part| part.to_string()).collect();
+            let rest = combined.strip_prefix(root).unwrap_or("");
+            for part in rest.split('/') {
+                match part {
+                    "" | "." => {}
+                    ".." => {
+                        if parts.len() > root_parts.len() {
+                            parts.pop();
+                        }
+                    }
+                    _ => parts.push(part.to_string()),
+                }
+            }
+            Ok(format!("/{}", parts.join("/")))
+        }
+
+        /// Resolve every symlink in `path` while keeping the result below `root`.
+        fn resolve_rooted(
+            &self,
+            path: &str,
+            root: &str,
+            follow_final: bool,
+        ) -> Result<String, Errno> {
+            if root == "/" {
+                return Ok(path.to_string());
+            }
+            if path != root && !path.starts_with(&format!("{root}/")) {
+                return Err(Errno::ENOENT);
+            }
+            let mut current = root.to_string();
+            let mut components: Vec<String> = path
+                .strip_prefix(root)
+                .unwrap_or("")
+                .split('/')
+                .filter(|part| !part.is_empty())
+                .map(String::from)
+                .collect();
+            let mut index = 0usize;
+            let mut links = 0usize;
+            while index < components.len() {
+                let component = components[index].clone();
+                if component == "." {
+                    index += 1;
+                    continue;
+                }
+                if component == ".." {
+                    if current != root {
+                        current = current
+                            .rsplit_once('/')
+                            .map(|(parent, _)| if parent.is_empty() { "/" } else { parent })
+                            .unwrap_or("/")
+                            .to_string();
+                    }
+                    index += 1;
+                    continue;
+                }
+                let candidate = if current == "/" {
+                    format!("/{component}")
+                } else {
+                    format!("{current}/{component}")
+                };
+                let (mount_id, suffix) = self.table.resolve(&candidate)?;
+                let scheme = self
+                    .table
+                    .get(mount_id)
+                    .ok_or(Errno::ENOENT)?
+                    .scheme
+                    .clone();
+                match self.target_lstat(&scheme, &suffix) {
+                    Ok(stat) if stat.mode & S_IFMT == S_IFLNK => {
+                        if !follow_final && index + 1 == components.len() {
+                            return Err(Errno::ELOOP);
+                        }
+                        links += 1;
+                        if links > 40 {
+                            return Err(Errno::ELOOP);
+                        }
+                        let target = self.target_readlink(&scheme, &suffix)?;
+                        if target.is_empty() {
+                            return Err(Errno::ENOENT);
+                        }
+                        let base = if target.starts_with('/') {
+                            root.to_string()
+                        } else {
+                            candidate
+                                .rsplit_once('/')
+                                .map(|(parent, _)| if parent.is_empty() { "/" } else { parent })
+                                .unwrap_or("/")
+                                .to_string()
+                        };
+                        let resolved = self.normalize_under_root(root, &base, &target)?;
+                        components = resolved
+                            .strip_prefix(root)
+                            .unwrap_or("")
+                            .split('/')
+                            .filter(|part| !part.is_empty())
+                            .map(String::from)
+                            .collect();
+                        index = 0;
+                        current = root.to_string();
+                    }
+                    Ok(stat) => {
+                        if index + 1 < components.len() && stat.mode & S_IFMT != S_IFDIR {
+                            return Err(Errno::ENOTDIR);
+                        }
+                        current = candidate;
+                        index += 1;
+                    }
+                    Err(Errno::ENOENT) if index + 1 == components.len() => {
+                        return Ok(candidate);
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            Ok(current)
         }
 
         fn mmap_call(
@@ -817,6 +977,15 @@ mod program {
             let directory = requires_dir || flags.directory();
             let target_flags = OpenFlags::from_wire(flags.to_wire() & !WIRE_OPEN_DIRECTORY)
                 .map_err(|_| Errno::EINVAL)?;
+            let mut path = path;
+            if let Ok(root_len) = usize::try_from(ctx.root_len)
+                && root_len > 0
+            {
+                let root = path.get(..root_len).ok_or(Errno::EINVAL)?.to_string();
+                if root != "/" {
+                    path = self.resolve_rooted(&path, &root, !target_flags.nofollow())?;
+                }
+            }
             let (mount_id, suffix) = self.table.resolve(&path)?;
             let scheme = self
                 .table

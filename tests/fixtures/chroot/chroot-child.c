@@ -11,7 +11,15 @@
 int main(void) {
     int inside = open("/inside", O_RDONLY) >= 0;
     int outside = open("/outside", O_RDONLY) >= 0;
-    printf("chroot-child: inside=%d outside=%d\n", inside, outside);
+    int symlink = open("/good", O_RDONLY) >= 0;
+    int escape = open("/escape", O_RDONLY) >= 0;
+    printf(
+        "chroot-child: inside=%d outside=%d symlink=%d escape=%d\n",
+        inside,
+        outside,
+        symlink,
+        escape
+    );
     fflush(stdout);
-    return inside && !outside ? 0 : 1;
+    return inside && !outside && symlink && !escape ? 0 : 1;
 }
