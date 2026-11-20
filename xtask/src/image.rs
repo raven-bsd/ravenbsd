@@ -242,7 +242,7 @@ pub(crate) fn run_with_overrides(
         demo_ufs = Some(ufs);
         preflight_initfs = Some(initfs_bytes);
         // The one-disk demo has the ESP as partition 1 and the UFS root as partition 2.
-        let manifest = fs::read(root.join("profiles/qemu-ufs.d/fsd-ufs-demo.toml"))
+        let manifest = fs::read(root.join("profiles/qemu-ufs.d/fsd-ufs-demo.manifest"))
             .context("cannot read the demo fsd-ufs manifest")?;
         let preflight = preflight_initfs
             .as_deref()
