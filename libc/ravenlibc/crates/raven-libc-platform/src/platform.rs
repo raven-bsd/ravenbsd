@@ -417,6 +417,27 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
 
     /// `dup2`/`dup3`: `old == new` returns `new` after checking `old` is open.
     pub fn dup2(&self, old: i32, new: i32, cloexec: bool) -> Result<i32, Errno> {
+        let traced = (0..=2).contains(&new);
+        if traced {
+            let _ = raven_libc_sys::sys::debug_write(
+                alloc::format!("d2 old={old} new={new}\n").as_bytes(),
+            );
+        }
+        let result = self.dup2_body(old, new, cloexec);
+        if traced {
+            let _ = raven_libc_sys::sys::debug_write(
+                alloc::format!(
+                    "d2r old={old} new={new} ok={} e={}\n",
+                    result.is_ok(),
+                    result.as_ref().err().map_or(0, |error| error.0)
+                )
+                .as_bytes(),
+            );
+        }
+        result
+    }
+
+    fn dup2_body(&self, old: i32, new: i32, cloexec: bool) -> Result<i32, Errno> {
         if new < 0 {
             return Err(Errno::EBADF);
         }
