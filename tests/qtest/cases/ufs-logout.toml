@@ -42,7 +42,7 @@ regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
-timeout_secs = 180
+timeout_secs = 90
 
 [[step]]
 send = "root\n"
