@@ -108,17 +108,21 @@ clean failure, then uses the documented `RAVEN_CONFIG_ROOT=/tmp/raven-release-te
 the atomic drop-in proof and reads the saved hostname/mode back. The live default remains `/`
 on a writable UFS root.
 
-The `qemu-ufs` profile extends `shell`, not `release`, so this release fragment does not stage
-`/bin/raven` in the UFS payload; a `profiles/shell.d` fragment is required for that. A `shell.d`
-staging of `/bin/raven` would currently collide with the existing
-`profiles/raven-admin-test.d/20-raven.toml` staging (outside K209's Owns), and the profile merge
-rejects duplicate paths. This is recorded as the K209 blocker; the release image and qtest are
-green.
+The UFS payload (`qemu-ufs`, which extends `shell`) gets the same target-built binary from
+`profiles/qemu-ufs.d/90-raven.toml`, plus the K198 default drop-in at
+`/etc/raven/conf.d/network.toml`. No `shell.d` fragment is used: a `/bin/raven` staging there
+would collide with the fixture-only `profiles/raven-admin-test.d/20-raven.toml`, and the profile
+merge rejects duplicate paths. The UFS root is writable, so `raven config --dry-run` reports
+`file=present` there and a validated save lands on the UFS root.
 
 `raven-release` (`tests/qtest/cases/raven-release.toml`) boots the release profile, logs in,
 asserts `/bin/raven` is executable, runs `raven net if/route/status` and `raven --json status`,
 then drives the dry-run, the clean read-only failure and the test-root save, and reads the
-drop-in back. `release-login`, `modern-admin` and `modern-net` remain green.
+drop-in back. `raven-ufs` (`tests/qtest/cases/raven-ufs.toml`) builds and boots the one-disk
+demo qcow2, logs in, asserts `/bin/raven`, `raven net if/route/status` and `raven --json status`,
+runs `raven config check`/`get`, then drives the dry-run (`file=present`) and a real atomic save
+on UFS and reads the saved drop-in back. `release-login`, `modern-admin` and `modern-net` remain
+green.
 
 ## Donor reconciliation
 
