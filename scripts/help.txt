@@ -18,8 +18,10 @@ guard|Stable-Rust guard only
 test|Full check plus every QEMU integration test
 ufs-selftest|Validate the in-place UFS image/card updater
 qemu-ufs|Boot the QEMU UFS-root preflight (development)
+soak-smoke|Bounded soak/freeze harness smoke (default 120 s)
 group:Release
 release-gate|Full release check plus the QEMU release-login gate
+soak-24h|Owner 24 h soak/freeze run (timeout 90000)
 world|Build the libc-world test set
 posix-gaps|List POSIX conformance gaps
 posix-check|Run the POSIX conformance profile
@@ -36,3 +38,6 @@ PLATFORM|Board platform: generic or pi4
 PROFILE|Image profile: base, shell, release, pi4-release, ...
 RELEASE|Set to 1 for an optimised component build
 VERBOSE|Set to 1 to print the commands xtask runs
+SOAK_SECONDS|Smoke workload seconds (default 120)
+SOAK_INTERVAL|Smoke workload cycle seconds (default 5)
+SOAK_PROFILE|Soak image profile (default release)

@@ -13,6 +13,9 @@ PROFILE ?= base
 RELEASE ?= 0
 VERBOSE ?= 0
 SETUP_ARGS ?=
+SOAK_SECONDS ?= 120
+SOAK_INTERVAL ?= 5
+SOAK_PROFILE ?= release
 BASE ?= origin/master
 HELP_SCRIPT ?= scripts/make-help.sh
 HELP_MANIFEST ?= scripts/help.txt
@@ -27,7 +30,7 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs
+	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs soak-smoke soak-24h
 
 help:
 	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
@@ -69,6 +72,9 @@ release-gate:
 	@$(XTASK) check
 	@RAVEN_USER_RELEASE=1 $(XTASK) qtest --case release-login --arch x86_64
 
+soak-24h:
+	@sh scripts/soak.sh --duration 86400 --interval 30 --profile $(SOAK_PROFILE)
+
 check-full-if-needed:
 	@changed=$$(git diff --name-only $(BASE)...HEAD -- \
 		libc/ravenlibc/crates/raven-libc-malloc); \
@@ -103,6 +109,9 @@ image:
 # K176: QEMU UFS-root preflight (ESP bootstrap + a real UFS2 root disk).
 qemu-ufs:
 	@sh scripts/qemu-ufs.sh
+
+soak-smoke:
+	@sh scripts/soak.sh --duration $(SOAK_SECONDS) --interval $(SOAK_INTERVAL) --profile $(SOAK_PROFILE)
 
 run:
 	@$(XTASK) run --arch $(ARCH) --profile $(PROFILE)
