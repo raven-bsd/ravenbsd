@@ -3,6 +3,8 @@
 
 //! Live readiness tests: non-consuming, direction-specific, backlog, FIN/error/UDP edges.
 
+use alloc::vec::Vec;
+
 use super::*;
 use crate::Ipv4Config;
 use crate::stack::{Ipv4Addr, StackConfig};
@@ -68,7 +70,79 @@ fn readable_and_writable_do_not_alias() {
 
     stack.shutdown_write(connection).expect("shutdown");
     let shut = stack.readiness(connection).expect("shut");
-    assert!(!shut.writable, "the write side is shut down");
+    assert!(
+        shut.writable,
+        "FreeBSD sowriteable keeps POLLOUT set on SBS_CANTSENDMORE; a write returns EPIPE"
+    );
+}
+
+#[test]
+fn an_error_is_readable_and_writable_like_freebsd_soreadable_sowriteable() {
+    let (mut stack, connection) = established();
+    stack
+        .test_set_error(connection, Some(Errno::ECONNRESET))
+        .expect("error");
+
+    let ready = stack.readiness(connection).expect("ready");
+    assert!(ready.readable, "FreeBSD soreadable includes so_error");
+    assert!(ready.writable, "FreeBSD sowriteable includes so_error");
+    assert!(ready.error);
+    assert!(!ready.hup);
+}
+
+#[test]
+fn a_connecting_socket_is_not_writable_until_connected() {
+    let mut stack = stack();
+    let connection = stack
+        .tcp_connect((Ipv4Addr::new([127, 0, 0, 2]), 7002), Some(7001))
+        .expect("connect");
+    let ready = stack.readiness(connection).expect("connecting");
+    assert!(
+        !ready.writable,
+        "FreeBSD sowriteable requires SS_ISCONNECTED for a connection-required socket; \
+         state={:?} error={:?} ready={ready:?}",
+        stack.tcp_state(connection),
+        stack.tcp_error(connection)
+    );
+    assert!(!ready.readable);
+}
+
+#[test]
+fn the_live_query_does_not_read_the_previous_edge_baseline() {
+    let (mut stack, connection) = established();
+    {
+        let record = stack.sockets.record_mut(connection).expect("record");
+        record.prev_readable = true;
+        record.prev_writable = false;
+    }
+    let ready = stack.readiness(connection).expect("live");
+    assert!(
+        !ready.readable,
+        "the stored edge baseline must not decide the live readiness"
+    );
+    assert!(ready.writable);
+}
+
+#[test]
+fn an_error_raises_readable_and_writable_edges_from_the_same_predicate() {
+    let (mut stack, connection) = established();
+    stack
+        .test_set_error(connection, Some(Errno::ECONNRESET))
+        .expect("error");
+    stack.poll(Instant::ZERO);
+    let events: Vec<crate::Event> = stack.take_events().collect();
+    assert!(
+        events.contains(&crate::Event::Readable(connection)),
+        "{events:?}"
+    );
+    assert!(
+        events.contains(&crate::Event::Writable(connection)),
+        "{events:?}"
+    );
+    assert!(
+        events.contains(&crate::Event::Error(connection, Errno::ECONNRESET)),
+        "{events:?}"
+    );
 }
 
 #[test]
@@ -120,6 +194,8 @@ fn a_pending_error_is_reported_and_not_consumed_by_the_query() {
         .expect("error");
 
     assert!(stack.readiness(connection).expect("first").error);
+    assert!(stack.readiness(connection).expect("first").readable);
+    assert!(stack.readiness(connection).expect("first").writable);
     assert!(stack.readiness(connection).expect("second").error);
     let mut buffer = [0u8; 2];
     assert_eq!(stack.recv(connection, &mut buffer), Err(Errno::ECONNRESET));
