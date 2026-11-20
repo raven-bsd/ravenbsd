@@ -1230,8 +1230,12 @@ name = "raven-cli"
 version = "0.1.0"
 dependencies = [
  "lexopt",
+ "raven-abi",
  "raven-config",
  "raven-output",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-scheme",
  "raven-theme",
  "serde_json",
 ]
