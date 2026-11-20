@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "cubic"
+port = 24009
+baseline = "timeout 180 sudo -n python3 tests/net-conformance/baselines/linux/run.py --scenario cubic"
+donor = [
+  "NetBSD sys/netinet/tcp_congctl.c (congestion-control selection; reference only)",
+  "Linux net/ipv4/tcp_cubic.c (outcome only)",
+]
+rfcs = ["RFC 9438 (CUBIC)"]
+
+[[expect]]
+step = "read the Linux host default congestion-control algorithm"
+packet = "none (capability baseline)"
+assert = "/proc/sys/net/ipv4/tcp_congestion_control is cubic"
+
+[[expect]]
+step = "wire-level CUBIC cwnd growth"
+packet = "not in this baseline"
+assert = "narrowed: a short single-flow transfer cannot distinguish CUBIC from NewReno on the wire without kernel CC introspection; the K253 harness owns the product-stack scenario"
