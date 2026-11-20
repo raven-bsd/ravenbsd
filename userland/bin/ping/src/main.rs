@@ -79,12 +79,26 @@ mod program {
             .get(..options.payload_len)
             .ok_or("payload length out of range")?;
 
+        let interval_ms = options.interval_secs.saturating_mul(1000);
+        let mut previous_sent: Option<u64> = None;
         let mut sent = 0u16;
         let mut received = 0u16;
         let mut minimum = u32::MAX;
         let mut maximum = 0u32;
         let mut total = 0u64;
         for seq in 1..=options.count {
+            if let Some(previous) = previous_sent {
+                let target = previous.saturating_add(interval_ms);
+                let now = now_ms()?;
+                if now >= deadline || target >= deadline {
+                    break;
+                }
+                if now < target {
+                    sleep_ms(target - now);
+                }
+                let waited = now_ms()?.saturating_sub(previous);
+                raven_rt::println!("ping: interval seq={} waited={}ms", seq, waited);
+            }
             let now = now_ms()?;
             if now >= deadline {
                 break;
@@ -92,6 +106,7 @@ mod program {
             let remaining = (deadline - now).min(u64::from(MAX_ICMP_TIMEOUT_MS));
             let timeout_ms = u32::try_from(remaining.max(1)).map_err(|_| "timeout overflow")?;
             queue_echo(client, handle, id, seq, timeout_ms, payload)?;
+            previous_sent = Some(now);
             sent = sent.saturating_add(1);
             match read_reply(client, handle, target, seq, payload.len(), timeout_ms)? {
                 Some(rtt_ms) => {
