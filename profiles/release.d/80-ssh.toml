@@ -32,11 +32,6 @@ path = "/etc/ssh/sshd_config"
 mode = 0o644
 
 [[initfs.files]]
-src = "profiles/ssh.d/ssh-firstboot.sh"
-path = "/usr/libexec/ssh-firstboot"
-mode = 0o755
-
-[[initfs.files]]
 src = "profiles/ssh.d/sshd.toml"
 path = "/etc/services.d/sshd.toml"
 mode = 0o644

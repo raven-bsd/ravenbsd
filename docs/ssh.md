@@ -20,8 +20,8 @@ stages them read-only into the release image, together with:
 * `/etc/ssh/sshd_config` — root-only demo policy (`PermitRootLogin yes`,
   `PasswordAuthentication yes`, no PAM, no authorized keys, no sftp server beyond the built-in
   subsystem);
-* `/usr/libexec/ssh-firstboot` — creates the host keys and execs `sshd`;
-* `/etc/services.d/sshd.toml` — `sshd` needs `netd`, `vfsd`, `consd` and `ptyd`;
+* `/etc/services.d/sshd.toml` — the first-boot wrapper creates the host keys with
+  `ssh-keygen -A -f` and execs `sshd`; it needs `netd`, `vfsd`, `consd` and `ptyd`;
 * `/etc/services.d/ptyd.toml` — the K196 pty scheme for interactive sessions.
 
 The root account uses the existing development password from `/etc/shadow`; the password is not
@@ -29,11 +29,11 @@ repeated here. Do not expose this demo to an untrusted network.
 
 ## Host keys
 
-`ssh-firstboot` uses `/etc/ssh` when it is writable (UFS-root images) and falls back to
-`/tmp/ssh` for the read-only initfs release image. The UFS path generates the keys once with
-`ssh-keygen -A` and they persist across reboot. The initfs path generates the same key types in
-`/tmp/ssh` on every boot, so its host key is **ephemeral**; SSH clients must accept a changed key
-on each boot.
+The `sshd` service runs a bounded `/bin/rsh -c` first-boot command. It uses `/etc/ssh` when it
+is writable (UFS-root images) and falls back to `/tmp/ssh` for the read-only initfs release
+image. The UFS path generates the keys once with `ssh-keygen -A -f /etc/ssh` and they persist
+across reboot. The initfs path generates the same key types in `/tmp/ssh` on every boot, so its
+host key is **ephemeral**; SSH clients must accept a changed key on each boot.
 
 Private keys are never shipped in the image and must never be committed or published.
 

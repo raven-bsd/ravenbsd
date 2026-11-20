@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# OpenSSH server. The first-boot wrapper creates the host keys and execs sshd; the service
-# stays in the foreground so svcd can supervise it.
+# OpenSSH server. svcd cannot execute a shebang script directly, so the service runs the
+# first-party shell with a bounded `-c` command: create the key directory, generate the
+# missing host keys with `ssh-keygen -A -f`, then exec sshd in the foreground.
 
 name = "sshd"
-exec = "/usr/libexec/ssh-firstboot"
+exec = "/bin/rsh"
+args = ["-c", "d=/tmp/ssh; if [ -d /etc/ssh ] && [ -w /etc/ssh ]; then d=/etc/ssh; fi; mkdir -p \"$d\" /var/empty; chmod 700 \"$d\"; chmod 755 /var/empty; ssh-keygen -A -f \"$d\"; /sbin/sshd -D -e -f /etc/ssh/sshd_config -h \"$d/ssh_host_rsa_key\" -h \"$d/ssh_host_ecdsa_key\" -h \"$d/ssh_host_ed25519_key\""]
 needs = ["netd", "vfsd", "consd", "ptyd"]
 readiness = "none"
 restart = "on-failure"
