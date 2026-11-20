@@ -92,8 +92,8 @@ pub use observability::{
 };
 pub use pmtu::{
     IPV4_FLOOR, IPV6_FLOOR, IpFamily, MtuCache, PeerMss, Plpmtud, PlpmtudState, PmtuPath,
-    PmtuPending, PmtuResult, TCP_MINMSS, TCP_MSS_DEFAULT, classic_update, floor_for, mss_from_peer,
-    mss_headers, mss_to_advertise, on_icmp_pmtu, probe_sequence,
+    PmtuPending, PmtuResult, TCP_MINMSS, TCP_MSS_DEFAULT, floor_for, mss_from_peer, mss_headers,
+    mss_to_advertise, on_icmp_pmtu, probe_sequence,
 };
 pub use readiness::Readiness;
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};

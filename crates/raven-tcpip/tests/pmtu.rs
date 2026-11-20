@@ -7,8 +7,8 @@
 
 use raven_tcpip::{
     IPV4_FLOOR, IPV6_FLOOR, IpAddr, IpFamily, Ipv4Addr, Ipv6Addr, MtuCache, Plpmtud, PlpmtudState,
-    PmtuPath, PmtuResult, TCP_MSS_DEFAULT, classic_update, floor_for, mss_from_peer, mss_headers,
-    mss_to_advertise, on_icmp_pmtu, probe_sequence,
+    PmtuPath, PmtuResult, TCP_MSS_DEFAULT, floor_for, mss_from_peer, mss_headers, mss_to_advertise,
+    on_icmp_pmtu, probe_sequence,
 };
 
 fn v4(value: u8) -> IpAddr {
@@ -19,37 +19,6 @@ fn v6() -> IpAddr {
     IpAddr::V6(Ipv6Addr::new([
         0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     ]))
-}
-
-#[test]
-fn classic_pmtu_lowers_the_cached_mtu() {
-    assert_eq!(classic_update(Some(1500), 1400, true, v4(9)), Some(1400));
-}
-
-#[test]
-fn classic_pmtu_ignores_unmatched_quotes() {
-    assert_eq!(classic_update(Some(1500), 900, false, v4(9)), Some(1500));
-}
-
-#[test]
-fn classic_pmtu_clamps_v4_to_the_floor() {
-    assert_eq!(
-        classic_update(Some(1500), 100, true, v4(9)),
-        Some(IPV4_FLOOR)
-    );
-}
-
-#[test]
-fn classic_pmtu_clamps_v6_to_the_floor() {
-    assert_eq!(
-        classic_update(Some(9000), 1000, true, v6()),
-        Some(IPV6_FLOOR)
-    );
-}
-
-#[test]
-fn classic_pmtu_never_raises_a_cached_value() {
-    assert_eq!(classic_update(Some(1300), 1400, true, v4(9)), Some(1300));
 }
 
 #[test]
@@ -240,11 +209,6 @@ fn a_1400_path_converges_within_budget() {
     }
     assert_eq!(pmtud.state, PlpmtudState::SearchComplete);
     assert_eq!(pmtud.current, 1400);
-}
-
-#[test]
-fn classic_pmtu_ignores_a_zero_match_flag_even_with_a_bad_mtu() {
-    assert_eq!(classic_update(None, 1, false, v4(1)), None);
 }
 
 #[test]

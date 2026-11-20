@@ -258,25 +258,6 @@ pub fn floor_for(destination: IpAddr) -> u32 {
     }
 }
 
-/// Validate and clamp an ICMP-reported MTU against the quoted connection.
-///
-/// `quoted_matches` must be true only when the quoted header identifies a live
-/// connection; otherwise the report is ignored.
-#[must_use]
-pub fn classic_update(
-    cached: Option<u32>,
-    reported: u32,
-    quoted_matches: bool,
-    destination: IpAddr,
-) -> Option<u32> {
-    if !quoted_matches {
-        return cached;
-    }
-    let floor = floor_for(destination);
-    let value = reported.max(floor);
-    Some(cached.map_or(value, |old| old.min(value).max(floor)))
-}
-
 /// The RFC 8899 PLPMTUD state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlpmtudState {
