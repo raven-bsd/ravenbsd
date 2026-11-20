@@ -35,11 +35,13 @@ regex = '^socket-inet: listen ok$'
 [[expect]]
 regex = '^socket-inet: listening port=23080$'
 
+# The real profile also runs getty, so the console login prompt can share the serial line.
 [[expect]]
-regex = '^socket-inet: poll revents=1$'
+regex = '^.*socket-inet: poll revents=1$'
 
+# The newline-less accept line can share the getty login prompt.
 [[expect]]
-regex = '^socket-inet: accept fd=[0-9]+$'
+regex = '^.*socket-inet: accept fd=[0-9]+$'
 
 [[expect]]
 regex = '^socket-inet: accepted peer=[0-9.]+:[0-9]+$'

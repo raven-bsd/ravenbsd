@@ -78,6 +78,11 @@ impl<B: StackBackend> Core<B> {
         self.backend.socket_table()
     }
 
+    /// Live readiness of `socket` without consuming data or errors.
+    pub fn readiness(&self, socket: SocketId) -> Result<crate::Readiness, Errno> {
+        self.backend.readiness(socket)
+    }
+
     /// Packet/byte counters observed at the device boundary.
     #[must_use]
     pub fn interface_counters(&self) -> Option<crate::InterfaceCounters> {

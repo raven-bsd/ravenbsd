@@ -2000,7 +2000,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     /// A forked child inherits the parent's queue handle. The kernel allows one waiter per queue,
     /// so the child must not keep using it; a lazy reset on `EBUSY` covers every fork/exec path
     /// without a fork hook in the shell.
-    pub(crate) fn reset_event_queue(&self) {
+    pub fn reset_event_queue(&self) {
         if let Some(queue) = self.event_queue.borrow_mut().take() {
             let _ = self.backend.handle_close(queue);
         }

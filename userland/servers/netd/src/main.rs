@@ -12,9 +12,10 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use alloc::collections::BTreeMap;
+    use alloc::collections::{BTreeMap, BTreeSet};
     use alloc::rc::Rc;
     use alloc::string::String;
+    use alloc::vec::Vec;
     use core::cell::Cell;
 
     use raven_abi::errno::Errno;
@@ -36,10 +37,16 @@ mod program {
 
     const MAC: [u8; 6] = [0x02, 0, 0, 0, 0, 0x01];
     const OPEN_WRITE: u32 = 2;
+    /// Doorbells kept per file (one per process that polls the shared descriptor).
+    const MAX_DOORBELLS_PER_FILE: usize = 16;
 
     struct NetHandler {
         netd: Netd<Loopback>,
-        events: BTreeMap<u64, Handle>,
+        /// Readiness doorbells per open file. A file is shared by every process that holds a
+        /// handle to it, so all holders are rung.
+        events: BTreeMap<u64, Vec<Handle>>,
+        /// Files whose level is re-checked after the next stack poll (accepted backlog).
+        rearm: BTreeSet<u64>,
         nic_retry_ms: i64,
         nic_mode: NicMode,
         printed_eth0: bool,
@@ -61,6 +68,7 @@ mod program {
         let mut handler = NetHandler {
             netd,
             events: BTreeMap::new(),
+            rearm: BTreeSet::new(),
             nic_retry_ms: now,
             nic_mode: NicMode::select(&args),
             printed_eth0: false,
@@ -303,9 +311,31 @@ mod program {
                     raven_netcore::Event::Accepted { listener, .. } => listener,
                 };
                 for file in self.netd.files_for_socket(ready.interface, socket) {
-                    if let Some(event) = self.events.get(&file) {
-                        let _ = event_signal(*event, 1);
-                    }
+                    self.ring(file);
+                }
+            }
+            // An accept can leave a second connection in the backlog and the stack raises no new
+            // edge for it. A read deliberately does not re-arm: the doorbell latch is cleared only
+            // by EVQ_WAIT, so a signal after a partial read outlives the read and an inherited
+            // socket sees a spurious ready later. The live query (K244) is the verdict; the edge
+            // is only the wake-up.
+            let touched = core::mem::take(&mut self.rearm);
+            for file in touched {
+                if self
+                    .netd
+                    .socket_readiness(file)
+                    .is_ok_and(|ready| ready.readable)
+                {
+                    self.ring(file);
+                }
+            }
+        }
+
+        /// Ring every doorbell attached to `file`.
+        fn ring(&self, file: u64) {
+            if let Some(events) = self.events.get(&file) {
+                for event in events {
+                    let _ = event_signal(*event, 1);
                 }
             }
         }
@@ -410,6 +440,9 @@ mod program {
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
+            if let Ok(SocketRequest::Call(Call::Accept)) = SocketRequest::decode(request) {
+                self.rearm.insert(file);
+            }
             self.netd
                 .call(file, request, response)
                 .map_err(HandlerError::Errno)
@@ -427,9 +460,24 @@ mod program {
                     return Err(HandlerError::Errno(Errno::EINVAL));
                 }
                 let event = event_create().map_err(HandlerError::Errno)?;
-                if let Some(previous) = self.events.insert(file, event) {
-                    let _ = raven_rt::handle_close(previous);
+                // The transition that made the socket ready may have happened before this
+                // doorbell existed (an accepted socket is opened after its data arrived; an
+                // inherited descriptor is polled long after). The live query is the truth, not
+                // the edge: ring now if there is something to collect.
+                if self
+                    .netd
+                    .socket_readiness(file)
+                    .is_ok_and(|ready| ready.readable)
+                {
+                    let _ = event_signal(event, 1);
                 }
+                let doorbells = self.events.entry(file).or_default();
+                if doorbells.len() >= MAX_DOORBELLS_PER_FILE {
+                    // Bounded: drop the oldest. Its holder keeps a valid but silent handle.
+                    let oldest = doorbells.remove(0);
+                    let _ = raven_rt::handle_close(oldest);
+                }
+                doorbells.push(event);
                 let mut data = [0u8; 6];
                 Response::Ok
                     .encode(&mut data)
@@ -437,6 +485,9 @@ mod program {
                 let mut reply = CallReply::with_data(&data)?;
                 reply.attach(event, 0)?;
                 return Ok(reply);
+            }
+            if let Ok(SocketRequest::Call(Call::Accept)) = SocketRequest::decode(request) {
+                self.rearm.insert(file);
             }
             let written = self
                 .netd
@@ -446,7 +497,8 @@ mod program {
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
-            if let Some(event) = self.events.remove(&file) {
+            self.rearm.remove(&file);
+            for event in self.events.remove(&file).unwrap_or_default() {
                 let _ = raven_rt::handle_close(event);
             }
             self.netd.close(file).map_err(HandlerError::Errno)

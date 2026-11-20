@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::Loopback;
+use raven_proto_net::socket::{READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE};
 use raven_proto_net::{IfName, IfaceRequest, IfaceResponse, Route, Shutdown, SockOpt};
 
 const MAC: [u8; 6] = [0x02, 0, 0, 0, 0, 1];
@@ -728,4 +729,339 @@ fn a_late_static_config_replaces_the_published_address() {
     assert_eq!(config.gateway, Some([192, 168, 7, 1]));
     let lease = netd.dhcp_lease().unwrap();
     assert_eq!(lease.dns[0].octets(), [192, 168, 7, 53]);
+}
+
+// ---- K244: live readiness query ---------------------------------------------------------
+
+fn readiness(netd: &mut Netd<Loopback>, file: u64) -> Response {
+    call_socket(netd, file, Call::Poll)
+}
+
+fn ready_bits(netd: &mut Netd<Loopback>, file: u64) -> i32 {
+    match readiness(netd, file) {
+        Response::Value(bits) => bits,
+        other => panic!("unexpected readiness response: {other:?}"),
+    }
+}
+
+fn readiness_retry(netd: &mut Netd<Loopback>, file: u64, bit: i32, now: &mut i64) -> i32 {
+    for _ in 0..200 {
+        poll(netd, now);
+        let bits = ready_bits(netd, file);
+        if bits & bit != 0 {
+            return bits;
+        }
+    }
+    panic!("readiness bit {bit:#x} did not appear");
+}
+
+#[test]
+fn readiness_query_is_non_consuming_and_directional() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+
+    let idle = ready_bits(&mut netd, accepted);
+    assert_eq!(idle & READY_WRITABLE, READY_WRITABLE);
+    assert_eq!(idle & READY_READABLE, 0);
+    assert_eq!(idle & READY_ERROR, 0);
+
+    assert_eq!(netd.write(client, 0, b"hello").unwrap(), 5);
+    let first = readiness_retry(&mut netd, accepted, READY_READABLE, &mut now);
+    let second = ready_bits(&mut netd, accepted);
+    assert_eq!(first, second, "a query does not consume the bytes");
+    assert_eq!(first & READY_WRITABLE, READY_WRITABLE);
+
+    let mut buffer = [0u8; 16];
+    let read = read_retry(&mut netd, accepted, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"hello");
+    let drained = ready_bits(&mut netd, accepted);
+    assert_eq!(drained & READY_READABLE, 0);
+}
+
+#[test]
+fn readiness_shutdown_clears_writable() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+
+    assert_eq!(
+        ready_bits(&mut netd, accepted) & READY_WRITABLE,
+        READY_WRITABLE
+    );
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            accepted,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+    assert_eq!(ready_bits(&mut netd, accepted) & READY_WRITABLE, 0);
+}
+
+#[test]
+fn listener_readiness_follows_the_accept_backlog() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    assert_eq!(ready_bits(&mut netd, listener) & READY_READABLE, 0);
+
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let bits = readiness_retry(&mut netd, listener, READY_READABLE, &mut now);
+    assert_eq!(bits & READY_WRITABLE, 0);
+
+    let _id = accept(&mut netd, listener, &mut now);
+    assert_eq!(ready_bits(&mut netd, listener) & READY_READABLE, 0);
+}
+
+#[test]
+fn readiness_reports_a_peer_half_close_as_readable_not_hup() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+    let bits = readiness_retry(&mut netd, accepted, READY_READABLE, &mut now);
+    assert_eq!(bits & READY_HUP, 0, "a half-close is not a full hangup");
+
+    let mut buffer = [0u8; 4];
+    assert_eq!(netd.read(accepted, 0, &mut buffer), Ok(0));
+    let after = ready_bits(&mut netd, accepted);
+    assert_eq!(after & READY_READABLE, READY_READABLE);
+    assert_eq!(after & READY_HUP, 0);
+}
+
+#[test]
+fn readiness_has_defined_errors_for_invalid_and_non_socket_files() {
+    let mut netd = new_netd();
+
+    assert_eq!(netd.readiness(999), Err(Errno::EBADF));
+
+    let control = netd.open("net:").unwrap();
+    assert_eq!(netd.readiness(control), Err(Errno::EINVAL));
+
+    let unbound = netd.open("net:tcp/127.0.0.1:7100").unwrap();
+    assert_eq!(netd.readiness(unbound), Err(Errno::ENOTCONN));
+}
+
+// ---- K240 edge/doorbell regressions, kept green by K244 -------------------------------
+
+fn poll_events(netd: &mut Netd<Loopback>, now: &mut i64) -> Vec<raven_netcore::Event> {
+    *now = now.saturating_add(1);
+    netd.poll(*now)
+        .into_iter()
+        .map(|ready| ready.event)
+        .collect()
+}
+
+fn established_pair(netd: &mut Netd<Loopback>, now: &mut i64) -> (u64, u64, u64) {
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(netd, listener, now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    (listener, client, accepted)
+}
+
+#[test]
+fn data_arriving_in_the_pass_after_a_drain_still_raises_readable() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let (_listener, client, accepted) = established_pair(&mut netd, &mut now);
+    let socket = netd.socket_id(accepted).expect("accepted socket");
+
+    assert_eq!(netd.write(client, 0, b"a").unwrap(), 1);
+    let mut seen = false;
+    for _ in 0..50 {
+        seen |= poll_events(&mut netd, &mut now).contains(&raven_netcore::Event::Readable(socket));
+        if seen {
+            break;
+        }
+    }
+    assert!(seen, "the first byte raises Readable");
+
+    // The application drains the queue between two passes, and the next byte arrives in the very
+    // next pass. The edge baseline must follow the drain or this raises no event.
+    let mut buffer = [0u8; 8];
+    assert_eq!(netd.read(accepted, 0, &mut buffer).unwrap(), 1);
+    assert_eq!(netd.write(client, 0, b"b").unwrap(), 1);
+    let mut seen = false;
+    for _ in 0..50 {
+        seen |= poll_events(&mut netd, &mut now).contains(&raven_netcore::Event::Readable(socket));
+        if seen {
+            break;
+        }
+    }
+    assert!(seen, "a refill right after a drain raises Readable again");
+}
+
+#[test]
+fn a_connection_completing_right_after_an_accept_still_raises_accepted() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let listener_socket = netd.socket_id(listener).expect("listener socket");
+    let first = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, first, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let mut announced = false;
+    for _ in 0..50 {
+        announced |= poll_events(&mut netd, &mut now)
+            .iter()
+            .any(|event| matches!(event, raven_netcore::Event::Accepted { .. }));
+        if announced {
+            break;
+        }
+    }
+    assert!(announced, "the first connection is announced");
+
+    let second = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, second, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    assert!(matches!(
+        call_socket(&mut netd, listener, Call::Accept),
+        Response::Socket { .. }
+    ));
+    let mut announced_again = false;
+    for _ in 0..50 {
+        announced_again |= poll_events(&mut netd, &mut now).iter().any(|event| {
+            matches!(event, raven_netcore::Event::Accepted { listener, .. } if *listener == listener_socket)
+        });
+        if announced_again {
+            break;
+        }
+    }
+    assert!(
+        announced_again,
+        "the connection that completed after the accept is announced too"
+    );
+}
+
+#[test]
+fn live_readiness_follows_backlog_data_and_end_of_stream() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    assert!(!netd.socket_readiness(listener).unwrap().readable);
+
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    for _ in 0..50 {
+        poll(&mut netd, &mut now);
+        if netd.socket_readiness(listener).unwrap().readable {
+            break;
+        }
+    }
+    assert!(netd.socket_readiness(listener).unwrap().readable);
+    let id = accept(&mut netd, listener, &mut now);
+    assert!(!netd.socket_readiness(listener).unwrap().readable);
+
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    assert_eq!(netd.write(client, 0, b"hello").unwrap(), 5);
+    for _ in 0..50 {
+        poll(&mut netd, &mut now);
+        if netd.socket_readiness(accepted).unwrap().readable {
+            break;
+        }
+    }
+    assert!(netd.socket_readiness(accepted).unwrap().readable);
+    let mut buffer = [0u8; 16];
+    assert_eq!(read_retry(&mut netd, accepted, &mut buffer, &mut now), 5);
+    assert!(!netd.socket_readiness(accepted).unwrap().readable);
+
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+    for _ in 0..50 {
+        poll(&mut netd, &mut now);
+        if netd.socket_readiness(accepted).unwrap().readable {
+            break;
+        }
+    }
+    assert!(netd.socket_readiness(accepted).unwrap().readable);
+    assert_eq!(netd.read(accepted, 0, &mut buffer).unwrap(), 0);
+    assert!(netd.socket_readiness(accepted).unwrap().readable);
+    assert!(!netd.socket_readiness(accepted).unwrap().hup);
 }

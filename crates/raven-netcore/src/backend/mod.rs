@@ -63,6 +63,15 @@ pub trait StackBackend {
         Vec::new()
     }
 
+    /// Live readiness of one socket without consuming data or errors.
+    ///
+    /// A backend that cannot answer returns [`Errno::EOPNOTSUPP`]; the caller must not invent a
+    /// stored readiness verdict in that case.
+    fn readiness(&self, s: SocketId) -> Result<crate::Readiness, Errno> {
+        let _ = s;
+        Err(Errno::EOPNOTSUPP)
+    }
+
     /// Packet/byte counters observed at the device boundary.
     fn interface_counters(&self) -> Option<crate::InterfaceCounters> {
         None

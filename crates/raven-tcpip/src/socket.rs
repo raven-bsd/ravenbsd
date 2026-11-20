@@ -322,10 +322,20 @@ impl<D: Device> Stack<D> {
         loop {
             let next = {
                 let record = self.sockets.record_mut(listener)?;
-                let Kind::Listener { pending, .. } = &mut record.kind else {
+                let Kind::Listener {
+                    pending, reported, ..
+                } = &mut record.kind
+                else {
                     return Err(Errno::ENOTSOCK);
                 };
-                pending.pop().map(|entry| SocketId(entry.socket))
+                let popped = pending.pop().map(|entry| SocketId(entry.socket));
+                if popped.is_some() {
+                    // `reported` counts the announced prefix; removing the front entry must
+                    // shorten it, or the entry that moves into its place counts as announced
+                    // and a connection completing around an accept never wakes the poller.
+                    *reported = reported.saturating_sub(1);
+                }
+                popped
             };
             let Some(connection) = next else {
                 return Ok(None);
@@ -559,7 +569,9 @@ impl<D: Device> Stack<D> {
         };
         let count = buffer.len().min(datagram.data.len());
         buffer[..count].copy_from_slice(&datagram.data[..count]);
-        Ok((datagram.data.len(), datagram.src))
+        let result = (datagram.data.len(), datagram.src);
+        self.resync_readable_baseline(socket);
+        Ok(result)
     }
 
     /// Read and discard a UDP datagram, returning its payload length.

@@ -51,3 +51,8 @@ The exec `FdMap` duplicates each inherited socket event handle (`HANDLE_DUP`) an
 child's handle, so a parent that closes its accepted fd/event immediately after fork cannot
 invalidate the child's readiness source. If the duplicate is unavailable, the original handle is
 kept so the data fds still inherit.
+
+The child entry of `fork` drops the inherited cached event queue immediately
+(`raven_fork_child_reset`). The child's first `poll` creates its own queue. This is unconditional,
+not only the `EBUSY` fallback, because a fork-only child (the post-auth session) must never share
+the parent's queue even when the parent is not waiting at that instant.
