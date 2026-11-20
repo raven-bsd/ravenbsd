@@ -107,6 +107,29 @@ pub trait FdTable {
         }
         closed
     }
+
+    /// Set `FD_CLOEXEC` on every descriptor in `lo..=hi`.
+    ///
+    /// Additive over ticket C66 4.2; the default loops [`FdTable::set_cloexec`] for fake tables.
+    /// A real table clamps the upper bound to the hard descriptor limit, so a `CLOSE_RANGE_CLOEXEC`
+    /// request over `INT_MAX` never walks two billion integers.
+    fn set_cloexec_range(&mut self, lo: i32, hi: i32) {
+        if lo < 0 || hi < lo {
+            return;
+        }
+        let mut fd = lo;
+        loop {
+            // A closed descriptor is not an error for the range operation.
+            let _ = self.set_cloexec(fd, true);
+            if fd == hi {
+                break;
+            }
+            fd = match fd.checked_add(1) {
+                Some(next) => next,
+                None => break,
+            };
+        }
+    }
 }
 
 /// The event queue.

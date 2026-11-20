@@ -1,29 +1,44 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# bobtheshell prompt for brush, ported from the owner's zsh theme without zsh escapes,
-# vcs_info or an oh-my-zsh/oh-my-bash framework. Source this file in an interactive brush:
-#
-#   . /etc/brush/bobtheshell.sh
+# bobthefish-style prompt for brush. The segment line carries the exit status, the folded
+# path and the git branch; the last line stays the stable `raven# ` input marker so serial
+# transcripts and scripted gates keep working.
 #
 # Stable modes:
-#   RAVEN_PROMPT=plain       -> `raven# ` (no ANSI, transcript-safe)
-#   NO_COLOR or TERM=dumb    -> `user@host:path# ` with no ANSI
-#   RAVEN_PROMPT_POWERLINE=1 -> U+E0B0 separators; the flat `|` fallback otherwise
-#
-# RAVEN_PROMPT_TEXT always holds the visible (colour-free) prompt text so tests and
-# terminal-title helpers do not have to parse the PS1 escape syntax.
+#   RAVEN_PROMPT=plain or RAVEN_PLAIN_PROMPT=1 -> `raven# ` (no ANSI, transcript-safe)
+#   NO_COLOR or TERM=dumb                      -> `user@host:folded-path# `, no ANSI
+#   RAVEN_PROMPT_POWERLINE=1                   -> U+E0B0 separator and branch glyph
 
 [[ -n ${RAVEN_BOBTHESHELL_LOADED:-} ]] && return
 RAVEN_BOBTHESHELL_LOADED=1
 
 raven_prompt_path() {
-    case "$PWD" in
-        "$HOME") printf '~' ;;
-        "$HOME"/*) printf '~/%s' "${PWD##*/}" ;;
-        /) printf '/' ;;
-        *) printf '%s' "${PWD##*/}" ;;
-    esac
+    local path=${PWD:-}
+    local prefix=''
+    local segment
+    local out=''
+
+    if [[ $path == "$HOME" ]]; then
+        printf '~'
+        return
+    fi
+    if [[ $path == "$HOME"/* ]]; then
+        prefix='~/'
+        path=${path#"$HOME"/}
+    elif [[ $path == /* ]]; then
+        prefix='/'
+        path=${path#/}
+    fi
+    while [[ $path == */* ]]; do
+        segment=${path%%/*}
+        path=${path#*/}
+        if [[ -n $segment ]]; then
+            # Fold every intermediate component to its first character.
+            out+="${segment%"${segment#?}"}/"
+        fi
+    done
+    printf '%s%s%s' "$prefix" "$out" "$path"
 }
 
 raven_prompt_git() {
@@ -44,7 +59,7 @@ raven_prompt_git() {
     local porcelain
     porcelain=$(git status --porcelain 2>&1)
     [[ -n $porcelain ]] && dirty='*'
-    printf ' %s%s' "$branch" "$dirty"
+    printf '%s%s' "$branch" "$dirty"
 }
 
 raven_prompt_jobs() {
@@ -53,14 +68,14 @@ raven_prompt_jobs() {
     for job in $(jobs -p); do
         count=$((count + 1))
     done
-    [[ $count -gt 0 ]] && printf ' jobs:%s' "$count"
+    [[ $count -gt 0 ]] && printf '%s' "$count"
 }
 
 raven_prompt() {
     local status=$?
     local mode=${RAVEN_PROMPT:-}
 
-    if [[ $mode == plain ]]; then
+    if [[ $mode == plain || ${RAVEN_PLAIN_PROMPT:-0} == 1 ]]; then
         PS1='raven# '
         RAVEN_PROMPT_TEXT=$PS1
         return
@@ -79,21 +94,48 @@ raven_prompt() {
         return
     fi
 
+    local powerline=${RAVEN_PROMPT_POWERLINE:-0}
+    local text=''
+    local segments=''
+
+    if [[ $status -ne 0 ]]; then
+        text+="${status} "
+        segments+="\[\e[1;31m\]${status}\[\e[0m\] "
+    fi
+
+    text+="${path}"
+    segments+="\[\e[38;5;183m\]${path}\[\e[0m\]"
+
     local git
     git=$(raven_prompt_git)
-    local venv=
-    [[ -n ${VIRTUAL_ENV:-} ]] && venv=" ${VIRTUAL_ENV##*/}"
-    local fail=
-    [[ $status -ne 0 ]] && fail=" !$status"
-    local sep='|'
-    if [[ ${RAVEN_PROMPT_POWERLINE:-0} == 1 ]]; then
-        sep=$'\ue0b0'
+    if [[ -n $git ]]; then
+        if [[ $powerline == 1 ]]; then
+            text+=" ${git}"
+            segments+=" \[\e[1;32m\]\ue0a0 ${git}\[\e[0m\]"
+        else
+            text+=" git:${git}"
+            segments+=" \[\e[1;32m\]git:${git}\[\e[0m\]"
+        fi
     fi
+
+    local venv
+    if [[ -n ${VIRTUAL_ENV:-} ]]; then
+        venv=${VIRTUAL_ENV##*/}
+        text+=" ${venv}"
+        segments+=" \[\e[38;5;45m\]${venv}\[\e[0m\]"
+    fi
+
     local jobs
     jobs=$(raven_prompt_jobs)
+    if [[ -n $jobs ]]; then
+        text+=" jobs:${jobs}"
+        segments+=" \[\e[38;5;220m\]jobs:${jobs}\[\e[0m\]"
+    fi
 
-    RAVEN_PROMPT_TEXT="${user}@${host} ${sep} ${path}${git}${venv}${fail}${jobs} ${root} "
-    PS1="\[\e[38;5;183m\]${user}@${host}\[\e[0m\] ${sep} \[\e[38;5;231m\]${path}\[\e[0m\]${git}${venv}${fail}${jobs} \[\e[38;5;183m\]${root}\[\e[0m\] "
+    RAVEN_PROMPT_TEXT="${text}
+raven${root} "
+    PS1="${segments}
+\[\e[38;5;183m\]raven${root} \[\e[0m\]"
 }
 
 PROMPT_COMMAND=raven_prompt

@@ -15,6 +15,8 @@ pub mod debug_read;
 pub mod driver;
 /// `DTRACE_*` provider control syscalls (S57).
 pub mod dtrace;
+/// K208 raw duplex endpoint pair/shutdown syscalls.
+pub mod duplex;
 pub mod event;
 pub mod exec;
 pub mod futex;
@@ -111,6 +113,21 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == exec::PROC_EXEC {
         return exec::exec(frame);
+    }
+    if number == duplex::DUPLEX_PAIR {
+        return duplex::pair(frame);
+    }
+    if number == duplex::DUPLEX_SHUTDOWN {
+        return duplex::shutdown(frame);
+    }
+    if number == duplex::DUPLEX_SENDMSG {
+        return duplex::sendmsg(frame);
+    }
+    if number == duplex::DUPLEX_RECVMSG {
+        return duplex::recvmsg(frame);
+    }
+    if number == duplex::DUPLEX_PEERCRED {
+        return duplex::peercred(frame);
     }
     if number == pipe::PIPE {
         return pipe::pipe(frame);

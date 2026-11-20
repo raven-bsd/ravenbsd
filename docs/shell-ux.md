@@ -1,55 +1,90 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# Shell UX: listing aliases (K183)
+# Shell UX: bobthefish prompt, completion, highlighting and coloured ls (K192)
 
-Status: OBSERVED on the release login. `ed` is shipped, but its console/stdin I/O is K186 and
-is not part of K183.
+Status: OBSERVED on the `release` login. The prompt keeps a stable `raven# ` last line; the
+segments above it carry the bobthefish information. `ed` is shipped, but its console/stdin I/O
+belongs to K186.
 
-## Listing aliases
+## Prompt
 
-`etc/profile` defines two aliases when the shell is interactive:
+`etc/brush/bobtheshell.sh` is the interactive prompt. Its segment line shows:
+
+* the exit status, only when nonzero, in bold red (`127`);
+* the folded current path: `~/w/r/ravenbsd-demos` for
+  `/root/work/ravenos-workspace/ravenbsd-demos`, `~` for `HOME`;
+* the git branch in green when inside a work tree (`git:main*`), with a bounded
+  `git status --porcelain` for the dirty marker;
+* the virtualenv basename and background-job count when present.
+
+The last line is `raven# ` (root) or `raven$ ` (non-root), so `release-login` and the other
+serial gates keep a stable marker. The interactive line editor draws only the last line; the
+segment line is shown once above it.
+
+Plain modes are deterministic and contain no escapes:
+
+| Mode | Selection | Prompt |
+|---|---|---|
+| stable plain | `RAVEN_PROMPT=plain` or `RAVEN_PLAIN_PROMPT=1` | `raven# ` |
+| colour disabled | `NO_COLOR` or `TERM=dumb` | `root@raven:~/w/r/ravenbsd-demos# ` |
+
+## Completion and highlighting
+
+On RavenBSD the default backend is still `Minimal`, but for a terminal it now delegates to the
+Vt line editor **without** the basic style. That editor uses the same semantic highlighter and
+completion engine as Reedline:
+
+* `ec<TAB>` inserts `echo` (a unique candidate);
+* `c<TAB><TAB>` opens the candidate menu in columns (`caller cat command ...`);
+* a command that is not found is painted bold red after the cursor leaves the word, before
+  Enter;
+* builtins, aliases, keywords, quoted strings, parameters and operators use the shared palette.
+
+### History autosuggestions
+
+After the cursor, the Vt editor shows the newest matching history suffix dimmed. Right or End
+accepts the whole hint; any other key keeps the typed text. The match is local history only,
+newest first, and multi-line entries are skipped.
+
+`NO_COLOR`, `TERM=dumb`, `RAVEN_PLAIN_PROMPT=1` and `RAVEN_AUTOSUGGEST=0` disable the hint
+entirely; plain mode draws no extra text or escape sequence. The shell environment is consulted
+per prompt, so an `export RAVEN_AUTOSUGGEST=0` takes effect on the next line.
+
+`NO_COLOR`, `TERM=dumb` and `RAVEN_PLAIN_PROMPT=1` keep the drawn line plain. Reedline itself
+still panics on RavenBSD's TLS teardown (`cannot access a Thread Local Storage value during or
+after destruction`), so it is not the selected backend; the Vt editor delivers the same
+visible menu and semantic colours without that runtime path.
+
+## Coloured listings
+
+`etc/profile` defines the aliases only for interactive login shells:
 
 ```sh
-alias l='ls -CF'
-alias ll='ls -lah'
+alias l='ls -CF --color=auto'
+alias ll='ls -lah --color=auto'
+alias ls='ls --color=auto'
 ```
 
-`l` gives the compact classified listing (`/` for directories, `*` for executables); `ll` gives
-the long listing with hidden files and human-readable sizes.
+`brush -c` never reads `/etc/profile`, and the block is guarded by `$-`, so scripts keep the
+base `PATH` and `/bin/ls` remains script-safe. `LS_COLORS` supplies the basic directory,
+symlink and executable colours.
 
-The aliases exist only in interactive brush login sessions. Non-interactive `brush -c` does not
-read `/etc/profile`, and the block also guards on `$-`:
+## Evidence
 
-```text
-$ brush -c 'alias l; echo no=$?'
-alias: l: not found
-no=1
-```
-
-A script that relied on the base `PATH` keeps working; the aliases cannot leak into it.
-
-The K177 bobtheshell prompt is unchanged by this ticket. `RAVEN_PROMPT=plain`, `NO_COLOR` and
-`TERM=dumb` still select the same prompt modes as before.
-
-## ed
-
-`ed` is the 0.1.0 text editor. It is the POSIX line editor from `userland/bin/ed`, already
-shipped in the tree. A full-screen editor (`vi`, `nano`, `emacs`) is **not** in this ticket and
-not in 0.1.0.
-
-K183 does not change or prove `ed`. The editor's console/stdin I/O is owned by **K186**; until
-that lands, this ticket makes no claim that an interactive `ed` session works from the release
-shell. The `shell-alias` qtest covers the aliases only.
-
-## Scope
-
-No oh-my-bash, Reedline backend/hint change, eza/Atuin, network fetch, boot-log styling,
-coloured `--help` or second editor binary is part of K183.
+* `tests/qtest/cases/shell-prompt.toml`: folded path, red status, green branch, plain modes.
+* `tests/qtest/cases/shell-completion.toml`: unique completion and the column menu.
+* `tests/qtest/cases/shell-highlight.toml`: bold-red not-found command with `keep_ansi`, and a
+  plain nested `NO_COLOR`/`RAVEN_PLAIN_PROMPT` session.
+* `tests/qtest/cases/shell-alias.toml`: the three aliases and the non-interactive miss.
+* `release-login`, `base-tools`: unchanged stable output.
 
 ## Donor reconciliation (DR-52)
 
-| Topic | Illumos finding | BSD file/licence | Linux finding | Decision |
+| Topic | Illumos | BSD | Linux | Raven decision |
 |---|---|---|---|---|
-| interactive short aliases | user/site shell configuration; no system-wide `l`/`ll` requirement | NetBSD `etc/profile` (BSD-3-Clause) sets environment only, no aliases | distro `/etc/profile.d` aliases are user convenience, not shell semantics | first-principles two-line alias block in `etc/profile`; no donor code copied |
-| line-editor smoke path | `ed` is the historical line editor | NetBSD `bin/ed` (BSD-3-Clause) is the behavioural reference; the Rust editor already exists from P4t | GNU ed is reference only | not part of K183; the shipped editor's console/stdin I/O is K186 |
+| Prompt layout | shell configuration, no system prompt requirement | BSD `/etc/profile` only; no bobthefish code | fish/bobthefish is user config; behaviour only | first-party prompt function with folded path, status and branch; no theme code copied |
+| Completion menu | shell/readline behaviour only | NetBSD libedit menu completion; behaviour only | zsh/fish menu outcomes | use brush's existing completion engine and Vt menu; no donor code |
+| Syntax colour | no shell syntax-colour contract | no copied code | zsh-syntax-highlighting outcome only | use brush's existing semantic highlighter and palette |
+| Coloured ls | `ls` colour is user configuration | BSD `LSCOLORS`/`CLICOLOR` outcomes | GNU `--color=auto` outcome | interactive aliases plus `LS_COLORS`; `/bin/ls` stays script-safe |
+| Line editor input | terminal/STDIN semantics; CDDL behaviour only | NetBSD `bin/ed` reads stdin; BSD-3-Clause reference | GNU ed reads stdin; outcome only | not part of K192; K186 owns the shipped editor's `tty:console` input |

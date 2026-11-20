@@ -9546,3 +9546,14 @@ tier = "A"
 copied = "2026-11-16"
 modified = true
 notes = "OpenSSL 3.5.0 source tree for the C add-on (DR-45); crypto, build and API source are unmodified. Upstream apps/demos/doc/fuzz/test private-key fixtures (286 files) are excluded because GitHub push protection rejects them; the build uses no-tests and does not need them. The build is out of tree against the RavenBSD libc clang sysroot; the only compatibility code is addons/tls/compat/tls_compat.c."
+
+[[import]]
+path = "addons/ssh/openssh"
+upstream = "openssh-portable"
+upstream_path = "."
+upstream_rev = "d449e662b6b8b8cb20e852d8084c269af1c5e8f1"
+license = "ISC"
+tier = "A"
+copied = "2026-11-20"
+modified = true
+notes = "OpenSSH portable V_10_6_P2 (tag peeled commit) for the C add-on (DR-65); protocol, cipher suites, KEX, key formats and crypto are unmodified. The upstream regress/ test tree (including 45 private-key fixtures) is excluded because GitHub push protection rejects the keys and the build does not use regress. The build is out of tree against the RavenBSD libc clang sysroot and the T1 libcrypto/libssl; portability changes, if any, live only in addons/ssh/compat/."

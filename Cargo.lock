@@ -302,6 +302,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "curl"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-http",
+ "raven-http-net",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tls",
+]
+
+[[package]]
 name = "cxref"
 version = "0.1.0"
 dependencies = [
@@ -995,6 +1009,7 @@ dependencies = [
  "raven-proto-svc",
  "raven-rt",
  "raven-scheme",
+ "raven-tui",
 ]
 
 [[package]]
@@ -1229,8 +1244,12 @@ name = "raven-cli"
 version = "0.1.0"
 dependencies = [
  "lexopt",
+ "raven-abi",
  "raven-config",
  "raven-output",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-scheme",
  "raven-theme",
  "serde_json",
 ]
@@ -2623,6 +2642,7 @@ name = "raven-ping"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-http-net",
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
@@ -3691,6 +3711,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tui"
+version = "0.1.0"
+
+[[package]]
 name = "raven-turnstile"
 version = "0.1.0"
 
@@ -4376,6 +4400,17 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "wget"
+version = "0.1.0"
+dependencies = [
+ "curl",
+ "raven-abi",
+ "raven-http",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]

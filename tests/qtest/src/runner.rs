@@ -32,6 +32,7 @@ pub(crate) struct RunSpec {
     pub program: String,
     pub args: Vec<String>,
     pub timeout: Duration,
+    pub keep_ansi: bool,
 }
 
 /// Why a `[[step]]` did not finish.
@@ -364,7 +365,7 @@ fn run_inner(
         let remaining = spec.timeout.saturating_sub(started.elapsed());
         let slice = remaining.min(Duration::from_millis(10));
         match receiver.recv_timeout(slice) {
-            Ok(chunk) => consume(&chunk, &mut raw, &mut lines, &mut dialogue),
+            Ok(chunk) => consume(&chunk, &mut raw, &mut lines, &mut dialogue, spec.keep_ansi),
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => {
                 // stdout closed but the process is still alive; poll until it exits.
@@ -381,10 +382,10 @@ fn run_inner(
     }
     let _ = reader.join();
     for chunk in receiver.try_iter() {
-        consume(&chunk, &mut raw, &mut lines, &mut dialogue);
+        consume(&chunk, &mut raw, &mut lines, &mut dialogue, spec.keep_ansi);
     }
     if !raw.is_empty() {
-        let line = clean_bytes(&raw);
+        let line = clean_bytes(&raw, spec.keep_ansi);
         raw.clear();
         if let Some(active) = dialogue.as_deref_mut() {
             active.line(&line, Instant::now());
@@ -443,10 +444,11 @@ fn consume(
     raw: &mut Vec<u8>,
     lines: &mut Vec<String>,
     dialogue: &mut Option<&mut Dialogue>,
+    keep_ansi: bool,
 ) {
     for &byte in chunk {
         if byte == b'\n' {
-            let line = clean_bytes(raw);
+            let line = clean_bytes(raw, keep_ansi);
             raw.clear();
             if let Some(active) = dialogue.as_deref_mut() {
                 active.line(&line, Instant::now());
@@ -457,7 +459,7 @@ fn consume(
         }
     }
     if let Some(active) = dialogue.as_deref_mut() {
-        let partial = clean_bytes(raw);
+        let partial = clean_bytes(raw, keep_ansi);
         active.partial(&partial, Instant::now());
     }
 }
@@ -475,12 +477,12 @@ fn tail(lines: &[String], count: usize) -> Vec<String> {
     lines[start..].to_vec()
 }
 
-fn clean_bytes(bytes: &[u8]) -> String {
-    let mut line = String::from_utf8_lossy(bytes).into_owned();
-    if line.ends_with('\r') {
-        line.pop();
-    }
-    strip_ansi(&line)
+fn clean_bytes(bytes: &[u8], keep_ansi: bool) -> String {
+    let line = String::from_utf8_lossy(bytes).into_owned();
+    // The VT line editor returns the cursor to column zero with CR on every redraw;
+    // keep the logical line (the terminal semantics are already applied by the case).
+    let line = line.replace('\r', "");
+    if keep_ansi { line } else { strip_ansi(&line) }
 }
 
 fn strip_ansi(line: &str) -> String {

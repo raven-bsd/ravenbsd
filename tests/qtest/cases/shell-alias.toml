@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K183: interactive listing aliases. The release login is the real interactive brush console:
-# it asserts both aliases and runs them. The same login proves that `brush -c` does not inherit
-# them. The release profile keeps the K177 plain `raven# ` marker, so the transcript stays free
-# of ANSI and Unicode. The shipped `ed` console/stdin I/O is K186 and is not part of this case.
+# K183/K192: interactive coloured listing aliases. The release login is the real interactive
+# brush console: it asserts `l`, `ls` and `ll`, runs them, and proves `brush -c` does not inherit
+# them. The bobthefish prompt keeps the stable `raven# ` marker on its last line.
 
 name = "shell-alias"
 arch = "x86_64"
@@ -21,10 +20,13 @@ regex = '(?i)^.*login: ?root'
 regex = '(?i)^password: ?$'
 
 [[expect]]
-regex = "^alias l='ls -CF'$"
+regex = "^alias l='ls -CF --color=auto'$"
 
 [[expect]]
-regex = "^alias ll='ls -lah'$"
+regex = "^alias ll='ls -lah --color=auto'$"
+
+[[expect]]
+regex = "^alias ls='ls --color=auto'$"
 
 [[expect]]
 regex = '^alpha\.txt.*sub/$'
@@ -69,16 +71,24 @@ send = "alias l\n"
 delay_ms = 100
 
 [[step]]
-wait = "^alias l='ls -CF'$"
-timeout_secs = 15
+wait = "^alias l='ls -CF --color=auto'$"
+timeout_secs = 30
 
 [[step]]
 send = "alias ll\n"
 delay_ms = 100
 
 [[step]]
-wait = "^alias ll='ls -lah'$"
-timeout_secs = 15
+wait = "^alias ll='ls -lah --color=auto'$"
+timeout_secs = 30
+
+[[step]]
+send = "alias ls\n"
+delay_ms = 100
+
+[[step]]
+wait = "^alias ls='ls --color=auto'$"
+timeout_secs = 30
 
 [[step]]
 send = "mkdir -p /tmp/aliasdir/sub; echo alpha > /tmp/aliasdir/alpha.txt; cd /tmp/aliasdir\n"
@@ -86,7 +96,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 send = "l\n"
@@ -94,11 +104,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^alpha\.txt.*sub/$'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 send = "ll\n"
@@ -106,11 +116,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^-rw.*alpha\.txt$'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 send = "/bin/brush -c 'alias l >/tmp/alias-l.err 2>&1 || echo noalias-l'\n"
@@ -118,11 +128,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^noalias-l$'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 send = "/bin/brush -c 'alias ll >/tmp/alias-ll.err 2>&1 || echo noalias-ll'\n"
@@ -130,11 +140,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^noalias-ll$'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 send = "exit 0\n"

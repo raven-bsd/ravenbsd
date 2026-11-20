@@ -18,6 +18,7 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
     use raven_abi::types::clock;
+    use raven_http_net::{ResolveError, Resolver, SchemeResolver};
     use raven_ping::{MAX_PAYLOAD, Options};
     use raven_proto_net::socket::{MAX_ICMP_TIMEOUT_MS, Response, SocketRequest};
     use raven_rt::entry;
@@ -49,11 +50,29 @@ mod program {
     }
 
     fn run(options: &Options<'_>) -> Result<bool, String> {
-        let target =
-            raven_ping::parse_ipv4(options.host).map_err(|error| error.message().to_string())?;
+        let mut resolver = SchemeResolver::new();
+        let target = match resolver.resolve(options.host, 5000) {
+            Ok(resolved) => resolved.address.octets(),
+            Err(ResolveError::NotFound) => {
+                return Err(alloc::format!(
+                    "cannot resolve {}: unknown host",
+                    options.host
+                ));
+            }
+            Err(ResolveError::Timeout) => {
+                return Err(alloc::format!("cannot resolve {}: timed out", options.host));
+            }
+            Err(ResolveError::Io) => {
+                return Err(alloc::format!(
+                    "cannot resolve {}: resolver error",
+                    options.host
+                ));
+            }
+        };
+        let address = alloc::format!("{}.{}.{}.{}", target[0], target[1], target[2], target[3]);
         let id = echo_id()?;
         let client = Client::new();
-        let path = alloc::format!("net:icmp/{}", options.host);
+        let path = alloc::format!("net:icmp/{address}");
         let handle = client
             .open(&path, READ_WRITE)
             .map_err(|error| error.description().to_string())?;
@@ -79,12 +98,26 @@ mod program {
             .get(..options.payload_len)
             .ok_or("payload length out of range")?;
 
+        let interval_ms = options.interval_secs.saturating_mul(1000);
+        let mut previous_sent: Option<u64> = None;
         let mut sent = 0u16;
         let mut received = 0u16;
         let mut minimum = u32::MAX;
         let mut maximum = 0u32;
         let mut total = 0u64;
         for seq in 1..=options.count {
+            if let Some(previous) = previous_sent {
+                let target = previous.saturating_add(interval_ms);
+                let now = now_ms()?;
+                if now >= deadline || target >= deadline {
+                    break;
+                }
+                if now < target {
+                    sleep_ms(target - now);
+                }
+                let waited = now_ms()?.saturating_sub(previous);
+                raven_rt::println!("ping: interval seq={} waited={}ms", seq, waited);
+            }
             let now = now_ms()?;
             if now >= deadline {
                 break;
@@ -92,6 +125,7 @@ mod program {
             let remaining = (deadline - now).min(u64::from(MAX_ICMP_TIMEOUT_MS));
             let timeout_ms = u32::try_from(remaining.max(1)).map_err(|_| "timeout overflow")?;
             queue_echo(client, handle, id, seq, timeout_ms, payload)?;
+            previous_sent = Some(now);
             sent = sent.saturating_add(1);
             match read_reply(client, handle, target, seq, payload.len(), timeout_ms)? {
                 Some(rtt_ms) => {

@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::socket::{
     AF_INET, AF_INET6, AF_UNIX, MSG_DONTWAIT, MSG_NOSIGNAL, MSG_PEEK, MSG_TRUNC, MSG_WAITALL,
-    SO_ERROR, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_STREAM, SOL_SOCKET,
+    SO_ERROR, SO_PEERCRED, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_STREAM, SOL_SOCKET,
 };
 use raven_proto_net::{Call, Endpoint, Shutdown as WireShutdown, SockOpt};
 
@@ -21,6 +21,7 @@ use crate::msg::{gather, total_len};
 use crate::opts::{self, RecordOption};
 use crate::ready::{self, PollInterest};
 use crate::record::{SocketRec, SocketState};
+use crate::unix::UnixShutdown;
 use crate::{CallReply, Caps, Net, NetBackend, NetEnv, Sock, SocketFds, UnixBackend, WaitItem};
 
 /// Returned by `recvmsg`.
@@ -89,7 +90,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             return Err(Errno::EPROTONOSUPPORT);
         }
         let unix = self.unix.as_ref().ok_or(Errno::EAFNOSUPPORT)?;
-        let (left, right) = unix.pair(base)?;
+        let (left, right) = unix.pair_flags(base, nonblock, cloexec)?;
         let first = self.install_pair_socket(base, left, cloexec, nonblock)?;
         let second = match self.install_pair_socket(base, right, cloexec, nonblock) {
             Ok(fd) => fd,
@@ -365,12 +366,6 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 raise_sigpipe: false,
             });
         }
-        if !control.is_empty() {
-            return Err(SendErr {
-                errno: Errno::EOPNOTSUPP,
-                raise_sigpipe: false,
-            });
-        }
         let total = total_len(iov);
         if total > raven_proto_net::MAX_DATAGRAM {
             return Err(SendErr {
@@ -489,11 +484,48 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 });
             }
         };
+        if !control.is_empty() && rec.domain != AF_UNIX {
+            return Err(SendErr {
+                errno: Errno::EOPNOTSUPP,
+                raise_sigpipe: false,
+            });
+        }
+        if rec.domain == AF_UNIX && !control.is_empty() {
+            let Some(unix) = self.unix.as_ref() else {
+                return Err(SendErr {
+                    errno: Errno::EAFNOSUPPORT,
+                    raise_sigpipe: false,
+                });
+            };
+            return match unix.unix_sendmsg(&self.backend, sock, data, control, flags_in) {
+                Ok(count) => Ok(count),
+                Err(Errno::EPIPE) => Err(SendErr {
+                    errno: Errno::EPIPE,
+                    raise_sigpipe: flags_in & MSG_NOSIGNAL == 0,
+                }),
+                Err(Errno::EAGAIN) => Err(SendErr {
+                    errno: Errno::EAGAIN,
+                    raise_sigpipe: false,
+                }),
+                Err(error) => Err(SendErr {
+                    errno: error,
+                    raise_sigpipe: false,
+                }),
+            };
+        }
         let nonblock = rec.nonblock || info.nonblock || flags_in & MSG_DONTWAIT != 0;
         let deadline = Deadline::new(&self.env, rec.sndtimeo_ms);
         loop {
             let write_to = if opened_now { None } else { destination };
-            match self.backend.write(sock, data, write_to) {
+            let result = if rec.domain == AF_UNIX {
+                match self.unix.as_ref() {
+                    Some(unix) => unix.unix_write(&self.backend, sock, data),
+                    None => Err(Errno::EAFNOSUPPORT),
+                }
+            } else {
+                self.backend.write(sock, data, write_to)
+            };
+            match result {
                 Ok(count) => return Ok(count),
                 Err(Errno::EAGAIN) => {
                     if nonblock {
@@ -557,6 +589,52 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             });
         }
         let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+        if rec.domain == AF_UNIX && !control_out.is_empty() {
+            if flags_in & MSG_PEEK != 0 {
+                return Err(Errno::EOPNOTSUPP);
+            }
+            let max_read = total_len_iov(iov).min(raven_proto_net::MAX_DATAGRAM);
+            let mut buffer = vec![0u8; max_read];
+            let nonblock = rec.nonblock || info.nonblock || flags_in & MSG_DONTWAIT != 0;
+            let deadline = Deadline::new(&self.env, rec.rcvtimeo_ms);
+            let unix = self.unix.as_ref().ok_or(Errno::EAFNOSUPPORT)?;
+            loop {
+                match unix.unix_recvmsg(
+                    &self.backend,
+                    sock,
+                    &mut buffer,
+                    control_out.len(),
+                    flags_in,
+                ) {
+                    Ok(received) => {
+                        if received.control.len() > control_out.len() {
+                            return Err(Errno::EMSGSIZE);
+                        }
+                        if let Some(slot) = control_out.get_mut(..received.control.len()) {
+                            slot.copy_from_slice(&received.control);
+                        }
+                        let data = buffer.get(..received.len.min(buffer.len())).unwrap_or(&[]);
+                        let used = scatter(data, iov);
+                        return Ok(RecvMsg {
+                            len: used,
+                            name_len: 0,
+                            control_len: received.control.len(),
+                            flags: 0,
+                        });
+                    }
+                    Err(Errno::EAGAIN) => {
+                        if nonblock || deadline.expired(&self.env) {
+                            return Err(Errno::EAGAIN);
+                        }
+                        self.wait_one(sock, true, deadline.remaining(&self.env))?;
+                    }
+                    Err(error) => {
+                        rec.state = SocketState::Closed;
+                        return Err(error);
+                    }
+                }
+            }
+        }
         let nonblock = rec.nonblock || info.nonblock || flags_in & MSG_DONTWAIT != 0;
         let want_all = flags_in & MSG_WAITALL != 0 && rec.ty == SOCK_STREAM;
         let max_read = total_len_iov(iov).min(raven_proto_net::MAX_DATAGRAM);
@@ -574,16 +652,27 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             }
             let peek = flags_in & MSG_PEEK != 0;
             let result = if read_len <= stack.len() {
-                if peek {
-                    self.backend
-                        .peek(sock, stack.get_mut(..read_len).unwrap_or(&mut []))
+                let buffer = stack.get_mut(..read_len).unwrap_or(&mut []);
+                if rec.domain == AF_UNIX {
+                    match self.unix.as_ref() {
+                        Some(unix) if peek => unix.unix_peek(&self.backend, sock, buffer),
+                        Some(unix) => unix.unix_read(&self.backend, sock, buffer),
+                        None => Err(Errno::EAFNOSUPPORT),
+                    }
+                } else if peek {
+                    self.backend.peek(sock, buffer)
                 } else {
-                    self.backend
-                        .read(sock, stack.get_mut(..read_len).unwrap_or(&mut []))
+                    self.backend.read(sock, buffer)
                 }
             } else {
                 large = vec![0u8; read_len];
-                if peek {
+                if rec.domain == AF_UNIX {
+                    match self.unix.as_ref() {
+                        Some(unix) if peek => unix.unix_peek(&self.backend, sock, &mut large),
+                        Some(unix) => unix.unix_read(&self.backend, sock, &mut large),
+                        None => Err(Errno::EAFNOSUPPORT),
+                    }
+                } else if peek {
                     self.backend.peek(sock, &mut large)
                 } else {
                     self.backend.read(sock, &mut large)
@@ -652,7 +741,13 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             _ => return Err(Errno::EINVAL),
         };
         let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
-        self.backend.call(sock, Call::Shutdown { how: wire })?;
+        if rec.domain == AF_UNIX {
+            let unix = self.unix.as_ref().ok_or(Errno::EAFNOSUPPORT)?;
+            let selector = UnixShutdown::from_posix(how).ok_or(Errno::EINVAL)?;
+            unix.shutdown(sock, selector)?;
+        } else {
+            self.backend.call(sock, Call::Shutdown { how: wire })?;
+        }
         let (read, write) = match rec.state {
             SocketState::Shutdown { read, write } => (read, write),
             _ => (false, false),
@@ -669,6 +764,13 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let table = self.table.borrow();
         let rec = table.get(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if rec.domain == AF_UNIX {
+            let unnamed = SockAddr::Un {
+                path: [0u8; 108],
+                len: 0,
+            };
+            return Ok(write_sockaddr(&unnamed, out));
+        }
         let local = if let Some(local) = rec.local {
             Some(local)
         } else if let Some(sock) = rec.sock {
@@ -694,6 +796,16 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let table = self.table.borrow();
         let rec = table.get(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if rec.domain == AF_UNIX {
+            if rec.state != SocketState::Connected {
+                return Err(Errno::ENOTCONN);
+            }
+            let unnamed = SockAddr::Un {
+                path: [0u8; 108],
+                len: 0,
+            };
+            return Ok(write_sockaddr(&unnamed, out));
+        }
         let peer = if let Some(peer) = rec.peer {
             Some(peer)
         } else if let Some(sock) = rec.sock {
@@ -710,6 +822,23 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         Ok(write_sockaddr(&SockAddr::from_endpoint(peer), out))
     }
 
+    /// `getpeereid`: the creator uid/gid of a connected `AF_UNIX` endpoint.
+    pub fn getpeereid(&self, fd: i32) -> Result<(u32, u32), Errno> {
+        let info = self.fds.resolve(fd)?;
+        let table = self.table.borrow();
+        let rec = table.get(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if rec.domain != AF_UNIX {
+            return Err(Errno::EOPNOTSUPP);
+        }
+        let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+        let cred = self
+            .unix
+            .as_ref()
+            .ok_or(Errno::EOPNOTSUPP)?
+            .peercred(sock)?;
+        Ok((cred.uid, cred.gid))
+    }
+
     /// `getsockopt`.
     pub fn getsockopt(
         &self,
@@ -721,6 +850,29 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let mut table = self.table.borrow_mut();
         let rec = table.get_mut(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if level == SOL_SOCKET && name == SO_PEERCRED {
+            if rec.domain != AF_UNIX {
+                return Err(Errno::EOPNOTSUPP);
+            }
+            let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+            let cred = self
+                .unix
+                .as_ref()
+                .ok_or(Errno::EOPNOTSUPP)?
+                .peercred(sock)?;
+            let slot = out.get_mut(..12).ok_or(Errno::EINVAL)?;
+            let pid = i32::try_from(cred.pid).unwrap_or(i32::MAX);
+            slot.get_mut(0..4)
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&pid.to_ne_bytes());
+            slot.get_mut(4..8)
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&cred.uid.to_ne_bytes());
+            slot.get_mut(8..12)
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&cred.gid.to_ne_bytes());
+            return Ok(12);
+        }
         if level == SOL_SOCKET && name == SO_ERROR {
             let mut value = rec.so_error;
             rec.so_error = 0;

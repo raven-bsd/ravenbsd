@@ -53,14 +53,16 @@ pub struct SpawnRequest {
 /// A request to fork the caller.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ForkRequest {
-    /// Entry point.
+    /// Entry point of the child's first thread.
     pub entry: u64,
-    /// Stack pointer.
+    /// Stack pointer the child's first thread starts on.
     pub sp: u64,
     /// Argument passed to the entry point.
     pub arg: u64,
-    /// Fork flags.
+    /// Upper bound on the fork flags; non-zero is rejected in v1.
     pub fork_flags: u32,
+    /// User TLS base the child's thread inherits.
+    pub tp: u64,
 }
 
 /// A request to replace the caller's image.

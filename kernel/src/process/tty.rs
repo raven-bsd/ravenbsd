@@ -56,7 +56,7 @@ pub fn is_tty_file(file: &SchemeFile) -> bool {
         .schemes
         .lock()
         .iter()
-        .any(|scheme| scheme.name == "ttyd" || scheme.name == "tty")
+        .any(|scheme| scheme.name == "ttyd" || scheme.name == "tty" || scheme.name == "pty")
 }
 
 fn find(file: &SchemeFile) -> Option<Arc<Ctty>> {

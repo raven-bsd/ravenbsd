@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K199: stage the first-party HTTP tools in the shell/release/UFS profiles.
+[[initfs.programs]]
+package = "curl"
+path = "/bin/curl"
+
+[[initfs.programs]]
+package = "wget"
+path = "/bin/wget"
