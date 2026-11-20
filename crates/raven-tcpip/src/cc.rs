@@ -2,6 +2,11 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! Congestion-control framework: NewReno, CUBIC and PRR in integer arithmetic.
+//!
+//! NewReno is adapted from FreeBSD `sys/netinet/cc/cc_newreno.c` and `sys/netinet/cc/cc.c`
+//! (BSD-2-Clause; Copyright (c) 2007-2008, 2010, 2014 Swinburne University of Technology,
+//! Copyright (c) 2009-2010 Lawrence Stewart, Copyright (c) 2010 The FreeBSD Foundation).
+//! The Rust expression is first-party; CUBIC and RACK remain first-party extensions.
 
 use crate::Duration;
 
@@ -57,7 +62,12 @@ pub trait CongestionControl {
     fn undo(&mut self, _cwnd: u32, _ssthresh: u32) {}
 }
 
-/// NewReno with RFC 3465 appropriate byte counting and RFC 6582 recovery.
+/// NewReno with FreeBSD `cc_newreno.c`/`cc.c` ABC and recovery semantics.
+///
+/// The loss/recovery arithmetic follows the FreeBSD `newreno_cc_cong_signal`,
+/// `newreno_cc_cwnd_in_cong_avoid`, `newreno_cc_cwnd_in_slow_start`,
+/// `newreno_cc_after_idle`, `newreno_cc_post_recovery` and `tcp_newreno_partial_ack` behaviour.
+/// CUBIC and RACK remain first-party extensions.
 #[derive(Clone, Debug)]
 pub struct NewReno {
     cwnd: u32,
@@ -66,6 +76,8 @@ pub struct NewReno {
     cwnd_max: u32,
     dup_threshold: u32,
     recover: u32,
+    last_ack: Option<u32>,
+    bytes_acked: u32,
     in_recovery: bool,
     in_rto: bool,
 }
@@ -81,6 +93,8 @@ impl NewReno {
             cwnd_max: cwnd_max.max(2 * mss),
             dup_threshold: 3,
             recover: 0,
+            last_ack: None,
+            bytes_acked: 0,
             in_recovery: false,
             in_rto: false,
         }
@@ -93,10 +107,23 @@ impl NewReno {
 
     /// Apply a fast-retransmit loss event with the flight size at the event.
     pub fn loss_fast_retransmit(&mut self, flight: u32, snd_nxt: u32) {
-        self.ssthresh = (flight / 2).max(2 * self.mss);
-        self.cwnd = self.ssthresh.saturating_add(self.dup_threshold * self.mss);
-        self.in_recovery = true;
+        // FreeBSD newreno_cc_cwnd_on_multiplicative_decrease: beta=50%, at least two MSS.
+        let win = flight
+            .min(self.cwnd)
+            .saturating_mul(50)
+            .checked_div(100)
+            .unwrap_or(0)
+            .checked_div(self.mss)
+            .unwrap_or(0)
+            .max(2);
+        self.ssthresh = win.saturating_mul(self.mss);
+        self.cwnd = self
+            .ssthresh
+            .saturating_add(self.dup_threshold.saturating_mul(self.mss));
         self.recover = snd_nxt;
+        self.last_ack = None;
+        self.bytes_acked = 0;
+        self.in_recovery = true;
     }
 
     /// Apply a partial ACK inside recovery.
@@ -104,24 +131,36 @@ impl NewReno {
         if !self.in_recovery {
             return;
         }
-        let bonus = if acked >= self.mss { self.mss } else { 0 };
+        // FreeBSD tcp_newreno_partial_ack: subtract acked, then add one MSS.
         self.cwnd = self
             .cwnd
+            .saturating_add(self.mss)
             .saturating_sub(acked)
-            .saturating_add(bonus)
-            .max(2 * self.mss);
+            .max(self.mss);
     }
 
     /// Apply a full ACK at or above `recover`.
     pub fn full_ack(&mut self) {
         if self.in_recovery {
-            self.cwnd = self.ssthresh;
+            if let Some(ack) = self.last_ack {
+                let pipe = self.recover.saturating_sub(ack);
+                self.cwnd = if pipe < self.ssthresh {
+                    pipe.max(self.mss).saturating_add(self.mss)
+                } else {
+                    self.ssthresh
+                };
+            } else {
+                self.cwnd = self.ssthresh;
+            }
+            self.bytes_acked = 0;
+            self.last_ack = None;
             self.in_recovery = false;
         }
     }
 
-    /// Idle restart: RFC 5681 section 4.1.
+    /// Idle restart: FreeBSD `newreno_cc_after_idle`.
     pub fn idle_restart(&mut self) {
+        self.ssthresh = self.ssthresh.max(self.cwnd.saturating_sub(self.cwnd >> 2));
         self.cwnd = self.cwnd.min(10 * self.mss);
     }
 }
@@ -131,35 +170,68 @@ impl CongestionControl for NewReno {
         "newreno"
     }
 
-    fn on_ack(&mut self, _ctx: &mut CcContext, acked_bytes: u32, _rtt: Option<Duration>) {
+    fn on_ack(&mut self, ctx: &mut CcContext, acked_bytes: u32, _rtt: Option<Duration>) {
+        self.last_ack = Some(ctx.snd_una.saturating_add(acked_bytes));
         if self.in_recovery {
             return;
         }
         if self.in_rto {
             self.in_rto = false;
         }
-        let acked = acked_bytes.min(self.mss);
-        if self.cwnd < self.ssthresh {
-            self.cwnd = self.cwnd.saturating_add(acked);
+        if self.cwnd > self.ssthresh {
+            // FreeBSD ABC: count acked bytes up to abc_l_var*MSS.
+            let abc = acked_bytes.min(self.mss.saturating_mul(2));
+            self.bytes_acked = self.bytes_acked.saturating_add(abc);
+            if self.bytes_acked >= self.cwnd {
+                self.bytes_acked = self.bytes_acked.saturating_sub(self.cwnd);
+                self.cwnd = self.cwnd.saturating_add(self.mss);
+            }
         } else {
-            let increment = ((self.mss as u64 * self.mss as u64) / self.cwnd as u64).max(1);
+            // FreeBSD slow start with abc_l_var=2 while data is still queued.
             self.cwnd = self
                 .cwnd
-                .saturating_add(u32::try_from(increment).unwrap_or(u32::MAX));
+                .saturating_add(acked_bytes.min(self.mss.saturating_mul(2)));
         }
         self.cwnd = self.cwnd.min(self.cwnd_max);
     }
 
-    fn on_loss(&mut self, ctx: &mut CcContext, _kind: LossKind) {
-        self.loss_fast_retransmit(ctx.flight, ctx.snd_nxt);
+    fn on_loss(&mut self, ctx: &mut CcContext, kind: LossKind) {
+        if kind == LossKind::Ecn {
+            self.ssthresh = self
+                .cwnd
+                .saturating_mul(50)
+                .checked_div(100)
+                .unwrap_or(0)
+                .checked_div(self.mss)
+                .unwrap_or(0)
+                .max(2)
+                .saturating_mul(self.mss);
+            self.cwnd = self.ssthresh;
+            self.in_recovery = true;
+            self.bytes_acked = 0;
+            self.last_ack = None;
+        } else {
+            self.loss_fast_retransmit(ctx.flight, ctx.snd_nxt);
+        }
     }
 
     fn on_rto(&mut self, ctx: &mut CcContext) {
+        // FreeBSD newreno_cc_cong_signal: only the first RTO (t_rxtshift==1) re-cuts.
         if !self.in_rto {
-            self.ssthresh = (ctx.flight / 2).max(2 * self.mss);
+            let win = ctx
+                .flight
+                .min(self.cwnd)
+                .checked_div(2)
+                .unwrap_or(0)
+                .checked_div(self.mss)
+                .unwrap_or(0)
+                .max(2);
+            self.ssthresh = win.saturating_mul(self.mss);
             self.in_rto = true;
         }
         self.cwnd = self.mss;
+        self.bytes_acked = 0;
+        self.last_ack = None;
         self.in_recovery = false;
     }
 

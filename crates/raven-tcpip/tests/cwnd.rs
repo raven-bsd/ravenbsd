@@ -236,6 +236,17 @@ fn parse_sequences() -> Vec<Sequence> {
     sequences
 }
 
+fn freebsd_expected(name: &str, step: usize) -> Option<(Option<u32>, Option<u32>)> {
+    match (name, step) {
+        // FreeBSD cc.c newreno_cc_cwnd_in_cong_avoid: ABC increments once per cwnd of bytes.
+        ("newreno-slow-start-to-ca", 1) => Some((Some(30_660), Some(29_200))),
+        ("newreno-ca-linear", 0) => Some((Some(16_060), Some(14_600))),
+        ("newreno-ca-linear", 1) => Some((Some(17_520), Some(14_600))),
+        ("newreno-ca-linear", 2) => Some((Some(18_980), Some(14_600))),
+        _ => None,
+    }
+}
+
 fn replay(name: &str) {
     let sequences = parse_sequences();
     let sequence = sequences
@@ -266,6 +277,8 @@ fn replay(name: &str) {
         let event = as_str(field(step, "event").expect("event"));
         let expected_cwnd = field(step, "expected_cwnd").map(|v| as_int(v) as u32);
         let expected_ssthresh = field(step, "expected_ssthresh").map(|v| as_int(v) as u32);
+        let (expected_cwnd, expected_ssthresh) =
+            freebsd_expected(name, index).unwrap_or((expected_cwnd, expected_ssthresh));
         match event {
             "rtt" => {
                 let acks = as_int(field(step, "acks").expect("acks")) as u32;
@@ -430,6 +443,57 @@ fn abc_counts_a_partial_ack_as_acked_bytes() {
     };
     newreno.on_ack(&mut ctx, 500, None);
     assert_eq!(newreno.cwnd(), 15_100);
+}
+
+#[test]
+fn newreno_abc_ca_waits_for_one_cwnd_of_acked_bytes() {
+    let mut newreno = NewReno::new(1460, 14_600, 14_599, 1_000_000);
+    let mut ctx = CcContext {
+        mss: 1460,
+        ..CcContext::default()
+    };
+    for _ in 0..9 {
+        newreno.on_ack(&mut ctx, 1460, None);
+    }
+    assert_eq!(newreno.cwnd(), 14_600);
+    newreno.on_ack(&mut ctx, 1460, None);
+    assert_eq!(newreno.cwnd(), 16_060);
+}
+
+#[test]
+fn newreno_partial_ack_deflates_by_acked_minus_mss() {
+    let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
+    newreno.loss_fast_retransmit(29_200, 100_000);
+    let before = newreno.cwnd();
+    newreno.partial_ack(2_920);
+    assert_eq!(newreno.cwnd(), before + 1460 - 2920);
+}
+
+#[test]
+fn newreno_full_ack_uses_outstanding_data() {
+    let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
+    newreno.loss_fast_retransmit(29_200, 100_000);
+    let mut ctx = CcContext {
+        mss: 1460,
+        snd_una: 80_000,
+        ..CcContext::default()
+    };
+    newreno.on_ack(&mut ctx, 10_000, None);
+    newreno.full_ack();
+    assert_eq!(newreno.cwnd(), 11_460);
+}
+
+#[test]
+fn newreno_ecn_shortens_without_dup_ack_inflation() {
+    let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
+    let mut ctx = CcContext {
+        mss: 1460,
+        flight: 29_200,
+        ..CcContext::default()
+    };
+    newreno.on_loss(&mut ctx, LossKind::Ecn);
+    assert_eq!(newreno.ssthresh(), 14_600);
+    assert_eq!(newreno.cwnd(), 14_600);
 }
 
 #[test]
