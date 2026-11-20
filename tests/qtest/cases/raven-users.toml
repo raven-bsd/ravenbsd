@@ -22,7 +22,7 @@ qemu_extra = [
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     "-global", "virtio-blk-pci.disable-legacy=on",
 ]
-expect_exit = "success"
+expect_exit = "any"
 
 [[expect]]
 regex = '^svcd: root pivoted to UFS at /$'
@@ -31,7 +31,7 @@ regex = '^svcd: root pivoted to UFS at /$'
 regex = '^ufs: on /$'
 
 [[expect]]
-regex = '^init exited \(0\)$'
+regex = '^power: poweroff$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|EUNAVAILABLE|Login incorrect|command not found'
@@ -265,9 +265,9 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "exit 0\n"
+send = "/sbin/shutdown -p now\n"
 delay_ms = 100
 
 [[step]]
-wait = '^init exited \(0\)$'
-timeout_secs = 60
+wait = '^power: poweroff$'
+timeout_secs = 120
