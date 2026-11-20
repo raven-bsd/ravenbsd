@@ -17,8 +17,8 @@ use raven_rt::spawn::{RtSys, SpawnError, SpawnOptions, Sys};
 use raven_rt::sync::Mutex;
 use raven_scheme::Server;
 use raven_svc_manifest::{
-    GraphError, Manifest, Overrides, ParseError, ParseErrorKind, UnknownService, apply_overrides,
-    parse_overrides,
+    GraphError, Manifest, Overrides, ParseError, ParseErrorKind, Restart, UnknownService,
+    apply_overrides, parse_overrides,
 };
 
 use crate::config::{self, Config};
@@ -44,6 +44,8 @@ pub(crate) struct Core {
     pub(crate) pending_starts: Vec<StartRequest>,
     pub(crate) pending_terminations: Vec<Handle>,
     pub(crate) all_up_printed: bool,
+    /// True when the image asks for the per-service timing diagnostics.
+    pub(crate) verbose: bool,
     /// The health record read from the UFS root, when the image carries one.
     pub(crate) health: Option<Health>,
     /// True once the marker write has been attempted for this boot.
@@ -142,6 +144,7 @@ pub fn run() -> i32 {
             .any(|service| service.name == *name)
     });
     let root_exec = alloc::vec![false; supervisor.len()];
+    let verbose = boot_timing_enabled(&initfs);
     let core = Arc::new(Mutex::new(Core {
         supervisor,
         config,
@@ -149,6 +152,7 @@ pub fn run() -> i32 {
         pending_starts: Vec::new(),
         pending_terminations: Vec::new(),
         all_up_printed: false,
+        verbose,
         health: None,
         health_written: false,
         root_exec,
@@ -209,11 +213,12 @@ pub fn run() -> i32 {
             }
         }
         // Root one-shot services read through vfsd; start them one at a time so the shared
-        // file-serving path is not exercised by several new clients at once.
-        if let Some(code) = run_waves(&core, None, true, true) {
+        // file-serving path is not exercised by several new clients at once. The release
+        // getty is deliberately started after that plan so its banner/login is the last line.
+        if let Some(code) = run_full_plan(&core, true, true) {
             return code;
         }
-    } else if let Some(code) = run_waves(&core, None, false, false) {
+    } else if let Some(code) = run_full_plan(&core, false, false) {
         return code;
     }
 
@@ -334,6 +339,104 @@ fn start_and_wait(core: &Arc<Mutex<Core>>, members: &[usize]) -> Option<i32> {
             return None;
         }
         let _ = raven_rt::nanosleep(5_000_000);
+    }
+}
+
+/// True when the image asks for the per-service timing diagnostics.
+///
+/// `/etc/raven/boot-verbose` enables them explicitly; `/etc/raven/boot-quiet` is staged by the
+/// release profile for the concise default. Images with neither keep the diagnostics used by
+/// the shell/test transcript cases.
+fn boot_timing_enabled(initfs: &Initfs<'_>) -> bool {
+    let verbose = initfs
+        .get("/etc/raven/boot-verbose")
+        .is_some_and(|entry| !entry.data.is_empty() && entry.data != b"0" && entry.data != b"0\n");
+    verbose || initfs.get("/etc/raven/boot-quiet").is_none()
+}
+
+/// Run the full plan with the login service held back until everything else is up.
+///
+/// The getty banner/login is the user-visible last line; printing the concise boot report before
+/// it keeps later service lines from scrolling the prompt away. A getty failure still prints and
+/// still fails the boot.
+fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) -> Option<i32> {
+    let getty = {
+        let guard = core.lock();
+        guard
+            .supervisor
+            .services()
+            .iter()
+            .position(|service| service.name == "getty" && service.enable)
+    };
+    let selected = getty.map(|index| {
+        let mut mask = alloc::vec![true; core.lock().supervisor.len()];
+        if let Some(slot) = mask.get_mut(index) {
+            *slot = false;
+        }
+        mask
+    });
+    if let Some(code) = run_waves(core, selected.as_deref(), only_unstarted, serial) {
+        return Some(code);
+    }
+    if let Some(index) = getty {
+        print_boot_report(core, index);
+        core.lock().all_up_printed = true;
+        let generation = { core.lock().supervisor.start(index, now_ms()) };
+        if let Some(generation) = generation {
+            spawn_worker(core, index, generation);
+        }
+    }
+    None
+}
+
+/// Print the concise boot report and the health marker before the login starts.
+fn print_boot_report(core: &Arc<Mutex<Core>>, skip: usize) {
+    let (up, failed) = {
+        let guard = core.lock();
+        let mut up = 0usize;
+        let mut failed = 0usize;
+        for (index, service) in guard.supervisor.services().iter().enumerate() {
+            if !service.enable || index == skip {
+                continue;
+            }
+            let ready = guard
+                .supervisor
+                .runtime()
+                .get(index)
+                .is_some_and(|runtime| {
+                    runtime.state == State::Running
+                        || (service.restart == Restart::Never && !service.required)
+                });
+            if ready {
+                up = up.saturating_add(1);
+            } else {
+                failed = failed.saturating_add(1);
+            }
+        }
+        (up, failed)
+    };
+    if failed == 0 {
+        raven_rt::println!("svcd: all services up");
+    } else {
+        raven_rt::println!("svcd: boot report: {up} up, {failed} failed");
+    }
+    let (health_due, health) = {
+        let mut guard = core.lock();
+        let due =
+            !guard.health_written && guard.health.is_some() && guard.supervisor.health_ready();
+        if due {
+            guard.health_written = true;
+        }
+        (due, guard.health)
+    };
+    if health_due {
+        raven_rt::println!("svcd: required services ready");
+        if let Some(health) = health {
+            match crate::health::mark(health) {
+                Ok(()) => raven_rt::println!("svcd: health marker written"),
+                Err(error) => raven_rt::eprintln!("svcd: health marker: {error}"),
+            }
+        }
     }
 }
 
@@ -654,6 +757,11 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
         match notice {
             Notice::Up(index) => {
                 if let Some(service) = guard.supervisor.services().get(*index) {
+                    // The login service is started last; its banner/login must be the final
+                    // console output, so its lifecycle line is part of the boot report instead.
+                    if service.name == "getty" {
+                        continue;
+                    }
                     raven_rt::println!("svcd: {} up", service.name);
                     emit_ready_timing(&guard, *index, "ready_at");
                 }
@@ -679,6 +787,9 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
 /// `^...$`; this diagnostic line follows them and carries the generation, the deadline base and
 /// the spawn, first-poll and finish timestamps in monotonic milliseconds.
 fn emit_ready_timing(guard: &Core, index: usize, finish_label: &str) {
+    if !guard.verbose {
+        return;
+    }
     let Some(service) = guard.supervisor.services().get(index) else {
         return;
     };

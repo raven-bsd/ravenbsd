@@ -31,13 +31,16 @@ regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
 regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
-regex = '^svcd: getty up$'
+regex = '^svcd: all services up$'
 
 [[expect]]
 regex = '(?i)^.*login: ?root'
 
 [[expect]]
 regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^/root$'
 
 [[expect]]
 regex = '^cat$'
@@ -82,6 +85,22 @@ delay_ms = 100
 [[step]]
 wait = '^raven# $'
 timeout_secs = 300
+
+[[step]]
+send = "cd && pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/root$'
+timeout_secs = 30
+
+[[step]]
+send = "cd /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
 
 [[step]]
 send = "ls -alh /\n"
