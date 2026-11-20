@@ -116,6 +116,10 @@ stage_sysroot() {
     builtins=$resource/lib/linux/libclang_rt.builtins-x86_64.a
     [ -f "$builtins" ] || die "missing compiler-rt builtins: $builtins"
     cp "$builtins" "$sysroot/usr/lib/libclang_rt.builtins.a"
+    # The RavenBSD forwarding stdatomic.h shadows clang's header and its include_next finds
+    # nothing. Remove it from the staged sysroot so clang's own C11 atomics are used. This is a
+    # build-sysroot workaround for the libc forwarding header; no OpenSSL source is modified.
+    rm -f "$sysroot/usr/include/stdatomic.h"
 }
 
 configure() {
@@ -151,6 +155,9 @@ build() {
     cp "$build/apps/openssl" "$install/bin/openssl"
     cp "$build/libcrypto.a" "$build/libssl.a" "$install/lib/"
     cp -a "$build/include/openssl/." "$install/include/openssl/"
+    # The generated include tree does not contain every public source header (for example
+    # openssl/macros.h). Add the upstream public headers without clobbering generated files.
+    cp -an "$source/include/openssl/." "$install/include/openssl/"
     clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
         -I"$build/include" -I"$source/include" -I"$source/apps" \
         -std=gnu11 -O1 -D__ravenbsd__=1 -D__unix__=1 \
