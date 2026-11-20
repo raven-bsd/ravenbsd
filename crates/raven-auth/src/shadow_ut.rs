@@ -11,22 +11,34 @@ fn a_root_line_round_trips() {
     let entry = ShadowEntry::parse(&line).expect("parse");
     assert_eq!(entry.name, "root");
     assert_eq!(entry.hash, ROOT_HASH);
-    assert_eq!(entry.last_change, 0);
+    assert_eq!(entry.last_change, 20_000);
     assert_eq!(entry.max, 99_999);
     assert_eq!(entry.warn, 7);
+    assert_eq!(entry.inactive, -1);
+    assert_eq!(entry.expire, -1);
     assert_eq!(entry.render(), line);
 }
 
 #[test]
-fn empty_numeric_fields_are_zero() {
+fn empty_numeric_fields_follow_shadow_defaults() {
     let entry = ShadowEntry::parse("root:x:::::::").expect("parse");
     assert_eq!(entry.last_change, 0);
     assert_eq!(entry.min, 0);
     assert_eq!(entry.max, 0);
     assert_eq!(entry.warn, 0);
-    assert_eq!(entry.inactive, 0);
-    assert_eq!(entry.expire, 0);
+    assert_eq!(entry.inactive, -1);
+    assert_eq!(entry.expire, -1);
     assert_eq!(entry.reserved, 0);
+}
+
+#[test]
+fn the_canonical_root_hash_is_16_char_salt_and_verifies() {
+    const CANONICAL: &str = "$6$rounds=5000$G3aRZtaEHFI9mxqP$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.";
+    assert!(verify_password("raven", CANONICAL));
+    assert!(!verify_password("wrong", CANONICAL));
+    let fields: Vec<&str> = CANONICAL.split('$').collect();
+    assert_eq!(fields.get(2), Some(&"rounds=5000"));
+    assert_eq!(fields.get(3).map(|salt| salt.len()), Some(16));
 }
 
 #[test]

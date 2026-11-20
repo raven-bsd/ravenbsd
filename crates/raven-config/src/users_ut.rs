@@ -108,6 +108,28 @@ fn load_reads_the_base_account_files() {
 }
 
 #[test]
+fn empty_inactive_and_expire_parse_as_minus_one() {
+    let root = TempRoot::new();
+    let hash = "$6$rounds=5000$G3aRZtaEHFI9mxqP$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.";
+    root.write(
+        "etc/shadow",
+        &format!("root:{hash}:20000:0:99999:7:::\nalice:{hash}:19000:0:99999:7:-1:-1:0\n"),
+        0o600,
+    );
+    let accounts = Accounts::load(root.path()).unwrap();
+    let root_entry = accounts.shadow("root").unwrap();
+    assert_eq!(root_entry.inactive, -1);
+    assert_eq!(root_entry.expire, -1);
+    let alice = accounts.shadow("alice").unwrap();
+    assert_eq!(alice.inactive, -1);
+    assert_eq!(alice.expire, -1);
+    assert_eq!(
+        alice.render(),
+        format!("alice:{hash}:19000:0:99999:7:-1:-1:0")
+    );
+}
+
+#[test]
 fn add_user_writes_passwd_shadow_group_home_and_autologin() {
     let root = TempRoot::new();
     let mut request = spec("musicbox", 1000, 1000, "/bin/tui-demo", Some("tui-pass"));
@@ -126,6 +148,7 @@ fn add_user_writes_passwd_shadow_group_home_and_autologin() {
     let hash = line.split(':').nth(1).unwrap();
     assert!(hash.starts_with("$6$"));
     assert!(raven_auth::verify_password("tui-pass", hash));
+    assert!(line.ends_with(":0:99999:7:-1:-1:0"));
     assert!(!shadow.contains("tui-pass"));
 
     let group = root.read("etc/group");

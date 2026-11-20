@@ -110,7 +110,7 @@ name:hash:last_change:min:max:warn:inactive:expire:reserved
 * Mode `0600`, owner `root:wheel`; it is never installed into the world-readable initfs view in a
   way that a non-root process can open. Only root (or a root-owned auth tool) may read it.
 * Root record uses REL1b's deterministic default hash for 0.1.0 compatibility:
-  `root:$6$rounds=5000$G3aRZtaEHFI9mxqPo3H6$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.:0:0:99999:7:0:0:0`.
+  `root:$6$rounds=5000$G3aRZtaEHFI9mxqP$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.:20000:0:99999:7:::`.
 * Argon2id is **not** a 0.2.0 format change. It is a later policy decision; a `$argon2id$` parser
   can be added without changing the file shape, but existing `$6$` records must keep verifying.
 

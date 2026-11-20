@@ -50,8 +50,8 @@ impl ShadowEntry {
             min: 0,
             max: 99999,
             warn: 7,
-            inactive: 0,
-            expire: 0,
+            inactive: -1,
+            expire: -1,
             reserved: 0,
         }
     }
@@ -87,6 +87,25 @@ impl ShadowEntry {
                 field,
             )
         };
+        let optional = |index: usize, field: &'static str| -> Result<i64, DbError> {
+            let text = fields.get(index).copied().unwrap_or("");
+            if text.is_empty() {
+                return Ok(-1);
+            }
+            let value = text.parse::<i64>().map_err(|_| DbError::InvalidField {
+                file: DbFile::Shadow,
+                line: line_no,
+                field,
+            })?;
+            if value < -1 {
+                return Err(DbError::InvalidField {
+                    file: DbFile::Shadow,
+                    line: line_no,
+                    field,
+                });
+            }
+            Ok(value)
+        };
         Ok(Self {
             name: name.to_string(),
             hash: hash.to_string(),
@@ -94,8 +113,8 @@ impl ShadowEntry {
             min: number(3, "min")?,
             max: number(4, "max")?,
             warn: number(5, "warn")?,
-            inactive: number(6, "inactive")?,
-            expire: number(7, "expire")?,
+            inactive: optional(6, "inactive")?,
+            expire: optional(7, "expire")?,
             reserved: number(8, "reserved")?,
         })
     }

@@ -12,8 +12,9 @@ use crate::hash::{DEFAULT_ROOT_HASH, verify_password};
 
 /// One `/etc/shadow` record.
 ///
-/// The nine fields are `name:hash:last_change:min:max:warn:inactive:expire:reserved`; an empty
-/// numeric field is read as zero, which is the shadow convention for "unset".
+/// The nine fields are `name:hash:last_change:min:max:warn:inactive:expire:reserved`. Empty
+/// `last_change`/`min`/`max`/`warn` fields read as zero; an empty `inactive`/`expire` field is
+/// `-1`, the shadow convention for "not set" (zero means day 0 to OpenSSH).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ShadowEntry {
     /// Account name.
@@ -60,6 +61,18 @@ impl ShadowEntry {
                 field.parse::<i64>().map_err(|_| AuthError::InvalidNumber)
             }
         };
+        let optional = |index: usize| -> Result<i64, AuthError> {
+            let field = fields.get(index).copied().unwrap_or("");
+            if field.is_empty() {
+                Ok(-1)
+            } else {
+                let value = field.parse::<i64>().map_err(|_| AuthError::InvalidNumber)?;
+                if value < -1 {
+                    return Err(AuthError::InvalidNumber);
+                }
+                Ok(value)
+            }
+        };
         Ok(Self {
             name,
             hash,
@@ -67,8 +80,8 @@ impl ShadowEntry {
             min: number(3)?,
             max: number(4)?,
             warn: number(5)?,
-            inactive: number(6)?,
-            expire: number(7)?,
+            inactive: optional(6)?,
+            expire: optional(7)?,
             reserved: number(8)?,
         })
     }
@@ -106,7 +119,7 @@ impl ShadowEntry {
 /// A shadow line for `root` with the supplied hash and the standard release fields.
 #[must_use]
 pub fn root_line(hash: &str) -> String {
-    format!("root:{hash}:0:0:99999:7:0:0:0")
+    format!("root:{hash}:20000:0:99999:7:-1:-1:-1")
 }
 
 /// The default `root` shadow line generated from the release password at build time.
