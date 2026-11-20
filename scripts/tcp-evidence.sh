@@ -6,8 +6,10 @@
 # keeps the repository convention (`sh scripts/<name>.sh`) and runs it in the foreground.
 #
 #   sh scripts/tcp-evidence.sh --selftest
-#   sh scripts/tcp-evidence.sh --audit --reports-root /path/to/ravenbsd-prjmgmt/tickets
-#   sh scripts/tcp-evidence.sh --all --reports-root /path/to/ravenbsd-prjmgmt/tickets
+#   sh scripts/tcp-evidence.sh --audit --reports-root /path/to/ravenbsd-prjmgmt/tickets \
+#       --freebsd-root /path/to/freebsd --dragonfly-root /path/to/dragonfly
+#   sh scripts/tcp-evidence.sh --all --reports-root /path/to/ravenbsd-prjmgmt/tickets \
+#       --freebsd-root /path/to/freebsd --dragonfly-root /path/to/dragonfly
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)

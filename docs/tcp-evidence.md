@@ -3,14 +3,13 @@
 
 # TCP provenance and evidence (K264)
 
-Status: **PARTIAL.** The audit, the unit evidence and the reproducible packet are implemented and
-run. The audit intentionally **fails** on one upstream port report (K260) and rejects two proposed
-entries (K259) because the donor files carry the NRL 4-clause advertising clause. The packet-level
-conformance matrix is blocked because the K253 harness is not on `origin/master`.
-
-The K264 tool itself is green: its self-test passes, the unit suite is 647/647, and the audit
-correctly rejects unsupported provenance instead of recording it. The tree is not yet
-provenance-clean until the upstream items below are fixed.
+Status: **PARTIAL (rework round 1).** The NetBSD TCP files are NRL 4-clause **NO-COPY**. No
+NetBSD TCP provenance entry exists or may be added. The permitted donors are **FreeBSD
+`sys/netinet`** (BSD-3-Clause, no advertising; `cc/cc_newreno.c` is BSD-2-Clause) and
+**DragonFly `sys/netinet/tcp_sack.c`** (BSD-3-Clause). Every NetBSD-derived port branch/report is
+quarantined until it is reworked against those donors. The port reports currently contain no
+FreeBSD/DragonFly entry, so this packet adds no `PROVENANCE.toml` entry. The K253 packet matrix is
+still blocked because the harness is not merged into `origin/master`.
 
 ## Commands and results
 
@@ -18,98 +17,90 @@ All commands are foreground with an explicit cap.
 
 | Command | Cap | Exit | Result |
 |---|---|---|---|
-| `sh scripts/tcp-evidence.sh --selftest` | 60 s | 0 | `PASS netbsd_imports=0 other_imports=1 claims=11 matrix_blocker=detected` |
-| `cargo nextest run -p raven-tcpip` | 180 s | 0 | **647 tests run: 647 passed, 0 skipped** (1.186 s) |
-| `sh scripts/tcp-evidence.sh --audit --reports-root <tickets> --donor-root <netbsd>` | 120 s | 1 | **fail**: 67 files, 0 NetBSD imports, 1 smoltcp/0BSD, 11 claims, 5 clean-room claims, 2 rejected entries, **1 violation** |
-| `sh scripts/tcp-evidence.sh --all ...` | 240 s | 1 | audit fail, unit pass, matrix blocked |
+| `sh scripts/tcp-evidence.sh --selftest` | 60 s | 0 | `PASS netbsd_imports=0 quarantined=8 claims=11 matrix_blocker=detected` |
+| `cargo nextest run -p raven-tcpip` | 180 s | 0 | **647 tests run: 647 passed, 0 skipped** |
+| `sh scripts/tcp-evidence.sh --audit --reports-root <tickets> --freebsd-root <fb> --dragonfly-root <df>` | 120 s | 0 | **pass**: 67 files, 0 NetBSD imports, 8 quarantined claims, 15 donor files verified, 2 rejected entries, 0 violations |
+| `sh scripts/tcp-evidence.sh --all ...` | 240 s | 2 | audit pass, unit pass, matrix blocked |
 | `make check-fast` | 420 s | 0 | **`check-fast: PASSED`** |
 
-The audit violation is:
+## Why NetBSD TCP is quarantined
+
+The pinned NetBSD tree (`36eddebcc36cb0775aa2962005b9c05419a6ff01`) has a second copyright block
+in the key TCP files:
+
+| NetBSD donor | Header | Decision |
+|---|---|---|
+| `sys/netinet/tcp_output.c` | WIDE 3-clause **plus NRL 4-clause advertising** | **NO-COPY** |
+| `sys/netinet/tcp_input.c` | WIDE 3-clause **plus NRL 4-clause advertising** | **NO-COPY** |
+| `sys/netinet/tcp_congctl.c` | NetBSD/WIDE **plus NRL 4-clause advertising** | **NO-COPY** |
+| `sys/netinet/tcp_sack.c` | NetBSD/UCB **plus NRL 4-clause advertising** | **NO-COPY** |
+| `sys/netinet/tcp_var.h` | NRL 4-clause advertising | **NO-COPY** |
+
+A four-clause file is NO-COPY under the project donor rules. The audit therefore rejects any
+`upstream = "netbsd"` import under `crates/raven-tcpip`, and the intake marks every NetBSD-derived
+branch/report quarantined:
 
 ```text
-K260: DONE permitted port but status is pending; add the exact entry and set status=landed
+K254 jerry/K254   K255 carl/K255    K256 mark/K256    K257 stuart/K257
+K258 dave/K258    K259 mel/K259     K260 kevin/K260   K261 tim/K261
 ```
 
-K260's pushed branch (`kevin/K260`, `61073d22`) changes `socket.rs`, `listen.rs` and
-`tests/listen.rs` but adds no `PROVENANCE.toml` entry, although its donors (`tcp_usrreq.c`,
-`tcp_subr.c`) are three-clause and therefore copyable. The audit refuses to invent the entry; K260
-must send it or restate the work as clean-room.
+K258's clean-room implementation and K259's two proposed NetBSD entries are held; K259's ecn.rs
+and pmtu.rs entries are **rejected** because they cite the NRL files. K260's report is DONE but
+still NetBSD-derived, so it is quarantined rather than accepted with a missing entry.
 
-## Donor licence audit
+## Permitted donors
 
-The audit reads the pinned NetBSD checkout (`36eddebcc36cb0775aa2962005b9c05419a6ff01`) and
-classifies each donor header. It does not trust the report prose.
+The audit reads the pinned donor revisions from the checkout's git objects, so the sparse
+worktrees do not hide the files:
 
-| Donor file | Header finding | Decision |
-|---|---|---|
-| `sys/netinet/tcp_output.c` | WIDE 3-clause **plus NRL 4-clause advertising** | **NO-COPY**; clean-room only |
-| `sys/netinet/tcp_input.c` | WIDE 3-clause **plus NRL 4-clause advertising** | **NO-COPY**; clean-room only |
-| `sys/netinet/tcp_congctl.c` | NetBSD/WIDE **plus NRL 4-clause advertising** | **NO-COPY**; clean-room only |
-| `sys/netinet/tcp_sack.c` | NetBSD/UCB **plus NRL 4-clause advertising** | **NO-COPY**; clean-room only |
-| `sys/netinet/tcp_var.h` | NRL 4-clause advertising | **NO-COPY**; clean-room only |
-| `sys/netinet/tcp_subr.c` | WIDE/NetBSD/UCB 3-clause, no NRL | BSD-3-Clause, copy permitted |
-| `sys/netinet/tcp_timer.c` | WIDE/NetBSD/UCB 3-clause, no NRL | BSD-3-Clause, copy permitted |
-| `sys/netinet/tcp_usrreq.c` | WIDE/NetBSD/UCB 3-clause, no NRL | BSD-3-Clause, copy permitted |
-| `sys/sys/socketvar.h` | NetBSD 2-clause + UCB 3-clause | BSD-3-Clause, copy permitted |
-| `sys/kern/uipc_socket.c` | NetBSD 2-clause + UCB 3-clause | BSD-3-Clause, copy permitted |
-| `sys/kern/uipc_socket2.c` | NetBSD 2-clause + UCB 3-clause | BSD-3-Clause, copy permitted |
+| Donor | Revision | Licence | Files checked |
+|---|---|---|---|
+| FreeBSD | `133344405f532bd54ff3629a77d4c4e062f01fdb` | BSD-3-Clause (cc_newreno BSD-2-Clause) | `sys/netinet/tcp_output.c`, `tcp_input.c`, `tcp_timer.c`, `tcp_subr.c`, `tcp_usrreq.c`, `cc/cc_newreno.c`; `sys/sys/socketvar.h`; `sys/kern/sys_socket.c`, `uipc_socket.c` |
+| DragonFly | `94448f622a06cde90ba42d688e9cab2448ad9ab3` | BSD-3-Clause | `sys/netinet/tcp_sack.c` |
 
-Consequences for the wave:
+No advertising clause is present in either donor's checked files. The donor HEADs match the
+pins; the audit records `source=git` for the sparse files.
 
-* **K258** (`cc.rs`) correctly records no entry: `tcp_congctl.c`/`tcp_input.c`/`tcp_output.c`
-  are NO-COPY and the report is a clean-room implementation. The claim is `clean-room`.
-* **K259** proposed two entries (`ecn.rs`, `pmtu.rs`), but both cite `tcp_input.c`/`tcp_output.c`
-  and/or `tcp_var.h`, all NRL 4-clause. Both entries are **rejected**; the claim is `clean-room`.
-  `ecn.rs`/`pmtu.rs` must stay clean-room with no `[[import]]`.
-* **K254** (`tcp_output.c`/`tcp_input.c`) and **K255** (`tcp_input.c`) name NO-COPY donors. A
-  literal port is not allowed; their output/input code must be clean-room, with no entry.
-* **K257** (`tcp_sack.c`) is NO-COPY; `sack.rs` must be clean-room. The ticket's
-  `IsLost`/`NextSeg`/`Pipe` names are FreeBSD/RFC 6675 names, not NetBSD symbols, so they cannot
-  be presented as a NetBSD port either.
-* **K256** may copy only `tcp_timer.c`; `recovery.rs` must not copy `tcp_input.c` (NO-COPY).
-* **K261** may copy `socketvar.h`/`uipc_socket.c` (BSD-3-Clause when both notices are retained);
-  it is still `WORKING`, so no entry exists yet.
-* **K260** is the only DONE permitted port without an entry: the audit violation above.
+## Provenance entries
 
-The standard checker (`cargo run -q -p raven-provenance -- check --root .`) passes because there is
-no false entry in `PROVENANCE.toml`. The K264 audit is stricter: it fails when a DONE report's
-entry is missing, when a clean-room claim has an entry, or when an entry's licence does not match
-the donor header.
+`PROVENANCE.toml` still has **no** `crates/raven-tcpip` NetBSD import. The only entry under the
+crate is the pre-existing smoltcp DHCP client (`src/dhcp.rs`, 0BSD, tier A, revision
+`8b0e5c85...`), unrelated to TCP.
 
-## Why there are no TCP imports yet
+No FreeBSD/DragonFly entry is added yet: the current port reports and branches still map NetBSD
+`tcp_input.c`/`tcp_output.c`/`tcp_sack.c`, and adding a FreeBSD/DragonFly entry for that code would
+be a false provenance claim. A reworked port report must send the exact entry; the audit will add
+it only with `status=landed` and the matching code in the same commit.
 
-`PROVENANCE.toml` still has no `crates/raven-tcpip` NetBSD import. The only entry under the crate
-is the pre-existing smoltcp DHCP client (`src/dhcp.rs`, 0BSD, tier A, revision `8b0e5c85...`),
-unrelated to this wave.
+## Port-claim intake
 
-The reasons are evidential, not an omission:
+A reworked report must send one entry per product file:
 
-1. K260's entry is missing (the port is DONE but the report has no exact block).
-2. K259's entries are rejected by the NRL 4-clause donor.
-3. K254/K255/K257/K258/K259 are clean-room claims and must not carry an import.
-4. K256/K261 are still `WORKING`; their entries will be collected when they land.
+```toml
+[[import]]
+path = "crates/raven-tcpip/src/<file>.rs"
+upstream = "freebsd"          # or "dragonfly" for tcp_sack
+upstream_path = "sys/netinet/<donor>.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"      # BSD-2-Clause for cc/cc_newreno.c
+tier = "A"
+copied = "YYYY-MM-DD"
+modified = true
+notes = "<donor functions and every divergence>"
+```
 
-Adding any of those entries now would be exactly the unsupported claim this ticket must reject.
-
-## Conformance matrix
-
-`scripts/tcp-evidence.sh --matrix` runs `scripts/net-conformance.sh` for the five K253 scenarios
-(`handshake`, `zero-window`, `window-update`, `retransmit`, `fin-rst`) against the Linux baseline
-and the Raven target, storing pcaps and serial logs per run. On this tree the harness is absent
-(`tests/net-conformance/harness.py`, `scripts/net-conformance*` and the fixture are not on
-`origin/master`), so the packet records `matrix: blocked` with that exact reason. A missing
-harness, a non-root host or a tap-namespace failure is `blocked` (exit 77), never a pass.
-
-K263 produced independent Linux baselines on `phil/K263`, but they are not the K253 harness and are
-not merged; the packet does not substitute them for the named scenarios.
+Then flip the claim from `quarantined` to `landed` in the same commit. The audit fails if a
+NetBSD import appears, if a quarantined claim gains an import, if a landed claim lacks one, or if
+the donor symbol/licence does not match the pinned donor.
 
 ## Evidence packet
 
 A run writes `tests/evidence/tcp/run-<UTC>/`:
 
 ```text
-manifest.json          commit, dirty state, host tools, input SHA-256
-audit.txt/audit.json   per-file SPDX, donor licences, symbols, imports, claims, violations
+manifest.json          commit, dirty state, host tools, input and donor revisions
+audit.txt/audit.json   NetBSD quarantine, FreeBSD/DragonFly donors, claims, violations
 unit.json              nextest counts and exit
 logs/unit.log          full nextest output
 matrix.json            per-target/per-scenario status (blocked when K253 is absent)
@@ -119,8 +110,8 @@ command.log            phase and command index
 sha256sums.txt         SHA-256 of every packet file
 ```
 
-The commit of record is in `manifest.json`; `sha256sums.txt` covers the packet. Editing a packet
-after the run invalidates its hashes.
+The packet is immutable evidence: `sha256sums.txt` covers it, and `manifest.json` records the
+commit and donor pins. Editing a packet after the run invalidates its hashes.
 
 ## Reproduce
 
@@ -129,22 +120,24 @@ timeout 60  sh scripts/tcp-evidence.sh --selftest
 timeout 180 cargo nextest run -p raven-tcpip
 timeout 120 sh scripts/tcp-evidence.sh --audit \
     --reports-root /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/tickets \
-    --donor-root /home/bo/work/ravenos-workspace/ravenbsd-resources/netbsd
+    --freebsd-root /home/bo/work/ravenos-workspace/ravenbsd-resources/freebsd \
+    --dragonfly-root /home/bo/work/ravenos-workspace/ravenbsd-resources/dragonfly
 timeout 240 sh scripts/tcp-evidence.sh --all \
     --reports-root /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/tickets \
-    --donor-root /home/bo/work/ravenos-workspace/ravenbsd-resources/netbsd
+    --freebsd-root /home/bo/work/ravenos-workspace/ravenbsd-resources/freebsd \
+    --dragonfly-root /home/bo/work/ravenos-workspace/ravenbsd-resources/dragonfly
 ```
 
-When K253 lands, run the matrix and measure its runtime; use that measurement plus a margin for
-the cap. The five scenarios are fixed in `scripts/tcp-evidence.py`; K263 can add cases only by
-updating the harness and this list.
+The matrix becomes available when `scripts/net-conformance.sh` lands (K253, branch `bob/K253`
+`ef5c1158`, not merged). Measure its runtime then and use that measurement plus a margin for the
+cap.
 
 ## Limits
 
 * No 24 h or live SSH/tap claim is made here; live SSH is the Bob integration gate.
 * No product, kernel, libc or network code is changed by K264.
-* The donor audit reads the first 120 lines of each pinned donor file. It verifies the licence
-  class and symbol presence, not copied-expression similarity; the literal-port reviewers remain
-  responsible for the file-by-file review.
-* The packet is partial until K253 and the port reports are fixed; the tool records that state
-  instead of hiding it.
+* The donor audit reads the pinned donor objects and checks the licence class and symbol presence,
+  not copied-expression similarity; the literal-port reviewers remain responsible for the
+  file-by-file review.
+* The packet is partial until the NetBSD-derived ports are reworked against FreeBSD/DragonFly and
+  K253 lands; the tool records that state instead of hiding it.

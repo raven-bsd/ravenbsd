@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-"""K264 TCP provenance audit and reproducible evidence packet.
+"""K264 TCP provenance audit and reproducible evidence packet (rework rev 78).
 
-The TCP port wave (K254-K261) sends one exact PROVENANCE.toml entry per NetBSD-ported file.
-This tool is the independent audit and the evidence runner:
+The NetBSD TCP files are NRL 4-clause NO-COPY and are quarantined. The permitted TCP donors are
+FreeBSD sys/netinet (BSD-3-Clause, no advertising) and DragonFly sys/netinet/tcp_sack.c
+(BSD-3-Clause). The audit:
 
-  --audit     check the crate SPDX surface, the NetBSD imports and the port-claim intake
+  --audit     forbid NetBSD TCP imports, verify the FreeBSD/DragonFly donors and the claims,
+              and check that every NetBSD-derived branch/report is quarantined
   --unit      run `cargo nextest run -p raven-tcpip` and record the test counts
   --matrix    run the K253 conformance matrix (Linux baseline + Raven target) if it is in tree
   --all       audit + unit + matrix (default)
   --selftest  pure, fast self-test; no nextest and no QEMU
 
 Every command is recorded in a timestamped packet under tests/evidence/tcp/. A missing K253
-harness or a non-root host is recorded as `blocked`, never as a pass. A port report marked DONE
-without a matching import is an audit failure; an import for a file whose claim is still pending
-is also a failure (no premature provenance).
+harness, a missing donor object or a non-root host is recorded as `blocked`, never as a pass.
 """
 
 from __future__ import annotations
@@ -38,11 +38,14 @@ ROOT = Path(__file__).resolve().parent.parent
 CRATE = "crates/raven-tcpip"
 CLAIMS_PATH = "tests/evidence/tcp/port-claims.json"
 DEFAULT_CONFORMANCE = "scripts/net-conformance.sh"
+
+FREEBSD_REV = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+DRAGONFLY_REV = "94448f622a06cde90ba42d688e9cab2448ad9ab3"
 NETBSD_REV = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+DONOR_PINS = {"freebsd": FREEBSD_REV, "dragonfly": DRAGONFLY_REV}
+DEFAULT_FREEBSD_ROOT = "/home/bo/work/ravenos-workspace/ravenbsd-resources/freebsd"
+DEFAULT_DRAGONFLY_ROOT = "/home/bo/work/ravenos-workspace/ravenbsd-resources/dragonfly"
 BSD3 = "BSD-3-Clause"
-UNIT_TIMEOUT = 180
-SCENARIO_TIMEOUT = 300
-SCENARIOS = ("handshake", "zero-window", "window-update", "retransmit", "fin-rst")
 ALLOWED_LICENSES = {
     "BSD-3-Clause",
     "BSD-2-Clause",
@@ -54,7 +57,10 @@ ALLOWED_LICENSES = {
     "Unicode-3.0",
     "CC0-1.0",
 }
+UNIT_TIMEOUT = 180
+SCENARIO_TIMEOUT = 300
 VERSION_TIMEOUT = 10
+SCENARIOS = ("handshake", "zero-window", "window-update", "retransmit", "fin-rst")
 
 
 def utc_now() -> str:
@@ -94,11 +100,6 @@ def toml_value(text: str):
 
 
 def parse_imports(text: str) -> list[dict]:
-    """Parse the flat `[[import]]` tables used by PROVENANCE.toml.
-
-    Only the scalar keys the audit needs are collected. Notes are ignored, so a multi-line note
-    cannot affect the result.
-    """
     wanted = {
         "path",
         "upstream",
@@ -163,22 +164,60 @@ def report_state(path: Path) -> dict:
 
 
 def donor_licence(text: str) -> tuple[str, str]:
-    """Classify a donor header from its first 120 lines.
-
-    NRL/UCB 4-clause advertising text is NO-COPY under the workspace donor rules. A three-clause
-    block is BSD-3-Clause; a two-clause block is BSD-2-Clause.
-    """
-    head = "\n".join(text.splitlines()[:120])
+    head = "\n".join(text.splitlines()[:160])
     if re.search(r"(?i)NRL grants permission|all advertising materials", head):
         return "NO-COPY", "NRL/UCB 4-clause advertising clause"
+    explicit = re.search(r"SPDX-License-Identifier:\s*(\S+)", head)
+    if explicit and explicit.group(1) in ALLOWED_LICENSES:
+        return explicit.group(1), "explicit SPDX header"
     if re.search(r"(?m)^\s*\*?\s*3\.\s+Neither the name", head):
         return "BSD-3-Clause", "3-clause BSD"
     if re.search(r"(?m)^\s*\*?\s*2\.\s+Redistributions in binary form", head):
         return "BSD-2-Clause", "2-clause BSD"
-    return "UNKNOWN", "no recognised BSD clause block"
+    return "UNKNOWN", "no recognised BSD licence block"
 
 
-def audit(root: Path, claims_path: Path, reports_root: Path | None, donor_root: Path | None = None) -> dict:
+def git_head(path: Path) -> str | None:
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=VERSION_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def donor_text(root: Path, file: str) -> tuple[str | None, str | None]:
+    """Read a donor file from the worktree or, for a sparse checkout, from the git object."""
+    worktree = root / file
+    if worktree.is_file():
+        return worktree.read_text(encoding="utf-8", errors="replace"), "worktree"
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(root), "show", f"HEAD:{file}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=VERSION_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None, None
+    if proc.returncode != 0 or not proc.stdout:
+        return None, None
+    return proc.stdout, "git"
+
+
+def audit(
+    root: Path,
+    claims_path: Path,
+    reports_root: Path | None,
+    freebsd_root: Path | None,
+    dragonfly_root: Path | None,
+) -> dict:
     violations: list[str] = []
     warnings: list[str] = []
 
@@ -199,7 +238,9 @@ def audit(root: Path, claims_path: Path, reports_root: Path | None, donor_root: 
         if str(entry.get("path", "")).startswith(CRATE + "/")
     ]
     netbsd_imports = [entry for entry in imports if entry.get("upstream") == "netbsd"]
-    other_imports = [entry for entry in imports if entry.get("upstream") != "netbsd"]
+    freebsd_imports = [entry for entry in imports if entry.get("upstream") == "freebsd"]
+    dragonfly_imports = [entry for entry in imports if entry.get("upstream") == "dragonfly"]
+    other_imports = [entry for entry in imports if entry.get("upstream") not in ("netbsd", "freebsd", "dragonfly")]
 
     try:
         claims_doc = load_claims(claims_path)
@@ -214,6 +255,18 @@ def audit(root: Path, claims_path: Path, reports_root: Path | None, donor_root: 
             "donor_audit": [],
         }
     claims = claims_doc.get("claims", [])
+    quarantine = claims_doc.get("quarantine", {})
+    quarantine_branches = quarantine.get("branches", []) if isinstance(quarantine, dict) else []
+    donors_meta = claims_doc.get("donors", {})
+    donors_checked = {
+        name: {
+            "revision": (donors_meta.get(name, {}) or {}).get("revision"),
+            "expected": pin,
+            "head": None,
+            "status": "not-checked",
+        }
+        for name, pin in DONOR_PINS.items()
+    }
 
     files = source_files(root)
     if not files:
@@ -249,10 +302,11 @@ def audit(root: Path, claims_path: Path, reports_root: Path | None, donor_root: 
             violations.append(f"{CRATE}/Cargo.toml license is {match.group(1)}, not {BSD3}")
 
     port_claims = [claim for claim in claims if claim.get("kind") == "port"]
-    claim_status = {claim.get("ticket"): claim.get("status") for claim in claims}
+    quarantined = [claim for claim in claims if claim.get("status") == "quarantined"]
 
     for entry in imports:
         path = str(entry.get("path", ""))
+        upstream = entry.get("upstream")
         target = root / path
         if not target.is_file():
             violations.append(f"import path does not exist: {path}")
@@ -264,44 +318,44 @@ def audit(root: Path, claims_path: Path, reports_root: Path | None, donor_root: 
         if not re.search(rf"SPDX-License-Identifier:\s*{re.escape(license_name)}\b", header):
             violations.append(f"{path}: header does not carry the recorded {license_name} SPDX")
 
-        if entry.get("upstream") != "netbsd":
+        if upstream == "netbsd":
+            violations.append(
+                f"{path}: NetBSD TCP is NRL 4-clause NO-COPY; the import is forbidden and the "
+                "branch/report must be quarantined and reworked against FreeBSD/DragonFly"
+            )
+            continue
+        if upstream not in DONOR_PINS:
             if not entry.get("upstream_rev"):
-                violations.append(f"{path}: non-NetBSD import has no upstream_rev")
+                violations.append(f"{path}: non-donor import has no upstream_rev")
             continue
 
-        matching = [
-            claim for claim in port_claims
-            if matches(path, claim.get("paths", []))
-        ]
+        matching = [claim for claim in port_claims if matches(path, claim.get("paths", []))]
         if not matching:
             violations.append(f"{path}: import has no port claim")
-            expected = BSD3
-        else:
-            copies = {str(claim.get("copy")) for claim in matching}
-            tickets = ", ".join(str(claim.get("ticket")) for claim in matching)
-            if "clean-room" in copies:
-                violations.append(
-                    f"{path}: clean-room claim ({tickets}) must not have a NetBSD import"
-                )
-            expected = "BSD-2-Clause" if "permitted-bsd2" in copies else BSD3
-        if license_name != expected:
+            continue
+        tickets = ", ".join(str(claim.get("ticket")) for claim in matching)
+        if any(claim.get("status") == "quarantined" for claim in matching):
             violations.append(
-                f"{path}: license {license_name!r} does not match the claim donor licence {expected}"
+                f"{path}: import belongs to quarantined claim ({tickets}); rework and flip the "
+                "claim to landed in the same commit as the FreeBSD/DragonFly entry"
+            )
+        if not any(claim.get("status") == "landed" for claim in matching):
+            violations.append(f"{path}: import is premature; matching claims are not landed ({tickets})")
+        if license_name not in (BSD3, "BSD-2-Clause"):
+            violations.append(
+                f"{path}: permitted TCP import license is {license_name!r}, "
+                "expected BSD-3-Clause or BSD-2-Clause"
             )
         if entry.get("tier") != "A":
             violations.append(f"{path}: tier is {entry.get('tier')!r}, expected 'A'")
-        if entry.get("upstream_rev") != NETBSD_REV:
+        if entry.get("upstream_rev") != DONOR_PINS[str(upstream)]:
             violations.append(
-                f"{path}: revision {entry.get('upstream_rev')!r} is not the wave pin {NETBSD_REV}"
+                f"{path}: revision {entry.get('upstream_rev')!r} is not the {upstream} pin "
+                f"{DONOR_PINS[str(upstream)]}"
             )
         donor_path = str(entry.get("upstream_path", ""))
-        if not re.search(r"sys/(netinet|kern|sys)/.+\.(c|h)", donor_path):
-            violations.append(f"{path}: upstream_path is not a NetBSD TCP/kernel path: {donor_path!r}")
-
-        if matching and not any(claim.get("status") == "landed" for claim in matching):
-            tickets = ", ".join(str(claim.get("ticket")) for claim in matching)
-            if not any(claim.get("copy") == "clean-room" for claim in matching):
-                violations.append(f"{path}: import is premature; matching claims are pending ({tickets})")
+        if not donor_path.startswith("sys/"):
+            violations.append(f"{path}: upstream_path is not a FreeBSD/DragonFly sys/ path: {donor_path!r}")
 
     for claim in claims:
         ticket = claim.get("ticket", "?")
@@ -309,59 +363,58 @@ def audit(root: Path, claims_path: Path, reports_root: Path | None, donor_root: 
         kind = claim.get("kind")
         copy = claim.get("copy")
         paths = claim.get("paths", [])
-        if status not in ("pending", "pending-merge", "landed", "clean-room", "blocked"):
+        if status not in ("pending", "pending-merge", "landed", "quarantined", "blocked"):
             violations.append(f"{ticket}: unknown claim status {status!r}")
             continue
         if kind not in ("port", "test-only"):
             violations.append(f"{ticket}: unknown claim kind {kind!r}")
             continue
-        if kind == "port" and copy not in ("clean-room", "permitted", "permitted-bsd2"):
+        if kind == "port" and copy not in ("quarantined", "permitted"):
             violations.append(f"{ticket}: port claim copy decision is {copy!r}")
+        if kind == "port" and claim.get("netbsd_derived") and status != "quarantined":
+            violations.append(f"{ticket}: NetBSD-derived port claim must be quarantined")
 
         matching_all = [entry for entry in imports if matches(str(entry.get("path", "")), paths)]
-        matching_imports = [entry for entry in matching_all if entry.get("upstream") == "netbsd"]
+        matching_netbsd = [entry for entry in matching_all if entry.get("upstream") == "netbsd"]
+        matching_permitted = [
+            entry for entry in matching_all if entry.get("upstream") in DONOR_PINS
+        ]
         if kind == "test-only" and matching_all:
             violations.append(
                 f"{ticket}: test-only claim has product imports: "
                 + ", ".join(str(entry.get("path")) for entry in matching_all)
             )
-        if kind == "port" and copy == "clean-room" and matching_imports:
-            violations.append(
-                f"{ticket}: clean-room claim has NetBSD imports: "
-                + ", ".join(str(entry.get("path")) for entry in matching_imports)
-            )
-        if kind == "port" and copy != "clean-room" and status == "clean-room":
-            violations.append(f"{ticket}: only a clean-room claim may use status=clean-room")
-        if kind == "port" and copy == "clean-room" and status == "landed":
-            violations.append(f"{ticket}: a clean-room claim cannot be landed (no import is allowed)")
-        if kind == "port" and status == "landed" and copy != "clean-room":
+        if kind == "port" and status == "quarantined":
+            if matching_all:
+                violations.append(
+                    f"{ticket}: quarantined claim has imports; rework it and set status=landed: "
+                    + ", ".join(str(entry.get("path")) for entry in matching_all)
+                )
+        if kind == "port" and status == "landed":
+            if matching_netbsd:
+                violations.append(f"{ticket}: landed claim still has a NetBSD import")
             missing: list[str] = []
             for path in paths:
                 full = root / path
                 if full.is_file() and full.suffix == ".rs":
-                    if not any(entry.get("path") == path for entry in netbsd_imports):
+                    if not any(entry.get("path") == path for entry in matching_permitted):
                         missing.append(path)
                 elif any(char in path for char in "*?["):
                     for existing in root.glob(path):
                         if existing.is_file() and existing.suffix == ".rs":
                             rel = str(existing.relative_to(root))
-                            if not any(entry.get("path") == rel for entry in netbsd_imports):
+                            if not any(entry.get("path") == rel for entry in matching_permitted):
                                 missing.append(rel)
             if missing:
-                violations.append(f"{ticket}: landed but missing imports: " + ", ".join(missing))
-        if (
-            kind == "port"
-            and status in ("pending", "pending-merge")
-            and copy != "clean-room"
-            and matching_imports
-        ):
+                violations.append(f"{ticket}: landed but missing FreeBSD/DragonFly imports: " + ", ".join(missing))
+        if kind == "port" and status in ("pending", "pending-merge") and matching_all:
             violations.append(
                 f"{ticket}: pending claim already has imports: "
-                + ", ".join(str(entry.get("path")) for entry in matching_imports)
+                + ", ".join(str(entry.get("path")) for entry in matching_all)
             )
         for rejected in claim.get("rejected_entries", []):
             rejected_path = str(rejected.get("path"))
-            if any(entry.get("path") == rejected_path for entry in netbsd_imports):
+            if any(entry.get("path") == rejected_path for entry in imports):
                 violations.append(f"{ticket}: rejected entry was added: {rejected_path}")
 
         if reports_root is not None and claim.get("report"):
@@ -372,134 +425,128 @@ def audit(root: Path, claims_path: Path, reports_root: Path | None, donor_root: 
             if not report["present"]:
                 warnings.append(f"{ticket}: report is missing: {report_path}")
             elif report["result"] == "DONE":
-                if kind == "port":
-                    if copy == "clean-room" and status != "clean-room":
-                        violations.append(
-                            f"{ticket}: DONE clean-room report but status is {status}; "
-                            "set status=clean-room and do not add an entry"
-                        )
-                    elif copy != "clean-room" and status != "landed":
-                        violations.append(
-                            f"{ticket}: DONE permitted port but status is {status}; "
-                            "add the exact entry and set status=landed"
-                        )
+                if kind == "port" and status == "quarantined":
+                    warnings.append(
+                        f"{ticket}: NetBSD-derived report is DONE but quarantined; rework it "
+                        "against FreeBSD/DragonFly and resubmit"
+                    )
+                elif kind == "port" and status != "landed":
+                    violations.append(
+                        f"{ticket}: DONE permitted port but status is {status}; "
+                        "add the exact entry and set status=landed"
+                    )
                 elif kind == "test-only" and status == "pending-merge":
                     warnings.append(f"{ticket}: test-only report is DONE; merge is still pending")
                 elif status == "blocked":
                     warnings.append(f"{ticket}: claim is blocked but the report is DONE")
-            elif status == "landed" and report["result"] != "DONE":
-                warnings.append(f"{ticket}: claim is landed but report is {report['result']}")
             elif status == "blocked" and report["result"] not in ("BLOCKED", "PARTIAL", None):
                 warnings.append(f"{ticket}: claim is blocked but report is {report['result']}")
 
-    for path in files:
-        top = first_lines(path, 60)
-        if re.search(r"(?i)\bported\s+from\s+(the\s+)?netbsd\b", top):
-            rel = str(path.relative_to(root))
-            if not any(entry.get("path") == rel for entry in netbsd_imports):
-                violations.append(f"{rel}: says 'ported from NetBSD' but has no import")
-        if re.search(r"(?i)(copyright.*netbsd\s+foundation|copyright.*wide\s+project)", top):
-            rel = str(path.relative_to(root))
-            if not any(entry.get("path") == rel for entry in netbsd_imports):
-                violations.append(f"{rel}: carries a NetBSD/WIDE copyright but has no import")
+    claim_by_ticket = {str(claim.get("ticket")): claim for claim in claims}
+    for branch in quarantine_branches:
+        ticket = str(branch.get("ticket"))
+        claim = claim_by_ticket.get(ticket)
+        if claim is None:
+            violations.append(f"quarantine branch {ticket} has no claim")
+        elif claim.get("status") != "quarantined":
+            violations.append(f"quarantine branch {ticket} must have status=quarantined")
+    for claim in claims:
+        if claim.get("kind") == "port" and claim.get("netbsd_derived"):
+            if not any(str(branch.get("ticket")) == str(claim.get("ticket")) for branch in quarantine_branches):
+                violations.append(f"{claim.get('ticket')}: NetBSD-derived claim is not in the quarantine register")
 
     donor_audit: list[dict] = []
-    claim_licences: dict[str, list[str]] = {}
-    if donor_root is not None:
-        for claim in claims:
-            ticket = str(claim.get("ticket"))
-            for check in claim.get("donor_checks", []):
-                rel = str(check.get("file"))
-                full = donor_root / rel
-                row = {
-                    "ticket": ticket,
-                    "file": rel,
-                    "symbols": [],
-                    "missing": [],
-                    "licence": None,
-                    "licence_reason": None,
-                }
-                if not full.is_file():
-                    violations.append(f"{ticket}: donor file missing: {rel}")
-                    row["missing"] = list(check.get("symbols", []))
-                else:
-                    text = full.read_text(encoding="utf-8", errors="replace")
-                    row["licence"], row["licence_reason"] = donor_licence(text)
-                    claim_licences.setdefault(ticket, []).append(str(row["licence"]))
-                    for symbol in check.get("symbols", []):
-                        found = symbol in text
-                        row["symbols"].append({"name": symbol, "found": found})
-                        if not found:
-                            row["missing"].append(symbol)
-                            violations.append(
-                                f"{ticket}: donor symbol missing in {rel}: {symbol}"
-                            )
+    donor_missing: list[str] = []
+    roots = {"freebsd": freebsd_root, "dragonfly": dragonfly_root}
+    for name, root_path in roots.items():
+        if root_path is None:
+            warnings.append(f"{name} donor root not provided")
+            donors_checked[name]["status"] = "not-provided"
+            continue
+        head = git_head(root_path)
+        donors_checked[name]["head"] = head
+        if head != DONOR_PINS[name]:
+            violations.append(
+                f"{name} donor HEAD is {head!r}, expected the pin {DONOR_PINS[name]}"
+            )
+            donors_checked[name]["status"] = "revision-mismatch"
+        else:
+            donors_checked[name]["status"] = "verified"
+
+    for claim in claims:
+        ticket = str(claim.get("ticket"))
+        for check in claim.get("donor_checks", []):
+            upstream = str(check.get("upstream"))
+            rel = str(check.get("file"))
+            root_path = roots.get(upstream)
+            row = {
+                "ticket": ticket,
+                "upstream": upstream,
+                "file": rel,
+                "source": None,
+                "licence": None,
+                "licence_reason": None,
+                "symbols": [],
+                "missing": [],
+            }
+            if root_path is None:
+                warnings.append(f"{ticket}: {upstream} donor root not provided; {rel} not verified")
+                row["missing"] = list(check.get("symbols", []))
                 donor_audit.append(row)
-            divergence = claim.get("divergence")
-            if divergence:
-                warnings.append(
-                    f"{ticket}: divergence needs reviewer approval: {divergence}"
-                )
-            rejected = claim.get("rejected_entries", [])
-            if rejected:
-                warnings.append(
-                    f"{ticket}: {len(rejected)} proposed provenance entr"
-                    f"{'y' if len(rejected) == 1 else 'ies'} rejected by the licence audit"
-                )
-        for claim in claims:
-            if claim.get("kind") != "port":
                 continue
-            ticket = str(claim.get("ticket"))
-            licences = claim_licences.get(ticket, [])
-            if not licences:
+            text, source = donor_text(root_path, rel)
+            row["source"] = source
+            if text is None:
+                donor_missing.append(f"{ticket}: {upstream} donor object missing: {rel}")
+                row["missing"] = list(check.get("symbols", []))
+                donor_audit.append(row)
                 continue
-            if "NO-COPY" in licences or "UNKNOWN" in licences:
-                expected = "clean-room"
-            elif "BSD-2-Clause" in licences:
-                expected = "permitted-bsd2"
-            else:
-                expected = "permitted"
-            claim["donor_licence"] = sorted(set(licences))
-            claim["expected_copy"] = expected
-            if claim.get("copy") != expected:
+            row["licence"], row["licence_reason"] = donor_licence(text)
+            if row["licence"] == "NO-COPY":
                 violations.append(
-                    f"{ticket}: claim copy decision {claim.get('copy')!r} does not match "
-                    f"the donor licence audit {expected!r} ({sorted(set(licences))})"
+                    f"{ticket}: {upstream} donor {rel} is NO-COPY ({row['licence_reason']}); "
+                    "rework the donor choice"
                 )
-    else:
-        warnings.append("donor root not provided; donor symbols and licences were not verified")
+            elif row["licence"] not in (BSD3, "BSD-2-Clause"):
+                violations.append(
+                    f"{ticket}: {upstream} donor {rel} is {row['licence']}, expected a permissive BSD licence"
+                )
+            for symbol in check.get("symbols", []):
+                found = symbol in text
+                row["symbols"].append({"name": symbol, "found": found})
+                if not found:
+                    row["missing"].append(symbol)
+                    donor_missing.append(f"{ticket}: symbol {symbol} missing in {rel}")
+            donor_audit.append(row)
+
+    if donor_missing:
+        violations.extend(f"donor unavailable: {item}" for item in donor_missing)
 
     donors_lock = root.parent / "ravenbsd-resources" / "donors.lock"
-    lock_state = {"path": str(donors_lock), "present": donors_lock.is_file(), "netbsd": None}
-    if donors_lock.is_file():
-        for line in donors_lock.read_text(encoding="utf-8", errors="replace").splitlines():
-            if "netbsd" in line.lower():
-                lock_state["netbsd"] = line.strip()
-                break
-        if lock_state["netbsd"] is None:
-            warnings.append("donors.lock has no NetBSD entry")
-    else:
+    if not donors_lock.is_file():
         warnings.append(f"donors lock not found at {donors_lock}; revision check skipped")
 
     return {
         "result": "pass" if not violations else "fail",
         "root": str(root),
         "netbsd_revision": NETBSD_REV,
+        "freebsd_revision": FREEBSD_REV,
+        "dragonfly_revision": DRAGONFLY_REV,
         "imports": imports,
         "netbsd_imports": netbsd_imports,
+        "freebsd_imports": freebsd_imports,
+        "dragonfly_imports": dragonfly_imports,
         "other_imports": other_imports,
         "claims": claims,
-        "claim_status": claim_status,
+        "quarantine": quarantine,
+        "quarantined": sorted(str(claim.get("ticket")) for claim in quarantined),
         "files_scanned": len(files),
         "violations": violations,
         "warnings": warnings,
-        "donors_lock": lock_state,
         "donor_audit": donor_audit,
+        "donor_missing": donor_missing,
+        "donors_checked": donors_checked,
         "rejected_entries": sum(len(claim.get("rejected_entries", [])) for claim in claims),
-        "no_copy_claims": sorted(
-            str(claim.get("ticket")) for claim in claims
-            if claim.get("expected_copy") == "clean-room"
-        ),
     }
 
 
@@ -591,23 +638,32 @@ def phase_audit(
     packet: Path,
     claims: Path,
     reports_root: Path | None,
-    donor_root: Path | None,
+    freebsd_root: Path | None,
+    dragonfly_root: Path | None,
 ) -> dict:
-    result = audit(root, claims, reports_root, donor_root)
+    result = audit(root, claims, reports_root, freebsd_root, dragonfly_root)
     (packet / "audit.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     lines = [
         f"tcp-provenance: {result['result']}",
-        f"netbsd_revision: {result['netbsd_revision']}",
+        f"netbsd_revision: {result['netbsd_revision']} (NO-COPY / quarantined)",
+        f"freebsd_revision: {result['freebsd_revision']}",
+        f"dragonfly_revision: {result['dragonfly_revision']}",
         f"files_scanned: {result['files_scanned']}",
-        f"imports: {len(result['imports'])} "
-        f"(netbsd: {len(result['netbsd_imports'])}, other: {len(result['other_imports'])})",
+        f"imports: {len(result['imports'])} (netbsd: {len(result['netbsd_imports'])}, "
+        f"freebsd: {len(result['freebsd_imports'])}, dragonfly: {len(result['dragonfly_imports'])}, "
+        f"other: {len(result['other_imports'])})",
         f"claims: {len(result['claims'])}",
+        f"quarantined: {len(result['quarantined'])} ({', '.join(result['quarantined'])})",
         f"donor_files: {len(result['donor_audit'])}",
-        f"no_copy_claims: {len(result.get('no_copy_claims', []))}",
-        f"rejected_entries: {result.get('rejected_entries', 0)}",
+        f"donor_missing: {len(result['donor_missing'])}",
+        f"rejected_entries: {result['rejected_entries']}",
         f"violations: {len(result['violations'])}",
         f"warnings: {len(result['warnings'])}",
     ]
+    for name, state in result["donors_checked"].items():
+        lines.append(
+            f"  donor {name}: {state['status']} head={state['head']} expected={state['expected']}"
+        )
     for claim in result["claims"]:
         report = claim.get("report_result")
         extra = f" report={report}" if report else ""
@@ -623,11 +679,11 @@ def phase_audit(
         "status": result["result"],
         "imports": len(result["imports"]),
         "netbsd_imports": len(result["netbsd_imports"]),
-        "other_imports": len(result["other_imports"]),
-        "claims": len(result["claims"]),
+        "freebsd_imports": len(result["freebsd_imports"]),
+        "dragonfly_imports": len(result["dragonfly_imports"]),
+        "quarantined": len(result["quarantined"]),
+        "rejected_entries": result["rejected_entries"],
         "donor_files": len(result["donor_audit"]),
-        "no_copy_claims": len(result.get("no_copy_claims", [])),
-        "rejected_entries": result.get("rejected_entries", 0),
         "violations": result["violations"],
         "warnings": result["warnings"],
     }
@@ -847,7 +903,8 @@ def command_run(root: Path, args) -> int:
     if not claims.is_absolute():
         claims = root / claims
     reports_root = Path(args.reports_root) if args.reports_root else None
-    donor_root = Path(args.donor_root) if args.donor_root else None
+    freebsd_root = Path(args.freebsd_root) if args.freebsd_root else None
+    dragonfly_root = Path(args.dragonfly_root) if args.dragonfly_root else None
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     packet = Path(args.out) if args.out else root / "tests" / "evidence" / "tcp" / f"run-{stamp}"
     if packet.exists() and any(packet.iterdir()):
@@ -862,16 +919,19 @@ def command_run(root: Path, args) -> int:
         "generated": utc_now(),
         "host": info,
         "reports_root": str(reports_root) if reports_root else None,
-        "donor_root": str(donor_root) if donor_root else None,
+        "freebsd_root": str(freebsd_root) if freebsd_root else None,
+        "dragonfly_root": str(dragonfly_root) if dragonfly_root else None,
         "claims": str(claims),
         "inputs_sha256": sha256_paths(input_paths(root, claims)),
+        "freebsd_revision": FREEBSD_REV,
+        "dragonfly_revision": DRAGONFLY_REV,
         "netbsd_revision": NETBSD_REV,
     }
     (packet / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     phases: list[dict] = []
     if args.audit or args.all:
-        phases.append(phase_audit(root, packet, claims, reports_root, donor_root))
+        phases.append(phase_audit(root, packet, claims, reports_root, freebsd_root, dragonfly_root))
     if args.unit or args.all:
         phases.append(phase_unit(root, packet))
     if args.matrix or args.all:
@@ -889,17 +949,17 @@ def selftest(root: Path) -> int:
     sample = """
 [[import]]
 path = "a.rs"
-upstream = "netbsd"
+upstream = "freebsd"
 upstream_path = "sys/netinet/tcp_output.c"
-upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
 license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-20"
+copied = "2026-11-21"
 modified = true
 
 [[import]]
 path = "b.rs"
-upstream = "netbsd"
+upstream = "dragonfly"
 """
     entries = parse_imports(sample)
     assert len(entries) == 2, entries
@@ -909,14 +969,20 @@ upstream = "netbsd"
     assert not matches("crates/raven-tcpip/src/x.rs", ["tests/**"])
 
     claims = root / CLAIMS_PATH
-    result = audit(root, claims, None)
+    result = audit(root, claims, None, None, None)
     if result["result"] != "pass":
         print("tcp-evidence-selftest: FAIL audit", file=sys.stderr)
         for violation in result["violations"]:
             print(f"  {violation}", file=sys.stderr)
         return 1
     if result["netbsd_imports"]:
-        print("tcp-evidence-selftest: FAIL unexpected TCP NetBSD imports", file=sys.stderr)
+        print("tcp-evidence-selftest: FAIL NetBSD TCP import present", file=sys.stderr)
+        return 1
+    if len(result["quarantined"]) != 8:
+        print(
+            f"tcp-evidence-selftest: FAIL expected 8 quarantined claims, got {result['quarantined']}",
+            file=sys.stderr,
+        )
         return 1
     if not claims.is_file():
         print("tcp-evidence-selftest: FAIL claims file missing", file=sys.stderr)
@@ -946,24 +1012,24 @@ upstream = "netbsd"
         return 1
     print(
         "tcp-evidence-selftest: PASS "
-        f"netbsd_imports=0 other_imports={len(result['other_imports'])} "
-        f"claims={len(doc.get('claims', []))} matrix_blocker=detected"
+        f"netbsd_imports=0 quarantined=8 claims={len(doc.get('claims', []))} "
+        "matrix_blocker=detected"
     )
     return 0
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--audit", action="store_true", help="run the provenance/claims audit")
+    parser.add_argument("--audit", action="store_true", help="run the provenance/quarantine audit")
     parser.add_argument("--unit", action="store_true", help="run cargo nextest -p raven-tcpip")
     parser.add_argument("--matrix", action="store_true", help="run the K253 conformance matrix")
     parser.add_argument("--all", action="store_true", help="audit + unit + matrix")
     parser.add_argument("--selftest", action="store_true", help="fast self-test; no nextest/QEMU")
     parser.add_argument("--out", help="packet directory (default tests/evidence/tcp/run-<UTC>)")
     parser.add_argument("--claims", default=CLAIMS_PATH, help="port claims JSON")
-    parser.add_argument("--reports-root", help="tickets/ root for the report DONE/pending check")
-    parser.add_argument("--donor-root", help="NetBSD donor checkout for the exact symbol checks")
-    parser.add_argument("--reports-strict", action="store_true", help="(reserved) fail on missing reports")
+    parser.add_argument("--reports-root", help="tickets/ root for the report DONE/quarantine check")
+    parser.add_argument("--freebsd-root", default=DEFAULT_FREEBSD_ROOT, help="FreeBSD donor checkout")
+    parser.add_argument("--dragonfly-root", default=DEFAULT_DRAGONFLY_ROOT, help="DragonFly donor checkout")
     return parser.parse_args()
 
 
