@@ -242,6 +242,9 @@ mod tls_program {
             }
         };
         let tls = curl::is_https(&options.url);
+        output("wget: tls=");
+        output(if tls { "1" } else { "0" });
+        output("\n");
         let mut transport = curl::tls::TlsTransport::new(&options.ca_file, tls);
         let clock = SystemClock;
         let response = match fetch_with(&options, &mut transport, &clock) {
