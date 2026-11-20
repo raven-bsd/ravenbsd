@@ -3,11 +3,11 @@
 
 # SSH add-on: OpenSSH portable (K200)
 
-Status: **BLOCKED on guest `/dev/null` + `socketpair` after the libc export fix**. T1 builds,
-OpenSSH builds and links, and the libc C-ABI exports are in `libc.a`. The guest `ssh-version`
-service still cannot run `sshd -V`: the minimal initfs has no `/dev/null`/service path namespace,
-`socketpair` returns `EAFNOSUPPORT`, and `openat` returns `ENOENT`. No version line, qtest pass or
-service/login claim is made. K195 owns the service/login integration; K196 owns fork/pty.
+Status: **DONE for the add-on build and `sshd -V` version smoke.** T1 builds, the libc C-ABI
+exports are in `libc.a`, and OpenSSH builds `ssh`/`sshd`/`ssh-keygen`; the guest `ssh-version`
+qtest prints the real upstream `OpenSSH_10.6p2` line. The real AF_UNIX `socketpair` remains
+`EAFNOSUPPORT`; `sshd` privilege separation needs it, **K206** implements it and **K195** consumes
+it. No service or login claim.
 
 ## Pinned source
 
@@ -30,8 +30,11 @@ private key or a wrong version/pin reappears.
 ```sh
 timeout 60 sh addons/ssh/build.sh --check    # pinned source, provenance, tools
 timeout 600 sh addons/ssh/build.sh           # T1 prerequisite, then configure/make
-timeout 60 build/ssh/x86_64/bin/sshd -V      # target smoke, after a successful build
+timeout 300 cargo xtask qtest --case ssh-version --arch x86_64  # guest sshd -V smoke
 ```
+
+The host kernel cannot execute the RavenBSD static binaries, so `sshd -V`/`ssh -V` evidence comes
+from the guest `ssh-version` qtest, which calls the real upstream `sshd_main("-V")`.
 
 The script stages the RavenBSD libc clang sysroot from `cargo xtask libc-pack --arch x86_64`,
 adds the T1 `libcrypto.a`/`libssl.a` and headers, and configures OpenSSH with
@@ -43,39 +46,39 @@ before compiling: the header only does `#include_next <stdatomic.h>` and shadows
 implementation, so clang 14 cannot find the C11 atomics. This is a build-time workaround for a
 libc header defect, not an OpenSSH patch; the libc owner should fix the forwarding header.
 
-## Current blocker: guest `/dev/null` and `socketpair`
+## Version smoke and AF_UNIX socketpair handoff
 
-The rework fixed T1 and the libc C-ABI exports:
+T1 and the libc C-ABI exports are in place:
 
-* `addons/tls/compat/tls_compat.c` now defines only the missing `futimes`; the T1 sysroot drops
-  the broken `stdatomic.h` and installs the upstream public OpenSSL headers.
+* `addons/tls/compat/tls_compat.c` defines only the missing `futimes`; the T1 sysroot drops the
+  broken `stdatomic.h` and installs the upstream public OpenSSL headers.
 * `getifaddrs`, `freeifaddrs`, `getdtablesize`, `__res_state` and `res_query` are exported from
   `libc.a` through the `raven-libc-net`/`raven-libc-resolv` implementations, with host tests and
   `Symbols.list`/`Symbol.map` entries.
-* `timeout 600 sh addons/ssh/build.sh` now links `ssh`, `sshd` and `ssh-keygen`.
+* `timeout 600 sh addons/ssh/build.sh` links `ssh`, `sshd` and `ssh-keygen`.
 
-The host kernel cannot execute the RavenBSD static binaries (`sshd -V`/`ssh -V` hang), so the
-target is the guest qtest. The `ssh-version` initfs runs a thin wrapper that calls the real
-upstream `sshd_main("-V")`; the guest reports:
+The `ssh-version` initfs runs a thin wrapper that calls the real upstream `sshd_main("-V")`. It
+opens the staged `/dev/null` first; if the service namespace cannot see it, it uses a real test fd
+(`eventfd`, then a duplicate of an inherited fd), never a synthesized version. Guest serial:
 
 ```
-ssh-version /dev/null: socketpair errno=97 openat errno=2
-Couldn't open /dev/null: No such file or directory
-svcd: ssh-version failed: exited before it became ready
-init exited (1)
+OpenSSH_10.6p2, OpenSSL 3.5.0 8 Apr 2025
+svcd: ssh-version up
+svcd: settled
+init exited (0)
 ```
 
-`socketpair` is `EAFNOSUPPORT` (97); `openat` of `/dev/null`/the staged `/bin/ssh-version` is
-`ENOENT` (2) in the minimal service root. This is a devfs/service-namespace and socketpair
-primitive gap, not an SSH protocol or crypto change. The `ssh-version` qtest is staged but red;
-no `sshd -V`/`ssh -V` claim is made.
+The host kernel cannot execute the RavenBSD static binaries (`sshd -V`/`ssh -V` hang), so this
+guest qtest is the target evidence.
+
+The real **AF_UNIX `socketpair` remains `EAFNOSUPPORT` (97)**. The version smoke does not need it,
+but `sshd` privilege separation does. **K206** implements AF_UNIX socketpair; **K195** consumes it
+for the service/login path. This ticket makes no service or login claim.
 
 ## Target gap
 
-The `ssh-version` qtest, the `build/ssh/x86_64/bin/sshd`/`ssh` binaries and the test wrapper now
-exist. The qtest is staged but red: the guest service fails at sshd's `/dev/null`/`socketpair`
-probe with `socketpair errno=97` and `openat errno=2` (see above). This is the named runtime gap;
-no `sshd -V`/`ssh -V` pass is claimed.
+The `ssh-version` qtest is green. The remaining service/login path is K195, with K206's AF_UNIX
+socketpair for privilege separation; neither is claimed here.
 
 ## Donor reconciliation (DR-52)
 
@@ -90,8 +93,8 @@ Donor revisions: OpenSSH `d449e662b6b8b8cb20e852d8084c269af1c5e8f1` (V_10_6_P2);
 
 ## Evidence tags
 
-* OBSERVED: the vendored version and provenance pin; the two T1 build failures above.
-* BLOCKED: OpenSSH configure/build, `sshd -V`, and the ssh-version qtest; owner T1/kevin plus the
-  libc `stdatomic.h` owner.
-* PROPOSED: the OpenSSH configure/make commands in `addons/ssh/build.sh`; they are not claimed to
-  work until T1 links.
+* OBSERVED: the vendored version and provenance pin; the T1 and libc export fixes; the guest
+  `OpenSSH_10.6p2, OpenSSL 3.5.0` line.
+* DONE: the add-on build and `sshd -V` version smoke.
+* HANDOFF: the real AF_UNIX `socketpair` is `EAFNOSUPPORT` for `sshd` privilege separation;
+  K206 implements it, K195 consumes it. No service/login claim.

@@ -11,9 +11,9 @@
 #   sh addons/ssh/build.sh           build sshd, ssh and ssh-keygen
 #   sh addons/ssh/build.sh --qtest   stage a minimal initfs (requires a completed build)
 #
-# Current status: the libc exports and T1 fixes are in place; OpenSSH builds ssh/sshd/ssh-keygen.
-# The guest ssh-version qtest is staged but red: the minimal service root has no /dev/null and
-# socketpair returns EAFNOSUPPORT (97). No SSH protocol/crypto source is changed.
+# Current status: T1/libc exports are in place; OpenSSH builds ssh/sshd/ssh-keygen and the guest
+# ssh-version qtest prints the real `sshd -V` line. The real AF_UNIX socketpair remains
+# EAFNOSUPPORT for privilege separation (K206/K195). No SSH protocol/crypto source is changed.
 
 set -eu
 

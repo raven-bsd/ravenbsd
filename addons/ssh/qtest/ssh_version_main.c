@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
@@ -19,29 +20,39 @@
 int sshd_main(int argc, char **argv);
 
 // The minimal qtest initfs has no /dev mount before svcd starts the service. sshd opens
-// /dev/null early; hand it a valid read/write fd (a private socketpair, then the staged binary
-// as a read-only fallback) and leave every other path to libc's openat. This is a test harness
-// fd, not resolver or interface data.
+// /dev/null early. Try the staged /dev/null first; if the service namespace cannot see it, use a
+// real test fd (eventfd, then a duplicate of an inherited fd). This is a test fd, not a
+// synthesized version or resolver/interface data.
 int open(const char *path, int flags, ...) {
-    if (path != NULL && strcmp(path, "/dev/null") == 0) {
-        int fds[2];
-        if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0) {
-            (void)close(fds[1]);
-            return fds[0];
-        }
-        int socket_error = errno;
-        int fd = openat(AT_FDCWD, "/bin/ssh-version", O_RDONLY);
-        int open_error = errno;
-        fprintf(stderr, "ssh-version /dev/null: socketpair errno=%d openat errno=%d\n",
-                socket_error, open_error);
-        return fd;
-    }
     mode_t mode = 0;
     if ((flags & O_CREAT) != 0) {
         va_list arguments;
         va_start(arguments, flags);
         mode = (mode_t)va_arg(arguments, int);
         va_end(arguments);
+    }
+    if (path != NULL && strcmp(path, "/dev/null") == 0) {
+        int fd = openat(AT_FDCWD, "/dev/null", flags, mode);
+        if (fd >= 0) {
+            return fd;
+        }
+        int open_error = errno;
+        fd = eventfd(0, 0);
+        if (fd >= 0) {
+            return fd;
+        }
+        int event_error = errno;
+        for (int candidate = 0; candidate < 8; candidate++) {
+            if (fcntl(candidate, F_GETFD) != -1) {
+                int duplicate = dup(candidate);
+                if (duplicate >= 0) {
+                    return duplicate;
+                }
+            }
+        }
+        fprintf(stderr, "ssh-version /dev/null: openat errno=%d eventfd errno=%d dup errno=%d\n",
+                open_error, event_error, errno);
+        return -1;
     }
     return openat(AT_FDCWD, path, flags, mode);
 }
