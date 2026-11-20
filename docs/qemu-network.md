@@ -71,6 +71,27 @@ tap, and proves:
 - host `dig @10.0.2.3 example.com` — **PASS** (`104.20.23.154`);
 - `down` leaves no bridge, tap, dnsmasq or NAT rule — **PASS**.
 
+### K227: deterministic host-reachable address and demo credentials
+
+The guest keeps the fixed `10.0.2.15/24`; the bridge owns `10.0.2.2/24`, so the connected route
+is deterministic (`ip route get 10.0.2.15` -> `dev ravenbr0 src 10.0.2.2`). The helper also runs a
+DHCP range for the same address, but no hostfwd is used. `scripts/qemu-net.sh --check` verifies
+`ip`, `iptables`, `dnsmasq`, `sysctl`, the uplink route and that `ravenbr0`/`ravendemo0` are free,
+without root or a boot.
+
+`scripts/qemu-ufs-run.sh` prints:
+
+```
+run.sh: guest=10.0.2.15 user=luser password=raven
+run.sh: ssh luser@10.0.2.15 ls   # requires K195 sshd + K225 TCP; pending
+```
+
+The `luser` account and password are the documented demo credential for K195; this ticket does not
+change the OpenSSH profile or claim the login. The host TCP/SSH assertion waits for K225/K195; the
+`net-host` qtest runs the bounded host-side tap proof (host ping, guest ping/internet, DNS server,
+cleanup) and then boots the release image to prove the getty path is unchanged. No hostfwd
+substitution.
+
 ### K203 handoff: guest name resolution
 
 This ticket does **not** claim that the guest resolves a name. The exact handoff to K203 is:

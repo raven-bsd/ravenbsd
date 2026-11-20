@@ -18,6 +18,9 @@ helper=$root/scripts/qemu-net.sh
 user_net=0
 tap=${RAVEN_QEMU_TAP:-ravendemo0}
 net_up=0
+guest_ip=10.0.2.15
+demo_user=luser
+demo_password=${RAVEN_DEMO_PASSWORD:-raven}
 
 usage() {
     cat <<'EOF'
@@ -50,6 +53,11 @@ while [ "$#" -gt 0 ]; do
 done
 check_only=${check_only:-0}
 
+print_demo() {
+    printf 'run.sh: guest=%s user=%s password=%s\n' "$guest_ip" "$demo_user" "$demo_password"
+    printf 'run.sh: ssh luser@%s ls   # requires K195 sshd + K225 TCP; pending\n' "$guest_ip"
+}
+
 check_tools() {
     command -v qemu-img >/dev/null 2>&1 || fail "qemu-img not found (install qemu-utils)"
     command -v qemu-system-x86_64 >/dev/null 2>&1 ||
@@ -65,6 +73,7 @@ check_tools() {
 check_tools
 
 if [ "$check_only" -eq 1 ]; then
+    print_demo
     if grep -q '^ *up)' "$helper"; then
         echo "run.sh: check PASS (qemu-img, OVMF, bidirectional helper)"
     else
@@ -93,7 +102,11 @@ else
     [ -n "$tap" ] || refuse_net "network helper did not report a tap device"
     net_up=1
     net_args="-netdev tap,id=n0,ifname=$tap,script=no,downscript=no -device virtio-net-pci,netdev=n0,disable-legacy=on"
+    guest_ip=$(printf '%s\n' "$contract" | sed -n 's/.* guest=\([^ ]*\).*/\1/p' | head -n 1)
+    [ -n "$guest_ip" ] || guest_ip=10.0.2.15
 fi
+
+print_demo
 
 if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
     accel="-enable-kvm -cpu host"
