@@ -118,7 +118,7 @@ pub fn poll<B: SysBackend, L: Lock>(
             let mut revents = 0i16;
             if event.events & EV_SIGNALED != 0 {
                 // The notification event is level-only: report the caller's requested bits.
-                let fired_fd = fds.get(index).map_or(-1, |entry| entry.fd);
+                let fired_fd = entry.fd;
                 let _ = raven_libc_sys::sys::debug_write(
                     alloc::format!("kp:fired fd={fired_fd}\n").as_bytes(),
                 );
