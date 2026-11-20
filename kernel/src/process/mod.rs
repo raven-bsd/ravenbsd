@@ -6,6 +6,7 @@
 //! S08 has one thread per process. The process owns its address space and handle table; the
 //! single thread owns the kernel stack used by syscall and trap entry.
 
+pub mod duplex;
 pub mod exec;
 pub mod handle;
 pub mod pipe;
@@ -1520,6 +1521,7 @@ fn wake_process_waiters(process: &Arc<Process>) {
     // needs the pid registry and another process's handle table.
     let mut irqs: Vec<Arc<crate::driver::irq::Irq>> = Vec::new();
     let mut pipes: Vec<Arc<crate::process::pipe::PipeEnd>> = Vec::new();
+    let mut duplexes: Vec<Arc<crate::process::duplex::DuplexEnd>> = Vec::new();
     {
         let handles = process.handles.lock();
         handles.for_each_live(|_, object, _, _| match object {
@@ -1539,6 +1541,10 @@ fn wake_process_waiters(process: &Arc<Process>) {
             Object::Pipe(end) => {
                 end.wake_process(process.id);
                 pipes.push(Arc::clone(end));
+            }
+            Object::Duplex(end) => {
+                end.wake_process(process.id);
+                duplexes.push(Arc::clone(end));
             }
             Object::Memory(memory) => {
                 let _ = memory.page_waiters().wake_process(process.id);
@@ -1561,6 +1567,45 @@ fn wake_process_waiters(process: &Arc<Process>) {
             retired_pipe = Some(pipe);
         }
     }
+    let mut retired_duplex: Option<Arc<crate::process::duplex::DuplexEnd>> = None;
+    for duplex in duplexes {
+        let duplicate = retired_duplex
+            .as_ref()
+            .is_some_and(|retired| retired.same_pair(&duplex));
+        if !duplicate && !duplex_held_elsewhere(process, &duplex) {
+            duplex.retire();
+            retired_duplex = Some(duplex);
+        }
+    }
+}
+
+/// True when a live process other than `owner` still has a handle to the same duplex pair.
+fn duplex_held_elsewhere(
+    owner: &Arc<Process>,
+    duplex: &Arc<crate::process::duplex::DuplexEnd>,
+) -> bool {
+    let registry = PID_REGISTRY.lock();
+    for (id, weak) in registry.iter() {
+        if *id == owner.id {
+            continue;
+        }
+        let Some(other) = weak.upgrade() else {
+            continue;
+        };
+        let table = other.handles.lock();
+        let mut found = false;
+        table.for_each_live(|_, object, _, _| {
+            if let Object::Duplex(candidate) = object
+                && candidate.same_pair(duplex)
+            {
+                found = true;
+            }
+        });
+        if found {
+            return true;
+        }
+    }
+    false
 }
 
 /// True when a live process other than `owner` still has a handle to the same pipe.

@@ -41,6 +41,16 @@ completion engine as Reedline:
   Enter;
 * builtins, aliases, keywords, quoted strings, parameters and operators use the shared palette.
 
+### History autosuggestions
+
+After the cursor, the Vt editor shows the newest matching history suffix dimmed. Right or End
+accepts the whole hint; any other key keeps the typed text. The match is local history only,
+newest first, and multi-line entries are skipped.
+
+`NO_COLOR`, `TERM=dumb`, `RAVEN_PLAIN_PROMPT=1` and `RAVEN_AUTOSUGGEST=0` disable the hint
+entirely; plain mode draws no extra text or escape sequence. The shell environment is consulted
+per prompt, so an `export RAVEN_AUTOSUGGEST=0` takes effect on the next line.
+
 `NO_COLOR`, `TERM=dumb` and `RAVEN_PLAIN_PROMPT=1` keep the drawn line plain. Reedline itself
 still panics on RavenBSD's TLS teardown (`cannot access a Thread Local Storage value during or
 after destruction`), so it is not the selected backend; the Vt editor delivers the same

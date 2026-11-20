@@ -20,6 +20,7 @@ use raven_proto_net::ring::{
 use raven_scheme::Client;
 use virtio_net::{ControlInfo, MAX_FRAME_LEN, RING_RX_BUFFERS, frame_desc};
 
+use crate::network::StaticConfig;
 use crate::{Loopback, Netd, NicConfig};
 
 /// Address QEMU user-mode assigns to the guest.
@@ -59,9 +60,20 @@ impl NicMode {
 }
 
 /// Attach the `nic:` service as the second core.
-pub fn attach(netd: &mut Netd<Loopback>, now_ms: i64, mode: NicMode) -> Result<NicConfig, String> {
-    let (device, config) = NicDevice::open(mode)?;
+///
+/// A static drop-in overrides the legacy QEMU/platform selection: the address is published
+/// immediately and no DHCP client is started. DNS is kept on the state machine for resolvd.
+pub fn attach(
+    netd: &mut Netd<Loopback>,
+    now_ms: i64,
+    mode: NicMode,
+    static_config: Option<StaticConfig>,
+) -> Result<NicConfig, String> {
+    let (device, config) = NicDevice::open(mode, static_config.as_ref())?;
     netd.attach_nic(device, config, now_ms);
+    if let Some(static_config) = static_config {
+        netd.set_nic_dns(static_config.dns);
+    }
     Ok(config)
 }
 
@@ -93,7 +105,10 @@ impl NicDevice {
 }
 
 impl NicDevice {
-    fn open(mode: NicMode) -> Result<(Self, NicConfig), String> {
+    fn open(
+        mode: NicMode,
+        static_config: Option<&StaticConfig>,
+    ) -> Result<(Self, NicConfig), String> {
         let client = Client::new();
         let info = read_info(&client)?;
         if !info.link {
@@ -126,9 +141,18 @@ impl NicDevice {
             tx_free.push_back(index);
         }
         write_control(&client, "nic:start")?;
-        let config = match mode {
-            NicMode::QemuUser => NicConfig::qemu(info.mac.0, info.mtu),
-            NicMode::DhcpFirst => NicConfig::platform(info.mac.0, info.mtu),
+        let config = match static_config {
+            Some(static_config) => NicConfig::static_config(
+                info.mac.0,
+                info.mtu,
+                static_config.addr,
+                static_config.prefix,
+                static_config.gateway,
+            ),
+            None => match mode {
+                NicMode::QemuUser => NicConfig::qemu(info.mac.0, info.mtu),
+                NicMode::DhcpFirst => NicConfig::platform(info.mac.0, info.mtu),
+            },
         };
         Ok((
             Self {

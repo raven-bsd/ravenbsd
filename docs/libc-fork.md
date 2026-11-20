@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # libc fork and PTY primitives
 
 K196 wires the POSIX process and terminal primitives OpenSSH needs onto first-party
@@ -61,3 +64,8 @@ libc-forkpty: parent pid=13 name=pty:slave/1
 libc-forkpty: master=pty-child
 libc-forkpty: ok
 ```
+
+Both cases pass on `x86_64` and on `aarch64` (the case `pre` takes its architecture from
+`RAVEN_QT_ARCH`): the aarch64 thunk saves/restores x19-x28/x29/x30, keeps the resume SP
+16-byte aligned, and passes the `TPIDR_EL0` thread pointer to `THREAD_CREATE_EX`. The same PTY
+master/slave/EOF path runs through `ptyd` on both architectures.
