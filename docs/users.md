@@ -11,7 +11,8 @@ records are in `userland/bin/raven/src/admin.rs`.
 
 ## Base accounts
 
-The release image ships two accounts. The 0.1.0 password for both is `raven`.
+The release and UFS images stage two accounts from the same source files. The 0.1.0 password
+for both is `raven`.
 
 ```text
 root:x:0:0:root:/root:/bin/rsh
@@ -24,9 +25,10 @@ raven:x:1000:1000:raven:/home/raven:/bin/rsh
 | `raven` | 1000/1000 | `/home/raven` | `/bin/rsh` |
 
 `luser` is not a base account. K195's SSH profile uses `raven`; it must not duplicate the
-account. The base `raven` home directory is owned by the image builder; a runtime save creates
-and chowns new homes (the admin runs as root). A non-root preview root keeps the caller's
-ownership because the kernel denies `chown`.
+account. The release profile stages `/home/raven`; the `raven-users` fixture creates the same
+directory in its private UFS disk because `qemu-ufs` extends `shell`, not `release`. A runtime
+save creates and chowns new homes (the admin runs as root). A non-root preview root keeps the
+caller's ownership because the kernel denies `chown`.
 
 The `raven` shadow record is a standard `$6$` vector generated independently with
 `openssl passwd -6 -salt K229ravenBase01 raven`; runtime changes and new accounts use the
