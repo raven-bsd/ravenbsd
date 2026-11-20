@@ -32,6 +32,7 @@ demo=$(sh scripts/qemu-ufs.sh --build-only | tail -n 1)
 raw=$out/raven-users.raw
 qcow2=$out/raven-users.qcow2
 qemu-img convert -O raw "$demo" "$raw"
+sh scripts/raven-ufs mkdir /home/raven "$raw"
 sh scripts/raven-ufs put "$stub" /bin/tui-demo "$raw"
 qemu-img convert -O qcow2 "$raw" "$qcow2"
 rm -f "$raw"
