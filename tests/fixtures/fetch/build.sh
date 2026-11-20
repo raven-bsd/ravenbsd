@@ -147,14 +147,11 @@ start_http_server() {
 
 start_https_server() {
     log "starting the local HTTPS server on 24443"
-    printf 'known-http-body' >"$out/https-root/known.txt"
     rm -f "$out/https-server.log"
-    (
-        cd "$out/https-root"
-        exec timeout 240 openssl s_server -accept 24443 \
-            -cert "$certs/server.pem" -key "$certs/server.key" \
-            -no_ticket -WWW -naccept 8
-    ) >"$out/https-server.log" 2>&1 &
+    timeout 240 python3 "$root/tests/fixtures/fetch/tls_server.py" \
+        --port 24443 --seconds 180 \
+        --cert "$certs/server.pem" --key "$certs/server.key" \
+        >"$out/https-server.log" 2>&1 &
     echo $! >"$out/https-server.pid"
     sleep 1
     if ! kill -0 "$(cat "$out/https-server.pid")" 2>/dev/null; then
