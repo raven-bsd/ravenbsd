@@ -5,7 +5,9 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use fatfs::{FileSystem, FsOptions};
 
@@ -204,6 +206,11 @@ pub(crate) fn run_with_overrides(
         fs::read(&loader).with_context(|| format!("cannot read {}", loader.display()))?;
     let kernel_bytes =
         fs::read(&kernel_path).with_context(|| format!("cannot read {}", kernel_path.display()))?;
+    // K193: the bootable UFS demo is one GPT disk (ESP first, UFS2 second). Keep the
+    // two-disk preflight artifacts for `ufs-root`: its bootstrap initfs still selects
+    // partition 1 of the separate root disk.
+    let mut demo_ufs: Option<Vec<u8>> = None;
+    let mut preflight_initfs: Option<Vec<u8>> = None;
     // The `hw` profile carries a UFS root. Until virtio-blk lands, blockd serves it from the
     // initfs as a RAM disk, so the one-partition GPT disk is inserted at /etc/blockd.img.
     let initfs_bytes = if pi4_pivot {
@@ -223,15 +230,30 @@ pub(crate) fn run_with_overrides(
         // The payload profile stages brush/uutils and other generated files; build those
         // prerequisites before staging the UFS tree.
         crate::initfs::ensure_prerequisites(root, arch, &profile)?;
-        // The root disk is a real GPT/UFS2 disk staged from the payload profile; it is
-        // attached to QEMU as a virtio-blk function, never embedded in the initfs.
-        let ufs = crate::rootfs::build_sd_root(root, arch, profile_name, true)?;
+        // The two-disk preflight keeps a real one-partition GPT/UFS2 root disk.
+        let ufs_path = crate::rootfs::build_sd_root(root, arch, profile_name, true)?;
         let disk = root
             .join("build")
             .join(arch.as_str())
             .join("qemu-ufs-root.img");
-        crate::rootfs::build_root_disk(&ufs, &disk)?;
-        initfs_bytes
+        crate::rootfs::build_root_disk(&ufs_path, &disk)?;
+        let ufs =
+            fs::read(&ufs_path).with_context(|| format!("cannot read {}", ufs_path.display()))?;
+        demo_ufs = Some(ufs);
+        preflight_initfs = Some(initfs_bytes);
+        // The one-disk demo has the ESP as partition 1 and the UFS root as partition 2.
+        let manifest = fs::read(root.join("profiles/qemu-ufs.d/fsd-ufs-demo.toml"))
+            .context("cannot read the demo fsd-ufs manifest")?;
+        let preflight = preflight_initfs
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("qemu-ufs preflight initfs is missing"))?;
+        replace_initfs_file(
+            preflight,
+            "/etc/services.d/fsd-ufs.toml",
+            &manifest,
+            0o644,
+            crate::initfs::image_epoch(root),
+        )?
     } else {
         match crate::rootfs::build_for_profile(root, arch, profile_name, true)? {
             Some(disk) => {
@@ -250,22 +272,50 @@ pub(crate) fn run_with_overrides(
         Arch::Riscv64 => bail!("loader is not supported for riscv64"),
     };
 
-    let mut fat = FatImageBuilder::new(usize::try_from(ESP_SECTORS * SECTOR_SIZE)?)?
-        .with_epoch(source_date_epoch());
-    for dir in ["EFI", "EFI/BOOT", "raven"] {
-        fat.add_dir(dir)?;
-    }
-    fat.add_file(loader_name, &loader_bytes)?;
-    fat.add_file("raven/kernel.elf", &kernel_bytes)?;
-    fat.add_file("raven/initfs.img", &initfs_bytes)?;
-    fat.add_file("raven/boot.toml", boot_toml.as_bytes())?;
-    let esp = fat.finish()?;
-    ensure!(
-        esp.len() as u64 == ESP_SECTORS * SECTOR_SIZE,
-        "ESP image has the wrong size"
-    );
+    let esp = build_esp(
+        loader_name,
+        &loader_bytes,
+        &kernel_bytes,
+        &initfs_bytes,
+        boot_toml.as_bytes(),
+    )?;
 
-    let gpt = GptLayout::new(
+    let output = overrides
+        .output
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| default_output(root, arch));
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+
+    if let (Some(ufs), Some(preflight)) = (demo_ufs.as_deref(), preflight_initfs.as_deref()) {
+        let preflight_esp = build_esp(
+            loader_name,
+            &loader_bytes,
+            &kernel_bytes,
+            preflight,
+            boot_toml.as_bytes(),
+        )?;
+        let preflight_output = root
+            .join("build")
+            .join(arch.as_str())
+            .join("qemu-ufs-preflight.img");
+        let preflight_gpt = preflight_gpt()?;
+        write_image(&preflight_output, &preflight_gpt, &preflight_esp)?;
+        write_ufs_demo(root, arch, &output, &esp, ufs)?;
+        println!("{}", output.display());
+        return Ok(0);
+    }
+
+    let gpt = preflight_gpt()?;
+    write_image(&output, &gpt, &esp)?;
+    println!("{}", output.display());
+    Ok(0)
+}
+
+fn preflight_gpt() -> Result<GptLayout> {
+    GptLayout::new(
         TOTAL_SECTORS,
         vec![
             Partition::new(
@@ -283,19 +333,110 @@ pub(crate) fn run_with_overrides(
                 "ROOT",
             ),
         ],
-    )?;
+    )
+}
 
-    let output = overrides
-        .output
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| default_output(root, arch));
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("cannot create {}", parent.display()))?;
+fn build_esp(
+    loader_name: &str,
+    loader: &[u8],
+    kernel: &[u8],
+    initfs: &[u8],
+    boot_toml: &[u8],
+) -> Result<Vec<u8>> {
+    let mut fat = FatImageBuilder::new(usize::try_from(ESP_SECTORS * SECTOR_SIZE)?)?
+        .with_epoch(source_date_epoch());
+    for dir in ["EFI", "EFI/BOOT", "raven"] {
+        fat.add_dir(dir)?;
     }
-    write_image(&output, &gpt, &esp)?;
-    println!("{}", output.display());
-    Ok(0)
+    fat.add_file(loader_name, loader)?;
+    fat.add_file("raven/kernel.elf", kernel)?;
+    fat.add_file("raven/initfs.img", initfs)?;
+    fat.add_file("raven/boot.toml", boot_toml)?;
+    let esp = fat.finish()?;
+    ensure!(
+        esp.len() as u64 == ESP_SECTORS * SECTOR_SIZE,
+        "ESP image has the wrong size"
+    );
+    Ok(esp)
+}
+
+/// Write the one-disk demo image and its qcow2 + run.sh/README artifacts.
+fn write_ufs_demo(root: &Path, arch: Arch, output: &Path, esp: &[u8], ufs: &[u8]) -> Result<()> {
+    ensure!(
+        !ufs.is_empty() && ufs.len().is_multiple_of(SECTOR_SIZE as usize),
+        "UFS payload is not a whole number of 512-byte sectors"
+    );
+    let ufs_sectors = ufs.len() as u64 / SECTOR_SIZE;
+    let ufs_start = ESP_START_LBA + ESP_SECTORS;
+    let total = ufs_start
+        .checked_add(ufs_sectors)
+        .and_then(|value| value.checked_add(GPT_ENTRY_SECTORS + 1))
+        .ok_or_else(|| anyhow::anyhow!("UFS demo image size overflow"))?;
+    let gpt = GptLayout::new(
+        total,
+        vec![
+            Partition::new(
+                TYPE_ESP,
+                0,
+                ESP_START_LBA,
+                ESP_START_LBA + ESP_SECTORS - 1,
+                "ESP",
+            ),
+            Partition::new(
+                crate::rootfs::TYPE_FREEBSD_UFS,
+                1,
+                ufs_start,
+                ufs_start + ufs_sectors - 1,
+                "ufs-root",
+            ),
+        ],
+    )?;
+    write_sd_image(output, &gpt, esp, ufs_start, ufs)?;
+
+    let demo = root
+        .join("build")
+        .join(arch.as_str())
+        .join("ravenbsd-ufs-demo");
+    fs::create_dir_all(&demo).with_context(|| format!("cannot create {}", demo.display()))?;
+    let qcow2 = demo.join("ravenbsd-ufs-demo.qcow2");
+    let status = Command::new("qemu-img")
+        .arg("convert")
+        .arg("-O")
+        .arg("qcow2")
+        .arg(output)
+        .arg(&qcow2)
+        .status()
+        .context("cannot run qemu-img; install qemu-utils")?;
+    ensure!(status.success(), "qemu-img convert failed ({status})");
+    let run = demo.join("run.sh");
+    let readme = demo.join("README");
+    fs::copy(root.join("scripts/qemu-ufs-run.sh"), &run)
+        .context("cannot copy the demo run.sh template")?;
+    fs::copy(root.join("scripts/qemu-ufs-README.md"), &readme)
+        .context("cannot copy the demo README template")?;
+    fs::set_permissions(&run, fs::Permissions::from_mode(0o755))?;
+    println!("{}", qcow2.display());
+    Ok(())
+}
+
+fn replace_initfs_file(
+    image: &[u8],
+    path: &str,
+    data: &[u8],
+    mode: u32,
+    epoch: u64,
+) -> Result<Vec<u8>> {
+    let parsed = raven_initfs::Initfs::parse(image)
+        .map_err(|error| anyhow::anyhow!("cannot parse initfs: {error:?}"))?;
+    let mut builder = raven_initfs::InitfsBuilder::new().with_image_epoch(epoch);
+    for entry in parsed.entries() {
+        if entry.path == path {
+            builder.add_file(path, data, mode)?;
+        } else {
+            builder.add_file(entry.path, entry.data, entry.mode)?;
+        }
+    }
+    Ok(builder.build())
 }
 
 /// Build the initfs for a rootfs profile from release user programs.
