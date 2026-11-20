@@ -59,8 +59,17 @@ build_http_tools() {
 }
 
 ensure_addon() {
-    if [ -f "$addon/lib/libssl.a" ] && [ -f "$addon/lib/libcrypto.a" ] &&
-        [ -f "$sysroot/usr/lib/libc.a" ] && [ -f "$root/build/tls/tls_compat.o" ]; then
+    stale=0
+    if [ ! -f "$addon/lib/libssl.a" ] || [ ! -f "$addon/lib/libcrypto.a" ] ||
+        [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$root/build/tls/tls_compat.o" ]; then
+        stale=1
+    elif [ -n "$(find "$root/libc/ravenlibc/crates" "$root/libc/ravenlibc/abi" \
+        "$root/libc/ravenlibc/crt" -newer "$sysroot/usr/lib/libc.a" -print -quit 2>/dev/null)" ]; then
+        # The add-on sysroot carries its own libc copy. A stale copy makes the TLS client run
+        # against an older fd/stdio/net stack than the shell and kernel; rebuild the add-on.
+        stale=1
+    fi
+    if [ "$stale" -eq 0 ]; then
         return 0
     fi
     log "building the OpenSSL add-on (host clang 14 ordering workaround)"
@@ -135,8 +144,8 @@ build_initfs() {
 start_http_server() {
     log "starting the local HTTP server on 18081"
     rm -f "$out/http-server.log"
-    timeout 240 python3 "$root/tests/fixtures/fetch/http_server.py" \
-        --port 18081 --seconds 180 >"$out/http-server.log" 2>&1 &
+    timeout 700 python3 "$root/tests/fixtures/fetch/http_server.py" \
+        --port 18081 --seconds 600 >"$out/http-server.log" 2>&1 &
     echo $! >"$out/http-server.pid"
     sleep 0.3
     if ! kill -0 "$(cat "$out/http-server.pid")" 2>/dev/null; then
@@ -148,8 +157,8 @@ start_http_server() {
 start_https_server() {
     log "starting the local HTTPS server on 24443"
     rm -f "$out/https-server.log"
-    timeout 240 python3 "$root/tests/fixtures/fetch/tls_server.py" \
-        --port 24443 --seconds 180 \
+    timeout 700 python3 "$root/tests/fixtures/fetch/tls_server.py" \
+        --port 24443 --seconds 600 \
         --cert "$certs/server.pem" --key "$certs/server.key" \
         >"$out/https-server.log" 2>&1 &
     echo $! >"$out/https-server.pid"

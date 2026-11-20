@@ -53,6 +53,12 @@ mod ffi {
     >;
     pub(crate) type BioCreate = Option<unsafe extern "C" fn(bio: *mut Bio) -> c_int>;
 
+    pub(crate) const SSL_ERROR_NONE: c_int = 0;
+    pub(crate) const SSL_ERROR_WANT_READ: c_int = 2;
+    pub(crate) const SSL_ERROR_WANT_WRITE: c_int = 3;
+    pub(crate) const SSL_ERROR_SYSCALL: c_int = 5;
+    pub(crate) const SSL_ERROR_ZERO_RETURN: c_int = 6;
+
     unsafe extern "C" {
         pub(crate) fn OPENSSL_init_ssl(options: u64, settings: *const c_void) -> c_int;
         pub(crate) fn TLS_client_method() -> *const SslMethod;
@@ -84,6 +90,7 @@ mod ffi {
         -> c_int;
         pub(crate) fn SSL_write(ssl: *mut Ssl, buffer: *const c_void, length: c_int) -> c_int;
         pub(crate) fn SSL_read(ssl: *mut Ssl, buffer: *mut c_void, length: c_int) -> c_int;
+        pub(crate) fn SSL_get_error(ssl: *const Ssl, ret: c_int) -> c_int;
         pub(crate) fn SSL_shutdown(ssl: *mut Ssl) -> c_int;
 
         pub(crate) fn BIO_meth_new(type_: c_int, name: *const c_char) -> *mut BioMethod;
@@ -166,12 +173,26 @@ impl Connection {
     /// Read plaintext through TLS.
     pub fn read(&mut self, bytes: &mut [u8]) -> Result<usize, Error> {
         let length = c_int::try_from(bytes.len()).map_err(|_| Error::Io)?;
-        // SAFETY: `ssl` is live and `bytes` is a valid writable buffer for `length` bytes.
-        let read = unsafe { ffi::SSL_read(self.ssl, bytes.as_mut_ptr().cast(), length) };
-        if read < 0 {
-            return Err(Error::Io);
+        loop {
+            // SAFETY: `ssl` is live and `bytes` is a valid writable buffer for `length` bytes.
+            let read = unsafe { ffi::SSL_read(self.ssl, bytes.as_mut_ptr().cast(), length) };
+            if read > 0 {
+                return Ok(read as usize);
+            }
+            // SAFETY: `ssl` is live and `read` is the return value of the SSL_read above.
+            let error = unsafe { ffi::SSL_get_error(self.ssl, read) };
+            match error {
+                // A clean close_notify or a zero-length read is EOF.
+                ffi::SSL_ERROR_ZERO_RETURN | ffi::SSL_ERROR_NONE => return Ok(0),
+                // The BIO is blocking, but OpenSSL can still request a retry after a control
+                // record (for example a session ticket); retry the read instead of failing.
+                ffi::SSL_ERROR_WANT_READ | ffi::SSL_ERROR_WANT_WRITE => continue,
+                // A syscall error with a zero return is the peer closing without close_notify;
+                // treat it as EOF, never as a truncated response.
+                ffi::SSL_ERROR_SYSCALL if read == 0 => return Ok(0),
+                _ => return Err(Error::Io),
+            }
         }
-        Ok(read as usize)
     }
 }
 
