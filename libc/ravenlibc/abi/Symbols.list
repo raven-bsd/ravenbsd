@@ -571,6 +571,7 @@ gethostid
 gethostname
 getifaddrs
 getisax
+getitimer
 getline
 getlogin
 getlogin_r
@@ -1305,6 +1306,7 @@ setgroupent
 setgroups
 sethostent
 sethostname
+setitimer
 setjmp
 setlinebuf
 setlocale

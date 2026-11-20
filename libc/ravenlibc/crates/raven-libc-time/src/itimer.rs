@@ -31,7 +31,7 @@ impl Default for ITimer {
 impl ITimer {
     /// Create a disarmed timer.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             table: TimerTable::new(1),
             id: None,
@@ -77,8 +77,12 @@ impl ITimer {
     }
 
     /// Validate and convert a `timeval` to a `timespec`.
+    ///
+    /// `tv_sec` must fit the nanosecond deadline (otherwise the conversion would silently
+    /// saturate) and `tv_usec` must be the POSIX `0..1_000_000` range.
     pub fn timeval_to_timespec(seconds: i64, microseconds: i64) -> Result<Timespec, Errno> {
-        if !(0..1_000_000).contains(&microseconds) || seconds < 0 {
+        const MAX_SEC: i64 = (u64::MAX / 1_000_000_000) as i64;
+        if !(0..1_000_000).contains(&microseconds) || !(0..=MAX_SEC).contains(&seconds) {
             return Err(errno(EINVAL));
         }
         Ok(Timespec {
