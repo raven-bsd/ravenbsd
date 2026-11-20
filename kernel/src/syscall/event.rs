@@ -338,7 +338,7 @@ fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
             if end.is_reader() {
                 if end.readable() { event::READABLE } else { 0 }
             } else if end.writable() {
-                event::WRITABLE
+                crate::event::evq_core::WRITABLE
             } else {
                 0
             }
