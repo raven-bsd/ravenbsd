@@ -33,3 +33,21 @@ prints `rtc: unavailable` and `CLOCK_REALTIME` stays at zero (boot never blocks 
 * `CLOCK_GET` (`0x04`) returns `Timespec` for `REALTIME` (advancing) and `MONOTONIC`.
 * `CLOCK_SET` (`0x09`, reviewer-assigned; not yet a `raven-abi` variant): sets `REALTIME` to a
   user `Timespec`; `MONOTONIC` is `EINVAL`, out-of-range values are `EINVAL`.
+
+## Interval timers (`setitimer`/`getitimer`)
+
+`ITIMER_REAL` is one process timer shared by `alarm`, `ualarm`, `setitimer` and `getitimer`:
+
+* the deadline/interval arithmetic is `raven-libc-time::itimer::ITimer` (selector and `timeval`
+  range validation, the previous value, zero-value cancellation and interval-aware remaining);
+* the shell owns one kernel timer (`TIMER_CREATE`/`TIMER_SET`) and one detached thread that waits
+  on its event queue and queues `SIGALRM` through `PROC_SIGNAL`;
+* `setitimer`/`getitimer` accept `ITIMER_REAL` and return `EINVAL` for `ITIMER_VIRTUAL`/`ITIMER_PROF`,
+  reject negative or out-of-range `timeval` fields, and write the previous value to `old`;
+* `alarm(2)` is the same state with a zero interval, so `alarm` and `setitimer` observe each
+  other's remaining time.
+
+The delivery seam is `pause`/`PROC_SIGRECV`: the queued `SIGALRM` interrupts `pause` with
+`EINTR`. The `sigaction` disposition is stored, but the current seam consumes the queued signal
+rather than dispatching the handler; that is pre-existing behaviour shared with `alarm(2)`
+(`posix-alarm`). **OBSERVED** by the `itimer` qtest.
