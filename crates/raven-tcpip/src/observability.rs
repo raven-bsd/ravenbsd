@@ -1425,7 +1425,7 @@ impl<D: crate::Device> Stack<D> {
                     .unwrap_or(u32::MAX),
                 },
             }),
-            Kind::Listener { port, .. } => Ok(SocketInfo {
+            Kind::Listener { port, pending, .. } => Ok(SocketInfo {
                 state: crate::TcpState::Listen,
                 local: (
                     self.ipv4
@@ -1435,7 +1435,9 @@ impl<D: crate::Device> Stack<D> {
                 ),
                 remote: None,
                 send_queue: 0,
-                recv_queue: 0,
+                // A listener's receive queue is its accept queue: connections that completed the
+                // handshake and wait for `accept` (the figure `ss -l` shows as Recv-Q).
+                recv_queue: pending.len(),
                 cwnd: 0,
                 ssthresh: 0,
                 srtt_ms: 0,

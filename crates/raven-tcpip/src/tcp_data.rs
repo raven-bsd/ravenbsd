@@ -45,7 +45,17 @@ impl<D: Device> Stack<D> {
         {
             connection.last_activity = self.now;
         }
-        self.tcp_try_send(socket)?;
+        // The bytes are in the send queue and belong to the stack now. A transmit that the device
+        // refused for lack of a buffer is a transient condition, not a failed write: reporting
+        // `EAGAIN` here made a non-blocking caller write the same bytes again, the queue then held
+        // them twice, and the peer received the record duplicated (K231). `retry_tcp_sends` sends
+        // whatever is still unsent at the next poll, and the retransmission timer covers segments
+        // that were sent and lost. NetBSD turns `ENOBUFS` into success after `sbappendstream` in
+        // `tcp_output`, and illumos `tcp_send_data` discards the result of `conn_ip_output`.
+        match self.tcp_try_send(socket) {
+            Ok(()) | Err(Errno::EAGAIN) => {}
+            Err(error) => return Err(error),
+        }
         Ok(accepted)
     }
 
@@ -98,8 +108,24 @@ impl<D: Device> Stack<D> {
         {
             connection.last_activity = self.now;
         }
+        self.resync_readable_baseline(socket);
         let _ = self.send_ack_for(socket);
         Ok(count)
+    }
+
+    /// Record the receive-queue level the application just left behind.
+    ///
+    /// `refresh_events` runs once at the end of `Stack::poll` and reports `Readable` only on a
+    /// false-to-true transition against `prev_readable`. A read that drains the queue between
+    /// two passes must therefore lower that baseline itself; otherwise data that arrives in the
+    /// very next pass sees a stale `true`, raises no edge, and a poller sleeping on the socket is
+    /// never woken (K231).
+    pub(crate) fn resync_readable_baseline(&mut self, socket: SocketId) {
+        if let Ok(record) = self.sockets.record_mut(socket) {
+            record.prev_readable = record.forced_readable
+                || !record.rx.is_empty()
+                || matches!(&record.kind, Kind::Udp { datagrams, .. } if !datagrams.is_empty());
+        }
     }
 
     /// Set Nagle behaviour.
