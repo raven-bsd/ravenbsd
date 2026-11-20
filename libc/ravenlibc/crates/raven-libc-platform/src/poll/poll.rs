@@ -63,6 +63,7 @@ pub fn poll<B: SysBackend, L: Lock>(
                 if reference.poll_signaled() {
                     // A scheme-backed socket reports through its attached notification event,
                     // not through the data handle's level.
+                    let _ = raven_libc_sys::sys::debug_write(b"kp:add\n");
                     wanted |= EV_SIGNALED;
                 }
                 if wanted == 0 {
@@ -115,6 +116,7 @@ pub fn poll<B: SysBackend, L: Lock>(
             let mut revents = 0i16;
             if event.events & EV_SIGNALED != 0 {
                 // The notification event is level-only: report the caller's requested bits.
+                let _ = raven_libc_sys::sys::debug_write(b"kp:fired\n");
                 if requested & (POLLIN | POLLPRI) != 0 {
                     revents |= POLLIN as i16;
                 }
