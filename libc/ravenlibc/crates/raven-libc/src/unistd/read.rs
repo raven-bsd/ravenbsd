@@ -24,5 +24,17 @@ pub unsafe extern "C" fn read(fd: c_int, buffer: *mut c_void, count: usize) -> i
             )
         }));
     }
-    crate::ffi::ret::platform_ssize(crate::ffi::platform::global().read(fd, slice))
+    let result = crate::ffi::platform::global().read(fd, slice);
+    if fd == 4 {
+        let _ = raven_libc_sys::sys::debug_write(
+            alloc::format!(
+                "rd4 ok={} n={} err={}\n",
+                result.is_ok(),
+                result.as_ref().map_or(0, |n| *n),
+                result.as_ref().err().map_or(0, |e| e.0)
+            )
+            .as_bytes(),
+        );
+    }
+    crate::ffi::ret::platform_ssize(result)
 }
