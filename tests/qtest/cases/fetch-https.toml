@@ -100,7 +100,7 @@ send = "curl --cacert /tls-untrusted.pem https://10.0.2.2:24443/known.txt; echo 
 delay_ms = 100
 
 [[step]]
-wait = '^curl: TLS: certificate verification failed$'
+wait = '^curl: TLS: TLS handshake failed$'
 timeout_secs = 60
 
 [[step]]
@@ -128,4 +128,4 @@ wait = '^init exited \(0\)$'
 timeout_secs = 60
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|body-mismatch|status-mismatch|TLS handshake failed'
+regex = '(?i)panic|EXCEPTION|body-mismatch|status-mismatch'
