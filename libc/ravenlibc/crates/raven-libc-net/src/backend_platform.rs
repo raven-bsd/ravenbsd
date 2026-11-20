@@ -35,6 +35,7 @@ pub struct PlatformBackend<'a, B: SysBackend, L: Lock> {
 /// The attached `CALL` reply carries the 6-byte [`Response::Ok`] inline and then one
 /// `(handle, rights_mask)` pair; the kernel installs that handle in the caller's table.
 pub(crate) fn event_handle<B: SysBackend>(backend: &B, sock: Sock) -> Result<Handle, Errno> {
+    let _ = raven_libc_sys::sys::debug_write(b"ke:begin\n");
     let request = SocketRequest::Call(Call::Event);
     let mut encoded = [0u8; 64];
     let used = request.encode(&mut encoded).map_err(|_| Errno::EINVAL)?;
@@ -45,7 +46,10 @@ pub(crate) fn event_handle<B: SysBackend>(backend: &B, sock: Sock) -> Result<Han
             encoded.get(..used).unwrap_or(&[]),
             &mut response,
         )
-        .map_err(|error| Errno(error.0))?;
+        .map_err(|error| {
+            let _ = raven_libc_sys::sys::debug_write(b"ke:callerr\n");
+            Errno(error.0)
+        })?;
     let bytes: [u8; 4] = response
         .get(6..10)
         .ok_or(Errno::EPROTO)?
@@ -53,8 +57,10 @@ pub(crate) fn event_handle<B: SysBackend>(backend: &B, sock: Sock) -> Result<Han
         .map_err(|_| Errno::EPROTO)?;
     let value = u32::from_le_bytes(bytes);
     if value == 0 || value == u32::MAX {
+        let _ = raven_libc_sys::sys::debug_write(b"ke:bad\n");
         return Err(Errno::EPROTO);
     }
+    let _ = raven_libc_sys::sys::debug_write(b"ke:ok\n");
     Ok(Handle(value))
 }
 
