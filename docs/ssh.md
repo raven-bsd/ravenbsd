@@ -29,11 +29,11 @@ repeated here. Do not expose this demo to an untrusted network.
 
 ## Host keys
 
-The `sshd` service runs a bounded `/bin/rsh -c` first-boot command. It uses `/etc/ssh` when it
-is writable (UFS-root images) and falls back to `/tmp/ssh` for the read-only initfs release
-image. The UFS path generates the keys once with `ssh-keygen -A -f /etc/ssh` and they persist
-across reboot. The initfs path generates the same key types in `/tmp/ssh` on every boot, so its
-host key is **ephemeral**; SSH clients must accept a changed key on each boot.
+The `sshd` service runs a bounded `/bin/rsh -c` first-boot command. The released initfs image has
+a read-only `/etc`, so it generates the keys in `/tmp/ssh` on every boot and its host key is
+**ephemeral**; SSH clients must accept a changed key on each boot. A persistent UFS root (K193)
+must stage the same service with `/etc/ssh` and `ssh-keygen -A -f /etc/ssh`; that image path is
+not merged in this tree yet, so host-key persistence is not claimed here.
 
 Private keys are never shipped in the image and must never be committed or published.
 
