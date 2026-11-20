@@ -5,7 +5,7 @@
 
 name = "ssh-probe"
 exec = "/bin/ssh"
-args = ["/bin/ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no", "-o", "ConnectTimeout=5", "-p", "22", "root@10.0.2.15", "uname", "-a"]
+args = ["/bin/ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no", "-o", "ConnectTimeout=5", "-p", "2222", "root@10.0.2.15", "uname", "-a"]
 needs = ["netd", "sshd"]
 readiness = "none"
 restart = "on-failure"
