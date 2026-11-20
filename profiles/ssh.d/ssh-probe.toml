@@ -9,5 +9,5 @@ args = ["/bin/ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=
 needs = ["netd", "sshd"]
 readiness = "none"
 restart = "on-failure"
-max_restarts = 10
+max_restarts = 100
 required = false
