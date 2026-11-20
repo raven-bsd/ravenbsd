@@ -295,6 +295,10 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         entries
     }
 
+    fn readiness(&self, s: SocketId) -> Result<crate::Readiness, Errno> {
+        self.stack.readiness(Self::native(s))
+    }
+
     fn interface_counters(&self) -> Option<InterfaceCounters> {
         let mut counters = self.counters.get();
         counters.rx_drops = counters.rx_drops.saturating_add(self.rx_drops);

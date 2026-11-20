@@ -715,6 +715,10 @@ impl NetBackend for FakeNetd {
                 ))
             }
             Call::Event => Ok(CallReply::Ok),
+            // K244 adds the additive live readiness query. The host fake has no native stack;
+            // K245 wires the real backend and the libc poll consumer. A defined unsupported
+            // answer keeps the fake honest instead of inventing readiness.
+            Call::Poll => Err(Errno::EOPNOTSUPP),
         }
     }
 

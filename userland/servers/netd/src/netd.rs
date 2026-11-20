@@ -11,8 +11,8 @@ use alloc::vec::Vec;
 use crate::network::StaticConfig;
 use raven_abi::errno::Errno;
 use raven_netcore::{
-    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, RouteEntry,
-    SocketId, SocketState, SocketTransport,
+    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, Readiness,
+    RouteEntry, SocketId, SocketState, SocketTransport,
 };
 use raven_proto_fs::{S_IFSOCK, Stat};
 use raven_proto_net::{
@@ -22,7 +22,10 @@ use raven_proto_net::{
     SOCKET_STATE_ESTABLISHED, SOCKET_STATE_FIN_WAIT_1, SOCKET_STATE_FIN_WAIT_2, SOCKET_STATE_ICMP,
     SOCKET_STATE_LAST_ACK, SOCKET_STATE_LISTEN, SOCKET_STATE_SYN_RECEIVED, SOCKET_STATE_SYN_SENT,
     SOCKET_STATE_TIME_WAIT, SOCKET_STATE_UDP, SOCKET_TCP, SOCKET_UDP, SocketEntry, Transport, path,
-    socket::{Call, Endpoint, Response, SockOpt, SocketRequest},
+    socket::{
+        Call, Endpoint, READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE, Response, SockOpt,
+        SocketRequest,
+    },
 };
 
 /// Mode reported by `FSTAT` for a socket file.
@@ -162,6 +165,7 @@ trait SocketCore {
     fn add_route(&mut self, route: RouteEntry) -> Result<(), Errno>;
     fn delete_route(&mut self, dest: Ipv4Addr, prefix_len: u8) -> Result<(), Errno>;
     fn socket_table(&self) -> Vec<CoreSocket>;
+    fn readiness(&self, s: SocketId) -> Result<Readiness, Errno>;
     fn interface_counters(&self) -> Option<InterfaceCounters>;
     fn icmp_bind(&mut self, id: u16) -> Result<SocketId, Errno>;
     fn icmp_echo(
@@ -227,6 +231,10 @@ impl<D: Device> SocketCore for NetCore<D> {
 
     fn socket_table(&self) -> Vec<CoreSocket> {
         NetCore::socket_table(self)
+    }
+
+    fn readiness(&self, s: SocketId) -> Result<Readiness, Errno> {
+        NetCore::readiness(self, s)
     }
 
     fn interface_counters(&self) -> Option<InterfaceCounters> {
@@ -1187,6 +1195,7 @@ impl<D: Device> Netd<D> {
             Call::GetPeerName => self.endpoint_response(file, true),
             Call::SetSockOpt { opt, value } => self.set_option(file, opt, value),
             Call::GetSockOpt { opt } => self.get_option(file, opt),
+            Call::Poll => self.readiness(file),
             // The target glue creates the S26 event handle and attaches it; the pure core has no
             // kernel handle table.
             Call::Event => Err(Errno::EOPNOTSUPP),
@@ -1440,6 +1449,39 @@ impl<D: Device> Netd<D> {
             SockOpt::Error => return Err(Errno::EINVAL),
         }
         Ok(Response::Ok)
+    }
+
+    /// Live readiness of the socket behind an open file.
+    ///
+    /// The file must already name a live socket on the same interface; the core predicate runs
+    /// on that interface and socket id. A control file and a file without a socket have a defined
+    /// error instead of a made-up "ready" bit.
+    pub fn socket_readiness(&self, file: u64) -> Result<Readiness, Errno> {
+        let (interface, socket) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+            File::Control => return Err(Errno::EINVAL),
+            File::Socket(socket) => (socket.interface, socket.socket),
+        };
+        let id = socket.ok_or(Errno::ENOTCONN)?;
+        self.core_ref(interface).readiness(id)
+    }
+
+    /// Answer the live readiness query for an open socket file.
+    fn readiness(&self, file: u64) -> Result<Response, Errno> {
+        let ready = self.socket_readiness(file)?;
+        let mut bits = 0i32;
+        if ready.readable {
+            bits |= READY_READABLE;
+        }
+        if ready.writable {
+            bits |= READY_WRITABLE;
+        }
+        if ready.hup {
+            bits |= READY_HUP;
+        }
+        if ready.error {
+            bits |= READY_ERROR;
+        }
+        Ok(Response::Value(bits))
     }
 
     fn get_option(&mut self, file: u64, opt: SockOpt) -> Result<Response, Errno> {
