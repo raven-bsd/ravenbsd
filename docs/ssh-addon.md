@@ -3,11 +3,11 @@
 
 # SSH add-on: OpenSSH portable (K200)
 
-Status: **DONE for the add-on build and `sshd -V` version smoke.** T1 builds, the libc C-ABI
-exports are in `libc.a`, and OpenSSH builds `ssh`/`sshd`/`ssh-keygen`; the guest `ssh-version`
-qtest prints the real upstream `OpenSSH_10.6p2` line. The real AF_UNIX `socketpair` remains
-`EAFNOSUPPORT`; `sshd` privilege separation needs it, **K206** implements it and **K195** consumes
-it. No service or login claim.
+Status: **DONE for the add-on build, split server binaries and `sshd -V` version smoke.** T1
+builds, the libc C-ABI exports are in `libc.a`, and OpenSSH builds `ssh`, `sshd`,
+`sshd-session`, `sshd-auth` and `ssh-keygen`; the guest `ssh-version` qtest prints the real
+upstream `OpenSSH_10.6p2` line. The AF_UNIX pair and control path are implemented by
+K206/K210/K211; **K195** owns the service/login integration. No service or login claim.
 
 ## Pinned source
 
@@ -38,8 +38,44 @@ from the guest `ssh-version` qtest, which calls the real upstream `sshd_main("-V
 
 The script stages the RavenBSD libc clang sysroot from `cargo xtask libc-pack --arch x86_64`,
 adds the T1 `libcrypto.a`/`libssl.a` and headers, and configures OpenSSH with
-`--host=x86_64-unknown-ravenbsd --with-ssl-dir=build/tls/x86_64 --without-openssl-header-check`.
-Build outputs are intentionally out of tree under `build/ssh/`.
+`--host=x86_64-unknown-linux-gnu --libexecdir=/usr/libexec --with-ssl-dir=build/tls/x86_64
+--without-openssl-header-check`. Build outputs are intentionally out of tree under `build/ssh/`.
+
+### Split server binaries (OpenSSH 10.6, K212)
+
+OpenSSH 10.6 runs the listener as three programs. `sshd` accepts the connection and re-execs
+`sshd-session` (the unprivileged session) and `sshd-auth` (the authentication helper). Building
+only `sshd` leaves the parent with no child to exec, so a connection resets at
+`kex_exchange_identification`.
+
+The build now produces and stages:
+
+```text
+build/ssh/x86_64/bin/ssh
+build/ssh/x86_64/bin/sshd
+build/ssh/x86_64/bin/ssh-keygen
+build/ssh/x86_64/libexec/sshd-session
+build/ssh/x86_64/libexec/sshd-auth
+```
+
+`--libexecdir=/usr/libexec` makes the compiled `_PATH_SSHD_SESSION` and `_PATH_SSHD_AUTH` target
+paths, not `build/ssh/...` prefixes. The build fails if the strings are missing:
+
+```text
+timeout 60 strings build/ssh/x86_64/bin/sshd | grep /usr/libexec/sshd-session
+timeout 60 strings build/ssh/x86_64/bin/sshd | grep /usr/libexec/sshd-auth
+```
+
+**K195 staging handoff:** install the two split binaries into the target root at the paths the
+listener embeds:
+
+```text
+build/ssh/x86_64/libexec/sshd-session -> /usr/libexec/sshd-session
+build/ssh/x86_64/libexec/sshd-auth    -> /usr/libexec/sshd-auth
+```
+
+The parent `sshd` must be staged with those paths present; the service/login manifest, host keys
+and the real connection are K195's, not this add-on's.
 
 The build removes the RavenBSD forwarding `usr/include/stdatomic.h` from its **build sysroot**
 before compiling: the header only does `#include_next <stdatomic.h>` and shadows clang's own
@@ -55,7 +91,8 @@ T1 and the libc C-ABI exports are in place:
 * `getifaddrs`, `freeifaddrs`, `getdtablesize`, `__res_state` and `res_query` are exported from
   `libc.a` through the `raven-libc-net`/`raven-libc-resolv` implementations, with host tests and
   `Symbols.list`/`Symbol.map` entries.
-* `timeout 600 sh addons/ssh/build.sh` links `ssh`, `sshd` and `ssh-keygen`.
+* `timeout 600 sh addons/ssh/build.sh` links `ssh`, `sshd`, `sshd-session`, `sshd-auth` and
+  `ssh-keygen`; the split binaries are staged under `build/ssh/x86_64/libexec/`.
 
 The `ssh-version` initfs runs a thin wrapper that calls the real upstream `sshd_main("-V")`. It
 opens the staged `/dev/null` first; if the service namespace cannot see it, it uses a real test fd
@@ -71,14 +108,18 @@ init exited (0)
 The host kernel cannot execute the RavenBSD static binaries (`sshd -V`/`ssh -V` hang), so this
 guest qtest is the target evidence.
 
-The real **AF_UNIX `socketpair` remains `EAFNOSUPPORT` (97)**. The version smoke does not need it,
-but `sshd` privilege separation does. **K206** implements AF_UNIX socketpair; **K195** consumes it
-for the service/login path. This ticket makes no service or login claim.
+The real AF_UNIX pair is now implemented: **K206** supplied the full-duplex `socketpair`,
+**K210** added kernel control messages and peer credentials, and **K211** mapped `SCM_RIGHTS`,
+`SO_PEERCRED` and `getpeereid` through libc. The version smoke does not need them, but `sshd`
+privilege separation does. **K195** consumes the pair and the split binaries for the
+service/login path.
 
 ## Target gap
 
-The `ssh-version` qtest is green. The remaining service/login path is K195, with K206's AF_UNIX
-socketpair for privilege separation; neither is claimed here.
+The `ssh-version` qtest is green and the split server binaries are staged. The remaining
+service/login work belongs to K195: the profile/service manifest, host-key generation into a
+writable `/etc/ssh`, `/usr/libexec` staging of `sshd-session`/`sshd-auth`, and the real login
+qtest. No service or login is claimed here.
 
 ## Donor reconciliation (DR-52)
 
@@ -95,6 +136,8 @@ Donor revisions: OpenSSH `d449e662b6b8b8cb20e852d8084c269af1c5e8f1` (V_10_6_P2);
 
 * OBSERVED: the vendored version and provenance pin; the T1 and libc export fixes; the guest
   `OpenSSH_10.6p2, OpenSSL 3.5.0` line.
-* DONE: the add-on build and `sshd -V` version smoke.
-* HANDOFF: the real AF_UNIX `socketpair` is `EAFNOSUPPORT` for `sshd` privilege separation;
-  K206 implements it, K195 consumes it. No service/login claim.
+* DONE: the add-on build, the split `sshd-session`/`sshd-auth` binaries and the `sshd -V` version
+  smoke.
+* HANDOFF: K195 stages `build/ssh/x86_64/libexec/sshd-session` and `sshd-auth` at
+  `/usr/libexec/`, adds the service/login profile and host keys, and runs the real login qtest.
+  No service/login claim here.
