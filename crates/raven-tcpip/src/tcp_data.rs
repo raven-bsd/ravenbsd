@@ -45,7 +45,18 @@ impl<D: Device> Stack<D> {
         {
             connection.last_activity = self.now;
         }
-        self.tcp_try_send(socket)?;
+        // The bytes are in the send queue and belong to the stack now. A transmit that the device
+        // refused for lack of a buffer is a transient condition, not a failed write: reporting
+        // `EAGAIN` here made a non-blocking caller write the same bytes again, the queue then held
+        // them twice, and the peer received the record duplicated (K231/K251). `retry_tcp_sends`
+        // sends whatever is still unsent at the next poll, and the retransmission timer covers
+        // segments that were sent and lost. NetBSD turns `ENOBUFS` into success after
+        // `sbappendstream` in `tcp_output`, and illumos `tcp_send_data` discards the result of
+        // `conn_ip_output`.
+        match self.tcp_try_send(socket) {
+            Ok(()) | Err(Errno::EAGAIN) => {}
+            Err(error) => return Err(error),
+        }
         Ok(accepted)
     }
 
