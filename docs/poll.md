@@ -17,6 +17,13 @@ so a caller that polls without reading gets one spurious readiness, not a busy l
 mask swap is not implemented (PG-26); OpenSSH's packet path passes a NULL mask. The mask is
 accepted but not swapped. `pselect` still returns `ENOSYS` until that atomic swap lands.
 
+Across `execve`, the fd table is carried in the `__RAVEN_FDMAP` environment block. Version 2 of
+that block includes the scheme event handle and the one-shot readiness mask, so a child that
+inherits an accepted socket can replay a packet that was already queued before the exec. Version
+1 (the `raven-spawn` form) is still decoded with zero event/readiness. The child replays at most
+one level per inherited fd; a read that drains the queue then blocks normally, and a second poll
+without a read does not spin.
+
 The donor comparison is NetBSD `sys/kern/sys_socket.c:soo_poll`,
 `sys/kern/uipc_socket.c:sopoll`, `sys/kern/uipc_socket2.c:sowakeup` and
 `sys/kern/sys_select.c:selrecord`/`selnotify`. `sopoll` re-checks the socket level on every call;

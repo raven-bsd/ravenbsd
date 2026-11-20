@@ -12,8 +12,10 @@
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -105,7 +107,7 @@ static int ppoll_one(int fd, int timeout_ms) {
 
 #define PORT 23082
 
-int main(void) {
+static int run_same_process(void) {
     struct sockaddr_in address;
     struct sockaddr_in peer;
     socklen_t peer_length = sizeof(peer);
@@ -190,4 +192,157 @@ int main(void) {
     (void)close(listener);
     say("net-two-reads: ok\n");
     return 0;
+}
+
+static int run_exec_parent(void) {
+    struct sockaddr_in address;
+    struct sockaddr_in peer;
+    socklen_t peer_length = sizeof(peer);
+    int listener;
+    int client;
+    int connection;
+    int status = 0;
+    pid_t child;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        return fail("exec socket", errno);
+    }
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_port = htons(PORT);
+    address.sin_addr.s_addr = htonl(0x7f000001);
+    if (bind(listener, (const struct sockaddr *)&address, sizeof(address)) < 0) {
+        return fail("exec bind", errno);
+    }
+    if (listen(listener, 4) < 0) {
+        return fail("exec listen", errno);
+    }
+    say("net-two-reads-exec: listening\n");
+    client = socket(AF_INET, SOCK_STREAM, 0);
+    if (client < 0) {
+        return fail("exec client socket", errno);
+    }
+    if (connect(client, (const struct sockaddr *)&address, sizeof(address)) < 0) {
+        return fail("exec connect", errno);
+    }
+    if (poll_one(listener, 5000) <= 0) {
+        return fail("exec poll listener", errno);
+    }
+    connection = accept(listener, (struct sockaddr *)&peer, &peer_length);
+    if (connection < 0) {
+        return fail("exec accept", errno);
+    }
+    say("net-two-reads-exec: accepted\n");
+
+    // Two packets are queued before the fork. The parent reads only the first; the second stays
+    // in the socket queue, and the Ofd event/replay state must survive the child's execve.
+    if (write(client, "alphabravo", 10) != 10) {
+        return fail("exec write first", errno);
+    }
+    if (poll_one(connection, 5000) <= 0) {
+        return fail("exec poll first", errno);
+    }
+    if (read_packet(connection, "alpha", 5) != 0) {
+        return fail("exec read first", errno);
+    }
+    say("net-two-reads-exec: parent first ok\n");
+
+    child = fork();
+    if (child < 0) {
+        return fail("exec fork", errno);
+    }
+    if (child == 0) {
+        int inherited = dup(connection);
+        if (inherited < 0) {
+            _exit(120);
+        }
+        (void)close(connection);
+        (void)close(client);
+        (void)close(listener);
+        char fd_text[16];
+        int length = snprintf(fd_text, sizeof(fd_text), "%d", inherited);
+        if (length <= 0) {
+            _exit(122);
+        }
+        char *args[] = {(char *)"/bin/net-two-reads-reader", fd_text, NULL};
+        char *envp[] = {NULL};
+        execve("/bin/net-two-reads-reader", args, envp);
+        _exit(121);
+    }
+    (void)close(connection);
+    (void)close(listener);
+    sleep(1);
+    if (write(client, "charlie", 7) != 7) {
+        return fail("exec write third", errno);
+    }
+    if (waitpid(child, &status, 0) != child || status != 0) {
+        char line[96];
+        int length = snprintf(line, sizeof(line), "net-two-reads-exec: child status=%d\n", status);
+        if (length > 0) {
+            (void)raven_debug_write(line, (size_t)length);
+        }
+        say("net-two-reads-exec: fail\n");
+        return 1;
+    }
+    if (read_packet(client, "two-reads-ack", 13) != 0) {
+        return fail("exec read ack", errno);
+    }
+    (void)close(client);
+    say("net-two-reads-exec: parent ok\n");
+    say("net-two-reads-exec: ok\n");
+    return 0;
+}
+
+static int run_reader(int argc, char **argv) {
+    int fd = 4;
+    int idle;
+
+    if (argc > 1) {
+        fd = atoi(argv[1]);
+        if (fd < 0) {
+            return fail("reader fd", errno);
+        }
+    }
+
+    if (poll_one(fd, 5000) <= 0) {
+        return fail("reader poll second", errno);
+    }
+    if (read_packet(fd, "bravo", 5) != 0) {
+        return fail("reader read second", errno);
+    }
+    say("net-two-reads-exec: child second ok\n");
+
+    idle = poll_one(fd, 100);
+    if (idle != 0) {
+        return fail("reader poll busy", idle);
+    }
+    if (ppoll_one(fd, 5000) <= 0) {
+        return fail("reader ppoll third", errno);
+    }
+    if (read_packet(fd, "charlie", 7) != 0) {
+        return fail("reader read third", errno);
+    }
+    say("net-two-reads-exec: child third ok\n");
+    if (write(fd, "two-reads-ack", 13) != 13) {
+        return fail("reader write ack", errno);
+    }
+    say("net-two-reads-exec: child ok\n");
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    (void)argc;
+    const char *name = argv[0] == NULL ? "" : argv[0];
+    const char *slash = strrchr(name, '/');
+    if (slash != NULL) {
+        name = slash + 1;
+    }
+    if (strstr(name, "-reader") != NULL) {
+        return run_reader(argc, argv);
+    }
+    if (strstr(name, "-exec") != NULL) {
+        return run_exec_parent();
+    }
+    return run_same_process();
 }

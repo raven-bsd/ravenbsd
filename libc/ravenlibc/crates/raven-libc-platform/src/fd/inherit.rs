@@ -9,12 +9,16 @@
 //!
 //! ```text
 //! 0   4  magic "RFDM"
-//! 4   2  version = 1
+//! 4   2  version = 2
 //! 6   2  count
-//! 8  18*count  entries { fd: i32, handle: u32, kind: u8, fd_flags: u8,
-//!                        status: u32, path_off: u32 }
+//! 8  26*count  entries { fd: i32, handle: u32, kind: u8, fd_flags: u8,
+//!                        status: u32, path_off: u32, event: u32, readiness: u32 }
 //! ..  string table: NUL-terminated paths; path_off 0xFFFF_FFFF means none
 //! ```
+//!
+//! Version 1 (18-byte entries, no event/readiness) is still decoded: `raven-spawn` publishes
+//! that form for ordinary inherited stdio. The libc `execve` path uses version 2 so the child
+//! keeps the scheme notification event and the one-shot poll replay across the image swap.
 
 use alloc::vec::Vec;
 
@@ -26,11 +30,15 @@ use crate::fd::ofd::OfdKind;
 /// Magic at the start of the block.
 pub const FDMAP_MAGIC: [u8; 4] = *b"RFDM";
 /// Current block version.
-pub const FDMAP_VERSION: u16 = 1;
+pub const FDMAP_VERSION: u16 = 2;
+/// The legacy version `raven-spawn` publishes.
+pub const FDMAP_VERSION_V1: u16 = 1;
 /// Fixed header length.
 pub const HEADER_LEN: usize = 8;
-/// Fixed entry length.
+/// Version-1 entry length (also the prefix of a version-2 entry).
 pub const ENTRY_LEN: usize = 18;
+/// Current entry length, with the event handle and readiness mask.
+pub const ENTRY_LEN_V2: usize = 26;
 /// No-path marker in `path_off`.
 pub const NO_PATH: u32 = u32::MAX;
 
@@ -56,6 +64,10 @@ pub struct FdMapEntry {
     pub status: u32,
     /// Absolute path, if known.
     pub path: Option<Vec<u8>>,
+    /// Scheme notification event handle, or zero.
+    pub event: u32,
+    /// The K232 one-shot readiness replay mask.
+    pub readiness: u32,
 }
 
 impl FdMapEntry {
@@ -68,6 +80,8 @@ impl FdMapEntry {
             fd_flags,
             status,
             path: None,
+            event: 0,
+            readiness: 0,
         }
     }
 }
@@ -107,7 +121,7 @@ impl FdMap {
             }
         }
         let mut out = Vec::with_capacity(
-            HEADER_LEN + ENTRY_LEN.saturating_mul(self.entries.len()) + strings.len(),
+            HEADER_LEN + ENTRY_LEN_V2.saturating_mul(self.entries.len()) + strings.len(),
         );
         out.extend_from_slice(&FDMAP_MAGIC);
         out.extend_from_slice(&FDMAP_VERSION.to_le_bytes());
@@ -119,6 +133,8 @@ impl FdMap {
             out.push(entry.fd_flags);
             out.extend_from_slice(&entry.status.to_le_bytes());
             out.extend_from_slice(&offset.to_le_bytes());
+            out.extend_from_slice(&entry.event.to_le_bytes());
+            out.extend_from_slice(&entry.readiness.to_le_bytes());
         }
         out.extend_from_slice(&strings);
         Ok(out)
@@ -162,24 +178,36 @@ impl FdMap {
             return Err(Errno::EPROTO);
         }
         let version = read_u16(input, 4).ok_or(Errno::EPROTO)?;
-        if version != FDMAP_VERSION {
-            return Err(Errno::EPROTO);
-        }
+        let entry_len = match version {
+            FDMAP_VERSION_V1 => ENTRY_LEN,
+            FDMAP_VERSION => ENTRY_LEN_V2,
+            _ => return Err(Errno::EPROTO),
+        };
         let count = usize::from(read_u16(input, 6).ok_or(Errno::EPROTO)?);
-        let entries_len = ENTRY_LEN.checked_mul(count).ok_or(Errno::EPROTO)?;
+        let entries_len = entry_len.checked_mul(count).ok_or(Errno::EPROTO)?;
         let strings_start = HEADER_LEN.checked_add(entries_len).ok_or(Errno::EPROTO)?;
         let strings = input.get(strings_start..).ok_or(Errno::EPROTO)?;
         let mut entries = Vec::with_capacity(count);
         let mut index = 0usize;
         while index < count {
-            let base = HEADER_LEN + index.saturating_mul(ENTRY_LEN);
-            let record = input.get(base..base + ENTRY_LEN).ok_or(Errno::EPROTO)?;
+            let base = HEADER_LEN + index.saturating_mul(entry_len);
+            let record = input.get(base..base + entry_len).ok_or(Errno::EPROTO)?;
             let fd = read_i32(record, 0).ok_or(Errno::EPROTO)?;
             let handle = read_u32(record, 4).ok_or(Errno::EPROTO)?;
             let kind = kind_from_byte(*record.get(8).ok_or(Errno::EPROTO)?);
             let fd_flags = *record.get(9).ok_or(Errno::EPROTO)?;
             let status = read_u32(record, 10).ok_or(Errno::EPROTO)?;
             let offset = read_u32(record, 14).ok_or(Errno::EPROTO)?;
+            let event = if version == FDMAP_VERSION {
+                read_u32(record, 18).ok_or(Errno::EPROTO)?
+            } else {
+                0
+            };
+            let readiness = if version == FDMAP_VERSION {
+                read_u32(record, 22).ok_or(Errno::EPROTO)?
+            } else {
+                0
+            };
             let path = if offset == NO_PATH {
                 None
             } else {
@@ -197,6 +225,8 @@ impl FdMap {
                 fd_flags,
                 status,
                 path,
+                event,
+                readiness,
             });
             index = index.saturating_add(1);
         }
