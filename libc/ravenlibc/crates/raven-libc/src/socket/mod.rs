@@ -24,6 +24,7 @@ use crate::ffi::platform::ShellLock;
 
 mod accept;
 mod duplex;
+mod getpeereid;
 mod getsockname;
 #[path = "socket.rs"]
 mod listen;

@@ -1269,6 +1269,7 @@ RAVEN_1.0 {
 		accept4;
 		bind;
 		connect;
+		getpeereid;
 		getpeername;
 		getsockname;
 		getsockopt;

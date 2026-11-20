@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K211: AF_UNIX SCM_RIGHTS and peer credentials through libc sendmsg/recvmsg.
+# The shared fixture first runs the K206 pair/close/dup/fork checks, then the control checks.
+name = "socketpair-control"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+initfs = "build/fixtures/socketpair/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+pre = ["sh tests/qtest/cases/socketpair-fixture/build.sh"]
+
+[[expect]]
+regex = '^socketpair-control: fd ok$'
+
+[[expect]]
+regex = '^socketpair-control: dgram ok$'
+
+[[expect]]
+regex = '^socketpair-control: negative ok$'
+
+[[expect]]
+regex = '^socketpair-control: cred ok$'
+
+[[expect]]
+regex = '^socketpair-control: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|socketpair: fail'

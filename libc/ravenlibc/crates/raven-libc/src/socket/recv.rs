@@ -86,14 +86,26 @@ pub unsafe extern "C" fn recvmsg(fd: c_int, message: *mut Msghdr, flags: c_int) 
             Ok(iov) => iov,
             Err(error) => return crate::ffi::ret::ssize(Err(error)),
         };
-    let mut control = [0u8; 0];
-    match with_net(|net| net.recvmsg(fd, name, &mut iov, &mut control, flags)) {
+    let control_capacity = header.msg_controllen as usize;
+    if control_capacity != 0 && header.msg_control.is_null() {
+        return crate::ffi::ret::ssize(Err(fault()));
+    }
+    // SAFETY: the caller supplied `msg_controllen` writable control bytes; a zero length does
+    // not dereference the pointer.
+    let control: &mut [u8] = if control_capacity == 0 {
+        &mut []
+    } else {
+        unsafe {
+            core::slice::from_raw_parts_mut(header.msg_control.cast::<u8>(), control_capacity)
+        }
+    };
+    match with_net(|net| net.recvmsg(fd, name, &mut iov, control, flags)) {
         Ok(reply) => {
             // SAFETY: the caller's in/out socklen.
             unsafe {
                 crate::ffi::sockaddr::write_len(&mut header.msg_namelen, reply.name_len, capacity)
             };
-            header.msg_controllen = 0;
+            header.msg_controllen = u32::try_from(reply.control_len).unwrap_or(u32::MAX);
             header.msg_flags = reply.flags;
             isize::try_from(reply.len).unwrap_or(isize::MAX)
         }
