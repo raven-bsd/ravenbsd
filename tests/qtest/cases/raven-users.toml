@@ -69,7 +69,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "chmod 755 /bin/tui-demo && echo shell-ready\n"
+send = "if [ -x /bin/tui-demo ]; then echo shell-ready; fi\n"
 delay_ms = 100
 
 [[step]]
