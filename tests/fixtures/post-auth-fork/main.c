@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -72,6 +73,13 @@ static int poll_readable(int fd, int timeout_ms) {
 #define PORT 23083
 #define REQUEST "POSTAUTH 5 hello"
 #define RESPONSE "POSTOK 2 ok"
+
+static void *parent_poll_thread(void *argument) {
+    int connection = *(int *)argument;
+    say("post-auth-fork: parent poll registered\n");
+    (void)poll_readable(connection, 5000);
+    return NULL;
+}
 
 static int run_child(int connection) {
     if (poll_readable(connection, 5000) <= 0) {
@@ -145,15 +153,20 @@ int main(void) {
         _exit(result);
     }
 
-    // The parent does not poll or read the accepted socket after the fork. It only sends the
-    // request after a delay, then reaps the child and reads the response on its own client end.
-    (void)close(connection);
+    // The parent registers the accepted socket on its own event queue in a side thread, but never
+    // reads it. This is the SSH monitor/session topology: the parent's registration and the
+    // child's registration name the same inherited UserEvent.
+    pthread_t poller;
+    if (pthread_create(&poller, NULL, parent_poll_thread, &connection) != 0) {
+        return fail("parent poll thread", errno);
+    }
     (void)close(listener);
     sleep(1);
     if (write(client, REQUEST, sizeof(REQUEST) - 1) != (ssize_t)(sizeof(REQUEST) - 1)) {
         return fail("parent write", errno);
     }
     say("post-auth-fork: parent request sent\n");
+    (void)pthread_join(poller, NULL);
     if (waitpid(child, &status, 0) != child || status != 0) {
         char line[96];
         int length = snprintf(line, sizeof(line), "post-auth-fork: child status=%d\n", status);
