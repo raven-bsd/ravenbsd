@@ -34,7 +34,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
         elif path == "/slow":
-            time.sleep(2)
+            # K219: sleep well past the 1 s client cap; the test must prove a timeout, not a
+            # fast reply that happens to finish under load.
+            time.sleep(5)
             self.respond(200, b"slow-body", "text/plain")
         elif path == "/missing":
             self.respond(404, b"missing", "text/plain")

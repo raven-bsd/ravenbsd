@@ -4,12 +4,19 @@
 #
 # Build the K199 fetch gate:
 #   sh tests/fixtures/fetch/build.sh http
+#   sh tests/fixtures/fetch/build.sh installed
 #   sh tests/fixtures/fetch/build.sh https
 #
+# K219: each fixture has a unique port and stops only its own previous server. The pre reads the
+# pid file, kills and waits, removes the pid file, starts the new process, and verifies both the
+# process and the listening socket with a bounded retry. A stale listener without a pid file is
+# stopped by port (the ports are unique to these fixtures) before the new server starts.
+#
 # `http` builds the base curl/wget (raven-http + raven-http-net) and starts the multi-request
-# local HTTP server. `https` builds the add-on curl/wget (raven-tls + OpenSSL), stages the T3 test
-# CA, and starts a host `openssl s_server -WWW`. The servers are one-shot test processes with a
-# bounded lifetime; they are not product services.
+# local HTTP server on 18081. `installed` only starts the 18082 server for fetch-installed;
+# `https` builds the add-on curl/wget (raven-tls + OpenSSL), stages the T3 test CA, and starts a
+# host `openssl s_server -WWW` on 24443. The servers are one-shot test processes with a bounded
+# lifetime; they are not product services.
 
 set -eu
 
@@ -22,6 +29,10 @@ certs=$root/build/tls/certs/test
 addon=$root/build/tls/x86_64
 sysroot=$addon/sysroot
 target_dir=${CARGO_TARGET_DIR:-target}
+
+http_port=18081
+installed_port=18082
+https_port=24443
 
 log() {
     echo "fetch: $*"
@@ -36,19 +47,123 @@ die() {
 command -v python3 >/dev/null 2>&1 || die "python3 is required"
 command -v openssl >/dev/null 2>&1 || die "host openssl is required"
 command -v cargo >/dev/null 2>&1 || die "cargo is required"
+command -v ss >/dev/null 2>&1 || die "ss is required for the listening check"
 
 mkdir -p "$out" "$out/https-root"
 
+listening() {
+    port=$1
+    ss -ltn 2>/dev/null | grep -q ":$port "
+}
+
+wait_free() {
+    port=$1
+    tries=0
+    while listening "$port" && [ "$tries" -lt 50 ]; do
+        tries=$((tries + 1))
+        sleep 0.1
+    done
+    ! listening "$port"
+}
+
 stop_server() {
     pidfile=$1
+    port=$2
     if [ -f "$pidfile" ]; then
-        kill "$(cat "$pidfile")" 2>/dev/null || true
+        pid=$(cat "$pidfile")
         rm -f "$pidfile"
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            log "stopping server pid $pid on port $port"
+            kill "$pid" 2>/dev/null || true
+            tries=0
+            while kill -0 "$pid" 2>/dev/null && [ "$tries" -lt 50 ]; do
+                tries=$((tries + 1))
+                sleep 0.1
+            done
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null || true
+            fi
+        fi
+    fi
+    if listening "$port"; then
+        command -v fuser >/dev/null 2>&1 ||
+            die "port $port is in use and fuser is unavailable"
+        log "port $port is still in use; stopping the stale listener"
+        fuser -k -TERM "$port/tcp" >/dev/null 2>&1 || true
+        if ! wait_free "$port"; then
+            fuser -k "$port/tcp" >/dev/null 2>&1 || true
+            wait_free "$port" || die "port $port did not become free"
+        fi
     fi
 }
 
-stop_server "$out/http-server.pid"
-stop_server "$out/https-server.pid"
+wait_ready() {
+    pidfile=$1
+    pid=$2
+    port=$3
+    logfile=$4
+    tries=0
+    while [ "$tries" -lt 50 ]; do
+        if kill -0 "$pid" 2>/dev/null && listening "$port"; then
+            log "server pid $pid on 127.0.0.1:$port"
+            return 0
+        fi
+        if ! kill -0 "$pid" 2>/dev/null; then
+            cat "$logfile" >&2 || true
+            rm -f "$pidfile"
+            die "server on port $port exited during startup"
+        fi
+        tries=$((tries + 1))
+        sleep 0.1
+    done
+    cat "$logfile" >&2 || true
+    kill "$pid" 2>/dev/null || true
+    rm -f "$pidfile"
+    die "server on port $port did not listen within 5 s"
+}
+
+start_http_server() {
+    pidfile=$out/http-server.pid
+    logfile=$out/http-server.log
+    lifetime=$1
+    log "starting the local HTTP server on $http_port"
+    stop_server "$pidfile" "$http_port"
+    rm -f "$logfile"
+    timeout "$lifetime" python3 "$root/tests/fixtures/fetch/http_server.py" \
+        --port "$http_port" --seconds 600 >"$logfile" 2>&1 &
+    pid=$!
+    echo "$pid" >"$pidfile"
+    wait_ready "$pidfile" "$pid" "$http_port" "$logfile"
+}
+
+start_installed_server() {
+    pidfile=$out/fetch-installed-server.pid
+    logfile=$out/fetch-installed-server.log
+    lifetime=$1
+    log "starting the fetch-installed HTTP server on $installed_port"
+    stop_server "$pidfile" "$installed_port"
+    rm -f "$logfile"
+    timeout "$lifetime" python3 "$root/tests/fixtures/fetch/http_server.py" \
+        --port "$installed_port" --seconds 600 >"$logfile" 2>&1 &
+    pid=$!
+    echo "$pid" >"$pidfile"
+    wait_ready "$pidfile" "$pid" "$installed_port" "$logfile"
+}
+
+start_https_server() {
+    pidfile=$out/https-server.pid
+    logfile=$out/https-server.log
+    log "starting the local HTTPS server on $https_port"
+    stop_server "$pidfile" "$https_port"
+    rm -f "$logfile"
+    timeout 240 python3 "$root/tests/fixtures/fetch/tls_server.py" \
+        --port "$https_port" --seconds 180 \
+        --cert "$certs/server.pem" --key "$certs/server.key" \
+        >"$logfile" 2>&1 &
+    pid=$!
+    echo "$pid" >"$pidfile"
+    wait_ready "$pidfile" "$pid" "$https_port" "$logfile"
+}
 
 build_http_tools() {
     log "building base curl/wget (x86_64-unknown-none)"
@@ -127,53 +242,29 @@ build_initfs() {
                 "/tls-untrusted.pem=$certs/untrusted-ca.pem:644" >/dev/null
             ;;
         *)
-            die "usage: sh tests/fixtures/fetch/build.sh http|https"
+            die "usage: sh tests/fixtures/fetch/build.sh http|installed|https"
             ;;
     esac
-}
-
-start_http_server() {
-    log "starting the local HTTP server on 18081"
-    rm -f "$out/http-server.log"
-    timeout 240 python3 "$root/tests/fixtures/fetch/http_server.py" \
-        --port 18081 --seconds 180 >"$out/http-server.log" 2>&1 &
-    echo $! >"$out/http-server.pid"
-    sleep 0.3
-    if ! kill -0 "$(cat "$out/http-server.pid")" 2>/dev/null; then
-        cat "$out/http-server.log" >&2 || true
-        die "HTTP server failed to start"
-    fi
-}
-
-start_https_server() {
-    log "starting the local HTTPS server on 24443"
-    rm -f "$out/https-server.log"
-    timeout 240 python3 "$root/tests/fixtures/fetch/tls_server.py" \
-        --port 24443 --seconds 180 \
-        --cert "$certs/server.pem" --key "$certs/server.key" \
-        >"$out/https-server.log" 2>&1 &
-    echo $! >"$out/https-server.pid"
-    sleep 1
-    if ! kill -0 "$(cat "$out/https-server.pid")" 2>/dev/null; then
-        cat "$out/https-server.log" >&2 || true
-        die "HTTPS server failed to start"
-    fi
 }
 
 case "$mode" in
     http)
         build_http_tools
         build_initfs
-        start_http_server
-        log "ready: $out/http-initfs.img"
+        start_http_server 360
+        log "ready: $out/http-initfs.img on $http_port"
+        ;;
+    installed)
+        start_installed_server 400
+        log "ready: fetch-installed server on $installed_port"
         ;;
     https)
         build_tls_tools
         build_initfs
         start_https_server
-        log "ready: $out/https-initfs.img"
+        log "ready: $out/https-initfs.img on $https_port"
         ;;
     *)
-        die "usage: sh tests/fixtures/fetch/build.sh http|https"
+        die "usage: sh tests/fixtures/fetch/build.sh http|installed|https"
         ;;
 esac

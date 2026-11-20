@@ -3,6 +3,8 @@
 
 # K199: base curl/wget over raven-http/raven-http-net against a multi-request local HTTP server.
 # The base binaries stay C-free; the HTTPS fallback must be a clear EUNAVAILABLE.
+# K219: the fixture server uses port 18081; its /slow endpoint sleeps 5 s, so --max-time 1 must
+# return non-zero with real margin.
 
 name = "fetch-http"
 arch = "x86_64"

@@ -11,7 +11,7 @@
 # each command's output to a file and reads it with the builtin `read`. Do not reintroduce
 # `$(...)` or `|` here.
 
-base=http://10.0.2.2:18081
+base=http://10.0.2.2:18083
 expected=/etc/eink-insult.txt
 curl_out=/tmp/insult-curl.txt
 wget_out=/tmp/insult-wget.txt

@@ -2,9 +2,11 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # K202: read-only `raven net` on the QEMU user network. The release initfs supplies netd,
-# getty/login and the network tools; the pre step adds the target `raven` binary. The case
-# asserts the real interface address (10.0.2.15/24) and default gateway (10.0.2.2), plus
-# `raven net status` exit 0. It does not write network configuration.
+# getty/login and the network tools; the pre step builds a case-specific release initfs and adds
+# the target `raven` binary. The case asserts the real interface address (10.0.2.15/24) and
+# default gateway (10.0.2.2), plus `raven net status` exit 0. It does not write network
+# configuration. K219: the pre never reuses the shared build/x86_64/initfs.img, so a preceding
+# modern-admin build cannot leave the admin/rsh initfs in place.
 
 name = "modern-net"
 arch = "x86_64"

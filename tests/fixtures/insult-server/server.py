@@ -62,7 +62,7 @@ def serve(client: socket.socket) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=18081)
+    parser.add_argument("--port", type=int, default=18083)
     parser.add_argument("--max-requests", type=int, default=8)
     parser.add_argument("--idle-timeout", type=float, default=300.0)
     options = parser.parse_args()
