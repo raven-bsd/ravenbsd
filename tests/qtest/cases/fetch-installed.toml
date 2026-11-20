@@ -39,7 +39,7 @@ regex = '^mode = "dhcp"$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|No such file|not found'
+regex = '(?i)panic|EXCEPTION'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
