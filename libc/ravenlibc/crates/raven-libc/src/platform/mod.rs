@@ -32,6 +32,7 @@ pub(crate) mod ftruncate;
 pub(crate) mod futimens;
 pub(crate) mod getaudit;
 pub(crate) mod getcwd;
+pub(crate) mod getdtablesize;
 pub(crate) mod gethostname;
 pub(crate) mod ioctl;
 pub(crate) mod link;

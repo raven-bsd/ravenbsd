@@ -11,10 +11,9 @@
 #   sh addons/ssh/build.sh           build sshd, ssh and ssh-keygen
 #   sh addons/ssh/build.sh --qtest   stage a minimal initfs (requires a completed build)
 #
-# Current status: BLOCKED on libc exports after the T1 fix. T1 OpenSSL now builds; OpenSSH
-# configures and compiles, but the static link misses getifaddrs/freeifaddrs/getdtablesize/
-# __res_state/res_query from libc.a. The check mode below passes; build/qtest report the exact
-# link failure.
+# Current status: the libc exports and T1 fixes are in place; OpenSSH builds ssh/sshd/ssh-keygen.
+# The guest ssh-version qtest is staged but red: the minimal service root has no /dev/null and
+# socketpair returns EAFNOSUPPORT (97). No SSH protocol/crypto source is changed.
 
 set -eu
 
@@ -38,6 +37,7 @@ t1_stage=$root/build/ssh/$arch/t1
 build=$root/build/ssh/openssh-build-$arch
 install=$root/build/ssh/$arch
 version_file=$source/version.h
+version_src=$root/addons/ssh/qtest/ssh_version_main.c
 jobs=${SSH_JOBS:-4}
 
 log() {
@@ -81,7 +81,7 @@ check_source() {
 }
 
 check_tools() {
-    for tool in clang perl make llvm-ar; do
+    for tool in clang perl make llvm-ar llvm-objcopy; do
         command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
     done
     find_lld || die "ld.lld is required (host PATH or the Rust toolchain)"
@@ -178,12 +178,50 @@ build() {
     log "built: $install/bin/ssh $install/bin/sshd $install/bin/ssh-keygen"
 }
 
+build_version_wrapper() {
+    [ -f "$build/sshd.o" ] || die "sshd.o missing; run --build first"
+    llvm-objcopy --redefine-sym main=sshd_main "$build/sshd.o" "$build/sshd_version.o" ||
+        die "cannot rename the upstream sshd main"
+    clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+        -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector \
+        -I"$t1_stage/include" -include "$compat/ssh_compat.h" -std=gnu11 -O1 \
+        -c "$version_src" -o "$build/ssh_version_main.o" ||
+        die "cannot compile the ssh-version wrapper"
+    clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+        -nostdlib -nostartfiles -static -T"$root/tests/libc/target/x86_64.ld" \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" \
+        "$build/ssh_version_main.o" "$build/sshd_version.o" \
+        "$build/platform-listen.o" "$build/servconf.o" "$build/srclimit.o" \
+        "$build/groupaccess.o" "$build/auth2-methods.o" "$build/dns.o" \
+        "$build/fatal.o" "$build/compat.o" "$build/utf8.o" "$build/authfd.o" \
+        "$build/canohost.o" "$build/ssh-pkcs11-client.o" "$build/ssh-sk-client.o" \
+        -L"$build" -L"$build/openbsd-compat" -L"$sysroot/usr/lib" -L"$t1_stage/lib" \
+        -lssh -lopenbsd-compat -lc -lclang_rt.builtins -lcrypto \
+        "$sysroot/usr/lib/crtn.o" -Wl,--allow-multiple-definition -Wl,--error-limit=0 \
+        -o "$install/bin/ssh-version" ||
+        die "cannot link the ssh-version wrapper"
+    log "built: $install/bin/ssh-version"
+}
+
 qtest_initfs() {
-    for binary in ssh sshd ssh-keygen; do
-        [ -x "$install/bin/$binary" ] ||
-            die "missing $install/bin/$binary; --qtest requires a completed build"
-    done
-    die "ssh-version qtest staging is BLOCKED on the T1 OpenSSL build; no initfs was produced"
+    [ -x "$install/bin/sshd" ] || build
+    if [ ! -x "$install/bin/ssh-version" ] || [ "$version_src" -nt "$install/bin/ssh-version" ]; then
+        build_version_wrapper
+    fi
+    init=$root/build/$arch/user/raven-init
+    if [ ! -x "$init" ]; then
+        cargo xtask build user --arch "$arch" -p raven-init
+    fi
+    output=$install/ssh-version-initfs.img
+    cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+        "$output" \
+        "/init=$init" \
+        "/bin/ssh-version=$install/bin/ssh-version" \
+        "/dev/null=$root/addons/ssh/qtest/dev-null" \
+        "/etc/services.d/ssh-version.toml=$root/addons/ssh/qtest/ssh-version.toml" \
+        "/etc/svcd.conf=$root/addons/ssh/qtest/svcd.conf"
+    log "qtest initfs: $output"
 }
 
 case "$mode" in

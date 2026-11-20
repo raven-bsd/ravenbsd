@@ -32,6 +32,7 @@ __gnu_basename
 __h_errno_location
 __progname
 __progname_full
+__res_state
 __sigsetjmp
 __stack_chk_guard
 __xpg_strerror_r
@@ -477,6 +478,7 @@ free
 free_aligned_sized
 free_sized
 freeaddrinfo
+freeifaddrs
 freelocale
 freezero
 freopen
@@ -541,6 +543,7 @@ getcwd
 getdate
 getdelim
 getdents
+getdtablesize
 getegid
 getentropy
 getenv
@@ -566,6 +569,7 @@ gethostbyname_r
 gethostent
 gethostid
 gethostname
+getifaddrs
 getisax
 getline
 getlogin
@@ -1213,6 +1217,7 @@ rename
 renameat
 renameat2
 res_init
+res_query
 rewind
 rewinddir
 rindex

@@ -3,10 +3,11 @@
 
 # SSH add-on: OpenSSH portable (K200)
 
-Status: **BLOCKED on libc exports after the T1 fix**. T1 OpenSSL now builds and OpenSSH
-configures and compiles; the final static link is missing libc C-ABI exports. No `sshd -V`,
-`ssh -V`, guest qtest or service/login claim is made. K195 owns the service/login integration;
-K196 owns fork/pty.
+Status: **BLOCKED on guest `/dev/null` + `socketpair` after the libc export fix**. T1 builds,
+OpenSSH builds and links, and the libc C-ABI exports are in `libc.a`. The guest `ssh-version`
+service still cannot run `sshd -V`: the minimal initfs has no `/dev/null`/service path namespace,
+`socketpair` returns `EAFNOSUPPORT`, and `openat` returns `ENOENT`. No version line, qtest pass or
+service/login claim is made. K195 owns the service/login integration; K196 owns fork/pty.
 
 ## Pinned source
 
@@ -42,37 +43,39 @@ before compiling: the header only does `#include_next <stdatomic.h>` and shadows
 implementation, so clang 14 cannot find the C11 atomics. This is a build-time workaround for a
 libc header defect, not an OpenSSH patch; the libc owner should fix the forwarding header.
 
-## Current blocker: libc exports after the T1 fix
+## Current blocker: guest `/dev/null` and `socketpair`
 
-The rework fixed T1: `addons/tls/compat/tls_compat.c` now defines only the missing `futimes`
-(all other calls are exported by ravenlibc), the T1 build sysroot drops the broken forwarding
-`stdatomic.h`, and the T1 install includes the upstream public headers (`openssl/macros.h`).
-`timeout 600 sh addons/tls/build.sh` produces `libcrypto.a`/`libssl.a`.
+The rework fixed T1 and the libc C-ABI exports:
 
-OpenSSH then configures (with `--host=x86_64-unknown-linux-gnu` for config.sub feature selection,
-`--without-zlib`, T1 staged without the cross `openssl` binary) and compiles its objects. The
-static link of `ssh`/`sshd` is blocked by libc exports that the current `libc.a` does not provide:
+* `addons/tls/compat/tls_compat.c` now defines only the missing `futimes`; the T1 sysroot drops
+  the broken `stdatomic.h` and installs the upstream public OpenSSL headers.
+* `getifaddrs`, `freeifaddrs`, `getdtablesize`, `__res_state` and `res_query` are exported from
+  `libc.a` through the `raven-libc-net`/`raven-libc-resolv` implementations, with host tests and
+  `Symbols.list`/`Symbol.map` entries.
+* `timeout 600 sh addons/ssh/build.sh` now links `ssh`, `sshd` and `ssh-keygen`.
+
+The host kernel cannot execute the RavenBSD static binaries (`sshd -V`/`ssh -V` hang), so the
+target is the guest qtest. The `ssh-version` initfs runs a thin wrapper that calls the real
+upstream `sshd_main("-V")`; the guest reports:
 
 ```
-undefined symbol: getifaddrs
-undefined symbol: freeifaddrs
-undefined symbol: getdtablesize
-undefined symbol: __res_state
-undefined symbol: res_query
+ssh-version /dev/null: socketpair errno=97 openat errno=2
+Couldn't open /dev/null: No such file or directory
+svcd: ssh-version failed: exited before it became ready
+init exited (1)
 ```
 
-`libc/ravenlibc/include` declares `getifaddrs`/`freeifaddrs` and `res_query`, and
-`libc/ravenlibc/crates/raven-libc-net/src/iface.rs` and `raven-libc-resolv/src/compat.rs` contain
-implementations, but the C-ABI wrappers are not in the packed `libc.a`; the `libs*` stubs are
-empty. `getdtablesize` is a small fallback that `openbsd-compat/bsd-closefrom.c` can use via
-`sysconf`. These are libc/K196 owners, not SSH protocol patches. No `sshd` binary, `-V`, or qtest
-is produced until they are exported.
+`socketpair` is `EAFNOSUPPORT` (97); `openat` of `/dev/null`/the staged `/bin/ssh-version` is
+`ENOENT` (2) in the minimal service root. This is a devfs/service-namespace and socketpair
+primitive gap, not an SSH protocol or crypto change. The `ssh-version` qtest is staged but red;
+no `sshd -V`/`ssh -V` claim is made.
 
 ## Target gap
 
-The `ssh-version` qtest and `build/ssh/x86_64/bin/sshd` do not exist yet. `--qtest` refuses to
-stage an initfs until a completed build exists and the qtest wrapper/service is written. This is
-the named test gap; it is not claimed as covered.
+The `ssh-version` qtest, the `build/ssh/x86_64/bin/sshd`/`ssh` binaries and the test wrapper now
+exist. The qtest is staged but red: the guest service fails at sshd's `/dev/null`/`socketpair`
+probe with `socketpair errno=97` and `openat errno=2` (see above). This is the named runtime gap;
+no `sshd -V`/`ssh -V` pass is claimed.
 
 ## Donor reconciliation (DR-52)
 

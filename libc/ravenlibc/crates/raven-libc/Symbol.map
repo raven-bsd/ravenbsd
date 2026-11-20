@@ -415,6 +415,7 @@ RAVEN_1.0 {
 		creat64;
 		fstat;
 		getcwd;
+		getdtablesize;
 		ioctl;
 		lstat;
 		mmap;
@@ -1230,7 +1231,9 @@ RAVEN_1.0 {
 		endprotoent;
 		endservent;
 		freeaddrinfo;
+		freeifaddrs;
 		getaddrinfo;
+		getifaddrs;
 		gethostbyaddr;
 		gethostbyaddr_r;
 		gethostbyname;
@@ -1401,6 +1404,7 @@ RAVEN_1.0 {
 		ntohs;
 		# --- netdb data ---
 		__h_errno_location;
+		__res_state;
 		h_errno;
 		in6addr_any;
 		in6addr_loopback;
@@ -1417,6 +1421,7 @@ RAVEN_1.0 {
 		ns_put32;
 		ns_skiprr;
 		res_init;
+		res_query;
 		# --- pwd ---
 		endpwent;
 		getpwent;
