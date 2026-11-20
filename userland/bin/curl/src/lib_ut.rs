@@ -117,7 +117,7 @@ fn parses_the_supported_options() {
 #[test]
 fn parse_rejects_bad_options() {
     assert_eq!(
-        parse(["-Z", "http://x/"].into_iter()),
+        parse(["-Q", "http://x/"].into_iter()),
         Err(ParseError::UnknownFlag)
     );
     assert_eq!(parse(["-o"].into_iter()), Err(ParseError::MissingValue));
