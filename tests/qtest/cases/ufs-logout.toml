@@ -30,16 +30,14 @@ regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 regex = '^svcd: root pivoted to UFS at /$'
 
 [[expect]]
-regex = '(?i)^.*login: ?$'
-
-[[expect]]
-regex = '(?i)^password: ?$'
-
-[[expect]]
-regex = '^raven# $'
+regex = '^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
+
+# A normal shell exit must never end init in the demo.
+[[forbid]]
+regex = '^init exited'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
