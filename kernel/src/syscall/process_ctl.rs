@@ -14,8 +14,8 @@ use raven_abi::types::personality::CREATE_LINUX;
 use raven_abi::types::{Handle, Personality, Rights};
 use raven_usercopy::UserSlice;
 
-use crate::ipc::model::{self, NAME_MAX};
-use crate::ipc::router;
+use crate::ipc::model::{self, NAME_MAX, PATH_MAX};
+use crate::ipc::{registry, router};
 use crate::process::status::{
     P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit, SIGKILL, WAIT_OPTIONS,
     WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, signal_valid,
@@ -52,6 +52,48 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// The ABI contract crate is reviewer-owned; the number is exposed here until the next ABI
 /// revision adds a `Syscall` variant.
 pub const PROC_FORK: usize = 0x39;
+
+/// K66 wire read bit.
+const WIRE_OPEN_READ: u32 = 1;
+/// K66 wire require-directory bit.
+const WIRE_OPEN_DIRECTORY: u32 = 0x40;
+
+/// `proc_chroot(path: *const u8, len: usize) -> 0`.
+///
+/// The caller must be root (`euid == 0`). The path is resolved inside the current root, opened
+/// with `O_DIRECTORY` so a missing path or a non-directory is the server's exact errno, and then
+/// stored as the normalized kernel-visible root. Fork, `PROC_CREATE` and `PROC_EXEC` inherit it;
+/// the next `chroot` resolves against it.
+pub fn chroot(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    if caller.ids.lock().euid != 0 {
+        return Err(Errno::EPERM);
+    }
+    let path = router::user_string(frame.rdi, frame.rsi, PATH_MAX)?;
+    let (scheme, suffix) = split_root_path(&path);
+    let root = caller.root.lock().clone();
+    let target = process::resolve_root_path(&root, suffix);
+    let server = registry::lookup(&caller, scheme)?;
+    let handle = router::open(
+        &caller,
+        server,
+        &target,
+        WIRE_OPEN_READ | WIRE_OPEN_DIRECTORY,
+    )?;
+    router::close(&caller, handle)?;
+    *caller.root.lock() = target;
+    Ok(0)
+}
+
+/// Split an optional `file:`/`vfs:` scheme from a chroot path; a bare path uses `file:`.
+fn split_root_path(path: &str) -> (&str, &str) {
+    if let Some((scheme, rest)) = path.split_once(':')
+        && matches!(scheme, "file" | "vfs")
+    {
+        return (scheme, rest);
+    }
+    ("file", path)
+}
 
 /// `proc_fork(src, flags) -> Handle`.
 ///
