@@ -7,6 +7,8 @@ use alloc::vec;
 
 use raven_abi::errno::Errno;
 
+use crate::Platform;
+use crate::backend::FakeSys;
 use crate::fd::inherit::{
     ENTRY_LEN, FDMAP_MAGIC, FDMAP_VERSION, FdMap, FdMapEntry, HEADER_LEN, NO_PATH, entry_handle,
     transferable,
@@ -129,6 +131,29 @@ fn transferable_kinds() {
 fn entry_handle_wraps_the_number() {
     let entry = FdMapEntry::new(0, 0xabcd, OfdKind::File, 0, 0);
     assert_eq!(entry_handle(&entry).0, 0xabcd);
+}
+
+#[test]
+fn restore_fdmap_shares_one_ofd_per_handle() {
+    let platform = Platform::new(FakeSys::new());
+    let block = FdMap {
+        entries: vec![
+            FdMapEntry::new(0, 0x21, OfdKind::File, 0, 2),
+            FdMapEntry::new(1, 0x21, OfdKind::File, 0, 2),
+        ],
+    };
+    platform.restore_fdmap(&block).expect("restore");
+    let first = platform.get(0).expect("fd0").index();
+    let second = platform.get(1).expect("fd1").index();
+    assert_eq!(first, second, "fds sharing a handle must share the OFD");
+    assert_eq!(platform.ofd_refs(), 2);
+    platform.close(0).expect("close fd0");
+    assert!(platform.get(1).is_ok(), "fd1 must survive displacing fd0");
+    assert_eq!(platform.ofd_refs(), 1);
+    // FakeSys does not know the fabricated handle, so only the OFD/table state is asserted.
+    let _ = platform.close(1);
+    assert!(platform.get(1).is_err());
+    assert_eq!(platform.ofd_refs(), 0);
 }
 
 #[test]
