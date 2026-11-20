@@ -171,6 +171,35 @@ impl ProcessIds {
     }
 }
 
+/// Resolve a client path against a per-process root.
+///
+/// Both `root` and `path` are lexical: `.` is dropped, `..` pops but clamps at the root, and
+/// the result is absolute and free of a trailing slash. A root of `/` is the unrooted view.
+pub(crate) fn resolve_root_path(root: &str, path: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            other => parts.push(other),
+        }
+    }
+    let mut result = String::new();
+    if root != "/" {
+        result.push_str(root);
+    }
+    for part in parts {
+        result.push('/');
+        result.push_str(part);
+    }
+    if result.is_empty() {
+        result.push('/');
+    }
+    result
+}
+
 /// Maximum command-name bytes stored in a process record.
 pub const MAX_COMMAND: usize = 256;
 
@@ -236,6 +265,8 @@ pub struct Process {
     pub waiters: WaitQueue,
     /// Visible scheme names (per-process namespace).
     pub namespace: Mutex<Namespace>,
+    /// Per-process root, normalized absolute and without a trailing slash (`"/"` is unrooted).
+    pub root: Mutex<String>,
     /// Scheme names registered by this process.
     pub schemes: Mutex<alloc::vec::Vec<Arc<SchemeServer>>>,
     /// Packets waiting for this process's `RECV`.
@@ -406,6 +437,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(String::from("/")),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -433,17 +465,24 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    let (namespace, ids, limits) = if let Some(parent) = current() {
+    let (namespace, root, ids, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
+        let root = parent.root.lock().clone();
         let ids = ProcessIds::inherited(&parent.ids.lock(), parent.id);
         let limits = *parent.limits.lock();
         (
             snapshot.child_snapshot(&ipc::registry::names()),
+            root,
             ids,
             limits,
         )
     } else {
-        (Namespace::root(), ProcessIds::kernel(), default_limits())
+        (
+            Namespace::root(),
+            String::from("/"),
+            ProcessIds::kernel(),
+            default_limits(),
+        )
     };
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
@@ -463,6 +502,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(namespace),
+        root: Mutex::new(root),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -501,6 +541,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
     let personality = *source.personality.lock();
     let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
     let limits = *source.limits.lock();
+    let root = source.root.lock().clone();
     let child = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -519,6 +560,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(root),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -810,6 +852,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(String::from("/")),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),

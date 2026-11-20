@@ -199,6 +199,13 @@ pub const TRACE_SET: usize = 0x0B;
 /// exact.
 pub const RECORD_LOCK: usize = 0x0C;
 
+/// `proc_chroot(path: *const u8, len: usize) -> 0` sets the calling process's root.
+///
+/// Root-only (`euid == 0`); the path is resolved inside the current root, must name a directory
+/// and is stored as a normalized absolute path without a trailing slash. A raw constant, not a
+/// [`Syscall`] variant, so the existing exhaustive matches downstream stay intact.
+pub const PROC_CHROOT: usize = 0x0D;
+
 /// `msync(proc: Handle, addr: usize, len: usize, flags: usize) -> 0`.
 ///
 /// Writes dirty pages of a shared file-backed mapping back through the pager without unmapping
