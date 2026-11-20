@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{
-    Field, MODE_CHOICES, NetworkCurrent, load_network, modules, network_path, plan_from_fields,
-    write_atomic,
+    Current, Field, MODE_CHOICES, NetworkCurrent, load_network, modules, network_path,
+    plan_from_fields, write_atomic,
 };
 
 static NEXT: AtomicUsize = AtomicUsize::new(1);
@@ -53,7 +53,12 @@ impl Drop for TempDir {
 }
 
 fn fields_for(current: &NetworkCurrent) -> Vec<Field> {
-    modules(current).remove(0).fields
+    modules(&Current {
+        network: current.clone(),
+        accounts: raven_config::users::Accounts::default(),
+    })
+    .remove(0)
+    .fields
 }
 
 fn set(fields: &mut [Field], key: &str, value: &str) {

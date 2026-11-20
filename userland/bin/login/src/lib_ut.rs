@@ -73,6 +73,44 @@ fn other_accounts_and_locked_hashes_never_verify() {
 }
 
 #[test]
+fn any_account_with_a_shadow_record_can_authenticate() {
+    let alice_hash = "$6$rounds=5000$G3aRZtaEHFI9mxqPo3H6$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.";
+    let shadow = format!("{ROOT_SHADOW}\nalice:{alice_hash}:0:0:99999:7:0:0:0\n");
+    assert_eq!(login_status(&shadow, "alice", "raven"), LOGIN_OK);
+    assert_eq!(login_status(&shadow, "alice", "wrong"), LOGIN_RETRY);
+    assert_eq!(login_status(&shadow, "bob", "raven"), LOGIN_RETRY);
+}
+
+#[test]
+fn passwd_entries_are_looked_up_by_name() {
+    let text =
+        "root:x:0:0:root:/root:/bin/rsh\nalice:x:1000:1000:Alice:/home/alice:/bin/tui-demo\n";
+    let entries = parse_passwd(text);
+    assert_eq!(entries.len(), 2);
+    let alice = find_passwd(text, "alice").expect("alice");
+    assert_eq!(alice.home, "/home/alice");
+    assert_eq!(alice.shell, "/bin/tui-demo");
+    assert!(find_passwd(text, "bob").is_none());
+}
+
+#[test]
+fn autologin_is_parsed_and_invalid_users_disable_it() {
+    assert_eq!(
+        parse_autologin("[console]\nuser = \"musicbox\"\nenabled = true\n"),
+        Autologin {
+            enabled: true,
+            user: String::from("musicbox"),
+        }
+    );
+    assert!(!parse_autologin("user = \"musicbox\"\nenabled = false\n").enabled);
+    assert_eq!(
+        parse_autologin("user = \"bad:name\"\nenabled = true\n"),
+        Autologin::default()
+    );
+    assert_eq!(parse_autologin(""), Autologin::default());
+}
+
+#[test]
 fn usernames_are_normalised_and_bounded() {
     assert_eq!(normalize_username("root\n"), Some("root"));
     assert_eq!(normalize_username("  root  "), Some("root"));

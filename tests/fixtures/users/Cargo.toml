@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[workspace]
+members = ["tui-demo"]
+resolver = "3"
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
+lto = false
+codegen-units = 1

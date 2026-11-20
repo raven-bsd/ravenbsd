@@ -4,6 +4,7 @@
 //! State-machine tests for search, selection, editing, validation and save.
 
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -39,6 +40,25 @@ impl Drop for TempDir {
     }
 }
 
+fn seed_accounts(root: &Path) {
+    let write = |relative: &str, text: &str, mode: u32| {
+        let path = root.join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, text).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+    };
+    write("etc/passwd", "root:x:0:0:root:/root:/bin/rsh\n", 0o644);
+    write(
+        "etc/shadow",
+        "root:$6$rounds=5000$G3aRZtaEHFI9mxqPo3H6$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.:0:0:99999:7:0:0:0\n",
+        0o600,
+    );
+    write("etc/group", "root:x:0:root\n", 0o644);
+    write("bin/rsh", "#!/bin/rsh\n", 0o755);
+    write("bin/tui-demo", "#!/bin/rsh\n", 0o755);
+    fs::create_dir_all(root.join("root")).unwrap();
+}
+
 fn feed(tui: &mut Tui, events: &[Event]) -> Option<Action> {
     let mut last = None;
     for event in events {
@@ -56,7 +76,7 @@ fn search_filters_and_selects_services() {
     let root = TempDir::new();
     let mut tui = Tui::new(root.path(), Options::default());
     feed(&mut tui, &[Event::Char('/')]);
-    feed(&mut tui, &text_events("ser"));
+    feed(&mut tui, &text_events("services"));
     let action = tui.handle(Event::Enter);
     assert_eq!(action, Action::Continue);
     assert_eq!(tui.focus, Focus::Form);
@@ -101,7 +121,7 @@ fn dry_run_produces_a_plan_and_writes_nothing() {
     tui.handle(Event::Enter);
     feed(&mut tui, &text_events("dry"));
     let action = tui.handle(Event::CtrlSave);
-    let Action::DryRun(text) = action else {
+    let Action::DryRun { text, .. } = action else {
         panic!("expected DryRun");
     };
     assert!(text.contains("hostname = \"dry\""));
@@ -119,7 +139,9 @@ fn static_without_address_is_a_validation_error() {
     let action = tui.handle(Event::CtrlSave);
     assert!(matches!(action, Action::Validation(_)));
     assert!(!network_path(root.path()).exists());
-    let error = tui.selected_field().and_then(|field| field.error.as_deref());
+    let error = tui
+        .selected_field()
+        .and_then(|field| field.error.as_deref());
     assert!(error.is_some());
 }
 
@@ -150,4 +172,70 @@ fn q_cancels_from_the_list() {
     let root = TempDir::new();
     let mut tui = Tui::new(root.path(), Options::default());
     assert_eq!(tui.handle(Event::Char('q')), Action::Cancelled);
+}
+
+#[test]
+fn users_add_form_creates_the_musicbox_account() {
+    let root = TempDir::new();
+    seed_accounts(root.path());
+    let mut tui = Tui::new(root.path(), Options::default());
+    feed(&mut tui, &text_events("/users"));
+    assert_eq!(tui.handle(Event::Enter), Action::Continue);
+    assert_eq!(tui.selected_module().unwrap().title, "Users (add)");
+    feed(&mut tui, &text_events("musicbox"));
+    for _ in 0..4 {
+        tui.handle(Event::Tab);
+    }
+    feed(&mut tui, &text_events("/bin/tui-demo"));
+    tui.handle(Event::Tab);
+    feed(&mut tui, &text_events("tui-pass"));
+    tui.handle(Event::Tab);
+    feed(&mut tui, &text_events("tui-pass"));
+    tui.handle(Event::Tab);
+    tui.handle(Event::Char('y'));
+    let action = tui.handle(Event::Enter);
+    assert!(matches!(action, Action::Saved(_)), "{action:?}");
+    let passwd = fs::read_to_string(root.path().join("etc/passwd")).unwrap();
+    assert!(passwd.contains("musicbox:x:1000:1000::/home/musicbox:/bin/tui-demo"));
+    let shadow = fs::read_to_string(root.path().join("etc/shadow")).unwrap();
+    assert!(shadow.contains("musicbox:$6$"));
+    assert!(!shadow.contains("tui-pass"));
+    let autologin = fs::read_to_string(root.path().join("etc/raven/autologin.toml")).unwrap();
+    assert!(autologin.contains("user = \"musicbox\""));
+    assert!(autologin.contains("enabled = true"));
+    assert!(root.path().join("home/musicbox").is_dir());
+}
+
+#[test]
+fn users_dry_run_names_the_passwd_target_and_hides_the_password() {
+    let root = TempDir::new();
+    seed_accounts(root.path());
+    let options = Options {
+        dry_run: true,
+        ..Options::default()
+    };
+    let mut tui = Tui::new(root.path(), options);
+    feed(&mut tui, &text_events("/users"));
+    tui.handle(Event::Enter);
+    feed(&mut tui, &text_events("musicbox"));
+    for _ in 0..4 {
+        tui.handle(Event::Tab);
+    }
+    feed(&mut tui, &text_events("/bin/tui-demo"));
+    tui.handle(Event::Tab);
+    feed(&mut tui, &text_events("secret-pass"));
+    tui.handle(Event::Tab);
+    feed(&mut tui, &text_events("secret-pass"));
+    let action = tui.handle(Event::Enter);
+    let Action::DryRun { target, text } = action else {
+        panic!("expected DryRun, got {action:?}");
+    };
+    assert!(target.ends_with("etc/passwd"));
+    assert!(!text.contains("secret-pass"));
+    assert!(text.contains("password = \"<set>\""));
+    assert!(
+        !fs::read_to_string(root.path().join("etc/passwd"))
+            .unwrap()
+            .contains("musicbox")
+    );
 }

@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-tui-demo"
+version = "0.1.0"
+description = "K229 fixture: a stub TUI shell used as a user's passwd shell."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+publish = false
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "tui-demo"
+path = "src/main.rs"
+
+[dependencies]
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
