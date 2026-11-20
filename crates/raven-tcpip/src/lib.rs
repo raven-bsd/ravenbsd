@@ -64,6 +64,7 @@ mod sack_send;
 mod seq;
 mod signature;
 mod socket;
+mod syncache;
 mod stack;
 mod table;
 mod tcp_data;
