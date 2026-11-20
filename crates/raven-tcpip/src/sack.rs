@@ -68,6 +68,29 @@ pub struct SackResult {
     pub rescue_rxt_after: i64,
 }
 
+/// A saved scoreboard for reneging rollback (`tcp_sack_save_scoreboard`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SackSnapshot {
+    sacked: Vec<(u32, u32)>,
+    lostseq: u32,
+    reneging: bool,
+}
+
+/// DragonFly `tcp_sack_ndsack_blocks`: classify the leading DSACK block(s).
+#[must_use]
+pub fn ndsack_blocks(blocks: &[(i64, i64)], snd_una: i64) -> u8 {
+    if blocks.is_empty() {
+        return 0;
+    }
+    if blocks[0].0 < snd_una {
+        return 1;
+    }
+    if blocks.len() > 1 && blocks[0].0 >= blocks[1].0 && blocks[0].1 <= blocks[1].1 {
+        return 2;
+    }
+    0
+}
+
 /// A bounded SACK scoreboard over byte offsets relative to `snd_una`.
 #[derive(Clone, Debug)]
 pub struct SackScoreboard {
@@ -122,6 +145,12 @@ impl SackScoreboard {
     pub fn note_reneging(&mut self) {
         self.reneging = true;
         self.sacked.clear();
+    }
+
+    /// Whether the last scoreboard update detected reneging.
+    #[must_use]
+    pub fn is_reneging(&self) -> bool {
+        self.reneging
     }
 
     /// Insert a SACK block, clipping to `[0, high_data)` and merging overlaps.
@@ -239,6 +268,94 @@ impl SackScoreboard {
             }
         }
         bytes
+    }
+
+    /// DragonFly `tcp_sack_ack_blocks`: drop blocks the cumulative ACK covers and detect
+    /// reneging when the ACK lands inside a still-reported block.
+    pub fn ack_blocks(&mut self, ack: u32) {
+        while let Some((_, end)) = self.sacked.first().copied() {
+            if end <= ack {
+                self.sacked.remove(0);
+            } else {
+                break;
+            }
+        }
+        if let Some((start, _)) = self.sacked.first().copied()
+            && ack >= start
+        {
+            self.note_reneging();
+        }
+        self.update_lostseq(0);
+    }
+
+    /// DragonFly `tcp_sack_add_blocks`: validate and insert incoming SACK blocks.
+    ///
+    /// The first block is skipped when it is a DSACK (below `snd_una` or enclosed by the next
+    /// block); blocks above `snd_max` stop the update.
+    pub fn add_blocks(&mut self, ack: u32, snd_max: u32, blocks: &[(i64, i64)]) {
+        let start = if ndsack_blocks(blocks, 0) > 0 { 1 } else { 0 };
+        for (left, right) in blocks.iter().skip(start) {
+            if *left <= i64::from(ack) {
+                continue;
+            }
+            if *right > i64::from(snd_max) {
+                break;
+            }
+            self.insert_block(*left, *right);
+        }
+    }
+
+    /// DragonFly `tcp_sack_skip_sacked`: advance past a SACKed block containing `seq`.
+    #[must_use]
+    pub fn skip_sacked(&self, seq: u32) -> u32 {
+        for (start, end) in &self.sacked {
+            if seq >= *start && seq < *end {
+                return *end;
+            }
+        }
+        seq
+    }
+
+    /// DragonFly `tcp_sack_first_unsacked_len`.
+    #[must_use]
+    pub fn first_unsacked_len(&self) -> u32 {
+        self.sacked.first().map_or(self.mss, |(start, _)| *start)
+    }
+
+    /// DragonFly `tcp_sack_compute_pipe` (the RFC 6675 `pipe()` above keeps the vector contract).
+    #[must_use]
+    pub fn compute_pipe(&self) -> u32 {
+        let lostseq = self.computed_lostseq();
+        let mut nlost = self.high_data.saturating_sub(lostseq);
+        let mut nretransmitted = self.high_rxt.saturating_sub(self.high_ack);
+        for (start, end) in &self.sacked {
+            if *start < self.high_rxt {
+                nretransmitted =
+                    nretransmitted.saturating_sub((*end).min(self.high_rxt).saturating_sub(*start));
+            }
+            if *start >= lostseq {
+                nlost = nlost.saturating_sub(end.saturating_sub(*start));
+            }
+        }
+        nlost.saturating_add(nretransmitted)
+    }
+
+    /// Save the scoreboard for DragonFly `tcp_sack_save_scoreboard`.
+    #[must_use]
+    pub fn snapshot(&self) -> SackSnapshot {
+        SackSnapshot {
+            sacked: self.sacked.clone(),
+            lostseq: self.lostseq,
+            reneging: self.reneging,
+        }
+    }
+
+    /// Restore a saved scoreboard and re-apply the cumulative ACK (`tcp_sack_revert_scoreboard`).
+    pub fn revert(&mut self, snapshot: SackSnapshot, snd_una: u32) {
+        self.sacked = snapshot.sacked;
+        self.lostseq = snapshot.lostseq;
+        self.reneging = snapshot.reneging;
+        self.ack_blocks(snd_una);
     }
 
     /// The complement of `sacked` over `[0, high_data)`.
@@ -364,6 +481,133 @@ impl SackScoreboard {
             rescue_rxt_after: rescue_after,
         }
     }
+}
+
+/// Receiver SACK report state (`tcp_sack_fill_report`, `tcp_sack_ack_history`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SackReport {
+    /// Reported out-of-order blocks, newest first.
+    pub history: Vec<(u32, u32)>,
+    /// The block for this ACK, when one is owed.
+    pub report: Option<(u32, u32)>,
+    /// The enclosing block for a duplicate SACK.
+    pub encloses: Option<(u32, u32)>,
+    /// The report carries a DSACK.
+    pub dsack: bool,
+    /// Per-connection history cap.
+    pub max_history: usize,
+}
+
+// Full DragonFly receiver-report surface; the live receiver call site is outside this ticket's
+// Owns (`tcp_state.rs`), and every method is covered by the unit tests.
+#[cfg_attr(not(test), allow(dead_code))]
+impl SackReport {
+    /// Create a report with a history cap.
+    #[must_use]
+    pub fn new(max_history: usize) -> Self {
+        Self {
+            history: Vec::new(),
+            report: None,
+            encloses: None,
+            dsack: false,
+            max_history: max_history.max(1),
+        }
+    }
+
+    /// Record the block that triggered this ACK.
+    pub fn note_block(&mut self, start: u32, end: u32, dsack: bool) {
+        self.report = Some((start, end));
+        self.dsack = dsack;
+    }
+
+    /// Whether a SACK option must be emitted.
+    #[must_use]
+    pub fn report_needed(&self) -> bool {
+        self.report.is_some() || self.dsack || self.encloses.is_some()
+    }
+
+    /// Clear the per-ACK report; keep the history.
+    pub fn cleanup(&mut self) {
+        self.report = None;
+        self.encloses = None;
+        self.dsack = false;
+    }
+
+    /// `tcp_sack_ack_history`: drop or trim history below `rcv_nxt`.
+    pub fn ack_history(&mut self, rcv_nxt: u32) {
+        let mut kept = Vec::with_capacity(self.history.len());
+        for (start, end) in self.history.drain(..) {
+            if end <= rcv_nxt {
+                continue;
+            }
+            kept.push((start.max(rcv_nxt), end));
+        }
+        self.history = kept;
+    }
+
+    /// `tcp_sack_update_reported_history`: merge a new block into the reported history.
+    pub fn update_reported_history(&mut self, start: u32, end: u32) {
+        let mut kept = Vec::with_capacity(self.history.len());
+        let mut start = start;
+        let mut end = end;
+        for (old_start, old_end) in self.history.drain(..) {
+            if end < old_start || start > old_end {
+                kept.push((old_start, old_end));
+                continue;
+            }
+            start = start.min(old_start);
+            end = end.max(old_end);
+        }
+        kept.insert(0, (start, end));
+        kept.truncate(self.max_history);
+        self.history = kept;
+    }
+
+    /// `tcp_sack_fill_report`: build the ordered blocks for the option payload.
+    pub fn fill_report(&mut self, rcv_nxt: u32, max_blocks: usize) -> Vec<(u32, u32)> {
+        self.ack_history(rcv_nxt);
+        let mut blocks = Vec::new();
+        if let Some(block) = self.report {
+            blocks.push(block);
+        }
+        if let Some(block) = self.encloses {
+            blocks.push(block);
+        }
+        for block in &self.history {
+            if blocks.len() >= max_blocks {
+                break;
+            }
+            if blocks.first() != Some(block) {
+                blocks.push(*block);
+            }
+        }
+        blocks.truncate(max_blocks);
+        self.cleanup();
+        blocks
+    }
+}
+
+/// Parse a SACK option (`kind=5`) into its blocks.
+// Full DragonFly option surface; the live option parser is in `tcp_state.rs` (outside Owns).
+#[cfg_attr(not(test), allow(dead_code))]
+#[must_use]
+pub fn parse_sack_option(bytes: &[u8]) -> Option<Vec<(u32, u32)>> {
+    if bytes.first().copied()? != 5 {
+        return None;
+    }
+    let length = usize::from(*bytes.get(1)?);
+    if length < 10 || length % 8 != 2 || length > bytes.len() {
+        return None;
+    }
+    let count = (length - 2) / 8;
+    let mut blocks = Vec::with_capacity(count);
+    for index in 0..count {
+        let base = 2usize.checked_add(index.checked_mul(8)?)?;
+        let start = u32::from_be_bytes(bytes.get(base..base + 4)?.try_into().ok()?);
+        let end = u32::from_be_bytes(bytes.get(base + 4..base + 8)?.try_into().ok()?);
+        blocks.push((start, end));
+    }
+    Some(blocks)
 }
 
 /// Receiver-side block selection: most recent holes first, bounded by the option
