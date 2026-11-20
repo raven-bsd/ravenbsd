@@ -10,9 +10,52 @@ use anyhow::{Context, Result, anyhow, bail};
 use raven_initfs::InitfsBuilder;
 
 use crate::build::{self, Arch, Component};
-use crate::profiles::Profile;
+use crate::profiles::{Profile, Program};
 use crate::repo::Workspace;
 use crate::uutils;
+
+/// The reproducible initfs epoch.
+///
+/// `SOURCE_DATE_EPOCH` wins when the caller sets it for an A/B reproducible build; otherwise the
+/// commit timestamp is used. The host clock is never consulted. The last fallback is the
+/// documented default epoch, so an entry never falls back to 1970.
+pub(crate) fn image_epoch(root: &Path) -> u64 {
+    if let Some(epoch) = crate::image::source_date_epoch()
+        && let Ok(value) = u64::try_from(epoch)
+    {
+        return value;
+    }
+    crate::repo::head_info(root)
+        .ok()
+        .and_then(|head| u64::try_from(head.epoch).ok())
+        .unwrap_or(raven_initfs::DEFAULT_EPOCH)
+}
+
+/// Shell-visible first-party `/bin` tools that must be statically linked.
+///
+/// The release/shell userland links `/bin` programs as dynamic PIE, but libc `posix_spawn`
+/// refuses an interpreter image through `spawn_image_with_fdmap`; the shell would report a
+/// dynamic tool as "command not found". `/sbin` programs are static by path; this list covers
+/// the `/bin` tools the login shell runs. `raven-getty` and `login` stay dynamic so the release
+/// gate keeps exercising the loader and libc startup path.
+const STATIC_SHELL_PACKAGES: &[&str] = &[
+    "curl",
+    "ed",
+    "man",
+    "raven-date",
+    "raven-hostname",
+    "raven-ps",
+    "raven-rsh",
+    "raven-sleep",
+    "raven-svcctl",
+    "raven-uname",
+    "wget",
+];
+
+/// Whether a profile program is built static rather than PIE.
+fn program_is_static(program: &Program) -> bool {
+    !program.path.starts_with("/bin/") || STATIC_SHELL_PACKAGES.contains(&program.package.as_str())
+}
 
 /// Build `build/<arch>/initfs.img` from the profile's programs.
 pub(crate) fn run(root: &Path, arch: Arch, profile: &str) -> Result<u8> {
@@ -44,7 +87,7 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
                     .programs
                     .iter()
                     .find(|program| &program.package == package)
-                    .is_none_or(|program| !program.path.starts_with("/bin/"))
+                    .is_none_or(program_is_static)
             });
         if !static_packages.is_empty() {
             let code = build::run(
@@ -74,7 +117,7 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         }
     }
 
-    let mut builder = InitfsBuilder::new();
+    let mut builder = InitfsBuilder::new().with_image_epoch(image_epoch(root));
     for program in &profile.initfs.programs {
         let path = build::artifact_path(root, arch, Component::User, &program.package);
         let data = fs::read(&path).with_context(|| {

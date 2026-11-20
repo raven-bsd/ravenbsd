@@ -188,6 +188,7 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 return Err(Errno::EBUSY);
             }
             let configured = gic::set_priority(number, PRIORITY).is_ok()
+                // CPU 0 is the boot CPU index; the GIC driver converts it to ITARGETSR mask 1.
                 && gic::set_target(number, 0).is_ok()
                 && gic::configure_spi(number, route.level).is_ok()
                 && gic::disable(number).is_ok()

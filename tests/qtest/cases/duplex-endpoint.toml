@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K208: kernel duplex endpoint pair. The fixture exercises both directions, EOF/EPIPE, all
+# shutdown selectors, datagram message boundaries, dup/transfer/close and EVQ readiness through
+# the raw 0x110/0x111 syscalls.
+
+name = "duplex-endpoint"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/duplex/build.sh"]
+initfs = "build/fixtures/duplex/duplex.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^duplex: both=1 flags=1$'
+
+[[expect]]
+regex = '^duplex: eof_epipe=1 shutdown=1$'
+
+[[expect]]
+regex = '^duplex: datagram=1 handles=1 evq=1$'
+
+[[expect]]
+regex = '^duplex: close=1$'
+
+[[expect]]
+regex = '^duplex: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|duplex: FAIL'

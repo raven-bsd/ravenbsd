@@ -26,6 +26,7 @@ extern crate alloc;
 mod trace;
 
 mod chunk;
+mod pivot;
 
 #[cfg(target_os = "none")]
 mod program {
@@ -41,7 +42,7 @@ mod program {
     use raven_proto_fs::{
         ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
         DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
-        OpenFlags, S_IFDIR, S_IFMT, Stat, WIRE_OPEN_DIRECTORY, normalize_request,
+        OpenFlags, S_IFDIR, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, normalize_request,
     };
     use raven_rt::entry;
     use raven_rt::println;
@@ -354,10 +355,16 @@ mod program {
             flags: OpenFlags,
         ) -> Result<(), Errno> {
             if flags.create() {
-                self.check_parent(scheme, suffix, creds)?;
+                // Check the target before its parent: a mount root has an empty suffix, and its
+                // parent lives outside the mounted scheme. `open("/dev/null", O_CREAT)` must
+                // treat the existing device as the target instead of testing `null:` as a
+                // directory.
                 match self.target_stat(scheme, suffix) {
                     Ok(stat) => return check_stat_access(creds, stat, flags),
-                    Err(Errno::ENOENT) => return Ok(()),
+                    Err(Errno::ENOENT) => {
+                        self.check_parent(scheme, suffix, creds)?;
+                        return Ok(());
+                    }
                     Err(error) => return Err(error),
                 }
             }
@@ -1099,16 +1106,20 @@ mod program {
                     let path = normalized(&path)?;
                     let scheme = bytes_to_string(scheme)?;
                     let before = self.mount_generation;
-                    let result = self.table.mount(&path, &scheme);
-                    if self.trace {
-                        println!(
-                            "vfsd-trace: mount path={path} scheme={scheme} gen={before} result={}",
-                            result.is_ok()
-                        );
+                    if path == "/" {
+                        // K176: a mount at `/` is the live root pivot. Open files keep their
+                        // targets; the replacement table keeps /dev, /tmp and every other
+                        // non-root mount.
+                        let replacement = crate::pivot::pivot_root(&self.table, &scheme)?;
+                        self.table = replacement;
+                    } else {
+                        self.table.mount(&path, &scheme)?;
                     }
-                    result?;
                     self.bump_mounts();
                     if self.trace {
+                        println!(
+                            "vfsd-trace: mount path={path} scheme={scheme} gen={before} result=true"
+                        );
                         println!("vfsd-trace: mount-bump gen={}", self.mount_generation);
                     }
                     status(response, Ok(()))
@@ -1152,20 +1163,19 @@ mod program {
                     }
                     status(response, Ok(()))
                 }
-                Call::Statfs => {
-                    let (mount_id, _) = self.table.resolve("/")?;
-                    let scheme = self
-                        .table
-                        .get(mount_id)
-                        .ok_or(Errno::ENOENT)?
-                        .scheme
-                        .clone();
-                    let client = Client::new();
-                    let root = client.open(&scheme, READ)?;
-                    let result = proxy_call(&client, root, &decoded, response);
-                    let _ = client.close(root);
-                    Ok(result?)
-                }
+                Call::Statfs => match proxy_call(&Client::new(), target, &decoded, response) {
+                    Ok(written) => Ok(written),
+                    Err(Errno::ENOSYS) => {
+                        // Device schemes such as null:, zero: and rand: do not account for
+                        // blocks or inodes. Report zero capacity instead of resolving another
+                        // mount (previously `/`/initfs) and inheriting its 41 MiB numbers.
+                        let statfs = StatFs::default();
+                        Ok(CallResponse::StatFs { status: 0, statfs }
+                            .encode(response)
+                            .map_err(|_| HandlerError::Errno(Errno::EPROTO))?)
+                    }
+                    Err(error) => Err(error.into()),
+                },
                 Call::Truncate { .. } | Call::Fchown { .. } => {
                     let stat = Client::new().fstat(target)?;
                     if matches!(decoded.call, Call::Truncate { .. })

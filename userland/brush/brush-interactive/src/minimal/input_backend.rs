@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2024 reuben olinsky
 
-use std::io::{BufRead, Write};
-#[cfg(not(target_os = "ravenbsd"))]
-use std::io::IsTerminal;
+use std::io::{BufRead, IsTerminal, Write};
 
 use crate::{
     InputBackend, ShellError,
@@ -40,9 +38,31 @@ impl InputBackend for MinimalInputBackend {
     ) -> Result<ReadResult, ShellError> {
         #[cfg(target_os = "ravenbsd")]
         {
-            // The console scheme is not a POSIX tty and std's stdin buffer lives in a
-            // thread-local that the current-thread runtime tears down early. Read fd 0
-            // directly and always show the prompt: the login shell is interactive.
+            // The login console reports as a terminal (`isatty` maps to the tty
+            // GET_MODE call), but the default RavenBSD backend is `Minimal`. Use the
+            // VT line editor so TAB reaches the completion menu and the semantic
+            // highlighter. The plain switches keep drawn input free of escapes.
+            #[cfg(feature = "vt")]
+            if std::io::stdout().is_terminal() || std::io::stdin().is_terminal() {
+                let plain = std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty())
+                    || std::env::var("TERM").is_ok_and(|term| term == "dumb")
+                    || std::env::var("RAVEN_PLAIN_PROMPT").is_ok_and(|value| value == "1");
+                let options = crate::UIOptions {
+                    disable_color: plain,
+                    disable_highlighting: plain,
+                    ..Default::default()
+                };
+                let mut backend = crate::VtInputBackend::default().with_ui_options(&options);
+                if plain {
+                    backend = backend.with_basic_style();
+                }
+                return Box::pin(backend.read_line(shell_ref, prompt)).await;
+            }
+
+            // Fallback: the console scheme is not a POSIX tty and std's stdin buffer
+            // lives in a thread-local that the current-thread runtime tears down
+            // early. Read fd 0 directly and always show the prompt: the login shell
+            // is interactive.
             let mut reader = std::io::BufReader::new(RawStdin);
             return Self::read_program_from(
                 shell_ref,

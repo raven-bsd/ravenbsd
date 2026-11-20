@@ -12,3 +12,23 @@ path = "/etc/services.d/vfsd.toml"
 [[initfs.files]]
 src = "etc/mounts"
 path = "/etc/mounts"
+
+# K175: /etc/mounts mounts /dev/null, /dev/zero, /dev/random and /dev/urandom, so every profile
+# that inherits this fragment needs the parent directory and a visible mount point for each.
+# The initfs builder creates parent directories for staged files; the bytes of these placeholders
+# are never visible after vfsd mounts the device over the path.
+[[initfs.files]]
+src = "etc/mounts"
+path = "/dev/null"
+
+[[initfs.files]]
+src = "etc/mounts"
+path = "/dev/zero"
+
+[[initfs.files]]
+src = "etc/mounts"
+path = "/dev/random"
+
+[[initfs.files]]
+src = "etc/mounts"
+path = "/dev/urandom"

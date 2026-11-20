@@ -76,6 +76,7 @@ fn put_replaces_and_reads_back_with_fsck() {
             mode: Some(0o755),
             uid: Some(0),
             gid: Some(0),
+            mtime: None,
             parents: true,
         },
     )
@@ -119,6 +120,7 @@ fn mkdir_and_put_with_parents() {
             mode: Some(0o750),
             uid: Some(0),
             gid: Some(0),
+            mtime: None,
             parents: true,
         },
     )
@@ -135,6 +137,7 @@ fn mkdir_and_put_with_parents() {
             mode: Some(0o755),
             uid: Some(0),
             gid: Some(0),
+            mtime: None,
             parents: true,
         },
     )
@@ -247,6 +250,102 @@ fn fresh_image_is_clean_and_listable() {
     assert!(fsck(&source).expect("fsck").clean_after);
     let root = list(&source, "/").expect("list root");
     assert!(root.iter().any(|name| name == "lost+found"), "{root:?}");
+}
+
+#[test]
+fn repair_keeps_a_clean_image_clean() {
+    let dir = TempDir::new("repair");
+    let image_path = fresh_image(&dir);
+    let source = image(&image_path);
+    let report = repair(&source).expect("repair");
+    assert!(report.clean_after);
+    assert!(report.findings.is_empty());
+    assert!(fsck(&source).expect("fsck after repair").clean_after);
+}
+
+#[test]
+fn remove_file_and_recursive_tree_keep_fsck_clean() {
+    let dir = TempDir::new("remove");
+    let image_path = fresh_image(&dir);
+    let source = image(&image_path);
+    let host = dir.join("payload");
+    fs::write(&host, b"keep\n").expect("host file");
+    put(
+        &source,
+        &host,
+        "/rm/file",
+        &PutOptions {
+            parents: true,
+            ..PutOptions::default()
+        },
+    )
+    .expect("put file");
+    mkdir(
+        &source,
+        "/rm/sub",
+        &MkdirOptions {
+            parents: true,
+            ..MkdirOptions::default()
+        },
+    )
+    .expect("mkdir sub");
+    put(&source, &host, "/rm/sub/child", &PutOptions::default()).expect("put child");
+    symlink(&source, "/rm/file", "/rm/link", &SymlinkOptions::default()).expect("symlink");
+
+    remove(&source, "/rm/file", false).expect("rm file");
+    remove(&source, "/rm/link", false).expect("rm symlink");
+    assert!(remove(&source, "/rm", false).is_err(), "non-empty rmdir");
+    remove(&source, "/rm", true).expect("rm -r");
+    assert!(
+        list(&source, "/")
+            .expect("list")
+            .iter()
+            .all(|name| name != "rm")
+    );
+    assert!(fsck(&source).expect("fsck").clean_after);
+}
+
+#[test]
+fn put_preserves_host_mtime_and_accepts_an_override() {
+    use std::time::{Duration, UNIX_EPOCH};
+
+    let dir = TempDir::new("mtime");
+    let image_path = fresh_image(&dir);
+    let source = image(&image_path);
+    let host = dir.join("stamp.txt");
+    fs::write(&host, b"stamp\n").expect("host file");
+    let stamp = UNIX_EPOCH + Duration::from_secs(1_700_000_123);
+    let handle = fs::OpenOptions::new()
+        .write(true)
+        .open(&host)
+        .expect("open host");
+    handle
+        .set_times(fs::FileTimes::new().set_modified(stamp))
+        .expect("set mtime");
+    drop(handle);
+
+    put(&source, &host, "/stamp.txt", &PutOptions::default()).expect("put host mtime");
+    assert_eq!(
+        stat(&source, "/stamp.txt").expect("stat").mtime.sec,
+        1_700_000_123
+    );
+
+    put(
+        &source,
+        &host,
+        "/stamp.txt",
+        &PutOptions {
+            mtime: Some(Timespec {
+                sec: 1_600_000_000,
+                nsec: 42,
+            }),
+            ..PutOptions::default()
+        },
+    )
+    .expect("put override mtime");
+    let attr = stat(&source, "/stamp.txt").expect("stat override");
+    assert_eq!(attr.mtime.sec, 1_600_000_000);
+    assert_eq!(attr.mtime.nsec, 42);
 }
 
 #[test]

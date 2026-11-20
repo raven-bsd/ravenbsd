@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Mark this bootstrap as the live-pivot profile: svcd mounts ufs: at `/` instead of
+# /root once the storage stack is up.
+
+[[initfs.files]]
+src = "profiles/qemu-ufs.d/root-mode"
+path = "/etc/raven/root-mode"
+mode = 0o644

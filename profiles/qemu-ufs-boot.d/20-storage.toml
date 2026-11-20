@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K179 storage/network drivers: devd launches every matched virtio function (blk+net)
+# in one boot. blockd serves the virtio-blk UFS root; virtio-net provides nic: for
+# the UFS netd started after the pivot.
+
+[[initfs.programs]]
+package = "raven-pcid"
+path = "/sbin/pcid"
+
+[[initfs.programs]]
+package = "raven-devd"
+path = "/sbin/devd"
+
+[[initfs.programs]]
+package = "virtio-blk"
+path = "/sbin/virtio-blk"
+
+[[initfs.programs]]
+package = "virtio-net"
+path = "/sbin/virtio-net"
+
+[[initfs.programs]]
+package = "raven-blockd"
+path = "/sbin/blockd"
+
+[[initfs.programs]]
+package = "fsd-ufs"
+path = "/sbin/fsd-ufs"
+
+[[initfs.files]]
+src = "etc/services.d/pcid.toml"
+path = "/etc/services.d/pcid.toml"
+
+[[initfs.files]]
+src = "profiles/ufs-demo.d/devd.manifest"
+path = "/etc/services.d/devd.toml"
+
+[[initfs.files]]
+src = "profiles/ufs-demo.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/fsd-ufs.toml"
+path = "/etc/services.d/fsd-ufs.toml"
+
+[[initfs.files]]
+src = "profiles/ufs-demo.d/drivers.conf"
+path = "/etc/drivers.toml"

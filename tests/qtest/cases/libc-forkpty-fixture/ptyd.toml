@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K196: the real pty server for the libc-forkpty case. It is a resident scheme; the one-shot
+# libc client is the case's exit condition.
+
+name = "ptyd"
+exec = "/sbin/ptyd"
+needs = ["logd"]
+provides = ["scheme:pty"]
+readiness = "scheme"
+ready_timeout_ms = 30_000
+restart = "never"
+max_restarts = 0

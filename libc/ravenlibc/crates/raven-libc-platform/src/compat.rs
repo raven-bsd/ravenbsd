@@ -630,9 +630,17 @@ pub fn getdents<B: SysBackend, L: Lock>(
 ) -> Result<usize, Errno> {
     // The file servers return the packed K60 entry format. `readdir` expects the Linux
     // `struct dirent` records (20-byte header, NUL-terminated name, 8-byte reclen), so decode the
-    // server page and re-encode it into the caller's buffer. One server page is at most 4 KiB.
+    // server page and re-encode it into the caller's buffer. Read only what the caller buffer can
+    // represent: a K60 record is 16+name (8-aligned) and a Linux record is 20+name (8-aligned),
+    // so the worst expansion is 4/3 (names 7-8 bytes). Reading 3/4 of the caller buffer keeps the
+    // converted records inside it; the old 4 KiB read advanced the server cursor past records
+    // that did not fit and silently dropped them.
+    if buf.len() < 280 {
+        return Err(Errno::EINVAL);
+    }
+    let raw_len = (buf.len().saturating_mul(3) / 4).clamp(272, 4096);
     let mut raw = [0u8; 4096];
-    let length = platform.read(fd, &mut raw)?;
+    let length = platform.read(fd, &mut raw[..raw_len])?;
     let mut written = 0usize;
     for item in raven_proto_fs::DirEntryIter::new(&raw[..length]) {
         let entry = item.map_err(|_| Errno::EPROTO)?;

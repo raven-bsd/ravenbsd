@@ -173,6 +173,34 @@ pub fn platform_dma_window() -> Option<DmaWindow> {
     None
 }
 
+/// The PL011 GIC interrupt id from the live DTB, or the board fallback.
+///
+/// QEMU `virt` uses a PL011 at `0x0900_0000` and SPI 1 (GIC id 33); the Pi 4 PL011 is at
+/// `0xFE20_1000` and SPI 121 (GIC id 153). AAVMF may expose no DTB, so the base-address
+/// fallback keeps the UEFI virt path working.
+#[must_use]
+pub fn uart_irq(platform: &Platform) -> Option<u32> {
+    // SAFETY: paging published the copied BootInfo during init and it is immutable afterwards.
+    let boot_info = unsafe { &*crate::memory::paging::boot_info_ptr() };
+    if let Some(fdt) = dtb(boot_info.dtb.base, boot_info.dtb.len)
+        && let Some(node) = fdt.find_compatible(&["arm,pl011"])
+        && let Some(value) = node.property("interrupts")
+    {
+        for chunk in value.chunks_exact(12) {
+            if be_u32(chunk, 0) == Some(0)
+                && let Some(number) = be_u32(chunk, 4)
+            {
+                return Some(number.saturating_add(32));
+            }
+        }
+    }
+    match platform.uart {
+        0x0900_0000 => Some(33),
+        0xFE20_1000 => Some(153),
+        _ => None,
+    }
+}
+
 /// The trigger/polarity of one GIC SPI.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SpiRoute {

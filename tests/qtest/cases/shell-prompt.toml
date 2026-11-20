@@ -1,0 +1,138 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K192: bobthefish prompt probes over the shell-test image. One brush script checks the folded
+# path, red status and green branch, plus the plain/NO_COLOR/dumb modes. keep_ansi preserves the
+# literal PS1 escape text so the colour codes are asserted explicitly.
+
+name = "shell-prompt"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 240
+keep_ansi = true
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+unordered = true
+
+[[expect]]
+regex = '^rsh: ready$'
+unordered = true
+
+[[expect]]
+regex = 'plain=raven# '
+
+[[expect]]
+regex = 'plainflag=raven# '
+
+[[expect]]
+regex = 'path=~/w/r/ravenbsd-demos'
+
+[[expect]]
+regex = 'status=1 ~/w/r/ravenbsd-demos'
+
+[[expect]]
+regex = '1;31m'
+
+[[expect]]
+regex = 'branch=/t/repo git:main\*'
+
+[[expect]]
+regex = '1;32m'
+
+[[expect]]
+regex = 'nocolor=root@raven:~/w/r/ravenbsd-demos# '
+
+[[expect]]
+regex = 'dumb=root@raven:~/w/r/ravenbsd-demos# '
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = '''
+cat > /tmp/prompt-probe.sh <<'EOF'
+export HOME=/tmp/h
+mkdir -p /tmp/h/work/ravenos-workspace/ravenbsd-demos
+cd /tmp/h/work/ravenos-workspace/ravenbsd-demos
+. /etc/brush/bobtheshell.sh
+RAVEN_PROMPT=plain; raven_prompt; printf 'plain=%s\n' "$PS1"
+RAVEN_PROMPT=; RAVEN_PLAIN_PROMPT=1; raven_prompt; printf 'plainflag=%s\n' "$PS1"
+RAVEN_PLAIN_PROMPT=0
+raven_prompt; printf 'path=%s\n' "$RAVEN_PROMPT_TEXT"
+false; raven_prompt; printf 'status=%s\n' "$RAVEN_PROMPT_TEXT"; printf 'statusps1=%s\n' "$PS1"
+mkdir -p /tmp/repo; cd /tmp/repo
+git() { case "$1" in rev-parse) echo true;; symbolic-ref) echo main;; status) echo " M";; esac; }
+raven_prompt; printf 'branch=%s\n' "$RAVEN_PROMPT_TEXT"; printf 'branchps1=%s\n' "$PS1"
+cd /tmp/h/work/ravenos-workspace/ravenbsd-demos
+NO_COLOR=1; raven_prompt; printf 'nocolor=%s\n' "$PS1"
+unset NO_COLOR; TERM=dumb; raven_prompt; printf 'dumb=%s\n' "$PS1"
+EOF
+'''
+delay_ms = 300
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --norc /tmp/prompt-probe.sh\n"
+delay_ms = 100
+
+[[step]]
+wait = 'plain=raven# '
+timeout_secs = 60
+
+[[step]]
+wait = 'plainflag=raven# '
+timeout_secs = 60
+
+[[step]]
+wait = 'path=~/w/r/ravenbsd-demos'
+timeout_secs = 60
+
+[[step]]
+wait = 'status=1 ~/w/r/ravenbsd-demos'
+timeout_secs = 60
+
+[[step]]
+wait = '1;31m'
+timeout_secs = 60
+
+[[step]]
+wait = 'branch=/t/repo git:main\*'
+timeout_secs = 60
+
+[[step]]
+wait = '1;32m'
+timeout_secs = 60
+
+[[step]]
+wait = 'nocolor=root@raven:~/w/r/ravenbsd-demos# '
+timeout_secs = 60
+
+[[step]]
+wait = 'dumb=root@raven:~/w/r/ravenbsd-demos# '
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

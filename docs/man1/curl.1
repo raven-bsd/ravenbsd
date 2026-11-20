@@ -1,0 +1,85 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 20, 2026
+.Dt CURL 1
+.Os RavenBSD
+.Sh NAME
+.Nm curl
+.Nd simple HTTP and verified HTTPS fetch
+.Sh SYNOPSIS
+.Nm
+.Op Fl s
+.Op Fl f
+.Op Fl I
+.Op Fl L
+.Op Fl o Ar file
+.Op Fl -max-time Ar seconds
+.Op Fl H Ar "Name: value"
+.Op Fl -cacert Ar file
+.Ar URL
+.Sh DESCRIPTION
+The
+.Nm
+utility performs one bounded HTTP GET for
+.Ar URL .
+The response body is written to standard output unless
+.Fl o
+selects a file.
+.Pp
+The base build is plain HTTP over
+.Xr raven-http 3
+and
+.Xr raven-http-net 3 .
+It does not link C or OpenSSL; an
+.Pa https://
+URL fails with a clear
+.Dv EUNAVAILABLE
+message instead of downloading without verification.
+The optional TLS add-on build links
+.Xr raven-tls 3
+and the owner-approved OpenSSL add-on; it verifies the certificate chain and
+the host name or IP address and never falls back to an unverified connection.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl o Ar file
+Write the response body to
+.Ar file .
+The value
+.Sq -
+means standard output.
+An existing file is overwritten.
+.It Fl s
+Suppress non-body diagnostics.
+.It Fl f
+Treat an HTTP status of 400 or greater as failure.
+.It Fl I
+Print the status line and headers.
+This is a GET whose body is discarded; there is no HEAD method.
+.It Fl L
+Follow up to five redirects.
+Without this option the redirect budget is zero.
+.It Fl -max-time Ar seconds
+Set the total request deadline in seconds.
+The default is 10.
+.It Fl H Ar "Name: value"
+Add one request header.
+Reserved hop-by-hop and host headers are rejected.
+.It Fl -cacert Ar file
+TLS add-on build only: trust exactly this PEM bundle instead of the default
+.Pa /addons/etc/ssl/certs/ca-bundle.pem .
+.El
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2; an HTTP failure selected by
+.Fl f
+exits with status 22.
+.Sh SEE ALSO
+.Xr wget 1
+.Sh STANDARDS
+RavenBSD.
+This is a deliberately small subset, not a GNU curl replacement.
+.Sh HISTORY
+The
+.Nm
+utility first appeared in RavenBSD 0.1.0.

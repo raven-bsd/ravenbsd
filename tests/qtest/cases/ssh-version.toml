@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K200 target smoke: the upstream OpenSSH 10.6p2 sshd runs from a minimal initfs and prints its
+# version. No host key, daemon, login or service claim.
+name = "ssh-version"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+initfs = "build/ssh/x86_64/ssh-version-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+pre = ["sh addons/ssh/build.sh --qtest"]
+
+[[expect]]
+regex = '^OpenSSH_10\.6p2'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|sshd: no hostkeys|No such file'

@@ -114,6 +114,10 @@ pub struct CaseSpec {
     pub boot_cmdline: Option<String>,
     /// Extra QEMU arguments appended after the fixed ones.
     pub qemu_extra: Vec<String>,
+    /// Interface for the case image drive (`ide` or `virtio`); None keeps the default.
+    pub disk_if: Option<String>,
+    /// Format for the case image drive (`raw` or `qcow2`); None means raw.
+    pub disk_format: Option<String>,
     /// Expected exit condition.
     pub expect_exit: ExpectExit,
     /// When set, the case is not executed and reports this reason as `skipped`.
@@ -122,8 +126,12 @@ pub struct CaseSpec {
     pub pre: Vec<String>,
     /// Prebuilt initfs installed instead of the profile's, relative to the working directory.
     pub initfs: Option<String>,
+    /// Prebuilt case image instead of invoking `cargo xtask image`.
+    pub image: Option<String>,
     /// Kernel ELF installed instead of the built kernel (loader test kernels).
     pub loader_kernel: Option<String>,
+    /// Keep ANSI escape sequences in the captured serial lines (explicit colour assertions).
+    pub keep_ansi: bool,
 }
 
 /// A validated case with compiled regexes.
@@ -249,10 +257,25 @@ impl Case {
         {
             bail!("initfs must not be empty");
         }
+        if let Some(image) = &raw.image
+            && image.trim().is_empty()
+        {
+            bail!("image must not be empty");
+        }
         if let Some(kernel) = &raw.loader_kernel
             && kernel.trim().is_empty()
         {
             bail!("loader_kernel must not be empty");
+        }
+        if let Some(disk_if) = &raw.disk_if
+            && !matches!(disk_if.as_str(), "ide" | "virtio")
+        {
+            bail!("disk_if must be `ide` or `virtio`");
+        }
+        if let Some(disk_format) = &raw.disk_format
+            && !matches!(disk_format.as_str(), "raw" | "qcow2")
+        {
+            bail!("disk_format must be `raw` or `qcow2`");
         }
         Ok(Self {
             spec: CaseSpec {
@@ -262,11 +285,15 @@ impl Case {
                 timeout_secs: raw.timeout_secs,
                 boot_cmdline: raw.boot_cmdline,
                 qemu_extra: raw.qemu_extra,
+                disk_if: raw.disk_if,
+                disk_format: raw.disk_format,
                 expect_exit,
                 skip: raw.skip,
                 pre: raw.pre,
                 initfs: raw.initfs,
+                image: raw.image,
                 loader_kernel: raw.loader_kernel,
+                keep_ansi: raw.keep_ansi,
             },
             expects: raw.expect,
             forbids: raw.forbid,
@@ -322,6 +349,10 @@ struct RawCase {
     boot_cmdline: Option<String>,
     #[serde(default)]
     qemu_extra: Vec<String>,
+    #[serde(default)]
+    disk_if: Option<String>,
+    #[serde(default)]
+    disk_format: Option<String>,
     expect_exit: String,
     #[serde(default)]
     skip: Option<String>,
@@ -330,7 +361,11 @@ struct RawCase {
     #[serde(default)]
     initfs: Option<String>,
     #[serde(default)]
+    image: Option<String>,
+    #[serde(default)]
     loader_kernel: Option<String>,
+    #[serde(default)]
+    keep_ansi: bool,
     #[serde(default, rename = "expect")]
     expect: Vec<Expect>,
     #[serde(default, rename = "forbid")]
@@ -637,3 +672,7 @@ regex = '(?i)panic'
         }
     }
 }
+
+#[cfg(test)]
+#[path = "case_ut.rs"]
+mod image_field_tests;

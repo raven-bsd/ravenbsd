@@ -1,0 +1,150 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K176: QEMU UFS-root preflight. The ESP image is the bootstrap; the virtio-blk disk
+# is the real UFS2 root built from the qemu-ufs payload profile. The second boot is
+# the ufs-root-persist case.
+
+name = "ufs-root"
+arch = "x86_64"
+profile = "qemu-ufs"
+timeout_secs = 420
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/x86_64/qemu-ufs-root.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^brush$'
+unordered = true
+
+[[expect]]
+regex = '^ls$'
+unordered = true
+
+[[expect]]
+regex = '^ufs: +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+
+[[expect]]
+regex = '^k176-persist$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|no UFS root device|cannot access|d\?{9}'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/ls -lah /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/ls /bin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/df -h\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/mount\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/ping 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo k176-persist > /persist-marker && cat /persist-marker\n"
+delay_ms = 100
+
+[[step]]
+wait = '^k176-persist$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

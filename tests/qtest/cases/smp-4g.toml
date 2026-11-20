@@ -1,0 +1,151 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S157: release-profile boot at 4 GiB and 4 vCPUs. The extra -m/-smp are appended after the
+# harness defaults, so QEMU uses the last value. This is the interactive smoke; the repeated
+# 5 KVM + 5 TCG boot matrix lives in scripts/smp-4g.sh.
+
+name = "smp-4g"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+pre = ["sh tests/release/check-loader.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-m", "4096",
+    "-smp", "4",
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+unordered = true
+
+[[expect]]
+regex = '^mem: [0-9]+ MiB usable'
+
+[[expect]]
+regex = '^svcd: getty up$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^RavenBSD raven 0\.1 .* x86_64$'
+
+[[expect]]
+regex = '^cat$'
+
+[[expect]]
+regex = '^ls$'
+
+[[expect]]
+regex = '^uname$'
+
+[[expect]]
+regex = '^PID PPID UID GID CMD$'
+
+[[expect]]
+regex = '^[0-9.]+[KMG]?\s+/tmp$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD raven 0\.1 .* x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls /bin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cat$'
+timeout_secs = 30
+
+[[step]]
+wait = '^ls$'
+timeout_secs = 30
+
+[[step]]
+wait = '^uname$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ps --posix\n"
+delay_ms = 100
+
+[[step]]
+wait = '^PID PPID UID GID CMD$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "du /tmp\n"
+delay_ms = 100
+
+[[step]]
+wait = '^[0-9.]+[KMG]?\s+/tmp$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|out of memory|oom|du: .*failed|ps: .*bad service'

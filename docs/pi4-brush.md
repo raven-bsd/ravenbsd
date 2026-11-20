@@ -27,6 +27,44 @@ build/aarch64/uutils/ls: ELF 64-bit LSB executable, ARM aarch64, statically link
 `build/aarch64` source is an AArch64 ELF (`e_machine` 0xb7). It also rejects `build/brush` and
 `build/x86_64/uutils` sources.
 
+### 1a. aarch64 link layout (K169)
+
+The aarch64 brush build now passes a real `-C link-arg=-Txtask/brush-aarch64.ld` and requires the
+script to exist before cargo runs. `userland/linker/aarch64.ld` was evaluated and not used for
+brush: it places `.tbss` after `.data` and does not name the dynamic metadata, so brush's TLS and
+dynamic layout are not guaranteed. The dedicated script maps the program headers (PT_PHDR), keeps
+`.tdata`/`.tbss` contiguous for PT_TLS, names `.dynamic`/`.dyn*`/`.rela.*`, and pads every
+file-backed PT_LOAD tail to 4096. x86_64 keeps `xtask/brush-x86_64.ld`.
+
+`cargo xtask build brush --arch <arch>` now runs the real `raven-elf` Strict planner on the staged
+artifact (fail on `FileTailNotPageAligned`); `--check` re-verifies an existing artifact without
+building. The staging script uses `--check` for the aarch64 artifact and the x86_64 control.
+
+K169 verification (2026-11-19, base `ab651e7e`):
+
+```
+build/aarch64/brush sha256 2fa2d6e7fb262346d86687820342f0161fac5389818f0bb7fb6d18651654b4a0
+build/x86_64/brush  sha256 ff4469b5f12374079cb2b990535b83f3aaacda9f29c7a2c18cff3255a342371e
+
+build/aarch64/brush: Strict plan = Ok(1401)
+build/x86_64/brush:  Strict plan = Ok(1651)
+```
+
+AArch64 LOAD table:
+
+```
+Type Offset   VirtAddr           FileSiz  MemSiz   Flg Align
+LOAD 0x000000 0x0000000000400000 0x458000 0x458000 R E 0x10000
+LOAD 0x458000 0x0000000000858000 0x117000 0x117000 R   0x10000
+LOAD 0x56f000 0x000000000096f000 0x005000 0x005000 RW  0x10000
+LOAD 0x574000 0x0000000000974000 0x000000 0x004020 RW  0x10000
+TLS  0x56f000 0x000000000096f000 0x000308 0x000620 R   0x8
+```
+
+Every file-backed tail ends on a page (0x858000, 0x96f000, 0x974000); the last LOAD is BSS-only
+(`filesz=0`). Entry `0x82c138` lies in the R E LOAD, and PT_PHDR/PT_TLS are present. The staging
+check reports `PASS (16 aarch64 files)` and exercises both Strict plans.
+
 ## 2. Release profile
 
 `profiles/pi4-release.toml` adds the release userspace through `profiles/pi4-release.d/`:

@@ -157,10 +157,12 @@ pub fn replace_image(
         .map_err(|_| Errno::ENOMEM)?;
     to_close.extend_from_slice(close);
     caller.handles.lock().for_each_live(|handle, object, _, _| {
-        if let Object::Pipe(end) = object
-            && end.is_cloexec()
-            && !to_close.contains(&handle)
-        {
+        let cloexec = match object {
+            Object::Pipe(end) => end.is_cloexec(),
+            Object::Duplex(end) => end.is_cloexec(),
+            _ => false,
+        };
+        if cloexec && !to_close.contains(&handle) {
             to_close.push(handle);
         }
     });

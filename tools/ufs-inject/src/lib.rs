@@ -18,6 +18,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
+pub use ufs_core::Timespec;
 use ufs_core::check::{Mode, Report, check};
 use ufs_core::{Attr, BlockIo, FileType, Ino, IoError, MountOptions, SetAttr, Ufs, UfsError};
 
@@ -53,6 +54,8 @@ pub struct PutOptions {
     pub uid: Option<u32>,
     /// Override the host gid.
     pub gid: Option<u32>,
+    /// Override the host modification time.
+    pub mtime: Option<Timespec>,
     /// Create missing parent directories.
     pub parents: bool,
 }
@@ -64,6 +67,8 @@ pub struct SymlinkOptions {
     pub uid: Option<u32>,
     /// Owner gid, default 0.
     pub gid: Option<u32>,
+    /// Modification time, default unchanged.
+    pub mtime: Option<Timespec>,
     /// Create missing parent directories.
     pub parents: bool,
 }
@@ -77,6 +82,8 @@ pub struct MkdirOptions {
     pub uid: Option<u32>,
     /// Owner gid, default 0.
     pub gid: Option<u32>,
+    /// Modification time, default unchanged.
+    pub mtime: Option<Timespec>,
     /// Create missing parent directories.
     pub parents: bool,
 }
@@ -397,15 +404,19 @@ fn parent_and_name<D: BlockIo>(
     Ok((dir, name.to_string()))
 }
 
-fn host_attributes(host: &Path) -> Result<(u16, u32, u32, Vec<u8>), String> {
+fn host_attributes(host: &Path) -> Result<(u16, u32, u32, Timespec, Vec<u8>), String> {
     let metadata =
         fs::metadata(host).map_err(|error| format!("stat {}: {error}", host.display()))?;
     if !metadata.is_file() {
         return Err(format!("{} is not a regular file", host.display()));
     }
     let mode = (metadata.permissions().mode() & 0o7777) as u16;
+    let mtime = Timespec {
+        sec: metadata.mtime(),
+        nsec: u32::try_from(metadata.mtime_nsec()).unwrap_or(0) % 1_000_000_000,
+    };
     let data = fs::read(host).map_err(|error| format!("read {}: {error}", host.display()))?;
-    Ok((mode, metadata.uid(), metadata.gid(), data))
+    Ok((mode, metadata.uid(), metadata.gid(), mtime, data))
 }
 
 fn set_attributes<D: BlockIo>(
@@ -414,6 +425,7 @@ fn set_attributes<D: BlockIo>(
     mode: Option<u16>,
     uid: Option<u32>,
     gid: Option<u32>,
+    mtime: Option<Timespec>,
 ) -> Result<(), String> {
     ufs.setattr(
         ino,
@@ -421,6 +433,7 @@ fn set_attributes<D: BlockIo>(
             mode,
             uid,
             gid,
+            mtime,
             ..SetAttr::default()
         },
     )
@@ -455,10 +468,11 @@ pub fn put(
     dest: &str,
     options: &PutOptions,
 ) -> Result<PutReport, String> {
-    let (host_mode, host_uid, host_gid, data) = host_attributes(host)?;
+    let (host_mode, host_uid, host_gid, host_mtime, data) = host_attributes(host)?;
     let mode = options.mode.unwrap_or(host_mode);
     let uid = options.uid.unwrap_or(host_uid);
     let gid = options.gid.unwrap_or(host_gid);
+    let mtime = options.mtime.unwrap_or(host_mtime);
     let mut ufs = mount_writable(image)?;
     let (parent, name) = parent_and_name(&mut ufs, dest, options.parents)?;
     let existing = match ufs.lookup(parent, name.as_bytes()) {
@@ -490,7 +504,7 @@ pub fn put(
             return Err(format!("short write at {dest}: {written}/{}", data.len()));
         }
     }
-    set_attributes(&mut ufs, ino, Some(mode), Some(uid), Some(gid))?;
+    set_attributes(&mut ufs, ino, Some(mode), Some(uid), Some(gid), Some(mtime))?;
     let _disk = ufs
         .unmount()
         .map_err(|error| format!("unmount {}: {error}", image.path.display()))?;
@@ -543,7 +557,14 @@ pub fn mkdir(image: &Image, path: &str, options: &MkdirOptions) -> Result<Ino, S
             Err(error) => return Err(format!("lookup {path}: {error}")),
         }
     };
-    set_attributes(&mut ufs, ino, Some(mode), Some(uid), Some(gid))?;
+    set_attributes(
+        &mut ufs,
+        ino,
+        Some(mode),
+        Some(uid),
+        Some(gid),
+        options.mtime,
+    )?;
     let _disk = ufs
         .unmount()
         .map_err(|error| format!("unmount {}: {error}", image.path.display()))?;
@@ -591,6 +612,9 @@ pub fn symlink(
     let ino = ufs
         .symlink(parent, name.as_bytes(), target.as_bytes(), uid, gid)
         .map_err(|error| format!("symlink {path}: {error}"))?;
+    if options.mtime.is_some() {
+        set_attributes(&mut ufs, ino, None, None, None, options.mtime)?;
+    }
     let _disk = ufs
         .unmount()
         .map_err(|error| format!("unmount {}: {error}", image.path.display()))?;
@@ -602,6 +626,73 @@ pub fn symlink(
         ));
     }
     Ok(ino)
+}
+
+fn remove_entry<D: BlockIo>(
+    ufs: &mut Ufs<D>,
+    parent: Ino,
+    name: &[u8],
+    path: &str,
+    recursive: bool,
+) -> Result<(), String> {
+    let ino = ufs
+        .lookup(parent, name)
+        .map_err(|error| format!("lookup {path}: {error}"))?;
+    let attr = ufs
+        .getattr(ino)
+        .map_err(|error| format!("stat {path}: {error}"))?;
+    if attr.kind != FileType::Directory {
+        return ufs
+            .unlink(parent, name)
+            .map_err(|error| format!("unlink {path}: {error}"));
+    }
+    if !recursive {
+        return ufs
+            .rmdir(parent, name)
+            .map_err(|error| format!("rmdir {path}: {error}"));
+    }
+    let mut children = Vec::new();
+    ufs.readdir(ino, 0, &mut |entry, _| {
+        if entry.name != b"." && entry.name != b".." {
+            children.push(entry.name.clone());
+        }
+        true
+    })
+    .map_err(|error| format!("readdir {path}: {error}"))?;
+    let base = path.trim_end_matches('/');
+    for child in children {
+        let child_name = String::from_utf8_lossy(&child);
+        let child_path = format!("{base}/{child_name}");
+        remove_entry(ufs, ino, &child, &child_path, true)?;
+    }
+    ufs.rmdir(parent, name)
+        .map_err(|error| format!("rmdir {path}: {error}"))
+}
+
+/// Remove a file, symlink or empty directory; `recursive` removes a directory tree.
+///
+/// # Errors
+/// Returns a message for a missing path, a non-empty directory without `recursive`, a bad path
+/// or a dirty fsck after the removal.
+pub fn remove(image: &Image, path: &str, recursive: bool) -> Result<(), String> {
+    let normalized = normalize(path)?;
+    if normalized == "/" {
+        return Err(String::from("the filesystem root cannot be removed"));
+    }
+    let mut ufs = mount_writable(image)?;
+    let (parent, name) = parent_and_name(&mut ufs, &normalized, false)?;
+    remove_entry(&mut ufs, parent, name.as_bytes(), &normalized, recursive)?;
+    let _disk = ufs
+        .unmount()
+        .map_err(|error| format!("unmount {}: {error}", image.path.display()))?;
+    let report = check_image(image)?;
+    if !report.clean_after {
+        return Err(format!(
+            "fsck after rm is not clean ({} finding(s))",
+            report.findings.len()
+        ));
+    }
+    Ok(())
 }
 
 /// Read a regular file.
@@ -665,6 +756,16 @@ pub fn stat(image: &Image, path: &str) -> Result<Attr, String> {
     Ok(attr)
 }
 
+/// Stat a path without following a final symlink.
+///
+/// # Errors
+/// Returns a message for a missing path.
+pub fn lstat(image: &Image, path: &str) -> Result<Attr, String> {
+    let mut ufs = mount_read_only(image)?;
+    let (_, attr) = resolve_node(&mut ufs, path, false, 0)?;
+    Ok(attr)
+}
+
 /// Run the read-only fsck.
 ///
 /// # Errors
@@ -672,6 +773,19 @@ pub fn stat(image: &Image, path: &str) -> Result<Attr, String> {
 /// successful return with `clean_after == false`.
 pub fn fsck(image: &Image) -> Result<Report, String> {
     check_image(image)
+}
+
+/// Preen the UFS slice in place: repair the checker's normal findings and verify the result.
+///
+/// # Errors
+/// Returns a message when the image cannot be opened or repaired; a report with
+/// `clean_after == false` is returned for findings the checker cannot resolve.
+pub fn repair(image: &Image) -> Result<Report, String> {
+    let mut disk = open_disk(image, true)?;
+    let report = check(&mut disk, Mode::Repair).map_err(|error| format!("fsck repair: {error}"))?;
+    disk.flush()
+        .map_err(|_| format!("flush {}", image.path.display()))?;
+    Ok(report)
 }
 
 /// The four permission bits and type for a `stat` line.

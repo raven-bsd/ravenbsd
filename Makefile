@@ -14,6 +14,8 @@ RELEASE ?= 0
 VERBOSE ?= 0
 SETUP_ARGS ?=
 BASE ?= origin/master
+HELP_SCRIPT ?= scripts/make-help.sh
+HELP_MANIFEST ?= scripts/help.txt
 
 export VERBOSE
 
@@ -24,10 +26,13 @@ XTASK = cargo run -q -p xtask --
 -include .raven-env.mk
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast
+.PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
+	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs
 
 help:
+	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
+
+help-xtask:
 	@$(XTASK) help
 
 setup:
@@ -43,6 +48,11 @@ check:
 # or the working tree. Seconds, not minutes. The full `make check` stays the checkpoint gate.
 check-fast:
 	@$(XTASK) check --fast --changed
+
+# Host-only UFS image/partition updater proof: GPT/ESP+UFS, put/rm/mkdir/sync,
+# fsck and the safety refusals. No board and no whole-image copy.
+ufs-selftest:
+	@sh scripts/raven-ufs-selftest.sh
 
 # Full allocator stress gate: the 1M-op model runs are ignored by the routine
 # `cargo test` in `check` and are executed here, at merge/release time.
@@ -89,6 +99,10 @@ release:
 
 image:
 	@$(XTASK) image --arch $(ARCH) --platform $(PLATFORM) --profile $(PROFILE)
+
+# K176: QEMU UFS-root preflight (ESP bootstrap + a real UFS2 root disk).
+qemu-ufs:
+	@sh scripts/qemu-ufs.sh
 
 run:
 	@$(XTASK) run --arch $(ARCH) --profile $(PROFILE)

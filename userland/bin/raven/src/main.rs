@@ -16,12 +16,38 @@
 mod admin;
 
 #[cfg(not(target_os = "none"))]
+mod tui;
+
+#[cfg(not(target_os = "none"))]
 fn main() {
+    use std::io::IsTerminal;
+
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    // The login console is the interactive stream on the target; the scheme-backed console can
+    // report `isatty(0) == false` even though the interactive login profile is active, so the
+    // profile marker is the fallback. `brush -c` does not load the profile, which keeps scripts
+    // on the non-TTY usage path.
+    let is_tty = std::io::stdin().is_terminal()
+        || std::io::stdout().is_terminal()
+        || (cfg!(target_os = "ravenbsd") && std::env::var_os("RAVEN_PROFILE").is_some())
+        || std::env::var_os("RAVEN_TUI").is_some();
+    if let Some(request) = tui::request(&args, is_tty) {
+        #[cfg(target_os = "ravenbsd")]
+        {
+            let mut output = Console;
+            std::process::exit(tui::run(&mut output, &request));
+        }
+        #[cfg(not(target_os = "ravenbsd"))]
+        {
+            let mut output = std::io::stdout();
+            std::process::exit(tui::run(&mut output, &request));
+        }
+    }
+
     #[cfg(target_os = "ravenbsd")]
     {
         // The std runtime points an unconnected stdout/stderr at `/dev/null`; write through the
         // kernel debug console instead, exactly like the no_std userland programs.
-        let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
         let mut stdout = Console;
         let mut stderr = Console;
         if let Some(code) = admin::dispatch(&args, &mut stdout, &mut stderr) {
@@ -30,7 +56,7 @@ fn main() {
         let mut io = raven_cli::Io {
             stdout: &mut stdout,
             stderr: &mut stderr,
-            is_tty: false,
+            is_tty,
             no_color: true,
         };
         let exit = raven_cli::run(args, &mut io);
@@ -39,17 +65,15 @@ fn main() {
 
     #[cfg(not(target_os = "ravenbsd"))]
     {
-        use std::io::IsTerminal;
-
         let mut stdout = std::io::stdout();
         let mut stderr = std::io::stderr();
         let mut io = raven_cli::Io {
             stdout: &mut stdout,
             stderr: &mut stderr,
-            is_tty: std::io::stdout().is_terminal(),
+            is_tty,
             no_color: std::env::var_os("NO_COLOR").is_some(),
         };
-        let exit = raven_cli::run(std::env::args_os().skip(1), &mut io);
+        let exit = raven_cli::run(args, &mut io);
         std::process::exit(exit.code());
     }
 }

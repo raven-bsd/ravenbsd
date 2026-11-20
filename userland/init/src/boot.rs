@@ -6,7 +6,7 @@
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::types::clock;
@@ -17,8 +17,8 @@ use raven_rt::spawn::{RtSys, SpawnError, SpawnOptions, Sys};
 use raven_rt::sync::Mutex;
 use raven_scheme::Server;
 use raven_svc_manifest::{
-    GraphError, Manifest, Overrides, ParseError, ParseErrorKind, UnknownService, apply_overrides,
-    parse_overrides,
+    GraphError, Manifest, Overrides, ParseError, ParseErrorKind, Restart, UnknownService,
+    apply_overrides, parse_overrides,
 };
 
 use crate::config::{self, Config};
@@ -33,6 +33,8 @@ static CORE: Mutex<Option<Arc<Mutex<Core>>>> = Mutex::new(None);
 static SERVER: Mutex<Option<Server>> = Mutex::new(None);
 /// Fallback clock counter when `CLOCK_MONOTONIC` is unavailable.
 static FALLBACK_MS: AtomicU64 = AtomicU64::new(0);
+/// True after a successful root pivot: merged root services execute from `/`, not `/root`.
+static ROOT_PIVOTED: AtomicBool = AtomicBool::new(false);
 
 /// State shared by the boot thread, workers and the `svc:` server.
 pub(crate) struct Core {
@@ -42,6 +44,8 @@ pub(crate) struct Core {
     pub(crate) pending_starts: Vec<StartRequest>,
     pub(crate) pending_terminations: Vec<Handle>,
     pub(crate) all_up_printed: bool,
+    /// True when the image asks for the per-service timing diagnostics.
+    pub(crate) verbose: bool,
     /// The health record read from the UFS root, when the image carries one.
     pub(crate) health: Option<Health>,
     /// True once the marker write has been attempted for this boot.
@@ -140,6 +144,7 @@ pub fn run() -> i32 {
             .any(|service| service.name == *name)
     });
     let root_exec = alloc::vec![false; supervisor.len()];
+    let verbose = boot_timing_enabled(&initfs);
     let core = Arc::new(Mutex::new(Core {
         supervisor,
         config,
@@ -147,6 +152,7 @@ pub fn run() -> i32 {
         pending_starts: Vec::new(),
         pending_terminations: Vec::new(),
         all_up_printed: false,
+        verbose,
         health: None,
         health_written: false,
         root_exec,
@@ -187,20 +193,32 @@ pub fn run() -> i32 {
         if let Some(code) = run_waves(&core, Some(&selected), false, false) {
             return code;
         }
-        match activate_root(&core) {
-            Ok(()) => {
-                core.lock().health = read_root_health();
+        if pivot_requested() {
+            match activate_pivot_root(&core) {
+                Ok(()) => {
+                    core.lock().health = read_health_at("");
+                }
+                Err(reason) => {
+                    raven_rt::println!("svcd: root pivot: {reason}; staying on the initfs");
+                }
             }
-            Err(reason) => {
-                raven_rt::println!("svcd: root: {reason}; starting the initfs plan");
+        } else {
+            match activate_root(&core) {
+                Ok(()) => {
+                    core.lock().health = read_health_at("/root");
+                }
+                Err(reason) => {
+                    raven_rt::println!("svcd: root: {reason}; starting the initfs plan");
+                }
             }
         }
         // Root one-shot services read through vfsd; start them one at a time so the shared
-        // file-serving path is not exercised by several new clients at once.
-        if let Some(code) = run_waves(&core, None, true, true) {
+        // file-serving path is not exercised by several new clients at once. The release
+        // getty is deliberately started after that plan so its banner/login is the last line.
+        if let Some(code) = run_full_plan(&core, true, true) {
             return code;
         }
-    } else if let Some(code) = run_waves(&core, None, false, false) {
+    } else if let Some(code) = run_full_plan(&core, false, false) {
         return code;
     }
 
@@ -324,6 +342,107 @@ fn start_and_wait(core: &Arc<Mutex<Core>>, members: &[usize]) -> Option<i32> {
     }
 }
 
+/// True when the image asks for the per-service timing diagnostics.
+///
+/// `/etc/raven/boot-verbose` enables them explicitly; `/etc/raven/boot-quiet` is staged by the
+/// release profile for the concise default. Images with neither keep the diagnostics used by
+/// the shell/test transcript cases.
+fn boot_timing_enabled(initfs: &Initfs<'_>) -> bool {
+    let verbose = initfs
+        .get("/etc/raven/boot-verbose")
+        .is_some_and(|entry| !entry.data.is_empty() && entry.data != b"0" && entry.data != b"0\n");
+    verbose || initfs.get("/etc/raven/boot-quiet").is_none()
+}
+
+/// Run the full plan with the login service held back until everything else is up.
+///
+/// The getty banner/login is the user-visible last line; printing the concise boot report before
+/// it keeps later service lines from scrolling the prompt away. A getty failure still prints and
+/// still fails the boot.
+fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) -> Option<i32> {
+    let getty = {
+        let guard = core.lock();
+        guard
+            .supervisor
+            .services()
+            .iter()
+            .position(|service| service.name == "getty" && service.enable)
+    };
+    let selected = getty.map(|index| {
+        let mut mask = alloc::vec![true; core.lock().supervisor.len()];
+        if let Some(slot) = mask.get_mut(index) {
+            *slot = false;
+        }
+        mask
+    });
+    if let Some(code) = run_waves(core, selected.as_deref(), only_unstarted, serial) {
+        return Some(code);
+    }
+    if let Some(index) = getty {
+        print_boot_report(core, index);
+        // Keep the lifecycle line the release cases anchor, but print it before the banner so the
+        // prompt remains the final console line.
+        raven_rt::println!("svcd: getty up");
+        core.lock().all_up_printed = true;
+        let generation = { core.lock().supervisor.start(index, now_ms()) };
+        if let Some(generation) = generation {
+            spawn_worker(core, index, generation);
+        }
+    }
+    None
+}
+
+/// Print the concise boot report and the health marker before the login starts.
+fn print_boot_report(core: &Arc<Mutex<Core>>, skip: usize) {
+    let (up, failed) = {
+        let guard = core.lock();
+        let mut up = 0usize;
+        let mut failed = 0usize;
+        for (index, service) in guard.supervisor.services().iter().enumerate() {
+            if !service.enable || index == skip {
+                continue;
+            }
+            let ready = guard
+                .supervisor
+                .runtime()
+                .get(index)
+                .is_some_and(|runtime| {
+                    runtime.state == State::Running
+                        || (service.restart == Restart::Never && !service.required)
+                });
+            if ready {
+                up = up.saturating_add(1);
+            } else {
+                failed = failed.saturating_add(1);
+            }
+        }
+        (up, failed)
+    };
+    if failed == 0 {
+        raven_rt::println!("svcd: all services up");
+    } else {
+        raven_rt::println!("svcd: boot report: {up} up, {failed} failed");
+    }
+    let (health_due, health) = {
+        let mut guard = core.lock();
+        let due =
+            !guard.health_written && guard.health.is_some() && guard.supervisor.health_ready();
+        if due {
+            guard.health_written = true;
+        }
+        (due, guard.health)
+    };
+    if health_due {
+        raven_rt::println!("svcd: required services ready");
+        if let Some(health) = health {
+            match crate::health::mark(health) {
+                Ok(()) => raven_rt::println!("svcd: health marker written"),
+                Err(error) => raven_rt::eprintln!("svcd: health marker: {error}"),
+            }
+        }
+    }
+}
+
 /// Select the bootstrap services and every dependency they need by service name or scheme.
 fn bootstrap_selection(services: &[Manifest]) -> Vec<bool> {
     const SEEDS: &[&str] = &[
@@ -394,12 +513,89 @@ fn plan_text(supervisor: &Supervisor, selected: Option<&[bool]>) -> String {
 }
 
 /// Mount the root filesystem at `/root`, read and merge its service set.
+///
+/// The `blockd -> fsd-ufs -> vfsd` chain can be present without a real root device (the release
+/// QEMU profile). Mounting `ufs:` in that state leaves a dangling `/root`: readdir lists the
+/// mountpoint while lstat fails. Probe the root scheme first, and if a later step fails, unmount
+/// before falling back to the initfs plan so no dangling entry survives.
 fn activate_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
+    // A root-capable image has `/etc/services.d` on the UFS root; activate_root needs it anyway.
+    // A legacy/test image may carry a real UFS tree without a service set: keep the `/root`
+    // mount so the card stays visible, but do not claim a merged root and let the caller start
+    // the initfs plan (the read-only/RW card probes mount the tree themselves). An image with
+    // no `ufs:` scheme at all (the initfs/release image) must not create a broken mount.
+    if let Err(error) = raven_rt::fs::read_dir("ufs:/etc/services.d") {
+        if raven_rt::fs::read_dir("ufs:/").is_err() {
+            return Err(alloc::format!(
+                "/root: no UFS root device ({})",
+                error.description()
+            ));
+        }
+        raven_rt::fs::mount("/root", "ufs:")
+            .map_err(|error| alloc::format!("/root mount failed: {}", error.description()))?;
+        raven_rt::println!("svcd: root mounted at /root");
+        return Err(alloc::format!(
+            "/root: no UFS service set ({})",
+            error.description()
+        ));
+    }
     raven_rt::fs::mount("/root", "ufs:")
         .map_err(|error| alloc::format!("/root mount failed: {}", error.description()))?;
     raven_rt::println!("svcd: root mounted at /root");
-    let services = read_root_services()?;
-    let overrides = read_root_overrides()?;
+    let result = activate_mounted_root(core, "/root");
+    if result.is_err()
+        && let Err(error) = raven_rt::fs::umount("/root")
+    {
+        raven_rt::println!(
+            "svcd: /root: cannot unmount after a failed activation: {}",
+            error.description()
+        );
+    }
+    result
+}
+
+/// True when the bootstrap profile requests the UFS root at `/` instead of `/root`.
+fn pivot_requested() -> bool {
+    match raven_rt::fs::read_to_vec("file:/etc/raven/root-mode") {
+        Ok(bytes) => bytes == b"pivot" || bytes == b"pivot\n",
+        Err(_) => false,
+    }
+}
+
+/// Pivot the namespace root to the UFS root.
+///
+/// The vfsd mount at `/` replaces the initfs root and keeps `/dev`, `/tmp` and every other
+/// non-root mount. The bootstrap services keep their open files; new path resolution (the root
+/// service set, login/getty and the tools) comes from UFS. A failed merge restores the initfs.
+fn activate_pivot_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
+    if let Err(error) = raven_rt::fs::read_dir("ufs:/etc/services.d") {
+        return Err(alloc::format!(
+            "/: no UFS root device ({})",
+            error.description()
+        ));
+    }
+    raven_rt::fs::mount("/", "ufs:")
+        .map_err(|error| alloc::format!("/ pivot mount failed: {}", error.description()))?;
+    ROOT_PIVOTED.store(true, Ordering::Release);
+    raven_rt::println!("svcd: root pivoted to UFS at /");
+    let result = activate_mounted_root(core, "");
+    if result.is_err() {
+        if let Err(error) = raven_rt::fs::mount("/", "initfs:") {
+            raven_rt::println!(
+                "svcd: /: cannot restore the initfs root: {}",
+                error.description()
+            );
+        }
+        ROOT_PIVOTED.store(false, Ordering::Release);
+        return result;
+    }
+    Ok(())
+}
+
+/// Read and merge the mounted root's services. The mount must already have succeeded.
+fn activate_mounted_root(core: &Arc<Mutex<Core>>, root: &str) -> Result<(), String> {
+    let services = read_services_at(root)?;
+    let overrides = read_overrides_at(root)?;
     let root_count = services.len();
     let root_names: Vec<String> = services
         .iter()
@@ -422,9 +618,10 @@ fn activate_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
     Ok(())
 }
 
-fn read_root_services() -> Result<Vec<Manifest>, String> {
-    let entries = raven_rt::fs::read_dir("file:/root/etc/services.d")
-        .map_err(|error| alloc::format!("/root/etc/services.d: {}", error.description()))?;
+fn read_services_at(root: &str) -> Result<Vec<Manifest>, String> {
+    let services_dir = alloc::format!("file:{root}/etc/services.d");
+    let entries = raven_rt::fs::read_dir(&services_dir)
+        .map_err(|error| alloc::format!("{root}/etc/services.d: {}", error.description()))?;
     let mut names: Vec<String> = entries
         .into_iter()
         .map(|entry| entry.name)
@@ -433,14 +630,14 @@ fn read_root_services() -> Result<Vec<Manifest>, String> {
     names.sort();
     let mut services = Vec::new();
     for name in names {
-        let path = alloc::format!("file:/root/etc/services.d/{name}");
+        let path = alloc::format!("file:{root}/etc/services.d/{name}");
         let data = raven_rt::fs::read_to_vec(&path)
             .map_err(|error| alloc::format!("{path}: {}", error.description()))?;
         let text = core::str::from_utf8(&data).map_err(|_| alloc::format!("{path}: not UTF-8"))?;
         match Manifest::parse(text) {
             Ok(manifest) => services.push(manifest),
             Err(error) => raven_rt::println!(
-                "svcd: /root/etc/services.d/{name}: {}",
+                "svcd: {root}/etc/services.d/{name}: {}",
                 describe_parse_error(&error)
             ),
         }
@@ -448,26 +645,29 @@ fn read_root_services() -> Result<Vec<Manifest>, String> {
     Ok(services)
 }
 
-fn read_root_overrides() -> Result<Option<Overrides>, String> {
-    match raven_rt::fs::read_to_vec("file:/root/etc/rc.conf") {
+fn read_overrides_at(root: &str) -> Result<Option<Overrides>, String> {
+    let path = alloc::format!("file:{root}/etc/rc.conf");
+    match raven_rt::fs::read_to_vec(&path) {
         Ok(data) => {
             let text = core::str::from_utf8(&data)
-                .map_err(|_| "/root/etc/rc.conf: not UTF-8".to_string())?;
+                .map_err(|_| alloc::format!("{root}/etc/rc.conf: not UTF-8"))?;
             parse_overrides(text).map(Some).map_err(|error| {
-                alloc::format!("/root/etc/rc.conf: {}", describe_parse_error(&error))
+                alloc::format!("{root}/etc/rc.conf: {}", describe_parse_error(&error))
             })
         }
         Err(raven_abi::errno::Errno::ENOENT) => Ok(None),
-        Err(error) => Err(alloc::format!("/root/etc/rc.conf: {}", error.description())),
+        Err(error) => Err(alloc::format!(
+            "{root}/etc/rc.conf: {}",
+            error.description()
+        )),
     }
 }
 
-/// The health record on the UFS root, read after the root mount.
-const ROOT_HEALTH_PATH: &str = "file:/root/etc/boot-health";
-
-fn read_root_health() -> Option<Health> {
-    match raven_rt::fs::read_to_vec(ROOT_HEALTH_PATH) {
-        Ok(bytes) => parse_health_bytes("/root/etc/boot-health", &bytes),
+/// The health record on the mounted root, read after the mount/pivot.
+fn read_health_at(root: &str) -> Option<Health> {
+    let path = alloc::format!("file:{root}/etc/boot-health");
+    match raven_rt::fs::read_to_vec(&path) {
+        Ok(bytes) => parse_health_bytes(&alloc::format!("{root}/etc/boot-health"), &bytes),
         Err(Errno::ENOENT) => None,
         Err(error) => {
             raven_rt::println!("svcd: /root/etc/boot-health: {}", error.description());
@@ -560,6 +760,11 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
         match notice {
             Notice::Up(index) => {
                 if let Some(service) = guard.supervisor.services().get(*index) {
+                    // The login service is started last; its banner/login must be the final
+                    // console output, so its lifecycle line is part of the boot report instead.
+                    if service.name == "getty" {
+                        continue;
+                    }
                     raven_rt::println!("svcd: {} up", service.name);
                     emit_ready_timing(&guard, *index, "ready_at");
                 }
@@ -585,6 +790,9 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
 /// `^...$`; this diagnostic line follows them and carries the generation, the deadline base and
 /// the spawn, first-poll and finish timestamps in monotonic milliseconds.
 fn emit_ready_timing(guard: &Core, index: usize, finish_label: &str) {
+    if !guard.verbose {
+        return;
+    }
     let Some(service) = guard.supervisor.services().get(index) else {
         return;
     };
@@ -652,7 +860,11 @@ pub(crate) fn spawn_service(manifest: &Manifest, from_root: bool) -> Result<Hand
     let prefixes = namespace_prefixes();
 
     if from_root {
-        let path = alloc::format!("file:/root{}", manifest.exec);
+        let path = if ROOT_PIVOTED.load(Ordering::Acquire) {
+            manifest.exec.to_string()
+        } else {
+            alloc::format!("file:/root{}", manifest.exec)
+        };
         match raven_rt::spawn::read_file_image(&path) {
             Ok(image) => {
                 let mut sys = GrantSys {
@@ -820,6 +1032,7 @@ fn describe_spawn(error: SpawnError) -> String {
         SpawnError::BadElf(error) => alloc::format!("bad ELF: {error:?}"),
         SpawnError::HasInterpreter => "ELF interpreter is not supported".to_string(),
         SpawnError::TooLarge => "image is too large".to_string(),
+        SpawnError::BadCwd => "invalid working directory".to_string(),
         SpawnError::Sys(error) => error.description().to_string(),
     }
 }

@@ -349,13 +349,11 @@ dlinfo DEFERRED(C62): raven-libc-rtld is not merged on carl/libc
 dlopen DEFERRED(C62): raven-libc-rtld is not merged on carl/libc
 dlsym DEFERRED(C62): raven-libc-rtld is not merged on carl/libc
 dlvsym DEFERRED(C62): raven-libc-rtld is not merged on carl/libc
-getifaddrs DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 freeifaddrs DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 if_nametoindex DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 if_indextoname DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 if_nameindex DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 if_freenameindex DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-res_query DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 res_search DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 res_querydomain DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 res_mkquery DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged

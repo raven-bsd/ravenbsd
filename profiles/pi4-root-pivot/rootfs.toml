@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Rootfs spec for the host-backed Pi 4 pivot proof. The programs and files come
+# from the resolved `pi4-root-pivot` profile (the pi4-rootfs release userland);
+# this spec adds the same post-pivot markers as the SD root and uses a smaller
+# 48 MiB image so the fake card fits the emmc2 test backend (64 MiB limit).
+
+size = 50331648
+
+[[files]]
+src = "profiles/pi4-rootfs.d/root.keep"
+path = "/root/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/pi4-rootfs.d/dev.keep"
+path = "/dev/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/pi4-rootfs.d/tmp.keep"
+path = "/tmp/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/pi4-rootfs.d/rootfs-mounts"
+path = "/etc/mounts"
+mode = 0o644
+
+[[files]]
+src = "profiles/pi4-rootfs.d/ufs-root-marker"
+path = "/etc/raven/ufs-root-marker"
+mode = 0o644

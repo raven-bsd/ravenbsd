@@ -24,6 +24,8 @@ pub enum SpawnError {
     HasInterpreter,
     /// The stack image, an address or a file image exceeds its bound.
     TooLarge,
+    /// The child working directory is empty, relative, contains NUL or is too long.
+    BadCwd,
     /// A kernel syscall failed.
     Sys(Errno),
 }
