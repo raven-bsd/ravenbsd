@@ -920,3 +920,12 @@ fn stored_local_port_orders_open_bind_then_options() {
         }))
     ));
 }
+
+#[test]
+fn lazy_socket_binds_and_listens() {
+    let net = net_without_unix(Caps::default());
+    let fd = net.socket(AF_INET, SOCK_STREAM, 0).expect("socket");
+    net.bind(fd, &addr([0, 0, 0, 0], 22)).expect("bind");
+    net.listen(fd, 128).expect("listen");
+    assert!(net.poll_interest(fd).is_ok());
+}
