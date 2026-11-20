@@ -25,6 +25,9 @@ IMAGE = ROOT / "build" / "qtest" / "ssh-login.img"
 OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
 OVMF_VARS = Path("/usr/share/OVMF/OVMF_VARS_4M.fd")
 RUN = ROOT / "build" / "ssh" / "login-test"
+NET = os.environ.get("SSH_LOGIN_NET", "tap")
+SSH_PORT = 22 if NET == "tap" else 2222
+SSH_HOST = "10.0.2.15" if NET == "tap" else "127.0.0.1"
 
 
 def wait_log(path: Path, needle: bytes, timeout: float) -> bool:
@@ -55,12 +58,20 @@ def qemu_boot(index: int) -> subprocess.Popen:
         "-drive", f"if=pflash,format=raw,file={vars_path}",
         "-drive", f"format=raw,file={IMAGE}",
         "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
-        "-nic", "none",
-        "-netdev", "tap,id=n0,ifname=ravendemo0,script=no,downscript=no",
-        "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     ]
+    if NET == "tap":
+        argv += [
+            "-nic", "none",
+            "-netdev", "tap,id=n0,ifname=ravendemo0,script=no,downscript=no",
+            "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+        ]
+    else:
+        argv += [
+            "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22",
+            "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+        ]
     child = subprocess.Popen(argv, cwd=ROOT, start_new_session=True)
-    if not wait_log(log, b"svcd: sshd up", 60):
+    if not wait_log(log, b"svcd: sshd up", 120):
         kill(child)
         raise RuntimeError(f"sshd did not start; serial {log}")
     if not wait_log(log, b"netd: interface eth0 10.0.2.15/24", 10):
@@ -69,15 +80,15 @@ def qemu_boot(index: int) -> subprocess.Popen:
     # The service is spawned before sshd finishes generating keys and binding; wait for TCP 22.
     import socket
 
-    deadline = time.monotonic() + 45
+    deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection(("10.0.2.15", 22), timeout=1):
+            with socket.create_connection((SSH_HOST, SSH_PORT), timeout=1):
                 return child
         except OSError:
             time.sleep(0.5)
     kill(child)
-    raise RuntimeError(f"sshd did not listen on 10.0.2.15:22; serial {log}")
+    raise RuntimeError(f"sshd did not listen on {SSH_HOST}:{SSH_PORT}; serial {log}")
 
 
 def kill(child: subprocess.Popen) -> None:
@@ -97,13 +108,14 @@ def ssh_base() -> list[str]:
         "-o", "PubkeyAuthentication=no",
         "-o", "ConnectTimeout=10",
         "-o", "NumberOfPasswordPrompts=1",
-        "root@10.0.2.15",
+        "-p", str(SSH_PORT),
+        f"root@{SSH_HOST}",
     ]
 
 
 def host_key() -> str:
     result = subprocess.run(
-        ["ssh-keyscan", "-T", "5", "-p", "22", "10.0.2.15"],
+        ["ssh-keyscan", "-T", "5", "-p", str(SSH_PORT), SSH_HOST],
         cwd=ROOT,
         check=False,
         text=True,

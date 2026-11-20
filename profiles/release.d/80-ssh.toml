@@ -41,20 +41,6 @@ src = "profiles/ssh.d/ptyd.toml"
 path = "/etc/services.d/ptyd.toml"
 mode = 0o644
 
-[[initfs.files]]
-src = "profiles/ssh.d/ssh-keygen-rsa.toml"
-path = "/etc/services.d/ssh-keygen-rsa.toml"
-mode = 0o644
-
-[[initfs.files]]
-src = "profiles/ssh.d/ssh-keygen-ecdsa.toml"
-path = "/etc/services.d/ssh-keygen-ecdsa.toml"
-mode = 0o644
-
-[[initfs.files]]
-src = "profiles/ssh.d/ssh-keygen-ed25519.toml"
-path = "/etc/services.d/ssh-keygen-ed25519.toml"
-mode = 0o644
 
 [[initfs.files]]
 src = "profiles/ssh.d/ssh.keep"
