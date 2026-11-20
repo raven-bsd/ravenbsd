@@ -96,16 +96,30 @@ pub fn poll<B: SysBackend, L: Lock>(
     let queue = platform.event_queue()?;
     let backend = platform.backend();
     for (index, handle, events) in &registrations {
-        backend.evq_ctl(
+        let added = backend.evq_ctl(
             queue,
             EVQ_ADD,
             *handle,
             *events,
             u64::try_from(*index).unwrap_or(0),
-        )?;
+        );
+        if let Err(error) = added {
+            let _ = raven_libc_sys::sys::debug_write(
+                alloc::format!("kp:ctl err={}\n", error.0).as_bytes(),
+            );
+            return Err(error);
+        }
     }
     let mut events = [EvqEvent::default(); MAX_POLL_FDS];
     let waited = backend.evq_wait(queue, &mut events, timeout_ns);
+    let _ = raven_libc_sys::sys::debug_write(
+        alloc::format!(
+            "kp:wait ok={} n={}\n",
+            waited.is_ok(),
+            waited.as_ref().map_or(0, |n| *n)
+        )
+        .as_bytes(),
+    );
     for (_, handle, _) in &registrations {
         let _ = backend.evq_ctl(queue, EVQ_DEL, *handle, 0, 0);
     }
