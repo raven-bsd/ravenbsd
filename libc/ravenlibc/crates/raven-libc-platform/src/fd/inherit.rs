@@ -34,6 +34,13 @@ pub const ENTRY_LEN: usize = 18;
 /// No-path marker in `path_off`.
 pub const NO_PATH: u32 = u32::MAX;
 
+/// The environment name used to carry an `FdMap` across `execve`.
+///
+/// `PROC_EXEC` keeps the kernel handle table but replaces the image (and therefore the libc fd
+/// table). The shell serializes the table into this one environment entry; the new image
+/// restores it before its first fd use and then removes the entry.
+pub const ENV_NAME: &[u8] = b"__RAVEN_FDMAP";
+
 /// One inherited descriptor.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FdMapEntry {
@@ -115,6 +122,35 @@ impl FdMap {
         }
         out.extend_from_slice(&strings);
         Ok(out)
+    }
+
+    /// Encode the block as the lowercase hex value of [`Self::encode`].
+    ///
+    /// The environment cannot hold NUL bytes; hex is the one text form both sides use.
+    pub fn encode_env(&self) -> Result<Vec<u8>, Errno> {
+        let bytes = self.encode()?;
+        let mut out = Vec::with_capacity(bytes.len().saturating_mul(2));
+        for byte in bytes {
+            out.push(hex_digit(byte >> 4));
+            out.push(hex_digit(byte & 0x0f));
+        }
+        Ok(out)
+    }
+
+    /// Decode the hex value produced by [`Self::encode_env`].
+    pub fn decode_env(value: &[u8]) -> Result<Self, Errno> {
+        if !value.len().is_multiple_of(2) {
+            return Err(Errno::EINVAL);
+        }
+        let mut bytes = Vec::with_capacity(value.len() / 2);
+        let mut index = 0usize;
+        while index < value.len() {
+            let high = hex_value(*value.get(index).ok_or(Errno::EINVAL)?)?;
+            let low = hex_value(*value.get(index.saturating_add(1)).ok_or(Errno::EINVAL)?)?;
+            bytes.push((high << 4) | low);
+            index = index.saturating_add(2);
+        }
+        Self::decode(&bytes)
     }
 
     /// Decode and validate one complete block.
@@ -206,6 +242,22 @@ pub const fn transferable(kind: OfdKind) -> bool {
 /// A handle reference used when rebuilding a child table.
 pub fn entry_handle(entry: &FdMapEntry) -> Handle {
     Handle(entry.handle)
+}
+
+fn hex_digit(value: u8) -> u8 {
+    match value {
+        0..=9 => b'0' + value,
+        _ => b'a' + value.saturating_sub(10),
+    }
+}
+
+fn hex_value(digit: u8) -> Result<u8, Errno> {
+    match digit {
+        b'0'..=b'9' => Ok(digit.saturating_sub(b'0')),
+        b'a'..=b'f' => Ok(digit.saturating_sub(b'a').saturating_add(10)),
+        b'A'..=b'F' => Ok(digit.saturating_sub(b'A').saturating_add(10)),
+        _ => Err(Errno::EINVAL),
+    }
 }
 
 fn read_u16(bytes: &[u8], offset: usize) -> Option<u16> {

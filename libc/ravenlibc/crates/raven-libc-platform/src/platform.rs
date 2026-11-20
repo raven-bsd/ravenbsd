@@ -21,7 +21,7 @@ use raven_proto_fs::{Call, CallRequest, CallResponse, SetTime, Stat as WireStat}
 
 use crate::backend::SysBackend;
 use crate::fd::fdsan::{Action, FdsanState, Mismatch};
-use crate::fd::inherit::{FdMap, FdMapEntry, transferable};
+use crate::fd::inherit::{ENV_NAME, FdMap, FdMapEntry, transferable};
 use crate::fd::ofd::{OfdArena, OfdKind, OfdRef};
 use crate::fd::table::{FD_CLOEXEC, FdTable};
 use crate::fd::{DEFAULT_HARD_NOFILE, DEFAULT_SOFT_NOFILE};
@@ -1575,6 +1575,57 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             out.push(inherited);
         }
         Ok(FdMap { entries: out })
+    }
+
+    /// Build the `NAME=hex` environment entry that carries the fd table across `execve`.
+    ///
+    /// `PROC_EXEC` keeps the kernel handles in the same process but replaces the image, so the
+    /// new libc starts with an empty table. The environment entry carries the identity mapping
+    /// (`fd -> handle`) that the new image restores before its first fd use. Non-transferable
+    /// kinds and pending socket OFDs without a handle are skipped.
+    pub fn exec_fdmap_env(&self) -> Result<Option<Vec<u8>>, Errno> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        let mut block = FdMap::empty();
+        for (fd, entry) in entries {
+            let ofd = arena.get(entry.ofd).ok_or(Errno::EBADF)?;
+            if !transferable(ofd.kind) || ofd.handle == Handle::NONE {
+                continue;
+            }
+            let mut inherited = FdMapEntry::new(
+                fd,
+                ofd.handle.0,
+                ofd.kind,
+                entry.fd_flags,
+                ofd.status.load(core::sync::atomic::Ordering::Relaxed),
+            );
+            inherited.path = ofd.path.as_ref().map(|path| path.to_vec());
+            block.entries.push(inherited);
+        }
+        if block.entries.is_empty() {
+            return Ok(None);
+        }
+        let value = block.encode_env()?;
+        let mut out =
+            Vec::with_capacity(ENV_NAME.len().saturating_add(1).saturating_add(value.len()));
+        out.extend_from_slice(ENV_NAME);
+        out.push(b'=');
+        out.extend_from_slice(&value);
+        Ok(Some(out))
+    }
+
+    /// Close every descriptor marked `FD_CLOEXEC` after `execve` restored the table.
+    ///
+    /// The kernel keeps handles across exec; only the new libc knows which descriptors carried
+    /// the flag. This runs once during startup, after [`Self::restore_fdmap`].
+    pub fn close_cloexec_fds(&self) -> Result<(), Errno> {
+        let open = self.fd.borrow().open_entries();
+        for (fd, entry) in open {
+            if entry.cloexec() {
+                let _ = self.close(fd);
+            }
+        }
+        Ok(())
     }
 
     /// Rebuild the table from an inheritance block whose handles are already valid in this

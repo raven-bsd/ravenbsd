@@ -147,20 +147,46 @@ fn apply_startup(platform: &Platform<RealSys, ShellLock>) {
 fn restore_inherited_fds(platform: &Platform<RealSys, ShellLock>) {
     let pointer = STARTUP_FDMAP.load(Ordering::Acquire);
     let count = STARTUP_FDMAP_N.load(Ordering::Acquire);
-    if pointer == 0 || count == 0 || count > 1024 {
+    if pointer != 0 && count != 0 && count <= 1024 {
+        let Some(len) = ENTRY_LEN
+            .checked_mul(count)
+            .and_then(|entries| entries.checked_add(HEADER_LEN))
+        else {
+            return;
+        };
+        // SAFETY: the start recorded the spawner-mapped header+entry block; it is mapped for the
+        // lifetime of the process and the bounds are the decoded count.
+        let bytes = unsafe { core::slice::from_raw_parts(pointer as *const u8, len) };
+        if let Ok(block) = FdMap::decode(bytes) {
+            let _ = platform.restore_fdmap(&block);
+        }
         return;
     }
-    let Some(len) = ENTRY_LEN
-        .checked_mul(count)
-        .and_then(|entries| entries.checked_add(HEADER_LEN))
-    else {
-        return;
-    };
-    // SAFETY: the start recorded the spawner-mapped header+entry block; it is mapped for the
-    // lifetime of the process and the bounds are the decoded count.
-    let bytes = unsafe { core::slice::from_raw_parts(pointer as *const u8, len) };
-    if let Ok(block) = FdMap::decode(bytes) {
-        let _ = platform.restore_fdmap(&block);
+    restore_exec_fdmap(platform);
+}
+
+/// Restore the fd table that `execve` serialized into [`ENV_NAME`].
+///
+/// The kernel keeps the handles across `exec`; the environment entry carries the identity
+/// `fd -> handle` mapping. `FD_CLOEXEC` entries are restored with their flag and then closed so
+/// the new image never observes them.
+fn restore_exec_fdmap(platform: &Platform<RealSys, ShellLock>) {
+    #[cfg(not(target_os = "none"))]
+    {
+        let _ = platform;
+    }
+    #[cfg(target_os = "none")]
+    {
+        let name = raven_libc_platform::fd::inherit::ENV_NAME;
+        let Some(value) = crate::stdlib::env_support::get(name) else {
+            return;
+        };
+        if let Ok(block) = FdMap::decode_env(value)
+            && platform.restore_fdmap(&block).is_ok()
+        {
+            let _ = platform.close_cloexec_fds();
+        }
+        let _ = crate::stdlib::env_support::unset(name);
     }
 }
 
