@@ -6,7 +6,7 @@
 # fetches it with curl and wget, writes the same bytes with -o/-O, sees a 404 and curl -f
 # failure, and follows the redirect. No external network and no panel/hardware claim.
 #
-# The release client tools come from K199; the case is skipped until that ticket lands.
+# The release client tools come from K199 (curl/wget staged at /bin by profiles/shell.d).
 
 name = "eink-insult"
 arch = "x86_64"
@@ -20,7 +20,6 @@ qemu_extra = [
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
 expect_exit = "success"
-skip = "needs K199 curl/wget in the release image"
 
 [[expect]]
 regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
@@ -47,7 +46,10 @@ regex = '^Your shell is so slow it still waits for the loader\.$'
 regex = '^cmp-ok$'
 
 [[expect]]
-regex = '^404$'
+regex = '^HTTP/1\.1 404 Not Found'
+
+[[expect]]
+regex = '^curl-missing:0$'
 
 [[expect]]
 regex = '^curl-f:22$'
@@ -146,11 +148,15 @@ wait = '^raven# $'
 timeout_secs = 10
 
 [[step]]
-send = "curl -s -o /dev/null -w '%{http_code}\\n' http://10.0.2.2:18081/missing\n"
+send = "curl -s -I http://10.0.2.2:18081/missing; echo curl-missing:$?\n"
 delay_ms = 100
 
 [[step]]
-wait = '^404$'
+wait = '^HTTP/1\.1 404 Not Found'
+timeout_secs = 10
+
+[[step]]
+wait = '^curl-missing:0$'
 timeout_secs = 10
 
 [[step]]
