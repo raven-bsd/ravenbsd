@@ -124,6 +124,8 @@ pub struct CaseSpec {
     pub initfs: Option<String>,
     /// Kernel ELF installed instead of the built kernel (loader test kernels).
     pub loader_kernel: Option<String>,
+    /// Keep ANSI escape sequences in the captured serial lines (explicit colour assertions).
+    pub keep_ansi: bool,
 }
 
 /// A validated case with compiled regexes.
@@ -267,6 +269,7 @@ impl Case {
                 pre: raw.pre,
                 initfs: raw.initfs,
                 loader_kernel: raw.loader_kernel,
+                keep_ansi: raw.keep_ansi,
             },
             expects: raw.expect,
             forbids: raw.forbid,
@@ -331,6 +334,8 @@ struct RawCase {
     initfs: Option<String>,
     #[serde(default)]
     loader_kernel: Option<String>,
+    #[serde(default)]
+    keep_ansi: bool,
     #[serde(default, rename = "expect")]
     expect: Vec<Expect>,
     #[serde(default, rename = "forbid")]

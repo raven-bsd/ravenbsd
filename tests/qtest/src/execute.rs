@@ -193,6 +193,7 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
         program,
         args,
         timeout,
+        keep_ansi: case.spec.keep_ansi,
     };
     // Only real QEMU runs need the incremental evidence log; fake `--runner` tests stay
     // side-effect free.
