@@ -49,6 +49,7 @@ mod event;
 mod icmp_stack;
 mod ipv4_stack;
 mod ipv6_stack;
+mod isn;
 mod listen;
 mod neighbor;
 mod observability;
@@ -85,6 +86,7 @@ pub use ipv6_stack::{
     IpAddr, Ipv6Addr, Ipv6AddressState, Ipv6Cidr, Ipv6Config, Neighbor6Cache, Neighbor6Entry,
     Neighbor6State,
 };
+pub use isn::{IsnConn, IsnEntropy, IsnState};
 pub use listen::{AcceptQueue, HalfOpen, HalfOpenQueue, IsnGenerator, ListenStats, SynCookie};
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use observability::{
