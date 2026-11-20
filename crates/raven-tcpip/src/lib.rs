@@ -44,6 +44,7 @@ mod cc;
 mod device;
 mod dhcp;
 mod dhcp_stack;
+mod ecn;
 mod event;
 mod icmp_stack;
 mod ipv4_stack;
@@ -67,6 +68,7 @@ mod stack;
 mod table;
 mod tcp_data;
 mod tcp_state;
+mod tcp_timer;
 mod time;
 mod udp_stack;
 
