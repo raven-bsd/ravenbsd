@@ -974,6 +974,7 @@ RAVEN_1.0 {
 		ctime;
 		difftime;
 		getdate;
+		getitimer;
 		gettimeofday;
 		gmtime;
 		gmtime_r;
@@ -981,6 +982,7 @@ RAVEN_1.0 {
 		localtime_r;
 		mktime;
 		nanosleep;
+		setitimer;
 		stime;
 		strftime;
 		strftime_l;
@@ -1269,6 +1271,7 @@ RAVEN_1.0 {
 		accept4;
 		bind;
 		connect;
+		getpeereid;
 		getpeername;
 		getsockname;
 		getsockopt;

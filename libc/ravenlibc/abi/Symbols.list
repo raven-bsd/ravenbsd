@@ -571,6 +571,7 @@ gethostid
 gethostname
 getifaddrs
 getisax
+getitimer
 getline
 getlogin
 getlogin_r
@@ -589,6 +590,7 @@ getopt_long_only
 getpagesize
 getpayload
 getpayloadf
+getpeereid
 getpeername
 getpgid
 getpgrp
@@ -1304,6 +1306,7 @@ setgroupent
 setgroups
 sethostent
 sethostname
+setitimer
 setjmp
 setlinebuf
 setlocale

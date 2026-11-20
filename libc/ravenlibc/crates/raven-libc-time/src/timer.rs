@@ -138,7 +138,7 @@ pub struct TimerTable {
 impl TimerTable {
     /// Create a table with at most `max` live timers.
     #[must_use]
-    pub fn new(max: usize) -> Self {
+    pub const fn new(max: usize) -> Self {
         Self {
             slots: Vec::new(),
             max,

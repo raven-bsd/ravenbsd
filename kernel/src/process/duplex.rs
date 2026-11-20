@@ -22,12 +22,15 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use raven_abi::errno::Errno;
+use raven_abi::types::Rights;
+use raven_handles::LineageNode;
 use raven_usercopy::UserSlice;
 use spin::Mutex;
 
 use crate::event;
 use crate::event::evq_core::{HUP, READABLE, WRITABLE};
 use crate::process;
+use crate::process::handle::Object;
 use crate::process::pipe::ring;
 use crate::sched;
 use crate::sched::wait::WaitQueue;
@@ -48,6 +51,14 @@ pub const DUPLEX_DATAGRAM: u32 = 1;
 pub const O_NONBLOCK: u32 = 0o4000;
 /// Close-on-exec endpoint flag (recorded for the future exec sweep).
 pub const O_CLOEXEC: u32 = 0o2000000;
+/// `MSG_NOSIGNAL`: suppress the `SIGPIPE` queue on `EPIPE` for one send.
+pub const DUPLEX_MSG_NOSIGNAL: u32 = 0x4000;
+/// Maximum handles in one control message.
+pub const DUPLEX_MAX_HANDLES: usize = 16;
+/// Maximum pending control messages per direction.
+pub const DUPLEX_CONTROL_QUEUE_MAX: usize = 64;
+/// Maximum control bytes accepted from one send.
+pub const DUPLEX_CONTROL_MAX: usize = 256;
 
 /// `shutdown(SHUT_RD)`.
 pub const SHUT_RD: u8 = 0;
@@ -85,6 +96,86 @@ impl Side {
     }
 }
 
+/// Kernel-stamped identity of the process that created the pair.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PeerCredentials {
+    /// Process id.
+    pub pid: u64,
+    /// Real user id at creation.
+    pub uid: u32,
+    /// Real group id at creation.
+    pub gid: u32,
+}
+
+/// One handle carried by an `SCM_RIGHTS` control message, waiting for the receiver.
+pub(crate) struct PendingHandle {
+    pub(crate) object: Object,
+    pub(crate) rights: Rights,
+    pub(crate) lineage: Arc<LineageNode>,
+}
+
+impl PendingHandle {
+    pub(crate) fn new(object: Object, rights: Rights, lineage: Arc<LineageNode>) -> Self {
+        Self {
+            object,
+            rights,
+            lineage,
+        }
+    }
+}
+
+struct ControlMessage {
+    /// Stream byte offset this ancillary record is attached to.
+    offset: u64,
+    handles: Vec<PendingHandle>,
+}
+
+struct StreamBuffer {
+    ring: ring::Ring,
+    /// Total bytes written into the ring by the sender.
+    written: u64,
+    /// Total bytes consumed by the receiver.
+    read: u64,
+    controls: VecDeque<ControlMessage>,
+}
+
+impl StreamBuffer {
+    fn control_ready(&self) -> bool {
+        self.controls
+            .front()
+            .is_some_and(|control| control.offset <= self.read)
+    }
+
+    fn control_full(&self) -> bool {
+        self.controls.len() >= DUPLEX_CONTROL_QUEUE_MAX
+    }
+
+    fn discard_controls_at_read(&mut self) {
+        while self
+            .controls
+            .front()
+            .is_some_and(|control| control.offset <= self.read)
+        {
+            let _ = self.controls.pop_front();
+        }
+    }
+
+    fn discard_controls_before_read(&mut self) {
+        while self
+            .controls
+            .front()
+            .is_some_and(|control| control.offset < self.read)
+        {
+            let _ = self.controls.pop_front();
+        }
+    }
+}
+
+struct DatagramMessage {
+    data: Vec<u8>,
+    handles: Vec<PendingHandle>,
+}
+
 /// One handle to a duplex endpoint.
 pub struct DuplexEnd {
     pair: Arc<Duplex>,
@@ -117,6 +208,11 @@ impl DuplexEnd {
     /// True when both handles belong to the same pair.
     pub fn same_pair(&self, other: &DuplexEnd) -> bool {
         Arc::ptr_eq(&self.pair, &other.pair)
+    }
+
+    /// Kernel-stamped credentials of the process that created the pair.
+    pub fn credentials(&self) -> PeerCredentials {
+        self.pair.peer
     }
 
     /// Mark both sides closed and wake every waiter.
@@ -187,6 +283,7 @@ impl Drop for DuplexEnd {
 
 struct Duplex {
     id: u64,
+    peer: PeerCredentials,
     state: Mutex<DuplexState>,
     left_readers: WaitQueue,
     left_writers: WaitQueue,
@@ -304,7 +401,7 @@ impl DuplexState {
 }
 
 enum Buffer {
-    Stream(ring::Ring),
+    Stream(StreamBuffer),
     Datagram(DatagramBuffer),
 }
 
@@ -316,20 +413,46 @@ impl Buffer {
                 bytes: 0,
             }))
         } else {
-            ring::Ring::pipe().map(Self::Stream).ok_or(Errno::ENOMEM)
+            let ring = ring::Ring::pipe().ok_or(Errno::ENOMEM)?;
+            Ok(Self::Stream(StreamBuffer {
+                ring,
+                written: 0,
+                read: 0,
+                controls: VecDeque::new(),
+            }))
         }
     }
 
     fn is_empty(&self) -> bool {
         match self {
-            Self::Stream(ring) => ring.is_empty(),
+            Self::Stream(buffer) => buffer.ring.is_empty() && buffer.controls.is_empty(),
             Self::Datagram(queue) => queue.queue.is_empty(),
+        }
+    }
+
+    fn data_empty(&self) -> bool {
+        match self {
+            Self::Stream(buffer) => buffer.ring.is_empty(),
+            Self::Datagram(queue) => queue.queue.is_empty(),
+        }
+    }
+
+    fn control_ready(&self) -> bool {
+        match self {
+            Self::Stream(buffer) => buffer.control_ready(),
+            Self::Datagram(_) => false,
+        }
+    }
+
+    fn discard_controls_at_read(&mut self) {
+        if let Self::Stream(buffer) = self {
+            buffer.discard_controls_at_read();
         }
     }
 
     fn writable(&self) -> bool {
         match self {
-            Self::Stream(ring) => ring.free() != 0,
+            Self::Stream(buffer) => buffer.ring.free() != 0,
             Self::Datagram(queue) => {
                 queue.queue.len() < DUPLEX_DATAGRAM_MAX_MESSAGES
                     && queue.bytes < DUPLEX_DATAGRAM_CAPACITY
@@ -349,7 +472,7 @@ impl Buffer {
 }
 
 struct DatagramBuffer {
-    queue: VecDeque<Vec<u8>>,
+    queue: VecDeque<DatagramMessage>,
     bytes: usize,
 }
 
@@ -365,8 +488,17 @@ pub fn create(flags: u32) -> Result<(Arc<DuplexEnd>, Arc<DuplexEnd>), Errno> {
     let left_to_right = Buffer::new(datagram)?;
     let right_to_left = Buffer::new(datagram)?;
     let id = NEXT_DUPLEX_ID.fetch_add(1, Ordering::Relaxed);
+    let peer = process::current().map_or(PeerCredentials::default(), |caller| {
+        let ids = caller.ids.lock();
+        PeerCredentials {
+            pid: caller.id,
+            uid: ids.uid,
+            gid: ids.gid,
+        }
+    });
     let pair = Arc::new(Duplex {
         id,
+        peer,
         state: Mutex::new(DuplexState {
             left_to_right,
             right_to_left,
@@ -418,7 +550,8 @@ pub fn read(end: &Arc<DuplexEnd>, destination: UserSlice) -> Result<usize, Errno
             return Ok(0);
         }
         let peer = end.side.peer();
-        if state.incoming(end.side).is_empty() {
+        state.incoming_mut(end.side).discard_controls_at_read();
+        if state.incoming(end.side).data_empty() {
             if state.write_shutdown(peer) || state.ends(peer) == 0 {
                 return Ok(0);
             }
@@ -428,7 +561,7 @@ pub fn read(end: &Arc<DuplexEnd>, destination: UserSlice) -> Result<usize, Errno
             drop(state);
             wait(end.pair.readers(end.side), end.pair.id, WAIT_READ, || {
                 let state = end.pair.state.lock();
-                Ok(state.incoming(end.side).is_empty()
+                Ok(state.incoming(end.side).data_empty()
                     && !state.read_shutdown(end.side)
                     && !state.write_shutdown(peer)
                     && state.ends(peer) != 0)
@@ -437,9 +570,10 @@ pub fn read(end: &Arc<DuplexEnd>, destination: UserSlice) -> Result<usize, Errno
         }
         let incoming = state.incoming_mut(end.side);
         let copied = match incoming {
-            Buffer::Stream(ring) => read_stream(ring, destination, limit)?,
+            Buffer::Stream(buffer) => read_stream(buffer, destination, limit)?,
             Buffer::Datagram(buffer) => read_datagram(buffer, destination, limit)?,
         };
+        state.incoming_mut(end.side).discard_controls_at_read();
         drop(state);
         end.pair.wake_writers(peer);
         event::notify_all();
@@ -448,12 +582,12 @@ pub fn read(end: &Arc<DuplexEnd>, destination: UserSlice) -> Result<usize, Errno
 }
 
 fn read_stream(
-    ring: &mut ring::Ring,
+    buffer: &mut StreamBuffer,
     destination: UserSlice,
     limit: usize,
 ) -> Result<usize, Errno> {
-    let want = ring.len().min(limit);
-    let (first, second) = ring.read_parts();
+    let want = buffer.ring.len().min(limit);
+    let (first, second) = buffer.ring.read_parts();
     let first_take = want.min(first.len());
     if let Some(bytes) = first.get(..first_take) {
         copy_out(destination.address(), bytes)?;
@@ -468,7 +602,8 @@ fn read_stream(
         )?;
     }
     let copied = first_take.saturating_add(second_take);
-    ring.consume(copied);
+    buffer.ring.consume(copied);
+    buffer.read = buffer.read.saturating_add(copied as u64);
     Ok(copied)
 }
 
@@ -480,15 +615,107 @@ fn read_datagram(
     let Some(message) = buffer.queue.front() else {
         return Ok(0);
     };
-    let copied = message.len().min(limit);
-    if let Some(bytes) = message.get(..copied) {
+    let copied = message.data.len().min(limit);
+    if let Some(bytes) = message.data.get(..copied) {
         copy_out(destination.address(), bytes)?;
     }
-    let length = message.len();
+    let length = message.data.len();
     if buffer.queue.pop_front().is_some() {
         buffer.bytes = buffer.bytes.saturating_sub(length);
     }
     Ok(copied)
+}
+
+/// Receive one chunk or datagram plus any attached `SCM_RIGHTS` handles.
+///
+/// The control capacity is checked before consuming data or handles. A too-small buffer
+/// returns `EMSGSIZE` and leaves the message queued. The returned handles are installed by the
+/// caller after this function returns.
+pub fn recv(
+    end: &Arc<DuplexEnd>,
+    destination: UserSlice,
+    control_capacity: usize,
+) -> Result<(usize, Vec<PendingHandle>), Errno> {
+    let limit = usize::try_from(destination.length()).map_err(|_| Errno::EINVAL)?;
+    loop {
+        let mut state = end.pair.state.lock();
+        if state.read_shutdown(end.side) {
+            return Ok((0, Vec::new()));
+        }
+        let peer = end.side.peer();
+        if let Buffer::Stream(buffer) = state.incoming_mut(end.side) {
+            buffer.discard_controls_before_read();
+        }
+        let data_empty = state.incoming(end.side).data_empty();
+        let control_ready = state.incoming(end.side).control_ready();
+        if data_empty && !control_ready {
+            if state.write_shutdown(peer) || state.ends(peer) == 0 {
+                return Ok((0, Vec::new()));
+            }
+            if end.nonblock {
+                return Err(Errno::EAGAIN);
+            }
+            drop(state);
+            wait(end.pair.readers(end.side), end.pair.id, WAIT_READ, || {
+                let state = end.pair.state.lock();
+                Ok(state.incoming(end.side).data_empty()
+                    && !state.incoming(end.side).control_ready()
+                    && !state.read_shutdown(end.side)
+                    && !state.write_shutdown(peer)
+                    && state.ends(peer) != 0)
+            })?;
+            continue;
+        }
+        let (copied, handles) = match state.incoming_mut(end.side) {
+            Buffer::Stream(buffer) => {
+                if buffer.control_ready() {
+                    let needed = buffer
+                        .controls
+                        .front()
+                        .map_or(0, |control| control_size(control.handles.len()));
+                    if control_capacity < needed {
+                        return Err(Errno::EMSGSIZE);
+                    }
+                    let copied = read_stream(buffer, destination, limit)?;
+                    let control = buffer.controls.pop_front().ok_or(Errno::EINVAL)?;
+                    (copied, control.handles)
+                } else {
+                    (read_stream(buffer, destination, limit)?, Vec::new())
+                }
+            }
+            Buffer::Datagram(buffer) => {
+                let Some(message) = buffer.queue.front() else {
+                    return Err(Errno::EINVAL);
+                };
+                let needed = control_size(message.handles.len());
+                if control_capacity < needed {
+                    return Err(Errno::EMSGSIZE);
+                }
+                let copied = message.data.len().min(limit);
+                if let Some(bytes) = message.data.get(..copied) {
+                    copy_out(destination.address(), bytes)?;
+                }
+                let length = message.data.len();
+                let Some(message) = buffer.queue.pop_front() else {
+                    return Err(Errno::EINVAL);
+                };
+                buffer.bytes = buffer.bytes.saturating_sub(length);
+                (copied, message.handles)
+            }
+        };
+        drop(state);
+        end.pair.wake_writers(peer);
+        event::notify_all();
+        return Ok((copied, handles));
+    }
+}
+
+fn control_size(handles: usize) -> usize {
+    if handles == 0 {
+        0
+    } else {
+        16usize.saturating_add(handles.saturating_mul(4))
+    }
 }
 
 /// Write one buffer to `end`.
@@ -497,31 +724,59 @@ fn read_datagram(
 /// queues one complete message atomically. A write after local write shutdown, peer read shutdown
 /// or peer close queues `SIGPIPE` and returns `EPIPE`.
 pub fn write(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno> {
-    if source.is_empty() {
-        return Ok(0);
-    }
-    if end.datagram {
-        return write_datagram(end, source);
-    }
-    write_stream(end, source)
+    send(end, source, Vec::new(), 0)
 }
 
-fn write_stream(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno> {
+/// Write `source` with an optional set of `SCM_RIGHTS` handles.
+///
+/// `flags` currently accepts [`DUPLEX_MSG_NOSIGNAL`]; unknown flags are rejected by the syscall
+/// layer. Stream mode attaches the handles to the first byte of this send; a zero-length send is
+/// a control-only record. Datagram mode stores the handles with the one message.
+pub fn send(
+    end: &Arc<DuplexEnd>,
+    source: UserSlice,
+    handles: Vec<PendingHandle>,
+    flags: u32,
+) -> Result<usize, Errno> {
+    if source.is_empty() && handles.is_empty() {
+        return Ok(0);
+    }
+    let signal = flags & DUPLEX_MSG_NOSIGNAL == 0;
+    if end.datagram {
+        write_datagram(end, source, handles, signal)
+    } else {
+        write_stream(end, source, handles, signal)
+    }
+}
+
+fn write_stream(
+    end: &Arc<DuplexEnd>,
+    source: UserSlice,
+    handles: Vec<PendingHandle>,
+    signal: bool,
+) -> Result<usize, Errno> {
     let total = usize::try_from(source.length()).map_err(|_| Errno::EINVAL)?;
+    let mut pending = if handles.is_empty() {
+        None
+    } else {
+        Some(handles)
+    };
     let mut done = 0usize;
     loop {
         let mut state = end.pair.state.lock();
         let peer = end.side.peer();
         if state.write_shutdown(end.side) || state.read_shutdown(peer) || state.ends(peer) == 0 {
             drop(state);
-            raise_sigpipe();
+            raise_sigpipe(signal);
             return Err(Errno::EPIPE);
         }
-        let free = match state.outgoing(end.side) {
-            Buffer::Stream(ring) => ring.free(),
-            Buffer::Datagram(_) => 0,
+        let has_control = pending.is_some();
+        let no_data = done >= total;
+        let (free, control_full) = match state.outgoing(end.side) {
+            Buffer::Stream(buffer) => (buffer.ring.free(), has_control && buffer.control_full()),
+            Buffer::Datagram(_) => return Err(Errno::EINVAL),
         };
-        if free == 0 {
+        if (!no_data && free == 0) || control_full {
             if end.nonblock {
                 return if done == 0 {
                     Err(Errno::EAGAIN)
@@ -532,12 +787,13 @@ fn write_stream(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno>
             drop(state);
             if let Err(error) = wait(end.pair.writers(end.side), end.pair.id, WAIT_WRITE, || {
                 let state = end.pair.state.lock();
-                let outgoing = state.outgoing(end.side);
-                let free = match outgoing {
-                    Buffer::Stream(ring) => ring.free(),
-                    Buffer::Datagram(_) => 0,
+                let (free, control_full) = match state.outgoing(end.side) {
+                    Buffer::Stream(buffer) => {
+                        (buffer.ring.free(), has_control && buffer.control_full())
+                    }
+                    Buffer::Datagram(_) => (0, false),
                 };
-                Ok(free == 0
+                Ok(((!no_data && free == 0) || control_full)
                     && !state.write_shutdown(end.side)
                     && !state.read_shutdown(peer)
                     && state.ends(peer) != 0)
@@ -551,11 +807,21 @@ fn write_stream(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno>
             continue;
         }
         let chunk = total.saturating_sub(done).min(free);
-        let outgoing = state.outgoing_mut(end.side);
-        let copied = match outgoing {
-            Buffer::Stream(ring) => write_stream_ring(ring, source, done, chunk)?,
-            Buffer::Datagram(_) => 0,
+        let buffer = match state.outgoing_mut(end.side) {
+            Buffer::Stream(buffer) => buffer,
+            Buffer::Datagram(_) => return Err(Errno::EINVAL),
         };
+        let offset = buffer.written;
+        let copied = if no_data {
+            0
+        } else {
+            write_stream_ring(buffer, source, done, chunk)?
+        };
+        if let Some(handles) = pending.take() {
+            buffer
+                .controls
+                .push_back(ControlMessage { offset, handles });
+        }
         drop(state);
         end.pair.wake_readers(peer);
         event::notify_all();
@@ -570,12 +836,12 @@ fn write_stream(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno>
 }
 
 fn write_stream_ring(
-    ring: &mut ring::Ring,
+    buffer: &mut StreamBuffer,
     source: UserSlice,
     done: usize,
     chunk: usize,
 ) -> Result<usize, Errno> {
-    let (first, second) = ring.write_parts();
+    let (first, second) = buffer.ring.write_parts();
     let first_take = chunk.min(first.len());
     if let Some(bytes) = first.get_mut(..first_take) {
         copy_in(bytes, source.address().saturating_add(done as u64))?;
@@ -592,28 +858,32 @@ fn write_stream_ring(
         )?;
     }
     let copied = first_take.saturating_add(second_take);
-    ring.produce(copied);
+    buffer.ring.produce(copied);
+    buffer.written = buffer.written.saturating_add(copied as u64);
     Ok(copied)
 }
 
-fn write_datagram(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno> {
+fn write_datagram(
+    end: &Arc<DuplexEnd>,
+    source: UserSlice,
+    handles: Vec<PendingHandle>,
+    signal: bool,
+) -> Result<usize, Errno> {
     let total = usize::try_from(source.length()).map_err(|_| Errno::EINVAL)?;
-    if total > DUPLEX_DATAGRAM_MAX {
+    if total > DUPLEX_DATAGRAM_MAX || handles.len() > DUPLEX_MAX_HANDLES {
         return Err(Errno::EMSGSIZE);
     }
-    let mut message = Vec::new();
-    message
-        .try_reserve_exact(total)
-        .map_err(|_| Errno::ENOMEM)?;
-    message.resize(total, 0);
-    copy_from_user(&mut message, source)?;
-    let mut pending = Some(message);
+    let mut data = Vec::new();
+    data.try_reserve_exact(total).map_err(|_| Errno::ENOMEM)?;
+    data.resize(total, 0);
+    copy_from_user(&mut data, source)?;
+    let mut pending = Some(DatagramMessage { data, handles });
     loop {
         let mut state = end.pair.state.lock();
         let peer = end.side.peer();
         if state.write_shutdown(end.side) || state.read_shutdown(peer) || state.ends(peer) == 0 {
             drop(state);
-            raise_sigpipe();
+            raise_sigpipe(signal);
             return Err(Errno::EPIPE);
         }
         let fits = state.outgoing(end.side).datagram_fits(total);
@@ -635,7 +905,7 @@ fn write_datagram(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errn
             let Some(message) = pending.take() else {
                 return Err(Errno::EINVAL);
             };
-            buffer.bytes = buffer.bytes.saturating_add(message.len());
+            buffer.bytes = buffer.bytes.saturating_add(message.data.len());
             buffer.queue.push_back(message);
         } else {
             return Err(Errno::EINVAL);
@@ -693,9 +963,9 @@ fn copy_in(destination: &mut [u8], address: u64) -> Result<(), Errno> {
     copy_from_user(destination, UserSlice::new(address, length)?)
 }
 
-/// Queue `SIGPIPE` on the calling process.
-fn raise_sigpipe() {
-    if let Some(caller) = process::current() {
+/// Queue `SIGPIPE` on the calling process unless the caller suppressed it.
+fn raise_sigpipe(signal: bool) {
+    if signal && let Some(caller) = process::current() {
         caller.queue_signal(SIGPIPE, 0);
     }
 }

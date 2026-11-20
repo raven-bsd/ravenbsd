@@ -46,6 +46,19 @@ fn relative_overrides_are_anchored_at_the_root() {
 }
 
 #[test]
+fn replace_initfs_file_replaces_one_entry() {
+    let mut builder = raven_initfs::InitfsBuilder::new();
+    builder.add_file("/etc/keep", b"keep", 0o644).unwrap();
+    builder.add_file("/etc/replace", b"old", 0o644).unwrap();
+    let image = builder.build();
+    let replaced = replace_initfs_file(&image, "/etc/replace", b"new", 0o600, 0).expect("replace");
+    let parsed = raven_initfs::Initfs::parse(&replaced).expect("parse");
+    assert_eq!(parsed.get("/etc/keep").unwrap().data, b"keep");
+    assert_eq!(parsed.get("/etc/replace").unwrap().data, b"new");
+    assert_eq!(parsed.get("/etc/replace").unwrap().mode, 0o600);
+}
+
+#[test]
 fn platform_parses_generic_pi4_and_rejects_unknown() {
     assert!(matches!(Platform::parse("generic"), Ok(Platform::Generic)));
     assert!(matches!(Platform::parse("pi4"), Ok(Platform::Pi4)));

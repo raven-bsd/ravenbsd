@@ -29,6 +29,15 @@
 #define FMT_SCALED_STRSIZE 7
 #endif
 
+/* ravenlibc paths.h omits the mail/default-PATH constants that session.c (linked only into
+ * sshd-session) uses. Keep the values in this portability header; no upstream source changes. */
+#ifndef _PATH_MAILDIR
+#define _PATH_MAILDIR "/var/mail"
+#endif
+#ifndef _PATH_STDPATH
+#define _PATH_STDPATH "/usr/bin:/bin:/usr/sbin:/sbin"
+#endif
+
 /* ravenlibc exports these symbols but some public headers do not declare them. */
 void freezero(void *, size_t);
 void arc4random_buf(void *, size_t);

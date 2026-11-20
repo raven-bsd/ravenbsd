@@ -297,8 +297,15 @@ fn prepare_external(
         code: firmware.code,
         vars,
     };
-    let command = qemu::qemu_command(arch, &image, &firmware, &case.spec.qemu_extra)
-        .map_err(PrepareError::Error)?;
+    let command = qemu::qemu_command(
+        arch,
+        &image,
+        &firmware,
+        &case.spec.qemu_extra,
+        case.spec.disk_if.as_deref(),
+        case.spec.disk_format.as_deref(),
+    )
+    .map_err(PrepareError::Error)?;
     Ok(Prepared {
         program: command.program,
         args: command.args,
@@ -319,6 +326,16 @@ fn prepare_image(
             )));
         }
         return Ok(image.clone());
+    }
+    if let Some(image) = &case.spec.image {
+        let path = PathBuf::from(image);
+        if !path.is_file() {
+            return Err(PrepareError::Error(format!(
+                "case image not found: {} (set by `image`; the pre step must build it)",
+                path.display()
+            )));
+        }
+        return Ok(path);
     }
     fs::create_dir_all(&options.out_dir).map_err(|error| {
         PrepareError::Error(format!(

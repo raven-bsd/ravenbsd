@@ -25,6 +25,9 @@ regex = '^duplex: eof_epipe=1 shutdown=1$'
 regex = '^duplex: datagram=1 handles=1 evq=1$'
 
 [[expect]]
+regex = '^duplex: close=1$'
+
+[[expect]]
 regex = '^duplex: ok$'
 
 [[expect]]

@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K206: the real libc socketpair(AF_UNIX) path. The fixture links libc.a and checks both stream
+# directions, EOF after shutdown, EPIPE after a peer close, and SOCK_DGRAM boundaries.
+name = "socketpair"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+initfs = "build/fixtures/socketpair/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+pre = ["sh tests/qtest/cases/socketpair-fixture/build.sh"]
+
+[[expect]]
+regex = '^socketpair: dgram ok$'
+
+[[expect]]
+regex = '^socketpair: shutdown-read ok$'
+
+[[expect]]
+regex = '^socketpair: shutdown-both ok$'
+
+[[expect]]
+regex = '^socketpair: dup ok$'
+
+[[expect]]
+regex = '^socketpair: fork ok$'
+
+[[expect]]
+regex = '^socketpair: close ok$'
+
+[[expect]]
+regex = '^socketpair: a-to-b ok$'
+
+[[expect]]
+regex = '^socketpair: b-to-a ok$'
+
+[[expect]]
+regex = '^socketpair: eof ok$'
+
+[[expect]]
+regex = '^socketpair: peer-close ok$'
+
+[[expect]]
+regex = '^socketpair: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|socketpair: fail'
