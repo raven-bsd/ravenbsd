@@ -11,7 +11,8 @@ pub extern "C" fn dup2(old: c_int, new: c_int) -> c_int {
         let _ = raven_libc_sys::sys::debug_write(
             alloc::format!(
                 "dp2 pid={} old={} new={} ok={} err={}\n",
-                crate::process::getpid(),
+                // SAFETY: the C `getpid` export takes no arguments and reads no memory.
+                unsafe { crate::compat::getpid() },
                 old,
                 new,
                 result.is_ok(),
