@@ -34,10 +34,16 @@ impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
     fn install(&self, s: Option<Sock>, cloexec: bool, nonblock: bool) -> Result<i32, Errno> {
         let status = 2u32 | if nonblock { O_NONBLOCK as u32 } else { 0 };
         match s {
-            Some(sock) => self
-                .platform
-                .install(Handle(sock.0), OfdKind::Socket, status, None, cloexec)
-                .map_err(|error| Errno(error.0)),
+            Some(sock) => {
+                let fd = self
+                    .platform
+                    .install(Handle(sock.0), OfdKind::Socket, status, None, cloexec)
+                    .map_err(|error| Errno(error.0))?;
+                if let Ok(info) = self.resolve(fd) {
+                    self.event(info.ofd, sock);
+                }
+                Ok(fd)
+            }
             None => self
                 .platform
                 .install_pending(OfdKind::Socket, status, None, cloexec)
@@ -46,7 +52,15 @@ impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
     }
 
     fn attach(&self, ofd: u32, s: Sock) {
-        let _ = self.platform.attach_handle(ofd, Handle(s.0));
+        if self.platform.attach_handle(ofd, Handle(s.0)).is_ok() {
+            self.event(ofd, s);
+        }
+    }
+
+    fn event(&self, ofd: u32, s: Sock) {
+        if let Ok(event) = crate::backend_platform::event_handle(self.platform.backend(), s) {
+            let _ = self.platform.set_ofd_event(ofd, event);
+        }
     }
     fn resolve(&self, fd: i32) -> Result<FdInfo, Errno> {
         let reference = self.platform.get(fd).map_err(|error| Errno(error.0))?;

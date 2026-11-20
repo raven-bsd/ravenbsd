@@ -28,6 +28,7 @@ pub const FD_SETSIZE: usize = 1024;
 pub(crate) const EV_READABLE: u32 = 1;
 pub(crate) const EV_WRITABLE: u32 = 2;
 pub(crate) const EV_HUP: u32 = 4;
+pub(crate) const EV_SIGNALED: u32 = 8;
 
 #[cfg(test)]
 #[path = "poll_ut.rs"]

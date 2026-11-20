@@ -14,7 +14,7 @@ use crate::backend::SysBackend;
 use crate::fd::ofd::OfdKind;
 use crate::lock::Lock;
 use crate::platform::Platform;
-use crate::poll::{EV_HUP, EV_READABLE, EV_WRITABLE, MAX_POLL_FDS};
+use crate::poll::{EV_HUP, EV_READABLE, EV_SIGNALED, EV_WRITABLE, MAX_POLL_FDS};
 
 const EVQ_ADD: u32 = 1;
 const EVQ_DEL: u32 = 3;
@@ -60,10 +60,15 @@ pub fn poll<B: SysBackend, L: Lock>(
                 if events & POLLOUT != 0 {
                     wanted |= EV_WRITABLE;
                 }
+                if reference.poll_signaled() {
+                    // A scheme-backed socket reports through its attached notification event,
+                    // not through the data handle's level.
+                    wanted |= EV_SIGNALED;
+                }
                 if wanted == 0 {
                     ready = ready.saturating_add(1);
                 } else {
-                    registrations.push((index, reference.handle(), wanted | EV_HUP));
+                    registrations.push((index, reference.poll_handle(), wanted | EV_HUP));
                 }
             }
             OfdKind::Epoll | OfdKind::Timer | OfdKind::EventFd | OfdKind::ProcessFd => {
@@ -106,7 +111,17 @@ pub fn poll<B: SysBackend, L: Lock>(
     for event in events.iter().take(count) {
         let index = event.cookie as usize;
         if let Some(entry) = fds.get_mut(index) {
+            let requested = i32::from(entry.events);
             let mut revents = 0i16;
+            if event.events & EV_SIGNALED != 0 {
+                // The notification event is level-only: report the caller's requested bits.
+                if requested & (POLLIN | POLLPRI) != 0 {
+                    revents |= POLLIN as i16;
+                }
+                if requested & POLLOUT != 0 {
+                    revents |= POLLOUT as i16;
+                }
+            }
             if event.events & EV_READABLE != 0 {
                 revents |= POLLIN as i16;
             }

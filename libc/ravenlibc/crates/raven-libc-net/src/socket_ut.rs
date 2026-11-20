@@ -154,7 +154,11 @@ fn tcp_client_wire_sequence() {
             WireLog::Call(Call::SetSockOpt {
                 opt: SockOpt::RcvBuf,
                 value: 65_536
-            })
+            }),
+            WireLog::Call(Call::Connect(Endpoint {
+                ip: [10, 0, 0, 2],
+                port: 80
+            }))
         ]
     );
     let mut out = [0u8; 16];
@@ -869,7 +873,11 @@ fn all_wire_options_reach_the_backend_in_call_order() {
             Call::SetSockOpt {
                 opt: SockOpt::TcpNoDelay,
                 value: 1
-            }
+            },
+            Call::Connect(Endpoint {
+                ip: [10, 0, 0, 2],
+                port: 80
+            })
         ]
     );
 }

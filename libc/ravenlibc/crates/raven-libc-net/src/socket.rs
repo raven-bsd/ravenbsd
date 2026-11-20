@@ -163,45 +163,28 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             return Err(Errno::EOPNOTSUPP);
         }
         if !matches!(rec.state, SocketState::Bound | SocketState::Open) {
-            trace(b"kl:state\n");
             return Err(Errno::EINVAL);
         }
-        let local = match rec.local {
-            Some(local) => local,
-            None => {
-                trace(b"kl:nolocal\n");
-                return Err(Errno::EINVAL);
-            }
-        };
+        let local = rec.local.ok_or(Errno::EINVAL)?;
         if local.port == 0 {
-            trace(b"kl:port0\n");
             return Err(Errno::EADDRNOTAVAIL);
         }
         let backlog = clamp_backlog(backlog)?;
         if rec.sock.is_none() {
             let mut buffer = [0u8; 64];
             let path = crate::msg::socket_path(rec.ty, local, &mut buffer)?;
-            let sock = match self.backend.open(path) {
-                Ok(sock) => sock,
-                Err(error) => {
-                    trace(b"kl:open\n");
-                    return Err(error);
-                }
-            };
+            let sock = self.backend.open(path)?;
             self.fds.attach(info.ofd, sock);
             rec.sock = Some(sock);
             if let Err(error) = apply_wire(&self.backend, sock, &mut rec.wire) {
-                trace(b"kl:apply\n");
                 self.backend.close(sock);
                 rec.sock = None;
                 return Err(error);
             }
         }
         let sock = rec.sock.ok_or(Errno::EBADF)?;
-        if let Err(error) = self.backend.call(sock, Call::Listen { backlog }) {
-            trace(b"kl:call\n");
-            return Err(error);
-        }
+        self.backend.call(sock, Call::Listen { backlog })?;
+        self.fds.event(info.ofd, sock);
         rec.state = SocketState::Listening;
         rec.accepting = true;
         Ok(())
@@ -312,6 +295,10 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 rec.sock = None;
                 return Err(error);
             }
+            // Opening `net:tcp/<endpoint>` selects the interface; the scheme still needs the
+            // explicit `CONNECT` that starts the handshake.
+            self.backend.call(sock, Call::Connect(endpoint))?;
+            self.fds.event(info.ofd, sock);
             rec.peer = Some(endpoint);
             rec.state = SocketState::Connected;
             if nonblock || rec.nonblock {
@@ -325,6 +312,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let result = self.backend.call(sock, Call::Connect(endpoint));
         match result {
             Ok(_) => {
+                self.fds.event(info.ofd, sock);
                 rec.peer = Some(endpoint);
                 if nonblock || rec.nonblock {
                     rec.state = SocketState::Connecting;
@@ -334,6 +322,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 Ok(())
             }
             Err(error) if error == Errno::EAGAIN || error == Errno::EINPROGRESS => {
+                self.fds.event(info.ofd, sock);
                 rec.state = SocketState::Connecting;
                 rec.peer = Some(endpoint);
                 if nonblock || rec.nonblock {
@@ -1096,10 +1085,6 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             Err(error) => Err(error),
         }
     }
-}
-
-fn trace(text: &[u8]) {
-    let _ = raven_libc_sys::sys::debug_write(text);
 }
 
 fn validate_proto(ty: i32, proto: i32) -> Result<(), Errno> {

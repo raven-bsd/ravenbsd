@@ -46,6 +46,8 @@ pub enum OfdKind {
 pub struct Ofd {
     /// The kernel handle this OFD owns; `Handle::NONE` until a lazy socket is attached.
     pub handle: Cell<Handle>,
+    /// The notification event a scheme-backed socket uses for `poll` readiness.
+    pub event: Cell<Handle>,
     /// Kind recorded at open time.
     pub kind: OfdKind,
     /// Access mode and the mutable status bits (Linux `F_GETFL` values).
@@ -71,6 +73,7 @@ impl Ofd {
     ) -> Self {
         Self {
             handle: Cell::new(handle),
+            event: Cell::new(Handle::NONE),
             kind,
             status: AtomicU32::new(status),
             refs: AtomicU32::new(1),
@@ -94,6 +97,36 @@ impl Ofd {
         }
         self.handle.set(handle);
         Ok(())
+    }
+
+    /// Attach the notification event that makes a scheme-backed socket pollable.
+    pub fn set_event(&mut self, event: Handle) -> Result<(), raven_abi::errno::Errno> {
+        if event == Handle::NONE {
+            return Err(raven_abi::errno::Errno::EINVAL);
+        }
+        if self.event.get() != Handle::NONE {
+            return Err(raven_abi::errno::Errno::EEXIST);
+        }
+        self.event.set(event);
+        Ok(())
+    }
+
+    /// The handle `poll`/`epoll` should watch.
+    ///
+    /// Scheme-backed sockets watch the attached notification event; every other OFD watches its
+    /// own kernel handle.
+    pub fn poll_handle(&self) -> Handle {
+        let event = self.event.get();
+        if event != Handle::NONE {
+            event
+        } else {
+            self.handle.get()
+        }
+    }
+
+    /// Whether the watched handle is a notification event rather than the data handle.
+    pub fn poll_signaled(&self) -> bool {
+        self.event.get() != Handle::NONE
     }
 
     /// Whether the access mode includes read.
@@ -276,6 +309,20 @@ impl<'a, B: SysBackend, L: Lock> OfdRef<'a, B, L> {
         self.platform.set_ofd_status(self.index, status)
     }
 
+    /// The handle `poll`/`epoll` should watch.
+    ///
+    /// Scheme-backed sockets watch the attached notification event; every other OFD watches its
+    /// own kernel handle.
+    pub fn poll_handle(&self) -> Handle {
+        self.snapshot()
+            .map_or(Handle::NONE, |ofd| ofd.poll_handle())
+    }
+
+    /// Whether the watched handle is a notification event rather than the data handle.
+    pub fn poll_signaled(&self) -> bool {
+        self.snapshot().is_some_and(|ofd| ofd.poll_signaled())
+    }
+
     /// Change the remembered kind (a successful probe caches it).
     pub fn set_kind(&self, kind: OfdKind) {
         self.platform.set_ofd_kind(self.index, kind);
@@ -297,6 +344,7 @@ impl Clone for Ofd {
     fn clone(&self) -> Self {
         Self {
             handle: Cell::new(self.handle.get()),
+            event: Cell::new(self.event.get()),
             kind: self.kind,
             status: AtomicU32::new(self.status.load(Ordering::Relaxed)),
             refs: AtomicU32::new(self.refs.load(Ordering::Relaxed)),

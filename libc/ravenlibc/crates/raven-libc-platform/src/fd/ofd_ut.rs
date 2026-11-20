@@ -80,6 +80,19 @@ fn pending_ofd_attaches_once() {
 }
 
 #[test]
+fn an_event_handle_becomes_the_poll_source() {
+    let mut ofd = Ofd::new(Handle(4), OfdKind::Socket, 0, None, 1);
+    assert_eq!(ofd.poll_handle(), Handle(4));
+    assert!(!ofd.poll_signaled());
+    assert_eq!(ofd.set_event(Handle(5)), Ok(()));
+    assert_eq!(ofd.poll_handle(), Handle(5));
+    assert!(ofd.poll_signaled());
+    assert_eq!(ofd.set_event(Handle(6)), Err(Errno::EEXIST));
+    let mut plain = Ofd::new(Handle(7), OfdKind::File, 0, None, 2);
+    assert_eq!(plain.set_event(Handle::NONE), Err(Errno::EINVAL));
+}
+
+#[test]
 fn epochs_increase() {
     let mut arena = OfdArena::new();
     let first = arena.insert(Handle(1), OfdKind::File, 0, None);

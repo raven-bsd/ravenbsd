@@ -185,6 +185,9 @@ pub trait SocketFds {
     fn install(&self, s: Option<Sock>, cloexec: bool, nonblock: bool) -> Result<i32, Errno>;
     /// Attach the kernel handle to a pending socket.
     fn attach(&self, ofd: u32, s: Sock);
+    /// Attach the notification event that makes the socket `poll`-ready. Backends without an
+    /// event source keep the default no-op.
+    fn event(&self, _ofd: u32, _s: Sock) {}
     /// Resolve a libc fd.
     fn resolve(&self, fd: i32) -> Result<FdInfo, Errno>;
     /// The last reference to an OFD went away.
