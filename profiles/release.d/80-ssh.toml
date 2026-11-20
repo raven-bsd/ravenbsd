@@ -37,6 +37,11 @@ path = "/etc/services.d/sshd.toml"
 mode = 0o644
 
 [[initfs.files]]
+src = "profiles/ssh.d/ssh-hostkeys.toml"
+path = "/etc/services.d/ssh-hostkeys.toml"
+mode = 0o644
+
+[[initfs.files]]
 src = "profiles/ssh.d/ptyd.toml"
 path = "/etc/services.d/ptyd.toml"
 mode = 0o644
