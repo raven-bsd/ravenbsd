@@ -89,7 +89,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config\n"
+send = "/usr/sbin/raven config\n"
 delay_ms = 100
 
 [[step]]
@@ -181,7 +181,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven --json users list\n"
+send = "/usr/sbin/raven --json users list\n"
 delay_ms = 100
 
 [[step]]
@@ -193,7 +193,19 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven --json users show musicbox\n"
+send = "raven --json users list\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{.*"kind":"user".*"name":"musicbox".*"shell":"/bin/tui-demo".*"autologin":true.*"password_set":true.*\}$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json users show musicbox\n"
 delay_ms = 100
 
 [[step]]
@@ -205,7 +217,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven --json users check\n"
+send = "/usr/sbin/raven --json users check\n"
 delay_ms = 100
 
 [[step]]

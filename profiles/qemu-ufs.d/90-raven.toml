@@ -8,7 +8,7 @@
 # section, and gives the TUI a real file to save atomically on the writable UFS root.
 [[initfs.files]]
 src = "build/fixtures/modern-admin/raven"
-path = "/bin/raven"
+path = "/usr/sbin/raven"
 mode = 0o755
 generated = true
 

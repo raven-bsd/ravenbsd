@@ -3,7 +3,7 @@
 #
 # K209: the writable-UFS administration gate. Boot the one-disk demo qcow2 (ESP first, UFS2 root
 # second) built by `scripts/qemu-ufs.sh --build-only`, log in as root/raven, and prove the target
-# `raven` client: /bin/raven, net if/route/status, --json status, config check/get, the config TUI
+# `raven` client: /usr/sbin/raven, net if/route/status, --json status, config check/get, the config TUI
 # dry-run with file=present, and a real atomic save of /etc/raven/conf.d/network.toml on UFS.
 # Run `raven-release` (or `tests/fixtures/modern-admin/build.sh`) once first: the UFS profile stages
 # that target-built artifact and this case's single pre step only builds the UFS image.
@@ -69,7 +69,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "if [ -x /bin/raven ]; then echo raven-present; fi\n"
+send = "if [ -x /usr/sbin/raven ]; then echo raven-present; fi; if [ -e /bin/raven ]; then echo bin-raven-present; else echo bin-raven-absent; fi\n"
 delay_ms = 100
 
 [[step]]
@@ -77,11 +77,15 @@ wait = '^raven-present$'
 timeout_secs = 30
 
 [[step]]
+wait = '^bin-raven-absent$'
+timeout_secs = 30
+
+[[step]]
 wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven --json net if\n"
+send = "/usr/sbin/raven --json net if\n"
 delay_ms = 100
 
 [[step]]
@@ -93,7 +97,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven net route\n"
+send = "/usr/sbin/raven net route\n"
 delay_ms = 100
 
 [[step]]
@@ -105,7 +109,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven net status && echo net-status-ok\n"
+send = "/usr/sbin/raven net status && echo net-status-ok\n"
 delay_ms = 100
 
 [[step]]
@@ -117,7 +121,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven --json status\n"
+send = "/usr/sbin/raven --json status\n"
 delay_ms = 100
 
 [[step]]
@@ -129,7 +133,19 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config check && echo config-check-ok\n"
+send = "raven --json status\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config check && echo config-check-ok\n"
 delay_ms = 100
 
 [[step]]
@@ -145,7 +161,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config get network.hostname\n"
+send = "/usr/sbin/raven config get network.hostname\n"
 delay_ms = 100
 
 [[step]]
@@ -157,7 +173,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config get network.mode\n"
+send = "/usr/sbin/raven config get network.mode\n"
 delay_ms = 100
 
 [[step]]
@@ -177,7 +193,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config --dry-run\n"
+send = "/usr/sbin/raven config --dry-run\n"
 delay_ms = 100
 
 [[step]]
@@ -205,7 +221,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config\n"
+send = "/usr/sbin/raven config\n"
 delay_ms = 100
 
 [[step]]
@@ -249,7 +265,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config check && echo config-recheck-ok\n"
+send = "/usr/sbin/raven config check && echo config-recheck-ok\n"
 delay_ms = 100
 
 [[step]]
@@ -261,7 +277,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven config get network.hostname\n"
+send = "/usr/sbin/raven config get network.hostname\n"
 delay_ms = 100
 
 [[step]]
