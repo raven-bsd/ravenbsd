@@ -64,7 +64,13 @@ pub fn poll<B: SysBackend, L: Lock>(
                     // A scheme-backed socket reports through its attached notification event,
                     // not through the data handle's level.
                     let _ = raven_libc_sys::sys::debug_write(
-                        alloc::format!("kp:add fd={}\n", entry.fd).as_bytes(),
+                        alloc::format!(
+                            "kp:add fd={} ofd={} ev={}\n",
+                            entry.fd,
+                            reference.index(),
+                            reference.poll_handle().0
+                        )
+                        .as_bytes(),
                     );
                     wanted |= EV_SIGNALED;
                 }
