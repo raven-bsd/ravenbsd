@@ -68,7 +68,7 @@ wait = '^curl-head=0$'
 timeout_secs = 30
 
 [[step]]
-send = "curl --cacert /tls-ca.pem https://10.0.2.2:24443/known.txt; echo; echo curl-https=$?\n"
+send = "curl --cacert /tls-ca.pem https://10.0.2.2:24443/known.txt; ec=$?; echo; echo curl-https=$ec\n"
 delay_ms = 100
 
 [[step]]
