@@ -74,10 +74,12 @@ pub fn chroot(frame: &SyscallFrame) -> Result<usize, Errno> {
     let root = caller.root.lock().clone();
     let target = process::resolve_root_path(&root, suffix);
     let server = registry::lookup(&caller, scheme)?;
+    let context = (root != "/").then_some(root.as_str());
     let handle = router::open(
         &caller,
         server,
         &target,
+        context,
         WIRE_OPEN_READ | WIRE_OPEN_DIRECTORY,
     )?;
     router::close(&caller, handle)?;

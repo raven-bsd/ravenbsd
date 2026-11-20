@@ -154,6 +154,9 @@ pub struct SchemePacket {
     pub group_count: u32,
     /// Caller supplementary groups (version 2).
     pub groups: [u32; MAX_GROUPS],
+    /// Length of the per-process root prefix in [`SchemePacket::path`] for a rooted `Open`;
+    /// zero means unrooted (K224).
+    pub root_len: u32,
     /// Cross-process trace id (`R-OBS-6`); zero means "not traced".
     pub trace_id: u64,
 }
@@ -184,6 +187,7 @@ impl Default for SchemePacket {
             egid: 0,
             group_count: 0,
             groups: [0; MAX_GROUPS],
+            root_len: 0,
             trace_id: 0,
         }
     }
@@ -193,7 +197,7 @@ impl Default for SchemePacket {
 pub const PACKET_SIZE: usize = size_of::<SchemePacket>();
 
 const _: () = {
-    assert!(PACKET_SIZE == 528);
+    assert!(PACKET_SIZE == 536);
     assert!(offset_of!(SchemePacket, version) == 0);
     assert!(offset_of!(SchemePacket, opcode) == 4);
     assert!(offset_of!(SchemePacket, flags) == 6);
@@ -217,7 +221,8 @@ const _: () = {
     assert!(offset_of!(SchemePacket, egid) == 448);
     assert!(offset_of!(SchemePacket, group_count) == 452);
     assert!(offset_of!(SchemePacket, groups) == 456);
-    assert!(offset_of!(SchemePacket, trace_id) == 520);
+    assert!(offset_of!(SchemePacket, root_len) == 520);
+    assert!(offset_of!(SchemePacket, trace_id) == 528);
 };
 
 /// Why a reply's reported result length is not acceptable.
@@ -362,6 +367,7 @@ pub fn encode(packet: &SchemePacket, out: &mut [u8]) -> Result<(), PacketError> 
         put_u32(out, offset, group);
         index = index.saturating_add(1);
     }
+    put_u32(out, offset_of!(SchemePacket, root_len), packet.root_len);
     put_u64(out, offset_of!(SchemePacket, trace_id), packet.trace_id);
     Ok(())
 }
@@ -425,6 +431,7 @@ pub fn decode(input: &[u8]) -> Result<SchemePacket, PacketError> {
         egid: get_u32(input, offset_of!(SchemePacket, egid))?,
         group_count: get_u32(input, offset_of!(SchemePacket, group_count))?,
         groups,
+        root_len: get_u32(input, offset_of!(SchemePacket, root_len))?,
         trace_id: get_u64(input, offset_of!(SchemePacket, trace_id))?,
     })
 }
@@ -463,6 +470,9 @@ impl SchemePacket {
             return Err(PacketError::BadLength);
         }
         if self.group_count as usize > MAX_GROUPS {
+            return Err(PacketError::BadLength);
+        }
+        if self.root_len as usize > MAX_PATH {
             return Err(PacketError::BadLength);
         }
         if response && !(0..=4095).contains(&self.status) {

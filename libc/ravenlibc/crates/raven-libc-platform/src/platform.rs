@@ -1687,40 +1687,36 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     /// Rebuild the table from an inheritance block whose handles are already valid in this
     /// process. The block is installed before `main`; the table starts empty (O-5).
     pub fn restore_fdmap(&self, block: &FdMap) -> Result<(), Errno> {
-        // Descriptors that shared one OFD before exec (e.g. 0 and 1 from `dup2`) must share one
-        // OFD again: separate OFDs for the same kernel handle would close it when the first fd
-        // is displaced. Group by handle and add one reference per extra fd.
-        let mut shared: Vec<(u32, u32)> = Vec::new();
+        let mut by_handle: alloc::collections::BTreeMap<u32, u32> =
+            alloc::collections::BTreeMap::new();
         for entry in &block.entries {
             if !transferable(entry.kind) {
                 return Err(Errno::EINVAL);
             }
-            let ofd = match shared
-                .iter()
-                .find(|(handle, _)| *handle == entry.handle)
-                .copied()
-            {
-                Some((_, ofd)) => {
-                    self.ofd.borrow_mut().add_ref(ofd)?;
-                    ofd
-                }
-                None => {
-                    let ofd = self.ofd.borrow_mut().insert(
-                        Handle(entry.handle),
-                        entry.kind,
-                        entry.status,
-                        entry.path.clone().map(Vec::into_boxed_slice),
-                    );
-                    shared.push((entry.handle, ofd));
-                    ofd
-                }
+            // A handle has exactly one OFD: fds that were dup'd from each other must share the
+            // status flags and the close-at-last-reference lifetime.
+            let ofd = if let Some(index) = by_handle.get(&entry.handle).copied() {
+                self.ofd.borrow_mut().add_ref(index)?;
+                index
+            } else {
+                let index = self.ofd.borrow_mut().insert(
+                    Handle(entry.handle),
+                    entry.kind,
+                    entry.status,
+                    entry.path.clone().map(Vec::into_boxed_slice),
+                );
+                by_handle.insert(entry.handle, index);
+                index
             };
-            self.fd.borrow_mut().install_at(
+            if let Err(error) = self.fd.borrow_mut().install_at(
                 entry.fd as u32,
                 ofd,
                 entry.fd_flags & FD_CLOEXEC != 0,
                 0,
-            )?;
+            ) {
+                self.release_ofd_ref(ofd);
+                return Err(error);
+            }
         }
         Ok(())
     }
