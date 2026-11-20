@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K220: libc execve of a >8 MiB static image through PROC_EXEC. The small init first proves a
+# bad ELF leaves the old image running, then execs the large helper; the helper prints the same
+# pid, argv and environment and runs from the multi-MiB image. The image exceeds both the old
+# 1 MiB kernel copy and the old 8 MiB spawn reader cap.
+
+name = "exec-large"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/proc/build.sh exec-large"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^exec-large: start pid=[0-9]+$'
+
+[[expect]]
+regex = '^exec-large: bad-elf refused errno=8$'
+
+[[expect]]
+regex = '^exec-large: child pid=[0-9]+ same=1$'
+
+[[expect]]
+regex = '^exec-large: argv=3 alpha beta$'
+
+[[expect]]
+regex = '^exec-large: env=K220$'
+
+[[expect]]
+regex = '^exec-large: image=9437184$'
+
+[[expect]]
+regex = '^exec-large: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|exec-large: fail'
