@@ -5,6 +5,7 @@
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::cell::Cell;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use raven_abi::errno::Errno;
@@ -43,8 +44,8 @@ pub enum OfdKind {
 /// One open-file description.
 #[derive(Debug)]
 pub struct Ofd {
-    /// The kernel handle this OFD owns.
-    pub handle: Handle,
+    /// The kernel handle this OFD owns; `Handle::NONE` until a lazy socket is attached.
+    pub handle: Cell<Handle>,
     /// Kind recorded at open time.
     pub kind: OfdKind,
     /// Access mode and the mutable status bits (Linux `F_GETFL` values).
@@ -69,7 +70,7 @@ impl Ofd {
         epoch: u32,
     ) -> Self {
         Self {
-            handle,
+            handle: Cell::new(handle),
             kind,
             status: AtomicU32::new(status),
             refs: AtomicU32::new(1),
@@ -77,6 +78,22 @@ impl Ofd {
             dir_cursor_ok: false,
             epoch,
         }
+    }
+
+    /// Set the kernel handle of a pending OFD.
+    ///
+    /// The lazy-socket seam installs an OFD before `socket(2)` knows an endpoint; `attach`
+    /// supplies the scheme handle once `bind`/`connect`/`listen` creates it. An OFD that
+    /// already owns a handle is never replaced.
+    pub fn set_handle(&mut self, handle: Handle) -> Result<(), raven_abi::errno::Errno> {
+        if handle == Handle::NONE {
+            return Err(raven_abi::errno::Errno::EINVAL);
+        }
+        if self.handle.get() != Handle::NONE {
+            return Err(raven_abi::errno::Errno::EEXIST);
+        }
+        self.handle.set(handle);
+        Ok(())
     }
 
     /// Whether the access mode includes read.
@@ -234,7 +251,7 @@ impl<'a, B: SysBackend, L: Lock> OfdRef<'a, B, L> {
 
     /// The kernel handle.
     pub fn handle(&self) -> Handle {
-        self.snapshot().map_or(Handle::NONE, |ofd| ofd.handle)
+        self.snapshot().map_or(Handle::NONE, |ofd| ofd.handle.get())
     }
 
     /// The OFD kind.
@@ -279,7 +296,7 @@ impl<B: SysBackend, L: Lock> Drop for OfdRef<'_, B, L> {
 impl Clone for Ofd {
     fn clone(&self) -> Self {
         Self {
-            handle: self.handle,
+            handle: Cell::new(self.handle.get()),
             kind: self.kind,
             status: AtomicU32::new(self.status.load(Ordering::Relaxed)),
             refs: AtomicU32::new(self.refs.load(Ordering::Relaxed)),
@@ -289,3 +306,7 @@ impl Clone for Ofd {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "ofd_ut.rs"]
+mod tests;

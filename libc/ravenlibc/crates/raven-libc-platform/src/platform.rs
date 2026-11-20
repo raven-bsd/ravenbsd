@@ -229,7 +229,10 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     fn take_close_handle(&self, index: u32) -> Option<Handle> {
         let mut arena = self.ofd.borrow_mut();
         if arena.drop_ref(index) {
-            arena.release(index).map(|ofd| ofd.handle)
+            arena
+                .release(index)
+                .map(|ofd| ofd.handle.get())
+                .filter(|handle| *handle != Handle::NONE)
         } else {
             None
         }
@@ -277,6 +280,35 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         cloexec: bool,
     ) -> Result<i32, Errno> {
         self.install_impl(None, handle, kind, status, path, cloexec, 0)
+    }
+
+    /// Install an OFD that has no kernel handle yet and return the new lowest-free fd.
+    ///
+    /// `socket(2)` must return a descriptor before `bind`/`connect`/`listen` decides the scheme
+    /// endpoint. The lazy-socket seam installs this pending socket OFD and supplies the handle
+    /// later with [`Platform::attach_handle`].
+    pub fn install_pending(
+        &self,
+        kind: OfdKind,
+        status: u32,
+        path: Option<Box<[u8]>>,
+        cloexec: bool,
+    ) -> Result<i32, Errno> {
+        self.install_impl(None, Handle::NONE, kind, status, path, cloexec, 0)
+    }
+
+    /// Attach the kernel handle to an OFD installed with [`Platform::install_pending`].
+    ///
+    /// The handle is owned by the fd table from this point on. A second attach is `EEXIST`, and
+    /// an OFD that already owns a handle is never replaced.
+    pub fn attach_handle(&self, ofd: u32, handle: Handle) -> Result<(), Errno> {
+        if handle == Handle::NONE {
+            return Err(Errno::EINVAL);
+        }
+        let _guard = guard(&self.lock);
+        let mut arena = self.ofd.borrow_mut();
+        let slot = arena.get_mut(ofd).ok_or(Errno::EBADF)?;
+        slot.set_handle(handle)
     }
 
     /// Install a handle at exactly `fd`, closing any displaced OFD.
@@ -327,7 +359,10 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             let close = displaced.and_then(|entry| {
                 if arena.drop_ref(entry.ofd) {
-                    arena.release(entry.ofd).map(|ofd| ofd.handle)
+                    arena
+                        .release(entry.ofd)
+                        .map(|ofd| ofd.handle.get())
+                        .filter(|handle| *handle != Handle::NONE)
                 } else {
                     None
                 }
@@ -1561,7 +1596,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             let child = mapping
                 .iter()
-                .find(|(parent, _)| *parent == ofd.handle)
+                .find(|(parent, _)| *parent == ofd.handle.get())
                 .map(|(_, child)| *child)
                 .ok_or(Errno::EBADF)?;
             let mut inherited = FdMapEntry::new(
