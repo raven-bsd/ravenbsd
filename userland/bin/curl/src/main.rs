@@ -254,11 +254,6 @@ mod tls_program {
             }
         };
         let tls = is_https(&options.url);
-        output("curl: tls=");
-        output(if tls { "1" } else { "0" });
-        output(" url=");
-        output(&options.url);
-        output("\n");
         let request = if tls {
             match curl::https_http_url(&options.url) {
                 Ok(url) => url,

@@ -51,7 +51,7 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
-send = "curl http://10.0.2.2:18081/known.txt; echo; echo curl-body=$?\n"
+send = "curl http://10.0.2.2:18081/known.txt; ec=$?; echo; echo curl-body=$ec\n"
 delay_ms = 100
 
 [[step]]
