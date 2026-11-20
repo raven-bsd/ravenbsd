@@ -8,12 +8,13 @@
 #
 # Usage:
 #   sh addons/ssh/build.sh --check   verify the pinned source, provenance and host tools
-#   sh addons/ssh/build.sh           build sshd, ssh and ssh-keygen
+#   sh addons/ssh/build.sh           build ssh, sshd, sshd-session, sshd-auth and ssh-keygen
 #   sh addons/ssh/build.sh --qtest   stage a minimal initfs (requires a completed build)
 #
-# Current status: T1/libc exports are in place; OpenSSH builds ssh/sshd/ssh-keygen and the guest
-# ssh-version qtest prints the real `sshd -V` line. The real AF_UNIX socketpair remains
-# EAFNOSUPPORT for privilege separation (K206/K195). No SSH protocol/crypto source is changed.
+# OpenSSH 10.6 splits the server into `sshd` (the listener), `sshd-session` and `sshd-auth`.
+# The target runtime paths are `/usr/libexec/sshd-session` and `/usr/libexec/sshd-auth`; the
+# build outputs are staged at `build/ssh/x86_64/libexec/` so K195 can install them there.
+# No SSH protocol, crypto or privilege-separation source is changed.
 
 set -eu
 
@@ -81,7 +82,7 @@ check_source() {
 }
 
 check_tools() {
-    for tool in clang perl make llvm-ar llvm-objcopy; do
+    for tool in clang perl make strings llvm-ar llvm-objcopy; do
         command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
     done
     find_lld || die "ld.lld is required (host PATH or the Rust toolchain)"
@@ -151,7 +152,7 @@ configure() {
         LDFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -fuse-ld=lld -nostdlib -nostartfiles -static -T$root/tests/libc/target/x86_64.ld -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 $sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o -L$sysroot/usr/lib -L$t1_stage/lib" \
         LIBS="-L$sysroot/usr/lib -L$t1_stage/lib -lc -lclang_rt.builtins $sysroot/usr/lib/crtn.o" \
         "$source/configure" --host=x86_64-unknown-linux-gnu --build=x86_64-pc-linux-gnu \
-            --prefix="$install" --sysconfdir="$install/etc/ssh" \
+            --prefix="$install" --sysconfdir="$install/etc/ssh" --libexecdir=/usr/libexec \
             --with-ssl-dir="$t1_stage" --without-openssl-header-check \
             --without-zlib --without-pam --without-selinux --without-audit --without-kerberos5 --without-libedit
     )
@@ -167,15 +168,32 @@ build() {
     find_lld
     log "build: configuring OpenSSH 10.6p2 for x86_64-unknown-ravenbsd"
     configure
+    # The linux-gnu host selection forces USE_BTMP/_PATH_BTMP, but RavenBSD has no <utmp.h>.
+    # Drop the generated btmp defines; OpenSSH then uses the available utmpx path and does not
+    # compile the struct-utmp failure logger. The configure field probe also reports ut_addr in
+    # utmpx.h, but RavenBSD's header has only ut_addr_v6; drop that false positive. This edits
+    # build artifacts, not upstream source.
+    config="$build/config.h"
+    sed -e '/^#define USE_BTMP/d' -e '/^#define _PATH_BTMP/d' \
+        -e '/^#define HAVE_ADDR_IN_UTMPX/d' "$config" > "$config.k212"
+    mv "$config.k212" "$config"
     log "build: compiling (jobs=$jobs)"
     (
         cd "$build"
-        make -j"$jobs" ssh sshd ssh-keygen \
+        make -j"$jobs" ssh sshd sshd-session sshd-auth ssh-keygen \
             EX_LIBS="-L$sysroot/usr/lib -L$t1/lib -lssl -lcrypto -lc -lclang_rt.builtins $sysroot/usr/lib/crtn.o -Wl,--error-limit=0"
     )
-    mkdir -p "$install/bin"
+    strings "$build/sshd" | grep -Fq '/usr/libexec/sshd-session' ||
+        die "sshd does not embed the target sshd-session path"
+    strings "$build/sshd" | grep -Fq '/usr/libexec/sshd-auth' ||
+        die "sshd does not embed the target sshd-auth path"
+    mkdir -p "$install/bin" "$install/libexec"
     cp "$build/ssh" "$build/sshd" "$build/ssh-keygen" "$install/bin/"
+    cp "$build/sshd-session" "$build/sshd-auth" "$install/libexec/"
+    chmod 0755 "$install/libexec/sshd-session" "$install/libexec/sshd-auth"
     log "built: $install/bin/ssh $install/bin/sshd $install/bin/ssh-keygen"
+    log "built: $install/libexec/sshd-session $install/libexec/sshd-auth"
+    log "K195 staging: install libexec/sshd-session -> /usr/libexec/sshd-session; install libexec/sshd-auth -> /usr/libexec/sshd-auth"
 }
 
 build_version_wrapper() {
