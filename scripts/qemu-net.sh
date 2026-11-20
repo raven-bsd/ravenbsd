@@ -28,11 +28,26 @@ dnsmasq_log=/run/raven-qemu-net-dnsmasq.log
 usage() {
     cat <<'EOF'
 usage:
+  scripts/qemu-net.sh --check  verify prerequisites without root or booting
   scripts/qemu-net.sh up       create the bridge/tap, NAT and DNS; print the contract
   scripts/qemu-net.sh down     remove them and restore ip_forward
   scripts/qemu-net.sh status   print the contract if up
   scripts/qemu-net.sh          run the S95 slirp user-network gate
 EOF
+}
+
+check() {
+    for command in ip iptables dnsmasq sysctl; do
+        command -v "$command" >/dev/null 2>&1 || refuse "missing prerequisite: $command"
+    done
+    uplink=$(uplink_device)
+    [ -n "$uplink" ] || refuse "no IPv4 default route"
+    ip link show "$uplink" >/dev/null 2>&1 || refuse "uplink $uplink does not exist"
+    if ip link show "$bridge" >/dev/null 2>&1 || ip link show "$tap" >/dev/null 2>&1; then
+        refuse "leftover $bridge/$tap; run 'scripts/qemu-net.sh down'"
+    fi
+    printf 'qemu-net: check PASS (ip, iptables, dnsmasq, sysctl; uplink=%s; %s/%s free)\n' \
+        "$uplink" "$bridge" "$tap"
 }
 
 refuse() {
@@ -208,10 +223,11 @@ gate() {
 }
 
 case "${1:-}" in
+    --check|check) check ;;
     up) shift; up "$@" ;;
     down) shift; down "$@" ;;
     status) shift; status "$@" ;;
-    ""|--check) gate "$@" ;;
+    "") gate "$@" ;;
     -h|--help) usage ;;
     *) usage >&2; exit 2 ;;
 esac

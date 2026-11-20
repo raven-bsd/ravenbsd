@@ -280,11 +280,6 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
     }
 
-    /// Every open `(fd, entry)`, in ascending order.
-    pub fn open_fds(&self) -> Vec<(i32, crate::fd::table::FdEntry)> {
-        self.fd.borrow().open_entries()
-    }
-
     /// Attach the notification event a scheme-backed socket uses for `poll` readiness.
     pub fn set_ofd_event(&self, index: u32, event: Handle) -> Result<(), Errno> {
         let mut arena = self.ofd.borrow_mut();

@@ -18,6 +18,12 @@ use crate::{FdInfo, Sock, SocketFds};
 /// A lazy-mode `socket()` installs a pending socket OFD through
 /// [`raven_libc_platform::Platform::install_pending`]; `bind`/`connect`/`listen` later attaches
 /// the scheme handle through [`raven_libc_platform::Platform::attach_handle`].
+///
+/// Donor divergence (recorded for review): NetBSD `kern_descrip.c:fd_allocfile`/`fd_affix` and
+/// `uipc_socket.c:socreate` create the socket first and publish a `file_t` whose `f_socket` is
+/// already set; there is no handle-less descriptor. Raven's scheme ABI needs the fd before the
+/// scheme path is known, so the pending OFD has `Handle::NONE` until `attach`. The donor
+/// `closef`/`fd_close` reference-drop invariant is kept: one OFD, one handle, close at zero refs.
 pub struct FdGlue<'a, B: SysBackend, L: Lock> {
     platform: &'a Platform<B, L>,
 }

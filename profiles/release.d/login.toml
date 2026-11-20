@@ -19,17 +19,17 @@ src = "profiles/release.d/login.service.manifest"
 path = "/etc/services.d/getty.toml"
 
 [[initfs.files]]
-src = "profiles/ssh.d/passwd"
+src = "etc/passwd"
 path = "/etc/passwd"
 mode = 0o644
 
 [[initfs.files]]
-src = "profiles/ssh.d/group"
+src = "etc/group"
 path = "/etc/group"
 mode = 0o644
 
 [[initfs.files]]
-src = "profiles/ssh.d/shadow"
+src = "etc/shadow"
 path = "/etc/shadow"
 mode = 0o600
 

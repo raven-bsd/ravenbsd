@@ -120,6 +120,14 @@ impl<B: SysBackend, L: Lock> NetBackend for PlatformBackend<'_, B, L> {
             Response::Socket { id } => {
                 // `ACCEPT` returns a server-side socket id; materialise the client-side scheme
                 // file (`net:accept/<id>`) so the new fd owns a real handle.
+                //
+                // Donor divergence (recorded for review): NetBSD `uipc_socket.c:sonewconn` and
+                // Illumos `sockcommon_sops.c:so_accept` return the accepted socket object
+                // directly and the file references it (`struct file.f_socket`/`sonode`); the
+                // fd's `write` reaches that object's send queue (`sys_socket.c:soo_write` ->
+                // `uipc_socket.c:sosend`). ABI v1 has no server-side SchemeFile-create, so K230
+                // re-opens the server id as `net:accept/<id>`; `netd` maps it to the same
+                // `SocketId`, keeping one socket object and one `tx`/`snd_*` state.
                 let path = alloc::format!("{}{id}", raven_proto_net::path::ACCEPT_PREFIX);
                 let handle =
                     open_scheme_path(self.platform.backend(), path.as_bytes(), WIRE_READ_WRITE)

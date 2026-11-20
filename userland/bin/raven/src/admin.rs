@@ -15,8 +15,9 @@
 
 use std::ffi::OsString;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use raven_config::users::{Accounts, UserRecord, check as check_users};
 use raven_config::{ConfigLoader, set_enabled};
 use raven_output::{Record, Value};
 use raven_proto_svc::{Op, State, Status};
@@ -70,6 +71,7 @@ pub(crate) fn dispatch(args: &[OsString], out: &mut dyn Write, err: &mut dyn Wri
         "status" => run_status(&globals, &scheme, &rest, out, err),
         "doctor" => run_doctor(&globals, &scheme, &rest, out, err),
         "svc" => run_svc(&globals, &scheme, &rest, out, err),
+        "users" => run_users(&globals, &rest, out, err),
         _ => return None,
     };
     Some(code)
@@ -94,7 +96,7 @@ fn parse(args: &[OsString]) -> Option<(Globals, String, Vec<String>)> {
                     .iter()
                     .map(|value| value.to_string_lossy().into_owned())
                     .collect();
-                return matches!(command.as_str(), "status" | "doctor" | "svc")
+                return matches!(command.as_str(), "status" | "doctor" | "svc" | "users")
                     .then_some((globals, command, rest));
             }
         }
@@ -334,6 +336,164 @@ fn emit_service(globals: &Globals, service: &Service, changed: bool, out: &mut d
             if service.ready { "ready" } else { "not-ready" }
         );
     }
+}
+
+fn run_users(globals: &Globals, args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> i32 {
+    let root = std::env::var_os("RAVEN_CONFIG_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/"));
+    run_users_at(&root, globals, args, out, err)
+}
+
+fn run_users_at(
+    root: &Path,
+    globals: &Globals,
+    args: &[String],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
+    let Some(command) = args.first().map(String::as_str) else {
+        return error(
+            globals,
+            "EUSAGE",
+            "users needs list, show or check",
+            "users",
+            err,
+        );
+    };
+    match command {
+        "list" if args.len() == 1 => {
+            let accounts = match Accounts::load(root) {
+                Ok(accounts) => accounts,
+                Err(failure) => {
+                    return error(globals, "EUSERS", &failure.to_string(), "users", err);
+                }
+            };
+            if globals.quiet {
+                return 0;
+            }
+            for user in &accounts.users {
+                if globals.json {
+                    let mut line = String::new();
+                    if user_record(&accounts, user).write_json(&mut line).is_ok() {
+                        let _ = writeln!(out, "{line}");
+                    }
+                } else {
+                    let _ = writeln!(
+                        out,
+                        "{}\t{}\t{}\t{}\t{}",
+                        user.name, user.uid, user.gid, user.home, user.shell
+                    );
+                }
+            }
+            0
+        }
+        "show" if args.len() == 2 => {
+            let accounts = match Accounts::load(root) {
+                Ok(accounts) => accounts,
+                Err(failure) => {
+                    return error(globals, "EUSERS", &failure.to_string(), "users", err);
+                }
+            };
+            let Some(user) = accounts.user(&args[1]) else {
+                return error(
+                    globals,
+                    "ENOENT",
+                    &format!("user `{}` does not exist", args[1]),
+                    "users",
+                    err,
+                );
+            };
+            if globals.quiet {
+                return 0;
+            }
+            if globals.json {
+                let mut line = String::new();
+                if user_record(&accounts, user).write_json(&mut line).is_ok() {
+                    let _ = writeln!(out, "{line}");
+                }
+            } else {
+                let _ = writeln!(
+                    out,
+                    "{}: uid={} gid={} home={} shell={} autologin={} password_set={}",
+                    user.name,
+                    user.uid,
+                    user.gid,
+                    user.home,
+                    user.shell,
+                    accounts.is_autologin(&user.name),
+                    accounts
+                        .shadow(&user.name)
+                        .is_some_and(raven_config::users::ShadowRecord::has_hash)
+                );
+            }
+            0
+        }
+        "check" if args.len() == 1 => {
+            let report = match check_users(root) {
+                Ok(report) => report,
+                Err(failure) => {
+                    return error(globals, "EUSERS", &failure.to_string(), "users", err);
+                }
+            };
+            if globals.quiet {
+                return i32::from(!report.ok());
+            }
+            if globals.json {
+                let mut line = String::new();
+                let record = Record::new("check")
+                    .string("id", "users")
+                    .string("status", if report.ok() { "ok" } else { "fail" })
+                    .u64("users", report.users as u64)
+                    .u64("groups", report.groups as u64)
+                    .array(
+                        "errors",
+                        report
+                            .errors
+                            .iter()
+                            .map(|error| Value::String(error.clone()))
+                            .collect(),
+                    );
+                if record.write_json(&mut line).is_ok() {
+                    let _ = writeln!(out, "{line}");
+                }
+            } else if report.ok() {
+                let _ = writeln!(
+                    out,
+                    "users: ok ({} users, {} groups)",
+                    report.users, report.groups
+                );
+            } else {
+                for error in &report.errors {
+                    let _ = writeln!(err, "users: {error}");
+                }
+            }
+            i32::from(!report.ok())
+        }
+        _ => error(
+            globals,
+            "EUSAGE",
+            "usage: raven users list|show <name>|check",
+            "users",
+            err,
+        ),
+    }
+}
+
+fn user_record(accounts: &Accounts, user: &UserRecord) -> Record {
+    Record::new("user")
+        .string("name", &user.name)
+        .u64("uid", u64::from(user.uid))
+        .u64("gid", u64::from(user.gid))
+        .string("home", &user.home)
+        .string("shell", &user.shell)
+        .bool("autologin", accounts.is_autologin(&user.name))
+        .bool(
+            "password_set",
+            accounts
+                .shadow(&user.name)
+                .is_some_and(raven_config::users::ShadowRecord::has_hash),
+        )
 }
 
 fn error(globals: &Globals, code: &str, message: &str, command: &str, err: &mut dyn Write) -> i32 {
