@@ -5,8 +5,8 @@
 # the real upstream binary.
 
 name = "sshd"
-exec = "/sbin/sshd"
-args = ["/sbin/sshd", "-D", "-ddd", "-e", "-E", "/tmp/sshd.log", "-f", "/etc/ssh/sshd_config"]
+exec = "/bin/rsh"
+args = ["/bin/rsh", "-c", "/sbin/sshd -D -ddd -e -E /tmp/sshd.log -f /etc/ssh/sshd_config"]
 needs = ["netd", "vfsd", "consd", "ptyd", "ssh-hostkeys"]
 readiness = "none"
 restart = "on-failure"
