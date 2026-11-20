@@ -43,3 +43,16 @@ pub fn halt() -> ! {
         }
     }
 }
+
+/// Power the machine off through PSCI `SYSTEM_OFF`.
+///
+/// QEMU `virt` implements this. A real Pi 4 firmware that lacks PSCI SYSTEM_OFF falls back to
+/// `halt`; the board power path remains a named hardware blocker in `docs/power.md`.
+pub fn poweroff() -> ! {
+    psci::system_off()
+}
+
+/// Reset the machine through PSCI `SYSTEM_RESET`.
+pub fn reset() -> ! {
+    psci::system_reset()
+}
