@@ -212,9 +212,15 @@ fn fake_backend_forks() {
 fn exec_reports_the_backend_error() {
     let backend = FakeBackend::new();
     backend.fail_next_exec(ENOENT);
-    assert_eq!(exec(&backend, b"/", b"/missing", &[], &[], None), ENOENT);
+    assert_eq!(
+        exec(&backend, b"/", b"/missing", &[], &[], None, &[], &[]),
+        ENOENT
+    );
     backend.fail_next_exec(EACCES);
-    assert_eq!(exec(&backend, b"/", b"/noexec", &[], &[], None), EACCES);
+    assert_eq!(
+        exec(&backend, b"/", b"/noexec", &[], &[], None, &[], &[]),
+        EACCES
+    );
 }
 
 #[test]
