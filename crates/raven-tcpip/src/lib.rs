@@ -94,7 +94,7 @@ pub use pmtu::{
     probe_sequence,
 };
 pub use readiness::Readiness;
-pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
+pub use recovery::{Ecn, Rack, RackContext, RackEntry, RackOutcome, SpuriousUndo, Tlp, pto};
 pub use route::{Route, RouteTable};
 pub use rto::RtoEstimator;
 pub use sack::{NextKind, NextSeg, SackResult, SackScoreboard, receiver_blocks, sack_option_bytes};

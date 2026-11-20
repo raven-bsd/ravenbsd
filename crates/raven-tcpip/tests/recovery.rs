@@ -80,6 +80,87 @@ fn twenty_percent_reordering_causes_zero_retransmissions() {
 }
 
 #[test]
+fn rack_core_ack_declares_old_loss_and_enters_recovery() {
+    use raven_tcpip::RackContext;
+    let mut rack = Rack::new(10);
+    rack.send(1000, 2000, 0);
+    let outcome = rack.ack_received(&RackContext {
+        now_ms: 100,
+        srtt_ms: 100,
+        mss: 1460,
+        ack: 1500,
+        snd_nxt: 3000,
+        cwnd: 14_600,
+        ssthresh: 7_300,
+        ..RackContext::default()
+    });
+    assert_eq!(outcome.acked, 1500);
+    assert_eq!(outcome.lost, vec![1000]);
+    assert!(outcome.retransmit);
+    assert!(rack.in_recovery);
+    assert_eq!(rack.recover, 3000);
+}
+
+#[test]
+fn rack_core_update_entry_refreshes_retransmit_time() {
+    let mut rack = Rack::new(10);
+    rack.send(1000, 2000, 0);
+    rack.update_entry(1000, 500, 50);
+    assert_eq!(rack.entries[0].xmit_ts, 50);
+    assert!(rack.entries[0].retransmitted);
+}
+
+#[test]
+fn rack_core_post_recovery_uses_the_ssthresh_floor() {
+    use raven_tcpip::RackContext;
+    let rack = Rack::new(10);
+    let ctx = RackContext {
+        mss: 1460,
+        ssthresh: 10_000,
+        ..RackContext::default()
+    };
+    assert_eq!(rack.post_recovery(&ctx, 5_000), 6_460);
+    assert_eq!(rack.post_recovery(&ctx, 12_000), 10_000);
+}
+
+#[test]
+fn rack_reo_window_grows_on_observed_reordering() {
+    let mut rack = Rack::new(10);
+    rack.observe_reordering(100);
+    assert_eq!(rack.reorder_window, 35);
+    rack.on_dsack(100);
+    assert_eq!(rack.reorder_window, 60);
+}
+
+#[test]
+fn rack_core_ack_retains_newer_ranges_and_exits_recovery() {
+    use raven_tcpip::RackContext;
+    let mut rack = Rack::new(10);
+    rack.send(1000, 2000, 0);
+    rack.send(2000, 3000, 0);
+    let ctx = RackContext {
+        now_ms: 100,
+        srtt_ms: 100,
+        mss: 1460,
+        ack: 2500,
+        snd_nxt: 3000,
+        cwnd: 14_600,
+        ssthresh: 7_300,
+        ..RackContext::default()
+    };
+    let _ = rack.ack_received(&ctx);
+    assert_eq!(rack.entries.len(), 1);
+    assert_eq!(rack.entries[0].start, 2000);
+    let end = rack.ack_received(&RackContext {
+        ack: 3000,
+        now_ms: 200,
+        srtt_ms: 100,
+        ..ctx
+    });
+    assert!(end.recovered);
+}
+
+#[test]
 fn tlp_pto_is_srtt_plus_four_rttvar() {
     assert_eq!(pto(100, 10).as_millis(), 142);
 }
