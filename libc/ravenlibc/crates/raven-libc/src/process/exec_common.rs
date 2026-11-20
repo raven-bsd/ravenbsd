@@ -31,7 +31,14 @@ pub(crate) fn run(
     search: bool,
 ) -> c_int {
     let backend = crate::ffi::procbackend::backend();
-    let cwd = crate::ffi::platform::global().cwd();
+    let platform = crate::ffi::platform::global();
+    let cwd = platform.cwd();
+    let mut envp = envp;
+    if let Ok(Some(fdmap)) = platform.exec_fdmap_env() {
+        let prefix = raven_libc_platform::fd::inherit::ENV_NAME;
+        envp.retain(|row| !row.starts_with(prefix));
+        envp.push(fdmap);
+    }
     if !search {
         let value = crate::ffi::map_proc::exec(&backend, &cwd, path, &argv, &envp, fd);
         return crate::ffi::ret::int(Err(crate::ffi::map_proc::error(value)));
