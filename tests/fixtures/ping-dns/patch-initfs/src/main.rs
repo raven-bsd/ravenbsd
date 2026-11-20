@@ -23,7 +23,7 @@ const RESOLV_CONF: &str = "/etc/resolv.conf";
 const RESOLV_LINE: &[u8] = b"nameserver 127.0.0.1\n";
 const FIXTURE: &str = "/bin/ping-dns-dnsd";
 const GETTY_MANIFEST: &str = "/etc/services.d/getty.toml";
-const GETTY_NEEDS: &[u8] = b"needs = [\"scheme:resolv\", ";
+const GETTY_NEEDS: &[u8] = b"\"scheme:resolv\", ";
 
 fn main() -> ExitCode {
     match run() {
