@@ -174,9 +174,7 @@ pub fn clone_transferable(
         Object::BootBlob(object) => Object::BootBlob(Arc::clone(object)),
         Object::DmaBuffer(object) => Object::DmaBuffer(Arc::clone(object)),
         Object::Irq(object) => Object::Irq(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
         Object::SchemeFile(object) => Object::SchemeFile(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
         Object::SchemeServer(object) => Object::SchemeServer(Arc::clone(object)),
         Object::Pipe(object) => Object::Pipe(Arc::clone(object)),
         _ => return Err(Errno::EBADF),
