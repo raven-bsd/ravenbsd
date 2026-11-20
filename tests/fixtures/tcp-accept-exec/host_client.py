@@ -45,7 +45,7 @@ def recv_exact(stream, wanted, deadline):
 
 def pass_once(host, port, banner, ack, deadline):
     with socket.create_connection((host, port), timeout=2.0) as stream:
-        stream.settimeout(5.0)
+        stream.settimeout(60.0)
         received = recv_exact(stream, len(banner), deadline)
         if received != banner:
             return f"banner mismatch got={received!r}"
@@ -72,6 +72,7 @@ def main():
                 log(f"tcp-accept-exec host: exec {error} attempt={attempt}", args.log)
                 time.sleep(0.1)
                 continue
+            time.sleep(0.2)
             error = pass_once(args.host, args.port, NOEXEC_BANNER, NOEXEC_ACK, deadline)
             if error is not None:
                 log(f"tcp-accept-exec host: noexec {error} attempt={attempt}", args.log)

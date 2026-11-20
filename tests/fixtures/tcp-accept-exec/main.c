@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,8 +56,18 @@ static int read_exact(int fd, const char *wanted) {
     size_t want = strlen(wanted);
     size_t got = 0;
     while (got < want) {
+        struct pollfd ready;
+        ready.fd = fd;
+        ready.events = POLLIN;
+        ready.revents = 0;
+        if (poll(&ready, 1, 2000) <= 0) {
+            return -1;
+        }
         char buffer[64];
         ssize_t count = read(fd, buffer, want - got);
+        if (count < 0 && (errno == EAGAIN || errno == EINTR)) {
+            continue;
+        }
         if (count <= 0) {
             return -1;
         }
@@ -88,7 +99,14 @@ int main(void) {
     }
     say("tcp-accept-exec: listening 10.0.2.15:%d\n", PORT);
 
+    int accepted_fds[2] = {-1, -1};
     for (int pass = 0; pass < 2; pass++) {
+        struct pollfd ready;
+        ready.fd = listener;
+        ready.events = POLLIN;
+        ready.revents = 0;
+        while (poll(&ready, 1, 1000) <= 0) {
+        }
         struct sockaddr_in peer;
         socklen_t peer_len = sizeof(peer);
         int accepted = accept(listener, (struct sockaddr *)&peer, &peer_len);
@@ -97,6 +115,7 @@ int main(void) {
         }
         say("tcp-accept-exec: accepted fd=%d pass=%d peer=%s:%d\n", accepted, pass,
                inet_ntoa(peer.sin_addr), ntohs(peer.sin_port));
+        accepted_fds[pass] = accepted;
 
         if (pass == 0) {
             pid_t child = fork();
@@ -133,10 +152,15 @@ int main(void) {
                 return fail("noexec ack");
             }
         }
-        close(accepted);
     }
 
+    for (int pass = 0; pass < 2; pass++) {
+        if (accepted_fds[pass] >= 0) {
+            close(accepted_fds[pass]);
+        }
+    }
     close(listener);
     say("tcp-accept-exec: done\n");
+    _exit(0);
     return 0;
 }

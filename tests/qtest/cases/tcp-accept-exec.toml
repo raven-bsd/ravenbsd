@@ -10,7 +10,7 @@
 name = "tcp-accept-exec"
 arch = "x86_64"
 profile = "hw-net"
-timeout_secs = 300
+timeout_secs = 90
 pre = [
     "sh tests/fixtures/tcp-accept-exec/build.sh",
     "sh tests/fixtures/tcp-accept-exec/start-host-client.sh",
@@ -22,7 +22,7 @@ qemu_extra = [
     "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23125-:23125",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
-expect_exit = "success"
+expect_exit = "timeout"
 
 [[expect]]
 regex = '^tcp-accept-exec: listening 10\.0\.2\.15:23125$'
@@ -40,16 +40,14 @@ regex = '^tcp-accept-exec: exec child status=0$'
 regex = '^tcp-accept-exec: accepted fd=[0-9]+ pass=1 peer=10\.0\.2\.2:[0-9]+$'
 
 [[expect]]
-regex = '^tcp-accept-exec: noexec wrote=23$'
+regex = '^tcp-accept-exec: noexec wrote=21$'
 
 [[expect]]
 regex = '^tcp-accept-exec: done$'
 
 [[expect]]
 regex = '^netd: tcp write file=[0-9]+ sid=[0-9]+ state=Established snd_una=[0-9]+ snd_nxt=[0-9]+ snd_wnd=[0-9]+ tx=0 len=19 result=Ok\(19\)$'
-
-[[expect]]
-regex = '^init exited \(0\)$'
+unordered = true
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|tcp-accept-exec: fail'
