@@ -3689,6 +3689,11 @@ dependencies = [
 [[package]]
 name = "raven-tty"
 version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-tty",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-tty-core"

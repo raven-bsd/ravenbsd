@@ -71,19 +71,41 @@ pub(crate) fn request(args: &[OsString], is_tty: bool) -> Option<Request> {
     Some(Request { dry_run, color })
 }
 
+/// A target console guard, kept alive for the whole TUI session.
+#[cfg(target_os = "ravenbsd")]
+enum RawGuard {
+    Scheme(raven_tty::SchemeRawMode),
+    Termios(raven_tty::RawMode),
+}
+
 /// Run the TUI and map its outcome to a process exit code.
 pub(crate) fn run<W: Write>(writer: &mut W, request: &Request) -> i32 {
-    // The real console keeps the canonical line discipline until we clear ICANON/ECHO. The
-    // first-party guard restores the saved termios on drop and on HUP/INT/QUIT/TERM. A qtest
-    // that is not a terminal falls back to the canonical line parser.
+    // The real console is the `tty:console` scheme; `rsh` passes its handle as RSH_FD0. The
+    // scheme guard saves the canonical/echo settings and switches raw through consd. A plain
+    // POSIX tty uses the termios guard instead; a non-TTY qtest keeps the canonical parser.
     #[cfg(target_os = "ravenbsd")]
-    let raw = raven_tty::RawMode::enable(0);
+    let raw = {
+        let scheme = std::env::var("RSH_FD0")
+            .ok()
+            .and_then(|value| value.parse::<u32>().ok())
+            .ok_or(raven_tty::Error::NoConsole)
+            .and_then(raven_tty::SchemeRawMode::enable);
+        match scheme {
+            Ok(guard) => Some(RawGuard::Scheme(guard)),
+            Err(error) => {
+                let _ = writeln!(writer, "raven config: console raw mode: {error}");
+                match raven_tty::RawMode::enable(0) {
+                    Ok(guard) => Some(RawGuard::Termios(guard)),
+                    Err(error) => {
+                        let _ = writeln!(writer, "raven config: termios raw mode: {error}");
+                        None
+                    }
+                }
+            }
+        }
+    };
     #[cfg(target_os = "ravenbsd")]
-    if let Err(error) = &raw {
-        let _ = writeln!(writer, "raven config: raw mode unavailable: {error}");
-    }
-    #[cfg(target_os = "ravenbsd")]
-    let _raw = raw.ok();
+    let _raw = raw;
     let stdin = std::io::stdin();
     let mut input = stdin.lock();
     let options = raven_tui::Options {

@@ -116,7 +116,13 @@ pub enum Error {
     GetAttr,
     /// `tcsetattr` rejected the new settings.
     SetAttr,
-    /// Another [`RawMode`] is already active.
+    /// The console handles carry no `RSH_FD0` scheme descriptor.
+    NoConsole,
+    /// The console scheme rejected `GET_MODE`.
+    GetMode,
+    /// The console scheme rejected `SET_MODE`.
+    SetMode,
+    /// Another raw-mode guard is already active.
     Busy,
 }
 
@@ -125,6 +131,9 @@ impl fmt::Display for Error {
         formatter.write_str(match self {
             Self::GetAttr => "tcgetattr failed",
             Self::SetAttr => "tcsetattr failed",
+            Self::NoConsole => "RSH_FD0 is not a console handle",
+            Self::GetMode => "console GET_MODE failed",
+            Self::SetMode => "console SET_MODE failed",
             Self::Busy => "raw mode is already active",
         })
     }
@@ -225,6 +234,12 @@ extern "C" fn restore_on_signal(signum: c_int) {
         _exit(128 + signum);
     }
 }
+
+#[cfg(target_os = "ravenbsd")]
+mod scheme;
+
+#[cfg(target_os = "ravenbsd")]
+pub use scheme::SchemeRawMode;
 
 #[cfg(test)]
 #[path = "lib_ut.rs"]
