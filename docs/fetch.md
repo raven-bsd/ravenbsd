@@ -129,10 +129,11 @@ on `127.0.0.1:18081` (QEMU exposes it as `10.0.2.2`). The `fetch-http` case cove
 Fixture ports are unique (K219): `fetch-http` uses `18081`, `fetch-installed` uses `18082`, and
 `eink-insult` uses `18083`. Each pre stops only its own previous pid, waits for it to exit,
 removes the pid file, starts the server, and verifies both the process and the listening socket
-with a bounded retry; a stale listener without a pid file is stopped by its unique port. No
-fixture kills another fixture's server. The `/slow` endpoint sleeps 5 s while the `fetch-http`
-client keeps `--max-time 1`, so `curl-slow=1` proves the timeout with real margin instead of a
-fast reply under load.
+with a bounded retry. If the port is still held after the pid stop, a process rooted in this
+checkout is stopped as a stale server; a listener from another checkout is a hard failure with
+the `ss` transcript, never a cross-tree kill. No fixture kills another fixture's server. The
+`/slow` endpoint sleeps 5 s while the `fetch-http` client keeps `--max-time 1`, so
+`curl-slow=1` proves the timeout with real margin instead of a fast reply under load.
 
 `build.sh https` builds the add-on tools, generates the T3 test CA/server certificate (valid
 1970-2049 for the zero guest clock) and starts a host TLS HTTP server on `24443` backed by

@@ -70,7 +70,18 @@ stop_server() {
     if listening; then
         command -v fuser >/dev/null 2>&1 ||
             die "port $port is in use and fuser is unavailable"
-        log "port $port is still in use; stopping the stale listener"
+        command -v readlink >/dev/null 2>&1 ||
+            die "port $port is in use and readlink is unavailable"
+        pids=$(fuser "$port/tcp" 2>/dev/null || true)
+        [ -n "$pids" ] || die "port $port is listening but fuser found no pid"
+        for pid in $pids; do
+            cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+            if [ "$cwd" != "$root" ]; then
+                ss -ltnp 2>/dev/null | grep ":$port " >&2 || true
+                die "port $port is held by pid $pid outside $root"
+            fi
+        done
+        log "port $port is still held by a stale server in this checkout; stopping it"
         fuser -k -TERM "$port/tcp" >/dev/null 2>&1 || true
         if ! wait_free; then
             fuser -k "$port/tcp" >/dev/null 2>&1 || true
