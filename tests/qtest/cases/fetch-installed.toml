@@ -1,14 +1,20 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K199/K198 staging gate: the release image must actually contain the first-party curl/wget
-# binaries and the strict network drop-in, not just the overlay profile used by fetch-http.
+# K199/K198/K216 staging gate: the release image must actually contain the first-party curl/wget
+# binaries and run them from the release shell (they are static /bin tools, not dynamic PIE).
+# The gate executes both version flags and performs a real local QEMU user-net fetch.
 name = "fetch-installed"
 arch = "x86_64"
 profile = "release"
-timeout_secs = 240
+timeout_secs = 300
+pre = ["mkdir -p build/fixtures/fetch && rm -f build/fixtures/fetch/fetch-installed-server.pid && (timeout 240 python3 tests/fixtures/fetch/http_server.py --port 18081 --seconds 180 > build/fixtures/fetch/fetch-installed-server.log 2>&1 & echo $! > build/fixtures/fetch/fetch-installed-server.pid) && sleep 0.5 && kill -0 $(cat build/fixtures/fetch/fetch-installed-server.pid)"]
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = []
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
 expect_exit = "success"
 
 [[expect]]
@@ -28,6 +34,27 @@ regex = '^-rwxr-xr-x .* /bin/curl$'
 
 [[expect]]
 regex = '^-rwxr-xr-x .* /bin/wget$'
+
+[[expect]]
+regex = '^curl 0\.1\.0 \(RavenBSD\)$'
+
+[[expect]]
+regex = '^curl-version=0$'
+
+[[expect]]
+regex = '^wget 0\.1\.0 \(RavenBSD\)$'
+
+[[expect]]
+regex = '^wget-version=0$'
+
+[[expect]]
+regex = '^known-http-body$'
+
+[[expect]]
+regex = '^curl-fetch=0$'
+
+[[expect]]
+regex = '^wget-fetch=0$'
 
 [[expect]]
 regex = '^hostname = "raven"$'
@@ -67,6 +94,54 @@ delay_ms = 100
 
 [[step]]
 wait = '^-rwxr-xr-x .* /bin/wget$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/curl --version; echo curl-version=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl 0\.1\.0 \(RavenBSD\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^curl-version=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/wget --version; echo wget-version=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^wget 0\.1\.0 \(RavenBSD\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^wget-version=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/curl http://10.0.2.2:18081/known.txt; echo; echo curl-fetch=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 60
+
+[[step]]
+wait = '^curl-fetch=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/wget -O /tmp/installed-wget.txt http://10.0.2.2:18081/known.txt; echo wget-fetch=$?; /bin/cat /tmp/installed-wget.txt; echo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^wget-fetch=0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^known-http-body$'
 timeout_secs = 30
 
 [[step]]

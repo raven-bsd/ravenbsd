@@ -51,6 +51,10 @@ mod program {
     }
 
     fn main(args: raven_rt::Args) -> i32 {
+        if curl::version_requested(args.iter().skip(1)) {
+            raven_rt::println!("{}", curl::VERSION_LINE);
+            return EXIT_OK;
+        }
         let options = match parse(args.iter().skip(1)) {
             Ok(options) => options,
             Err(error) => {
@@ -242,6 +246,11 @@ mod tls_program {
     }
 
     fn run(args: &[&str]) -> i32 {
+        if curl::version_requested(args.iter().skip(1).copied()) {
+            output(curl::VERSION_LINE);
+            output("\n");
+            return EXIT_OK;
+        }
         let options = match parse(args.iter().skip(1).copied()) {
             Ok(options) => options,
             Err(error) => {
