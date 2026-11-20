@@ -6,11 +6,14 @@
 //! The base build downloads plain HTTP through `raven-http`/`raven-http-net`; the `tls` add-on
 //! build links `raven-tls` (OpenSSL) for certificate- and hostname-verified HTTPS.
 
-#![cfg_attr(target_os = "none", no_std)]
-#![cfg_attr(target_os = "none", no_main)]
-#![cfg_attr(not(all(target_os = "none", feature = "tls")), forbid(unsafe_code))]
+#![cfg_attr(any(target_os = "none", target_os = "ravenbsd"), no_std)]
+#![cfg_attr(any(target_os = "none", target_os = "ravenbsd"), no_main)]
+#![cfg_attr(
+    not(all(feature = "tls", any(target_os = "none", target_os = "ravenbsd"))),
+    forbid(unsafe_code)
+)]
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 extern crate alloc;
 
 #[cfg(all(target_os = "none", not(feature = "tls")))]
@@ -139,7 +142,7 @@ mod program {
     }
 }
 
-#[cfg(all(target_os = "none", feature = "tls"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "tls"))]
 mod tls_program {
     use alloc::string::String;
     use alloc::vec::Vec;
@@ -360,5 +363,5 @@ mod tls_program {
     }
 }
 
-#[cfg(not(target_os = "none"))]
+#[cfg(all(not(target_os = "none"), not(feature = "tls")))]
 fn main() {}

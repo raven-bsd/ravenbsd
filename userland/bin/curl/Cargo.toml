@@ -26,15 +26,15 @@ tls = ["dep:raven-tls", "dep:raven-scheme", "dep:raven-proto-net"]
 
 [dependencies]
 raven-http = { path = "../../../crates/raven-http" }
-
-[target.'cfg(target_os = "none")'.dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
-raven-http-net = { path = "../../../crates/raven-http-net" }
 raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
-raven-rt = { path = "../../rt", features = ["alloc"] }
 raven-tls = { path = "../../../crates/raven-tls", optional = true }
 raven-scheme = { path = "../../../crates/raven-scheme", optional = true }
 raven-proto-net = { path = "../../../crates/raven-proto-net", optional = true }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-http-net = { path = "../../../crates/raven-http-net" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
 
 [lints]
 workspace = true

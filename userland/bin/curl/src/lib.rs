@@ -8,7 +8,10 @@
 //! add-on build that links `raven-tls`, never through an unverified fallback.
 
 #![cfg_attr(not(test), no_std)]
-#![cfg_attr(not(all(target_os = "none", feature = "tls")), forbid(unsafe_code))]
+#![cfg_attr(
+    not(all(feature = "tls", any(target_os = "none", target_os = "ravenbsd"))),
+    forbid(unsafe_code)
+)]
 
 extern crate alloc;
 
@@ -332,7 +335,7 @@ pub fn https_http_url(url: &str) -> Result<String, ParseError> {
 /// True when this build links the TLS add-on.
 pub const TLS_AVAILABLE: bool = cfg!(feature = "tls");
 
-#[cfg(all(target_os = "none", feature = "tls"))]
+#[cfg(all(feature = "tls", any(target_os = "none", target_os = "ravenbsd")))]
 pub mod tls;
 
 /// Create the base-build plain-HTTP transport.

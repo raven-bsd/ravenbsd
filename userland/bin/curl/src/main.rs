@@ -7,11 +7,14 @@
 //! `EUNAVAILABLE` for HTTPS. The `tls` add-on build links `raven-tls` (OpenSSL) and enables
 //! certificate- and hostname-verified HTTPS.
 
-#![cfg_attr(target_os = "none", no_std)]
-#![cfg_attr(target_os = "none", no_main)]
-#![forbid(unsafe_code)]
+#![cfg_attr(any(target_os = "none", target_os = "ravenbsd"), no_std)]
+#![cfg_attr(any(target_os = "none", target_os = "ravenbsd"), no_main)]
+#![cfg_attr(
+    not(all(feature = "tls", any(target_os = "none", target_os = "ravenbsd"))),
+    forbid(unsafe_code)
+)]
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 extern crate alloc;
 
 #[cfg(all(target_os = "none", not(feature = "tls")))]
@@ -151,17 +154,16 @@ mod program {
     }
 }
 
-#[cfg(all(target_os = "none", feature = "tls"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "tls"))]
 mod tls_program {
-    use alloc::string::String;
     use alloc::vec::Vec;
     use core::alloc::{GlobalAlloc, Layout};
     use core::ffi::{CStr, c_char, c_int, c_long, c_void};
     use core::ptr;
 
     use curl::{
-        EXIT_ERROR, EXIT_HTTP_FAILED, EXIT_OK, EXIT_USAGE, FetchError, Options, fetch_with,
-        format_head, is_https, parse,
+        EXIT_ERROR, EXIT_HTTP_FAILED, EXIT_OK, EXIT_USAGE, FetchError, fetch_with, format_head,
+        is_https, parse,
     };
     use raven_http::Clock;
 
@@ -379,5 +381,5 @@ mod tls_program {
     }
 }
 
-#[cfg(not(target_os = "none"))]
+#[cfg(all(not(target_os = "none"), not(feature = "tls")))]
 fn main() {}

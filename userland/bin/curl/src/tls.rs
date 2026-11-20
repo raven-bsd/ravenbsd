@@ -21,7 +21,7 @@ use raven_proto_net::{Call, Endpoint, Response as SocketResponse, SocketRequest}
 use raven_scheme::Client;
 use raven_tls::{Connection, Error as TlsError, Transport as TlsIo, TransportError as TlsIoError};
 
-use crate::{Transport as HttpTransport, TransportError as HttpTransportError};
+use raven_http::{Transport as HttpTransport, TransportError as HttpTransportError};
 
 const READ_WRITE: u32 = 3;
 const READ: u32 = 1;
@@ -108,7 +108,7 @@ impl SchemeSocket {
                             return Err(());
                         }
                     }
-                    Err(_) => {
+                    Ok(_) | Err(_) => {
                         self.close_handle();
                         return Err(());
                     }
