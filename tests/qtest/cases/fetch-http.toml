@@ -3,6 +3,8 @@
 
 # K199: base curl/wget over raven-http/raven-http-net against a multi-request local HTTP server.
 # The base binaries stay C-free; the HTTPS fallback must be a clear EUNAVAILABLE.
+# K219: the fixture server uses port 18081; its /slow endpoint sleeps 5 s, so --max-time 1 must
+# return non-zero with real margin.
 
 name = "fetch-http"
 arch = "x86_64"
@@ -63,15 +65,31 @@ wait = '^curl-body=0$'
 timeout_secs = 30
 
 [[step]]
-send = "touch /tmp/probe; echo touch=$?; printf x > /tmp/probe2; echo redir=$?\n"
-delay_ms = 100
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "touch /tmp/probe; echo touch=$?\n"
+delay_ms = 0
 
 [[step]]
 wait = '^touch=0$'
 timeout_secs = 30
 
 [[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "printf x > /tmp/probe2; echo redir=$?\n"
+delay_ms = 0
+
+[[step]]
 wait = '^redir=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]

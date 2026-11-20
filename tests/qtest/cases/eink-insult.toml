@@ -2,10 +2,13 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # K217: the E-Ink content fetch proof in one staged script. A deterministic host server
-# (127.0.0.1:18081, exposed to the guest as 10.0.2.2 through QEMU user networking) serves one
+# (127.0.0.1:18083, exposed to the guest as 10.0.2.2 through QEMU user networking) serves one
 # fixed insult line. The test initfs carries /etc/eink-insult.sh with all fetch, comparison, 404,
 # -f and redirect checks; the qtest sends that script once and waits for its unique markers, so
 # the per-character prompt redraw cannot drop a multi-command sequence.
+#
+# K219: the fixture uses the unique port 18083; the pre stops its previous pid, waits, and
+# verifies the listening socket before the guest boots.
 #
 # K199 stages /bin/curl and /bin/wget; K216 may make them static. Until then the K201 pre
 # overlays statically linked copies into the test initfs. The expected body is the server-owned
