@@ -3,7 +3,7 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # K202/K219: build the release initfs (netd, getty/login, network tools), build the target
-# `raven` admin binary, and repack the initfs with /bin/raven for the modern-net qtest.
+# `raven` admin binary, and repack the initfs with /usr/sbin/raven for the modern-net qtest.
 #
 # K219: never reuse the shared build/x86_64/initfs.img. modern-admin (or its qtest image build)
 # can leave the admin/rsh initfs there, which makes modern-net boot `rsh: ready` instead of
@@ -32,4 +32,4 @@ cargo run --quiet --manifest-path tests/qtest/cases/modern-net/image/Cargo.toml 
     --target-dir "$target" --bin modern-net-image -- \
     "$base" "$out/initfs.img" \
     "/init=build/x86_64/user/raven-init" \
-    "/bin/raven=build/fixtures/modern-admin/raven"
+    "/usr/sbin/raven=build/fixtures/modern-admin/raven"

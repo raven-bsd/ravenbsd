@@ -30,7 +30,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven config --dry-run\n"
+send = "/usr/sbin/raven config --dry-run\n"
 delay_ms = 100
 
 [[step]]
@@ -58,7 +58,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven config\n"
+send = "/usr/sbin/raven config\n"
 delay_ms = 100
 
 [[step]]
@@ -86,7 +86,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven config --dry-run\n"
+send = "/usr/sbin/raven config --dry-run\n"
 delay_ms = 100
 
 [[step]]

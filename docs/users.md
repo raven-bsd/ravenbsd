@@ -9,6 +9,9 @@ OBSERVED (host tests and the `raven-users`/`raven-ufs` qtests): `raven config` a
 `crates/raven-config/src/users.rs`; the TUI forms are in `crates/raven-tui`; the target CLI
 records are in `userland/bin/raven/src/admin.rs`.
 
+The admin client is installed at `/usr/sbin/raven`; `/usr/sbin` is in the root PATH, so
+`raven ...` and `/usr/sbin/raven ...` are equivalent.
+
 ## Base accounts
 
 The release and UFS images stage two accounts from the same source files. The 0.1.0 password

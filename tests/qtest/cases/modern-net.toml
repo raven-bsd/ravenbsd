@@ -67,7 +67,7 @@ wait = '^raven# $'
 timeout_secs = 360
 
 [[step]]
-send = "/bin/raven --json net if\n"
+send = "/usr/sbin/raven --json net if\n"
 delay_ms = 100
 
 [[step]]
@@ -79,7 +79,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven net route\n"
+send = "/usr/sbin/raven net route\n"
 delay_ms = 100
 
 [[step]]
@@ -91,7 +91,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/raven net status && echo net-status-ok\n"
+send = "/usr/sbin/raven net status && echo net-status-ok\n"
 delay_ms = 100
 
 [[step]]
