@@ -8,7 +8,7 @@ use super::*;
 #[test]
 fn names_pair_zero() {
     let mut buffer = [0u8; 32];
-    let length = slave_path(0, &mut buffer).expect("name");
+    let length = slave_path(0, &mut buffer).unwrap_or(usize::MAX);
     assert_eq!(&buffer[..length], b"pty:slave/0");
     assert_eq!(buffer[length], 0);
 }
@@ -16,7 +16,7 @@ fn names_pair_zero() {
 #[test]
 fn names_a_multi_digit_pair() {
     let mut buffer = [0u8; 32];
-    let length = slave_path(1234, &mut buffer).expect("name");
+    let length = slave_path(1234, &mut buffer).unwrap_or(usize::MAX);
     assert_eq!(&buffer[..length], b"pty:slave/1234");
     assert_eq!(buffer[length], 0);
 }
