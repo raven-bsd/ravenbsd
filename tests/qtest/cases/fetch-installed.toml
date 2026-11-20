@@ -8,7 +8,7 @@ name = "fetch-installed"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 300
-pre = ["mkdir -p build/fixtures/fetch && rm -f build/fixtures/fetch/fetch-installed-server.pid && (timeout 240 python3 tests/fixtures/fetch/http_server.py --port 18082 --seconds 180 > build/fixtures/fetch/fetch-installed-server.log 2>&1 & echo $! > build/fixtures/fetch/fetch-installed-server.pid) && sleep 0.5 && kill -0 $(cat build/fixtures/fetch/fetch-installed-server.pid)"]
+pre = ["mkdir -p build/fixtures/fetch && rm -f build/fixtures/fetch/fetch-installed-server.pid && (timeout 700 python3 tests/fixtures/fetch/http_server.py --port 18082 --seconds 600 > build/fixtures/fetch/fetch-installed-server.log 2>&1 & echo $! > build/fixtures/fetch/fetch-installed-server.pid) && sleep 0.5 && kill -0 $(cat build/fixtures/fetch/fetch-installed-server.pid)"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
