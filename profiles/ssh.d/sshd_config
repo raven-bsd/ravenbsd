@@ -9,6 +9,7 @@ ListenAddress 0.0.0.0
 PidFile /tmp/sshd.pid
 HostKey /tmp/ssh/ssh_host_ed25519_key
 PermitRootLogin yes
+AllowUsers root luser
 PasswordAuthentication yes
 KbdInteractiveAuthentication no
 UsePAM no

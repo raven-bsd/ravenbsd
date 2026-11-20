@@ -17,7 +17,7 @@ sh addons/ssh/build.sh
 The build output is `build/ssh/x86_64/bin/{sshd,ssh,ssh-keygen}`. `profiles/release.d/80-ssh.toml`
 stages them read-only into the release image, together with:
 
-* `/etc/ssh/sshd_config` — root-only demo policy (`PermitRootLogin yes`,
+* `/etc/ssh/sshd_config` — demo policy (`AllowUsers root luser`, `PermitRootLogin yes`,
   `PasswordAuthentication yes`, no PAM, no authorized keys, no sftp server beyond the built-in
   subsystem);
 * `/etc/services.d/sshd.toml` — the first-boot wrapper creates the host keys with
@@ -28,8 +28,13 @@ stages them read-only into the release image, together with:
 reported but does not turn a successful login/boot into a failed image. The release-login gate is
 therefore unaffected until the SSH primitive is complete.
 
-The root account uses the existing development password from `/etc/shadow`; the password is not
-repeated here. Do not expose this demo to an untrusted network.
+The release account database stages `/etc/passwd`, `/etc/group` and `/etc/shadow` from
+`profiles/ssh.d/`. Besides `root` (uid 0) and the privilege-separation `sshd` (uid 74), it has
+the unprivileged demo account `luser` (uid/gid 1000, home `/home/luser`, shell `/bin/rsh`). Both
+`root` and `luser` use the same documented development password, `raven`, from the existing
+`/etc/shadow` hash; the hash is not repeated here and the plain text is only a demo credential.
+Root login and the console root recovery account are kept. Do not expose this demo to an
+untrusted network.
 
 ## Host keys
 
@@ -66,7 +71,14 @@ crypto. Tear the bridge down with `sudo -n sh scripts/qemu-net.sh down`.
 
 ## Tests
 
+`tests/ssh/ssh-guest-login.sh` (with `tests/ssh/ssh-guest-login.py`) is the host-side test for the
+unprivileged demo account over the K227 guest address. It needs `SSH_GUEST_HOST` (and optionally
+`SSH_GUEST_PORT`, default 22); without it the script exits 2 and waits for K227. When K227
+publishes the guest address it runs `ssh luser@<guest> ls`, an interactive `ssh -tt` session and
+a wrong-password refusal, printing the wall time of each session. It does not substitute the
+`hostfwd` port.
+
 The `ssh-login` qtest is intended to cover the host-to-guest command, an interactive `ssh -tt`
 session, a wrong-password refusal and host-key persistence. The service cannot be claimed until
-the AF_UNIX `socketpair` backend used by `sshd` privilege separation is merged and the guest
-image boots the service. See the K195 report for the exact primitive and the startup transcript.
+the accepted-socket transmit path (K225) delivers the banner; `sshd` privilege separation and the
+chroot already run. See the K195 report for the exact primitive and the startup transcript.

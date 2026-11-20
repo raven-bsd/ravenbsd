@@ -68,3 +68,8 @@ mode = 0o644
 src = "profiles/ssh.d/empty.keep"
 path = "/var/empty/.keep"
 mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/home-luser.keep"
+path = "/home/luser/.keep"
+mode = 0o644
