@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: rdr
+# features: redirect,ipv4,stateful,translation
+# reference: OpenBSD sys/net/pf.c:pf_get_translation,pf_map_addr; NetBSD sys/net/npf/npf_nat.c
+# support: donor-only (raven-pf at 4adc24a2 has no rdr)
+#
+# Mapping: 203.0.113.5:80 -> 10.0.0.80:8080. Rows are the pre- and
+# post-translation views of the same inbound flow; K273/K274 must redirect
+# before filtering and keep the reverse flow in the state table.
+# now direction interface proto source sport destination dport length flags expected disposition
+0   in  eth0 tcp 198.51.100.20 40000 203.0.113.5 80   60 S  pass created
+1   in  eth0 tcp 198.51.100.20 40000 10.0.0.80   8080 60 S  pass existing
+2   out eth0 tcp 10.0.0.80     8080  198.51.100.20 40000 60 SA pass existing

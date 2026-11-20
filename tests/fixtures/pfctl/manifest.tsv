@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Expected outcome for every pf.conf fixture. `line` is the 1-based line that
+# must be named for a rejected file; `-` means the whole file is accepted.
+# The exact diagnostic wording is intentionally not pinned here: K274 owns it.
+# file|status|line|construct|note
+basic.conf|ok|-|rules|pass/block/quick/in/out/on/proto/from/to/port/keep-state
+stateful.conf|ok|-|rules|flags/port-list/icmp-type/keep-state
+tables.conf|ok|-|tables|persistent and inline tables
+nat.conf|ok|-|nat|source NAT
+rdr.conf|ok|-|rdr|port redirect and binat
+options.conf|ok|-|options|skip/optimization/timeout/limit/scrub
+malformed/unknown-keyword.conf|error|4|rules|reject, no partial load
+malformed/bad-address.conf|error|4|rules|reject, no partial load
+malformed/bad-prefix.conf|error|4|rules|reject, no partial load
+malformed/bad-port.conf|error|4|rules|reject, no partial load
+malformed/unclosed-table.conf|error|3|tables|reject, no partial load
+malformed/unbalanced-brace.conf|error|4|rules|reject, no partial load
+malformed/unterminated-rule.conf|error|4|rules|reject, no partial load
+malformed/oversized-line.conf|error|3|rules|bounded parser, reject

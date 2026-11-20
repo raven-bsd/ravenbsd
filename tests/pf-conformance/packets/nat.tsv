@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: nat
+# features: nat,ipv4,stateful,translation
+# reference: OpenBSD sys/net/pf.c:pf_map_addr and translation lookup; NetBSD sys/net/npf/npf_nat.c; FreeBSD sys/netpfil/pf/pf_nat.c (absent in the sparse checkout)
+# support: donor-only (raven-pf at 4adc24a2 has no NAT)
+#
+# Mapping: 10.0.0.5:40000 <-> 203.0.113.5:40000 when talking to
+# 198.51.100.20:80. Rows are post-translation packets; K273/K274 must
+# produce this mapping and keep the reverse flow in the state table.
+# now direction interface proto source sport destination dport length flags expected disposition
+0   out eth0 tcp 10.0.0.5     40000 198.51.100.20 80   60 S  pass created
+1   in  eth0 tcp 198.51.100.20 80   203.0.113.5   40000 60 SA pass existing
+2   out eth0 tcp 203.0.113.5  40000 198.51.100.20 80   60 A  pass existing

@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: stateful-udp
+# features: stateful,udp,allow,deny,expiry,reverse
+# reference: OpenBSD sys/net/pf.c:pf_test,pf_create_state; FreeBSD sys/netpfil/pf/pf.c; NetBSD sys/net/npf/npf_conn.c
+# expect-counters in_pass=3 in_block=2 out_pass=3 out_block=0 states_created=3 states_expired=2 state_hits=3
+#
+# now direction interface proto source sport destination dport length flags expected disposition
+0   out eth0 udp 10.0.0.5   53000 192.0.2.53 53   57 - pass  created
+1   in  eth0 udp 192.0.2.53 53    10.0.0.5   53000 45 - pass  existing
+30  out eth0 udp 10.0.0.5   53000 192.0.2.53 53   57 - pass  existing
+92  in  eth0 udp 192.0.2.53 53    10.0.0.5   53000 45 - block -
+100 in  eth0 udp 10.0.0.6   53001 192.0.2.53 53   57 - pass  created
+101 out eth0 udp 192.0.2.53 53    10.0.0.6   53001 45 - pass  existing
+110 in  eth0 udp 10.0.0.7   5353  192.0.2.53 5000 40 - block -
+162 in  eth0 udp 10.0.0.6   53001 192.0.2.53 53   57 - pass  created

@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# id|kind|rules|packets|support|expect
+#   kind=scenario: rules+packets drive the engine
+#   kind=parse-error: rules must be rejected at expect=<line>,<substring>
+#   support=raven-pf: executed by the fixture harness
+#   support=raven-pf-parse-error: executed by the fixture harness
+#   support=donor-only: validated structurally, skipped with the stated reason
+stateful-tcp|scenario|rules/stateful-tcp.conf|packets/stateful-tcp.tsv|raven-pf|-
+stateful-udp|scenario|rules/stateful-udp.conf|packets/stateful-udp.tsv|raven-pf|-
+stateful-icmp|scenario|rules/stateful-icmp.conf|packets/stateful-icmp.tsv|raven-pf|-
+default-deny|scenario|rules/default-deny.conf|packets/default-deny.tsv|raven-pf|-
+quick-last-match|scenario|rules/quick-last-match.conf|packets/quick-last-match.tsv|raven-pf|-
+nat|scenario|rules/nat.conf|packets/nat.tsv|donor-only|raven-pf has no NAT; staged for K273/K274
+rdr|scenario|rules/rdr.conf|packets/rdr.tsv|donor-only|raven-pf has no rdr; staged for K273/K274
+ipv6|scenario|rules/ipv6.conf|packets/ipv6.tsv|donor-only|raven-pf is IPv4-only; staged for K273
+fragment|scenario|rules/fragment.conf|packets/fragment.tsv|donor-only|raven-pf has no fragment model; staged for K273
+malformed-unknown-keyword|parse-error|rules/malformed-unknown-keyword.conf|-|raven-pf-parse-error|4,unknown protocol
+malformed-bad-address|parse-error|rules/malformed-bad-address.conf|-|raven-pf-parse-error|4,invalid IPv4 address
+malformed-bad-port|parse-error|rules/malformed-bad-port.conf|-|raven-pf-parse-error|4,invalid port
