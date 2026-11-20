@@ -8,7 +8,7 @@
 use raven_tcpip::{
     IPV4_FLOOR, IPV6_FLOOR, IpAddr, IpFamily, Ipv4Addr, Ipv6Addr, MssUpdate, MtuCache, Plpmtud,
     PlpmtudState, TCP_MSS_DEFAULT, floor_for, mss_headers, mss_update, mssopt, next_pmtu,
-    on_icmp_frag_needed, probe_sequence,
+    next_pmtu6, on_icmp_frag_needed, on_icmp6_frag_needed, probe_sequence,
 };
 
 fn v4(value: u8) -> IpAddr {
@@ -334,4 +334,15 @@ fn freebsd_icmp_next_pmtu_and_quote_filter() {
         on_icmp_frag_needed(200, 100, 200, 1200, 1500, 1460, 216),
         None
     );
+}
+
+#[test]
+fn freebsd_icmp6_next_pmtu_and_quote_filter() {
+    assert_eq!(next_pmtu6(1400), 1400);
+    assert_eq!(next_pmtu6(1000), IPV6_FLOOR);
+    assert_eq!(on_icmp6_frag_needed(100, 100, 200, 1400, 1460), Some(1400));
+    // 1460 + 60 is not smaller than 1460 + 60.
+    assert_eq!(on_icmp6_frag_needed(100, 100, 200, 1520, 1460), None);
+    assert_eq!(on_icmp6_frag_needed(99, 100, 200, 1400, 1460), None);
+    assert_eq!(on_icmp6_frag_needed(200, 100, 200, 1400, 1460), None);
 }

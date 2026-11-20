@@ -257,6 +257,31 @@ pub fn on_icmp_frag_needed(
     (mtu < maxseg.saturating_add(40)).then_some(mtu)
 }
 
+/// FreeBSD `tcp6_next_pmtu`: the advertised MTU, floored at `IPV6_MMTU`.
+#[must_use]
+pub fn next_pmtu6(reported: u32) -> u32 {
+    reported.max(IPV6_FLOOR)
+}
+
+/// FreeBSD `tcp6_ctlinput_with_port` need-fragmentation decision.
+///
+/// The quoted sequence must be in `[snd_una, snd_max)` and the MTU must be smaller than
+/// `maxseg + sizeof(struct tcphdr) + sizeof(struct ip6_hdr)`.
+#[must_use]
+pub fn on_icmp6_frag_needed(
+    quoted_seq: u32,
+    snd_una: u32,
+    snd_max: u32,
+    reported_mtu: u32,
+    maxseg: u32,
+) -> Option<u32> {
+    if quoted_seq < snd_una || quoted_seq >= snd_max {
+        return None;
+    }
+    let mtu = next_pmtu6(reported_mtu);
+    (mtu < maxseg.saturating_add(mss_headers(IpFamily::V6))).then_some(mtu)
+}
+
 /// The RFC 8899 PLPMTUD state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlpmtudState {
