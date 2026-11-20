@@ -100,6 +100,30 @@ fn lseek_moves_the_fake_cursor() {
 }
 
 #[test]
+fn exec_fdmap_duplicates_the_event_handle() {
+    use crate::fd::inherit::{ENV_NAME, FdMap};
+
+    let platform = platform();
+    let fd = platform.open(b"/a", 0, 0).expect("open");
+    let index = platform.get(fd).expect("fd").index();
+    let event = platform
+        .backend()
+        .dup(platform.get(fd).expect("fd").handle(), 0)
+        .expect("event stand-in");
+    platform.set_ofd_event(index, event).expect("attach");
+    let env = platform.exec_fdmap_env().expect("env").expect("some");
+    let (_, value) = env.split_at(ENV_NAME.len());
+    let value = value.strip_prefix(b"=").expect("separator");
+    let map = FdMap::decode_env(value).expect("decode");
+    let inherited = map.entries.iter().find(|entry| entry.fd == fd).expect("fd");
+    assert_ne!(inherited.event, event.0, "child gets its own event handle");
+    let _ = platform
+        .backend()
+        .handle_close(crate::Handle(inherited.event));
+    let _ = platform.close(fd);
+}
+
+#[test]
 fn a_blocking_socket_read_waits_and_retries_after_eagain() {
     let platform = platform();
     let fd = platform

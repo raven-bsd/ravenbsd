@@ -1688,7 +1688,17 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 ofd.status.load(core::sync::atomic::Ordering::Relaxed),
             );
             inherited.path = ofd.path.as_ref().map(|path| path.to_vec());
-            inherited.event = event_number(ofd.event.get());
+            // The parent may close its accepted fd and event immediately after fork, before the
+            // child restores the FdMap. Give the child its own handle to the same UserEvent so
+            // the parent's final close cannot invalidate it.
+            let event = ofd.event.get();
+            inherited.event = if event == Handle::NONE {
+                0
+            } else {
+                self.backend
+                    .dup(event, raven_abi::types::Rights::ALL.bits())
+                    .map_or(event.0, |duplicate| duplicate.0)
+            };
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
             block.entries.push(inherited);
         }
