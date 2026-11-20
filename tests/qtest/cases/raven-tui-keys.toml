@@ -158,7 +158,7 @@ wait = 'raven config: module=Users \(add\)'
 timeout_secs = 30
 
 [[step]]
-send = "q\n"
+send = "\u0003"
 delay_ms = 100
 
 [[step]]
