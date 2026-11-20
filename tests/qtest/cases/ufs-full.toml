@@ -9,7 +9,8 @@ name = "ufs-full"
 arch = "x86_64"
 profile = "qemu-ufs"
 timeout_secs = 240
-pre = ["cp build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2 build/qtest/ufs-full.img"]
+pre = ["sh scripts/qemu-ufs.sh --build-only"]
+image = "build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2"
 disk_if = "virtio"
 disk_format = "qcow2"
 boot_cmdline = "console=ttyS0 test-exit=1"

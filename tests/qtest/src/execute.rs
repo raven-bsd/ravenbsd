@@ -327,6 +327,16 @@ fn prepare_image(
         }
         return Ok(image.clone());
     }
+    if let Some(image) = &case.spec.image {
+        let path = PathBuf::from(image);
+        if !path.is_file() {
+            return Err(PrepareError::Error(format!(
+                "case image not found: {} (set by `image`; the pre step must build it)",
+                path.display()
+            )));
+        }
+        return Ok(path);
+    }
     fs::create_dir_all(&options.out_dir).map_err(|error| {
         PrepareError::Error(format!(
             "cannot create output directory {}: {error}",

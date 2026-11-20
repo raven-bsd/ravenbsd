@@ -11,6 +11,7 @@ The older two-disk ESP + root preflight is retained only for the `ufs-root` regr
 
 ```sh
 make qemu-ufs
+scripts/qemu-ufs.sh --build-only   # build only; prints the qcow2 path; no QEMU
 ```
 
 This prepares the static disk tools, builds the release userland, assembles the one GPT disk,
@@ -74,23 +75,20 @@ observed qcow2 boot.
 
 ## 2. Two-disk preflight
 
-The K176 `ufs-root` regression still uses the separate bootstrap ESP and root disk:
+The K176 `ufs-root` regression still uses the separate bootstrap ESP and root disk.
+`cargo xtask image --arch x86_64 --profile qemu-ufs --output <path>` writes the two-disk
+**preflight ESP** at `<path>` and the separate `build/x86_64/qemu-ufs-root.img`; it does not
+write the demo disk to `--output`.
 
 ```sh
-cargo xtask qtest --case ufs-root --arch x86_64 --no-build
+cargo xtask qtest --case ufs-root --arch x86_64
 cargo xtask qtest --case ufs-root-persist --arch x86_64 --no-build
 ```
 
-The qemu-ufs image build emits `build/x86_64/qemu-ufs-preflight.img` (ESP) and
-`build/x86_64/qemu-ufs-root.img` (one-partition UFS GPT). Copy the preflight ESP to the qtest
-selector:
-
-```sh
-cp build/x86_64/qemu-ufs-preflight.img build/qtest/ufs-root.img
-```
-
 The boot transcript still contains `svcd: root pivoted to UFS at /`, `ufs: 240M … /`,
-`ufs: on /` and `k176-persist`.
+`ufs: on /` and `k176-persist`. The demo `ufs-full` case is self-building: its `pre` runs
+`scripts/qemu-ufs.sh --build-only`, then the harness reads the qcow2 from the case `image`
+field instead of rebuilding the profile.
 
 ## 3. Evidence
 

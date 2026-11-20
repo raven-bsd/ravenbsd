@@ -297,13 +297,11 @@ pub(crate) fn run_with_overrides(
             preflight,
             boot_toml.as_bytes(),
         )?;
-        let preflight_output = root
-            .join("build")
-            .join(arch.as_str())
-            .join("qemu-ufs-preflight.img");
         let preflight_gpt = preflight_gpt()?;
-        write_image(&preflight_output, &preflight_gpt, &preflight_esp)?;
-        write_ufs_demo(root, arch, &output, &esp, ufs)?;
+        // `--output` remains the two-disk preflight ESP (K176). The one-disk demo is
+        // emitted only at its fixed build/<arch>/ravenbsd-ufs-demo path.
+        write_image(&output, &preflight_gpt, &preflight_esp)?;
+        write_ufs_demo(root, arch, &esp, ufs)?;
         println!("{}", output.display());
         return Ok(0);
     }
@@ -361,7 +359,7 @@ fn build_esp(
 }
 
 /// Write the one-disk demo image and its qcow2 + run.sh/README artifacts.
-fn write_ufs_demo(root: &Path, arch: Arch, output: &Path, esp: &[u8], ufs: &[u8]) -> Result<()> {
+fn write_ufs_demo(root: &Path, arch: Arch, esp: &[u8], ufs: &[u8]) -> Result<()> {
     ensure!(
         !ufs.is_empty() && ufs.len().is_multiple_of(SECTOR_SIZE as usize),
         "UFS payload is not a whole number of 512-byte sectors"
@@ -391,23 +389,25 @@ fn write_ufs_demo(root: &Path, arch: Arch, output: &Path, esp: &[u8], ufs: &[u8]
             ),
         ],
     )?;
-    write_sd_image(output, &gpt, esp, ufs_start, ufs)?;
-
     let demo = root
         .join("build")
         .join(arch.as_str())
         .join("ravenbsd-ufs-demo");
     fs::create_dir_all(&demo).with_context(|| format!("cannot create {}", demo.display()))?;
+    let raw = demo.join("ravenbsd-ufs-demo.raw");
+    write_sd_image(&raw, &gpt, esp, ufs_start, ufs)?;
+
     let qcow2 = demo.join("ravenbsd-ufs-demo.qcow2");
     let status = Command::new("qemu-img")
         .arg("convert")
         .arg("-O")
         .arg("qcow2")
-        .arg(output)
+        .arg(&raw)
         .arg(&qcow2)
         .status()
         .context("cannot run qemu-img; install qemu-utils")?;
     ensure!(status.success(), "qemu-img convert failed ({status})");
+    let _ = fs::remove_file(&raw);
     let run = demo.join("run.sh");
     let readme = demo.join("README");
     fs::copy(root.join("scripts/qemu-ufs-run.sh"), &run)
