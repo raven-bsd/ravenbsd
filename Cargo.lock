@@ -302,6 +302,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "curl"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-http",
+ "raven-http-net",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tls",
+]
+
+[[package]]
 name = "cxref"
 version = "0.1.0"
 dependencies = [
@@ -4376,6 +4390,17 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "wget"
+version = "0.1.0"
+dependencies = [
+ "curl",
+ "raven-abi",
+ "raven-http",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
