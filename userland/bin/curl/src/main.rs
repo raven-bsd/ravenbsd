@@ -298,6 +298,12 @@ mod tls_program {
                         output("curl: TLS: ");
                         output(message);
                         output("\n");
+                    } else {
+                        // TEMP K218: the TLS read error code when no connect/handshake error
+                        // was recorded.
+                        output("curl: tls-code=");
+                        number(usize::try_from(raven_tls::last_ssl_error()).unwrap_or(0));
+                        output("\n");
                     }
                 }
                 return match error {
