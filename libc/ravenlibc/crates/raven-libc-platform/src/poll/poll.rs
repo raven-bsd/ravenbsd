@@ -140,12 +140,31 @@ pub fn poll<B: SysBackend, L: Lock>(
     Ok(fired)
 }
 
-/// `ppoll`: the signal mask swap must be atomic with the wait (PG-26); until then `ENOSYS`.
+/// `ppoll`.
+///
+/// The atomic signal-mask swap (`PG-26`) does not exist yet. OpenSSH's packet path passes a
+/// `NULL` mask, and refusing every `ppoll` would block a server read forever; poll with the
+/// caller's current mask and round the timeout up to the poll millisecond granularity. The mask
+/// argument is accepted but not swapped until the atomic operation lands.
 pub fn ppoll<B: SysBackend, L: Lock>(
-    _platform: &Platform<B, L>,
-    _fds: &mut [Pollfd],
-    _timeout: Option<&raven_libc_abi::structs::Timespec>,
+    platform: &Platform<B, L>,
+    fds: &mut [Pollfd],
+    timeout: Option<&raven_libc_abi::structs::Timespec>,
     _sigmask: Option<&[u64]>,
 ) -> Result<usize, Errno> {
-    Err(Errno::ENOSYS)
+    let timeout_ms = match timeout {
+        None => -1,
+        Some(value) => {
+            if value.tv_sec < 0 || value.tv_nsec < 0 {
+                0
+            } else {
+                let nanos = i128::from(value.tv_sec)
+                    .saturating_mul(1_000_000_000)
+                    .saturating_add(i128::from(value.tv_nsec));
+                let millis = nanos.saturating_add(999_999) / 1_000_000;
+                i32::try_from(millis).unwrap_or(i32::MAX)
+            }
+        }
+    };
+    poll(platform, fds, timeout_ms)
 }

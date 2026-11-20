@@ -4,6 +4,7 @@
 //! Regression tests for the lazily allocated `getttyent` string arena.
 
 use super::*;
+use crate::ffi::TestLock;
 use core::ffi::CStr;
 
 fn entry() -> TtyEnt {
@@ -25,6 +26,7 @@ unsafe fn text(pointer: *mut c_char) -> Vec<u8> {
 
 #[test]
 fn successive_fills_reuse_one_heap_arena() {
+    let _guard = TestLock::acquire();
     // SAFETY: the C API is non-reentrant and this test is the only caller.
     let first = unsafe { fill(&entry()) };
     // SAFETY: as above.
@@ -42,6 +44,7 @@ fn successive_fills_reuse_one_heap_arena() {
 
 #[test]
 fn a_later_fill_overwrites_the_previous_record() {
+    let _guard = TestLock::acquire();
     let mut long = entry();
     long.name = b"ttyv1".to_vec();
     long.comment = b"local console".to_vec();

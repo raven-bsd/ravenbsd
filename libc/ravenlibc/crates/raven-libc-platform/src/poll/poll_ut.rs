@@ -123,12 +123,17 @@ fn too_many_fds_is_einval() {
 }
 
 #[test]
-fn ppoll_is_enosys_until_pg_26() {
+fn ppoll_reports_the_poll_result() {
     let platform = regular_file_platform();
     let mut fds = [Pollfd {
         fd: 0,
         events: POLLIN as i16,
         revents: 0,
     }];
-    assert_eq!(ppoll(&platform, &mut fds, None, None), Err(Errno::ENOSYS));
+    let timeout = raven_libc_abi::structs::Timespec {
+        tv_sec: 0,
+        tv_nsec: 1_000_000,
+    };
+    assert_eq!(ppoll(&platform, &mut fds, Some(&timeout), None), Ok(1));
+    assert_eq!(fds[0].revents, POLLNVAL as i16);
 }
