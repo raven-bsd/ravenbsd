@@ -82,11 +82,11 @@ without root or a boot.
 `scripts/qemu-ufs-run.sh` prints:
 
 ```
-run.sh: guest=10.0.2.15 user=luser password=raven
-run.sh: ssh luser@10.0.2.15 ls   # requires K195 sshd + K225 TCP; pending
+run.sh: guest=10.0.2.15 user=raven password=raven
+run.sh: ssh raven@10.0.2.15 ls   # requires K195 sshd + K225 TCP; pending
 ```
 
-The `luser` account and password are the documented demo credential for K195; this ticket does not
+The `raven` account and password are the documented demo credential for K195; this ticket does not
 change the OpenSSH profile or claim the login. The host TCP/SSH assertion waits for K225/K195; the
 `net-host` qtest runs the bounded host-side tap proof (host ping, guest ping/internet, DNS server,
 cleanup) and then boots the release image to prove the getty path is unchanged. No hostfwd

@@ -19,7 +19,7 @@ user_net=0
 tap=${RAVEN_QEMU_TAP:-ravendemo0}
 net_up=0
 guest_ip=10.0.2.15
-demo_user=luser
+demo_user=raven
 demo_password=${RAVEN_DEMO_PASSWORD:-raven}
 
 usage() {
@@ -55,7 +55,7 @@ check_only=${check_only:-0}
 
 print_demo() {
     printf 'run.sh: guest=%s user=%s password=%s\n' "$guest_ip" "$demo_user" "$demo_password"
-    printf 'run.sh: ssh luser@%s ls   # requires K195 sshd + K225 TCP; pending\n' "$guest_ip"
+    printf 'run.sh: ssh raven@%s ls   # requires K195 sshd + K225 TCP; pending\n' "$guest_ip"
 }
 
 check_tools() {
