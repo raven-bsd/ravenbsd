@@ -7,7 +7,7 @@
 xtask = "run --package xtask --"
 
 # SC1: normal builds resolve from crates.io. The vendored release graph is opt-in: pass
-# `--config vendor-config.toml` (and, for nested xtask cargo builds, the matching
+# `--config .cargo/vendor.toml` (and, for nested xtask cargo builds, the matching
 # CARGO_SOURCE_* environment) to `cargo --offline`. See docs/supply-chain.md.
 
 # K19a: getrandom 0.4 selects its custom backend through this cfg. The
