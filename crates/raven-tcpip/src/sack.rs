@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+//
+// Ported from DragonFlyBSD sys/netinet/tcp_sack.c @
+// 94448f622a06cde90ba42d688e9cab2448ad9ab3 (3-clause BSD; Jeffrey M. Hsu and
+// The DragonFly Project). Rust reimplementation; no C expression copied.
 
 //! SACK scoreboard (RFC 6675), receiver block selection (RFC 2018) and DSACK.
 
@@ -76,6 +80,8 @@ pub struct SackScoreboard {
     pub dup_threshold: u32,
     pub range_cap: usize,
     pub dropped: usize,
+    /// First sequence number considered lost (DragonFly `scb.lostseq`), relative to `snd_una`.
+    pub lostseq: u32,
     dsack_detected: bool,
     reneging: bool,
 }
@@ -101,6 +107,7 @@ impl SackScoreboard {
             dup_threshold: dup_threshold.max(1),
             range_cap: range_cap.max(1),
             dropped: 0,
+            lostseq: 0,
             dsack_detected: false,
             reneging: false,
         }
@@ -137,6 +144,7 @@ impl SackScoreboard {
         }
         self.sacked.push((start, end));
         self.normalize();
+        self.update_lostseq(0);
     }
 
     fn normalize(&mut self) {
@@ -175,7 +183,29 @@ impl SackScoreboard {
         .unwrap_or(u32::MAX)
     }
 
-    /// RFC 6675 `IsLost(S)`.
+    /// Compute the DragonFly `lostseq` from the SACK blocks.
+    fn computed_lostseq(&self) -> u32 {
+        let threshold = self.dup_threshold.max(1);
+        let bytes_threshold = threshold.saturating_sub(1).saturating_mul(self.mss);
+        let mut blocks = 0u32;
+        let mut bytes = 0u32;
+        for (start, end) in self.sacked.iter().rev() {
+            blocks = blocks.saturating_add(1);
+            bytes = bytes.saturating_add(end.saturating_sub(*start));
+            if blocks == threshold || bytes >= bytes_threshold {
+                return *start;
+            }
+        }
+        0
+    }
+
+    /// DragonFly `tcp_sack_update_lostseq`: advance the first-lost mark from the SACK blocks.
+    pub fn update_lostseq(&mut self, snd_una: u32) {
+        let lostseq = self.computed_lostseq();
+        self.lostseq = if lostseq == 0 { snd_una } else { lostseq };
+    }
+
+    /// RFC 6675 `IsLost(S)` / DragonFly `tcp_sack_islost`.
     #[must_use]
     pub fn is_lost(&self, point: u32) -> bool {
         self.ranges_above(point) >= self.dup_threshold
@@ -184,6 +214,31 @@ impl SackScoreboard {
                     .dup_threshold
                     .saturating_sub(1)
                     .saturating_mul(self.mss)
+    }
+
+    /// DragonFly `tcp_sack_has_sacked`.
+    #[must_use]
+    pub fn has_sacked(&self, amount: u32) -> bool {
+        let mut bytes = 0u32;
+        for (start, end) in &self.sacked {
+            bytes = bytes.saturating_add(end.saturating_sub(*start));
+            if bytes >= amount {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// DragonFly `tcp_sack_bytes_below`.
+    #[must_use]
+    pub fn bytes_below(&self, sequence: u32) -> u32 {
+        let mut bytes = 0u32;
+        for (start, end) in &self.sacked {
+            if sequence > *start {
+                bytes = bytes.saturating_add(sequence.min(*end).saturating_sub(*start));
+            }
+        }
+        bytes
     }
 
     /// The complement of `sacked` over `[0, high_data)`.
@@ -203,7 +258,7 @@ impl SackScoreboard {
         gaps
     }
 
-    /// RFC 6675 `SetPipe`.
+    /// RFC 6675 `SetPipe` / DragonFly `tcp_sack_compute_pipe`.
     #[must_use]
     pub fn pipe(&self) -> u32 {
         let mut pipe = 0u32;

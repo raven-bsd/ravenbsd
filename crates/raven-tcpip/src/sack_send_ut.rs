@@ -54,6 +54,18 @@ fn scoreboard_uses_offsets_from_snd_una() {
 }
 
 #[test]
+fn dragonfly_lostseq_has_sacked_and_bytes_below() {
+    let mut board = SackScoreboard::new(10_000, 0, 0, 1_000, 3, 16);
+    board.insert_block(2_000, 3_000);
+    board.insert_block(4_000, 6_000);
+    assert_eq!(board.lostseq, 4_000);
+    assert!(board.has_sacked(3_000));
+    assert!(!board.has_sacked(3_001));
+    assert_eq!(board.bytes_below(5_000), 2_000);
+    assert_eq!(board.bytes_below(10_000), 3_000);
+}
+
+#[test]
 fn head_is_lost_needs_three_segments_of_sacked_data() {
     let mut c = connection();
     merge_sack_blocks(&mut c, &[(2_000, 3_000)]);
