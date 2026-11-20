@@ -158,7 +158,7 @@ send = "raven-release\n"
 delay_ms = 100
 
 [[step]]
-wait = '^raven config: saved /etc/raven/conf\.d/network\.toml$'
+wait = '^raven config: error: Read-only file system \(os error 30\)$'
 timeout_secs = 30
 
 [[step]]
@@ -166,7 +166,71 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "cat /etc/raven/conf.d/network.toml\n"
+send = "export RAVEN_CONFIG_ROOT=/tmp/raven-release-test\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/raven config --dry-run\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-release\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: dry-run plan=/tmp/raven-release-test/etc/raven/conf\.d/network\.toml file=absent$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-release\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: saved /tmp/raven-release-test/etc/raven/conf\.d/network\.toml$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /tmp/raven-release-test/etc/raven/conf.d/network.toml\n"
 delay_ms = 100
 
 [[step]]

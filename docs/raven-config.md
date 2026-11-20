@@ -100,17 +100,25 @@ form does not hard-code a shell command, `eval` or a vendor TUI framework.
 The release profile extends `shell` and gets a target-built `raven` at `/bin/raven` from
 `profiles/release.d/90-raven.toml`. The artifact is produced by
 `tests/fixtures/modern-admin/build.sh` (a target build, not the host binary); the
-`raven-release` qtest runs that builder before the image. The release/UFS `/etc` is writable, so
-the TUI saves `/etc/raven/conf.d/network.toml`; the file is staged with the K198 default and the
-qtest reads back the saved hostname/mode. The bare shell base and the `raven-admin-test` fixture
-keep their own staging entry; a `shell.d` duplicate would collide on `/bin/raven` with that test
-fragment. The read-only initfs failure path uses the documented `RAVEN_CONFIG_ROOT` test root and
-does not crash login.
+`raven-release` qtest runs that builder before the image.
+
+The release image's root is the read-only initfs: a default `/etc/raven/conf.d` save fails
+cleanly with `Read-only file system` and returns to the login prompt. The qtest exercises that
+clean failure, then uses the documented `RAVEN_CONFIG_ROOT=/tmp/raven-release-test` (ramfs) for
+the atomic drop-in proof and reads the saved hostname/mode back. The live default remains `/`
+on a writable UFS root.
+
+The `qemu-ufs` profile extends `shell`, not `release`, so this release fragment does not stage
+`/bin/raven` in the UFS payload; a `profiles/shell.d` fragment is required for that. A `shell.d`
+staging of `/bin/raven` would currently collide with the existing
+`profiles/raven-admin-test.d/20-raven.toml` staging (outside K209's Owns), and the profile merge
+rejects duplicate paths. This is recorded as the K209 blocker; the release image and qtest are
+green.
 
 `raven-release` (`tests/qtest/cases/raven-release.toml`) boots the release profile, logs in,
 asserts `/bin/raven` is executable, runs `raven net if/route/status` and `raven --json status`,
-then drives the dry-run and the real UFS save and reads the drop-in back. `release-login`,
-`modern-admin` and `modern-net` remain green.
+then drives the dry-run, the clean read-only failure and the test-root save, and reads the
+drop-in back. `release-login`, `modern-admin` and `modern-net` remain green.
 
 ## Donor reconciliation
 
