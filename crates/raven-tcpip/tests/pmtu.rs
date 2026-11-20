@@ -6,8 +6,9 @@
 #![cfg(feature = "testutil")]
 
 use raven_tcpip::{
-    IPV4_FLOOR, IPV6_FLOOR, IpAddr, Ipv4Addr, Ipv6Addr, MtuCache, Plpmtud, PlpmtudState,
-    classic_update, floor_for, probe_sequence,
+    IPV4_FLOOR, IPV6_FLOOR, IpAddr, IpFamily, Ipv4Addr, Ipv6Addr, MtuCache, Plpmtud, PlpmtudState,
+    PmtuPath, PmtuResult, TCP_MSS_DEFAULT, classic_update, floor_for, mss_from_peer, mss_headers,
+    mss_to_advertise, on_icmp_pmtu, probe_sequence,
 };
 
 fn v4(value: u8) -> IpAddr {
@@ -244,4 +245,92 @@ fn a_1400_path_converges_within_budget() {
 #[test]
 fn classic_pmtu_ignores_a_zero_match_flag_even_with_a_bad_mtu() {
     assert_eq!(classic_update(None, 1, false, v4(1)), None);
+}
+
+#[test]
+fn netbsd_mss_to_advertise_uses_max_mtu_and_default_floor() {
+    assert_eq!(mss_headers(IpFamily::V4), 40);
+    assert_eq!(mss_headers(IpFamily::V6), 60);
+    assert_eq!(
+        mss_to_advertise(1500, 9000, IpFamily::V4, false, TCP_MSS_DEFAULT),
+        8960
+    );
+    assert_eq!(
+        mss_to_advertise(1500, 9000, IpFamily::V4, true, TCP_MSS_DEFAULT),
+        1460
+    );
+    assert_eq!(
+        mss_to_advertise(100, 100, IpFamily::V4, true, TCP_MSS_DEFAULT),
+        536
+    );
+    assert_eq!(
+        mss_to_advertise(9000, 0, IpFamily::V6, true, TCP_MSS_DEFAULT),
+        8940
+    );
+}
+
+#[test]
+fn netbsd_mss_from_peer_clamps_options_and_send_buffer() {
+    assert_eq!(mss_from_peer(0, TCP_MSS_DEFAULT, 0, 0, 8192).segsz, 536);
+    assert_eq!(mss_from_peer(100, TCP_MSS_DEFAULT, 0, 0, 8192).segsz, 256);
+    assert_eq!(
+        mss_from_peer(1460, TCP_MSS_DEFAULT, 12, 0, 8192).segsz,
+        1448
+    );
+    assert_eq!(
+        mss_from_peer(1460, TCP_MSS_DEFAULT, 12, 40, 8192).segsz,
+        1408
+    );
+    assert_eq!(mss_from_peer(1460, TCP_MSS_DEFAULT, 0, 0, 1000).segsz, 1000);
+    assert_eq!(
+        mss_from_peer(1460, TCP_MSS_DEFAULT, 12, 0, 4000).send_buffer,
+        4344
+    );
+}
+
+#[test]
+fn netbsd_icmp_pmtu_classic_or_pending_by_acked_data() {
+    let mut path = PmtuPath {
+        mtu_sent: 1500,
+        mss_acked: 1000,
+        pending: None,
+    };
+    assert_eq!(
+        on_icmp_pmtu(&mut path, 100, 0, 200, 1200, 40, 1500, 5),
+        PmtuResult::Classic(1200)
+    );
+    assert_eq!(
+        on_icmp_pmtu(&mut path, 100, 0, 200, 1000, 40, 1500, 5),
+        PmtuResult::Pending(raven_tcpip::PmtuPending {
+            th_seq: 100,
+            nextmtu: 1000,
+            ip_len: 1500,
+            ip_hl: 5,
+        })
+    );
+    assert!(matches!(
+        on_icmp_pmtu(&mut path, 90, 0, 200, 900, 40, 1500, 5),
+        PmtuResult::Pending(raven_tcpip::PmtuPending { th_seq: 90, .. })
+    ));
+    assert_eq!(
+        on_icmp_pmtu(&mut path, 101, 0, 200, 900, 40, 1500, 5),
+        PmtuResult::Ignored
+    );
+}
+
+#[test]
+fn netbsd_icmp_pmtu_drops_stale_and_non_shrinking_reports() {
+    let mut path = PmtuPath {
+        mtu_sent: 1500,
+        mss_acked: 500,
+        pending: None,
+    };
+    assert_eq!(
+        on_icmp_pmtu(&mut path, 100, 101, 200, 1200, 40, 1500, 5),
+        PmtuResult::Ignored
+    );
+    assert_eq!(
+        on_icmp_pmtu(&mut path, 100, 0, 200, 1500, 40, 1500, 5),
+        PmtuResult::Ignored
+    );
 }
