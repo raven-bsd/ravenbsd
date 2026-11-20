@@ -53,6 +53,7 @@ mod neighbor;
 mod observability;
 mod plpmtud_live;
 mod pmtu;
+mod readiness;
 mod reassembly;
 mod recovery;
 mod route;
@@ -90,6 +91,7 @@ pub use pmtu::{
     IPV4_FLOOR, IPV6_FLOOR, MtuCache, Plpmtud, PlpmtudState, classic_update, floor_for,
     probe_sequence,
 };
+pub use readiness::Readiness;
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
 pub use route::{Route, RouteTable};
 pub use rto::RtoEstimator;

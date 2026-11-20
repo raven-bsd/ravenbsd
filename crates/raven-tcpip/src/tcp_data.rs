@@ -98,8 +98,22 @@ impl<D: Device> Stack<D> {
         {
             connection.last_activity = self.now;
         }
+        self.resync_readable_baseline(socket);
         let _ = self.send_ack_for(socket);
         Ok(count)
+    }
+
+    /// Record the receive-queue level the application just left behind.
+    ///
+    /// `refresh_events` runs once at the end of `Stack::poll` and reports `Readable` only on a
+    /// false-to-true transition against `prev_readable`. A read that drains the queue between
+    /// two passes must therefore lower that baseline itself; otherwise data that arrives in the
+    /// very next pass sees a stale `true`, raises no edge, and a poller sleeping on the socket is
+    /// never woken.
+    pub(crate) fn resync_readable_baseline(&mut self, socket: SocketId) {
+        if let Ok(record) = self.sockets.record_mut(socket) {
+            record.prev_readable = crate::readiness::socket_levels(record).readable;
+        }
     }
 
     /// Set Nagle behaviour.

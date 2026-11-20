@@ -529,17 +529,10 @@ impl<D: Device> Stack<D> {
         let mut events: Vec<Event> = Vec::new();
         for (raw_id, record) in &mut self.sockets.records {
             let id = SocketId(*raw_id);
-            let readable = record.forced_readable
-                || !record.rx.is_empty()
-                || match &record.kind {
-                    Kind::Udp { datagrams, .. } => !datagrams.is_empty(),
-                    _ => false,
-                };
-            let writable = !record.closed
-                && !record.tx_shutdown
-                && record.tx.len() < record.tx_cap
-                && !matches!(record.kind, Kind::Listener { .. });
-            let closed = record.closed || record.peer_closed;
+            let levels = crate::readiness::socket_levels(record);
+            let readable = levels.readable;
+            let writable = levels.writable;
+            let closed = levels.closed;
 
             if readable && !record.prev_readable {
                 events.push(Event::Readable(id));

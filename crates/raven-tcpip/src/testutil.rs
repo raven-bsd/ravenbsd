@@ -205,6 +205,16 @@ impl<D: Device> Stack<D> {
         Ok(())
     }
 
+    /// Mark a TCP peer FIN (a half-close) without a full close.
+    pub fn test_set_peer_fin(&mut self, socket: SocketId, fin: bool) -> Result<(), Errno> {
+        let record = self.sockets.record_mut(socket)?;
+        let Kind::Tcp(connection) = &mut record.kind else {
+            return Err(Errno::ENOTSOCK);
+        };
+        connection.peer_fin = fin;
+        Ok(())
+    }
+
     /// Push received bytes into a TCP socket's receive queue, respecting its cap.
     pub fn test_push_rx(&mut self, socket: SocketId, data: &[u8]) -> Result<usize, Errno> {
         let mut dropped = 0usize;
