@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::Instant;
+use crate::sack::SackHole;
 use alloc::vec;
 
 fn connection() -> TcpConnection {
@@ -80,4 +81,144 @@ fn pipe_excludes_sacked_and_lost_bytes() {
     assert_eq!(sack_pipe(&c), 6_000);
     c.high_rxt = 2_000;
     assert_eq!(sack_pipe(&c), 7_000);
+}
+
+#[test]
+fn netbsd_holes_split_and_trim_from_sack_blocks() {
+    let mut holes = SackHoles::new(16);
+    holes.sack_option(1_000, 1_000, 11_000, &[(3_000, 4_000), (6_000, 7_000)]);
+    assert_eq!(
+        holes.holes,
+        vec![
+            SackHole {
+                start: 1_000,
+                end: 3_000,
+                rxmit: 1_000
+            },
+            SackHole {
+                start: 4_000,
+                end: 6_000,
+                rxmit: 4_000
+            },
+        ]
+    );
+    assert_eq!(holes.rcv_lastsack, 7_000);
+    assert_eq!(holes.snd_fack, 7_000);
+    let (hole, rexmit) = holes.output(1_000).unwrap();
+    assert_eq!(hole.start, 1_000);
+    assert_eq!(hole.end, 3_000);
+    assert_eq!(rexmit, 0);
+}
+
+#[test]
+fn netbsd_holes_split_a_middle_block() {
+    let mut holes = SackHoles::new(16);
+    holes.sack_option(1_000, 1_000, 11_000, &[(5_000, 6_000)]);
+    assert_eq!(
+        holes.holes,
+        vec![SackHole {
+            start: 1_000,
+            end: 5_000,
+            rxmit: 1_000
+        }]
+    );
+    holes.holes[0].rxmit = 4_000;
+    holes.sack_option(1_000, 1_000, 11_000, &[(2_000, 3_000)]);
+    assert_eq!(
+        holes.holes,
+        vec![
+            SackHole {
+                start: 1_000,
+                end: 2_000,
+                rxmit: 2_000
+            },
+            SackHole {
+                start: 3_000,
+                end: 5_000,
+                rxmit: 4_000
+            },
+        ]
+    );
+}
+
+#[test]
+fn netbsd_del_sackholes_trims_and_removes() {
+    let mut holes = SackHoles::new(16);
+    holes.sack_option(1_000, 1_000, 11_000, &[(3_000, 4_000), (6_000, 7_000)]);
+    holes.del_sackholes(2_500, 1_000);
+    assert_eq!(holes.holes[0].start, 2_500);
+    holes.del_sackholes(4_000, 1_000);
+    assert_eq!(
+        holes.holes,
+        vec![SackHole {
+            start: 4_000,
+            end: 6_000,
+            rxmit: 4_000
+        }]
+    );
+}
+
+#[test]
+fn netbsd_sack_output_advances_rxmit_and_counts_bytes() {
+    let mut holes = SackHoles::new(16);
+    holes.sack_option(1_000, 1_000, 11_000, &[(3_000, 4_000)]);
+    assert_eq!(holes.holes[0].rxmit, 1_000);
+    holes.holes[0].rxmit = 2_000;
+    let (hole, bytes) = holes.output(1_000).unwrap();
+    assert_eq!(hole.start, 1_000);
+    assert_eq!(hole.rxmit, 2_000);
+    assert_eq!(bytes, 1_000);
+}
+
+#[test]
+fn netbsd_sack_adjust_moves_past_sacked_data() {
+    let mut holes = SackHoles::new(16);
+    holes.sack_option(1_000, 1_000, 11_000, &[(3_000, 4_000), (6_000, 7_000)]);
+    assert_eq!(holes.adjust(3_500), 4_000);
+    assert_eq!(holes.adjust(5_000), 5_000);
+    assert_eq!(holes.adjust(7_000), 7_000);
+}
+
+#[test]
+fn netbsd_dsack_and_block_count() {
+    let mut holes = SackHoles::new(16);
+    holes.new_dsack(900, 100);
+    assert_eq!(holes.dsack, Some((900, 1_000)));
+    assert_eq!(holes.numblks(0), 1);
+    assert_eq!(holes.numblks(5), 4);
+}
+
+#[test]
+fn netbsd_free_clears_the_scoreboard() {
+    let mut holes = SackHoles::new(16);
+    holes.sack_option(1_000, 1_000, 11_000, &[(3_000, 4_000)]);
+    holes.free();
+    assert!(holes.holes.is_empty());
+    assert_eq!(holes.rcv_lastsack, 0);
+    assert_eq!(holes.snd_fack, 0);
+}
+
+#[test]
+fn netbsd_from_sacked_covers_the_tail() {
+    let holes = SackHoles::from_sacked(1_000, 11_000, &[(3_000, 4_000), (6_000, 7_000)], 1_000, 16);
+    assert_eq!(
+        holes.holes,
+        vec![
+            SackHole {
+                start: 1_000,
+                end: 3_000,
+                rxmit: 1_000
+            },
+            SackHole {
+                start: 4_000,
+                end: 6_000,
+                rxmit: 4_000
+            },
+            SackHole {
+                start: 7_000,
+                end: 11_000,
+                rxmit: 7_000
+            },
+        ]
+    );
 }

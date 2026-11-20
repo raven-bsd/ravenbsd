@@ -13,7 +13,7 @@ use alloc::vec::Vec;
 use raven_tcpip_wire::tcp::TcpFlags;
 
 use crate::device::Device;
-use crate::sack::{NextKind, SackScoreboard};
+use crate::sack::{NextKind, SackHoles, SackScoreboard};
 use crate::seq::{seq_ge, seq_gt, seq_lt};
 use crate::socket::Kind;
 use crate::tcp_data::advertised_window;
@@ -235,6 +235,18 @@ impl<D: Device> Stack<D> {
         }
         let mss = u32::from(connection.mss);
         let una = connection.snd_una;
+        if connection.rto_recovery {
+            // NetBSD `tcp_sack_adjust`: after a timeout, skip SACKed data before the next
+            // retransmission. The hole list is the ported `snd_holes` scoreboard.
+            let holes = SackHoles::from_sacked(
+                una,
+                connection.snd_nxt,
+                &connection.sacked,
+                connection.high_rxt,
+                MAX_SACKED_RANGES,
+            );
+            connection.snd_nxt = holes.adjust(connection.snd_nxt);
+        }
         let mut board = scoreboard(connection);
         if board.pipe().saturating_add(mss) > connection.cc.cwnd() {
             return None;
