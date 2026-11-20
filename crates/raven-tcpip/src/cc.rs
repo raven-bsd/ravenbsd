@@ -2,6 +2,11 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! Congestion-control framework: NewReno, CUBIC and PRR in integer arithmetic.
+//!
+//! The NewReno recovery arithmetic follows the behaviour of NetBSD `sys/netinet/tcp_congctl.c`
+//! and the `tcp_input.c`/`tcp_output.c` hooks. That NetBSD file carries an NRL 4-clause block;
+//! it was read for behaviour only and this is original Rust, with no donor code copied. CUBIC
+//! and RACK remain first-party extensions.
 
 use crate::Duration;
 
@@ -57,7 +62,12 @@ pub trait CongestionControl {
     fn undo(&mut self, _cwnd: u32, _ssthresh: u32) {}
 }
 
-/// NewReno with RFC 3465 appropriate byte counting and RFC 6582 recovery.
+/// NewReno with the NetBSD `tcp_congctl.c` ABC and recovery state machine.
+///
+/// The loss/recovery arithmetic follows NetBSD `tcp_reno_congestion_exp`,
+/// `tcp_newreno_fast_retransmit`, `tcp_newreno_fast_retransmit_newack`,
+/// `tcp_newreno_newack` and `tcp_reno_slow_retransmit`. CUBIC remains a first-party RFC 8312
+/// extension.
 #[derive(Clone, Debug)]
 pub struct NewReno {
     cwnd: u32,
@@ -66,6 +76,8 @@ pub struct NewReno {
     cwnd_max: u32,
     dup_threshold: u32,
     recover: u32,
+    last_ack: Option<u32>,
+    bytes_acked: u32,
     in_recovery: bool,
     in_rto: bool,
 }
@@ -81,6 +93,8 @@ impl NewReno {
             cwnd_max: cwnd_max.max(2 * mss),
             dup_threshold: 3,
             recover: 0,
+            last_ack: None,
+            bytes_acked: 0,
             in_recovery: false,
             in_rto: false,
         }
@@ -93,10 +107,24 @@ impl NewReno {
 
     /// Apply a fast-retransmit loss event with the flight size at the event.
     pub fn loss_fast_retransmit(&mut self, flight: u32, snd_nxt: u32) {
-        self.ssthresh = (flight / 2).max(2 * self.mss);
-        self.cwnd = self.ssthresh.saturating_add(self.dup_threshold * self.mss);
-        self.in_recovery = true;
+        // NetBSD uses min(snd_wnd, snd_cwnd) in tcp_common_congestion_exp. The CcContext has no
+        // snd_wnd field, and `flight` is bounded by the receiver window and cwnd at the loss
+        // point, so it is the closest available proxy.
+        let win = flight
+            .min(self.cwnd)
+            .checked_div(2)
+            .unwrap_or(0)
+            .checked_div(self.mss)
+            .unwrap_or(0)
+            .max(2);
+        self.ssthresh = win.saturating_mul(self.mss);
+        self.cwnd = self
+            .ssthresh
+            .saturating_add(self.dup_threshold.saturating_mul(self.mss));
         self.recover = snd_nxt;
+        self.last_ack = None;
+        self.bytes_acked = 0;
+        self.in_recovery = true;
     }
 
     /// Apply a partial ACK inside recovery.
@@ -104,18 +132,29 @@ impl NewReno {
         if !self.in_recovery {
             return;
         }
-        let bonus = if acked >= self.mss { self.mss } else { 0 };
+        // NetBSD tcp_newreno_fast_retransmit_newack: deflate by (acked - MSS).
         self.cwnd = self
             .cwnd
+            .saturating_add(self.mss)
             .saturating_sub(acked)
-            .saturating_add(bonus)
             .max(2 * self.mss);
     }
 
     /// Apply a full ACK at or above `recover`.
     pub fn full_ack(&mut self) {
         if self.in_recovery {
-            self.cwnd = self.ssthresh;
+            if let Some(ack) = self.last_ack {
+                let outstanding = self.recover.saturating_sub(ack);
+                self.cwnd = if outstanding < self.ssthresh {
+                    outstanding.saturating_add(self.mss)
+                } else {
+                    self.ssthresh
+                };
+            } else {
+                self.cwnd = self.ssthresh;
+            }
+            self.bytes_acked = 0;
+            self.last_ack = None;
             self.in_recovery = false;
         }
     }
@@ -131,21 +170,25 @@ impl CongestionControl for NewReno {
         "newreno"
     }
 
-    fn on_ack(&mut self, _ctx: &mut CcContext, acked_bytes: u32, _rtt: Option<Duration>) {
+    fn on_ack(&mut self, ctx: &mut CcContext, acked_bytes: u32, _rtt: Option<Duration>) {
+        self.last_ack = Some(ctx.snd_una.saturating_add(acked_bytes));
         if self.in_recovery {
             return;
         }
         if self.in_rto {
             self.in_rto = false;
         }
-        let acked = acked_bytes.min(self.mss);
-        if self.cwnd < self.ssthresh {
-            self.cwnd = self.cwnd.saturating_add(acked);
+        if self.cwnd >= self.ssthresh {
+            // NetBSD tcp_reno_newack with tcp_do_abc=1: count bytes, not ACK packets.
+            self.bytes_acked = self.bytes_acked.saturating_add(acked_bytes);
+            if self.bytes_acked >= self.cwnd {
+                self.bytes_acked = self.bytes_acked.saturating_sub(self.cwnd);
+                self.cwnd = self.cwnd.saturating_add(self.mss);
+            }
         } else {
-            let increment = ((self.mss as u64 * self.mss as u64) / self.cwnd as u64).max(1);
-            self.cwnd = self
-                .cwnd
-                .saturating_add(u32::try_from(increment).unwrap_or(u32::MAX));
+            // tcp_abc_aggressive=1: L=2*SMSS while data is still queued.
+            let limit = self.mss.saturating_mul(2);
+            self.cwnd = self.cwnd.saturating_add(acked_bytes.min(limit));
         }
         self.cwnd = self.cwnd.min(self.cwnd_max);
     }
@@ -155,12 +198,21 @@ impl CongestionControl for NewReno {
     }
 
     fn on_rto(&mut self, ctx: &mut CcContext) {
-        if !self.in_rto {
-            self.ssthresh = (ctx.flight / 2).max(2 * self.mss);
-            self.in_rto = true;
-        }
+        // NetBSD tcp_reno_slow_retransmit: half of min(snd_wnd, cwnd), floor two MSS.
+        let win = ctx
+            .flight
+            .min(self.cwnd)
+            .checked_div(2)
+            .unwrap_or(0)
+            .checked_div(self.mss)
+            .unwrap_or(0)
+            .max(2);
+        self.ssthresh = win.saturating_mul(self.mss);
         self.cwnd = self.mss;
+        self.bytes_acked = 0;
+        self.last_ack = None;
         self.in_recovery = false;
+        self.in_rto = true;
     }
 
     fn cwnd(&self) -> u32 {
