@@ -1,14 +1,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# OpenSSH server. svcd cannot execute a shebang script directly, so the service runs the
-# first-party shell with a bounded `-c` command: create the key directory, generate the
-# missing host keys with `ssh-keygen -A -f`, then exec sshd in the foreground.
+# OpenSSH server. The one-shot keygen services above create /tmp/ssh/ssh_host_*; sshd runs as
+# the real upstream binary, not through a shell wrapper.
 
 name = "sshd"
-exec = "/bin/rsh"
-args = ["/bin/rsh", "-c", "mkdir -p /tmp/ssh /var/empty; rm -f /tmp/ssh/ssh_host_*; for t in rsa ecdsa ed25519; do ssh-keygen -q -t $t -N '' -f /tmp/ssh/ssh_host_${t}_key; done; /sbin/sshd -D -e -f /etc/ssh/sshd_config"]
-needs = ["netd", "vfsd", "consd", "ptyd"]
+exec = "/sbin/sshd"
+args = ["/sbin/sshd", "-D", "-e", "-f", "/etc/ssh/sshd_config"]
+needs = ["netd", "vfsd", "consd", "ptyd", "ssh-keygen-rsa", "ssh-keygen-ecdsa", "ssh-keygen-ed25519"]
 readiness = "none"
 restart = "on-failure"
 max_restarts = 3

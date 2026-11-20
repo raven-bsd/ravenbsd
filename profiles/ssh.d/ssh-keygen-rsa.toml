@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# One-shot RSA host-key generation. The initfs release uses /tmp/ssh; a writable UFS root can
+# stage the same key path under /etc/ssh when K193 lands.
+
+name = "ssh-keygen-rsa"
+exec = "/bin/rsh"
+args = ["/bin/rsh", "-c", "mkdir -p /tmp/ssh; rm -f /tmp/ssh/ssh_host_rsa_key; ssh-keygen -q -t rsa -N '' -f /tmp/ssh/ssh_host_rsa_key"]
+needs = ["vfsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
