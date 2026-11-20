@@ -168,3 +168,7 @@ pub enum Event {
 
 #[cfg(any(test, feature = "testutil"))]
 pub mod testutil;
+
+#[cfg(test)]
+#[path = "core_ut.rs"]
+mod tests;
