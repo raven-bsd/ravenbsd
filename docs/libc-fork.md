@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # libc fork and PTY primitives
 
 K196 wires the POSIX process and terminal primitives OpenSSH needs onto first-party
