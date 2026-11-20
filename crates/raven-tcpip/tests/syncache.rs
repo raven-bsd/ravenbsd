@@ -330,6 +330,59 @@ fn ipv6_keys_hash_and_lookup() {
 }
 
 #[test]
+fn the_bucket_limit_is_exactly_the_configured_value() {
+    let mut cache = small_cache(1, 2, 8);
+    for (seed, now) in [(1, 0), (2, 1)] {
+        let (request, _) = syn(seed, now);
+        cache.insert(request, now);
+    }
+    assert_eq!(cache.bucket_len(0), 2);
+    let (third, now) = syn(3, 2);
+    cache.insert(third, now);
+    assert_eq!(cache.bucket_len(0), 2);
+    assert_eq!(cache.len(), 2);
+    assert_eq!(cache.stats().bucket_overflow, 1);
+}
+
+#[test]
+fn promotion_accepts_only_iss_plus_one() {
+    let mut cache = small_cache(1, 4, 8);
+    let (request, _) = syn(1, 0);
+    cache.insert(request, 0);
+    assert_eq!(cache.promote(ack(1, 1_001, 101)), PromoteOutcome::BadAck);
+    assert_eq!(cache.promote(ack(1, 1_003, 101)), PromoteOutcome::BadAck);
+    assert!(matches!(
+        cache.promote(ack(1, 1_002, 101)),
+        PromoteOutcome::Promoted { .. }
+    ));
+    assert_eq!(cache.len(), 0);
+}
+
+#[test]
+fn only_an_rst_at_irs_plus_one_aborts() {
+    let mut cache = small_cache(1, 4, 8);
+    let (request, _) = syn(1, 0);
+    cache.insert(request, 0);
+    assert_eq!(cache.abort(&key(1), 102), AbortOutcome::Challenge);
+    assert_eq!(cache.len(), 1);
+    assert_eq!(cache.abort(&key(1), 101), AbortOutcome::Removed);
+    assert_eq!(cache.len(), 0);
+}
+
+#[test]
+fn a_duplicate_syn_restarts_the_initial_rto_timer() {
+    let mut cache = small_cache(1, 4, 8);
+    let (request, _) = syn(1, 0);
+    cache.insert(request, 0);
+    assert_eq!(cache.poll(1_000), vec![SyncacheAction::Retransmit(key(1))]);
+    assert_eq!(cache.next_deadline(), Some(3_000));
+    let (duplicate, _) = syn(1, 0);
+    cache.insert(duplicate, 1_500);
+    assert_eq!(cache.next_deadline(), Some(2_500));
+    assert_eq!(cache.lookup(&key(1)).expect("entry").rxmits, 0);
+}
+
+#[test]
 fn stats_start_at_zero() {
     let cache = Syncache::new(SyncacheConfig::default());
     let stats = cache.stats();
