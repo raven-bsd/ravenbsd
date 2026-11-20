@@ -62,10 +62,10 @@ impl RtoModel {
         self.rto_ms = (self.rto_ms * 2.0).min(self.max_ms);
     }
 
-    /// Persist/retransmit backoff delay in milliseconds for the current shift.
+    /// NetBSD `tcp_setpersist` delay for this backoff shift, clamped to `[5 s, 60 s]`.
     #[must_use]
-    pub fn backoff_delay_ms(&self) -> u64 {
-        persist_delay_ms(self.backoff)
+    pub fn backoff_delay_ms(&self, base_ms: u64) -> u64 {
+        persist_delay_ms(base_ms, self.backoff)
     }
 }
 
@@ -131,10 +131,10 @@ impl NaiveRto {
     }
 }
 
-/// NetBSD `tcp_backoff`/persist delay schedule in milliseconds.
+/// NetBSD `tcp_backoff[t_rxtshift]` multiplier.
 #[must_use]
-pub const fn persist_delay_ms(shift: u32) -> u64 {
-    let seconds = match shift {
+pub const fn backoff_multiplier(shift: u32) -> u64 {
+    match shift {
         0 => 1,
         1 => 2,
         2 => 4,
@@ -142,6 +142,19 @@ pub const fn persist_delay_ms(shift: u32) -> u64 {
         4 => 16,
         5 => 32,
         _ => 64,
-    };
-    seconds * 1_000
+    }
+}
+
+/// NetBSD `tcp_setpersist` interval: `base_ms * tcp_backoff[shift]`, clamped to
+/// `[TCPTV_PERSMIN, TCPTV_PERSMAX]` (5 s to 60 s).
+#[must_use]
+pub const fn persist_delay_ms(base_ms: u64, shift: u32) -> u64 {
+    let delay = base_ms.saturating_mul(backoff_multiplier(shift));
+    if delay < 5_000 {
+        5_000
+    } else if delay > 60_000 {
+        60_000
+    } else {
+        delay
+    }
 }

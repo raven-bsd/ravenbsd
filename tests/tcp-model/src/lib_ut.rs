@@ -198,6 +198,9 @@ fn rto_model_and_current_stack_respect_bounds_for_10k_operations() {
     let mut model = RtoModel::new(1_000.0, 200.0, 60_000.0);
     let mut naive = NaiveRto::new(1_000, 200, 60_000);
     let mut stack = RtoEstimator::new(1_000, 200, 60_000, 1);
+    assert_eq!(persist_delay_ms(1_000, 0), 5_000);
+    assert_eq!(persist_delay_ms(1_000, 3), 8_000);
+    assert_eq!(persist_delay_ms(1_000, 6), 60_000);
     let mut divergences = 0usize;
     let mut first = String::new();
     for step in 0..10_000 {
@@ -207,7 +210,10 @@ fn rto_model_and_current_stack_respect_bounds_for_10k_operations() {
             stack.timeout();
             assert!(model.rto_ms <= 60_000.0);
             assert!((200..=60_000).contains(&stack.rto_ms()));
-            assert_eq!(model.backoff_delay_ms(), persist_delay_ms(model.backoff));
+            let base = model.rto_ms as u64;
+            let delay = model.backoff_delay_ms(base);
+            assert_eq!(delay, persist_delay_ms(base, model.backoff));
+            assert!((5_000..=60_000).contains(&delay));
         } else {
             let rtt = u64::from(rng.range(1, 500));
             model.sample(rtt as f64);
@@ -411,7 +417,9 @@ fn k252_zero_window_persist_against_the_current_stack() {
     server.poll(Instant::from_millis(1_350));
     client.poll(Instant::from_millis(1_410));
     assert_eq!(drain(&mut client, connected), data);
-    println!("tcp-model: K252 zero-window persist PASS probe=1 delivered=44");
+    println!(
+        "tcp-model: K252 zero-window persist PASS probe=1 delivered=44 observed_first_probe<=1200ms netbsd_tcp_setpersist_min=5000ms"
+    );
 }
 
 #[test]
