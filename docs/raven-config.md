@@ -49,6 +49,25 @@ The input parser accepts a canonical line (characters followed by newline) and r
 so both a normal shell and the serial qtest can drive it. `NO_COLOR`, `TERM=dumb` and
 `--color never` select the plain layout; otherwise ANSI is used only for styling and clearing.
 
+## Raw terminal and color
+
+On the RavenBSD console the binary puts the terminal in raw mode through the first-party
+`crates/raven-tty` guard before it reads stdin: `ICANON`, `ECHO`, `ISIG` and the other
+line-discipline flags are cleared and the 8-bit data path is selected. The guard restores the
+saved `termios` on every normal exit and on `SIGHUP`/`SIGINT`/`SIGQUIT`/`SIGTERM`. When the
+descriptor is not a terminal (or `tcgetattr` fails), the binary keeps the canonical line parser,
+so the scripted qtests and non-TTY invocations still work.
+
+Color mode draws a bordered two-pane frame, a bold/dim header, a reverse-video selected module
+row, a marked selected field, a colored status line and a dim key-help footer. The `>` selection
+marker stays in every mode, so color is never the only signal. The serial profile's
+`TERM=vt100` is enough for the ANSI 16/256 SGR sequences; `NO_COLOR`, `TERM=dumb` and
+`--color never` disable styling, while `--color always` forces it.
+
+The raw-key gate (`tests/qtest/cases/raven-tui-keys.toml`) sends Down/Tab/Enter/Esc without a
+newline and checks the selected module and form field change; the canonical `/users\n` path is
+run in the same case.
+
 The scheme-backed login console can report `isatty(0) == false` even when the interactive profile
 is loaded. `RAVEN_TUI=1` is the explicit override for that console and for the scripted qtest;
 `brush -c` does not load the login profile, so non-interactive scripts keep the usage path unless
@@ -110,6 +129,11 @@ the base `raven` account and the musicbox/TUI-shell pattern are in [`docs/users.
   `musicbox` with a stub `/bin/tui-demo` through the TUI, verifies passwd/shadow/group, the home,
   the `$6$` hash and the autologin file, authenticates with `/bin/login`, runs the passwd shell
   locally, and checks `raven users list/show/check` JSON. The `ssh musicbox@` proof remains K195.
+* `raven-tui-keys` (`tests/qtest/cases/raven-tui-keys.toml`): sends raw Down/Tab/Enter/Esc bytes
+  without a newline, asserts the selected module (`Network` -> `Users (add)` -> `Users: root`) and
+  the form field (`UID`) change, then re-runs the canonical `/users\n` line path and the
+  `--color always` path. `cargo nextest run -p raven-tty` covers the literal NetBSD
+  `cfmakeraw` flag port and the non-TTY rejection.
 * `raven-config-tui` qtest (`tests/qtest/cases/raven-config-tui.toml`): boots the
   `raven-admin-test` profile, sets `NO_COLOR=1`, `RAVEN_TUI=1` and
   `RAVEN_CONFIG_ROOT=/tmp/raven-config-test`, drives `raven config --dry-run` and the real save
