@@ -30,13 +30,13 @@ repeated here. Do not expose this demo to an untrusted network.
 ## Host keys
 
 The one-shot `ssh-hostkeys` service runs a bounded `/bin/rsh -c` command that creates `/tmp/ssh`
-and generates the per-type host keys; `sshd` starts after it. The released initfs image has a
-read-only `/etc`, so the keys live in `/tmp/ssh` on every boot and the host key is **ephemeral**;
-SSH clients must accept a changed key on each boot. A persistent UFS root (K193) must stage the
-same services with `/etc/ssh`; that image path is not merged in this tree yet, so host-key
-persistence is not claimed here. The per-key `ssh-keygen -q -t TYPE -N '' -f` form is used
-because the vendored build's `ssh-keygen -A -f PREFIX` concatenates PREFIX with the absolute
-configure-time sysconfdir.
+and generates an Ed25519 host key; `sshd` starts after it. The released initfs image has a
+read-only `/etc`, so the key lives in `/tmp/ssh` on every boot and is **ephemeral**; SSH clients
+must accept a changed key on each boot. A persistent UFS root (K193) must stage the same services
+with `/etc/ssh`; that image path is not merged in this tree yet, so host-key persistence is not
+claimed here. The per-key `ssh-keygen -q -t ed25519 -N '' -f` form is used because the vendored
+build's `ssh-keygen -A -f PREFIX` concatenates PREFIX with the absolute configure-time
+sysconfdir.
 
 Private keys are never shipped in the image and must never be committed or published.
 
