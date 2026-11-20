@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "pmtu-blackhole"
+port = 24010
+baseline = "timeout 180 sudo -n python3 tests/net-conformance/baselines/linux/run.py --scenario pmtu-blackhole"
+donor = [
+  "NetBSD sys/netinet/tcp_output.c:tcp_output (PMTU/segment sizing)",
+  "NetBSD sys/netinet/tcp_input.c:tcp_input (ICMP frag-needed handling)",
+]
+rfcs = ["RFC 8899 (DPLPMTUD)", "RFC 1191 (path MTU discovery)"]
+
+[[expect]]
+step = "sender path MTU 1500, router MTU 1400, ICMP frag-needed suppressed"
+packet = "data"
+assert = "not driven by the single-veth baseline: the sender learns the veth MTU, so no black hole exists"
+
+[[expect]]
+step = "deterministic black-hole harness"
+packet = "not in this baseline"
+assert = "narrowed: needs a router namespace between two veths with a reduced MTU and an ICMP frag-needed filter; add when the K253 harness provides the router topology"
