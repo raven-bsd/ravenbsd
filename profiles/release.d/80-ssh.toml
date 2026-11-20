@@ -22,6 +22,18 @@ path = "/bin/ssh-keygen"
 mode = 0o755
 generated = true
 
+[[initfs.files]]
+src = "build/ssh/x86_64/libexec/sshd-session"
+path = "/usr/libexec/sshd-session"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/ssh/x86_64/libexec/sshd-auth"
+path = "/usr/libexec/sshd-auth"
+mode = 0o755
+generated = true
+
 [[initfs.programs]]
 package = "raven-ptyd"
 path = "/sbin/ptyd"
