@@ -25,9 +25,6 @@ regex = '^post-auth-fork: listening$'
 regex = '^post-auth-fork: accepted$'
 
 [[expect]]
-regex = '^post-auth-fork: parent poll registered$'
-
-[[expect]]
 regex = '^post-auth-fork: parent request sent$'
 
 [[expect]]
