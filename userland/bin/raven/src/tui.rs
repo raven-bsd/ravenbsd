@@ -77,7 +77,13 @@ pub(crate) fn run<W: Write>(writer: &mut W, request: &Request) -> i32 {
     // first-party guard restores the saved termios on drop and on HUP/INT/QUIT/TERM. A qtest
     // that is not a terminal falls back to the canonical line parser.
     #[cfg(target_os = "ravenbsd")]
-    let _raw = raven_tty::RawMode::enable(0).ok();
+    let raw = raven_tty::RawMode::enable(0);
+    #[cfg(target_os = "ravenbsd")]
+    if let Err(error) = &raw {
+        let _ = writeln!(writer, "raven config: raw mode unavailable: {error}");
+    }
+    #[cfg(target_os = "ravenbsd")]
+    let _raw = raw.ok();
     let stdin = std::io::stdin();
     let mut input = stdin.lock();
     let options = raven_tui::Options {
