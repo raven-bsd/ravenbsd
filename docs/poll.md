@@ -29,3 +29,24 @@ The donor comparison is NetBSD `sys/kern/sys_socket.c:soo_poll`,
 `sys/kern/sys_select.c:selrecord`/`selnotify`. `sopoll` re-checks the socket level on every call;
 the Raven replay provides the same outcome for a queued level that the one-shot event already
 delivered. No donor code is copied.
+
+A blocking socket read treats an empty netd queue as "wait", not an error: after `EAGAIN` it
+waits on the same per-thread event queue as `poll` and retries. A non-blocking socket still
+returns `EAGAIN`. This is what makes a stale doorbell harmless to a POSIX-style reader.
+
+`poll` registers one event-queue source per watched handle, merges the requested events and fans
+the result back to every `pollfd` that named it, each from its own requested direction. An entry
+with `events == 0` is not ready. A failed registration removes the ones already added.
+
+The readiness doorbell is a `UserEvent`, not a scheme file; it is released with `HANDLE_CLOSE`,
+not `CLOSE`.
+
+A forked child inherits its parent's cached event queue handle. Because a queue allows one waiter,
+`poll` treats `EVQ_WAIT` `EBUSY` as that inherited-queue case: it drops the cached handle, creates
+a fresh queue for the child and retries once. The parent keeps its own queue; neither waiter sees
+`EBUSY`.
+
+The exec `FdMap` duplicates each inherited socket event handle (`HANDLE_DUP`) and records the
+child's handle, so a parent that closes its accepted fd/event immediately after fork cannot
+invalidate the child's readiness source. If the duplicate is unavailable, the original handle is
+kept so the data fds still inherit.

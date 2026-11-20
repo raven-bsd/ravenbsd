@@ -188,8 +188,8 @@ impl ShadowRecord {
             min: 0,
             max: SHADOW_MAX,
             warn: SHADOW_WARN,
-            inactive: 0,
-            expire: 0,
+            inactive: -1,
+            expire: -1,
             reserved: 0,
         }
     }
@@ -226,6 +226,23 @@ impl ShadowRecord {
                 .parse::<i64>()
                 .map_err(|_| parse_error(SHADOW_FILE, line_number, "invalid numeric field"))
         };
+        let optional = |index: usize| -> Result<i64, UserError> {
+            let field = fields.get(index).copied().unwrap_or_default();
+            if field.is_empty() {
+                return Ok(-1);
+            }
+            let value = field
+                .parse::<i64>()
+                .map_err(|_| parse_error(SHADOW_FILE, line_number, "invalid numeric field"))?;
+            if value < -1 {
+                return Err(parse_error(
+                    SHADOW_FILE,
+                    line_number,
+                    "inactive/expire must be -1 or a day",
+                ));
+            }
+            Ok(value)
+        };
         Ok(Self {
             name: name.to_string(),
             hash: hash.to_string(),
@@ -233,8 +250,8 @@ impl ShadowRecord {
             min: number(3)?,
             max: number(4)?,
             warn: number(5)?,
-            inactive: number(6)?,
-            expire: number(7)?,
+            inactive: optional(6)?,
+            expire: optional(7)?,
             reserved: number(8)?,
         })
     }

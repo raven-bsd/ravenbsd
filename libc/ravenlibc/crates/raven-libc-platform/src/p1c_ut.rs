@@ -98,3 +98,92 @@ fn lseek_moves_the_fake_cursor() {
     assert_eq!(platform.lseek(99, 0, 0), Err(Errno::EBADF));
     let _ = platform.close(fd);
 }
+
+#[test]
+fn exec_fdmap_duplicates_the_event_handle() {
+    use crate::fd::inherit::{ENV_NAME, FdMap};
+
+    let platform = platform();
+    let fd = platform.open(b"/a", 0, 0).expect("open");
+    let index = platform.get(fd).expect("fd").index();
+    let event = platform
+        .backend()
+        .dup(platform.get(fd).expect("fd").handle(), 0)
+        .expect("event stand-in");
+    platform.set_ofd_event(index, event).expect("attach");
+    let env = platform.exec_fdmap_env().expect("env").expect("some");
+    let (_, value) = env.split_at(ENV_NAME.len());
+    let value = value.strip_prefix(b"=").expect("separator");
+    let map = FdMap::decode_env(value).expect("decode");
+    let inherited = map.entries.iter().find(|entry| entry.fd == fd).expect("fd");
+    assert_ne!(inherited.event, event.0, "child gets its own event handle");
+    let _ = platform
+        .backend()
+        .handle_close(crate::Handle(inherited.event));
+    let _ = platform.close(fd);
+}
+
+#[test]
+fn a_blocking_socket_read_waits_and_retries_after_eagain() {
+    let platform = platform();
+    let fd = platform
+        .open(b"/a", fcntl::O_RDONLY as u32, 0)
+        .expect("open");
+    let index = platform.get(fd).expect("fd").index();
+    platform.set_ofd_kind(index, OfdKind::Socket);
+    platform
+        .set_ofd_event(index, crate::Handle(9))
+        .expect("event");
+    platform
+        .backend()
+        .ready(crate::Handle(9), crate::poll::EV_SIGNALED);
+    platform
+        .backend()
+        .fail_next(crate::backend::Fault::Read, Errno::EAGAIN);
+    let mut buffer = [0u8; 4];
+    assert_eq!(platform.read(fd, &mut buffer), Ok(1));
+    assert_eq!(buffer[0], b'x');
+    let _ = platform.close(fd);
+}
+
+#[test]
+fn a_nonblocking_socket_read_returns_eagain() {
+    let platform = platform();
+    let fd = platform
+        .open(b"/a", fcntl::O_RDONLY as u32, 0)
+        .expect("open");
+    let index = platform.get(fd).expect("fd").index();
+    platform.set_ofd_kind(index, OfdKind::Socket);
+    platform.set_ofd_status(index, fcntl::O_NONBLOCK as u32);
+    platform
+        .backend()
+        .fail_next(crate::backend::Fault::Read, Errno::EAGAIN);
+    let mut buffer = [0u8; 4];
+    assert_eq!(platform.read(fd, &mut buffer), Err(Errno::EAGAIN));
+    let _ = platform.close(fd);
+}
+
+#[test]
+fn closing_an_fd_releases_its_doorbell_with_handle_close() {
+    let platform = platform();
+    let base = platform.backend().open_handles();
+    let fd = platform.open(b"/a", 0, 0).expect("open");
+    let doorbell = platform
+        .backend()
+        .dup(platform.get(fd).expect("fd").handle(), 0)
+        .expect("a second handle stands in for the doorbell");
+    let index = platform.get(fd).expect("fd").index();
+    platform.set_ofd_event(index, doorbell).expect("attach");
+    assert_eq!(
+        platform.backend().open_handles(),
+        base + 2,
+        "data + doorbell"
+    );
+    assert_eq!(platform.close(fd), Ok(()));
+    assert_eq!(
+        platform.backend().handle_close_calls(),
+        1,
+        "the doorbell goes through HANDLE_CLOSE"
+    );
+    assert_eq!(platform.backend().open_handles(), base, "nothing leaks");
+}

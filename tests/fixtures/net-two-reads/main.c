@@ -272,6 +272,11 @@ static int run_exec_parent(void) {
     }
     (void)close(connection);
     (void)close(listener);
+    // Poll on the parent's own descriptor while the child starts polling on its inherited one.
+    // A shared event queue would answer EBUSY; the platform must split it after fork.
+    if (poll_one(client, 100) < 0) {
+        return fail("exec parent poll", errno);
+    }
     sleep(1);
     if (write(client, "charlie", 7) != 7) {
         return fail("exec write third", errno);
@@ -317,10 +322,16 @@ static int run_reader(int argc, char **argv) {
     if (idle != 0) {
         return fail("reader poll busy", idle);
     }
-    if (ppoll_one(fd, 5000) <= 0) {
-        return fail("reader ppoll third", errno);
+    // Deliberately read without polling while the parent still delays "charlie". A blocking
+    // socket read must wait on the doorbell and return data, never EAGAIN.
+    char first = 0;
+    if (read(fd, &first, 1) != 1) {
+        return fail("reader blocking read", errno);
     }
-    if (read_packet(fd, "charlie", 7) != 0) {
+    if (first != 'c') {
+        return fail("reader blocking byte", errno);
+    }
+    if (read_packet(fd, "harlie", 6) != 0) {
         return fail("reader read third", errno);
     }
     say("net-two-reads-exec: child third ok\n");

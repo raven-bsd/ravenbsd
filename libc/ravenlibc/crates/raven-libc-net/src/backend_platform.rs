@@ -10,9 +10,13 @@
 //! read/write, typed CALL, close) and reports `ENOSYS` for the parts that need a net-aware
 //! scheme client. The gap is listed as a QUESTION in the C63 report; the fake backend and the
 //! trait-level tests are unaffected.
+use alloc::vec::Vec;
+
 use crate::ErrnoExt;
 
 use raven_libc_abi::errno::Errno;
+use raven_libc_abi::poll::{POLLERR, POLLHUP, POLLIN, POLLOUT};
+use raven_libc_abi::structs::Pollfd;
 use raven_libc_platform::Handle;
 use raven_libc_platform::Platform;
 use raven_libc_platform::backend::SysBackend;
@@ -146,8 +150,61 @@ impl<B: SysBackend, L: Lock> NetBackend for PlatformBackend<'_, B, L> {
             .close(raven_libc_platform::Handle(s.0));
     }
 
-    fn wait(&self, _items: &mut [WaitItem], _timeout_ms: Option<u64>) -> Result<usize, Errno> {
-        Err(Errno::ENOSYS)
+    fn wait(&self, items: &mut [WaitItem], timeout_ms: Option<u64>) -> Result<usize, Errno> {
+        let mut fds = Vec::with_capacity(items.len());
+        let mut owners = Vec::with_capacity(items.len());
+        for (index, item) in items.iter_mut().enumerate() {
+            item.got_read = false;
+            item.got_write = false;
+            item.got_err = false;
+            item.got_hup = false;
+            let Some(fd) = self.platform.fd_for_socket_handle(Handle(item.sock.0)) else {
+                continue;
+            };
+            let mut events = 0i16;
+            if item.want_read {
+                events |= POLLIN as i16;
+            }
+            if item.want_write {
+                events |= POLLOUT as i16;
+            }
+            if events == 0 {
+                continue;
+            }
+            fds.push(Pollfd {
+                fd,
+                events,
+                revents: 0,
+            });
+            owners.push(index);
+        }
+        if fds.is_empty() {
+            return Ok(0);
+        }
+        let timeout = match timeout_ms {
+            None => -1,
+            Some(ms) => i32::try_from(ms).unwrap_or(i32::MAX),
+        };
+        let _ = raven_libc_platform::poll::poll(self.platform, &mut fds, timeout)
+            .map_err(|error| Errno(error.0))?;
+        let mut ready = 0usize;
+        for (position, index) in owners.into_iter().enumerate() {
+            let Some(entry) = fds.get(position) else {
+                continue;
+            };
+            let Some(item) = items.get_mut(index) else {
+                continue;
+            };
+            let revents = i32::from(entry.revents);
+            item.got_read = revents & POLLIN != 0;
+            item.got_write = revents & POLLOUT != 0;
+            item.got_err = revents & POLLERR != 0;
+            item.got_hup = revents & POLLHUP != 0;
+            if item.got_read || item.got_write || item.got_err || item.got_hup {
+                ready = ready.saturating_add(1);
+            }
+        }
+        Ok(ready)
     }
 
     fn iface(&self, req: IfaceRequest) -> Result<IfaceResponse, Errno> {

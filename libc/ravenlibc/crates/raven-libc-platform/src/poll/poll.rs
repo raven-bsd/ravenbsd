@@ -19,6 +19,14 @@ use crate::poll::{EV_HUP, EV_READABLE, EV_SIGNALED, EV_WRITABLE, MAX_POLL_FDS};
 const EVQ_ADD: u32 = 1;
 const EVQ_DEL: u32 = 3;
 
+/// One event-queue registration and every `pollfd` entry that names the same source.
+struct Registration<'a, B: SysBackend, L: Lock> {
+    reference: OfdRef<'a, B, L>,
+    events: u32,
+    entries: Vec<usize>,
+    rearm: u32,
+}
+
 /// `poll`.
 pub fn poll<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
@@ -29,7 +37,7 @@ pub fn poll<B: SysBackend, L: Lock>(
         return Err(Errno::EINVAL);
     }
     let mut ready = 0usize;
-    let mut registrations: Vec<(usize, OfdRef<'_, B, L>, u32)> = Vec::new();
+    let mut registrations: Vec<Registration<'_, B, L>> = Vec::new();
     for (index, entry) in fds.iter_mut().enumerate() {
         entry.revents = 0;
         if entry.fd < 0 {
@@ -44,17 +52,6 @@ pub fn poll<B: SysBackend, L: Lock>(
             }
         };
         let events = i32::from(entry.events);
-        // The kernel consumes the scheme event on delivery. Replay the last delivered level
-        // once so data that is still queued (or a second packet already in `rx`) is not lost.
-        let rearm = reference.take_poll_rearm();
-        if rearm != 0 {
-            let revents = delivered_revents(rearm, events);
-            if revents != 0 {
-                entry.revents = revents;
-                ready = ready.saturating_add(1);
-                continue;
-            }
-        }
         match reference.kind() {
             OfdKind::File | OfdKind::Dir => {
                 let mask = events & (POLLIN | POLLOUT | POLLPRI | POLLERR);
@@ -71,15 +68,43 @@ pub fn poll<B: SysBackend, L: Lock>(
                 if events & POLLOUT != 0 {
                     wanted |= EV_WRITABLE;
                 }
+                // An entry that asks for nothing is not ready; it used to count as ready and
+                // made a caller with an idle `pollfd` spin.
+                if wanted == 0 {
+                    continue;
+                }
                 if reference.poll_signaled() {
                     // A scheme-backed socket reports through its attached notification event,
                     // not through the data handle's level.
                     wanted |= EV_SIGNALED;
                 }
-                if wanted == 0 {
-                    ready = ready.saturating_add(1);
+                let handle = reference.poll_handle();
+                if let Some(registration) = registrations
+                    .iter_mut()
+                    .find(|known| known.reference.poll_handle() == handle)
+                {
+                    registration.events |= wanted | EV_HUP;
+                    registration.entries.push(index);
+                    let revents = delivered_revents(registration.rearm, events);
+                    if revents != 0 {
+                        entry.revents = revents;
+                        ready = ready.saturating_add(1);
+                    }
                 } else {
-                    registrations.push((index, reference, wanted | EV_HUP));
+                    // The kernel consumes the scheme event on delivery. Replay the last
+                    // delivered level once so data still queued is not lost.
+                    let rearm = reference.take_poll_rearm();
+                    let revents = delivered_revents(rearm, events);
+                    if revents != 0 {
+                        entry.revents = revents;
+                        ready = ready.saturating_add(1);
+                    }
+                    registrations.push(Registration {
+                        reference,
+                        events: wanted | EV_HUP,
+                        entries: Vec::from([index]),
+                        rearm,
+                    });
                 }
             }
             OfdKind::Epoll | OfdKind::Timer | OfdKind::EventFd | OfdKind::ProcessFd => {
@@ -101,33 +126,49 @@ pub fn poll<B: SysBackend, L: Lock>(
             .unwrap_or(0)
             .saturating_mul(1_000_000)
     };
-    let queue = platform.event_queue()?;
     let backend = platform.backend();
-    for (index, reference, events) in &registrations {
-        backend.evq_ctl(
-            queue,
-            EVQ_ADD,
-            reference.poll_handle(),
-            *events,
-            u64::try_from(*index).unwrap_or(0),
-        )?;
-    }
     let mut events = [EvqEvent::default(); MAX_POLL_FDS];
-    let waited = backend.evq_wait(queue, &mut events, timeout_ns);
-    for (_, reference, _) in &registrations {
-        let _ = backend.evq_ctl(queue, EVQ_DEL, reference.poll_handle(), 0, 0);
-    }
-    let count = waited?;
+    let mut attempt = 0usize;
+    let count = loop {
+        let queue = platform.event_queue()?;
+        for (position, registration) in registrations.iter().enumerate() {
+            if let Err(error) = backend.evq_ctl(
+                queue,
+                EVQ_ADD,
+                registration.reference.poll_handle(),
+                registration.events,
+                u64::try_from(position).unwrap_or(0),
+            ) {
+                for added in registrations.iter().take(position) {
+                    let _ = backend.evq_ctl(queue, EVQ_DEL, added.reference.poll_handle(), 0, 0);
+                }
+                return Err(error);
+            }
+        }
+        let waited = backend.evq_wait(queue, &mut events, timeout_ns);
+        for registration in &registrations {
+            let _ = backend.evq_ctl(queue, EVQ_DEL, registration.reference.poll_handle(), 0, 0);
+        }
+        match waited {
+            Err(Errno::EBUSY) if attempt == 0 => {
+                // A child inherited the parent's cached queue across fork; the queue allows
+                // one waiter. Drop this process's handle and create its own queue, then retry.
+                platform.reset_event_queue();
+                attempt = 1;
+            }
+            other => break other?,
+        }
+    };
     let mut fired = 0usize;
     for event in events.iter().take(count) {
-        let index = event.cookie as usize;
-        if let Some((_, reference, _)) = registrations
-            .iter()
-            .find(|(registration, _, _)| *registration == index)
-        {
-            reference.set_poll_rearm(event.events);
-        }
-        if let Some(entry) = fds.get_mut(index) {
+        let Some(registration) = registrations.get(event.cookie as usize) else {
+            continue;
+        };
+        registration.reference.set_poll_rearm(event.events);
+        for &index in &registration.entries {
+            let Some(entry) = fds.get_mut(index) else {
+                continue;
+            };
             let requested = i32::from(entry.events);
             let revents = delivered_revents(event.events, requested);
             if revents != 0 {
@@ -137,6 +178,20 @@ pub fn poll<B: SysBackend, L: Lock>(
         }
     }
     Ok(fired)
+}
+
+/// Wait until `fd` is readable. Used by a blocking socket read after netd reports `EAGAIN`.
+pub fn wait_readable<B: SysBackend, L: Lock>(
+    platform: &Platform<B, L>,
+    fd: i32,
+    timeout_ms: i32,
+) -> Result<usize, Errno> {
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    poll(platform, &mut fds, timeout_ms)
 }
 
 /// Translate a kernel readiness mask into the caller's `poll` bits.
@@ -151,10 +206,10 @@ fn delivered_revents(mask: u32, requested: i32) -> i16 {
             revents |= POLLOUT as i16;
         }
     }
-    if mask & EV_READABLE != 0 {
+    if mask & EV_READABLE != 0 && requested & (POLLIN | POLLPRI) != 0 {
         revents |= POLLIN as i16;
     }
-    if mask & EV_WRITABLE != 0 {
+    if mask & EV_WRITABLE != 0 && requested & POLLOUT != 0 {
         revents |= POLLOUT as i16;
     }
     if mask & EV_HUP != 0 {
