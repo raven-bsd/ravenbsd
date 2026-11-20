@@ -95,7 +95,7 @@ field instead of rebuilding the profile.
 The demo uses its own session policy, not the release one-shot:
 
 - `profiles/qemu-ufs.d/getty.manifest`: `restart = "always"`, `restart_delay_ms = 200`,
-  `max_restarts = 1000`, needs `vfsd-ufs`;
+  `max_restarts = 1000`, needs `vfsd`;
 - `profiles/qemu-ufs.d/svcd.conf`: no `exit_when_exits = getty`;
 - `profiles/qemu-ufs.d/10-session.toml` stages those two files.
 

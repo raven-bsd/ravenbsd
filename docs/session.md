@@ -12,7 +12,7 @@ release qtest remains one-shot for `test-exit=1`.
 ones:
 
 - `profiles/qemu-ufs.d/getty.manifest` — `getty` has `restart = "always"`, `restart_delay_ms = 200`,
-  `max_restarts = 1000` and needs `consd`, `vfsd-ufs`, `ramfsd`, `initfsd`;
+  `max_restarts = 1000` and needs `consd`, `vfsd`, `ramfsd`, `initfsd`;
 - `profiles/qemu-ufs.d/svcd.conf` — no `exit_when_exits = getty`; svcd stays alive while getty is
   respawned.
 
@@ -22,7 +22,7 @@ The service file uses the established `.manifest` extension: every `.toml` under
 
 A normal `exit` from the brush shell is a success; the supervisor restarts getty, and the console
 prints `login:` again. A second login is accepted. The service graph keeps the resident
-`vfsd-ufs`/`consd`/`ramfsd`/`initfsd` services; getty is the only service with `always`.
+`vfsd`/`consd`/`ramfsd`/`initfsd` services; getty is the only service with `always`.
 
 The release profile is unchanged: `profiles/release.d/svcd.conf` still has
 `exit_when_exits = getty` and `profiles/release.d/login.service.manifest` stays `on-failure`, so
