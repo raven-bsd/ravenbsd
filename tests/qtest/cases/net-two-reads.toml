@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K232: an accepted TCP socket must remain level-ready after the first read. The host sends
+# "alpha"+"bravo" in one segment, then "charlie" after a delay; the guest poll/read/poll/read
+# cycle proves the queued second packet, the ppoll path, and no busy loop.
+name = "net-two-reads"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+initfs = "build/fixtures/net-two-reads/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = ["sh tests/fixtures/net-two-reads/build.sh"]
+
+[[expect]]
+regex = '^net-two-reads: listening$'
+
+[[expect]]
+regex = '^net-two-reads: accepted$'
+
+[[expect]]
+regex = '^net-two-reads: first ok$'
+
+[[expect]]
+regex = '^net-two-reads: second ok$'
+
+[[expect]]
+regex = '^net-two-reads: idle ok$'
+
+[[expect]]
+regex = '^net-two-reads: third ok$'
+
+[[expect]]
+regex = '^net-two-reads: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)net-two-reads: fail|panic|EXCEPTION'
