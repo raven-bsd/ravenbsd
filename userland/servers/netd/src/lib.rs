@@ -15,6 +15,7 @@ extern crate alloc;
 
 mod loopback;
 mod netd;
+pub mod network;
 #[cfg(target_os = "none")]
 pub mod nic;
 

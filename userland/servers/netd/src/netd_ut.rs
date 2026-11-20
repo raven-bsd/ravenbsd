@@ -691,3 +691,41 @@ fn only_the_nic_gateway_records_a_release_ping() {
     );
     assert_eq!(netd.take_release_ping(), None);
 }
+
+#[test]
+fn a_static_nic_is_published_without_dhcp() {
+    let mut netd = new_netd();
+    netd.attach_nic(
+        Loopback::new(NIC_MAC),
+        NicConfig::static_config(NIC_MAC, 1500, [10, 0, 2, 15], 24, Some([10, 0, 2, 2])),
+        0,
+    );
+    netd.set_nic_dns(vec![[10, 0, 2, 3]]);
+    let config = netd.published_nic().unwrap();
+    assert_eq!(config.addr, [10, 0, 2, 15]);
+    assert_eq!(config.prefix, 24);
+    assert_eq!(config.gateway, Some([10, 0, 2, 2]));
+    let lease = netd.dhcp_lease().unwrap();
+    assert_eq!(lease.address.octets(), [10, 0, 2, 15]);
+    assert_eq!(lease.prefix_len, 24);
+    assert_eq!(lease.router.unwrap().octets(), [10, 0, 2, 2]);
+    assert_eq!(lease.dns[0].octets(), [10, 0, 2, 3]);
+    assert!(lease.renew_at_ms.is_none());
+}
+
+#[test]
+fn a_late_static_config_replaces_the_published_address() {
+    let mut netd = new_netd_with_nic();
+    netd.apply_static(&StaticConfig {
+        addr: [192, 168, 7, 20],
+        prefix: 25,
+        gateway: Some([192, 168, 7, 1]),
+        dns: vec![[192, 168, 7, 53]],
+    });
+    let config = netd.published_nic().unwrap();
+    assert_eq!(config.addr, [192, 168, 7, 20]);
+    assert_eq!(config.prefix, 25);
+    assert_eq!(config.gateway, Some([192, 168, 7, 1]));
+    let lease = netd.dhcp_lease().unwrap();
+    assert_eq!(lease.dns[0].octets(), [192, 168, 7, 53]);
+}

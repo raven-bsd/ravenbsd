@@ -8,6 +8,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
+use crate::network::StaticConfig;
 use raven_abi::errno::Errno;
 use raven_netcore::{
     CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, RouteEntry,
@@ -60,6 +61,8 @@ pub enum NicAddressing {
     QemuUser,
     /// Platform NIC: no address is published until a validated DHCP lease arrives.
     DhcpFirst,
+    /// Explicit static address, prefix and gateway; no DHCP client is started.
+    Static,
 }
 
 /// Static NIC configuration supplied by the target glue after `nic:info`.
@@ -110,10 +113,36 @@ impl NicConfig {
         }
     }
 
+    /// The explicit static configuration: no DHCP, publish immediately.
+    #[must_use]
+    pub const fn static_config(
+        mac: [u8; 6],
+        mtu: u16,
+        addr: [u8; 4],
+        prefix: u8,
+        gateway: Option<[u8; 4]>,
+    ) -> Self {
+        Self {
+            mac,
+            mtu,
+            addr,
+            prefix,
+            gateway,
+            dhcp: false,
+            addressing: NicAddressing::Static,
+        }
+    }
+
     /// Whether this is the QEMU fixed-address mode.
     #[must_use]
     pub const fn is_qemu_user(self) -> bool {
         matches!(self.addressing, NicAddressing::QemuUser)
+    }
+
+    /// Whether the stack should configure an IPv4 address without waiting for DHCP.
+    #[must_use]
+    pub const fn is_configured(self) -> bool {
+        !matches!(self.addressing, NicAddressing::DhcpFirst)
     }
 }
 
@@ -427,6 +456,7 @@ pub struct Netd<D: Device> {
     nic_config: Option<NicConfig>,
     nic_control: Option<NicControl>,
     nic_lease: Option<DhcpLease>,
+    nic_dns: Vec<[u8; 4]>,
     release_ping: Option<ReleasePing>,
     files: BTreeMap<u64, File>,
     next_file: u64,
@@ -448,6 +478,7 @@ impl<D: Device> Netd<D> {
             nic_config: None,
             nic_control: None,
             nic_lease: None,
+            nic_dns: Vec::new(),
             release_ping: None,
             files: BTreeMap::new(),
             next_file: 1,
@@ -465,7 +496,7 @@ impl<D: Device> Netd<D> {
     /// Attach the persistent NIC as a second socket core.
     pub fn attach_nic<N: Device + 'static>(&mut self, device: N, config: NicConfig, now_ms: i64) {
         let mut core = NetCore::new(device, config.mac, now_ms);
-        if config.is_qemu_user() {
+        if config.is_configured() {
             core.set_ipv4(
                 Ipv4Addr::from_octets(config.addr),
                 config.prefix,
@@ -478,12 +509,50 @@ impl<D: Device> Netd<D> {
         self.nic = Some(Box::new(core));
         self.nic_config = Some(config);
         self.nic_lease = None;
-        self.nic_control = config.is_qemu_user().then_some(NicControl {
+        self.nic_dns.clear();
+        self.nic_control = config.is_configured().then_some(NicControl {
             addr: config.addr,
             prefix: config.prefix,
             gateway: config.gateway,
             up: true,
         });
+    }
+
+    /// Keep the configured DNS list for resolvd and publish a synthetic lease in static mode.
+    pub fn set_nic_dns(&mut self, dns: Vec<[u8; 4]>) {
+        self.nic_dns = dns;
+        self.nic_lease = self.static_lease();
+    }
+
+    /// Apply the static parameters after a late configuration read.
+    ///
+    /// The boot path reads the drop-in before attaching the NIC. This method exists for a
+    /// configuration that arrives after a default attach: it replaces the published address
+    /// and publishes the DNS list without restarting the stack.
+    pub fn apply_static(&mut self, config: &StaticConfig) {
+        let Some(nic_config) = self.nic_config else {
+            return;
+        };
+        let updated = NicConfig::static_config(
+            nic_config.mac,
+            nic_config.mtu,
+            config.addr,
+            config.prefix,
+            config.gateway,
+        );
+        self.nic_config = Some(updated);
+        self.nic_control = Some(NicControl {
+            addr: config.addr,
+            prefix: config.prefix,
+            gateway: config.gateway,
+            up: true,
+        });
+        self.core_mut(Interface::Nic).set_ipv4(
+            Ipv4Addr::from_octets(config.addr),
+            config.prefix,
+            config.gateway.map(Ipv4Addr::from_octets),
+        );
+        self.set_nic_dns(config.dns.clone());
     }
 
     /// Whether a NIC core is attached.
@@ -509,13 +578,34 @@ impl<D: Device> Netd<D> {
         Some(config)
     }
 
-    /// The live NIC DHCP lease, if the stack has one or a platform lease was applied.
+    /// The live NIC DHCP lease, if the stack has one or a static/platform lease was applied.
     #[must_use]
     pub fn dhcp_lease(&self) -> Option<DhcpLease> {
         self.nic
             .as_ref()
             .and_then(|nic| nic.dhcp_lease())
             .or_else(|| self.nic_lease.clone())
+    }
+
+    fn static_lease(&self) -> Option<DhcpLease> {
+        let config = self.nic_config?;
+        if !matches!(config.addressing, NicAddressing::Static) {
+            return None;
+        }
+        let control = self.nic_control.as_ref()?;
+        Some(DhcpLease {
+            address: Ipv4Addr::from_octets(control.addr),
+            prefix_len: control.prefix,
+            router: control.gateway.map(Ipv4Addr::from_octets),
+            dns: self
+                .nic_dns
+                .iter()
+                .map(|server| Ipv4Addr::from_octets(*server))
+                .collect(),
+            renew_at_ms: None,
+            rebind_at_ms: None,
+            expires_at_ms: None,
+        })
     }
 
     /// Apply one validated platform DHCP lease and publish `eth0`.
@@ -1527,7 +1617,14 @@ impl<D: Device> Netd<D> {
                 let Some(interface) = self.interface_for_name(name.as_str()) else {
                     return self.iface_error(response, Errno::ENODEV);
                 };
-                let Some(lease) = self.core_ref(interface).dhcp_lease() else {
+                // The NIC lease may be a live DHCP lease or the synthetic static lease that
+                // carries the configured DNS list to resolvd.
+                let lease = if interface == Interface::Nic {
+                    self.dhcp_lease()
+                } else {
+                    self.core_ref(interface).dhcp_lease()
+                };
+                let Some(lease) = lease else {
                     return self.iface_error(response, Errno::ENOENT);
                 };
                 let mut offset = 0usize;
