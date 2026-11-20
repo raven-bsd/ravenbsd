@@ -132,6 +132,14 @@ The matrix becomes available when `scripts/net-conformance.sh` lands (K253, bran
 `ef5c1158`, not merged). Measure its runtime then and use that measurement plus a margin for the
 cap.
 
+## Checker regression tests
+
+`python3 scripts/tcp-evidence_ut.py` runs three fixtures: a landed port with its required entry
+deleted, a NetBSD/NRL import, and a valid FreeBSD import. The checker must reject the first two and
+accept the third. The test then mutates a temporary copy of the checker to remove the NetBSD rule
+and the missing-entry rule; the bad fixtures must pass under those mutants, proving the test catches
+the regression. The output is stored as the `checker` phase in the evidence packet.
+
 ## Limits
 
 * No 24 h or live SSH/tap claim is made here; live SSH is the Bob integration gate.

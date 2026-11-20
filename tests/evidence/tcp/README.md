@@ -24,6 +24,7 @@ timestamped evidence packet per run of `scripts/tcp-evidence.sh`.
 
 ```sh
 timeout 60  sh scripts/tcp-evidence.sh --selftest
+timeout 30  python3 scripts/tcp-evidence_ut.py
 timeout 240 sh scripts/tcp-evidence.sh --unit
 timeout 120 sh scripts/tcp-evidence.sh --audit \
     --reports-root /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/tickets \

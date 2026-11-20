@@ -689,6 +689,32 @@ def phase_audit(
     }
 
 
+def phase_checker(root: Path, packet: Path) -> dict:
+    run = run_command(
+        [sys.executable, "scripts/tcp-evidence_ut.py"],
+        30,
+        packet / "logs" / "checker.log",
+        root,
+    )
+    if run["timed_out"]:
+        status = "blocked"
+    elif run["exit"] == 0 and "tcp-evidence-tests: PASS" in run["stdout"]:
+        status = "pass"
+    else:
+        status = "fail"
+    data = {
+        "name": "checker",
+        "status": status,
+        "command": run["command"],
+        "exit": run["exit"],
+        "timed_out": run["timed_out"],
+        "duration_s": run["duration_s"],
+        "log": "logs/checker.log",
+    }
+    (packet / "checker.json").write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return data
+
+
 def phase_unit(root: Path, packet: Path) -> dict:
     run = run_command(
         ["cargo", "nextest", "run", "-p", "raven-tcpip"],
@@ -834,6 +860,7 @@ def input_paths(root: Path, claims: Path) -> list[Path]:
         claims,
         root / "scripts" / "tcp-evidence.py",
         root / "scripts" / "tcp-evidence.sh",
+        root / "scripts" / "tcp-evidence_ut.py",
         root / "tests" / "evidence" / "tcp" / "README.md",
     ]
     paths += source_files(root)
@@ -934,6 +961,8 @@ def command_run(root: Path, args) -> int:
         phases.append(phase_audit(root, packet, claims, reports_root, freebsd_root, dragonfly_root))
     if args.unit or args.all:
         phases.append(phase_unit(root, packet))
+    if args.checker or args.all:
+        phases.append(phase_checker(root, packet))
     if args.matrix or args.all:
         phases.append(phase_matrix(root, packet))
 
@@ -1022,6 +1051,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--audit", action="store_true", help="run the provenance/quarantine audit")
     parser.add_argument("--unit", action="store_true", help="run cargo nextest -p raven-tcpip")
+    parser.add_argument("--checker", action="store_true", help="run the provenance-checker negative/mutation tests")
     parser.add_argument("--matrix", action="store_true", help="run the K253 conformance matrix")
     parser.add_argument("--all", action="store_true", help="audit + unit + matrix")
     parser.add_argument("--selftest", action="store_true", help="fast self-test; no nextest/QEMU")
@@ -1038,7 +1068,7 @@ def main() -> int:
     root = ROOT
     if args.selftest:
         return selftest(root)
-    if not (args.audit or args.unit or args.matrix or args.all):
+    if not (args.audit or args.unit or args.checker or args.matrix or args.all):
         args.all = True
     return command_run(root, args)
 
