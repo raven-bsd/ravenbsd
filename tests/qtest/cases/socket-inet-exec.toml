@@ -30,8 +30,9 @@ pre = [
 [[expect]]
 regex = '^socket-inet-exec: listening port=23081$'
 
+# The accept block is newline-less and can share the getty login prompt.
 [[expect]]
-regex = '^socket-inet-exec: accepted fd=[0-9]+ peer=[0-9.]+:[0-9]+$'
+regex = '^.*socket-inet-exec: accepted fd=[0-9]+ peer=[0-9.]+:[0-9]+$'
 
 [[expect]]
 regex = '^socket-inet-exec-child: hello sent bytes=979$'
