@@ -2623,6 +2623,7 @@ name = "raven-ping"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-http-net",
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
