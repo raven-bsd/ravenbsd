@@ -5,9 +5,15 @@
 
 #![cfg(feature = "testutil")]
 
+mod common;
+
+use common::{A, B, address, handshake, inject_segment, pair, pump_ms, trace_link_tcp};
+use raven_abi::errno::Errno;
 use raven_tcpip::{
-    AcceptQueue, HalfOpen, HalfOpenQueue, IpAddr, Ipv4Addr, IsnGenerator, SynCookie,
+    AcceptQueue, HalfOpen, HalfOpenQueue, Instant, IpAddr, Ipv4Addr, IsnGenerator, SocketId,
+    SynCookie, TcpState,
 };
+use raven_tcpip_wire::tcp::TcpFlags;
 
 fn peer(value: u8) -> IpAddr {
     IpAddr::V4(Ipv4Addr::new([198, 51, 100, value]))
@@ -281,4 +287,208 @@ fn isn_deterministic_mode_ignores_the_clock() {
         generator.generate(peer(3), 2000, 443, 0),
         generator.generate(peer(3), 2000, 443, 999_999)
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// NetBSD usrreq port (`tcp_usrreq.c:tcp_connect`/`tcp_listen`/`tcp_accept`/`tcp_disconnect1`,
+// `uipc_socket.c:soclose`/`sonewconn`).  Every case asserts a state or wire effect that the
+// corresponding donor branch produces; a mutation of that branch must fail the test.
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn connect_rejects_a_zero_remote_port() {
+    let (_link, mut a, _b) = pair();
+    assert_eq!(
+        a.tcp_connect((IpAddr::V4(address(B)), 0), None),
+        Err(Errno::EADDRNOTAVAIL)
+    );
+}
+
+#[test]
+fn connect_binds_an_ephemeral_port_and_sends_the_syn() {
+    let (link, mut a, _b) = pair();
+    let client = a
+        .tcp_connect((IpAddr::V4(address(B)), 80), None)
+        .expect("connect");
+    assert_eq!(a.tcp_state(client), Ok(TcpState::SynSent));
+    let (port, remote) = a.test_tcp_endpoints(client).expect("endpoints");
+    assert_ne!(port, 0);
+    assert_eq!(remote, Some((IpAddr::V4(address(B)), 80)));
+    assert!(
+        trace_link_tcp(&link, 0)
+            .iter()
+            .any(|(flags, _, _, _)| flags.syn() && !flags.ack()),
+        "active open must emit the initial SYN"
+    );
+}
+
+#[test]
+fn connect_rejects_a_second_socket_on_the_same_local_port() {
+    let (_link, mut a, _b) = pair();
+    a.tcp_connect((IpAddr::V4(address(B)), 80), Some(40_000))
+        .expect("first connect");
+    assert_eq!(
+        a.tcp_connect((IpAddr::V4(address(B)), 81), Some(40_000)),
+        Err(Errno::EADDRINUSE)
+    );
+}
+
+#[test]
+fn listen_enters_the_listen_state_and_accept_is_empty() {
+    let (_link, _a, mut b) = pair();
+    let listener = b.tcp_listen(80, 8).expect("listen");
+    assert_eq!(b.tcp_state(listener), Ok(TcpState::Listen));
+    assert_eq!(b.tcp_accept(listener), Ok(None));
+}
+
+#[test]
+fn accept_pops_completed_connections_in_fifo_order() {
+    let (_link, mut a, mut b) = pair();
+    let listener = b.tcp_listen(80, 8).expect("listen");
+    a.tcp_connect((IpAddr::V4(address(B)), 80), Some(40_000))
+        .expect("first");
+    pump_ms(&mut a, &mut b, 0, 200);
+    a.tcp_connect((IpAddr::V4(address(B)), 80), Some(40_001))
+        .expect("second");
+    pump_ms(&mut a, &mut b, 210, 450);
+    let first = b
+        .tcp_accept(listener)
+        .expect("accept first")
+        .expect("first queued");
+    let second = b
+        .tcp_accept(listener)
+        .expect("accept second")
+        .expect("second queued");
+    assert_eq!(
+        b.test_tcp_endpoints(first).expect("first endpoints").1,
+        Some((IpAddr::V4(address(A)), 40_000))
+    );
+    assert_eq!(
+        b.test_tcp_endpoints(second).expect("second endpoints").1,
+        Some((IpAddr::V4(address(A)), 40_001))
+    );
+    assert_eq!(b.tcp_accept(listener), Ok(None));
+}
+
+#[test]
+fn close_established_flushes_receive_data_and_keeps_queued_send_data() {
+    let (link, mut a, mut b) = pair();
+    let (client, server) = handshake(&mut a, &mut b);
+    a.test_set_tcp_snd_wnd(client, 0);
+    assert_eq!(a.send(client, b"hello"), Ok(5));
+    let mark = link.trace().entries().len();
+    a.close(client).expect("close");
+    assert!(
+        !trace_link_tcp(&link, mark)
+            .iter()
+            .any(|(flags, _, _, _)| flags.fin()),
+        "a close with queued data defers the FIN until the data drains"
+    );
+    a.test_set_tcp_snd_wnd(client, 65_535);
+    pump_ms(&mut a, &mut b, 0, 500);
+    let mut buffer = [0u8; 16];
+    let count = b.recv(server, &mut buffer).expect("receive queued data");
+    assert_eq!(&buffer[..count], b"hello");
+    assert!(
+        trace_link_tcp(&link, mark)
+            .iter()
+            .any(|(flags, _, _, _)| flags.fin()),
+        "the deferred FIN follows the drained send queue"
+    );
+}
+
+#[test]
+fn close_established_flushes_the_receive_queue() {
+    let (_link, mut a, mut b) = pair();
+    let (client, server) = handshake(&mut a, &mut b);
+    a.send(client, b"pending").expect("send");
+    pump_ms(&mut a, &mut b, 0, 300);
+    assert!(b.recv_queue_len(server).expect("receive queue") > 0);
+    b.close(server).expect("close");
+    assert_eq!(b.recv_queue_len(server), Ok(0));
+}
+
+#[test]
+fn close_embryonic_syn_received_sends_no_fin() {
+    let (link, _a, mut b) = pair();
+    let listener = b.tcp_listen(80, 2).expect("listen");
+    inject_segment(&mut b, A, B, 40_000, 80, 100, 0, TcpFlags::SYN, &[]);
+    b.poll(Instant::ZERO);
+    let child = b.test_listener_half_open(listener)[0];
+    assert_eq!(b.tcp_state(child), Ok(TcpState::SynReceived));
+    let mark = link.trace().entries().len();
+    b.close(child).expect("close");
+    assert_eq!(b.tcp_state(child), Ok(TcpState::Closed));
+    assert!(
+        !trace_link_tcp(&link, mark)
+            .iter()
+            .any(|(flags, _, _, _)| flags.fin()),
+        "tcp_disconnect1 calls tcp_close for an embryonic connection, not tcp_usrclosed"
+    );
+    assert!(b.test_listener_half_open(listener).is_empty());
+}
+
+#[test]
+fn close_syn_sent_drops_the_connection_without_a_fin() {
+    let (link, mut a, _b) = pair();
+    let client = a
+        .tcp_connect((IpAddr::V4(address(B)), 80), Some(40_000))
+        .expect("connect");
+    let mark = link.trace().entries().len();
+    a.close(client).expect("close");
+    assert_eq!(a.tcp_state(client), Ok(TcpState::Closed));
+    assert!(
+        !trace_link_tcp(&link, mark)
+            .iter()
+            .any(|(flags, _, _, _)| flags.fin()),
+        "tcp_disconnect1 closes SYN_SENT without a FIN"
+    );
+}
+
+#[test]
+fn shutdown_write_on_syn_received_sends_the_fin() {
+    let (link, _a, mut b) = pair();
+    let listener = b.tcp_listen(80, 2).expect("listen");
+    inject_segment(&mut b, A, B, 40_000, 80, 100, 0, TcpFlags::SYN, &[]);
+    b.poll(Instant::ZERO);
+    let child = b.test_listener_half_open(listener)[0];
+    let mark = link.trace().entries().len();
+    b.shutdown_write(child).expect("shutdown");
+    assert_eq!(b.tcp_state(child), Ok(TcpState::FinWait1));
+    assert!(
+        trace_link_tcp(&link, mark)
+            .iter()
+            .any(|(flags, _, _, _)| flags.fin()),
+        "tcp_shutdown runs tcp_usrclosed, which moves SYN_RECEIVED to FIN_WAIT_1"
+    );
+}
+
+#[test]
+fn close_listener_aborts_queued_children() {
+    let (_link, _a, mut b) = pair();
+    let listener = b.tcp_listen(80, 4).expect("listen");
+    let completed = b.test_pending_connection(listener).expect("completed");
+    inject_segment(&mut b, A, B, 40_002, 80, 100, 0, TcpFlags::SYN, &[]);
+    b.poll(Instant::ZERO);
+    let partial = b.test_listener_half_open(listener)[0];
+    b.close(listener).expect("close listener");
+    assert_eq!(b.tcp_state(completed), Ok(TcpState::Closed));
+    assert_eq!(b.tcp_state(partial), Ok(TcpState::Closed));
+    assert_eq!(b.tcp_accept(listener), Err(Errno::EBADF));
+}
+
+#[test]
+fn close_listener_leaves_an_accepted_child_open() {
+    let (_link, mut a, mut b) = pair();
+    let (_client, accepted) = handshake(&mut a, &mut b);
+    b.close(SocketId(1)).expect("close listener");
+    assert_eq!(b.tcp_state(accepted), Ok(TcpState::Established));
+}
+
+#[test]
+fn second_close_of_a_connection_is_ebadf() {
+    let (_link, mut a, mut b) = pair();
+    let (_client, server) = handshake(&mut a, &mut b);
+    b.close(server).expect("first close");
+    assert_eq!(b.close(server), Err(Errno::EBADF));
 }

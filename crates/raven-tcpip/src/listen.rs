@@ -90,6 +90,11 @@ impl HalfOpenQueue {
         self.entries.iter().map(|entry| entry.socket)
     }
 
+    /// Drop every partial connection (`sys/kern/uipc_socket.c:soclose` aborts `so_q0`).
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
     /// Number of half-open entries.
     #[must_use]
     pub fn len(&self) -> usize {

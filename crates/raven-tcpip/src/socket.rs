@@ -294,7 +294,11 @@ impl<D: Device> Stack<D> {
         }
         let rx_cap = self.recv_buffer_cap();
         let tx_cap = self.send_buffer_cap();
-        let backlog = backlog.max(1);
+        // NetBSD `solisten` stores `uimin(backlog, somaxconn)` as the listener's queue limit;
+        // `sonewconn` then refuses a child once both the partial and completed queues are over
+        // that limit. ACCEPT_QUEUE_CEILING is the `somaxconn` analogue here, and the partial
+        // queue is bounded by the same limit at SYN time.
+        let backlog = backlog.clamp(1, ACCEPT_QUEUE_CEILING);
         self.sockets.alloc(
             Kind::Listener {
                 port,
@@ -405,25 +409,18 @@ impl<D: Device> Stack<D> {
     }
 
     /// Close a socket and release its buffers.
+    ///
+    /// TCP close follows NetBSD `sys/netinet/tcp_usrreq.c:tcp_disconnect1`: an embryonic
+    /// connection (`TCPS_HAVEESTABLISHED` is false, so `SYN_SENT`, `SYN_RECEIVED` or `CLOSED`)
+    /// is dropped by `tcp_close` without a FIN, while an established connection flushes its
+    /// receive buffer and runs `tcp_usrclosed` (FIN_WAIT_1 from ESTABLISHED, LAST_ACK from
+    /// CLOSE_WAIT). Data already queued for transmission is kept, as `tcp_close` does not
+    /// `sbflush` the send buffer; it drains before the FIN.
     pub fn close(&mut self, socket: SocketId) -> Result<(), Errno> {
         if let Ok(record) = self.sockets.record(socket)
             && matches!(record.kind, Kind::Tcp(_))
         {
-            if record.app_closed {
-                return Err(Errno::EBADF);
-            }
-            match self.tcp_shutdown(socket) {
-                Ok(()) => {}
-                // The connection already ended (reset, timeout): releasing the handle is fine
-                // once; only a second close is a bad handle.
-                Err(Errno::EBADF) => {}
-                Err(error) => return Err(error),
-            }
-            let record = self.sockets.record_mut(socket)?;
-            record.tx_shutdown = true;
-            record.app_closed = true;
-            record.tx.clear();
-            return Ok(());
+            return self.tcp_disconnect(socket);
         }
         let record = self.sockets.record_mut(socket)?;
         if record.closed {
@@ -441,14 +438,98 @@ impl<D: Device> Stack<D> {
             orphans.extend(pending.sockets());
             orphans.extend(half_open.sockets());
             pending.clear();
+            half_open.clear();
         }
         if let Kind::Udp { datagrams, .. } = &mut record.kind {
             datagrams.clear();
         }
+        // `sys/kern/uipc_socket.c:soclose` aborts every child still on `so_q0` and `so_q`; a
+        // synchronized child gets its RST through `tcp_abort`/`tcp_drop`, and the record is
+        // made reclaimable instead of being left as an unusable orphan.
         for raw in orphans {
+            let _ = self.abort(SocketId(raw));
             if let Some(child) = self.sockets.records.get_mut(&raw) {
                 child.app_closed = true;
             }
+        }
+        Ok(())
+    }
+
+    /// `tcp_disconnect1` for a TCP socket.
+    fn tcp_disconnect(&mut self, socket: SocketId) -> Result<(), Errno> {
+        let (state, app_closed) = {
+            let record = self.sockets.record(socket)?;
+            let Kind::Tcp(connection) = &record.kind else {
+                return Err(Errno::ENOTSOCK);
+            };
+            (connection.state, record.app_closed)
+        };
+        if app_closed {
+            return Err(Errno::EBADF);
+        }
+        // `TCPS_HAVEESTABLISHED` is `state >= TCPS_ESTABLISHED`; SYN_RECEIVED is still embryonic.
+        let established = !matches!(
+            state,
+            crate::tcp_state::TcpState::Closed
+                | crate::tcp_state::TcpState::Listen
+                | crate::tcp_state::TcpState::SynSent
+                | crate::tcp_state::TcpState::SynReceived
+        );
+        if !established {
+            // No FIN: NetBSD calls tcp_close for an embryonic connection, not tcp_usrclosed.
+            self.release_embryonic(socket)?;
+            return Ok(());
+        }
+        match self.tcp_shutdown(socket) {
+            Ok(()) => {}
+            // The connection already ended (reset, timeout): releasing the handle is fine
+            // once; only a second close is a bad handle.
+            Err(Errno::EBADF) => {}
+            Err(error) => return Err(error),
+        }
+        let record = self.sockets.record_mut(socket)?;
+        record.tx_shutdown = true;
+        record.app_closed = true;
+        // tcp_disconnect1 flushes so_rcv before entering the shutdown states.
+        record.rx.clear();
+        Ok(())
+    }
+
+    /// Drop an embryonic TCP record without emitting a FIN (`tcp_disconnect1` -> `tcp_close`).
+    fn release_embryonic(&mut self, socket: SocketId) -> Result<(), Errno> {
+        let raw = socket.0;
+        let port = {
+            let record = self.sockets.record(socket)?;
+            match &record.kind {
+                Kind::Tcp(connection) => connection.local_port,
+                _ => return Err(Errno::ENOTSOCK),
+            }
+        };
+        let listener = self.sockets.records.iter().find_map(|(id, record)| {
+            if record.closed {
+                return None;
+            }
+            match record.kind {
+                Kind::Listener { port: bound, .. } if bound == port => Some(*id),
+                _ => None,
+            }
+        });
+        if let Some(listener) = listener
+            && let Ok(record) = self.sockets.record_mut(SocketId(listener))
+            && let Kind::Listener { half_open, .. } = &mut record.kind
+        {
+            // soqremque(q0): the partial connection is no longer a backlog entry.
+            half_open.remove_socket(raw);
+        }
+        self.sockets.unindex(socket);
+        let record = self.sockets.record_mut(socket)?;
+        record.closed = true;
+        record.app_closed = true;
+        record.tx_shutdown = true;
+        record.rx.clear();
+        record.tx.clear();
+        if let Kind::Tcp(connection) = &mut record.kind {
+            connection.state = crate::tcp_state::TcpState::Closed;
         }
         Ok(())
     }
