@@ -556,6 +556,36 @@ fn close_listener_leaves_an_accepted_child_open() {
 }
 
 #[test]
+fn shutdown_write_on_syn_sent_defers_the_fin_until_connected() {
+    let (link, mut a, mut b) = pair();
+    let _listener = b.tcp_listen(80, 4).expect("listen");
+    let client = a
+        .tcp_connect((IpAddr::V4(address(B)), 80), Some(40_000))
+        .expect("connect");
+    assert_eq!(a.tcp_state(client), Ok(TcpState::SynSent));
+    let mark = link.trace().entries().len();
+    a.shutdown_write(client).expect("shutdown");
+    assert_eq!(a.tcp_state(client), Ok(TcpState::SynSent));
+    assert!(
+        !trace_link_tcp(&link, mark)
+            .iter()
+            .any(|(flags, _, _, _)| flags.fin()),
+        "TF_NEEDFIN must not emit a FIN before the handshake completes"
+    );
+    pump_ms(&mut a, &mut b, 0, 200);
+    assert!(matches!(
+        a.tcp_state(client),
+        Ok(TcpState::FinWait1 | TcpState::FinWait2)
+    ));
+    assert!(
+        trace_link_tcp(&link, mark)
+            .iter()
+            .any(|(flags, _, _, _)| flags.fin()),
+        "the deferred FIN is emitted after ESTABLISHED"
+    );
+}
+
+#[test]
 fn second_close_of_a_connection_is_ebadf() {
     let (_link, mut a, mut b) = pair();
     let (_client, server) = handshake(&mut a, &mut b);
