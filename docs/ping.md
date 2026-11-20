@@ -73,13 +73,20 @@ slirp reply, an unknown name fails with the line above and `ping-status:1`, and
 tap/bridge environment uses the dnsmasq server at `10.0.2.3`; the qtest uses the loopback fixture
 so it needs no host tap or external DNS.
 
+A process's scheme namespace is snapshotted when the process is created. The stock release starts
+the getty session before `resolvd` registers `resolv:`, so the interactive shell (and its children)
+cannot open the resolver even though the service is up. The test initfs therefore adds
+`scheme:resolv` to the getty `needs`, which schedules the login chain after `resolvd`. Correcting
+the production service order or granting the prefix is a release-profile follow-up outside this
+ticket's Owns; `ping` and the resolver policy are unchanged.
+
 ## Tests
 
 ```
-timeout 300 cargo xtask qtest --case ping-dns --arch x86_64
-timeout 300 cargo xtask qtest --case ping-interval --arch x86_64 --no-build
+timeout 360 cargo xtask qtest --case ping-dns --arch x86_64
+timeout 360 cargo xtask qtest --case ping-interval --arch x86_64
 timeout 120 cargo nextest run -p raven-ping
-timeout 240 make check-fast
+timeout 300 make check-fast
 ```
 
 `ping-dns` starts the loopback DNS fixture, resolves `ping.test` to 10.0.2.2 and pings it, checks

@@ -5,6 +5,9 @@
 # uses a loopback DNS fixture (127.0.0.1:53) staged into the release initfs with a test-only
 # /etc/resolv.conf; it answers ping.test with 10.0.2.2 so the ICMP echo is a real slirp reply.
 # Unknown names fail without ICMP; numeric ping keeps working. No hard-coded destination.
+# The test initfs also adds scheme:resolv to the getty needs: the stock release creates getty
+# before resolvd, so the login chain's scheme-namespace snapshot lacks resolv: (release-profile
+# finding outside this ticket).
 
 name = "ping-dns"
 arch = "x86_64"
