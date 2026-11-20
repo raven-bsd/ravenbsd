@@ -223,6 +223,89 @@ fn udp_readiness_is_the_datagram_queue() {
 }
 
 #[test]
+fn listener_readiness_bits_are_not_transposed() {
+    let mut stack = stack();
+    let listener = stack.tcp_listen(7100, 4).expect("listen");
+    let empty = stack.readiness(listener).expect("empty");
+    assert!(!empty.readable);
+    assert!(!empty.writable);
+
+    let _connection = stack
+        .test_pending_connection(listener)
+        .expect("pending connection");
+    let backlog = stack.readiness(listener).expect("backlog");
+    assert!(backlog.readable, "a pending connection is readable");
+    assert!(!backlog.writable, "a listener is never writable");
+}
+
+#[test]
+fn a_listener_backlog_raises_an_accepted_edge() {
+    let mut stack = stack();
+    let listener = stack.tcp_listen(7101, 4).expect("listen");
+    stack.poll(Instant::ZERO);
+    let _ = stack.take_events().count();
+
+    let connection = stack
+        .test_pending_connection(listener)
+        .expect("pending connection");
+    stack.poll(Instant::from_millis(1));
+    let events: Vec<crate::Event> = stack.take_events().collect();
+    assert!(
+        events.contains(&crate::Event::Accepted {
+            listener,
+            conn: connection
+        }),
+        "{events:?}"
+    );
+
+    stack.poll(Instant::from_millis(2));
+    let second: Vec<crate::Event> = stack.take_events().collect();
+    assert!(
+        !second
+            .iter()
+            .any(|event| matches!(event, crate::Event::Accepted { .. })),
+        "stale accepted event: {second:?}"
+    );
+}
+
+#[test]
+fn a_new_data_byte_raises_a_readable_edge() {
+    let (mut stack, connection) = established();
+    stack.poll(Instant::ZERO);
+    let _ = stack.take_events().count();
+
+    stack.test_push_rx(connection, b"x").expect("push");
+    stack.poll(Instant::from_millis(1));
+    let events: Vec<crate::Event> = stack.take_events().collect();
+    assert!(
+        events.contains(&crate::Event::Readable(connection)),
+        "missed readable edge: {events:?}"
+    );
+}
+
+#[test]
+fn a_close_event_is_emitted_once_and_not_stale() {
+    let (mut stack, connection) = established();
+    stack.poll(Instant::ZERO);
+    let _ = stack.take_events().count();
+
+    stack.test_set_closed(connection, true).expect("close");
+    stack.poll(Instant::from_millis(1));
+    let first: Vec<crate::Event> = stack.take_events().collect();
+    assert!(
+        first.contains(&crate::Event::Closed(connection)),
+        "missed close edge: {first:?}"
+    );
+
+    stack.poll(Instant::from_millis(2));
+    let second: Vec<crate::Event> = stack.take_events().collect();
+    assert!(
+        !second.contains(&crate::Event::Closed(connection)),
+        "stale close event: {second:?}"
+    );
+}
+
+#[test]
 fn an_unknown_socket_is_ebadf() {
     let stack = stack();
     assert_eq!(stack.readiness(SocketId(999)), Err(Errno::EBADF));
