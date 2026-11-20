@@ -32,6 +32,14 @@ pub fn proc_exec(request: &[u8; 104]) -> Result<usize, Errno> {
     crate::errno::ret(raw)
 }
 
+/// Raw `PIPE2` (`0x6f`): create a pipe and write the read/write handles into `handles`.
+pub fn pipe2(handles: &mut [u32; 2], flags: u32) -> Result<usize, Errno> {
+    // SAFETY: `handles` is a live two-word array; the kernel writes exactly eight bytes and
+    // validates the scalar flags word.
+    let raw = unsafe { arch::syscall2(0x6f, handles.as_mut_ptr() as usize, flags as usize) };
+    crate::errno::ret(raw)
+}
+
 /// User-visible event record written by `EVQ_WAIT`.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

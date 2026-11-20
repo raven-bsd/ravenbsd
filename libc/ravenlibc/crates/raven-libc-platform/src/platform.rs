@@ -1656,14 +1656,37 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok(())
     }
 
-    /// `pipe`: `ENOSYS` until PG-35 (`pipe:` server).
+    /// `pipe`.
     pub fn pipe(&self) -> Result<(i32, i32), Errno> {
-        Err(Errno::ENOSYS)
+        self.pipe2(0)
     }
 
-    /// `pipe2`: `ENOSYS` until PG-35.
-    pub fn pipe2(&self, _flags: i32) -> Result<(i32, i32), Errno> {
-        Err(Errno::ENOSYS)
+    /// `pipe2`.
+    pub fn pipe2(&self, flags: i32) -> Result<(i32, i32), Errno> {
+        let mut handles = [0u32; 2];
+        raven_libc_sys::sys::pipe2(&mut handles, u32::try_from(flags).unwrap_or(0))?;
+        let cloexec = flags & fcntl::O_CLOEXEC as i32 != 0;
+        let nonblock = flags & fcntl::O_NONBLOCK as i32 != 0;
+        let status = if nonblock {
+            fcntl::O_NONBLOCK as u32
+        } else {
+            0
+        };
+        let read = self.install(Handle(handles[0]), OfdKind::Pipe, status, None, cloexec);
+        let write = self.install(Handle(handles[1]), OfdKind::Pipe, status | 1, None, cloexec);
+        match (read, write) {
+            (Ok(read), Ok(write)) => Ok((read, write)),
+            (Ok(read), Err(error)) => {
+                let _ = self.close(read);
+                let _ = self.backend.close(Handle(handles[1]));
+                Err(error)
+            }
+            (Err(error), _) => {
+                let _ = self.backend.close(Handle(handles[0]));
+                let _ = self.backend.close(Handle(handles[1]));
+                Err(error)
+            }
+        }
     }
 
     /// `tcgetattr`.
