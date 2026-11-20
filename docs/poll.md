@@ -15,7 +15,7 @@ so a caller that polls without reading gets one spurious readiness, not a busy l
 
 `ppoll` converts the absolute `timespec` to the poll millisecond granularity. The atomic signal
 mask swap is not implemented (PG-26); OpenSSH's packet path passes a NULL mask. The mask is
-accepted but not swapped.
+accepted but not swapped. `pselect` still returns `ENOSYS` until that atomic swap lands.
 
 The donor comparison is NetBSD `sys/kern/sys_socket.c:soo_poll`,
 `sys/kern/uipc_socket.c:sopoll`, `sys/kern/uipc_socket2.c:sowakeup` and

@@ -4,7 +4,7 @@
 #
 # Stage the target `raven` admin binary for the modern-admin profile. The binary is the std CLI
 # linked against the packed ravenlibc archive and the C64d crt objects; it is installed at
-# `/bin/raven` by profiles/raven-admin-test.d/20-raven.toml. The K74 host/stub binary is never
+# `/usr/sbin/raven` by profiles/raven-admin-test.d/20-raven.toml. The K74 host/stub binary is never
 # used here. The debug user programs nearly fill the 64 MiB ESP, so the admin binary is stripped
 set -eu
 

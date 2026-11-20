@@ -82,3 +82,12 @@ fn scripted_cancel_exits_without_a_file() {
     assert!(output.contains("raven config: cancelled"));
     assert!(!network_path(root.path()).exists());
 }
+
+#[test]
+fn incomplete_arrows_wait_for_the_final_byte() {
+    assert_eq!(crate::complete_prefix(b"\x1b"), 0);
+    assert_eq!(crate::complete_prefix(b"\x1b["), 0);
+    assert_eq!(crate::complete_prefix(b"\x1b[B"), 3);
+    assert_eq!(crate::complete_prefix(b"\x1b[B\n"), 4);
+    assert_eq!(crate::complete_prefix(b"q"), 1);
+}
