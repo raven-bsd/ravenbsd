@@ -32,19 +32,7 @@ pub fn close_range<T: FdTable>(table: &mut T, lo: u32, hi: u32, flags: u32) -> R
     let lo = i32::try_from(lo).unwrap_or(i32::MAX);
     let hi = i32::try_from(hi).unwrap_or(i32::MAX);
     if flags & CLOSE_RANGE_CLOEXEC != 0 {
-        let mut fd = lo;
-        loop {
-            if table.set_cloexec(fd, true).is_err() {
-                // A closed descriptor is not an error for the range operation.
-            }
-            if fd == hi {
-                break;
-            }
-            fd = match fd.checked_add(1) {
-                Some(next) => next,
-                None => break,
-            };
-        }
+        table.set_cloexec_range(lo, hi);
         return Ok(());
     }
     let _ = table.close_range_between(lo, hi);

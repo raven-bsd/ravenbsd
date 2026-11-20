@@ -68,6 +68,55 @@ fn sys_error(value: raven_abi::errno::Errno) -> raven_libc_platform::Errno {
     raven_libc_platform::Errno(value.0)
 }
 
+/// The inclusive upper bound for a descriptor range.
+///
+/// No descriptor at or above the hard `RLIMIT_NOFILE` can exist, so a `close_range` upper bound
+/// of `INT_MAX` is clamped instead of iterated to two billion.
+fn bounded_hi(hi: i32, hard: u32) -> i32 {
+    let max = i32::try_from(hard.saturating_sub(1)).unwrap_or(i32::MAX);
+    hi.min(max)
+}
+
+/// Close a real descriptor range through the platform table.
+///
+/// The table's `close_range` walks its own used-bit bitmap and hard limit, not every integer to
+/// `hi`; only the open handles are closed. `remove_side` drops the personality side-table entries
+/// in the same inclusive range.
+fn real_close_between(lo: i32, hi: i32, remove_side: impl FnOnce(i32, i32)) -> usize {
+    if lo < 0 || hi < lo {
+        return 0;
+    }
+    let before = platform().open_count();
+    // The platform range is half-open; `hi` is inclusive here.
+    let last = u32::try_from(hi).unwrap_or(u32::MAX).saturating_add(1);
+    let _ = platform().close_range(u32::try_from(lo).unwrap_or(0), last);
+    remove_side(lo, hi);
+    before.saturating_sub(platform().open_count())
+}
+
+/// Mark a real descriptor range `FD_CLOEXEC`, clamped to the hard descriptor limit.
+fn real_set_cloexec_range(lo: i32, hi: i32) {
+    if lo < 0 || hi < lo {
+        return;
+    }
+    let hi = bounded_hi(hi, platform().rlimits().nofile_hard);
+    if hi < lo {
+        return;
+    }
+    let mut fd = lo;
+    loop {
+        // A closed descriptor is not an error for the range operation.
+        let _ = platform().set_cloexec(fd, true);
+        if fd == hi {
+            break;
+        }
+        fd = match fd.checked_add(1) {
+            Some(next) => next,
+            None => break,
+        };
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Linux personality seams
 
@@ -270,6 +319,26 @@ impl raven_libc_personality_linux::seams::FdTable for RealFdTable {
             side.entries.remove(&fd);
         });
         result
+    }
+
+    fn close_range_between(&mut self, lo: i32, hi: i32) -> usize {
+        real_close_between(lo, hi, |lo, hi| {
+            SIDE_KINDS.with(|side| {
+                let keys: alloc::vec::Vec<i32> = side
+                    .entries
+                    .keys()
+                    .copied()
+                    .filter(|fd| *fd >= lo && *fd <= hi)
+                    .collect();
+                for fd in keys {
+                    side.entries.remove(&fd);
+                }
+            });
+        })
+    }
+
+    fn set_cloexec_range(&mut self, lo: i32, hi: i32) {
+        real_set_cloexec_range(lo, hi);
     }
 
     fn set_cloexec(
@@ -699,6 +768,26 @@ impl raven_libc_personality_bsd::seams::FdTable for RealFdTableBsd {
             side.entries.remove(&fd);
         });
         result
+    }
+
+    fn close_range_between(&mut self, lo: i32, hi: i32) -> usize {
+        real_close_between(lo, hi, |lo, hi| {
+            BSD_SIDE_KINDS.with(|side| {
+                let keys: alloc::vec::Vec<i32> = side
+                    .entries
+                    .keys()
+                    .copied()
+                    .filter(|fd| *fd >= lo && *fd <= hi)
+                    .collect();
+                for fd in keys {
+                    side.entries.remove(&fd);
+                }
+            });
+        })
+    }
+
+    fn set_cloexec_range(&mut self, lo: i32, hi: i32) {
+        real_set_cloexec_range(lo, hi);
     }
 
     fn set_cloexec(

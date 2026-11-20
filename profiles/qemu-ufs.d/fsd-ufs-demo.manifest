@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K193 one-disk demo: the ESP is GPT partition 1 and the UFS2 root is partition 2.
+# The two-disk preflight keeps the stock partition-1 manifest.
+name = "fsd-ufs"
+exec = "/sbin/fsd-ufs"
+needs = ["scheme:block"]
+provides = ["scheme:ufs"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+
+[env]
+FSD_UFS_DEVICE = "block:0"
+FSD_UFS_PARTITION = "2"
+FSD_UFS_SCHEME = "ufs"
+FSD_UFS_READ_ONLY = "0"
