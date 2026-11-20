@@ -34,6 +34,7 @@ fallback.
 | `--max-time SECS` | Total request deadline; a positive integer. The default is 10 s. |
 | `-H 'Name: value'` | Add one request header. Reserved hop-by-hop/host headers are rejected by the core. |
 | `--cacert FILE` | TLS add-on build only: trust exactly this PEM bundle instead of the default `/addons/etc/ssl/certs/ca-bundle.pem`. |
+| `-V`, `--version` | Print `curl <version> (RavenBSD)` and exit 0. |
 
 ### wget
 
@@ -43,6 +44,7 @@ fallback.
 | `-q` | Suppress the summary and diagnostics. |
 | `--max-time SECS` | Total request deadline; default 10 s. |
 | `--cacert FILE` | TLS add-on build only; same trust semantics as curl. |
+| `-V`, `--version` | Print `wget <version> (RavenBSD)` and exit 0. |
 
 `wget` always follows a bounded redirect set. The default output name is the last URL path
 segment; an empty path or trailing slash becomes `index.html`; `.` and `..` are rejected. There is
@@ -133,6 +135,22 @@ server is pinned to TLS 1.2 and sends a proper `close_notify`; this avoids the k
 TLS 1.3 ticket/CCS race. The target TLS stack and verification path are unchanged. The host
 server log is `build/fixtures/fetch/https-server.log`; QEMU serial logs are under
 `build/qtest/`.
+
+## Static shell staging
+
+`/bin` tools in the shell and release profiles are linked **static**. The login shell cannot spawn
+an interpreter image, so a dynamic PIE `/bin/curl` or `/bin/wget` fails as `command not found`
+even though the file exists. `STATIC_SHELL_PACKAGES` in `xtask/src/initfs.rs` names the packages
+built static: `ed`, `man`, `raven-date`, `raven-hostname`, `raven-ps`, `raven-rsh`,
+`raven-sleep`, `raven-svcctl`, `raven-uname`, `curl` and `wget`. Everything under `/sbin` and
+`/init` is static regardless of the list; `getty` and `login` remain dynamic because `svcd`
+starts them through the loader, not the shell.
+
+The release image stages `/bin/curl` and `/bin/wget` from those static builds; the
+`fetch-installed` qtest executes `/bin/curl --version`, `/bin/wget --version` and a real local
+HTTP fetch from the release shell. K201's test-only initfs overlay may still replace the binaries
+for `eink-insult`, but the product staging no longer depends on it. **OBSERVED** by
+`fetch-installed`.
 
 ## Limits and non-claims
 

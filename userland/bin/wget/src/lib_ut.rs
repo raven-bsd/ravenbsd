@@ -169,3 +169,18 @@ fn formats_the_summary() {
         "wget: http://example.test/page -> page (5 bytes)"
     );
 }
+
+#[test]
+fn version_flag_is_recognised() {
+    assert!(version_requested(["-V"].into_iter()));
+    assert!(version_requested(["--version"].into_iter()));
+    assert!(!version_requested(
+        ["-q", "http://example.test/"].into_iter()
+    ));
+}
+
+#[test]
+fn version_line_names_the_client() {
+    assert!(VERSION_LINE.starts_with("wget "));
+    assert!(VERSION_LINE.contains("(RavenBSD)"));
+}

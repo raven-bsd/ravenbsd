@@ -49,6 +49,10 @@ mod program {
     }
 
     fn main(args: raven_rt::Args) -> i32 {
+        if wget::version_requested(args.iter().skip(1)) {
+            raven_rt::println!("{}", wget::VERSION_LINE);
+            return EXIT_OK;
+        }
         let options = match parse(args.iter().skip(1)) {
             Ok(options) => options,
             Err(error) => {

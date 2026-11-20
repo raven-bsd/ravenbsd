@@ -42,6 +42,7 @@ fn program(package: &str, path: &str) -> Program {
 #[test]
 fn shell_bin_tools_link_statically_but_getty_and_login_stay_dynamic() {
     for package in [
+        "curl",
         "man",
         "raven-date",
         "raven-hostname",
@@ -50,6 +51,7 @@ fn shell_bin_tools_link_statically_but_getty_and_login_stay_dynamic() {
         "raven-sleep",
         "raven-svcctl",
         "raven-uname",
+        "wget",
     ] {
         assert!(
             program_is_static(&program(package, "/bin/tool")),
