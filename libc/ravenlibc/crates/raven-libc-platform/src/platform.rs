@@ -219,30 +219,43 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     pub(crate) fn release_ofd_ref(&self, index: u32) {
         let close = {
             let _guard = guard(&self.lock);
-            self.take_close_handle(index)
+            self.take_close_handles(index)
         };
-        let _ = self.close_handle(close);
+        let _ = self.close_handles(close);
     }
 
-    /// Drop one reference and, at zero, take the handle out of the arena. The caller must close
-    /// the returned handle **after** releasing the lock.
-    fn take_close_handle(&self, index: u32) -> Option<Handle> {
+    /// Drop one reference and, at zero, take the data and event handles out of the arena. The
+    /// caller must close the returned handles **after** releasing the lock.
+    fn take_close_handles(&self, index: u32) -> [Handle; 2] {
         let mut arena = self.ofd.borrow_mut();
         if arena.drop_ref(index) {
-            arena.release(index).map(|ofd| ofd.handle)
+            arena
+                .release(index)
+                .map_or([Handle::NONE; 2], |ofd| [ofd.handle.get(), ofd.event.get()])
         } else {
-            None
+            [Handle::NONE; 2]
         }
     }
 
-    fn close_handle(&self, handle: Option<Handle>) -> Result<(), Errno> {
-        match handle {
-            Some(handle) => match self.backend.close(handle) {
-                Err(Errno::EINTR) => Ok(()),
-                other => other,
-            },
-            None => Ok(()),
+    fn close_handle(&self, handle: Handle) -> Result<(), Errno> {
+        if handle == Handle::NONE {
+            return Ok(());
         }
+        match self.backend.close(handle) {
+            Err(Errno::EINTR) => Ok(()),
+            other => other,
+        }
+    }
+
+    fn close_handles(&self, handles: [Handle; 2]) -> Result<(), Errno> {
+        let mut first = Ok(());
+        for handle in handles {
+            let result = self.close_handle(handle);
+            if first.is_ok() && result.is_err() {
+                first = result;
+            }
+        }
+        first
     }
 
     pub(crate) fn set_ofd_status(&self, index: u32, status: u32) -> u32 {
@@ -267,6 +280,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
     }
 
+    /// Attach the notification event a scheme-backed socket uses for `poll` readiness.
+    pub fn set_ofd_event(&self, index: u32, event: Handle) -> Result<(), Errno> {
+        let mut arena = self.ofd.borrow_mut();
+        let slot = arena.get_mut(index).ok_or(Errno::EBADF)?;
+        slot.set_event(event)
+    }
+
     /// Install a handle and return the new lowest-free fd.
     pub fn install(
         &self,
@@ -277,6 +297,35 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         cloexec: bool,
     ) -> Result<i32, Errno> {
         self.install_impl(None, handle, kind, status, path, cloexec, 0)
+    }
+
+    /// Install an OFD that has no kernel handle yet and return the new lowest-free fd.
+    ///
+    /// `socket(2)` must return a descriptor before `bind`/`connect`/`listen` decides the scheme
+    /// endpoint. The lazy-socket seam installs this pending socket OFD and supplies the handle
+    /// later with [`Platform::attach_handle`].
+    pub fn install_pending(
+        &self,
+        kind: OfdKind,
+        status: u32,
+        path: Option<Box<[u8]>>,
+        cloexec: bool,
+    ) -> Result<i32, Errno> {
+        self.install_impl(None, Handle::NONE, kind, status, path, cloexec, 0)
+    }
+
+    /// Attach the kernel handle to an OFD installed with [`Platform::install_pending`].
+    ///
+    /// The handle is owned by the fd table from this point on. A second attach is `EEXIST`, and
+    /// an OFD that already owns a handle is never replaced.
+    pub fn attach_handle(&self, ofd: u32, handle: Handle) -> Result<(), Errno> {
+        if handle == Handle::NONE {
+            return Err(Errno::EINVAL);
+        }
+        let _guard = guard(&self.lock);
+        let mut arena = self.ofd.borrow_mut();
+        let slot = arena.get_mut(ofd).ok_or(Errno::EBADF)?;
+        slot.set_handle(handle)
     }
 
     /// Install a handle at exactly `fd`, closing any displaced OFD.
@@ -327,14 +376,16 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             let close = displaced.and_then(|entry| {
                 if arena.drop_ref(entry.ofd) {
-                    arena.release(entry.ofd).map(|ofd| ofd.handle)
+                    arena
+                        .release(entry.ofd)
+                        .map(|ofd| [ofd.handle.get(), ofd.event.get()])
                 } else {
                     None
                 }
             });
             (installed, close)
         };
-        self.close_handle(close)?;
+        self.close_handles(close.unwrap_or([Handle::NONE; 2]))?;
         Ok(installed as i32)
     }
 
@@ -389,11 +440,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 displaced = table.remove(new);
             }
             table.install_at(new as u32, index, cloexec, tag)?;
-            let close = displaced.and_then(|entry| self.take_close_handle(entry.ofd));
+            let close = displaced.map(|entry| self.take_close_handles(entry.ofd));
             (displaced, close)
         };
         let _ = displaced;
-        self.close_handle(close)?;
+        self.close_handles(close.unwrap_or([Handle::NONE; 2]))?;
         Ok(new)
     }
 
@@ -405,9 +456,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 let mut table = self.fd.borrow_mut();
                 table.remove(fd).ok_or(Errno::EBADF)?
             };
-            self.take_close_handle(entry.ofd)
+            self.take_close_handles(entry.ofd)
         };
-        self.close_handle(close)
+        self.close_handles(close)
     }
 
     /// `close` with an expected fdsan tag.
@@ -471,11 +522,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             let removed = self.fd.borrow_mut().close_from(first);
             removed
                 .iter()
-                .filter_map(|(_, entry)| self.take_close_handle(entry.ofd))
+                .flat_map(|(_, entry)| self.take_close_handles(entry.ofd))
                 .collect::<Vec<_>>()
         };
         for handle in handles {
-            self.close_handle(Some(handle))?;
+            self.close_handle(handle)?;
         }
         Ok(())
     }
@@ -487,11 +538,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             let removed = self.fd.borrow_mut().close_range(first, last);
             removed
                 .iter()
-                .filter_map(|(_, entry)| self.take_close_handle(entry.ofd))
+                .flat_map(|(_, entry)| self.take_close_handles(entry.ofd))
                 .collect::<Vec<_>>()
         };
         for handle in handles {
-            self.close_handle(Some(handle))?;
+            self.close_handle(handle)?;
         }
         Ok(())
     }
@@ -1561,7 +1612,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             let child = mapping
                 .iter()
-                .find(|(parent, _)| *parent == ofd.handle)
+                .find(|(parent, _)| *parent == ofd.handle.get())
                 .map(|(_, child)| *child)
                 .ok_or(Errno::EBADF)?;
             let mut inherited = FdMapEntry::new(
@@ -1589,12 +1640,12 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         let mut block = FdMap::empty();
         for (fd, entry) in entries {
             let ofd = arena.get(entry.ofd).ok_or(Errno::EBADF)?;
-            if !transferable(ofd.kind) || ofd.handle == Handle::NONE {
+            if !transferable(ofd.kind) || ofd.handle.get() == Handle::NONE {
                 continue;
             }
             let mut inherited = FdMapEntry::new(
                 fd,
-                ofd.handle.0,
+                ofd.handle.get().0,
                 ofd.kind,
                 entry.fd_flags,
                 ofd.status.load(core::sync::atomic::Ordering::Relaxed),
