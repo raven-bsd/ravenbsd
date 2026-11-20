@@ -2,11 +2,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K201: prepare the deterministic insult content server and the test initfs for the eink-insult
+# K217: prepare the deterministic insult content server and the test initfs for the eink-insult
 # qtest. The release profile stages dynamic PIE /bin/curl and /bin/wget, but the login shell's
 # spawn path cannot execute an interpreter image, so it reports them as "command not found". The
 # K199 fetch gate overlays statically linked builds of the same clients into its test initfs; this
-# script does the same. The production staging fix is outside K201's Owns.
+# script does the same. The production staging fix is outside K217's Owns.
+# The test initfs also carries /etc/eink-insult.sh (the one-send proof) and /etc/eink-insult.txt
+# (the server-owned expected bytes). /tmp is a ramfs mount in this image, so an initfs /tmp file
+# would be hidden; the release has /bin/brush but no /bin/sh, so the qtest runs the script with
+# /bin/brush.
 # The server binds 127.0.0.1:18081 for QEMU user-net (guest 10.0.2.2), serves at most 8 requests
 # and exits on idle. A previous pid is stopped first so a rerun cannot reuse a stale server.
 
@@ -31,12 +35,14 @@ if [ ! -s "$base" ]; then
     RAVEN_USER_RELEASE=1 cargo xtask initfs --arch x86_64 --profile release
     cp build/x86_64/initfs.img "$base"
 fi
-echo "insult-server: overlaying static curl/wget into $out/initfs.img"
+echo "insult-server: overlaying static curl/wget and the one-send script into $out/initfs.img"
 CARGO_TARGET_DIR="$out/host-target" \
     cargo run -q -p raven-b70-overlay -- \
         "$base" "$out/initfs.img" \
         "/bin/curl=$out/curl-static:755" \
-        "/bin/wget=$out/wget-static:755"
+        "/bin/wget=$out/wget-static:755" \
+        "/etc/eink-insult.sh=$root/tests/fixtures/insult-server/eink-insult.sh:755" \
+        "/etc/eink-insult.txt=$root/tests/fixtures/insult-server/insult.txt:644"
 
 pid_file=$out/server.pid
 log=$out/server.log

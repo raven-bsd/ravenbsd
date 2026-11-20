@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# E-Ink content contract (K201)
+# E-Ink content contract (K201/K217)
 
-Date: 2026-11-20. Ticket: K201. Owner: Otto. Follow-up: E4 (panel), E5 (photo).
+Date: 2026-11-20. Ticket: K201. Follow-up: K217 (one-send script), E4 (panel), E5 (photo).
 
 ## Purpose
 
@@ -35,21 +35,31 @@ source of truth, and the qtest spells the same bytes only as the expected server
 
 ## Guest proof (`eink-insult`)
 
-The qtest logs in to the release image and runs:
+The qtest logs in to the release image and sends one command:
 
 ```
-curl -s http://10.0.2.2:18081/insult                       # prints the body
-curl -s -o /tmp/insult-curl.txt http://10.0.2.2:18081/insult
-wget -q -O /tmp/insult-wget.txt http://10.0.2.2:18081/insult
-cmp /tmp/insult-curl.txt /tmp/insult-wget.txt && echo cmp-ok
-curl -s -o /dev/null -w '%{http_code}\n' http://10.0.2.2:18081/missing   # 404
-curl -s -f http://10.0.2.2:18081/missing; echo curl-f:$?                  # 22
-curl -s -L http://10.0.2.2:18081/redirect                   # follows to the body
+/bin/brush /etc/eink-insult.sh
 ```
 
-`curl`/`wget` come from K199; until that ticket lands the case carries
-`skip = "needs K199 curl/wget in the release image"`. No external server, no fake socket, no
-panel write.
+The script is staged in the test initfs. `/tmp` is a ramfs mount in this image, so an initfs file
+under `/tmp` would be hidden; the release shell is `/bin/brush` and there is no `/bin/sh`. The
+script runs the complete proof and prints unique markers:
+
+```
+eink-body: Your shell is so slow it still waits for the loader.
+eink-cmp: ok
+eink-404: HTTP/1.1 404 Not Found
+eink-f: 22
+eink-redirect: Your shell is so slow it still waits for the loader.
+eink-done
+```
+
+The script fetches the body with `/bin/curl`, writes the same URL with `/bin/curl -o` and
+`/bin/wget -O`, and compares both files with the server-owned `insult.txt` staged at
+`/etc/eink-insult.txt`. It compares byte counts with `wc -c` and content with the shell `test`
+builtin because the release uutils slice has no `cmp`. The 404 is the real `curl -s -I` status
+line; `-f` returns 22; `-L` follows `/redirect` to `/insult-final`. No external server, no fake
+socket, no panel write.
 
 ## E4 handoff
 
