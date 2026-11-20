@@ -80,7 +80,15 @@ wait = '^raven# $'
 timeout_secs = 60
 
 [[step]]
-send = "/bin/ping-dns-dnsd &\n"
+send = "/bin/ping-dns-dnsd >/tmp/ping-dns-dnsd.log 2>&1 &\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "sleep 1; cat /tmp/ping-dns-dnsd.log\n"
 delay_ms = 100
 
 [[step]]
