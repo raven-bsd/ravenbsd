@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K232 net-two-reads service: bind the AF_INET listener after the net scheme is published.
+name = "net-two-reads"
+exec = "/bin/net-two-reads"
+needs = ["scheme:net"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

@@ -11,7 +11,7 @@ use raven_libc_abi::structs::Pollfd;
 use raven_libc_sys::sys::EvqEvent;
 
 use crate::backend::SysBackend;
-use crate::fd::ofd::OfdKind;
+use crate::fd::ofd::{OfdKind, OfdRef};
 use crate::lock::Lock;
 use crate::platform::Platform;
 use crate::poll::{EV_HUP, EV_READABLE, EV_SIGNALED, EV_WRITABLE, MAX_POLL_FDS};
@@ -29,7 +29,7 @@ pub fn poll<B: SysBackend, L: Lock>(
         return Err(Errno::EINVAL);
     }
     let mut ready = 0usize;
-    let mut registrations: Vec<(usize, raven_abi::types::Handle, u32)> = Vec::new();
+    let mut registrations: Vec<(usize, OfdRef<'_, B, L>, u32)> = Vec::new();
     for (index, entry) in fds.iter_mut().enumerate() {
         entry.revents = 0;
         if entry.fd < 0 {
@@ -44,6 +44,17 @@ pub fn poll<B: SysBackend, L: Lock>(
             }
         };
         let events = i32::from(entry.events);
+        // The kernel consumes the scheme event on delivery. Replay the last delivered level
+        // once so data that is still queued (or a second packet already in `rx`) is not lost.
+        let rearm = reference.take_poll_rearm();
+        if rearm != 0 {
+            let revents = delivered_revents(rearm, events);
+            if revents != 0 {
+                entry.revents = revents;
+                ready = ready.saturating_add(1);
+                continue;
+            }
+        }
         match reference.kind() {
             OfdKind::File | OfdKind::Dir => {
                 let mask = events & (POLLIN | POLLOUT | POLLPRI | POLLERR);
@@ -68,7 +79,7 @@ pub fn poll<B: SysBackend, L: Lock>(
                 if wanted == 0 {
                     ready = ready.saturating_add(1);
                 } else {
-                    registrations.push((index, reference.poll_handle(), wanted | EV_HUP));
+                    registrations.push((index, reference, wanted | EV_HUP));
                 }
             }
             OfdKind::Epoll | OfdKind::Timer | OfdKind::EventFd | OfdKind::ProcessFd => {
@@ -92,45 +103,33 @@ pub fn poll<B: SysBackend, L: Lock>(
     };
     let queue = platform.event_queue()?;
     let backend = platform.backend();
-    for (index, handle, events) in &registrations {
+    for (index, reference, events) in &registrations {
         backend.evq_ctl(
             queue,
             EVQ_ADD,
-            *handle,
+            reference.poll_handle(),
             *events,
             u64::try_from(*index).unwrap_or(0),
         )?;
     }
     let mut events = [EvqEvent::default(); MAX_POLL_FDS];
     let waited = backend.evq_wait(queue, &mut events, timeout_ns);
-    for (_, handle, _) in &registrations {
-        let _ = backend.evq_ctl(queue, EVQ_DEL, *handle, 0, 0);
+    for (_, reference, _) in &registrations {
+        let _ = backend.evq_ctl(queue, EVQ_DEL, reference.poll_handle(), 0, 0);
     }
     let count = waited?;
     let mut fired = 0usize;
     for event in events.iter().take(count) {
         let index = event.cookie as usize;
+        if let Some((_, reference, _)) = registrations
+            .iter()
+            .find(|(registration, _, _)| *registration == index)
+        {
+            reference.set_poll_rearm(event.events);
+        }
         if let Some(entry) = fds.get_mut(index) {
             let requested = i32::from(entry.events);
-            let mut revents = 0i16;
-            if event.events & EV_SIGNALED != 0 {
-                // The notification event is level-only: report the caller's requested bits.
-                if requested & (POLLIN | POLLPRI) != 0 {
-                    revents |= POLLIN as i16;
-                }
-                if requested & POLLOUT != 0 {
-                    revents |= POLLOUT as i16;
-                }
-            }
-            if event.events & EV_READABLE != 0 {
-                revents |= POLLIN as i16;
-            }
-            if event.events & EV_WRITABLE != 0 {
-                revents |= POLLOUT as i16;
-            }
-            if event.events & EV_HUP != 0 {
-                revents |= POLLHUP as i16;
-            }
+            let revents = delivered_revents(event.events, requested);
             if revents != 0 {
                 entry.revents = revents;
                 fired = fired.saturating_add(1);
@@ -140,12 +139,35 @@ pub fn poll<B: SysBackend, L: Lock>(
     Ok(fired)
 }
 
+/// Translate a kernel readiness mask into the caller's `poll` bits.
+fn delivered_revents(mask: u32, requested: i32) -> i16 {
+    let mut revents = 0i16;
+    if mask & EV_SIGNALED != 0 {
+        // The notification event is level-only: report the caller's requested bits.
+        if requested & (POLLIN | POLLPRI) != 0 {
+            revents |= POLLIN as i16;
+        }
+        if requested & POLLOUT != 0 {
+            revents |= POLLOUT as i16;
+        }
+    }
+    if mask & EV_READABLE != 0 {
+        revents |= POLLIN as i16;
+    }
+    if mask & EV_WRITABLE != 0 {
+        revents |= POLLOUT as i16;
+    }
+    if mask & EV_HUP != 0 {
+        revents |= POLLHUP as i16;
+    }
+    revents
+}
+
 /// `ppoll`.
 ///
-/// The atomic signal-mask swap (`PG-26`) does not exist yet. OpenSSH's packet path passes a
-/// `NULL` mask, and refusing every `ppoll` would block a server read forever; poll with the
-/// caller's current mask and round the timeout up to the poll millisecond granularity. The mask
-/// argument is accepted but not swapped until the atomic operation lands.
+/// The atomic signal-mask swap (`PG-26`) is not implemented; OpenSSH's packet path passes a
+/// `NULL` mask. Poll with the caller's current mask and round the absolute timeout up to the
+/// poll millisecond granularity. The mask is accepted but not swapped until PG-26 lands.
 pub fn ppoll<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fds: &mut [Pollfd],

@@ -6,13 +6,15 @@
 use alloc::vec;
 
 use raven_abi::errno::Errno;
+use raven_abi::types::Handle;
 use raven_libc_abi::fcntl;
 use raven_libc_abi::poll::{POLLHUP, POLLIN, POLLNVAL, POLLOUT};
 use raven_libc_abi::structs::Pollfd;
 
 use crate::backend::FakeSys;
+use crate::fd::OfdKind;
 use crate::platform::Platform;
-use crate::poll::{MAX_POLL_FDS, poll, ppoll};
+use crate::poll::{EV_SIGNALED, MAX_POLL_FDS, poll, ppoll};
 
 fn regular_file_platform() -> Platform<FakeSys> {
     let fake = FakeSys::new();
@@ -136,4 +138,31 @@ fn ppoll_reports_the_poll_result() {
     };
     assert_eq!(ppoll(&platform, &mut fds, Some(&timeout), None), Ok(1));
     assert_eq!(fds[0].revents, POLLNVAL as i16);
+}
+
+#[test]
+fn a_delivered_scheme_event_rearms_once() {
+    let platform = Platform::new(FakeSys::new());
+    let fd = platform
+        .install(Handle(7), OfdKind::Socket, 2, None, false)
+        .expect("install");
+    let ofd = platform.get(fd).expect("fd").index();
+    platform.set_ofd_event(ofd, Handle(9)).expect("event");
+    platform.backend().ready(Handle(9), EV_SIGNALED);
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN);
+    // The kernel consumed the event, but the socket may still hold queued level-ready data.
+    // The next poll replays the delivered level once.
+    fds[0].revents = 0;
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN);
+    // No busy loop: a third poll with no new event and no rearm times out.
+    fds[0].revents = 0;
+    assert_eq!(poll(&platform, &mut fds, 1), Ok(0));
+    assert_eq!(fds[0].revents, 0);
 }
