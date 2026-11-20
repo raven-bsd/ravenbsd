@@ -297,8 +297,15 @@ fn prepare_external(
         code: firmware.code,
         vars,
     };
-    let command = qemu::qemu_command(arch, &image, &firmware, &case.spec.qemu_extra)
-        .map_err(PrepareError::Error)?;
+    let command = qemu::qemu_command(
+        arch,
+        &image,
+        &firmware,
+        &case.spec.qemu_extra,
+        case.spec.disk_if.as_deref(),
+        case.spec.disk_format.as_deref(),
+    )
+    .map_err(PrepareError::Error)?;
     Ok(Prepared {
         program: command.program,
         args: command.args,
