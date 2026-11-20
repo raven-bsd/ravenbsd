@@ -36,6 +36,8 @@ const MAX_MACRO_EXPANSIONS: usize = 100;
 pub(crate) struct LineReader {
     pub style: Style,
     pub highlighting: bool,
+    /// Whether history autosuggestions are drawn.
+    pub autosuggest: bool,
     pub bindings: Arc<Mutex<VtKeyBindings>>,
     /// The line being edited when a bound key was pressed, while its command runs.
     pub bound_line: Option<(String, usize)>,
@@ -153,6 +155,7 @@ impl LineReader {
             // interrupts, and Ctrl-D on an empty line ends input.
             if key.bytes == [0x03] {
                 // Leave the interrupted line as it was, marked as such.
+                editor.clear_hint();
                 editor.buffer.end();
                 editor.draw(out, columns)?;
                 out.write_all(b"^C\n")?;
@@ -223,10 +226,17 @@ impl LineReader {
         program: &str,
         editor: &mut LineEditor<'_>,
     ) {
-        if self.highlighting && self.style == Style::Vt {
-            let shell = shell.lock().await;
+        let highlighted = self.highlighting && self.style == Style::Vt;
+        let suggested = self.autosuggest && self.style == Style::Vt;
+        if !highlighted && !suggested {
+            editor.clear_hint();
+            return;
+        }
+        let shell = shell.lock().await;
+        if highlighted {
             editor.highlight(&shell, program);
         }
+        editor.update_hint(&shell.history(), suggested);
     }
 
     /// Works out what a pressed key does, given the key bindings, reading more keys
