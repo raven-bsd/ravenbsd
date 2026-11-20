@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K247 post-auth fork service.
+name = "post-auth-fork"
+exec = "/bin/post-auth-fork"
+needs = ["scheme:net"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
