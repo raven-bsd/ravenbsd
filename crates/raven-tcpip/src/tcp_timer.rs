@@ -191,6 +191,36 @@ impl TimerState {
         }
     }
 
+    /// `TP_KEEPINIT(tp)`: the per-connection value or the global default.
+    #[must_use]
+    pub fn effective_keepinit_ms(&self) -> u64 {
+        if self.keepinit_ms == 0 {
+            TCPTV_KEEP_INIT_MS
+        } else {
+            self.keepinit_ms
+        }
+    }
+
+    /// `TP_KEEPIDLE(tp)`: the per-connection value or the global default.
+    #[must_use]
+    pub fn effective_keepidle_ms(&self) -> u64 {
+        if self.keepidle_ms == 0 {
+            TCPTV_KEEP_IDLE_MS
+        } else {
+            self.keepidle_ms
+        }
+    }
+
+    /// `TP_KEEPINTVL(tp)`: the per-connection value or the global default.
+    #[must_use]
+    pub fn effective_keepintvl_ms(&self) -> u64 {
+        if self.keepintvl_ms == 0 {
+            TCPTV_KEEPINTVL_MS
+        } else {
+            self.keepintvl_ms
+        }
+    }
+
     /// `TP_MAXIDLE(tp)`: `TP_KEEPCNT(tp) * TP_KEEPINTVL(tp)`.
     #[must_use]
     pub fn maxidle_ms(&self) -> u64 {
@@ -199,12 +229,12 @@ impl TimerState {
         } else {
             self.keepcnt
         };
-        count.saturating_mul(self.keepintvl_ms)
+        count.saturating_mul(self.effective_keepintvl_ms())
     }
 
     /// Arm `TT_KEEP` for the connect path (`tcp_usrreq.c`: `TP_KEEPINIT(tp)` on SYN states).
     pub fn arm_keep_init(&mut self, now_ms: u64) {
-        self.keep_deadline_ms = Some(now_ms.saturating_add(self.keepinit_ms));
+        self.keep_deadline_ms = Some(now_ms.saturating_add(self.effective_keepinit_ms()));
     }
 
     /// Arm `TT_2MSL` the way `tcp_twstart()`/`tcp_input.c` do: `2 * MSL` in TIME-WAIT, the fast
@@ -381,8 +411,9 @@ pub fn tcp_timer_keep(tp: &mut TimerState, now_ms: u64) -> KeepOutcome {
     // The keepalive callout is not reset on every ACK, so it may fire before TP_KEEPIDLE.
     if established(tp.state) {
         let idle = now_ms.saturating_sub(tp.rcvtime_ms);
-        if idle < tp.keepidle_ms {
-            tp.keep_deadline_ms = Some(now_ms.saturating_add(tp.keepidle_ms - idle));
+        let keepidle = tp.effective_keepidle_ms();
+        if idle < keepidle {
+            tp.keep_deadline_ms = Some(now_ms.saturating_add(keepidle - idle));
             return KeepOutcome::Rearm;
         }
     }
@@ -395,20 +426,22 @@ pub fn tcp_timer_keep(tp: &mut TimerState, now_ms: u64) -> KeepOutcome {
     }
 
     if (tp.always_keepalive || tp.keepalive) && keep_state_allows_probe(tp.state) {
-        if now_ms.saturating_sub(tp.rcvtime_ms) >= tp.keepidle_ms.saturating_add(tp.maxidle_ms()) {
+        if now_ms.saturating_sub(tp.rcvtime_ms)
+            >= tp.effective_keepidle_ms().saturating_add(tp.maxidle_ms())
+        {
             drop_state(tp);
             return KeepOutcome::Drop {
                 error: Errno::ETIMEDOUT,
             };
         }
-        tp.keep_deadline_ms = Some(now_ms.saturating_add(tp.keepintvl_ms));
+        tp.keep_deadline_ms = Some(now_ms.saturating_add(tp.effective_keepintvl_ms()));
         return KeepOutcome::Probe {
             seq: tp.snd_una.wrapping_sub(1),
             ack: tp.rcv_nxt,
         };
     }
 
-    tp.keep_deadline_ms = Some(now_ms.saturating_add(tp.keepidle_ms));
+    tp.keep_deadline_ms = Some(now_ms.saturating_add(tp.effective_keepidle_ms()));
     KeepOutcome::Rearm
 }
 
@@ -427,7 +460,7 @@ pub fn tcp_timer_2msl(tp: &mut TimerState, now_ms: u64) -> TwoMslOutcome {
     let close = if force_close {
         true
     } else if now_ms.saturating_sub(tp.rcvtime_ms) <= tp.maxidle_ms() {
-        tp.two_msl_deadline_ms = Some(now_ms.saturating_add(tp.keepintvl_ms));
+        tp.two_msl_deadline_ms = Some(now_ms.saturating_add(tp.effective_keepintvl_ms()));
         false
     } else {
         true

@@ -515,6 +515,19 @@ fn arm_two_msl_uses_two_msl_for_time_wait_and_maxidle_for_fin_wait_two() {
 }
 
 #[test]
+fn zero_keepalive_options_use_the_global_defaults() {
+    let mut tp = TimerState::new(TcpState::Established, 0);
+    tp.keepinit_ms = 0;
+    tp.keepidle_ms = 0;
+    tp.keepintvl_ms = 0;
+    tp.keepcnt = 0;
+    assert_eq!(tp.effective_keepinit_ms(), 75_000);
+    assert_eq!(tp.effective_keepidle_ms(), 7_200_000);
+    assert_eq!(tp.effective_keepintvl_ms(), 75_000);
+    assert_eq!(tp.maxidle_ms(), 600_000);
+}
+
+#[test]
 fn arm_keep_init_uses_the_connect_interval() {
     let mut tp = TimerState::new(TcpState::SynSent, 0);
     tp.arm_keep_init(500);
