@@ -80,6 +80,24 @@ pub unsafe extern "C" fn posix_spawnp(
             unsafe { pid.write(child) };
             0
         }
-        Err(error) => error,
+        Err(error) => {
+            // K189 temporary: the failing fd table for the aarch64 pivot spawn.
+            #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+            {
+                use alloc::format;
+                let mut text = format!("k189 spawnp err={error} fds=");
+                for entry in &table {
+                    text.push_str(&format!(
+                        "{}:{}:{},",
+                        entry.fd,
+                        entry.handle,
+                        u8::from(entry.cloexec)
+                    ));
+                }
+                text.push('\n');
+                let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
+            }
+            error
+        }
     }
 }
