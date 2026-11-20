@@ -1665,8 +1665,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     pub fn pipe2(&self, flags: i32) -> Result<(i32, i32), Errno> {
         let mut handles = [0u32; 2];
         raven_libc_sys::sys::pipe2(&mut handles, u32::try_from(flags).unwrap_or(0))?;
-        let cloexec = flags & fcntl::O_CLOEXEC as i32 != 0;
-        let nonblock = flags & fcntl::O_NONBLOCK as i32 != 0;
+        let cloexec = flags & fcntl::O_CLOEXEC != 0;
+        let nonblock = flags & fcntl::O_NONBLOCK != 0;
         let status = if nonblock {
             fcntl::O_NONBLOCK as u32
         } else {
