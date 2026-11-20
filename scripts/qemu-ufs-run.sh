@@ -122,7 +122,6 @@ qemu-system-x86_64 \
     -serial stdio \
     -display none \
     -monitor none \
-    -no-reboot \
     -nic none \
     -global virtio-blk-pci.disable-legacy=on \
     -drive "if=pflash,format=raw,readonly=on,file=$code" \

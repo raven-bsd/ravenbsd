@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-shutdown"
+version = "0.1.0"
+description = "RavenBSD shutdown, reboot and poweroff commands."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "raven_shutdown"
+path = "src/lib.rs"
+
+[[bin]]
+name = "shutdown"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-proto-svc = { path = "../../../crates/raven-proto-svc" }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt", features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true

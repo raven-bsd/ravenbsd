@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K235: /sbin/shutdown -p now stops the release services and powers the QEMU q35 guest off
+# through the kernel ACPI S5 path. QEMU exits with status 0; the harness accepts the clean
+# host exit through expect_exit = "any" because its C5 exit map reserves 33 for isa-debug-exit.
+
+name = "poweroff"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "any"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^shutdown: stopping services$'
+
+[[expect]]
+regex = '^shutdown: [0-9]+ services stopped$'
+
+[[expect]]
+regex = '^shutdown: poweroff$'
+
+[[expect]]
+regex = '^power: poweroff$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|power: .*failed|shutdown: .*not permitted'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/sbin/shutdown -p now\n"
+delay_ms = 100
+
+[[step]]
+wait = '^power: poweroff$'
+timeout_secs = 120

@@ -1,0 +1,42 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 20, 2026
+.Dt SHUTDOWN 1
+.Os RavenBSD
+.Sh NAME
+.Nm shutdown
+.Nd stop services and power off or reboot the system
+.Sh SYNOPSIS
+.Nm
+.Fl r
+.Ar now
+.Nm
+.Fl h
+.Ar now
+.Nm
+.Fl p
+.Ar now
+.Sh DESCRIPTION
+The
+.Nm
+utility asks
+.Xr svcd 8
+to stop every running service except the live getty session, flushes file systems, then
+requests the kernel power action:
+.Bl -tag -width "-p"
+.It Fl r
+Reboot normally.
+.It Fl h
+Halt without powering off.
+.It Fl p
+Power off.
+.El
+.Pp
+The operation requires effective uid 0.
+.Sh EXIT STATUS
+.Ex -std
+A permission or kernel failure exits 1; a usage error exits 2.
+.Sh SEE ALSO
+.Xr poweroff 1 ,
+.Xr reboot 1 ,
+.Xr svcd 8
