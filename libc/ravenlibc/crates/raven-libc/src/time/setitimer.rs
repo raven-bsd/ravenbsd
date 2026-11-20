@@ -15,7 +15,7 @@ use raven_libc_time::timer::ITimerSpec;
 
 /// POSIX `struct itimerval`.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ITimerVal {
     /// Repeating interval.
     pub it_interval: Timeval,

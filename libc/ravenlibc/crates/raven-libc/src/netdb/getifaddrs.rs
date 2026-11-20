@@ -149,5 +149,5 @@ pub unsafe extern "C" fn freeifaddrs(list: *mut IfAddrs) {
 }
 
 #[cfg(test)]
-#[path = "ifaddrs_ut.rs"]
+#[path = "getifaddrs_ut.rs"]
 mod tests;
