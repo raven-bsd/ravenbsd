@@ -226,7 +226,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "/usr/sbin/raven config\n"
+send = "raven config\n"
 delay_ms = 100
 
 [[step]]
