@@ -138,6 +138,10 @@ stage_sysroot() {
 
 configure() {
     find_lld
+    # Git checkout mtimes are not ordered; the generated configure must not look older than
+    # configure.ac/aclocal.m4 or OpenSSH refuses with `run autoreconf`. Touch the generated
+    # file, do not regenerate or modify the vendored source.
+    touch "$source/configure"
     rm -rf "$build" "$t1_stage"
     mkdir -p "$build" "$t1_stage"
     cp -a "$t1/lib" "$t1_stage/lib"
