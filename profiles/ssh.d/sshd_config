@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# OpenSSH server policy for the root-only 0.1.0 demo. Host keys are generated on first start
+# (see ssh-firstboot); they are not shipped in the image.
+
+Port 22
+ListenAddress 0.0.0.0
+PidFile /tmp/sshd.pid
+PermitRootLogin yes
+PasswordAuthentication yes
+KbdInteractiveAuthentication no
+UsePAM no
+AuthorizedKeysFile none
+StrictModes no
+PrintMotd no
+UseDNS no
+LogLevel VERBOSE
+Subsystem sftp internal-sftp

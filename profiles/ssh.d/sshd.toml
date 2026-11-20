@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# OpenSSH server. The first-boot wrapper creates the host keys and execs sshd; the service
+# stays in the foreground so svcd can supervise it.
+
+name = "sshd"
+exec = "/usr/libexec/ssh-firstboot"
+needs = ["netd", "vfsd", "consd", "ptyd"]
+readiness = "none"
+restart = "on-failure"
+max_restarts = 3

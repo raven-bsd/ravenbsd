@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K195: upstream OpenSSH add-on service. The binaries are built by addons/ssh/build.sh; the
+# profile stages them read-only. Host keys are generated at first start, never shipped.
+
+[[initfs.files]]
+src = "build/ssh/x86_64/bin/sshd"
+path = "/sbin/sshd"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/ssh/x86_64/bin/ssh"
+path = "/bin/ssh"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/ssh/x86_64/bin/ssh-keygen"
+path = "/bin/ssh-keygen"
+mode = 0o755
+generated = true
+
+[[initfs.programs]]
+package = "raven-ptyd"
+path = "/sbin/ptyd"
+
+[[initfs.files]]
+src = "profiles/ssh.d/sshd_config"
+path = "/etc/ssh/sshd_config"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/ssh-firstboot.sh"
+path = "/usr/libexec/ssh-firstboot"
+mode = 0o755
+
+[[initfs.files]]
+src = "profiles/ssh.d/sshd.toml"
+path = "/etc/services.d/sshd.toml"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/ptyd.toml"
+path = "/etc/services.d/ptyd.toml"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/ssh.keep"
+path = "/etc/ssh/.keep"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/empty.keep"
+path = "/var/empty/.keep"
+mode = 0o644
