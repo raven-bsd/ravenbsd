@@ -56,3 +56,9 @@ The child entry of `fork` drops the inherited cached event queue immediately
 (`raven_fork_child_reset`). The child's first `poll` creates its own queue. This is unconditional,
 not only the `EBUSY` fallback, because a fork-only child (the post-auth session) must never share
 the parent's queue even when the parent is not waiting at that instant.
+
+For a scheme socket, `poll` now scans the current readiness with `Call::Poll` before sleeping and
+again after a wake. The registration is only the wake hint; only directions that are currently
+ready become `revents`. A spurious wake is retried with the remaining monotonic deadline, and
+`timeout == 0` performs only the immediate scan. Socketpairs, pipes and TTYs continue to use the
+kernel data-handle level; they do not use the net query.
