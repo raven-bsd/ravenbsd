@@ -482,11 +482,7 @@ fn clean_bytes(bytes: &[u8], keep_ansi: bool) -> String {
     // The VT line editor returns the cursor to column zero with CR on every redraw;
     // keep the logical line (the terminal semantics are already applied by the case).
     let line = line.replace('\r', "");
-    if keep_ansi {
-        line
-    } else {
-        strip_ansi(&line)
-    }
+    if keep_ansi { line } else { strip_ansi(&line) }
 }
 
 fn strip_ansi(line: &str) -> String {
