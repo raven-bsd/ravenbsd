@@ -52,6 +52,22 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
+send = "curl -I --cacert /tls-ca.pem https://10.0.2.2:24443/known.txt; echo curl-head=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^HTTP/1\.1 200'
+timeout_secs = 120
+
+[[step]]
+wait = '^Content-Length: 15$'
+timeout_secs = 30
+
+[[step]]
+wait = '^curl-head=0$'
+timeout_secs = 30
+
+[[step]]
 send = "curl --cacert /tls-ca.pem https://10.0.2.2:24443/known.txt; echo; echo curl-https=$?\n"
 delay_ms = 100
 
