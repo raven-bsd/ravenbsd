@@ -20,6 +20,13 @@ The service file uses the established `.manifest` extension: every `.toml` under
 `profiles/qemu-ufs.d/` is a profile fragment, while `.manifest` is staged as the run-time
 `/etc/services.d/getty.toml` (same pattern as the release and ufs-demo profiles).
 
+The bootstrap initfs must carry the same demo `svcd.conf`
+(`profiles/qemu-ufs-boot.d/40-rc.toml`): svcd reads `/etc/svcd.conf` once, before it pivots
+the root to UFS, and never re-reads it. Staging the release file there would keep
+`exit_when_exits = getty` active even though the pivoted root has the demo file. The service
+manifests are re-read after the pivot, so the UFS-root `getty` manifest supplies
+`restart = "always"`.
+
 A normal `exit` from the brush shell is a success; the supervisor restarts getty, and the console
 prints `login:` again. A second login is accepted. The service graph keeps the resident
 `vfsd`/`consd`/`ramfsd`/`initfsd` services; getty is the only service with `always`.
