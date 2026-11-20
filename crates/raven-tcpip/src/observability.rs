@@ -1272,6 +1272,12 @@ pub struct SocketInfo {
     pub remote: Option<(crate::IpAddr, u16)>,
     /// Bytes queued but not yet acknowledged.
     pub send_queue: usize,
+    /// First unacknowledged sequence number.
+    pub snd_una: u32,
+    /// Next sequence number to send.
+    pub snd_nxt: u32,
+    /// Peer receive window.
+    pub snd_wnd: u32,
     /// Bytes queued for the application.
     pub recv_queue: usize,
     /// Current congestion window, bytes.
@@ -1403,6 +1409,9 @@ impl<D: crate::Device> Stack<D> {
                 local: (connection.local, connection.local_port),
                 remote: connection.remote,
                 send_queue: record.tx.len(),
+                snd_una: connection.snd_una,
+                snd_nxt: connection.snd_nxt,
+                snd_wnd: connection.snd_wnd,
                 recv_queue: record.rx.len(),
                 cwnd: connection.cc.cwnd(),
                 ssthresh: connection.cc.ssthresh(),
@@ -1435,6 +1444,9 @@ impl<D: crate::Device> Stack<D> {
                 ),
                 remote: None,
                 send_queue: 0,
+                snd_una: 0,
+                snd_nxt: 0,
+                snd_wnd: 0,
                 recv_queue: 0,
                 cwnd: 0,
                 ssthresh: 0,

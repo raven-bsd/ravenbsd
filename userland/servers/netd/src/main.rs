@@ -404,9 +404,25 @@ mod program {
         }
 
         fn write(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
-            self.netd
+            let trace = self.netd.tcp_write_trace(file);
+            let result = self
+                .netd
                 .write(file, offset, buffer)
-                .map_err(HandlerError::Errno)
+                .map_err(HandlerError::Errno);
+            if let Some(trace) = trace {
+                raven_rt::println!(
+                    "netd: tcp write file={file} sid={} state={:?} snd_una={} snd_nxt={} snd_wnd={} tx={} len={} result={:?}",
+                    trace.socket,
+                    trace.state,
+                    trace.snd_una,
+                    trace.snd_nxt,
+                    trace.snd_wnd,
+                    trace.tx_queue,
+                    buffer.len(),
+                    &result
+                );
+            }
+            result
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {

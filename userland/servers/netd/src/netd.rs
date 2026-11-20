@@ -146,6 +146,23 @@ impl NicConfig {
     }
 }
 
+/// One TCP write boundary for the accepted-socket trace.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TcpWriteTrace {
+    /// Native socket id.
+    pub socket: u32,
+    /// TCB state.
+    pub state: raven_netcore::SocketState,
+    /// First unacknowledged sequence number.
+    pub snd_una: u32,
+    /// Next sequence number to send.
+    pub snd_nxt: u32,
+    /// Peer receive window.
+    pub snd_wnd: u32,
+    /// Bytes queued for the wire before the write.
+    pub tx_queue: u32,
+}
+
 /// One ICMP echo reply that matched the NIC gateway.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReleasePing {
@@ -736,6 +753,28 @@ impl<D: Device> Netd<D> {
             File::Control => None,
             File::Socket(socket) => socket.socket,
         }
+    }
+
+    /// Snapshot of the TCP socket behind `file` for the write trace.
+    #[must_use]
+    pub fn tcp_write_trace(&self, file: u64) -> Option<TcpWriteTrace> {
+        let File::Socket(socket) = self.files.get(&file)? else {
+            return None;
+        };
+        let id = socket.socket?;
+        let entry = self
+            .core_ref(socket.interface)
+            .socket_table()
+            .into_iter()
+            .find(|entry| entry.id == id)?;
+        Some(TcpWriteTrace {
+            socket: id.0,
+            state: entry.state,
+            snd_una: entry.snd_una,
+            snd_nxt: entry.snd_nxt,
+            snd_wnd: entry.snd_wnd,
+            tx_queue: entry.tx_queue,
+        })
     }
 
     /// Interface behind one open socket file.

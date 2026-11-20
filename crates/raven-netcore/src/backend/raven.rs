@@ -269,6 +269,9 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
                     remote: info.remote.and_then(endpoint),
                     rx_queue: info.recv_queue.min(u32::MAX as usize) as u32,
                     tx_queue: info.send_queue.min(u32::MAX as usize) as u32,
+                    snd_una: info.snd_una,
+                    snd_nxt: info.snd_nxt,
+                    snd_wnd: info.snd_wnd,
                 });
             } else if let Some(port) = self.udp_ports.get(&socket.0) {
                 entries.push(CoreSocket {
@@ -279,6 +282,9 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
                     remote: self.udp_remotes.get(&socket.0).copied(),
                     rx_queue: 0,
                     tx_queue: 0,
+                    snd_una: 0,
+                    snd_nxt: 0,
+                    snd_wnd: 0,
                 });
             } else if let Some((_, target)) = self.icmp_ids.get(&socket.0) {
                 entries.push(CoreSocket {
@@ -289,6 +295,9 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
                     remote: target.map(|target| (target, 0)),
                     rx_queue: 0,
                     tx_queue: 0,
+                    snd_una: 0,
+                    snd_nxt: 0,
+                    snd_wnd: 0,
                 });
             }
         }

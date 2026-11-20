@@ -124,6 +124,12 @@ pub struct CoreSocket {
     pub rx_queue: u32,
     /// Bytes queued for the wire.
     pub tx_queue: u32,
+    /// First unacknowledged sequence number (TCP).
+    pub snd_una: u32,
+    /// Next sequence number to send (TCP).
+    pub snd_nxt: u32,
+    /// Peer receive window (TCP).
+    pub snd_wnd: u32,
 }
 
 /// Packet and byte counters observed at one device boundary.
