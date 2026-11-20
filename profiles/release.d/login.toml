@@ -29,7 +29,7 @@ path = "/etc/group"
 mode = 0o644
 
 [[initfs.files]]
-src = "etc/shadow"
+src = "profiles/ssh.d/shadow"
 path = "/etc/shadow"
 mode = 0o600
 
