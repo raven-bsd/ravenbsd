@@ -100,6 +100,14 @@ extern "C" fn raven_fork_resume(sp: usize) -> c_int {
     }
 }
 
+/// Child-side fork hook: drop the inherited cached event queue.
+///
+/// One event queue allows one waiter. The child must create its own queue rather than share the
+/// parent's cached handle; the next `poll` creates it lazily.
+extern "C" fn raven_fork_child_reset() {
+    crate::ffi::platform::global().reset_event_queue();
+}
+
 /// `fork`.
 #[cfg(target_arch = "x86_64")]
 #[unsafe(naked)]
@@ -134,6 +142,7 @@ pub extern "C" fn fork() -> c_int {
 #[unsafe(naked)]
 extern "C" fn raven_fork_child() {
     core::arch::naked_asm!(
+        "call {reset}",
         "xor eax, eax",
         "add rsp, 8",
         "pop r15",
@@ -143,6 +152,7 @@ extern "C" fn raven_fork_child() {
         "pop rbx",
         "pop rbp",
         "ret",
+        reset = sym raven_fork_child_reset,
     );
 }
 
@@ -177,6 +187,7 @@ pub extern "C" fn fork() -> c_int {
 #[unsafe(naked)]
 extern "C" fn raven_fork_child() {
     core::arch::naked_asm!(
+        "bl {reset}",
         "mov x0, #0",
         "ldp x27, x28, [sp], #16",
         "ldp x25, x26, [sp], #16",
@@ -185,6 +196,7 @@ extern "C" fn raven_fork_child() {
         "ldp x19, x20, [sp], #16",
         "ldp x29, x30, [sp], #16",
         "ret",
+        reset = sym raven_fork_child_reset,
     );
 }
 
