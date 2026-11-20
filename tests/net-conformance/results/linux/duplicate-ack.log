@@ -1,9 +1,8 @@
 endpoint: READY
-first data 10.26.3.1:24003->10.26.3.2:20466 [AP] seq=824279483 ack=788637214 win=502 len=1024 mss=None ws=None sack=False
-retransmit 10.26.3.1:24003->10.26.3.2:20466 [AP] seq=824280507 ack=788637214 win=502 len=1024 mss=None ws=None sack=False
-RESULT duplicate-ack PASS fast retransmit seq=824280507 len=1024 elapsed=0.10s
+first data 10.26.3.1:24003->10.26.3.2:37337 [AP] seq=3673468714 ack=1296972863 win=502 len=1024 mss=None ws=None sack=False
+retransmit 10.26.3.1:24003->10.26.3.2:37337 [AP] seq=3673469738 ack=1296972863 win=502 len=1024 mss=None ws=None sack=False
+RESULT duplicate-ack PASS fast retransmit seq=3673469738 len=1024 elapsed=0.13s
 PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/duplicate-ack.pcap
-endpoint: ACCEPTED ('10.26.3.2', 20466)
+endpoint: ACCEPTED ('10.26.3.2', 37337)
 endpoint: WROTE 1024
 endpoint: WROTE 2048
-endpoint: WROTE 3072

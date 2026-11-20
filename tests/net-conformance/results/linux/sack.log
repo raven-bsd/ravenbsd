@@ -1,5 +1,5 @@
 endpoint: READY
-SACK SYN-ACK: 10.26.3.1:24008->10.26.3.2:20475 [SA] seq=2866727320 ack=791776894 win=64240 len=0 mss=1460 ws=7 sack=True
-RESULT sack PASS SACK permitted elapsed=0.14s
+SACK SYN-ACK: 10.26.3.1:24008->10.26.3.2:37346 [SA] seq=3877379727 ack=1299620809 win=64240 len=0 mss=1460 ws=7 sack=True
+RESULT sack PASS SACK permitted elapsed=0.05s
 PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/sack.pcap
-endpoint: ACCEPTED ('10.26.3.2', 20475)
+endpoint: ACCEPTED ('10.26.3.2', 37346)
