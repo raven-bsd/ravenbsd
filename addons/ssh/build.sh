@@ -11,10 +11,10 @@
 #   sh addons/ssh/build.sh           build sshd, ssh and ssh-keygen
 #   sh addons/ssh/build.sh --qtest   stage a minimal initfs (requires a completed build)
 #
-# Current status: BLOCKED on T1. The T1 OpenSSL build fails before this script can configure
-# OpenSSH: (1) the libc stdatomic.h forwarding header breaks clang's <stdatomic.h>, and
-# (2) with a scratch header workaround, the T1 compat shim duplicates libc symbols at link.
-# The check mode below still passes; build/qtest report the exact T1 failure.
+# Current status: BLOCKED on libc exports after the T1 fix. T1 OpenSSL now builds; OpenSSH
+# configures and compiles, but the static link misses getifaddrs/freeifaddrs/getdtablesize/
+# __res_state/res_query from libc.a. The check mode below passes; build/qtest report the exact
+# link failure.
 
 set -eu
 
@@ -34,6 +34,7 @@ source=$root/addons/ssh/openssh
 compat=$root/addons/ssh/compat
 sysroot=$root/build/ssh/$arch/sysroot
 t1=$root/build/tls/$arch
+t1_stage=$root/build/ssh/$arch/t1
 build=$root/build/ssh/openssh-build-$arch
 install=$root/build/ssh/$arch
 version_file=$source/version.h
@@ -74,7 +75,7 @@ check_source() {
     grep -q '^addons/ssh/openssh/$' "$root/.provenance-ignore" ||
         die ".provenance-ignore does not exempt the vendored OpenSSH tree"
     [ -f "$root/docs/ssh-addon.md" ] || die "missing docs/ssh-addon.md"
-    if grep -rqE "BEGIN (RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY" "$source"; then
+    if grep -rqE '^-----BEGIN (RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----' "$source"; then
         die "vendored OpenSSH contains a private-key fixture rejected by push protection"
     fi
 }
@@ -136,17 +137,23 @@ stage_sysroot() {
 
 configure() {
     find_lld
-    rm -rf "$build"
-    mkdir -p "$build"
+    rm -rf "$build" "$t1_stage"
+    mkdir -p "$build" "$t1_stage"
+    cp -a "$t1/lib" "$t1_stage/lib"
+    cp -a "$t1/include" "$t1_stage/include"
     (
         cd "$build"
         CC=clang \
-        CFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector -I$t1/include" \
-        LDFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -fuse-ld=lld -nostdlib -nostartfiles -static -T$root/tests/libc/target/x86_64.ld -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 $sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o -L$t1/lib" \
-        "$source/configure" --host=x86_64-unknown-ravenbsd --build=x86_64-pc-linux-gnu \
+        ac_cv_func_getline=yes ac_cv_func_getdelim=yes ac_cv_func_setsid=yes ac_cv_func_getcwd=yes \
+        ac_cv_func_setresuid=yes ac_cv_func_setresgid=yes \
+        ac_cv_func_snprintf=yes ac_cv_func_vsnprintf=yes ac_cv_func_arc4random_buf=yes \
+        CFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector -I$t1_stage/include -include $compat/ssh_compat.h" \
+        LDFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -fuse-ld=lld -nostdlib -nostartfiles -static -T$root/tests/libc/target/x86_64.ld -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 $sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o -L$sysroot/usr/lib -L$t1_stage/lib" \
+        LIBS="-L$sysroot/usr/lib -L$t1_stage/lib -lc -lclang_rt.builtins $sysroot/usr/lib/crtn.o" \
+        "$source/configure" --host=x86_64-unknown-linux-gnu --build=x86_64-pc-linux-gnu \
             --prefix="$install" --sysconfdir="$install/etc/ssh" \
-            --with-ssl-dir="$t1" --without-openssl-header-check \
-            --without-pam --without-selinux --without-audit --without-kerberos5 --without-libedit
+            --with-ssl-dir="$t1_stage" --without-openssl-header-check \
+            --without-zlib --without-pam --without-selinux --without-audit --without-kerberos5 --without-libedit
     )
 }
 

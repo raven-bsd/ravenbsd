@@ -3,10 +3,10 @@
 
 # SSH add-on: OpenSSH portable (K200)
 
-Status: **BLOCKED on T1**. The upstream OpenSSH portable source is vendored unmodified, but the
-T1 OpenSSL add-on does not build against the current libc, so `sshd`/`ssh` cannot be cross-built
-or run yet. No SSH protocol, crypto or service code is implemented here; K195 owns the service
-and login integration.
+Status: **BLOCKED on libc exports after the T1 fix**. T1 OpenSSL now builds and OpenSSH
+configures and compiles; the final static link is missing libc C-ABI exports. No `sshd -V`,
+`ssh -V`, guest qtest or service/login claim is made. K195 owns the service/login integration;
+K196 owns fork/pty.
 
 ## Pinned source
 
@@ -16,7 +16,7 @@ and login integration.
 | Tag | `V_10_6_P2` (peeled commit `d449e662b6b8b8cb20e852d8084c269af1c5e8f1`) |
 | Version | `OpenSSH_10.6p2` (`addons/ssh/openssh/version.h`) |
 | Licence | OpenSSH `LICENCE` (BSD-style; ISC-compatible) |
-| Vendor path | `addons/ssh/openssh/` (unmodified except excluded test private keys) |
+| Vendor path | `addons/ssh/openssh/` (unmodified except the excluded `regress/` test tree) |
 | Provenance | `PROVENANCE.toml` import `addons/ssh/openssh`; `.provenance-ignore` exempts the tree from the first-party SPDX rule |
 
 The upstream `regress/` test tree (including 45 private-key fixtures) is excluded because GitHub
@@ -42,37 +42,31 @@ before compiling: the header only does `#include_next <stdatomic.h>` and shadows
 implementation, so clang 14 cannot find the C11 atomics. This is a build-time workaround for a
 libc header defect, not an OpenSSH patch; the libc owner should fix the forwarding header.
 
-## Current blocker: T1 OpenSSL
+## Current blocker: libc exports after the T1 fix
 
-Observed on `origin/master` `86625900`:
+The rework fixed T1: `addons/tls/compat/tls_compat.c` now defines only the missing `futimes`
+(all other calls are exported by ravenlibc), the T1 build sysroot drops the broken forwarding
+`stdatomic.h`, and the T1 install includes the upstream public headers (`openssl/macros.h`).
+`timeout 600 sh addons/tls/build.sh` produces `libcrypto.a`/`libssl.a`.
 
-1. **T1's own build** (`timeout 600 sh addons/tls/build.sh`) compiles OpenSSL but fails at
-   `crypto/lhash/*.c` with:
+OpenSSH then configures (with `--host=x86_64-unknown-linux-gnu` for config.sub feature selection,
+`--without-zlib`, T1 staged without the cross `openssl` binary) and compiles its objects. The
+static link of `ssh`/`sshd` is blocked by libc exports that the current `libc.a` does not provide:
 
-   ```
-   /usr/lib/llvm-14/lib/clang/14.0.0/include/stdatomic.h:21:
-   .../build/tls/x86_64/sysroot/usr/include/stdatomic.h:10:15:
-   fatal error: 'stdatomic.h' file not found
-   #include_next <stdatomic.h>
-   ```
+```
+undefined symbol: getifaddrs
+undefined symbol: freeifaddrs
+undefined symbol: getdtablesize
+undefined symbol: __res_state
+undefined symbol: res_query
+```
 
-2. **With a scratch T1 copy that removes only that sysroot header**, the build gets through the
-   compile and fails at the static link with duplicate symbols between the T1 compat shim and
-   the current `libc.a`:
-
-   ```
-   rust-lld: error: duplicate symbol: chmod
-   rust-lld: error: duplicate symbol: pipe
-   rust-lld: error: duplicate symbol: select
-   rust-lld: error: duplicate symbol: openlog
-   rust-lld: error: duplicate symbol: syslog
-   ...
-   make[1]: *** [Makefile:14546: apps/openssl] Error 1
-   ```
-
-Both failures are in `addons/tls/**`/libc, outside K200's Owns. No OpenSSH `configure`, link,
-`sshd -V`, guest qtest or service/login claim is made. `addons/ssh/build.sh --build` invokes the
-T1 script when the artifacts are missing and preserves its exact failure.
+`libc/ravenlibc/include` declares `getifaddrs`/`freeifaddrs` and `res_query`, and
+`libc/ravenlibc/crates/raven-libc-net/src/iface.rs` and `raven-libc-resolv/src/compat.rs` contain
+implementations, but the C-ABI wrappers are not in the packed `libc.a`; the `libs*` stubs are
+empty. `getdtablesize` is a small fallback that `openbsd-compat/bsd-closefrom.c` can use via
+`sysconf`. These are libc/K196 owners, not SSH protocol patches. No `sshd` binary, `-V`, or qtest
+is produced until they are exported.
 
 ## Target gap
 
