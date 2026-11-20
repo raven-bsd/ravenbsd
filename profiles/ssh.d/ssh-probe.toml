@@ -8,5 +8,6 @@ exec = "/bin/ssh"
 args = ["/bin/ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no", "-o", "ConnectTimeout=5", "-p", "22", "root@10.0.2.15", "uname", "-a"]
 needs = ["netd", "sshd"]
 readiness = "none"
-restart = "never"
+restart = "on-failure"
+max_restarts = 10
 required = false
