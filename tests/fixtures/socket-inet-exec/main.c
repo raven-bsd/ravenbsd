@@ -13,15 +13,19 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #define PORT 23081
-#define CHILD "/bin/socket-inet-exec-child"
-#define CHILD_FD 7
+#define CHILD "/bin/socket-inet-exec"
 #define CHILD_STALE 3
+
+// The exec'd session lives in the same image as the listener (child.c). The parent execs itself
+// with the "child" argument and the inherited descriptor number.
+int child_main(int fd);
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
 static long raven_debug_write(const char *bytes, size_t len) {
@@ -86,11 +90,15 @@ static void say_peer(int connection, const struct sockaddr_in *peer) {
     }
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     struct sockaddr_in address;
     struct sockaddr_in peer;
     socklen_t peer_length;
     int listener;
+
+    if (argc > 2 && strcmp(argv[1], "child") == 0) {
+        return child_main(atoi(argv[2]));
+    }
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
     if (listener < 0) {
@@ -135,22 +143,33 @@ int main(void) {
             return fail("accept");
         }
         say_peer(connection, &peer);
+        // The monitor touches the accepted socket before handing it to the session, as sshd does;
+        // this creates the readiness doorbell the exec'd child inherits.
+        struct pollfd accepted_ready;
+        accepted_ready.fd = connection;
+        accepted_ready.events = POLLIN;
+        accepted_ready.revents = 0;
+        (void)poll(&accepted_ready, 1, 100);
 
         pid_t child = fork();
         if (child < 0) {
             return fail("fork");
         }
         if (child == 0) {
-            if (connection != CHILD_FD && dup2(connection, CHILD_FD) != CHILD_FD) {
+            int inherited = dup(connection);
+            if (inherited < 0) {
                 _exit(120);
             }
-            if (connection != CHILD_FD) {
-                (void)close(connection);
-            }
+            (void)close(connection);
             (void)close(listener);
-            char *argv[] = {(char *)CHILD, NULL};
+            char fd_text[16];
+            int length = snprintf(fd_text, sizeof(fd_text), "%d", inherited);
+            if (length <= 0) {
+                _exit(122);
+            }
+            char *child_argv[] = {(char *)CHILD, (char *)"child", fd_text, NULL};
             char *envp[] = {NULL};
-            execve(CHILD, argv, envp);
+            execve(CHILD, child_argv, envp);
             _exit(121);
         }
 

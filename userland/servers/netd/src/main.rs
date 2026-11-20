@@ -315,11 +315,14 @@ mod program {
                     self.ring(file);
                 }
             }
-            // A doorbell is an edge latch that `EVQ_WAIT` clears on delivery, and the stack
-            // reports an edge only when the level goes from empty to non-empty. A poller that
-            // read or accepted *part* of what was queued would therefore sleep on data that is
-            // still there. After a consuming call, and after the stack has processed anything
-            // that arrived meanwhile, ring again if the socket is still ready (K231).
+            // An accept can leave a second connection in the backlog, and the stack raises no new
+            // edge for it. Re-check the level after the stack poll and ring again (K231).
+            //
+            // A read deliberately does not re-arm: the doorbell is an edge latch that only
+            // `EVQ_WAIT` clears, so a signal raised after a partial read outlives the read. An
+            // inherited accepted socket would then see it as a spurious ready on its next idle
+            // poll (`net-two-reads-exec`). The per-OFD readiness mask covers the next poll, and
+            // K239 makes a blocking read wait on the doorbell when the queue is empty.
             let touched = core::mem::take(&mut self.rearm);
             for file in touched {
                 if self.netd.socket_level_ready(file) {
@@ -425,7 +428,6 @@ mod program {
         }
 
         fn read(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
-            self.rearm.insert(file);
             self.netd
                 .read(file, offset, buffer)
                 .map_err(HandlerError::Errno)

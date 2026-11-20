@@ -4,8 +4,8 @@
 #
 # Build the K231 exec'd accepted-socket fixture and pack a test-only initfs. The base image is
 # the `network-config-test` profile (virtio-net, netd static 10.0.2.15, ravenlibc); the fixture
-# overlays `/bin/socket-inet-exec` (the forking listener), `/bin/socket-inet-exec-child` (the
-# exec'd session), the service manifest and a test-only `/etc/svcd.conf`.
+# overlays `/bin/socket-inet-exec` (the forking listener; the same image runs the exec'd session
+# in `child` mode), the service manifest and a test-only `/etc/svcd.conf`.
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
@@ -62,35 +62,41 @@ if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
     builtins=1
 fi
 
-build_binary() {
+compile() {
     source=$1
     object=$2
-    binary=$3
+    shift 2
 
     "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
         -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
         -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
-        -c "$source" -o "$object"
+        "$@" -c "$source" -o "$object"
+}
+
+link() {
+    binary=$1
+    shift
+
     if [ -n "$builtins" ]; then
         "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
             -nostdlib -nostartfiles -static -T"$link_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$object" \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$@" \
             -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
             "$sysroot/usr/lib/crtn.o" -o "$binary"
     else
         "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
             -nostdlib -nostartfiles -static -T"$link_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$object" \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$@" \
             -L"$sysroot/usr/lib" -lc \
             "$sysroot/usr/lib/crtn.o" -o "$binary"
     fi
 }
 
-build_binary "$root/tests/fixtures/socket-inet-exec/main.c" "$out/main.o" "$out/socket-inet-exec"
-build_binary "$root/tests/fixtures/socket-inet-exec/child.c" "$out/child.o" \
-    "$out/socket-inet-exec-child"
+compile "$root/tests/fixtures/socket-inet-exec/main.c" "$out/main.o"
+compile "$root/tests/fixtures/socket-inet-exec/child.c" "$out/child.o" -Dmain=child_main
+link "$out/socket-inet-exec" "$out/main.o" "$out/child.o"
 
 cargo xtask initfs --arch "$arch" --profile network-config-test > /dev/null
 cp build/"$arch"/initfs.img "$out/base.img"
@@ -99,7 +105,6 @@ cargo build -q -p raven-b70-overlay
 overlay=$root/target/debug/raven-b70-overlay
 "$overlay" "$out/base.img" "$out/initfs.img" \
     "/bin/socket-inet-exec=$out/socket-inet-exec:0755" \
-    "/bin/socket-inet-exec-child=$out/socket-inet-exec-child:0755" \
     "/etc/services.d/socket-inet-exec.toml=$root/tests/fixtures/socket-inet-exec/socket-inet-exec.toml" \
     "/etc/svcd.conf=$root/tests/fixtures/socket-inet-exec/svcd.conf"
 

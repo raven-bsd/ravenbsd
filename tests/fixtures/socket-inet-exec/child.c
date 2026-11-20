@@ -17,7 +17,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#define SOCKET_FD 7
+static int socket_fd = -1;
+#define SOCKET_FD socket_fd
 #define BANNER "SSH-2.0-RavenK231\r\n"
 #define KEXINIT_BYTES 960
 #define CLIENT_BYTES 2912
@@ -110,12 +111,13 @@ static int send_all(const unsigned char *data, size_t count) {
     return 0;
 }
 
-int main(void) {
+int child_main(int fd) {
     static unsigned char hello[sizeof(BANNER) - 1 + KEXINIT_BYTES];
     static unsigned char client[CLIENT_BYTES];
     size_t banner_length = sizeof(BANNER) - 1;
     size_t got = 0;
 
+    socket_fd = fd;
     int flags = fcntl(SOCKET_FD, F_GETFL);
     if (flags < 0 || fcntl(SOCKET_FD, F_SETFL, flags | O_NONBLOCK) < 0) {
         say_value("socket-inet-exec-child: nonblock errno=", errno, "\n");
