@@ -58,6 +58,14 @@ pub trait SysBackend {
     fn write(&self, handle: Handle, buf: &[u8]) -> Result<usize, Errno>;
     /// Close a handle.
     fn close(&self, handle: Handle) -> Result<(), Errno>;
+    /// Close a kernel handle that is not a scheme file: an event, queue or timer.
+    ///
+    /// `CLOSE` is the scheme-file close; the kernel answers `EBADF` for other object kinds and
+    /// leaves the object open. [`RealSys`] uses `HANDLE_CLOSE`; the default forwards to
+    /// [`SysBackend::close`] for backends that do not distinguish them.
+    fn handle_close(&self, handle: Handle) -> Result<(), Errno> {
+        self.close(handle)
+    }
     /// Duplicate a handle with a rights mask.
     fn dup(&self, handle: Handle, rights: u32) -> Result<Handle, Errno>;
     /// Fill the 64-byte `FSTAT` record.
@@ -167,6 +175,10 @@ impl SysBackend for RealSys {
 
     fn close(&self, handle: Handle) -> Result<(), Errno> {
         raven_libc_sys::sys::close(handle)
+    }
+
+    fn handle_close(&self, handle: Handle) -> Result<(), Errno> {
+        raven_libc_sys::sys::handle_close(handle)
     }
 
     fn dup(&self, handle: Handle, rights: u32) -> Result<Handle, Errno> {
@@ -568,7 +580,29 @@ impl FakeSys {
     fn record(&self, op: u64) {
         self.world.borrow_mut().trace.push(op);
     }
+
+    fn close_in_world(&self, handle: Handle) -> Result<(), Errno> {
+        let mut world = self.world.borrow_mut();
+        let file = world.handles.remove(&handle.0).ok_or(Errno::EBADF)?;
+        if !world.handles.values().any(|candidate| *candidate == file) {
+            world.open_files.remove(&file);
+        }
+        Ok(())
+    }
+
+    /// How many handles were closed through `HANDLE_CLOSE` rather than `CLOSE`.
+    pub fn handle_close_calls(&self) -> usize {
+        self.world
+            .borrow()
+            .trace
+            .iter()
+            .filter(|op| **op == HANDLE_CLOSE_TRACE)
+            .count()
+    }
 }
+
+/// Trace tag for `FakeSys::handle_close` ("HCLS").
+const HANDLE_CLOSE_TRACE: u64 = 0x4843_4C53;
 
 fn key(path: &[u8]) -> Vec<u8> {
     let mut full = b"file:".to_vec();
@@ -696,12 +730,13 @@ impl SysBackend for FakeSys {
     fn close(&self, handle: Handle) -> Result<(), Errno> {
         self.take_fault(Fault::Close)?;
         self.record(0x434C_4F53);
-        let mut world = self.world.borrow_mut();
-        let file = world.handles.remove(&handle.0).ok_or(Errno::EBADF)?;
-        if !world.handles.values().any(|candidate| *candidate == file) {
-            world.open_files.remove(&file);
-        }
-        Ok(())
+        self.close_in_world(handle)
+    }
+
+    fn handle_close(&self, handle: Handle) -> Result<(), Errno> {
+        self.take_fault(Fault::Close)?;
+        self.record(HANDLE_CLOSE_TRACE);
+        self.close_in_world(handle)
     }
 
     fn dup(&self, handle: Handle, _rights: u32) -> Result<Handle, Errno> {
@@ -979,11 +1014,17 @@ impl SysBackend for FakeSys {
         const MOD: u32 = 2;
         const DEL: u32 = 3;
         match op {
-            ADD => registrations.push(FakeEvent {
-                handle: handle.0,
-                events,
-                cookie,
-            }),
+            ADD => {
+                // The kernel answers EEXIST to a second registration of the same handle.
+                if registrations.iter().any(|entry| entry.handle == handle.0) {
+                    return Err(Errno::EEXIST);
+                }
+                registrations.push(FakeEvent {
+                    handle: handle.0,
+                    events,
+                    cookie,
+                });
+            }
             DEL => registrations.retain(|entry| entry.handle != handle.0),
             MOD => {
                 for entry in registrations.iter_mut() {

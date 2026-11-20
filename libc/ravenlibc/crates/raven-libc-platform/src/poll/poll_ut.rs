@@ -140,6 +140,128 @@ fn ppoll_reports_the_poll_result() {
     assert_eq!(fds[0].revents, POLLNVAL as i16);
 }
 
+fn tty_platform() -> (Platform<FakeSys>, i32) {
+    let fake = FakeSys::new();
+    fake.tty(b"/dev/tty");
+    let platform = Platform::new(fake);
+    let fd = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("open");
+    (platform, fd)
+}
+
+#[test]
+fn two_entries_for_one_descriptor_register_it_once() {
+    let (platform, fd) = tty_platform();
+    let handle = platform.get(fd).expect("ref").handle();
+    platform.backend().ready(handle, 1);
+    let mut fds = [
+        Pollfd {
+            fd,
+            events: POLLIN as i16,
+            revents: 0,
+        },
+        Pollfd {
+            fd,
+            events: POLLOUT as i16,
+            revents: 0,
+        },
+    ];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1), "not EEXIST");
+    assert_eq!(fds[0].revents as i32, POLLIN);
+    assert_eq!(fds[1].revents, 0, "the writer entry did not ask for POLLIN");
+}
+
+#[test]
+fn every_entry_for_a_shared_descriptor_gets_its_own_revents() {
+    let (platform, fd) = tty_platform();
+    let handle = platform.get(fd).expect("ref").handle();
+    platform.backend().ready(handle, 3);
+    let mut fds = [
+        Pollfd {
+            fd,
+            events: POLLIN as i16,
+            revents: 0,
+        },
+        Pollfd {
+            fd,
+            events: POLLOUT as i16,
+            revents: 0,
+        },
+        Pollfd {
+            fd,
+            events: (POLLIN | POLLOUT) as i16,
+            revents: 0,
+        },
+    ];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(3));
+    assert_eq!(fds[0].revents as i32, POLLIN);
+    assert_eq!(fds[1].revents as i32, POLLOUT);
+    assert_eq!(fds[2].revents as i32, POLLIN | POLLOUT);
+}
+
+#[test]
+fn a_failed_poll_leaves_the_cached_queue_usable() {
+    let (platform, fd) = tty_platform();
+    let handle = platform.get(fd).expect("ref").handle();
+    for _ in 0..3 {
+        platform.backend().ready(handle, 1);
+        let mut fds = [
+            Pollfd {
+                fd,
+                events: POLLIN as i16,
+                revents: 0,
+            },
+            Pollfd {
+                fd,
+                events: POLLOUT as i16,
+                revents: 0,
+            },
+        ];
+        assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    }
+}
+
+#[test]
+fn an_entry_with_no_events_is_not_ready() {
+    let (platform, fd) = tty_platform();
+    let mut fds = [
+        Pollfd {
+            fd,
+            events: POLLIN as i16,
+            revents: 0,
+        },
+        Pollfd {
+            fd,
+            events: 0,
+            revents: 0,
+        },
+    ];
+    assert_eq!(poll(&platform, &mut fds, 1), Ok(0));
+    assert_eq!(fds[1].revents, 0);
+}
+
+#[test]
+fn poll_recovers_from_a_foreign_waiting_event_queue() {
+    let platform = Platform::new(FakeSys::new());
+    let fd = platform
+        .install(Handle(7), OfdKind::Socket, 2, None, false)
+        .expect("install");
+    let ofd = platform.get(fd).expect("fd").index();
+    platform.set_ofd_event(ofd, Handle(9)).expect("event");
+    platform.backend().ready(Handle(9), EV_SIGNALED);
+    platform
+        .backend()
+        .fail_next(crate::backend::Fault::EvqWait, Errno::EBUSY);
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN);
+}
+
 #[test]
 fn a_delivered_scheme_event_rearms_once() {
     let platform = Platform::new(FakeSys::new());

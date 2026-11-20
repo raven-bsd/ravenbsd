@@ -1,4 +1,4 @@
 root:$6$rounds=5000$G3aRZtaEHFI9mxqPo3H6$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.:0:0:99999:7:0:0:0
 alice:$6$r4ven$S6VNu6h5bJJ4N0puQ63budZes8.I7oATcnLzSQBmkTcTvZ.4QTdkbKttZybkfYqCmRZvvzbfDzxeMs3FalGIQ.:19000:0:99999:7:0:0:0
 bob:!:19000:0:99999:7:0:0:0
-carol:!:0:0:99999:7:0:0:0
+carol:!:0:0:99999:7:-1:-1:0
