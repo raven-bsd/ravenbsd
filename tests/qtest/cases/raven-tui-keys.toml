@@ -70,7 +70,7 @@ wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
-send = "export NO_COLOR=1 RAVEN_TUI=1\n"
+send = "export NO_COLOR=1 RAVEN_TUI=1 RAVEN_TUI_RAW=1\n"
 delay_ms = 100
 
 [[step]]

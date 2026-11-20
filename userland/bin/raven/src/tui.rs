@@ -90,7 +90,11 @@ pub(crate) fn run<W: Write>(writer: &mut W, request: &Request) -> i32 {
     // saves the canonical/echo settings and switches raw through the K36 protocol. A plain POSIX
     // tty uses the termios guard instead; a non-TTY qtest keeps the canonical parser.
     #[cfg(target_os = "ravenbsd")]
-    let (mut input, _termios): (Box<dyn std::io::Read>, Option<raven_tty::RawMode>) =
+    let use_console =
+        std::env::var_os("RAVEN_TUI_RAW").is_some() || std::env::var_os("RAVEN_TUI").is_none();
+    #[cfg(target_os = "ravenbsd")]
+    let (mut input, _termios): (Box<dyn std::io::Read>, Option<raven_tty::RawMode>) = if use_console
+    {
         match raven_tty::Console::open() {
             Ok(mut console) => {
                 if let Err(error) = console.enable_raw() {
@@ -108,7 +112,10 @@ pub(crate) fn run<W: Write>(writer: &mut W, request: &Request) -> i32 {
                     }
                 }
             }
-        };
+        }
+    } else {
+        (Box::new(std::io::stdin()), None)
+    };
     #[cfg(not(target_os = "ravenbsd"))]
     let mut input: Box<dyn std::io::Read> = Box::new(std::io::stdin());
     let options = raven_tui::Options {
