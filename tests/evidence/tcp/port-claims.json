@@ -1,0 +1,222 @@
+{
+  "schema": 1,
+  "generated_by": "K264",
+  "netbsd_revision": "36eddebcc36cb0775aa2962005b9c05419a6ff01",
+  "rules": {
+    "port": "A product file ported from NetBSD needs a PROVENANCE.toml import with upstream=netbsd, license=BSD-3-Clause, tier=A and the pinned revision; status is pending until the port lands.",
+    "test-only": "Tests, docs and harnesses carry no per-file NetBSD import; a product import in these paths is an audit violation.",
+    "report_done": "A port report marked DONE must have status=landed and its exact PROVENANCE entry; the audit rejects a DONE report with a pending claim."
+  },
+  "claims": [
+    {
+      "ticket": "K253",
+      "lane": "bob",
+      "kind": "test-only",
+      "status": "pending-merge",
+      "copy": "none",
+      "report": "bob/reports/K253.md",
+      "paths": [
+        "scripts/net-conformance*",
+        "tests/net-conformance/**",
+        "tests/fixtures/net-conformance/**",
+        "docs/tcp-conformance.md"
+      ],
+      "donor": "NetBSD sys/netinet/tcp_output.c, tcp_input.c, tcp_timer.c as scenario reference; no product code copied",
+      "donor_checks": [
+        {"file": "sys/netinet/tcp_output.c", "symbols": ["tcp_output"]},
+        {"file": "sys/netinet/tcp_input.c", "symbols": ["tcp_input"]},
+        {"file": "sys/netinet/tcp_timer.c", "symbols": ["tcp_timer_persist"]}
+      ],
+      "note": "Harness core is not on origin/master; K263 reports the same blocker"
+    },
+    {
+      "ticket": "K254",
+      "lane": "jerry",
+      "kind": "port",
+      "status": "pending",
+      "copy": "clean-room",
+      "report": "jerry/reports/K254.md",
+      "paths": [
+        "crates/raven-tcpip/src/tcp_data.rs",
+        "crates/raven-tcpip/src/tcp_state.rs",
+        "crates/raven-tcpip/src/stack.rs",
+        "crates/raven-tcpip/src/cc.rs"
+      ],
+      "donor": "NetBSD sys/netinet/tcp_output.c tcp_output (send window/SWS/Nagle, win=1 persist, out: ENOBUFS); tcp_timer.c tcp_timer_persist/tcp_setpersist; tcp_input.c ACK catch-up",
+      "donor_checks": [
+        {"file": "sys/netinet/tcp_output.c", "symbols": ["tcp_output", "tcp_setpersist", "win = 1", "out:"]},
+        {"file": "sys/netinet/tcp_timer.c", "symbols": ["tcp_timer_persist", "tcp_backoff"]},
+        {"file": "sys/netinet/tcp_input.c", "symbols": ["SEQ_LT(tp->snd_nxt, tp->snd_una)"]}
+      ],
+      "divergence": "tcp_output.c and tcp_input.c carry the NRL 4-clause advertising clause (NO-COPY); a literal port is forbidden. The implemented output/input logic must be clean-room with no [[import]]. The TxError::Busy success semantics are a separate Raven divergence from the donor out: label and need reviewer approval.",
+      "note": "Report is WORKING; no exact PROVENANCE entry yet"
+    },
+    {
+      "ticket": "K255",
+      "lane": "carl",
+      "kind": "port",
+      "status": "pending",
+      "copy": "clean-room",
+      "report": "carl/reports/K255.md",
+      "paths": [
+        "crates/raven-tcpip/src/tcp_state.rs",
+        "crates/raven-tcpip/src/tcp_state_ut.rs"
+      ],
+      "donor": "NetBSD sys/netinet/tcp_input.c tcp_input state dispatch, ACK/window accounting, tcp_dooptions",
+      "donor_checks": [
+        {"file": "sys/netinet/tcp_input.c", "symbols": ["tcp_input", "tcp_dooptions"]}
+      ],
+      "divergence": "tcp_input.c carries the NRL 4-clause advertising clause (NO-COPY); tcp_state.rs must be clean-room with no [[import]].",
+      "note": "Report is WORKING; donor map not yet filled"
+    },
+    {
+      "ticket": "K256",
+      "lane": "mark",
+      "kind": "port",
+      "status": "pending",
+      "copy": "permitted",
+      "report": "mark/reports/K256.md",
+      "paths": [
+        "crates/raven-tcpip/src/rto.rs",
+        "crates/raven-tcpip/src/recovery.rs",
+        "crates/raven-tcpip/src/tcp_timer.rs"
+      ],
+      "donor": "NetBSD sys/netinet/tcp_timer.c tcp_timer_rexmt/tcp_timer_keep/tcp_timer_2msl, backoff and RTO/deadline calculation",
+      "donor_checks": [
+        {"file": "sys/netinet/tcp_timer.c", "symbols": ["tcp_timer_rexmt", "tcp_timer_keep", "tcp_timer_2msl", "tcp_timer_persist", "tcp_backoff"]}
+      ],
+      "divergence": "Only tcp_timer.c (WIDE/NetBSD/UCB 3-clause) is copyable. recovery.rs must not copy tcp_input.c (NRL 4-clause); any tcp_input-derived behaviour must be clean-room with no [[import]].",
+      "note": "Report is WORKING; no exact PROVENANCE entry yet"
+    },
+    {
+      "ticket": "K257",
+      "lane": "stuart",
+      "kind": "port",
+      "status": "pending",
+      "copy": "clean-room",
+      "report": "stuart/reports/K257.md",
+      "paths": [
+        "crates/raven-tcpip/src/sack.rs",
+        "crates/raven-tcpip/src/sack_send.rs",
+        "crates/raven-tcpip/src/sack_send_ut.rs"
+      ],
+      "donor": "NetBSD sys/netinet/tcp_sack.c and the SACK/loss hooks in tcp_input.c (scoreboard, IsLost/NextSeg/Pipe, reneging, DSACK)",
+      "donor_checks": [
+        {"file": "sys/netinet/tcp_sack.c", "symbols": ["tcp_sack_option", "tcp_sack_output", "tcp_del_sackholes", "tcp_new_dsack"]}
+      ],
+      "divergence": "tcp_sack.c carries the NRL 4-clause advertising clause and a UCB 4-clause block (NO-COPY); a literal port is forbidden and sack.rs must be clean-room with no [[import]]. NetBSD also has no IsLost/NextSeg/Pipe (FreeBSD/RFC 6675 names); any such API is first-party and needs reviewer approval.",
+      "note": "Report is WORKING; no exact PROVENANCE entry yet"
+    },
+    {
+      "ticket": "K258",
+      "lane": "dave",
+      "kind": "port",
+      "status": "clean-room",
+      "copy": "clean-room",
+      "report": "dave/reports/K258.md",
+      "paths": [
+        "crates/raven-tcpip/src/cc.rs"
+      ],
+      "donor": "NetBSD sys/netinet/tcp_input.c fast-retransmit/recovery and tcp_output.c cwnd hooks; CUBIC/RACK remain first-party extensions",
+      "donor_checks": [
+        {"file": "sys/netinet/tcp_input.c", "symbols": ["tcp_input"]},
+        {"file": "sys/netinet/tcp_output.c", "symbols": ["tcp_output"]}
+      ],
+      "divergence": "The NetBSD donors tcp_congctl.c/tcp_input.c/tcp_output.c carry the NRL 4-clause advertising clause (NO-COPY), so the report's clean-room/no-entry decision is correct. CUBIC and RACK are first-party Raven extensions; the entry must not claim the whole cc.rs as a NetBSD port.",
+      "note": "Report is WORKING; the entry must cover only the NetBSD baseline, not CUBIC/RACK"
+    },
+    {
+      "ticket": "K259",
+      "lane": "mel",
+      "kind": "port",
+      "status": "clean-room",
+      "copy": "clean-room",
+      "report": "mel/reports/K259.md",
+      "paths": [
+        "crates/raven-tcpip/src/pmtu.rs",
+        "crates/raven-tcpip/src/plpmtud_live.rs",
+        "crates/raven-tcpip/src/plpmtud_live_ut.rs",
+        "crates/raven-tcpip/src/ecn.rs"
+      ],
+      "donor": "NetBSD sys/netinet/tcp_input.c/tcp_output.c ECN handling, tcp_subr.c MSS/PMTU; PLPMTUD (RFC 8899) remains first-party",
+      "donor_checks": [
+        {"file": "sys/netinet/tcp_subr.c", "symbols": ["tcp_mss_to_advertise", "tcp_mss_from_peer", "tcp_mtudisc"]},
+        {"file": "sys/netinet/tcp_input.c", "symbols": ["TF_ECN_SND_ECE"]},
+        {"file": "sys/netinet/tcp_output.c", "symbols": ["tcp_output"]}
+      ],
+      "divergence": "The report's two proposed entries are rejected: tcp_input.c, tcp_output.c and tcp_var.h carry the NRL 4-clause advertising clause (NO-COPY), and the pmtu.rs entry also cites tcp_input.c/tcp_var.h. ecn.rs and pmtu.rs must be clean-room behavioural implementations with no [[import]]; PLPMTUD remains first-party.",
+      "rejected_entries": [
+        {"path": "crates/raven-tcpip/src/ecn.rs", "reason": "donors tcp_input.c/tcp_output.c/tcp_var.h are NRL 4-clause NO-COPY"},
+        {"path": "crates/raven-tcpip/src/pmtu.rs", "reason": "entry cites tcp_input.c/tcp_var.h (NRL 4-clause); only tcp_subr.c is permissive, so a mixed literal entry is unsupported"}
+      ],
+      "note": "Report is DONE; its proposed entries are rejected by the licence audit"
+    },
+    {
+      "ticket": "K260",
+      "lane": "kevin",
+      "kind": "port",
+      "status": "pending",
+      "copy": "permitted",
+      "report": "kevin/reports/K260.md",
+      "paths": [
+        "crates/raven-tcpip/src/socket.rs",
+        "crates/raven-tcpip/src/listen.rs"
+      ],
+      "donor": "NetBSD sys/netinet/tcp_usrreq.c tcp_connect/tcp_listen/tcp_accept/tcp_disconnect; tcp_subr.c tcp_connect/tcp_drop/tcp_close",
+      "donor_checks": [
+        {"file": "sys/netinet/tcp_usrreq.c", "symbols": ["tcp_connect", "tcp_listen", "tcp_accept", "tcp_disconnect"]},
+        {"file": "sys/netinet/tcp_subr.c", "symbols": ["tcp_close"]}
+      ],
+      "note": "Report is WORKING; donor map filled, implementation in progress"
+    },
+    {
+      "ticket": "K261",
+      "lane": "tim",
+      "kind": "port",
+      "status": "pending",
+      "copy": "permitted",
+      "report": "tim/reports/K261.md",
+      "paths": [
+        "crates/raven-tcpip/src/event.rs",
+        "crates/raven-tcpip/src/readiness.rs",
+        "crates/raven-tcpip/src/readiness_ut.rs"
+      ],
+      "donor": "NetBSD sys/sys/socketvar.h soreadable/sowritable, sys/kern/uipc_socket.c sodopoll/sopoll, uipc_socket2.c sowakeup; sys_select.c rescan",
+      "donor_checks": [
+        {"file": "sys/sys/socketvar.h", "symbols": ["soreadable", "sowritable"]},
+        {"file": "sys/kern/uipc_socket.c", "symbols": ["sodopoll", "sopoll"]},
+        {"file": "sys/kern/uipc_socket2.c", "symbols": ["sowakeup"]}
+      ],
+      "divergence": "The K244 readiness query was clean-room with no donor code (its report says so); the entry must cover only newly ported predicate code and must not claim the K244 code. socketvar.h and uipc_socket.c combine NetBSD Foundation 2-clause blocks with UCB 3-clause blocks, so the ported file uses BSD-3-Clause and retains both notices.",
+      "note": "Report is WORKING; donor map filled"
+    },
+    {
+      "ticket": "K262",
+      "lane": "lance",
+      "kind": "test-only",
+      "status": "pending-merge",
+      "copy": "none",
+      "report": "lance/reports/K262.md",
+      "paths": [
+        "tests/tcp-model/**"
+      ],
+      "donor": "NetBSD/RFC behaviour as the model reference; no product code",
+      "note": "Model suite is test-only; no provenance entry"
+    },
+    {
+      "ticket": "K263",
+      "lane": "phil",
+      "kind": "test-only",
+      "status": "pending-merge",
+      "copy": "none",
+      "report": "phil/reports/K263.md",
+      "paths": [
+        "tests/net-conformance/scenarios/**",
+        "tests/net-conformance/baselines/**",
+        "tests/net-conformance/results/linux/**"
+      ],
+      "donor": "NetBSD tcp_output.c/tcp_input.c/tcp_timer.c as scenario reference; no product code",
+      "note": "DONE on phil/K263 with independent Linux baselines; the K253 harness is still absent, so the packet matrix stays blocked"
+    }
+  ]
+}
