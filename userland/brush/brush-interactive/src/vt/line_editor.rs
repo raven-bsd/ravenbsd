@@ -877,3 +877,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "line_editor_ut.rs"]
+mod autosuggest_tests;

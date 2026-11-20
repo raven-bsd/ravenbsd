@@ -227,8 +227,7 @@ impl LineReader {
         editor: &mut LineEditor<'_>,
     ) {
         let highlighted = self.highlighting && self.style == Style::Vt;
-        let suggested = self.autosuggest && self.style == Style::Vt;
-        if !highlighted && !suggested {
+        if !highlighted && (!self.autosuggest || self.style != Style::Vt) {
             editor.clear_hint();
             return;
         }
@@ -236,6 +235,20 @@ impl LineReader {
         if highlighted {
             editor.highlight(&shell, program);
         }
+        let suggested = self.autosuggest
+            && self.style == Style::Vt
+            && !shell
+                .env_str("RAVEN_AUTOSUGGEST")
+                .is_some_and(|value| value == "0")
+            && !shell
+                .env_str("NO_COLOR")
+                .is_some_and(|value| !value.is_empty())
+            && !shell
+                .env_str("TERM")
+                .is_some_and(|value| value == "dumb")
+            && !shell
+                .env_str("RAVEN_PLAIN_PROMPT")
+                .is_some_and(|value| value == "1");
         editor.update_hint(&shell.history(), suggested);
     }
 

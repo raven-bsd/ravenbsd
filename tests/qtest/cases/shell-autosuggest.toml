@@ -100,7 +100,7 @@ send = "echo autos"
 delay_ms = 800
 
 [[step]]
-send = "\u001b[C"
+send = "\u0005"
 delay_ms = 300
 
 [[step]]
