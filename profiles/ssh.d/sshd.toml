@@ -7,7 +7,7 @@
 
 name = "sshd"
 exec = "/bin/rsh"
-args = ["/bin/rsh", "-c", "mkdir -p /tmp/ssh /var/empty; chmod 700 /tmp/ssh; chmod 755 /var/empty; ssh-keygen -A -f /tmp/ssh; /sbin/sshd -D -e -f /etc/ssh/sshd_config"]
+args = ["/bin/rsh", "-c", "mkdir -p /tmp/ssh /var/empty; rm -f /tmp/ssh/ssh_host_*; for t in rsa ecdsa ed25519; do ssh-keygen -q -t $t -N '' -f /tmp/ssh/ssh_host_${t}_key; done; /sbin/sshd -D -e -f /etc/ssh/sshd_config"]
 needs = ["netd", "vfsd", "consd", "ptyd"]
 readiness = "none"
 restart = "on-failure"

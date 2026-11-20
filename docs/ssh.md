@@ -32,8 +32,10 @@ repeated here. Do not expose this demo to an untrusted network.
 The `sshd` service runs a bounded `/bin/rsh -c` first-boot command. The released initfs image has
 a read-only `/etc`, so it generates the keys in `/tmp/ssh` on every boot and its host key is
 **ephemeral**; SSH clients must accept a changed key on each boot. A persistent UFS root (K193)
-must stage the same service with `/etc/ssh` and `ssh-keygen -A -f /etc/ssh`; that image path is
-not merged in this tree yet, so host-key persistence is not claimed here.
+must stage the same service with `/etc/ssh`; that image path is not merged in this tree yet, so
+host-key persistence is not claimed here. The per-key `ssh-keygen -q -t TYPE -N '' -f` form is
+used because the vendored build's `ssh-keygen -A -f PREFIX` concatenates PREFIX with the absolute
+configure-time sysconfdir.
 
 Private keys are never shipped in the image and must never be committed or published.
 
