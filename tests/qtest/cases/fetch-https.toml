@@ -52,7 +52,7 @@ wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
-send = "/bin/ls -l /bin/curl; /bin/curl --version; echo tls-ver=$?; /bin/curl -I --cacert /tls-ca.pem https://10.0.2.2:24443/known.txt; echo curl-head=$?\n"
+send = "curl -I --cacert /tls-ca.pem https://10.0.2.2:24443/known.txt; echo curl-head=$?\n"
 delay_ms = 100
 
 [[step]]

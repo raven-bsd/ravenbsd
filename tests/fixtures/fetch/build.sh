@@ -144,8 +144,8 @@ build_initfs() {
 start_http_server() {
     log "starting the local HTTP server on 18081"
     rm -f "$out/http-server.log"
-    timeout 240 python3 "$root/tests/fixtures/fetch/http_server.py" \
-        --port 18081 --seconds 180 >"$out/http-server.log" 2>&1 &
+    timeout 700 python3 "$root/tests/fixtures/fetch/http_server.py" \
+        --port 18081 --seconds 600 >"$out/http-server.log" 2>&1 &
     echo $! >"$out/http-server.pid"
     sleep 0.3
     if ! kill -0 "$(cat "$out/http-server.pid")" 2>/dev/null; then
@@ -157,8 +157,8 @@ start_http_server() {
 start_https_server() {
     log "starting the local HTTPS server on 24443"
     rm -f "$out/https-server.log"
-    timeout 240 python3 "$root/tests/fixtures/fetch/tls_server.py" \
-        --port 24443 --seconds 180 \
+    timeout 700 python3 "$root/tests/fixtures/fetch/tls_server.py" \
+        --port 24443 --seconds 600 \
         --cert "$certs/server.pem" --key "$certs/server.key" \
         >"$out/https-server.log" 2>&1 &
     echo $! >"$out/https-server.pid"

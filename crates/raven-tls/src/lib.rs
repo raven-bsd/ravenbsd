@@ -19,7 +19,6 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use core::ffi::{c_char, c_int, c_long, c_void};
-use core::sync::atomic::{AtomicI32, Ordering};
 
 mod ffi {
     use super::*;
@@ -150,15 +149,6 @@ pub enum Error {
     Io,
 }
 
-/// The OpenSSL error code of the last failed read (0 when none).
-static LAST_SSL_ERROR: AtomicI32 = AtomicI32::new(0);
-
-/// The OpenSSL `SSL_get_error` code of the last failed read, for diagnostics.
-#[must_use]
-pub fn last_ssl_error() -> i32 {
-    LAST_SSL_ERROR.load(Ordering::Relaxed)
-}
-
 /// One verified TLS connection.
 pub struct Connection {
     ssl: *mut ffi::Ssl,
@@ -191,7 +181,6 @@ impl Connection {
             }
             // SAFETY: `ssl` is live and `read` is the return value of the SSL_read above.
             let error = unsafe { ffi::SSL_get_error(self.ssl, read) };
-            LAST_SSL_ERROR.store(error, Ordering::Relaxed);
             match error {
                 // A clean close_notify or a zero-length read is EOF.
                 ffi::SSL_ERROR_ZERO_RETURN | ffi::SSL_ERROR_NONE => return Ok(0),
