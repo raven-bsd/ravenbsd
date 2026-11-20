@@ -335,12 +335,44 @@ mod tls_program {
             let slice = bytes.get(offset..).unwrap_or(&[]);
             // SAFETY: fd 1 is the process stdout and `slice` is a live readable buffer.
             let written = unsafe { write(1, slice.as_ptr().cast(), slice.len()) };
-            if written <= 0 {
+            if written > 0 {
+                offset = offset.saturating_add(usize::try_from(written).unwrap_or(0));
+                continue;
+            }
+            // The shell-spawned add-on child may have no usable fd 1; the base client writes
+            // through DEBUG_WRITE, so use the same console sink instead of losing every line.
+            // SAFETY: the kernel DEBUG_WRITE copies `len` readable bytes from `slice` and returns
+            // the byte count; the scalar arguments follow the raven-abi convention.
+            let debug = unsafe { debug_write(slice.as_ptr(), slice.len()) };
+            if debug <= 0 {
                 return Err(());
             }
-            offset = offset.saturating_add(usize::try_from(written).unwrap_or(0));
+            offset = offset.saturating_add(usize::try_from(debug).unwrap_or(0));
         }
         Ok(())
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn debug_write(bytes: *const u8, len: usize) -> isize {
+        let result: isize;
+        // SAFETY: DEBUG_WRITE (0x03) takes a readable pointer/length; the kernel validates them.
+        unsafe {
+            core::arch::asm!(
+                "syscall",
+                inlateout("rax") 3isize => result,
+                in("rdi") bytes,
+                in("rsi") len,
+                lateout("rcx") _,
+                lateout("r11") _,
+                options(nostack),
+            );
+        }
+        result
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    unsafe fn debug_write(_bytes: *const u8, _len: usize) -> isize {
+        -1
     }
 
     fn output(text: &str) {
