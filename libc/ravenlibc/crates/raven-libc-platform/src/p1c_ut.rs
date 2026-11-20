@@ -48,6 +48,32 @@ fn getdtablesize_tracks_the_nofile_limit() {
 }
 
 #[test]
+fn exec_fdmap_env_carries_the_table_and_closes_cloexec() {
+    use crate::fd::inherit::{ENV_NAME, FdMap};
+
+    let platform = platform();
+    let plain = platform.open(b"/a", 0, 0).expect("open");
+    let cloexec = platform.open(b"/a", 0, 0).expect("open");
+    platform.set_cloexec(cloexec, true).expect("cloexec");
+
+    let entry = platform.exec_fdmap_env().expect("env").expect("some");
+    let (name, value) = entry.split_at(ENV_NAME.len());
+    assert_eq!(name, ENV_NAME);
+    let value = value.strip_prefix(b"=").expect("separator");
+    let map = FdMap::decode_env(value).expect("decode");
+    assert!(map.entries.iter().any(|row| row.fd == plain));
+    assert!(
+        map.entries
+            .iter()
+            .any(|row| row.fd == cloexec && row.fd_flags & 1 != 0)
+    );
+
+    platform.close_cloexec_fds().expect("close");
+    assert!(platform.get(cloexec).is_err());
+    assert!(platform.get(plain).is_ok());
+}
+
+#[test]
 fn hostid_and_domainname_round_trip() {
     let platform = platform();
     assert_eq!(platform.gethostid(), 1234);

@@ -1,30 +1,32 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# K195: the fork/exec socketpair inheritance shape used by the OpenSSH rexec: the child writes
-# 563 + 191 bytes, the parent duplicates the peer to fd 4 and execs a static reader, which must
-# see the exact bytes and then EOF.
+# K222: a pre-fork AF_UNIX socketpair must survive fork and exec. The child duplicates the
+# inherited end, execs a static reader, and sees exactly the parent's bytes, then EOF. A
+# FD_CLOEXEC descriptor must be closed by the exec.
 name = "socketpair-exec"
 arch = "x86_64"
-profile = "base"
-timeout_secs = 180
-initfs = "build/fixtures/socketpair-exec/initfs.img"
+profile = "libc-test"
+timeout_secs = 300
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
-pre = ["sh tests/qtest/cases/socketpair-exec-fixture/build.sh"]
+pre = ["sh tests/fixtures/socketpair-exec/build.sh"]
 
 [[expect]]
-regex = '^socketpair-exec: reader start$'
-
-[[expect]]
-regex = '^socketpair-exec: bytes=754$'
-
-[[expect]]
-regex = '^socketpair-exec: exact ok$'
+regex = '^socketpair-exec: exact bytes ok$'
 
 [[expect]]
 regex = '^socketpair-exec: eof ok$'
+
+[[expect]]
+regex = '^socketpair-exec: cloexec closed$'
+
+[[expect]]
+regex = '^socketpair-exec: reader ok$'
+
+[[expect]]
+regex = '^socketpair-exec: parent ok$'
 
 [[expect]]
 regex = '^socketpair-exec: ok$'

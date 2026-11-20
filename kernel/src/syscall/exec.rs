@@ -21,13 +21,12 @@ use crate::usercopy::copy_from_user;
 /// Raw `proc_exec(request) -> 0` number. The ABI crate is reviewer-owned.
 pub const PROC_EXEC: usize = 0x6a;
 
-const REQUEST_BYTES: usize = 104;
+const REQUEST_BYTES: usize = 88;
 const MAX_PATH: usize = 4096;
 const MAX_COUNT: usize = 4096;
 const MAX_STRING: usize = 64 * 1024;
 const MAX_ARG_BYTES: usize = 128 * 1024;
 const MAX_HANDLES: usize = 65536;
-const MAX_FDMAP: usize = 64 * 1024;
 const ELF_HEADER_BYTES: usize = 64;
 const PHDR_BYTES: usize = 56;
 const MAX_PHDRS: usize = 64;
@@ -48,8 +47,6 @@ struct Request {
     close_list: u64,
     close_count: u64,
     flags: u64,
-    fdmap: u64,
-    fdmap_len: u64,
 }
 
 impl Request {
@@ -68,8 +65,6 @@ impl Request {
             close_list: word(&bytes, 64),
             close_count: word(&bytes, 72),
             flags: word(&bytes, 80),
-            fdmap: word(&bytes, 88),
-            fdmap_len: word(&bytes, 96),
         })
     }
 }
@@ -96,9 +91,6 @@ pub fn exec(frame: &SyscallFrame) -> Result<usize, Errno> {
     if request.close_count > MAX_HANDLES as u64 {
         return Err(Errno::EINVAL);
     }
-    if request.fdmap_len > MAX_FDMAP as u64 {
-        return Err(Errno::EINVAL);
-    }
 
     let image_len = usize::try_from(request.image_len).map_err(|_| Errno::EFBIG)?;
     let header = read_header(request.image, image_len)?;
@@ -116,16 +108,6 @@ pub fn exec(frame: &SyscallFrame) -> Result<usize, Errno> {
     let argv = string_array(request.argv, request.argc, &mut total)?;
     let envp = string_array(request.envp, request.envc, &mut total)?;
     let close = close_list(request.close_list, request.close_count)?;
-    let mut fdmap = Vec::new();
-    if request.fdmap_len != 0 {
-        let length = usize::try_from(request.fdmap_len).map_err(|_| Errno::EINVAL)?;
-        fdmap.try_reserve_exact(length).map_err(|_| Errno::ENOMEM)?;
-        fdmap.resize(length, 0);
-        copy_from_user(
-            &mut fdmap,
-            UserSlice::new(request.fdmap, request.fdmap_len)?,
-        )?;
-    }
 
     exec::replace_image_from_user(
         &caller,
@@ -136,7 +118,6 @@ pub fn exec(frame: &SyscallFrame) -> Result<usize, Errno> {
         &argv,
         &envp,
         &close,
-        &fdmap,
     )?;
     Ok(0)
 }

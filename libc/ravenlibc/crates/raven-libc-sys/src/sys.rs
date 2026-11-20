@@ -21,12 +21,12 @@ use crate::arch;
 /// Number of typed wrappers in this module; must equal `Syscall::ALL.len()`.
 pub const WRAPPER_COUNT: usize = 47;
 
-/// Raw `PROC_EXEC` (`0x6a`): replace the caller's image from an 104-byte flat request.
+/// Raw `PROC_EXEC` (`0x6a`): replace the caller's image from an 88-byte flat request.
 ///
 /// The request layout is owned by the kernel/`raven-libc-proc`; this wrapper only checks the
 /// pointer it passes. On success the kernel does not return to this code.
-pub fn proc_exec(request: &[u8; 104]) -> Result<usize, Errno> {
-    // SAFETY: `request` is a live 104-byte array and the kernel validates every pointer and
+pub fn proc_exec(request: &[u8; 88]) -> Result<usize, Errno> {
+    // SAFETY: `request` is a live 88-byte array and the kernel validates every pointer and
     // length inside it through the fault-safe user-copy layer.
     let raw = unsafe { arch::syscall1(0x6a, request.as_ptr() as usize) };
     crate::errno::ret(raw)

@@ -130,3 +130,18 @@ fn entry_handle_wraps_the_number() {
     let entry = FdMapEntry::new(0, 0xabcd, OfdKind::File, 0, 0);
     assert_eq!(entry_handle(&entry).0, 0xabcd);
 }
+
+#[test]
+fn env_round_trip_is_lowercase_hex() {
+    let map = sample();
+    let encoded = map.encode_env().expect("encode");
+    assert!(encoded.iter().all(u8::is_ascii_hexdigit));
+    assert!(encoded.iter().all(|byte| !byte.is_ascii_uppercase()));
+    assert_eq!(FdMap::decode_env(&encoded), Ok(map));
+}
+
+#[test]
+fn env_rejects_odd_length_and_bad_digits() {
+    assert_eq!(FdMap::decode_env(b"abc"), Err(Errno::EINVAL));
+    assert_eq!(FdMap::decode_env(b"zz"), Err(Errno::EINVAL));
+}

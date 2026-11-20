@@ -24,8 +24,8 @@ const MAX_ARG_BYTES: usize = 128 * 1024;
 /// Maximum path bytes, matching the kernel.
 const MAX_PATH: usize = 4096;
 
-/// The 104-byte flat request consumed by `PROC_EXEC`, in field order.
-const REQUEST_WORDS: usize = 13;
+/// The 88-byte flat request consumed by `PROC_EXEC`, in field order.
+const REQUEST_WORDS: usize = 11;
 type KernelRequest = [u8; REQUEST_WORDS * 8];
 
 fn put_word(request: &mut KernelRequest, index: usize, value: u64) {
@@ -91,8 +91,6 @@ pub fn exec(request: &ExecRequest) -> Errno {
     put_word(&mut kernel, 8, close.as_ptr() as u64);
     put_word(&mut kernel, 9, close.len() as u64);
     put_word(&mut kernel, 10, 0);
-    put_word(&mut kernel, 11, request.fdmap.as_ptr() as u64);
-    put_word(&mut kernel, 12, request.fdmap.len() as u64);
     match raven_libc_sys::sys::proc_exec(&kernel) {
         Ok(_) => 0,
         Err(error) => i32::from(error.0),

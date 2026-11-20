@@ -45,7 +45,6 @@ pub(crate) fn fork<B: ProcBackend>(backend: &B) -> Result<i32, ProcErrno> {
 }
 
 /// The `exec` request and its result (the call never returns on success).
-#[allow(clippy::too_many_arguments)] // mirrors the C entry point
 pub(crate) fn exec<B: ProcBackend>(
     backend: &B,
     cwd: &[u8],
@@ -53,8 +52,6 @@ pub(crate) fn exec<B: ProcBackend>(
     argv: &[alloc::vec::Vec<u8>],
     envp: &[alloc::vec::Vec<u8>],
     fd: Option<i32>,
-    close_list: &[u32],
-    fdmap: &[u8],
 ) -> ProcErrno {
     backend.exec(&ExecRequest {
         exec_flags: 0,
@@ -65,8 +62,8 @@ pub(crate) fn exec<B: ProcBackend>(
         cwd: cwd.to_vec(),
         argv: argv.to_vec(),
         envp: envp.to_vec(),
-        close_list: close_list.to_vec(),
-        fdmap: fdmap.to_vec(),
+        close_list: alloc::vec::Vec::new(),
+        fdmap: alloc::vec::Vec::new(),
         sigmask: [0; 128],
         ignored: [0; 128],
     })
