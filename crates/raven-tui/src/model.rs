@@ -12,16 +12,26 @@ use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+use raven_config::users::{
+    Accounts, UserAction, UserSpec, apply, render_plan, validate_action,
+};
+
 /// The dedicated network drop-in, relative to the configuration root.
 pub const NETWORK_FILE: &str = "etc/raven/conf.d/network.toml";
+/// `/etc/passwd`, relative to the configuration root (the Users dry-run target).
+pub const PASSWD_FILE: &str = "etc/passwd";
 /// Allowed network modes.
 pub const MODE_CHOICES: &[&str] = &["dhcp", "static"];
+/// Allowed yes/no choices.
+pub const YES_NO: &[&str] = &["no", "yes"];
 
 /// The kind of value a form field holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FieldKind {
     /// Free text.
     Text,
+    /// A secret; the display is masked and the value is never printed.
+    Secret,
     /// One of a fixed choice list.
     Choice(&'static [&'static str]),
     /// Read-only information.
@@ -77,25 +87,49 @@ impl Field {
         }
     }
 
-    /// Display value (the effective value).
+    /// Display value (the effective value), masked for secrets.
     #[must_use]
     pub fn display(&self) -> String {
+        if self.kind == FieldKind::Secret {
+            return if self.value.is_empty() {
+                String::from("(not set)")
+            } else {
+                String::from("********")
+            };
+        }
         self.effective()
     }
+}
+
+/// What a module edits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModuleKind {
+    /// The K198 network drop-in.
+    Network,
+    /// A new Users account.
+    UsersAdd,
+    /// An existing Users account.
+    UsersEdit,
+    /// Read-only information.
+    Info,
 }
 
 /// One module in the left pane.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Module {
     /// Stable identifier.
-    pub id: &'static str,
+    pub id: String,
     /// Left-pane title.
-    pub title: &'static str,
+    pub title: String,
     /// One-line summary.
-    pub summary: &'static str,
+    pub summary: String,
     /// Form fields.
     pub fields: Vec<Field>,
-    /// Whether the Save action writes the network drop-in.
+    /// What the Save action edits.
+    pub kind: ModuleKind,
+    /// Existing login name for a Users edit.
+    pub user: Option<String>,
+    /// Whether the Save action writes something.
     pub writable: bool,
 }
 
@@ -180,18 +214,206 @@ pub struct ValidationError {
     pub message: String,
 }
 
-/// Build the module registry for the current values.
+/// The values the registry is built from.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Current {
+    /// Network drop-in values.
+    pub network: NetworkCurrent,
+    /// Files-backed accounts.
+    pub accounts: Accounts,
+}
+
+/// Build the module registry: Network, Users, one entry per account, then the read-only modules.
 #[must_use]
-pub fn modules(current: &NetworkCurrent) -> Vec<Module> {
+pub fn modules(current: &Current) -> Vec<Module> {
+    let mut modules = base_modules(&current.network);
+    modules.insert(1, users_add_module(&current.accounts));
+    for (offset, user) in current.accounts.users.iter().enumerate() {
+        modules.insert(2 + offset, users_edit_module(&current.accounts, user));
+    }
+    modules
+}
+
+fn users_add_module(accounts: &Accounts) -> Module {
+    Module {
+        id: String::from("users-add"),
+        title: String::from("Users (add)"),
+        summary: String::from("Add a user: name, uid/gid, home, shell, password, autologin"),
+        fields: vec![
+            Field::new(
+                "username",
+                "Username",
+                "New login name; letters, digits, . _ -",
+                FieldKind::Text,
+                String::new(),
+            ),
+            Field::new(
+                "uid",
+                "UID",
+                "Numeric user id; the next regular id by default",
+                FieldKind::Text,
+                accounts.next_uid().to_string(),
+            ),
+            Field::new(
+                "gid",
+                "GID",
+                "Numeric primary group; a same-name group is created",
+                FieldKind::Text,
+                accounts.next_gid().to_string(),
+            ),
+            Field::new(
+                "home",
+                "Home",
+                "Empty uses /home/<name>; created on save",
+                FieldKind::Text,
+                String::new(),
+            ),
+            Field::new(
+                "shell",
+                "Shell",
+                "Absolute executable path; a TUI app is a valid shell",
+                FieldKind::Text,
+                String::from(raven_config::users::DEFAULT_SHELL),
+            ),
+            Field::new(
+                "password",
+                "Password",
+                "Hashed as SHA-512 crypt $6$; never stored plaintext",
+                FieldKind::Secret,
+                String::new(),
+            ),
+            Field::new(
+                "confirm",
+                "Confirm",
+                "Repeat the password",
+                FieldKind::Secret,
+                String::new(),
+            ),
+            Field::new(
+                "autologin",
+                "Autologin",
+                "Start this account on the console without a password",
+                FieldKind::Choice(YES_NO),
+                String::from("no"),
+            ),
+        ],
+        kind: ModuleKind::UsersAdd,
+        user: None,
+        writable: true,
+    }
+}
+
+fn users_edit_module(accounts: &Accounts, user: &raven_config::users::UserRecord) -> Module {
+    let root = user.name == raven_config::users::ROOT_USER;
+    let text = |key: &'static str,
+                label: &'static str,
+                help: &'static str,
+                value: String,
+                kind: FieldKind| {
+        Field::new(key, label, help, kind, value)
+    };
+    let field_kind = || if root { FieldKind::Info } else { FieldKind::Text };
+    Module {
+        id: format!("users:{}", user.name),
+        title: format!("Users: {}", user.name),
+        summary: format!("uid {} gid {} shell {}", user.uid, user.gid, user.shell),
+        fields: vec![
+            text(
+                "username",
+                "Username",
+                "The login name cannot be changed",
+                user.name.clone(),
+                FieldKind::Info,
+            ),
+            text(
+                "uid",
+                "UID",
+                "Root keeps uid 0",
+                user.uid.to_string(),
+                field_kind(),
+            ),
+            text(
+                "gid",
+                "GID",
+                "Root keeps gid 0",
+                user.gid.to_string(),
+                field_kind(),
+            ),
+            text(
+                "home",
+                "Home",
+                "Created on save when it is missing",
+                user.home.clone(),
+                field_kind(),
+            ),
+            text(
+                "shell",
+                "Shell",
+                "Absolute executable path",
+                user.shell.clone(),
+                field_kind(),
+            ),
+            text(
+                "password",
+                "Password",
+                "Empty keeps the current hash; otherwise set a new one",
+                String::new(),
+                FieldKind::Secret,
+            ),
+            text(
+                "confirm",
+                "Confirm",
+                "Repeat a new password",
+                String::new(),
+                FieldKind::Secret,
+            ),
+            text(
+                "autologin",
+                "Autologin",
+                "Console autologin; one account at a time",
+                if accounts.is_autologin(&user.name) {
+                    String::from("yes")
+                } else {
+                    String::from("no")
+                },
+                if root {
+                    FieldKind::Info
+                } else {
+                    FieldKind::Choice(YES_NO)
+                },
+            ),
+            text(
+                "delete",
+                "Delete",
+                "Delete this account, its shadow record and group",
+                String::from("no"),
+                if root {
+                    FieldKind::Info
+                } else {
+                    FieldKind::Choice(YES_NO)
+                },
+            ),
+        ],
+        kind: ModuleKind::UsersEdit,
+        user: Some(user.name.clone()),
+        writable: true,
+    }
+}
+
+/// Build the network and read-only part of the registry.
+#[must_use]
+fn base_modules(current: &NetworkCurrent) -> Vec<Module> {
     let mode = if MODE_CHOICES.contains(&current.mode.as_str()) {
         current.mode.clone()
     } else {
         String::from("dhcp")
     };
     let network = Module {
-        id: "network",
-        title: "Network",
-        summary: "Hostname, DHCP or static IPv4 address",
+        id: String::from("network"),
+        title: String::from("Network"),
+        summary: String::from("Hostname, DHCP or static IPv4 address"),
+        kind: ModuleKind::Network,
+        user: None,
         fields: vec![
             Field::new(
                 "hostname",
@@ -241,9 +463,11 @@ pub fn modules(current: &NetworkCurrent) -> Vec<Module> {
     vec![
         network,
         Module {
-            id: "services",
-            title: "Services",
-            summary: "Service enablement (read-only; K198/K76 own apply)",
+            id: String::from("services"),
+            title: String::from("Services"),
+            summary: String::from("Service enablement (read-only; K198/K76 own apply)"),
+            kind: ModuleKind::Info,
+            user: None,
             fields: vec![
                 Field::new(
                     "core",
@@ -263,9 +487,11 @@ pub fn modules(current: &NetworkCurrent) -> Vec<Module> {
             writable: false,
         },
         Module {
-            id: "logging",
-            title: "Logging",
-            summary: "Log level and destination (read-only; K76 owns apply)",
+            id: String::from("logging"),
+            title: String::from("Logging"),
+            summary: String::from("Log level and destination (read-only; K76 owns apply)"),
+            kind: ModuleKind::Info,
+            user: None,
             fields: vec![
                 Field::new(
                     "level",
@@ -285,9 +511,11 @@ pub fn modules(current: &NetworkCurrent) -> Vec<Module> {
             writable: false,
         },
         Module {
-            id: "theme",
-            title: "Theme",
-            summary: "Colour policy and prompt (read-only)",
+            id: String::from("theme"),
+            title: String::from("Theme"),
+            summary: String::from("Colour policy and prompt (read-only)"),
+            kind: ModuleKind::Info,
+            user: None,
             fields: vec![
                 Field::new(
                     "color",
@@ -307,9 +535,11 @@ pub fn modules(current: &NetworkCurrent) -> Vec<Module> {
             writable: false,
         },
         Module {
-            id: "about",
-            title: "About",
-            summary: "raven config version and layout",
+            id: String::from("about"),
+            title: String::from("About"),
+            summary: String::from("raven config version and layout"),
+            kind: ModuleKind::Info,
+            user: None,
             fields: vec![
                 Field::new(
                     "version",
@@ -535,6 +765,136 @@ pub fn plan_from_fields(fields: &[Field]) -> Result<NetworkPlan, Vec<ValidationE
     } else {
         Err(errors)
     }
+}
+
+/// Load the account files for the Users modules. A read failure is a status warning; the
+/// registry still opens so the operator can see why.
+#[must_use]
+pub fn load_accounts(root: &Path) -> (Accounts, Option<String>) {
+    match Accounts::load(root) {
+        Ok(accounts) => (accounts, None),
+        Err(error) => (Accounts::default(), Some(format!("users: {error}"))),
+    }
+}
+
+/// Parse a Users form into an action and validate it against the loaded accounts.
+pub fn plan_user(
+    root: &Path,
+    module: &Module,
+    fields: &[Field],
+    accounts: &Accounts,
+) -> Result<UserAction, Vec<ValidationError>> {
+    let field = |key: &'static str| fields.iter().find(|field| field.key == key);
+    let mut errors = Vec::new();
+    let name = if module.kind == ModuleKind::UsersAdd {
+        field("username")
+            .map_or(String::new(), Field::effective)
+            .trim()
+            .to_string()
+    } else {
+        module.user.clone().unwrap_or_default()
+    };
+    let uid = parse_form_id(field("uid"), "uid", &mut errors);
+    let gid = parse_form_id(field("gid"), "gid", &mut errors);
+    let home = field("home").map_or(String::new(), Field::effective);
+    let home = home.trim().to_string();
+    let shell = field("shell").map_or(String::new(), Field::effective);
+    let shell = shell.trim().to_string();
+    let autologin = field("autologin").is_some_and(|field| field.effective() == "yes");
+    let password = field("password").map_or(String::new(), Field::effective);
+    let confirm = field("confirm").map_or(String::new(), Field::effective);
+    let adding = module.kind == ModuleKind::UsersAdd;
+    let password = if password.is_empty() && confirm.is_empty() {
+        if adding {
+            errors.push(ValidationError {
+                key: "password",
+                message: String::from("a new user needs a password"),
+            });
+        }
+        None
+    } else if password.is_empty() {
+        errors.push(ValidationError {
+            key: "password",
+            message: String::from("password must not be empty"),
+        });
+        None
+    } else if password != confirm {
+        errors.push(ValidationError {
+            key: "confirm",
+            message: String::from("passwords do not match"),
+        });
+        None
+    } else {
+        Some(password)
+    };
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    if !adding && field("delete").is_some_and(|field| field.effective() == "yes") {
+        let action = UserAction::Delete { name };
+        return validate_action(root, accounts, &action)
+            .map(|()| action)
+            .map_err(convert_spec_errors);
+    }
+    let spec = UserSpec {
+        name: name.clone(),
+        uid,
+        gid,
+        home,
+        shell,
+        password,
+        autologin,
+    };
+    let action = if adding {
+        UserAction::Add(spec)
+    } else {
+        UserAction::Edit { name, spec }
+    };
+    validate_action(root, accounts, &action)
+        .map(|()| action)
+        .map_err(convert_spec_errors)
+}
+
+fn parse_form_id(
+    field: Option<&Field>,
+    key: &'static str,
+    errors: &mut Vec<ValidationError>,
+) -> u32 {
+    let text = field.map_or(String::new(), Field::effective);
+    match text.trim().parse::<u32>() {
+        Ok(value) => value,
+        Err(_) => {
+            errors.push(ValidationError {
+                key,
+                message: format!("{key} must be a number"),
+            });
+            0
+        }
+    }
+}
+
+fn convert_spec_errors(errors: Vec<raven_config::users::SpecError>) -> Vec<ValidationError> {
+    errors
+        .into_iter()
+        .map(|error| ValidationError {
+            key: error.key,
+            message: error.message,
+        })
+        .collect()
+}
+
+/// Apply a validated Users action.
+pub fn apply_user(
+    root: &Path,
+    action: &UserAction,
+) -> Result<raven_config::users::ApplyOutcome, String> {
+    apply(root, action).map_err(|error| error.to_string())
+}
+
+/// Render the Users dry-run plan (no secrets).
+#[must_use]
+pub fn user_plan(action: &UserAction) -> String {
+    render_plan(action)
 }
 
 /// Write the plan atomically to the dedicated drop-in. The temporary file is in the same

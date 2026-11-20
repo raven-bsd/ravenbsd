@@ -67,16 +67,15 @@ pub fn run<R: Read, W: Write>(
                     writeln!(output, "raven config: saved {}", path.display())?;
                     return Ok(Outcome::Saved(path));
                 }
-                Action::DryRun(text) => {
-                    let state = if network_path(root).exists() {
+                Action::DryRun { target, text } => {
+                    let state = if Path::new(&target).exists() {
                         "present"
                     } else {
                         "absent"
                     };
                     writeln!(
                         output,
-                        "raven config: dry-run plan={} file={state}",
-                        network_path(root).display()
+                        "raven config: dry-run plan={target} file={state}"
                     )?;
                     write!(output, "{text}")?;
                     return Ok(Outcome::DryRun(text));

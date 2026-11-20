@@ -3714,6 +3714,9 @@ dependencies = [
 [[package]]
 name = "raven-tui"
 version = "0.1.0"
+dependencies = [
+ "raven-config",
+]
 
 [[package]]
 name = "raven-turnstile"
