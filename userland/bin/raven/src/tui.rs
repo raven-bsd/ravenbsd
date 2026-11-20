@@ -71,10 +71,53 @@ pub(crate) fn request(args: &[OsString], is_tty: bool) -> Option<Request> {
     Some(Request { dry_run, color })
 }
 
+/// A target console reader over the `tty:console` scheme.
+#[cfg(target_os = "ravenbsd")]
+struct ConsoleInput(raven_tty::Console);
+
+#[cfg(target_os = "ravenbsd")]
+impl std::io::Read for ConsoleInput {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.0
+            .read(buffer)
+            .map_err(|error| std::io::Error::other(format!("{error}")))
+    }
+}
+
 /// Run the TUI and map its outcome to a process exit code.
 pub(crate) fn run<W: Write>(writer: &mut W, request: &Request) -> i32 {
-    let stdin = std::io::stdin();
-    let mut input = stdin.lock();
+    // The real console is the `tty:console` scheme; `consd` owns its line discipline. The guard
+    // saves the canonical/echo settings and switches raw through the K36 protocol. A plain POSIX
+    // tty uses the termios guard instead; a non-TTY qtest keeps the canonical parser.
+    #[cfg(target_os = "ravenbsd")]
+    let use_console =
+        std::env::var_os("RAVEN_TUI_RAW").is_some() || std::env::var_os("RAVEN_TUI").is_none();
+    #[cfg(target_os = "ravenbsd")]
+    let (mut input, _termios): (Box<dyn std::io::Read>, Option<raven_tty::RawMode>) = if use_console
+    {
+        match raven_tty::Console::open() {
+            Ok(mut console) => {
+                if let Err(error) = console.enable_raw() {
+                    let _ = writeln!(writer, "raven config: console raw mode: {error}");
+                }
+                (Box::new(ConsoleInput(console)), None)
+            }
+            Err(error) => {
+                let _ = writeln!(writer, "raven config: console open: {error}");
+                match raven_tty::RawMode::enable(0) {
+                    Ok(guard) => (Box::new(std::io::stdin()), Some(guard)),
+                    Err(error) => {
+                        let _ = writeln!(writer, "raven config: termios raw mode: {error}");
+                        (Box::new(std::io::stdin()), None)
+                    }
+                }
+            }
+        }
+    } else {
+        (Box::new(std::io::stdin()), None)
+    };
+    #[cfg(not(target_os = "ravenbsd"))]
+    let mut input: Box<dyn std::io::Read> = Box::new(std::io::stdin());
     let options = raven_tui::Options {
         dry_run: request.dry_run,
         color: request.color,

@@ -9557,3 +9557,14 @@ tier = "A"
 copied = "2026-11-20"
 modified = true
 notes = "OpenSSH portable V_10_6_P2 (tag peeled commit) for the C add-on (DR-65); protocol, cipher suites, KEX, key formats and crypto are unmodified. The upstream regress/ test tree (including 45 private-key fixtures) is excluded because GitHub push protection rejects the keys and the build does not use regress. The build is out of tree against the RavenBSD libc clang sysroot and the T1 libcrypto/libssl; portability changes, if any, live only in addons/ssh/compat/."
+
+[[import]]
+path = "crates/raven-tty/src/lib.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/termios/cfmakeraw.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-20"
+modified = true
+notes = "The make_raw flag set is the literal NetBSD cfmakeraw port (IMAXBEL/IGNBRK/BRKINT/PARMRK/ISTRIP/INLCR/IGNCR/ICRNL/IXON, OPOST, ECHO/ECHONL/ICANON/ISIG/IEXTEN, CSIZE/PARENB clear and CS8); the TCSANOW mapping follows netbsd:lib/libc/termios/tcsetattr.c. The Rust termios guard, signal restore and safe API are first-party."

@@ -1009,6 +1009,7 @@ dependencies = [
  "raven-proto-svc",
  "raven-rt",
  "raven-scheme",
+ "raven-tty",
  "raven-tui",
 ]
 
@@ -3710,6 +3711,16 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "raven-trace-core",
+]
+
+[[package]]
+name = "raven-tty"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-scheme",
 ]
 
 [[package]]
