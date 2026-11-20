@@ -85,6 +85,7 @@ mod daylight;
 mod getdate;
 mod localtime;
 mod nanosleep;
+mod setitimer;
 mod strftime;
 mod time;
 mod timer_create;
