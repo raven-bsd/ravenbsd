@@ -100,7 +100,7 @@ wait = '^raven# $'
 timeout_secs = 10
 
 [[step]]
-send = "ping -c 1 ping.test\n"
+send = "/sbin/ping -c 1 ping.test\n"
 delay_ms = 100
 
 [[step]]
@@ -116,7 +116,7 @@ wait = '^raven# $'
 timeout_secs = 10
 
 [[step]]
-send = "ping -c 1 missing.test; echo ping-status:$?\n"
+send = "/sbin/ping -c 1 missing.test; echo ping-status:$?\n"
 delay_ms = 100
 
 [[step]]
@@ -132,7 +132,7 @@ wait = '^raven# $'
 timeout_secs = 10
 
 [[step]]
-send = "ping -c 1 10.0.2.2\n"
+send = "/sbin/ping -c 1 10.0.2.2\n"
 delay_ms = 100
 
 [[step]]
