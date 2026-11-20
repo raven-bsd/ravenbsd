@@ -60,7 +60,7 @@ wait = '^HTTP/1\.1 200'
 timeout_secs = 120
 
 [[step]]
-wait = '^Content-type: text/plain$'
+wait = '^Content-type: text/plain'
 timeout_secs = 30
 
 [[step]]
