@@ -28,7 +28,8 @@ pub unsafe extern "C" fn read(fd: c_int, buffer: *mut c_void, count: usize) -> i
     if fd == 4 {
         let _ = raven_libc_sys::sys::debug_write(
             alloc::format!(
-                "rd4 ok={} n={} err={}\n",
+                "rd4 pid={} ok={} n={} err={}\n",
+                crate::process::getpid(),
                 result.is_ok(),
                 result.as_ref().map_or(0, |n| *n),
                 result.as_ref().err().map_or(0, |e| e.0)
