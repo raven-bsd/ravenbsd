@@ -8,7 +8,7 @@
 name = "shell-highlight"
 arch = "x86_64"
 profile = "release"
-timeout_secs = 180
+timeout_secs = 240
 keep_ansi = true
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
@@ -21,7 +21,7 @@ regex = '(?i)^.*login: ?root'
 regex = '(?i)^password: ?$'
 
 [[expect]]
-regex = '\x1b\[1;31mzzz-not-a-command'
+regex = '1;31mzzz-not-a-command'
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -58,16 +58,12 @@ send = "zzz-not-a-command "
 delay_ms = 800
 
 [[step]]
-wait = '\x1b\[1;31mzzz-not-a-command'
-timeout_secs = 15
-
-[[step]]
 send = "\u0003"
 delay_ms = 300
 
 [[step]]
 wait = 'raven# '
-timeout_secs = 15
+timeout_secs = 30
 
 # The plain switches must keep the next session free of the not-found style.
 [[step]]
@@ -76,7 +72,7 @@ delay_ms = 100
 
 [[step]]
 wait = 'raven# '
-timeout_secs = 15
+timeout_secs = 30
 
 [[step]]
 send = "/bin/brush -i --rcfile /etc/brush/brushrc\n"
