@@ -6,7 +6,7 @@
 
 name = "sshd"
 exec = "/sbin/sshd"
-args = ["/sbin/sshd", "-D", "-ddd", "-E", "tty:console", "-f", "/etc/ssh/sshd_config"]
+args = ["/sbin/sshd", "-D", "-E", "/tmp/sshd.log", "-f", "/etc/ssh/sshd_config"]
 needs = ["netd", "vfsd", "consd", "ptyd", "ssh-hostkeys"]
 readiness = "none"
 restart = "on-failure"
