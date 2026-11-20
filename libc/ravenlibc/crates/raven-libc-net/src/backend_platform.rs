@@ -21,6 +21,9 @@ use raven_proto_net::{Call, Endpoint, IfaceRequest, IfaceResponse, Response, Soc
 
 use crate::{CallReply, Caps, NetBackend, ReadDone, Sock, WaitItem};
 
+/// The kernel `OPEN` access bits: read and write. A socket file is always both.
+const WIRE_READ_WRITE: u16 = 3;
+
 /// A `NetBackend` over one C55 platform.
 pub struct PlatformBackend<'a, B: SysBackend, L: Lock> {
     platform: &'a Platform<B, L>,
@@ -40,7 +43,7 @@ impl<B: SysBackend, L: Lock> NetBackend for PlatformBackend<'_, B, L> {
     }
 
     fn open(&self, path: &str) -> Result<Sock, Errno> {
-        let handle = open_scheme_path(self.platform.backend(), path.as_bytes(), 0)
+        let handle = open_scheme_path(self.platform.backend(), path.as_bytes(), WIRE_READ_WRITE)
             .map_err(|error| Errno(error.0))?;
         Ok(Sock(handle.0))
     }
@@ -85,7 +88,18 @@ impl<B: SysBackend, L: Lock> NetBackend for PlatformBackend<'_, B, L> {
             Response::Ok => Ok(CallReply::Ok),
             Response::Endpoint(endpoint) => Ok(CallReply::Endpoint(endpoint)),
             Response::Value(value) => Ok(CallReply::Value(value)),
-            Response::Socket { id } => Ok(CallReply::Accepted(Sock(id))),
+            Response::Socket { id } => {
+                // `ACCEPT` returns a server-side socket id; materialise the client-side scheme
+                // file (`net:accept/<id>`) so the new fd owns a real handle.
+                let path = alloc::format!("{}{id}", raven_proto_net::path::ACCEPT_PREFIX);
+                let handle = open_scheme_path(
+                    self.platform.backend(),
+                    path.as_bytes(),
+                    WIRE_READ_WRITE,
+                )
+                .map_err(|error| Errno(error.0))?;
+                Ok(CallReply::Accepted(Sock(handle.0)))
+            }
             Response::Err(error) => Err(Errno(error.0)),
             _ => Err(Errno::EPROTO),
         }
@@ -103,7 +117,7 @@ impl<B: SysBackend, L: Lock> NetBackend for PlatformBackend<'_, B, L> {
     }
 
     fn iface(&self, req: IfaceRequest) -> Result<IfaceResponse, Errno> {
-        let handle = open_scheme_path(self.platform.backend(), b"net:", 0)
+        let handle = open_scheme_path(self.platform.backend(), b"net:", WIRE_READ_WRITE)
             .map_err(|error| Errno(error.0))?;
         let mut request = [0u8; 64];
         let used = req.encode(&mut request).map_err(|_| Errno::EINVAL)?;
