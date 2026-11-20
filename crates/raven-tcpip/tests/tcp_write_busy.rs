@@ -240,3 +240,67 @@ fn a_refused_transmit_does_not_stall_data_queued_behind_it() {
     settle(&mut rig, 800);
     assert_eq!(drain(&mut rig), data);
 }
+
+#[test]
+fn a_small_write_after_prior_unacked_data_is_flushed_on_the_next_poll() {
+    let mut rig = rig();
+    let first = payload(100);
+    assert_eq!(rig.server.send(rig.accepted, &first), Ok(first.len()));
+
+    // One-way delay is 50 ms, so the first segment reaches the client at 250. Its delayed ACK
+    // leaves on the client's next poll, but the server has not processed it yet.
+    rig.client.poll(Instant::from_millis(250));
+    assert_eq!(rig.client.recv_queue_len(rig.connected), Ok(first.len()));
+    rig.client.poll(Instant::from_millis(300));
+
+    // The small write meets an unacknowledged first segment, so Nagle holds it in the queue.
+    let second = payload(44);
+    assert_eq!(rig.server.send(rig.accepted, &second), Ok(second.len()));
+    assert_eq!(
+        rig.server
+            .socket_info(rig.accepted)
+            .expect("info")
+            .send_queue,
+        first.len() + second.len(),
+        "the small write is queued behind the unacknowledged data"
+    );
+
+    // One server poll processes the ACK and must flush the queued small write without another
+    // application write.
+    rig.server.poll(Instant::from_millis(360));
+    rig.client.poll(Instant::from_millis(420));
+    let mut expected = first;
+    expected.extend_from_slice(&second);
+    assert_eq!(drain(&mut rig), expected);
+}
+
+#[test]
+fn a_zero_window_write_is_probed_and_flushed_when_the_peer_answers() {
+    let mut rig = rig();
+    // The peer advertised a closed window and the update that reopened it was lost. A bare ACK
+    // would never be answered, so the stack must send a one-byte persist probe.
+    assert!(rig.server.test_set_tcp_snd_wnd(rig.accepted, 0));
+    let data = payload(44);
+    assert_eq!(rig.server.send(rig.accepted, &data), Ok(data.len()));
+    assert_eq!(
+        rig.server
+            .socket_info(rig.accepted)
+            .expect("info")
+            .send_queue,
+        data.len(),
+        "the closed window holds the whole write"
+    );
+    assert_eq!(rig.client.recv_queue_len(rig.connected), Ok(0));
+
+    // The first persist probe is due one second after the write. The client accepts one byte
+    // and its delayed ACK follows on its next poll.
+    rig.server.poll(Instant::from_millis(1200));
+    rig.client.poll(Instant::from_millis(1250));
+    assert_eq!(rig.client.recv_queue_len(rig.connected), Ok(1));
+    rig.client.poll(Instant::from_millis(1300));
+
+    // The ACK carries the peer's real window; the same server poll flushes the rest.
+    rig.server.poll(Instant::from_millis(1350));
+    rig.client.poll(Instant::from_millis(1410));
+    assert_eq!(drain(&mut rig), data);
+}
