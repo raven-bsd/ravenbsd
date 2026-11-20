@@ -65,6 +65,7 @@ mod seq;
 mod signature;
 mod socket;
 mod stack;
+mod syncache;
 mod table;
 mod tcp_data;
 mod tcp_state;
