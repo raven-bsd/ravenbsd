@@ -1,0 +1,5 @@
+endpoint: READY
+ECN SYN-ACK: 10.26.3.1:24007->10.26.3.2:20474 [SAE] seq=1857059420 ack=791570746 win=64240 len=0 mss=1460 ws=7 sack=True
+RESULT ecn PASS ECN negotiated (ECE on SYN-ACK) elapsed=0.15s
+PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/ecn.pcap
+endpoint: ACCEPTED ('10.26.3.2', 20474)
