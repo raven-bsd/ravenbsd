@@ -239,6 +239,7 @@ mod tls_program {
     }
 
     fn run(args: &[&str]) -> i32 {
+        output("curl: tls-run\n");
         let options = match parse(args.iter().skip(1).copied()) {
             Ok(options) => options,
             Err(error) => {
@@ -301,6 +302,11 @@ mod tls_program {
         } else {
             &response.body
         };
+        output("curl: status=");
+        number(usize::from(response.status));
+        output(" bytes=");
+        number(bytes.len());
+        output("\n");
         let write = match options.output.as_deref() {
             None | Some("-") => write_stdout(bytes),
             Some(path) => curl::tls::write_file(path, bytes).map_err(|_| ()),
