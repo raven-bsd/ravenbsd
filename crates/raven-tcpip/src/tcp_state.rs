@@ -1572,8 +1572,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if segment.ack_flag() {
-                            connection.snd_wnd = u32::from(segment.window) << connection.snd_wscale;
-                            connection.max_snd_wnd = connection.max_snd_wnd.max(segment.window);
+                            update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
                         if segment.payload.is_empty()
                             && segment.ack_flag()
@@ -1636,6 +1635,7 @@ impl<D: Device> Stack<D> {
                                 send_ack = true;
                             }
                         }
+                        let tiwin = u32::from(segment.window) << connection.snd_wscale;
                         let duplicate_window = segment.window <= connection.last_ack_window;
                         connection.last_ack_window = segment.window;
                         let sack_new = connection.sack_permitted
@@ -1648,12 +1648,12 @@ impl<D: Device> Stack<D> {
                             .tlp_probe_at
                             .is_some_and(|probe| now.saturating_since(probe).as_millis() < 1000);
                         if !after_tlp
-                            && segment.ack == connection.snd_una
+                            && seq_le(segment.ack, connection.snd_una)
                             && segment.payload.is_empty()
                             && connection.snd_una != connection.snd_nxt
                             && !segment.syn()
                             && !segment.fin()
-                            && (duplicate_window || sack_new)
+                            && (tiwin == connection.snd_wnd || duplicate_window || sack_new)
                         {
                             connection.dupack_count = connection.dupack_count.saturating_add(1);
                             let threshold = u8::try_from(self.tunables.dup_ack_threshold)
@@ -1731,6 +1731,9 @@ impl<D: Device> Stack<D> {
                             send_challenge = true;
                             break 'transition;
                         }
+                        if segment.ack_flag() {
+                            update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
+                        }
                         if !segment.payload.is_empty() {
                             incoming = Some((segment.seq, segment.payload));
                         }
@@ -1773,6 +1776,9 @@ impl<D: Device> Stack<D> {
                             send_challenge = true;
                             break 'transition;
                         }
+                        if segment.ack_flag() {
+                            update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
+                        }
                         if !segment.payload.is_empty() {
                             incoming = Some((segment.seq, segment.payload));
                         }
@@ -1809,7 +1815,7 @@ impl<D: Device> Stack<D> {
                             send_ack = true;
                         }
                         if segment.ack_flag() {
-                            connection.snd_wnd = u32::from(segment.window) << connection.snd_wscale;
+                            update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
                     }
                     TcpState::Closing => {
@@ -1830,6 +1836,9 @@ impl<D: Device> Stack<D> {
                         if segment.syn() {
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if segment.ack_flag() {
+                            update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
                         if !segment.payload.is_empty() {
                             self.counters.data_after_fin =
@@ -1860,6 +1869,9 @@ impl<D: Device> Stack<D> {
                         if segment.syn() {
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if segment.ack_flag() {
+                            update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
                         if !segment.payload.is_empty() {
                             self.counters.data_after_fin =
@@ -3249,6 +3261,23 @@ impl<D: Device> Stack<D> {
             self.tcp_delayed_ack(socket, now);
             let _ = self.tcp_zero_window_timer(socket, now);
         }
+    }
+}
+
+/// FreeBSD `tcp_do_segment` step 6: only a newer segment/ACK may update `snd_wnd`.
+fn update_snd_wnd(connection: &mut TcpConnection, seq: u32, ack: u32, window: u16) {
+    let scaled = u32::from(window) << connection.snd_wscale;
+    if seq_lt(connection.snd_wl1, seq)
+        || (connection.snd_wl1 == seq
+            && (seq_lt(connection.snd_wl2, ack)
+                || (connection.snd_wl2 == ack && scaled > connection.snd_wnd)))
+    {
+        connection.snd_wnd = scaled;
+        connection.snd_wl1 = seq;
+        connection.snd_wl2 = ack;
+        connection.max_snd_wnd = connection
+            .max_snd_wnd
+            .max(u16::try_from(scaled).unwrap_or(u16::MAX));
     }
 }
 
