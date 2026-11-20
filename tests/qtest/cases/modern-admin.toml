@@ -66,7 +66,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven --json status\n"
+send = "/usr/sbin/raven --json status\n"
 delay_ms = 100
 
 [[step]]
@@ -78,7 +78,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven doctor && echo raven doctor: ok\n"
+send = "/usr/sbin/raven doctor && echo raven doctor: ok\n"
 delay_ms = 100
 
 [[step]]
@@ -90,7 +90,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven config check && echo raven config check: ok\n"
+send = "/usr/sbin/raven config check && echo raven config check: ok\n"
 delay_ms = 100
 
 [[step]]
