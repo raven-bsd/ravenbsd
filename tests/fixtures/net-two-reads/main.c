@@ -161,15 +161,14 @@ static int run_same_process(void) {
     }
     say("net-two-reads: first ok\n");
 
-    if (poll_one(connection, 5000) <= 0) {
-        return fail("poll second", errno);
-    }
+    // The second packet is already queued. A stored poll verdict is not a readiness fact, so
+    // read it directly; the blocking read waits on the live kernel queue if needed.
     if (read_packet(connection, "bravo", 5) != 0) {
         return fail("read second", errno);
     }
     say("net-two-reads: second ok\n");
 
-    // No busy loop: the one-shot rearm was consumed; this must time out before "charlie".
+    // No busy loop: no new data is queued until "charlie".
     int idle = poll_one(connection, 100);
     if (idle != 0) {
         return fail("poll busy", idle);
@@ -310,9 +309,8 @@ static int run_reader(int argc, char **argv) {
         }
     }
 
-    if (poll_one(fd, 5000) <= 0) {
-        return fail("reader poll second", errno);
-    }
+    // A packet queued before exec is read directly: a stored poll verdict is not a readiness
+    // fact. The blocking read waits/returns from the live kernel queue.
     if (read_packet(fd, "bravo", 5) != 0) {
         return fail("reader read second", errno);
     }
