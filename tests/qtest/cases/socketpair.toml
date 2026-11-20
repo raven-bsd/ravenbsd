@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K206: the real libc socketpair(AF_UNIX) path. The fixture links libc.a and checks both stream
+# directions, EOF after shutdown, EPIPE after a peer close, and SOCK_DGRAM boundaries.
+name = "socketpair"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+initfs = "build/fixtures/socketpair/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+# K206 BLOCKED: the kernel has no duplex endpoint ABI. PIPE/PIPE2 (0x6e/0x6f) is half-duplex
+# (read on the writer and write on the reader are EBADF), raven-chan is a pure model with no
+# syscall, and the one-handle-per-OFD fd table cannot represent two pipes as one endpoint.
+# Remove this line when CHANNEL_CREATE/socketpair lands; the fixture then checks both directions,
+# EOF, EPIPE and datagram boundaries.
+skip = "needs the kernel duplex endpoint ABI (no CHANNEL_CREATE/socketpair; PIPE/PIPE2 is half-duplex); enabling this case prints 'socketpair: socketpair errno=97'"
+pre = ["sh tests/qtest/cases/socketpair-fixture/build.sh"]
+
+[[expect]]
+regex = '^socketpair: a-to-b ok$'
+
+[[expect]]
+regex = '^socketpair: b-to-a ok$'
+
+[[expect]]
+regex = '^socketpair: eof ok$'
+
+[[expect]]
+regex = '^socketpair: peer-close ok$'
+
+[[expect]]
+regex = '^socketpair: dgram ok$'
+
+[[expect]]
+regex = '^socketpair: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|socketpair: fail'
