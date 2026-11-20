@@ -36,6 +36,8 @@ const MAX_MACRO_EXPANSIONS: usize = 100;
 pub(crate) struct LineReader {
     pub style: Style,
     pub highlighting: bool,
+    /// Whether history autosuggestions are drawn.
+    pub autosuggest: bool,
     pub bindings: Arc<Mutex<VtKeyBindings>>,
     /// The line being edited when a bound key was pressed, while its command runs.
     pub bound_line: Option<(String, usize)>,
@@ -153,6 +155,7 @@ impl LineReader {
             // interrupts, and Ctrl-D on an empty line ends input.
             if key.bytes == [0x03] {
                 // Leave the interrupted line as it was, marked as such.
+                editor.clear_hint();
                 editor.buffer.end();
                 editor.draw(out, columns)?;
                 out.write_all(b"^C\n")?;
@@ -223,10 +226,30 @@ impl LineReader {
         program: &str,
         editor: &mut LineEditor<'_>,
     ) {
-        if self.highlighting && self.style == Style::Vt {
-            let shell = shell.lock().await;
+        let highlighted = self.highlighting && self.style == Style::Vt;
+        if !highlighted && (!self.autosuggest || self.style != Style::Vt) {
+            editor.clear_hint();
+            return;
+        }
+        let shell = shell.lock().await;
+        if highlighted {
             editor.highlight(&shell, program);
         }
+        let suggested = self.autosuggest
+            && self.style == Style::Vt
+            && !shell
+                .env_str("RAVEN_AUTOSUGGEST")
+                .is_some_and(|value| value == "0")
+            && !shell
+                .env_str("NO_COLOR")
+                .is_some_and(|value| !value.is_empty())
+            && !shell
+                .env_str("TERM")
+                .is_some_and(|value| value == "dumb")
+            && !shell
+                .env_str("RAVEN_PLAIN_PROMPT")
+                .is_some_and(|value| value == "1");
+        editor.update_hint(&shell.history(), suggested);
     }
 
     /// Works out what a pressed key does, given the key bindings, reading more keys
