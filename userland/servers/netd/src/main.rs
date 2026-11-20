@@ -19,7 +19,7 @@ mod program {
 
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, clock};
-    use raven_proto_fs::Stat;
+    use raven_proto_fs::{O_RDWR, Stat};
     use raven_proto_net::socket::{Call, Response, SocketRequest};
     use raven_rt::entry;
     use raven_rt::event::{EventQueue, EvqEvent, READABLE, event_create, event_signal};
@@ -28,6 +28,7 @@ mod program {
         Server,
     };
 
+    use netd::network::{LoadError, NetworkConfig, NetworkMode};
     use netd::nic::NicMode;
     use netd::{Loopback, NetEvent, Netd};
 
@@ -45,6 +46,12 @@ mod program {
         release_dhcp: bool,
         release_ping: bool,
         release_unavailable: bool,
+        network: Option<NetworkConfig>,
+        network_ready: bool,
+        network_deadline_ms: i64,
+        hostname: Option<String>,
+        hostname_applied: bool,
+        static_mode: bool,
     }
 
     fn main(args: raven_rt::Args) -> i32 {
@@ -60,7 +67,14 @@ mod program {
             release_dhcp: false,
             release_ping: false,
             release_unavailable: false,
+            network: None,
+            network_ready: false,
+            network_deadline_ms: now.saturating_add(10_000),
+            hostname: None,
+            hostname_applied: false,
+            static_mode: false,
         };
+        handler.load_network(now);
         // A `nic:` driver may register a moment after svcd launches netd. Register `net:` for
         // loopback first and retry the NIC from the main loop so a late driver never fails netd
         // or delays getty. The service manifest still waits for `scheme:nic` where available.
@@ -138,11 +152,85 @@ mod program {
             if self.netd.has_nic() {
                 return Ok(());
             }
-            let _config = netd::nic::attach(&mut self.netd, now, self.nic_mode)?;
+            if !self.load_network(now) {
+                return Ok(());
+            }
+            let static_config = self.network.as_ref().and_then(NetworkConfig::static_config);
+            let _config = netd::nic::attach(&mut self.netd, now, self.nic_mode, static_config)?;
             Ok(())
         }
 
+        /// Read and validate the network drop-in once. Returns false only while the file
+        /// service is still starting, so the caller can retry without attaching a wrong mode.
+        fn load_network(&mut self, now: i64) -> bool {
+            if self.network_ready {
+                return true;
+            }
+            match netd::network::load() {
+                Ok(Some(config)) => {
+                    self.static_mode = config.mode == NetworkMode::Static;
+                    self.hostname = config.hostname.clone();
+                    match config.mode {
+                        NetworkMode::Static => raven_rt::println!(
+                            "netd: network config mode=static hostname={}",
+                            config.hostname.as_deref().unwrap_or("(image default)")
+                        ),
+                        NetworkMode::Dhcp => raven_rt::println!(
+                            "netd: network config mode=dhcp hostname={}",
+                            config.hostname.as_deref().unwrap_or("(image default)")
+                        ),
+                    }
+                    self.network = Some(config);
+                    self.network_ready = true;
+                    true
+                }
+                Ok(None) => {
+                    self.network_ready = true;
+                    true
+                }
+                Err(LoadError::NotReady) => {
+                    if now >= self.network_deadline_ms {
+                        self.network_ready = true;
+                        true
+                    } else {
+                        false
+                    }
+                }
+                Err(error @ LoadError::Invalid(_)) => {
+                    raven_rt::eprintln!(
+                        "netd: network config: {}; using image default",
+                        error.message()
+                    );
+                    self.network_ready = true;
+                    true
+                }
+            }
+        }
+
+        fn apply_hostname(&mut self) {
+            if self.hostname_applied {
+                return;
+            }
+            let Some(name) = self.hostname.clone() else {
+                return;
+            };
+            if Self::write_hostname(&name) {
+                raven_rt::println!("netd: hostname {name}");
+                self.hostname_applied = true;
+            }
+        }
+
+        fn write_hostname(name: &str) -> bool {
+            let Ok(mut file) = raven_rt::fs::open("sys:/hostname", O_RDWR) else {
+                return false;
+            };
+            let written = file.write(name.as_bytes()).is_ok();
+            let _ = file.close();
+            written
+        }
+
         fn publish_and_feed(&mut self) {
+            self.apply_hostname();
             if !self.printed_eth0
                 && let Some(config) = self.netd.published_nic()
             {
@@ -161,7 +249,7 @@ mod program {
         }
 
         fn feed_dhcp(&mut self) {
-            if self.release_dhcp || self.release_unavailable {
+            if self.static_mode || self.release_dhcp || self.release_unavailable {
                 return;
             }
             if self.netd.published_nic().is_none() {

@@ -89,7 +89,9 @@ mod program {
         ) -> HandlerResult<Opened> {
             let path = path.strip_prefix('/').unwrap_or(path);
             let (pair, role) = match path {
-                "master" => (0u64, Role::Master),
+                // `svcd` probes a resident scheme with the bare `pty:` path; pair 0 is the
+                // historical named pair and is safe to create for the probe.
+                "" | "master" => (0u64, Role::Master),
                 "slave" => (0u64, Role::Slave),
                 _ => {
                     let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
@@ -194,11 +196,21 @@ mod program {
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
-            if self.files.remove(&file).is_some() {
-                Ok(())
-            } else {
-                Err(Errno::EBADF.into())
+            let Some(entry) = self.files.remove(&file) else {
+                return Err(Errno::EBADF.into());
+            };
+            // The kernel delivers CLOSE once the last duplicate of the slave is gone; from
+            // then on the master sees EOF instead of an empty read.
+            if entry.role == Role::Slave
+                && !self
+                    .files
+                    .values()
+                    .any(|other| other.pair == entry.pair && other.role == Role::Slave)
+                && let Some(pty) = self.pairs.get_mut(entry.pair)
+            {
+                pty.hangup();
             }
+            Ok(())
         }
     }
 

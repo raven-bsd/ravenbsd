@@ -653,10 +653,8 @@ fn success_call_sequence() {
         other => panic!("expected child stack map, got {other:?}"),
     };
     assert_eq!(stack_base, usize::try_from(USER_END).unwrap() - STACK_SIZE);
-    assert_eq!(
-        flags,
-        map::pack(prot::READ | prot::WRITE, map::SHARED | map::FIXED)
-    );
+    // K196: the child stack is private so PROC_FORK can copy-on-write it.
+    assert_eq!(flags, map::pack(prot::READ | prot::WRITE, map::FIXED));
     assert_eq!(
         calls[6],
         Call::Unmap {

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K191: the release image defaults to the concise boot report. The per-service timing
+# diagnostics stay available by staging /etc/raven/boot-verbose (see docs/boot.md).
+
+[[initfs.files]]
+src = "profiles/release.d/boot-quiet"
+path = "/etc/raven/boot-quiet"
+mode = 0o644

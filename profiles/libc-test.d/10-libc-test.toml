@@ -46,3 +46,12 @@ path = "/etc/time-expected.txt"
 [[initfs.files]]
 src = "profiles/libc-test.d/libc-test.manifest"
 path = "/etc/services.d/libc-test.toml"
+
+# K196: the pty: scheme for the libc-forkpty case.
+[[initfs.programs]]
+package = "raven-ptyd"
+path = "/sbin/ptyd"
+
+[[initfs.files]]
+src = "tests/qtest/cases/libc-forkpty-fixture/ptyd.toml"
+path = "/etc/services.d/ptyd.toml"

@@ -10,3 +10,5 @@ signals	1 2 13 22 23 24 29 50 53	7 8 12 19	libc-test	static
 dynamic	1 2 13 22 23 24 29 49 50 53	36 51 52	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
 spawn	1 13 22 23 24 29 50 53	35 44 45 46 47 49	libc-test libc-child	static
 spawn-std	1 13 22 23 24 29 50 53	35 44 45 46 47 49	libc-test libc-child	static
+fork	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test	static
+forkpty	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test	static
