@@ -8,7 +8,7 @@ name = "fetch-installed"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 300
-pre = ["mkdir -p build/fixtures/fetch && rm -f build/fixtures/fetch/fetch-installed-server.pid && (timeout 240 python3 tests/fixtures/fetch/http_server.py --port 18081 --seconds 180 > build/fixtures/fetch/fetch-installed-server.log 2>&1 & echo $! > build/fixtures/fetch/fetch-installed-server.pid) && sleep 0.5 && kill -0 $(cat build/fixtures/fetch/fetch-installed-server.pid)"]
+pre = ["mkdir -p build/fixtures/fetch && rm -f build/fixtures/fetch/fetch-installed-server.pid && (timeout 240 python3 tests/fixtures/fetch/http_server.py --port 18082 --seconds 180 > build/fixtures/fetch/fetch-installed-server.log 2>&1 & echo $! > build/fixtures/fetch/fetch-installed-server.pid) && sleep 0.5 && kill -0 $(cat build/fixtures/fetch/fetch-installed-server.pid)"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
@@ -121,7 +121,7 @@ wait = '^wget-version=0$'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/curl http://10.0.2.2:18081/known.txt; echo; echo curl-fetch=$?\n"
+send = "/bin/curl http://10.0.2.2:18082/known.txt; echo; echo curl-fetch=$?\n"
 delay_ms = 100
 
 [[step]]
@@ -133,7 +133,7 @@ wait = '^curl-fetch=0$'
 timeout_secs = 30
 
 [[step]]
-send = "/bin/wget -O /tmp/installed-wget.txt http://10.0.2.2:18081/known.txt; echo wget-fetch=$?; /bin/cat /tmp/installed-wget.txt; echo\n"
+send = "/bin/wget -O /tmp/installed-wget.txt http://10.0.2.2:18082/known.txt; echo wget-fetch=$?; /bin/cat /tmp/installed-wget.txt; echo\n"
 delay_ms = 100
 
 [[step]]
