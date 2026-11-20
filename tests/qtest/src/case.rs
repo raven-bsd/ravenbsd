@@ -126,6 +126,8 @@ pub struct CaseSpec {
     pub pre: Vec<String>,
     /// Prebuilt initfs installed instead of the profile's, relative to the working directory.
     pub initfs: Option<String>,
+    /// Prebuilt case image instead of invoking `cargo xtask image`.
+    pub image: Option<String>,
     /// Kernel ELF installed instead of the built kernel (loader test kernels).
     pub loader_kernel: Option<String>,
     /// Keep ANSI escape sequences in the captured serial lines (explicit colour assertions).
@@ -255,6 +257,11 @@ impl Case {
         {
             bail!("initfs must not be empty");
         }
+        if let Some(image) = &raw.image
+            && image.trim().is_empty()
+        {
+            bail!("image must not be empty");
+        }
         if let Some(kernel) = &raw.loader_kernel
             && kernel.trim().is_empty()
         {
@@ -284,6 +291,7 @@ impl Case {
                 skip: raw.skip,
                 pre: raw.pre,
                 initfs: raw.initfs,
+                image: raw.image,
                 loader_kernel: raw.loader_kernel,
                 keep_ansi: raw.keep_ansi,
             },
@@ -352,6 +360,8 @@ struct RawCase {
     pre: Vec<String>,
     #[serde(default)]
     initfs: Option<String>,
+    #[serde(default)]
+    image: Option<String>,
     #[serde(default)]
     loader_kernel: Option<String>,
     #[serde(default)]
@@ -662,3 +672,7 @@ regex = '(?i)panic'
         }
     }
 }
+
+#[cfg(test)]
+#[path = "case_ut.rs"]
+mod image_field_tests;

@@ -63,7 +63,7 @@ pub struct SpawnOptions<'a> {
 ///
 /// Userland binaries are a few MiB even in a debug build; the bound keeps a hostile or corrupt
 /// server from making PID 1 allocate without limit.
-pub const MAX_FILE_IMAGE: usize = 8 * 1024 * 1024;
+pub const MAX_FILE_IMAGE: usize = 16 * 1024 * 1024;
 
 /// Chunk size for reading a `file:` image.
 ///

@@ -89,10 +89,40 @@ form does not hard-code a shell command, `eval` or a vendor TUI framework.
   validation, atomic write, dry-run, read-only modules, non-TTY guard) and
   `cargo nextest run -p raven` (the binary invocation guard).
 * `raven-config-tui` qtest (`tests/qtest/cases/raven-config-tui.toml`): boots the
-  `raven-admin-test` profile, sets `NO_COLOR=1`, drives `raven config --dry-run` and the real save
+  `raven-admin-test` profile, sets `NO_COLOR=1`, `RAVEN_TUI=1` and
+  `RAVEN_CONFIG_ROOT=/tmp/raven-config-test`, drives `raven config --dry-run` and the real save
   with the scripted keys in `tests/fixtures/raven-tui/README.md`, checks the dry-run wrote
   nothing, and reads the saved drop-in back.
 * `modern-admin` remains the non-TUI acceptance (`raven config check`).
+
+## Release/UFS staging (K209)
+
+The release profile extends `shell` and gets a target-built `raven` at `/bin/raven` from
+`profiles/release.d/90-raven.toml`. The artifact is produced by
+`tests/fixtures/modern-admin/build.sh` (a target build, not the host binary); the
+`raven-release` qtest runs that builder before the image.
+
+The release image's root is the read-only initfs: a default `/etc/raven/conf.d` save fails
+cleanly with `Read-only file system` and returns to the login prompt. The qtest exercises that
+clean failure, then uses the documented `RAVEN_CONFIG_ROOT=/tmp/raven-release-test` (ramfs) for
+the atomic drop-in proof and reads the saved hostname/mode back. The live default remains `/`
+on a writable UFS root.
+
+The UFS payload (`qemu-ufs`, which extends `shell`) gets the same target-built binary from
+`profiles/qemu-ufs.d/90-raven.toml`, plus the K198 default drop-in at
+`/etc/raven/conf.d/network.toml`. No `shell.d` fragment is used: a `/bin/raven` staging there
+would collide with the fixture-only `profiles/raven-admin-test.d/20-raven.toml`, and the profile
+merge rejects duplicate paths. The UFS root is writable, so `raven config --dry-run` reports
+`file=present` there and a validated save lands on the UFS root.
+
+`raven-release` (`tests/qtest/cases/raven-release.toml`) boots the release profile, logs in,
+asserts `/bin/raven` is executable, runs `raven net if/route/status` and `raven --json status`,
+then drives the dry-run, the clean read-only failure and the test-root save, and reads the
+drop-in back. `raven-ufs` (`tests/qtest/cases/raven-ufs.toml`) builds and boots the one-disk
+demo qcow2, logs in, asserts `/bin/raven`, `raven net if/route/status` and `raven --json status`,
+runs `raven config check`/`get`, then drives the dry-run (`file=present`) and a real atomic save
+on UFS and reads the saved drop-in back. `release-login`, `modern-admin` and `modern-net` remain
+green.
 
 ## Donor reconciliation
 

@@ -96,8 +96,8 @@ fn open_master(flags: c_int) -> Result<c_int, u16> {
         }
     };
     if !remember(fd, pair) {
+        // SAFETY: `fd` is the descriptor just installed by this call.
         unsafe {
-            // SAFETY: `fd` is the descriptor just installed by this call.
             super::close(fd);
         }
         return Err(EMFILE as u16);

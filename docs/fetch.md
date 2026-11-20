@@ -34,6 +34,7 @@ fallback.
 | `--max-time SECS` | Total request deadline; a positive integer. The default is 10 s. |
 | `-H 'Name: value'` | Add one request header. Reserved hop-by-hop/host headers are rejected by the core. |
 | `--cacert FILE` | TLS add-on build only: trust exactly this PEM bundle instead of the default `/addons/etc/ssl/certs/ca-bundle.pem`. |
+| `-V`, `--version` | Print `curl <version> (RavenBSD)` and exit 0. |
 
 ### wget
 
@@ -43,6 +44,7 @@ fallback.
 | `-q` | Suppress the summary and diagnostics. |
 | `--max-time SECS` | Total request deadline; default 10 s. |
 | `--cacert FILE` | TLS add-on build only; same trust semantics as curl. |
+| `-V`, `--version` | Print `wget <version> (RavenBSD)` and exit 0. |
 
 `wget` always follows a bounded redirect set. The default output name is the last URL path
 segment; an empty path or trailing slash becomes `index.html`; `.` and `..` are rejected. There is
@@ -124,6 +126,15 @@ on `127.0.0.1:18081` (QEMU exposes it as `10.0.2.2`). The `fetch-http` case cove
 `insult: your code is so slow it missed the TLB shootdown`, and the base-build HTTPS
 `EUNAVAILABLE` fallback.
 
+Fixture ports are unique (K219): `fetch-http` uses `18081`, `fetch-installed` uses `18082`, and
+`eink-insult` uses `18083`. Each pre stops only its own previous pid, waits for it to exit,
+removes the pid file, starts the server, and verifies both the process and the listening socket
+with a bounded retry. If the port is still held after the pid stop, a process rooted in this
+checkout is stopped as a stale server; a listener from another checkout is a hard failure with
+the `ss` transcript, never a cross-tree kill. No fixture kills another fixture's server. The
+`/slow` endpoint sleeps 5 s while the `fetch-http` client keeps `--max-time 1`, so
+`curl-slow=1` proves the timeout with real margin instead of a fast reply under load.
+
 `build.sh https` builds the add-on tools, generates the T3 test CA/server certificate (valid
 1970-2049 for the zero guest clock) and starts a host TLS HTTP server on `24443` backed by
 Python's OpenSSL `ssl` module with the T3 cert/key. The `fetch-https` case verifies the exact
@@ -133,6 +144,22 @@ server is pinned to TLS 1.2 and sends a proper `close_notify`; this avoids the k
 TLS 1.3 ticket/CCS race. The target TLS stack and verification path are unchanged. The host
 server log is `build/fixtures/fetch/https-server.log`; QEMU serial logs are under
 `build/qtest/`.
+
+## Static shell staging
+
+`/bin` tools in the shell and release profiles are linked **static**. The login shell cannot spawn
+an interpreter image, so a dynamic PIE `/bin/curl` or `/bin/wget` fails as `command not found`
+even though the file exists. `STATIC_SHELL_PACKAGES` in `xtask/src/initfs.rs` names the packages
+built static: `ed`, `man`, `raven-date`, `raven-hostname`, `raven-ps`, `raven-rsh`,
+`raven-sleep`, `raven-svcctl`, `raven-uname`, `curl` and `wget`. Everything under `/sbin` and
+`/init` is static regardless of the list; `getty` and `login` remain dynamic because `svcd`
+starts them through the loader, not the shell.
+
+The release image stages `/bin/curl` and `/bin/wget` from those static builds; the
+`fetch-installed` qtest executes `/bin/curl --version`, `/bin/wget --version` and a real local
+HTTP fetch from the release shell. K201's test-only initfs overlay may still replace the binaries
+for `eink-insult`, but the product staging no longer depends on it. **OBSERVED** by
+`fetch-installed`.
 
 ## Limits and non-claims
 
@@ -160,3 +187,12 @@ Donor revisions: NetBSD `36eddebcc36cb0775aa2962005b9c05419a6ff01`, FreeBSD
 
 No donor code was copied or translated. `PROVENANCE.toml` is unchanged; the OpenSSL add-on's
 existing provenance import remains the only TLS source.
+
+## TLS client output and the add-on libc
+
+The TLS add-on binaries (`curl-tls`/`wget-tls`) are static programs linked against the add-on
+sysroot, which carries its own copy of `libc.a`. The fetch fixture now refreshes that copy when
+the libc sources are newer: a stale copy made the TLS client run an older fd/stdio/net stack
+than the shell and kernel. The shell-spawned add-on child can also have no usable fd 1; the TLS
+clients fall back to the base client's `DEBUG_WRITE` console sink so `-I` headers, summaries and
+errors are never lost. **OBSERVED** by `fetch-https` (K218).

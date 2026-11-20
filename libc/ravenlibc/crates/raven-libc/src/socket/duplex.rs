@@ -92,7 +92,7 @@ pub(crate) fn duplex_flags(ty: i32, nonblock: bool, cloexec: bool) -> u32 {
 }
 
 /// The target backend: one duplex endpoint handle per `AF_UNIX` socket.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Default)]
 pub(crate) struct ShellUnix;
 
 impl UnixBackend for ShellUnix {
@@ -133,9 +133,9 @@ impl UnixBackend for ShellUnix {
         Ok(())
     }
 
-    fn unix_sendmsg(
+    fn unix_sendmsg<B: raven_libc_net::NetBackend + ?Sized>(
         &self,
-        _backend: &dyn raven_libc_net::NetBackend,
+        _backend: &B,
         sock: Sock,
         data: &[u8],
         control: &[u8],
@@ -166,9 +166,9 @@ impl UnixBackend for ShellUnix {
         ret(result).map_err(|error| Errno(error.0))
     }
 
-    fn unix_recvmsg(
+    fn unix_recvmsg<B: raven_libc_net::NetBackend + ?Sized>(
         &self,
-        _backend: &dyn raven_libc_net::NetBackend,
+        _backend: &B,
         sock: Sock,
         data: &mut [u8],
         control_capacity: usize,

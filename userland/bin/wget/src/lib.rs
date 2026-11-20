@@ -92,6 +92,17 @@ impl ParseError {
 /// # Errors
 ///
 /// Returns [`ParseError`] for an unknown option, a missing value, no URL or multiple URLs.
+/// The version line printed by `-V`/`--version`.
+pub const VERSION_LINE: &str = concat!("wget ", env!("CARGO_PKG_VERSION"), " (RavenBSD)");
+
+/// Whether the argument list asks for the version line.
+#[must_use]
+pub fn version_requested<'a>(args: impl Iterator<Item = &'a str>) -> bool {
+    args.into_iter()
+        .any(|arg| arg == "-V" || arg == "--version")
+}
+
+/// Parse command-line arguments (without the program name).
 pub fn parse<'a>(args: impl Iterator<Item = &'a str>) -> Result<Options, ParseError> {
     let args: Vec<&str> = args.collect();
     let mut options = Options {

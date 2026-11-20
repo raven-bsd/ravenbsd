@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_rt::entry;
-use raven_rt::exec::{ExecRequest, MAX_EXEC_IMAGE, exec_image, exec_raw};
+use raven_rt::exec::{ExecRequest, exec_image, exec_raw};
 use raven_rt::pipe::{O_CLOEXEC, pipe, pipe2};
 use raven_rt::println;
 
@@ -54,9 +54,12 @@ fn run() -> Result<(), Errno> {
     let bad_image = exec_image(b"not an elf", b"/bad", &[b"bad"], &[], &[]) == Err(Errno::ENOEXEC);
     // The kernel rejects an oversized request before touching the live address space.
     let dummy = [0u8; 1];
+    // The libc/raw kernel bound is 16 MiB; the rt convenience wrapper keeps its own smaller
+    // self-limit, so the raw path is checked against the kernel bound here.
+    const KERNEL_MAX_EXEC_IMAGE: u64 = 16 * 1024 * 1024;
     let oversized = ExecRequest {
         image: dummy.as_ptr() as u64,
-        image_len: (MAX_EXEC_IMAGE as u64).saturating_add(1),
+        image_len: KERNEL_MAX_EXEC_IMAGE.saturating_add(1),
         path: 0,
         path_len: 0,
         argv: 0,

@@ -123,9 +123,11 @@ the audit.
 
 ### 8.1 Vendored graph
 
-The release build uses a `cargo vendor` snapshot with checksums and `source.crates-io.replace-with`,
-built `--offline`. If the snapshot is too large to commit, it is a checksummed release artifact
-referenced by the release evidence. The snapshot is unmodified upstream code; it is not a fork.
+The release build uses a `cargo vendor` snapshot with checksums and an **opt-in**
+`source.crates-io.replace-with` in `.cargo/vendor.toml`, built `--offline`. Ordinary and clean
+builds resolve from crates.io; a fresh checkout without the untracked `vendor/` tree builds
+normally. If the snapshot is too large to commit, it is a checksummed release artifact referenced
+by the release evidence. The snapshot is unmodified upstream code; it is not a fork.
 
 ### 8.2 Forks and adoptions
 
@@ -158,6 +160,58 @@ the base; CDDL only in separate add-on processes. Every copied file keeps its no
   and owner-approved; the SBOM matches the image.
 * A CVE fix that changes the image invalidates the old image hash and requires a fresh image/gate
   record; it does not reuse the previous evidence.
+
+### SC1 vendored snapshot (2026-11-19)
+
+`scripts/release-vendor.sh` creates the snapshot and its evidence. The release graph is three
+cargo workspaces — the root product, `userland/brush` and `userland/uutils` — merged into one
+`vendor/` tree:
+
+```text
+vendor/                 771 crates, 1.2 GiB, cargo checksums per crate (not tracked source)
+vendor/manifest.toml    root/brush/uutils lock sha256, 771 crates, SBOM sha256 80c2994a…
+vendor/sbom.cdx.json    CycloneDX 1.5, 771 components with SHA-256 hashes and licences
+build/release/vendor-full.tar.zst  full snapshot artifact, 131 MiB,
+                                   sha256 16a94b19c3d7ee28091f14482cc3ffea35cc3d674d56bfe0a9c167c3b2acc26d
+.cargo/vendor.toml      opt-in source.crates-io.replace-with = "vendored-sources"
+.cargo/config.toml      aliases and target cfgs only (normal builds use crates.io)
+```
+
+The 1.2 GiB snapshot is too large to track and must not receive the project SPDX headers: only
+`vendor/manifest.toml` and `vendor/sbom.cdx.json` are committed. The snapshot is a checksummed
+release artifact (`vendor-full.tar.zst`); upload it to the release evidence store and record the
+URL with the manifest checksum. Materialize it on a fresh checkout before an offline build:
+
+```sh
+timeout 360 sh scripts/release-vendor.sh
+CARGO_NET_OFFLINE=true \
+CARGO_SOURCE_CRATES_IO_REPLACE_WITH=vendored-sources \
+CARGO_SOURCE_VENDORED_SOURCES_DIRECTORY="$PWD/vendor" \
+  timeout 300 cargo --offline --config .cargo/vendor.toml \
+    xtask image --arch x86_64 --profile release --output build/release/vendor-check.img
+```
+
+Note the offline flag is a **cargo** flag (`cargo --offline xtask ...`); a trailing `--offline` is
+an xtask argument and is rejected. `xtask` spawns nested `cargo build` processes that do not
+inherit `--config`; the `CARGO_SOURCE_*` environment carries the same vendored source to them.
+
+`.cargo/audit.toml` is a symlink to the reviewed root `audit.toml`; `cargo audit` reads that path.
+`deny.toml` carries the same advisory exceptions plus the bans/licences/sources policy.
+
+### Audit exceptions
+
+All five current advisories are name/version collisions with the first-party workspace utilities
+`userland/bin/tar` and `userland/bin/time` (both `0.1.0`, `publish = false`). No upstream
+`tar-rs`/`time` crate is linked or shipped. SC2 renames the utilities to `raven-tar`/`raven-time`;
+these exceptions expire 2027-02-28. No blanket ignore.
+
+| ID | Owner | Reachability | Expiry |
+|---|---|---|---|
+| RUSTSEC-2018-0002 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
+| RUSTSEC-2021-0080 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
+| RUSTSEC-2026-0067 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
+| RUSTSEC-2026-0068 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
+| RUSTSEC-2020-0071 | kevin | first-party `time` utility; no time crate code | 2027-02-28 |
 
 ## 11. Metrics
 

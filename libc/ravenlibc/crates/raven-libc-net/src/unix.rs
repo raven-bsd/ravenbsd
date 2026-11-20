@@ -140,9 +140,9 @@ pub trait UnixBackend {
     ///
     /// The target backend parses the C `SCM_RIGHTS` records, resolves each descriptor to a kernel
     /// handle and calls the K210 control send. The fake has no hardware path and rejects control.
-    fn unix_sendmsg(
+    fn unix_sendmsg<B: NetBackend + ?Sized>(
         &self,
-        _backend: &dyn NetBackend,
+        _backend: &B,
         _sock: Sock,
         _data: &[u8],
         _control: &[u8],
@@ -156,9 +156,9 @@ pub trait UnixBackend {
     /// The target backend installs the kernel-returned handles as descriptors with `adopt`, then
     /// returns a ready-to-copy C `cmsghdr` buffer. `control_capacity` is the caller's
     /// `msg_controllen`.
-    fn unix_recvmsg(
+    fn unix_recvmsg<B: NetBackend + ?Sized>(
         &self,
-        _backend: &dyn NetBackend,
+        _backend: &B,
         _sock: Sock,
         _data: &mut [u8],
         _control_capacity: usize,
