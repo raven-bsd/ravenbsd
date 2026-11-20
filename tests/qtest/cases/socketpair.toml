@@ -11,11 +11,6 @@ initfs = "build/fixtures/socketpair/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
-# K206 is implemented over the K208 pair, but libc close(2) still goes through CLOSE (0x64),
-# whose kernel router only recognises Object::SchemeFile (kernel/src/ipc/router.rs:319-326).
-# A duplex endpoint close returns EBADF, so this case is skipped until that kernel path handles
-# Object::Duplex. Removing the skip reproduces `socketpair: close first errno=9`.
-skip = "needs the kernel CLOSE(0x64) path for Object::Duplex (router::close returns EBADF for non-SchemeFile handles); enabling this case prints 'socketpair: close first errno=9'"
 pre = ["sh tests/qtest/cases/socketpair-fixture/build.sh"]
 
 [[expect]]
@@ -26,6 +21,12 @@ regex = '^socketpair: shutdown-read ok$'
 
 [[expect]]
 regex = '^socketpair: shutdown-both ok$'
+
+[[expect]]
+regex = '^socketpair: dup ok$'
+
+[[expect]]
+regex = '^socketpair: fork ok$'
 
 [[expect]]
 regex = '^socketpair: close ok$'

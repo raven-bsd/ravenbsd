@@ -67,8 +67,10 @@ ordinary `READ`/`WRITE` syscalls move bytes or one datagram. `SHUT_RD`, `SHUT_WR
 are `0`, `1` and `2`.
 
 The kernel tracks the two side lifetimes across `HANDLE_DUP`, `HANDLE_TRANSFER`, `HANDLE_COPY`,
-`PROC_FORK`, `CLOSE` and the exec sweep. The last handle of one side gives the peer EOF and
-`EPIPE`; a duplex endpoint is also an `EVQ_CTL` source with READABLE, WRITABLE and HUP.
+`PROC_FORK`, `CLOSE` and the exec sweep. `CLOSE` (`0x64`) drops a pipe or duplex endpoint
+directly (there is no userspace server to notify), so libc `close(2)` reaches the endpoint
+`Drop`. The last handle of one side gives the peer EOF and `EPIPE`; a duplex endpoint is also an
+`EVQ_CTL` source with READABLE, WRITABLE and HUP.
 
 ## 4. Libc mapping
 
@@ -81,6 +83,7 @@ The kernel tracks the two side lifetimes across `HANDLE_DUP`, `HANDLE_TRANSFER`,
 | Data routing | `raven-libc-net/src/socket.rs` | `sendmsg`/`recvmsg`/`shutdown` call `self.unix` when `rec.domain == AF_UNIX`; otherwise the `net:` backend path is unchanged. |
 | Addresses | `raven-libc-net/src/socket.rs` | `getsockname`/`getpeername` return an unnamed `sockaddr_un` (`AF_UNIX`, empty path) for a connected pair; `getpeername` on an unconnected pair is `ENOTCONN`. |
 | Readiness | `raven-libc-platform/src/poll/poll.rs` | `poll` registers the endpoint handle with EVQ directly, so READABLE/WRITABLE/HUP work without a libc-side waiter. |
+| Lifecycle | `raven-libc-platform` fd table | `close(2)` calls `CLOSE`, `dup(2)` shares the OFD, and `fork` clones the handle table; the last live descriptor of a side produces peer EOF/`EPIPE`. |
 
 The fd table never sees two pipes pretending to be one socket: each `AF_UNIX` descriptor is one
 kernel duplex endpoint handle, and `close`/`dup`/`fork` keep their ordinary meaning.
@@ -94,9 +97,12 @@ The `socketpair` qtest (`tests/qtest/cases/socketpair.toml`) links the real `lib
 3. `shutdown(sv[0], SHUT_RD)` -> local read is `0` and the peer write is `EPIPE`.
 4. `shutdown(sv[0], SHUT_RDWR)` -> local read is `0` and local write is `EPIPE`.
 5. `SOCK_DGRAM`: two writes, two reads, boundaries intact.
+6. `dup(fd)`, close the original, then write/read and observe EOF after the peer closes.
+7. `fork`: the child writes an inherited endpoint, the parent reads, and the child exit gives
+   the parent EOF; the parent reaps the child.
 
 The K208 kernel fixture (`duplex-endpoint`) covers the raw ABI, including `dup`, `transfer`, EOF,
-`EPIPE`, all shutdown selectors, datagrams and EVQ readiness.
+`EPIPE`, all shutdown selectors, datagrams, EVQ readiness and `CLOSE`.
 
 ## 6. Out of scope
 

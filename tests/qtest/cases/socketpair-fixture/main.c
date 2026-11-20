@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
@@ -44,6 +46,84 @@ static int fail(const char *what) {
     say_errno(what, errno);
     say("socketpair: fail\n");
     return 1;
+}
+
+static int dup_pair(void) {
+    int sv[2];
+    int duplicate;
+    char buffer[8];
+    ssize_t count;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("dup socketpair");
+    }
+    duplicate = dup(sv[0]);
+    if (duplicate < 0) {
+        return fail("dup");
+    }
+    if (close(sv[0]) != 0) {
+        return fail("dup close original");
+    }
+    if (write(duplicate, "dup", 3) != 3) {
+        return fail("dup write");
+    }
+    count = read(sv[1], buffer, sizeof(buffer));
+    if (count != 3 || memcmp(buffer, "dup", 3) != 0) {
+        return fail("dup read");
+    }
+    if (close(sv[1]) != 0) {
+        return fail("dup close peer");
+    }
+    count = read(duplicate, buffer, sizeof(buffer));
+    if (count != 0) {
+        return fail("dup eof");
+    }
+    if (close(duplicate) != 0) {
+        return fail("dup close duplicate");
+    }
+    say("socketpair: dup ok\n");
+    return 0;
+}
+
+static int fork_pair(void) {
+    int sv[2];
+    pid_t child;
+    char buffer[8];
+    ssize_t count;
+    int status = 0;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("fork socketpair");
+    }
+    child = fork();
+    if (child < 0) {
+        return fail("fork");
+    }
+    if (child == 0) {
+        (void)close(sv[1]);
+        if (write(sv[0], "fork", 4) != 4) {
+            _exit(2);
+        }
+        _exit(0);
+    }
+    (void)close(sv[0]);
+    count = read(sv[1], buffer, sizeof(buffer));
+    if (count != 4 || memcmp(buffer, "fork", 4) != 0) {
+        return fail("fork read");
+    }
+    count = read(sv[1], buffer, sizeof(buffer));
+    if (count != 0) {
+        return fail("fork eof");
+    }
+    if (waitpid(child, &status, 0) != child || !WIFEXITED(status) ||
+        WEXITSTATUS(status) != 0) {
+        return fail("fork wait");
+    }
+    if (close(sv[1]) != 0) {
+        return fail("fork close");
+    }
+    say("socketpair: fork ok\n");
+    return 0;
 }
 
 static int close_pair(void) {
@@ -196,6 +276,12 @@ int main(void) {
         return 1;
     }
     if (shutdown_both_pair() != 0) {
+        return 1;
+    }
+    if (dup_pair() != 0) {
+        return 1;
+    }
+    if (fork_pair() != 0) {
         return 1;
     }
     if (close_pair() != 0) {
