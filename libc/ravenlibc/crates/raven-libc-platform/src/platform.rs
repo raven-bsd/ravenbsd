@@ -2006,6 +2006,45 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
     }
 
+    /// Take a fresh scheme reference for every inherited socket in the fork child.
+    ///
+    /// The kernel copies the handle table on fork, but the scheme server counts references per
+    /// open file. A parent `close` must therefore not be the last reference while the child still
+    /// holds the descriptor. `DUP` both gives the child its own handle and sends the server the
+    /// duplicate notification; `closef`-style last-reference release then works on both sides.
+    pub fn fork_child_inherit(&self) {
+        let mut seen = alloc::collections::BTreeSet::new();
+        let indices: Vec<u32> = self
+            .fd
+            .borrow()
+            .open_entries()
+            .into_iter()
+            .map(|(_, entry)| entry.ofd)
+            .collect();
+        for index in indices {
+            if !seen.insert(index) {
+                continue;
+            }
+            let (kind, handle) = {
+                let arena = self.ofd.borrow();
+                let Some(ofd) = arena.get(index) else {
+                    continue;
+                };
+                (ofd.kind, ofd.handle.get())
+            };
+            if kind != OfdKind::Socket || handle == Handle::NONE {
+                continue;
+            }
+            if let Ok(duplicate) = self
+                .backend
+                .dup(handle, raven_abi::types::Rights::ALL.bits())
+                && let Some(ofd) = self.ofd.borrow_mut().get_mut(index)
+            {
+                ofd.handle.set(duplicate);
+            }
+        }
+    }
+
     /// The OFD table epoch for `fd`, used in epoll cookies.
     pub(crate) fn ofd_epoch(&self, fd: i32) -> Option<u32> {
         let index = {

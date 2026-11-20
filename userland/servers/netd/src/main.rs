@@ -497,11 +497,14 @@ mod program {
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
-            self.rearm.remove(&file);
-            for event in self.events.remove(&file).unwrap_or_default() {
-                let _ = raven_rt::handle_close(event);
+            let last = self.netd.close(file).map_err(HandlerError::Errno)?;
+            if last {
+                self.rearm.remove(&file);
+                for event in self.events.remove(&file).unwrap_or_default() {
+                    let _ = raven_rt::handle_close(event);
+                }
             }
-            self.netd.close(file).map_err(HandlerError::Errno)
+            Ok(())
         }
 
         fn dup(&mut self, file: u64) -> HandlerResult<u64> {

@@ -187,3 +187,34 @@ fn closing_an_fd_releases_its_doorbell_with_handle_close() {
     );
     assert_eq!(platform.backend().open_handles(), base, "nothing leaks");
 }
+
+#[test]
+fn fork_child_duplicates_an_inherited_socket_handle() {
+    let platform = platform();
+    let file = platform.open(b"/a", 0, 0).expect("file");
+    let handle = platform.get(file).expect("file").handle();
+    let socket = platform
+        .install(handle, OfdKind::Socket, 2, None, false)
+        .expect("socket");
+    let old_socket = platform.get(socket).expect("socket").handle();
+    let old_file = platform.get(file).expect("file").handle();
+    let index = platform.get(socket).expect("socket").index();
+
+    platform.fork_child_inherit();
+
+    let new_socket = platform.get(socket).expect("socket").handle();
+    assert_ne!(
+        new_socket, old_socket,
+        "the child takes a fresh scheme handle"
+    );
+    assert_eq!(
+        platform.get(socket).expect("socket").index(),
+        index,
+        "the fd keeps the same OFD"
+    );
+    assert_eq!(
+        platform.get(file).expect("file").handle(),
+        old_file,
+        "a non-netd file keeps its inherited handle"
+    );
+}
