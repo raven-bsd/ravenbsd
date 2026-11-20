@@ -995,6 +995,7 @@ dependencies = [
  "raven-proto-svc",
  "raven-rt",
  "raven-scheme",
+ "raven-tui",
 ]
 
 [[package]]
@@ -3689,6 +3690,10 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
 ]
+
+[[package]]
+name = "raven-tui"
+version = "0.1.0"
 
 [[package]]
 name = "raven-turnstile"
