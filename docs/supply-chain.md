@@ -123,9 +123,11 @@ the audit.
 
 ### 8.1 Vendored graph
 
-The release build uses a `cargo vendor` snapshot with checksums and `source.crates-io.replace-with`,
-built `--offline`. If the snapshot is too large to commit, it is a checksummed release artifact
-referenced by the release evidence. The snapshot is unmodified upstream code; it is not a fork.
+The release build uses a `cargo vendor` snapshot with checksums and an **opt-in**
+`source.crates-io.replace-with` in `vendor-config.toml`, built `--offline`. Ordinary and clean
+builds resolve from crates.io; a fresh checkout without the untracked `vendor/` tree builds
+normally. If the snapshot is too large to commit, it is a checksummed release artifact referenced
+by the release evidence. The snapshot is unmodified upstream code; it is not a fork.
 
 ### 8.2 Forks and adoptions
 
@@ -171,7 +173,8 @@ vendor/manifest.toml    root/brush/uutils lock sha256, 771 crates, SBOM sha256 8
 vendor/sbom.cdx.json    CycloneDX 1.5, 771 components with SHA-256 hashes and licences
 build/release/vendor-full.tar.zst  full snapshot artifact, 131 MiB,
                                    sha256 16a94b19c3d7ee28091f14482cc3ffea35cc3d674d56bfe0a9c167c3b2acc26d
-.cargo/config.toml      source.crates-io.replace-with = "vendored-sources"
+vendor-config.toml      opt-in source.crates-io.replace-with = "vendored-sources"
+.cargo/config.toml      aliases and target cfgs only (normal builds use crates.io)
 ```
 
 The 1.2 GiB snapshot is too large to track and must not receive the project SPDX headers: only
@@ -181,12 +184,16 @@ URL with the manifest checksum. Materialize it on a fresh checkout before an off
 
 ```sh
 timeout 360 sh scripts/release-vendor.sh
-timeout 300 cargo --offline xtask image --arch x86_64 --profile release \
-  --output build/release/vendor-check.img
+CARGO_NET_OFFLINE=true \
+CARGO_SOURCE_CRATES_IO_REPLACE_WITH=vendored-sources \
+CARGO_SOURCE_VENDORED_SOURCES_DIRECTORY="$PWD/vendor" \
+  timeout 300 cargo --offline --config vendor-config.toml \
+    xtask image --arch x86_64 --profile release --output build/release/vendor-check.img
 ```
 
 Note the offline flag is a **cargo** flag (`cargo --offline xtask ...`); a trailing `--offline` is
-an xtask argument and is rejected.
+an xtask argument and is rejected. `xtask` spawns nested `cargo build` processes that do not
+inherit `--config`; the `CARGO_SOURCE_*` environment carries the same vendored source to them.
 
 `.cargo/audit.toml` is a symlink to the reviewed root `audit.toml`; `cargo audit` reads that path.
 `deny.toml` carries the same advisory exceptions plus the bans/licences/sources policy.

@@ -4,9 +4,10 @@
 #
 # SC1: build the vendored release graph, its CycloneDX SBOM and the manifest.
 #
-# The release image and every `--offline` build use `.cargo/config.toml`'s
-# `source.crates-io.replace-with = "vendored-sources"`. The release graph is three cargo
-# workspaces: the root product, the in-tree brush shell and the in-tree uutils slice. Each is
+# The offline release build uses the opt-in `vendor-config.toml`
+# (`source.crates-io.replace-with = "vendored-sources"`); ordinary builds resolve from crates.io.
+# The release graph is three cargo workspaces: the root product, the in-tree brush shell and the
+# in-tree uutils slice. Each is
 # vendored with its own committed Cargo.lock; the parts are merged into one `vendor/` directory
 # with cargo's per-crate `.cargo-checksum.json`. A missing crate fails the vendor command; it is
 # never fetched silently by a release build.
@@ -48,12 +49,12 @@ command -v python3 >/dev/null 2>&1 || { echo "release-vendor: python3 not found"
 
 verify_layout() {
     [ -d "$vendor_dir" ] || { echo "release-vendor: $vendor_dir is missing" >&2; exit 1; }
-    grep -q 'replace-with = "vendored-sources"' .cargo/config.toml || {
-        echo "release-vendor: .cargo/config.toml has no vendored-sources replacement" >&2
+    grep -q 'replace-with = "vendored-sources"' vendor-config.toml || {
+        echo "release-vendor: vendor-config.toml has no vendored-sources replacement" >&2
         exit 1
     }
-    grep -q "directory = \"$vendor_dir\"" .cargo/config.toml || {
-        echo "release-vendor: .cargo/config.toml does not point at $vendor_dir" >&2
+    grep -q "directory = \"$vendor_dir\"" vendor-config.toml || {
+        echo "release-vendor: vendor-config.toml does not point at $vendor_dir" >&2
         exit 1
     }
     [ -f "$sbom" ] || { echo "release-vendor: $sbom is missing" >&2; exit 1; }
