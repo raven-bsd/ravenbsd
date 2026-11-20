@@ -99,7 +99,7 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_FORK {
         return process_ctl::fork(frame);
     }
-    if number == raven_abi::syscall::Syscall::PROC_REBOOT as usize {
+    if number == raven_abi::syscall::PROC_REBOOT {
         return process_ctl::reboot(frame);
     }
     if number == raven_abi::syscall::PROC_CHROOT {
