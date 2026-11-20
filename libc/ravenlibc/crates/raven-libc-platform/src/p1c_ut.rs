@@ -74,6 +74,25 @@ fn exec_fdmap_env_carries_the_table_and_closes_cloexec() {
 }
 
 #[test]
+fn restore_fdmap_shares_one_ofd_per_handle() {
+    use crate::fd::OfdKind;
+    use crate::fd::inherit::{FdMap, FdMapEntry};
+
+    let platform = platform();
+    let mut map = FdMap::empty();
+    map.entries.push(FdMapEntry::new(0, 7, OfdKind::File, 0, 0));
+    map.entries.push(FdMapEntry::new(1, 7, OfdKind::File, 0, 0));
+    platform.restore_fdmap(&map).expect("restore");
+    let first = platform.get(0).expect("fd0");
+    let second = platform.get(1).expect("fd1");
+    assert_eq!(first.index(), second.index());
+    drop(first);
+    drop(second);
+    platform.close(0).expect("close 0");
+    assert!(platform.get(1).is_ok(), "fd1 keeps the shared handle alive");
+}
+
+#[test]
 fn hostid_and_domainname_round_trip() {
     let platform = platform();
     assert_eq!(platform.gethostid(), 1234);
