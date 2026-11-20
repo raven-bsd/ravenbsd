@@ -66,9 +66,18 @@ fn malformed_operands_are_rejected() {
     );
     assert_eq!(parse(&["-z", "127.0.0.1"]), Err(ParseError::Usage));
     assert_eq!(parse(&["127.0.0.1", "127.0.0.2"]), Err(ParseError::Usage));
-    assert_eq!(parse(&["300.0.0.1"]), Err(ParseError::BadAddress));
-    assert_eq!(parse(&["127.0.0"]), Err(ParseError::BadAddress));
-    assert_eq!(parse(&["127.0.0.1.2"]), Err(ParseError::BadAddress));
+    assert_eq!(parse(&[""]), Err(ParseError::BadHost));
+}
+
+#[test]
+fn hostnames_are_accepted() {
+    let options = parse(&["ping.test"]).expect("hostname");
+    assert_eq!(options.host, "ping.test");
+    let options = parse(&["example.com"]).expect("fqdn");
+    assert_eq!(options.host, "example.com");
+    let options = parse(&["-c", "1", "missing.test"]).expect("hostname with options");
+    assert_eq!(options.host, "missing.test");
+    assert_eq!(options.count, 1);
 }
 
 #[test]

@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Standalone fixture tool (its own workspace): copies a release initfs, adds the K203 DNS
+# fixture at /bin/ping-dns-dnsd and stages a test-only /etc/resolv.conf (nameserver 127.0.0.1).
+
+[package]
+name = "ping-dns-patch"
+version = "0.1.0"
+description = "Add the K203 DNS fixture and test resolv.conf to a release initfs."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[workspace]
+
+[dependencies]
+raven-initfs = { path = "../../../../crates/raven-initfs", features = ["std"] }

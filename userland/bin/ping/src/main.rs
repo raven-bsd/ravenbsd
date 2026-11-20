@@ -18,6 +18,7 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
     use raven_abi::types::clock;
+    use raven_http_net::{ResolveError, Resolver, SchemeResolver};
     use raven_ping::{MAX_PAYLOAD, Options};
     use raven_proto_net::socket::{MAX_ICMP_TIMEOUT_MS, Response, SocketRequest};
     use raven_rt::entry;
@@ -49,11 +50,29 @@ mod program {
     }
 
     fn run(options: &Options<'_>) -> Result<bool, String> {
-        let target =
-            raven_ping::parse_ipv4(options.host).map_err(|error| error.message().to_string())?;
+        let mut resolver = SchemeResolver::new();
+        let target = match resolver.resolve(options.host, 5000) {
+            Ok(resolved) => resolved.address.octets(),
+            Err(ResolveError::NotFound) => {
+                return Err(alloc::format!(
+                    "cannot resolve {}: unknown host",
+                    options.host
+                ));
+            }
+            Err(ResolveError::Timeout) => {
+                return Err(alloc::format!("cannot resolve {}: timed out", options.host));
+            }
+            Err(ResolveError::Io) => {
+                return Err(alloc::format!(
+                    "cannot resolve {}: resolver error",
+                    options.host
+                ));
+            }
+        };
+        let address = alloc::format!("{}.{}.{}.{}", target[0], target[1], target[2], target[3]);
         let id = echo_id()?;
         let client = Client::new();
-        let path = alloc::format!("net:icmp/{}", options.host);
+        let path = alloc::format!("net:icmp/{address}");
         let handle = client
             .open(&path, READ_WRITE)
             .map_err(|error| error.description().to_string())?;
