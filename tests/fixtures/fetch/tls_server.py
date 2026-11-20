@@ -71,6 +71,11 @@ def main():
     args = parser.parse_args()
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    # The target netd/TCP path has a known TLS 1.3 post-handshake-ticket/CCS race. Pin the test
+    # server to TLS 1.2, as the T2 s_server used -no_ticket; the client still verifies the chain
+    # and IP name and no unverified path exists.
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.maximum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(args.cert, args.key)
     server = Server(("0.0.0.0", args.port), Handler)
     server.context = context
