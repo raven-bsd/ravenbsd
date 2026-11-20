@@ -18,13 +18,19 @@ fn accept_common(fd: c_int, addr: *mut c_void, len: *mut SockLen, flags: c_int) 
         Ok(out) => out,
         Err(error) => return crate::ffi::ret::int(Err(error)),
     };
+    let _ = raven_libc_sys::sys::debug_write(b"ka:begin\n");
     match with_net(|net| net.accept(fd, out, flags)) {
         Ok((new_fd, full)) => {
             // SAFETY: the caller's in/out socklen.
             unsafe { crate::ffi::sockaddr::write_len(len, full, capacity) };
+            let _ = raven_libc_sys::sys::debug_write(b"ka:ok\n");
             new_fd
         }
-        Err(error) => crate::ffi::ret::int(Err(error)),
+        Err(error) => {
+            let _ =
+                raven_libc_sys::sys::debug_write(alloc::format!("ka:err {}\n", error.0).as_bytes());
+            crate::ffi::ret::int(Err(error))
+        }
     }
 }
 
