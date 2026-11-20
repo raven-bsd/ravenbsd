@@ -15,6 +15,7 @@ extern crate alloc;
 
 #[cfg(all(target_os = "none", not(feature = "tls")))]
 mod program {
+    use alloc::format;
     use alloc::string::String;
 
     use raven_abi::types::clock;
@@ -103,7 +104,13 @@ mod program {
         if filename == "-" {
             return write_stdout(bytes);
         }
-        let mut file = raven_rt::fs::open(filename, O_WRONLY | O_CREAT | O_TRUNC)?;
+        let resolved = raven_rt::fs::resolve(filename);
+        let full = if raven_rt::fs::has_scheme(&resolved) {
+            resolved
+        } else {
+            format!("file:{resolved}")
+        };
+        let mut file = raven_rt::fs::open(&full, O_WRONLY | O_CREAT | O_TRUNC)?;
         let mut offset = 0usize;
         while offset < bytes.len() {
             let written = file.write(bytes.get(offset..).unwrap_or(&[]))?;
