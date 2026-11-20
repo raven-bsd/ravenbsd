@@ -11,3 +11,4 @@ needs = ["netd", "vfsd", "consd", "ptyd", "ssh-hostkeys"]
 readiness = "none"
 restart = "on-failure"
 max_restarts = 3
+required = false

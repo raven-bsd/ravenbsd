@@ -24,6 +24,10 @@ stages them read-only into the release image, together with:
   `ssh-keygen -A -f` and execs `sshd`; it needs `netd`, `vfsd`, `consd` and `ptyd`;
 * `/etc/services.d/ptyd.toml` — the K196 pty scheme for interactive sessions.
 
+`sshd` and its one-shot host-key service are `required = false`: a failed SSH service is
+reported but does not turn a successful login/boot into a failed image. The release-login gate is
+therefore unaffected until the SSH primitive is complete.
+
 The root account uses the existing development password from `/etc/shadow`; the password is not
 repeated here. Do not expose this demo to an untrusted network.
 

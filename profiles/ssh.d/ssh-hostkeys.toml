@@ -12,3 +12,4 @@ needs = ["vfsd"]
 readiness = "exit"
 restart = "never"
 max_restarts = 0
+required = false
