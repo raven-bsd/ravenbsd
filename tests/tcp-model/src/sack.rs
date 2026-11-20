@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! SACK scoreboard models.
+//! SACK byte-set reference.
 //!
-//! `SackedSet` is a naive byte-set reference for RFC 6675 block/ACK arithmetic. `NetBsdScoreboard`
-//! is the model-only hole-list port of NetBSD `sys/netinet/tcp_sack.c,v 1.36` (`tcp_sack_option`,
-//! `tcp_del_sackholes`, `tcp_sack_output`). The current `raven-tcpip::SackScoreboard` is compared
-//! against the byte-set reference in the tests.
+//! `SackedSet` is a naive byte-set reference for RFC 6675 block and ACK arithmetic. The current
+//! `raven-tcpip::SackScoreboard` is compared against it; no donor scoreboard code is copied.
 
 use std::collections::BTreeSet;
-
-use crate::seq::{seq_ge, seq_gt, seq_le, seq_lt, seq_max, seq_min};
 
 /// A naive SACK reference over individual byte offsets.
 #[derive(Clone, Debug, Default)]
@@ -141,159 +137,12 @@ impl SackedSet {
             .filter(|(start, _)| self.is_lost(*start, mss, dup_threshold))
             .collect()
     }
-}
 
-/// One NetBSD SACK hole.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Hole {
-    /// First byte of the hole.
-    pub start: u32,
-    /// One past the last byte.
-    pub end: u32,
-    /// Retransmit cursor.
-    pub rxmit: u32,
-}
-
-/// The NetBSD `snd_holes` scoreboard.
-#[derive(Clone, Debug)]
-pub struct NetBsdScoreboard {
-    /// Oldest unacknowledged sequence.
-    pub snd_una: u32,
-    /// Highest sent sequence.
-    pub snd_max: u32,
-    /// Highest SACKed sequence.
-    pub snd_fack: u32,
-    /// Right edge of the last received SACK block.
-    pub rcv_lastsack: u32,
-    /// Sorted holes.
-    pub holes: Vec<Hole>,
-}
-
-impl NetBsdScoreboard {
-    /// Create an empty scoreboard.
-    #[must_use]
-    pub fn new(snd_una: u32, snd_max: u32) -> Self {
-        Self {
-            snd_una,
-            snd_max,
-            snd_fack: snd_una,
-            rcv_lastsack: snd_una,
-            holes: Vec::new(),
-        }
-    }
-
-    /// Apply one SACK block with cumulative ACK `ack`.
-    pub fn sack_block(&mut self, left: u32, right: u32, ack: u32) {
-        let acked = seq_max(ack, self.snd_una);
-        if seq_le(right, acked) || seq_gt(right, self.snd_max) || seq_ge(left, right) {
-            return;
-        }
-        if seq_ge(right, self.snd_fack) {
-            self.snd_fack = right;
-        }
-        if self.holes.is_empty() {
-            if seq_lt(acked, left) {
-                self.holes.push(Hole {
-                    start: acked,
-                    end: left,
-                    rxmit: acked,
-                });
-            }
-            self.rcv_lastsack = right;
-            return;
-        }
-        let mut index = 0usize;
-        while index < self.holes.len() {
-            let mut hole = self.holes[index];
-            if seq_le(right, hole.start) {
-                break;
-            }
-            if seq_ge(left, hole.end) {
-                index += 1;
-                continue;
-            }
-            if seq_le(left, hole.start) {
-                if seq_ge(right, hole.end) {
-                    self.holes.remove(index);
-                    break;
-                }
-                hole.start = right;
-                hole.rxmit = seq_max(hole.rxmit, hole.start);
-                self.holes[index] = hole;
-                break;
-            }
-            if seq_ge(right, hole.end) {
-                hole.end = left;
-                hole.rxmit = seq_min(hole.rxmit, hole.end);
-                self.holes[index] = hole;
-                break;
-            }
-            if seq_lt(hole.start, left) && seq_gt(hole.end, right) {
-                let split = Hole {
-                    start: right,
-                    end: hole.end,
-                    rxmit: seq_max(hole.rxmit, right),
-                };
-                hole.end = left;
-                hole.rxmit = seq_min(hole.rxmit, hole.end);
-                self.holes[index] = hole;
-                self.holes.insert(index + 1, split);
-                break;
-            }
-            index += 1;
-        }
-        if seq_lt(self.rcv_lastsack, left) {
-            self.holes.push(Hole {
-                start: self.rcv_lastsack,
-                end: left,
-                rxmit: self.rcv_lastsack,
-            });
-        }
-        if seq_lt(self.rcv_lastsack, right) {
-            self.rcv_lastsack = right;
-        }
-    }
-
-    /// Remove holes covered by a cumulative ACK.
-    pub fn del_sackholes(&mut self, ack: u32) {
-        let last = seq_max(ack, self.snd_una);
-        let index = 0usize;
-        while index < self.holes.len() {
-            let hole = self.holes[index];
-            if seq_le(hole.end, last) {
-                self.holes.remove(index);
-            } else if seq_lt(hole.start, last) {
-                self.holes[index].start = last;
-                if seq_lt(self.holes[index].rxmit, last) {
-                    self.holes[index].rxmit = last;
-                }
-                break;
-            } else {
-                break;
-            }
-        }
-        self.snd_una = last;
-    }
-
-    /// First hole with retransmit work, if any.
-    #[must_use]
-    pub fn sack_output(&self) -> Option<Hole> {
-        self.holes
-            .iter()
-            .copied()
-            .find(|hole| seq_lt(hole.rxmit, hole.end) && seq_ge(hole.rxmit, self.snd_una))
-    }
-
-    /// Check the scoreboard's structural invariants.
+    /// Structural invariants: sorted, disjoint runs and gaps inside `high_data`.
     #[must_use]
     pub fn invariants_hold(&self) -> bool {
-        self.holes.iter().all(|hole| {
-            seq_lt(hole.start, hole.end)
-                && seq_ge(hole.rxmit, hole.start)
-                && seq_le(hole.rxmit, hole.end)
-        }) && self
-            .holes
-            .windows(2)
-            .all(|pair| seq_le(pair[0].end, pair[1].start))
+        self.bytes.iter().all(|byte| *byte < self.high_data)
+            && self.runs().windows(2).all(|pair| pair[0].1 <= pair[1].0)
+            && self.gaps().windows(2).all(|pair| pair[0].1 <= pair[1].0)
     }
 }

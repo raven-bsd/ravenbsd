@@ -3,10 +3,11 @@
 
 //! Send-window model and a naive offset reference.
 //!
-//! Behaviour reference: NetBSD `sys/netinet/tcp_input.c,v 1.441` window update
-//! (`snd_una`/`snd_nxt`/`snd_wnd`/`snd_wl1`/`snd_wl2`) and
-//! `sys/netinet/tcp_output.c,v 1.222` persist (`win = 1` when `t_force` and `win == 0`).
-//! The naive reference uses monotonic byte offsets instead of serial-number comparisons.
+//! Behaviour reference: FreeBSD `sys/netinet/tcp_input.c` at
+//! `133344405f532bd54ff3629a77d4c4e062f01fdb` (BSD-3-Clause), window update block
+//! (`snd_una`/`snd_nxt`/`snd_wnd`/`snd_wl1`/`snd_wl2`), and RFC 9293 Section 3.8.4.
+//! The zero-window probe sends one byte when the window is closed. The naive reference uses
+//! monotonic byte offsets instead of serial-number comparisons; no donor code is copied here.
 
 use crate::seq::{seq_distance, seq_ge, seq_gt, seq_le, seq_lt, seq_max};
 
@@ -89,14 +90,16 @@ impl SendWindow {
         }
     }
 
-    /// Apply a window update with the NetBSD `snd_wl1`/`snd_wl2` ordering rule.
+    /// Apply a window update with the RFC 9293 / FreeBSD `snd_wl1`/`snd_wl2` ordering rule.
     /// Returns true when the update was accepted.
     pub fn update_window(&mut self, seq: u32, ack: u32, wnd: u16) -> bool {
-        let newer = seq_gt(seq, self.snd_wl1) || (seq == self.snd_wl1 && seq_le(ack, self.snd_wl2));
+        let scaled = u32::from(wnd) << self.snd_wscale.min(14);
+        let newer = seq_lt(self.snd_wl1, seq)
+            || (seq == self.snd_wl1
+                && (seq_lt(self.snd_wl2, ack) || (ack == self.snd_wl2 && scaled > self.snd_wnd)));
         if !newer {
             return false;
         }
-        let scaled = u32::from(wnd) << self.snd_wscale.min(14);
         self.snd_wnd = scaled;
         self.max_snd_wnd = self.max_snd_wnd.max(scaled);
         self.snd_wl1 = seq;
@@ -104,7 +107,7 @@ impl SendWindow {
         true
     }
 
-    /// NetBSD persist probe: with a closed window and queued data, send one byte.
+    /// Zero-window probe: with a closed window and queued data, send one byte.
     pub fn persist_probe(&mut self, queued: u32) -> bool {
         if self.snd_wnd != 0 || queued == 0 || self.inflight() >= self.cwnd {
             return false;
@@ -120,10 +123,13 @@ impl SendWindow {
         seq_ge(ack, self.snd_una) && seq_le(ack, self.snd_max)
     }
 
-    /// Whether the window update is newer than the stored one.
+    /// Whether an update with this sequence, acknowledgement and window is newer.
     #[must_use]
-    pub fn window_is_newer(&self, seq: u32, ack: u32) -> bool {
-        seq_gt(seq, self.snd_wl1) || (seq == self.snd_wl1 && !seq_lt(self.snd_wl2, ack))
+    pub fn window_is_newer(&self, seq: u32, ack: u32, wnd: u16) -> bool {
+        let scaled = u32::from(wnd) << self.snd_wscale.min(14);
+        seq_lt(self.snd_wl1, seq)
+            || (seq == self.snd_wl1
+                && (seq_lt(self.snd_wl2, ack) || (ack == self.snd_wl2 && scaled > self.snd_wnd)))
     }
 }
 
@@ -205,11 +211,13 @@ impl NaiveWindow {
 
     /// Accept a newer window update (plain offset ordering).
     pub fn update_window(&mut self, seq: u32, ack: u32, wnd: u16) -> bool {
-        let newer = seq > self.snd_wl1 || (seq == self.snd_wl1 && ack <= self.snd_wl2);
+        let scaled = u32::from(wnd) << self.snd_wscale.min(14);
+        let newer = seq > self.snd_wl1
+            || (seq == self.snd_wl1
+                && (ack > self.snd_wl2 || (ack == self.snd_wl2 && scaled > self.snd_wnd)));
         if !newer {
             return false;
         }
-        let scaled = u32::from(wnd) << self.snd_wscale.min(14);
         self.snd_wnd = scaled;
         self.max_snd_wnd = self.max_snd_wnd.max(scaled);
         self.snd_wl1 = seq;

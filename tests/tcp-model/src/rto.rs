@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! RFC 6298 / NetBSD RTO and persist model.
+//! RFC 6298 RTO and RFC 9293 zero-window probe model.
 //!
-//! Behaviour reference: NetBSD `sys/netinet/tcp_input.c,v 1.441` `tcp_xmit_timer` and
-//! `sys/netinet/tcp_timer.c,v 1.99` `tcp_timer_rexmt`/`tcp_timer_persist`; RFC 6298.
-//! `RtoModel` uses floating point for the reference, `NaiveRto` uses integer microseconds.
+//! Behaviour reference: RFC 6298 Sections 2-5 (estimator and backoff) and RFC 9293
+//! Section 3.8.6 (zero-window probing). FreeBSD `sys/netinet/tcp_timer.c` at
+//! `133344405f532bd54ff3629a77d4c4e062f01fdb` (BSD-3-Clause) was inspected for behavior only;
+//! no donor code is copied. `RtoModel` uses floating point, `NaiveRto` integer microseconds.
 
 /// Floating-point RFC 6298 estimator.
 #[derive(Clone, Copy, Debug)]
@@ -62,10 +63,10 @@ impl RtoModel {
         self.rto_ms = (self.rto_ms * 2.0).min(self.max_ms);
     }
 
-    /// NetBSD `tcp_setpersist` delay for this backoff shift, clamped to `[5 s, 60 s]`.
+    /// Zero-window probe delay for this backoff shift, clamped to `[1 s, 60 s]`.
     #[must_use]
-    pub fn backoff_delay_ms(&self, base_ms: u64) -> u64 {
-        persist_delay_ms(base_ms, self.backoff)
+    pub fn probe_delay_ms(&self, base_ms: u64) -> u64 {
+        zero_window_probe_delay_ms(base_ms, self.backoff)
     }
 }
 
@@ -131,27 +132,19 @@ impl NaiveRto {
     }
 }
 
-/// NetBSD `tcp_backoff[t_rxtshift]` multiplier.
+/// Exponential zero-window probe multiplier for `shift`.
 #[must_use]
-pub const fn backoff_multiplier(shift: u32) -> u64 {
-    match shift {
-        0 => 1,
-        1 => 2,
-        2 => 4,
-        3 => 8,
-        4 => 16,
-        5 => 32,
-        _ => 64,
-    }
+pub const fn probe_multiplier(shift: u32) -> u64 {
+    let capped = if shift > 6 { 6 } else { shift };
+    1u64 << capped
 }
 
-/// NetBSD `tcp_setpersist` interval: `base_ms * tcp_backoff[shift]`, clamped to
-/// `[TCPTV_PERSMIN, TCPTV_PERSMAX]` (5 s to 60 s).
+/// RFC 9293 zero-window probe interval: `base_ms * 2^shift`, clamped to `[1 s, 60 s]`.
 #[must_use]
-pub const fn persist_delay_ms(base_ms: u64, shift: u32) -> u64 {
-    let delay = base_ms.saturating_mul(backoff_multiplier(shift));
-    if delay < 5_000 {
-        5_000
+pub const fn zero_window_probe_delay_ms(base_ms: u64, shift: u32) -> u64 {
+    let delay = base_ms.saturating_mul(probe_multiplier(shift));
+    if delay < 1_000 {
+        1_000
     } else if delay > 60_000 {
         60_000
     } else {

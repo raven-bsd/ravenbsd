@@ -3,9 +3,9 @@
 
 //! Host-only TCP model and property tests.
 //!
-//! This crate is a test oracle, not product code. It ports the NetBSD sequence and scoreboard
-//! behaviour into a reference model, compares it with a naive independent model, and exercises
-//! the current `raven-tcpip` public surface. Divergences are reported, not patched here.
+//! This crate is a test oracle, not product code. It ports the permissive FreeBSD
+//! `sys/netinet/tcp_seq.h` model and re-derives the state, window, RTO and SACK references from
+//! RFC 9293, 6298 and 6675. Divergences are reported, not patched here.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), allow(dead_code))]

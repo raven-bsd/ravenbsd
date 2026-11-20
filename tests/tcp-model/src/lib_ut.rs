@@ -13,8 +13,8 @@ use raven_tcpip_sim::{Endpoint, Link, LinkConfig};
 
 use crate::congestion;
 use crate::rng::Rng;
-use crate::rto::{NaiveRto, RtoModel, persist_delay_ms};
-use crate::sack::{NetBsdScoreboard, SackedSet};
+use crate::rto::{NaiveRto, RtoModel, zero_window_probe_delay_ms};
+use crate::sack::SackedSet;
 use crate::seq::{
     seq_distance, seq_ge, seq_gt, seq_le, seq_lt, seq_max, seq_min, seq_sub, tcp_rcvseqinit,
     tcp_sendseqinit,
@@ -26,6 +26,36 @@ const A: [u8; 4] = [192, 0, 2, 1];
 const B: [u8; 4] = [192, 0, 2, 2];
 const AMAC: [u8; 6] = [0x02, 0, 0, 0, 0, 0x01];
 const BMAC: [u8; 6] = [0x02, 0, 0, 0, 0, 0x02];
+
+#[test]
+fn model_sources_have_no_forbidden_donor_provenance() {
+    let needle_a = ["Ne", "tBSD"].concat().to_ascii_lowercase();
+    let needle_b = ["N", "R", "L"].concat().to_ascii_lowercase();
+    let needle_c = ["tcp_", "sack.c"].concat().to_ascii_lowercase();
+    let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut hits = Vec::new();
+    for entry in std::fs::read_dir(&source_dir).expect("read src") {
+        let path = entry.expect("entry").path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).expect("read source");
+        let lower = text.to_ascii_lowercase();
+        if lower.contains(&needle_a) || lower.contains(&needle_b) || lower.contains(&needle_c) {
+            hits.push(
+                path.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+    }
+    hits.sort();
+    assert!(
+        hits.is_empty(),
+        "forbidden no-copy donor provenance remains in model sources: {hits:?}"
+    );
+}
 
 fn signed_delta(a: u32, b: u32) -> i32 {
     let raw = i64::from(a) - i64::from(b);
@@ -51,7 +81,7 @@ fn sequence_arithmetic_matches_the_naive_reference_for_10k_pairs() {
         assert_eq!(seq_gt(a, b), delta > 0);
         assert_eq!(seq_ge(a, b), delta >= 0);
         assert_eq!(seq_distance(a, b), b.wrapping_sub(a));
-        assert_eq!(seq_sub(a, b), i64::from(a.wrapping_sub(b)));
+        assert_eq!(seq_sub(a, b), delta);
         let minimum = if delta < 0 { a } else { b };
         let maximum = if delta > 0 { a } else { b };
         assert_eq!(seq_min(a, b), minimum);
@@ -68,7 +98,8 @@ fn sequence_arithmetic_matches_the_naive_reference_for_10k_pairs() {
     assert_eq!(send.snd_una, 0x8000_0100);
     assert_eq!(send.snd_nxt, send.snd_una);
     assert_eq!(send.snd_max, send.snd_una);
-    assert_eq!(send.snd_fack, send.snd_una);
+    assert_eq!(send.snd_up, send.snd_una);
+    assert_eq!(send.snd_recover, send.snd_una);
     assert_eq!(tcp_rcvseqinit(0xffff_ffff), (0, 0));
 }
 
@@ -125,10 +156,6 @@ fn window_model_matches_the_naive_offset_reference_for_10k_operations() {
             }
             _ => {
                 assert!(model.valid_ack(model.snd_una));
-                assert!(
-                    model.window_is_newer(model.snd_wl1, model.snd_wl2),
-                    "the stored window must be current at step {step}"
-                );
             }
         }
     }
@@ -136,6 +163,39 @@ fn window_model_matches_the_naive_offset_reference_for_10k_operations() {
         model.snd_una,
         iss.wrapping_add(seq_distance(iss, model.snd_una))
     );
+}
+
+#[test]
+fn window_update_accepts_a_newer_ack_and_rejects_a_smaller_window() {
+    let mut model = SendWindow::new(1_000, 1_200, 4_800);
+    model.snd_wnd = 2_000;
+    model.snd_wl1 = 100;
+    model.snd_wl2 = 90;
+
+    assert!(
+        model.update_window(100, 95, 2_000),
+        "same SEQ with a newer ACK must update the window"
+    );
+    assert_eq!(model.snd_wl2, 95);
+
+    assert!(
+        !model.update_window(100, 95, 1_000),
+        "same SEQ and ACK with a smaller window must be ignored"
+    );
+    assert_eq!(model.snd_wnd, 2_000);
+
+    assert!(
+        model.update_window(100, 95, 2_500),
+        "same SEQ and ACK with a larger window must update"
+    );
+    assert_eq!(model.snd_wnd, 2_500);
+
+    assert!(
+        !model.update_window(99, 200, 3_000),
+        "an older SEQ must not update the window"
+    );
+    assert!(!model.window_is_newer(100, 95, 2_500));
+    assert!(model.window_is_newer(100, 95, 2_600));
 }
 
 #[test]
@@ -198,9 +258,10 @@ fn rto_model_and_current_stack_respect_bounds_for_10k_operations() {
     let mut model = RtoModel::new(1_000.0, 200.0, 60_000.0);
     let mut naive = NaiveRto::new(1_000, 200, 60_000);
     let mut stack = RtoEstimator::new(1_000, 200, 60_000, 1);
-    assert_eq!(persist_delay_ms(1_000, 0), 5_000);
-    assert_eq!(persist_delay_ms(1_000, 3), 8_000);
-    assert_eq!(persist_delay_ms(1_000, 6), 60_000);
+    assert_eq!(zero_window_probe_delay_ms(1_000, 0), 1_000);
+    assert_eq!(zero_window_probe_delay_ms(1_000, 3), 8_000);
+    assert_eq!(zero_window_probe_delay_ms(1_000, 6), 60_000);
+    assert_eq!(zero_window_probe_delay_ms(500, 0), 1_000);
     let mut divergences = 0usize;
     let mut first = String::new();
     for step in 0..10_000 {
@@ -211,9 +272,9 @@ fn rto_model_and_current_stack_respect_bounds_for_10k_operations() {
             assert!(model.rto_ms <= 60_000.0);
             assert!((200..=60_000).contains(&stack.rto_ms()));
             let base = model.rto_ms as u64;
-            let delay = model.backoff_delay_ms(base);
-            assert_eq!(delay, persist_delay_ms(base, model.backoff));
-            assert!((5_000..=60_000).contains(&delay));
+            let delay = model.probe_delay_ms(base);
+            assert_eq!(delay, zero_window_probe_delay_ms(base, model.backoff));
+            assert!((1_000..=60_000).contains(&delay));
         } else {
             let rtt = u64::from(rng.range(1, 500));
             model.sample(rtt as f64);
@@ -254,6 +315,10 @@ fn sack_scoreboard_matches_the_byte_set_reference_and_reports_divergences() {
         let end = start + i64::from(rng.range(1, 80));
         scoreboard.insert_block(start, end);
         reference.insert(start, end);
+        assert!(
+            reference.invariants_hold(),
+            "SACK reference invariant at step {step}"
+        );
         if scoreboard.sacked != reference.runs() {
             structural = structural.saturating_add(1);
             if first.is_empty() {
@@ -310,29 +375,6 @@ fn sack_scoreboard_matches_the_byte_set_reference_and_reports_divergences() {
         structural, 0,
         "SACK ranges/gaps must match the byte-set reference: {first}"
     );
-}
-
-#[test]
-fn netbsd_sack_hole_port_holds_its_invariants_for_10k_operations() {
-    let mut rng = Rng::new(0x1000_0006);
-    let mut scoreboard = NetBsdScoreboard::new(0, 512);
-    for step in 0..10_000 {
-        let ack = rng.below(200);
-        let left = rng.range(0, 400);
-        let right = left.saturating_add(rng.range(1, 100));
-        scoreboard.sack_block(left, right, ack);
-        if step % 7 == 0 {
-            scoreboard.del_sackholes(ack);
-        }
-        assert!(
-            scoreboard.invariants_hold(),
-            "NetBSD hole invariant at step {step}: {scoreboard:?}"
-        );
-        if let Some(hole) = scoreboard.sack_output() {
-            assert!(hole.start < hole.end);
-            assert!(hole.rxmit <= hole.end);
-        }
-    }
 }
 
 #[test]
@@ -427,7 +469,7 @@ fn k252_zero_window_persist_against_the_current_stack() {
     client.poll(Instant::from_millis(1_410));
     assert_eq!(drain(&mut client, connected), data);
     println!(
-        "tcp-model: K252 zero-window persist PASS probe=1 delivered=44 observed_first_probe<=1200ms netbsd_tcp_setpersist_min=5000ms"
+        "tcp-model: K252 zero-window persist PASS probe=1 delivered=44 observed_first_probe<=1200ms model_min=1000ms"
     );
 }
 
@@ -442,7 +484,7 @@ fn k255_sack_cumulative_ack_and_range_cap_edges_are_reported() {
     cumulative.ack(400);
     assert!(cumulative.runs().is_empty());
     println!(
-        "tcp-model: K255 SACK cumulative ACK 400: sacked={:?} gaps={:?}; NetBSD tcp_del_sackholes would trim the below-ACK range (naive after ack {:?})",
+        "tcp-model: K255 SACK cumulative ACK 400: sacked={:?} gaps={:?}; a cumulative-ACK trim would remove the below-ACK range (naive after ack {:?})",
         scoreboard.sacked,
         scoreboard.gaps(),
         cumulative.runs()

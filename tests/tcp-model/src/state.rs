@@ -1,14 +1,41 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+// Copyright (c) 1982, 1986, 1993
+//	The Regents of the University of California.  All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+// 3. Neither the name of the University nor the names of its contributors
+//    may be used to endorse or promote products derived from this software
+//    without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+// OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+// OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+// SUCH DAMAGE.
 
 //! TCP state machine model.
 //!
-//! States and output flags are the literal NetBSD `sys/netinet/tcp_fsm.h,v 1.16` table; event
-//! transitions are the NetBSD `sys/netinet/tcp_input.c,v 1.441` / `tcp_subr.c,v 1.300` cases.
-//! The model match and the table reference are written independently; the property test compares
-//! them over randomized event sequences.
+//! State names and output flags are a model-only port of FreeBSD
+//! `sys/netinet/tcp_fsm.h` at `133344405f532bd54ff3629a77d4c4e062f01fdb`
+//! (BSD-3-Clause). The event transitions are clean-room from RFC 9293 Figure 6 and the
+//! per-state processing rules. The model match and the table reference are written
+//! independently; the property test compares them over randomized event sequences.
 
-/// The eleven RFC 9293 / NetBSD `tcp_fsm.h` states.
+/// The eleven RFC 9293 states.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum State {
     /// Closed.
@@ -96,7 +123,7 @@ const TH_SYN: u8 = 0x02;
 const TH_RST: u8 = 0x04;
 const TH_ACK: u8 = 0x10;
 
-/// The NetBSD `tcp_outflags` table.
+/// The FreeBSD `tcp_outflags` table, keyed by state.
 #[must_use]
 pub const fn output_flags(state: State) -> u8 {
     match state {

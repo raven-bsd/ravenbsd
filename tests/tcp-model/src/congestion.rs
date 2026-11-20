@@ -3,9 +3,8 @@
 
 //! Property checks for the full feature set: CUBIC, RACK, ECN and PLPMTUD.
 //!
-//! These are RFC-based invariants over the current `raven-tcpip` public types. NetBSD does not own
-//! CUBIC/RACK/PLPMTUD, so this is a first-party test extension; the Linux donor has no `net/` in
-//! the sparse checkout and is outcome-only. SACK itself is exercised by the SACK module.
+//! These are RFC-based invariants over the current `raven-tcpip` public types (RFC 8312, 8985,
+//! 3168 and 8899/9002). No donor code is copied; SACK is exercised by the SACK module.
 
 use raven_tcpip::{
     CcContext, CongestionControl, Cubic, Duration, Ecn, IPV4_FLOOR, LossKind, Plpmtud, Rack,
