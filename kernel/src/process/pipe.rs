@@ -77,6 +77,18 @@ impl PipeEnd {
         self.cloexec
     }
 
+    /// True when a read end has data or EOF.
+    pub fn readable(&self) -> bool {
+        let state = self.pipe.state.lock();
+        !state.ring.is_empty() || state.write_ends == 0
+    }
+
+    /// True when a write end has space or no reader (EPIPE).
+    pub fn writable(&self) -> bool {
+        let state = self.pipe.state.lock();
+        state.ring.free() != 0 || state.read_ends == 0
+    }
+
     /// Wake and remove every pipe waiter owned by `process_id`.
     ///
     /// A thread blocked in `read`/`write` holds this endpoint's `Arc` and a wait-queue entry;
@@ -124,6 +136,7 @@ impl Drop for PipeEnd {
         if wake_readers {
             self.pipe.readers.wake_all();
         }
+        crate::event::notify_all();
     }
 }
 
@@ -228,6 +241,7 @@ pub fn read(end: &Arc<PipeEnd>, destination: UserSlice) -> Result<usize, Errno> 
         state.ring.consume(copied);
         drop(state);
         end.pipe.writers.wake_all();
+        crate::event::notify_all();
         return Ok(copied);
     }
 }
@@ -299,6 +313,7 @@ pub fn write(end: &Arc<PipeEnd>, source: UserSlice) -> Result<usize, Errno> {
         state.ring.produce(copied);
         drop(state);
         end.pipe.readers.wake_all();
+        crate::event::notify_all();
         done = done.saturating_add(copied);
         if done >= total {
             return Ok(done);

@@ -317,6 +317,7 @@ fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result
         Object::Timer(_) | Object::UserEvent(_) | Object::Process(_) => Ok(()),
         Object::Irq(_) => Ok(()),
         Object::Duplex(_) => Ok(()),
+        Object::Pipe(_) => Ok(()),
         #[cfg(target_arch = "x86_64")]
         Object::SchemeFile(_) | Object::SchemeServer(_) => Ok(()),
         _ => Err(Errno::EBADF),
@@ -333,6 +334,15 @@ fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
             event::SIGNALED
         }
         Ok(Object::Duplex(end)) => end.readiness(),
+        Ok(Object::Pipe(end)) => {
+            if end.is_reader() {
+                if end.readable() { event::READABLE } else { 0 }
+            } else if end.writable() {
+                event::WRITABLE
+            } else {
+                0
+            }
+        }
         #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeServer(server)) if !server.is_live() => event::HUP,
         #[cfg(target_arch = "x86_64")]
