@@ -178,3 +178,12 @@ Donor revisions: NetBSD `36eddebcc36cb0775aa2962005b9c05419a6ff01`, FreeBSD
 
 No donor code was copied or translated. `PROVENANCE.toml` is unchanged; the OpenSSL add-on's
 existing provenance import remains the only TLS source.
+
+## TLS client output and the add-on libc
+
+The TLS add-on binaries (`curl-tls`/`wget-tls`) are static programs linked against the add-on
+sysroot, which carries its own copy of `libc.a`. The fetch fixture now refreshes that copy when
+the libc sources are newer: a stale copy made the TLS client run an older fd/stdio/net stack
+than the shell and kernel. The shell-spawned add-on child can also have no usable fd 1; the TLS
+clients fall back to the base client's `DEBUG_WRITE` console sink so `-I` headers, summaries and
+errors are never lost. **OBSERVED** by `fetch-https` (K218).
