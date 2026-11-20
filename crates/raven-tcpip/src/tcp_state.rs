@@ -548,6 +548,19 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// Pretend the peer advertised `window`, modelling a stale or lost window update.
+    #[cfg(any(test, feature = "testutil"))]
+    pub fn test_set_tcp_snd_wnd(&mut self, socket: SocketId, window: u32) -> bool {
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            connection.snd_wnd = window;
+            true
+        } else {
+            false
+        }
+    }
+
     /// The local port and remote endpoint for a TCP socket (host tests).
     #[cfg(any(test, feature = "testutil"))]
     #[must_use]

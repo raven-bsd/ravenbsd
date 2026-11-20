@@ -159,6 +159,25 @@ impl<D: Device> Stack<D> {
     /// Transmit as much queued data as the peer window, SWS and Nagle allow.
     #[allow(clippy::type_complexity)]
     pub(crate) fn tcp_try_send(&mut self, socket: SocketId) -> Result<(), Errno> {
+        self.tcp_try_send_inner(socket, false).map(|_| ())
+    }
+
+    /// Send a one-byte persist probe past a closed peer window.
+    ///
+    /// A bare ACK does not make the peer answer, so a stale zero window would never reopen.
+    /// NetBSD `tcp_output` handles the persist timer by treating the window as one byte
+    /// (`win = 1`) and running the normal send path: one byte is transmitted, `snd_nxt` advances
+    /// and the retransmission timer covers the probe if the peer drops it. The peer's answer
+    /// carries its current window and the rest of the queued data is flushed by the same poll.
+    ///
+    /// Returns whether a byte was actually transmitted; congestion control can still block it.
+    pub(crate) fn tcp_send_zero_window_probe(&mut self, socket: SocketId) -> Result<bool, Errno> {
+        self.tcp_try_send_inner(socket, true)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn tcp_try_send_inner(&mut self, socket: SocketId, mut probe: bool) -> Result<bool, Errno> {
+        let mut sent_any = false;
         loop {
             let snapshot = {
                 let record = self.sockets.record_mut(socket)?;
@@ -172,7 +191,7 @@ impl<D: Device> Stack<D> {
                         | TcpState::FinWait1
                         | TcpState::FinWait2
                 ) {
-                    return Ok(());
+                    return Ok(sent_any);
                 }
                 let inflight = connection.snd_nxt.wrapping_sub(connection.snd_una);
                 let queued = u32::try_from(record.tx.len()).unwrap_or(u32::MAX);
@@ -192,15 +211,44 @@ impl<D: Device> Stack<D> {
                         inflight
                     };
                     if window <= inflight || cwnd <= in_network {
-                        if window <= inflight && connection.zero_window_deadline.is_none() {
-                            connection.zero_window_deadline = Some(Instant::from_millis(
-                                self.now.as_millis().saturating_add(
-                                    i64::try_from(connection.zero_window_backoff_ms)
-                                        .unwrap_or(i64::MAX),
+                        // The persist timer is allowed to push exactly one byte past a closed
+                        // window; congestion control still has to have room for it.
+                        let probe_now = probe && window == 0 && cwnd > in_network && unsent > 0;
+                        if !probe_now {
+                            if window <= inflight && connection.zero_window_deadline.is_none() {
+                                connection.zero_window_deadline = Some(Instant::from_millis(
+                                    self.now.as_millis().saturating_add(
+                                        i64::try_from(connection.zero_window_backoff_ms)
+                                            .unwrap_or(i64::MAX),
+                                    ),
+                                ));
+                            }
+                            None
+                        } else {
+                            let start = usize::try_from(inflight).unwrap_or(usize::MAX);
+                            let payload = queue_range(&record.tx, start, 1);
+                            let push = start + payload.len() == record.tx.len();
+                            Some(Some((
+                                payload,
+                                connection.local,
+                                connection.remote,
+                                connection.local_port,
+                                connection.snd_nxt,
+                                connection.rcv_nxt,
+                                {
+                                    let free = record.rx_cap.saturating_sub(record.rx.len());
+                                    u16::try_from(
+                                        (free >> connection.rcv_wscale).min(usize::from(u16::MAX)),
+                                    )
+                                    .unwrap_or(u16::MAX)
+                                },
+                                push,
+                                crate::tcp_state::timestamp_options_public(
+                                    connection,
+                                    u32::try_from(self.now.as_millis()).unwrap_or(0),
                                 ),
-                            ));
+                            )))
                         }
-                        None
                     } else {
                         let cwnd_room = cwnd - in_network;
                         let usable = (window - inflight).min(unsent).min(cwnd_room);
@@ -295,6 +343,7 @@ impl<D: Device> Stack<D> {
             self.send_tcp_packet(
                 local, remote.0, local_port, remote.1, flags, seq, ack, window, &payload, false,
             )?;
+            sent_any = true;
             let record = self.sockets.record_mut(socket)?;
             if let Kind::Tcp(connection) = &mut record.kind {
                 connection.snd_nxt = connection
@@ -332,8 +381,11 @@ impl<D: Device> Stack<D> {
                         )));
                 }
             }
+            // The persist timer sends exactly one byte; the retransmission timer covers it and
+            // the rest waits for the peer's window update.
+            probe = false;
         }
-        Ok(())
+        Ok(sent_any)
     }
 
     fn tcp_send_deferred_fin(&mut self, socket: SocketId) -> Result<(), Errno> {
@@ -697,26 +749,46 @@ impl<D: Device> Stack<D> {
 
     /// Zero-window probe timer.
     pub(crate) fn tcp_zero_window_timer(&mut self, socket: SocketId, now: Instant) -> bool {
-        let probe = {
+        let (due, unsent) = {
             let Ok(record) = self.sockets.record(socket) else {
                 return false;
             };
             let Kind::Tcp(connection) = &record.kind else {
                 return false;
             };
-            connection
-                .zero_window_deadline
-                .is_some_and(|deadline| deadline <= now)
-                && record.tx.len()
+            (
+                connection
+                    .zero_window_deadline
+                    .is_some_and(|deadline| deadline <= now),
+                record.tx.len()
                     > usize::try_from(connection.snd_nxt.wrapping_sub(connection.snd_una))
-                        .unwrap_or(0)
+                        .unwrap_or(0),
+            )
         };
-        if !probe {
+        if !due {
+            return false;
+        }
+        if !unsent {
+            // The write drained before the timer fired. Clear the expired deadline so
+            // `next_poll_delay` stops asking for an immediate poll.
+            if let Ok(record) = self.sockets.record_mut(socket)
+                && let Kind::Tcp(connection) = &mut record.kind
+            {
+                connection.zero_window_deadline = None;
+            }
             return false;
         }
         self.counters.zwprobe_sent = self.counters.zwprobe_sent.wrapping_add(1);
         self.counters.zwprobe_fires = self.counters.zwprobe_fires.wrapping_add(1);
-        let _ = self.send_ack_for(socket);
+        // NetBSD `tcp_output` forces one byte of output while the persist timer is armed
+        // (`win = 1`). A bare ACK is not answered by the peer, so the window would stay closed.
+        // If congestion control or the device blocks the byte, fall back to the probe ACK.
+        match self.tcp_send_zero_window_probe(socket) {
+            Ok(true) => {}
+            _ => {
+                let _ = self.send_ack_for(socket);
+            }
+        }
         if let Ok(record) = self.sockets.record_mut(socket)
             && let Kind::Tcp(connection) = &mut record.kind
         {
