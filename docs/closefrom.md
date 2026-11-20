@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # closefrom and close_range
 
 K214 fixes the `closefrom(3)` / `close_range(3, INT_MAX, 0)` path that OpenSSH 10.6 uses when
