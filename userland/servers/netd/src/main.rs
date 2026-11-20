@@ -313,7 +313,15 @@ mod program {
                 }
                 for file in files {
                     if let Some(event) = self.events.get(&file) {
-                        let _ = event_signal(*event, 1);
+                        let signal = event_signal(*event, 1);
+                        if matches!(ready.event, raven_netcore::Event::Accepted { .. }) {
+                            raven_rt::println!(
+                                "netd: accepted signal file={} event={} ok={}",
+                                file,
+                                event.0,
+                                signal.is_ok()
+                            );
+                        }
                     } else if matches!(ready.event, raven_netcore::Event::Accepted { .. }) {
                         raven_rt::println!("netd: accepted event without a registered file");
                     }
