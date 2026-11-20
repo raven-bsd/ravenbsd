@@ -1,0 +1,200 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K201: the E-Ink content fetch proof. A deterministic host server (127.0.0.1:18081, exposed to
+# the guest as 10.0.2.2 through QEMU user networking) serves one fixed insult line. The guest
+# fetches it with curl and wget, writes the same bytes with -o/-O, sees a 404 and curl -f
+# failure, and follows the redirect. No external network and no panel/hardware claim.
+#
+# K199 stages the clients at /bin/curl and /bin/wget, but as dynamic PIE; the login shell cannot
+# spawn an interpreter image. The pre overlays statically linked builds of the same clients into
+# the test initfs (the K199 fetch gate uses the same pattern). The production staging finding is
+# outside K201's Owns.
+
+name = "eink-insult"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 280
+pre = ["sh tests/fixtures/insult-server/build.sh"]
+initfs = "build/fixtures/insult-server/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^Your shell is so slow it still waits for the loader\.$'
+
+[[expect]]
+regex = '^Your shell is so slow it still waits for the loader\.$'
+
+[[expect]]
+regex = '^Your shell is so slow it still waits for the loader\.$'
+
+[[expect]]
+regex = '^cmp-ok$'
+
+[[expect]]
+regex = '^HTTP/1\.1 404 Not Found'
+
+[[expect]]
+regex = '^curl-missing:0$'
+
+[[expect]]
+regex = '^curl-f:22$'
+
+[[expect]]
+regex = '^Your shell is so slow it still waits for the loader\.$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found|insult-server: failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "curl -s http://10.0.2.2:18081/insult\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Your shell is so slow it still waits for the loader\.$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "curl -s -o /tmp/insult-curl.txt http://10.0.2.2:18081/insult\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /tmp/insult-curl.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Your shell is so slow it still waits for the loader\.$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "wget -q -O /tmp/insult-wget.txt http://10.0.2.2:18081/insult\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /tmp/insult-wget.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Your shell is so slow it still waits for the loader\.$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "curl_bytes=$(wc -c < /tmp/insult-curl.txt); wget_bytes=$(wc -c < /tmp/insult-wget.txt); [ \"$curl_bytes\" = \"$wget_bytes\" ] && echo cmp-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cmp-ok$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "curl -s -I http://10.0.2.2:18081/missing; echo curl-missing:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^HTTP/1\.1 404 Not Found'
+timeout_secs = 10
+
+[[step]]
+wait = '^curl-missing:0$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "curl -s -f http://10.0.2.2:18081/missing; echo curl-f:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl-f:22$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "curl -s -L http://10.0.2.2:18081/redirect\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Your shell is so slow it still waits for the loader\.$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
