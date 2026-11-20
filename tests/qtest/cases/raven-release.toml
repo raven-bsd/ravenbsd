@@ -38,7 +38,7 @@ send = "raven\n"
 delay_ms = 100
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 300
 
 [[step]]
@@ -50,7 +50,7 @@ wait = '^raven-present$'
 timeout_secs = 30
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
@@ -62,7 +62,7 @@ wait = '^\{"schema":1,"kind":"net\.if","name":"[^"]+","state":"up","address":"10
 timeout_secs = 30
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
@@ -74,7 +74,7 @@ wait = '^default\s+10\.0\.2\.2\s+\S+'
 timeout_secs = 30
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
@@ -86,7 +86,7 @@ wait = '^net-status-ok$'
 timeout_secs = 30
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
@@ -98,7 +98,7 @@ wait = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
 timeout_secs = 30
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
@@ -106,7 +106,7 @@ send = "export NO_COLOR=1 RAVEN_TUI=1\n"
 delay_ms = 100
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
@@ -134,7 +134,7 @@ wait = '^raven config: dry-run plan=/etc/raven/conf\.d/network\.toml file=presen
 timeout_secs = 30
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
@@ -162,7 +162,7 @@ wait = '^raven config: saved /etc/raven/conf\.d/network\.toml$'
 timeout_secs = 30
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
@@ -178,7 +178,7 @@ wait = '^mode = "dhcp"$'
 timeout_secs = 30
 
 [[step]]
-wait = '^(raven#|root@raven:/#) $'
+wait = '^\s*(raven#|root@raven:/#) $'
 timeout_secs = 30
 
 [[step]]
