@@ -15,9 +15,9 @@ use crate::{FdInfo, Sock, SocketFds};
 
 /// The C55 fd-table adapter.
 ///
-/// C55 has no "install a pending OFD" primitive, so a lazy-mode `socket()` cannot be installed
-/// through this adapter yet; `install(None)` reports `ENOSYS`. Attached sockets work through the
-/// ordinary `Platform::install`. This is a QUESTION for C55/C64, recorded in the report.
+/// A lazy-mode `socket()` installs a pending socket OFD through
+/// [`raven_libc_platform::Platform::install_pending`]; `bind`/`connect`/`listen` later attaches
+/// the scheme handle through [`raven_libc_platform::Platform::attach_handle`].
 pub struct FdGlue<'a, B: SysBackend, L: Lock> {
     platform: &'a Platform<B, L>,
 }
@@ -32,25 +32,45 @@ impl<'a, B: SysBackend, L: Lock> FdGlue<'a, B, L> {
 
 impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
     fn install(&self, s: Option<Sock>, cloexec: bool, nonblock: bool) -> Result<i32, Errno> {
-        let sock = s.ok_or(Errno::ENOSYS)?;
         let status = 2u32 | if nonblock { O_NONBLOCK as u32 } else { 0 };
-        self.platform
-            .install(Handle(sock.0), OfdKind::Socket, status, None, cloexec)
-            .map_err(|error| Errno(error.0))
+        match s {
+            Some(sock) => {
+                let fd = self
+                    .platform
+                    .install(Handle(sock.0), OfdKind::Socket, status, None, cloexec)
+                    .map_err(|error| Errno(error.0))?;
+                if let Ok(info) = self.resolve(fd) {
+                    self.event(info.ofd, sock);
+                }
+                Ok(fd)
+            }
+            None => self
+                .platform
+                .install_pending(OfdKind::Socket, status, None, cloexec)
+                .map_err(|error| Errno(error.0)),
+        }
     }
 
-    fn attach(&self, _ofd: u32, _s: Sock) {
-        // C55 has no operation that replaces the handle of an OFD; see the type comment.
+    fn attach(&self, ofd: u32, s: Sock) {
+        // The event is attached after bind/listen/connect: the scheme rejects `Call::Event`
+        // before the socket exists, and a second attach would replace the event the fd polls.
+        let _ = self.platform.attach_handle(ofd, Handle(s.0));
     }
 
+    fn event(&self, ofd: u32, s: Sock) {
+        if let Ok(event) = crate::backend_platform::event_handle(self.platform.backend(), s) {
+            let _ = self.platform.set_ofd_event(ofd, event);
+        }
+    }
     fn resolve(&self, fd: i32) -> Result<FdInfo, Errno> {
         let reference = self.platform.get(fd).map_err(|error| Errno(error.0))?;
         if reference.kind() != OfdKind::Socket {
             return Err(Errno::ENOTSOCK);
         }
+        let handle = reference.handle();
         Ok(FdInfo {
             ofd: reference.index(),
-            sock: Some(Sock(reference.handle().0)),
+            sock: (handle != Handle::NONE).then_some(Sock(handle.0)),
             nonblock: reference.status() & O_NONBLOCK as u32 != 0,
         })
     }
