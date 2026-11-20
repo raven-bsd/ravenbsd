@@ -133,6 +133,11 @@ impl Ofd {
         self.event.get() != Handle::NONE
     }
 
+    /// Replace the one-shot readiness replay mask (exec restore uses this).
+    pub fn set_poll_rearm(&self, events: u32) {
+        self.rearm.store(events, Ordering::Relaxed);
+    }
+
     /// Whether the access mode includes read.
     pub fn readable(&self) -> bool {
         self.status.load(Ordering::Relaxed) & 0o3 != 0o1

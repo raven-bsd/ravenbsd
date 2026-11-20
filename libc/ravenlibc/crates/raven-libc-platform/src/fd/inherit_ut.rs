@@ -10,14 +10,16 @@ use raven_abi::errno::Errno;
 use crate::Platform;
 use crate::backend::FakeSys;
 use crate::fd::inherit::{
-    ENTRY_LEN, FDMAP_MAGIC, FDMAP_VERSION, FdMap, FdMapEntry, HEADER_LEN, NO_PATH, entry_handle,
-    transferable,
+    ENTRY_LEN_V2, FDMAP_MAGIC, FDMAP_VERSION, FDMAP_VERSION_V1, FdMap, FdMapEntry, HEADER_LEN,
+    NO_PATH, entry_handle, transferable,
 };
 use crate::fd::ofd::OfdKind;
 
 fn sample() -> FdMap {
     let mut first = FdMapEntry::new(0, 0x10, OfdKind::File, 0, 0);
     first.path = Some(b"/tmp/a".to_vec());
+    first.event = 0x30;
+    first.readiness = 5;
     let second = FdMapEntry::new(3, 0x11, OfdKind::Dir, 1, 2);
     FdMap {
         entries: vec![first, second],
@@ -49,7 +51,7 @@ fn string_table_is_shared() {
     map.entries[1].path = Some(b"/tmp/a".to_vec());
     let bytes = map.encode().expect("encode");
     // Header + two entries + one NUL-terminated string.
-    assert_eq!(bytes.len(), HEADER_LEN + 2 * ENTRY_LEN + 14);
+    assert_eq!(bytes.len(), HEADER_LEN + 2 * ENTRY_LEN_V2 + 14);
     let decoded = FdMap::decode(&bytes).expect("decode");
     assert_eq!(
         decoded.entries[1].path.as_deref(),
@@ -154,6 +156,24 @@ fn restore_fdmap_shares_one_ofd_per_handle() {
     let _ = platform.close(1);
     assert!(platform.get(1).is_err());
     assert_eq!(platform.ofd_refs(), 0);
+}
+
+#[test]
+fn version_one_block_decodes_without_readiness() {
+    let mut bytes = alloc::vec::Vec::new();
+    bytes.extend_from_slice(&FDMAP_MAGIC);
+    bytes.extend_from_slice(&FDMAP_VERSION_V1.to_le_bytes());
+    bytes.extend_from_slice(&1u16.to_le_bytes());
+    bytes.extend_from_slice(&0i32.to_le_bytes());
+    bytes.extend_from_slice(&7u32.to_le_bytes());
+    bytes.push(0); // File
+    bytes.push(0);
+    bytes.extend_from_slice(&2u32.to_le_bytes());
+    bytes.extend_from_slice(&NO_PATH.to_le_bytes());
+    let decoded = FdMap::decode(&bytes).expect("v1 decode");
+    assert_eq!(decoded.entries.len(), 1);
+    assert_eq!(decoded.entries[0].event, 0);
+    assert_eq!(decoded.entries[0].readiness, 0);
 }
 
 #[test]

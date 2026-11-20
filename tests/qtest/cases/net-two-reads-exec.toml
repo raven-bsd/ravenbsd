@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K238: carry accepted-socket readiness across fork+exec. The parent reads packet 1 from a
+# loopback accepted socket while packet 2 is already queued, then dups the fd and execs the
+# reader mode. The child's first poll must replay the inherited readiness and read packet 2;
+# a delayed packet 3 exercises ppoll and the one-shot bound.
+name = "net-two-reads-exec"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+initfs = "build/fixtures/net-two-reads/initfs-exec.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = ["sh tests/fixtures/net-two-reads/build.sh"]
+
+[[expect]]
+regex = '^net-two-reads-exec: listening$'
+
+[[expect]]
+regex = '^net-two-reads-exec: accepted$'
+
+[[expect]]
+regex = '^net-two-reads-exec: parent first ok$'
+
+[[expect]]
+regex = '^net-two-reads-exec: child second ok$'
+
+[[expect]]
+regex = '^net-two-reads-exec: child third ok$'
+
+[[expect]]
+regex = '^net-two-reads-exec: child ok$'
+
+[[expect]]
+regex = '^net-two-reads-exec: parent ok$'
+
+[[expect]]
+regex = '^net-two-reads-exec: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)net-two-reads-exec: fail|panic|EXCEPTION'

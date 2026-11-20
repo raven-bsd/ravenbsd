@@ -86,4 +86,11 @@ overlay=$root/target/debug/raven-b70-overlay
     "/etc/services.d/net-two-reads.toml=$root/tests/fixtures/net-two-reads/net-two-reads.toml" \
     "/etc/svcd.conf=$root/tests/fixtures/net-two-reads/svcd.conf"
 
-echo "net-two-reads fixture: staged $out/initfs.img"
+"$overlay" "$out/base.img" "$out/initfs-exec.img" \
+    "/bin/net-two-reads=$out/net-two-reads:0755" \
+    "/bin/net-two-reads-exec=$out/net-two-reads:0755" \
+    "/bin/net-two-reads-reader=$out/net-two-reads:0755" \
+    "/etc/services.d/net-two-reads-exec.toml=$root/tests/fixtures/net-two-reads/net-two-reads-exec.toml" \
+    "/etc/svcd.conf=$root/tests/fixtures/net-two-reads/svcd.conf"
+
+echo "net-two-reads fixture: staged $out/initfs.img and $out/initfs-exec.img"

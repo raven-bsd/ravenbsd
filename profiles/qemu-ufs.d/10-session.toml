@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# Release login/session entries for the UFS payload (same sources as the release
-# profile): getty/login, the root account files, the release rc/svcd policy.
+# K234: UFS demo login/session entries. The getty service restarts on a normal
+# shell exit and the demo svcd.conf has no exit_when_exits, so the console
+# returns to `login:` instead of ending init. The release profile keeps its
+# one-shot test-exit policy.
 
 [[initfs.programs]]
 package = "raven-getty"
@@ -13,7 +15,7 @@ package = "login"
 path = "/bin/login"
 
 [[initfs.files]]
-src = "profiles/release.d/login.service.manifest"
+src = "profiles/qemu-ufs.d/getty.manifest"
 path = "/etc/services.d/getty.toml"
 
 [[initfs.files]]
@@ -46,6 +48,6 @@ src = "profiles/release.d/rc.conf"
 path = "/etc/rc.conf"
 
 [[initfs.files]]
-src = "profiles/release.d/svcd.conf"
+src = "profiles/qemu-ufs.d/svcd.conf"
 path = "/etc/svcd.conf"
 mode = 0o644

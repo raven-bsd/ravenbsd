@@ -1623,6 +1623,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 ofd.status.load(core::sync::atomic::Ordering::Relaxed),
             );
             inherited.path = ofd.path.as_ref().map(|path| path.to_vec());
+            inherited.event = event_number(ofd.event.get());
+            inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
             out.push(inherited);
         }
         Ok(FdMap { entries: out })
@@ -1651,6 +1653,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 ofd.status.load(core::sync::atomic::Ordering::Relaxed),
             );
             inherited.path = ofd.path.as_ref().map(|path| path.to_vec());
+            inherited.event = event_number(ofd.event.get());
+            inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
             block.entries.push(inherited);
         }
         if block.entries.is_empty() {
@@ -1700,6 +1704,12 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                     entry.status,
                     entry.path.clone().map(Vec::into_boxed_slice),
                 );
+                if let Some(inherited) = self.ofd.borrow_mut().get_mut(index) {
+                    if entry.event != 0 {
+                        let _ = inherited.set_event(Handle(entry.event));
+                    }
+                    inherited.set_poll_rearm(entry.readiness);
+                }
                 by_handle.insert(entry.handle, index);
                 index
             };
@@ -1957,6 +1967,10 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     pub(crate) fn epoll_state(&self) -> &RefCell<EpollState> {
         &self.epoll
     }
+}
+
+fn event_number(event: Handle) -> u32 {
+    if event == Handle::NONE { 0 } else { event.0 }
 }
 
 fn is_tty_path(path: &[u8]) -> bool {
