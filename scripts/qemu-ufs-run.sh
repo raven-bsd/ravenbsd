@@ -57,7 +57,8 @@ check_tools() {
     [ -f "$qcow2" ] || fail "missing $qcow2"
     [ -f "$code" ] || fail "OVMF code not found: $code"
     [ -f "$vars_src" ] || fail "OVMF vars not found: $vars_src"
-    [ -x "$helper" ] || fail "network helper not found: $helper"
+    [ -f "$helper" ] || fail "network helper not found: $helper"
+    sh -n "$helper" || fail "network helper is not a shell script: $helper"
     qemu-img info "$qcow2" >/dev/null 2>&1 || fail "qemu-img cannot read $qcow2"
 }
 
@@ -74,8 +75,8 @@ fi
 
 cp "$vars_src" "$vars"
 cleanup() {
-    if [ "$net_up" -eq 1 ] && [ -x "$helper" ]; then
-        "$helper" down >/dev/null 2>&1 || true
+    if [ "$net_up" -eq 1 ] && [ -f "$helper" ]; then
+        sh "$helper" down >/dev/null 2>&1 || true
     fi
     rm -f "$vars"
 }
@@ -87,7 +88,7 @@ if [ "$user_net" -eq 1 ]; then
 else
     grep -q '^ *up)' "$helper" ||
         refuse_net "$helper has no up/down; K194 tap/bridge is required for bidirectional networking"
-    contract=$("$helper" up) || refuse_net "cannot bring up the tap/bridge (root/tap required)"
+    contract=$(sh "$helper" up) || refuse_net "cannot bring up the tap/bridge (root/tap required)"
     tap=$(printf '%s\n' "$contract" | sed -n 's/^tap=\([^ ]*\).*/\1/p' | head -n 1)
     [ -n "$tap" ] || refuse_net "network helper did not report a tap device"
     net_up=1
@@ -110,6 +111,7 @@ qemu-system-x86_64 \
     -monitor none \
     -no-reboot \
     -nic none \
+    -global virtio-blk-pci.disable-legacy=on \
     -drive "if=pflash,format=raw,readonly=on,file=$code" \
     -drive "if=pflash,format=raw,file=$vars" \
     -drive "file=$qcow2,if=virtio,format=qcow2" \

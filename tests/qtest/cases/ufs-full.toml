@@ -1,19 +1,23 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K193: the full bootable UFS demo. The case image is ONE GPT disk (ESP first,
-# 256 MiB UFS2 root second), attached as the harness's single disk drive. The
-# release userland, static disk tools, /root and network stack live on the UFS root.
+# K193: the full bootable UFS demo. The case image is the demo qcow2: ONE GPT disk
+# (ESP first, 256 MiB UFS2 root second) attached as one virtio-blk drive. The release
+# userland, static disk tools, /root and network stack live on the UFS root.
 
 name = "ufs-full"
 arch = "x86_64"
 profile = "qemu-ufs"
 timeout_secs = 240
+pre = ["cp build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2 build/qtest/ufs-full.img"]
+disk_if = "virtio"
+disk_format = "qcow2"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
     "-netdev", "user,id=n0",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-global", "virtio-blk-pci.disable-legacy=on",
 ]
 expect_exit = "success"
 

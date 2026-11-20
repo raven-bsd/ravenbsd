@@ -23,9 +23,11 @@ build/x86_64/ravenbsd-ufs-demo/
 └── README
 ```
 
-The exact boot disk argument is one virtio-blk drive:
+The exact boot disk argument is one virtio-blk drive, forced to the modern device
+(`0x1042`) that the guest `virtio-blk` driver matches:
 
 ```text
+-global virtio-blk-pci.disable-legacy=on
 -drive file=ravenbsd-ufs-demo.qcow2,if=virtio,format=qcow2
 ```
 
@@ -65,9 +67,10 @@ The payload carries `brush`, `ed`, `df`, `mount`, `ping`, `ls`, `cat`, the stati
 `lsblk`/`gpart`/`newfs` and their man pages. K192's interactive prompt is inherited-pending;
 `etc/brush/**` is not edited here.
 
-`ufs-full` boots the same single GPT disk as the harness's one disk drive (the harness uses the
-default IDE controller; `run.sh` uses virtio-blk). `qemu-img check`/`info` are the qcow2 checks.
-No qcow2 boot is claimed in this report unless it was actually booted.
+`ufs-full` copies the demo qcow2 to its case image and boots it with the new `disk_if =
+"virtio"` / `disk_format = "qcow2"` harness fields, so the guest sees exactly one modern
+virtio-blk disk. `qemu-img check`/`info` are the qcow2 checks; the `ufs-full` transcript is the
+observed qcow2 boot.
 
 ## 2. Two-disk preflight
 

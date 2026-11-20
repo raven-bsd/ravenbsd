@@ -17,8 +17,12 @@ their man pages.
 `run.sh` attaches exactly one disk to the guest:
 
 ```text
+-global virtio-blk-pci.disable-legacy=on
 -drive file=ravenbsd-ufs-demo.qcow2,if=virtio,format=qcow2
 ```
+
+The `-global` keeps the auto-created device modern (`0x1042`) so the guest `virtio-blk`
+driver matches it.
 
 It uses OVMF pflash code/vars, KVM when `/dev/kvm` is writable, `-serial stdio`, and no second root
 disk. The default network is the K194 bidirectional tap/bridge helper:
