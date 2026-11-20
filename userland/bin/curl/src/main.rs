@@ -242,10 +242,12 @@ mod tls_program {
                 values.push(value);
             }
         }
+        output("k218-main\n");
         run(&values)
     }
 
     fn run(args: &[&str]) -> i32 {
+        output("k218-run\n");
         if curl::version_requested(args.iter().skip(1).copied()) {
             output(curl::VERSION_LINE);
             output("\n");
