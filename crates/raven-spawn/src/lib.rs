@@ -861,7 +861,10 @@ fn spawn_elf<S: Sys>(
     };
     sys.write_parent_mem(write_address, image);
 
-    let child_flags = map::pack(prot::READ | prot::WRITE, map::SHARED | map::FIXED);
+    // The parent's scratch mapping above is SHARED only to populate the memory object. The
+    // child's stack must be private: `PROC_FORK` can only copy-on-write a private mapping, and a
+    // shared stack would let a forked child scribble over the parent's frames.
+    let child_flags = map::pack(prot::READ | prot::WRITE, map::FIXED);
     if let Err(error) = sys.map(
         child,
         memobj,
@@ -1012,7 +1015,9 @@ fn copy_tail<S: Sys>(
     };
     sys.copy_mapping(scratch, source_map, len);
     let _ = sys.unmap(Handle::SELF_PROC, source_map, page);
-    let child_flags = map::pack(prot::READ | prot::WRITE, map::SHARED | map::FIXED);
+    // Writable program data must be private so a fork's COW sees the parent's pages; the
+    // parent's scratch mapping above still populates the shared object.
+    let child_flags = map::pack(prot::READ | prot::WRITE, map::FIXED);
     if let Err(error) = sys.map(child, object, 0, vaddr, page, child_flags) {
         let _ = sys.unmap(Handle::SELF_PROC, scratch, page);
         let _ = sys.handle_close(object);
