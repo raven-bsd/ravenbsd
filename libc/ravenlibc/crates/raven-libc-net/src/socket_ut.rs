@@ -154,7 +154,11 @@ fn tcp_client_wire_sequence() {
             WireLog::Call(Call::SetSockOpt {
                 opt: SockOpt::RcvBuf,
                 value: 65_536
-            })
+            }),
+            WireLog::Call(Call::Connect(Endpoint {
+                ip: [10, 0, 0, 2],
+                port: 80
+            }))
         ]
     );
     let mut out = [0u8; 16];
@@ -869,7 +873,11 @@ fn all_wire_options_reach_the_backend_in_call_order() {
             Call::SetSockOpt {
                 opt: SockOpt::TcpNoDelay,
                 value: 1
-            }
+            },
+            Call::Connect(Endpoint {
+                ip: [10, 0, 0, 2],
+                port: 80
+            })
         ]
     );
 }
@@ -919,4 +927,13 @@ fn stored_local_port_orders_open_bind_then_options() {
             ..
         }))
     ));
+}
+
+#[test]
+fn lazy_socket_binds_and_listens() {
+    let net = net_without_unix(Caps::default());
+    let fd = net.socket(AF_INET, SOCK_STREAM, 0).expect("socket");
+    net.bind(fd, &addr([0, 0, 0, 0], 22)).expect("bind");
+    net.listen(fd, 128).expect("listen");
+    assert!(net.poll_interest(fd).is_ok());
 }

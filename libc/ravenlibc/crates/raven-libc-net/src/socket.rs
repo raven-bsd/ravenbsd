@@ -184,6 +184,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         }
         let sock = rec.sock.ok_or(Errno::EBADF)?;
         self.backend.call(sock, Call::Listen { backlog })?;
+        self.fds.event(info.ofd, sock);
         rec.state = SocketState::Listening;
         rec.accepting = true;
         Ok(())
@@ -294,6 +295,10 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 rec.sock = None;
                 return Err(error);
             }
+            // Opening `net:tcp/<endpoint>` selects the interface; the scheme still needs the
+            // explicit `CONNECT` that starts the handshake.
+            self.backend.call(sock, Call::Connect(endpoint))?;
+            self.fds.event(info.ofd, sock);
             rec.peer = Some(endpoint);
             rec.state = SocketState::Connected;
             if nonblock || rec.nonblock {
@@ -307,6 +312,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let result = self.backend.call(sock, Call::Connect(endpoint));
         match result {
             Ok(_) => {
+                self.fds.event(info.ofd, sock);
                 rec.peer = Some(endpoint);
                 if nonblock || rec.nonblock {
                     rec.state = SocketState::Connecting;
@@ -316,6 +322,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 Ok(())
             }
             Err(error) if error == Errno::EAGAIN || error == Errno::EINPROGRESS => {
+                self.fds.event(info.ofd, sock);
                 rec.state = SocketState::Connecting;
                 rec.peer = Some(endpoint);
                 if nonblock || rec.nonblock {
