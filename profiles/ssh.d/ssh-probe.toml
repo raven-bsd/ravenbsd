@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Temporary diagnostic: connect to the guest's own sshd so the console stays free for the log.
+
+name = "ssh-probe"
+exec = "/bin/ssh"
+args = ["/bin/ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no", "-o", "ConnectTimeout=5", "-p", "22", "root@10.0.2.15", "uname", "-a"]
+needs = ["netd", "sshd"]
+readiness = "none"
+restart = "on-failure"
+max_restarts = 100
+required = false
