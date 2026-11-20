@@ -380,6 +380,9 @@ fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) ->
     }
     if let Some(index) = getty {
         print_boot_report(core, index);
+        // Keep the lifecycle line the release cases anchor, but print it before the banner so the
+        // prompt remains the final console line.
+        raven_rt::println!("svcd: getty up");
         core.lock().all_up_printed = true;
         let generation = { core.lock().supervisor.start(index, now_ms()) };
         if let Some(generation) = generation {

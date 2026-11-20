@@ -60,12 +60,6 @@ regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed'
 wait = '(?i)^.*login: ?$'
 timeout_secs = 90
 
-# The no-NIC release profile retries the lease for about a minute; the supervisor's last
-# console line can otherwise land in the middle of the first interactive command output.
-[[step]]
-wait = '^svcd: resolvd timing:'
-timeout_secs = 90
-
 [[step]]
 send = "root\n"
 delay_ms = 100
