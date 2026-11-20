@@ -8,10 +8,7 @@
 //! add-on build that links `raven-tls`, never through an unverified fallback.
 
 #![cfg_attr(not(test), no_std)]
-#![cfg_attr(
-    not(all(target_os = "none", feature = "tls")),
-    forbid(unsafe_code)
-)]
+#![cfg_attr(not(all(target_os = "none", feature = "tls")), forbid(unsafe_code))]
 
 extern crate alloc;
 

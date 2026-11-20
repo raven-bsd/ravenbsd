@@ -93,7 +93,12 @@ mod program {
         };
         match write_output(&options, output.as_bytes()) {
             Ok(()) => EXIT_OK,
-            Err(status) => status,
+            Err(status) => {
+                if !options.silent {
+                    raven_rt::eprintln!("curl: cannot write output");
+                }
+                status
+            }
         }
     }
 
@@ -160,8 +165,7 @@ mod tls_program {
             } else {
                 let mut pointer = ptr::null_mut();
                 // SAFETY: `pointer` is writable and the libc call checks the alignment.
-                let status =
-                    unsafe { posix_memalign(&mut pointer, layout.align(), layout.size()) };
+                let status = unsafe { posix_memalign(&mut pointer, layout.align(), layout.size()) };
                 if status == 0 {
                     pointer.cast()
                 } else {
@@ -376,4 +380,3 @@ mod tls_program {
 
 #[cfg(not(target_os = "none"))]
 fn main() {}
-

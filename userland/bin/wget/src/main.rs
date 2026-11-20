@@ -8,10 +8,7 @@
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
-#![cfg_attr(
-    not(all(target_os = "none", feature = "tls")),
-    forbid(unsafe_code)
-)]
+#![cfg_attr(not(all(target_os = "none", feature = "tls")), forbid(unsafe_code))]
 
 #[cfg(target_os = "none")]
 extern crate alloc;
@@ -160,8 +157,7 @@ mod tls_program {
             } else {
                 let mut pointer = ptr::null_mut();
                 // SAFETY: `pointer` is writable and the libc call checks the alignment.
-                let status =
-                    unsafe { posix_memalign(&mut pointer, layout.align(), layout.size()) };
+                let status = unsafe { posix_memalign(&mut pointer, layout.align(), layout.size()) };
                 if status == 0 {
                     pointer.cast()
                 } else {

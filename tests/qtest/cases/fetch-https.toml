@@ -64,11 +64,11 @@ wait = '^curl-https=0$'
 timeout_secs = 30
 
 [[step]]
-send = "wget --cacert /tls-ca.pem -O /etc/https-known.txt https://10.0.2.2:24443/known.txt; echo wget-https=$?; cat /etc/https-known.txt; echo\n"
+send = "wget --cacert /tls-ca.pem -O /tmp/https-known.txt https://10.0.2.2:24443/known.txt; echo wget-https=$?; cat /tmp/https-known.txt; echo\n"
 delay_ms = 100
 
 [[step]]
-wait = '^wget: https://10\.0\.2\.2:24443/known\.txt -> /etc/https-known\.txt \(15 bytes\)$'
+wait = '^wget: https://10\.0\.2\.2:24443/known\.txt -> /tmp/https-known\.txt \(15 bytes\)$'
 timeout_secs = 120
 
 [[step]]

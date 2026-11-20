@@ -19,9 +19,7 @@ use raven_abi::types::Handle;
 use raven_proto_fs::{O_CREAT, O_TRUNC, O_WRONLY, OpenFlags};
 use raven_proto_net::{Call, Endpoint, Response as SocketResponse, SocketRequest};
 use raven_scheme::Client;
-use raven_tls::{
-    Connection, Error as TlsError, Transport as TlsIo, TransportError as TlsIoError,
-};
+use raven_tls::{Connection, Error as TlsError, Transport as TlsIo, TransportError as TlsIoError};
 
 use crate::{Transport as HttpTransport, TransportError as HttpTransportError};
 
@@ -82,12 +80,7 @@ impl SchemeSocket {
         }
     }
 
-    fn connect(
-        &mut self,
-        address: Ipv4Addr,
-        port: u16,
-        timeout_ms: u32,
-    ) -> Result<(), ()> {
+    fn connect(&mut self, address: Ipv4Addr, port: u16, timeout_ms: u32) -> Result<(), ()> {
         self.close_handle();
         let path = format!("net:tcp/{address}:{port}");
         let handle = self.client.open(&path, READ_WRITE).map_err(|_| ())?;
@@ -337,10 +330,7 @@ impl HttpTransport for TlsTransport {
             .connect(address, port, timeout_ms)
             .map_err(|()| HttpTransportError::Io)?;
         if self.tls {
-            let stream = TlsStream {
-                socket,
-                timeout_ms,
-            };
+            let stream = TlsStream { socket, timeout_ms };
             match raven_tls::connect(Box::new(stream), host, &self.ca_file) {
                 Ok(connection) => self.stream = Some(Stream::Tls(connection)),
                 Err(error) => {
@@ -359,9 +349,9 @@ impl HttpTransport for TlsTransport {
             Some(Stream::Plain(socket)) => socket
                 .send(bytes, timeout_ms)
                 .map_err(|()| HttpTransportError::Io),
-            Some(Stream::Tls(connection)) => connection
-                .write(bytes)
-                .map_err(|_| HttpTransportError::Io),
+            Some(Stream::Tls(connection)) => {
+                connection.write(bytes).map_err(|_| HttpTransportError::Io)
+            }
             None => Err(HttpTransportError::Io),
         }
     }
@@ -371,9 +361,9 @@ impl HttpTransport for TlsTransport {
             Some(Stream::Plain(socket)) => socket
                 .recv(bytes, timeout_ms)
                 .map_err(|()| HttpTransportError::Io),
-            Some(Stream::Tls(connection)) => connection
-                .read(bytes)
-                .map_err(|_| HttpTransportError::Io),
+            Some(Stream::Tls(connection)) => {
+                connection.read(bytes).map_err(|_| HttpTransportError::Io)
+            }
             None => Err(HttpTransportError::Io),
         }
     }
@@ -413,8 +403,7 @@ pub fn write_file(path: &str, bytes: &[u8]) -> Result<(), Errno> {
         format!("/{path}")
     };
     let scheme = format!("file:{absolute}");
-    let flags = OpenFlags::from_linux(O_WRONLY | O_CREAT | O_TRUNC)
-        .map_err(|_| Errno::EINVAL)?;
+    let flags = OpenFlags::from_linux(O_WRONLY | O_CREAT | O_TRUNC).map_err(|_| Errno::EINVAL)?;
     let client = Client::new();
     let handle = client.open_flags(&scheme, flags)?;
     let mut offset = 0usize;

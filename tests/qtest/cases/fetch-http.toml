@@ -63,7 +63,7 @@ wait = '^curl-body=0$'
 timeout_secs = 30
 
 [[step]]
-send = "curl -o /etc/curl-known.txt http://10.0.2.2:18081/known.txt; echo curl-o=$?; cat /etc/curl-known.txt; echo\n"
+send = "curl -o /tmp/curl-known.txt http://10.0.2.2:18081/known.txt; echo curl-o=$?; cat /tmp/curl-known.txt; echo\n"
 delay_ms = 100
 
 [[step]]
@@ -75,11 +75,11 @@ wait = '^known-http-body$'
 timeout_secs = 30
 
 [[step]]
-send = "wget -O /etc/wget-known.txt http://10.0.2.2:18081/known.txt; echo wget-o=$?; cat /etc/wget-known.txt; echo\n"
+send = "wget -O /tmp/wget-known.txt http://10.0.2.2:18081/known.txt; echo wget-o=$?; cat /tmp/wget-known.txt; echo\n"
 delay_ms = 100
 
 [[step]]
-wait = '^wget: http://10\.0\.2\.2:18081/known\.txt -> /etc/wget-known\.txt \(15 bytes\)$'
+wait = '^wget: http://10\.0\.2\.2:18081/known\.txt -> /tmp/wget-known\.txt \(15 bytes\)$'
 timeout_secs = 60
 
 [[step]]
@@ -91,7 +91,7 @@ wait = '^known-http-body$'
 timeout_secs = 30
 
 [[step]]
-send = "cd /etc; wget http://10.0.2.2:18081/known.txt; echo wget-default=$?; cat known.txt; echo\n"
+send = "cd /tmp; wget http://10.0.2.2:18081/known.txt; echo wget-default=$?; cat known.txt; echo\n"
 delay_ms = 100
 
 [[step]]
