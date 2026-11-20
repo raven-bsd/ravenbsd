@@ -14,6 +14,21 @@ cd "$root"
 out=build/fixtures/ping-dns
 mkdir -p "$out"
 
+if_missing=0
+for argument in "$@"; do
+    case "$argument" in
+        --if-missing) if_missing=1 ;;
+        *)
+            echo "usage: sh tests/fixtures/ping-dns/build.sh [--if-missing]" >&2
+            exit 2
+            ;;
+    esac
+done
+if [ "$if_missing" -eq 1 ] && [ -s "$out/ping-dns-dnsd" ] && [ -s "$out/initfs.img" ]; then
+    echo "ping-dns: --if-missing: fixture and initfs already exist; skipping build"
+    exit 0
+fi
+
 echo "ping-dns: building the loopback DNS fixture"
 RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/x86_64.ld" \
     CARGO_TARGET_DIR="$out/target" \

@@ -10,7 +10,7 @@ name = "ping-dns"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 280
-pre = ["sh tests/fixtures/ping-dns/build.sh"]
+pre = ["sh tests/fixtures/ping-dns/build.sh --if-missing"]
 initfs = "build/fixtures/ping-dns/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
