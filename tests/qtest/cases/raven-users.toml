@@ -121,7 +121,7 @@ send = "cat /etc/passwd\n"
 delay_ms = 100
 
 [[step]]
-wait = '^musicbox:x:1000:1000::/home/musicbox:/bin/tui-demo$'
+wait = '^musicbox:x:1001:1001::/home/musicbox:/bin/tui-demo$'
 timeout_secs = 30
 
 [[step]]
@@ -145,7 +145,7 @@ send = "cat /etc/group\n"
 delay_ms = 100
 
 [[step]]
-wait = '^musicbox:x:1000:$'
+wait = '^musicbox:x:1001:$'
 timeout_secs = 30
 
 [[step]]
@@ -209,7 +209,7 @@ send = "/bin/raven --json users check\n"
 delay_ms = 100
 
 [[step]]
-wait = '^\{.*"kind":"check".*"id":"users".*"status":"ok".*"users":2.*"groups":2.*\}$'
+wait = '^\{.*"kind":"check".*"id":"users".*"status":"ok".*"users":3.*"groups":3.*\}$'
 timeout_secs = 30
 
 [[step]]
