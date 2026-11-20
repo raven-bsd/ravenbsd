@@ -141,7 +141,34 @@ build_initfs() {
     esac
 }
 
+# True when a server on `port` already serves the fixture's `/known.txt` body. Another minion's
+# concurrent fixture can legitimately hold the shared test port; reusing it is safe only when the
+# exact body matches.
+already_serving() {
+    python3 - "$1" <<'PY'
+import socket
+import sys
+
+try:
+    connection = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 1)
+    connection.sendall(b"GET /known.txt HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+    data = b""
+    while True:
+        chunk = connection.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+    print("known-http-body" in data.decode("latin-1", "replace"))
+except OSError:
+    print("False")
+PY
+}
+
 start_http_server() {
+    if already_serving 18081 | grep -qx True; then
+        log "HTTP server already serving the fixture on 18081"
+        return 0
+    fi
     log "starting the local HTTP server on 18081"
     rm -f "$out/http-server.log"
     timeout 700 python3 "$root/tests/fixtures/fetch/http_server.py" \
