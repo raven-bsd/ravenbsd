@@ -14,12 +14,16 @@
 pub const DEFAULT_COUNT: u16 = 4;
 /// Default overall timeout in seconds.
 pub const DEFAULT_TIMEOUT_SECS: u64 = 5;
+/// Default interval between echo requests in seconds.
+pub const DEFAULT_INTERVAL_SECS: u64 = 1;
 /// Default payload length in bytes.
 pub const DEFAULT_PAYLOAD: usize = 32;
 /// Largest accepted echo count.
 pub const MAX_COUNT: u16 = 1000;
 /// Largest accepted timeout in seconds.
 pub const MAX_TIMEOUT_SECS: u64 = 60;
+/// Largest accepted interval between echo requests in seconds.
+pub const MAX_INTERVAL_SECS: u64 = 60;
 /// Largest accepted payload, matching the protocol's ICMP bound.
 pub const MAX_PAYLOAD: usize = 1400;
 
@@ -32,6 +36,8 @@ pub struct Options<'a> {
     pub count: u16,
     /// Overall budget for the whole run in seconds.
     pub timeout_secs: u64,
+    /// Interval between echo requests in seconds.
+    pub interval_secs: u64,
     /// Payload bytes in each echo request.
     pub payload_len: usize,
 }
@@ -43,6 +49,7 @@ impl<'a> Options<'a> {
             host,
             count: DEFAULT_COUNT,
             timeout_secs: DEFAULT_TIMEOUT_SECS,
+            interval_secs: DEFAULT_INTERVAL_SECS,
             payload_len: DEFAULT_PAYLOAD,
         }
     }
@@ -59,6 +66,8 @@ pub enum ParseError {
     BadCount,
     /// The timeout is not `1..=MAX_TIMEOUT_SECS`.
     BadTimeout,
+    /// The interval is not `1..=MAX_INTERVAL_SECS`.
+    BadInterval,
     /// The payload is larger than `MAX_PAYLOAD`.
     BadPayload,
     /// The destination is not a dotted-quad IPv4 address.
@@ -69,10 +78,11 @@ impl ParseError {
     /// Stable diagnostic text.
     pub const fn message(self) -> &'static str {
         match self {
-            Self::Usage => "usage: ping [-c count] [-w seconds] [-s bytes] host",
+            Self::Usage => "usage: ping [-c count] [-i seconds] [-w seconds] [-s bytes] host",
             Self::MissingValue => "option requires a value",
             Self::BadCount => "invalid echo count",
             Self::BadTimeout => "invalid timeout",
+            Self::BadInterval => "invalid interval",
             Self::BadPayload => "invalid payload size",
             Self::BadAddress => "invalid IPv4 address",
         }
@@ -112,6 +122,7 @@ pub fn valid_ipv4(text: &str) -> bool {
 pub fn parse<'a>(args: &[&'a str]) -> Result<Options<'a>, ParseError> {
     let mut count = DEFAULT_COUNT;
     let mut timeout_secs = DEFAULT_TIMEOUT_SECS;
+    let mut interval_secs = DEFAULT_INTERVAL_SECS;
     let mut payload_len = DEFAULT_PAYLOAD;
     let mut host = None;
     let mut index = 0usize;
@@ -126,6 +137,15 @@ pub fn parse<'a>(args: &[&'a str]) -> Result<Options<'a>, ParseError> {
                     return Err(ParseError::BadCount);
                 }
                 count = parsed as u16;
+            }
+            "-i" => {
+                index += 1;
+                let value = args.get(index).copied().ok_or(ParseError::MissingValue)?;
+                let parsed = decimal(value).ok_or(ParseError::BadInterval)?;
+                if parsed == 0 || parsed > MAX_INTERVAL_SECS {
+                    return Err(ParseError::BadInterval);
+                }
+                interval_secs = parsed;
             }
             "-w" => {
                 index += 1;
@@ -164,6 +184,7 @@ pub fn parse<'a>(args: &[&'a str]) -> Result<Options<'a>, ParseError> {
         host,
         count,
         timeout_secs,
+        interval_secs,
         payload_len,
     })
 }
