@@ -1065,3 +1065,39 @@ fn live_readiness_follows_backlog_data_and_end_of_stream() {
     assert!(netd.socket_readiness(accepted).unwrap().readable);
     assert!(!netd.socket_readiness(accepted).unwrap().hup);
 }
+
+#[test]
+fn file_references_keep_the_socket_alive_until_the_last_close() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    let socket = netd.socket_id(accepted).expect("accepted socket");
+    let files = netd.socket_files();
+
+    // A fork child takes one more reference. The parent's close drops only its own.
+    assert_eq!(netd.dup(accepted), Ok(accepted));
+    assert_eq!(netd.close(accepted), Ok(false));
+    assert_eq!(netd.socket_id(accepted), Some(socket));
+    assert_eq!(netd.socket_files(), files);
+
+    assert_eq!(netd.write(client, 0, b"keep").unwrap(), 4);
+    let mut buffer = [0u8; 8];
+    let read = read_retry(&mut netd, accepted, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"keep");
+
+    assert_eq!(netd.close(accepted), Ok(true));
+    assert_eq!(netd.socket_id(accepted), None);
+    assert_eq!(netd.socket_files(), files - 1);
+    assert_eq!(netd.close(accepted), Err(Errno::EBADF));
+}
