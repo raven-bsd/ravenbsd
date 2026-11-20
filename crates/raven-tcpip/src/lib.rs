@@ -79,6 +79,10 @@ pub use device::{ChecksumOffload, Device, DeviceCaps, Medium, TxError};
 pub use dhcp::{
     DhcpTimers, Event as DhcpEvent, Lease as DhcpLease, RetryConfig as DhcpRetryConfig,
 };
+pub use ecn::{
+    ECN_CE, ECN_ECT0, ECN_ECT1, ECN_MASK, ECN_NOTECT, EcnCounters, EcnState, TH_ACK, TH_AE, TH_CWR,
+    TH_ECE, TH_SYN, get_ace, set_ace,
+};
 pub use event::{Event, PollResult, SocketId};
 pub use ipv6_stack::{
     IpAddr, Ipv6Addr, Ipv6AddressState, Ipv6Cidr, Ipv6Config, Neighbor6Cache, Neighbor6Entry,
@@ -90,7 +94,8 @@ pub use observability::{
     Counters, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,
 };
 pub use pmtu::{
-    IPV4_FLOOR, IPV6_FLOOR, MtuCache, Plpmtud, PlpmtudState, classic_update, floor_for,
+    IPV4_FLOOR, IPV6_FLOOR, IpFamily, MssUpdate, MtuCache, Plpmtud, PlpmtudState, TCP_MINMSS,
+    TCP_MSS_DEFAULT, floor_for, mss_headers, mss_update, mssopt, next_pmtu, on_icmp_frag_needed,
     probe_sequence,
 };
 pub use readiness::Readiness;
