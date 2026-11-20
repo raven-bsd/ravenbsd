@@ -34,6 +34,7 @@ use raven_abi::types::{Handle, prot};
 use raven_elf::{Elf, ElfError, LoadMode, Machine, MapStep, StepKind};
 use raven_handles::HandleTable;
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
+use raven_usercopy::UserSlice;
 use raven_vma::Backing;
 use spin::Mutex;
 
@@ -58,6 +59,7 @@ use crate::memory::aspace::AddressSpace;
 use crate::memory::uspace::UserAddressSpace;
 use crate::memory::{frame, paging};
 use crate::sched::wait::WaitQueue;
+use crate::usercopy::copy_from_user;
 
 use self::handle::Object;
 use self::status::{RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
@@ -922,6 +924,103 @@ fn map_step(
         page = page.saturating_add(1);
     }
     Ok(())
+}
+
+/// Load an exec image directly from the caller's user range.
+///
+/// The ELF header and program-header table were copied into a small kernel buffer; this path
+/// copies each `PT_LOAD` page from the still-live caller image into a fresh frame, so the 4 MiB
+/// kernel heap never holds the multi-MiB image. The ranges were validated by
+/// [`raven_elf::Elf::parse_with_len`] and are checked again here.
+pub(crate) fn load_segments_from_user(
+    address_space: &mut UserAddressSpace,
+    elf: &Elf<'_>,
+    image_base: u64,
+    image_len: u64,
+    bias: u64,
+) -> Result<(), ProcessError> {
+    let plan =
+        raven_elf::plan_load_biased(elf, PAGE, bias, LoadMode::Copy).map_err(ProcessError::Elf)?;
+    for step in plan {
+        address_space
+            .vmas_mut()
+            .insert(step.vaddr, step.len, step.prot, Backing::Anonymous)
+            .map_err(|_| ProcessError::BadAddress)?;
+        let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
+        map_step_from_user(&mut mapper, image_base, image_len, step)?;
+    }
+    // The just-written code pages must be visible to instruction fetch before EL0 runs.
+    #[cfg(target_arch = "aarch64")]
+    crate::arch::mmu::icache_invalidate_all();
+    Ok(())
+}
+
+fn map_step_from_user(
+    mapper: &mut paging::KernelMapper<'_>,
+    image_base: u64,
+    image_len: u64,
+    step: MapStep,
+) -> Result<(), ProcessError> {
+    let flags = prot_flags(step.prot)?;
+    let pages = step.len / PAGE;
+    let mut page = 0u64;
+    while page < pages {
+        let vaddr = step
+            .vaddr
+            .checked_add(page.saturating_mul(PAGE))
+            .ok_or(ProcessError::BadAddress)?;
+        let virt = VirtAddr::new(vaddr).ok_or(ProcessError::BadAddress)?;
+        let physical = frame::alloc_zeroed_frame().ok_or(ProcessError::OutOfFrames)?;
+        let destination = frame::phys_to_virt(physical);
+        if destination.is_null() {
+            return Err(ProcessError::OutOfFrames);
+        }
+        match step.kind {
+            StepKind::File { offset } => {
+                let file_offset = offset
+                    .checked_add(page.saturating_mul(PAGE))
+                    .ok_or(ProcessError::BadAddress)?;
+                copy_user_range(destination, image_base, image_len, file_offset, PAGE)?;
+            }
+            StepKind::CopyTail { offset, len } => {
+                copy_user_range(destination, image_base, image_len, offset, len)?;
+            }
+            StepKind::Zero => {}
+        }
+        // Make the bytes written through the HHDM visible to instruction fetch.
+        #[cfg(target_arch = "aarch64")]
+        // SAFETY: `destination` is a whole 4 KiB frame mapped read/write through the HHDM.
+        unsafe {
+            crate::arch::mmu::dcache_clean_range(destination as u64, PAGE);
+        }
+        mapper
+            .map(virt, PhysAddr(physical.0), flags, PageSize::Size4K)
+            .map_err(ProcessError::Map)?;
+        page = page.saturating_add(1);
+    }
+    Ok(())
+}
+
+fn copy_user_range(
+    destination: *mut u8,
+    image_base: u64,
+    image_len: u64,
+    offset: u64,
+    length: u64,
+) -> Result<(), ProcessError> {
+    let end = offset.checked_add(length).ok_or(ProcessError::BadAddress)?;
+    if end > image_len {
+        return Err(ProcessError::BadAddress);
+    }
+    let address = image_base
+        .checked_add(offset)
+        .ok_or(ProcessError::BadAddress)?;
+    let length = usize::try_from(length).map_err(|_| ProcessError::BadAddress)?;
+    // SAFETY: `destination` is a freshly zeroed frame mapped read/write through the HHDM and
+    // `length` is at most one page; the slice is live for the duration of the copy.
+    let destination = unsafe { core::slice::from_raw_parts_mut(destination, length) };
+    let source = UserSlice::new(address, length as u64).map_err(|_| ProcessError::BadAddress)?;
+    copy_from_user(destination, source).map_err(|_| ProcessError::BadAddress)
 }
 
 fn file_bytes(data: &[u8], offset: u64, page: u64, length: u64) -> Result<&[u8], ProcessError> {

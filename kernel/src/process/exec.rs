@@ -9,9 +9,10 @@
 //! syscall-return path installs the new entry/stack. Any failure drops the temporary space and
 //! returns the error with the old image and registers intact.
 //!
-//! The loader is the kernel's existing `raven-elf` plan/copy path (`load_segments`) and the C8
-//! stack builder used by `/init`; the runtime reads the file with `raven-spawn`'s shared image
-//! reader and passes the bytes here.
+//! The loader uses the kernel's `raven-elf` planner and the C8 stack builder used by `/init`.
+//! Only the ELF header, program headers and `PT_INTERP` string are copied into kernel memory;
+//! each `PT_LOAD` page is copied directly from the caller's still-live image, so the 4 MiB kernel
+//! heap never holds the multi-MiB image.
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -24,12 +25,13 @@ use raven_elf::Elf;
 use super::handle::Object;
 use super::{AddressSpace, Process, ProcessError, ProcessState, UserAddressSpace};
 
-/// Largest image copied into kernel memory for one exec.
+/// Largest exec image accepted from the caller.
 ///
-/// The kernel heap is 4 MiB and the image is a temporary copy; the release user programs are
-/// about 200 KiB. A larger image is rejected with `EFBIG` until the loader can map directly from
-/// the caller's memory object.
-pub const MAX_EXEC_IMAGE: usize = 1024 * 1024;
+/// The image stays in the caller's address space; the kernel copies only the ELF header,
+/// program-header table and `PT_INTERP` string (bounded separately) and streams each `PT_LOAD`
+/// segment into fresh frames. The bound covers the staged 8.3 MiB OpenSSH helpers with headroom;
+/// it is an input limit, not a kernel-heap allocation.
+pub const MAX_EXEC_IMAGE: usize = 16 * 1024 * 1024;
 
 /// `ET_EXEC`: a fixed-address executable.
 const ET_EXEC: u16 = 2;
@@ -51,20 +53,24 @@ pub struct ExecContext {
     pub stack: u64,
 }
 
-/// Replace `caller`'s image with `image`.
+/// Replace `caller`'s image from the still-live user range.
 ///
-/// `argv`/`envp` are already copied into kernel storage; `path` is the `AT_EXECFN` spelling.
-/// `close` is the caller's CLOEXEC handle list; pipe ends created with `O_CLOEXEC` are added
-/// automatically.
-pub fn replace_image(
+/// `header` contains the ELF header, the complete program-header table and any `PT_INTERP`
+/// string; `image_base`/`image_len` name the caller's full image. Segments are copied directly
+/// from that range. `argv`/`envp` are already copied into kernel storage; `path` is the
+/// `AT_EXECFN` spelling. `close` is the caller's CLOEXEC handle list; pipe ends created with
+/// `O_CLOEXEC` are added automatically.
+pub fn replace_image_from_user(
     caller: &Arc<Process>,
-    image: &[u8],
+    header: &[u8],
+    image_base: u64,
+    image_len: u64,
     path: &[u8],
     argv: &[Vec<u8>],
     envp: &[Vec<u8>],
     close: &[Handle],
 ) -> Result<(), Errno> {
-    if image.is_empty() || image.len() > MAX_EXEC_IMAGE {
+    if header.is_empty() || image_len == 0 || image_len > MAX_EXEC_IMAGE as u64 {
         return Err(Errno::EFBIG);
     }
     // The current thread must be the only thread: this slice has no scheduler-side thread list
@@ -78,13 +84,14 @@ pub fn replace_image(
     }
     let thread = crate::sched::current_thread().ok_or(Errno::ESRCH)?;
 
-    let kind = elf_type(image).ok_or(Errno::ENOEXEC)?;
+    let kind = elf_type(header).ok_or(Errno::ENOEXEC)?;
     let range = if kind == ET_DYN {
         0..super::USER_END
     } else {
         super::USER_MIN..super::USER_END
     };
-    let elf = Elf::parse(image, super::TARGET_MACHINE, range).map_err(|_| Errno::ENOEXEC)?;
+    let elf = Elf::parse_with_len(header, image_len, super::TARGET_MACHINE, range)
+        .map_err(|_| Errno::ENOEXEC)?;
     let main_bias = match kind {
         ET_EXEC => 0,
         ET_DYN => MAIN_PIE_BASE,
@@ -143,7 +150,8 @@ pub fn replace_image(
         super::load_segments(&mut new_space, interp, data, interpreter_bias)
             .map_err(process_errno)?;
     }
-    super::load_segments(&mut new_space, &elf, image, main_bias).map_err(process_errno)?;
+    super::load_segments_from_user(&mut new_space, &elf, image_base, image_len, main_bias)
+        .map_err(process_errno)?;
     let argv_refs: Vec<&[u8]> = argv.iter().map(Vec::as_slice).collect();
     let envp_refs: Vec<&[u8]> = envp.iter().map(Vec::as_slice).collect();
     let stack = super::build_stack(&mut new_space, path, &argv_refs, &envp_refs, &ids, aux)
