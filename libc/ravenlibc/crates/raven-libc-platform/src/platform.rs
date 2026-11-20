@@ -1962,6 +1962,17 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok(queue)
     }
 
+    /// Drop a cached event queue and create a fresh one on the next wait.
+    ///
+    /// A forked child inherits the parent's queue handle. The kernel allows one waiter per queue,
+    /// so the child must not keep using it; a lazy reset on `EBUSY` covers every fork/exec path
+    /// without a fork hook in the shell.
+    pub(crate) fn reset_event_queue(&self) {
+        if let Some(queue) = self.event_queue.borrow_mut().take() {
+            let _ = self.backend.handle_close(queue);
+        }
+    }
+
     /// The OFD table epoch for `fd`, used in epoll cookies.
     pub(crate) fn ofd_epoch(&self, fd: i32) -> Option<u32> {
         let index = {

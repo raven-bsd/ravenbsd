@@ -272,6 +272,11 @@ static int run_exec_parent(void) {
     }
     (void)close(connection);
     (void)close(listener);
+    // Poll on the parent's own descriptor while the child starts polling on its inherited one.
+    // A shared event queue would answer EBUSY; the platform must split it after fork.
+    if (poll_one(client, 100) < 0) {
+        return fail("exec parent poll", errno);
+    }
     sleep(1);
     if (write(client, "charlie", 7) != 7) {
         return fail("exec write third", errno);

@@ -40,3 +40,8 @@ with `events == 0` is not ready. A failed registration removes the ones already 
 
 The readiness doorbell is a `UserEvent`, not a scheme file; it is released with `HANDLE_CLOSE`,
 not `CLOSE`.
+
+A forked child inherits its parent's cached event queue handle. Because a queue allows one waiter,
+`poll` treats `EVQ_WAIT` `EBUSY` as that inherited-queue case: it drops the cached handle, creates
+a fresh queue for the child and retries once. The parent keeps its own queue; neither waiter sees
+`EBUSY`.
