@@ -122,7 +122,7 @@ wait = '> UID:'
 timeout_secs = 30
 
 [[step]]
-send = "\u001b"
+send = "\u001b\u0000"
 delay_ms = 150
 
 [[step]]

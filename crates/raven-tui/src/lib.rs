@@ -50,13 +50,21 @@ pub fn run<R: Read, W: Write>(
     writeln!(output, "raven config: TUI")?;
     write!(output, "{}", render(&tui))?;
     let mut buffer = [0u8; 64];
+    let mut pending = Vec::new();
     loop {
         let read = input.read(&mut buffer)?;
         if read == 0 {
             writeln!(output, "raven config: cancelled")?;
             return Ok(Outcome::Cancelled);
         }
-        for event in key::parse(&buffer[..read]) {
+        pending.extend_from_slice(&buffer[..read]);
+        let split = complete_prefix(&pending);
+        let events = key::parse(&pending[..split]);
+        pending.drain(..split);
+        if events.is_empty() {
+            continue;
+        }
+        for event in events {
             let action = tui.handle(event);
             if let Some(notice) = tui.take_notice() {
                 writeln!(output, "{notice}")?;
@@ -89,6 +97,21 @@ pub fn run<R: Read, W: Write>(
         }
         write!(output, "{}", render(&tui))?;
     }
+}
+
+/// Split off a trailing incomplete ANSI escape (`ESC` or `ESC [`).
+///
+/// The serial console delivers an arrow key as separate bytes; parsing `ESC` alone would cancel
+/// the TUI instead of moving the selection, so the incomplete tail waits for the next read.
+fn complete_prefix(bytes: &[u8]) -> usize {
+    let length = bytes.len();
+    if length >= 1 && bytes[length - 1] == 0x1b {
+        return length - 1;
+    }
+    if length >= 2 && bytes[length - 2] == 0x1b && bytes[length - 1] == b'[' {
+        return length - 2;
+    }
+    length
 }
 
 #[cfg(test)]
