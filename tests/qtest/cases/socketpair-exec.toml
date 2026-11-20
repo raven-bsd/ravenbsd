@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K195: the fork/exec socketpair inheritance shape used by the OpenSSH rexec: the child writes
+# 563 + 191 bytes, the parent duplicates the peer to fd 4 and execs a static reader, which must
+# see the exact bytes and then EOF.
+name = "socketpair-exec"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+initfs = "build/fixtures/socketpair-exec/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+pre = ["sh tests/qtest/cases/socketpair-exec-fixture/build.sh"]
+
+[[expect]]
+regex = '^socketpair-exec: reader start$'
+
+[[expect]]
+regex = '^socketpair-exec: bytes=754$'
+
+[[expect]]
+regex = '^socketpair-exec: exact ok$'
+
+[[expect]]
+regex = '^socketpair-exec: eof ok$'
+
+[[expect]]
+regex = '^socketpair-exec: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|socketpair-exec: fail'

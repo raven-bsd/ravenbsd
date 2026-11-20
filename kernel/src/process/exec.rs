@@ -59,7 +59,7 @@ pub struct ExecContext {
 /// string; `image_base`/`image_len` name the caller's full image. Segments are copied directly
 /// from that range. `argv`/`envp` are already copied into kernel storage; `path` is the
 /// `AT_EXECFN` spelling. `close` is the caller's CLOEXEC handle list; pipe ends created with
-/// `O_CLOEXEC` are added automatically.
+/// `O_CLOEXEC` are added automatically. `fdmap` is the encoded `RFDM` block for the new image.
 pub fn replace_image_from_user(
     caller: &Arc<Process>,
     header: &[u8],
@@ -69,6 +69,7 @@ pub fn replace_image_from_user(
     argv: &[Vec<u8>],
     envp: &[Vec<u8>],
     close: &[Handle],
+    fdmap: &[u8],
 ) -> Result<(), Errno> {
     if header.is_empty() || image_len == 0 || image_len > MAX_EXEC_IMAGE as u64 {
         return Err(Errno::EFBIG);
@@ -154,8 +155,16 @@ pub fn replace_image_from_user(
         .map_err(process_errno)?;
     let argv_refs: Vec<&[u8]> = argv.iter().map(Vec::as_slice).collect();
     let envp_refs: Vec<&[u8]> = envp.iter().map(Vec::as_slice).collect();
-    let stack = super::build_stack(&mut new_space, path, &argv_refs, &envp_refs, &ids, aux)
-        .map_err(process_errno)?;
+    let stack = super::build_stack(
+        &mut new_space,
+        path,
+        &argv_refs,
+        &envp_refs,
+        &ids,
+        aux,
+        fdmap,
+    )
+    .map_err(process_errno)?;
 
     // Collect the handle exits before the switch: the image and stack are now fully built, so a
     // close failure can no longer abort the exec.

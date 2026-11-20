@@ -52,6 +52,8 @@ pub(crate) fn exec<B: ProcBackend>(
     argv: &[alloc::vec::Vec<u8>],
     envp: &[alloc::vec::Vec<u8>],
     fd: Option<i32>,
+    close_list: &[u32],
+    fdmap: &[u8],
 ) -> ProcErrno {
     backend.exec(&ExecRequest {
         exec_flags: 0,
@@ -62,8 +64,8 @@ pub(crate) fn exec<B: ProcBackend>(
         cwd: cwd.to_vec(),
         argv: argv.to_vec(),
         envp: envp.to_vec(),
-        close_list: alloc::vec::Vec::new(),
-        fdmap: alloc::vec::Vec::new(),
+        close_list: close_list.to_vec(),
+        fdmap: fdmap.to_vec(),
         sigmask: [0; 128],
         ignored: [0; 128],
     })

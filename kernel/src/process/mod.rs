@@ -790,7 +790,15 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         entry: elf.entry(),
         phnum: elf.phnum() as u64,
     };
-    let user_stack = build_stack(&mut user_address_space, path_bytes, &argv, &[], &ids, aux)?;
+    let user_stack = build_stack(
+        &mut user_address_space,
+        path_bytes,
+        &argv,
+        &[],
+        &ids,
+        aux,
+        &[],
+    )?;
 
     let process = Arc::new(Process {
         id,
@@ -1071,6 +1079,7 @@ fn build_stack(
     envp: &[&[u8]],
     ids: &ProcessIds,
     aux: StackAuxv,
+    fdmap: &[u8],
 ) -> Result<u64, ProcessError> {
     // PG-50: `rsp == sp0`, 16-byte aligned, with the C8 argv/envp/auxv block at `sp0`.
     const AT_PHDR: u64 = 3;
@@ -1092,6 +1101,8 @@ fn build_stack(
     const AT_HWCAP2: u64 = 26;
     const AT_EXECFN: u64 = 31;
     const AT_MINSIGSTKSZ: u64 = 51;
+    const AT_RAVEN_FDMAP: u64 = 0x7003;
+    const AT_RAVEN_FDMAP_N: u64 = 0x7004;
     const PHENT: u64 = 56;
     const ARG_MAX: usize = 128 * 1024;
     const MAX_COUNT: usize = 4096;
@@ -1115,6 +1126,9 @@ fn build_stack(
             .checked_add(variable.len().saturating_add(1))
             .ok_or(ProcessError::ArgTooLong)?;
     }
+    string_bytes = string_bytes
+        .checked_add(fdmap.len())
+        .ok_or(ProcessError::ArgTooLong)?;
     if string_bytes > ARG_MAX {
         return Err(ProcessError::ArgTooLong);
     }
@@ -1138,6 +1152,18 @@ fn build_stack(
         .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
         .ok_or(ProcessError::BadAddress)?;
 
+    let (fdmap_address, fdmap_count) = if fdmap.is_empty() {
+        (0, 0)
+    } else {
+        let address = place_bytes(&mut buffer, &mut cursor, stack_base, fdmap)?;
+        let count = fdmap
+            .get(6..8)
+            .and_then(|bytes| <[u8; 2]>::try_from(bytes).ok())
+            .map(u16::from_le_bytes)
+            .unwrap_or(0) as u64;
+        (address, count)
+    };
+
     let platform_address = place_bytes(&mut buffer, &mut cursor, stack_base, platform.as_bytes())?;
     let path_address = place_bytes(&mut buffer, &mut cursor, stack_base, path)?;
     let mut argv_addresses = Vec::new();
@@ -1155,7 +1181,7 @@ fn build_stack(
         env_addresses.push(place_bytes(&mut buffer, &mut cursor, stack_base, variable)?);
     }
 
-    let auxv_pairs = 19usize;
+    let auxv_pairs = 21usize;
     let words = 1usize
         .checked_add(argv.len())
         .and_then(|total| total.checked_add(1))
@@ -1215,6 +1241,8 @@ fn build_stack(
         (AT_HWCAP2, 0),
         (AT_EXECFN, path_address),
         (AT_MINSIGSTKSZ, 8192),
+        (AT_RAVEN_FDMAP, fdmap_address),
+        (AT_RAVEN_FDMAP_N, fdmap_count),
     ] {
         write_word(&mut buffer, &mut block_cursor, key)?;
         write_word(&mut buffer, &mut block_cursor, value)?;

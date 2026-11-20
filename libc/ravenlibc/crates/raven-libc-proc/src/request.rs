@@ -82,8 +82,8 @@ pub struct ExecRequest {
     pub envp: Vec<Vec<u8>>,
     /// Handles to close before the image starts.
     pub close_list: Vec<u32>,
-    /// Descriptor map.
-    pub fdmap: Vec<FdMapEntry>,
+    /// The encoded `RFDM` descriptor block inherited by the new image.
+    pub fdmap: Vec<u8>,
     /// Signal mask.
     pub sigmask: [u8; 128],
     /// Ignored signals.

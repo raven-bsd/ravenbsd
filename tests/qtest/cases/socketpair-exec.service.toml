@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K195 one-shot socketpair-exec probe.
+name = "socketpair-exec"
+exec = "/bin/socketpair-exec"
+args = []
+needs = ["vfsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
