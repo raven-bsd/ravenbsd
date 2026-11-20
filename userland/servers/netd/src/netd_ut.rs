@@ -729,3 +729,187 @@ fn a_late_static_config_replaces_the_published_address() {
     let lease = netd.dhcp_lease().unwrap();
     assert_eq!(lease.dns[0].octets(), [192, 168, 7, 53]);
 }
+
+// ---- K231: readiness levels and edges ---------------------------------------------------
+
+fn poll_events(netd: &mut Netd<Loopback>, now: &mut i64) -> Vec<raven_netcore::Event> {
+    *now = now.saturating_add(1);
+    netd.poll(*now)
+        .into_iter()
+        .map(|ready| ready.event)
+        .collect()
+}
+
+/// A listener with one accepted, idle connection: `(listener, client, accepted)`.
+fn established_pair(netd: &mut Netd<Loopback>, now: &mut i64) -> (u64, u64, u64) {
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(netd, listener, now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    (listener, client, accepted)
+}
+
+#[test]
+fn socket_level_ready_follows_backlog_data_and_end_of_stream() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    assert!(!netd.socket_level_ready(listener), "no connection queued");
+
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    for _ in 0..50 {
+        poll(&mut netd, &mut now);
+        if netd.socket_level_ready(listener) {
+            break;
+        }
+    }
+    assert!(
+        netd.socket_level_ready(listener),
+        "a completed handshake waiting for accept makes the listener ready"
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    assert!(
+        !netd.socket_level_ready(listener),
+        "the backlog is empty again"
+    );
+
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    assert!(!netd.socket_level_ready(accepted), "nothing to read yet");
+    assert_eq!(netd.write(client, 0, b"hello").unwrap(), 5);
+    for _ in 0..50 {
+        poll(&mut netd, &mut now);
+        if netd.socket_level_ready(accepted) {
+            break;
+        }
+    }
+    assert!(netd.socket_level_ready(accepted), "unread data");
+    let mut buffer = [0u8; 16];
+    assert_eq!(read_retry(&mut netd, accepted, &mut buffer, &mut now), 5);
+    assert!(!netd.socket_level_ready(accepted), "drained");
+
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+    for _ in 0..50 {
+        poll(&mut netd, &mut now);
+        if netd.socket_level_ready(accepted) {
+            break;
+        }
+    }
+    assert!(
+        netd.socket_level_ready(accepted),
+        "the peer finished sending"
+    );
+    assert_eq!(netd.read(accepted, 0, &mut buffer).unwrap(), 0);
+    assert!(
+        netd.socket_level_ready(accepted),
+        "end of stream stays ready until the socket is closed"
+    );
+}
+
+#[test]
+fn data_arriving_in_the_pass_after_a_drain_still_raises_readable() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let (_listener, client, accepted) = established_pair(&mut netd, &mut now);
+    let socket = netd.socket_id(accepted).expect("accepted socket");
+
+    assert_eq!(netd.write(client, 0, b"a").unwrap(), 1);
+    let mut seen = false;
+    for _ in 0..50 {
+        seen |= poll_events(&mut netd, &mut now).contains(&raven_netcore::Event::Readable(socket));
+        if seen {
+            break;
+        }
+    }
+    assert!(seen, "the first byte raises Readable");
+
+    // The application drains the queue between two passes, and the next byte arrives in the very
+    // next pass. The edge baseline must have followed the drain or this raises no event and a
+    // poller sleeping on the socket is never woken (K231).
+    let mut buffer = [0u8; 8];
+    assert_eq!(netd.read(accepted, 0, &mut buffer).unwrap(), 1);
+    assert_eq!(netd.write(client, 0, b"b").unwrap(), 1);
+    let mut seen = false;
+    for _ in 0..50 {
+        seen |= poll_events(&mut netd, &mut now).contains(&raven_netcore::Event::Readable(socket));
+        if seen {
+            break;
+        }
+    }
+    assert!(seen, "a refill right after a drain raises Readable again");
+}
+
+#[test]
+fn a_connection_completing_right_after_an_accept_still_raises_accepted() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let listener_socket = netd.socket_id(listener).expect("listener socket");
+    let first = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, first, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let mut announced = false;
+    for _ in 0..50 {
+        announced |= poll_events(&mut netd, &mut now)
+            .iter()
+            .any(|event| matches!(event, raven_netcore::Event::Accepted { .. }));
+        if announced {
+            break;
+        }
+    }
+    assert!(announced, "the first connection is announced");
+
+    // A second connection is already on its way when the application accepts the first one.
+    let second = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, second, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    assert!(matches!(
+        call_socket(&mut netd, listener, Call::Accept),
+        Response::Socket { .. }
+    ));
+    let mut announced_again = false;
+    for _ in 0..50 {
+        announced_again |= poll_events(&mut netd, &mut now).iter().any(|event| {
+            matches!(event, raven_netcore::Event::Accepted { listener, .. } if *listener == listener_socket)
+        });
+        if announced_again {
+            break;
+        }
+    }
+    assert!(
+        announced_again,
+        "the connection that completed after the accept is announced too"
+    );
+}

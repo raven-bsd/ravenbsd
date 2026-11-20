@@ -747,6 +747,41 @@ impl<D: Device> Netd<D> {
         }
     }
 
+    /// Whether a poller on `file` has something to collect *right now*: unread data, a queued
+    /// connection on a listener, or a peer that has finished sending or closed.
+    ///
+    /// The readiness doorbell is an edge latch, so a doorbell created after the transition (an
+    /// accepted socket, or an inherited descriptor in a new process) and a partly drained socket
+    /// both need this level to decide whether to ring again. It reads the same state the stack's
+    /// `Readable`/`Accepted`/`Closed` edges are derived from (a listener's receive queue is its
+    /// accept queue). Writability is not part of it: a poller that only wants `POLLOUT` is woken
+    /// by the stack's own `Writable` edge, and ringing for it here would turn every `POLLIN`
+    /// wait on an idle connection into a spurious wake.
+    #[must_use]
+    pub fn socket_level_ready(&self, file: u64) -> bool {
+        let Some(File::Socket(socket)) = self.files.get(&file) else {
+            return false;
+        };
+        let Some(id) = socket.socket else {
+            return false;
+        };
+        self.core_ref(socket.interface)
+            .socket_table()
+            .iter()
+            .find(|entry| entry.id == id)
+            .is_some_and(|entry| {
+                entry.rx_queue > 0
+                    || matches!(
+                        entry.state,
+                        raven_netcore::SocketState::CloseWait
+                            | raven_netcore::SocketState::LastAck
+                            | raven_netcore::SocketState::Closing
+                            | raven_netcore::SocketState::TimeWait
+                            | raven_netcore::SocketState::Closed
+                    )
+            })
+    }
+
     /// Open files currently attached to `socket` on `interface`.
     #[must_use]
     pub fn files_for_socket(&self, interface: Interface, socket: SocketId) -> Vec<u64> {
