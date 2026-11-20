@@ -8,7 +8,7 @@
 
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/../../../.." && pwd -P)
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd -P)
 cd "$root"
 
 arch=x86_64
