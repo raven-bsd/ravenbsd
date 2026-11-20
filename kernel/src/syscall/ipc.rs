@@ -77,18 +77,20 @@ fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     // A per-process root only affects the file namespace. Lexical `.`/`..` resolution clamps at
     // the root before the request leaves the process boundary; symlink resolution remains a
     // vfsd responsibility (K224).
+    let mut root = None;
     let effective = if matches!(scheme, "file" | "vfs") {
-        let root = caller.root.lock().clone();
-        if root == "/" {
+        let caller_root = caller.root.lock().clone();
+        if caller_root == "/" {
             String::from(suffix)
         } else {
-            process::resolve_root_path(&root, suffix)
+            root = Some(caller_root.clone());
+            process::resolve_root_path(&caller_root, suffix)
         }
     } else {
         String::from(suffix)
     };
     let server = registry::lookup(caller, scheme)?;
-    let handle = router::open(caller, server, &effective, flags)?;
+    let handle = router::open(caller, server, &effective, root.as_deref(), flags)?;
     Ok(handle.0 as usize)
 }
 

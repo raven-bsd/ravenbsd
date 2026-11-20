@@ -14,13 +14,14 @@ fn sample() -> SchemePacket {
     packet.response_addr = 0x7000_1000_0000;
     packet.response_len = 4096;
     packet.offset = 123;
-    packet.set_path(b"echo:hello").unwrap();
+    packet.set_path(b"/tmp/root/inside").unwrap();
+    packet.root_len = 9;
     packet
 }
 
 #[test]
 fn packet_size_and_offsets_are_stable() {
-    assert_eq!(PACKET_SIZE, 528);
+    assert_eq!(PACKET_SIZE, 536);
     assert_eq!(size_of::<Opcode>(), 2);
 }
 
@@ -67,7 +68,8 @@ fn roundtrip_preserves_every_field() {
     assert_eq!(decoded.response_addr, packet.response_addr);
     assert_eq!(decoded.response_len, packet.response_len);
     assert_eq!(decoded.offset, packet.offset);
-    assert_eq!(decoded.path_bytes(), b"echo:hello");
+    assert_eq!(decoded.path_bytes(), b"/tmp/root/inside");
+    assert_eq!(decoded.root_len, 9);
     assert_eq!(decoded.data_bytes(), b"");
     let mut read = SchemePacket::request(Opcode::Read, 1, 1);
     read.set_data(b"payload").unwrap();
@@ -97,6 +99,9 @@ fn length_limits_are_enforced() {
     assert_eq!(packet.validate(false), Err(PacketError::BadLength));
     let mut packet = SchemePacket::request(Opcode::Open, 1, 1);
     packet.data_len = (MAX_PATH + 1) as u32;
+    assert_eq!(packet.validate(false), Err(PacketError::BadLength));
+    let mut packet = SchemePacket::request(Opcode::Open, 1, 1);
+    packet.root_len = (MAX_PATH + 1) as u32;
     assert_eq!(packet.validate(false), Err(PacketError::BadLength));
 }
 

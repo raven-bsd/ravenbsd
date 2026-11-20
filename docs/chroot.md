@@ -74,12 +74,30 @@ The empty-root case uses `/tmp/var/empty` because the `libc-test` initfs has no 
 `/var`; the kernel root is path-agnostic, so the release `/var/empty` used by OpenSSH follows
 the same code path.
 
-## Symlink follow-up (K224)
+## Rooted symlink resolution (K224)
 
-The kernel enforces lexical absolute/`..` confinement. vfsd still resolves symbolic links in
-its own namespace, and a symlink inside the root can point outside it. The kernel alone cannot
-resolve that without a server-side rooted lookup or `O_NOFOLLOW` on every component. This is a
-named **K224 (vfsd)** dependency; this ticket does not claim full symlink confinement.
+The S11 `OPEN` packet carries the root as a prefix of its path plus `root_len` (zero for an
+unrooted process), and vfsd receives that length in `Ctx`. Rooted opens resolve every component
+in vfsd:
+
+- relative symlink targets are resolved from the link's parent under the root;
+- absolute targets are interpreted relative to the root, not the underlying filesystem root;
+- `..` pops but cannot climb above the root;
+- dangling and outside targets return `ENOENT`; `O_NOFOLLOW` on a final link returns `ELOOP`;
+- the symlink walk is bounded at 40 links (`ELOOP`).
+
+Unrooted processes and rooted paths that do not touch a symlink preserve the existing path
+behaviour. The kernel still prefixes the lexical root before `OPEN`, so the packet path is already
+inside the root; vfsd uses the new root field to resolve links in that same boundary.
+
+The `chroot` qtest now covers: unrooted inside symlink, rooted inside symlink, absolute target,
+`../` escape, dangling target, and the same inside/escape pair after fork/exec:
+
+```text
+chroot: unrooted good=1
+chroot: symlink inside=1 abs=1 escape=0 rel=0 dangling=0
+chroot-child: inside=1 outside=0 symlink=1 escape=0
+```
 
 ## Donor reconciliation
 

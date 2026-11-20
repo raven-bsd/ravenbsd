@@ -134,6 +134,8 @@ pub struct Ctx {
     pub response_len: u64,
     /// Caller credentials attached by the kernel.
     pub credentials: Credentials,
+    /// Length of the per-process root prefix in the `Open` path; zero means unrooted (K224).
+    pub root_len: u32,
     /// Trace id stamped on the request by the kernel; zero means "not traced" (`R-OBS-6`).
     pub trace_id: u64,
 }
@@ -471,6 +473,7 @@ impl<K: Kernel> Server<K> {
                 packet.packet.groups,
                 packet.packet.group_count,
             ),
+            root_len: packet.packet.root_len,
             trace_id: packet.packet.trace_id,
         };
         match self.handle(packet.packet, handler, &ctx) {
