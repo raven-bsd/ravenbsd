@@ -126,28 +126,39 @@ pub fn poll<B: SysBackend, L: Lock>(
             .unwrap_or(0)
             .saturating_mul(1_000_000)
     };
-    let queue = platform.event_queue()?;
     let backend = platform.backend();
-    for (position, registration) in registrations.iter().enumerate() {
-        if let Err(error) = backend.evq_ctl(
-            queue,
-            EVQ_ADD,
-            registration.reference.poll_handle(),
-            registration.events,
-            u64::try_from(position).unwrap_or(0),
-        ) {
-            for added in registrations.iter().take(position) {
-                let _ = backend.evq_ctl(queue, EVQ_DEL, added.reference.poll_handle(), 0, 0);
-            }
-            return Err(error);
-        }
-    }
     let mut events = [EvqEvent::default(); MAX_POLL_FDS];
-    let waited = backend.evq_wait(queue, &mut events, timeout_ns);
-    for registration in &registrations {
-        let _ = backend.evq_ctl(queue, EVQ_DEL, registration.reference.poll_handle(), 0, 0);
-    }
-    let count = waited?;
+    let mut attempt = 0usize;
+    let count = loop {
+        let queue = platform.event_queue()?;
+        for (position, registration) in registrations.iter().enumerate() {
+            if let Err(error) = backend.evq_ctl(
+                queue,
+                EVQ_ADD,
+                registration.reference.poll_handle(),
+                registration.events,
+                u64::try_from(position).unwrap_or(0),
+            ) {
+                for added in registrations.iter().take(position) {
+                    let _ = backend.evq_ctl(queue, EVQ_DEL, added.reference.poll_handle(), 0, 0);
+                }
+                return Err(error);
+            }
+        }
+        let waited = backend.evq_wait(queue, &mut events, timeout_ns);
+        for registration in &registrations {
+            let _ = backend.evq_ctl(queue, EVQ_DEL, registration.reference.poll_handle(), 0, 0);
+        }
+        match waited {
+            Err(Errno::EBUSY) if attempt == 0 => {
+                // A child inherited the parent's cached queue across fork; the queue allows
+                // one waiter. Drop this process's handle and create its own queue, then retry.
+                platform.reset_event_queue();
+                attempt = 1;
+            }
+            other => break other?,
+        }
+    };
     let mut fired = 0usize;
     for event in events.iter().take(count) {
         let Some(registration) = registrations.get(event.cookie as usize) else {

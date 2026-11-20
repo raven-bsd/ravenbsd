@@ -242,6 +242,27 @@ fn an_entry_with_no_events_is_not_ready() {
 }
 
 #[test]
+fn poll_recovers_from_a_foreign_waiting_event_queue() {
+    let platform = Platform::new(FakeSys::new());
+    let fd = platform
+        .install(Handle(7), OfdKind::Socket, 2, None, false)
+        .expect("install");
+    let ofd = platform.get(fd).expect("fd").index();
+    platform.set_ofd_event(ofd, Handle(9)).expect("event");
+    platform.backend().ready(Handle(9), EV_SIGNALED);
+    platform
+        .backend()
+        .fail_next(crate::backend::Fault::EvqWait, Errno::EBUSY);
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN);
+}
+
+#[test]
 fn a_delivered_scheme_event_rearms_once() {
     let platform = Platform::new(FakeSys::new());
     let fd = platform
