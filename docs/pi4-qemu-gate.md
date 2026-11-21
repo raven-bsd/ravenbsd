@@ -60,6 +60,24 @@ the Pi 4 board; the login path still completes and is the only claim here.
   current markers (styled screen, welcome, login/password, `raven#`, clean exit). It does not
   weaken or delete the existing cases; their stale expectation is a separate test-owner fix.
 
+## K411 five-boot stability sample
+
+Tree `c685aa6ce9e20eed536309111e2a63463c56d45a`, image sha256
+`1539663743cda9341a232a474206db9376de82619200b9a61f47834241f26d2f` (320 MiB, build 244.89 s).
+Five consecutive `login-aarch64` boots, `--no-build`, KVM host QEMU:
+
+| Run | Exit | Wall s | Host load1 | Panic/TLB | Kernel |
+|---:|---:|---:|---:|---:|---|
+| 1 | 0 | 65 | 27.07 | 0 | `c685aa6ce` |
+| 2 | 0 | 30 | 44.27 | 0 | `c685aa6ce` |
+| 3 | 0 | 44 | 35.85 | 0 | `c685aa6ce` |
+| 4 | 0 | 44 | 35.46 | 0 | `c685aa6ce` |
+| 5 | 0 | 26 | 31.43 | 0 | `c685aa6ce` |
+
+p50 44 s, p90 65 s. Every boot reached the styled screen, `login:`/`Password:`/`raven# ` and
+`init exited (0)`; no panic, exception or TLB line. Host QEMU only - no board/HDMI claim.
+Artifacts: `tests/evidence/pi4/c685aa6ce9e20eed536309111e2a63463c56d45a/`.
+
 ## Hardware gates
 
 | Gate | Status |
