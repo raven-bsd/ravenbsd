@@ -66,6 +66,7 @@ mod rack_pipe;
 mod rack_sack;
 mod rack_transport;
 mod rack_retransmit;
+mod rack_state;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -168,6 +169,13 @@ pub use rack_retransmit::{
     RACK_RWND_COLLAPSED, RACK_SACK_PASSED, RACK_SENT_FP, RACK_TLP, RACK_TO_REXT, RACK_WAS_ACKED,
     RACK_WAS_LOST, RACK_WAS_SACKPASS, RackRetransmit, RackSendMap, RackTransmission,
     RetransmitError, Rsm, SACKED, TH_PUSH,
+pub use rack_state::{
+    TCPS_CLOSING, TCPS_FIN_WAIT_1, TCPS_FIN_WAIT_2, TCPS_LAST_ACK, TCPS_TIME_WAIT,
+    rack_do_close_wait, rack_do_closing, rack_do_compressed_ack_processing, rack_do_established,
+    rack_do_fastnewdata, rack_do_fin_wait_1, rack_do_fin_wait_2, rack_do_lastack, rack_do_segment,
+    rack_do_segment_nounlock, rack_do_syn_recv, rack_do_syn_sent, rack_do_win_updates,
+    rack_handle_delayed_ack, rack_handle_might_revert, rack_handle_probe_response,
+    rack_process_data, rack_process_option,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
