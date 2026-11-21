@@ -66,6 +66,8 @@ pub(crate) struct TcpConnection {
     pub snd_wl1: u32,
     #[allow(dead_code)]
     pub snd_wl2: u32,
+    /// Sequence number of the last ACK sent; FreeBSD RST validation uses it.
+    pub last_ack_sent: u32,
     pub fin_sent: bool,
     pub fin_acked: bool,
     pub peer_fin: bool,
@@ -203,6 +205,7 @@ impl TcpConnection {
             rcv_wnd: 65_535,
             snd_wl1: 0,
             snd_wl2: 0,
+            last_ack_sent: iss,
             fin_sent: false,
             fin_acked: false,
             peer_fin: false,
@@ -310,6 +313,7 @@ impl TcpConnection {
             rcv_wnd: 65_535,
             snd_wl1: irs,
             snd_wl2: iss,
+            last_ack_sent: irs.wrapping_add(1),
             fin_sent: false,
             fin_acked: false,
             peer_fin: false,
@@ -1406,6 +1410,7 @@ impl<D: Device> Stack<D> {
         let mut send_ack = false;
         let mut send_challenge = false;
         let mut send_rst = false;
+        let mut drop_with_reset = false;
         let mut send_syn_ack = false;
         let mut rst_seq = 0;
         let mut close_error = None;
@@ -1427,6 +1432,69 @@ impl<D: Device> Stack<D> {
                 return;
             };
             'transition: {
+                // FreeBSD `tcp_do_segment` validates RST before the state dispatch
+                // (RFC 5961 section 3.2), then drops a SYN in a synchronized state
+                // (section 4.2).  SYN_SENT and TIME_WAIT keep their own split bodies.
+                if segment.rst()
+                    && !matches!(connection.state, TcpState::SynSent | TcpState::TimeWait)
+                {
+                    match reset_disposition(connection, segment.seq) {
+                        ResetDisposition::Accept => {
+                            if connection.state == TcpState::SynReceived {
+                                close_error = Some(Errno::ECONNREFUSED);
+                                self.counters.attempt_fails =
+                                    self.counters.attempt_fails.wrapping_add(1);
+                            } else {
+                                close_error = Some(Errno::ECONNRESET);
+                            }
+                            if connection.state == TcpState::Established {
+                                self.counters.estab_resets =
+                                    self.counters.estab_resets.wrapping_add(1);
+                            }
+                            closed = true;
+                        }
+                        ResetDisposition::Challenge => {
+                            send_challenge = true;
+                            self.counters.rst_challenge =
+                                self.counters.rst_challenge.wrapping_add(1);
+                        }
+                        ResetDisposition::Ignore => {
+                            self.counters.rst_out_of_window =
+                                self.counters.rst_out_of_window.wrapping_add(1);
+                        }
+                    }
+                    break 'transition;
+                }
+                if segment.syn()
+                    && !matches!(
+                        connection.state,
+                        TcpState::SynSent | TcpState::SynReceived | TcpState::TimeWait
+                    )
+                {
+                    send_challenge = true;
+                    break 'transition;
+                }
+                // FreeBSD validates SEG.ACK against SND.MAX before the synchronized
+                // state body.  ESTABLISHED/FIN-WAIT-1 already do this in their body.
+                if segment.ack_flag()
+                    && matches!(
+                        connection.state,
+                        TcpState::FinWait2
+                            | TcpState::CloseWait
+                            | TcpState::Closing
+                            | TcpState::LastAck
+                    )
+                    && !ack_window_ok(connection, segment.ack)
+                {
+                    if seq_gt(segment.ack, connection.highest_sent()) {
+                        self.counters.acks_for_unsent =
+                            self.counters.acks_for_unsent.wrapping_add(1);
+                    } else {
+                        self.counters.ack_challenge = self.counters.ack_challenge.wrapping_add(1);
+                    }
+                    send_challenge = true;
+                    break 'transition;
+                }
                 match connection.state {
                     TcpState::SynSent => {
                         if segment.rst() {
@@ -1469,32 +1537,16 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::SynReceived => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                if connection.passive {
-                                    closed = true;
-                                } else {
-                                    close_error = Some(Errno::ECONNREFUSED);
-                                    closed = true;
-                                }
-                                self.counters.attempt_fails =
-                                    self.counters.attempt_fails.wrapping_add(1);
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
                         if segment.syn() && !segment.ack_flag() {
-                            apply_syn_options(connection, segment, now);
                             if segment.seq == connection.irs {
+                                apply_syn_options(connection, segment, now);
                                 send_syn_ack = true;
+                            } else if seq_lt(segment.seq, connection.irs) {
+                                // The LAND guard in `tcp_do_segment` resets a SYN
+                                // below IRS instead of touching the half-open.
+                                drop_with_reset = true;
                             } else {
-                                closed = true;
+                                send_ack = true;
                             }
                             break 'transition;
                         }
@@ -1503,9 +1555,21 @@ impl<D: Device> Stack<D> {
                             && seq_le(segment.ack, connection.snd_nxt)
                         {
                             connection.snd_una = segment.ack;
-                            connection.snd_wnd = u32::from(segment.window) << connection.snd_wscale;
-                            connection.max_snd_wnd = connection.max_snd_wnd.max(segment.window);
+                            // FreeBSD SYN_RECEIVED: snd_wnd = tiwin and
+                            // snd_wl1 = SEG.SEQ - 1.  The following data segment
+                            // is therefore the first one allowed to update the
+                            // window, which keeps the split-1 stale-window rule.
+                            let scaled = u32::from(segment.window) << connection.snd_wscale;
+                            connection.snd_wnd = scaled;
+                            connection.max_snd_wnd = connection
+                                .max_snd_wnd
+                                .max(u16::try_from(scaled).unwrap_or(u16::MAX));
+                            connection.snd_wl1 = segment.seq.wrapping_sub(1);
+                            connection.snd_wl2 = segment.ack;
                             transition = Some(TcpState::Established);
+                            if !segment.payload.is_empty() {
+                                incoming = Some((segment.seq, segment.payload));
+                            }
                             if connection.passive {
                                 pending_listener = Some(connection.local_port);
                             }
@@ -1514,33 +1578,17 @@ impl<D: Device> Stack<D> {
                             rst_seq = segment.ack;
                         }
                         if segment.fin() && segment.seq == connection.rcv_nxt {
-                            connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
-                            connection.peer_fin = true;
-                            transition = Some(TcpState::CloseWait);
-                            send_ack = true;
+                            if segment.payload.is_empty() {
+                                connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
+                                connection.peer_fin = true;
+                                transition = Some(TcpState::CloseWait);
+                                send_ack = true;
+                            } else {
+                                fin_after_data = true;
+                            }
                         }
                     }
                     TcpState::Established => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                                self.counters.estab_resets =
-                                    self.counters.estab_resets.wrapping_add(1);
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if connection.timestamps
                             && let Some(tsval) = segment.tsval
                             && seq_lt(tsval, connection.ts_recent)
@@ -1683,24 +1731,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::FinWait1 => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if connection.timestamps
                             && let Some(tsval) = segment.tsval
                             && seq_lt(tsval, connection.ts_recent)
@@ -1758,24 +1788,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::FinWait2 => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if segment.ack_flag() {
                             update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
@@ -1790,24 +1802,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::CloseWait => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if !segment.payload.is_empty() {
                             incoming = Some((segment.seq, segment.payload));
                         }
@@ -1819,24 +1813,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::Closing => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if segment.ack_flag() {
                             update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
@@ -1852,24 +1828,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::LastAck => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if segment.ack_flag() {
                             update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
@@ -2050,6 +2008,9 @@ impl<D: Device> Stack<D> {
         }
         if send_rst {
             let _ = self.send_rst_for(socket, rst_seq);
+        }
+        if drop_with_reset {
+            let _ = self.send_drop_with_reset(socket, segment);
         }
     }
 
@@ -2437,12 +2398,14 @@ impl<D: Device> Stack<D> {
         }
         if let Ok(record) = self.sockets.record_mut(socket)
             && let Kind::Tcp(connection) = &mut record.kind
-            && connection.state == TcpState::SynReceived
         {
-            connection.rto_deadline =
-                Some(Instant::from_millis(self.now.as_millis().saturating_add(
-                    i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
-                )));
+            connection.last_ack_sent = rcv_nxt;
+            if connection.state == TcpState::SynReceived {
+                connection.rto_deadline =
+                    Some(Instant::from_millis(self.now.as_millis().saturating_add(
+                        i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
+                    )));
+            }
         }
         let mut flags = flags_or(TcpFlags::SYN, TcpFlags::ACK);
         if self.tunables.ecn_enable != 0
@@ -2531,6 +2494,7 @@ impl<D: Device> Stack<D> {
             && let Kind::Tcp(connection) = &mut record.kind
         {
             connection.last_adv_window = window;
+            connection.last_ack_sent = rcv_nxt;
         }
         self.send_tcp_packet(
             local,
@@ -2563,6 +2527,11 @@ impl<D: Device> Stack<D> {
                 advertised_window(record),
             )
         };
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            connection.last_ack_sent = rcv_nxt;
+        }
         self.send_tcp_packet(
             local,
             remote.0,
@@ -2594,6 +2563,44 @@ impl<D: Device> Stack<D> {
             TcpFlags::RST,
             seq,
             0,
+            0,
+            &[],
+            false,
+        )
+    }
+
+    /// FreeBSD `tcp_dropwithreset`: an ACKed segment gets a bare RST echoing its
+    /// ACK; a segment without ACK gets RST|ACK acknowledging its sequence space.
+    fn send_drop_with_reset(
+        &mut self,
+        socket: SocketId,
+        segment: &Segment<'_>,
+    ) -> Result<(), Errno> {
+        let (local, remote, port) = {
+            let record = self.sockets.record(socket)?;
+            let Kind::Tcp(connection) = &record.kind else {
+                return Err(Errno::ENOTSOCK);
+            };
+            let remote = connection.remote.ok_or(Errno::ENOTCONN)?;
+            (connection.local, remote, connection.local_port)
+        };
+        let (flags, seq, ack) = if segment.ack_flag() {
+            (TcpFlags::RST, segment.ack, 0)
+        } else {
+            (
+                flags_or(TcpFlags::RST, TcpFlags::ACK),
+                0,
+                segment.seq.wrapping_add(segment.len()),
+            )
+        };
+        self.send_tcp_packet(
+            local,
+            remote.0,
+            port,
+            remote.1,
+            flags,
+            seq,
+            ack,
             0,
             &[],
             false,
@@ -3281,14 +3288,35 @@ fn update_snd_wnd(connection: &mut TcpConnection, seq: u32, ack: u32, window: u1
     }
 }
 
-fn in_window(connection: &TcpConnection, seq: u32) -> bool {
-    seq_ge(seq, connection.rcv_nxt)
-        && seq_lt(
-            seq,
-            connection
-                .rcv_nxt
-                .wrapping_add(u32::from(connection.rcv_wnd)),
-        )
+enum ResetDisposition {
+    Accept,
+    Challenge,
+    Ignore,
+}
+
+/// FreeBSD `tcp_do_segment` RFC 5961 section 3.2: a RST is accepted only at
+/// `last_ack_sent` or `RCV.NXT`, challenged when it lands in the window, and
+/// ignored otherwise.
+fn reset_disposition(connection: &TcpConnection, seq: u32) -> ResetDisposition {
+    let in_window = if connection.rcv_wnd == 0 {
+        connection.last_ack_sent == seq || connection.rcv_nxt == seq
+    } else {
+        seq_ge(seq, connection.last_ack_sent)
+            && seq_lt(
+                seq,
+                connection
+                    .rcv_nxt
+                    .wrapping_add(u32::from(connection.rcv_wnd)),
+            )
+    };
+    if !in_window {
+        return ResetDisposition::Ignore;
+    }
+    if connection.last_ack_sent == seq || connection.rcv_nxt == seq {
+        ResetDisposition::Accept
+    } else {
+        ResetDisposition::Challenge
+    }
 }
 
 fn ack_window_ok(connection: &TcpConnection, ack: u32) -> bool {
