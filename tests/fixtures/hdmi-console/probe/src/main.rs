@@ -5,11 +5,13 @@
 //!
 //! The service reads the exact firmware `config.txt` text staged into the test initfs, checks
 //! the configured mode, drives the merged `raven-fb` blitter on a small local display buffer,
-//! and proves the mailbox codec error paths return instead of panicking. Its output travels the
-//! same `DEBUG_WRITE` path whose Pi 4 kernel glue mirrors bytes to the HDMI console.
+//! and proves the mailbox codec error paths return instead of panicking. It then prints the
+//! target styled boot screen through the same `DEBUG_WRITE` path whose Pi 4 kernel glue mirrors
+//! bytes to the HDMI console; the host check renders the same text to a 1024x768 PPM.
 //!
 //! The small local buffer is deliberate: the full 1024x768 artifact is rendered by the host
 //! check, while this target probe proves the same code paths compile and run in the guest.
+//! Physical panel evidence remains UI1's board run; this probe never claims a monitor.
 
 #![no_std]
 #![no_main]
@@ -27,6 +29,12 @@ const HEIGHT: u32 = 32;
 const BYTES_PER_PIXEL: u32 = 4;
 const PITCH: u32 = WIDTH * BYTES_PER_PIXEL;
 const PIXELS: usize = (PITCH * HEIGHT) as usize;
+const RULE: &str =
+    "--------------------------------------------------------------------------------";
+#[cfg(target_arch = "x86_64")]
+const ARCH: &str = "x86_64";
+#[cfg(target_arch = "aarch64")]
+const ARCH: &str = "aarch64";
 
 fn main(_args: raven_rt::Args) -> i32 {
     let config = match read_config() {
@@ -73,8 +81,26 @@ fn main(_args: raven_rt::Args) -> i32 {
         return fail("mailbox fallback");
     }
     raven_rt::println!("hdmi-console: mailbox fallback ok");
+    print_styled_screen();
     raven_rt::println!("hdmi-console: done");
     0
+}
+
+/// Print the target styled boot screen to the serial mirror.
+///
+/// These are the text lines the host check renders at 1024x768. The live init on the base tree
+/// still prints its concise boot report; K374 owns the live presentation. The marker keeps the
+/// probe's lines distinct from the init output while the login prompt remains getty's real one.
+fn print_styled_screen() {
+    raven_rt::println!("hdmi-console: styled screen");
+    raven_rt::println!("R A V E N   B S D");
+    raven_rt::println!("{RULE}");
+    raven_rt::println!("000.00  svcd                ok");
+    raven_rt::println!("000.00  consd               ok");
+    raven_rt::println!("000.00  getty               ok");
+    raven_rt::println!("{RULE}");
+    raven_rt::println!();
+    raven_rt::println!("Welcome to RavenBSD 0.1 {ARCH}");
 }
 
 fn fail(what: &str) -> i32 {

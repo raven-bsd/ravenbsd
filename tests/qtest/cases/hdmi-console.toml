@@ -6,9 +6,10 @@
 # raven-fb probe; the host check renders the 1024x768x32 artifact. This is not a physical-monitor
 # claim: the Pi 4 panel/keyboard evidence remains UI1's board run.
 #
-# The boot-screen expectation accepts the concise `svcd: all services up` report on the pre-K374
-# base and the styled `R A V E N   B S D` title once K374 lands; both are the same boot screen
-# position before getty. The login identity accepts the current getty banner or K374's Welcome.
+# The target probe prints the styled boot screen through DEBUG_WRITE, the same byte stream the
+# Pi 4 serial mirror also sends to fb::write_text: title, 80-column rules, timed rows and Welcome.
+# The host check renders the same text at 1024x768x32. The real getty owns `login:`; a physical
+# monitor and USB keyboard remain UI1 board evidence, never this qtest.
 
 name = "hdmi-console"
 arch = "x86_64"
@@ -44,15 +45,34 @@ unordered = true
 regex = '^hdmi-console: done$'
 unordered = true
 
-# The boot screen is printed before getty. Pre-K374 this is the concise boot report; after K374
-# it is the styled title. Exactly one of these presentations is present on a given base.
+# Target probe: the styled screen is printed to the serial mirror and rendered by the host PPM.
+# The marker keeps these lines distinct from the init's concise boot report on the base tree.
 [[expect]]
-regex = '^(svcd: all services up|R A V E N   B S D)$'
+regex = '^hdmi-console: styled screen$'
 unordered = true
 
-# Current getty owns the banner; K374 moves the identity to the init `Welcome` line.
 [[expect]]
-regex = '^(RavenBSD 0\.1 \((x86_64|aarch64)\) \(tty:console\)|Welcome to RavenBSD 0\.1 (x86_64|aarch64))$'
+regex = '^R A V E N   B S D$'
+unordered = true
+
+[[expect]]
+regex = '^-{80}$'
+unordered = true
+
+[[expect]]
+regex = '^000\.00  svcd +ok$'
+unordered = true
+
+[[expect]]
+regex = '^000\.00  consd +ok$'
+unordered = true
+
+[[expect]]
+regex = '^000\.00  getty +ok$'
+unordered = true
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 (x86_64|aarch64)$'
 unordered = true
 
 [[expect]]

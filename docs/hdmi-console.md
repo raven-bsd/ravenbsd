@@ -176,9 +176,10 @@ donors; no CDDL/GPL code was read or copied. Donor revision: NetBSD
 
 ## 9. Open inputs
 
-* The full styled boot screen (title, rules, timed service table, `Welcome`) is K374. On the
-  current base the same screen position carries the concise `svcd: all services up` report and
-  the getty banner; K386 accepts either presentation and records which one ran.
+* The live init presentation of the styled screen is K374. The K386 qtest asserts the styled
+  screen through the target probe's serial mirror (marked `hdmi-console: styled screen`) and the
+  host PPM; the live init's concise boot report remains in the same transcript and is not an
+  HDMI-console gap.
 * Real-panel mode/timing evidence if the monitor rejects DMT 1024x768 60 Hz; the fallback is a
   different fixed `hdmi_mode`.
 * A real monitor photo, USB-keyboard login and panel/cable record belong to UI1; the K386 qtest
@@ -209,13 +210,16 @@ What the case proves:
 | Firmware mode is 1024x768x32, from the actual `xtask/src/pi.rs` `CONFIG_TXT` literal | `build/fixtures/hdmi-console/config.txt`, `host.log` |
 | `raven-fb` renders the exact 8x16 glyph, scrolls and keeps the cursor | target `hdmi-console: blit/scroll ok`; host `build/qtest/hdmi-console.ppm` |
 | Malformed/failed mailbox replies return errors; the kernel's `fb.rs` failure paths stay `UART only` and contain no panic/unwrap | target `hdmi-console: mailbox fallback ok`; host `host.log` source checks |
-| Boot banner, boot screen and `login:` are the same serial stream the Pi 4 kernel mirrors | `build/qtest/hdmi-console.log`, `hdmi-console.json` |
+| The styled screen (title, 80-column rules, timed rows, `Welcome`) is on the serial stream the Pi 4 kernel mirrors | target `hdmi-console: styled screen` block in `build/qtest/hdmi-console.log` |
+| Boot banner and the real `login:` prompt are on the same stream | `build/qtest/hdmi-console.log`, `hdmi-console.json` |
 | Login `root`/`raven`, shell prompt, one command and clean `init exited (0)` | same serial log |
 
 The QEMU `virt` harness has no Pi 4 firmware mailbox and no panel, so there is no hardware
 framebuffer capture. The honest chain is: the serial log is the byte stream that
 `arch::aarch64::serial::{write_str,write_bytes}` mirrors to `fb::write_text` on a Pi 4 build;
-the target probe runs the same `raven-fb` blitter in the guest; and the host check renders that
-screen into `build/qtest/hdmi-console.ppm` at 1024x768x32. The PPM is a synthetic blitter render,
-not a photo of a monitor. A real monitor and USB keyboard login remain UI1 board evidence, and
-no physical-monitor claim is made here.
+the target probe prints the styled screen and runs the same `raven-fb` blitter in the guest; and
+the host check renders that screen into `build/qtest/hdmi-console.ppm` at 1024x768x32. The
+`hdmi-console: styled screen` marker separates the probe's lines from the init's concise boot
+report; the real getty owns `login:`. The PPM is a synthetic blitter render, not a photo of a
+monitor. A real monitor and USB keyboard login remain UI1 board evidence, and no
+physical-monitor claim is made here.
