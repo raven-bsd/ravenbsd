@@ -372,6 +372,16 @@ pub struct FilterDevice<D: Device> {
     dropped: u64,
 }
 
+/// One frame being evaluated, grouped so the filter context is not a long
+/// argument list (K423; clippy `too_many_arguments`).
+struct FrameContext<'a> {
+    caps: DeviceCaps,
+    frame: &'a [u8],
+    direction: Direction,
+    interface: &'static str,
+    now: Instant,
+}
+
 impl<D: Device> FilterDevice<D> {
     /// Wrap `inner`; `None` keeps the historical pass-through behaviour.
     #[must_use]
@@ -406,21 +416,17 @@ impl<D: Device> FilterDevice<D> {
 
     fn evaluate(
         engine: &mut Engine,
-        caps: DeviceCaps,
-        frame: &[u8],
-        direction: Direction,
-        interface: &'static str,
-        now: Instant,
+        ctx: FrameContext<'_>,
         log: &FilterLog,
         dropped: &mut u64,
     ) -> Outcome {
-        let Some(view) = parse_frame(caps, frame) else {
+        let Some(view) = parse_frame(ctx.caps, ctx.frame) else {
             return Outcome::Keep;
         };
-        let packet = view.packet(direction, interface);
+        let packet = view.packet(ctx.direction, ctx.interface);
         let decision = engine.evaluate(
             &packet,
-            u64::try_from(now.as_millis().max(0)).unwrap_or(0) / 1000,
+            u64::try_from(ctx.now.as_millis().max(0)).unwrap_or(0) / 1000,
         );
         for entry in engine.drain_logs() {
             log.borrow_mut().push(format_log(&entry));
@@ -431,7 +437,7 @@ impl<D: Device> FilterDevice<D> {
         }
         match decision.translation {
             None => Outcome::Keep,
-            Some(translation) => match rewrite(frame, view, translation) {
+            Some(translation) => match rewrite(ctx.frame, view, translation) {
                 Some(rewritten) => Outcome::Rewrite(rewritten),
                 None => {
                     // A translation the 0.1.0 hook cannot express (fragment or ICMPv6
@@ -439,8 +445,8 @@ impl<D: Device> FilterDevice<D> {
                     *dropped = dropped.saturating_add(1);
                     log.borrow_mut().push(format!(
                         "netd: pf drop {} {} translate-unsupported",
-                        direction_name(direction),
-                        interface
+                        direction_name(ctx.direction),
+                        ctx.interface
                     ));
                     Outcome::Drop
                 }
@@ -468,11 +474,13 @@ impl<D: Device> Device for FilterDevice<D> {
             None => consume(frame),
             Some(engine) => match Self::evaluate(
                 engine,
-                caps,
-                frame,
-                Direction::In,
-                interface,
-                now,
+                FrameContext {
+                    caps,
+                    frame,
+                    direction: Direction::In,
+                    interface,
+                    now,
+                },
                 &log,
                 dropped,
             ) {
@@ -504,11 +512,13 @@ impl<D: Device> Device for FilterDevice<D> {
         fill(&mut frame);
         match Self::evaluate(
             engine,
-            caps,
-            &frame,
-            Direction::Out,
-            interface,
-            now,
+            FrameContext {
+                caps,
+                frame: &frame,
+                direction: Direction::Out,
+                interface,
+                now,
+            },
             log,
             dropped,
         ) {
@@ -601,7 +611,7 @@ fn rewrite(frame: &[u8], view: FrameView, translation: Translation) -> Option<Ve
         let ihl = view.l4_offset.checked_sub(view.ip_offset)?;
         out.get_mut(view.ip_offset + 10..view.ip_offset + 12)?
             .copy_from_slice(&[0, 0]);
-        let checksum = checksum(&out.get(view.ip_offset..view.ip_offset + ihl)?);
+        let checksum = checksum(out.get(view.ip_offset..view.ip_offset + ihl)?);
         out.get_mut(view.ip_offset + 10..view.ip_offset + 12)?
             .copy_from_slice(&checksum.to_be_bytes());
     }
