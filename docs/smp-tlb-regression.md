@@ -47,9 +47,27 @@ that case).
 |---|---|---|
 | `cargo xtask qtest --case smp-boot` (new IF=0 check) | `selftest: smp tlb if0 failed: IF=0 shootdown timed out` | `selftest: smp tlb if0 ok elapsed_ms=0..4` |
 | `5x sh tests/smp/lock-time/run.sh repro` | run 3: `tlb shootdown timeout ... nr=0x1 irq_age_ms=127` | 5/5 PASS, no TLB line |
-| `posix-fs-smp` TCG4 | `tlb shootdown timeout ... nr=0x62` on the pre-fix kernel | no TLB line; the long TCG4 acceptance is host-load blocked (fixture worker deadline under load 100, preserved) |
-| `posix-fs-smp-kvm4` | pending | **pass** at host load 95-123, race 50/50, done 8, init 0; the earlier NMI `swapgs` page fault is gone |
+| `posix-fs-smp` TCG4 | `tlb shootdown timeout ... nr=0x62` on the pre-fix kernel | no TLB line; 11/14 executed low-load runs passed, 3 hit the S85e fixture worker deadline (one at host load 1.33), preserved |
+| `posix-fs-smp-kvm4` | pending | **pass** at host load 1.69 on the merged tree, race 50/50, done 8, init 0; the earlier NMI `swapgs` page fault is gone |
 | `make check-fast` | - | `check-fast: PASSED` |
+
+## Low-load TCG4 campaign
+
+After merging current `origin/master`, four batches of five TCG4 `posix-fs-smp` runs were attempted
+at host load 1.3-19.9. The batches stop on the first failure:
+
+| Batch | Runs executed | Pass | Fail | Failure |
+|---|---|---:|---:|---|
+| 1 | 1 | 0 | 1 | fixture worker deadline, load 19.95 |
+| 2 | 5 | 4 | 1 | fixture worker deadline, load 13.51 |
+| 3 | 5 | 5 | 0 | - |
+| 4 | 3 | 2 | 1 | fixture worker deadline, load 1.33 |
+
+No run produced a `smp: tlb shootdown timeout` line. The batch-4 failure at **host load 1.33**
+shows the fixture deadline is not purely host load: the S85e mount latency is about 1.6 s per
+mount and the 220 s worker deadline is marginal on this TCG host. That is an S85e/S139 fixture
+issue, outside S159's Owns; the S159 TLB primitive is covered by the deterministic IF=0 test and
+the KVM4 run.
 
 The mutation check reverts `send_tlb` to the fixed IPI; `smp-boot` fails the IF=0 check again.
 No test expectation was weakened and no deadline was raised.
