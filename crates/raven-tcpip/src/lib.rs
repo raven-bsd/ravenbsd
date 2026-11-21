@@ -56,6 +56,7 @@ mod neighbor;
 mod observability;
 mod plpmtud_live;
 mod pmtu;
+mod rack_bbr;
 mod rack_hpts;
 mod rack_log;
 mod rack_misc;
@@ -118,6 +119,12 @@ pub use pmtu::{
     IPV4_FLOOR, IPV6_FLOOR, IpFamily, MssUpdate, MtuCache, Plpmtud, PlpmtudState, TCP_MINMSS,
     TCP_MSS_DEFAULT, floor_for, mss_headers, mss_update, mssopt, next_pmtu, next_pmtu6,
     on_icmp_frag_needed, on_icmp6_frag_needed, probe_sequence,
+};
+pub use rack_bbr::{
+    BBR_UNIT, BbrLogEvent, BbrRack, BbrTunables, GpSample, HYBRID_CSPR, HYBRID_CU, HYBRID_ENABLE,
+    HYBRID_H_MS, HYBRID_SETMSS, HYBRID_WASSET, HybridRequest, MIN_GP_WIN, PACE_MAX_IP_BYTES,
+    Quality, RACK_MIN_BW, RACK_REQ_AVG, RACK_TIMELY_CNT_BOOST, SendfileTrack, TF_FASTRECOVERY,
+    TF_GPUTINPROG,
 };
 pub use rack_hpts::{
     HPTS_USECS_PER_SLOT, HptsCallback, NUM_OF_HPTSI_SLOTS, PACE_TMR_DELACK, PACE_TMR_KEEP,
