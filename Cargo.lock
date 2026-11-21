@@ -4158,6 +4158,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcp-output-stress"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
 name = "time"
 version = "0.1.0"
 dependencies = [

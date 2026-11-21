@@ -296,6 +296,7 @@ members = [
     "userland/servers/linuxd",
     "tests/net/packetdrill-harness",
     "tests/tcpip",
+    "tests/tcp-output-stress",
     "tests/tcp-model",
     "tests/tcpip/conformance",
     "tests/tcpip/fuzz-replay",
