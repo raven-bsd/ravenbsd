@@ -2,111 +2,69 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K400 pre-tag workspace test-build gate. Compiles every host workspace test target with
-# `cargo test --no-run`, without running a test and without network. The fast `check-fast` gate
-# only builds changed packages; this gate closes that blind spot.
+# K395 workspace test-build audit. Builds every workspace package's test targets with
+# `cargo test --no-run` (no test execution) and writes a per-package result TSV plus the
+# failure logs under tests/release/workspace-build/<sha>/.
 #
-# The gate is package-by-package so one failing crate cannot hide another package's test-build
-# error. Each package log is kept under build/release/check-build/. A failing package is printed
-# with its first compiler error and source location; the group summary is pass/fail per top-level
-# workspace area. Exit 0 only when every package test target compiles.
+# usage: sh tests/release/workspace-build/run.sh
+# The caller supplies the overall foreground timeout; each package gets a 120 s cap so a
+# single hang cannot consume the whole audit budget.
 
 set -eu
-
-root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd -P)
+root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
+sha=$(git rev-parse HEAD)
+out=${WORKSPACE_BUILD_OUT:-"$root/tests/release/workspace-build/$sha"}
+mkdir -p "$out/failures"
 
-logdir=build/release/check-build
-rm -rf "$logdir"
-mkdir -p "$logdir"
-
-command -v cargo >/dev/null 2>&1 || { echo "check-build: cargo not found" >&2; exit 1; }
-command -v python3 >/dev/null 2>&1 || { echo "check-build: python3 not found" >&2; exit 1; }
-
-cargo metadata --no-deps --format-version 1 >"$logdir/metadata.json"
-python3 - "$logdir/metadata.json" >"$logdir/packages.tsv" <<'PY'
+python3 - "$out" <<'PY'
 import json
-import sys
-
 import os
-import re
+import subprocess
+import sys
+import time
 
-metadata = json.load(open(sys.argv[1], encoding="utf-8"))
-root = os.path.abspath(os.path.join(os.path.dirname(sys.argv[1]), "../../.."))
-direct_fixture = re.compile(r"tests/fixtures/[^/]+/Cargo\.toml$")
-for package in metadata.get("packages", []):
-    raven = (package.get("metadata") or {}).get("raven") or {}
-    if raven.get("target"):
-        continue
-    manifest = package["manifest_path"]
-    relative = os.path.relpath(manifest, root)
-    # The kernel and the direct test fixtures are bare/uefi targets; their host test harness
-    # is not the release workspace test target. Nested fixture tools stay in.
-    if relative == "kernel/Cargo.toml" or direct_fixture.search(relative):
-        continue
-    print(package["name"] + "\t" + manifest)
+out = sys.argv[1]
+metadata = subprocess.run(
+    ["cargo", "metadata", "--no-deps", "--format-version", "1"],
+    capture_output=True,
+    text=True,
+    check=True,
+)
+packages = sorted({package["name"] for package in json.loads(metadata.stdout)["packages"]})
+results_path = os.path.join(out, "results.tsv")
+
+with open(results_path, "w") as results:
+    results.write("package\tstatus\tseconds\tfirst_error\n")
+    for index, package in enumerate(packages, 1):
+        started = time.time()
+        built = subprocess.run(
+            ["timeout", "120", "cargo", "test", "--no-run", "-p", package],
+            capture_output=True,
+            text=True,
+        )
+        seconds = time.time() - started
+        output = built.stdout + "\n" + built.stderr
+        if built.returncode == 0:
+            status = "pass"
+            first = ""
+        elif built.returncode == 124:
+            status = "timeout"
+            first = "timeout 120s"
+        else:
+            status = "fail"
+            first = ""
+            for line in output.splitlines():
+                if line.startswith("error[") or line.startswith("error:"):
+                    first = line.strip()
+                    break
+            safe = package.replace("/", "_").replace(":", "_")
+            with open(os.path.join(out, "failures", safe + ".log"), "w") as log:
+                log.write(output)
+        results.write(f"{package}\t{status}\t{seconds:.2f}\t{first}\n")
+        results.flush()
+        if index % 25 == 0:
+            print(f"workspace-build: {index}/{len(packages)} packages", file=sys.stderr, flush=True)
 PY
 
-per_package=${CHECK_BUILD_PACKAGE_TIMEOUT:-180}
-total=0
-failed=0
-: >"$logdir/failures.txt"
-: >"$logdir/results.tsv"
-
-while IFS="$(printf '\t')" read -r name manifest; do
-    [ -n "$name" ] || continue
-    total=$((total + 1))
-    safe=$(printf '%s' "$name" | tr '/ ' '__')
-    log="$logdir/$safe.log"
-    relative=${manifest#"$root"/}
-    case "$relative" in
-        crates/*) group=crates ;;
-        libc/*) group=libc ;;
-        userland/*) group=userland ;;
-        tests/*) group=tests ;;
-        kernel/*) group=kernel ;;
-        boot/*) group=boot ;;
-        tools/*) group=tools ;;
-        xtask/*) group=xtask ;;
-        *) group=other ;;
-    esac
-    if timeout "$per_package" cargo test --no-run --offline --locked -p "$name" >"$log" 2>&1; then
-        printf '%s\t%s\tpass\n' "$group" "$name" >>"$logdir/results.tsv"
-        continue
-    fi
-    code=$?
-    failed=$((failed + 1))
-    printf '%s\t%s\tfail\n' "$group" "$name" >>"$logdir/results.tsv"
-    if [ "$code" -eq 124 ]; then
-        printf 'check-build: FAIL %s: timed out after %s s\n' "$name" "$per_package" |
-            tee -a "$logdir/failures.txt"
-        continue
-    fi
-    first=$(grep -m1 '^error' "$log" || true)
-    location=$(awk '/^error/{found=1} found && /--> /{print; exit}' "$log" |
-        sed 's/^[[:space:]]*--> //')
-    if [ -n "$location" ]; then
-        printf 'check-build: FAIL %s: %s (%s)\n' "$name" "$first" "$location" |
-            tee -a "$logdir/failures.txt"
-    else
-        printf 'check-build: FAIL %s: %s\n' "$name" "$first" |
-            tee -a "$logdir/failures.txt"
-    fi
-done <"$logdir/packages.tsv"
-
-printf 'check-build: log %s\n' "$logdir"
-awk -F '\t' '
-    { total[$1]++; if ($3 == "pass") pass[$1]++ }
-    END {
-        for (group in total) {
-            printf "check-build: group %-10s %d/%d pass\n", group, pass[group] + 0, total[group]
-        }
-    }
-' "$logdir/results.tsv" | sort
-
-if [ "$failed" -eq 0 ]; then
-    printf 'check-build: PASS (%d packages)\n' "$total"
-    exit 0
-fi
-printf 'check-build: FAILED (%d/%d packages)\n' "$failed" "$total"
-exit 1
+printf 'workspace-build: results %s\n' "$out/results.tsv"

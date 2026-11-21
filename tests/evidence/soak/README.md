@@ -77,6 +77,26 @@ sample, and the gate remains BLOCKED. A `partial` row requires the preserved
 paths) and is regenerated last. Any edit after publishing invalidates the sums;
 re-run `sha256sum` and record the reason in the closing note.
 
+## Bounded smoke evidence (K399)
+
+A pre-flight smoke stores one directory per **tree SHA** (not per image) so both
+bounded smokes of one merged tree sit together:
+
+```
+tests/evidence/soak/<tree-sha>/
+├── smoke.tsv            # one row per smoke (columns below)
+├── tcp-soak/            # summary.json/.txt, tcp-soak.jsonl, socket-state.log, serial logs
+├── freeze-soak/         # summary.json/.txt, soak.jsonl, serial logs
+└── SHA256SUMS
+```
+
+`smoke.tsv` columns: `config image image_sha256 commit start_utc end_utc
+duration_s cycles expected_cycles result stall_gap_s panic exception fatal tlb
+nmi restart stall log_dir`. Counts are case-insensitive serial-log matches; they
+must be `0` for a bounded pass, and a non-zero count is a failure to report (with
+the exact line), not a retry. The 24 h run above still uses the
+`<image-sha256>/hour-NN.log` layout.
+
 ## Related
 
 * Harness: `scripts/soak.sh`, `tests/fixtures/soak/soak_driver.py` (K228).

@@ -36,14 +36,10 @@ use alloc::vec::Vec;
 use login::{Profile, normalize_username};
 
 /// Printed once before the first prompt.
-#[cfg(target_arch = "x86_64")]
-pub const BANNER: &str = "RavenBSD 0.1 (x86_64) (tty:console)\n";
-/// Printed once before the first prompt.
-#[cfg(target_arch = "aarch64")]
-pub const BANNER: &str = "RavenBSD 0.1 (aarch64) (tty:console)\n";
-/// Printed once before the first prompt.
-#[cfg(target_arch = "riscv64")]
-pub const BANNER: &str = "RavenBSD 0.1 (riscv64) (tty:console)\n";
+///
+/// The boot orchestrator now prints the styled title, rules, timed table and `Welcome` line;
+/// getty only owns the `login: ` prompt, so its own banner is empty.
+pub const BANNER: &str = "";
 /// The username prompt; printed again after every failed attempt.
 pub const PROMPT: &[u8] = b"login: ";
 /// A rejected user name that getty answers without spawning `login`.

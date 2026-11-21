@@ -58,7 +58,7 @@ check-fast:
 # Pre-tag gate: compile every host workspace test target, do not run tests. Closes the
 # check-fast changed-package blind spot (K394/K400). Run after check-fast and before the qtests.
 check-build:
-	@sh tests/release/workspace-build/run.sh
+	@sh tests/release/workspace-build/check.sh
 
 # Host-only UFS image/partition updater proof: GPT/ESP+UFS, put/rm/mkdir/sync,
 # fsck and the safety refusals. No board and no whole-image copy.

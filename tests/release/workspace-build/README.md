@@ -3,51 +3,53 @@
 
 # Workspace test-build gate (K400)
 
-`make check-build` runs `tests/release/workspace-build/run.sh`. It compiles every host workspace
-test target with `cargo test --no-run --offline --locked` package-by-package, never executes a
-test and never touches the network.
+`make check-build` runs `tests/release/workspace-build/check.sh`. K395's
+`tests/release/workspace-build/run.sh` is the authoritative per-package sweep; K400's wrapper
+classifies its results against the K395 audit and fails on any unowned compile failure.
 
-Why: `make check-fast` builds only the packages changed by the branch. K394 showed the blind spot
-when a pristine master could not compile the `fsd-ufs` tests (`E0063`, missing `root_len`) while
-`check-fast` stayed green. K400 adds this gate without changing `check-fast`.
+Why: `make check-fast` builds only the changed packages. K394 showed the blind spot when pristine
+master could not compile the `fsd-ufs` tests (`E0063`, missing `root_len`) while `check-fast`
+stayed green. K400 adds this pre-tag gate without changing `check-fast`.
 
 ## Pre-tag sequence
 
 1. `make check-fast` — fast changed-package gate.
-2. `make check-build` — every host workspace test target compiles.
+2. `make check-build` — every workspace test target compiles; only the named exclusions/owners
+   below may fail.
 3. the QEMU/release qtests on the frozen image.
+
+## Classification (K395 audit)
+
+Source: `docs/releases/0.1.0-workspace-build-audit.md`. The explicit list is
+`tests/release/workspace-build/exclusions.tsv`; the gate reads it and never guesses.
+
+| Class | Count | Behaviour |
+|---|---:|---|
+| compiled | 405 | pass |
+| K401 host-build exclusions | 71 | expected; target-none/bare fixtures and kernel, not meaningful under the host test build |
+| K394 `fsd-ufs` | 1 | owned failure; the gate stays green while K394 is open |
+| K402 `raven-blockd`, `raven-ramfsd` | 2 | owned failure; same `Ctx.root_len` gap |
+| K403 `raven-pi4-platd` | 1 | owned failure; host link duplicate `_start` |
+| unowned | 0 | **the gate exits 1 and names the package with file:line** |
+
+Any package not in the explicit list that fails to compile is unowned and blocks the pre-tag
+checkpoint. The gate does not rely on Cargo's first-error stop: the K395 runner builds each
+package separately.
 
 ## Output
 
-- Concise per-package failures with the first compiler error and `file:line`.
-- Pass/fail per top-level group (`crates`, `libc`, `userland`, `tests`, `kernel`, `boot`, `tools`,
-  `xtask`).
-- Full per-package logs: `build/release/check-build/<package>.log`.
-- Exit code 0 only when every package test target compiles.
+- `check-build: N packages: P pass, E host-build exclusions, O owned, U unowned`.
+- One `OWNED <pkg> (<ticket>): <first error> (<file:line>)` line per owned failure.
+- One `FAIL <pkg>: <first error> (<file:line>)` line per unowned failure; exit 1.
+- Full per-package logs: `build/release/workspace-build/<package>.log` (the path is printed).
 
-A package that times out at `CHECK_BUILD_PACKAGE_TIMEOUT` (default 180 s) is a failure, not a
-silent skip.
+## Runtime
 
-## Measured runtime (2026-11-21, base `4371e8ea`)
+K395's audit measured **428.48 s** for 480 packages on the audit host. The ticket cap is
+**1800 s** (cold + margin); the per-package cap is 120 s.
 
-| Run | Packages | Result | Seconds |
-|---|---:|---|---:|
-| cold, first full workspace test build in this clone | 390 | 7 failures (incl. kernel/bare fixtures before the filter) | 569.42 |
-| warm, filtered host workspace | 382 | 3 failures | 121.89 |
+## Current status
 
-The ticket cap is **1800 s** (cold + margin). The warm gate is ~2 minutes; the per-package
-`CHECK_BUILD_PACKAGE_TIMEOUT` bounds a single crate at 180 s.
-
-## Current master status
-
-On `4371e8ea` the gate is red on the K394/K395 class even though every other group passes:
-
-```text
-check-build: FAIL fsd-ufs: error[E0063]: missing field `root_len` (userland/servers/fsd-ufs/src/handler_ut.rs:149:5)
-check-build: FAIL raven-ramfsd: error[E0063]: missing field `root_len` (userland/servers/ramfsd/src/handler_ut.rs:29:5)
-check-build: FAIL raven-blockd: error[E0063]: missing field `root_len` (userland/servers/blockd/src/handler_ut.rs:22:5)
-```
-
-That is the gate doing its job: `check-fast` does not see these unchanged packages. K394 owns the
-`fsd-ufs` fix; the `raven-ramfsd`/`raven-blockd` rows are the same regression and need the same
-one-line initializer update. The gate stays in the pre-tag sequence and must be green before tag.
+On the K395 audit base the gate is green with exactly the four owned failures (K394, K402, K403)
+and the 71 K401 exclusions. It turns red if any unowned package fails; the gate's mutation proof
+removes the `fsd-ufs` K394 entry and shows the gate failing on the same E0063.

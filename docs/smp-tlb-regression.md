@@ -46,6 +46,7 @@ that case).
 | Test | Before | After |
 |---|---|---|
 | `cargo xtask qtest --case smp-boot` (new IF=0 check) | `selftest: smp tlb if0 failed: IF=0 shootdown timed out` | `selftest: smp tlb if0 ok elapsed_ms=0..4` |
+| `cargo xtask qtest --case smp-boot` (K393 edges) | - | `gs ok absent=1 invalid=1`, `swapgs ok`, `nested ok rounds=32`; the three mutations fail |
 | `5x sh tests/smp/lock-time/run.sh repro` | run 3: `tlb shootdown timeout ... nr=0x1 irq_age_ms=127` | 5/5 PASS, no TLB line |
 | `posix-fs-smp` TCG4 | `tlb shootdown timeout ... nr=0x62` on the pre-fix kernel | no TLB line; 11/14 executed low-load runs passed, 3 hit the S85e fixture worker deadline (one at host load 1.33), preserved |
 | `posix-fs-smp-kvm4` | pending | **pass** at host load 1.69 on the merged tree, race 50/50, done 8, init 0; the earlier NMI `swapgs` page fault is gone |
@@ -71,6 +72,49 @@ the KVM4 run.
 
 The mutation check reverts `send_tlb` to the fixed IPI; `smp-boot` fails the IF=0 check again.
 No test expectation was weakened and no deadline was raised.
+
+## NMI entry contract (K393)
+
+The vector-2 entry has three observable states:
+
+| State | `GS_BASE` | `KERNEL_GS_BASE` | Entry action |
+|---|---|---|---|
+| kernel GS active | per-CPU block | user base (0 after a syscall) or the same block at early boot | no swap; handler uses `GS_BASE` |
+| user GS active | 0 (user base) | per-CPU block | swap on entry, swap back on exit |
+| syscall `swapgs` window | 0 (user base) | per-CPU block | swap on entry, swap back on exit |
+
+The entry must not use `CS` to decide: an NMI can land after the syscall instruction has loaded
+kernel `CS` but before `swapgs` has exchanged the bases. It reads the privileged
+`KERNEL_GS_BASE` (`0xC0000102`); a kernel address there (`value >> 47 == 0x1ffff`) means the
+bases are not swapped yet, so it executes `swapgs` and sets the `r15` swap flag. A zero or
+non-kernel value means the kernel GS base is already active (or absent by design), so it does
+not swap and must leave both MSRs unchanged. `r15` is saved on the IST stack and restored after
+the optional exit `swapgs`.
+
+The handler runs on vector 2 with IST2, sends no LAPIC EOI, and touches only the shootdown
+atomics and `invlpg`; it takes no lock. NMI is blocked until `iretq`, so a second NMI is latched
+and delivered afterwards. `shootdown::handle_ipi` returns false when `PENDING == 0` or
+`LAST == sequence`, which makes a duplicate or stale NMI a no-op (no double acknowledgement).
+Concurrent shooters serialize on `ActiveGuard`; a CPU that is itself shooting down may receive
+an NMI while waiting for or holding the guard, and the handler still acks without taking it.
+
+The deterministic `selftest=smp` edges:
+
+* `selftest: smp tlb gs ok absent=1 invalid=1`: CPU 1 has `KERNEL_GS_BASE=0` and then a
+  non-kernel nonzero value while `GS_BASE` is the per-CPU block; the NMI must not swap and must
+  leave both MSRs unchanged.
+* `selftest: smp tlb swapgs ok elapsed_ms=N`: CPU 1 simulates the pre-`swapgs` window
+  (`GS_BASE=0`, `KERNEL_GS_BASE=per-CPU`, IF=0); the NMI must swap, ack the shootdown and
+  restore the pair.
+* `selftest: smp tlb nested ok rounds=32`: two pinned shooters race 16 shootdowns each; all
+  must acknowledge, and a following bare NMI with no pending sequence must not change the
+  target's flush count.
+
+The mutation checks are: unconditional `swapgs` fails the GS-pattern test; the old CS-only
+entry fails the `swapgs`-window test; dropping the `LAST == sequence` guard fails the nested
+test with `duplicate NMI acknowledged a stale shootdown`. The merged entry itself is unchanged;
+the tests are the K393 deliverable. The pinned targets are settled briefly before the next
+target is queued on the same CPU; that is test sequencing, not product behaviour.
 
 ## Donor reconciliation
 
