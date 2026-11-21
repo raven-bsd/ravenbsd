@@ -91,7 +91,7 @@ test exist in the current `crates/raven-tcpip` source.
 | 69 | `tcp_rack_partialack` (L5483) | K334 | `NewReno::partial_ack` | `newreno_partial_ack_keeps_recovery_active` | partial-ack recovery branch removed -> test fails | PASS |
 | 70 | `rack_exit_recovery` (L5502) | K333 | `RackPipe::rack_exit_recovery` | `rack_exit_recovery_clears_both_recovery_flags` | clear only TF_FASTRECOVERY -> CONGRECOVERY remains | PASS |
 | 71 | `rack_post_recovery` (L5511) | K333 | `RackPipe::rack_post_recovery` | `rack_post_recovery_adds_back_prr_and_exits` | drop the PRR addback -> 8000 vs 9500 | PASS |
-| 72 | `rack_cong_signal` (L5591) | K269 | `RackPipe::rack_enter_recovery` | `rack_enter_recovery_sets_prr_and_snd_recover` | recovery state mutation | GAP K269 |
+| 72 | `rack_cong_signal` (L5591) | K269 | `Rack::rack_cong_signal` | `rack_cong_signal_enters_recovery_and_sets_prr` | recovery-state mutation | PASS |
 | 73 | `rack_cc_after_idle` (L5721) | K334 | `NewReno::idle_restart` | `idle_restart_caps_at_ten_segments` | idle-restart IW cap removed -> test fails | PASS |
 | 74 | `rack_find_lowest_rsm` (L5763) | K331 | `RackRetransmit::rack_find_lowest_rsm` | `rack_find_lowest_rsm_skips_acked_entries` | selected ACKed entries; test failed exit 100 | PASS |
 | 75 | `rack_find_high_nonack` (L5783) | K331 | `RackRetransmit::rack_find_high_nonack` | `rack_find_high_nonack_skips_acked_and_fin_segments` | stopped skipping `RACK_HAS_FIN`; test failed exit 100 | PASS |
@@ -145,7 +145,7 @@ test exist in the current `crates/raven-tcpip` source.
 | 123 | `rack_note_dsack` (L10602) | K336 | `RackSack::rack_note_dsack` | `rack_note_dsack_counts_rounds_and_requests_spurious_recovery` | remove the DSACK-round increment -> test fails | PASS |
 | 124 | `do_rack_compute_pipe` (L10668) | K333 | `RackPipe::do_rack_compute_pipe` | `do_rack_compute_pipe_subtracts_sacked_and_lost_and_adds_holes` | drop `considered_lost` -> 3950 vs 3750 | PASS |
 | 125 | `rack_compute_pipe` (L10675) | K333 | `RackPipe::rack_compute_pipe` | `do_rack_compute_pipe_subtracts_sacked_and_lost_and_adds_holes` | same pipe mutation -> public wrapper fails | PASS |
-| 126 | `rack_update_prr` (L10683) | K269 | `RackPipe::rack_post_recovery` | `rack_post_recovery_adds_back_prr_and_exits` | PRR +1 mutation | GAP K269 |
+| 126 | `rack_update_prr` (L10683) | K269 | `Rack::rack_update_prr` | `rack_update_prr_high_pipe_uses_the_recovery_fraction` | PRR `+1` mutation | PASS |
 | 127 | `rack_log_ack` (L10746) | K329 | `crate::rack_log::rack_log_ack` | `donor_rack_log_ack` | event suppression -> test fails | PASS |
 | 128 | `rack_strike_dupack` (L10991) | K331 | `RackRetransmit::rack_strike_dupack` | `rack_strike_dupack_retransmits_on_the_third_dupack` | raised the readiness test to `> 3`; test failed exit 100 | PASS |
 | 129 | `rack_check_bottom_drag` (L11038) | K334 | `BbrRack::bw_can_be_raised` | `rack_bw_can_be_raised_checks_pacing_overage` | pacing overage threshold removed -> test fails | PASS |
@@ -244,8 +244,8 @@ test exist in the current `crates/raven-tcpip` source.
 
 | Status | Rows |
 |---|---:|
-| PASS | 217 |
-| GAP K269 | 2 |
+| PASS | 219 |
+| GAP K269 | 0 |
 | missing | 0 |
 | duplicate | 0 |
 | unknown | 0 |
@@ -254,8 +254,7 @@ test exist in the current `crates/raven-tcpip` source.
 
 `cargo run -q -p rack-register -- --check` reports
 `donors=219 rows=219 missing=0 unknown=0 duplicate=0 bad_owner=0 empty_rust=0 empty_test=0
-empty_mutation=0 not_pass=2 missing_symbol=0 missing_test=0`. The two non-PASS rows are the K269
-gap (`rack_cong_signal`, `rack_update_prr`); they are not hidden as PASS.
+empty_mutation=0 not_pass=0 missing_symbol=0 missing_test=0`. All 219 rows are PASS.
 
 ## Audit findings
 
@@ -264,9 +263,9 @@ gap (`rack_cong_signal`, `rack_update_prr`); they are not hidden as PASS.
 * **Ownership:** each function has exactly one owner. The historical K269/K328-K336 group-report
   overlaps are resolved in this register; the group reports are historical evidence and no longer
   override the register.
-* **K269 gap:** `rack_cong_signal` and `rack_update_prr` are Dave's K269 rows. The register records
-  the current delegated implementation candidates but leaves the status `GAP K269`; they are not
-  marked PASS to hide the gap.
+* **K269 rows:** `rack_cong_signal` and `rack_update_prr` are Dave's K269 rows and now map to
+  `Rack::rack_cong_signal` and `Rack::rack_update_prr` with named tests and mutations; both are
+  PASS.
 * **Delegations:** 33 donor helpers are inlined into or replaced by an existing product primitive
   (`rc_init_window` -> `BbrRack::init_window`, `tcp_rack_partialack` -> `NewReno::partial_ack`,
   `rack_fo_m_copym` -> `RackOs::m_copym`, `rack_check_queue_level` ->

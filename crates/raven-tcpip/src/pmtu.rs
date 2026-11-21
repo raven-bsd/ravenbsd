@@ -350,6 +350,26 @@ impl Plpmtud {
         mid.max(self.low + 1)
     }
 
+    /// The next probe size without consuming a probe from the budget.
+    ///
+    /// This lets the send path reject a probe that does not fit the current window without
+    /// losing search budget; `next_probe` remains the consuming entry point.
+    #[must_use]
+    pub fn next_probe_size(&self) -> Option<u32> {
+        if self.state != PlpmtudState::Searching || self.probes >= self.budget {
+            return None;
+        }
+        if self.high <= self.low + 1 {
+            if self.current < self.high {
+                Some(self.high)
+            } else {
+                None
+            }
+        } else {
+            Some((self.low + (self.high - self.low) / 2).max(self.low + 1))
+        }
+    }
+
     /// The next probe size, or `None` when the search is complete/error.
     pub fn next_probe(&mut self) -> Option<u32> {
         if self.state != PlpmtudState::Searching {
