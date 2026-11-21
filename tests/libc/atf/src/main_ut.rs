@@ -34,6 +34,14 @@ fn parse_u64_rejects_negative_values() {
 }
 
 #[test]
+fn run_backend_parses_the_c74x_target_modes() {
+    assert_eq!(RunBackend::parse("none"), Ok(RunBackend::None));
+    assert_eq!(RunBackend::parse("host-linux"), Ok(RunBackend::HostLinux));
+    assert_eq!(RunBackend::parse("qemu"), Ok(RunBackend::Qemu));
+    assert!(RunBackend::parse("bogus").is_err());
+}
+
+#[test]
 fn default_jobs_is_between_one_and_eight() {
     let jobs = default_jobs();
     assert!((1..=8).contains(&jobs));

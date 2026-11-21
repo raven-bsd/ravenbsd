@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "g1-picolibc"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/g1/build-picolibc.sh"]
+initfs = "build/fixtures/g1/picolibc-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+# One built picolibc program (`test-uchar`, a C5 pass row) runs as PID 1. This proves the C5
+# side of the G1 qemu backend end-to-end; the full suite is
+# `raven-atf-run suite --suite picolibc --mode target --run-backend qemu`.
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^process: starting /init$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

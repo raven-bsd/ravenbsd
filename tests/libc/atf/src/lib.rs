@@ -102,7 +102,7 @@ pub enum RunBackend {
     None,
     /// Host Linux execution with a Linux `raven-libc-sys` backend (refused when absent).
     HostLinux,
-    /// On-target QEMU execution; an interface only in C71.
+    /// On-target QEMU execution (the C74x target backend).
     Qemu,
 }
 
