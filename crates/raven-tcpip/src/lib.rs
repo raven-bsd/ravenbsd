@@ -58,6 +58,7 @@ mod plpmtud_live;
 mod pmtu;
 mod rack_hpts;
 mod rack_os;
+mod rack_vtable;
 mod readiness;
 mod reassembly;
 mod recovery;
@@ -119,6 +120,18 @@ pub use rack_hpts::{
 };
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
+};
+pub use rack_vtable::{
+    HPTS_USECS_PER_SLOT, IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PACE_TMR_DELACK,
+    PACE_TMR_KEEP, PACE_TMR_MASK, PACE_TMR_PERSIT, PACE_TMR_RACK, PACE_TMR_RXT, PACE_TMR_TLP,
+    PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR, RACK_RXT_SCOREBOARD_CLEAR_THRESH, RL_MIN_DIVISOR,
+    RackFunctionBlock, RackOptions, RackPortState, RackQuery, RackSegment, RackSegmentResult,
+    RackSockopt, RackStack, RackStackInfo, RackVtable, SockoptDir, TCP_FUNC_DEFAULT_OK,
+    TCP_FUNC_OUTPUT_CANDROP, TCP_FUNCTION_NAME_LEN_MAX, TCP_INFO, TCP_PACING_DND,
+    TCP_QUERY_RACK_TIMES, TCP_QUERY_SENDMAP, TCP_QUERY_TIMERS_UP, TCP_RACK_PACE_MAX_SEG,
+    TCP_RACK_PACE_MIN_SEG, TCP_RACK_PACING_BETA, TCP_RACK_PACING_DIVISOR, TCPS_CLOSE_WAIT,
+    TCPS_CLOSED, TCPS_ESTABLISHED, TCPS_LISTEN, TCPS_SYN_RECEIVED, TCPS_SYN_SENT, TF_SACK_PERMIT,
+    TF_SENTFIN, TF2_MBUF_ACKCMP, TF2_SUPPORTS_MBUFQ, TH_FIN, TH_RST,
 };
 pub use readiness::Readiness;
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
