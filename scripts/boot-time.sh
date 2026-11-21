@@ -14,13 +14,18 @@
 # measurement without KVM and reports it without the gate.
 #
 # Usage:
-#   sh scripts/boot-time.sh                  # KVM 1 CPU, 3 runs
-#   sh scripts/boot-time.sh --smp 4          # after S83; KVM 4-CPU gate
+#   sh scripts/boot-time.sh                  # KVM 4 CPU, 3 runs (OVMF path)
+#   sh scripts/boot-time.sh --no-firmware    # S89 direct boot; QEMU->login <1 s gate
+#   sh scripts/boot-time.sh --smp 1          # 1-CPU baseline
 #   sh scripts/boot-time.sh --tcg            # TCG report, no gate
 #   sh scripts/boot-time.sh --image FILE     # use an existing image (commit checked)
 #   sh scripts/boot-time.sh --runs 1         # shorter exploratory run
+#   sh scripts/boot-time.sh --no-login-checks  # timing only
 #
-# No QEMU/OVMF or user input is sent; the VM is stopped as soon as the login prompt appears.
+# The timing run stops the VM as soon as the login prompt appears. The login checks then boot
+# once more, log in as root, and prove the brush shell, tab completion (`complete -p`, the
+# deterministic proof from etc/profile), the QEMU user-network peer (`ping 10.0.2.2`) and the
+# interactive command latency. They are skipped with --tcg (latency is only gated under KVM).
 
 set -eu
 
@@ -29,8 +34,10 @@ cd "$root"
 
 arch=x86_64
 runs=3
-smp=1
+smp=4
 kvm=1
+no_firmware=0
+login_checks=1
 exclusive=0
 timeout_s=300
 image=
@@ -43,12 +50,15 @@ tmpdir=
 usage() {
     cat <<'EOF'
 usage: sh scripts/boot-time.sh [--arch x86_64] [--smp N] [--runs N] [--tcg]
-                               [--exclusive] [--image FILE] [--out DIR] [--timeout SECONDS]
+                               [--no-firmware] [--no-login-checks] [--exclusive]
+                               [--image FILE] [--out DIR] [--timeout SECONDS]
 
   --arch x86_64  only the x86_64 release gate is supported.
-  --smp N        QEMU CPU count (default 1; the gate is 4 after S83).
+  --smp N        QEMU CPU count (default 4, the 0.1.0 gate).
   --runs N       measured runs (default 3).
   --tcg          disable KVM; report only, no gate.
+  --no-firmware  drive the S89 direct-boot path; gate QEMU start -> login <1 s.
+  --no-login-checks  skip the post-login shell/completion/network/latency checks.
   --exclusive    refuse a busy host and record the host state before measuring.
   --image FILE   use an existing image instead of building one; its banner commit is checked.
   --out DIR      serial logs and summary (default build/boot-time).
@@ -110,6 +120,14 @@ while [ "$#" -gt 0 ]; do
             kvm=0
             shift
             ;;
+        --no-firmware)
+            no_firmware=1
+            shift
+            ;;
+        --no-login-checks)
+            login_checks=0
+            shift
+            ;;
         --exclusive)
             exclusive=1
             shift
@@ -140,6 +158,34 @@ case $timeout_s in
     '' | *[!0-9]*) printf 'boot-time: invalid --timeout value: %s\n' "$timeout_s" >&2; exit 2 ;;
 esac
 
+commit=$(git rev-parse --short HEAD)
+[ -n "$commit" ] || fail "cannot read HEAD"
+
+# The S89 direct path has no OVMF stage: QEMU starts the PVH loader with -kernel. The 0.1.0
+# gate is the full QEMU-process start -> login interval on that path.
+if [ "$no_firmware" -eq 1 ]; then
+    [ -z "$image" ] || fail "--no-firmware uses the direct loader; --image is not supported"
+    mkdir -p "$out"
+    printf '==> build kernel from %s\n' "$commit"
+    if ! cargo xtask build kernel --arch "$arch" --release >"$out/direct-build-kernel.log" 2>&1; then
+        tail -20 "$out/direct-build-kernel.log" >&2
+        fail "kernel build failed"
+    fi
+    printf '==> build release initfs from %s\n' "$commit"
+    if ! cargo xtask initfs --arch "$arch" --profile release >"$out/direct-build-initfs.log" 2>&1; then
+        tail -20 "$out/direct-build-initfs.log" >&2
+        fail "release initfs build failed"
+    fi
+    set -- --mode full --smp "$smp" --runs "$runs" --out "$out" --timeout "$timeout_s"
+    if [ "$kvm" -eq 0 ]; then
+        set -- "$@" --tcg
+    fi
+    if [ "$exclusive" -eq 1 ]; then
+        set -- "$@" --exclusive
+    fi
+    exec sh scripts/boot-direct.sh "$@"
+fi
+
 [ -r "$ovmf_code" ] || fail "OVMF code not found: $ovmf_code (set RAVEN_OVMF_CODE)"
 [ -r "$ovmf_vars" ] || fail "OVMF vars not found: $ovmf_vars (set RAVEN_OVMF_VARS)"
 command -v qemu-system-x86_64 >/dev/null 2>&1 || fail "qemu-system-x86_64 is not installed"
@@ -147,9 +193,6 @@ command -v python3 >/dev/null 2>&1 || fail "python3 is required for the byte-lev
 if [ "$kvm" -eq 1 ]; then
     [ -r /dev/kvm ] || fail "/dev/kvm is not readable; use --tcg for a software run"
 fi
-
-commit=$(git rev-parse --short HEAD)
-[ -n "$commit" ] || fail "cannot read HEAD"
 
 mkdir -p "$out"
 if [ -z "$image" ]; then
@@ -383,15 +426,173 @@ printf 'boot-time: p90 firmware_ms=%s kernel_ms=%s total_ms=%s\n' \
 printf 'boot-time: max firmware_ms=%s kernel_ms=%s total_ms=%s\n' \
     "$max_firmware" "$max_kernel" "$max_total"
 
+# Post-login verification: brush shell, tab completion (`complete -p`, the deterministic proof
+# from etc/profile), the QEMU user-network peer, and interactive command latency. Output markers
+# are chosen so the serial echo of the typed command cannot match them.
+login_check_failed=0
+if [ "$login_checks" -eq 1 ] && [ "$kvm" -eq 1 ]; then
+    check_vars=$tmpdir/check-vars.fd
+    cp "$ovmf_vars" "$check_vars"
+    check_log=$out/login-check.log
+    if ! check_result=$(python3 - "$image" "$check_vars" "$check_log" "$timeout_s" "$smp" "$ovmf_code" "$tmpdir/login-check.sock" <<'PY2'
+import os
+import socket
+import subprocess
+import sys
+import time
+
+image, vars_file, log_path, timeout_s, smp, ovmf_code, sock_path = sys.argv[1:8]
+try:
+    os.unlink(sock_path)
+except FileNotFoundError:
+    pass
+args = [
+    "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", smp,
+    "-serial", f"unix:{sock_path},server=on,wait=off", "-display", "none",
+    "-monitor", "none", "-no-reboot", "-enable-kvm", "-cpu", "host",
+    "-drive", f"if=pflash,format=raw,readonly=on,file={ovmf_code}",
+    "-drive", f"if=pflash,format=raw,file={vars_file}",
+    "-drive", f"format=raw,file={image}",
+    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
+    "-nic", "none", "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+log = open(log_path, "wb")
+proc = subprocess.Popen(
+    args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+)
+sock = None
+for _ in range(2000):
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(sock_path)
+        break
+    except OSError:
+        sock = None
+        if proc.poll() is not None:
+            break
+        time.sleep(0.005)
+if sock is None:
+    print("login-check: cannot connect to the serial socket", file=sys.stderr)
+    sys.exit(1)
+sock.settimeout(0.02)
+buf = b""
+
+
+def feed():
+    global buf
+    try:
+        chunk = sock.recv(8192)
+    except socket.timeout:
+        return True
+    except OSError:
+        return False
+    if not chunk:
+        return False
+    log.write(chunk)
+    log.flush()
+    buf += chunk
+    return True
+
+
+def wait_for(needle, seconds, reset=False):
+    global buf
+    if reset:
+        buf = b""
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if needle in buf:
+            return True
+        if not feed():
+            return False
+    return needle in buf
+
+
+def send(text):
+    sock.sendall(text.encode())
+
+
+def command(cmd, needle, seconds=20):
+    global buf
+    buf = b""
+    start = time.monotonic()
+    send(cmd + "\n")
+    if not wait_for(needle, seconds):
+        return None
+    return round((time.monotonic() - start) * 1000.0, 1)
+
+
+if not wait_for(b"login:", 120, reset=True):
+    print("login-check: no login prompt", file=sys.stderr)
+    sys.exit(1)
+send("root\n")
+if not wait_for(b"Password:", 30):
+    print("login-check: no password prompt", file=sys.stderr)
+    sys.exit(1)
+send("raven\n")
+if not wait_for(b"raven# ", 60):
+    print("login-check: no root prompt", file=sys.stderr)
+    sys.exit(1)
+
+shell_ms = command("echo $SHELL", b"/bin/brush", 20)
+complete_ms = command("complete -p", b"raven-test", 20)
+ping_ms = command("ping -c 1 10.0.2.2", b"rtt=", 30)
+echo_ms = command("echo $((6*7))", b"42", 20)
+ls_ms = command("ls /", b"init", 20)
+
+send("exit 0\n")
+try:
+    proc.wait(timeout=10)
+except subprocess.TimeoutExpired:
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+sock.close()
+log.close()
+
+
+def state(value):
+    return "ok" if value is not None else "FAIL"
+
+
+print(
+    "shell=%s completion=%s ping=%s latency_ms=echo:%s,ls:%s"
+    % (state(shell_ms), state(complete_ms), state(ping_ms), echo_ms, ls_ms)
+)
+sys.exit(
+    0 if all(value is not None for value in (shell_ms, complete_ms, ping_ms, echo_ms, ls_ms)) else 1
+)
+PY2
+    ); then
+        [ -f "$check_log" ] && tail -20 "$check_log" >&2
+        login_check_failed=1
+        printf 'boot-time: login-check FAIL (log %s)\n' "$check_log" >&2
+    else
+        printf 'boot-time: login-check %s\n' "$check_result"
+    fi
+else
+    printf 'boot-time: login-check SKIPPED (accel=%s)\n' "$accel"
+fi
+
 if [ "$kvm" -eq 1 ] && [ "$smp" -eq 4 ]; then
     if [ "$median_kernel" -lt 1000 ]; then
-        printf 'boot-time: GATE PASS: KVM 4-CPU kernel->login median %sms < 1000ms\n' "$median_kernel"
+        printf 'boot-time: OS gate: KVM 4-CPU kernel->login median %sms < 1000ms\n' "$median_kernel"
     else
-        printf 'boot-time: GATE FAIL: KVM 4-CPU kernel->login median %sms >= 1000ms\n' "$median_kernel" >&2
+        printf 'boot-time: OS gate FAIL: KVM 4-CPU kernel->login median %sms >= 1000ms\n' "$median_kernel" >&2
         exit 1
     fi
+    printf 'boot-time: OVMF total median %sms (firmware %sms); the 1 s QEMU->login gate is the S89 direct path: sh scripts/boot-time.sh --no-firmware\n' \
+        "$median_total" "$median_firmware"
 elif [ "$kvm" -eq 1 ]; then
-    printf 'boot-time: GATE PENDING (S83 4-CPU): 1-CPU KVM baseline kernel->login median %sms\n' "$median_kernel"
+    printf 'boot-time: baseline (smp=%s): kernel->login median %sms; the gate runs at -smp 4\n' \
+        "$smp" "$median_kernel"
 else
     printf 'boot-time: GATE NOT APPLICABLE (TCG): kernel->login median %sms reported only\n' "$median_kernel"
+fi
+
+if [ "$login_check_failed" -ne 0 ]; then
+    exit 1
 fi
