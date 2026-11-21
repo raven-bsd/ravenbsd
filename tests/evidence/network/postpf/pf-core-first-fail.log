@@ -1,0 +1,52 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.84s
+     Running `target/debug/xtask qtest --case pf-core --arch x86_64`
+pf-core: fail
+--- serial (last 40 lines) ---
+svcd: pcid up
+svcd: pcid timing: generation=1 start=22805 spawn=24943 first_poll=24987 deadline=84943 stalled=0 ready_at=25595
+svcd: logd up
+svcd: logd timing: generation=1 start=22708 spawn=25081 first_poll=25139 deadline=30081 stalled=0 ready_at=25624
+rtc: 2026-11-21 12:37:50 (epoch 1795264670s)
+1795264715.253 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=25696 spawn=27681 first_poll=27688 deadline=147681 stalled=0 ready_at=45346
+devd: devices=6
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+devd: driver virtio-net irq line=11
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=11
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+svcd: devd up
+svcd: devd timing: generation=1 start=25646 spawn=27576 first_poll=27626 deadline=87576 stalled=0 ready_at=46532
+netd: pf loaded rules=2 nat=0
+netd: interface eth0 10.0.2.15/24
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+svcd: netd timing: generation=1 start=46536 spawn=51166 first_poll=51171 deadline=111166 stalled=0 ready_at=51405
+netd: iface eth0 10.0.2.15/24
+netd: readiness event
+netd: ping 10.0.2.2 rtt=41ms
+netd: readiness event
+netd: event wait timed out
+svcd: pf-probe failed: exited before it became ready
+svcd: pf-probe timing: generation=1 start=51427 spawn=51957 first_poll=none deadline=56957 stalled=0 finished_at=52317
+svcd: settled
+init exited (1)
+--- unmatched expectations ---
+^pf: allowed flow ok$
+^pf: blocked datagram sent$
+^netd: pf block out eth0 udp 10\.0\.2\.15:7201 -> 10\.0\.2\.2:47002 reason=match$
+^pf: ok$
+^init exited \(0\)$
+--- result ---
+exit status 35; expected success; unmatched expectations: ^pf: allowed flow ok$, ^pf: blocked datagram sent$, ^netd: pf block out eth0 udp 10\.0\.2\.15:7201 -> 10\.0\.2\.2:47002 reason=match$, ^pf: ok$, ^init exited \(0\)$

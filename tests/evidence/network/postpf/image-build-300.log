@@ -1,0 +1,482 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.10s
+     Running `target/debug/xtask image --arch x86_64 --profile release --output build/qtest/net-postpf.img`
+==> build loader x86_64 (x86_64-unknown-uefi, release, lto=fat)
+    Finished `release` profile [optimized] target(s) in 0.98s
+    /media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/build/x86_64/loader.efi
+==> build kernel x86_64 (x86_64-unknown-none, release, lto=fat)
+    Blocking waiting for file lock on package cache
+   Compiling raven-kernel v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/kernel)
+    Finished `release` profile [optimized] target(s) in 1m 03s
+    /media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/build/x86_64/kernel.elf
+==> libc x86_64: packing missing prerequisites (build/x86_64/libc.so.1, build/x86_64/ld-elf.so.1)
+   Compiling raven-libc-sys v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-sys)
+   Compiling raven-libc-proc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-proc)
+   Compiling raven-libc-thread v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-thread)
+   Compiling raven-libc-signal v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-signal)
+   Compiling raven-libc-platform v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-platform)
+   Compiling raven-libc-personality-bsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-bsd)
+   Compiling raven-libc-personality-solaris v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-solaris)
+   Compiling raven-libc-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-net)
+   Compiling raven-libc-personality-linux v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-linux)
+   Compiling raven-libc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc)
+warning: unused imports: `c_int` and `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/call_once.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^  ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `mutex::Mutex`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_broadcast.rs:6:42
+  |
+6 | use raven_libc_thread::{c11, cond::Cond, mutex::Mutex};
+  |                                          ^^^^^^^^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_destroy.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_destroy.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `mutex::Mutex`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_destroy.rs:6:42
+  |
+6 | use raven_libc_thread::{c11, cond::Cond, mutex::Mutex};
+  |                                          ^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_init.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `mutex::Mutex`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_init.rs:6:42
+  |
+6 | use raven_libc_thread::{c11, cond::Cond, mutex::Mutex};
+  |                                          ^^^^^^^^^^^^
+
+warning: unused import: `mutex::Mutex`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_signal.rs:6:42
+  |
+6 | use raven_libc_thread::{c11, cond::Cond, mutex::Mutex};
+  |                                          ^^^^^^^^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/mtx_destroy.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/mtx_destroy.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/mtx_init.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `c_int` and `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_current.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^  ^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_detach.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_detach.rs:6:5
+  |
+6 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_equal.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_equal.rs:6:5
+  |
+6 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_exit.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_join.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_join.rs:6:5
+  |
+6 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_sleep.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused imports: `c_int` and `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_yield.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^  ^^^^^^
+
+warning: unused import: `raven_libc_thread::thread::once::Once`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_create.rs:7:5
+  |
+7 | use raven_libc_thread::thread::once::Once;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `c_int` and `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_delete.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^  ^^^^^^
+
+warning: unused import: `raven_libc_thread::thread::once::Once`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_delete.rs:7:5
+  |
+7 | use raven_libc_thread::thread::once::Once;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_get.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^
+
+warning: unused import: `raven_libc_thread::thread::once::Once`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_get.rs:7:5
+  |
+7 | use raven_libc_thread::thread::once::Once;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::thread::once::Once`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_set.rs:7:5
+  |
+7 | use raven_libc_thread::thread::once::Once;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_proc::local_backend::LocalBackend`
+  --> libc/ravenlibc/crates/raven-libc/src/ffi/procbackend.rs:20:5
+   |
+20 | use raven_libc_proc::local_backend::LocalBackend;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/platform/readlink.rs:4:25
+  |
+4 | use core::ffi::{c_char, c_int};
+  |                         ^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/_pthread_cleanup_pop.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/_pthread_cleanup_push.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::mutex as m`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_cond_broadcast.rs:6:5
+  |
+6 | use raven_libc_thread::mutex as m;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::mutex as m`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_cond_destroy.rs:6:5
+  |
+6 | use raven_libc_thread::mutex as m;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::mutex as m`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_cond_init.rs:6:5
+  |
+6 | use raven_libc_thread::mutex as m;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::mutex as m`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_cond_signal.rs:6:5
+  |
+6 | use raven_libc_thread::mutex as m;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_detach.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_detach.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `attr as a`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_detach.rs:6:39
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                       ^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getaffinity_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getattr_np.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getattr_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `self`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getattr_np.rs:6:33
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                 ^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getconcurrency.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getcpuclockid.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getcpuclockid.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `attr as a` and `self`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getcpuclockid.rs:6:33
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                 ^^^^  ^^^^^^^^^
+
+warning: unused import: `c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getspecific.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_join.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `attr as a`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_join.rs:6:39
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                       ^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_key_delete.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_setaffinity_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_setconcurrency.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_testcancel.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_timedjoin_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `attr as a`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_timedjoin_np.rs:6:39
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                       ^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_tryjoin_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `attr as a`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_tryjoin_np.rs:6:39
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                       ^^^^^^^^^
+
+warning: unused import: `file_from_ptr`
+  --> libc/ravenlibc/crates/raven-libc/src/stdio/tmpfile.rs:10:30
+   |
+10 | use raven_libc_stdio::{Fail, file_from_ptr};
+   |                              ^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/stdio/vswscanf.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `c_char`
+ --> libc/ravenlibc/crates/raven-libc/src/stdio/vwprintf.rs:6:17
+  |
+6 | use core::ffi::{c_char, c_int, c_void};
+  |                 ^^^^^^
+
+warning: unused import: `c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/stdio/wide_ops/getwc_unlocked.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^
+
+warning: variable does not need to be mutable
+  --> libc/ravenlibc/crates/raven-libc/src/pwd/putspent.rs:70:9
+   |
+70 |     let mut ok = push(out, &mut position, name)
+   |         ----^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `position` is never read
+  --> libc/ravenlibc/crates/raven-libc/src/stdlib/ecvt_r.rs:43:24
+   |
+43 |     let mut position = 0usize;
+   |                        ^^^^^^ this value is reassigned later and never used
+...
+49 |                 position = 3;
+   |                 ------------ `position` is overwritten here before the previous value is read
+   |
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> libc/ravenlibc/crates/raven-libc/src/wchar/wcstold.rs:13:9
+   |
+13 |     let mut converted: *mut c_char = core::ptr::null_mut();
+   |         ----^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: function `fail` is never used
+  --> libc/ravenlibc/crates/raven-libc/src/stdio/popen.rs:22:4
+   |
+22 | fn fail(error: raven_libc_platform::Errno) -> c_int {
+   |    ^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `raven-libc` (lib) generated 65 warnings (run `cargo fix --lib -p raven-libc` to apply 63 suggestions)
+    Finished `libc-a-server` profile [optimized] target(s) in 1m 34s
+libc-pack: build: ok
+libc-pack: members: ok
+libc-pack: pack: ok (2636 members, 1451 raven_libc)
+libc-pack: symbols: ok (mkmap: merge: ok (1727 public, 30 private))
+libc-pack: map: ok
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `libc-a` profile [optimized] target(s) in 2.48s
+libc-pack: crt: ok (8 objects)
+libc-stubs: wrote build/x86_64/stubs/libbsd.a
+libc-stubs: wrote build/x86_64/stubs/libbsd.so
+libc-stubs: wrote build/x86_64/stubs/libcompat.a
+libc-stubs: wrote build/x86_64/stubs/libcompat.so
+libc-stubs: wrote build/x86_64/stubs/libcrypt.a
+libc-stubs: wrote build/x86_64/stubs/libcrypt.so
+libc-stubs: wrote build/x86_64/stubs/libdl.a
+libc-stubs: wrote build/x86_64/stubs/libdl.so
+libc-stubs: wrote build/x86_64/stubs/libexecinfo.a
+libc-stubs: wrote build/x86_64/stubs/libexecinfo.so
+libc-stubs: wrote build/x86_64/stubs/libgen.a
+libc-stubs: wrote build/x86_64/stubs/libgen.so
+libc-stubs: wrote build/x86_64/stubs/libintl.a
+libc-stubs: wrote build/x86_64/stubs/libintl.so
+libc-stubs: wrote build/x86_64/stubs/libm.a
+libc-stubs: wrote build/x86_64/stubs/libm.so
+libc-stubs: wrote build/x86_64/stubs/libnsl.a
+libc-stubs: wrote build/x86_64/stubs/libnsl.so
+libc-stubs: wrote build/x86_64/stubs/libposix4.a
+libc-stubs: wrote build/x86_64/stubs/libposix4.so
+libc-stubs: wrote build/x86_64/stubs/libpthread.a
+libc-stubs: wrote build/x86_64/stubs/libpthread.so
+libc-stubs: wrote build/x86_64/stubs/libresolv.a
+libc-stubs: wrote build/x86_64/stubs/libresolv.so
+libc-stubs: wrote build/x86_64/stubs/librpcsvc.a
+libc-stubs: wrote build/x86_64/stubs/librpcsvc.so
+libc-stubs: wrote build/x86_64/stubs/librt.a
+libc-stubs: wrote build/x86_64/stubs/librt.so
+libc-stubs: wrote build/x86_64/stubs/libsocket.a
+libc-stubs: wrote build/x86_64/stubs/libsocket.so
+libc-stubs: wrote build/x86_64/stubs/libssp.a
+libc-stubs: wrote build/x86_64/stubs/libssp.so
+libc-stubs: wrote build/x86_64/stubs/libssp_nonshared.a
+libc-stubs: wrote build/x86_64/stubs/libssp_nonshared.so
+libc-stubs: wrote build/x86_64/stubs/libthread.a
+libc-stubs: wrote build/x86_64/stubs/libthread.so
+libc-stubs: wrote build/x86_64/stubs/libutil.a
+libc-stubs: wrote build/x86_64/stubs/libutil.so
+libc-stubs: wrote build/x86_64/stubs/libxnet.a
+libc-stubs: wrote build/x86_64/stubs/libxnet.so
+libc-pack: stubs: ok (40 files)
+libc-pack: sysroot: ok
+libc-link: mkmap: ok

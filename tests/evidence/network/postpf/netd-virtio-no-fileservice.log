@@ -1,0 +1,84 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.19s
+     Running `target/debug/xtask qtest --case netd-virtio --arch x86_64`
+netd-virtio: fail
+--- serial (last 40 lines) ---
+pcid: devices=6
+svcd: logd up
+svcd: logd timing: generation=1 start=7476 spawn=9214 first_poll=9327 deadline=14214 stalled=0 ready_at=9712
+svcd: pcid up
+svcd: pcid timing: generation=1 start=7616 spawn=9237 first_poll=9283 deadline=69237 stalled=0 ready_at=9843
+devd: devices=6
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+devd: driver virtio-net irq line=11
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=11
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+svcd: devd up
+svcd: devd timing: generation=1 start=9878 spawn=11089 first_poll=11236 deadline=71089 stalled=0 ready_at=34645
+netd: pf config: file service is not ready; refusing to start
+svcd: netd failed: exited before it became ready
+svcd: netd timing: generation=1 start=34677 spawn=47058 first_poll=47096 deadline=107058 stalled=0 finished_at=57217
+netd: net: did not register
+svcd: netd-virtio-probe failed: exited before it became ready
+svcd: netd-virtio-probe timing: generation=1 start=57228 spawn=58208 first_poll=none deadline=63208 stalled=0 finished_at=60922
+netd stopped 0
+svcctl: netd: timed out waiting for the operation
+svcd: netd-virtio-restart failed: exited before it became ready
+svcd: netd-virtio-restart timing: generation=1 start=60926 spawn=61109 first_poll=none deadline=66109 stalled=0 finished_at=66647
+netd: net: did not register
+svcd: netd-virtio-probe2 failed: exited before it became ready
+svcd: netd-virtio-probe2 timing: generation=1 start=66655 spawn=67147 first_poll=none deadline=72147 stalled=0 finished_at=69564
+netd: pf config: file service is not ready; refusing to start
+svcd: netd failed: exited before it became ready
+svcd: netd timing: generation=2 start=61149 spawn=63535 first_poll=63550 deadline=123535 stalled=0 finished_at=73649
+svcd: settled
+init exited (1)
+--- unmatched expectations ---
+^netd: interface eth0 10\.0\.2\.15/24$
+^netd: interface lo 127\.0\.0\.1/8$
+^netd: ready$
+^svcd: netd up$
+^netd: iface eth0 10\.0\.2\.15/24$
+^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$
+^netd: readiness event$
+^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$
+^netd: route eth0 ok$
+^netd: netstat eth0 sockets=[0-9]+ rx=[1-9][0-9]* tx=[1-9][0-9]*$
+^netd: virtio endpoints ok$
+^netd: virtio options ok$
+^netd: virtio tcp echo ok$
+^netd: readiness event$
+^netd: virtio udp echo ok$
+^netd: virtio probe ok$
+^svcd: netd-virtio-probe up$
+^netd: interface eth0 10\.0\.2\.15/24$
+^netd: interface lo 127\.0\.0\.1/8$
+^netd: ready$
+^svcd: netd up$
+^netd running 0$
+^svcd: netd-virtio-restart up$
+^netd: iface eth0 10\.0\.2\.15/24$
+^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$
+^netd: readiness event$
+^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$
+^netd: route eth0 ok$
+^netd: netstat eth0 sockets=[0-9]+ rx=[1-9][0-9]* tx=[1-9][0-9]*$
+^netd: virtio endpoints ok$
+^netd: virtio options ok$
+^netd: virtio tcp echo ok$
+^netd: readiness event$
+^netd: virtio udp echo ok$
+^netd: virtio restart ok$
+^svcd: netd-virtio-probe2 up$
+^init exited \(0\)$
+--- result ---
+exit status 35; expected success; unmatched expectations: ^netd: interface eth0 10\.0\.2\.15/24$, ^netd: interface lo 127\.0\.0\.1/8$, ^netd: ready$, ^svcd: netd up$, ^netd: iface eth0 10\.0\.2\.15/24$, ^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$, ^netd: readiness event$, ^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$, ^netd: route eth0 ok$, ^netd: netstat eth0 sockets=[0-9]+ rx=[1-9][0-9]* tx=[1-9][0-9]*$, ^netd: virtio endpoints ok$, ^netd: virtio options ok$, ^netd: virtio tcp echo ok$, ^netd: readiness event$, ^netd: virtio udp echo ok$, ^netd: virtio probe ok$, ^svcd: netd-virtio-probe up$, ^netd: interface eth0 10\.0\.2\.15/24$, ^netd: interface lo 127\.0\.0\.1/8$, ^netd: ready$, ^svcd: netd up$, ^netd running 0$, ^svcd: netd-virtio-restart up$, ^netd: iface eth0 10\.0\.2\.15/24$, ^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$, ^netd: readiness event$, ^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$, ^netd: route eth0 ok$, ^netd: netstat eth0 sockets=[0-9]+ rx=[1-9][0-9]* tx=[1-9][0-9]*$, ^netd: virtio endpoints ok$, ^netd: virtio options ok$, ^netd: virtio tcp echo ok$, ^netd: readiness event$, ^netd: virtio udp echo ok$, ^netd: virtio restart ok$, ^svcd: netd-virtio-probe2 up$, ^init exited \(0\)$
