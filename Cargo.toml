@@ -297,6 +297,7 @@ members = [
     "tests/net/packetdrill-harness",
     "tests/tcpip",
     "tests/tcp-model",
+    "tests/tcp-input-model",
     "tests/tcpip/conformance",
     "tests/tcpip/fuzz-replay",
     "tests/tcpip/interop",
