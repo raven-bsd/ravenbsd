@@ -1,0 +1,4 @@
+endpoint: READY
+tcp_congestion_control=cubic
+RESULT cubic PASS Linux default CC is cubic (capability baseline) elapsed=0.12s
+PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/cubic.pcap

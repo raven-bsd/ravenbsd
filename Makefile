@@ -16,6 +16,8 @@ SETUP_ARGS ?=
 SOAK_SECONDS ?= 120
 SOAK_INTERVAL ?= 5
 SOAK_PROFILE ?= release
+TCP_SOAK_SECONDS ?= 600
+TCP_SOAK_INTERVAL ?= 10
 BASE ?= origin/master
 HELP_SCRIPT ?= scripts/make-help.sh
 HELP_MANIFEST ?= scripts/help.txt
@@ -30,7 +32,8 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs soak-smoke soak-24h
+	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs soak-smoke soak-24h \
+	tcp-soak-smoke tcp-soak-24h
 
 help:
 	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
@@ -112,6 +115,14 @@ qemu-ufs:
 
 soak-smoke:
 	@sh scripts/soak.sh --duration $(SOAK_SECONDS) --interval $(SOAK_INTERVAL) --profile $(SOAK_PROFILE)
+
+# K285: bounded 10-minute TCP soak smoke on the tcp-soak profile image. The 24 h run is
+# owner-only: `timeout 90000 make tcp-soak-24h`.
+tcp-soak-smoke:
+	@sh scripts/tcp-soak.sh --duration $(TCP_SOAK_SECONDS) --interval $(TCP_SOAK_INTERVAL)
+
+tcp-soak-24h:
+	@sh scripts/tcp-soak.sh --duration 86400 --interval 30
 
 run:
 	@$(XTASK) run --arch $(ARCH) --profile $(PROFILE)

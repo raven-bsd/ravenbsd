@@ -1,0 +1,4 @@
+endpoint: READY
+SKIP a deterministic PMTU black hole needs a router namespace with a reduced MTU and suppressed ICMP frag-needed; the single veth peer cannot hide the path MTU from the sender
+RESULT pmtu-blackhole SKIP a deterministic PMTU black hole needs a router namespace with a reduced MTU and suppressed ICMP frag-needed; the single veth peer cannot hide the path MTU from the sender elapsed=0.11s
+PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/pmtu-blackhole.pcap

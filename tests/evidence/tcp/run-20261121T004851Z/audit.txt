@@ -1,0 +1,50 @@
+tcp-provenance: pass
+netbsd_revision: 36eddebcc36cb0775aa2962005b9c05419a6ff01 (NO-COPY / quarantined)
+freebsd_revision: 133344405f532bd54ff3629a77d4c4e062f01fdb
+dragonfly_revision: 94448f622a06cde90ba42d688e9cab2448ad9ab3
+files_scanned: 70
+imports: 8 (netbsd: 0, freebsd: 6, dragonfly: 1, other: 1)
+claims: 26
+quarantined: 17 (K254, K255, K256, K257, K258, K259, K260, K261, K265, K266, K267, K269, K273, K274, K275, K277, K278)
+donor_files: 11
+donor_missing: 0
+rejected_entries: 0
+violations: 0
+warnings: 9
+  donor freebsd: verified head=133344405f532bd54ff3629a77d4c4e062f01fdb expected=133344405f532bd54ff3629a77d4c4e062f01fdb
+  donor dragonfly: verified head=94448f622a06cde90ba42d688e9cab2448ad9ab3 expected=94448f622a06cde90ba42d688e9cab2448ad9ab3
+  claim K253: test-only/landed report=PARTIAL
+  claim K254: port/quarantined report=PARTIAL
+  claim K255: port/quarantined report=WORKING
+  claim K256: port/quarantined report=BLOCKED
+  claim K257: port/quarantined report=PARTIAL
+  claim K258: port/quarantined report=DONE
+  claim K259: port/quarantined report=DONE
+  claim K260: port/quarantined report=DONE
+  claim K261: port/quarantined report=BLOCKED
+  claim K262: test-only/landed report=DONE
+  claim K263: test-only/landed report=DONE
+  claim K265: port/quarantined report=DONE
+  claim K266: port/quarantined report=DONE
+  claim K267: port/quarantined report=DONE
+  claim K268: port/landed report=DONE
+  claim K269: port/quarantined report=WORKING
+  claim K270: port/landed report=DONE
+  claim K271: port/landed report=DONE
+  claim K272: port/landed report=DONE
+  claim K273: port/quarantined report=WORKING
+  claim K274: port/quarantined report=WORKING
+  claim K275: port/quarantined report=DONE
+  claim K276: port/landed report=DONE
+  claim K277: port/quarantined report=PARTIAL
+  claim K278: port/quarantined report=DONE
+  claim K279: test-only/landed report=DONE
+  warning: K258: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit
+  warning: K259: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit
+  warning: K260: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit
+  warning: K265: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit
+  warning: K266: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit
+  warning: K267: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit
+  warning: K275: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit
+  warning: K278: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit
+  warning: donors lock not found at /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd-resources/donors.lock; revision check skipped

@@ -1,0 +1,57 @@
+{
+  "commit": "3cda29230c862a21d15bb33fedb391ed963034b0",
+  "dirty": "no",
+  "exit": 0,
+  "generated": "2026-11-21T00:49:11Z",
+  "phases": [
+    {
+      "donor_files": 11,
+      "dragonfly_imports": 1,
+      "freebsd_imports": 6,
+      "imports": 8,
+      "name": "audit",
+      "netbsd_imports": 0,
+      "quarantined": 17,
+      "rejected_entries": 0,
+      "status": "pass",
+      "violations": [],
+      "warnings": [
+        "K258: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit",
+        "K259: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit",
+        "K260: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit",
+        "K265: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit",
+        "K266: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit",
+        "K267: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit",
+        "K275: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit",
+        "K278: NetBSD-derived report is DONE but quarantined; rework it against FreeBSD/DragonFly and resubmit",
+        "donors lock not found at /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd-resources/donors.lock; revision check skipped"
+      ]
+    },
+    {
+      "command": "cargo nextest run -p raven-tcpip",
+      "counts": {
+        "duration_s": 2.237,
+        "failed": 0,
+        "passed": 710,
+        "run": 710,
+        "skipped": 0
+      },
+      "duration_s": 19.581,
+      "exit": 0,
+      "log": "logs/unit.log",
+      "name": "unit",
+      "status": "pass",
+      "timed_out": false
+    },
+    {
+      "command": "/usr/bin/python3 scripts/tcp-evidence_ut.py",
+      "duration_s": 0.271,
+      "exit": 0,
+      "log": "logs/checker.log",
+      "name": "checker",
+      "status": "pass",
+      "timed_out": false
+    }
+  ],
+  "result": "pass"
+}

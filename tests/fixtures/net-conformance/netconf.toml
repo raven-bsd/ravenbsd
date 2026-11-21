@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K253 packet-level conformance listener: starts after netd publishes the net
+# scheme and listens on 10.0.2.15:23090.  The harness selects the scenario from
+# the wire; the service never exits by itself.
+
+name = "netconf"
+exec = "/bin/netconf"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
