@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-fmd"
+version = "0.1.0"
+description = "Minimal FMA diagnose/retire policy engine for the userland fmd."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "raven_fmd"
+path = "src/lib.rs"
+
+[dependencies]
+raven-proto-fm = { path = "../../../crates/raven-proto-fm" }
+
+[lints]
+workspace = true

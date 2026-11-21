@@ -285,6 +285,7 @@ members = [
     "userland/servers/initfsd-probe",
     "userland/servers/pcid",
     "userland/servers/devd",
+    "userland/servers/fmd",
     "userland/servers/netd",
     "userland/servers/vfsd",
     "userland/servers/crond",

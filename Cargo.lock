@@ -1688,6 +1688,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-fmd"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fm",
+]
+
+[[package]]
 name = "raven-frames"
 version = "0.1.0"
 
@@ -2042,6 +2049,7 @@ dependencies = [
  "raven-mem",
  "raven-pager",
  "raven-pci",
+ "raven-proto-fm",
  "raven-proto-linux",
  "raven-rmm",
  "raven-sched-core",
@@ -2961,6 +2969,10 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-proto-dev"
+version = "0.1.0"
+
+[[package]]
+name = "raven-proto-fm"
 version = "0.1.0"
 
 [[package]]

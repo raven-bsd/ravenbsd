@@ -24,6 +24,8 @@ mod fdt {
 }
 mod driver;
 mod event;
+#[allow(dead_code)] // Built by the fault-injection profile once a producer is wired.
+mod fm;
 mod initfs;
 mod ipc;
 mod log;
