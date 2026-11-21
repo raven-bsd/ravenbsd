@@ -73,6 +73,19 @@ pub fn poll<B: SysBackend, L: Lock>(
                 if events & POLLOUT != 0 {
                     wanted |= EV_WRITABLE;
                 }
+                // K195 DIAGNOSTIC (temporary): the first socket poll's facts.
+                if reference.kind() == OfdKind::Socket {
+                    let text = alloc::format!(
+                        "k195p0 fd={} handle={} signaled={} poll_handle={} want={:#x} status={:#x}\n",
+                        entry.fd,
+                        reference.handle().0,
+                        reference.poll_signaled(),
+                        reference.poll_handle().0,
+                        wanted,
+                        reference.status()
+                    );
+                    let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
+                }
                 // An entry that asks for nothing is not ready; it used to count as ready and
                 // made a caller with an idle `pollfd` spin.
                 if wanted == 0 {
@@ -117,15 +130,23 @@ pub fn poll<B: SysBackend, L: Lock>(
         let Some(bits) = live_readiness(backend, registration.reference.poll_handle()) else {
             continue;
         };
-        // K195 DIAGNOSTIC (temporary): the live bits for a scheme socket at poll time.
+        let live_ready = apply_bits(registration, fds, bits);
+        // K195 DIAGNOSTIC (temporary): the live bits and the resulting revents.
         {
+            let revents = registration
+                .entries
+                .iter()
+                .filter_map(|index| fds.get(*index))
+                .map(|entry| entry.revents)
+                .max()
+                .unwrap_or(0);
             let text = alloc::format!(
-                "k195p handle={} live={bits}\n",
+                "k195p handle={} live={bits} ready={live_ready} revents={revents}\n",
                 registration.reference.poll_handle().0
             );
             let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
         }
-        ready = ready.saturating_add(apply_bits(registration, fds, bits));
+        ready = ready.saturating_add(live_ready);
     }
     if ready > 0 {
         return Ok(ready);
