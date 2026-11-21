@@ -27,11 +27,13 @@ pub mod address;
 pub mod ast;
 pub mod engine;
 pub mod parser;
+pub mod pfctl;
 pub mod state;
 
-pub use address::{AddrSpec, Ipv4Addr, PortSpec};
+pub use address::{AddrSpec, Ipv4Addr, Ipv6Addr, PortSpec};
 pub use ast::{
-    Action, AddrPort, Direction, IfaceSpec, Packet, Protocol, Rule, Ruleset, StatePolicy,
+    Action, AddrPort, Direction, IfaceSpec, NatRule, Packet, Packet6, Protocol, Rule, Ruleset,
+    StatePolicy, Table, Translation,
 };
 pub use engine::{CounterSnapshot, Decision, Engine, MAX_RULES, RuleStatSnapshot, Verdict};
 pub use parser::{ParseError, parse};

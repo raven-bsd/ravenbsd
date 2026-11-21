@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "pf-core-fixture"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-3-Clause"
+
+[workspace]
+
+[dependencies]
+raven-pf = { path = "../../../crates/raven-pf" }
+raven-rt = { path = "../../../userland/rt", features = ["alloc"] }

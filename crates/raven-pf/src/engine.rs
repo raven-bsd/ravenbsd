@@ -6,7 +6,7 @@
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use crate::ast::{Action, IfaceSpec, Packet, Ruleset, StatePolicy};
+use crate::ast::{Action, IfaceSpec, Packet, Packet6, Ruleset, StatePolicy, Translation};
 use crate::state::{StateDisposition, StateTable, TcpState, Timeouts};
 
 pub use crate::parser::MAX_RULES;
@@ -151,6 +151,18 @@ impl Engine {
         &self.states
     }
 
+    /// Apply the first matching NAT/redirect rule.
+    ///
+    /// The caller rewrites the endpoint before forwarding; this is the stateless translation
+    /// seam. Stateful reverse translation is a documented K274 integration point.
+    #[must_use]
+    pub fn translate(&self, packet: &Packet<'_>) -> Option<Translation> {
+        self.ruleset
+            .nat
+            .iter()
+            .find_map(|rule| rule.translation(packet))
+    }
+
     /// The global counters as plain values.
     #[must_use]
     pub fn counters(&self) -> CounterSnapshot {
@@ -267,6 +279,52 @@ impl Engine {
         }
     }
 
+    /// Evaluate one IPv6 packet statelessly.
+    ///
+    /// IPv6 state entries are not part of the B17 state key; this path enforces the same rule
+    /// order and default action without creating state.
+    pub fn evaluate_v6(&mut self, packet: &Packet6<'_>) -> Decision {
+        let mut matched = None;
+        for (index, rule) in self.ruleset.rules.iter().enumerate() {
+            if let Some(stats) = self.rules.get(index) {
+                stats.evaluations.fetch_add(1, Ordering::Relaxed);
+            }
+            if rule.matches_v6(packet) {
+                if let Some(stats) = self.rules.get(index) {
+                    stats.matches.fetch_add(1, Ordering::Relaxed);
+                }
+                matched = Some(index);
+                if rule.quick {
+                    break;
+                }
+            }
+        }
+        let (action, rule) = match matched {
+            Some(index) => (
+                self.ruleset
+                    .rules
+                    .get(index)
+                    .map_or(self.ruleset.default_action, |rule| rule.action),
+                Some(index),
+            ),
+            None => (self.ruleset.default_action, None),
+        };
+        let verdict = match action {
+            Action::Pass => Verdict::Pass,
+            Action::Block => Verdict::Block,
+        };
+        self.counters_for_v6(packet, verdict);
+        if let Some(index) = rule {
+            self.hit_rule_v6(index, packet);
+        }
+        Decision {
+            verdict,
+            rule,
+            state: None,
+            tcp: None,
+        }
+    }
+
     fn counters_for(&self, packet: &Packet<'_>, verdict: Verdict) {
         let counter = match (packet.direction, verdict) {
             (crate::ast::Direction::In, Verdict::Pass) => &self.counters.in_pass,
@@ -278,6 +336,25 @@ impl Engine {
     }
 
     fn hit_rule(&self, index: usize, packet: &Packet<'_>) {
+        if let Some(stats) = self.rules.get(index) {
+            stats.packets.fetch_add(1, Ordering::Relaxed);
+            stats
+                .bytes
+                .fetch_add(u64::from(packet.length), Ordering::Relaxed);
+        }
+    }
+
+    fn counters_for_v6(&self, packet: &Packet6<'_>, verdict: Verdict) {
+        let counter = match (packet.direction, verdict) {
+            (crate::ast::Direction::In, Verdict::Pass) => &self.counters.in_pass,
+            (crate::ast::Direction::In, Verdict::Block) => &self.counters.in_block,
+            (crate::ast::Direction::Out, Verdict::Pass) => &self.counters.out_pass,
+            (crate::ast::Direction::Out, Verdict::Block) => &self.counters.out_block,
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn hit_rule_v6(&self, index: usize, packet: &Packet6<'_>) {
         if let Some(stats) = self.rules.get(index) {
             stats.packets.fetch_add(1, Ordering::Relaxed);
             stats

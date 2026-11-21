@@ -137,3 +137,50 @@ The following files were read for behaviour only (**OBSERVED**):
 
 No `PROVENANCE.toml` import applies (clean-room). The upstream revisions are the pinned
 `openbsd`, `netbsd` and `freebsd` entries in `ravenbsd-resources/donors.lock`.
+
+## 9. K273 additions
+
+K273 extends the B17 core with the 0.1.0 pf surface:
+
+* **IPv6**: `Ipv6Addr`, `AddrSpec::V6Host`/`V6Network`, `Packet6` and
+  `Rule::matches_v6`; `Engine::evaluate_v6` is the IPv6 counterpart of `evaluate` and is
+  stateless because the B17 state key is IPv4-only.
+* **Tables**: `table <name> { addr, ... }` declarations are parsed and expanded into one rule per
+  table address, so the runtime `Rule` shape is unchanged.
+* **NAT/redirect**: `nat`/`rdr` rules are parsed into `Ruleset::nat`; `Engine::translate` returns
+  the first matching `Translation`. The caller rewrites the endpoint before forwarding. Stateful
+  reverse translation is a K274 integration point.
+* **pfctl ABI**: `raven_pf::pfctl` is a bounded, first-party request/response codec
+  (`Load`, `Stats`, `ClearStats`, `StateCount`, `RuleStats`), not a FreeBSD ioctl. The kernel
+  `pfioc_*` structures are mbuf/kernel shaped and are not used.
+* **Fail-closed parsing** remains: malformed tables, NAT rules and rule text return
+  `ParseError`; the parser does not silently ignore them.
+
+The qtest `pf-core` case (`tests/qtest/cases/pf-core.toml`) builds
+`tests/fixtures/pf` and boots it as `/init`. It checks a table-expanded pass, a block, a stateful
+reply, NAT translation, an IPv6 pass and a rejected malformed rule.
+
+### Donor map for K273
+
+The donor is FreeBSD `133344405f532bd54ff3629a77d4c4e062f01fdb`. The files in the sparse
+checkout are **BSD-2-Clause**.
+
+| Topic | Donor file and function | Use |
+|---|---|---|
+| address/port match | `sys/netpfil/pf/pf.c`: `pf_match_addr`, `pf_match_addr_range`, `pf_match`, `pf_match_port`, `pf_match_rcvif` | behaviour model |
+| rules and default | `sys/netpfil/pf/pf.c`: `pf_test_rule`, `pf_match_rule` | behaviour model |
+| state | `sys/netpfil/pf/pf.c`: `pf_create_state`, `pf_test_state`, `pf_test_state_icmp` | behaviour model |
+| NAT/redirect | `sys/netpfil/pf/pf.c`: `pf_get_translation`, `pf_map_addr` call path | behaviour model; `pf_nat.c` is absent from this checkout |
+| tables | `sys/netpfil/pf/pf_table.c`: `pfr_initialize`, `pfr_lookup_addr`, `pfr_insert_kentry`, `pfr_destroy_kentry`, `pfr_validate_addr` | behaviour model |
+| pfctl | `usr.sbin/pfctl` is absent from this checkout; `sys/netpfil/pf/pf_ioctl.c`: `pfioctl`, `pf_begin_rules`, `pf_commit_rules` | first-party bounded ABI |
+
+The FreeBSD packet path is kernel `mbuf`/`pfil` code; the ticket requires a userspace filter, so
+the crate models the decisions over plain Rust packets instead of copying the kernel module. No
+4-clause/NRL/CDDL/GPL code was copied.
+
+### netd hook gap
+
+The filter call site is not wired. The only netd path in this ticket's Owns is
+`userland/servers/netd/src/filter*`, while the packet loop is in `netd/src/netd.rs`/`lib.rs`,
+which the ticket says not to edit. The hook and the QEMU block/allow demo remain the K274
+integration work.

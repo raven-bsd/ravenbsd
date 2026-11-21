@@ -4,8 +4,8 @@
 //! Integration tests over the B17 fixture rulesets and packets.
 
 use raven_pf::{
-    Action, AddrSpec, Direction, Engine, IfaceSpec, Ipv4Addr, Packet, PortSpec, Protocol,
-    StatePolicy, Verdict, parse,
+    Action, AddrSpec, Direction, Engine, IfaceSpec, Ipv4Addr, Ipv6Addr, Packet, Packet6, PortSpec,
+    Protocol, StatePolicy, Verdict, parse,
 };
 
 const BASIC: &str = include_str!("../../../tests/fixtures/b17-pf/basic.conf");
@@ -124,4 +124,112 @@ fn parse_flags(text: &str) -> u8 {
         };
     }
     flags
+}
+
+#[test]
+fn tables_expand_into_rules() {
+    let ruleset = parse("table <lan> { 10.0.0.0/8, 192.0.2.1 }\npass in from <lan> to any\n")
+        .expect("table ruleset");
+    assert_eq!(ruleset.tables.len(), 1);
+    assert_eq!(ruleset.tables[0].addresses, vec!["10.0.0.0/8", "192.0.2.1"]);
+    assert_eq!(ruleset.rules.len(), 2);
+
+    let mut engine = Engine::new(ruleset);
+    let inside = Packet::tcp(
+        Direction::In,
+        "eth0",
+        Ipv4Addr::new(192, 0, 2, 1),
+        1234,
+        Ipv4Addr::new(203, 0, 113, 9),
+        80,
+        0,
+        64,
+    );
+    assert_eq!(engine.evaluate(&inside, 0).verdict, Verdict::Pass);
+    let outside = Packet::tcp(
+        Direction::In,
+        "eth0",
+        Ipv4Addr::new(203, 0, 113, 9),
+        1234,
+        Ipv4Addr::new(192, 0, 2, 1),
+        80,
+        0,
+        64,
+    );
+    assert_eq!(engine.evaluate(&outside, 0).verdict, Verdict::Block);
+}
+
+#[test]
+fn nat_and_redirect_translate_the_expected_endpoint() {
+    let ruleset = parse(
+        "nat on eth0 from any to any -> 203.0.113.5\n\
+         rdr on eth0 proto tcp from any to any port 80 -> 127.0.0.1 port 8080\n",
+    )
+    .expect("nat ruleset");
+    let engine = Engine::new(ruleset);
+    let outbound = Packet::tcp(
+        Direction::Out,
+        "eth0",
+        Ipv4Addr::new(10, 0, 2, 15),
+        4000,
+        Ipv4Addr::new(198, 51, 100, 1),
+        80,
+        0,
+        64,
+    );
+    let translation = engine.translate(&outbound).expect("nat");
+    assert!(!translation.destination);
+    assert_eq!(
+        translation.address,
+        AddrSpec::Host(Ipv4Addr::new(203, 0, 113, 5))
+    );
+    assert_eq!(translation.port, 4000);
+
+    let inbound = Packet::tcp(
+        Direction::In,
+        "eth0",
+        Ipv4Addr::new(198, 51, 100, 1),
+        5000,
+        Ipv4Addr::new(203, 0, 113, 5),
+        80,
+        0,
+        64,
+    );
+    let translation = engine.translate(&inbound).expect("rdr");
+    assert!(translation.destination);
+    assert_eq!(
+        translation.address,
+        AddrSpec::Host(Ipv4Addr::new(127, 0, 0, 1))
+    );
+    assert_eq!(translation.port, 8080);
+}
+
+#[test]
+fn ipv6_static_rules_match_and_default_block() {
+    let source = Ipv6Addr::parse("2001:db8::1").expect("v6 source");
+    let destination = Ipv6Addr::parse("2001:db8:1::2").expect("v6 destination");
+    assert!(
+        AddrSpec::parse("2001:db8::/32")
+            .expect("v6 cidr")
+            .matches_v6(source)
+    );
+    let ruleset = parse("pass in proto tcp from 2001:db8::/32 to any\n").expect("v6 rule");
+    let mut engine = Engine::new(ruleset);
+    let packet = Packet6 {
+        direction: Direction::In,
+        interface: "eth0",
+        protocol: Protocol::Tcp,
+        source,
+        destination,
+        source_port: 1234,
+        destination_port: 443,
+        length: 64,
+        tcp_flags: 0,
+    };
+    assert_eq!(engine.evaluate_v6(&packet).verdict, Verdict::Pass);
+    let outside = Packet6 {
+        source: Ipv6Addr::parse("2001:db9::1").unwrap(),
+        ..packet
+    };
+    assert_eq!(engine.evaluate_v6(&outside).verdict, Verdict::Block);
 }
