@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K285: same concise boot report as the release image (see profiles/release.d/05-boot-quiet.toml).
+
+[[initfs.files]]
+src = "profiles/release.d/boot-quiet"
+path = "/etc/raven/boot-quiet"
+mode = 0o644
