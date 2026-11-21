@@ -19,6 +19,24 @@ exposes one more row: P7 riscv64 static server B 15,488 > 12,385, but the growth
 the 10 static invariants, the P7 riscv64 server B layout row, and the two riscv64 P9 static S/F
 rows.
 
+## C74z-S9 boot-row closure (OBSERVED, `6af246ac`)
+
+C74z-S9a (`dab7fe6c`, merged `6862c7ef`) made fd-table/stdio and main-thread TLS page setup
+lazy; no budget was raised. A fresh `cargo xtask libc-size --check` on this tree reports:
+
+| boot row | measured / budget | result |
+|---|---|---|
+| x86_64 syscalls before `main` | 0 / 0 | PASS |
+| x86_64 start instructions | 313 / 908 | PASS |
+| aarch64 syscalls before `main` | 3 / 3 | PASS |
+| aarch64 start instructions | 1235 / 1847 | PASS |
+| riscv64 syscalls before `main` | 0 / 0 | PASS |
+| riscv64 start instructions | 40 / 41 | PASS |
+
+The three C74z-S9 regressions are closed; the eager fd allocator and TLS page-path subtrees are
+outside the static start graph. The check still exits 1 because 61 non-boot rows from the other
+C74z clusters remain (15 pass / 61 fail / 65 known / 99 skipped), but no boot row fails.
+
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
 C74zb collapses the `printf` engine behind one type-erased core and shares the `mntent` line and
