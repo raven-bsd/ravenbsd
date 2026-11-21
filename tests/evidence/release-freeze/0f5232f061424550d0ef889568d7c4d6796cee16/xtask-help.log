@@ -1,0 +1,48 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.06s
+     Running `target/debug/xtask --help`
+RavenBSD build system
+
+usage: make <target> [ARCH=x86_64|aarch64|riscv64] [PLATFORM=generic|pi4] [PROFILE=base] [RELEASE=1] [VERBOSE=1]
+
+targets:
+  help          show this list
+  setup         install host packages, Rust toolchain and firmware paths
+  doctor        report what is installed or missing
+  check         fmt, clippy, host tests, stable guard, provenance and target clippy
+  guard         stable-Rust guard only
+  kernel        build the kernel ELF
+  loader        build the UEFI loader
+  dev           debug build of every component that exists
+  release       smallest optimised build of every component that exists
+  image         assemble a bootable image (ticket K05)
+  run           run the image under QEMU (ticket K05)
+  test          check plus QEMU integration tests
+  world         build kernel, loader and userland (milestone M4)
+  uutils        build the selected uutils coreutils for the Raven std target
+  provenance    validate SPDX headers and PROVENANCE.toml
+  toolchain     build the RavenBSD Rust toolchain (ticket K19)
+  clean         remove target/ and build/
+  distclean     also remove vendor/ and local build configuration
+
+cargo xtask commands:
+  check [--fast]
+  guard
+  build <kernel|loader|user> --arch <a> [--release] [-p <package>]...
+  image   --arch <a> [--platform <generic|pi4>] [--profile <p>] [--cmdline <s>] [--initfs <p>] [--kernel <p>] [--output <path>]
+  initfs  --arch <a> [--profile <p>]
+  run     --arch <a> [--profile <p>] [--no-build] [-- <qemu args>]
+  qtest   [--case <name> | --all] [--arch <a>] [--no-build]
+  provenance
+  posix-gaps [--check]
+  posix-check [--profile posix] [--arch A] [--json] [--host-only]
+  docs
+  libc-abi {gen|check|gaps|reconcile|release} [--root DIR]
+  libc-lint [CHECK...] [--root DIR] [--json]
+  libc-oracle ... (not implemented yet)
+  libc-headers ... (not implemented yet)
+  libc-link --arch A [--check] [--json]
+  libc-pack ... (not implemented yet)
+  libc-stubs [--arch A] [--out DIR] [--check]
+  libc-size ... (not implemented yet)
+  libc-world ... (not implemented yet)
+  libc-census ... (not implemented yet)
