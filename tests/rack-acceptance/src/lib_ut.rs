@@ -56,23 +56,14 @@ fn audit_produces_the_exact_219_row_status_and_218_target() {
 }
 
 #[test]
-fn the_k269_rows_remain_visible_gaps() {
+fn the_k269_rows_are_accepted() {
     let donor = register::load_donor().expect("donor");
     let register_rows = register::load_register().expect("register");
     let source = SourceIndex::load().expect("source");
     let report = audit::run(&donor, &register_rows, &source, &[]);
-    assert_eq!(report.accepted, 217);
+    assert_eq!(report.accepted, 219);
     assert_eq!(report.duplicates, Vec::<String>::new());
-    assert_eq!(report.gaps.len(), 2);
-    for function in ["rack_cong_signal", "rack_update_prr"] {
-        assert!(
-            report
-                .gaps
-                .iter()
-                .any(|gap| gap.function == function && gap.owner == "K269"),
-            "{function} must stay a K269 gap"
-        );
-    }
+    assert!(report.gaps.is_empty(), "K269 rows are no longer gaps");
 }
 
 #[test]

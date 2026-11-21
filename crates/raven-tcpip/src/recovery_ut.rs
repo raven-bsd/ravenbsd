@@ -192,7 +192,7 @@ fn rack_cong_signal_enters_recovery_and_sets_prr() {
     ctx.snd_max = 5_000;
     ctx.cwnd = 5_000;
     ctx.ssthresh = 3_000;
-    let outcome = rack.cong_signal(&ctx, RackSignal::DupAck);
+    let outcome = rack.rack_cong_signal(&ctx, RackSignal::DupAck);
     assert!(outcome.in_recovery);
     assert!(outcome.send_cwr);
     assert_eq!(outcome.recover, 5_000);

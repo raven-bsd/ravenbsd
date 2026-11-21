@@ -1396,6 +1396,11 @@ impl Rack {
             .saturating_sub(entry.rtr_bytes.min(entry.len()));
     }
 
+    /// Donor-name view of `congestion`.
+    pub fn rack_cong_signal(&mut self, ctx: &RackContext, signal: RackSignal) -> RackCongOutcome {
+        self.cong_signal(ctx, signal)
+    }
+
     /// Donor-name view of `ack_received`.
     pub fn rack_ack_received(&mut self, ctx: &RackContext) -> RackOutcome {
         self.process_ack(ctx)
