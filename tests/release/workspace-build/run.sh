@@ -14,7 +14,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
 sha=$(git rev-parse HEAD)
-out="$root/tests/release/workspace-build/$sha"
+out=${WORKSPACE_BUILD_OUT:-"$root/tests/release/workspace-build/$sha"}
 mkdir -p "$out/failures"
 
 python3 - "$out" <<'PY'
