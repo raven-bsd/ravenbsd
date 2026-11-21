@@ -71,6 +71,7 @@ mod syncache;
 mod table;
 mod tcp_data;
 mod tcp_mss;
+mod tcp_notify;
 mod tcp_state;
 mod tcp_timer;
 mod time;
@@ -126,6 +127,7 @@ pub use tcp_mss::{
     MssOptions, MssState, TCP_MAXOLEN, TCP6_MSS_DEFAULT, mss_from_peer, option_length,
     pad_option_length, tcp_fixed_maxseg, tcp_maxseg,
 };
+pub use tcp_notify::{TcpNotify, TcpNotifyOutcome, TcpStateChange};
 pub use tcp_state::TcpState;
 pub use time::{Duration, Instant};
 
