@@ -1045,6 +1045,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rack-transport-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-tlp-model",
+ "rack-vtable-model",
+ "raven-tcpip",
+]
+
+[[package]]
 name = "rack-vtable-model"
 version = "0.1.0"
 
