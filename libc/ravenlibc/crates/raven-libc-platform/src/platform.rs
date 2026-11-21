@@ -805,13 +805,34 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             return Err(Errno::EBADF);
         }
         let handle = reference.handle();
-        crate::intr::cancellable(|| {
+        let socket = reference.kind() == OfdKind::Socket;
+        let result = crate::intr::cancellable(|| {
             crate::intr::run(
                 crate::intr::CallClass::Restartable,
                 crate::intr::restart_wanted(),
                 || self.backend.write(handle, buf),
             )
-        })
+        });
+        // K195 DIAGNOSTIC (temporary, not a product change): trace every scheme-socket
+        // write so the sshd channel-confirmation write can be matched against netd's
+        // dispatch. Remove with the owning ticket.
+        if socket {
+            let text = match &result {
+                Ok(count) => alloc::format!(
+                    "k195w fd={fd} handle={} len={} ok={count}\n",
+                    handle.0,
+                    buf.len()
+                ),
+                Err(error) => alloc::format!(
+                    "k195w fd={fd} handle={} len={} err={}\n",
+                    handle.0,
+                    buf.len(),
+                    error.0
+                ),
+            };
+            let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
+        }
+        result
     }
 
     /// `readv`: one request up to 64 KiB, then a loop for the rest.

@@ -863,6 +863,8 @@ impl<D: Device> Netd<D> {
 
     /// Write stream bytes or one datagram to `file`.
     pub fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
+        // K195 DIAGNOSTIC (temporary, not a product change): trace netd's file dispatch.
+        raven_rt::println!("k195n write file={file} len={}", buffer.len());
         let (interface, transport, id, peer, write_shutdown) = match self.files.get(&file) {
             Some(File::Socket(socket)) => (
                 socket.interface,
