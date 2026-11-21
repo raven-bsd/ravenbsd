@@ -36,6 +36,7 @@ stack.
 | DSACK classification and skip | `dsack_blocks_are_classified_and_skipped` |
 | reneging | `reneging_clears_the_scoreboard` |
 | block-count cap | `the_range_cap_is_bounded_and_reports_drops`, `a_full_scoreboard_drops_an_overlapping_block_before_merging` |
+| receiver block order / option cap | `receiver_block_order_is_dsack_first_then_newest_with_the_option_cap` |
 | sequence wrap | `sequence_wrap_maps_to_relative_offsets` |
 
 Random seed: `0x30705a434b534143` (`0x3070_5a43_4b53_4143`). The 10k run performs 8002
