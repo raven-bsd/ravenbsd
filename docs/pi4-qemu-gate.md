@@ -3,8 +3,9 @@
 
 # Pi 4 aarch64 QEMU boot gate (K096b)
 
-Date: 2026-11-21  
-Tree: `b04e71ad87d0273ab9d86367b912a30c300c69ac`  
+Date: 2026-11-21
+Tree: `b04e71ad87d0273ab9d86367b912a30c300c69ac`
+
 Scope: host-side aarch64 release-image boot evidence. **No board, HDMI monitor or USB-keyboard
 claim**; those remain UI1 hardware gates.
 
@@ -81,3 +82,7 @@ the Pi 4 board; the login path still completes and is the only claim here.
 
 Under `tests/evidence/pi4/b04e71ad87d0273ab9d86367b912a30c300c69ac/`: image build log, image
 SHA-256/size, passing serial and JSON, stale-case serial/JSON, and `SHA256SUMS`.
+
+The earlier `d8f32734` Pi 4 host/QEMU sweep (pi4-root/devd/usb/emmc2/platd and the board-only
+UNAVAILABLE table) is preserved at `b04e71ad:docs/pi4-qemu-gate.md` in git history; this page is the
+current K096b aarch64 boot record.
