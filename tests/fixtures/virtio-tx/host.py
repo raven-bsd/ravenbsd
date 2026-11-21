@@ -36,7 +36,7 @@ def main():
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind((HOST, PORT))
     listener.listen(1)
-    listener.settimeout(70)
+    listener.settimeout(160)
     log(log_path, f"listening {HOST}:{PORT}")
     try:
         connection, address = listener.accept()
