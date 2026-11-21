@@ -14,9 +14,14 @@ use raven_tcpip_wire::tcp::{TcpBuilder, TcpFlags, TcpHeader, TcpOption, TcpPacke
 use crate::device::Device;
 use crate::ipv4_stack::to_wire as to_wire4;
 use crate::ipv6_stack::{IpAddr, Ipv6Addr, to_wire as to_wire6};
+use crate::isn::{ISN_SECRET_LENGTH, IsnConn, IsnEntropy};
 use crate::rto::RtoEstimator;
 use crate::seq::{seq_ge, seq_gt, seq_le, seq_lt};
-use crate::socket::{Kind, SocketRecord};
+use crate::socket::Kind;
+use crate::syncache::{
+    AbortOutcome, AckRequest, Address as SyncAddress, Endpoint as SyncEndpoint, InsertOutcome,
+    Key as SyncKey, PromoteOutcome, SynOptions, SynRequest,
+};
 use crate::tcp_data::advertised_window;
 use crate::{Instant, Ipv4Addr, SocketId, Stack};
 
@@ -66,6 +71,8 @@ pub(crate) struct TcpConnection {
     pub snd_wl1: u32,
     #[allow(dead_code)]
     pub snd_wl2: u32,
+    /// Sequence number of the last ACK sent; FreeBSD RST validation uses it.
+    pub last_ack_sent: u32,
     pub fin_sent: bool,
     pub fin_acked: bool,
     pub peer_fin: bool,
@@ -203,6 +210,7 @@ impl TcpConnection {
             rcv_wnd: 65_535,
             snd_wl1: 0,
             snd_wl2: 0,
+            last_ack_sent: iss,
             fin_sent: false,
             fin_acked: false,
             peer_fin: false,
@@ -310,6 +318,7 @@ impl TcpConnection {
             rcv_wnd: 65_535,
             snd_wl1: irs,
             snd_wl2: iss,
+            last_ack_sent: irs.wrapping_add(1),
             fin_sent: false,
             fin_acked: false,
             peer_fin: false,
@@ -569,6 +578,33 @@ impl<D: Device> Stack<D> {
             Kind::Tcp(connection) => Some((connection.local_port, connection.remote)),
             _ => None,
         }
+    }
+
+    /// Number of live syncache entries (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_syncache_len(&self) -> usize {
+        self.syncache.len()
+    }
+
+    /// The syncache entry for a remote port: `(iss, irs, sack, timestamp)` (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_syncache_entry(&self, remote_port: u16) -> Option<(u32, u32, bool, bool)> {
+        self.syncache
+            .entries()
+            .find(|entry| entry.key.remote.port == remote_port)
+            .map(|entry| (entry.iss, entry.irs, entry.sack, entry.timestamp.is_some()))
+    }
+
+    /// The peer MSS held by a syncache entry (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_syncache_peer_mss(&self, remote_port: u16) -> Option<u16> {
+        self.syncache
+            .entries()
+            .find(|entry| entry.key.remote.port == remote_port)
+            .map(|entry| entry.peer_mss.unwrap_or(536))
     }
 
     /// The initial send sequence for a TCP socket (host tests).
@@ -897,7 +933,7 @@ impl<D: Device> Stack<D> {
                 .usable_ipv6()
                 .map_or(IpAddr::V6(Ipv6Addr::UNSPECIFIED), IpAddr::V6),
         };
-        let iss = self.next_isn();
+        let iss = self.next_isn(local, local_port, remote.0, remote.1);
         let mut connection = TcpConnection::new_active(local, local_port, remote, iss, self.now);
         self.configure_tcp_connection(&mut connection, remote.0);
         let socket = self.sockets.alloc(
@@ -1004,15 +1040,28 @@ impl<D: Device> Stack<D> {
         default.min(max).min(self.config.rx_queue_bytes)
     }
 
-    fn next_isn(&mut self) -> u32 {
-        let counter = self.next_isn;
-        self.next_isn = self.next_isn.wrapping_add(0x0100_0000);
-        let clock = u32::try_from(self.now.as_millis() / 1000).unwrap_or(0);
-        match self.tunables.isn_strength {
-            0 => counter,
-            1 => isn_mix(counter ^ 0x9e37_79b9),
-            _ => isn_mix(counter ^ clock.rotate_left(13) ^ 0x85eb_ca6b),
-        }
+    fn next_isn(
+        &mut self,
+        local: IpAddr,
+        local_port: u16,
+        remote: IpAddr,
+        remote_port: u16,
+    ) -> u32 {
+        let mut increment = [0u8; 4];
+        self.rng.fill(&mut increment);
+        let cookie = self.cookie_secret.to_le_bytes();
+        let mut secret = [0u8; ISN_SECRET_LENGTH];
+        secret[..8].copy_from_slice(&cookie);
+        secret[8..].copy_from_slice(&cookie);
+        let increment = if self.tunables.isn_strength == 0 {
+            0
+        } else {
+            u32::from_le_bytes(increment)
+        };
+        let entropy = IsnEntropy::new(secret, increment);
+        let conn = IsnConn::new(local, local_port, remote, remote_port);
+        let ticks = u64::try_from(self.now.as_millis()).unwrap_or(0);
+        self.isn.next_isn(&conn, ticks, entropy)
     }
 
     pub(crate) fn tcp_input(
@@ -1187,6 +1236,24 @@ impl<D: Device> Stack<D> {
                 return;
             }
         }
+        let key = syncache_key(destination, destination_port, source, source_port);
+        if segment.rst() && self.syncache.abort(&key, segment.seq) == AbortOutcome::Removed {
+            self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
+            return;
+        }
+        if segment.ack_flag() && !segment.syn() {
+            let ack = AckRequest {
+                key,
+                seq: segment.seq,
+                ack: segment.ack,
+                window: segment.window,
+                timestamp: segment.tsval,
+            };
+            if self.promote_syncache(destination, destination_port, ack, &segment, now) {
+                self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
+                return;
+            }
+        }
         let listener = self.sockets.records.iter().find_map(|(raw_id, record)| {
             if record.closed {
                 return None;
@@ -1237,33 +1304,6 @@ impl<D: Device> Stack<D> {
     }
 
     /// Forget half-open entries whose connection closed or left SYN-RECEIVED.
-    fn prune_half_open(&mut self, listener: SocketId) {
-        let queued: Vec<u32> = match self.sockets.record(listener).map(|record| &record.kind) {
-            Ok(Kind::Listener { half_open, .. }) => half_open.sockets().collect(),
-            _ => return,
-        };
-        let stale: Vec<u32> = queued
-            .into_iter()
-            .filter(|raw| {
-                !self.sockets.records.get(raw).is_some_and(|record| {
-                    !record.closed
-                        && matches!(&record.kind,
-                            Kind::Tcp(connection) if connection.state == TcpState::SynReceived)
-                })
-            })
-            .collect();
-        if stale.is_empty() {
-            return;
-        }
-        if let Ok(record) = self.sockets.record_mut(listener)
-            && let Kind::Listener { half_open, .. } = &mut record.kind
-        {
-            for raw in stale {
-                half_open.remove_socket(raw);
-            }
-        }
-    }
-
     #[allow(clippy::too_many_arguments)]
     fn tcp_listen_input(
         &mut self,
@@ -1315,21 +1355,25 @@ impl<D: Device> Stack<D> {
         if !segment.syn() {
             return;
         }
-        self.prune_half_open(listener);
-        let limit = usize::try_from(self.tunables.half_open_limit).unwrap_or(1024);
-        let backlog_full = match self.sockets.record(listener) {
-            Ok(SocketRecord {
-                kind:
-                    Kind::Listener {
-                        _backlog,
-                        half_open,
-                        ..
-                    },
-                ..
-            }) => half_open.len() >= (*_backlog).min(limit),
+        if self.live_tcp_connections()
+            >= usize::try_from(self.tunables.connection_max).unwrap_or(usize::MAX)
+        {
+            self.counters.listen_drops = self.counters.listen_drops.wrapping_add(1);
+            self.drops = self.drops.saturating_add(1);
+            return;
+        }
+        let backlog = match self.sockets.record(listener).map(|record| &record.kind) {
+            Ok(Kind::Listener { _backlog, .. }) => *_backlog,
             _ => return,
         };
-        if backlog_full {
+        let half_open_limit = usize::try_from(self.tunables.half_open_limit).unwrap_or(usize::MAX);
+        let limit = backlog.min(half_open_limit);
+        let queued = self
+            .syncache
+            .entries()
+            .filter(|entry| entry.key.local.port == destination_port)
+            .count();
+        if queued >= limit {
             if self.tunables.syn_cookies_enable != 0 {
                 let iss = self.syn_cookie(
                     destination,
@@ -1359,45 +1403,242 @@ impl<D: Device> Stack<D> {
             self.drops = self.drops.saturating_add(1);
             return;
         }
-        if self.live_tcp_connections()
-            >= usize::try_from(self.tunables.connection_max).unwrap_or(usize::MAX)
+        let key = syncache_key(destination, destination_port, source, source_port);
+        if let Some(existing) = self.syncache.lookup(&key).cloned()
+            && seq_lt(segment.seq, existing.irs)
         {
-            self.counters.listen_drops = self.counters.listen_drops.wrapping_add(1);
-            self.drops = self.drops.saturating_add(1);
+            let _ = self.send_tcp_packet(
+                destination,
+                source,
+                destination_port,
+                source_port,
+                flags_or(TcpFlags::RST, TcpFlags::ACK),
+                0,
+                segment.seq.wrapping_add(segment.len()),
+                0,
+                &[],
+                false,
+            );
             return;
         }
-        let iss = self.next_isn();
-        let mut connection = TcpConnection::new_passive(
-            destination,
-            destination_port,
-            (source, source_port),
+        let iss = self.next_isn(destination, destination_port, source, source_port);
+        let request = SynRequest {
+            key,
+            irs: segment.seq,
             iss,
-            segment.seq,
+            receive_window: u32::try_from(self.recv_buffer_cap()).unwrap_or(u32::MAX),
+            options: SynOptions {
+                mss: segment.mss,
+                window_scale: segment.wscale,
+                sack_permitted: segment.sack_permitted,
+                timestamp: segment.tsval,
+                ecn: self.tunables.ecn_enable != 0 && (segment.flags.ece() || segment.flags.cwr()),
+                no_options: false,
+            },
+            ip_ttl: 64,
+            ip_tos: 0,
+        };
+        let now_ms = u64::try_from(now.as_millis()).unwrap_or(0);
+        match self.syncache.insert(request, now_ms) {
+            InsertOutcome::Inserted { .. } | InsertOutcome::Duplicate { .. } => {
+                self.counters.passive_opens = self.counters.passive_opens.wrapping_add(1);
+                let _ = self.send_syncache_syn_ack(&key);
+            }
+            InsertOutcome::Rejected => {
+                if self.tunables.syn_cookies_enable != 0 {
+                    let iss = self.syn_cookie(
+                        destination,
+                        source,
+                        destination_port,
+                        source_port,
+                        self.cookie_slot(self.now.as_millis()),
+                    );
+                    self.option_override = Some(vec![2, 4, 0x05, 0xb4, 1, 1, 3, 3, 0, 0]);
+                    let _ = self.send_tcp_packet(
+                        destination,
+                        source,
+                        destination_port,
+                        source_port,
+                        flags_or(TcpFlags::SYN, TcpFlags::ACK),
+                        iss,
+                        segment.seq.wrapping_add(1),
+                        65_535,
+                        &[],
+                        true,
+                    );
+                    self.counters.syn_cookie_sent = self.counters.syn_cookie_sent.wrapping_add(1);
+                    return;
+                }
+                self.counters.listen_drops = self.counters.listen_drops.wrapping_add(1);
+                self.drops = self.drops.saturating_add(1);
+            }
+        }
+    }
+
+    fn send_syncache_syn_ack(&mut self, key: &SyncKey) -> Result<(), Errno> {
+        let Some(entry) = self.syncache.lookup(key).cloned() else {
+            return Err(Errno::ENOENT);
+        };
+        let remote = syncache_ip(entry.key.remote.address);
+        let default_mss = u16::try_from(self.tunables.mss_default).unwrap_or(1_460);
+        let mss = our_mss(remote, self.device.capabilities(), default_mss);
+        let mut options = vec![2, 4];
+        options.extend_from_slice(&mss.to_be_bytes());
+        if entry.window_scale {
+            options.extend_from_slice(&[3, 3, entry.requested_r_scale]);
+        }
+        if entry.sack {
+            options.extend_from_slice(&[4, 2]);
+        }
+        if let Some(reflect) = entry.timestamp {
+            let tsval = u32::try_from(self.now.as_millis()).unwrap_or(0);
+            options.extend_from_slice(&[8, 10]);
+            options.extend_from_slice(&tsval.to_be_bytes());
+            options.extend_from_slice(&reflect.to_be_bytes());
+        }
+        self.option_override = Some(options);
+        let mut flags = flags_or(TcpFlags::SYN, TcpFlags::ACK);
+        if entry.ecn {
+            flags = flags_or(flags, TcpFlags::ECE);
+        }
+        self.send_tcp_packet(
+            syncache_ip(entry.key.local.address),
+            remote,
+            entry.key.local.port,
+            entry.key.remote.port,
+            flags,
+            entry.iss,
+            entry.irs.wrapping_add(1),
+            entry.receive_window,
+            &[],
+            true,
+        )
+    }
+
+    fn promote_syncache(
+        &mut self,
+        local: IpAddr,
+        local_port: u16,
+        ack: AckRequest,
+        segment: &Segment<'_>,
+        now: Instant,
+    ) -> bool {
+        let outcome = self.syncache.promote(ack);
+        let entry = match outcome {
+            PromoteOutcome::Promoted { entry, .. } => entry,
+            PromoteOutcome::Missing => return false,
+            PromoteOutcome::BadAck => {
+                let _ = self.send_tcp_raw(
+                    local,
+                    syncache_ip(ack.key.remote.address),
+                    local_port,
+                    ack.key.remote.port,
+                    TcpFlags::RST,
+                    segment.ack,
+                    0,
+                );
+                return true;
+            }
+            PromoteOutcome::BadSequence => {
+                if let Some(entry) = self.syncache.lookup(&ack.key).cloned() {
+                    let _ = self.send_tcp_packet(
+                        local,
+                        syncache_ip(entry.key.remote.address),
+                        local_port,
+                        entry.key.remote.port,
+                        TcpFlags::ACK,
+                        entry.iss,
+                        entry.irs.wrapping_add(1),
+                        entry.receive_window,
+                        &[],
+                        false,
+                    );
+                }
+                return true;
+            }
+            PromoteOutcome::MissingTimestamp | PromoteOutcome::StaleTimestamp => return true,
+        };
+
+        let remote = syncache_ip(entry.key.remote.address);
+        let mut connection = TcpConnection::new_passive(
+            local,
+            local_port,
+            (remote, entry.key.remote.port),
+            entry.iss,
+            entry.irs,
             now,
         );
-        self.configure_tcp_connection(&mut connection, source);
-        apply_syn_options(&mut connection, segment, now);
+        self.configure_tcp_connection(&mut connection, remote);
+        connection.state = TcpState::Established;
+        connection.passive = true;
+        connection.connect_deadline = None;
+        connection.snd_una = segment.ack;
+        connection.snd_nxt = segment.ack;
+        connection.snd_wnd = u32::from(segment.window) << entry.requested_s_scale.min(14);
+        connection.max_snd_wnd = segment.window;
+        connection.snd_wl1 = entry.irs;
+        connection.snd_wl2 = entry.iss;
+        connection.rcv_nxt = entry.irs.wrapping_add(1);
+        connection.timestamps = entry.timestamp.is_some() && connection.offer_timestamps;
+        connection.ts_recent = entry.timestamp.unwrap_or(0);
+        connection.ts_recent_age = now;
+        connection.sack_permitted = entry.sack && connection.offer_sack;
+        connection.negotiated_wscale = entry.window_scale.then_some(entry.requested_s_scale);
+        connection.snd_wscale = entry.requested_s_scale.min(14);
+        connection.rcv_wscale = entry.requested_r_scale;
+        if let Some(peer_mss) = entry.peer_mss {
+            let clamped = peer_mss.clamp(connection.mss_floor, connection.our_mss);
+            if clamped != peer_mss {
+                connection.mss_clamps = connection.mss_clamps.saturating_add(1);
+            }
+            connection.peer_mss = clamped;
+        }
+        let option_reduction = if connection.timestamps { 12 } else { 0 };
+        connection.mss = connection
+            .peer_mss
+            .min(connection.our_mss)
+            .saturating_sub(option_reduction)
+            .max(1);
+        connection.ecn_negotiated = entry.ecn && connection.ecn_enabled;
+        connection.last_activity = now;
+
         let Ok(socket) = self.sockets.alloc(
             Kind::Tcp(connection),
             self.recv_buffer_cap(),
             self.send_buffer_cap(),
         ) else {
-            return;
+            return true;
         };
-        self.counters.passive_opens = self.counters.passive_opens.wrapping_add(1);
-        if let Ok(record) = self.sockets.record_mut(listener)
-            && let Kind::Listener { half_open, .. } = &mut record.kind
-            && !half_open.push(crate::HalfOpen {
-                remote: source,
-                remote_port: source_port,
-                irs: segment.seq,
-                iss,
-                socket: socket.0,
-            })
+        let listener = self.sockets.records.iter().find_map(|(raw_id, record)| {
+            if record.closed {
+                return None;
+            }
+            match record.kind {
+                Kind::Listener { port, .. } if port == local_port => Some(SocketId(*raw_id)),
+                _ => None,
+            }
+        });
+        if let Some(listener) = listener
+            && let Ok(record) = self.sockets.record_mut(listener)
+            && let Kind::Listener { pending, .. } = &mut record.kind
         {
-            self.counters.half_open_drops = self.counters.half_open_drops.wrapping_add(1);
+            let limit = usize::try_from(self.tunables.accept_queue_limit).unwrap_or(128);
+            if pending.len() < limit {
+                let _ = pending.push(crate::HalfOpen {
+                    remote,
+                    remote_port: entry.key.remote.port,
+                    irs: entry.irs,
+                    iss: entry.iss,
+                    socket: socket.0,
+                });
+            } else {
+                self.counters.accept_queue_drops = self.counters.accept_queue_drops.wrapping_add(1);
+            }
         }
-        let _ = self.send_syn_ack(socket);
+        if !segment.payload.is_empty() {
+            self.tcp_input_established(socket, segment, now);
+        }
+        true
     }
 
     #[allow(unused_assignments)]
@@ -1406,6 +1647,7 @@ impl<D: Device> Stack<D> {
         let mut send_ack = false;
         let mut send_challenge = false;
         let mut send_rst = false;
+        let mut drop_with_reset = false;
         let mut send_syn_ack = false;
         let mut rst_seq = 0;
         let mut close_error = None;
@@ -1427,6 +1669,69 @@ impl<D: Device> Stack<D> {
                 return;
             };
             'transition: {
+                // FreeBSD `tcp_do_segment` validates RST before the state dispatch
+                // (RFC 5961 section 3.2), then drops a SYN in a synchronized state
+                // (section 4.2).  SYN_SENT and TIME_WAIT keep their own split bodies.
+                if segment.rst()
+                    && !matches!(connection.state, TcpState::SynSent | TcpState::TimeWait)
+                {
+                    match reset_disposition(connection, segment.seq) {
+                        ResetDisposition::Accept => {
+                            if connection.state == TcpState::SynReceived {
+                                close_error = Some(Errno::ECONNREFUSED);
+                                self.counters.attempt_fails =
+                                    self.counters.attempt_fails.wrapping_add(1);
+                            } else {
+                                close_error = Some(Errno::ECONNRESET);
+                            }
+                            if connection.state == TcpState::Established {
+                                self.counters.estab_resets =
+                                    self.counters.estab_resets.wrapping_add(1);
+                            }
+                            closed = true;
+                        }
+                        ResetDisposition::Challenge => {
+                            send_challenge = true;
+                            self.counters.rst_challenge =
+                                self.counters.rst_challenge.wrapping_add(1);
+                        }
+                        ResetDisposition::Ignore => {
+                            self.counters.rst_out_of_window =
+                                self.counters.rst_out_of_window.wrapping_add(1);
+                        }
+                    }
+                    break 'transition;
+                }
+                if segment.syn()
+                    && !matches!(
+                        connection.state,
+                        TcpState::SynSent | TcpState::SynReceived | TcpState::TimeWait
+                    )
+                {
+                    send_challenge = true;
+                    break 'transition;
+                }
+                // FreeBSD validates SEG.ACK against SND.MAX before the synchronized
+                // state body.  ESTABLISHED/FIN-WAIT-1 already do this in their body.
+                if segment.ack_flag()
+                    && matches!(
+                        connection.state,
+                        TcpState::FinWait2
+                            | TcpState::CloseWait
+                            | TcpState::Closing
+                            | TcpState::LastAck
+                    )
+                    && !ack_window_ok(connection, segment.ack)
+                {
+                    if seq_gt(segment.ack, connection.highest_sent()) {
+                        self.counters.acks_for_unsent =
+                            self.counters.acks_for_unsent.wrapping_add(1);
+                    } else {
+                        self.counters.ack_challenge = self.counters.ack_challenge.wrapping_add(1);
+                    }
+                    send_challenge = true;
+                    break 'transition;
+                }
                 match connection.state {
                     TcpState::SynSent => {
                         if segment.rst() {
@@ -1469,32 +1774,16 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::SynReceived => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                if connection.passive {
-                                    closed = true;
-                                } else {
-                                    close_error = Some(Errno::ECONNREFUSED);
-                                    closed = true;
-                                }
-                                self.counters.attempt_fails =
-                                    self.counters.attempt_fails.wrapping_add(1);
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
                         if segment.syn() && !segment.ack_flag() {
-                            apply_syn_options(connection, segment, now);
                             if segment.seq == connection.irs {
+                                apply_syn_options(connection, segment, now);
                                 send_syn_ack = true;
+                            } else if seq_lt(segment.seq, connection.irs) {
+                                // The LAND guard in `tcp_do_segment` resets a SYN
+                                // below IRS instead of touching the half-open.
+                                drop_with_reset = true;
                             } else {
-                                closed = true;
+                                send_ack = true;
                             }
                             break 'transition;
                         }
@@ -1503,9 +1792,21 @@ impl<D: Device> Stack<D> {
                             && seq_le(segment.ack, connection.snd_nxt)
                         {
                             connection.snd_una = segment.ack;
-                            connection.snd_wnd = u32::from(segment.window) << connection.snd_wscale;
-                            connection.max_snd_wnd = connection.max_snd_wnd.max(segment.window);
+                            // FreeBSD SYN_RECEIVED: snd_wnd = tiwin and
+                            // snd_wl1 = SEG.SEQ - 1.  The following data segment
+                            // is therefore the first one allowed to update the
+                            // window, which keeps the split-1 stale-window rule.
+                            let scaled = u32::from(segment.window) << connection.snd_wscale;
+                            connection.snd_wnd = scaled;
+                            connection.max_snd_wnd = connection
+                                .max_snd_wnd
+                                .max(u16::try_from(scaled).unwrap_or(u16::MAX));
+                            connection.snd_wl1 = segment.seq.wrapping_sub(1);
+                            connection.snd_wl2 = segment.ack;
                             transition = Some(TcpState::Established);
+                            if !segment.payload.is_empty() {
+                                incoming = Some((segment.seq, segment.payload));
+                            }
                             if connection.passive {
                                 pending_listener = Some(connection.local_port);
                             }
@@ -1514,33 +1815,17 @@ impl<D: Device> Stack<D> {
                             rst_seq = segment.ack;
                         }
                         if segment.fin() && segment.seq == connection.rcv_nxt {
-                            connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
-                            connection.peer_fin = true;
-                            transition = Some(TcpState::CloseWait);
-                            send_ack = true;
+                            if segment.payload.is_empty() {
+                                connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
+                                connection.peer_fin = true;
+                                transition = Some(TcpState::CloseWait);
+                                send_ack = true;
+                            } else {
+                                fin_after_data = true;
+                            }
                         }
                     }
                     TcpState::Established => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                                self.counters.estab_resets =
-                                    self.counters.estab_resets.wrapping_add(1);
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if connection.timestamps
                             && let Some(tsval) = segment.tsval
                             && seq_lt(tsval, connection.ts_recent)
@@ -1683,24 +1968,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::FinWait1 => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if connection.timestamps
                             && let Some(tsval) = segment.tsval
                             && seq_lt(tsval, connection.ts_recent)
@@ -1758,24 +2025,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::FinWait2 => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if segment.ack_flag() {
                             update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
@@ -1790,24 +2039,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::CloseWait => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if !segment.payload.is_empty() {
                             incoming = Some((segment.seq, segment.payload));
                         }
@@ -1819,24 +2050,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::Closing => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if segment.ack_flag() {
                             update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
@@ -1852,24 +2065,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::LastAck => {
-                        if segment.rst() {
-                            if segment.seq == connection.rcv_nxt {
-                                close_error = Some(Errno::ECONNRESET);
-                                closed = true;
-                            } else if in_window(connection, segment.seq) {
-                                send_challenge = true;
-                                self.counters.rst_challenge =
-                                    self.counters.rst_challenge.wrapping_add(1);
-                            } else {
-                                self.counters.rst_out_of_window =
-                                    self.counters.rst_out_of_window.wrapping_add(1);
-                            }
-                            break 'transition;
-                        }
-                        if segment.syn() {
-                            send_challenge = true;
-                            break 'transition;
-                        }
                         if segment.ack_flag() {
                             update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
                         }
@@ -1890,7 +2085,11 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if segment.syn() {
-                            if seq_gt(segment.seq, connection.irs) {
+                            let rfc6191 = segment.tsval.is_some_and(|tsval| {
+                                connection.timestamps
+                                    && (connection.ts_recent.wrapping_sub(tsval) as i32) < 0
+                            });
+                            if rfc6191 || seq_gt(segment.seq, connection.rcv_nxt) {
                                 connection.irs = segment.seq;
                                 connection.rcv_nxt = segment.seq.wrapping_add(1);
                                 let iss = connection.iss.wrapping_add(0x0100_0000);
@@ -2050,6 +2249,9 @@ impl<D: Device> Stack<D> {
         }
         if send_rst {
             let _ = self.send_rst_for(socket, rst_seq);
+        }
+        if drop_with_reset {
+            let _ = self.send_drop_with_reset(socket, segment);
         }
     }
 
@@ -2437,12 +2639,14 @@ impl<D: Device> Stack<D> {
         }
         if let Ok(record) = self.sockets.record_mut(socket)
             && let Kind::Tcp(connection) = &mut record.kind
-            && connection.state == TcpState::SynReceived
         {
-            connection.rto_deadline =
-                Some(Instant::from_millis(self.now.as_millis().saturating_add(
-                    i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
-                )));
+            connection.last_ack_sent = rcv_nxt;
+            if connection.state == TcpState::SynReceived {
+                connection.rto_deadline =
+                    Some(Instant::from_millis(self.now.as_millis().saturating_add(
+                        i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
+                    )));
+            }
         }
         let mut flags = flags_or(TcpFlags::SYN, TcpFlags::ACK);
         if self.tunables.ecn_enable != 0
@@ -2531,6 +2735,7 @@ impl<D: Device> Stack<D> {
             && let Kind::Tcp(connection) = &mut record.kind
         {
             connection.last_adv_window = window;
+            connection.last_ack_sent = rcv_nxt;
         }
         self.send_tcp_packet(
             local,
@@ -2563,6 +2768,11 @@ impl<D: Device> Stack<D> {
                 advertised_window(record),
             )
         };
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            connection.last_ack_sent = rcv_nxt;
+        }
         self.send_tcp_packet(
             local,
             remote.0,
@@ -2594,6 +2804,44 @@ impl<D: Device> Stack<D> {
             TcpFlags::RST,
             seq,
             0,
+            0,
+            &[],
+            false,
+        )
+    }
+
+    /// FreeBSD `tcp_dropwithreset`: an ACKed segment gets a bare RST echoing its
+    /// ACK; a segment without ACK gets RST|ACK acknowledging its sequence space.
+    fn send_drop_with_reset(
+        &mut self,
+        socket: SocketId,
+        segment: &Segment<'_>,
+    ) -> Result<(), Errno> {
+        let (local, remote, port) = {
+            let record = self.sockets.record(socket)?;
+            let Kind::Tcp(connection) = &record.kind else {
+                return Err(Errno::ENOTSOCK);
+            };
+            let remote = connection.remote.ok_or(Errno::ENOTCONN)?;
+            (connection.local, remote, connection.local_port)
+        };
+        let (flags, seq, ack) = if segment.ack_flag() {
+            (TcpFlags::RST, segment.ack, 0)
+        } else {
+            (
+                flags_or(TcpFlags::RST, TcpFlags::ACK),
+                0,
+                segment.seq.wrapping_add(segment.len()),
+            )
+        };
+        self.send_tcp_packet(
+            local,
+            remote.0,
+            port,
+            remote.1,
+            flags,
+            seq,
+            ack,
             0,
             &[],
             false,
@@ -2923,6 +3171,12 @@ impl<D: Device> Stack<D> {
 
     pub(crate) fn process_tcp_timers(&mut self, now: Instant) {
         self.absorb_detached();
+        let now_ms = u64::try_from(now.as_millis()).unwrap_or(0);
+        for action in self.syncache.poll(now_ms) {
+            if let crate::syncache::SyncacheAction::Retransmit(key) = action {
+                let _ = self.send_syncache_syn_ack(&key);
+            }
+        }
         for (key, slot) in self.timewait.expire_entries(now.as_millis()) {
             if slot.info.is_some() {
                 self.ports.release(key.local_port);
@@ -3267,10 +3521,19 @@ impl<D: Device> Stack<D> {
 /// FreeBSD `tcp_do_segment` step 6: only a newer segment/ACK may update `snd_wnd`.
 fn update_snd_wnd(connection: &mut TcpConnection, seq: u32, ack: u32, window: u16) {
     let scaled = u32::from(window) << connection.snd_wscale;
+    // A receiver advertising zero has stopped accepting data; stop sending immediately and
+    // let the persist timer probe.  A stale zero is safe; a missed zero is a stall.
+    if window == 0 && connection.snd_wnd != 0 {
+        connection.snd_wnd = 0;
+        connection.snd_wl1 = seq;
+        connection.snd_wl2 = ack;
+        return;
+    }
     if seq_lt(connection.snd_wl1, seq)
         || (connection.snd_wl1 == seq
             && (seq_lt(connection.snd_wl2, ack)
                 || (connection.snd_wl2 == ack && scaled > connection.snd_wnd)))
+        || (window == 0 && !seq_lt(seq, connection.snd_wl1) && connection.snd_wnd != 0)
     {
         connection.snd_wnd = scaled;
         connection.snd_wl1 = seq;
@@ -3281,14 +3544,35 @@ fn update_snd_wnd(connection: &mut TcpConnection, seq: u32, ack: u32, window: u1
     }
 }
 
-fn in_window(connection: &TcpConnection, seq: u32) -> bool {
-    seq_ge(seq, connection.rcv_nxt)
-        && seq_lt(
-            seq,
-            connection
-                .rcv_nxt
-                .wrapping_add(u32::from(connection.rcv_wnd)),
-        )
+enum ResetDisposition {
+    Accept,
+    Challenge,
+    Ignore,
+}
+
+/// FreeBSD `tcp_do_segment` RFC 5961 section 3.2: a RST is accepted only at
+/// `last_ack_sent` or `RCV.NXT`, challenged when it lands in the window, and
+/// ignored otherwise.
+fn reset_disposition(connection: &TcpConnection, seq: u32) -> ResetDisposition {
+    let in_window = if connection.rcv_wnd == 0 {
+        connection.last_ack_sent == seq || connection.rcv_nxt == seq
+    } else {
+        seq_ge(seq, connection.last_ack_sent)
+            && seq_lt(
+                seq,
+                connection
+                    .rcv_nxt
+                    .wrapping_add(u32::from(connection.rcv_wnd)),
+            )
+    };
+    if !in_window {
+        return ResetDisposition::Ignore;
+    }
+    if connection.last_ack_sent == seq || connection.rcv_nxt == seq {
+        ResetDisposition::Accept
+    } else {
+        ResetDisposition::Challenge
+    }
 }
 
 fn ack_window_ok(connection: &TcpConnection, ack: u32) -> bool {
@@ -3345,12 +3629,31 @@ fn signature_pseudo(local: IpAddr, remote: IpAddr, length: usize) -> Vec<u8> {
     }
 }
 
-fn isn_mix(mut value: u32) -> u32 {
-    value ^= value >> 16;
-    value = value.wrapping_mul(0x7feb_352d);
-    value ^= value >> 15;
-    value = value.wrapping_mul(0x846c_a68b);
-    value ^ (value >> 16)
+fn syncache_address(address: IpAddr) -> SyncAddress {
+    match address {
+        IpAddr::V4(value) => SyncAddress::V4(value.octets()),
+        IpAddr::V6(value) => SyncAddress::V6(value.octets()),
+    }
+}
+
+fn syncache_key(local: IpAddr, local_port: u16, remote: IpAddr, remote_port: u16) -> SyncKey {
+    SyncKey {
+        local: SyncEndpoint {
+            address: syncache_address(local),
+            port: local_port,
+        },
+        remote: SyncEndpoint {
+            address: syncache_address(remote),
+            port: remote_port,
+        },
+    }
+}
+
+fn syncache_ip(address: SyncAddress) -> IpAddr {
+    match address {
+        SyncAddress::V4(octets) => IpAddr::V4(Ipv4Addr::new(octets)),
+        SyncAddress::V6(octets) => IpAddr::V6(Ipv6Addr::new(octets)),
+    }
 }
 
 fn choose_wscale(receive_cap: usize) -> u8 {

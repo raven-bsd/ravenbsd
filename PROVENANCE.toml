@@ -9570,6 +9570,17 @@ modified = true
 notes = "The make_raw flag set is the literal NetBSD cfmakeraw port (IMAXBEL/IGNBRK/BRKINT/PARMRK/ISTRIP/INLCR/IGNCR/ICRNL/IXON, OPOST, ECHO/ECHONL/ICANON/ISIG/IEXTEN, CSIZE/PARENB clear and CS8); the TCSANOW mapping follows netbsd:lib/libc/termios/tcsetattr.c. The Rust termios guard, signal restore and safe API are first-party."
 
 [[import]]
+path = "crates/raven-tcpip/src/tcp_data.rs"
+upstream = "freebsd"
+upstream_path = "sys/netinet/tcp_output.c; sys/netinet/tcp_timer.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "tcp_default_output send gate (idle, sendwin=min(snd_wnd,snd_cwnd+SACK), len, closed-window rewind, TF_FORCEDATA one-byte persist probe, Nagle/SWS, sequence advance and ENOBUFS queue semantics), tcp_setpersist and tcp_timer_persist ported to the existing Rust TcpConnection/tx queue. Packet/option building and ACK/SYN output remain the existing send_tcp_packet/send_ack_for/send_syn_ack."
+
+[[import]]
 path = "crates/raven-tcpip/src/sack.rs"
 upstream = "dragonfly"
 upstream_path = "sys/netinet/tcp_sack.c"

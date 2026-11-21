@@ -46,14 +46,17 @@ mod dhcp;
 mod dhcp_stack;
 mod ecn;
 mod event;
+mod hostcache;
 mod icmp_stack;
 mod ipv4_stack;
 mod ipv6_stack;
+mod isn;
 mod listen;
 mod neighbor;
 mod observability;
 mod plpmtud_live;
 mod pmtu;
+mod rack_os;
 mod readiness;
 mod reassembly;
 mod recovery;
@@ -66,8 +69,12 @@ mod signature;
 mod socket;
 mod stack;
 mod syncache;
+mod syncookie;
 mod table;
 mod tcp_data;
+mod tcp_mss;
+mod tcp_notify;
+pub mod tcp_respond;
 mod tcp_state;
 mod tcp_timer;
 mod time;
@@ -85,19 +92,27 @@ pub use ecn::{
     TH_ECE, TH_SYN, get_ace, set_ace,
 };
 pub use event::{Event, PollResult, SocketId};
+pub use hostcache::{
+    DEFAULT_BUCKET_LIMIT, DEFAULT_EXPIRE_MS, DEFAULT_HASHSIZE, DEFAULT_PRUNE_MS, HostKey,
+    HostMetrics, Hostcache,
+};
 pub use ipv6_stack::{
     IpAddr, Ipv6Addr, Ipv6AddressState, Ipv6Cidr, Ipv6Config, Neighbor6Cache, Neighbor6Entry,
     Neighbor6State,
 };
+pub use isn::{IsnConn, IsnEntropy, IsnState};
 pub use listen::{AcceptQueue, HalfOpen, HalfOpenQueue, IsnGenerator, ListenStats, SynCookie};
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use observability::{
-    Counters, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,
+    Counters, HostcacheInfo, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,
 };
 pub use pmtu::{
     IPV4_FLOOR, IPV6_FLOOR, IpFamily, MssUpdate, MtuCache, Plpmtud, PlpmtudState, TCP_MINMSS,
     TCP_MSS_DEFAULT, floor_for, mss_headers, mss_update, mssopt, next_pmtu, next_pmtu6,
     on_icmp_frag_needed, on_icmp6_frag_needed, probe_sequence,
+};
+pub use rack_os::{
+    CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
 };
 pub use readiness::Readiness;
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
@@ -110,11 +125,25 @@ pub use signature::{AoAlgorithm, AoKey, DigestProvider, NoDigest};
 #[cfg(feature = "tcp-ao")]
 pub use signature::{hmac_sha1, hmac_sha256};
 pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};
+pub use syncookie::{
+    CookieAck, CookieConn, CookieRequest, ExpandedCookie, MSS_TABLE, SYNCOOKIE_LIFETIME_MS,
+    SYNCOOKIE_SECRET_SIZE, SyncacheSnapshot, Syncookie, SyncookiePolicy, SyncookieSecret,
+    TCP_MAX_WINDOW, WSCALE_TABLE, syncookie_cmp,
+};
 pub use table::{
     ConnectionKey, ConnectionTable, ListenerKey, ListenerTable, PortAllocator, Rebind,
     TimeWaitTable, rebind_decision,
 };
+pub use tcp_mss::{
+    MssOptions, MssState, TCP_MAXOLEN, TCP6_MSS_DEFAULT, mss_from_peer, option_length,
+    pad_option_length, tcp_fixed_maxseg, tcp_maxseg,
+};
+pub use tcp_notify::{TcpNotify, TcpNotifyOutcome, TcpStateChange};
 pub use tcp_state::TcpState;
+pub use tcp_timer::{
+    KeepOutcome, RexmtAction, RexmtOutcome, TimerState, TwoMslOutcome, tcp_timer_2msl,
+    tcp_timer_keep, tcp_timer_rexmt,
+};
 pub use time::{Duration, Instant};
 
 #[cfg(any(test, feature = "testutil"))]
