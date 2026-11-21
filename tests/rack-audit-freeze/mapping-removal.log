@@ -39,3 +39,4 @@ bbr	10	10000	10000	bbr seed 0x3260000a event 51863: expected pacing_rate 222650 
 	gap: K326 oracle values are complete; the product side is absent, so every modelled event is counted as a mismatch
 vtable	5	10000	1	vtable tfb_flags: expected 6, got 3
 	gap: the 10k-event K327 trace is replayed for determinism; only the callback probe matrix is compared against RackStack
+exit 1

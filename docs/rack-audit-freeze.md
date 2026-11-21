@@ -1,16 +1,17 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# RACK audit freeze (K366)
+# RACK audit freeze (K366, refreshed by K369)
 
-Frozen full-RACK acceptance evidence from a clean clone of `origin/master`.
+Frozen full-RACK acceptance evidence from a clean worktree at the K369 tool commit.
 
 ## Inputs
 
 | Item | Value |
 |---|---|
-| master commit | `2e8a873fd3a4e87b04d315cc9f1651f66b5364b1` |
-| tool | `rack-acceptance` at the same commit |
+| tool commit | `59c7a9ad7df6d368de768b106ab9c3ea0990d882` |
+| base master | `ddda93a5d9288db7a22eff2c2c8e0039727689a7` |
+| tool | `rack-acceptance` at `59c7a9ad` |
 | register | `docs/rack-coverage.md`, 219 rows, 219 PASS |
 | register SHA-256 | `d39d94a729354f810b0f6397f5a1a5e99ec4844182fbbd6df7ba6f4dc8f5c22e` |
 | donor | FreeBSD `sys/netinet/tcp_stacks/rack.c` at `133344405f532bd54ff3629a77d4c4e062f01fdb` |
@@ -18,9 +19,7 @@ Frozen full-RACK acceptance evidence from a clean clone of `origin/master`.
 | donor SHA-256 | `8c4a0b28b340216ac5de99c41dcb55f562439ee02314ca59a3ff9f2002b6d09e` |
 | donor functions | 219 |
 
-The fresh clone is `/tmp/opencode/k366/fresh`, cloned with
-`git clone --branch master --single-branch` from the minion clone and checked
-out at `2e8a873f`.
+The clean worktree is `/tmp/opencode/k369/clean`, checked out at the tool commit.
 
 ## Green run
 
@@ -34,47 +33,46 @@ target note: ticket text says 218 but the pinned donor/manifest has 219; the ext
 218-row view: 218/218 if the one-row discrepancy excludes tcp_addrack (PASS)
 ```
 
-Full output: `tests/rack-audit-freeze/acceptance.log`, runtime 4.57 s.
+Full output: `tests/rack-audit-freeze/acceptance.log`, runtime 3.28 s.
 
 ## Mutation / negative check
 
-All mutated runs use a scratch copy of the clean clone; the real register and
-reports were not modified.
+All mutated runs use `/tmp/opencode/k369/mut`, a scratch worktree at the same tool
+commit; the real register and reports were not modified.
 
-1. **Remove one accepted row** (`tcp_addrack`) from the scratch register:
-   `exit 1`, `donors=219 register=218 accepted=218 missing=1 gaps=0`.
-   Log: `remove-row.log`.
-2. **Remove one mapping** (`rack_log_gpset` Rust cell -> `missing_mapping`):
-   `exit 1`, `accepted=218 gaps=1 missing=0 duplicate=0 unknown=0`.
-   Log: `mapping-removal.log`.
-3. **Blank one test cell** (`rack_log_gpset` test -> `-`): the audit exits
-   **0** but K315 reports `empty_test=1`. This is a finding: the current
-   `rack-acceptance::is_ok` checks missing/duplicates/unknown/accepted but not
-   the K315 empty-cell lists. Log: `blank-test.log`. This ticket does not edit
-   the tool.
+1. **Blank test cell** (`rack_log_gpset` test -> `-`): `exit 1`,
+   `accepted=219`, `k315: empty_test=1`. Log: `blank-test.log`.
+2. **Blank Rust cell** (`rack_log_gpset` Rust -> `-`): `exit 1`,
+   `accepted=219`, `k315: empty_rust=1`. Log: `blank-rust.log`.
+3. **Blank mutation cell** (`rack_log_gpset` mutation -> `-`): `exit 1`,
+   `accepted=218 gaps=1`, `k315: empty_mutation=1`. Log: `blank-mutation.log`.
+4. **Remove one accepted row** (`tcp_addrack`): `exit 1`,
+   `donors=219 register=218 accepted=218 missing=1`. Log: `remove-row.log`.
+5. **Remove one mapping** (`rack_log_gpset` Rust -> `missing_mapping`): `exit 1`,
+   `accepted=218 gaps=1`. Log: `mapping-removal.log`.
 
-The required "remove one accepted row" proves the audit detects the missing
-function with a non-zero exit. The mapping-removal run additionally produces
-`gaps=1`; the blank-test run exposes a tool gap for its owner.
+K366 recorded the blank-test run as a finding (`exit 0`, `empty_test=1`). K369
+fixed `rack-acceptance::is_ok` to require the K315 cell audit clean, so the same
+mutation now exits 1. No check was weakened.
 
 ## Machine-readable fixture
 
-`tests/rack-audit-freeze/freeze.json` records the commit, donor/register hashes,
-commands, exits, summaries and logs. `donor.sha256` pins the extract.
+`tests/rack-audit-freeze/freeze.json` records the tool commit, donor/register
+hashes, commands, exits, summaries and logs. `donor.sha256` pins the extract.
 
 ## Scope
 
-No product code, register, acceptance tool, replay tool or ticket report was
-changed. The audit's replay section still reports model gaps for BBR/TLP/loss
-(the product exposes only part of those models); those are not register gaps and
-do not change the 219/219 acceptance result.
+No product code, register, replay tool or ticket report was changed. The audit's
+replay section still reports model gaps for BBR/TLP/loss (the product exposes
+only part of those models); those are not register gaps and do not change the
+219/219 acceptance result.
 
 ## Reproduction
 
 ```text
-rm -rf /tmp/opencode/k366/fresh
-git clone --branch master --single-branch <clean-clone> /tmp/opencode/k366/fresh
-cd /tmp/opencode/k366/fresh
+rm -rf /tmp/opencode/k369/clean
+git worktree add --detach /tmp/opencode/k369/clean 59c7a9ad7df6d368de768b106ab9c3ea0990d882
+cd /tmp/opencode/k369/clean
 timeout 120 cargo run -q -p rack-acceptance -- \
   --reports ../ravenbsd-prjmgmt/tickets --donor /tmp/opencode/freebsd-rack.c
 ```
