@@ -14,6 +14,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <time.h>
 #include <unistd.h>
 #include <unistd.h>
 
@@ -123,6 +124,10 @@ int main(void) {
 
     // Burst the whole 32 KiB before reading anything back; no serial logging in the loop so the
     // writes are not paced by the debug console.
+    struct timespec started;
+    struct timespec finished;
+
+    clock_gettime(CLOCK_MONOTONIC, &started);
     for (int index = 0; index < FRAMES; index++) {
         unsigned char *frame = buffer + (size_t)index * FRAME_BYTES;
         ssize_t wrote;
@@ -136,7 +141,10 @@ int main(void) {
             return 1;
         }
     }
-    say("virtio-tx: sent=32768\n");
+    clock_gettime(CLOCK_MONOTONIC, &finished);
+    long elapsed_ms = (finished.tv_sec - started.tv_sec) * 1000L +
+                      (finished.tv_nsec - started.tv_nsec) / 1000000L;
+    say_value("virtio-tx: sent=32768 elapsed_ms=", elapsed_ms, "\n");
 
     ssize_t echoed = read_full(connection, buffer, TOTAL_BYTES);
     say_value("virtio-tx: echo received=", (long)echoed, "\n");

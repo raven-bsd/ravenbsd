@@ -5,12 +5,13 @@
 # sends 32 KiB in 32 writes; the host verifies and echoes it. The guest logs `done` only after
 # every TX frame crossed the NIC and the echo returned. This is more than two TX ring capacities
 # (8 entries). The guest is a long-running network profile, so the case expects the harness
-# timeout.
+# timeout. The 180 s budget covers the measured >90 s guest boot under host load; the functional
+# assertions are unchanged.
 
 name = "virtio-tx"
 arch = "x86_64"
 profile = "server"
-timeout_secs = 90
+timeout_secs = 180
 initfs = "build/fixtures/virtio-tx/initfs.img"
 boot_cmdline = "console=ttyS0 loglevel=info"
 qemu_extra = [
@@ -30,7 +31,7 @@ regex = '^virtio-tx: connected$'
 unordered = true
 
 [[expect]]
-regex = '^virtio-tx: sent=32768$'
+regex = '^virtio-tx: sent=32768 elapsed_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
@@ -39,6 +40,14 @@ unordered = true
 
 [[expect]]
 regex = '^virtio-tx: done$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: irq tx fired=[1-9]'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: irq progress fired=([2-9][0-9]|[1-9][0-9]{2,}) '
 unordered = true
 
 [[forbid]]
