@@ -57,6 +57,7 @@ mod observability;
 mod plpmtud_live;
 mod pmtu;
 mod rack_hpts;
+mod rack_log;
 mod rack_os;
 mod rack_vtable;
 mod readiness;
@@ -118,6 +119,7 @@ pub use rack_hpts::{
     PACE_TMR_MASK, PACE_TMR_PERSIT, PACE_TMR_RACK, PACE_TMR_RXT, PACE_TMR_TLP, RackHpts,
     RackTimeout, hpts_usec_to_slots, rack_timeout_action,
 };
+pub use rack_log::{Counter as RackLogCounter, LogEntry as RackLogEntry, RackLog};
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
 };
