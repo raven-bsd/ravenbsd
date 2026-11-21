@@ -83,9 +83,13 @@ if [ "$check_only" -eq 1 ]; then
 fi
 
 cp "$vars_src" "$vars"
+helper_cmd="sh $helper"
+if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    helper_cmd="sudo -n sh $helper"
+fi
 cleanup() {
     if [ "$net_up" -eq 1 ] && [ -f "$helper" ]; then
-        sh "$helper" down >/dev/null 2>&1 || true
+        $helper_cmd down >/dev/null 2>&1 || true
     fi
     rm -f "$vars"
 }
@@ -97,7 +101,10 @@ if [ "$user_net" -eq 1 ]; then
 else
     grep -q '^ *up)' "$helper" ||
         refuse_net "$helper has no up/down; K194 tap/bridge is required for bidirectional networking"
-    contract=$(sh "$helper" up) || refuse_net "cannot bring up the tap/bridge (root/tap required)"
+    if [ "$helper_cmd" = "sh $helper" ] && [ "$(id -u)" -ne 0 ]; then
+        refuse_net "root required for the tap; run: sudo make demo"
+    fi
+    contract=$($helper_cmd up) || refuse_net "cannot bring up the tap/bridge (root/tap required)"
     tap=$(printf '%s\n' "$contract" | sed -n 's/^tap=\([^ ]*\).*/\1/p' | head -n 1)
     [ -n "$tap" ] || refuse_net "network helper did not report a tap device"
     net_up=1

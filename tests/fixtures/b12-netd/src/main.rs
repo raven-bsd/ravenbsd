@@ -56,11 +56,21 @@ mod program {
         ip: [10, 0, 2, 2],
         port: 47001,
     };
+    const PF_ALLOWED: Endpoint = Endpoint {
+        ip: [10, 0, 2, 2],
+        port: 47001,
+    };
+    const PF_BLOCKED: Endpoint = Endpoint {
+        ip: [10, 0, 2, 2],
+        port: 47002,
+    };
 
     fn main(args: raven_rt::Args) -> i32 {
         let phase = args.get(1).unwrap_or("first");
         let result = if phase.starts_with("virtio") {
             run_virtio(phase)
+        } else if phase == "pf" {
+            run_pf()
         } else {
             run(phase)
         };
@@ -71,6 +81,98 @@ mod program {
                 1
             }
         }
+    }
+
+    fn run_pf() -> Result<(), String> {
+        let client = raven_scheme::Client::new();
+        wait_netd(&client)?;
+        check_control_virtio(&client)?;
+        check_ping(&client, "10.0.2.2", [10, 0, 2, 2])?;
+        check_pf_allowed(&client)?;
+        check_pf_blocked(&client)?;
+        raven_rt::println!("pf: ok");
+        Ok(())
+    }
+
+    /// One allowed UDP flow; the host echo proves egress filtering and the ingress reply path.
+    fn check_pf_allowed(client: &raven_scheme::Client) -> Result<(), String> {
+        let socket = client
+            .open("net:udp/10.0.2.15:7200", READ_WRITE)
+            .map_err(|error| format!("pf allowed open: {}", error.description()))?;
+        expect_ok(
+            call(
+                client,
+                socket,
+                Call::Bind(Endpoint {
+                    ip: [10, 0, 2, 15],
+                    port: 7200,
+                }),
+            )?,
+            "pf allowed bind",
+        )?;
+        let (event, queue) = event_for(client, socket)?;
+        let payload = b"pf-allowed";
+        let request = SocketRequest::Write {
+            data: payload,
+            to: Some(PF_ALLOWED),
+        };
+        let mut encoded = [0u8; 64];
+        let length = request
+            .encode(&mut encoded)
+            .map_err(|_| "pf allowed write")?;
+        let mut response = [0u8; 128];
+        let read = client
+            .call(socket, &encoded[..length], &mut response)
+            .map_err(|error| format!("pf allowed send: {}", error.description()))?;
+        if Response::decode(&response[..read]) != Ok(Response::Write { len: 10 }) {
+            return Err("pf allowed write response differs".to_string());
+        }
+        let (data, from) = read_typed_event(client, socket, &queue, 32)?;
+        if data != payload || from != Some(PF_ALLOWED) {
+            return Err("pf allowed echo differs".to_string());
+        }
+        let _ = raven_rt::handle_close(event);
+        let _ = raven_rt::handle_close(queue.handle());
+        let _ = client.close(socket);
+        raven_rt::println!("pf: allowed flow ok");
+        Ok(())
+    }
+
+    /// One blocked UDP flow; netd logs the drop (the rule carries `log`).
+    fn check_pf_blocked(client: &raven_scheme::Client) -> Result<(), String> {
+        let socket = client
+            .open("net:udp/10.0.2.15:7201", READ_WRITE)
+            .map_err(|error| format!("pf blocked open: {}", error.description()))?;
+        expect_ok(
+            call(
+                client,
+                socket,
+                Call::Bind(Endpoint {
+                    ip: [10, 0, 2, 15],
+                    port: 7201,
+                }),
+            )?,
+            "pf blocked bind",
+        )?;
+        let request = SocketRequest::Write {
+            data: b"pf-blocked",
+            to: Some(PF_BLOCKED),
+        };
+        let mut encoded = [0u8; 64];
+        let length = request
+            .encode(&mut encoded)
+            .map_err(|_| "pf blocked write")?;
+        let mut response = [0u8; 128];
+        let read = client
+            .call(socket, &encoded[..length], &mut response)
+            .map_err(|error| format!("pf blocked send: {}", error.description()))?;
+        if Response::decode(&response[..read]) != Ok(Response::Write { len: 10 }) {
+            return Err("pf blocked write response differs".to_string());
+        }
+        raven_rt::println!("pf: blocked datagram sent");
+        let _ = raven_rt::nanosleep(200_000_000);
+        let _ = client.close(socket);
+        Ok(())
     }
 
     fn run_virtio(phase: &str) -> Result<(), String> {

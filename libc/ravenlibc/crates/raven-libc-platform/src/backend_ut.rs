@@ -9,7 +9,7 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_libc_abi::fcntl;
 
-use crate::backend::{FakeSys, Fault, SysBackend};
+use crate::backend::{FakeSys, Fault, RealSys, SysBackend};
 use crate::platform::Platform;
 
 #[test]
@@ -853,4 +853,64 @@ fn fd_table_stress_keeps_refcounts_consistent() {
         "one reference per installed fd"
     );
     assert!(guard.arena.live() <= guard.table.open_count());
+}
+
+#[test]
+fn platform_pipe_and_pipe2_return_usable_descriptors() {
+    use crate::fd::table::FD_CLOEXEC;
+
+    raven_libc_sys::fake::reset();
+    let platform = Platform::new(RealSys);
+    let (read, write) = platform.pipe().expect("pipe");
+    assert!(read >= 0 && write >= 0 && read != write);
+    assert_eq!(
+        platform.fcntl(read, fcntl::F_GETFL, 0).expect("read flags") as i32 & fcntl::O_NONBLOCK,
+        0
+    );
+    assert_eq!(
+        platform
+            .fcntl(write, fcntl::F_GETFL, 0)
+            .expect("write flags") as i32
+            & fcntl::O_WRONLY,
+        fcntl::O_WRONLY
+    );
+    platform.close(read).expect("close read");
+    platform.close(write).expect("close write");
+
+    let (read, write) = platform.pipe2(0).expect("pipe2(0)");
+    platform.close(read).expect("close pipe2 read");
+    platform.close(write).expect("close pipe2 write");
+
+    let (read, write) = platform.pipe2(fcntl::O_CLOEXEC).expect("pipe2(O_CLOEXEC)");
+    assert_eq!(
+        platform
+            .fcntl(read, fcntl::F_GETFD, 0)
+            .expect("read fd flags") as i32
+            & FD_CLOEXEC as i32,
+        FD_CLOEXEC as i32
+    );
+    assert_eq!(
+        platform
+            .fcntl(write, fcntl::F_GETFD, 0)
+            .expect("write fd flags") as i32
+            & FD_CLOEXEC as i32,
+        FD_CLOEXEC as i32
+    );
+    platform.close(read).expect("close cloexec read");
+    platform.close(write).expect("close cloexec write");
+
+    let (read, write) = platform
+        .pipe2(fcntl::O_NONBLOCK)
+        .expect("pipe2(O_NONBLOCK)");
+    assert_eq!(
+        platform
+            .fcntl(read, fcntl::F_GETFL, 0)
+            .expect("nonblock flags") as i32
+            & fcntl::O_NONBLOCK,
+        fcntl::O_NONBLOCK
+    );
+    platform.close(read).expect("close nonblock read");
+    platform.close(write).expect("close nonblock write");
+
+    assert_eq!(platform.pipe2(0x4000_0000), Err(Errno::EINVAL));
 }
