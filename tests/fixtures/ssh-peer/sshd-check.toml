@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K375 one-shot sshd config/host-key check. `sshd -t` exits 0 only when the config, the host key
+# and the privsep user are usable, so a failure is visible before the listener service starts.
+# rsh redirects stderr to stdout for the serial console.
+
+name = "sshd-check"
+exec = "/bin/rsh"
+args = ["/bin/rsh", "-c", "/sbin/sshd -t -f /etc/ssh/sshd_config 2>&1"]
+needs = ["vfsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = true

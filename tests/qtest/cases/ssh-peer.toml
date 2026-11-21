@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K375 guest SSH fake peer. The pre-step builds the minimal server-profile initfs with the real
+# OpenSSH sshd and starts the host peer; QEMU exposes guest port 22 as 127.0.0.1:2222. The guest
+# is a long-running server, so the case expects the harness timeout. The peer log is the evidence
+# and run.sh asserts it after the case.
+
+name = "ssh-peer"
+arch = "x86_64"
+profile = "server"
+timeout_secs = 120
+initfs = "build/fixtures/ssh-peer/initfs.img"
+boot_cmdline = "console=ttyS0 loglevel=info"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "timeout"
+pre = [
+    "sh tests/fixtures/ssh-peer/build.sh",
+    "SSH_PEER_WAIT=110 SSH_PEER_IDLE_MS=60000 sh tests/fixtures/ssh-peer/start-peer.sh > build/fixtures/ssh-peer/peer.stdout 2>&1 &",
+]
+
+[[expect]]
+regex = '^netd: ready$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: vfsd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: devd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: netd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: sshd (up|started)$'
+unordered = true
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|sshd: no hostkeys|Privilege separation user|No such file'

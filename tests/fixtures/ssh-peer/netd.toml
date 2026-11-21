@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K375 guest netd over the virtio-net frame-ring service. The generic loopback manifest does not
+# wait for `nic:`, which leaves sshd listening on loopback only.
+
+name = "netd"
+exec = "/sbin/netd"
+args = ["netd", "nic"]
+needs = ["logd", "scheme:nic"]
+provides = ["scheme:net"]
+readiness = "scheme"
+ready_timeout_ms = 90_000
+restart = "on-failure"
