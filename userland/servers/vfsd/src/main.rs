@@ -283,7 +283,7 @@ mod program {
                     .ok_or(Errno::ENOENT)?
                     .scheme
                     .clone();
-                match self.target_lstat(&scheme, &suffix) {
+                match self.target_lstat(&scheme, suffix) {
                     Ok(stat) if stat.mode & S_IFMT == S_IFLNK => {
                         if !follow_final && index + 1 == components.len() {
                             return Err(Errno::ELOOP);
@@ -292,7 +292,7 @@ mod program {
                         if links > 40 {
                             return Err(Errno::ELOOP);
                         }
-                        let target = self.target_readlink(&scheme, &suffix)?;
+                        let target = self.target_readlink(&scheme, suffix)?;
                         if target.is_empty() {
                             return Err(Errno::ENOENT);
                         }
