@@ -6,8 +6,9 @@
 #![cfg(feature = "testutil")]
 
 use raven_tcpip::{
-    IPV4_FLOOR, IPV6_FLOOR, IpAddr, Ipv4Addr, Ipv6Addr, MtuCache, Plpmtud, PlpmtudState,
-    classic_update, floor_for, probe_sequence,
+    IPV4_FLOOR, IPV6_FLOOR, IpAddr, IpFamily, Ipv4Addr, Ipv6Addr, MssUpdate, MtuCache, Plpmtud,
+    PlpmtudState, TCP_MSS_DEFAULT, floor_for, mss_headers, mss_update, mssopt, next_pmtu,
+    next_pmtu6, on_icmp_frag_needed, on_icmp6_frag_needed, probe_sequence,
 };
 
 fn v4(value: u8) -> IpAddr {
@@ -18,37 +19,6 @@ fn v6() -> IpAddr {
     IpAddr::V6(Ipv6Addr::new([
         0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     ]))
-}
-
-#[test]
-fn classic_pmtu_lowers_the_cached_mtu() {
-    assert_eq!(classic_update(Some(1500), 1400, true, v4(9)), Some(1400));
-}
-
-#[test]
-fn classic_pmtu_ignores_unmatched_quotes() {
-    assert_eq!(classic_update(Some(1500), 900, false, v4(9)), Some(1500));
-}
-
-#[test]
-fn classic_pmtu_clamps_v4_to_the_floor() {
-    assert_eq!(
-        classic_update(Some(1500), 100, true, v4(9)),
-        Some(IPV4_FLOOR)
-    );
-}
-
-#[test]
-fn classic_pmtu_clamps_v6_to_the_floor() {
-    assert_eq!(
-        classic_update(Some(9000), 1000, true, v6()),
-        Some(IPV6_FLOOR)
-    );
-}
-
-#[test]
-fn classic_pmtu_never_raises_a_cached_value() {
-    assert_eq!(classic_update(Some(1300), 1400, true, v4(9)), Some(1300));
 }
 
 #[test]
@@ -242,6 +212,137 @@ fn a_1400_path_converges_within_budget() {
 }
 
 #[test]
-fn classic_pmtu_ignores_a_zero_match_flag_even_with_a_bad_mtu() {
-    assert_eq!(classic_update(None, 1, false, v4(1)), None);
+fn freebsd_mssopt_uses_the_smaller_known_mtu() {
+    assert_eq!(mss_headers(IpFamily::V4), 40);
+    assert_eq!(mss_headers(IpFamily::V6), 60);
+    assert_eq!(mssopt(1500, 0, TCP_MSS_DEFAULT, IpFamily::V4), 1460);
+    assert_eq!(mssopt(1500, 9000, TCP_MSS_DEFAULT, IpFamily::V4), 1460);
+    assert_eq!(mssopt(0, 9000, TCP_MSS_DEFAULT, IpFamily::V6), 8940);
+    assert_eq!(mssopt(0, 0, TCP_MSS_DEFAULT, IpFamily::V4), TCP_MSS_DEFAULT);
+}
+
+#[test]
+fn freebsd_mss_update_clamps_offer_path_and_buffer() {
+    assert_eq!(
+        mss_update(
+            1460,
+            u32::MAX,
+            9000,
+            0,
+            TCP_MSS_DEFAULT,
+            216,
+            true,
+            false,
+            8192,
+            IpFamily::V4
+        ),
+        MssUpdate {
+            maxseg: 1460,
+            sack_prohibit: false
+        }
+    );
+    // `case -1` falls through to `default` and is rounded up to tcp_minmss.
+    assert_eq!(
+        mss_update(
+            -1,
+            u32::MAX,
+            9000,
+            0,
+            TCP_MSS_DEFAULT,
+            216,
+            true,
+            false,
+            8192,
+            IpFamily::V4
+        ),
+        MssUpdate {
+            maxseg: 216,
+            sack_prohibit: true
+        }
+    );
+    assert_eq!(
+        mss_update(
+            100,
+            u32::MAX,
+            1500,
+            0,
+            TCP_MSS_DEFAULT,
+            216,
+            true,
+            false,
+            8192,
+            IpFamily::V4
+        )
+        .maxseg,
+        216
+    );
+    assert_eq!(
+        mss_update(
+            0,
+            1400,
+            1500,
+            0,
+            TCP_MSS_DEFAULT,
+            216,
+            true,
+            false,
+            8192,
+            IpFamily::V4
+        )
+        .maxseg,
+        1360
+    );
+    assert_eq!(
+        mss_update(
+            1460,
+            u32::MAX,
+            1500,
+            0,
+            TCP_MSS_DEFAULT,
+            216,
+            true,
+            false,
+            1000,
+            IpFamily::V4
+        )
+        .maxseg,
+        1000
+    );
+}
+
+#[test]
+fn freebsd_icmp_next_pmtu_and_quote_filter() {
+    assert_eq!(next_pmtu(1200, 1500, 216), 1200);
+    assert_eq!(next_pmtu(1, 1500, 216), 256);
+    // No advertised MTU: walk the RFC 1191 plateau table (includes 1280).
+    assert_eq!(next_pmtu(0, 1500, 216), 1492);
+    assert_eq!(next_pmtu(0, 1400, 216), 1280);
+    assert_eq!(next_pmtu(0, 100, 216), 256);
+    assert_eq!(
+        on_icmp_frag_needed(100, 100, 200, 1200, 1500, 1460, 216),
+        Some(1200)
+    );
+    assert_eq!(
+        on_icmp_frag_needed(100, 100, 200, 1500, 1500, 1460, 216),
+        None
+    );
+    assert_eq!(
+        on_icmp_frag_needed(99, 100, 200, 1200, 1500, 1460, 216),
+        None
+    );
+    assert_eq!(
+        on_icmp_frag_needed(200, 100, 200, 1200, 1500, 1460, 216),
+        None
+    );
+}
+
+#[test]
+fn freebsd_icmp6_next_pmtu_and_quote_filter() {
+    assert_eq!(next_pmtu6(1400), 1400);
+    assert_eq!(next_pmtu6(1000), IPV6_FLOOR);
+    assert_eq!(on_icmp6_frag_needed(100, 100, 200, 1400, 1460), Some(1400));
+    // 1460 + 60 is not smaller than 1460 + 60.
+    assert_eq!(on_icmp6_frag_needed(100, 100, 200, 1520, 1460), None);
+    assert_eq!(on_icmp6_frag_needed(99, 100, 200, 1400, 1460), None);
+    assert_eq!(on_icmp6_frag_needed(200, 100, 200, 1400, 1460), None);
 }

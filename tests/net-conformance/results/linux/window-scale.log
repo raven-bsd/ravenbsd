@@ -1,5 +1,5 @@
 endpoint: READY
-SYN-ACK: 10.26.3.1:24001->10.26.3.2:37335 [SA] seq=4289301455 ack=1296668826 win=64240 len=0 mss=1460 ws=7 sack=True
-RESULT window-scale PASS ws=offered mss=1460 elapsed=0.10s
+SYN-ACK: 10.26.3.1:24001->10.26.3.2:35489 [SA] seq=1697804292 ack=3277988793 win=64240 len=0 mss=1460 ws=7 sack=True
+RESULT window-scale PASS ws=offered mss=1460 elapsed=0.07s
 PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/window-scale.pcap
-endpoint: ACCEPTED ('10.26.3.2', 37335)
+endpoint: ACCEPTED ('10.26.3.2', 35489)
