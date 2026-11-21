@@ -171,6 +171,7 @@ members = [
     "userland/bin/gencat",
     "userland/bin/locale",
     "userland/bin/ifconfig",
+    "userland/bin/tcpdump",
     "userland/bin/nc",
     "userland/bin/ping",
     "userland/bin/route",
