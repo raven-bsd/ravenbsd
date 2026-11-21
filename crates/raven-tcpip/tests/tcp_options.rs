@@ -627,6 +627,24 @@ fn sack_permitted_is_negotiated_on_the_default_handshake() {
 }
 
 #[test]
+fn a_small_receive_window_reaches_zero_after_the_buffer_fills() {
+    let (link, mut a, mut b) = pair();
+    b.set_property("tcp.recv_buffer_default", 2048)
+        .expect("recv buffer");
+    let (socket, peer) = handshake(&mut a, &mut b);
+    a.send(socket, &vec![0u8; 8192]).expect("send");
+    drive(&mut a, &mut b, &[210, 260, 310, 360]);
+    let (window, _, _) = a.test_tcp_window(socket).expect("window");
+    let windows: Vec<u16> = tcp_packets(&link).iter().map(|packet| packet.3).collect();
+    assert_eq!(
+        window,
+        0,
+        "the peer advertised a closed window; queued={:?} windows={windows:?}",
+        b.recv_queue_len(peer)
+    );
+}
+
+#[test]
 fn stale_window_update_does_not_overwrite_the_current_window() {
     let (_link, mut a, mut b) = pair();
     let (_sa, sb) = handshake(&mut a, &mut b);
