@@ -6,7 +6,7 @@
 # request. No exec, crypto or OpenSSH.
 name = "post-auth-fork"
 arch = "x86_64"
-profile = "network-config-test"
+profile = "server"
 timeout_secs = 300
 initfs = "build/fixtures/post-auth-fork/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"

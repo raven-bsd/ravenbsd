@@ -18,6 +18,9 @@ sha256sum -c tests/evidence/tcp/soak/SHA256SUMS >/dev/null
 packet=docs/releases/0.1.0-evidence.md
 grep -Fq '| shell-hygiene |' "$packet"
 grep -Fq '| tcp-soak |' "$packet"
+grep -Fq '| rack-audit |' "$packet"
+grep -Fq '| pf-conformance |' "$packet"
+grep -Fq '| pipe-poll |' "$packet"
 grep -Fq 'HARDWARE/UNVERIFIED' "$packet"
 
 readme=$(sha256sum tests/evidence/release-host/README.md | cut -d ' ' -f 1)
