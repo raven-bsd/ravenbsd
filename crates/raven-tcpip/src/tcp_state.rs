@@ -128,6 +128,8 @@ pub(crate) struct TcpConnection {
     pub ecn_enabled: bool,
     pub ecn_negotiated: bool,
     pub ecn_cwr_pending: bool,
+    /// Receiver saw CE and must echo ECE on its next ACKs.
+    pub ecn_ece_pending: bool,
     pub retransmits_total: u32,
     pub dupack_count: u8,
     pub last_activity: Instant,
@@ -265,6 +267,7 @@ impl TcpConnection {
             ecn_enabled: false,
             ecn_negotiated: false,
             ecn_cwr_pending: false,
+            ecn_ece_pending: false,
             retransmits_total: 0,
             dupack_count: 0,
             last_activity: now,
@@ -373,6 +376,7 @@ impl TcpConnection {
             ecn_enabled: false,
             ecn_negotiated: false,
             ecn_cwr_pending: false,
+            ecn_ece_pending: false,
             retransmits_total: 0,
             dupack_count: 0,
             last_activity: now,
@@ -422,6 +426,7 @@ struct Segment<'a> {
     seq: u32,
     ack: u32,
     flags: TcpFlags,
+    ecn: u8,
     window: u16,
     urgent: u16,
     mss: Option<u16>,
@@ -1068,6 +1073,7 @@ impl<D: Device> Stack<D> {
         &mut self,
         source: IpAddr,
         destination: IpAddr,
+        ecn: u8,
         payload: &[u8],
         now: Instant,
     ) {
@@ -1138,6 +1144,7 @@ impl<D: Device> Stack<D> {
             seq: packet.sequence(),
             ack: packet.acknowledgement(),
             flags: packet.flags(),
+            ecn: ecn & crate::ecn::ECN_MASK,
             window: packet.window(),
             urgent: packet.urgent_pointer(),
             mss,
@@ -1668,6 +1675,35 @@ impl<D: Device> Stack<D> {
             let Kind::Tcp(connection) = &mut record.kind else {
                 return;
             };
+            // FreeBSD `tcp_ecn_input_segment`: a CE-marked packet makes the receiver echo
+            // ECE and schedule CWR; a received CWR clears the ECE echo.
+            if connection.ecn_enabled && connection.ecn_negotiated {
+                if segment.ecn == crate::ecn::ECN_CE {
+                    let react = connection.ecn.on_ce();
+                    connection.ecn_ece_pending = true;
+                    connection.ecn_cwr_pending = true;
+                    self.counters.ecn_ce_marks = self.counters.ecn_ce_marks.wrapping_add(1);
+                    if react {
+                        let flight = connection.snd_nxt.wrapping_sub(connection.snd_una);
+                        let mut context = crate::CcContext {
+                            mss: u32::from(connection.mss),
+                            flight,
+                            pipe: flight,
+                            rtt: None,
+                            snd_nxt: connection.snd_nxt,
+                            snd_una: connection.snd_una,
+                        };
+                        connection
+                            .cc
+                            .on_loss(&mut context, crate::cc::LossKind::Ecn);
+                        connection.recover_seq = connection.snd_nxt;
+                        self.counters.ecn_ce_react = self.counters.ecn_ce_react.wrapping_add(1);
+                    }
+                }
+                if segment.flags.cwr() {
+                    connection.ecn_ece_pending = false;
+                }
+            }
             'transition: {
                 // FreeBSD `tcp_do_segment` validates RST before the state dispatch
                 // (RFC 5961 section 3.2), then drops a SYN in a synchronized state
@@ -2671,7 +2707,7 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn send_ack_for(&mut self, socket: SocketId) -> Result<(), Errno> {
-        let (options, window, previous_window, mss) = {
+        let (options, window, previous_window, mss, ece) = {
             let record = self.sockets.record(socket)?;
             let Kind::Tcp(connection) = &record.kind else {
                 return Err(Errno::ENOTSOCK);
@@ -2705,6 +2741,7 @@ impl<D: Device> Stack<D> {
                 advertised_window(record),
                 connection.last_adv_window,
                 connection.mss,
+                connection.ecn_ece_pending,
             )
         };
         if !options.is_empty() {
@@ -2737,12 +2774,16 @@ impl<D: Device> Stack<D> {
             connection.last_adv_window = window;
             connection.last_ack_sent = rcv_nxt;
         }
+        let mut flags = TcpFlags::ACK;
+        if ece {
+            flags = flags_or(flags, TcpFlags::ECE);
+        }
         self.send_tcp_packet(
             local,
             remote.0,
             port,
             remote.1,
-            TcpFlags::ACK,
+            flags,
             snd_nxt,
             rcv_nxt,
             window,
