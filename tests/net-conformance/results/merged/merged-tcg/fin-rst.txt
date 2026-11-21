@@ -1,0 +1,22 @@
+reading from file tests/net-conformance/results/merged/merged-tcg/fin-rst.pcap, link-type EN10MB (Ethernet), snapshot length 65535
+02:06:24.607255 IP (tos 0x0, ttl 64, id 54155, offset 0, flags [DF], proto TCP (6), length 52)
+    10.0.2.2.40319 > 10.0.2.15.23090: Flags [S], cksum 0xb02a (correct), seq 384275522, win 65535, options [mss 1460,wscale 7,sackOK,nop,nop,eol], length 0
+02:06:25.449291 ARP, Ethernet (len 6), IPv4 (len 4), Request who-has 10.0.2.2 tell 10.0.2.15, length 28
+02:06:25.449708 ARP, Ethernet (len 6), IPv4 (len 4), Reply 10.0.2.2 is-at 1a:8e:f6:84:ad:02, length 28
+02:06:25.449741 ARP, Ethernet (len 6), IPv4 (len 4), Reply 10.0.2.2 is-at 1a:8e:f6:84:ad:02, length 28
+02:06:25.520011 IP (tos 0x0, ttl 64, id 1, offset 0, flags [none], proto TCP (6), length 52)
+    10.0.2.15.23090 > 10.0.2.2.40319: Flags [S.], cksum 0x2cd4 (correct), seq 2221867991, ack 384275523, win 65535, options [mss 1460,wscale 3,sackOK,eol], length 0
+02:06:25.520158 IP (tos 0x0, ttl 64, id 46995, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40319 > 10.0.2.15.23090: Flags [.], cksum 0x6ca0 (correct), seq 1, ack 1, win 65535, length 0
+02:06:26.319551 IP (tos 0x0, ttl 64, id 2, offset 0, flags [none], proto TCP (6), length 84)
+    10.0.2.15.23090 > 10.0.2.2.40319: Flags [P.], cksum 0xa883 (correct), seq 1:45, ack 1, win 8192, length 44
+02:06:26.319686 IP (tos 0x0, ttl 64, id 16110, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40319 > 10.0.2.15.23090: Flags [.], cksum 0x6c74 (correct), seq 1, ack 45, win 65535, length 0
+02:06:28.520512 IP (tos 0x0, ttl 64, id 35443, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40319 > 10.0.2.15.23090: Flags [F.], cksum 0x6c73 (correct), seq 1, ack 45, win 65535, length 0
+02:06:28.682651 IP (tos 0x0, ttl 64, id 3, offset 0, flags [none], proto TCP (6), length 40)
+    10.0.2.15.23090 > 10.0.2.2.40319: Flags [.], cksum 0x4c73 (correct), seq 45, ack 2, win 8192, length 0
+02:06:29.178926 IP (tos 0x0, ttl 64, id 4, offset 0, flags [none], proto TCP (6), length 40)
+    10.0.2.15.23090 > 10.0.2.2.40319: Flags [F.], cksum 0x6c72 (correct), seq 45, ack 2, win 65535, length 0
+02:06:29.179070 IP (tos 0x0, ttl 64, id 58784, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40319 > 10.0.2.15.23090: Flags [R.], cksum 0x6c9c (correct), seq 1, ack 1, win 0, length 0
