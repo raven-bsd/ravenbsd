@@ -3546,6 +3546,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tar"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-tcpip"
 version = "0.1.0"
 dependencies = [
@@ -3643,6 +3652,16 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "toml",
+]
+
+[[package]]
+name = "raven-time"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -4138,25 +4157,6 @@ dependencies = [
  "raven-scheme",
  "raven-tool-core",
  "raven-ttyd",
-]
-
-[[package]]
-name = "tar"
-version = "0.1.0"
-dependencies = [
- "raven-proto-fs",
- "raven-rt",
- "raven-tool-core",
-]
-
-[[package]]
-name = "time"
-version = "0.1.0"
-dependencies = [
- "raven-abi",
- "raven-initfs",
- "raven-rt",
- "raven-tool-core",
 ]
 
 [[package]]
