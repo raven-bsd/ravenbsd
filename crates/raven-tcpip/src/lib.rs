@@ -70,6 +70,7 @@ mod stack;
 mod syncache;
 mod table;
 mod tcp_data;
+pub mod tcp_respond;
 mod tcp_state;
 mod tcp_timer;
 mod time;
