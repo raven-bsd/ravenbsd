@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 | Function | Rust | Test | Mutation | Status |
 |---|---|---|---|---|
 | `helper` | `crate::helper` | `helper_returns_one` | condition inverted -> test fails | PASS |
