@@ -442,3 +442,13 @@ fn rack_reneged_range_can_be_declared_lost_later() {
     assert_eq!(second.lost, vec![1_000]);
     assert!(second.entered_recovery);
 }
+
+#[test]
+fn rack_strike_dupack_returns_a_range_at_the_threshold() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    assert_eq!(rack.strike_dupack(), None);
+    assert_eq!(rack.strike_dupack(), None);
+    assert_eq!(rack.strike_dupack(), Some((1_000, 2_000)));
+    assert_eq!(rack.entries[0].dupack, RACK_DUP_THRESHOLD);
+}
