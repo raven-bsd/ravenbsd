@@ -1,0 +1,15 @@
+{
+  "case": "ufs-update-persist",
+  "arch": "x86_64",
+  "result": "fail",
+  "duration_ms": 55132,
+  "exit_status": null,
+  "matched": [
+    "^svcd: root pivoted to UFS at /$",
+    "^k185-second$"
+  ],
+  "unmatched": [
+    "^init exited \\(0\\)$"
+  ],
+  "forbidden_hits": []
+}

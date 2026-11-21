@@ -1,0 +1,69 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running `target/debug/xtask qtest --case ufs-root --arch x86_64 --no-build`
+ufs-root: fail
+--- serial (last 40 lines) ---
+stat
+svcctl
+tail
+touch
+true
+uname
+wc
+wget
+                                                                                /
+raven# raven# /bin/ls /binraven# /bin/ls /binraven# /bin/ls /binraven# /bin/ls /binraven# /bin/ls /binraven# /bin/draven# /bin/dfraven# /bin/df raven# /bin/df -raven# /bin/df -hraven# /bin/df -h
+Filesystem      Size  Used Avail Use% Mounted on
+ufs:            240M   41M  199M  17% /
+ramfs:           16M     0   16M   0% /tmp
+                                                                                /
+raven# raven# /bin/df -hraven# /sraven# /sbraven# /sbiraven# /sbinraven# /sbin/raven# /sbin/mraven# /sbin/moraven# /sbin/mouraven# /sbin/mounraven# /sbin/mountraven# /sbin/mount
+ufs: on /
+ramfs: on /tmp
+null: on /dev/null
+zero: on /dev/zero
+rand: on /dev/random
+rand: on /dev/urandom
+                                                                                /
+raven# raven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/praven# /sbin/piraven# /sbin/pinraven# /sbin/pingraven# /sbin/ping raven# /sbin/ping 1raven# /sbin/ping 10raven# /sbin/ping 10.raven# /sbin/ping 10.0raven# /sbin/ping 10.0.raven# /sbin/ping 10.0.2raven# /sbin/ping 10.0.2.raven# /sbin/ping 10.0.2.2raven# /sbin/ping 10.0.2.2
+ping: 10.0.2.2 seq=1 rtt=25ms
+ping: interval seq=2 waited=1001ms
+ping: 10.0.2.2 seq=2 rtt=2ms
+ping: interval seq=3 waited=1001ms
+ping: 10.0.2.2 seq=3 rtt=13ms
+ping: interval seq=4 waited=1000ms
+ping: 10.0.2.2 seq=4 rtt=11ms
+ping: 4 packets transmitted, 4 received, 0% packet loss
+ping: rtt min/avg/max = 2/12/25 ms
+                                                                                /
+raven# raven# eraven# ecraven# echraven# echoraven# echo raven# echo kraven# echo k1raven# echo k17raven# echo k176raven# echo k176-raven# echo k176-praven# echo k176-peraven# echo k176-perraven# echo k176-persraven# echo k176-persiraven# echo k176-persisraven# echo k176-persistraven# echo k176-persist raven# echo k176-persist >raven# echo k176-persist > raven# echo k176-persist > /raven# echo k176-persist > /praven# echo k176-persist > /peraven# echo k176-persist > /perraven# echo k176-persist > /persraven# echo k176-persist > /persiraven# echo k176-persist > /persisraven# echo k176-persist > /persistraven# echo k176-persist > /persist-raven# echo k176-persist > /persist-mraven# echo k176-persist > /persist-maraven# echo k176-persist > /persist-marraven# echo k176-persist > /persist-markraven# echo k176-persist > /persist-markeraven# echo k176-persist > /persist-markerraven# echo k176-persist > /persist-marker raven# echo k176-persist > /persist-marker &raven# echo k176-persist > /persist-marker &&raven# echo k176-persist > /persist-marker && raven# echo k176-persist > /persist-marker && craven# echo k176-persist > /persist-marker && caraven# echo k176-persist > /persist-marker && catraven# echo k176-persist > /persist-marker && cat raven# echo k176-persist > /persist-marker && cat /raven# echo k176-persist > /persist-marker && cat /praven# echo k176-persist > /persist-marker && cat /peraven# echo k176-persist > /persist-marker && cat /perraven# echo k176-persist > /persist-marker && cat /persraven# echo k176-persist > /persist-marker && cat /persiraven# echo k176-persist > /persist-marker && cat /persisraven# echo k176-persist > /persist-marker && cat /persistraven# echo k176-persist > /persist-marker && cat /persist-raven# echo k176-persist > /persist-marker && cat /persist-mraven# echo k176-persist > /persist-marker && cat /persist-maraven# echo k176-persist > /persist-marker && cat /persist-marraven# echo k176-persist > /persist-marker && cat /persist-markraven# echo k176-persist > /persist-marker && cat /persist-markeraven# echo k176-persist > /persist-marker && cat /persist-markerraven# echo k176-persist > /persist-marker && cat /persist-marker
+k176-persist
+                                                                                /
+raven# raven# echo k176-persist > /persist-marker && cat /persist-markerraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+RavenBSD 0.1 (x86_64) (tty:console)
+login: 
+--- unmatched expectations ---
+^init exited \(0\)$
+--- result ---
+step 23 (^init exited \(0\)$) failed: no matching serial line within 30 s
+last 20 serial line(s):
+rand: on /dev/random
+rand: on /dev/urandom
+                                                                                /
+raven# raven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/praven# /sbin/piraven# /sbin/pinraven# /sbin/pingraven# /sbin/ping raven# /sbin/ping 1raven# /sbin/ping 10raven# /sbin/ping 10.raven# /sbin/ping 10.0raven# /sbin/ping 10.0.raven# /sbin/ping 10.0.2raven# /sbin/ping 10.0.2.raven# /sbin/ping 10.0.2.2raven# /sbin/ping 10.0.2.2
+ping: 10.0.2.2 seq=1 rtt=25ms
+ping: interval seq=2 waited=1001ms
+ping: 10.0.2.2 seq=2 rtt=2ms
+ping: interval seq=3 waited=1001ms
+ping: 10.0.2.2 seq=3 rtt=13ms
+ping: interval seq=4 waited=1000ms
+ping: 10.0.2.2 seq=4 rtt=11ms
+ping: 4 packets transmitted, 4 received, 0% packet loss
+ping: rtt min/avg/max = 2/12/25 ms
+                                                                                /
+raven# raven# eraven# ecraven# echraven# echoraven# echo raven# echo kraven# echo k1raven# echo k17raven# echo k176raven# echo k176-raven# echo k176-praven# echo k176-peraven# echo k176-perraven# echo k176-persraven# echo k176-persiraven# echo k176-persisraven# echo k176-persistraven# echo k176-persist raven# echo k176-persist >raven# echo k176-persist > raven# echo k176-persist > /raven# echo k176-persist > /praven# echo k176-persist > /peraven# echo k176-persist > /perraven# echo k176-persist > /persraven# echo k176-persist > /persiraven# echo k176-persist > /persisraven# echo k176-persist > /persistraven# echo k176-persist > /persist-raven# echo k176-persist > /persist-mraven# echo k176-persist > /persist-maraven# echo k176-persist > /persist-marraven# echo k176-persist > /persist-markraven# echo k176-persist > /persist-markeraven# echo k176-persist > /persist-markerraven# echo k176-persist > /persist-marker raven# echo k176-persist > /persist-marker &raven# echo k176-persist > /persist-marker &&raven# echo k176-persist > /persist-marker && raven# echo k176-persist > /persist-marker && craven# echo k176-persist > /persist-marker && caraven# echo k176-persist > /persist-marker && catraven# echo k176-persist > /persist-marker && cat raven# echo k176-persist > /persist-marker && cat /raven# echo k176-persist > /persist-marker && cat /praven# echo k176-persist > /persist-marker && cat /peraven# echo k176-persist > /persist-marker && cat /perraven# echo k176-persist > /persist-marker && cat /persraven# echo k176-persist > /persist-marker && cat /persiraven# echo k176-persist > /persist-marker && cat /persisraven# echo k176-persist > /persist-marker && cat /persistraven# echo k176-persist > /persist-marker && cat /persist-raven# echo k176-persist > /persist-marker && cat /persist-mraven# echo k176-persist > /persist-marker && cat /persist-maraven# echo k176-persist > /persist-marker && cat /persist-marraven# echo k176-persist > /persist-marker && cat /persist-markraven# echo k176-persist > /persist-marker && cat /persist-markeraven# echo k176-persist > /persist-marker && cat /persist-markerraven# echo k176-persist > /persist-marker && cat /persist-marker
+k176-persist
+                                                                                /
+raven# raven# echo k176-persist > /persist-marker && cat /persist-markerraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+RavenBSD 0.1 (x86_64) (tty:console)

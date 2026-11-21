@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running `target/debug/xtask qtest --case ufs-disk-ufs1 --arch x86_64 --no-build`
+ufs-disk-ufs1: pass

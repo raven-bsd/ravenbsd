@@ -1,0 +1,1119 @@
+==> guard
+==> fmt
+==> clippy (host)
+    Checking raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-abi)
+    Checking raven-libc-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-abi)
+   Compiling raven-tcpip-wire v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tcpip-wire)
+    Checking raven-prng v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-prng)
+    Checking raven-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-elf)
+    Checking ufs-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/ufs-core)
+    Checking raven-initfs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-initfs)
+    Checking raven-linux-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-linux-abi)
+    Checking raven-tty-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tty-core)
+    Checking raven-proto-svc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-svc)
+   Compiling raven-auth v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-auth)
+    Checking rack-coverage v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-coverage)
+    Checking raven-fdt-lite v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-fdt-lite)
+    Checking rack-loss-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-loss-model)
+    Checking rack-vtable-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-vtable-model)
+    Checking raven-proto-tty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-tty)
+    Checking raven-theme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-theme)
+    Checking raven-proto-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-fs)
+    Checking raven-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-ipc)
+    Checking raven-proto-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-net)
+    Checking raven-conform v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-conform)
+    Checking rack-bbr-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-bbr-model)
+    Checking raven-pci v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-pci)
+    Checking raven-userdb v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-userdb)
+warning: unexpected `cfg` condition value: `ravenbsd`
+   --> toolchain/vendor/libc/src/unix/mod.rs:561:21
+    |
+561 |     } else if #[cfg(target_os = "ravenbsd")] {
+    |                     ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `target_os` are: `aix`, `amdhsa`, `android`, `cuda`, `cygwin`, `dragonfly`, `emscripten`, `espidf`, `freebsd`, `fuchsia`, `haiku`, `helenos`, `hermit`, `horizon`, `hurd`, `illumos`, `ios`, `l4re`, `linux`, `lynxos178`, `macos`, `managarm`, `motor`, `netbsd`, `none`, `nto`, `nuttx`, `ohos`, `openbsd`, `psp`, `psx`, `qurt`, `redox`, `rtems`, and `solaris` and 16 more
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `ravenbsd`
+    --> toolchain/vendor/libc/src/unix/mod.rs:2485:21
+     |
+2485 |     } else if #[cfg(target_os = "ravenbsd")] {
+     |                     ^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `target_os` are: `aix`, `amdhsa`, `android`, `cuda`, `cygwin`, `dragonfly`, `emscripten`, `espidf`, `freebsd`, `fuchsia`, `haiku`, `helenos`, `hermit`, `horizon`, `hurd`, `illumos`, `ios`, `l4re`, `linux`, `lynxos178`, `macos`, `managarm`, `motor`, `netbsd`, `none`, `nto`, `nuttx`, `ohos`, `openbsd`, `psp`, `psx`, `qurt`, `redox`, `rtems`, and `solaris` and 16 more
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: `libc` (lib) generated 2 warnings
+    Checking raven-svc-manifest v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-svc-manifest)
+    Checking raven-libc-hdrcheck v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/headers)
+    Checking raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-scheme)
+    Checking raven-rp1 v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-rp1)
+    Checking raven-mdoc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-mdoc)
+    Checking raven-date v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/date)
+    Checking raven-handles v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-handles)
+    Checking raven-libc-ctype v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-ctype)
+    Checking raven-libc-str v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-str)
+    Checking raven-libc-sys v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-sys)
+    Checking raven-libc-tls v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-tls)
+    Checking raven-libc-dtoa v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-dtoa)
+    Checking raven-libc-m v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-m)
+    Checking raven-libc-nss v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-nss)
+    Checking raven-libc-malloc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-malloc)
+    Checking raven-libc-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-elf)
+    Checking raven-spawn v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-spawn)
+    Checking raven-libc-pwd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-pwd)
+    Checking raven-tcpip v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tcpip)
+    Checking raven-libc-proc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-proc)
+    Checking raven-libc-fmt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-fmt)
+    Checking raven-libc-time v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-time)
+    Checking raven-libc-resolv v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-resolv)
+    Checking raven-libc-regex v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-regex)
+    Checking raven-libc-iconv v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-iconv)
+    Checking raven-libc-stdlib v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-stdlib)
+    Checking raven-libc-fts v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-fts)
+    Checking raven-libc-signal v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-signal)
+    Checking raven-libc-glob v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-glob)
+    Checking ufs-mkfs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/ufs-mkfs)
+    Checking raven-libc-thread v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-thread)
+    Checking raven-libc-pledge v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-pledge)
+    Checking raven-config v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-config)
+    Checking raven-libc-stdio v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-stdio)
+    Checking raven-libc-va-test v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/va)
+    Checking raven-libc-platform v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-platform)
+    Checking man v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/man)
+    Checking raven-libc-compat v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-compat)
+    Checking raven-libc-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-ipc)
+warning: `libc` (lib) generated 2 warnings (2 duplicates)
+    Checking libc-world v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/libc-world)
+    Checking raven-echo v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/echo)
+    Checking gpt-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/gpt-core)
+    Checking fat-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/fat-core)
+    Checking raven-libc-rand v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-rand)
+    Checking raven-libc-locale v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-locale)
+    Checking linux-shim v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/linux-shim)
+    Checking raven-pi5 v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-pi5)
+    Checking raven-usercopy v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-usercopy)
+    Checking raven-proto-audio v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-audio)
+    Checking raven-qtest v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/qtest)
+    Checking raven-proto-block v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-block)
+    Checking raven-output v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-output)
+    Checking raven-fs-fuzz-replay v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fs-fuzz/replay)
+    Checking posix-misc2-evidence v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/posix/utility/misc2/evidence)
+    Checking raven-libc-fuzz-replay v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/fuzz/replay)
+    Checking raven-rp1-xhci v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-rp1-xhci)
+    Checking xtask v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/xtask)
+    Checking linux-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/linux-elf)
+    Checking raven-plat v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-plat)
+    Checking raven-bootinfo v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-bootinfo)
+    Checking raven-rmm v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-rmm)
+    Checking raven-trace-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-trace-core)
+    Checking raven-libc-personality-solaris v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-solaris)
+    Checking raven-libc-personality-linux v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-linux)
+    Checking raven-libc-oracle v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/oracle)
+    Checking raven-libc-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-net)
+    Checking raven-libc-personality-bsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-bsd)
+    Checking raven-http v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-http)
+    Checking raven-fuzz-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-fuzz-model)
+    Checking raven-rt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/rt)
+    Checking raven-libc-rtld v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/ld)
+    Checking ufs-inject v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/ufs-inject)
+    Checking ufs-fsck v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/ufs-fsck)
+    Checking passwd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/passwd)
+    Checking raven-libc-crt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crt)
+    Checking posix-conform v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/posix-conform)
+    Checking linux-corpus v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/linux-corpus)
+    Checking libc-oracle v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/libc-oracle)
+    Checking raven-provenance v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-provenance)
+    Checking libc-census v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/libc-census)
+    Checking raven-atf-run v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/atf)
+    Checking raven-integration-inventory v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/integration-inventory)
+    Checking raven-audio-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-audio-core)
+    Checking raven-pf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-pf)
+    Checking raven-genet v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-genet)
+    Checking raven-libc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc)
+    Checking adduser v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/adduser)
+    Checking raven-http-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-http-net)
+    Checking raven-getrandom v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/raven-getrandom)
+    Checking raven-loader v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/boot/loader)
+    Checking raven-cli v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-cli)
+    Checking raven-tcpip-sim v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcpip)
+    Checking rack-tlp-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-tlp-model)
+    Checking raven-netcore v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-netcore)
+    Checking cc-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/cc-model)
+    Checking rack-sockopt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-sockopt)
+    Checking tcp-sack-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-sack-model)
+    Checking rack-audit-state-pipe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-audit-state-pipe)
+    Checking rack-recovery-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-recovery-model)
+    Checking cc-model-audit v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/cc-model-audit)
+    Checking tcp-usrreq-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-usrreq-model)
+    Checking tcp-teardown-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-teardown-model)
+    Checking rack-replay v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-replay)
+    Checking rack-pipe-matrix v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-pipe-matrix)
+    Checking raven-tcpip-conformance v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcpip/conformance)
+    Checking raven-tcpip-fuzz-replay v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcpip/fuzz-replay)
+    Checking raven-netcore-packetdrill-harness v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/net/packetdrill-harness)
+    Checking raven-tcpip-bench v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcpip/bench)
+    Checking rack-audit-sack-sockopt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-audit-sack-sockopt)
+    Checking raven-tcpip-interop v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcpip/interop)
+    Checking rack-misc-matrix v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-misc-matrix)
+    Checking login v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/login)
+    Checking ufs-powercut-tests v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/ufs-powercut)
+    Checking ufs-oracle-tests v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/ufs-oracle)
+    Checking su v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/su)
+    Checking id v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/id)
+    Checking whoami v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/whoami)
+    Checking groupadd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/groupadd)
+    Checking useradd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/useradd)
+    Checking rack-acceptance v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-acceptance)
+    Checking raven-tool-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tool-core)
+    Checking raven-linux-dispatch v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-linux-dispatch)
+    Checking raven-dtrace-user v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-dtrace-user)
+    Checking libc-size v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/libc-size)
+    Checking raven-libc-mkmap v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/tools/mkmap)
+    Checking libc-gate v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/gate)
+    Checking rack-timer-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-timer-model)
+    Checking rack-register v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-register)
+    Checking abi-diff v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/abi-diff)
+    Checking raven-vmem v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-vmem)
+    Checking raven-libc-p1c-ipc-test v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/p1c-ipc)
+    Checking rack-audit-log-bbr v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-audit-log-bbr)
+    Checking raven-libc-iconv-cjk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-iconv-cjk)
+    Checking raven-kmem v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-kmem)
+    Checking raven-usb-audio v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-usb-audio)
+    Checking raven-kstat v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-kstat)
+    Checking rack-audit-replay-union v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-audit-replay-union)
+    Checking raven-user-tests v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/user)
+    Checking raven-login v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/login/raven-login)
+    Checking raven-genet-stress v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/genet)
+    Checking tcp-output-stress v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-output-stress)
+    Checking raven-tcpip-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-model)
+    Checking tcp-input-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-input-model)
+    Checking tcp-window-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-window-model)
+    Checking tcp-loss-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-loss-model)
+    Checking raven-direct v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/boot/direct)
+    Checking rack-output-matrix v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-output-matrix)
+    Checking rack-transport-matrix v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-transport-matrix)
+    Checking raven-tcpip-oracle v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcpip/oracle)
+    Checking rack-sack-matrix v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-sack-matrix)
+    Checking tcp-timer-conformance v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/net-conformance/timers)
+    Checking tcp-paws-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-paws-model)
+    Checking rack-flags v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-flags)
+    Checking tcp-ecn-model v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/tcp-ecn-model)
+    Checking getrandom-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/getrandom-probe)
+    Checking raven-fs-fuzz v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/fs-fuzz)
+    Checking raven-fuzz v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/fuzz)
+    Checking hw-sound-client v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/hw-sound/client)
+    Checking audio-tools-gen v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/audio-tools/gen)
+    Checking raven-tui v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tui)
+    Checking raven-libc-spawn-test v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/spawn)
+    Checking raven-fuzz-replay v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fuzz/replay)
+    Checking raven-bootinfo-fdt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-bootinfo-fdt)
+    Checking raven-usb-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-usb-core)
+    Checking raven-xhci v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-xhci)
+    Checking raven-k14-mkdisk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k14-block/mkdisk)
+    Checking raven-k15-mkdisk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k15-blk/mkdisk)
+    Checking raven-k72-mkdisk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k72-hwfs/mkdisk)
+    Checking raven-k54-mkimage v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k54-ufs/mkimage)
+    Checking raven-libc-hdrgen v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/tools/hdrgen)
+    Checking raven-rp1-eth v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-rp1-eth)
+    Checking bench-host v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tools/bench-host)
+    Checking raven-rp1-fw v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-rp1-fw)
+    Checking raven-libc-ssp v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-ssp)
+    Checking raven-vfs-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-vfs-core)
+    Checking raven-ramfs-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-ramfs-core)
+    Checking rack-audit-output-retransmit v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-audit-output-retransmit)
+    Checking raven-b70-overlay v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/b70-net/overlay)
+    Checking http-fetch-patch v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/http-fetch/patch-initfs)
+    Checking raven-pwm v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-pwm)
+    Checking raven-pi4 v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-pi4)
+    Checking raven-driver v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-driver)
+    Checking raven-toolchain-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/libc/toolchain-abi)
+    Checking raven-k15-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k15-blk/probe)
+    Checking raven-vma v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-vma)
+    Checking audio-client v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/audio/client)
+    Checking raven-entropy v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-entropy)
+    Checking raven-cyclic v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-cyclic)
+    Checking raven-pager v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-pager)
+    Checking raven-ring v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-ring)
+    Checking raven-cmdline v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-cmdline)
+    Checking raven-sched-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-sched-core)
+    Checking raven-b15-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/b15-resolv/probe)
+    Checking raven-pi4-xhci v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-pi4-xhci)
+    Checking raven-sntp v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-sntp)
+    Checking raven-iommu v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-iommu)
+    Checking raven-b15-dnsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/b15-resolv/dnsd)
+    Checking raven-k72-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k72-hwfs/probe)
+    Checking raven-frames v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-frames)
+    Checking raven-fb v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-fb)
+    Checking raven-tls v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tls)
+    Checking raven-update-health-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/update/probe)
+    Checking raven-tty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tty)
+    Checking pi4-devd-fake-driver v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/pi4-devd/driver)
+    Checking raven-evq-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-evq-core)
+    Checking rack-audit-models v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-audit-models)
+    Checking raven-k55-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k55-ufs/probe)
+    Checking raven-turnstile v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-turnstile)
+    Checking raven-mem v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-mem)
+    Checking raven-esr v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-esr)
+    Checking raven-b12b-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/b12b-net/probe)
+    Checking raven-k14-controller v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k14-block/controller)
+    Checking raven-chan v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-chan)
+    Checking raven-proto-linux v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-linux)
+    Checking raven-shell-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-shell-core)
+    Checking raven-proto-trace v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-trace)
+    Checking raven-usb-hid v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-usb-hid)
+    Checking raven-cparse v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/ctags/cparse)
+    Checking raven-pi4-emmc2-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/pi4-emmc2/probe)
+    Checking rack-audit-misc-transport v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/rack-audit-misc-transport)
+    Checking raven-timemath v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-timemath)
+    Checking raven-dtrace-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-dtrace-core)
+    Checking raven-msi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-msi)
+    Checking raven-proto-dev v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-dev)
+    Checking raven-k54-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/k54-ufs/probe)
+    Checking pi4-root-rw-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/pi4-root/rw-probe)
+    Checking raven-ringbuf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-ringbuf)
+    Checking raven-b70-probe v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/tests/fixtures/b70-net/probe)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.14s
+==> tests (host, parallel)
+warning: output filename collision at /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/target/debug/examples/gen_tables
+  |
+  = note: the example target `gen_tables` in package `raven-linux-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-linux-abi)` has the same output filename as the example target `gen_tables` in package `raven-libc-iconv-cjk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-iconv-cjk)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/target/debug/examples/gen_tables.dwp
+  |
+  = note: the example target `gen_tables` in package `raven-linux-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-linux-abi)` has the same output filename as the example target `gen_tables` in package `raven-libc-iconv-cjk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/libc/ravenlibc/crates/raven-libc-iconv-cjk)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+   Compiling raven-kstat v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-kstat)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.83s
+────────────
+ Nextest run ID 560d8b18-6504-4df1-90a8-4c84fe1bafb6 with nextest profile: default
+    Starting 12997 tests across 344 binaries (4 tests skipped)
+────────────
+     Summary [  56.341s] 12997 tests run: 12997 passed, 4 skipped
+==> tests (doc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+   Doc-tests fat_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gpt_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests linux_elf
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_abi
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_audio_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_auth
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_bootinfo
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_bootinfo_fdt
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_chan
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_cmdline
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_config
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_conform
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_cyclic
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_driver
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_dtrace_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_dtrace_user
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_elf
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_entropy
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_esr
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_evq_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_fb
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_fdt_lite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_frames
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_fuzz_model
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_genet
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_genet_stress
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_handles
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_http
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_http_net
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_initfs
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_iommu
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_ipc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_kmem
+
+running 1 test
+test crates/raven-kmem/src/lib.rs - (line 16) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.19s; merged doctests compilation took 0.19s
+   Doc-tests raven_kstat
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc
+
+running 1 test
+test libc/ravenlibc/crates/raven-libc/src/va/trampoline.rs - va::trampoline (line 16) ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.09s; merged doctests compilation took 0.09s
+   Doc-tests raven_libc_abi
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_compat
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_ctype
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_dtoa
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_elf
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_fmt
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_fts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_glob
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_iconv
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_iconv_cjk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_ipc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_locale
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_m
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_malloc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_net
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_nss
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_personality_bsd
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_personality_linux
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_personality_solaris
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_platform
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_pledge
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_proc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_pwd
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_rand
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_regex
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_resolv
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_signal
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_ssp
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_stdio
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_stdlib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_str
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_sys
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_thread
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_time
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_libc_tls
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_linux_abi
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_linux_dispatch
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_mdoc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_mem
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_msi
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_netcore
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_output
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_pager
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_pci
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_pf
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_pi4
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_pi4_xhci
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_pi5
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_plat
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_prng
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_audio
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_block
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_dev
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_fs
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_linux
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_net
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_svc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_trace
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_proto_tty
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_provenance
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_pwm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_ramfs_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_ring
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_ringbuf
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_rmm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_rp1
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_rp1_eth
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_rp1_fw
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_rp1_xhci
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_sched_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_scheme
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_shell_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_sntp
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_spawn
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_svc_manifest
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_tcpip
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_tcpip_wire
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_theme
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_timemath
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_tls
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_tool_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_trace_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_tty
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_tty_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_tui
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_turnstile
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_usb_audio
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_usb_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_usb_hid
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_usercopy
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_userdb
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_vfs_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_vma
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests raven_vmem
+
+running 1 test
+test crates/raven-vmem/src/lib.rs - (line 15) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.13s; merged doctests compilation took 0.13s
+   Doc-tests raven_xhci
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ufs_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+==> profiles
+==> provenance
+11128 file(s) checked, 0 violation(s), 1 warning(s)
+warning: donors lock not found at /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd-resources/donors.lock; revision check skipped
+==> clippy kernel x86_64: skipped (--fast)
+==> clippy kernel aarch64: skipped (--fast)
+==> clippy user programs x86_64: skipped (--fast)
+==> clippy loader x86_64: skipped (--fast)
+==> docs
+docs: 219 page(s) checked
+check-fast summary:
+  ok       guard (exit 0, 8.05s)
+  ok       fmt (exit 0, 6.41s)
+  ok       clippy (host) (exit 0, 13.30s)
+  ok       tests (host, parallel) (exit 0, 58.99s)
+  ok       tests (doc) (exit 0, 4.35s)
+  ok       profiles (exit 0, 0.20s)
+  ok       provenance (exit 0, 39.14s)
+  skipped  clippy kernel x86_64 (--fast)
+  skipped  clippy kernel aarch64 (--fast)
+  skipped  clippy user programs x86_64 (--fast)
+  skipped  clippy loader x86_64 (--fast)
+  ok       docs (exit 0, 0.25s)
+check-fast: PASSED
