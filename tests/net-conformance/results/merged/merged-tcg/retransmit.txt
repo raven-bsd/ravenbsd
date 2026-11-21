@@ -1,0 +1,18 @@
+reading from file tests/net-conformance/results/merged/merged-tcg/retransmit.pcap, link-type EN10MB (Ethernet), snapshot length 65535
+02:05:56.118164 IP (tos 0x0, ttl 64, id 31619, offset 0, flags [DF], proto TCP (6), length 52)
+    10.0.2.2.40253 > 10.0.2.15.23090: Flags [S], cksum 0x06aa (correct), seq 1025120210, win 65535, options [mss 1460,wscale 7,sackOK,nop,nop,eol], length 0
+02:05:56.216657 ARP, Ethernet (len 6), IPv4 (len 4), Request who-has 10.0.2.2 tell 10.0.2.15, length 28
+02:05:56.216750 ARP, Ethernet (len 6), IPv4 (len 4), Reply 10.0.2.2 is-at 72:43:5e:06:46:29, length 28
+02:05:56.216774 ARP, Ethernet (len 6), IPv4 (len 4), Reply 10.0.2.2 is-at 72:43:5e:06:46:29, length 28
+02:05:56.243882 IP (tos 0x0, ttl 64, id 1, offset 0, flags [none], proto TCP (6), length 52)
+    10.0.2.15.23090 > 10.0.2.2.40253: Flags [S.], cksum 0xe4fa (correct), seq 2567671187, ack 1025120211, win 65535, options [mss 1460,wscale 3,sackOK,eol], length 0
+02:05:56.244007 IP (tos 0x0, ttl 64, id 60439, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40253 > 10.0.2.15.23090: Flags [.], cksum 0x24c7 (correct), seq 1, ack 1, win 65535, length 0
+02:05:56.395915 IP (tos 0x0, ttl 64, id 2, offset 0, flags [none], proto TCP (6), length 84)
+    10.0.2.15.23090 > 10.0.2.2.40253: Flags [P.], cksum 0x60aa (correct), seq 1:45, ack 1, win 8192, length 44
+02:05:57.359740 IP (tos 0x0, ttl 64, id 3, offset 0, flags [none], proto TCP (6), length 84)
+    10.0.2.15.23090 > 10.0.2.2.40253: Flags [P.], cksum 0x60aa (correct), seq 1:45, ack 1, win 8192, length 44
+02:05:57.359869 IP (tos 0x0, ttl 64, id 58647, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40253 > 10.0.2.15.23090: Flags [.], cksum 0x249b (correct), seq 1, ack 45, win 65535, length 0
+02:05:57.359901 IP (tos 0x0, ttl 64, id 47594, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40253 > 10.0.2.15.23090: Flags [R.], cksum 0x24c3 (correct), seq 1, ack 1, win 0, length 0

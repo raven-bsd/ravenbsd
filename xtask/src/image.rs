@@ -414,6 +414,12 @@ fn write_ufs_demo(root: &Path, arch: Arch, esp: &[u8], ufs: &[u8]) -> Result<()>
         .context("cannot copy the demo run.sh template")?;
     fs::copy(root.join("scripts/qemu-ufs-README.md"), &readme)
         .context("cannot copy the demo README template")?;
+    let makefile = demo.join("Makefile");
+    fs::write(
+        &makefile,
+        "# Generated one-disk UFS demo Makefile.\n.DEFAULT_GOAL := run\n.PHONY: run check\nrun:\n\t@./run.sh\ncheck:\n\t@./run.sh --check\n",
+    )
+    .context("cannot write the demo Makefile")?;
     fs::set_permissions(&run, fs::Permissions::from_mode(0o755))?;
     println!("{}", qcow2.display());
     Ok(())

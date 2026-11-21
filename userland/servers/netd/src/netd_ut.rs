@@ -791,7 +791,7 @@ fn readiness_query_is_non_consuming_and_directional() {
 }
 
 #[test]
-fn readiness_shutdown_clears_writable() {
+fn readiness_shutdown_follows_freebsd_directions() {
     let mut netd = new_netd();
     let mut now = 0i64;
     let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
@@ -811,6 +811,14 @@ fn readiness_shutdown_clears_writable() {
         ready_bits(&mut netd, accepted) & READY_WRITABLE,
         READY_WRITABLE
     );
+
+    // Pending data makes the accepted side readable before either shutdown.
+    assert_eq!(netd.write(client, 0, b"x"), Ok(1));
+    let readable = readiness_retry(&mut netd, accepted, READY_READABLE, &mut now);
+    assert_eq!(readable & READY_READABLE, READY_READABLE);
+    assert_eq!(readable & READY_WRITABLE, READY_WRITABLE);
+
+    // FreeBSD sowriteable: SHUT_WR sets SBS_CANTSENDMORE and POLLOUT stays set.
     assert_eq!(
         call_socket(
             &mut netd,
@@ -821,7 +829,58 @@ fn readiness_shutdown_clears_writable() {
         ),
         Response::Ok
     );
-    assert_eq!(ready_bits(&mut netd, accepted) & READY_WRITABLE, 0);
+    let write_shutdown = ready_bits(&mut netd, accepted);
+    assert_eq!(
+        write_shutdown & READY_WRITABLE,
+        READY_WRITABLE,
+        "FreeBSD SBS_CANTSENDMORE keeps POLLOUT"
+    );
+    assert_eq!(
+        write_shutdown & READY_READABLE,
+        READY_READABLE,
+        "write shutdown must not clear pending read data"
+    );
+    assert_eq!(netd.write(accepted, 0, b"x"), Err(Errno::EPIPE));
+
+    // FreeBSD soreadable: SHUT_RD does not clear the write side.
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            accepted,
+            Call::Shutdown {
+                how: Shutdown::Read
+            }
+        ),
+        Response::Ok
+    );
+    let read_shutdown = ready_bits(&mut netd, accepted);
+    assert_eq!(
+        read_shutdown & READY_WRITABLE,
+        READY_WRITABLE,
+        "read shutdown must not clear writable"
+    );
+    let mut buffer = [0u8; 4];
+    assert_eq!(netd.read(accepted, 0, &mut buffer), Ok(0));
+
+    // Full shutdown closes both file directions; the FreeBSD poll predicate remains writable.
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            accepted,
+            Call::Shutdown {
+                how: Shutdown::Both
+            }
+        ),
+        Response::Ok
+    );
+    assert_eq!(netd.read(accepted, 0, &mut buffer), Ok(0));
+    assert_eq!(netd.write(accepted, 0, b"x"), Err(Errno::EPIPE));
+    let both = ready_bits(&mut netd, accepted);
+    assert_eq!(
+        both & READY_WRITABLE,
+        READY_WRITABLE,
+        "FreeBSD SBS_CANTSENDMORE keeps POLLOUT"
+    );
 }
 
 #[test]
@@ -1064,4 +1123,55 @@ fn live_readiness_follows_backlog_data_and_end_of_stream() {
     assert_eq!(netd.read(accepted, 0, &mut buffer).unwrap(), 0);
     assert!(netd.socket_readiness(accepted).unwrap().readable);
     assert!(!netd.socket_readiness(accepted).unwrap().hup);
+}
+
+#[test]
+fn file_references_keep_the_socket_alive_until_the_last_close() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    let socket = netd.socket_id(accepted).expect("accepted socket");
+    let files = netd.socket_files();
+
+    // A fork child takes one more reference. The parent's close drops only its own.
+    assert_eq!(netd.dup(accepted), Ok(accepted));
+    assert_eq!(netd.close(accepted), Ok(false));
+    assert_eq!(netd.socket_id(accepted), Some(socket));
+    assert_eq!(netd.socket_files(), files);
+
+    assert_eq!(netd.write(client, 0, b"keep").unwrap(), 4);
+    let mut buffer = [0u8; 8];
+    let read = read_retry(&mut netd, accepted, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"keep");
+
+    assert_eq!(netd.close(accepted), Ok(true));
+    assert_eq!(netd.socket_id(accepted), None);
+    assert_eq!(netd.socket_files(), files - 1);
+    assert_eq!(netd.close(accepted), Err(Errno::EBADF));
+}
+
+#[test]
+fn a_filtered_server_drains_the_shared_filter_log() {
+    let policy = crate::FilterPolicy::from_text("set default pass\npass in on lo all\n").unwrap();
+    policy
+        .log()
+        .borrow_mut()
+        .push(alloc::string::String::from("netd: pf test"));
+    let mut netd = Netd::with_filter(Loopback::new(NIC_MAC), NIC_MAC, 0, Some(policy));
+    assert_eq!(
+        netd.take_filter_log(),
+        alloc::vec![alloc::string::String::from("netd: pf test")]
+    );
+    assert!(netd.take_filter_log().is_empty());
 }

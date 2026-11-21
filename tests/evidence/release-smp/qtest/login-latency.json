@@ -1,0 +1,18 @@
+{
+  "case": "login-latency",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 215990,
+  "exit_status": 33,
+  "matched": [
+    "^loader: RavenBSD loader 0\\.1 \\(x86_64\\)$",
+    "^RavenBSD kernel 0\\.1 \\(x86_64\\)",
+    "^svcd: getty up$",
+    "(?i)^.*login: ?root",
+    "(?i)^password: ?$",
+    "^raven# ",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}

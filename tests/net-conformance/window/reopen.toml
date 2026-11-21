@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "reopen"
+harness = "zero-window"
+donor = [
+  "FreeBSD sys/netinet/tcp_output.c: tcp_output window update and send gate",
+  "FreeBSD sys/netinet/tcp_output.c: tcp_output sendwin rewind after a zero window",
+]
+rfcs = ["RFC 9293 section 3.7.1 (window update)", "RFC 9293 section 3.8.6.1 (zero-window probe)"]
+
+[[expect]]
+step = "zero window is advertised"
+packet = "ACK"
+assert = "window=0; the 44-byte write stays queued"
+
+[[expect]]
+step = "peer reopens with a full window"
+packet = "ACK"
+assert = "ack=server_isn+1, window=65535"
+
+[[expect]]
+step = "server flushes the queued write exactly once"
+packet = "data"
+assert = "one 44-byte segment at server_isn+1; payload byte-identical; no duplicate sequence"

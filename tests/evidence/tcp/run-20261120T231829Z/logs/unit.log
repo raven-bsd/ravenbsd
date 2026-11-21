@@ -1,0 +1,660 @@
+$ cargo nextest run -p raven-tcpip
+started: 2026-11-20T23:18:29Z
+timeout: 180s
+exit: 0
+duration: 1.04s
+--- stdout ---
+--- stderr ---
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+────────────
+ Nextest run ID 1f6a94d6-05b6-46e6-88a4-e2169728d47e with nextest profile: default
+    Starting 647 tests across 26 binaries
+        PASS [   0.005s] (  1/647) raven-tcpip dhcp::tests::a_bound_lease_exposes_its_absolute_timers
+        PASS [   0.006s] (  2/647) raven-tcpip dhcp::tests::an_offer_without_a_server_identifier_is_ignored
+        PASS [   0.006s] (  3/647) raven-tcpip dhcp::tests::request_retries_back_off_then_discovery_restarts
+        PASS [   0.007s] (  4/647) raven-tcpip dhcp::tests::a_nak_while_requesting_restarts_discovery
+        PASS [   0.007s] (  5/647) raven-tcpip dhcp::tests::a_renewal_does_not_ask_for_a_broadcast_reply
+        PASS [   0.007s] (  6/647) raven-tcpip dhcp::tests::encoded_messages_carry_the_options_a_server_needs
+        PASS [   0.007s] (  7/647) raven-tcpip dhcp::tests::a_full_exchange_yields_a_lease_with_router_and_dns
+        PASS [   0.007s] (  8/647) raven-tcpip dhcp::tests::an_ack_with_a_bad_subnet_mask_is_ignored
+        PASS [   0.008s] (  9/647) raven-tcpip dhcp::tests::a_nak_while_renewing_deconfigures
+        PASS [   0.009s] ( 10/647) raven-tcpip dhcp::tests::an_unanswered_renewal_becomes_a_broadcast_rebind_after_t2
+        PASS [   0.009s] ( 11/647) raven-tcpip dhcp::tests::an_expired_lease_deconfigures_and_rediscovers
+        PASS [   0.009s] ( 12/647) raven-tcpip dhcp::tests::an_ack_while_renewing_extends_the_lease_without_an_event
+        PASS [   0.010s] ( 13/647) raven-tcpip dhcp::tests::invalid_t1_t2_orderings_fall_back_to_the_defaults
+        PASS [   0.010s] ( 14/647) raven-tcpip dhcp::tests::the_lease_is_renewed_by_unicast_at_t1
+        PASS [   0.011s] ( 15/647) raven-tcpip dhcp::tests::a_changed_ack_while_renewing_reports_the_new_lease
+        PASS [   0.006s] ( 16/647) raven-tcpip observability::tests::counters_get_unknown_name_is_none
+        PASS [   0.011s] ( 17/647) raven-tcpip observability::tests::bool_properties_are_zero_or_one
+        PASS [   0.005s] ( 18/647) raven-tcpip observability::tests::property_names_are_unique
+        PASS [   0.012s] ( 19/647) raven-tcpip dhcp::tests::replies_for_another_transaction_or_client_are_ignored
+        PASS [   0.012s] ( 20/647) raven-tcpip observability::tests::counters_default_to_zero
+        PASS [   0.007s] ( 21/647) raven-tcpip observability::tests::counters_names_are_unique
+        PASS [   0.013s] ( 22/647) raven-tcpip dhcp::tests::the_first_poll_discovers_and_a_second_waits_for_the_timeout
+        PASS [   0.008s] ( 23/647) raven-tcpip observability::tests::counters_names_cover_the_whole_struct
+        PASS [   0.009s] ( 24/647) raven-tcpip observability::tests::option_flags_default_to_nothing_negotiated
+        PASS [   0.006s] ( 25/647) raven-tcpip observability::tests::tunables_default_matches_table_defaults
+        PASS [   0.004s] ( 26/647) raven-tcpip plpmtud_live::tests::a_probe_is_due_only_when_the_room_covers_the_ceiling
+        PASS [   0.008s] ( 27/647) raven-tcpip observability::tests::stability_markers_are_exhaustive
+        PASS [   0.005s] ( 28/647) raven-tcpip plpmtud_live::tests::a_timeout_with_a_probe_outstanding_rewinds_and_lowers_the_ceiling
+        PASS [   0.006s] ( 29/647) raven-tcpip plpmtud_live::tests::a_finished_search_is_probed_again_after_the_interval
+        PASS [   0.005s] ( 30/647) raven-tcpip plpmtud_live::tests::ceiling_is_bounded_by_peer_and_timestamp_overhead
+        PASS [   0.005s] ( 31/647) raven-tcpip plpmtud_live::tests::no_black_hole_response_at_the_floor
+        PASS [   0.016s] ( 32/647) raven-tcpip dhcp::tests::truncated_and_malformed_packets_are_dropped
+        PASS [   0.007s] ( 33/647) raven-tcpip plpmtud_live::tests::no_search_when_the_payload_already_reaches_the_ceiling
+        PASS [   0.008s] ( 34/647) raven-tcpip plpmtud_live::tests::an_acknowledged_probe_raises_the_segment_payload
+        PASS [   0.007s] ( 35/647) raven-tcpip readiness::tests::a_listener_is_readable_only_while_the_backlog_has_a_connection
+        PASS [   0.011s] ( 36/647) raven-tcpip observability::tests::tunables_reject_unknown_name
+        PASS [   0.013s] ( 37/647) raven-tcpip observability::tests::property_table_is_non_empty
+        PASS [   0.014s] ( 38/647) raven-tcpip observability::tests::counters_reset_zeroes_a_moved_counter
+        PASS [   0.005s] ( 39/647) raven-tcpip readiness::tests::readable_and_writable_do_not_alias
+        PASS [   0.006s] ( 40/647) raven-tcpip readiness::tests::a_query_does_not_consume_received_bytes
+        PASS [   0.008s] ( 41/647) raven-tcpip readiness::tests::a_peer_fin_is_readable_without_claiming_a_full_hangup
+        PASS [   0.016s] ( 42/647) raven-tcpip observability::tests::property_ranges_are_sane
+        PASS [   0.013s] ( 43/647) raven-tcpip observability::tests::unit_names_render_as_spec_spellings
+        PASS [   0.014s] ( 44/647) raven-tcpip observability::tests::tunables_set_and_get_round_trip
+        PASS [   0.006s] ( 45/647) raven-tcpip sack_send::tests::dsack_and_future_blocks_are_ignored
+        PASS [   0.004s] ( 46/647) raven-tcpip sack_send::tests::prune_drops_and_trims_acknowledged_ranges
+        PASS [   0.007s] ( 47/647) raven-tcpip sack_send::tests::head_is_lost_needs_three_segments_of_sacked_data
+        PASS [   0.014s] ( 48/647) raven-tcpip plpmtud_live::tests::a_black_hole_drops_to_the_floor_and_starts_a_search
+        PASS [   0.009s] ( 49/647) raven-tcpip readiness::tests::udp_readiness_is_the_datagram_queue
+        PASS [   0.005s] ( 50/647) raven-tcpip seq::tests::just_below_half_range_is_ordered
+        PASS [   0.010s] ( 51/647) raven-tcpip readiness::tests::an_unknown_socket_is_ebadf
+        PASS [   0.009s] ( 52/647) raven-tcpip sack_send::tests::blocks_merge_and_report_new_coverage
+        PASS [   0.006s] ( 53/647) raven-tcpip sack_send::tests::scoreboard_uses_offsets_from_snd_una
+        PASS [   0.007s] ( 54/647) raven-tcpip sack_send::tests::rto_recovery_marks_every_hole_below_a_sack_lost
+        PASS [   0.014s] ( 55/647) raven-tcpip readiness::tests::a_pending_error_is_reported_and_not_consumed_by_the_query
+        PASS [   0.009s] ( 56/647) raven-tcpip seq::tests::comparisons_across_the_wrap_point
+        PASS [   0.013s] ( 57/647) raven-tcpip sack_send::tests::pipe_excludes_sacked_and_lost_bytes
+        PASS [   0.008s] ( 58/647) raven-tcpip time::tests::instant_arithmetic_saturates
+        PASS [   0.010s] ( 59/647) raven-tcpip seq::tests::distance_is_wrapping
+        PASS [   0.008s] ( 60/647) raven-tcpip::c30_live closed_sockets_are_reclaimed_before_the_table_fills
+        PASS [   0.009s] ( 61/647) raven-tcpip::c30_live closed_half_open_connections_free_their_backlog_slot
+        PASS [   0.009s] ( 62/647) raven-tcpip::c30_live ephemeral_ports_are_released_when_a_socket_is_reclaimed
+        PASS [   0.012s] ( 63/647) raven-tcpip tcp_state::tests::a_rewind_keeps_acks_for_sent_data_valid
+        PASS [   0.012s] ( 64/647) raven-tcpip tcp_state::tests::sending_past_the_old_high_water_mark_moves_it
+        PASS [   0.010s] ( 65/647) raven-tcpip::c30_live out_of_order_data_is_bounded_by_holes_not_segments
+        PASS [   0.014s] ( 66/647) raven-tcpip tcp_state::tests::highest_sent_is_snd_nxt_until_a_rewind
+        PASS [   0.006s] ( 67/647) raven-tcpip::cwnd abc_counts_a_partial_ack_as_acked_bytes
+        PASS [   0.008s] ( 68/647) raven-tcpip::c32_live a_detached_time_wait_ignores_a_reset_and_drops_stale_data
+        PASS [   0.004s] ( 69/647) raven-tcpip::cwnd cubic_w_max_persists_after_advance
+        PASS [   0.008s] ( 70/647) raven-tcpip::cwnd cubic_concave_growth_is_monotonic
+        PASS [   0.013s] ( 71/647) raven-tcpip::c32_live a_detached_time_wait_still_acks_a_retransmitted_fin
+        PASS [   0.007s] ( 72/647) raven-tcpip::cwnd cwnd_floor_is_two_segments
+        PASS [   0.012s] ( 73/647) raven-tcpip::cwnd cubic_convex_growth_reaches_w_max
+        PASS [   0.014s] ( 74/647) raven-tcpip::c32_live a_time_wait_connection_is_detached_when_the_table_fills
+        PASS [   0.008s] ( 75/647) raven-tcpip::cwnd cwnd_respects_the_cap
+        PASS [   0.007s] ( 76/647) raven-tcpip::cwnd duplicate_ack_threshold_default_is_three
+        PASS [   0.013s] ( 77/647) raven-tcpip::cwnd cubic_name_and_newreno_name
+        PASS [   0.009s] ( 78/647) raven-tcpip::cwnd duplicate_threshold_is_configurable
+        PASS [   0.021s] ( 79/647) raven-tcpip::c32_live a_detached_time_wait_expires_and_the_port_is_reusable
+        PASS [   0.007s] ( 80/647) raven-tcpip::cwnd icbrt_reference_table
+        PASS [   0.017s] ( 81/647) raven-tcpip::cwnd cubic_rto_uses_beta_and_one_mss
+        PASS [   0.007s] ( 82/647) raven-tcpip::cwnd newreno_partial_ack_keeps_recovery_active
+        PASS [   0.005s] ( 83/647) raven-tcpip::cwnd no_floating_point_in_congestion_control
+        PASS [   0.007s] ( 84/647) raven-tcpip::cwnd newreno_slow_start_doubles_per_rtt
+        PASS [   0.009s] ( 85/647) raven-tcpip::cwnd newreno_full_ack_ends_recovery
+        PASS [   0.011s] ( 86/647) raven-tcpip::cwnd initial_window_is_ten_segments
+        PASS [   0.022s] ( 87/647) raven-tcpip::cwnd cubic_initial_state_matches_inputs
+        PASS [   0.010s] ( 88/647) raven-tcpip::cwnd loss_kinds_are_distinct
+        PASS [   0.012s] ( 89/647) raven-tcpip::cwnd idle_restart_caps_at_ten_segments
+        PASS [   0.023s] ( 90/647) raven-tcpip::cwnd cubic_fast_convergence_reduces_w_max
+        PASS [   0.008s] ( 91/647) raven-tcpip::cwnd prr_records_transmissions
+        PASS [   0.006s] ( 92/647) raven-tcpip::cwnd prr_uses_the_ssrb_limit_when_pipe_is_low
+        PASS [   0.010s] ( 93/647) raven-tcpip::cwnd prr_out_accumulates
+        PASS [   0.006s] ( 94/647) raven-tcpip::cwnd rto_reduces_to_one_mss
+        PASS [   0.005s] ( 95/647) raven-tcpip::cwnd seq_cubic_second_loss
+        PASS [   0.005s] ( 96/647) raven-tcpip::cwnd seq_newreno_ca_linear
+        PASS [   0.011s] ( 97/647) raven-tcpip::cwnd repeated_rto_does_not_cut_ssthresh_again
+        PASS [   0.006s] ( 98/647) raven-tcpip::cwnd seq_cubic_slow_loss
+        PASS [   0.013s] ( 99/647) raven-tcpip::cwnd prr_ssrb_allows_a_near_half_window
+        PASS [   0.010s] (100/647) raven-tcpip::cwnd seq_cubic_convex
+        PASS [   0.011s] (101/647) raven-tcpip::cwnd seq_cubic_cap
+        PASS [   0.010s] (102/647) raven-tcpip::cwnd seq_cubic_idle
+        PASS [   0.005s] (103/647) raven-tcpip::cwnd seq_newreno_rto
+        PASS [   0.006s] (104/647) raven-tcpip::cwnd seq_newreno_partial_ack
+        PASS [   0.015s] (105/647) raven-tcpip::cwnd seq_cubic_rto
+        PASS [   0.013s] (106/647) raven-tcpip::cwnd seq_newreno_abc
+        PASS [   0.008s] (107/647) raven-tcpip::cwnd seq_newreno_cap
+        PASS [   0.007s] (108/647) raven-tcpip::cwnd seq_newreno_idle_restart
+        PASS [   0.007s] (109/647) raven-tcpip::cwnd seq_newreno_slow_start_to_ca
+        PASS [   0.019s] (110/647) raven-tcpip::cwnd seq_cubic_concave
+        PASS [   0.019s] (111/647) raven-tcpip::cwnd seq_cubic_fast_conv
+        PASS [   0.010s] (112/647) raven-tcpip::cwnd seq_newreno_repeated_rto
+        PASS [   0.047s] (113/647) raven-tcpip::c32_live a_hundred_short_connections_never_exhaust_a_small_table
+        PASS [   0.015s] (114/647) raven-tcpip::cwnd seq_newreno_fast_retransmit
+        PASS [   0.008s] (115/647) raven-tcpip::dhcp a_full_exchange_configures_the_interface_with_address_and_gateway
+        PASS [   0.009s] (116/647) raven-tcpip::cwnd vector_inventory_has_eighteen_cases
+        PASS [   0.009s] (117/647) raven-tcpip::dhcp a_nak_restarts_the_exchange
+        PASS [   0.055s] (118/647) raven-tcpip::c30_live ten_percent_loss_does_not_kill_the_connection_or_collapse_the_path_mtu
+        PASS [   0.016s] (119/647) raven-tcpip::cwnd seq_newreno_slow_start
+        PASS [   0.009s] (120/647) raven-tcpip::dhcp dhcp_needs_a_hardware_address
+        PASS [   0.011s] (121/647) raven-tcpip::dhcp a_leased_stack_answers_arp_and_reaches_the_gateway_network
+        PASS [   0.006s] (122/647) raven-tcpip::icmp_udp bad_udp_checksum_is_dropped_and_counted
+        PASS [   0.062s] (123/647) raven-tcpip::c30_live a_resend_after_a_false_black_hole_does_not_make_the_peer_ack_unsent_data
+        PASS [   0.060s] (124/647) raven-tcpip::c30_live slow_start_is_not_one_segment_per_round_trip
+        PASS [   0.012s] (125/647) raven-tcpip::dhcp the_discover_goes_out_as_a_broadcast_from_the_unspecified_address
+        PASS [   0.006s] (126/647) raven-tcpip::icmp_udp duplicate_echo_binding_is_eaddrinuse
+        PASS [   0.006s] (127/647) raven-tcpip::icmp_udp echo_request_is_answered_with_the_payload_intact
+        PASS [   0.008s] (128/647) raven-tcpip::icmp_udp broadcast_udp_does_not_generate_an_icmp_error
+        PASS [   0.008s] (129/647) raven-tcpip::icmp_udp datagram_over_the_receive_cap_is_dropped_and_socket_stays_usable
+        PASS [   0.009s] (130/647) raven-tcpip::icmp_udp closed_udp_port_generates_an_icmp_port_unreachable
+        PASS [   0.004s] (131/647) raven-tcpip::icmp_udp udp_boundaries_are_preserved_for_three_datagrams
+        PASS [   0.004s] (132/647) raven-tcpip::icmp_udp udp_roundtrip_between_two_stacks_over_the_simulator
+        PASS [   0.067s] (133/647) raven-tcpip::c30_live sack_recovery_completes_under_heavy_loss
+        PASS [   0.008s] (134/647) raven-tcpip::icmp_udp icmp_error_is_matched_to_the_udp_socket
+        PASS [   0.007s] (135/647) raven-tcpip::icmp_udp recv_from_a_closed_udp_socket_returns_zero
+        PASS [   0.009s] (136/647) raven-tcpip::icmp_udp non_initial_fragment_does_not_generate_an_icmp_error
+        PASS [   0.004s] (137/647) raven-tcpip::icmp_udp udp_send_to_without_ipv4_is_unreachable
+        PASS [   0.015s] (138/647) raven-tcpip::icmp_udp echo_reply_goes_only_to_the_bound_echo_socket
+        PASS [   0.016s] (139/647) raven-tcpip::icmp_udp echo_request_from_broadcast_is_not_answered
+        PASS [   0.015s] (140/647) raven-tcpip::icmp_udp ephemeral_ports_are_deterministic_and_never_collide
+        PASS [   0.005s] (141/647) raven-tcpip::ipv4_arp a_4000_byte_payload_fragments_into_three_packets
+        PASS [   0.005s] (142/647) raven-tcpip::ipv4_arp a_missing_middle_fragment_times_out_and_frees_memory
+        PASS [   0.012s] (143/647) raven-tcpip::icmp_udp short_recv_reports_the_true_datagram_length
+        PASS [   0.007s] (144/647) raven-tcpip::icmp_udp zero_udp_checksum_is_accepted_on_ipv4
+        PASS [   0.018s] (145/647) raven-tcpip::icmp_udp icmp_echo_request_without_route_is_unreachable
+        PASS [   0.017s] (146/647) raven-tcpip::icmp_udp icmp_error_does_not_generate_another_icmp_error
+        PASS [   0.015s] (147/647) raven-tcpip::icmp_udp icmp_error_rate_limit_caps_a_burst_and_recovers
+        PASS [   0.009s] (148/647) raven-tcpip::ipv4_arp arp_reply_resolves_the_neighbour_and_flushes_the_queue
+        PASS [   0.028s] (149/647) raven-tcpip::dhcp the_request_names_the_offered_address
+        PASS [   0.006s] (150/647) raven-tcpip::ipv4_arp gratuitous_arp_only_refreshes_an_existing_entry
+        PASS [   0.008s] (151/647) raven-tcpip::ipv4_arp bad_header_checksum_is_dropped
+        PASS [   0.004s] (152/647) raven-tcpip::ipv4_arp overlapping_fragments_discard_the_datagram
+        PASS [   0.080s] (153/647) raven-tcpip::c30_live sack_recovery_repairs_one_percent_loss_in_a_few_round_trips
+        PASS [   0.009s] (154/647) raven-tcpip::ipv4_arp fragments_reassemble_in_reverse_order
+        PASS [   0.011s] (155/647) raven-tcpip::ipv4_arp arp_request_for_our_address_gets_a_reply
+        PASS [   0.008s] (156/647) raven-tcpip::ipv4_arp neighbour_cache_evicts_the_least_recently_used
+        PASS [   0.012s] (157/647) raven-tcpip::ipv4_arp broadcast_is_delivered_locally
+        PASS [   0.005s] (158/647) raven-tcpip::ipv4_arp set_ipv4_installs_a_connected_route
+        PASS [   0.013s] (159/647) raven-tcpip::ipv4_arp arp_retries_with_backoff_then_reports_ehostunreach
+        PASS [   0.008s] (160/647) raven-tcpip::ipv4_arp reassembly_bytes_exhaustion_drops_new_keys_without_allocating
+        PASS [   0.009s] (161/647) raven-tcpip::ipv4_arp transport_payload_is_delivered_with_its_protocol
+        PASS [   0.016s] (162/647) raven-tcpip::ipv4_arp no_route_is_enetunreach
+        PASS [   0.006s] (163/647) raven-tcpip::ipv6 icmpv6_echo_request_is_answered
+        PASS [   0.013s] (164/647) raven-tcpip::ipv4_arp route_table_is_bounded
+        PASS [   0.010s] (165/647) raven-tcpip::ipv4_arp unresolved_destination_sends_an_arp_request_and_queues_one_packet
+        PASS [   0.015s] (166/647) raven-tcpip::ipv4_arp one_hour_forward_does_not_disturb_a_completed_reassembly
+        PASS [   0.005s] (167/647) raven-tcpip::ipv6 icmpv6_error_does_not_generate_an_error
+        PASS [   0.007s] (168/647) raven-tcpip::ipv6 dad_conflict_marks_the_address_unusable
+        PASS [   0.019s] (169/647) raven-tcpip::ipv4_arp longest_prefix_wins_over_default
+        PASS [   0.013s] (170/647) raven-tcpip::ipv4_arp reassembly_timeout_constant_is_thirty_seconds
+        PASS [   0.009s] (171/647) raven-tcpip::ipv4_arp unsolicited_arp_does_not_create_an_entry
+        PASS [   0.015s] (172/647) raven-tcpip::ipv4_arp packet_to_a_foreign_address_is_dropped
+        PASS [   0.007s] (173/647) raven-tcpip::ipv6 dad_keeps_the_address_tentative_until_the_timer
+        PASS [   0.005s] (174/647) raven-tcpip::ipv6 icmpv6_error_is_matched_to_the_udp_socket
+        PASS [   0.016s] (175/647) raven-tcpip::ipv4_arp thousand_pseudo_random_fragment_interleavings_never_leak
+        PASS [   0.009s] (176/647) raven-tcpip::ipv6 ipv6_duration_constant_is_used_for_neighbour_lifetimes
+        PASS [   0.009s] (177/647) raven-tcpip::ipv6 icmpv6_port_unreachable_is_generated_for_a_closed_port
+        PASS [   0.009s] (178/647) raven-tcpip::ipv6 multicast_udp_does_not_generate_an_icmpv6_error
+        PASS [   0.100s] (179/647) raven-tcpip::c30_live reordering_without_loss_completes_and_learns_the_reordering_distance
+        PASS [   0.009s] (180/647) raven-tcpip::ipv6 packet_too_big_records_the_rfc_floor
+        PASS [   0.009s] (181/647) raven-tcpip::ipv6 nd_with_hop_limit_254_is_discarded
+        PASS [   0.009s] (182/647) raven-tcpip::ipv6 ipv6_fragmented_udp_does_not_generate_an_error
+        PASS [   0.020s] (183/647) raven-tcpip::ipv4_arp set_ipv4_with_gateway_installs_a_default_route
+        PASS [   0.009s] (184/647) raven-tcpip::ipv6 link_local_address_is_derived_from_the_mac
+        PASS [   0.009s] (185/647) raven-tcpip::ipv6 nd_inside_a_fragment_is_discarded
+        PASS [   0.009s] (186/647) raven-tcpip::ipv6 slaac_installs_an_address_from_an_ra
+        PASS [   0.009s] (187/647) raven-tcpip::ipv6 neighbour_reaches_stale_then_delay_then_probe
+        PASS [   0.012s] (188/647) raven-tcpip::ipv6 router_solicitation_is_parsed
+        PASS [   0.009s] (189/647) raven-tcpip::ipv6 slaac_lifetime_extension_is_clamped_to_two_hours
+        PASS [   0.013s] (190/647) raven-tcpip::ipv6 nd_resolution_flushes_the_queued_packet
+        PASS [   0.005s] (191/647) raven-tcpip::ipv6 traffic_to_a_tentative_address_is_refused
+        PASS [   0.008s] (192/647) raven-tcpip::ipv6 v4_mapped_traffic_is_rejected_by_default
+        PASS [   0.008s] (193/647) raven-tcpip::listen accept_queue_push_and_pop
+        PASS [   0.009s] (194/647) raven-tcpip::listen accept_overflow_does_not_reset_the_half_open_entry
+        PASS [   0.063s] (195/647) raven-tcpip::dhcp a_static_address_stops_the_client
+        PASS [   0.009s] (196/647) raven-tcpip::ipv6 unknown_extension_option_with_skip_bits_is_skipped
+        PASS [   0.009s] (197/647) raven-tcpip::listen abandoned_counter_is_available
+        PASS [   0.009s] (198/647) raven-tcpip::listen completed_handshake_moves_between_queues
+        PASS [   0.013s] (199/647) raven-tcpip::ipv6 slaac_zero_valid_lifetime_deprecates_the_address
+        PASS [   0.006s] (200/647) raven-tcpip::listen cookie_changes_with_the_seed
+        PASS [   0.009s] (201/647) raven-tcpip::listen accept_queue_capacity_minimum_is_one
+        PASS [   0.010s] (202/647) raven-tcpip::ipv6 v4_mapped_traffic_is_accepted_when_enabled
+        PASS [   0.012s] (203/647) raven-tcpip::ipv6 udp_over_ipv6_roundtrip_between_two_stacks
+        PASS [   0.012s] (204/647) raven-tcpip::listen accept_queue_limit_counts
+        PASS [   0.008s] (205/647) raven-tcpip::listen cookie_is_valid_for_the_same_tuple
+        PASS [   0.009s] (206/647) raven-tcpip::listen cookie_path_counter_is_available
+        PASS [   0.004s] (207/647) raven-tcpip::listen cookie_rotation_counter_changes_the_value
+        PASS [   0.009s] (208/647) raven-tcpip::listen cookie_rejects_a_different_tuple
+        PASS [   0.005s] (209/647) raven-tcpip::listen cookie_rejects_a_stale_time_bucket
+        PASS [   0.005s] (210/647) raven-tcpip::listen cookie_time_bucket_is_stable_within_the_minute
+        PASS [   0.017s] (211/647) raven-tcpip::ipv6 unknown_extension_option_with_report_bits_sends_parameter_problem
+        PASS [   0.007s] (212/647) raven-tcpip::listen isn_default_mode_is_not_deterministic
+        PASS [   0.008s] (213/647) raven-tcpip::listen cookie_secret_rotation_invalidates_old_cookies
+        PASS [   0.005s] (214/647) raven-tcpip::listen isn_different_tuples_differ
+        PASS [   0.009s] (215/647) raven-tcpip::listen cookie_survives_rotation_when_issued_after
+        PASS [   0.009s] (216/647) raven-tcpip::listen half_open_capacity_minimum_is_one
+        PASS [   0.009s] (217/647) raven-tcpip::listen half_open_limit_drops_and_counts
+        PASS [   0.008s] (218/647) raven-tcpip::listen half_open_remove_missing_is_none
+        PASS [   0.009s] (219/647) raven-tcpip::listen half_open_push_and_len
+        PASS [   0.006s] (220/647) raven-tcpip::listen isn_has_bit_diversity
+        PASS [   0.009s] (221/647) raven-tcpip::listen isn_deterministic_mode_is_reproducible
+        PASS [   0.007s] (222/647) raven-tcpip::listen legitimate_connection_succeeds_during_a_flood
+        PASS [   0.008s] (223/647) raven-tcpip::listen isn_is_stable_for_the_same_time_and_tuple
+        PASS [   0.005s] (224/647) raven-tcpip::live_path initial_cwnd_bounds_the_first_burst
+        PASS [   0.005s] (225/647) raven-tcpip::observability committed_property_golden_list_is_stable
+        PASS [   0.010s] (226/647) raven-tcpip::listen isn_same_tuple_differs_across_time
+        PASS [   0.009s] (227/647) raven-tcpip::listen stats_start_at_zero
+        PASS [   0.007s] (228/647) raven-tcpip::listen ten_thousand_syns_do_not_exhaust_memory
+        PASS [   0.005s] (229/647) raven-tcpip::observability every_spec_counter_is_reachable_on_a_live_stack
+        PASS [   0.008s] (230/647) raven-tcpip::observability cross_field_port_range_is_atomic
+        PASS [   0.004s] (231/647) raven-tcpip::observability private_property_golden_list_is_stable
+        PASS [   0.009s] (232/647) raven-tcpip::observability cross_field_queue_limits_are_atomic
+        PASS [   0.017s] (233/647) raven-tcpip::listen half_open_remove_by_tuple
+        PASS [   0.006s] (234/647) raven-tcpip::observability option_flags_match_the_handshake_trace
+        PASS [   0.009s] (235/647) raven-tcpip::observability cross_field_buffer_defaults_are_atomic
+        PASS [   0.009s] (236/647) raven-tcpip::observability every_property_round_trips_on_a_live_stack
+        PASS [   0.009s] (237/647) raven-tcpip::observability cross_field_rto_bounds_are_atomic
+        PASS [   0.019s] (238/647) raven-tcpip::listen isn_deterministic_mode_ignores_the_clock
+        PASS [   0.016s] (239/647) raven-tcpip::observability counters_reset_zeroes_a_live_stack
+        PASS [   0.010s] (240/647) raven-tcpip::observability socket_info_unknown_socket_is_ebadf
+        PASS [   0.017s] (241/647) raven-tcpip::live_path tlp_probe_fires_before_the_rto
+        PASS [   0.012s] (242/647) raven-tcpip::observability socket_info_for_established_reports_state_and_tuple
+        PASS [   0.008s] (243/647) raven-tcpip::observability_counters an_ack_above_snd_nxt_moves_acks_for_unsent
+        PASS [   0.012s] (244/647) raven-tcpip::observability socket_info_for_listener_reports_listen
+        PASS [   0.009s] (245/647) raven-tcpip::observability sockets_enumerates_listener_and_connection
+        PASS [   0.010s] (246/647) raven-tcpip::observability spec_counter_rows_are_complete
+        PASS [   0.015s] (247/647) raven-tcpip::observability out_of_range_property_is_einval_and_changes_nothing
+        PASS [   0.010s] (248/647) raven-tcpip::observability_counters data_past_the_window_moves_the_drop_counters
+        PASS [   0.007s] (249/647) raven-tcpip::observability_counters handshake_moves_open_and_segment_counters
+        PASS [   0.011s] (250/647) raven-tcpip::observability unknown_property_is_enoent
+        PASS [   0.011s] (251/647) raven-tcpip::observability_counters duplicate_data_moves_the_dup_counters
+        PASS [   0.093s] (252/647) raven-tcpip::dhcp an_expired_lease_removes_the_address_and_discovery_restarts
+        PASS [   0.013s] (253/647) raven-tcpip::observability spec_property_rows_are_complete
+        PASS [   0.012s] (254/647) raven-tcpip::observability_counters a_valid_reset_moves_the_reset_counters
+        PASS [   0.005s] (255/647) raven-tcpip::observability_counters rst_for_unsent_counter_moves
+        PASS [   0.005s] (256/647) raven-tcpip::observability_counters pmtu_update_counter_moves
+        PASS [   0.013s] (257/647) raven-tcpip::observability_counters active_connection_count_is_visible_through_sockets
+        PASS [   0.005s] (258/647) raven-tcpip::observability_counters syn_cookie_used_counter_moves
+        PASS [   0.006s] (259/647) raven-tcpip::observability_counters user_timeout_counter_moves
+        PASS [   0.010s] (260/647) raven-tcpip::observability_counters port_allocation_moves_the_probe_counter
+        PASS [   0.005s] (261/647) raven-tcpip::observability_properties challenge_ack_interval_refills_the_bucket
+        PASS [   0.009s] (262/647) raven-tcpip::observability_counters unknown_options_are_counted
+        PASS [   0.011s] (263/647) raven-tcpip::observability_counters transfer_moves_byte_and_ack_counters
+        PASS [   0.015s] (264/647) raven-tcpip::observability_counters out_of_order_data_moves_the_ooo_counters
+        PASS [   0.005s] (265/647) raven-tcpip::observability_properties cwnd_min_sets_the_initial_floor
+        PASS [   0.005s] (266/647) raven-tcpip::observability_properties delack_delay_controls_the_timer
+        PASS [   0.013s] (267/647) raven-tcpip::observability_properties accept_queue_limit_drops_the_extra_completion
+        PASS [   0.012s] (268/647) raven-tcpip::observability_properties cc_algorithm_selects_newreno
+        PASS [   0.016s] (269/647) raven-tcpip::observability_counters rto_retransmission_moves_the_retransmission_counters
+        PASS [   0.014s] (270/647) raven-tcpip::observability_properties cc_algorithm_selects_cubic
+        PASS [   0.015s] (271/647) raven-tcpip::observability_counters zero_window_probe_counter_moves
+        PASS [   0.018s] (272/647) raven-tcpip::observability_counters timer_miss_counter_moves
+        PASS [   0.014s] (273/647) raven-tcpip::observability_properties challenge_ack_burst_suppresses_after_the_bucket
+        PASS [   0.015s] (274/647) raven-tcpip::observability_properties challenge_ack_global_interval_refills_the_bucket
+        PASS [   0.015s] (275/647) raven-tcpip::observability_properties connection_max_refuses_the_extra_connection
+        PASS [   0.010s] (276/647) raven-tcpip::observability_properties delack_segments_controls_immediate_acks
+        PASS [   0.015s] (277/647) raven-tcpip::observability_properties connect_retries_bounds_syn_retransmission
+        PASS [   0.009s] (278/647) raven-tcpip::observability_properties dup_ack_threshold_controls_fast_retransmit
+        PASS [   0.005s] (279/647) raven-tcpip::observability_properties ignore_path_mtu_keeps_the_interface_mss
+        PASS [   0.010s] (280/647) raven-tcpip::observability_properties ecn_enable_gates_the_negotiated_flag
+        PASS [   0.010s] (281/647) raven-tcpip::observability_properties finwait2_timeout_closes_a_half_closed_peer
+        PASS [   0.011s] (282/647) raven-tcpip::observability_properties half_open_limit_bounds_the_listener_queue
+        PASS [   0.022s] (283/647) raven-tcpip::observability_properties challenge_ack_global_burst_limits_all_connections
+        PASS [   0.005s] (284/647) raven-tcpip::observability_properties reassembly_holes_max_bounds_out_of_order_data
+        PASS [   0.013s] (285/647) raven-tcpip::observability_properties isn_strength_selects_a_different_generator
+        PASS [   0.009s] (286/647) raven-tcpip::observability_properties pmtu_cache_max_bounds_the_cache
+        PASS [   0.013s] (287/647) raven-tcpip::observability_properties keepalive_enable_gates_the_socket_option
+        PASS [   0.006s] (288/647) raven-tcpip::observability_properties port_range_selects_the_ephemeral_ports
+        PASS [   0.014s] (289/647) raven-tcpip::observability_properties initial_window_sets_the_initial_cwnd
+        PASS [   0.011s] (290/647) raven-tcpip::observability_properties mss_default_is_used_when_the_device_has_no_mtu
+        PASS [   0.011s] (291/647) raven-tcpip::observability_properties mss_ceiling_caps_the_announced_mss
+        PASS [   0.015s] (292/647) raven-tcpip::observability_properties hash_chain_max_reports_collisions
+        PASS [   0.010s] (293/647) raven-tcpip::observability_properties nagle_disabled_sends_small_writes_immediately
+        PASS [   0.013s] (294/647) raven-tcpip::observability_properties keepalive_probes_sets_the_timeout_probe_count
+        PASS [   0.014s] (295/647) raven-tcpip::observability_properties keepalive_interval_sets_the_default_probe_period
+        PASS [   0.014s] (296/647) raven-tcpip::observability_properties nagle_enabled_holds_the_second_small_write
+        PASS [   0.016s] (297/647) raven-tcpip::observability_properties mss_floor_clamps_a_small_peer_mss
+        PASS [   0.010s] (298/647) raven-tcpip::observability_properties reassembly_timeout_discards_hole_sets
+        PASS [   0.016s] (299/647) raven-tcpip::observability_properties pmtu_cache_ttl_expires_a_stale_entry
+        PASS [   0.010s] (300/647) raven-tcpip::observability_properties recv_buffer_default_sets_the_rx_cap
+        PASS [   0.005s] (301/647) raven-tcpip::observability_properties timer_late_threshold_counts_a_missed_timer
+        PASS [   0.011s] (302/647) raven-tcpip::observability_properties rto_max_caps_the_estimator_and_backoff
+        PASS [   0.011s] (303/647) raven-tcpip::observability_properties rto_min_clamps_a_small_sample
+        PASS [   0.011s] (304/647) raven-tcpip::observability_properties sack_ranges_max_caps_receiver_blocks
+        PASS [   0.011s] (305/647) raven-tcpip::observability_properties sack_enable_gates_the_syn_option
+        PASS [   0.012s] (306/647) raven-tcpip::observability_properties recv_buffer_max_caps_the_rx_cap
+        PASS [   0.012s] (307/647) raven-tcpip::observability_properties rto_initial_sets_the_first_retransmission_delay
+        PASS [   0.013s] (308/647) raven-tcpip::observability_properties send_buffer_default_sets_the_tx_cap
+        PASS [   0.014s] (309/647) raven-tcpip::observability_properties syn_cookie_lifetime_rejects_a_stale_ack
+        PASS [   0.005s] (310/647) raven-tcpip::pmtu a_1400_path_converges_within_budget
+        PASS [   0.006s] (311/647) raven-tcpip::observability_properties urgent_mode_gates_application_notification
+        PASS [   0.018s] (312/647) raven-tcpip::observability_properties rto_max_retries_gives_up_early
+        PASS [   0.040s] (313/647) raven-tcpip::observability_properties cwnd_max_caps_growth
+        PASS [   0.005s] (314/647) raven-tcpip::pmtu cache_keeps_destinations_separate
+        PASS [   0.014s] (315/647) raven-tcpip::observability_properties time_wait_interval_shortens_the_observed_timewait
+        PASS [   0.019s] (316/647) raven-tcpip::observability_properties send_buffer_max_caps_the_tx_cap
+        PASS [   0.017s] (317/647) raven-tcpip::observability_properties syn_cookies_enable_absorbs_a_full_half_open_queue
+        PASS [   0.014s] (318/647) raven-tcpip::observability_properties timestamps_enable_gates_the_syn_option
+        PASS [   0.006s] (319/647) raven-tcpip::pmtu cache_lifetime_at_least_one
+        PASS [   0.139s] (320/647) raven-tcpip::dhcp the_lease_is_renewed_by_unicast_before_it_ends
+        PASS [   0.011s] (321/647) raven-tcpip::observability_properties window_scale_enable_gates_the_syn_option
+        PASS [   0.010s] (322/647) raven-tcpip::pmtu cache_capacity_at_least_one
+        PASS [   0.014s] (323/647) raven-tcpip::observability_properties user_timeout_aborts_an_idle_connection
+        PASS [   0.009s] (324/647) raven-tcpip::pmtu cache_roundtrip
+        PASS [   0.013s] (325/647) raven-tcpip::pmtu cache_entry_expires
+        PASS [   0.013s] (326/647) raven-tcpip::pmtu cache_expiry_counts_entries
+        PASS [   0.007s] (327/647) raven-tcpip::pmtu classic_pmtu_ignores_a_zero_match_flag_even_with_a_bad_mtu
+        PASS [   0.013s] (328/647) raven-tcpip::pmtu cache_is_bounded_and_evicts
+        PASS [   0.006s] (329/647) raven-tcpip::pmtu plpmtud_ack_moves_the_low_bound
+        PASS [   0.007s] (330/647) raven-tcpip::pmtu floors_are_family_specific
+        PASS [   0.009s] (331/647) raven-tcpip::pmtu classic_pmtu_clamps_v4_to_the_floor
+        PASS [   0.009s] (332/647) raven-tcpip::pmtu classic_pmtu_lowers_the_cached_mtu
+        PASS [   0.010s] (333/647) raven-tcpip::pmtu classic_pmtu_ignores_unmatched_quotes
+        PASS [   0.009s] (334/647) raven-tcpip::pmtu classic_pmtu_never_raises_a_cached_value
+        PASS [   0.010s] (335/647) raven-tcpip::pmtu classic_pmtu_clamps_v6_to_the_floor
+        PASS [   0.008s] (336/647) raven-tcpip::pmtu plpmtud_all_acks_complete_at_max
+        PASS [   0.005s] (337/647) raven-tcpip::pmtu plpmtud_start_enters_searching
+        PASS [   0.022s] (338/647) raven-tcpip::observability_properties timewait_max_recycles_the_oldest_entry
+        PASS [   0.010s] (339/647) raven-tcpip::pmtu plpmtud_loss_moves_the_high_bound
+        PASS [   0.007s] (340/647) raven-tcpip::pmtu plpmtud_reprobe_is_not_due_early
+        PASS [   0.007s] (341/647) raven-tcpip::pmtu plpmtud_probe_sequence_is_monotonic
+        PASS [   0.004s] (342/647) raven-tcpip::recovery ecn_negotiates_when_both_offer
+        PASS [   0.005s] (343/647) raven-tcpip::recovery ecn_ce_without_negotiation_leaves_cwr_clear
+        PASS [   0.009s] (344/647) raven-tcpip::pmtu plpmtud_reprobe_is_due_after_the_interval
+        PASS [   0.010s] (345/647) raven-tcpip::pmtu plpmtud_max_never_below_base
+        PASS [   0.013s] (346/647) raven-tcpip::pmtu plpmtud_base_is_never_below_one
+        PASS [   0.010s] (347/647) raven-tcpip::pmtu plpmtud_probe_is_between_base_and_max
+        PASS [   0.009s] (348/647) raven-tcpip::pmtu probe_budget_is_retained
+        PASS [   0.007s] (349/647) raven-tcpip::recovery ecn_cwr_is_sent_once
+        PASS [   0.013s] (350/647) raven-tcpip::pmtu plpmtud_budget_exhaustion_is_an_error
+        PASS [   0.005s] (351/647) raven-tcpip::recovery ecn_reacts_again_after_the_rtt_boundary
+        PASS [   0.012s] (352/647) raven-tcpip::pmtu plpmtud_starts_at_base
+        PASS [   0.010s] (353/647) raven-tcpip::recovery ecn_ignores_ce_when_not_negotiated
+        PASS [   0.005s] (354/647) raven-tcpip::recovery pto_of_one_srtt_is_srtt_plus_minimum
+        PASS [   0.007s] (355/647) raven-tcpip::recovery ecn_requires_both_offers
+        PASS [   0.012s] (356/647) raven-tcpip::recovery ecn_ece_remains_pending_until_cleared
+        PASS [   0.007s] (357/647) raven-tcpip::recovery ecn_sets_ece_on_the_first_ce
+        PASS [   0.009s] (358/647) raven-tcpip::recovery ecn_rtt_clears_ce_latch
+        PASS [   0.010s] (359/647) raven-tcpip::recovery ecn_no_cwr_without_negotiation
+        PASS [   0.009s] (360/647) raven-tcpip::recovery ecn_reacts_once_per_rtt
+        PASS [   0.008s] (361/647) raven-tcpip::recovery ecn_second_ce_does_not_set_a_second_cwr
+        PASS [   0.016s] (362/647) raven-tcpip::pmtu plpmtud_probe_loss_does_not_change_state_to_base
+        PASS [   0.008s] (363/647) raven-tcpip::recovery pto_grows_with_rttvar
+        PASS [   0.008s] (364/647) raven-tcpip::recovery rack_dsack_grows_the_window
+        PASS [   0.009s] (365/647) raven-tcpip::recovery rack_dsack_marks_growth
+        PASS [   0.009s] (366/647) raven-tcpip::recovery rack_ack_advances_the_clock
+        PASS [   0.009s] (367/647) raven-tcpip::recovery rack_declares_loss_after_the_window
+        PASS [   0.005s] (368/647) raven-tcpip::recovery rack_older_send_does_not_rewind
+        PASS [   0.006s] (369/647) raven-tcpip::recovery rack_loss_is_not_declared_before_the_bound
+        PASS [   0.007s] (370/647) raven-tcpip::recovery rack_huge_srtt_does_not_overflow
+        PASS [   0.009s] (371/647) raven-tcpip::recovery rack_dsack_growth_is_bounded_by_srtt
+        PASS [   0.005s] (372/647) raven-tcpip::recovery rack_reordering_within_the_window_is_not_loss
+        PASS [   0.005s] (373/647) raven-tcpip::recovery rack_uses_a_quarter_srtt_bound
+        PASS [   0.008s] (374/647) raven-tcpip::recovery rack_loss_is_declared_after_the_bound
+        PASS [   0.009s] (375/647) raven-tcpip::recovery rack_multiple_sends_keep_the_latest
+        PASS [   0.008s] (376/647) raven-tcpip::recovery rack_zero_window_still_declares_after_one_ms
+        PASS [   0.009s] (377/647) raven-tcpip::recovery spurious_undo_restores_once
+        PASS [   0.009s] (378/647) raven-tcpip::recovery spurious_undo_values_are_kept
+        PASS [   0.007s] (379/647) raven-tcpip::recovery tlp_before_deadline_does_not_fire
+        PASS [   0.010s] (380/647) raven-tcpip::recovery spurious_undo_starts_armed
+        PASS [   0.005s] (381/647) raven-tcpip::recovery tlp_with_no_rto_is_sooner
+        PASS [   0.094s] (382/647) raven-tcpip::observability socket_info_mid_transfer_has_plausible_values
+        PASS [   0.008s] (383/647) raven-tcpip::recovery tlp_disarms_on_ack
+        PASS [   0.008s] (384/647) raven-tcpip::recovery tlp_pto_has_a_minimum_rttvar_term
+        PASS [   0.009s] (385/647) raven-tcpip::recovery tlp_is_sooner_than_a_later_rto
+        PASS [   0.011s] (386/647) raven-tcpip::recovery tlp_arms_and_fires
+        PASS [   0.009s] (387/647) raven-tcpip::recovery tlp_pto_saturates_for_large_values
+        PASS [   0.013s] (388/647) raven-tcpip::recovery rack_reordering_window_default_is_usable
+        PASS [   0.007s] (389/647) raven-tcpip::recovery tlp_without_deadline_is_not_sooner
+        PASS [   0.009s] (390/647) raven-tcpip::recovery tlp_fires_exactly_at_the_deadline
+        PASS [   0.011s] (391/647) raven-tcpip::recovery tlp_is_not_sooner_than_an_earlier_rto
+        PASS [   0.009s] (392/647) raven-tcpip::recovery twenty_percent_reordering_causes_zero_retransmissions
+        PASS [   0.011s] (393/647) raven-tcpip::recovery tlp_pto_is_srtt_plus_four_rttvar
+        PASS [   0.008s] (394/647) raven-tcpip::recovery two_tlps_do_not_interfere
+        PASS [   0.006s] (395/647) raven-tcpip::rto sequence_backoff_100
+        PASS [   0.006s] (396/647) raven-tcpip::rto sequence_alternating
+        PASS [   0.006s] (397/647) raven-tcpip::rto sequence_backoff_to_cap
+        PASS [   0.007s] (398/647) raven-tcpip::rto every_vector_sequence_is_present
+        PASS [   0.005s] (399/647) raven-tcpip::rto sequence_large_5000
+        PASS [   0.006s] (400/647) raven-tcpip::rto sequence_rttvar_dominated
+        PASS [   0.009s] (401/647) raven-tcpip::rto sequence_cap_20000
+        PASS [   0.010s] (402/647) raven-tcpip::rto sequence_backoff_then_sample
+        PASS [   0.008s] (403/647) raven-tcpip::rto sequence_fractional_rounding
+        PASS [   0.013s] (404/647) raven-tcpip::recovery undo_is_independent_of_rack
+        PASS [   0.011s] (405/647) raven-tcpip::rto sequence_backoff_cap
+        PASS [   0.009s] (406/647) raven-tcpip::rto sequence_decreasing
+        PASS [   0.006s] (407/647) raven-tcpip::rto sequence_spike
+        PASS [   0.009s] (408/647) raven-tcpip::rto sequence_increasing
+        PASS [   0.006s] (409/647) raven-tcpip::rto sequence_two_100_200
+        PASS [   0.011s] (410/647) raven-tcpip::rto sequence_min_clamp_100
+        PASS [   0.008s] (411/647) raven-tcpip::rto sequence_single_100
+        PASS [   0.011s] (412/647) raven-tcpip::rto sequence_min_default_200
+        PASS [   0.008s] (413/647) raven-tcpip::rto sequence_steady_40
+        PASS [   0.004s] (414/647) raven-tcpip::rto_loss rto_backoff_doubles_and_caps
+        PASS [   0.010s] (415/647) raven-tcpip::rto sequence_timeout_before_any_sample
+        PASS [   0.013s] (416/647) raven-tcpip::rto sequence_rto_max_clamp
+        PASS [   0.013s] (417/647) raven-tcpip::rto sequence_single_1
+        PASS [   0.005s] (418/647) raven-tcpip::sack adjacent_blocks_merge
+        PASS [   0.009s] (419/647) raven-tcpip::rto_loss a_black_holed_connection_gives_up_with_etimedout
+        PASS [   0.008s] (420/647) raven-tcpip::rto_loss karn_prevents_a_sample_from_a_retransmitted_segment
+        PASS [   0.005s] (421/647) raven-tcpip::sack case_bytes_threshold
+        PASS [   0.008s] (422/647) raven-tcpip::rto_loss the_rto_timer_is_disarmed_when_all_data_is_acknowledged
+        PASS [   0.010s] (423/647) raven-tcpip::rto_loss no_floating_point_in_the_stack_sources
+        PASS [   0.008s] (424/647) raven-tcpip::sack block_outside_the_window_is_dropped
+        PASS [   0.020s] (425/647) raven-tcpip::rto sequence_many_samples
+        PASS [   0.010s] (426/647) raven-tcpip::sack case_below_threshold
+        PASS [   0.016s] (427/647) raven-tcpip::rto sequence_zero_rtt
+        PASS [   0.007s] (428/647) raven-tcpip::sack case_high_rxt_in_gap
+        PASS [   0.006s] (429/647) raven-tcpip::sack case_mixed_pipe
+        PASS [   0.013s] (430/647) raven-tcpip::rto_loss rto_floor_and_ceiling_are_configurable
+        PASS [   0.007s] (431/647) raven-tcpip::sack case_high_rxt_pipe
+        PASS [   0.009s] (432/647) raven-tcpip::sack case_dsack_duplicate
+        PASS [   0.015s] (433/647) raven-tcpip::rto_loss rto_converges_on_a_500ms_link
+        PASS [   0.006s] (434/647) raven-tcpip::sack case_reneging
+        PASS [   0.018s] (435/647) raven-tcpip::rto_loss a_lost_segment_is_retransmitted_after_one_rto
+        PASS [   0.008s] (436/647) raven-tcpip::sack case_rule2_after_no_rule1
+        PASS [   0.005s] (437/647) raven-tcpip::sack case_rule5_all_sacked
+        PASS [   0.007s] (438/647) raven-tcpip::sack case_rule3_no_unsent
+        PASS [   0.005s] (439/647) raven-tcpip::sack case_three_ranges
+        PASS [   0.014s] (440/647) raven-tcpip::sack case_cap_two
+        PASS [   0.007s] (441/647) raven-tcpip::sack case_rule4_existing_rescue
+        PASS [   0.010s] (442/647) raven-tcpip::sack case_one_range
+        PASS [   0.006s] (443/647) raven-tcpip::sack dsack_block_header_length_is_correct
+        PASS [   0.006s] (444/647) raven-tcpip::sack dsack_flag_is_set_for_a_duplicate
+        PASS [   0.014s] (445/647) raven-tcpip::sack case_lost_gap
+        PASS [   0.006s] (446/647) raven-tcpip::sack is_lost_uses_range_count_and_byte_threshold
+        PASS [   0.006s] (447/647) raven-tcpip::sack next_seg_none_when_everything_is_sacked
+        PASS [   0.015s] (448/647) raven-tcpip::sack case_no_sacked_unsent
+        PASS [   0.005s] (449/647) raven-tcpip::sack no_receiver_blocks_for_no_holes
+        PASS [   0.005s] (450/647) raven-tcpip::sack no_sack_option_bytes_when_empty
+        PASS [   0.009s] (451/647) raven-tcpip::sack every_sack_case_is_present
+        PASS [   0.007s] (452/647) raven-tcpip::sack next_seg_rule4_sets_rescue_point
+        PASS [   0.005s] (453/647) raven-tcpip::sack rule2_uses_the_receiver_window
+        PASS [   0.004s] (454/647) raven-tcpip::sack rule3_caps_the_length_at_the_gap
+        PASS [   0.009s] (455/647) raven-tcpip::sack range_cap_is_conservative
+        PASS [   0.015s] (456/647) raven-tcpip::sack case_rule4_rescue
+        PASS [   0.009s] (457/647) raven-tcpip::sack pipe_counts_retransmitted_bytes_twice
+        PASS [   0.010s] (458/647) raven-tcpip::sack next_seg_rule1_records_high_rxt
+        PASS [   0.023s] (459/647) raven-tcpip::sack case_empty
+        PASS [   0.005s] (460/647) raven-tcpip::sack sack_option_bytes_encode_length_and_ranges
+        PASS [   0.009s] (461/647) raven-tcpip::sack receiver_blocks_are_most_recent_first
+        PASS [   0.006s] (462/647) raven-tcpip::sack timestamps_reduce_the_receiver_block_count
+        PASS [   0.009s] (463/647) raven-tcpip::signature md5_setter_reports_not_supported_until_approved
+        PASS [   0.005s] (464/647) raven-tcpip::skeleton null_device_receives_nothing
+        PASS [   0.012s] (465/647) raven-tcpip::sack reneging_clears_the_scoreboard
+        PASS [   0.009s] (466/647) raven-tcpip::skeleton accepted_event_is_emitted_once
+        PASS [   0.006s] (467/647) raven-tcpip::skeleton null_device_transmit_discards_silently
+        PASS [   0.005s] (468/647) raven-tcpip::skeleton one_hour_jump_runs_each_armed_timer_once
+        PASS [   0.008s] (469/647) raven-tcpip::skeleton config_defaults_are_bounded
+        PASS [   0.011s] (470/647) raven-tcpip::signature the_no_digest_provider_is_explicitly_placeholder
+        PASS [   0.012s] (471/647) raven-tcpip::signature ao_setter_reports_not_supported_until_approved
+        PASS [   0.008s] (472/647) raven-tcpip::skeleton next_poll_delay_is_exact_to_the_millisecond
+        PASS [   0.009s] (473/647) raven-tcpip::skeleton close_invalidates_the_socket
+        PASS [   0.008s] (474/647) raven-tcpip::skeleton loopback_rejects_frames_over_the_mtu
+        PASS [   0.009s] (475/647) raven-tcpip::skeleton next_poll_delay_is_none_without_timers
+        PASS [   0.009s] (476/647) raven-tcpip::skeleton loopback_frame_is_received_on_next_poll
+        PASS [   0.024s] (477/647) raven-tcpip::sack case_sacked_tail
+        PASS [   0.006s] (478/647) raven-tcpip::skeleton recv_after_peer_close_is_eof
+        PASS [   0.012s] (479/647) raven-tcpip::skeleton loopback_queue_is_bounded
+        PASS [   0.008s] (480/647) raven-tcpip::skeleton past_timer_fires_once_on_the_next_poll
+        PASS [   0.005s] (481/647) raven-tcpip::skeleton tcp_listen_rejects_duplicate_port_and_zero
+        PASS [   0.005s] (482/647) raven-tcpip::skeleton timer_capacity_is_bounded
+        PASS [   0.029s] (483/647) raven-tcpip::sack dsack_block_is_placed_first
+        PASS [   0.007s] (484/647) raven-tcpip::skeleton take_events_drains_and_a_second_call_is_empty
+        PASS [   0.008s] (485/647) raven-tcpip::skeleton send_recv_roundtrip
+        PASS [   0.011s] (486/647) raven-tcpip::skeleton readable_transition_is_emitted_once_per_edge
+        PASS [   0.008s] (487/647) raven-tcpip::skeleton tcp_accept_returns_none_when_empty
+        PASS [   0.010s] (488/647) raven-tcpip::skeleton send_exhaustion_returns_eagain
+        PASS [   0.005s] (489/647) raven-tcpip::skeleton udp_recv_from_returns_the_source
+        PASS [   0.006s] (490/647) raven-tcpip::table different_secrets_change_buckets
+        PASS [   0.005s] (491/647) raven-tcpip::table inverted_port_range_collapses_to_the_start
+        PASS [   0.008s] (492/647) raven-tcpip::skeleton writable_transition_is_emitted_once
+        PASS [   0.016s] (493/647) raven-tcpip::skeleton recv_on_an_empty_socket_is_eagain
+        PASS [   0.005s] (494/647) raven-tcpip::table listener_exact_beats_wildcard
+        PASS [   0.014s] (495/647) raven-tcpip::skeleton tcp_accept_returns_a_pending_connection
+        PASS [   0.008s] (496/647) raven-tcpip::skeleton unknown_socket_is_ebadf
+        PASS [   0.009s] (497/647) raven-tcpip::skeleton udp_send_to_bounds_the_write
+        PASS [   0.005s] (498/647) raven-tcpip::table listener_table_len_and_empty
+        PASS [   0.008s] (499/647) raven-tcpip::table established_and_listener_are_distinguished
+        PASS [   0.005s] (500/647) raven-tcpip::table long_collision_chains_are_counted
+        PASS [   0.018s] (501/647) raven-tcpip::skeleton two_stacks_with_the_same_seed_and_inputs_are_identical
+        PASS [   0.019s] (502/647) raven-tcpip::skeleton socket_ids_are_not_reused
+        PASS [   0.004s] (503/647) raven-tcpip::table rebind_fresh_port_is_allowed
+        PASS [   0.004s] (504/647) raven-tcpip::table rebind_listener_is_rejected
+        PASS [   0.019s] (505/647) raven-tcpip::skeleton socket_table_refuses_max_plus_one
+        PASS [   0.019s] (506/647) raven-tcpip::skeleton shutdown_write_on_a_listener_is_enotconn
+        PASS [   0.005s] (507/647) raven-tcpip::table port_allocation_is_randomised
+        PASS [   0.005s] (508/647) raven-tcpip::table port_allocation_is_in_range
+        PASS [   0.005s] (509/647) raven-tcpip::table port_exhaustion_returns_none
+        PASS [   0.010s] (510/647) raven-tcpip::table listener_on_a_different_port_is_not_matched
+        PASS [   0.005s] (511/647) raven-tcpip::table rebind_time_wait_requires_reuseaddr
+        PASS [   0.005s] (512/647) raven-tcpip::table table_insert_and_get
+        PASS [   0.005s] (513/647) raven-tcpip::table table_remove_missing_is_none
+        PASS [   0.005s] (514/647) raven-tcpip::table time_wait_insert_and_lookup
+        PASS [   0.012s] (515/647) raven-tcpip::table rebind_different_local_with_existing_tcp_is_rejected
+        PASS [   0.012s] (516/647) raven-tcpip::table port_allocation_does_not_repeat_while_in_use
+        PASS [   0.005s] (517/647) raven-tcpip::table time_wait_reuse_requires_a_higher_sequence_without_timestamps
+        PASS [   0.020s] (518/647) raven-tcpip::table classification_finds_one_of_ten_thousand
+        PASS [   0.024s] (519/647) raven-tcpip::skeleton udp_bind_rejects_duplicate_port
+        PASS [   0.008s] (520/647) raven-tcpip::table table_remove_returns_the_value
+        PASS [   0.010s] (521/647) raven-tcpip::table table_replace_keeps_one_entry
+        PASS [   0.010s] (522/647) raven-tcpip::table time_wait_missing_key_can_always_reuse
+        PASS [   0.011s] (523/647) raven-tcpip::table released_port_can_be_allocated_again
+        PASS [   0.005s] (524/647) raven-tcpip::tcp all_eleven_tcp_states_are_public
+        PASS [   0.017s] (525/647) raven-tcpip::table port_allocation_at_ninety_nine_percent_is_bounded
+        PASS [   0.007s] (526/647) raven-tcpip::tcp abort_on_a_listener_is_enotsock
+        PASS [   0.005s] (527/647) raven-tcpip::tcp backlog_limit_refuses_the_extra_half_open
+        PASS [   0.297s] (528/647) raven-tcpip::c30_live plpmtud_recovers_from_a_black_hole_and_finds_a_larger_payload
+        PASS [   0.005s] (529/647) raven-tcpip::tcp active_open_reaches_established_on_both_sides
+        PASS [   0.009s] (530/647) raven-tcpip::table time_wait_reuse_uses_timestamps_when_available
+        PASS [   0.010s] (531/647) raven-tcpip::tcp abort_sends_a_reset_and_frees_the_socket
+        PASS [   0.008s] (532/647) raven-tcpip::tcp challenge_acks_are_rate_limited
+        PASS [   0.005s] (533/647) raven-tcpip::tcp listener_ack_gets_a_reset
+        PASS [   0.007s] (534/647) raven-tcpip::tcp listener_state_and_empty_accept
+        PASS [   0.007s] (535/647) raven-tcpip::tcp in_window_syn_on_established_gets_a_challenge_ack
+        PASS [   0.011s] (536/647) raven-tcpip::tcp connect_to_closed_port_is_connection_refused
+        PASS [   0.019s] (537/647) raven-tcpip::table time_wait_limit_recycles_oldest
+        PASS [   0.012s] (538/647) raven-tcpip::tcp connect_without_an_answer_retransmits_and_times_out
+        PASS [   0.010s] (539/647) raven-tcpip::tcp fin_wait_2_timeout_closes_without_a_reset
+        PASS [   0.010s] (540/647) raven-tcpip::tcp duplicate_tcp_listen_is_eaddrinuse
+        PASS [   0.005s] (541/647) raven-tcpip::tcp reset_is_never_sent_in_reply_to_a_reset
+        PASS [   0.008s] (542/647) raven-tcpip::tcp keepalive_probes_then_times_out
+        PASS [   0.008s] (543/647) raven-tcpip::tcp orderly_close_from_the_server
+        PASS [   0.004s] (544/647) raven-tcpip::tcp rows_sm_ch_are_enumerated
+        PASS [   0.007s] (545/647) raven-tcpip::tcp recv_after_reset_returns_econnreset
+        PASS [   0.009s] (546/647) raven-tcpip::tcp orderly_close_from_the_client
+        PASS [   0.078s] (547/647) raven-tcpip::rto_loss one_mib_under_two_percent_loss_completes
+        PASS [   0.024s] (548/647) raven-tcpip::table time_wait_expiry_removes_due_entries
+        PASS [   0.004s] (549/647) raven-tcpip::tcp rows_sm_l_are_enumerated
+        PASS [   0.009s] (550/647) raven-tcpip::tcp rows_sm_c_are_enumerated
+        PASS [   0.006s] (551/647) raven-tcpip::tcp rows_sm_e_are_enumerated
+        PASS [   0.005s] (552/647) raven-tcpip::tcp rows_sm_tw_are_enumerated
+        PASS [   0.008s] (553/647) raven-tcpip::tcp rows_sm_cw_are_enumerated
+        PASS [   0.007s] (554/647) raven-tcpip::tcp rows_sm_la_are_enumerated
+        PASS [   0.007s] (555/647) raven-tcpip::tcp rows_sm_t_are_enumerated
+        PASS [   0.007s] (556/647) raven-tcpip::tcp rows_sm_f2_are_enumerated
+        PASS [   0.009s] (557/647) raven-tcpip::tcp rows_sm_cl_are_enumerated
+        PASS [   0.007s] (558/647) raven-tcpip::tcp rows_sm_u_are_enumerated
+        PASS [   0.009s] (559/647) raven-tcpip::tcp rows_sm_f1_are_enumerated
+        PASS [   0.009s] (560/647) raven-tcpip::tcp rows_sm_sr_are_enumerated
+        PASS [   0.009s] (561/647) raven-tcpip::tcp rows_sm_ss_are_enumerated
+        PASS [   0.009s] (562/647) raven-tcpip::tcp rows_sm_rst_are_enumerated
+        PASS [   0.005s] (563/647) raven-tcpip::tcp segment_to_a_closed_port_gets_a_reset
+        PASS [   0.008s] (564/647) raven-tcpip::tcp rst_outside_the_window_is_ignored
+        PASS [   0.006s] (565/647) raven-tcpip::tcp syn_received_state_is_visible_for_a_half_open_connection
+        PASS [   0.008s] (566/647) raven-tcpip::tcp sequence_wrap_is_handled_through_a_real_connection
+        PASS [   0.005s] (567/647) raven-tcpip::tcp time_wait_expires_and_the_port_becomes_reusable
+        PASS [   0.007s] (568/647) raven-tcpip::tcp state_machine_rows_are_enumerated_by_name
+        PASS [   0.011s] (569/647) raven-tcpip::tcp rst_inside_the_window_closes_the_connection
+        PASS [   0.005s] (570/647) raven-tcpip::tcp_data data_beyond_the_window_is_dropped_and_counted
+        PASS [   0.009s] (571/647) raven-tcpip::tcp simultaneous_open_reaches_established
+        PASS [   0.009s] (572/647) raven-tcpip::tcp simultaneous_close_reaches_time_wait
+        PASS [   0.008s] (573/647) raven-tcpip::tcp syn_sent_unacceptable_ack_gets_a_reset
+        PASS [   0.008s] (574/647) raven-tcpip::tcp tcp_connect_rejects_port_zero
+        PASS [   0.026s] (575/647) raven-tcpip::tcp full_lifecycle_event_order_is_accepted_then_closed
+        PASS [   0.005s] (576/647) raven-tcpip::tcp_data data_segments_carry_the_peer_window
+        PASS [   0.010s] (577/647) raven-tcpip::tcp tcp_state_on_udp_is_enotsock
+        PASS [   0.008s] (578/647) raven-tcpip::tcp_data acknowledgement_frees_the_send_queue
+        PASS [   0.010s] (579/647) raven-tcpip::tcp time_wait_ignores_rst
+        PASS [   0.007s] (580/647) raven-tcpip::tcp_data duplicate_data_is_not_delivered_twice
+        PASS [   0.011s] (581/647) raven-tcpip::tcp_data data_entirely_left_of_the_window_is_acked_not_delivered
+        PASS [   0.011s] (582/647) raven-tcpip::tcp_data data_and_fin_in_one_segment_moves_to_close_wait
+        PASS [   0.005s] (583/647) raven-tcpip::tcp_data queue_length_on_udp_is_enotsock
+        PASS [   0.009s] (584/647) raven-tcpip::tcp_data empty_send_does_not_change_queue_lengths
+        PASS [   0.008s] (585/647) raven-tcpip::tcp_data overlapping_data_tail_is_trimmed
+        PASS [   0.006s] (586/647) raven-tcpip::tcp_data psh_is_set_on_the_last_segment_of_a_batch
+        PASS [   0.009s] (587/647) raven-tcpip::tcp_data out_of_order_hole_limit_is_bounded
+        PASS [   0.011s] (588/647) raven-tcpip::tcp_data one_byte_each_way
+        PASS [   0.009s] (589/647) raven-tcpip::tcp_data partial_send_returns_the_exact_room
+        PASS [   0.008s] (590/647) raven-tcpip::tcp_data queue_lengths_report_the_buffered_bytes
+        PASS [   0.011s] (591/647) raven-tcpip::tcp_data out_of_order_segments_reassemble
+        PASS [   0.011s] (592/647) raven-tcpip::tcp_data partial_send_and_eagain_then_resume
+        PASS [   0.005s] (593/647) raven-tcpip::tcp_data send_empty_is_zero_and_recv_empty_buffer_is_zero
+        PASS [   0.010s] (594/647) raven-tcpip::tcp_data recv_on_listener_is_enotsock
+        PASS [   0.014s] (595/647) raven-tcpip::tcp_data partial_send_accounts_for_the_exact_bytes
+        PASS [   0.011s] (596/647) raven-tcpip::tcp_data recv_queue_length_is_zero_after_fin_and_drain
+        PASS [   0.018s] (597/647) raven-tcpip::tcp_data nagle_coalesces_and_nodelay_disables_it
+        PASS [   0.009s] (598/647) raven-tcpip::tcp_data send_after_shutdown_is_epipe
+        PASS [   0.011s] (599/647) raven-tcpip::tcp_data second_full_segment_gets_an_immediate_ack
+        PASS [   0.008s] (600/647) raven-tcpip::tcp_data shutdown_with_empty_queue_sends_fin_immediately
+        PASS [   0.011s] (601/647) raven-tcpip::tcp_data send_on_listener_is_enotconn
+        PASS [   0.011s] (602/647) raven-tcpip::tcp_data send_on_udp_is_enotconn
+        PASS [   0.008s] (603/647) raven-tcpip::tcp_data shutdown_write_drains_before_fin
+        PASS [   0.014s] (604/647) raven-tcpip::tcp_data recv_returns_zero_after_fin_and_data_is_drained_first
+        PASS [   0.005s] (605/647) raven-tcpip::tcp_data tcp_state_remains_established_after_data
+        PASS [   0.009s] (606/647) raven-tcpip::tcp_data set_nodelay_on_udp_is_enotsock
+        PASS [   0.017s] (607/647) raven-tcpip::tcp_data recv_queue_len_tracks_reads
+        PASS [   0.012s] (608/647) raven-tcpip::tcp_data set_nodelay_on_listener_is_enotsock
+        PASS [   0.007s] (609/647) raven-tcpip::tcp_data tcp_zero_window_probe_count_starts_at_zero
+        PASS [   0.007s] (610/647) raven-tcpip::tcp_data urgent_pointer_is_parsed_and_counted
+        PASS [   0.005s] (611/647) raven-tcpip::tcp_options ipv6_mss_is_twenty_bytes_smaller_than_ipv4
+        PASS [   0.012s] (612/647) raven-tcpip::tcp_data shutdown_write_twice_is_idempotent
+        PASS [   0.006s] (613/647) raven-tcpip::tcp_options default_mss_bounds_are_sane
+        PASS [   0.006s] (614/647) raven-tcpip::tcp_options disabling_window_scaling_removes_the_option
+        PASS [   0.006s] (615/647) raven-tcpip::tcp_options mss_is_announced_from_the_ipv4_path_mtu
+        PASS [   0.007s] (616/647) raven-tcpip::tcp_options disabling_timestamps_removes_the_option
+        PASS [   0.009s] (617/647) raven-tcpip::tcp_data zero_window_probes_fire_and_are_counted
+        PASS [   0.005s] (618/647) raven-tcpip::tcp_options sack_permitted_is_negotiated_on_the_default_handshake
+        PASS [   0.014s] (619/647) raven-tcpip::tcp_data two_urgent_segments_are_counted
+        PASS [   0.005s] (620/647) raven-tcpip::tcp_options timestamp_more_than_24_days_old_is_the_exception
+        PASS [   0.066s] (621/647) raven-tcpip::table time_wait_expiry_is_o1_per_entry
+        PASS [   0.012s] (622/647) raven-tcpip::tcp_options data_segments_do_not_repeat_syn_options
+        PASS [   0.006s] (623/647) raven-tcpip::tcp_options timestamps_are_negotiated_when_both_offer
+        PASS [   0.008s] (624/647) raven-tcpip::tcp_options stale_timestamp_is_dropped_by_paws
+        PASS [   0.023s] (625/647) raven-tcpip::tcp_data send_queue_len_on_unknown_socket_is_ebadf
+        PASS [   0.008s] (626/647) raven-tcpip::tcp_options timestamp_option_is_absent_when_the_feature_is_disabled
+        PASS [   0.015s] (627/647) raven-tcpip::tcp_data zero_window_stalls_and_resumes
+        PASS [   0.009s] (628/647) raven-tcpip::tcp_options timestamp_option_reduces_the_effective_mss
+        PASS [   0.006s] (629/647) raven-tcpip::tcp_options timestamps_are_not_enabled_when_the_peer_omits_them
+        PASS [   0.011s] (630/647) raven-tcpip::tcp_options syn_option_order_is_mss_sack_nop_ts_nop_ws_eol
+        PASS [   0.014s] (631/647) raven-tcpip::tcp_options peer_mss_larger_than_our_path_is_clamped
+        PASS [   0.011s] (632/647) raven-tcpip::tcp_options syn_window_is_unscaled_but_data_window_is_scaled
+        PASS [   0.015s] (633/647) raven-tcpip::tcp_options paws_counter_starts_at_zero
+        PASS [   0.015s] (634/647) raven-tcpip::tcp_options peer_mss_one_is_clamped_to_the_floor
+        PASS [   0.009s] (635/647) raven-tcpip::tcp_options window_scale_is_derived_from_the_receive_buffer
+        PASS [   0.006s] (636/647) raven-tcpip::tcp_write_busy a_zero_window_write_is_probed_and_flushed_when_the_peer_answers
+        PASS [   0.008s] (637/647) raven-tcpip::tcp_write_busy a_small_write_after_prior_unacked_data_is_flushed_on_the_next_poll
+        PASS [   0.132s] (638/647) raven-tcpip::rto_loss one_mib_under_ten_percent_loss_completes
+        PASS [   0.008s] (639/647) raven-tcpip::tcp_write_busy a_write_the_device_refused_once_is_accepted_and_delivered_exactly_once
+        PASS [   0.077s] (640/647) raven-tcpip::table ten_thousand_time_wait_entries_stay_within_the_limit
+        PASS [   0.029s] (641/647) raven-tcpip::tcp_data slow_reader_keeps_the_configured_caps
+        PASS [   0.010s] (642/647) raven-tcpip::tcp_write_busy a_refused_transmit_does_not_stall_data_queued_behind_it
+        PASS [   0.012s] (643/647) raven-tcpip::tcp_options window_scale_shift_15_is_clamped_to_14
+        PASS [   0.015s] (644/647) raven-tcpip::tcp_options tsecr_echoes_the_peer_timestamp
+        PASS [   0.013s] (645/647) raven-tcpip::tcp_write_busy a_caller_that_trusts_the_result_does_not_duplicate_a_record
+        PASS [   0.015s] (646/647) raven-tcpip::tcp_options window_scaling_is_negotiated_when_both_offer
+        PASS [   0.060s] (647/647) raven-tcpip::tcp_data one_mib_each_way_matches_a_hash
+────────────
+     Summary [   0.404s] 647 tests run: 647 passed, 0 skipped

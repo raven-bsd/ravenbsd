@@ -6,9 +6,13 @@
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
+use raven_abi::types::Handle;
 use raven_libc_abi::poll::{POLLERR, POLLHUP, POLLIN, POLLNVAL, POLLOUT, POLLPRI};
 use raven_libc_abi::structs::Pollfd;
+use raven_libc_abi::time::CLOCK_MONOTONIC;
 use raven_libc_sys::sys::EvqEvent;
+use raven_proto_net::socket::{READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE};
+use raven_proto_net::{Call, Response, SocketRequest};
 
 use crate::backend::SysBackend;
 use crate::fd::ofd::{OfdKind, OfdRef};
@@ -24,6 +28,8 @@ struct Registration<'a, B: SysBackend, L: Lock> {
     reference: OfdRef<'a, B, L>,
     events: u32,
     entries: Vec<usize>,
+    /// A scheme socket answers the live `Call::Poll` query; kernel-backed sources do not.
+    scheme: bool,
 }
 
 /// `poll`.
@@ -85,10 +91,12 @@ pub fn poll<B: SysBackend, L: Lock>(
                     registration.events |= wanted | EV_HUP;
                     registration.entries.push(index);
                 } else {
+                    let scheme = reference.poll_signaled();
                     registrations.push(Registration {
                         reference,
                         events: wanted | EV_HUP,
                         entries: Vec::from([index]),
+                        scheme,
                     });
                 }
             }
@@ -98,23 +106,46 @@ pub fn poll<B: SysBackend, L: Lock>(
             }
         }
     }
+    // Scan live readiness before sleeping. A scheme socket's current level via `Call::Poll` is
+    // the truth; the event registration below is only the wake hint. This also covers data that
+    // arrived between the last read and this poll.
+    let backend = platform.backend();
+    for registration in &registrations {
+        if !registration.scheme {
+            continue;
+        }
+        let Some(bits) = live_readiness(backend, registration.reference.poll_handle()) else {
+            continue;
+        };
+        ready = ready.saturating_add(apply_bits(registration, fds, bits));
+    }
     if ready > 0 {
         return Ok(ready);
     }
     if registrations.is_empty() || timeout_ms == 0 {
         return Ok(0);
     }
-    let timeout_ns = if timeout_ms < 0 {
-        0
+    let deadline = if timeout_ms < 0 {
+        None
     } else {
-        u64::try_from(timeout_ms)
+        let timeout_ns = u64::try_from(timeout_ms)
             .unwrap_or(0)
-            .saturating_mul(1_000_000)
+            .saturating_mul(1_000_000);
+        Some(monotonic_ns(backend).saturating_add(timeout_ns))
     };
-    let backend = platform.backend();
     let mut events = [EvqEvent::default(); MAX_POLL_FDS];
     let mut attempt = 0usize;
-    let count = loop {
+    loop {
+        let timeout_ns = match deadline {
+            Some(deadline) => {
+                let remaining = deadline.saturating_sub(monotonic_ns(backend));
+                if remaining == 0 {
+                    return Ok(0);
+                }
+                remaining
+            }
+            None => 0,
+        };
         let queue = platform.event_queue()?;
         for (position, registration) in registrations.iter().enumerate() {
             if let Err(error) = backend.evq_ctl(
@@ -134,34 +165,130 @@ pub fn poll<B: SysBackend, L: Lock>(
         for registration in &registrations {
             let _ = backend.evq_ctl(queue, EVQ_DEL, registration.reference.poll_handle(), 0, 0);
         }
-        match waited {
+        let count = match waited {
             Err(Errno::EBUSY) if attempt == 0 => {
                 // A child inherited the parent's cached queue across fork; the queue allows
                 // one waiter. Drop this process's handle and create its own queue, then retry.
                 platform.reset_event_queue();
                 attempt = 1;
+                continue;
             }
-            other => break other?,
-        }
-    };
-    let mut fired = 0usize;
-    for event in events.iter().take(count) {
-        let Some(registration) = registrations.get(event.cookie as usize) else {
-            continue;
+            other => other?,
         };
-        for &index in &registration.entries {
-            let Some(entry) = fds.get_mut(index) else {
+        let mut fired = 0usize;
+        for event in events.iter().take(count) {
+            let Some(registration) = registrations.get(event.cookie as usize) else {
                 continue;
             };
-            let requested = i32::from(entry.events);
-            let revents = delivered_revents(event.events, requested);
-            if revents != 0 {
-                entry.revents = revents;
-                fired = fired.saturating_add(1);
+            if registration.scheme
+                && let Some(bits) = live_readiness(backend, registration.reference.poll_handle())
+            {
+                // Only the current live directions are a verdict; a delivered event is a
+                // wake hint and may be stale.
+                fired = fired.saturating_add(apply_bits(registration, fds, bits));
+                continue;
+            }
+            fired = fired.saturating_add(apply_mask(registration, fds, event.events));
+        }
+        if fired > 0 {
+            return Ok(fired);
+        }
+        // Spurious wake: re-scan and wait again with the remaining deadline.
+        for registration in &registrations {
+            if !registration.scheme {
+                continue;
+            }
+            if let Some(bits) = live_readiness(backend, registration.reference.poll_handle()) {
+                let fired = apply_bits(registration, fds, bits);
+                if fired > 0 {
+                    return Ok(fired);
+                }
             }
         }
+        if let Some(deadline) = deadline
+            && monotonic_ns(backend) >= deadline
+        {
+            return Ok(0);
+        }
     }
-    Ok(fired)
+}
+
+/// Translate the live `Call::Poll` bits into `revents` for every entry that named the source.
+fn apply_bits<B: SysBackend, L: Lock>(
+    registration: &Registration<'_, B, L>,
+    fds: &mut [Pollfd],
+    bits: i32,
+) -> usize {
+    let mut fired = 0usize;
+    for &index in &registration.entries {
+        let Some(entry) = fds.get_mut(index) else {
+            continue;
+        };
+        let requested = i32::from(entry.events);
+        let mut revents = 0i16;
+        if bits & READY_READABLE != 0 && requested & (POLLIN | POLLPRI) != 0 {
+            revents |= POLLIN as i16;
+        }
+        if bits & READY_WRITABLE != 0 && requested & POLLOUT != 0 {
+            revents |= POLLOUT as i16;
+        }
+        if bits & READY_HUP != 0 {
+            revents |= POLLHUP as i16;
+        }
+        if bits & READY_ERROR != 0 {
+            revents |= POLLERR as i16;
+        }
+        if revents != 0 {
+            entry.revents = revents;
+            fired = fired.saturating_add(1);
+        }
+    }
+    fired
+}
+
+/// Translate a kernel event mask (socketpair/pipe/tty) into `revents`.
+fn apply_mask<B: SysBackend, L: Lock>(
+    registration: &Registration<'_, B, L>,
+    fds: &mut [Pollfd],
+    mask: u32,
+) -> usize {
+    let mut fired = 0usize;
+    for &index in &registration.entries {
+        let Some(entry) = fds.get_mut(index) else {
+            continue;
+        };
+        let requested = i32::from(entry.events);
+        let revents = delivered_revents(mask, requested);
+        if revents != 0 {
+            entry.revents = revents;
+            fired = fired.saturating_add(1);
+        }
+    }
+    fired
+}
+
+/// Non-consuming readiness query for a scheme socket (`Call::Poll`, K244).
+fn live_readiness<B: SysBackend>(backend: &B, handle: Handle) -> Option<i32> {
+    let mut request = [0u8; 8];
+    let used = SocketRequest::Call(Call::Poll).encode(&mut request).ok()?;
+    let mut response = [0u8; 16];
+    let count = backend
+        .call(handle, request.get(..used)?, &mut response)
+        .ok()?;
+    match Response::decode(response.get(..count)?).ok()? {
+        Response::Value(bits) => Some(bits),
+        _ => None,
+    }
+}
+
+/// Monotonic nanoseconds, used for the remaining poll deadline.
+fn monotonic_ns<B: SysBackend>(backend: &B) -> u64 {
+    let Ok(time) = backend.clock_get(CLOCK_MONOTONIC as u32) else {
+        return 0;
+    };
+    let sec = u64::try_from(time.tv_sec).unwrap_or(0);
+    let nsec = u64::try_from(time.tv_nsec).unwrap_or(0);
+    sec.saturating_mul(1_000_000_000).saturating_add(nsec)
 }
 
 /// Wait until `fd` is readable. Used by a blocking socket read after netd reports `EAGAIN`.

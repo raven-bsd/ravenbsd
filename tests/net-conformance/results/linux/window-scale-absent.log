@@ -1,0 +1,5 @@
+endpoint: READY
+SYN-ACK: 10.26.3.1:24002->10.26.3.2:23507 [SA] seq=3962156434 ack=3254820813 win=64240 len=0 mss=1460 ws=None sack=True
+RESULT window-scale-absent PASS ws=absent mss=1460 elapsed=0.12s
+PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/window-scale-absent.pcap
+endpoint: ACCEPTED ('10.26.3.2', 23507)

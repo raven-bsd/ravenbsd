@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "tcp-paws-model"
+version = "0.1.0"
+description = "Host-only TCP timestamps/PAWS and sequence-wrap model."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-tcpip = { path = "../../crates/raven-tcpip", features = ["testutil"] }
+raven-tcpip-wire = { path = "../../crates/raven-tcpip-wire" }
+raven-abi = { path = "../../crates/raven-abi" }
+
+[lints]
+workspace = true

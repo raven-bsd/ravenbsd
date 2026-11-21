@@ -31,7 +31,7 @@ esac
 target_dir=${CARGO_TARGET_DIR:-target}
 
 RUSTFLAGS="$rustflags" \
-    cargo build -p required-utils -p localedef -p lp -p newgrp -p time -p times -p tput -p ulimit \
+    cargo build -p required-utils -p localedef -p lp -p newgrp -p raven-time -p times -p tput -p ulimit \
         -p raven-initfsd -p raven-ramfsd -p raven-vfsd --target "$target" --release
 
 cat >"$out/etc/passwd" <<'EOF'

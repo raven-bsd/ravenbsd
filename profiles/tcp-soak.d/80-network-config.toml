@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K285: the default strict network drop-in, same as the release image
+# (see profiles/release.d/80-network-config.toml).
+
+[[initfs.files]]
+src = "etc/raven/conf.d/network.toml"
+path = "/etc/raven/conf.d/network.toml"
+mode = 0o644

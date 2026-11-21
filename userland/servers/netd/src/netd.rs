@@ -6,8 +6,10 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use alloc::string::String;
 use alloc::vec::Vec;
 
+use crate::filter::{FilterDevice, FilterLog, FilterPolicy, new_log};
 use crate::network::StaticConfig;
 use raven_abi::errno::Errno;
 use raven_netcore::{
@@ -459,7 +461,8 @@ struct NicControl {
 
 /// The host-testable `net:` server.
 pub struct Netd<D: Device> {
-    core: NetCore<D>,
+    core: NetCore<FilterDevice<D>>,
+    filter_log: FilterLog,
     nic: Option<Box<dyn SocketCore>>,
     nic_config: Option<NicConfig>,
     nic_control: Option<NicControl>,
@@ -467,6 +470,9 @@ pub struct Netd<D: Device> {
     nic_dns: Vec<[u8; 4]>,
     release_ping: Option<ReleasePing>,
     files: BTreeMap<u64, File>,
+    /// Open-file reference count per file id. `open`/`accept` starts at one, `dup`/fork adds
+    /// one, `close` drops one; the File/socket is released only at zero.
+    file_refs: BTreeMap<u64, u32>,
     next_file: u64,
     accepted: BTreeMap<u32, Accepted>,
     next_accept: u32,
@@ -478,10 +484,18 @@ impl<D: Device> Netd<D> {
     /// Create the server over `device` and configure IPv4 loopback.
     #[must_use]
     pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
-        let mut core = NetCore::new(device, mac, now_ms);
+        Self::with_filter(device, mac, now_ms, None)
+    }
+
+    /// Create the server with a packet-filter policy on the loopback interface.
+    #[must_use]
+    pub fn with_filter(device: D, mac: [u8; 6], now_ms: i64, policy: Option<FilterPolicy>) -> Self {
+        let filter_log = policy.as_ref().map_or_else(new_log, FilterPolicy::log);
+        let mut core = NetCore::new(FilterDevice::new(device, policy, "lo"), mac, now_ms);
         core.set_ipv4(Ipv4Addr::new(127, 0, 0, 1), 8, None);
         Self {
             core,
+            filter_log,
             nic: None,
             nic_config: None,
             nic_control: None,
@@ -489,6 +503,7 @@ impl<D: Device> Netd<D> {
             nic_dns: Vec::new(),
             release_ping: None,
             files: BTreeMap::new(),
+            file_refs: BTreeMap::new(),
             next_file: 1,
             accepted: BTreeMap::new(),
             next_accept: 1,
@@ -503,7 +518,22 @@ impl<D: Device> Netd<D> {
 
     /// Attach the persistent NIC as a second socket core.
     pub fn attach_nic<N: Device + 'static>(&mut self, device: N, config: NicConfig, now_ms: i64) {
-        let mut core = NetCore::new(device, config.mac, now_ms);
+        self.attach_nic_with_filter(device, config, now_ms, None);
+    }
+
+    /// Attach the NIC with a packet-filter policy on `eth0`.
+    pub fn attach_nic_with_filter<N: Device + 'static>(
+        &mut self,
+        device: N,
+        config: NicConfig,
+        now_ms: i64,
+        policy: Option<FilterPolicy>,
+    ) {
+        let mut core = NetCore::new(
+            FilterDevice::new(device, policy, "eth0"),
+            config.mac,
+            now_ms,
+        );
         if config.is_configured() {
             core.set_ipv4(
                 Ipv4Addr::from_octets(config.addr),
@@ -722,6 +752,11 @@ impl<D: Device> Netd<D> {
         }
     }
 
+    /// Take the pending packet-filter log lines from every interface.
+    pub fn take_filter_log(&mut self) -> Vec<String> {
+        core::mem::take(&mut *self.filter_log.borrow_mut())
+    }
+
     /// Number of open socket files (control files are excluded).
     #[must_use]
     pub fn socket_files(&self) -> usize {
@@ -796,6 +831,7 @@ impl<D: Device> Netd<D> {
         let id = self.next_file;
         self.next_file = self.next_file.checked_add(1).ok_or(Errno::ENFILE)?;
         self.files.insert(id, file);
+        self.file_refs.insert(id, 1);
         Ok(id)
     }
 
@@ -886,20 +922,30 @@ impl<D: Device> Netd<D> {
         }
     }
 
-    /// Close `file` and its socket.
-    pub fn close(&mut self, file: u64) -> Result<(), Errno> {
+    /// Drop one reference to `file`; return `true` when this was the last one.
+    ///
+    /// The File, its core socket and its readiness event stay alive while any descriptor,
+    /// including a fork-inherited one, still names the file.
+    pub fn close(&mut self, file: u64) -> Result<bool, Errno> {
+        let refs = self.file_refs.get_mut(&file).ok_or(Errno::EBADF)?;
+        if *refs > 1 {
+            *refs -= 1;
+            return Ok(false);
+        }
+        self.file_refs.remove(&file);
         let file = self.files.remove(&file).ok_or(Errno::EBADF)?;
         if let File::Socket(socket) = file
             && let Some(id) = socket.socket
         {
             let _ = self.core_mut(socket.interface).close(id);
         }
-        Ok(())
+        Ok(true)
     }
 
-    /// Duplicate a file description; the kernel owns the handle duplication.
+    /// Account for a duplicate/fork-inherited reference to `file`.
     pub fn dup(&mut self, file: u64) -> Result<u64, Errno> {
-        self.files.get(&file).ok_or(Errno::EBADF)?;
+        let refs = self.file_refs.get_mut(&file).ok_or(Errno::EBADF)?;
+        *refs = refs.checked_add(1).ok_or(Errno::EMFILE)?;
         Ok(file)
     }
 

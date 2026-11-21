@@ -1771,14 +1771,50 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok(())
     }
 
-    /// `pipe`: `ENOSYS` until PG-35 (`pipe:` server).
+    /// `pipe`: create an in-kernel pipe with no flags.
     pub fn pipe(&self) -> Result<(i32, i32), Errno> {
-        Err(Errno::ENOSYS)
+        self.pipe2(0)
     }
 
-    /// `pipe2`: `ENOSYS` until PG-35.
-    pub fn pipe2(&self, _flags: i32) -> Result<(i32, i32), Errno> {
-        Err(Errno::ENOSYS)
+    /// `pipe2`: create an in-kernel pipe and install its two handles in the fd table.
+    ///
+    /// The kernel accepts only `O_CLOEXEC` and `O_NONBLOCK`; every other bit is `EINVAL`, not a
+    /// silent ignore. `O_NONBLOCK` is recorded in both OFD status words and `O_CLOEXEC` in both
+    /// fd-table entries.
+    pub fn pipe2(&self, flags: i32) -> Result<(i32, i32), Errno> {
+        let flags = u32::try_from(flags).map_err(|_| Errno::EINVAL)?;
+        let known = (fcntl::O_CLOEXEC | fcntl::O_NONBLOCK) as u32;
+        if flags & !known != 0 {
+            return Err(Errno::EINVAL);
+        }
+        let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(flags)?;
+        let cloexec = flags & fcntl::O_CLOEXEC as u32 != 0;
+        let status = if flags & fcntl::O_NONBLOCK as u32 != 0 {
+            fcntl::O_NONBLOCK as u32
+        } else {
+            0
+        };
+        let read = self.install(
+            read_handle,
+            OfdKind::Pipe,
+            fcntl::O_RDONLY as u32 | status,
+            None,
+            cloexec,
+        )?;
+        let write = match self.install(
+            write_handle,
+            OfdKind::Pipe,
+            fcntl::O_WRONLY as u32 | status,
+            None,
+            cloexec,
+        ) {
+            Ok(fd) => fd,
+            Err(error) => {
+                let _ = self.close(read);
+                return Err(error);
+            }
+        };
+        Ok((read, write))
     }
 
     /// `tcgetattr`.
@@ -1980,6 +2016,45 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     pub fn reset_event_queue(&self) {
         if let Some(queue) = self.event_queue.borrow_mut().take() {
             let _ = self.backend.handle_close(queue);
+        }
+    }
+
+    /// Take a fresh scheme reference for every inherited socket in the fork child.
+    ///
+    /// The kernel copies the handle table on fork, but the scheme server counts references per
+    /// open file. A parent `close` must therefore not be the last reference while the child still
+    /// holds the descriptor. `DUP` both gives the child its own handle and sends the server the
+    /// duplicate notification; `closef`-style last-reference release then works on both sides.
+    pub fn fork_child_inherit(&self) {
+        let mut seen = alloc::collections::BTreeSet::new();
+        let indices: Vec<u32> = self
+            .fd
+            .borrow()
+            .open_entries()
+            .into_iter()
+            .map(|(_, entry)| entry.ofd)
+            .collect();
+        for index in indices {
+            if !seen.insert(index) {
+                continue;
+            }
+            let (kind, handle) = {
+                let arena = self.ofd.borrow();
+                let Some(ofd) = arena.get(index) else {
+                    continue;
+                };
+                (ofd.kind, ofd.handle.get())
+            };
+            if kind != OfdKind::Socket || handle == Handle::NONE {
+                continue;
+            }
+            if let Ok(duplicate) = self
+                .backend
+                .dup(handle, raven_abi::types::Rights::ALL.bits())
+                && let Some(ofd) = self.ofd.borrow_mut().get_mut(index)
+            {
+                ofd.handle.set(duplicate);
+            }
         }
     }
 

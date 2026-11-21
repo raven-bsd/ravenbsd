@@ -13,6 +13,11 @@ use raven_abi::errno::Errno;
 pub struct SocketId(pub u32);
 
 /// A readiness transition observed by [`crate::Stack::poll`].
+///
+/// Each variant is an edge between the NetBSD `soreadable`/`sowritable` levels in
+/// [`crate::readiness`] (`sodopoll`); the event is not a stored readiness mask. The K244 live query
+/// evaluates the same predicates without consuming anything, so a poller may re-check the current
+/// level after any transition.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Event {
     /// The socket has data that can be read.

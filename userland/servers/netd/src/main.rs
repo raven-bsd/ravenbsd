@@ -31,7 +31,7 @@ mod program {
 
     use netd::network::{LoadError, NetworkConfig, NetworkMode};
     use netd::nic::NicMode;
-    use netd::{Loopback, NetEvent, Netd};
+    use netd::{FilterPolicy, LoadError as FilterLoadError, Loopback, NetEvent, Netd};
 
     entry!(main);
 
@@ -59,12 +59,31 @@ mod program {
         hostname: Option<String>,
         hostname_applied: bool,
         static_mode: bool,
+        /// `/etc/pf.conf` policy shared by every interface.
+        pf: Option<FilterPolicy>,
     }
 
     fn main(args: raven_rt::Args) -> i32 {
         let now = now_ms();
         let require_nic = args.get(1) == Some("nic");
-        let netd = Netd::new(Loopback::new(MAC), MAC, now);
+        // Fail closed: a present but malformed ruleset stops netd instead of starting
+        // unfiltered. An absent file keeps the historical no-filter behaviour.
+        let pf = match load_pf_policy() {
+            Ok(policy) => policy,
+            Err(error) => {
+                raven_rt::eprintln!("netd: pf config: {error}; refusing to start");
+                return 1;
+            }
+        };
+        match &pf {
+            Some(policy) => raven_rt::println!(
+                "netd: pf loaded rules={} nat={}",
+                policy.rules(),
+                policy.nat_rules()
+            ),
+            None => raven_rt::println!("netd: pf absent"),
+        }
+        let netd = Netd::with_filter(Loopback::new(MAC), MAC, now, pf.clone());
         let mut handler = NetHandler {
             netd,
             events: BTreeMap::new(),
@@ -81,6 +100,7 @@ mod program {
             hostname: None,
             hostname_applied: false,
             static_mode: false,
+            pf,
         };
         handler.load_network(now);
         // A `nic:` driver may register a moment after svcd launches netd. Register `net:` for
@@ -131,6 +151,9 @@ mod program {
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
             handler.publish_and_feed();
+            for line in handler.netd.take_filter_log() {
+                raven_rt::println!("{line}");
+            }
             // No stack timer pending: block on the scheme-server source and its client events.
             // The one-second cap is only a safety net for a missed wakeup, not a heartbeat.
             let timeout_ns = handler
@@ -152,6 +175,25 @@ mod program {
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
             handler.publish_and_feed();
+            for line in handler.netd.take_filter_log() {
+                raven_rt::println!("{line}");
+            }
+        }
+    }
+
+    /// Load `/etc/pf.conf`, retrying while the file service starts. Missing means no filter;
+    /// malformed means the caller must exit without starting the stack.
+    fn load_pf_policy() -> Result<Option<FilterPolicy>, String> {
+        let deadline = now_ms().saturating_add(10_000);
+        loop {
+            match netd::load_pf() {
+                Ok(Some(ruleset)) => return Ok(Some(FilterPolicy::new(ruleset))),
+                Ok(None) => return Ok(None),
+                Err(FilterLoadError::NotReady) if now_ms() < deadline => {
+                    let _ = raven_rt::nanosleep(5_000_000);
+                }
+                Err(error) => return Err(error.message()),
+            }
         }
     }
 
@@ -164,7 +206,13 @@ mod program {
                 return Ok(());
             }
             let static_config = self.network.as_ref().and_then(NetworkConfig::static_config);
-            let _config = netd::nic::attach(&mut self.netd, now, self.nic_mode, static_config)?;
+            let _config = netd::nic::attach(
+                &mut self.netd,
+                now,
+                self.nic_mode,
+                static_config,
+                self.pf.clone(),
+            )?;
             Ok(())
         }
 
@@ -497,11 +545,14 @@ mod program {
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
-            self.rearm.remove(&file);
-            for event in self.events.remove(&file).unwrap_or_default() {
-                let _ = raven_rt::handle_close(event);
+            let last = self.netd.close(file).map_err(HandlerError::Errno)?;
+            if last {
+                self.rearm.remove(&file);
+                for event in self.events.remove(&file).unwrap_or_default() {
+                    let _ = raven_rt::handle_close(event);
+                }
             }
-            self.netd.close(file).map_err(HandlerError::Errno)
+            Ok(())
         }
 
         fn dup(&mut self, file: u64) -> HandlerResult<u64> {

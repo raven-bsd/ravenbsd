@@ -105,7 +105,10 @@ extern "C" fn raven_fork_resume(sp: usize) -> c_int {
 /// One event queue allows one waiter. The child must create its own queue rather than share the
 /// parent's cached handle; the next `poll` creates it lazily.
 extern "C" fn raven_fork_child_reset() {
-    crate::ffi::platform::global().reset_event_queue();
+    let platform = crate::ffi::platform::global();
+    platform.reset_event_queue();
+    // The child keeps its inherited socket descriptors alive after the parent closes its copies.
+    platform.fork_child_inherit();
 }
 
 /// `fork`.

@@ -177,12 +177,11 @@ fn closed_half_open_connections_free_their_backlog_slot() {
     };
     syn(&mut b, 5001);
     syn(&mut b, 5002);
-    assert_eq!(b.test_listener_half_open(listener).len(), 2);
+    assert_eq!(b.test_syncache_len(), 2);
     syn(&mut b, 5003);
-    assert_eq!(b.test_listener_half_open(listener).len(), 2);
+    assert_eq!(b.test_syncache_len(), 2);
     assert!(b.counters().half_open_drops >= 1);
-    let first = b.test_listener_half_open(listener)[0];
-    let first_iss = b.test_tcp_iss(first).expect("iss");
+    let (first_iss, ..) = b.test_syncache_entry(5001).expect("first");
     inject_segment(
         &mut b,
         A,
@@ -194,10 +193,12 @@ fn closed_half_open_connections_free_their_backlog_slot() {
         TcpFlags::RST,
         &[],
     );
+    b.poll(Instant::ZERO);
+    assert_eq!(b.test_syncache_len(), 1);
     syn(&mut b, 5003);
-    let queued = b.test_listener_half_open(listener);
-    assert_eq!(queued.len(), 2);
-    assert!(!queued.contains(&first));
+    assert_eq!(b.test_syncache_len(), 2);
+    assert!(b.test_syncache_entry(5001).is_none());
+    let _ = listener;
 }
 
 #[test]

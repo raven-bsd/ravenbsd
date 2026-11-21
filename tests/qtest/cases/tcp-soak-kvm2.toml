@@ -1,0 +1,142 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K351: KVM TCP soak at -smp 2. Derived from the K284 SMP matrix (tcp-smp2: the
+# accelerator and CPU count are the case contract, appended to qemu_extra so the last
+# -smp wins over the harness's fixed -smp 4) on the K285 tcp-soak profile (release
+# wiring, getty/login, raven-nc, guest workload at /etc/tcp-soak-workload.sh). The
+# scripted dialogue logs in as root, runs the bounded smoke workload (8 cycles, 5 s
+# interval, port base 7000) and ends the session so init reaches the test-exit path.
+
+name = "tcp-soak-kvm2"
+arch = "x86_64"
+profile = "tcp-soak"
+timeout_secs = 600
+boot_cmdline = "console=ttyS0 loglevel=info test-exit=1"
+qemu_extra = [
+    "-enable-kvm",
+    "-cpu",
+    "host",
+    "-smp",
+    "2",
+]
+expect_exit = "success"
+
+# Boot to the getty login prompt on the serial console.
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 60
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+# Bounded smoke workload: 8 cycles, 5 s between cycles, listener port base 7000.
+[[step]]
+send = "/bin/brush /etc/tcp-soak-workload.sh 8 5 7000\n"
+delay_ms = 100
+
+[[step]]
+wait = '^tcp-ready$'
+timeout_secs = 60
+
+# Stall detector (the qtest analogue of the K285 driver's --stall check): the final
+# cycle's heartbeat must arrive within the budget. A hang anywhere in the workload
+# delays or removes it and trips this deadline; the case fails, never retries.
+[[step]]
+wait = '^tcp-cycle-done: 8$'
+timeout_secs = 300
+
+[[step]]
+wait = '^tcp-done$'
+timeout_secs = 60
+
+# End the login session; with test-exit=1 init then exits 0 (QEMU status 33).
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+# Two CPUs came online before any socket activity.
+[[expect]]
+regex = '^smp: 2 cpus online$'
+
+# The workload ran, and every cycle started and completed, in order.
+[[expect]]
+regex = '^tcp-ready$'
+
+[[expect]]
+regex = '^tcp-cycle: 1$'
+
+[[expect]]
+regex = '^tcp-cycle-done: 1$'
+
+[[expect]]
+regex = '^tcp-cycle: 2$'
+
+[[expect]]
+regex = '^tcp-cycle-done: 2$'
+
+[[expect]]
+regex = '^tcp-cycle: 3$'
+
+[[expect]]
+regex = '^tcp-cycle-done: 3$'
+
+[[expect]]
+regex = '^tcp-cycle: 4$'
+
+[[expect]]
+regex = '^tcp-cycle-done: 4$'
+
+[[expect]]
+regex = '^tcp-cycle: 5$'
+
+[[expect]]
+regex = '^tcp-cycle-done: 5$'
+
+[[expect]]
+regex = '^tcp-cycle: 6$'
+
+[[expect]]
+regex = '^tcp-cycle-done: 6$'
+
+[[expect]]
+regex = '^tcp-cycle: 7$'
+
+[[expect]]
+regex = '^tcp-cycle-done: 7$'
+
+[[expect]]
+regex = '^tcp-cycle: 8$'
+
+[[expect]]
+regex = '^tcp-cycle-done: 8$'
+
+[[expect]]
+regex = '^tcp-done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
+
+# A non-zero nc client exit code is a workload error under the K285 protocol.
+[[forbid]]
+regex = '^tcp-echo: [1-9]'
+
+# The workload's own argument-validation failure lines.
+[[forbid]]
+regex = '^tcp-soak-workload:'
