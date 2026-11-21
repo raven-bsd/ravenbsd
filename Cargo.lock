@@ -2068,6 +2068,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-kstat"
+version = "0.1.0"
+dependencies = [
+ "raven-dtrace-user",
+]
+
+[[package]]
+name = "raven-kstat-cli"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-dtrace-user",
+ "raven-kstat",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-libc"
 version = "0.1.0"
 dependencies = [
@@ -2753,6 +2770,15 @@ dependencies = [
 [[package]]
 name = "raven-pf"
 version = "0.1.0"
+
+[[package]]
+name = "raven-pfctl"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "raven-pi4"
@@ -3721,6 +3747,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tar"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-tcpdump"
 version = "0.1.0"
 dependencies = [
@@ -3836,6 +3871,16 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "toml",
+]
+
+[[package]]
+name = "raven-time"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -4334,15 +4379,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tar"
-version = "0.1.0"
-dependencies = [
- "raven-proto-fs",
- "raven-rt",
- "raven-tool-core",
-]
-
-[[package]]
 name = "tcp-ecn-model"
 version = "0.1.0"
 dependencies = [
@@ -4426,16 +4462,6 @@ dependencies = [
  "raven-tcpip",
  "raven-tcpip-sim",
  "raven-tcpip-wire",
-]
-
-[[package]]
-name = "time"
-version = "0.1.0"
-dependencies = [
- "raven-abi",
- "raven-initfs",
- "raven-rt",
- "raven-tool-core",
 ]
 
 [[package]]

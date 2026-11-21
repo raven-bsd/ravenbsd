@@ -1,0 +1,73 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=90336 reserved=40736
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2712 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 604a9367 2026-11-21
+mem: 352 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x462324 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=15531 spawn=17417 first_poll=17563 deadline=22417 stalled=0 ready_at=17761
+rtc: 2026-11-21 12:43:46 (epoch 1795265026s)
+1795265048.701 ramfsd: started
+1795265049.061 randd: started
+1795265049.318 nulld: started
+1795265049.592 sysd: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=17876 spawn=22791 first_poll=22984 deadline=27791 stalled=0 ready_at=23819
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=17972 spawn=22440 first_poll=22770 deadline=27440 stalled=0 ready_at=24010
+svcd: randd up
+svcd: randd timing: generation=1 start=18040 spawn=22544 first_poll=22641 deadline=27544 stalled=0 ready_at=24050
+svcd: sysd up
+svcd: sysd timing: generation=1 start=18096 spawn=23048 first_poll=23198 deadline=28048 stalled=0 ready_at=25394
+svcd: consd up
+svcd: consd timing: generation=1 start=17793 spawn=23886 first_poll=24066 deadline=83886 stalled=0 ready_at=25417
+1795265051.729 zerod: started
+svcd: zerod up
+svcd: zerod timing: generation=1 start=18162 spawn=25502 first_poll=25572 deadline=30502 stalled=0 ready_at=25992
+1795265072.246 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=17800 spawn=25220 first_poll=25266 deadline=145220 stalled=0 ready_at=46279
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=46285 spawn=46653 first_poll=46660 deadline=106653 stalled=0 ready_at=46758
+svcd: rsh up
+svcd: rsh timing: generation=1 start=46760 spawn=47323 first_poll=none deadline=none stalled=0 ready_at=47323
+svcd: all services up
+rsh: ready
+raven# mkdir /tmp/du
+raven# echo hello > /tmp/du/a
+raven# du /tmp/du
+1	/tmp/du
+raven# echo $?
+0
+raven# exit 0
+init exited (0)

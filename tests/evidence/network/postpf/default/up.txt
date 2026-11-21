@@ -1,0 +1,2 @@
+tap=ravendemo0 bridge=ravenbr0 guest=10.0.2.15 host=10.0.2.2 dns=10.0.2.3 uplink=enp58s0
+qemu: -netdev tap,id=n0,ifname=ravendemo0,script=no,downscript=no -device virtio-net-pci,netdev=n0,disable-legacy=on

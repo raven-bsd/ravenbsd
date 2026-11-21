@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K274: run the raven-pfctl front-end in the guest. Write a two-statement pf.conf,
+# run `pfctl -nv -f`, assert the normalized output and the exit code, then leave
+# the session. Budget: shell-test boot ~33 s, three commands, whole case ~60 s.
+# The profile `pfctl` is profiles/pfctl.toml + profiles/pfctl.d/ (raven-pfctl at
+# /sbin/pfctl on the shell-test session).
+
+name = "pfctl-config"
+arch = "x86_64"
+profile = "pfctl"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^pass in all flags any keep state$'
+
+[[expect]]
+regex = '^block drop out all$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found|fatal runtime error|pfctl: .*: [0-9]+:'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "echo 'pass in all' > /tmp/pf.conf\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "echo 'block out all' >> /tmp/pf.conf\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/sbin/pfctl -nv -f /tmp/pf.conf\n"
+delay_ms = 100
+
+[[step]]
+wait = '^pass in all flags any keep state$'
+timeout_secs = 15
+
+[[step]]
+wait = '^block drop out all$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "echo $?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

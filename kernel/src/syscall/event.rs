@@ -313,6 +313,11 @@ fn queue_from_handle(
 }
 
 fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result<(), Errno> {
+    // A pipe end is a pollable source without needing the read/write data rights:
+    // the write handle carries WRITE, not READ, and poll must still observe it.
+    if let Ok(Object::Pipe(_)) = process.handles.lock().get(handle, Rights::NONE) {
+        return Ok(());
+    }
     match process.handles.lock().get(handle, Rights::READ)? {
         Object::Timer(_) | Object::UserEvent(_) | Object::Process(_) => Ok(()),
         Object::Irq(_) => Ok(()),
@@ -325,6 +330,10 @@ fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result
 
 fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
     let table = process.handles.lock();
+    // Both pipe ends are observable even though only the read end carries READ.
+    if let Ok(Object::Pipe(end)) = table.get(handle, Rights::NONE) {
+        return end.readiness();
+    }
     match table.get(handle, Rights::READ) {
         Ok(Object::Timer(timer)) if timer.peek(time::now_ns()) => event::SIGNALED,
         Ok(Object::UserEvent(event)) if event.ready() => event::SIGNALED,

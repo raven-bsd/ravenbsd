@@ -1,0 +1,19 @@
+{
+  "case": "net-postpf-default",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 219040,
+  "exit_status": 33,
+  "matched": [
+    "^RavenBSD kernel 0\\.1 \\(x86_64\\)",
+    "^netd: pf absent$",
+    "^netd: interface eth0 10\\.0\\.2\\.15/24$",
+    "^netd: ready$",
+    "^svcd: netd up$",
+    "^svcd: getty up$",
+    "^RavenBSD 0\\.1 \\(x86_64\\) \\(tty:console\\)$",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}

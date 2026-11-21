@@ -1,0 +1,4 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running `target/debug/xtask qtest --case net-postpf-default --arch x86_64`
+net-postpf-default: error
+  pre[0] `sh tests/qtest/cases/net-postpf/default.sh` failed with exit status: 1: qemu-net-selftest: FAIL: `ping -c 3 10.0.2.2` did not match 0% packet loss
