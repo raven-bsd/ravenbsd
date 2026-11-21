@@ -1,0 +1,160 @@
+{
+  "advisories": {
+    "count": 0,
+    "database": {
+      "advisory_count": 1555,
+      "last_commit": "55e1c3dfbd834237a05bbbf7b50ba3b5be27b662",
+      "last_updated": "2026-11-21T10:28:03+01:00"
+    },
+    "found": false,
+    "ignored": [],
+    "list": [],
+    "lockfile_dependency_count": 555,
+    "warnings": {}
+  },
+  "counts": {
+    "dev_only": 1,
+    "direct": 15,
+    "locked_packages": 64,
+    "shipped": 63,
+    "shipped_third_party": 63,
+    "transitive": 48,
+    "workspace_members": 480
+  },
+  "duplicates": [
+    {
+      "name": "bitflags",
+      "versions": [
+        "1.3.2",
+        "2.13.2"
+      ]
+    }
+  ],
+  "generated_utc": "2026-11-21T15:45:47Z",
+  "git_head": "978899da233994fe46d4fe7e7ff94f98ce633f94",
+  "queue": [
+    {
+      "decision": "remove",
+      "detail": "first-party tar 0.1.0 name collision; SC2 renamed it to raven-tar (3fcb1ea9), audit.toml ignore list now empty",
+      "id": "RUSTSEC-2018-0002",
+      "kind": "false-positive",
+      "owner": "kevin",
+      "review": "2026-12-05",
+      "state": "resolved"
+    },
+    {
+      "decision": "remove",
+      "detail": "first-party tar 0.1.0 name collision; SC2 renamed it to raven-tar (3fcb1ea9)",
+      "id": "RUSTSEC-2021-0080",
+      "kind": "false-positive",
+      "owner": "kevin",
+      "review": "2026-12-05",
+      "state": "resolved"
+    },
+    {
+      "decision": "remove",
+      "detail": "first-party tar 0.1.0 name collision; SC2 renamed it to raven-tar (3fcb1ea9)",
+      "id": "RUSTSEC-2026-0067",
+      "kind": "false-positive",
+      "owner": "kevin",
+      "review": "2026-12-05",
+      "state": "resolved"
+    },
+    {
+      "decision": "remove",
+      "detail": "first-party tar 0.1.0 name collision; SC2 renamed it to raven-tar (3fcb1ea9)",
+      "id": "RUSTSEC-2026-0068",
+      "kind": "false-positive",
+      "owner": "kevin",
+      "review": "2026-12-05",
+      "state": "resolved"
+    },
+    {
+      "decision": "remove",
+      "detail": "first-party time 0.1.0 name collision; SC2 renamed it to raven-time (3fcb1ea9), no time crate linked",
+      "id": "RUSTSEC-2020-0071",
+      "kind": "false-positive",
+      "owner": "kevin",
+      "review": "2026-12-05",
+      "state": "resolved"
+    },
+    {
+      "decision": "keep-pinned",
+      "detail": "K158 pthread ABI drift model; libc 0.2.186 + rust 1.97.1 std patches; tests/toolchain/pthread-abi/check.sh",
+      "id": "fork:toolchain/vendor/libc",
+      "kind": "fork",
+      "owner": "kevin",
+      "review": "2027-02-15",
+      "state": "open"
+    },
+    {
+      "decision": "keep-pinned",
+      "detail": "uutils/coreutils cf030b82ef519ab60ccacf763f7f086dd612d9c3 (0.13.0); quarterly sync",
+      "id": "fork:userland/uutils",
+      "kind": "fork",
+      "owner": "kevin",
+      "review": "2027-02-15",
+      "state": "open"
+    },
+    {
+      "decision": "keep-pinned",
+      "detail": "reubeno/brush 8adb6bc06815c34ccf6503902f6f292e04b1cbba (0.4.0); quarterly sync",
+      "id": "fork:userland/brush",
+      "kind": "fork",
+      "owner": "kevin",
+      "review": "2027-02-15",
+      "state": "open"
+    },
+    {
+      "decision": "keep-pinned",
+      "detail": "redox rmm 015af335c7bed8bfaa8c2ae8419ceba46fe0a227; frozen (S117/DR-63); replace when the page layer is touched",
+      "id": "frozen:crates/raven-rmm",
+      "kind": "frozen",
+      "owner": "mark",
+      "review": "2027-02-15",
+      "state": "open"
+    }
+  ],
+  "schema": 1,
+  "source": {
+    "audit": "cargo audit --json",
+    "lockfile": "Cargo.lock",
+    "metadata": "cargo metadata --format-version 1",
+    "process": "ravenbsd-prjmgmt/process/SUPPLY-CHAIN.md section 5",
+    "tree": "cargo tree --edges normal,build --prefix none --no-dedupe"
+  },
+  "tools": {
+    "cargo-audit": {
+      "status": "ok",
+      "version": "cargo-audit 0.22.1"
+    },
+    "cargo-deny": {
+      "reason": "not installed on this host; deny.toml remains the policy source",
+      "status": "unavailable"
+    },
+    "cargo-udeps": {
+      "reason": "requires a nightly toolchain (binary-dep-depinfo is nightly-only); probe fails on 1.97.1",
+      "status": "unavailable-on-stable",
+      "version": null
+    },
+    "dead-crates": {
+      "reason": "unmaintained advisories + the decision queue cover the dead/unmaintained set",
+      "status": "via-cargo-audit"
+    },
+    "osv-scanner": {
+      "reason": "not installed on this host; RustSec coverage via cargo-audit",
+      "status": "unavailable"
+    }
+  },
+  "tree": {
+    "lines": 1169,
+    "status": "ok"
+  },
+  "vendor": {
+    "artifact": "build/release/vendor-full.tar.zst",
+    "crates": 771,
+    "generated_utc": "2026-11-19T13:35:50Z",
+    "root_lock_sha256": "ccf2406fd6586200366e8a847ec90df6351dc5ea3d03a6e512d8bb8061084e88",
+    "sbom_sha256": "80c2994afe0dcf5d193f8aae3f33ac84d36675869c42c74741c558faacbcca6a"
+  }
+}
