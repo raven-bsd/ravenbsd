@@ -1002,6 +1002,14 @@ name = "rack-coverage"
 version = "0.1.0"
 
 [[package]]
+name = "rack-recovery-model"
+version = "0.1.0"
+dependencies = [
+ "rack-tlp-model",
+ "raven-tcpip",
+]
+
+[[package]]
 name = "rack-tlp-model"
 version = "0.1.0"
 dependencies = [
