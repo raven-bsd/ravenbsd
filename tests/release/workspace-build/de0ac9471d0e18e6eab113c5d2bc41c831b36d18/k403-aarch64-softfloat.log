@@ -1,0 +1,14 @@
+   Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-abi)
+   Compiling raven-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-elf)
+   Compiling raven-initfs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-initfs)
+   Compiling raven-trace-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-trace-core)
+   Compiling raven-proto-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-proto-fs)
+   Compiling raven-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-ipc)
+   Compiling raven-plat v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-plat)
+   Compiling raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-scheme)
+   Compiling raven-spawn v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-spawn)
+   Compiling raven-rt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/userland/rt)
+   Compiling raven-pi4-platd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/tests/fixtures/pi4-platd)
+error: `#[panic_handler]` function required, but not found
+
+error: could not compile `raven-pi4-platd` (bin "pi4-platd-client") due to 1 previous error

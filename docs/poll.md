@@ -62,3 +62,25 @@ again after a wake. The registration is only the wake hint; only directions that
 ready become `revents`. A spurious wake is retried with the remaining monotonic deadline, and
 `timeout == 0` performs only the immediate scan. Socketpairs, pipes and TTYs continue to use the
 kernel data-handle level; they do not use the net query.
+
+## K248 fork differential
+
+`tests/fixtures/post-auth-fork` builds the same C source twice: the host build
+(`build-host.sh`, Linux/glibc) and the Raven static build (`build.sh`). The host baseline captures
+`strace -f -tt -e trace=network,read,write,poll,ppoll,clone,fork,vfork,execve` (plus `close` for
+the parent-close phase). The Raven qtest uses the `server` initfs so the fork topology runs
+without the brush shell; the service stack (init/svcd/initfsd/vfsd/netd) is unchanged.
+
+After the K250 file-reference and K245 event fixes, the two traces agree: the parent `close(5)`
+drops one reference, the child `poll(5)` wakes after the parent's `write(4, "POSTAUTH 5 hello")`,
+reads 16 bytes, writes `POSTOK 2 ok`, and both sides exit 0. There is no divergence in this
+fork/listener/child-poll topology. The qtest markers are the durable regression check:
+
+```text
+post-auth-fork: child poll ok
+post-auth-fork: child read ok
+post-auth-fork: child write ok
+post-auth-fork: parent response ok
+post-auth-fork: ok
+init exited (0)
+```

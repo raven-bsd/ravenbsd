@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: rdr
+# features: rdr,ipv4,stateful,translation
+# reference: FreeBSD sys/netpfil/pf/pf_lb.c:pf_get_transaddr,pf_map_addr; sys/netpfil/pf/pf.c:pf_test_state
+# support: raven-pf (K273: redirect before filtering, reverse rewrite on the reply)
+#
+# Mapping: 203.0.113.5:80 -> 10.0.0.80:8080. The inbound row is the wire tuple
+# and the expected redirect; the outbound row is the internal server reply,
+# which the state rewrites back to the public destination.
+# expect-counters in_pass=1 in_block=0 out_pass=1 out_block=0 states_created=1 states_expired=0 state_hits=1
+# now direction interface proto source sport destination dport length flags expected disposition fragment translation
+0 in  eth0 tcp 198.51.100.20 40000 203.0.113.5 80   60 S  pass created  - 198.51.100.20:40000>10.0.0.80:8080
+1 out eth0 tcp 10.0.0.80     8080  198.51.100.20 40000 60 SA pass existing - 203.0.113.5:80>198.51.100.20:40000

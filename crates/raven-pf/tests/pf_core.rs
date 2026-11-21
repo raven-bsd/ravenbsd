@@ -93,14 +93,15 @@ fn the_core_packet_fixture_matches() {
         now += 1;
     }
     let counters = engine.counters();
-    assert_eq!(counters.in_pass, 5);
-    assert_eq!(counters.in_block, 4);
+    assert_eq!(counters.in_pass, 4);
+    assert_eq!(counters.in_block, 5);
     assert_eq!(counters.out_pass, 3);
     assert_eq!(counters.out_block, 0);
     assert_eq!(counters.states_created, 5);
     assert_eq!(counters.state_hits, 2);
-    // Only the `log` rule on the matching pass path logs; fragments match that rule too.
-    assert_eq!(engine.logs().len(), 2);
+    // Only the `log` rule on the matching pass path logs; a fragment never matches a
+    // rule that names a port (donor PF_VPROTO_FRAGMENT), so row 10 blocks without a log.
+    assert_eq!(engine.logs().len(), 1);
 }
 
 #[test]

@@ -1,0 +1,12 @@
+
+   Compiling raven-spawn v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/crates/raven-spawn)
+   Compiling raven-rt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/userland/rt)
+   Compiling raven-s18-iommu v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/profiles/iommu-fixture)
+error[E0152]: duplicate lang item in crate `std` (which `test` depends on): `panic_impl`
+  |
+  = note: the lang item is first defined in crate `raven_rt` (which `raven_s18_iommu` depends on)
+  = note: first definition in `raven_rt` loaded from /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-71bf378244731fc6.rlib
+  = note: second definition in `std` loaded from /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.so, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rlib, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rmeta
+
+For more information about this error, try `rustc --explain E0152`.
+error: could not compile `raven-s18-iommu` (bin "raven-s18-iommu" test) due to 1 previous error

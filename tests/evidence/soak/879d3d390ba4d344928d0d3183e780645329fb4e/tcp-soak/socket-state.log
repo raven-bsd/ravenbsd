@@ -1,0 +1,1325 @@
+[cycle 1] tcp-port: 7001
+[cycle 1] nc: listening tcp 127.0.0.1:7001
+[cycle 1] nc: connected tcp 127.0.0.1:7001
+[cycle 1] nc: received raven-tcp-soak
+[cycle 1] nc: echo 14 bytes
+[cycle 1] nc: done
+[cycle 1] nc: received raven-tcp-soak
+[cycle 1] nc: done
+[cycle 1] netstat: tcp LAST_ACK 127.0.0.1:53252 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 1] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:53252 iface=lo rx=0 tx=0
+[cycle 1] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 1] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 2] tcp-port: 7002
+[cycle 2] nc: listening tcp 127.0.0.1:7002
+[cycle 2] nc: connected tcp 127.0.0.1:7002
+[cycle 2] nc: received raven-tcp-soak
+[cycle 2] nc: echo 14 bytes
+[cycle 2] nc: done
+[cycle 2] nc: received raven-tcp-soak
+[cycle 2] nc: done
+[cycle 2] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:53252 iface=lo rx=0 tx=0
+[cycle 2] netstat: tcp LAST_ACK 127.0.0.1:34443 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 2] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:34443 iface=lo rx=0 tx=0
+[cycle 2] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 2] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 3] tcp-port: 7003
+[cycle 3] nc: listening tcp 127.0.0.1:7003
+[cycle 3] nc: connected tcp 127.0.0.1:7003
+[cycle 3] nc: received raven-tcp-soak
+[cycle 3] nc: echo 14 bytes
+[cycle 3] nc: done
+[cycle 3] nc: received raven-tcp-soak
+[cycle 3] nc: done
+[cycle 3] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:53252 iface=lo rx=0 tx=0
+[cycle 3] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:34443 iface=lo rx=0 tx=0
+[cycle 3] netstat: tcp LAST_ACK 127.0.0.1:33297 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 3] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:33297 iface=lo rx=0 tx=0
+[cycle 3] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 3] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 4] tcp-port: 7004
+[cycle 4] nc: listening tcp 127.0.0.1:7004
+[cycle 4] nc: connected tcp 127.0.0.1:7004
+[cycle 4] nc: received raven-tcp-soak
+[cycle 4] nc: echo 14 bytes
+[cycle 4] nc: done
+[cycle 4] nc: received raven-tcp-soak
+[cycle 4] nc: done
+[cycle 4] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:53252 iface=lo rx=0 tx=0
+[cycle 4] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:34443 iface=lo rx=0 tx=0
+[cycle 4] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:33297 iface=lo rx=0 tx=0
+[cycle 4] netstat: tcp LAST_ACK 127.0.0.1:41666 remote=127.0.0.1:7004 iface=lo rx=0 tx=0
+[cycle 4] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:41666 iface=lo rx=0 tx=0
+[cycle 4] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 4] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 5] tcp-port: 7005
+[cycle 5] nc: listening tcp 127.0.0.1:7005
+[cycle 5] nc: connected tcp 127.0.0.1:7005
+[cycle 5] nc: received raven-tcp-soak
+[cycle 5] nc: echo 14 bytes
+[cycle 5] nc: done
+[cycle 5] nc: received raven-tcp-soak
+[cycle 5] nc: done
+[cycle 5] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:53252 iface=lo rx=0 tx=0
+[cycle 5] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:34443 iface=lo rx=0 tx=0
+[cycle 5] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:33297 iface=lo rx=0 tx=0
+[cycle 5] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:41666 iface=lo rx=0 tx=0
+[cycle 5] netstat: tcp LAST_ACK 127.0.0.1:37477 remote=127.0.0.1:7005 iface=lo rx=0 tx=0
+[cycle 5] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:37477 iface=lo rx=0 tx=0
+[cycle 5] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 5] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 6] tcp-port: 7006
+[cycle 6] nc: listening tcp 127.0.0.1:7006
+[cycle 6] nc: connected tcp 127.0.0.1:7006
+[cycle 6] nc: received raven-tcp-soak
+[cycle 6] nc: echo 14 bytes
+[cycle 6] nc: done
+[cycle 6] nc: received raven-tcp-soak
+[cycle 6] nc: done
+[cycle 6] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:53252 iface=lo rx=0 tx=0
+[cycle 6] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:34443 iface=lo rx=0 tx=0
+[cycle 6] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:33297 iface=lo rx=0 tx=0
+[cycle 6] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:41666 iface=lo rx=0 tx=0
+[cycle 6] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:37477 iface=lo rx=0 tx=0
+[cycle 6] netstat: tcp LAST_ACK 127.0.0.1:47102 remote=127.0.0.1:7006 iface=lo rx=0 tx=0
+[cycle 6] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:47102 iface=lo rx=0 tx=0
+[cycle 6] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 6] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 7] tcp-port: 7007
+[cycle 7] nc: listening tcp 127.0.0.1:7007
+[cycle 7] nc: connected tcp 127.0.0.1:7007
+[cycle 7] nc: received raven-tcp-soak
+[cycle 7] nc: echo 14 bytes
+[cycle 7] nc: done
+[cycle 7] nc: received raven-tcp-soak
+[cycle 7] nc: done
+[cycle 7] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:34443 iface=lo rx=0 tx=0
+[cycle 7] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:33297 iface=lo rx=0 tx=0
+[cycle 7] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:41666 iface=lo rx=0 tx=0
+[cycle 7] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:37477 iface=lo rx=0 tx=0
+[cycle 7] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:47102 iface=lo rx=0 tx=0
+[cycle 7] netstat: tcp LAST_ACK 127.0.0.1:47457 remote=127.0.0.1:7007 iface=lo rx=0 tx=0
+[cycle 7] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:47457 iface=lo rx=0 tx=0
+[cycle 7] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 7] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 8] tcp-port: 7008
+[cycle 8] nc: listening tcp 127.0.0.1:7008
+[cycle 8] nc: connected tcp 127.0.0.1:7008
+[cycle 8] nc: received raven-tcp-soak
+[cycle 8] nc: echo 14 bytes
+[cycle 8] nc: done
+[cycle 8] nc: received raven-tcp-soak
+[cycle 8] nc: done
+[cycle 8] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:33297 iface=lo rx=0 tx=0
+[cycle 8] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:41666 iface=lo rx=0 tx=0
+[cycle 8] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:37477 iface=lo rx=0 tx=0
+[cycle 8] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:47102 iface=lo rx=0 tx=0
+[cycle 8] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:47457 iface=lo rx=0 tx=0
+[cycle 8] netstat: tcp LAST_ACK 127.0.0.1:55273 remote=127.0.0.1:7008 iface=lo rx=0 tx=0
+[cycle 8] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:55273 iface=lo rx=0 tx=0
+[cycle 8] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 8] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 9] tcp-port: 7009
+[cycle 9] nc: listening tcp 127.0.0.1:7009
+[cycle 9] nc: connected tcp 127.0.0.1:7009
+[cycle 9] nc: received raven-tcp-soak
+[cycle 9] nc: echo 14 bytes
+[cycle 9] nc: done
+[cycle 9] nc: received raven-tcp-soak
+[cycle 9] nc: done
+[cycle 9] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:41666 iface=lo rx=0 tx=0
+[cycle 9] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:37477 iface=lo rx=0 tx=0
+[cycle 9] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:47102 iface=lo rx=0 tx=0
+[cycle 9] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:47457 iface=lo rx=0 tx=0
+[cycle 9] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:55273 iface=lo rx=0 tx=0
+[cycle 9] netstat: tcp LAST_ACK 127.0.0.1:55582 remote=127.0.0.1:7009 iface=lo rx=0 tx=0
+[cycle 9] netstat: tcp TIME_WAIT 127.0.0.1:7009 remote=127.0.0.1:55582 iface=lo rx=0 tx=0
+[cycle 9] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 9] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 10] tcp-port: 7010
+[cycle 10] nc: listening tcp 127.0.0.1:7010
+[cycle 10] nc: connected tcp 127.0.0.1:7010
+[cycle 10] nc: received raven-tcp-soak
+[cycle 10] nc: echo 14 bytes
+[cycle 10] nc: done
+[cycle 10] nc: received raven-tcp-soak
+[cycle 10] nc: done
+[cycle 10] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:37477 iface=lo rx=0 tx=0
+[cycle 10] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:47102 iface=lo rx=0 tx=0
+[cycle 10] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:47457 iface=lo rx=0 tx=0
+[cycle 10] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:55273 iface=lo rx=0 tx=0
+[cycle 10] netstat: tcp TIME_WAIT 127.0.0.1:7009 remote=127.0.0.1:55582 iface=lo rx=0 tx=0
+[cycle 10] netstat: tcp LAST_ACK 127.0.0.1:46110 remote=127.0.0.1:7010 iface=lo rx=0 tx=0
+[cycle 10] netstat: tcp TIME_WAIT 127.0.0.1:7010 remote=127.0.0.1:46110 iface=lo rx=0 tx=0
+[cycle 10] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 10] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 11] tcp-port: 7011
+[cycle 11] nc: listening tcp 127.0.0.1:7011
+[cycle 11] nc: connected tcp 127.0.0.1:7011
+[cycle 11] nc: received raven-tcp-soak
+[cycle 11] nc: echo 14 bytes
+[cycle 11] nc: done
+[cycle 11] nc: received raven-tcp-soak
+[cycle 11] nc: done
+[cycle 11] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:47102 iface=lo rx=0 tx=0
+[cycle 11] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:47457 iface=lo rx=0 tx=0
+[cycle 11] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:55273 iface=lo rx=0 tx=0
+[cycle 11] netstat: tcp TIME_WAIT 127.0.0.1:7009 remote=127.0.0.1:55582 iface=lo rx=0 tx=0
+[cycle 11] netstat: tcp TIME_WAIT 127.0.0.1:7010 remote=127.0.0.1:46110 iface=lo rx=0 tx=0
+[cycle 11] netstat: tcp LAST_ACK 127.0.0.1:39637 remote=127.0.0.1:7011 iface=lo rx=0 tx=0
+[cycle 11] netstat: tcp TIME_WAIT 127.0.0.1:7011 remote=127.0.0.1:39637 iface=lo rx=0 tx=0
+[cycle 11] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 11] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 12] tcp-port: 7012
+[cycle 12] nc: listening tcp 127.0.0.1:7012
+[cycle 12] nc: connected tcp 127.0.0.1:7012
+[cycle 12] nc: received raven-tcp-soak
+[cycle 12] nc: echo 14 bytes
+[cycle 12] nc: done
+[cycle 12] nc: received raven-tcp-soak
+[cycle 12] nc: done
+[cycle 12] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:47457 iface=lo rx=0 tx=0
+[cycle 12] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:55273 iface=lo rx=0 tx=0
+[cycle 12] netstat: tcp TIME_WAIT 127.0.0.1:7009 remote=127.0.0.1:55582 iface=lo rx=0 tx=0
+[cycle 12] netstat: tcp TIME_WAIT 127.0.0.1:7010 remote=127.0.0.1:46110 iface=lo rx=0 tx=0
+[cycle 12] netstat: tcp TIME_WAIT 127.0.0.1:7011 remote=127.0.0.1:39637 iface=lo rx=0 tx=0
+[cycle 12] netstat: tcp LAST_ACK 127.0.0.1:51038 remote=127.0.0.1:7012 iface=lo rx=0 tx=0
+[cycle 12] netstat: tcp TIME_WAIT 127.0.0.1:7012 remote=127.0.0.1:51038 iface=lo rx=0 tx=0
+[cycle 12] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 12] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 13] tcp-port: 7013
+[cycle 13] nc: listening tcp 127.0.0.1:7013
+[cycle 13] nc: connected tcp 127.0.0.1:7013
+[cycle 13] nc: received raven-tcp-soak
+[cycle 13] nc: echo 14 bytes
+[cycle 13] nc: done
+[cycle 13] nc: received raven-tcp-soak
+[cycle 13] nc: done
+[cycle 13] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:55273 iface=lo rx=0 tx=0
+[cycle 13] netstat: tcp TIME_WAIT 127.0.0.1:7009 remote=127.0.0.1:55582 iface=lo rx=0 tx=0
+[cycle 13] netstat: tcp TIME_WAIT 127.0.0.1:7010 remote=127.0.0.1:46110 iface=lo rx=0 tx=0
+[cycle 13] netstat: tcp TIME_WAIT 127.0.0.1:7011 remote=127.0.0.1:39637 iface=lo rx=0 tx=0
+[cycle 13] netstat: tcp TIME_WAIT 127.0.0.1:7012 remote=127.0.0.1:51038 iface=lo rx=0 tx=0
+[cycle 13] netstat: tcp LAST_ACK 127.0.0.1:39414 remote=127.0.0.1:7013 iface=lo rx=0 tx=0
+[cycle 13] netstat: tcp TIME_WAIT 127.0.0.1:7013 remote=127.0.0.1:39414 iface=lo rx=0 tx=0
+[cycle 13] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 13] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 14] tcp-port: 7014
+[cycle 14] nc: listening tcp 127.0.0.1:7014
+[cycle 14] nc: connected tcp 127.0.0.1:7014
+[cycle 14] nc: received raven-tcp-soak
+[cycle 14] nc: echo 14 bytes
+[cycle 14] nc: done
+[cycle 14] nc: received raven-tcp-soak
+[cycle 14] nc: done
+[cycle 14] netstat: tcp TIME_WAIT 127.0.0.1:7009 remote=127.0.0.1:55582 iface=lo rx=0 tx=0
+[cycle 14] netstat: tcp TIME_WAIT 127.0.0.1:7010 remote=127.0.0.1:46110 iface=lo rx=0 tx=0
+[cycle 14] netstat: tcp TIME_WAIT 127.0.0.1:7011 remote=127.0.0.1:39637 iface=lo rx=0 tx=0
+[cycle 14] netstat: tcp TIME_WAIT 127.0.0.1:7012 remote=127.0.0.1:51038 iface=lo rx=0 tx=0
+[cycle 14] netstat: tcp TIME_WAIT 127.0.0.1:7013 remote=127.0.0.1:39414 iface=lo rx=0 tx=0
+[cycle 14] netstat: tcp LAST_ACK 127.0.0.1:51837 remote=127.0.0.1:7014 iface=lo rx=0 tx=0
+[cycle 14] netstat: tcp TIME_WAIT 127.0.0.1:7014 remote=127.0.0.1:51837 iface=lo rx=0 tx=0
+[cycle 14] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 14] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 15] tcp-port: 7015
+[cycle 15] nc: listening tcp 127.0.0.1:7015
+[cycle 15] nc: connected tcp 127.0.0.1:7015
+[cycle 15] nc: received raven-tcp-soak
+[cycle 15] nc: echo 14 bytes
+[cycle 15] nc: done
+[cycle 15] nc: received raven-tcp-soak
+[cycle 15] nc: done
+[cycle 15] netstat: tcp TIME_WAIT 127.0.0.1:7010 remote=127.0.0.1:46110 iface=lo rx=0 tx=0
+[cycle 15] netstat: tcp TIME_WAIT 127.0.0.1:7011 remote=127.0.0.1:39637 iface=lo rx=0 tx=0
+[cycle 15] netstat: tcp TIME_WAIT 127.0.0.1:7012 remote=127.0.0.1:51038 iface=lo rx=0 tx=0
+[cycle 15] netstat: tcp TIME_WAIT 127.0.0.1:7013 remote=127.0.0.1:39414 iface=lo rx=0 tx=0
+[cycle 15] netstat: tcp TIME_WAIT 127.0.0.1:7014 remote=127.0.0.1:51837 iface=lo rx=0 tx=0
+[cycle 15] netstat: tcp LAST_ACK 127.0.0.1:50515 remote=127.0.0.1:7015 iface=lo rx=0 tx=0
+[cycle 15] netstat: tcp TIME_WAIT 127.0.0.1:7015 remote=127.0.0.1:50515 iface=lo rx=0 tx=0
+[cycle 15] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 15] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 16] tcp-port: 7016
+[cycle 16] nc: listening tcp 127.0.0.1:7016
+[cycle 16] nc: connected tcp 127.0.0.1:7016
+[cycle 16] nc: received raven-tcp-soak
+[cycle 16] nc: echo 14 bytes
+[cycle 16] nc: done
+[cycle 16] nc: received raven-tcp-soak
+[cycle 16] nc: done
+[cycle 16] netstat: tcp TIME_WAIT 127.0.0.1:7011 remote=127.0.0.1:39637 iface=lo rx=0 tx=0
+[cycle 16] netstat: tcp TIME_WAIT 127.0.0.1:7012 remote=127.0.0.1:51038 iface=lo rx=0 tx=0
+[cycle 16] netstat: tcp TIME_WAIT 127.0.0.1:7013 remote=127.0.0.1:39414 iface=lo rx=0 tx=0
+[cycle 16] netstat: tcp TIME_WAIT 127.0.0.1:7014 remote=127.0.0.1:51837 iface=lo rx=0 tx=0
+[cycle 16] netstat: tcp TIME_WAIT 127.0.0.1:7015 remote=127.0.0.1:50515 iface=lo rx=0 tx=0
+[cycle 16] netstat: tcp TIME_WAIT 127.0.0.1:7016 remote=127.0.0.1:51700 iface=lo rx=0 tx=0
+[cycle 16] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 16] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 17] tcp-port: 7017
+[cycle 17] nc: listening tcp 127.0.0.1:7017
+[cycle 17] nc: connected tcp 127.0.0.1:7017
+[cycle 17] nc: received raven-tcp-soak
+[cycle 17] nc: echo 14 bytes
+[cycle 17] nc: done
+[cycle 17] nc: received raven-tcp-soak
+[cycle 17] nc: done
+[cycle 17] netstat: tcp TIME_WAIT 127.0.0.1:7012 remote=127.0.0.1:51038 iface=lo rx=0 tx=0
+[cycle 17] netstat: tcp TIME_WAIT 127.0.0.1:7013 remote=127.0.0.1:39414 iface=lo rx=0 tx=0
+[cycle 17] netstat: tcp TIME_WAIT 127.0.0.1:7014 remote=127.0.0.1:51837 iface=lo rx=0 tx=0
+[cycle 17] netstat: tcp TIME_WAIT 127.0.0.1:7015 remote=127.0.0.1:50515 iface=lo rx=0 tx=0
+[cycle 17] netstat: tcp TIME_WAIT 127.0.0.1:7016 remote=127.0.0.1:51700 iface=lo rx=0 tx=0
+[cycle 17] netstat: tcp TIME_WAIT 127.0.0.1:7017 remote=127.0.0.1:38403 iface=lo rx=0 tx=0
+[cycle 17] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 17] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 18] tcp-port: 7018
+[cycle 18] nc: listening tcp 127.0.0.1:7018
+[cycle 18] nc: connected tcp 127.0.0.1:7018
+[cycle 18] nc: received raven-tcp-soak
+[cycle 18] nc: echo 14 bytes
+[cycle 18] nc: done
+[cycle 18] nc: received raven-tcp-soak
+[cycle 18] nc: done
+[cycle 18] netstat: tcp TIME_WAIT 127.0.0.1:7013 remote=127.0.0.1:39414 iface=lo rx=0 tx=0
+[cycle 18] netstat: tcp TIME_WAIT 127.0.0.1:7014 remote=127.0.0.1:51837 iface=lo rx=0 tx=0
+[cycle 18] netstat: tcp TIME_WAIT 127.0.0.1:7015 remote=127.0.0.1:50515 iface=lo rx=0 tx=0
+[cycle 18] netstat: tcp TIME_WAIT 127.0.0.1:7016 remote=127.0.0.1:51700 iface=lo rx=0 tx=0
+[cycle 18] netstat: tcp TIME_WAIT 127.0.0.1:7017 remote=127.0.0.1:38403 iface=lo rx=0 tx=0
+[cycle 18] netstat: tcp TIME_WAIT 127.0.0.1:7018 remote=127.0.0.1:41414 iface=lo rx=0 tx=0
+[cycle 18] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 18] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 19] tcp-port: 7019
+[cycle 19] nc: listening tcp 127.0.0.1:7019
+[cycle 19] nc: connected tcp 127.0.0.1:7019
+[cycle 19] nc: received raven-tcp-soak
+[cycle 19] nc: echo 14 bytes
+[cycle 19] nc: done
+[cycle 19] nc: received raven-tcp-soak
+[cycle 19] nc: done
+[cycle 19] netstat: tcp TIME_WAIT 127.0.0.1:7014 remote=127.0.0.1:51837 iface=lo rx=0 tx=0
+[cycle 19] netstat: tcp TIME_WAIT 127.0.0.1:7015 remote=127.0.0.1:50515 iface=lo rx=0 tx=0
+[cycle 19] netstat: tcp TIME_WAIT 127.0.0.1:7016 remote=127.0.0.1:51700 iface=lo rx=0 tx=0
+[cycle 19] netstat: tcp TIME_WAIT 127.0.0.1:7017 remote=127.0.0.1:38403 iface=lo rx=0 tx=0
+[cycle 19] netstat: tcp TIME_WAIT 127.0.0.1:7018 remote=127.0.0.1:41414 iface=lo rx=0 tx=0
+[cycle 19] netstat: tcp TIME_WAIT 127.0.0.1:7019 remote=127.0.0.1:56352 iface=lo rx=0 tx=0
+[cycle 19] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 19] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 20] tcp-port: 7020
+[cycle 20] nc: listening tcp 127.0.0.1:7020
+[cycle 20] nc: connected tcp 127.0.0.1:7020
+[cycle 20] nc: received raven-tcp-soak
+[cycle 20] nc: echo 14 bytes
+[cycle 20] nc: received raven-tcp-soak
+[cycle 20] nc: done
+[cycle 20] nc: done
+[cycle 20] netstat: tcp TIME_WAIT 127.0.0.1:7015 remote=127.0.0.1:50515 iface=lo rx=0 tx=0
+[cycle 20] netstat: tcp TIME_WAIT 127.0.0.1:7016 remote=127.0.0.1:51700 iface=lo rx=0 tx=0
+[cycle 20] netstat: tcp TIME_WAIT 127.0.0.1:7017 remote=127.0.0.1:38403 iface=lo rx=0 tx=0
+[cycle 20] netstat: tcp TIME_WAIT 127.0.0.1:7018 remote=127.0.0.1:41414 iface=lo rx=0 tx=0
+[cycle 20] netstat: tcp TIME_WAIT 127.0.0.1:7019 remote=127.0.0.1:56352 iface=lo rx=0 tx=0
+[cycle 20] netstat: tcp TIME_WAIT 127.0.0.1:54695 remote=127.0.0.1:7020 iface=lo rx=0 tx=0
+[cycle 20] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 20] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 21] tcp-port: 7021
+[cycle 21] nc: listening tcp 127.0.0.1:7021
+[cycle 21] nc: connected tcp 127.0.0.1:7021
+[cycle 21] nc: received raven-tcp-soak
+[cycle 21] nc: echo 14 bytes
+[cycle 21] nc: done
+[cycle 21] nc: received raven-tcp-soak
+[cycle 21] nc: done
+[cycle 21] netstat: tcp TIME_WAIT 127.0.0.1:7016 remote=127.0.0.1:51700 iface=lo rx=0 tx=0
+[cycle 21] netstat: tcp TIME_WAIT 127.0.0.1:7017 remote=127.0.0.1:38403 iface=lo rx=0 tx=0
+[cycle 21] netstat: tcp TIME_WAIT 127.0.0.1:7018 remote=127.0.0.1:41414 iface=lo rx=0 tx=0
+[cycle 21] netstat: tcp TIME_WAIT 127.0.0.1:7019 remote=127.0.0.1:56352 iface=lo rx=0 tx=0
+[cycle 21] netstat: tcp TIME_WAIT 127.0.0.1:54695 remote=127.0.0.1:7020 iface=lo rx=0 tx=0
+[cycle 21] netstat: tcp TIME_WAIT 127.0.0.1:7021 remote=127.0.0.1:39543 iface=lo rx=0 tx=0
+[cycle 21] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 21] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 22] tcp-port: 7022
+[cycle 22] nc: listening tcp 127.0.0.1:7022
+[cycle 22] nc: connected tcp 127.0.0.1:7022
+[cycle 22] nc: received raven-tcp-soak
+[cycle 22] nc: echo 14 bytes
+[cycle 22] nc: done
+[cycle 22] nc: received raven-tcp-soak
+[cycle 22] nc: done
+[cycle 22] netstat: tcp TIME_WAIT 127.0.0.1:7022 remote=127.0.0.1:33641 iface=lo rx=0 tx=0
+[cycle 22] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 22] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 23] tcp-port: 7023
+[cycle 23] nc: listening tcp 127.0.0.1:7023
+[cycle 23] nc: connected tcp 127.0.0.1:7023
+[cycle 23] nc: received raven-tcp-soak
+[cycle 23] nc: echo 14 bytes
+[cycle 23] nc: done
+[cycle 23] nc: received raven-tcp-soak
+[cycle 23] nc: done
+[cycle 23] netstat: tcp TIME_WAIT 127.0.0.1:7022 remote=127.0.0.1:33641 iface=lo rx=0 tx=0
+[cycle 23] netstat: tcp TIME_WAIT 127.0.0.1:7023 remote=127.0.0.1:48040 iface=lo rx=0 tx=0
+[cycle 23] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 23] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 24] tcp-port: 7024
+[cycle 24] nc: listening tcp 127.0.0.1:7024
+[cycle 24] nc: connected tcp 127.0.0.1:7024
+[cycle 24] nc: received raven-tcp-soak
+[cycle 24] nc: echo 14 bytes
+[cycle 24] nc: done
+[cycle 24] nc: received raven-tcp-soak
+[cycle 24] nc: done
+[cycle 24] netstat: tcp TIME_WAIT 127.0.0.1:7022 remote=127.0.0.1:33641 iface=lo rx=0 tx=0
+[cycle 24] netstat: tcp TIME_WAIT 127.0.0.1:7023 remote=127.0.0.1:48040 iface=lo rx=0 tx=0
+[cycle 24] netstat: tcp TIME_WAIT 127.0.0.1:7024 remote=127.0.0.1:52490 iface=lo rx=0 tx=0
+[cycle 24] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 24] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 25] tcp-port: 7025
+[cycle 25] nc: listening tcp 127.0.0.1:7025
+[cycle 25] nc: connected tcp 127.0.0.1:7025
+[cycle 25] nc: received raven-tcp-soak
+[cycle 25] nc: echo 14 bytes
+[cycle 25] nc: done
+[cycle 25] nc: received raven-tcp-soak
+[cycle 25] nc: done
+[cycle 25] netstat: tcp TIME_WAIT 127.0.0.1:7022 remote=127.0.0.1:33641 iface=lo rx=0 tx=0
+[cycle 25] netstat: tcp TIME_WAIT 127.0.0.1:7023 remote=127.0.0.1:48040 iface=lo rx=0 tx=0
+[cycle 25] netstat: tcp TIME_WAIT 127.0.0.1:7024 remote=127.0.0.1:52490 iface=lo rx=0 tx=0
+[cycle 25] netstat: tcp TIME_WAIT 127.0.0.1:7025 remote=127.0.0.1:42473 iface=lo rx=0 tx=0
+[cycle 25] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 25] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 26] tcp-port: 7026
+[cycle 26] nc: listening tcp 127.0.0.1:7026
+[cycle 26] nc: connected tcp 127.0.0.1:7026
+[cycle 26] nc: received raven-tcp-soak
+[cycle 26] nc: echo 14 bytes
+[cycle 26] nc: done
+[cycle 26] nc: received raven-tcp-soak
+[cycle 26] nc: done
+[cycle 26] netstat: tcp TIME_WAIT 127.0.0.1:7022 remote=127.0.0.1:33641 iface=lo rx=0 tx=0
+[cycle 26] netstat: tcp TIME_WAIT 127.0.0.1:7023 remote=127.0.0.1:48040 iface=lo rx=0 tx=0
+[cycle 26] netstat: tcp TIME_WAIT 127.0.0.1:7024 remote=127.0.0.1:52490 iface=lo rx=0 tx=0
+[cycle 26] netstat: tcp TIME_WAIT 127.0.0.1:7025 remote=127.0.0.1:42473 iface=lo rx=0 tx=0
+[cycle 26] netstat: tcp TIME_WAIT 127.0.0.1:7026 remote=127.0.0.1:43306 iface=lo rx=0 tx=0
+[cycle 26] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 26] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 27] tcp-port: 7027
+[cycle 27] nc: listening tcp 127.0.0.1:7027
+[cycle 27] nc: connected tcp 127.0.0.1:7027
+[cycle 27] nc: received raven-tcp-soak
+[cycle 27] nc: echo 14 bytes
+[cycle 27] nc: done
+[cycle 27] nc: received raven-tcp-soak
+[cycle 27] nc: done
+[cycle 27] netstat: tcp TIME_WAIT 127.0.0.1:7022 remote=127.0.0.1:33641 iface=lo rx=0 tx=0
+[cycle 27] netstat: tcp TIME_WAIT 127.0.0.1:7023 remote=127.0.0.1:48040 iface=lo rx=0 tx=0
+[cycle 27] netstat: tcp TIME_WAIT 127.0.0.1:7024 remote=127.0.0.1:52490 iface=lo rx=0 tx=0
+[cycle 27] netstat: tcp TIME_WAIT 127.0.0.1:7025 remote=127.0.0.1:42473 iface=lo rx=0 tx=0
+[cycle 27] netstat: tcp TIME_WAIT 127.0.0.1:7026 remote=127.0.0.1:43306 iface=lo rx=0 tx=0
+[cycle 27] netstat: tcp TIME_WAIT 127.0.0.1:7027 remote=127.0.0.1:42347 iface=lo rx=0 tx=0
+[cycle 27] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 27] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 28] tcp-port: 7028
+[cycle 28] nc: listening tcp 127.0.0.1:7028
+[cycle 28] nc: connected tcp 127.0.0.1:7028
+[cycle 28] nc: received raven-tcp-soak
+[cycle 28] nc: echo 14 bytes
+[cycle 28] nc: done
+[cycle 28] nc: received raven-tcp-soak
+[cycle 28] nc: done
+[cycle 28] netstat: tcp TIME_WAIT 127.0.0.1:7023 remote=127.0.0.1:48040 iface=lo rx=0 tx=0
+[cycle 28] netstat: tcp TIME_WAIT 127.0.0.1:7024 remote=127.0.0.1:52490 iface=lo rx=0 tx=0
+[cycle 28] netstat: tcp TIME_WAIT 127.0.0.1:7025 remote=127.0.0.1:42473 iface=lo rx=0 tx=0
+[cycle 28] netstat: tcp TIME_WAIT 127.0.0.1:7026 remote=127.0.0.1:43306 iface=lo rx=0 tx=0
+[cycle 28] netstat: tcp TIME_WAIT 127.0.0.1:7027 remote=127.0.0.1:42347 iface=lo rx=0 tx=0
+[cycle 28] netstat: tcp TIME_WAIT 127.0.0.1:7028 remote=127.0.0.1:58764 iface=lo rx=0 tx=0
+[cycle 28] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 28] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 29] tcp-port: 7029
+[cycle 29] nc: listening tcp 127.0.0.1:7029
+[cycle 29] nc: connected tcp 127.0.0.1:7029
+[cycle 29] nc: received raven-tcp-soak
+[cycle 29] nc: echo 14 bytes
+[cycle 29] nc: done
+[cycle 29] nc: received raven-tcp-soak
+[cycle 29] nc: done
+[cycle 29] netstat: tcp TIME_WAIT 127.0.0.1:7024 remote=127.0.0.1:52490 iface=lo rx=0 tx=0
+[cycle 29] netstat: tcp TIME_WAIT 127.0.0.1:7025 remote=127.0.0.1:42473 iface=lo rx=0 tx=0
+[cycle 29] netstat: tcp TIME_WAIT 127.0.0.1:7026 remote=127.0.0.1:43306 iface=lo rx=0 tx=0
+[cycle 29] netstat: tcp TIME_WAIT 127.0.0.1:7027 remote=127.0.0.1:42347 iface=lo rx=0 tx=0
+[cycle 29] netstat: tcp TIME_WAIT 127.0.0.1:7028 remote=127.0.0.1:58764 iface=lo rx=0 tx=0
+[cycle 29] netstat: tcp TIME_WAIT 127.0.0.1:7029 remote=127.0.0.1:46058 iface=lo rx=0 tx=0
+[cycle 29] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 29] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 30] tcp-port: 7030
+[cycle 30] nc: listening tcp 127.0.0.1:7030
+[cycle 30] nc: connected tcp 127.0.0.1:7030
+[cycle 30] nc: received raven-tcp-soak
+[cycle 30] nc: echo 14 bytes
+[cycle 30] nc: done
+[cycle 30] nc: received raven-tcp-soak
+[cycle 30] nc: done
+[cycle 30] netstat: tcp TIME_WAIT 127.0.0.1:7025 remote=127.0.0.1:42473 iface=lo rx=0 tx=0
+[cycle 30] netstat: tcp TIME_WAIT 127.0.0.1:7026 remote=127.0.0.1:43306 iface=lo rx=0 tx=0
+[cycle 30] netstat: tcp TIME_WAIT 127.0.0.1:7027 remote=127.0.0.1:42347 iface=lo rx=0 tx=0
+[cycle 30] netstat: tcp TIME_WAIT 127.0.0.1:7028 remote=127.0.0.1:58764 iface=lo rx=0 tx=0
+[cycle 30] netstat: tcp TIME_WAIT 127.0.0.1:7029 remote=127.0.0.1:46058 iface=lo rx=0 tx=0
+[cycle 30] netstat: tcp TIME_WAIT 127.0.0.1:7030 remote=127.0.0.1:38566 iface=lo rx=0 tx=0
+[cycle 30] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 30] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 31] tcp-port: 7031
+[cycle 31] nc: listening tcp 127.0.0.1:7031
+[cycle 31] nc: connected tcp 127.0.0.1:7031
+[cycle 31] nc: received raven-tcp-soak
+[cycle 31] nc: echo 14 bytes
+[cycle 31] nc: done
+[cycle 31] nc: received raven-tcp-soak
+[cycle 31] nc: done
+[cycle 31] netstat: tcp TIME_WAIT 127.0.0.1:7026 remote=127.0.0.1:43306 iface=lo rx=0 tx=0
+[cycle 31] netstat: tcp TIME_WAIT 127.0.0.1:7027 remote=127.0.0.1:42347 iface=lo rx=0 tx=0
+[cycle 31] netstat: tcp TIME_WAIT 127.0.0.1:7028 remote=127.0.0.1:58764 iface=lo rx=0 tx=0
+[cycle 31] netstat: tcp TIME_WAIT 127.0.0.1:7029 remote=127.0.0.1:46058 iface=lo rx=0 tx=0
+[cycle 31] netstat: tcp TIME_WAIT 127.0.0.1:7030 remote=127.0.0.1:38566 iface=lo rx=0 tx=0
+[cycle 31] netstat: tcp TIME_WAIT 127.0.0.1:7031 remote=127.0.0.1:43732 iface=lo rx=0 tx=0
+[cycle 31] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 31] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 32] tcp-port: 7032
+[cycle 32] nc: listening tcp 127.0.0.1:7032
+[cycle 32] nc: connected tcp 127.0.0.1:7032
+[cycle 32] nc: received raven-tcp-soak
+[cycle 32] nc: echo 14 bytes
+[cycle 32] nc: done
+[cycle 32] nc: received raven-tcp-soak
+[cycle 32] nc: done
+[cycle 32] netstat: tcp TIME_WAIT 127.0.0.1:7027 remote=127.0.0.1:42347 iface=lo rx=0 tx=0
+[cycle 32] netstat: tcp TIME_WAIT 127.0.0.1:7028 remote=127.0.0.1:58764 iface=lo rx=0 tx=0
+[cycle 32] netstat: tcp TIME_WAIT 127.0.0.1:7029 remote=127.0.0.1:46058 iface=lo rx=0 tx=0
+[cycle 32] netstat: tcp TIME_WAIT 127.0.0.1:7030 remote=127.0.0.1:38566 iface=lo rx=0 tx=0
+[cycle 32] netstat: tcp TIME_WAIT 127.0.0.1:7031 remote=127.0.0.1:43732 iface=lo rx=0 tx=0
+[cycle 32] netstat: tcp TIME_WAIT 127.0.0.1:7032 remote=127.0.0.1:56417 iface=lo rx=0 tx=0
+[cycle 32] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 32] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 33] tcp-port: 7033
+[cycle 33] nc: listening tcp 127.0.0.1:7033
+[cycle 33] nc: connected tcp 127.0.0.1:7033
+[cycle 33] nc: received raven-tcp-soak
+[cycle 33] nc: echo 14 bytes
+[cycle 33] nc: received raven-tcp-soak
+[cycle 33] nc: done
+[cycle 33] nc: done
+[cycle 33] netstat: tcp TIME_WAIT 127.0.0.1:7028 remote=127.0.0.1:58764 iface=lo rx=0 tx=0
+[cycle 33] netstat: tcp TIME_WAIT 127.0.0.1:7029 remote=127.0.0.1:46058 iface=lo rx=0 tx=0
+[cycle 33] netstat: tcp TIME_WAIT 127.0.0.1:7030 remote=127.0.0.1:38566 iface=lo rx=0 tx=0
+[cycle 33] netstat: tcp TIME_WAIT 127.0.0.1:7031 remote=127.0.0.1:43732 iface=lo rx=0 tx=0
+[cycle 33] netstat: tcp TIME_WAIT 127.0.0.1:7032 remote=127.0.0.1:56417 iface=lo rx=0 tx=0
+[cycle 33] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 33] netstat: tcp TIME_WAIT 127.0.0.1:7033 remote=127.0.0.1:47445 iface=lo rx=0 tx=0
+[cycle 33] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 33] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 34] tcp-port: 7034
+[cycle 34] nc: listening tcp 127.0.0.1:7034
+[cycle 34] nc: connected tcp 127.0.0.1:7034
+[cycle 34] nc: received raven-tcp-soak
+[cycle 34] nc: echo 14 bytes
+[cycle 34] nc: received raven-tcp-soak
+[cycle 34] nc: done
+[cycle 34] nc: done
+[cycle 34] netstat: tcp TIME_WAIT 127.0.0.1:7029 remote=127.0.0.1:46058 iface=lo rx=0 tx=0
+[cycle 34] netstat: tcp TIME_WAIT 127.0.0.1:7030 remote=127.0.0.1:38566 iface=lo rx=0 tx=0
+[cycle 34] netstat: tcp TIME_WAIT 127.0.0.1:7031 remote=127.0.0.1:43732 iface=lo rx=0 tx=0
+[cycle 34] netstat: tcp TIME_WAIT 127.0.0.1:7032 remote=127.0.0.1:56417 iface=lo rx=0 tx=0
+[cycle 34] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 34] netstat: tcp TIME_WAIT 127.0.0.1:7033 remote=127.0.0.1:47445 iface=lo rx=0 tx=0
+[cycle 34] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 34] netstat: tcp TIME_WAIT 127.0.0.1:7034 remote=127.0.0.1:50720 iface=lo rx=0 tx=0
+[cycle 34] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 34] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 35] tcp-port: 7035
+[cycle 35] nc: listening tcp 127.0.0.1:7035
+[cycle 35] nc: connected tcp 127.0.0.1:7035
+[cycle 35] nc: received raven-tcp-soak
+[cycle 35] nc: echo 14 bytes
+[cycle 35] nc: done
+[cycle 35] nc: received raven-tcp-soak
+[cycle 35] nc: done
+[cycle 35] netstat: tcp TIME_WAIT 127.0.0.1:7030 remote=127.0.0.1:38566 iface=lo rx=0 tx=0
+[cycle 35] netstat: tcp TIME_WAIT 127.0.0.1:7031 remote=127.0.0.1:43732 iface=lo rx=0 tx=0
+[cycle 35] netstat: tcp TIME_WAIT 127.0.0.1:7032 remote=127.0.0.1:56417 iface=lo rx=0 tx=0
+[cycle 35] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 35] netstat: tcp TIME_WAIT 127.0.0.1:7033 remote=127.0.0.1:47445 iface=lo rx=0 tx=0
+[cycle 35] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 35] netstat: tcp TIME_WAIT 127.0.0.1:7034 remote=127.0.0.1:50720 iface=lo rx=0 tx=0
+[cycle 35] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 35] netstat: tcp TIME_WAIT 127.0.0.1:7035 remote=127.0.0.1:44694 iface=lo rx=0 tx=0
+[cycle 35] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 35] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 36] tcp-port: 7036
+[cycle 36] nc: listening tcp 127.0.0.1:7036
+[cycle 36] nc: connected tcp 127.0.0.1:7036
+[cycle 36] nc: received raven-tcp-soak
+[cycle 36] nc: echo 14 bytes
+[cycle 36] nc: done
+[cycle 36] nc: received raven-tcp-soak
+[cycle 36] nc: done
+[cycle 36] netstat: tcp TIME_WAIT 127.0.0.1:7031 remote=127.0.0.1:43732 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp TIME_WAIT 127.0.0.1:7032 remote=127.0.0.1:56417 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp TIME_WAIT 127.0.0.1:7033 remote=127.0.0.1:47445 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp TIME_WAIT 127.0.0.1:7034 remote=127.0.0.1:50720 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp TIME_WAIT 127.0.0.1:7035 remote=127.0.0.1:44694 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 36] netstat: tcp TIME_WAIT 127.0.0.1:7036 remote=127.0.0.1:50935 iface=lo rx=0 tx=0
+[cycle 36] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 36] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 37] tcp-port: 7037
+[cycle 37] nc: listening tcp 127.0.0.1:7037
+[cycle 37] nc: connected tcp 127.0.0.1:7037
+[cycle 37] nc: received raven-tcp-soak
+[cycle 37] nc: echo 14 bytes
+[cycle 37] nc: done
+[cycle 37] nc: received raven-tcp-soak
+[cycle 37] nc: done
+[cycle 37] netstat: tcp TIME_WAIT 127.0.0.1:7032 remote=127.0.0.1:56417 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp TIME_WAIT 127.0.0.1:7033 remote=127.0.0.1:47445 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp TIME_WAIT 127.0.0.1:7034 remote=127.0.0.1:50720 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp TIME_WAIT 127.0.0.1:7035 remote=127.0.0.1:44694 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp TIME_WAIT 127.0.0.1:7036 remote=127.0.0.1:50935 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 37] netstat: tcp TIME_WAIT 127.0.0.1:7037 remote=127.0.0.1:46490 iface=lo rx=0 tx=0
+[cycle 37] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 37] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 38] tcp-port: 7038
+[cycle 38] nc: listening tcp 127.0.0.1:7038
+[cycle 38] nc: connected tcp 127.0.0.1:7038
+[cycle 38] nc: received raven-tcp-soak
+[cycle 38] nc: echo 14 bytes
+[cycle 38] nc: received raven-tcp-soak
+[cycle 38] nc: done
+[cycle 38] nc: done
+[cycle 38] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp TIME_WAIT 127.0.0.1:7033 remote=127.0.0.1:47445 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp TIME_WAIT 127.0.0.1:7034 remote=127.0.0.1:50720 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp TIME_WAIT 127.0.0.1:7035 remote=127.0.0.1:44694 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp TIME_WAIT 127.0.0.1:7036 remote=127.0.0.1:50935 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp TIME_WAIT 127.0.0.1:7037 remote=127.0.0.1:46490 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 38] netstat: tcp TIME_WAIT 127.0.0.1:7038 remote=127.0.0.1:51549 iface=lo rx=0 tx=0
+[cycle 38] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 38] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 39] tcp-port: 7039
+[cycle 39] nc: listening tcp 127.0.0.1:7039
+[cycle 39] nc: connected tcp 127.0.0.1:7039
+[cycle 39] nc: received raven-tcp-soak
+[cycle 39] nc: echo 14 bytes
+[cycle 39] nc: received raven-tcp-soak
+[cycle 39] nc: done
+[cycle 39] nc: done
+[cycle 39] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp TIME_WAIT 127.0.0.1:7034 remote=127.0.0.1:50720 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp TIME_WAIT 127.0.0.1:7035 remote=127.0.0.1:44694 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp TIME_WAIT 127.0.0.1:7036 remote=127.0.0.1:50935 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp TIME_WAIT 127.0.0.1:7037 remote=127.0.0.1:46490 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp TIME_WAIT 127.0.0.1:7038 remote=127.0.0.1:51549 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 39] netstat: tcp TIME_WAIT 127.0.0.1:7039 remote=127.0.0.1:52346 iface=lo rx=0 tx=0
+[cycle 39] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 39] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 40] tcp-port: 7040
+[cycle 40] nc: listening tcp 127.0.0.1:7040
+[cycle 40] nc: connected tcp 127.0.0.1:7040
+[cycle 40] nc: received raven-tcp-soak
+[cycle 40] nc: echo 14 bytes
+[cycle 40] nc: done
+[cycle 40] nc: received raven-tcp-soak
+[cycle 40] nc: done
+[cycle 40] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp TIME_WAIT 127.0.0.1:7035 remote=127.0.0.1:44694 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp TIME_WAIT 127.0.0.1:7036 remote=127.0.0.1:50935 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp TIME_WAIT 127.0.0.1:7037 remote=127.0.0.1:46490 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp TIME_WAIT 127.0.0.1:7038 remote=127.0.0.1:51549 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp TIME_WAIT 127.0.0.1:7039 remote=127.0.0.1:52346 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 40] netstat: tcp TIME_WAIT 127.0.0.1:7040 remote=127.0.0.1:40217 iface=lo rx=0 tx=0
+[cycle 40] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 40] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 41] tcp-port: 7041
+[cycle 41] nc: listening tcp 127.0.0.1:7041
+[cycle 41] nc: connected tcp 127.0.0.1:7041
+[cycle 41] nc: received raven-tcp-soak
+[cycle 41] nc: echo 14 bytes
+[cycle 41] nc: done
+[cycle 41] nc: received raven-tcp-soak
+[cycle 41] nc: done
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp TIME_WAIT 127.0.0.1:7036 remote=127.0.0.1:50935 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp TIME_WAIT 127.0.0.1:7037 remote=127.0.0.1:46490 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp TIME_WAIT 127.0.0.1:7038 remote=127.0.0.1:51549 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp TIME_WAIT 127.0.0.1:7039 remote=127.0.0.1:52346 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp TIME_WAIT 127.0.0.1:7040 remote=127.0.0.1:40217 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 41] netstat: tcp TIME_WAIT 127.0.0.1:7041 remote=127.0.0.1:53142 iface=lo rx=0 tx=0
+[cycle 41] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 41] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 42] tcp-port: 7042
+[cycle 42] nc: listening tcp 127.0.0.1:7042
+[cycle 42] nc: connected tcp 127.0.0.1:7042
+[cycle 42] nc: received raven-tcp-soak
+[cycle 42] nc: echo 14 bytes
+[cycle 42] nc: received raven-tcp-soak
+[cycle 42] nc: done
+[cycle 42] nc: done
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp TIME_WAIT 127.0.0.1:7037 remote=127.0.0.1:46490 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp TIME_WAIT 127.0.0.1:7038 remote=127.0.0.1:51549 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp TIME_WAIT 127.0.0.1:7039 remote=127.0.0.1:52346 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp TIME_WAIT 127.0.0.1:7040 remote=127.0.0.1:40217 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp TIME_WAIT 127.0.0.1:7041 remote=127.0.0.1:53142 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 42] netstat: tcp TIME_WAIT 127.0.0.1:7042 remote=127.0.0.1:45669 iface=lo rx=0 tx=0
+[cycle 42] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 42] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 43] tcp-port: 7043
+[cycle 43] nc: listening tcp 127.0.0.1:7043
+[cycle 43] nc: connected tcp 127.0.0.1:7043
+[cycle 43] nc: received raven-tcp-soak
+[cycle 43] nc: echo 14 bytes
+[cycle 43] nc: done
+[cycle 43] nc: received raven-tcp-soak
+[cycle 43] nc: done
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 43] netstat: tcp TIME_WAIT 127.0.0.1:7043 remote=127.0.0.1:57162 iface=lo rx=0 tx=0
+[cycle 43] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 43] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 44] tcp-port: 7044
+[cycle 44] nc: listening tcp 127.0.0.1:7044
+[cycle 44] nc: connected tcp 127.0.0.1:7044
+[cycle 44] nc: received raven-tcp-soak
+[cycle 44] nc: echo 14 bytes
+[cycle 44] nc: done
+[cycle 44] nc: received raven-tcp-soak
+[cycle 44] nc: done
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp TIME_WAIT 127.0.0.1:7043 remote=127.0.0.1:57162 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 44] netstat: tcp TIME_WAIT 127.0.0.1:7044 remote=127.0.0.1:39259 iface=lo rx=0 tx=0
+[cycle 44] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 44] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 45] tcp-port: 7045
+[cycle 45] nc: listening tcp 127.0.0.1:7045
+[cycle 45] nc: connected tcp 127.0.0.1:7045
+[cycle 45] nc: received raven-tcp-soak
+[cycle 45] nc: echo 14 bytes
+[cycle 45] nc: received raven-tcp-soak
+[cycle 45] nc: done
+[cycle 45] nc: done
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp TIME_WAIT 127.0.0.1:7043 remote=127.0.0.1:57162 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp TIME_WAIT 127.0.0.1:7044 remote=127.0.0.1:39259 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 45] netstat: tcp TIME_WAIT 127.0.0.1:7045 remote=127.0.0.1:49993 iface=lo rx=0 tx=0
+[cycle 45] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 45] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 46] tcp-port: 7046
+[cycle 46] nc: listening tcp 127.0.0.1:7046
+[cycle 46] nc: connected tcp 127.0.0.1:7046
+[cycle 46] nc: received raven-tcp-soak
+[cycle 46] nc: echo 14 bytes
+[cycle 46] nc: received raven-tcp-soak
+[cycle 46] nc: done
+[cycle 46] nc: done
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp TIME_WAIT 127.0.0.1:7043 remote=127.0.0.1:57162 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp TIME_WAIT 127.0.0.1:7044 remote=127.0.0.1:39259 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp TIME_WAIT 127.0.0.1:7045 remote=127.0.0.1:49993 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 46] netstat: tcp TIME_WAIT 127.0.0.1:7046 remote=127.0.0.1:57688 iface=lo rx=0 tx=0
+[cycle 46] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 46] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 47] tcp-port: 7047
+[cycle 47] nc: listening tcp 127.0.0.1:7047
+[cycle 47] nc: connected tcp 127.0.0.1:7047
+[cycle 47] nc: received raven-tcp-soak
+[cycle 47] nc: echo 14 bytes
+[cycle 47] nc: done
+[cycle 47] nc: received raven-tcp-soak
+[cycle 47] nc: done
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp TIME_WAIT 127.0.0.1:7043 remote=127.0.0.1:57162 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp TIME_WAIT 127.0.0.1:7044 remote=127.0.0.1:39259 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp TIME_WAIT 127.0.0.1:7045 remote=127.0.0.1:49993 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp TIME_WAIT 127.0.0.1:7046 remote=127.0.0.1:57688 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 47] netstat: tcp TIME_WAIT 127.0.0.1:7047 remote=127.0.0.1:51075 iface=lo rx=0 tx=0
+[cycle 47] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 47] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 48] tcp-port: 7048
+[cycle 48] nc: listening tcp 127.0.0.1:7048
+[cycle 48] nc: connected tcp 127.0.0.1:7048
+[cycle 48] nc: received raven-tcp-soak
+[cycle 48] nc: echo 14 bytes
+[cycle 48] nc: done
+[cycle 48] nc: received raven-tcp-soak
+[cycle 48] nc: done
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp TIME_WAIT 127.0.0.1:7043 remote=127.0.0.1:57162 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp TIME_WAIT 127.0.0.1:7044 remote=127.0.0.1:39259 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp TIME_WAIT 127.0.0.1:7045 remote=127.0.0.1:49993 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp TIME_WAIT 127.0.0.1:7046 remote=127.0.0.1:57688 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp TIME_WAIT 127.0.0.1:7047 remote=127.0.0.1:51075 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 48] netstat: tcp TIME_WAIT 127.0.0.1:7048 remote=127.0.0.1:42090 iface=lo rx=0 tx=0
+[cycle 48] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 48] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 49] tcp-port: 7049
+[cycle 49] nc: listening tcp 127.0.0.1:7049
+[cycle 49] nc: connected tcp 127.0.0.1:7049
+[cycle 49] nc: received raven-tcp-soak
+[cycle 49] nc: echo 14 bytes
+[cycle 49] nc: done
+[cycle 49] nc: received raven-tcp-soak
+[cycle 49] nc: done
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp TIME_WAIT 127.0.0.1:7044 remote=127.0.0.1:39259 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp TIME_WAIT 127.0.0.1:7045 remote=127.0.0.1:49993 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp TIME_WAIT 127.0.0.1:7046 remote=127.0.0.1:57688 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp TIME_WAIT 127.0.0.1:7047 remote=127.0.0.1:51075 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp TIME_WAIT 127.0.0.1:7048 remote=127.0.0.1:42090 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 49] netstat: tcp TIME_WAIT 127.0.0.1:7049 remote=127.0.0.1:53944 iface=lo rx=0 tx=0
+[cycle 49] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 49] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 50] tcp-port: 7000
+[cycle 50] nc: listening tcp 127.0.0.1:7000
+[cycle 50] nc: connected tcp 127.0.0.1:7000
+[cycle 50] nc: received raven-tcp-soak
+[cycle 50] nc: echo 14 bytes
+[cycle 50] nc: done
+[cycle 50] nc: received raven-tcp-soak
+[cycle 50] nc: done
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp TIME_WAIT 127.0.0.1:7046 remote=127.0.0.1:57688 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp TIME_WAIT 127.0.0.1:7047 remote=127.0.0.1:51075 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp TIME_WAIT 127.0.0.1:7048 remote=127.0.0.1:42090 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp TIME_WAIT 127.0.0.1:7049 remote=127.0.0.1:53944 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 50] netstat: tcp TIME_WAIT 127.0.0.1:7000 remote=127.0.0.1:50217 iface=lo rx=0 tx=0
+[cycle 50] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 50] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 51] tcp-port: 7001
+[cycle 51] nc: listening tcp 127.0.0.1:7001
+[cycle 51] nc: connected tcp 127.0.0.1:7001
+[cycle 51] nc: received raven-tcp-soak
+[cycle 51] nc: echo 14 bytes
+[cycle 51] nc: done
+[cycle 51] nc: received raven-tcp-soak
+[cycle 51] nc: done
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp TIME_WAIT 127.0.0.1:7047 remote=127.0.0.1:51075 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp TIME_WAIT 127.0.0.1:7048 remote=127.0.0.1:42090 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp TIME_WAIT 127.0.0.1:7049 remote=127.0.0.1:53944 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp TIME_WAIT 127.0.0.1:7000 remote=127.0.0.1:50217 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 51] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:40520 iface=lo rx=0 tx=0
+[cycle 51] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 51] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 52] tcp-port: 7002
+[cycle 52] nc: listening tcp 127.0.0.1:7002
+[cycle 52] nc: connected tcp 127.0.0.1:7002
+[cycle 52] nc: received raven-tcp-soak
+[cycle 52] nc: echo 14 bytes
+[cycle 52] nc: done
+[cycle 52] nc: received raven-tcp-soak
+[cycle 52] nc: done
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp TIME_WAIT 127.0.0.1:7048 remote=127.0.0.1:42090 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp TIME_WAIT 127.0.0.1:7049 remote=127.0.0.1:53944 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp TIME_WAIT 127.0.0.1:7000 remote=127.0.0.1:50217 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:40520 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 52] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:60458 iface=lo rx=0 tx=0
+[cycle 52] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 52] netstat: eth0 rx_packets=2 tx_packets=2 rx_bytes=632 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 53] tcp-port: 7003
+[cycle 53] nc: listening tcp 127.0.0.1:7003
+[cycle 53] nc: connected tcp 127.0.0.1:7003
+[cycle 53] nc: received raven-tcp-soak
+[cycle 53] nc: echo 14 bytes
+[cycle 53] nc: done
+[cycle 53] nc: received raven-tcp-soak
+[cycle 53] nc: done
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp TIME_WAIT 127.0.0.1:7049 remote=127.0.0.1:53944 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp TIME_WAIT 127.0.0.1:7000 remote=127.0.0.1:50217 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:40520 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:60458 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp LAST_ACK 127.0.0.1:39022 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 53] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:39022 iface=lo rx=0 tx=0
+[cycle 53] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 53] netstat: eth0 rx_packets=3 tx_packets=2 rx_bytes=742 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 54] tcp-port: 7004
+[cycle 54] nc: listening tcp 127.0.0.1:7004
+[cycle 54] nc: connected tcp 127.0.0.1:7004
+[cycle 54] nc: received raven-tcp-soak
+[cycle 54] nc: echo 14 bytes
+[cycle 54] nc: done
+[cycle 54] nc: received raven-tcp-soak
+[cycle 54] nc: done
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp TIME_WAIT 127.0.0.1:7000 remote=127.0.0.1:50217 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:40520 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:60458 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:39022 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:39022 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp LAST_ACK 127.0.0.1:48865 remote=127.0.0.1:7004 iface=lo rx=0 tx=0
+[cycle 54] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:48865 iface=lo rx=0 tx=0
+[cycle 54] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 54] netstat: eth0 rx_packets=3 tx_packets=2 rx_bytes=742 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 55] tcp-port: 7005
+[cycle 55] nc: listening tcp 127.0.0.1:7005
+[cycle 55] nc: connected tcp 127.0.0.1:7005
+[cycle 55] nc: received raven-tcp-soak
+[cycle 55] nc: echo 14 bytes
+[cycle 55] nc: done
+[cycle 55] nc: received raven-tcp-soak
+[cycle 55] nc: done
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp TIME_WAIT 127.0.0.1:7001 remote=127.0.0.1:40520 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:60458 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:39022 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:39022 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:48865 remote=127.0.0.1:7004 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:48865 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp LAST_ACK 127.0.0.1:51442 remote=127.0.0.1:7005 iface=lo rx=0 tx=0
+[cycle 55] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:51442 iface=lo rx=0 tx=0
+[cycle 55] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 55] netstat: eth0 rx_packets=3 tx_packets=2 rx_bytes=742 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 56] tcp-port: 7006
+[cycle 56] nc: listening tcp 127.0.0.1:7006
+[cycle 56] nc: connected tcp 127.0.0.1:7006
+[cycle 56] nc: received raven-tcp-soak
+[cycle 56] nc: echo 14 bytes
+[cycle 56] nc: done
+[cycle 56] nc: received raven-tcp-soak
+[cycle 56] nc: done
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp TIME_WAIT 127.0.0.1:7002 remote=127.0.0.1:60458 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:39022 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:39022 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:48865 remote=127.0.0.1:7004 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:48865 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:51442 remote=127.0.0.1:7005 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:51442 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp LAST_ACK 127.0.0.1:37492 remote=127.0.0.1:7006 iface=lo rx=0 tx=0
+[cycle 56] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:37492 iface=lo rx=0 tx=0
+[cycle 56] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 56] netstat: eth0 rx_packets=3 tx_packets=2 rx_bytes=742 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 57] tcp-port: 7007
+[cycle 57] nc: listening tcp 127.0.0.1:7007
+[cycle 57] nc: connected tcp 127.0.0.1:7007
+[cycle 57] nc: received raven-tcp-soak
+[cycle 57] nc: echo 14 bytes
+[cycle 57] nc: done
+[cycle 57] nc: received raven-tcp-soak
+[cycle 57] nc: done
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:39022 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp TIME_WAIT 127.0.0.1:7003 remote=127.0.0.1:39022 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:48865 remote=127.0.0.1:7004 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:48865 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:51442 remote=127.0.0.1:7005 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:51442 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:37492 remote=127.0.0.1:7006 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:37492 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp LAST_ACK 127.0.0.1:33460 remote=127.0.0.1:7007 iface=lo rx=0 tx=0
+[cycle 57] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:33460 iface=lo rx=0 tx=0
+[cycle 57] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 57] netstat: eth0 rx_packets=3 tx_packets=2 rx_bytes=742 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 58] tcp-port: 7008
+[cycle 58] nc: listening tcp 127.0.0.1:7008
+[cycle 58] nc: connected tcp 127.0.0.1:7008
+[cycle 58] nc: received raven-tcp-soak
+[cycle 58] nc: echo 14 bytes
+[cycle 58] nc: done
+[cycle 58] nc: received raven-tcp-soak
+[cycle 58] nc: done
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:39022 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:48865 remote=127.0.0.1:7004 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp TIME_WAIT 127.0.0.1:7004 remote=127.0.0.1:48865 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:51442 remote=127.0.0.1:7005 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:51442 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:37492 remote=127.0.0.1:7006 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:37492 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:33460 remote=127.0.0.1:7007 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:33460 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp LAST_ACK 127.0.0.1:38656 remote=127.0.0.1:7008 iface=lo rx=0 tx=0
+[cycle 58] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:38656 iface=lo rx=0 tx=0
+[cycle 58] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 58] netstat: eth0 rx_packets=3 tx_packets=2 rx_bytes=742 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 59] tcp-port: 7009
+[cycle 59] nc: listening tcp 127.0.0.1:7009
+[cycle 59] nc: connected tcp 127.0.0.1:7009
+[cycle 59] nc: received raven-tcp-soak
+[cycle 59] nc: echo 14 bytes
+[cycle 59] nc: done
+[cycle 59] nc: received raven-tcp-soak
+[cycle 59] nc: done
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:39022 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:48865 remote=127.0.0.1:7004 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:51442 remote=127.0.0.1:7005 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp TIME_WAIT 127.0.0.1:7005 remote=127.0.0.1:51442 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:37492 remote=127.0.0.1:7006 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:37492 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:33460 remote=127.0.0.1:7007 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:33460 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:38656 remote=127.0.0.1:7008 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:38656 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp LAST_ACK 127.0.0.1:45864 remote=127.0.0.1:7009 iface=lo rx=0 tx=0
+[cycle 59] netstat: tcp TIME_WAIT 127.0.0.1:7009 remote=127.0.0.1:45864 iface=lo rx=0 tx=0
+[cycle 59] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 59] netstat: eth0 rx_packets=3 tx_packets=2 rx_bytes=742 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 60] tcp-port: 7010
+[cycle 60] nc: listening tcp 127.0.0.1:7010
+[cycle 60] nc: connected tcp 127.0.0.1:7010
+[cycle 60] nc: received raven-tcp-soak
+[cycle 60] nc: echo 14 bytes
+[cycle 60] nc: done
+[cycle 60] nc: received raven-tcp-soak
+[cycle 60] nc: done
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:47445 remote=127.0.0.1:7033 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:50720 remote=127.0.0.1:7034 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:44694 remote=127.0.0.1:7035 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:50935 remote=127.0.0.1:7036 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:46490 remote=127.0.0.1:7037 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:51549 remote=127.0.0.1:7038 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:52346 remote=127.0.0.1:7039 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:40217 remote=127.0.0.1:7040 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:53142 remote=127.0.0.1:7041 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:45669 remote=127.0.0.1:7042 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:57162 remote=127.0.0.1:7043 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:39259 remote=127.0.0.1:7044 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:49993 remote=127.0.0.1:7045 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:57688 remote=127.0.0.1:7046 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:51075 remote=127.0.0.1:7047 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:42090 remote=127.0.0.1:7048 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:53944 remote=127.0.0.1:7049 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:50217 remote=127.0.0.1:7000 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:40520 remote=127.0.0.1:7001 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:60458 remote=127.0.0.1:7002 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:39022 remote=127.0.0.1:7003 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:48865 remote=127.0.0.1:7004 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:51442 remote=127.0.0.1:7005 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:37492 remote=127.0.0.1:7006 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp TIME_WAIT 127.0.0.1:7006 remote=127.0.0.1:37492 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:33460 remote=127.0.0.1:7007 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp TIME_WAIT 127.0.0.1:7007 remote=127.0.0.1:33460 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:38656 remote=127.0.0.1:7008 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp TIME_WAIT 127.0.0.1:7008 remote=127.0.0.1:38656 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:45864 remote=127.0.0.1:7009 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp TIME_WAIT 127.0.0.1:7009 remote=127.0.0.1:45864 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp LAST_ACK 127.0.0.1:49270 remote=127.0.0.1:7010 iface=lo rx=0 tx=0
+[cycle 60] netstat: tcp TIME_WAIT 127.0.0.1:7010 remote=127.0.0.1:49270 iface=lo rx=0 tx=0
+[cycle 60] netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0
+[cycle 60] netstat: eth0 rx_packets=3 tx_packets=2 rx_bytes=742 tx_bytes=684 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0

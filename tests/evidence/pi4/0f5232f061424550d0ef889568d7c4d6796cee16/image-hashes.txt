@@ -1,0 +1,4 @@
+4229dcd419c71ed5ffc133268dd75475c89b67e8d2453a15078d4ccd94bff136  build/aarch64/ravenbsd-pi4.img
+5aca161509d40f6a8fbf2cad6a5ab338e00c94c1907518818778c6f5775aafa6  build/aarch64/ravenbsd-pi4-sd.img
+a362d92324852945b033f2424a917eadb65954ff786a6b5cd72e4cb2262a06c1  build/aarch64/initfs.img
+fad262ca198a6d8f9ac56f67071521c925dbab12fd6a65f9f115808758a3b1a4  build/fixtures/pi4-release/pi4.dtb

@@ -1,0 +1,20 @@
+# tree sha: 0f5232f061424550d0ef889568d7c4d6796cee16
+# date: 2026-11-21T16:10:10Z
+-rw-rw-r-- 1 bo bo  60534784 2026-11-21 13:12:35.129198651 +0100 build/aarch64/initfs.img
+-rw-rw-r-- 1 bo bo 335544320 2026-11-18 18:01:31.465603880 +0100 build/aarch64/ravenbsd-pi4.img
+-rw-rw-r-- 1 bo bo 500187648 2026-11-18 18:25:47.250313952 +0100 build/aarch64/ravenbsd-pi4-sd.img
+-rw-rw-r-- 1 bo bo       371 2026-11-17 03:46:35.645563303 +0100 build/fixtures/pi4-release/pi4.dtb
+
+Disk build/aarch64/ravenbsd-pi4-sd.img: 477,02 MiB, 500187648 bytes, 976929 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: 075A64C4-CF36-F324-9A2D-DE00B4BB4513
+
+Device                              Start    End Sectors  Size Type
+build/aarch64/ravenbsd-pi4-sd.img1   2048 452607  450560  220M EFI System
+build/aarch64/ravenbsd-pi4-sd.img2 452608 976895  524288  256M FreeBSD UFS
+
+build/aarch64/ravenbsd-pi4.img:    DOS/MBR boot sector; partition 1 : ID=0xee, start-CHS (0x0,0,2), end-CHS (0x3ff,255,63), startsector 1, 655359 sectors, extended partition table (last)
+build/aarch64/ravenbsd-pi4-sd.img: DOS/MBR boot sector; partition 1 : ID=0xee, start-CHS (0x0,0,2), end-CHS (0x3ff,255,63), startsector 1, 976928 sectors, extended partition table (last)
