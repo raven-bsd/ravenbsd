@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K372: a pipe fd is pollable through the guest libc poll/EVQ path. The C fixture
+# proves POLLOUT on an empty writable pipe, POLLIN after a write, POLLHUP/EOF after
+# the writer closes, and a blocked poll woken by a forked writer. It runs as /init
+# on the normal base kernel with a test-only initfs.
+
+name = "pipe-poll"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/pipe-poll/build.sh"]
+initfs = "build/fixtures/pipe-poll/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pipe-poll: pollout ok$'
+
+[[expect]]
+regex = '^pipe-poll: pollin ok$'
+
+[[expect]]
+regex = '^pipe-poll: hup ok$'
+
+[[expect]]
+regex = '^pipe-poll: wake ok$'
+
+[[expect]]
+regex = '^pipe-poll: ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pipe-poll: fail'
