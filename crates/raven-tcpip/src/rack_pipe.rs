@@ -21,24 +21,11 @@
 use alloc::vec::Vec;
 
 use crate::rack_hpts::RackHpts;
+use crate::rack_misc::{
+    RACK_ACKED, RACK_INITIAL_RTO, RACK_SACK_PASSED, RACK_WAS_LOST, RACK_WAS_SACKPASS, RackSendmap,
+};
 use crate::rack_vtable::{RackStack, TCPS_ESTABLISHED, TF_SENTFIN};
 
-/// `RACK_NUM_OF_RETRANS`.
-pub const RACK_NUM_OF_RETRANS: usize = 3;
-/// `RACK_ACKED`.
-pub const RACK_ACKED: u32 = 0x0000_0001;
-/// `RACK_TO_REXT`.
-pub const RACK_TO_REXT: u32 = 0x0000_0002;
-/// `RACK_SACK_PASSED`.
-pub const RACK_SACK_PASSED: u32 = 0x0000_0010;
-/// `RACK_WAS_SACKPASS`.
-pub const RACK_WAS_SACKPASS: u32 = 0x0000_0020;
-/// `RACK_MUST_RXT`.
-pub const RACK_MUST_RXT: u32 = 0x0001_0000;
-/// `RACK_WAS_LOST`.
-pub const RACK_WAS_LOST: u32 = 0x0040_0000;
-/// `RACK_INITIAL_RTO` (1 s in microseconds).
-pub const RACK_INITIAL_RTO: u32 = 1_000_000;
 /// `rack_tlp_min` (10 ms).
 pub const RACK_TLP_MIN: u32 = 10_000;
 /// `rack_rto_max` (4 s).
@@ -73,63 +60,6 @@ pub const CC_NDUPACK: u32 = 0x0800;
 pub const EXIT_RECOVERY_MASK: u32 = TF_CONGRECOVERY | TF_FASTRECOVERY;
 /// `IN_RECOVERY` mask.
 pub const IN_RECOVERY_MASK: u32 = TF_CONGRECOVERY | TF_FASTRECOVERY;
-
-/// One `struct rack_sendmap` entry in sequence order.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct RackSendmap {
-    /// `r_start`.
-    pub start: u32,
-    /// `r_end`.
-    pub end: u32,
-    /// `r_flags`.
-    pub flags: u32,
-    /// `r_rtr_cnt` (1 after the first transmission).
-    pub rtr_cnt: u8,
-    /// `r_tim_lastsent[]`.
-    pub tim_lastsent: [u32; RACK_NUM_OF_RETRANS],
-}
-
-impl RackSendmap {
-    /// A sendmap entry transmitted once at `now`.
-    #[must_use]
-    pub const fn new(start: u32, end: u32, now: u32) -> Self {
-        Self {
-            start,
-            end,
-            flags: 0,
-            rtr_cnt: 1,
-            tim_lastsent: [now; RACK_NUM_OF_RETRANS],
-        }
-    }
-
-    /// `r_end - r_start`.
-    #[must_use]
-    pub const fn len(&self) -> u32 {
-        self.end.wrapping_sub(self.start)
-    }
-
-    /// `true` when the entry covers no sequence space.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.start == self.end
-    }
-
-    /// `r_tim_lastsent[r_rtr_cnt - 1]`.
-    #[must_use]
-    pub const fn last_sent(&self) -> u32 {
-        let index = if self.rtr_cnt == 0 {
-            0
-        } else {
-            (self.rtr_cnt as usize) - 1
-        };
-        let index = if index >= RACK_NUM_OF_RETRANS {
-            RACK_NUM_OF_RETRANS - 1
-        } else {
-            index
-        };
-        self.tim_lastsent[index]
-    }
-}
 
 /// `true` when `a < b` in the donor `TSTMP_LT` wrapping-microsecond order.
 #[must_use]
