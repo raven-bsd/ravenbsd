@@ -302,6 +302,7 @@ members = [
     "tests/tcp-input-model",
     "tests/tcp-ecn-model",
     "tests/tcp-window-model",
+    "tests/tcp-sack-model",
     "tests/tcpip/conformance",
     "tests/tcpip/fuzz-replay",
     "tests/tcpip/interop",
