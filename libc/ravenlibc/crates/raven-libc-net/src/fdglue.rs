@@ -68,19 +68,23 @@ impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
         match crate::backend_platform::event_handle(self.platform.backend(), s) {
             Ok(event) => {
                 let set = self.platform.set_ofd_event(ofd, event);
-                let set_text = match &set {
-                    Ok(()) => alloc::string::String::from("ok"),
-                    Err(error) => alloc::format!("err={}", error.0),
-                };
                 let text = alloc::format!(
-                    "k195a sock={} attach=ok event={} set={set_text}\n",
+                    "k195a sock={} attach=ok event={} set={}\n",
                     s.0,
-                    event.0
+                    event.0,
+                    match &set {
+                        Ok(()) => alloc::format!("ok"),
+                        Err(error) => alloc::format!("err={}", error.0),
+                    }
                 );
                 let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
             }
             Err(error) => {
-                let text = alloc::format!("k195a sock={} attach=err errno={}\n", s.0, error.0);
+                let text = alloc::format!(
+                    "k195a sock={} attach=err errno={}\n",
+                    s.0,
+                    error.0
+                );
                 let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
             }
         }
