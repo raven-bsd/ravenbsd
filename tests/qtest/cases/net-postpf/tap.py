@@ -123,16 +123,22 @@ def read_until(pattern, timeout):
 
 
 def send(value):
-    data = value.encode()
-    while data:
-        try:
-            written = os.write(fd, data)
-        except BlockingIOError:
-            select.select([], [fd], [], 0.5)
-            continue
-        if written <= 0:
-            fail("serial write made no progress")
-        data = data[written:]
+    # Pace one byte at a time: the guest's 16550 input path can lose the tail of
+    # a burst once the first byte has raised the RX interrupt. The qtest's own
+    # step writer is similarly paced; a single os.write of the full ping command
+    # reproduces the first-byte-only failure recorded in selftest-failure.log.
+    for byte in value.encode():
+        data = bytes([byte])
+        while data:
+            try:
+                written = os.write(fd, data)
+            except BlockingIOError:
+                select.select([], [fd], [], 0.5)
+                continue
+            if written <= 0:
+                fail("serial write made no progress")
+            data = data[written:]
+        time.sleep(0.005)
 
 
 def guest(command, pattern, timeout):
