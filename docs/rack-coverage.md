@@ -137,9 +137,9 @@ Legend:
 | 112 | `rack_apply_updated_usrtt` (L8727) | K334 | - | - | - | ASSIGNED K334 |
 | 113 | `rack_update_rtt` (L8773) | K331 | - | - | - | ASSIGNED K331 |
 | 114 | `rack_log_sack_passed` (L9021) | K329 | crate::rack_log::rack_log_sack_passed | donor_rack_log_sack_passed | event suppression -> test fails | PASS |
-| 115 | `rack_need_set_test` (L9082) | K331 | - | - | - | ASSIGNED K331 |
+| 115 | `rack_need_set_test` (L9082) | K331 | crate::rack_retransmit::RackRetransmit::rack_need_set_test | rack_need_set_test_advances_the_goodput_window | remove the RACK_USE_END sequence update -> test fails (exit 100) | PASS |
 | 116 | `is_rsm_inside_declared_tlp_block` (L9232) | K334 | - | - | - | ASSIGNED K334 |
-| 117 | `rack_check_reorder_ack` (L9248) | K331 | - | - | - | ASSIGNED K331 |
+| 117 | `rack_check_reorder_ack` (L9248) | K331 | crate::rack_retransmit::RackRetransmit::rack_check_reorder_ack | rack_check_reorder_ack_undoes_spurious_recovery | remove the can_exit recovery block -> test fails (exit 100) | PASS |
 | 118 | `rack_proc_sack_blk` (L9282) | K336 | - | - | - | ASSIGNED K336 |
 | 119 | `rack_peer_reneges` (L10055) | K336 | - | - | - | ASSIGNED K336 |
 | 120 | `rack_rsm_sender_update` (L10091) | K334 | - | - | - | ASSIGNED K334 |

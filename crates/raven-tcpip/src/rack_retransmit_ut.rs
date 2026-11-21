@@ -98,6 +98,113 @@ fn rack_update_rsm_counts_retransmits_and_moves_time_order() {
 }
 
 #[test]
+fn rack_need_set_test_advances_the_goodput_window() {
+    let mut model = base_model();
+    let ids = fill(&mut model);
+    model.stack.tp.t_flags |= TF_GPUTINPROG;
+    model.gput_seq = 1_500;
+    model.gput_ts = 100;
+    model.gput_ack = 1_500;
+    model.act_rcv_time = 5_000;
+    model.rack_need_set_test(ids[0], 2_000, RACK_USE_END);
+    assert_eq!(model.gput_seq, 2_000);
+    assert_eq!(model.gput_ts, 5_000);
+    assert_eq!(model.gput_ack, 12_000);
+    assert_eq!(model.gp_output_ts, 1_100);
+    assert!(!model.app_limited_needs_set);
+    assert_eq!(model.gp_logs, 1);
+    assert_eq!(model.gp_marks_tended, 1);
+
+    // The sequence at snd_max has not been sent: stay app-limited.
+    model.gput_seq = 3_000;
+    model.gput_ts = 200;
+    model.gput_ack = 3_000;
+    model.rack_need_set_test(ids[2], 4_000, RACK_USE_END);
+    assert_eq!(model.gput_seq, 4_000);
+    assert!(model.app_limited_needs_set);
+    assert_eq!(model.gp_output_ts, 1_200);
+
+    // A retransmitted entry has an ambiguous timestamp and must not move the window.
+    let retransmitted = fill(&mut model)[0];
+    model.rack_update_rsm(retransmitted, 2_000, RACK_SENT_FP, 1_000);
+    model.gput_seq = 1_500;
+    model.gput_ts = 300;
+    model.gput_ack = 1_500;
+    let before = (model.gput_seq, model.gput_ts, model.gput_ack);
+    model.rack_need_set_test(retransmitted, 4_000, RACK_USE_END);
+    assert_eq!((model.gput_seq, model.gput_ts, model.gput_ack), before);
+}
+
+#[test]
+fn rack_check_reorder_ack_undoes_spurious_recovery() {
+    let mut model = base_model();
+    let id = model.send(1_000, 2_000, 1_000);
+    model.rack_update_rsm(id, 2_000, RACK_SENT_FP, 1_000);
+    if let Some(entry) = model.map.find_id_mut(id) {
+        entry.flags |= RACK_WAS_SACKPASS;
+    }
+    model.in_fast_recovery = true;
+    model.stack.tp.t_srtt = 800;
+    model.recovery_rxt_cnt = 1_000;
+    model.ssthresh_at_erec = 5_000;
+    model.might_revert = true;
+    model.retran_during_recovery = 1_000;
+    assert!(model.rack_check_reorder_ack(id, 2_000, 2_300, true));
+    assert_eq!(model.reorder_ts, 2_300);
+    assert_eq!(model.recovery_rxt_cnt, 0);
+    assert_eq!(model.stack.tp.snd_ssthresh, 5_000);
+    assert!(!model.in_fast_recovery);
+    assert!(!model.might_revert);
+    assert_eq!(model.retran_during_recovery, 0);
+    assert_eq!(model.prr_logs, 2);
+
+    // Too slow to be a reordered ACK.
+    let mut late = base_model();
+    let id = late.send(1_000, 2_000, 1_000);
+    late.rack_update_rsm(id, 2_000, RACK_SENT_FP, 1_000);
+    if let Some(entry) = late.map.find_id_mut(id) {
+        entry.flags |= RACK_WAS_SACKPASS;
+    }
+    late.in_fast_recovery = true;
+    late.stack.tp.t_srtt = 800;
+    assert!(!late.rack_check_reorder_ack(id, 2_000, 3_000, true));
+
+    // Without the exit permission the retransmit count is decremented but recovery stays.
+    let mut held = base_model();
+    let id = held.send(1_000, 2_000, 1_000);
+    held.rack_update_rsm(id, 2_000, RACK_SENT_FP, 1_000);
+    if let Some(entry) = held.map.find_id_mut(id) {
+        entry.flags |= RACK_WAS_SACKPASS;
+    }
+    held.in_fast_recovery = true;
+    held.stack.tp.t_srtt = 800;
+    held.recovery_rxt_cnt = 1_000;
+    assert!(held.rack_check_reorder_ack(id, 2_000, 2_300, false));
+    assert_eq!(held.recovery_rxt_cnt, 0);
+    assert!(held.in_fast_recovery);
+
+    // The guard set: no recovery flag, wrong retransmit count, or no SACK-pass flag.
+    let mut idle = base_model();
+    let id = idle.send(1_000, 2_000, 1_000);
+    idle.rack_update_rsm(id, 2_000, RACK_SENT_FP, 1_000);
+    if let Some(entry) = idle.map.find_id_mut(id) {
+        entry.flags |= RACK_WAS_SACKPASS;
+    }
+    idle.stack.tp.t_srtt = 800;
+    assert!(!idle.rack_check_reorder_ack(id, 2_000, 2_300, true));
+    idle.in_fast_recovery = true;
+    if let Some(entry) = idle.map.find_id_mut(id) {
+        entry.rtr_cnt = 1;
+    }
+    assert!(!idle.rack_check_reorder_ack(id, 2_000, 2_300, true));
+    if let Some(entry) = idle.map.find_id_mut(id) {
+        entry.rtr_cnt = 2;
+        entry.flags &= !RACK_WAS_SACKPASS;
+    }
+    assert!(!idle.rack_check_reorder_ack(id, 2_000, 2_300, true));
+}
+
+#[test]
 fn rack_update_entry_splits_partial_and_reports_overhang() {
     let mut model = RackRetransmit::new(1_000);
     let id = model.send(1_000, 3_000, 1_000);
