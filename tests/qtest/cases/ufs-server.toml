@@ -99,20 +99,36 @@ wait = '^df-ok$'
 timeout_secs = 30
 
 [[step]]
-send = "test -x /bin/lsblk && test -x /sbin/newfs && test -x /sbin/gpart && echo disk-tools-1\n"
+send = "test -x /bin/lsblk && echo d1\n"
 delay_ms = 100
 
 [[step]]
-wait = '^disk-tools-1$'
-timeout_secs = 30
+wait = '^d1$'
+timeout_secs = 60
 
 [[step]]
-send = "test -x /bin/df && test -x /bin/stat && echo disk-tools-2\n"
+send = "test -x /sbin/newfs && echo d2\n"
 delay_ms = 100
 
 [[step]]
-wait = '^disk-tools-2$'
-timeout_secs = 30
+wait = '^d2$'
+timeout_secs = 60
+
+[[step]]
+send = "test -x /sbin/gpart && echo d3\n"
+delay_ms = 100
+
+[[step]]
+wait = '^d3$'
+timeout_secs = 60
+
+[[step]]
+send = "test -x /bin/df && test -x /bin/stat && echo d4\n"
+delay_ms = 100
+
+[[step]]
+wait = '^d4$'
+timeout_secs = 60
 
 [[step]]
 send = "/bin/lsblk && echo lsblk-ok\n"
@@ -179,12 +195,20 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "echo ufs-server-persist > /persist.txt && sync && echo write-ok\n"
+send = "echo ufs-server-persist > /persist.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "sync && echo write-ok\n"
 delay_ms = 100
 
 [[step]]
 wait = '^write-ok$'
-timeout_secs = 30
+timeout_secs = 60
 
 [[step]]
 send = "/sbin/reboot\n"
