@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K277 pfctl fixture manifest. Every `.conf` under this tree has a row.
+# `status=error` names the 1-based line the parser must report; the exact
+# diagnostic wording is owned by K274 and pinned in the sibling `.conf.err`.
+# file|status|line|construct|note
+pf.conf|ok|-|rules|supported pf.conf subset: macros, tables, set, rules, nat, rdr, anchor
+includes/main.conf|ok|-|include|include expands in place
+includes/included.conf|ok|-|include|fragment included by main.conf
+invalid/bad-address.conf|error|5|rules|reject an out-of-range IPv4 octet
+invalid/bad-flags.conf|error|4|rules|reject unknown TCP flag letters
+invalid/hostname.conf|error|4|rules|reject a hostname (literals only)
+invalid/undefined-macro.conf|error|4|rules|reject an undefined macro
+invalid/unterminated.conf|error|4|rules|reject an unterminated string

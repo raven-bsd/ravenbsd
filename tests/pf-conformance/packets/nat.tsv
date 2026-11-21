@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: nat
+# features: nat,ipv4,stateful,translation
+# reference: FreeBSD sys/netpfil/pf/pf_lb.c:pf_get_transaddr,pf_map_addr; sys/netpfil/pf/pf.c:pf_test_state
+# support: raven-pf (K273: translation before filtering, reverse rewrite on the reply)
+#
+# Mapping: 10.0.0.5:40000 -> 203.0.113.5:40000 (`static-port`) talking to
+# 198.51.100.20:80. The outbound row carries the pre-translation tuple and the
+# expected translation; the inbound row is the wire reply that the state maps
+# back to the original tuple.
+# expect-counters in_pass=1 in_block=0 out_pass=2 out_block=0 states_created=1 states_expired=0 state_hits=2
+# now direction interface proto source sport destination dport length flags expected disposition fragment translation
+0 out eth0 tcp 10.0.0.5         40000 198.51.100.20 80 60 S  pass created  - 203.0.113.5:40000>198.51.100.20:80
+1 in  eth0 tcp 198.51.100.20    80    203.0.113.5   40000 60 SA pass existing - 198.51.100.20:80>10.0.0.5:40000
+2 out eth0 tcp 10.0.0.5         40000 198.51.100.20 80 60 A  pass existing - 203.0.113.5:40000>198.51.100.20:80

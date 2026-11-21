@@ -1152,6 +1152,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rack-timer-model"
+version = "0.1.0"
+
+[[package]]
 name = "rack-tlp-model"
 version = "0.1.0"
 dependencies = [

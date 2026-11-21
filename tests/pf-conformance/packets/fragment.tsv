@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: fragment
+# features: ipv4,fragmentation,reassembly,allow,deny
+# reference: OpenBSD sys/net/pf_norm.c:pf_reassemble; sys/net/pf.c:pf_normalize_ip; FreeBSD sys/netpfil/pf/pf_norm.c
+# support: donor-only (raven-pf at a426dee0 has no fragment model)
+#
+# With `scrub ... fragment reassemble`, pf_reassemble queues an incomplete
+# fragment and returns PF_PASS with *m0 == NULL, so the fragment is consumed
+# and not forwarded. The completed datagram is filtered once, and its verdict
+# is the third row. `queued` is a fixture state, not a forward verdict.
+# The final field is the byte offset and More-Fragments flag.
+#
+# now direction interface proto source sport destination dport length flags expected disposition fragment
+0   in  eth0 tcp 10.0.0.5 40000 192.0.2.10 80   1480 S  queued - 0/1
+1   in  eth0 tcp 10.0.0.5 40000 192.0.2.10 80   1480 -  queued - 1480/1
+2   in  eth0 tcp 10.0.0.5 40000 192.0.2.10 80   48   -  pass   - 2960/0
+3   in  eth0 udp 10.0.0.6 50000 192.0.2.10 5000 1480 -  queued - 0/1
+4   in  eth0 udp 10.0.0.6 50000 192.0.2.10 5000 1480 -  queued - 1480/1
+5   in  eth0 udp 10.0.0.6 50000 192.0.2.10 5000 48   -  block  - 2960/0
