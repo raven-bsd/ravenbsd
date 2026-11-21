@@ -298,6 +298,7 @@ members = [
     "tests/tcpip",
     "tests/tcp-output-stress",
     "tests/tcp-model",
+    "tests/tcp-input-model",
     "tests/tcpip/conformance",
     "tests/tcpip/fuzz-replay",
     "tests/tcpip/interop",
