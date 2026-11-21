@@ -60,10 +60,10 @@ fn the_public_vtable_runs_output_ack_and_queries() {
     };
     assert_eq!(stack.tfb_chg_query(&mut query), 0);
     let deadline = stack.os.tcp_hpts_insert(50);
-    stack.hpts_flags = PACE_TMR_RXT;
+    stack.hpts_flags = u32::from(PACE_TMR_RXT);
     stack.timer_exp = deadline;
     assert_eq!(stack.tfb_chg_query(&mut query), 1);
-    assert_eq!(query.timer_hpts_flags, PACE_TMR_RXT);
+    assert_eq!(query.timer_hpts_flags, u32::from(PACE_TMR_RXT));
 
     let mut times = RackQuery {
         req: TCP_QUERY_RACK_TIMES,
