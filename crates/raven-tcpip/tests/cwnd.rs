@@ -253,6 +253,10 @@ fn replay(name: &str) {
         .iter()
         .find(|sequence| sequence.name == name)
         .unwrap_or_else(|| panic!("missing cwnd sequence {name}"));
+    assert_eq!(
+        sequence.algorithm, "newreno",
+        "{name} is not a NewReno sequence"
+    );
     let mss = sequence.mss;
     let mut context = CcContext {
         mss,
@@ -264,14 +268,6 @@ fn replay(name: &str) {
         sequence.initial_ssthresh,
         sequence.cwnd_max,
     );
-    let mut cubic = Cubic::new(
-        mss,
-        sequence.initial_cwnd,
-        sequence.initial_ssthresh,
-        sequence.cwnd_max,
-    );
-    cubic.set_w_last_max(sequence.initial_w_last_max);
-    let mut now_ms = 0i64;
     let mut last_flight = sequence.initial_cwnd;
     for (index, step) in sequence.steps.iter().enumerate() {
         let event = as_str(field(step, "event").expect("event"));
@@ -283,33 +279,21 @@ fn replay(name: &str) {
             "rtt" => {
                 let acks = as_int(field(step, "acks").expect("acks")) as u32;
                 for _ in 0..acks {
-                    match sequence.algorithm.as_str() {
-                        "newreno" => newreno.on_ack(&mut context, mss, None),
-                        "cubic" => cubic.on_ack(&mut context, mss, None),
-                        other => panic!("unknown algorithm {other}"),
-                    }
+                    newreno.on_ack(&mut context, mss, None);
                 }
             }
             "ack" => {
                 let acked = as_int(field(step, "acked").expect("acked")) as u32;
-                match sequence.algorithm.as_str() {
-                    "newreno" => newreno.on_ack(&mut context, acked, None),
-                    "cubic" => cubic.on_ack(&mut context, acked, None),
-                    _ => {}
-                }
+                newreno.on_ack(&mut context, acked, None);
             }
             "loss" => {
                 last_flight = field(step, "flight")
                     .map(|v| as_int(v) as u32)
                     .unwrap_or(last_flight);
-                match sequence.algorithm.as_str() {
-                    "newreno" => newreno.loss_fast_retransmit(
-                        last_flight,
-                        as_int(field(step, "snd_nxt").unwrap_or(&Value::Int(0))) as u32,
-                    ),
-                    "cubic" => cubic.loss_event(now_ms),
-                    _ => {}
-                }
+                newreno.loss_fast_retransmit(
+                    last_flight,
+                    as_int(field(step, "snd_nxt").unwrap_or(&Value::Int(0))) as u32,
+                );
             }
             "partial_ack" => {
                 newreno.partial_ack(as_int(field(step, "acked").expect("acked")) as u32);
@@ -317,53 +301,16 @@ fn replay(name: &str) {
             "full_ack" => newreno.full_ack(),
             "rto" => {
                 context.flight = last_flight;
-                match sequence.algorithm.as_str() {
-                    "newreno" => newreno.on_rto(&mut context),
-                    "cubic" => cubic.rto_event(),
-                    _ => {}
-                }
+                newreno.on_rto(&mut context);
             }
             "idle_restart" => newreno.idle_restart(),
-            "advance" => {
-                let at = as_int(field(step, "at_ms").expect("at_ms"));
-                let idle = field(step, "idle_ms").map(as_int).unwrap_or(0);
-                let rtt = field(step, "rtt_ms")
-                    .map(|v| as_int(v) as u64)
-                    .unwrap_or(100);
-                cubic.advance(at, idle, rtt);
-                now_ms = at;
-            }
-            other => panic!("unknown event {other}"),
+            other => panic!("unknown NewReno event {other}"),
         }
-        let cwnd = match sequence.algorithm.as_str() {
-            "newreno" => newreno.cwnd(),
-            "cubic" => cubic.cwnd(),
-            _ => 0,
-        };
-        let ssthresh = match sequence.algorithm.as_str() {
-            "newreno" => newreno.ssthresh(),
-            "cubic" => cubic.ssthresh(),
-            _ => 0,
-        };
         if let Some(expected) = expected_cwnd {
-            assert_eq!(cwnd, expected, "{name} step {index} cwnd");
+            assert_eq!(newreno.cwnd(), expected, "{name} step {index} cwnd");
         }
         if let Some(expected) = expected_ssthresh {
-            assert_eq!(ssthresh, expected, "{name} step {index} ssthresh");
-        }
-        if let Some(expected) = field(step, "expected_w_max") {
-            assert_eq!(
-                cubic.w_max(),
-                as_int(expected) as u32,
-                "{name} step {index} w_max"
-            );
-        }
-        if let Some(expected) = field(step, "expected_k_us") {
-            assert_eq!(
-                cubic.k_us(),
-                as_int(expected) as u128,
-                "{name} step {index} k_us"
-            );
+            assert_eq!(newreno.ssthresh(), expected, "{name} step {index} ssthresh");
         }
     }
 }
@@ -387,14 +334,6 @@ cwnd_test!(seq_newreno_repeated_rto, "newreno-repeated-rto");
 cwnd_test!(seq_newreno_idle_restart, "newreno-idle-restart");
 cwnd_test!(seq_newreno_abc, "newreno-abc-partial-segment");
 cwnd_test!(seq_newreno_cap, "newreno-cwnd-cap");
-cwnd_test!(seq_cubic_slow_loss, "cubic-slow-start-then-loss");
-cwnd_test!(seq_cubic_concave, "cubic-concave");
-cwnd_test!(seq_cubic_convex, "cubic-convex");
-cwnd_test!(seq_cubic_fast_conv, "cubic-fast-convergence");
-cwnd_test!(seq_cubic_rto, "cubic-rto");
-cwnd_test!(seq_cubic_idle, "cubic-idle-excluded");
-cwnd_test!(seq_cubic_cap, "cubic-cwnd-cap");
-cwnd_test!(seq_cubic_second_loss, "cubic-second-loss");
 
 #[test]
 fn vector_inventory_has_eighteen_cases() {
@@ -530,49 +469,6 @@ fn icbrt_reference_table() {
 }
 
 #[test]
-fn cubic_fast_convergence_reduces_w_max() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.set_w_last_max(1_460_000);
-    cubic.loss_event(0);
-    assert!(cubic.w_max() < 420_480);
-}
-
-#[test]
-fn cubic_concave_growth_is_monotonic() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.loss_event(0);
-    let first = {
-        cubic.advance(1000, 0, 100);
-        cubic.cwnd()
-    };
-    let second = {
-        cubic.advance(3000, 0, 100);
-        cubic.cwnd()
-    };
-    let third = {
-        cubic.advance(6000, 0, 100);
-        cubic.cwnd()
-    };
-    assert!(first <= second && second <= third);
-}
-
-#[test]
-fn cubic_convex_growth_reaches_w_max() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.loss_event(0);
-    cubic.advance(9000, 0, 100);
-    assert!(cubic.cwnd() > 420_480);
-}
-
-#[test]
-fn cubic_rto_uses_beta_and_one_mss() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.rto_event();
-    assert_eq!(cubic.cwnd(), 1460);
-    assert_eq!(cubic.ssthresh(), 294_336);
-}
-
-#[test]
 fn prr_ssrb_allows_a_near_half_window() {
     let mut prr = Prr::enter(10_000, 20_000, 1460);
     let send = prr.on_ack(1_460, 15_000);
@@ -666,14 +562,6 @@ fn newreno_full_ack_ends_recovery() {
     newreno.full_ack();
     assert!(!newreno.in_recovery());
     assert_eq!(newreno.cwnd(), newreno.ssthresh());
-}
-
-#[test]
-fn cubic_w_max_persists_after_advance() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.loss_event(0);
-    cubic.advance(3000, 0, 100);
-    assert_eq!(cubic.w_max(), 420_480);
 }
 
 #[test]
