@@ -39,8 +39,6 @@ pub const RACK_WAS_SACKPASS: u8 = 0x04;
 pub const RACK_WAS_LOST: u8 = 0x08;
 /// `RACK_RWND_COLLAPSED`.
 pub const RACK_RWND_COLLAPSED: u8 = 0x10;
-/// `RACK_TLP`.
-pub const RACK_TLP: u8 = 0x20;
 
 /// One entry in the range sendmap (`struct rack_sendmap` subset).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
