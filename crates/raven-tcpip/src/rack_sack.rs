@@ -30,15 +30,15 @@ use crate::seq::{seq_ge, seq_gt, seq_le, seq_lt};
 pub const RACK_DSACK_HANDLING: u32 = 64;
 
 /// `RACK_ACKED`.
-pub const RACK_ACKED: u8 = 0x01;
+pub const RACK_ACKED: u32 = 0x01;
 /// `RACK_SACK_PASSED`.
-pub const RACK_SACK_PASSED: u8 = 0x02;
+pub const RACK_SACK_PASSED: u32 = 0x02;
 /// `RACK_WAS_SACKPASS`.
-pub const RACK_WAS_SACKPASS: u8 = 0x04;
+pub const RACK_WAS_SACKPASS: u32 = 0x04;
 /// `RACK_WAS_LOST`.
-pub const RACK_WAS_LOST: u8 = 0x08;
+pub const RACK_WAS_LOST: u32 = 0x08;
 /// `RACK_RWND_COLLAPSED`.
-pub const RACK_RWND_COLLAPSED: u8 = 0x10;
+pub const RACK_RWND_COLLAPSED: u32 = 0x10;
 
 /// One entry in the range sendmap (`struct rack_sendmap` subset).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,7 +52,7 @@ pub struct SackSegment {
     /// Retransmission count.
     pub rtr_cnt: u8,
     /// `r_flags` subset.
-    pub flags: u8,
+    pub flags: u32,
 }
 
 impl SackSegment {

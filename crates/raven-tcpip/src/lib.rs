@@ -61,9 +61,9 @@ mod rack_log;
 mod rack_misc;
 mod rack_os;
 mod rack_output;
+mod rack_pipe;
 mod rack_sack;
 mod rack_transport;
-mod rack_pipe;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -141,20 +141,18 @@ pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
 };
 pub use rack_output::{RackOutput, TimerResult};
-pub use rack_sack::{
-    RACK_ACKED, RACK_DSACK_HANDLING, RACK_SACK_PASSED, RACK_WAS_LOST, RACK_WAS_SACKPASS, RackSack,
-    SackSegment,
-};
-pub use rack_transport::{
-    AddRackMode, AddRackOutcome, HptsStart, HptsStartOutcome, HwTlsOutcome, MAX_HPTS_TIMEOUT_US,
-    RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
-    TimerStopOutcome, rack_ctloutput, rack_hw_tls_change, rack_process_timers, rack_pru_options,
-    rack_start_hpts_timer, rack_stop_all_timers, rack_switch_failed, rack_wake_check, tcp_addrack,
 pub use rack_pipe::{
     CC_NDUPACK, EXIT_RECOVERY_MASK, IN_RECOVERY_MASK, RACK_DELAYED_ACK_TIME, RACK_PRR_ADDBACKMAX,
     RACK_REORDER_FADE_DEFAULT, RACK_RTO_MAX, RACK_TLP_MIN, RackPipe, RackPipeState,
     TF_CONGRECOVERY, TF_FASTRECOVERY, TF_WASCRECOVERY, TF_WASFRECOVERY, TF2_ECN_PERMIT,
     TF2_ECN_SND_CWR, TLP_USE_ID, TLP_USE_TWO_ONE, TLP_USE_TWO_TWO, tstmp_ge, tstmp_lt,
+};
+pub use rack_sack::{RACK_DSACK_HANDLING, RackSack, SackSegment};
+pub use rack_transport::{
+    AddRackMode, AddRackOutcome, HptsStart, HptsStartOutcome, HwTlsOutcome, MAX_HPTS_TIMEOUT_US,
+    RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
+    TimerStopOutcome, rack_ctloutput, rack_hw_tls_change, rack_process_timers, rack_pru_options,
+    rack_start_hpts_timer, rack_stop_all_timers, rack_switch_failed, rack_wake_check, tcp_addrack,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
