@@ -19,6 +19,10 @@ use alloc::vec::Vec;
 use core::mem::size_of;
 
 use crate::rack_os::{MbufId, RackOs, RackTcpcb};
+use crate::rack_types::{
+    RACK_APP_LIMITED, RACK_HAD_PUSH, RACK_HAS_FIN, RACK_HAS_SYN, RACK_MUST_RXT,
+    RACK_NUM_OF_RETRANS, RACK_PMTU_CHG, RACK_RWND_COLLAPSED, RACK_TLP, RackSendmap,
+};
 use crate::rack_vtable::{
     IPPROTO_TCP, PRUS_OOB, RackSockopt, SockoptDir, TCP_INFO, TCP_PACING_DND, TCP_QUERY_RACK_TIMES,
     TCP_QUERY_SENDMAP, TCP_QUERY_TIMERS_UP, TCP_RACK_PACE_MAX_SEG, TCP_RACK_PACE_MIN_SEG,
@@ -32,59 +36,6 @@ pub const RACK_FREE_CACHE: usize = 4;
 pub const RACK_FREE_CNT_MAX: usize = 8;
 /// Largest deferred-option list the model accepts.
 pub const RACK_DEFERRED_MAX: usize = 16;
-
-/// `RACK_ACKED`.
-pub const RACK_ACKED: u32 = 0x000001;
-/// `RACK_TO_REXT`.
-pub const RACK_TO_REXT: u32 = 0x000002;
-/// `RACK_DEFERRED`.
-pub const RACK_DEFERRED: u32 = 0x000004;
-/// `RACK_OVERMAX`.
-pub const RACK_OVERMAX: u32 = 0x000008;
-/// `RACK_SACK_PASSED`.
-pub const RACK_SACK_PASSED: u32 = 0x000010;
-/// `RACK_WAS_SACKPASS`.
-pub const RACK_WAS_SACKPASS: u32 = 0x000020;
-/// `RACK_HAS_FIN`.
-pub const RACK_HAS_FIN: u32 = 0x000040;
-/// `RACK_TLP`.
-pub const RACK_TLP: u32 = 0x000080;
-/// `RACK_RWND_COLLAPSED`.
-pub const RACK_RWND_COLLAPSED: u32 = 0x000100;
-/// `RACK_APP_LIMITED`.
-pub const RACK_APP_LIMITED: u32 = 0x000200;
-/// `RACK_WAS_ACKED`.
-pub const RACK_WAS_ACKED: u32 = 0x000400;
-/// `RACK_HAS_SYN`.
-pub const RACK_HAS_SYN: u32 = 0x000800;
-/// `RACK_SENT_W_DSACK`.
-pub const RACK_SENT_W_DSACK: u32 = 0x001000;
-/// `RACK_SENT_SP`.
-pub const RACK_SENT_SP: u32 = 0x002000;
-/// `RACK_SENT_FP`.
-pub const RACK_SENT_FP: u32 = 0x004000;
-/// `RACK_HAD_PUSH`.
-pub const RACK_HAD_PUSH: u32 = 0x008000;
-/// `RACK_MUST_RXT`.
-pub const RACK_MUST_RXT: u32 = 0x010000;
-/// `RACK_IN_GP_WIN`.
-pub const RACK_IN_GP_WIN: u32 = 0x020000;
-/// `RACK_SHUFFLED`.
-pub const RACK_SHUFFLED: u32 = 0x040000;
-/// `RACK_MERGED`.
-pub const RACK_MERGED: u32 = 0x080000;
-/// `RACK_PMTU_CHG`.
-pub const RACK_PMTU_CHG: u32 = 0x100000;
-/// `RACK_STRADDLE`.
-pub const RACK_STRADDLE: u32 = 0x200000;
-/// `RACK_WAS_LOST`.
-pub const RACK_WAS_LOST: u32 = 0x400000;
-/// `RACK_IS_PCM`.
-pub const RACK_IS_PCM: u32 = 0x800000;
-/// `RACK_NUM_OF_RETRANS`.
-pub const RACK_NUM_OF_RETRANS: usize = 3;
-/// `RACK_INITIAL_RTO` (1 s in microseconds).
-pub const RACK_INITIAL_RTO: u32 = 1_000_000;
 
 /// `TCP_RACK_PROFILE`.
 pub const TCP_RACK_PROFILE: i32 = 1129;
@@ -112,87 +63,6 @@ pub const TCP_RACK_PACE_TO_FILL: i32 = 1127;
 pub const TCP_RACK_FORCE_MSEG: i32 = 1117;
 /// `TCP_RACK_ABC_VAL`.
 pub const TCP_RACK_ABC_VAL: i32 = 1133;
-
-/// One model sendmap (`struct rack_sendmap`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct RackSendmap {
-    /// `r_start`.
-    pub start: u32,
-    /// `r_end`.
-    pub end: u32,
-    /// `r_rtr_cnt`.
-    pub rtr_cnt: u8,
-    /// `r_act_rxt_cnt`.
-    pub act_rxt_cnt: u8,
-    /// `r_flags`.
-    pub flags: u32,
-    /// `r_dupack`.
-    pub dupack: u8,
-    /// `r_no_rtt_allowed`.
-    pub no_rtt_allowed: bool,
-    /// `r_rtr_bytes`.
-    pub rtr_bytes: u32,
-    /// `r_fas`.
-    pub fas: u32,
-    /// `r_bas`.
-    pub bas: u32,
-    /// `r_just_ret`.
-    pub just_ret: bool,
-    /// `r_hw_tls`.
-    pub hw_tls: bool,
-    /// `r_limit_type`.
-    pub limit_type: u8,
-    /// `r_tim_lastsent[]`.
-    pub tim_lastsent: [u32; RACK_NUM_OF_RETRANS],
-    /// `r_in_tmap`.
-    pub in_tmap: bool,
-    /// `m` reference.
-    pub mbuf: Option<MbufId>,
-    /// `soff`.
-    pub soff: u32,
-}
-
-impl RackSendmap {
-    /// Create an entry transmitted once at `now`.
-    #[must_use]
-    pub fn new(start: u32, end: u32, now: u32) -> Self {
-        Self {
-            start,
-            end,
-            rtr_cnt: 1,
-            tim_lastsent: [now; RACK_NUM_OF_RETRANS],
-            ..Self::default()
-        }
-    }
-
-    /// `r_end - r_start`.
-    #[must_use]
-    pub const fn len(&self) -> u32 {
-        self.end.wrapping_sub(self.start)
-    }
-
-    /// `true` when the entry covers no sequence space.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.start == self.end
-    }
-
-    /// `r_tim_lastsent[r_rtr_cnt - 1]`.
-    #[must_use]
-    pub const fn last_sent(&self) -> u32 {
-        let index = if self.rtr_cnt == 0 {
-            0
-        } else {
-            (self.rtr_cnt as usize) - 1
-        };
-        let index = if index >= RACK_NUM_OF_RETRANS {
-            RACK_NUM_OF_RETRANS - 1
-        } else {
-            index
-        };
-        self.tim_lastsent[index]
-    }
-}
 
 /// The fast-send-block header state.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -238,9 +108,9 @@ pub struct MiscQuery {
     /// `sendmap_fas`.
     pub sendmap_fas: u32,
     /// `sendmap_time`.
-    pub sendmap_time: [u32; RACK_NUM_OF_RETRANS],
+    pub sendmap_time: [u64; RACK_NUM_OF_RETRANS],
     /// `sendmap_ack_arrival`.
-    pub sendmap_ack_arrival: u32,
+    pub sendmap_ack_arrival: u64,
     /// `sendmap_flags`.
     pub sendmap_flags: u32,
     /// `sendmap_r_rtr_bytes`.

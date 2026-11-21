@@ -13,6 +13,7 @@
 use alloc::vec::Vec;
 
 use crate::rack_os::RackOs;
+use crate::rack_types::{PACE_MAX_IP_BYTES, RACK_INITIAL_RTO, TF_CONGRECOVERY, TF_FASTRECOVERY};
 use crate::rack_vtable::{RackStack, TF2_MBUF_ACKCMP, TF2_SUPPORTS_MBUFQ};
 
 /// FreeBSD `BBR_UNIT` (tcp_bbr.h).
@@ -29,14 +30,6 @@ pub const MIN_GP_WIN: u32 = 6;
 pub const RACK_REQ_AVG: u32 = 3;
 /// FreeBSD `RACK_TIMELY_CNT_BOOST`.
 pub const RACK_TIMELY_CNT_BOOST: u32 = 5;
-/// FreeBSD `RACK_INITIAL_RTO` in microseconds.
-pub const RACK_INITIAL_RTO: u64 = 1_000_000;
-/// FreeBSD `PACE_MAX_IP_BYTES` (rack_bbr_common.h).
-pub const PACE_MAX_IP_BYTES: u32 = 65_536;
-/// FreeBSD `TF_FASTRECOVERY`.
-pub const TF_FASTRECOVERY: u32 = 0x0010_0000;
-/// FreeBSD `TF_CONGRECOVERY`.
-pub const TF_CONGRECOVERY: u32 = 0x2000_0000;
 /// FreeBSD `TF_GPUTINPROG`.
 pub const TF_GPUTINPROG: u32 = 0x0000_8000;
 /// FreeBSD `RACK_DGP_PACING`.
@@ -2099,7 +2092,7 @@ impl BbrRack {
             let srtt = if stack.tp.t_srtt != 0 {
                 u64::from(stack.tp.t_srtt)
             } else {
-                RACK_INITIAL_RTO
+                u64::from(RACK_INITIAL_RTO)
             };
             if srtt < delay as u64 {
                 self.log_pacing_delay_calc(srtt, delay, rate_wanted, bw_est, lentim, 0, 99);
