@@ -307,6 +307,7 @@ members = [
     "tests/tcp-window-model",
     "tests/tcp-sack-model",
     "tests/rack-coverage",
+    "tests/rack-pipe-matrix",
     "tests/rack-sockopt",
     "tests/tcp-teardown-model",
     "tests/tcp-usrreq-model",

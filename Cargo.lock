@@ -1010,6 +1010,17 @@ name = "rack-loss-model"
 version = "0.1.0"
 
 [[package]]
+name = "rack-pipe-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-loss-model",
+ "rack-recovery-model",
+ "rack-tlp-model",
+ "raven-tcpip",
+]
+
+[[package]]
 name = "rack-recovery-model"
 version = "0.1.0"
 dependencies = [
