@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Harness filter matrix for the K274 tcpdump subset.
+# file|filter|expected packet count
+ipv4-tcp-handshake.pcap|tcp|8
+ipv4-tcp-handshake.pcap|tcp port 80|8
+ipv4-tcp-handshake.pcap|tcp[tcpflags] & tcp-syn != 0|2
+ipv4-tcp-handshake.pcap|src host 10.0.0.5|5
+ipv4-tcp-handshake.pcap|ip6|0
+ipv4-udp-dns.pcap|udp port 53|2
+ipv4-icmp-echo.pcap|icmp|2
+ipv4-icmp-echo.pcap|icmp[icmptype] == icmp-echo|1
+ipv6-tcp-http.pcap|ip6 and tcp|5
+ipv6-udp-icmp.pcap|ip6 and udp|2
+ipv6-udp-icmp.pcap|icmp6|2
+ipv4-fragmented-udp.pcap|ip[6:2] & 0x1fff != 0|2
+ipv4-fragmented-udp.pcap|ip[6:2] & 0x2000 != 0|2
+arp.pcap|arp|2
+ipv4-tcp-handshake.pcap|tcp port 9999|0

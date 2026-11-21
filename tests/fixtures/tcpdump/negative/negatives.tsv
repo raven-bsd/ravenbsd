@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K281 negative fixtures. `mode=error` must fail before any packet is decoded;
+# `mode=output` is a valid savefile whose packet carries a visible defect marker.
+# file|mode|expected
+unknown-linktype.pcap|error|unsupported link type
+bad-checksum.pcap|output|bad cksum

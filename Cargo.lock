@@ -3546,6 +3546,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpdump"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tcpip-wire",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-tcpip"
 version = "0.1.0"
 dependencies = [
