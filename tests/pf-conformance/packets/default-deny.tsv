@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: default-deny
+# features: stateless,default-deny,allow,deny,quick,cidr,ports,stateful
+# reference: OpenBSD sys/net/pf.c:pf_test,pf_match_rule; FreeBSD sys/netpfil/pf/pf.c:pf_match_rule
+# expect-counters in_pass=2 in_block=4 out_pass=1 out_block=1 states_created=2 states_expired=0 state_hits=1
+#
+# now direction interface proto source sport destination dport length flags expected disposition
+0   in  lo   tcp 127.0.0.1 12345 127.0.0.1   9999 60 S pass  created
+1   in  eth0 tcp 10.0.0.5  40000 192.0.2.10  443  60 A pass  created
+2   in  eth0 tcp 10.0.0.5  40001 192.0.2.10  444  60 S block -
+3   in  eth0 tcp 10.0.1.5  40002 192.0.2.10  443  60 S block -
+4   out eth0 tcp 10.0.0.5  40003 192.0.2.10  443  60 S block -
+5   in  eth0 udp 10.0.0.5  5353  192.0.2.10  53   40 - block -
+6   in  eth0 icmp 10.0.0.5 0     192.0.2.10  0    84 - block -
+7   out eth0 tcp 192.0.2.10 443  10.0.0.5    40000 60 A pass  existing

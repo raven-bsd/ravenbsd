@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: stateful-icmp
+# features: stateful,icmp,allow,deny,expiry,reverse
+# reference: OpenBSD sys/net/pf.c:pf_test,pf_create_state,pf_purge_expired_states; FreeBSD sys/netpfil/pf/pf.c
+# expect-counters in_pass=2 in_block=2 out_pass=2 out_block=0 states_created=2 states_expired=2 state_hits=2
+#
+# now direction interface proto source sport destination dport length flags expected disposition
+0   out eth0 icmp 10.0.0.5 0 192.0.2.10 0 84 - pass  created
+1   in  eth0 icmp 192.0.2.10 0 10.0.0.5 0 84 - pass  existing
+12  in  eth0 icmp 192.0.2.10 0 10.0.0.5 0 84 - block -
+20  out eth0 icmp 10.0.0.6 0 192.0.2.10 0 84 - pass  created
+21  in  eth0 icmp 192.0.2.10 0 10.0.0.6 0 84 - pass  existing
+32  in  eth0 icmp 192.0.2.10 0 10.0.0.6 0 84 - block -
