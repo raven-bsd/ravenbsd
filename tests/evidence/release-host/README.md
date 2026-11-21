@@ -1,13 +1,14 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# Release host evidence (K381 refresh)
+# Release host evidence (K412 refresh)
 
-Refreshed 2026-11-21T15:46:00Z at base `b8169cce429177dc82f207e18b695dbcf204437d`
-from merged evidence only. The source ticket reports in
-`ravenbsd-prjmgmt/tickets/<lane>/reports/` remain the primary record; this directory duplicates
-small artifacts and records the exact hash of every referenced file. No heavy gate was rerun for
-this refresh.
+Refreshed 2026-11-21T22:36:00Z at base `8bbdc97fd50a2c4997a8086c51f3d4f184a91ef2`.
+S116b's cold-start artifacts were imported from `origin/dave/S116b` (`fe46e124`); the x86_64 and
+aarch64 release images were built in this lane at `8bbdc97f` under the measured 1200 s caps. The
+source ticket reports in `ravenbsd-prjmgmt/tickets/<lane>/reports/` remain the primary record;
+this directory duplicates small artifacts and records the exact hash of every referenced file.
+No other heavy gate was rerun for this refresh.
 
 The Pi 4 board stays **HARDWARE/UNVERIFIED**: there is no board serial transcript or photo, and a
 host image or QEMU run is not a board result.
@@ -27,29 +28,30 @@ host image or QEMU run is not a board result.
 | pf-conformance | K273, K274, K296, K277 | `6af246ac`, `12e12871`, `a31195af`, `b8169cce` | OBSERVED | **PASS local; gate NO-GO** | `selftest.sh` 14 executed/1 skip/1 known; `nextest -p raven-pf -p raven-pfctl -p raven-tcpdump` 213/213 | `tests/evidence/release-host/pf-manifest.tsv`; `pf-semantics.tsv` | `b23beb4c6b3d16ac79d04d03c6451243d99aa8347ac7a854810967b254dd555b`; `a8b21d3a8e0bef12e370cfd08dc41e62ef0346a1de7d67f3bc35b1af70d4ed84` |
 | pf-post-k273 | K371 | `5d1e1efe` | OBSERVED | **PASS** | `net-postpf-default` 219,040 ms; `net-postpf-pf` 86,729 ms; both exit 33 | `tests/evidence/release-host/postpf-default.serial.log`; `postpf-pf.serial.log` | `496810bcfad5d1ea044945db48655fe674075ce70f856f655a6409e2237f798e`; `6367593e949e62890d0d794dc290b4cc81585991bdfc9407093f337e1ff4e95d` |
 | pipe-poll | K370, K372 | `f3c10013` | OBSERVED | **PASS pipe; SSH BLOCKED** | `pipe-poll` qtest pass; `raven-libc-platform` 584/584; K195 tap 0/10 (netd queued-TX) | `docs/pipe-poll.md` | `33b151bd1c910e8f3b5c1585ebe6d0a9c6bb0162cdef44fc79af69a477da8a48` |
-| image-x86_64 | REL6 | `fd394ff3` | UNVERIFIED | **PINNED** | image hash recorded at the old product commit; not rebuilt at `b8169cce` | `docs/release-images.md` | `cf59ad921923f06d0914d6d3951707189dba2d257c1ae3ff804d351fe56bfc69` |
-| image-aarch64 | REL6 | `fd394ff3` | UNVERIFIED | **PINNED** | image hash recorded at the old product commit; not rebuilt at `b8169cce` | `docs/release-images.md` | `cf59ad921923f06d0914d6d3951707189dba2d257c1ae3ff804d351fe56bfc69` |
-| cold-start | K135/K139 | `63efc104` | UNVERIFIED | **PENDING** | no 5/5 <1 s sample in the packet; board `QEMU boot <1 s` MET | `docs/releases/0.1.0-notes.md` | `88e6fcd36fe668c19f46489ad5245d07fc17f8636a17870322eeb768ab8074c9` |
+| image-x86_64 | REL6 | `8bbdc97f` | OBSERVED | **PINNED** | 335,544,320 B; sha256=`22477a19411b7ba7ee0317415e7c6f1c336abced94797e21f27d323dfc65b586`; `timeout 1200 cargo xtask image --arch x86_64 --profile release --output build/release/packet-x86_64.img`; 248 s | `tests/evidence/release-host/image-pins.txt`; `image-x86_64-build.log` | `fc3302e17b112eae39b4568ce7956b724219478f9000696212a23a6cc7638c25`; `501a9c3254d9a60a3d170326d87a1f40147ada559bcf34d37a70a8d9f50f25f2` |
+| image-aarch64 | REL6 | `8bbdc97f` | OBSERVED | **PINNED** | 335,544,320 B; sha256=`60cb51563aef74c04e27d3cdfd686b393cd52665e525011b43f03bd4948538ab`; `timeout 1200 cargo xtask image --arch aarch64 --profile release --output build/release/packet-aarch64.img`; 228 s | `tests/evidence/release-host/image-pins.txt`; `image-aarch64-build.log` | `fc3302e17b112eae39b4568ce7956b724219478f9000696212a23a6cc7638c25`; `4b60cdcc601f08605cd4c4f2e407b1647cecd3790aac106f14c572390686fbde` |
+| cold-start | S116b | `b58c5ac97` (artifacts `fe46e124`) | OBSERVED | **PASS 5/5** | KVM4 kernel→login 250/558/830/710/428 ms; median 558, p90 830, max 830; image sha256=`24c42352f5c40f09b853e2f82c52a77acd218df7bfc7e9fedd6968ad14af966e`; `timeout 1200 sh scripts/boot-time.sh --smp 4 --runs 5 --out /tmp/opencode/s116b-boot-time` | `tests/evidence/release-host/cold-start-boot/README.md`; `run.log` | `1c52a3c071744132f2b702bace5212e3d7c5284f300e16727368ca8ab4d7404b`; `b0f832278464b3006a3083e1c225a27bc9b3e817d8270dbe434800c9da78894d` |
+| cold-start-steps | S116b | `b04e71ad` | OBSERVED | **PASS 5/5** | KVM4 `login:`→`Password:` median 57.2 ms, p90 61.1; `Password:`→`raven#` median 105.8 ms, p90 112.9; both 5/5 <1000 ms | `tests/evidence/release-host/cold-start/README.md`; `run.log` | `addec918bebf02044464e2c2458e8f7f3e4b3fa8f561daf0bde52982bec92c67`; `bbdeb13d289a9a98c0a2a2dcbb08957c6bfd4698a90f08c0f265099e441d0b1f` |
 | pi4-board | owner hardware | - | HARDWARE/UNVERIFIED | **HARDWARE** | no board log/serial/photo; host image is not a board result | none | - |
 
 ## Release board NO-GO / HARDWARE rows
 
 The release truth is `tickets/release/0.1.0-gates.tsv` (SHA-256
-`5b185256c0edd9034679bd455491187bb97a961edea776a01073c1d3d3a06fd5`). The packet keeps these
+`b460db58717a643a0a46b9045c5c3218af48b6cf2b634fe5c40a9479de2b079f`). The packet keeps these
 rows explicit; they are not softened by the refreshed host rows.
 
 | Board row | Status | Evidence | Tag |
 |---|---|---|---|
 | SMP TLB shootdown under load | **NO-GO** | S159: 20/20 TCG4 `posix-fs-smp` failures at load 88-126; TLB timeout at iterations 4 (FSTAT) and 10 (EXIT); K376 reproducible load-matched gate; `tickets/otto/reports/S159.md` | OBSERVED |
-| SSH remote login | **BLOCKED** | K195 rev5: host 10/10 tap login never passed; K370/K372 pipe poll green; K375 fake peer; no login claim | OBSERVED |
-| pf packet filter | **NO-GO** | K273 `6af246ac`, K274 `12e12871`, K296 `a31195af`, K371 `5d1e1efe`, K277 `b8169cce`; K297 end-to-end and K380 fragment port-rule remaining | OBSERVED |
+| SSH remote login | **BLOCKED** | K195 rev5 + K382 negative: virtio-tx pass/used-ring reclaim; stall above TX; K195 differential pending; no login claim | OBSERVED |
+| pf packet filter | **MET** | K389 tree `f469b2fd`/merge `962603b1`: pf-core/kvm2/kvm4/tcg4/net-postpf-pf/socket-inet all pass; real drop + default `netd: pf absent` | OBSERVED |
 | Pi 4 SD/UFS + HDMI/USB | **HARDWARE** | no board, serial, monitor or keyboard attached | HARDWARE/UNVERIFIED |
 | Pi 4 E-Ink photo | **HARDWARE** | no panel/photo; E4 board run pending | HARDWARE/UNVERIFIED |
 | 24 h soak + freeze artifacts | **BLOCKED** | K228 soak harness merged; owner 24 h run not executed | OBSERVED |
-| Supply chain | **BLOCKED** | vendor-full.tar.zst/URL placeholder, cargo-deny not installed, owner exceptions | OBSERVED |
+| Supply chain | **BLOCKED (publish only)** | K390 merge `8ca70577`: 771 crates, local tarball sha `ae2a4482...`, `cargo-deny 0.22.0` pass, exceptions recorded; `artifact_url=UNPUBLISHED`, no upload | OBSERVED |
 | Cross-OS benchmark (ravenmark) | **MISSING** | no ravenmark result consumed | UNVERIFIED |
 | TCP stack release-grade | **NO-GO** | K295 packet complete, K365 soak, RACK 219/219; no SSH login, no 24 h soak | OBSERVED |
-| Release evidence packet | **NO-GO** | this packet; host rows refreshed, remaining board rows explicit | OBSERVED |
+| Release evidence packet | **NO-GO** | this packet; K412 refresh at `8bbdc97f`; S116b cold-start and both image pins closed; remaining board rows explicit | OBSERVED |
 
 ## Fresh host runs at `604a9367`
 
@@ -95,4 +97,5 @@ timeout 60 sh tests/evidence/release-host/check.sh
 
 The check runs `sha256sum -c tests/evidence/release-host/SHA256SUMS`, verifies the nested K368 and
 K365 manifests, and requires the packet to carry the `shell-hygiene`, `tcp-soak`, `rack-audit`,
-`pf-conformance`, `pipe-poll` and `HARDWARE/UNVERIFIED` rows. It does not run QEMU.
+`pf-conformance`, `pipe-poll`, cold-start and image-pin rows plus `HARDWARE/UNVERIFIED`. It does
+not run QEMU.
