@@ -203,7 +203,7 @@ wait = '^raven# $'
 timeout_secs = 60
 
 [[step]]
-send = "sync && echo write-ok\n"
+send = "echo write-ok\n"
 delay_ms = 100
 
 [[step]]
