@@ -13,6 +13,9 @@ fn dotted_product_profile_name_loads() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let profile = Profile::load(root, "0.1.0-ufs").expect("0.1.0-ufs profile");
     assert_eq!(profile.name, "0.1.0-ufs");
+    let boot = Profile::load(root, "0.1.0-ufs-boot").expect("0.1.0-ufs-boot profile");
+    assert_eq!(boot.name, "0.1.0-ufs-boot");
+    assert!(ufs_boot_profile(root, "0.1.0-ufs").is_some());
 }
 
 #[test]
