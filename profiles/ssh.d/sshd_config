@@ -21,7 +21,6 @@ AllowUsers root raven
 PasswordAuthentication yes
 PermitEmptyPasswords no
 KbdInteractiveAuthentication no
-UsePAM no
 AuthorizedKeysFile none
 StrictModes no
 PrintMotd no
