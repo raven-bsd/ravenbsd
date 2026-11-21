@@ -9656,3 +9656,29 @@ tier = "A"
 copied = "2026-11-20"
 modified = true
 notes = "FreeBSD TCP syncache port: syncache_add/insert/dup-SYN, hash buckets and limits, syncache_timeout/timer and tcp_backoff, syncache_expand ACK/timestamp promotion, syncache_chkrst RST validation, tcps_sc_* counters. The Rust module keeps the donor state machine and returns actions; packet output, TCB allocation and ISS generation stay in the stack. No C."
+
+# ---------------------------------------------------------------------------
+# K273 raven-pf userspace packet filter (donor map: docs/pf.md section 3).
+# ---------------------------------------------------------------------------
+
+[[import]]
+path = "crates/raven-pf/src/abi.rs"
+upstream = "freebsd"
+upstream_path = "sys/netpfil/pf/pf.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "Action/operation/pool/log/address/PFTM/PFRES constants, PFRES_NAMES, PFTM_*_VAL defaults and the pf_addr/pf_status shapes transcribed; namespaced Rust types, kernel-only fields and pfsync/pfctl ioctl transport omitted (deviation D-pf-abi-ioctl in docs/pf.md)."
+
+[[import]]
+path = "crates/raven-pf/src/nat.rs"
+upstream = "freebsd"
+upstream_path = "sys/netpfil/pf/pf_lb.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "pf_get_sport() port search and the pf_get_transaddr() redirect destination-port formula transcribed; Rust bounded vectors and deterministic cursors replace arc4random/mbuf/pool plumbing; no address-range, MAP-E or af-to paths."

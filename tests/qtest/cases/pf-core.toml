@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K273 acceptance case. The core is exercised by host tests today; the in-guest
+# case needs the netd hook, whose files are outside this ticket's Owns-globs.
+# Follow-up wiring list: docs/pf.md section 12.
+
+name = "pf-core"
+arch = "x86_64"
+profile = "netd-test"
+timeout_secs = 120
+skip = "K273 Owns-boundary: the netd ingress/egress hook requires userland/servers/netd/** (module list, Cargo.toml dependency, raven-netcore frame path) and profiles/**, which are outside the ticket's Owns-globs; crate-level acceptance is `cargo nextest run -p raven-pf`. Hook wiring list: docs/pf.md section 12."
+expect_exit = "success"
