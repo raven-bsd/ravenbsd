@@ -1009,6 +1009,15 @@ name = "rack-audit-misc-transport"
 version = "0.1.0"
 
 [[package]]
+name = "rack-audit-replay-union"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-replay",
+ "raven-tcpip",
+]
+
+[[package]]
 name = "rack-bbr-model"
 version = "0.1.0"
 

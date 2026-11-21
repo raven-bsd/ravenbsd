@@ -306,6 +306,7 @@ members = [
     "tests/tcp-ecn-model",
     "tests/tcp-window-model",
     "tests/tcp-sack-model",
+    "tests/rack-audit-replay-union",
     "tests/rack-coverage",
     "tests/rack-pipe-matrix",
     "tests/rack-audit-misc-transport",
