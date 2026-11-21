@@ -1068,6 +1068,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rack-register"
+version = "0.1.0"
+dependencies = [
+ "rack-acceptance",
+ "rack-coverage",
+]
+
+[[package]]
 name = "rack-replay"
 version = "0.1.0"
 dependencies = [
