@@ -153,6 +153,18 @@ fn sequence_wrap_maps_to_relative_offsets() {
 }
 
 #[test]
+fn receiver_block_order_is_dsack_first_then_newest_with_the_option_cap() {
+    let holes = [(10, 20), (30, 40), (50, 60), (70, 80), (90, 100)];
+    let with_timestamps = raven_tcpip::receiver_blocks(&holes, true, Some((0, 5)));
+    assert_eq!(with_timestamps, vec![(0, 5), (90, 100), (70, 80)]);
+    let without_timestamps = raven_tcpip::receiver_blocks(&holes, false, None);
+    assert_eq!(
+        without_timestamps,
+        vec![(90, 100), (70, 80), (50, 60), (30, 40)]
+    );
+}
+
+#[test]
 fn k268_sacked_bytes_above_counts_a_block_byte_at_the_point() {
     // K268 finding: `SackScoreboard::sacked_bytes_above` includes the byte
     // at `point`, while RFC 6675 "above SeqNum" is strict. The reference and
