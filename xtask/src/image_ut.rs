@@ -9,6 +9,13 @@ use std::path::Path;
 use super::*;
 
 #[test]
+fn dotted_product_profile_name_loads() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let profile = Profile::load(root, "0.1.0-ufs").expect("0.1.0-ufs profile");
+    assert_eq!(profile.name, "0.1.0-ufs");
+}
+
+#[test]
 fn ufs_root_is_selected_by_a_spec_and_a_boot_profile() {
     let root = std::env::temp_dir().join(format!("raven-image-ufs-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
