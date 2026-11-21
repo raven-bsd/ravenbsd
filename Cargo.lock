@@ -4230,6 +4230,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcp-usrreq-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
 name = "tcp-window-model"
 version = "0.1.0"
 dependencies = [
