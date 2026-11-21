@@ -7,12 +7,13 @@ SSH is the upstream OpenSSH 10.6p2 add-on (DR-65). The Raven tree does not vendo
 implementation and does not implement SSH in Rust. K200 owns `addons/ssh/**` and the source pin;
 K195 stages the built binaries as a release service and owns the login gate.
 
-Status: **build, service staging and the `sshd` account are DONE; the host-to-guest login is
-BLOCKED** on kernel pipe poll/event readiness. With the account and K370's libc `pipe(2)` in
-place, `sshd` starts, listens on TCP 22 and creates the monitor pipes; the first connection then
-dies before the SSH banner because upstream `monitor_read` polls the monitor log **pipe** with
-`poll(2)`, and the kernel does not expose pipe endpoints to the event queue
-(`monitor_read: poll: Bad file descriptor`).
+Status: **build, service staging, the `sshd` account, libc `pipe(2)` and pollable pipes are DONE;
+the host-to-guest login is BLOCKED** on the virtio-net TX path. K372 lifted the previous
+`monitor_read: poll: Bad file descriptor` block: the banner, KEX and password authentication now
+succeed, and the session channel open is received and confirmed. The confirmation (and, depending
+on timing, the banner) is then never transmitted: netd's NIC TX frame ring backs up with
+`TxError::Busy` while the virtio-net driver waits for a device completion that does not arrive.
+The real tap gate is **0/10**.
 
 ## Pinned source
 
@@ -112,36 +113,50 @@ ssh -o StrictHostKeyChecking=no raven@10.0.2.15 ls
 
 ## Blockers
 
-One primitive remains before a login can be claimed; it is outside K195's Owns
+One area remains before a login can be claimed; it is outside K195's Owns
 (`tests/ssh/** tests/qtest/cases/ssh-* profiles/ssh.d/** profiles/release.d/** docs/ssh.md`).
 
-1. **Pipe endpoints are not poll/event sources (kernel).** K370 added the libc `pipe(2)`/`pipe2(2)`
-   binding over `PIPE2` (0x6f), and `tests/ssh/pipe-probe.sh` now passes (`pipe-probe: ok`). The
-   next upstream call is a poll: `monitor.c:509-511` puts the monitor **log pipe**
-   (`pmonitor->m_log_recvfd`, created by `monitor.c:1929 monitor_openfds`) into
-   `poll(pfd, 2, -1)` with `POLLIN`; the server reads it with `monitor_read_log` while the session
-   runs, and `session.c` `do_exec_no_pty` polls its three stdio pipes as well.
-   `kernel/src/syscall/event.rs` `source_from_handle` has no `Object::Pipe` arm (line 322 falls
-   through to `Err(Errno::EBADF)`) and `readiness` (line 335 area) has no pipe case;
-   `kernel/src/process/pipe.rs` has no readable/writable readiness or wake (`kernel/src/process/duplex.rs:237`
-   `readiness` and its `writable` helper are the model). Guest evidence — daemon log of a boot
-   with the account and K370 staged, after one host connection:
+1. **The virtio-net TX path wedges after a number of frames (platform).** The SSH protocol now
+   reaches the session stage: `sshd -d` shows the banner, KEX and `Accepted password`, the client
+   sends `CHANNEL_OPEN`, and `serverloop.c` composes the confirmation
+   (`serverloop.c:650-660`); the client never logs `channel 0: open confirm`. The loop flushes only
+   when the connection fd reports `POLLOUT` (`serverloop.c:216`, `395`, `305`), and the segment
+   cannot leave the NIC.
 
-   ```text
-   Server listening on 0.0.0.0 port 22.
-   monitor_read: poll: Bad file descriptor
-   cleanup_exit: kill(23): Function not implemented
-   ```
+   Fresh trace on the merged tree (K372), one boot per run:
+   * host, tap `10.0.2.15:22`: `ssh raven@10.0.2.15 ls` — **0/10** (attempt 1 timed out, attempts
+     2–10 closed at the banner after the 8 s ConnectTimeout);
+   * guest `netstat -i` after the loop:
+     `eth0 rx_packets=122 tx_packets=132 rx_bytes=11566 tx_bytes=15642 rx_errors=0 tx_errors=37
+     rx_drops=16 tx_drops=0`;
+   * guest `netstat -a` during the stall:
+     `tcp ESTABLISHED 10.0.2.15:22 remote=10.0.2.2:42320 iface=eth0 rx=0 tx=0`;
+   * guest `/tmp/sshd.log` (INFO): `Server listening on 0.0.0.0 port 22.`, then the connection is
+     accepted and disconnected; with `sshd -d` the same boot shows the confirmation composed but
+     the client never receives it;
+   * driver boot log: `virtio-net: queue0 rx size=8`, `virtio-net: queue1 tx size=8`,
+     `virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536`,
+     `devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq`.
 
-   The host OpenSSH client sees `kex_exchange_identification: Connection closed by remote host`
-   or `Connection timed out during banner exchange`, depending on where the failing child is
-   reaped. The secondary `kill(23)` line is the production signal model: `kill`/`killpg` are
-   PG-44 procd RPCs and `SigCaps::PRODUCTION.proc_kill` is false
-   (`libc/ravenlibc/crates/raven-libc-signal/src/kernel.rs`), so sshd's cleanup cannot signal its
-   privsep child; it is not the banner blocker.
+   Exact code path: netd's `NicDevice::transmit` returns `TxError::Busy` when `tx_free` is empty
+   (`userland/servers/netd/src/nic.rs:243-245`); `reclaim_tx` only returns buffers when the
+   driver advances `header.tx_cons` (`nic.rs:175-188`); the counter is incremented in
+   `crates/raven-netcore/src/backend/counting.rs:58`. The driver has one TX in flight and only
+   reclaims after the virtio used index advances (`userland/drivers/virtio-net/src/main.rs:731-763`),
+   with an 8-entry TX frame ring and an 8-entry virtqueue
+   (`userland/drivers/virtio-net/src/lib.rs:438-442`). No `virtio-net: pump:` error is logged, so
+   the driver is waiting for a device completion that never arrives; the NIC TX ring stays full
+   and every later TCP segment is dropped at the NIC.
 
-K223's per-process root/`chroot` (the `/var/empty` chroot), K196's fork/PTY, the K206/K210/K211
-AF_UNIX pair, K370's libc `pipe(2)` and the `sshd` account are in place; they are not blockers.
+   The TCP send state (`snd_una/snd_nxt/snd_wnd/snd_cwnd`, persist deadline) is not exposed by any
+   guest facility: `netstat` prints the socket state and `rx`/`tx` queue bytes only. Reading the
+   `raven-tcpip` `TcpState` fields needs a kstat/API in netd or the stack, which is outside this
+   ticket's Owns; the socket traffic confirms the connection is ESTABLISHED with empty netd
+   queues while the NIC counters show the TX errors.
+
+K223's per-process root/`chroot`, K196's fork/PTY, the K206/K210/K211 AF_UNIX pair, K370's libc
+`pipe(2)`, K372's pollable pipe endpoints and the `sshd` account are in place; they are not
+blockers.
 
 ## Donor reconciliation (DR-52)
 
