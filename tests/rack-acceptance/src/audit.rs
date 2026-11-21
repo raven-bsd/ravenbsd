@@ -95,6 +95,10 @@ impl AcceptanceReport {
             && self.duplicates.is_empty()
             && self.unknown.is_empty()
             && self.accepted == self.donor_total
+            && self.k315.empty_rust.is_empty()
+            && self.k315.empty_test.is_empty()
+            && self.k315.empty_mutation.is_empty()
+            && self.k315.not_pass.is_empty()
     }
 
     /// Render the summary, owner split, gaps and replay matrix.

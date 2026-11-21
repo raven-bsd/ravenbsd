@@ -55,6 +55,72 @@ fn audit_produces_the_exact_219_row_status_and_218_target() {
     assert_eq!(report.rows[218].function, "tcp_addrack");
 }
 
+fn fixture_row(test: &str, rust: &str, mutation: &str) -> RegisterRow {
+    RegisterRow {
+        number: 1,
+        function: "rack_log_gpset".to_owned(),
+        owner: "K329".to_owned(),
+        rust: rust.to_owned(),
+        test: test.to_owned(),
+        mutation: mutation.to_owned(),
+        status: "PASS".to_owned(),
+    }
+}
+
+#[test]
+fn a_blank_test_cell_makes_the_audit_not_ok() {
+    let donor = vec![Function {
+        line: 1,
+        name: "rack_log_gpset".to_owned(),
+    }];
+    let register = vec![fixture_row(
+        "-",
+        "crate::rack_log::rack_log_gpset",
+        "event suppression",
+    )];
+    let source = SourceIndex::load().expect("source");
+    let report = audit::run(&donor, &register, &source, &[]);
+    assert_eq!(report.k315.empty_test, vec!["rack_log_gpset".to_owned()]);
+    assert!(!report.is_ok(), "a blank test cell must fail the gate");
+}
+
+#[test]
+fn a_blank_rust_cell_makes_the_audit_not_ok() {
+    let donor = vec![Function {
+        line: 1,
+        name: "rack_log_gpset".to_owned(),
+    }];
+    let register = vec![fixture_row(
+        "donor_rack_log_gpset",
+        "-",
+        "event suppression",
+    )];
+    let source = SourceIndex::load().expect("source");
+    let report = audit::run(&donor, &register, &source, &[]);
+    assert_eq!(report.k315.empty_rust, vec!["rack_log_gpset".to_owned()]);
+    assert!(!report.is_ok(), "a blank Rust cell must fail the gate");
+}
+
+#[test]
+fn a_blank_mutation_cell_makes_the_audit_not_ok() {
+    let donor = vec![Function {
+        line: 1,
+        name: "rack_log_gpset".to_owned(),
+    }];
+    let register = vec![fixture_row(
+        "donor_rack_log_gpset",
+        "crate::rack_log::rack_log_gpset",
+        "-",
+    )];
+    let source = SourceIndex::load().expect("source");
+    let report = audit::run(&donor, &register, &source, &[]);
+    assert_eq!(
+        report.k315.empty_mutation,
+        vec!["rack_log_gpset".to_owned()]
+    );
+    assert!(!report.is_ok(), "a blank mutation cell must fail the gate");
+}
+
 #[test]
 fn the_k269_rows_are_accepted() {
     let donor = register::load_donor().expect("donor");

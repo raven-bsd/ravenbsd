@@ -1,9 +1,10 @@
 {
-  "ticket": "K366",
-  "master_commit": "2e8a873fd3a4e87b04d315cc9f1651f66b5364b1",
+  "ticket": "K369",
+  "tool_commit": "59c7a9ad7df6d368de768b106ab9c3ea0990d882",
+  "base_master": "ddda93a5d9288db7a22eff2c2c8e0039727689a7",
   "tool": {
     "package": "rack-acceptance",
-    "commit": "2e8a873fd3a4e87b04d315cc9f1651f66b5364b1",
+    "commit": "59c7a9ad7df6d368de768b106ab9c3ea0990d882",
     "main_sha256": "dad088cbcae680b96469803f4affaf191af982e11664704ef7d2541ad225e343"
   },
   "register": {
@@ -26,26 +27,44 @@
     "summary": "donors=219 register=219 target=218 accepted=219 gaps=0 missing=0 duplicate=0 unknown=0",
     "k315": "missing=0 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=0 not_pass=0",
     "log": "acceptance.log",
-    "runtime_seconds": 4.57
+    "runtime_seconds": 3.28
   },
-  "remove_row_mutation": {
-    "input": "scratch clone docs/rack-coverage.md with the tcp_addrack row removed",
+  "blank_test_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the rack_log_gpset test cell blanked",
     "exit": 1,
-    "summary": "donors=219 register=218 target=218 accepted=218 gaps=0 missing=1 duplicate=0 unknown=0",
-    "log": "remove-row.log"
-  },
-  "mapping_removal_mutation": {
-    "input": "scratch clone docs/rack-coverage.md with the rack_log_gpset Rust mapping replaced by missing_mapping",
-    "exit": 1,
-    "summary": "donors=219 register=219 target=218 accepted=218 gaps=1 missing=0 duplicate=0 unknown=0",
-    "log": "mapping-removal.log"
-  },
-  "blank_test_finding": {
-    "input": "scratch clone docs/rack-coverage.md with the rack_log_gpset test cell blanked",
-    "exit": 0,
     "summary": "donors=219 register=219 target=218 accepted=219 gaps=0 missing=0 duplicate=0 unknown=0",
     "k315": "missing=0 duplicate=0 unknown=0 empty_rust=0 empty_test=1 empty_mutation=0 not_pass=0",
     "log": "blank-test.log",
-    "status": "FINDING: rack-acceptance is_ok ignores k315 empty_test; the blank row is not rejected"
+    "status": "PASS: the gate rejects the blank test cell"
+  },
+  "blank_rust_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the rack_log_gpset Rust mapping blanked",
+    "exit": 1,
+    "summary": "donors=219 register=219 target=218 accepted=219 gaps=0 missing=0 duplicate=0 unknown=0",
+    "k315": "missing=0 duplicate=0 unknown=0 empty_rust=1 empty_test=0 empty_mutation=0 not_pass=0",
+    "log": "blank-rust.log",
+    "status": "PASS: the gate rejects the blank Rust cell"
+  },
+  "blank_mutation_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the rack_log_gpset mutation cell blanked",
+    "exit": 1,
+    "summary": "donors=219 register=219 target=218 accepted=218 gaps=1 missing=0 duplicate=0 unknown=0",
+    "k315": "missing=0 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=1 not_pass=0",
+    "log": "blank-mutation.log",
+    "status": "PASS: the gate rejects the blank mutation cell"
+  },
+  "remove_row_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the tcp_addrack row removed",
+    "exit": 1,
+    "summary": "donors=219 register=218 target=218 accepted=218 gaps=0 missing=1 duplicate=0 unknown=0",
+    "k315": "missing=1 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=0 not_pass=0",
+    "log": "remove-row.log"
+  },
+  "mapping_removal_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the rack_log_gpset Rust mapping replaced by missing_mapping",
+    "exit": 1,
+    "summary": "donors=219 register=219 target=218 accepted=218 gaps=1 missing=0 duplicate=0 unknown=0",
+    "k315": "missing=0 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=0 not_pass=0",
+    "log": "mapping-removal.log"
   }
 }
