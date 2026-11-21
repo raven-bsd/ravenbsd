@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# One-shot host-key generation for the initfs release demo.
+#
+# The release image's `/` is the read-only `initfs:` scheme, so the writable
+# location is the `/tmp` ramfs; the ticket allows `/tmp/ssh` for the initfs-only
+# demo and the keys are ephemeral across boots. A UFS root stages the same
+# command against /etc/ssh for persistence (not claimed by this ticket).
+#
+# The per-type `ssh-keygen -q -t ed25519 -N '' -f PATH` form is used, not `-A`:
+# the K200 configure baked an absolute host path into SSHDIR, so `-A` would write
+# to <build-dir>/etc/ssh inside the guest. `-f` with an absolute target path is
+# unaffected by that constant.
+#
+# /var/empty is staged read-only in the image (profiles/ssh.d/var-empty.keep);
+# sshd's privilege-separation chroot requires it to exist before the daemon
+# starts, and the initfs root cannot create it at boot.
+
+name = "ssh-hostkeys"
+exec = "/bin/rsh"
+args = ["/bin/rsh", "-c", "mkdir -p /tmp/ssh; ssh-keygen -q -t ed25519 -N '' -f /tmp/ssh/ssh_host_ed25519_key"]
+needs = ["vfsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false
