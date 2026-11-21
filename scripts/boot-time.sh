@@ -14,8 +14,9 @@
 # measurement without KVM and reports it without the gate.
 #
 # Usage:
-#   sh scripts/boot-time.sh                  # KVM 1 CPU, 3 runs
-#   sh scripts/boot-time.sh --smp 4          # after S83; KVM 4-CPU gate
+#   sh scripts/boot-time.sh                  # KVM 4 CPU, 3 runs (OVMF path)
+#   sh scripts/boot-time.sh --no-firmware    # S89 direct boot; QEMU->login <1 s gate
+#   sh scripts/boot-time.sh --smp 1          # 1-CPU baseline
 #   sh scripts/boot-time.sh --tcg            # TCG report, no gate
 #   sh scripts/boot-time.sh --image FILE     # use an existing image (commit checked)
 #   sh scripts/boot-time.sh --runs 1         # shorter exploratory run
@@ -29,8 +30,9 @@ cd "$root"
 
 arch=x86_64
 runs=3
-smp=1
+smp=4
 kvm=1
+no_firmware=0
 exclusive=0
 timeout_s=300
 image=
@@ -43,12 +45,14 @@ tmpdir=
 usage() {
     cat <<'EOF'
 usage: sh scripts/boot-time.sh [--arch x86_64] [--smp N] [--runs N] [--tcg]
-                               [--exclusive] [--image FILE] [--out DIR] [--timeout SECONDS]
+                               [--no-firmware] [--exclusive] [--image FILE]
+                               [--out DIR] [--timeout SECONDS]
 
   --arch x86_64  only the x86_64 release gate is supported.
-  --smp N        QEMU CPU count (default 1; the gate is 4 after S83).
+  --smp N        QEMU CPU count (default 4, the 0.1.0 gate).
   --runs N       measured runs (default 3).
   --tcg          disable KVM; report only, no gate.
+  --no-firmware  drive the S89 direct-boot path; gate QEMU start -> login <1 s.
   --exclusive    refuse a busy host and record the host state before measuring.
   --image FILE   use an existing image instead of building one; its banner commit is checked.
   --out DIR      serial logs and summary (default build/boot-time).
@@ -110,6 +114,10 @@ while [ "$#" -gt 0 ]; do
             kvm=0
             shift
             ;;
+        --no-firmware)
+            no_firmware=1
+            shift
+            ;;
         --exclusive)
             exclusive=1
             shift
@@ -140,6 +148,34 @@ case $timeout_s in
     '' | *[!0-9]*) printf 'boot-time: invalid --timeout value: %s\n' "$timeout_s" >&2; exit 2 ;;
 esac
 
+commit=$(git rev-parse --short HEAD)
+[ -n "$commit" ] || fail "cannot read HEAD"
+
+# The S89 direct path has no OVMF stage: QEMU starts the PVH loader with -kernel. The gate is the
+# full QEMU-process start -> login interval, which is also the interval the ticket owns.
+if [ "$no_firmware" -eq 1 ]; then
+    [ -z "$image" ] || fail "--no-firmware uses the direct loader; --image is not supported"
+    mkdir -p "$out"
+    printf '==> build kernel from %s\n' "$commit"
+    if ! cargo xtask build kernel --arch "$arch" --release >"$out/direct-build-kernel.log" 2>&1; then
+        tail -20 "$out/direct-build-kernel.log" >&2
+        fail "kernel build failed"
+    fi
+    printf '==> build release initfs from %s\n' "$commit"
+    if ! cargo xtask initfs --arch "$arch" --profile release >"$out/direct-build-initfs.log" 2>&1; then
+        tail -20 "$out/direct-build-initfs.log" >&2
+        fail "release initfs build failed"
+    fi
+    set -- --mode full --smp "$smp" --runs "$runs" --out "$out" --timeout "$timeout_s"
+    if [ "$kvm" -eq 0 ]; then
+        set -- "$@" --tcg
+    fi
+    if [ "$exclusive" -eq 1 ]; then
+        set -- "$@" --exclusive
+    fi
+    exec sh scripts/boot-direct.sh "$@"
+fi
+
 [ -r "$ovmf_code" ] || fail "OVMF code not found: $ovmf_code (set RAVEN_OVMF_CODE)"
 [ -r "$ovmf_vars" ] || fail "OVMF vars not found: $ovmf_vars (set RAVEN_OVMF_VARS)"
 command -v qemu-system-x86_64 >/dev/null 2>&1 || fail "qemu-system-x86_64 is not installed"
@@ -147,9 +183,6 @@ command -v python3 >/dev/null 2>&1 || fail "python3 is required for the byte-lev
 if [ "$kvm" -eq 1 ]; then
     [ -r /dev/kvm ] || fail "/dev/kvm is not readable; use --tcg for a software run"
 fi
-
-commit=$(git rev-parse --short HEAD)
-[ -n "$commit" ] || fail "cannot read HEAD"
 
 mkdir -p "$out"
 if [ -z "$image" ]; then
