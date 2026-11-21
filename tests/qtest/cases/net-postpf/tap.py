@@ -142,12 +142,14 @@ def send(value):
 
 
 def guest(command, pattern, timeout):
+    # Wait for the command's output, not for `raven# `: the brush line editor
+    # redraws the prompt after every character, so a prompt wait returns before
+    # the ping runs (the first-byte-only failure in selftest-failure.log). The
+    # ping result line cannot appear in the command echo.
     global buffer
     buffer = ""
     send(command + "\n")
-    if not read_until(r"raven# ", timeout):
-        fail("no prompt after `%s`" % command)
-    if not re.search(pattern, buffer, re.IGNORECASE):
+    if not read_until(pattern, timeout):
         fail("`%s` did not match %s" % (command, pattern))
     print("PASS guest: %s" % command, flush=True)
 
