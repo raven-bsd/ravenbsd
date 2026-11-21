@@ -1,24 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# SC1 advisory exceptions. All five are false positives: the advisory database matches the
-# first-party workspace utilities `userland/bin/tar` and `userland/bin/time` (both version
-# 0.1.0, `publish = false`) by name/version. No upstream `tar-rs` or `time` crate source is
-# linked or shipped. SC2 renames the utilities to `raven-tar`/`raven-time`; until then this file
-# is the reviewed exception. No blanket ignore, no unknown advisory is suppressed.
-#
-# ID              owner  reason / reachability                                      expiry
-# RUSTSEC-2018-0002 kevin first-party tar utility, no tar-rs code                    2027-02-28
-# RUSTSEC-2021-0080 kevin first-party tar utility, no tar-rs code                    2027-02-28
-# RUSTSEC-2026-0067 kevin first-party tar utility, no tar-rs code                    2027-02-28
-# RUSTSEC-2026-0068 kevin first-party tar utility, no tar-rs code                    2027-02-28
-# RUSTSEC-2020-0071 kevin first-party time utility, no time crate code               2027-02-28
+# SC2: no advisory exceptions. The first-party utilities are `raven-tar` and `raven-time`; the
+# former `tar`/`time` package names (and their RUSTSEC name/version false positives) no longer
+# exist. New advisories are triaged on reachability per `docs/supply-chain.md` section 7 and are
+# not ignored without an owner-approved, expiring exception.
 
 [advisories]
-ignore = [
-    "RUSTSEC-2018-0002",
-    "RUSTSEC-2021-0080",
-    "RUSTSEC-2026-0067",
-    "RUSTSEC-2026-0068",
-    "RUSTSEC-2020-0071",
-]
+ignore = []

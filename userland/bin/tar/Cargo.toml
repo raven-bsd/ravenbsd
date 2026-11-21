@@ -2,9 +2,10 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 [package]
-name = "tar"
+name = "raven-tar"
 version = "0.1.0"
 description = "RavenBSD tar: POSIX ustar create, list and extract."
+publish = false
 edition.workspace = true
 license.workspace = true
 authors.workspace = true

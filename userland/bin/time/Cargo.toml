@@ -2,9 +2,10 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 [package]
-name = "time"
+name = "raven-time"
 version = "0.1.0"
 description = "RavenBSD time: report the real time of a utility."
+publish = false
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
