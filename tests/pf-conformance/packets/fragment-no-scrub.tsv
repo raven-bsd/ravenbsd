@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: fragment-no-scrub
+# features: ipv4,fragmentation,fail-closed,deny
+# reference: OpenBSD sys/net/pf.c:pf_match_rule (PF_VPROTO_FRAGMENT skips port_op/flagset/type/code); sys/net/pf_norm.c:pf_normalize_ip
+# support: donor-only (raven-pf at a426dee0 has no fragment model)
+#
+# Without scrub reassembly, every fragment is tested with
+# virtual_proto=PF_VPROTO_FRAGMENT. The port-80 pass rule is skipped for all
+# fragments, including the first one, so the default block applies. This is
+# the fail-closed negative case.
+#
+# now direction interface proto source sport destination dport length flags expected disposition fragment
+0   in  eth0 tcp 10.0.0.5 40000 192.0.2.10 80 1480 S  block - 0/1
+1   in  eth0 tcp 10.0.0.5 40000 192.0.2.10 80 1480 -  block - 1480/1
+2   in  eth0 tcp 10.0.0.5 40000 192.0.2.10 80 48   -  block - 2960/0

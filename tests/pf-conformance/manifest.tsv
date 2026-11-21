@@ -16,6 +16,10 @@ nat|scenario|rules/nat.conf|packets/nat.tsv|donor-only|raven-pf has no NAT; stag
 rdr|scenario|rules/rdr.conf|packets/rdr.tsv|donor-only|raven-pf has no rdr; staged for K273/K274
 ipv6|scenario|rules/ipv6.conf|packets/ipv6.tsv|donor-only|raven-pf is IPv4-only; staged for K273
 fragment|scenario|rules/fragment.conf|packets/fragment.tsv|donor-only|raven-pf has no fragment model; staged for K273
+fragment-no-scrub|scenario|rules/fragment-no-scrub.conf|packets/fragment-no-scrub.tsv|donor-only|raven-pf has no fragment model; fail-closed donor case
 malformed-unknown-keyword|parse-error|rules/malformed-unknown-keyword.conf|-|raven-pf-parse-error|4,unknown protocol
 malformed-bad-address|parse-error|rules/malformed-bad-address.conf|-|raven-pf-parse-error|4,invalid IPv4 address
 malformed-bad-port|parse-error|rules/malformed-bad-port.conf|-|raven-pf-parse-error|4,invalid port
+malformed-duplicate-direction|parse-error|rules/malformed-duplicate-direction.conf|-|raven-pf-parse-error|3,duplicate direction
+malformed-duplicate-from|parse-error|rules/malformed-duplicate-from.conf|-|raven-pf-parse-error|3,duplicate `from` clause
+malformed-missing-port|parse-error|rules/malformed-missing-port.conf|-|raven-pf-parse-error|3,`port` needs a value

@@ -19,3 +19,10 @@ malformed/unclosed-table.conf|error|3|tables|reject, no partial load
 malformed/unbalanced-brace.conf|error|4|rules|reject, no partial load
 malformed/unterminated-rule.conf|error|4|rules|reject, no partial load
 malformed/oversized-line.conf|error|3|rules|bounded parser, reject
+malformed/duplicate-direction.conf|error|3|rules|reject duplicate in/out
+malformed/duplicate-from.conf|error|3|rules|reject duplicate from
+malformed/bad-interface.conf|error|3|rules|reject invalid interface
+malformed/bad-icmp-type.conf|error|3|rules|reject unknown icmp-type
+malformed/bad-flags.conf|error|3|rules|reject invalid TCP flags
+malformed/reverse-port-range.conf|error|3|rules|reject reversed port range
+malformed/unknown-option.conf|error|3|options|reject unknown set option

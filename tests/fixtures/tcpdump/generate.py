@@ -222,13 +222,16 @@ class Pcap:
         self.index = 0
 
     def add(self, frame: bytes) -> None:
+        self.add_record(frame, len(frame), len(frame))
+
+    def add_record(self, frame: bytes, caplen: int, origlen: int) -> None:
         self.handle.write(
             struct.pack(
                 "<IIII",
                 BASE_TIME,
                 self.index * 1000,
-                len(frame),
-                len(frame),
+                caplen,
+                origlen,
             )
         )
         self.handle.write(frame)
@@ -377,6 +380,24 @@ def write_arp(path: Path) -> None:
     pcap.close()
 
 
+def write_malformed_truncated(path: Path) -> None:
+    frame = ethernet(B_MAC, A_MAC, ETH_P_IP, ipv4(A4, B4, 6, tcp(
+        A4, B4, 40000, 80, 1000, 0, SYN, options=tcp_options()
+    )))
+    pcap = Pcap(path)
+    pcap.add_record(frame[:20], 60, 60)
+    pcap.close()
+
+
+def write_malformed_bad_caplen(path: Path) -> None:
+    frame = ethernet(B_MAC, A_MAC, ETH_P_IP, ipv4(A4, B4, 6, tcp(
+        A4, B4, 40000, 80, 1000, 0, SYN, options=tcp_options()
+    )))
+    pcap = Pcap(path)
+    pcap.add_record(frame, 70000, 70000)
+    pcap.close()
+
+
 GENERATORS = {
     "ipv4-tcp-handshake.pcap": write_tcp_handshake,
     "ipv4-udp-dns.pcap": write_udp_dns,
@@ -385,6 +406,8 @@ GENERATORS = {
     "ipv6-udp-icmp.pcap": write_ipv6_udp_icmp,
     "ipv4-fragmented-udp.pcap": write_fragmented_udp,
     "arp.pcap": write_arp,
+    "malformed-truncated.pcap": write_malformed_truncated,
+    "malformed-bad-caplen.pcap": write_malformed_bad_caplen,
 }
 
 

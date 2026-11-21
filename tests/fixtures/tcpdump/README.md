@@ -33,6 +33,12 @@ tcpdump -nn -tt -v -r ipv4-fragmented-udp.pcap
 | `ipv4-fragmented-udp.pcap` | 3 | UDP split 1480/1480/48 with MF and offsets |
 | `arp.pcap` | 2 | ARP request/reply |
 
+Negative fixtures in `malformed.tsv` must be rejected, not decoded:
+`malformed-truncated.pcap` declares a 60-byte record but carries 20 bytes, and
+`malformed-bad-caplen.pcap` declares 70000 bytes, above the 65535 snapshot
+length. `check_fixtures.py` validates the parser error and `tcpdump` must exit
+non-zero for both.
+
 Donor reference for the decoder behaviour: NetBSD
 `external/bsd/tcpdump/dist/{tcpdump.c,print-ip.c,print-ip6.c,print-tcp.c,print-udp.c,print-icmp.c,print-arp.c,netdissect.h}`
 at `36eddebcc36cb0775aa2962005b9c05419a6ff01`. The pcaps are first-party

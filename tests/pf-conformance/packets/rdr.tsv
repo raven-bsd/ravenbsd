@@ -3,13 +3,13 @@
 #
 # scenario: rdr
 # features: redirect,ipv4,stateful,translation
-# reference: OpenBSD sys/net/pf.c:pf_get_translation,pf_map_addr; NetBSD sys/net/npf/npf_nat.c
-# support: donor-only (raven-pf at 4adc24a2 has no rdr)
+# reference: OpenBSD sys/net/pf_lb.c:pf_get_transaddr,pf_map_addr; sys/net/pf.c:pf_test_state; NetBSD sys/net/npf/npf_nat.c
+# support: donor-only (raven-pf at a426dee0 has no rdr)
 #
-# Mapping: 203.0.113.5:80 -> 10.0.0.80:8080. Rows are the pre- and
-# post-translation views of the same inbound flow; K273/K274 must redirect
-# before filtering and keep the reverse flow in the state table.
+# Mapping: wire 198.51.100.20:40000 -> 203.0.113.5:80 is redirected to
+# 10.0.0.80:8080 before filtering (pf.conf(5) TRANSLATION). The first row is
+# the post-translation packet the filter sees; the return row is the state
+# hit. The state entry restores 203.0.113.5:80 on the wire.
 # now direction interface proto source sport destination dport length flags expected disposition
-0   in  eth0 tcp 198.51.100.20 40000 203.0.113.5 80   60 S  pass created
-1   in  eth0 tcp 198.51.100.20 40000 10.0.0.80   8080 60 S  pass existing
-2   out eth0 tcp 10.0.0.80     8080  198.51.100.20 40000 60 SA pass existing
+0   in  eth0 tcp 198.51.100.20 40000 10.0.0.80   8080  60 S  pass created
+1   out eth0 tcp 10.0.0.80     8080  198.51.100.20 40000 60 SA pass existing

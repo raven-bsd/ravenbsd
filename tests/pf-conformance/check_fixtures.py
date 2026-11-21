@@ -68,6 +68,16 @@ def check_pf_conformance(root: Path) -> None:
     if not manifest.is_file():
         error(f"{manifest}: missing")
         return
+    semantics = base / "semantics.tsv"
+    semantic_ids = set()
+    if not semantics.is_file():
+        error(f"{semantics}: missing")
+    else:
+        for fields in read_rows(semantics):
+            if len(fields) != 3:
+                error(f"{semantics}: expected 3 fields, got {fields}")
+                continue
+            semantic_ids.add(fields[0])
     seen = set()
     for fields in read_rows(manifest):
         if len(fields) != 6:
@@ -100,12 +110,21 @@ def check_pf_conformance(root: Path) -> None:
             error(f"{manifest}: {ident}: unknown kind {kind}")
         if support not in {"raven-pf", "raven-pf-parse-error", "donor-only"}:
             error(f"{manifest}: {ident}: unknown support {support}")
+        if ident not in semantic_ids:
+            error(f"{semantics}: no row for manifest id {ident}")
+    for ident in semantic_ids - seen:
+        error(f"{semantics}: row for unknown manifest id {ident}")
 
 
 def check_packets(path: Path, support: str, scenario: str) -> None:
     rows = 0
     counters = 0
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    text = path.read_text(encoding="utf-8")
+    if "# reference:" not in text:
+        error(f"{path}: missing `# reference:` donor trace")
+    if support == "donor-only" and "# support: donor-only" not in text:
+        error(f"{path}: donor-only scenario must say `# support: donor-only`")
+    for line_number, line in enumerate(text.splitlines(), 1):
         stripped = line.strip()
         if stripped.startswith("# expect-counters "):
             counters += 1
@@ -144,7 +163,7 @@ def check_packets(path: Path, support: str, scenario: str) -> None:
             error(f"{path}:{line_number}: bad length {length}")
         if flags != "-" and not set(flags) <= set("SAFR"):
             error(f"{path}:{line_number}: bad flags {flags}")
-        if expected not in {"pass", "block"}:
+        if expected not in {"pass", "block", "queued"}:
             error(f"{path}:{line_number}: bad expected verdict {expected}")
         if disposition not in {"-", "created", "existing"}:
             error(f"{path}:{line_number}: bad disposition {disposition}")
@@ -152,6 +171,8 @@ def check_packets(path: Path, support: str, scenario: str) -> None:
             offset, _, more = fragment.partition("/")
             if not offset.isdigit() or int(offset) % 8 or more not in {"0", "1"}:
                 error(f"{path}:{line_number}: bad fragment {fragment}")
+        if expected == "queued" and fragment is None:
+            error(f"{path}:{line_number}: `queued` needs a fragment field")
         if support == "raven-pf":
             if source_ip is not None and source_ip.version != 4:
                 error(f"{path}:{line_number}: raven-pf scenario has an IPv6 source")
@@ -159,6 +180,8 @@ def check_packets(path: Path, support: str, scenario: str) -> None:
                 error(f"{path}:{line_number}: raven-pf scenario has an IPv6 destination")
             if fragment is not None:
                 error(f"{path}:{line_number}: raven-pf scenario has a fragment field")
+            if expected == "queued":
+                error(f"{path}:{line_number}: raven-pf scenario has a queued row")
     if rows == 0:
         error(f"{path}: no packet rows")
     if support == "raven-pf":
@@ -174,6 +197,11 @@ def check_pfctl(root: Path) -> None:
     if not manifest.is_file():
         error(f"{manifest}: missing")
         return
+    listed = {fields[0] for fields in read_rows(manifest) if fields}
+    for path in sorted(base.rglob("*.conf")):
+        relative = path.relative_to(base).as_posix()
+        if relative not in listed:
+            error(f"{manifest}: {relative}: fixture has no manifest row")
     for fields in read_rows(manifest):
         if len(fields) != 5:
             error(f"{manifest}: expected 5 fields, got {fields}")
@@ -332,6 +360,16 @@ def check_tcpdump(root: Path) -> None:
     if not manifest.is_file():
         error(f"{manifest}: missing")
         return
+    malformed_path = base / "malformed.tsv"
+    malformed: dict[str, str] = {}
+    if not malformed_path.is_file():
+        error(f"{malformed_path}: missing")
+    else:
+        for fields in read_rows(malformed_path):
+            if len(fields) != 2:
+                error(f"{malformed_path}: expected 2 fields, got {fields}")
+                continue
+            malformed[fields[0]] = fields[1]
     entries: dict[str, str] = {}
     for fields in read_rows(manifest):
         if len(fields) != 6:
@@ -355,9 +393,37 @@ def check_tcpdump(root: Path) -> None:
             continue
         if packets != int(count):
             error(f"{path}: {packets} packets, manifest says {count}")
+    listed = set(entries) | set(malformed)
+    for path in sorted(base.glob("*.pcap")):
+        if path.name not in listed:
+            error(f"{base}: {path.name}: pcap has no manifest row")
+    for name, expected in malformed.items():
+        path = base / name
+        if not path.is_file():
+            error(f"{malformed_path}: missing {path}")
+            continue
+        try:
+            check_pcap(path)
+        except (ValueError, struct.error) as exc:
+            if expected not in str(exc):
+                error(f"{path}: expected `{expected}`, got `{exc}`")
+        else:
+            error(f"{path}: malformed pcap was accepted")
     if not shutil.which("tcpdump"):
         print("SKIP tcpdump decode: tcpdump is not installed")
         return
+    for name in malformed:
+        result = subprocess.run(
+            ["tcpdump", "-nn", "-r", str(base / name)],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        if result.returncode == 0:
+            error(f"{base / name}: tcpdump accepted a malformed pcap")
+        elif not result.stderr.strip():
+            error(f"{base / name}: tcpdump failed without a diagnostic")
     decode_path = base / "decode.tsv"
     if decode_path.is_file():
         decoded: dict[str, list[str]] = {}

@@ -34,4 +34,7 @@ CARGO_TARGET_DIR="$root/target/pf-conformance-harness" \
     timeout 60 cargo run --offline --quiet \
     --manifest-path "$here/harness/Cargo.toml" -- "$here"
 
+echo "== negative check =="
+timeout 60 sh "$here/negative_check.sh"
+
 echo "selftest: PASS"
