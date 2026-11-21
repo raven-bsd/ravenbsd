@@ -40,7 +40,7 @@ First-party Rust implementations of the four required rows: `time`, `times`, `tp
 
 ```
 sh tests/posix/utility/run-simple2.sh
-cargo nextest run -p time -p times -p tput -p ulimit
+cargo nextest run -p raven-time -p times -p tput -p ulimit
 cargo xtask posix-check --profile posix --arch x86_64 --host-only
 make check-fast
 ```
