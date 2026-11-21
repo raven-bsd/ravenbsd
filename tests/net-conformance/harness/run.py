@@ -91,7 +91,9 @@ def run_capped(command: list[str], log_path: Path, timeout: int) -> tuple[int, s
 def build_image(args: argparse.Namespace, log_path: Path) -> tuple[Path | None, str]:
     if args.image:
         image = Path(args.image)
-        return (image if image.is_file() else None), f"image {image}"
+        if image.is_file():
+            return image, f"image {image}"
+        return None, f"image {image} is not a file"
     command = ["sh", "scripts/net-conformance.sh", "--build-only"]
     if args.branch:
         command += ["--branch", args.branch]
