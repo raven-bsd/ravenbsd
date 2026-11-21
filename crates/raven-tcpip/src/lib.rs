@@ -46,6 +46,7 @@ mod dhcp;
 mod dhcp_stack;
 mod ecn;
 mod event;
+mod hostcache;
 mod icmp_stack;
 mod ipv4_stack;
 mod ipv6_stack;
@@ -86,6 +87,10 @@ pub use ecn::{
     TH_ECE, TH_SYN, get_ace, set_ace,
 };
 pub use event::{Event, PollResult, SocketId};
+pub use hostcache::{
+    DEFAULT_BUCKET_LIMIT, DEFAULT_EXPIRE_MS, DEFAULT_HASHSIZE, DEFAULT_PRUNE_MS, HostKey,
+    HostMetrics, Hostcache,
+};
 pub use ipv6_stack::{
     IpAddr, Ipv6Addr, Ipv6AddressState, Ipv6Cidr, Ipv6Config, Neighbor6Cache, Neighbor6Entry,
     Neighbor6State,
