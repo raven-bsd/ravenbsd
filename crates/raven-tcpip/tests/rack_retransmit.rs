@@ -33,7 +33,7 @@ fn three_duplicate_acks_select_and_send_the_oldest_segment() {
     assert_eq!(tx.seq, 1_000);
     assert_eq!(tx.len, 1_000);
     assert_eq!(tx.flags & TH_ACK, TH_ACK);
-    assert_eq!(model.map.find_id(ids[0]).expect("entry").r_rtr_cnt, 2);
+    assert_eq!(model.map.find_id(ids[0]).expect("entry").rtr_cnt, 2);
 }
 
 #[test]
