@@ -48,6 +48,21 @@ fn plain_screen_has_the_exact_golden_bytes() {
 }
 
 #[test]
+fn ansi_screen_has_the_exact_golden_bytes() {
+    let expected = format!(
+        "\x1b[1;36mR A V E N   B S D\x1b[0m\n\
+         \x1b[2m{RULE}\x1b[0m\n\
+         000.00  svcd                \x1b[32mok\x1b[0m\n\
+         001.25  vfsd                \x1b[32mok\x1b[0m\n\
+         002.00  optional            \x1b[33mwarn\x1b[0m\n\
+         \x1b[2m{RULE}\x1b[0m\n\
+         \n\
+         Welcome to RavenBSD 0.1 x86_64\n"
+    );
+    assert_eq!(render("x86_64", &rows(), true), expected);
+}
+
+#[test]
 fn ansi_screen_strips_to_the_plain_screen() {
     let ansi = render("aarch64", &rows(), true);
     let plain = render("aarch64", &rows(), false);
