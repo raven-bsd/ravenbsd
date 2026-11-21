@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K414: rootfs spec for the 0.1.0-ufs payload. Programs and files come from the
+# resolved 0.1.0-ufs profile; this fixes the 256 MiB UFS2 size and adds the
+# root/device/tmp mount-point markers plus the post-pivot mount table.
+
+size = 268435456
+
+[[files]]
+src = "profiles/qemu-ufs.d/root.keep"
+path = "/root/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/qemu-ufs.d/dev.keep"
+path = "/dev/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/qemu-ufs.d/tmp.keep"
+path = "/tmp/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/qemu-ufs.d/mounts"
+path = "/etc/mounts"
+mode = 0o644

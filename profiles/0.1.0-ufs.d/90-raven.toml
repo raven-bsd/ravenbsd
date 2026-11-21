@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K209: the writable UFS payload carries the target-built `raven` administration client and the
+# K198 strict network drop-in. The artifact comes from `tests/fixtures/modern-admin/build.sh` (a
+# target build, never the host binary or the K74 stub). The drop-in makes `raven config
+# --dry-run` report `file=present`, lets `raven config check/get` see the effective network
+# section, and gives the TUI a real file to save atomically on the writable UFS root.
+[[initfs.files]]
+src = "build/fixtures/modern-admin/raven"
+path = "/usr/sbin/raven"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "etc/raven/conf.d/network.toml"
+path = "/etc/raven/conf.d/network.toml"
+mode = 0o644

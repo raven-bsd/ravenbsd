@@ -59,6 +59,20 @@ pub(crate) struct Overrides<'a> {
     pub(crate) output: Option<&'a Path>,
 }
 
+/// Bootstrap initfs profile for a persistent UFS-root image.
+///
+/// A profile opts into the qemu-ufs-style payload by shipping a rootfs spec and a sibling
+/// `<name>-boot.toml` bootstrap profile. The image builder no longer keys on the profile name.
+fn ufs_boot_profile(root: &Path, profile_name: &str) -> Option<String> {
+    if crate::rootfs::spec_path(root, profile_name).is_none() {
+        return None;
+    }
+    let boot = root
+        .join("profiles")
+        .join(format!("{profile_name}-boot.toml"));
+    boot.is_file().then(|| format!("{profile_name}-boot"))
+}
+
 pub(crate) fn run(
     root: &Path,
     arch: Arch,
@@ -98,6 +112,7 @@ pub(crate) fn run_with_overrides(
     // is the explicit switch for demo/test profiles.
     let profile = Profile::load(root, profile_name)?;
     let release_image = build::image_build_release(arch, &profile);
+    let ufs_boot = ufs_boot_profile(root, profile_name);
     let qemu_ufs = profile_name == "qemu-ufs";
     let pi4_pivot = profile_name == "pi4-root-pivot";
     if release_image {
@@ -178,14 +193,14 @@ pub(crate) fn run_with_overrides(
             let path = resolve_override(root, path);
             fs::read(&path).with_context(|| format!("cannot read {}", path.display()))?
         }
-        None if rootfs && !qemu_ufs && !pi4_pivot => {
+        None if rootfs && ufs_boot.is_none() && !pi4_pivot => {
             build_release_initfs(root, arch, &profile, &workspace)?
         }
         None => {
             // K176: the UFS-root image keeps the initfs bootstrap-only; the release
             // userland goes into the root disk below.
-            let initfs_profile = if qemu_ufs {
-                "qemu-ufs-boot"
+            let initfs_profile = if let Some(boot) = &ufs_boot {
+                boot.as_str()
             } else if pi4_pivot {
                 "pi4-root-pivot-boot"
             } else {
@@ -226,7 +241,7 @@ pub(crate) fn run_with_overrides(
         crate::rootfs::build_root_disk(&ufs, &disk)?;
         let data = fs::read(&disk).with_context(|| format!("cannot read {}", disk.display()))?;
         crate::rootfs::inject_initfs_file(&initfs_bytes, "/etc/pi4-root.img", &data, 0o444)?
-    } else if qemu_ufs {
+    } else if ufs_boot.is_some() {
         // The payload profile stages brush/uutils and other generated files; build those
         // prerequisites before staging the UFS tree.
         crate::initfs::ensure_prerequisites(root, arch, &profile)?;
@@ -235,25 +250,30 @@ pub(crate) fn run_with_overrides(
         let disk = root
             .join("build")
             .join(arch.as_str())
-            .join("qemu-ufs-root.img");
+            .join(format!("{profile_name}-root.img"));
         crate::rootfs::build_root_disk(&ufs_path, &disk)?;
         let ufs =
             fs::read(&ufs_path).with_context(|| format!("cannot read {}", ufs_path.display()))?;
         demo_ufs = Some(ufs);
-        preflight_initfs = Some(initfs_bytes);
-        // The one-disk demo has the ESP as partition 1 and the UFS root as partition 2.
-        let manifest = fs::read(root.join("profiles/qemu-ufs.d/fsd-ufs-demo.manifest"))
-            .context("cannot read the demo fsd-ufs manifest")?;
-        let preflight = preflight_initfs
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("qemu-ufs preflight initfs is missing"))?;
-        replace_initfs_file(
-            preflight,
-            "/etc/services.d/fsd-ufs.toml",
-            &manifest,
-            0o644,
-            crate::initfs::image_epoch(root),
-        )?
+        preflight_initfs = Some(initfs_bytes.clone());
+        if qemu_ufs {
+            // The one-disk demo has the ESP as partition 1 and the UFS root as partition 2.
+            // The two-disk preflight keeps the bootstrap's partition-1 fsd manifest.
+            let manifest = fs::read(root.join("profiles/qemu-ufs.d/fsd-ufs-demo.manifest"))
+                .context("cannot read the demo fsd-ufs manifest")?;
+            let preflight = preflight_initfs
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("{profile_name} preflight initfs is missing"))?;
+            replace_initfs_file(
+                preflight,
+                "/etc/services.d/fsd-ufs.toml",
+                &manifest,
+                0o644,
+                crate::initfs::image_epoch(root),
+            )?
+        } else {
+            initfs_bytes
+        }
     } else {
         match crate::rootfs::build_for_profile(root, arch, profile_name, true)? {
             Some(disk) => {
@@ -301,7 +321,9 @@ pub(crate) fn run_with_overrides(
         // `--output` remains the two-disk preflight ESP (K176). The one-disk demo is
         // emitted only at its fixed build/<arch>/ravenbsd-ufs-demo path.
         write_image(&output, &preflight_gpt, &preflight_esp)?;
-        write_ufs_demo(root, arch, &esp, ufs)?;
+        if qemu_ufs {
+            write_ufs_demo(root, arch, &esp, ufs)?;
+        }
         println!("{}", output.display());
         return Ok(0);
     }
