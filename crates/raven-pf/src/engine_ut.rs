@@ -361,8 +361,8 @@ fn redirect_rewrites_an_inbound_flow() {
 }
 
 #[test]
-fn fragments_match_rules_but_do_not_create_state() {
-    let ruleset = parse("pass in proto tcp from any to any port 80 keep state\n").unwrap();
+fn fragments_match_address_rules_but_do_not_create_state() {
+    let ruleset = parse("pass in proto tcp from any to any keep state\n").unwrap();
     let mut engine = Engine::new(ruleset);
     let fragment = Packet::tcp(Direction::In, "eth0", CLIENT, 40000, SERVER, 0, 0, 60).fragmented();
     let decision = engine.evaluate(&fragment, 0);

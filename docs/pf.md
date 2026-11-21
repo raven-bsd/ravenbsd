@@ -44,8 +44,10 @@ Deferred (documented limits):
   rules, `synproxy`, source-node limits and `pfctl` ioctl transport (K274);
 * address ranges (`PF_ADDR_RANGE`), `no-route`/`urpf-failed`/dynamic interface address kinds;
 * cross-family `af-to` translation, ICMP/ICMPv6 identifier NAT, fragment reassembly and the
-  fragment cache (a fragmented packet is filtered on addresses only and creates no state);
-* fragment reassembly/cache: a fragment is filtered on addresses only and creates no state.
+  fragment cache (a fragment creates no state and never matches a rule with a
+  source/destination port condition; address-only rules still match);
+* fragment reassembly/cache: a fragment creates no state and never matches a rule with a
+  source/destination port condition (address-only rules still match).
 
 ## 3. Donor map
 
@@ -93,7 +95,18 @@ rdr  (same shape; translates the destination)
 * Keywords are case-insensitive; comments start at `#`; blank lines are ignored. Braces and
   commas are whitespace.
 * A `pass` rule keeps state by default; `no state` disables it. A `block` rule never keeps
-  state. A fragmented packet matches on addresses only and creates no state.
+  state. A fragmented packet never matches a rule that names a source or destination
+  port (donor `pf_match_rule()` `PF_VPROTO_FRAGMENT`), can still match an address-only
+  rule, and creates no state. See the fragment rule below.
+
+### Fragments and port rules
+
+A `PF_VPROTO_FRAGMENT` rule match fails if either side names a port
+(`PF_TEST_ATTRIB((r->src.port_op || r->dst.port_op), fail)` in FreeBSD
+`sys/netpfil/pf/pf.c:5997-6002`). `raven-pf` implements the same rule in
+`Rule::matches`: `pass in proto tcp from any to any port 80` cannot admit a
+fragment; `pass in proto tcp from any to any` can. A fragment still creates no
+state (`D-pf-frag-state`), and the fragment reassembly cache remains deferred.
 * Limits: 4096 rules, 1024 NAT rules, 64 tables (1024 entries each), 16 pool addresses,
   512-byte lines, 32-byte interface/table names. A parse error names the 1-based line.
 
@@ -214,7 +227,7 @@ atomics. No allocation happens on the input path beyond state/log-table operatio
 | no rule matches | `set default` (block when absent) |
 | state table full | `Block`, `PFRES_MAXSTATES`, forced log |
 | translation cannot allocate | `Block`, `PFRES_MAPFAILED`, forced log |
-| fragmented packet | filtered on addresses only, no state |
+| fragmented packet | never matches a rule with a source/destination port condition; address-only rules can match; no state |
 | wire/random parser input | no panic (4000-case fuzz test) |
 | `/etc/pf.conf` present but malformed | `netd` logs the line and exits 1 before registering `net:` |
 | hook cannot express a translation (fragment/ICMPv6) | frame dropped, `translate-unsupported` logged |

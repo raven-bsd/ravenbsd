@@ -12,6 +12,6 @@ out eth0  tcp   10.0.0.6         40001 8.8.8.8          53    60  S  -    pass
 out eth0  tcp   2001:db8::5      40002 2001:db8:1::10   443   60  S  -    pass
 in  eth0  tcp   2001:db8:1::10   443   2001:db8::5      40002 60  SA -    pass
 in  eth0  icmp6 2001:db8::5      0     2001:db8::1      0     28  -  -    pass
-in  eth0  tcp   10.0.0.5         40003 192.0.2.10       443   60  -  frag pass
+in  eth0  tcp   10.0.0.5         40003 192.0.2.10       443   60  -  frag block
 in  eth0  tcp   192.0.2.99       40004 192.0.2.10       443   60  S  -    block
 in  eth0  tcp   10.0.0.5         40005 192.0.2.10       80    60  S  -    block
