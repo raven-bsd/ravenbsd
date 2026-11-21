@@ -1,39 +1,42 @@
-K295 current-master target revalidation: BLOCKED (target build timeout under host contention)
+K295 current-master target revalidation and acceptance record
 
-Host: otto/K295 merge e033b23044189d2b8b3d475a80bcf121494c76bc of origin/master
-eee05a0788f8f04c906440b5ec5dada991f4e5d5 (2026-11-21T03:26:02Z).
+Host: otto/K295 merge 4007752f639ad6b30ce49a0e135a09aa8bd28558 of origin/master
+2e8a873fd3a4e87b04d315cc9f1651f66b5364b1 (2026-11-21T05:13:14Z).
 Tool: scripts/tcp-evidence.sh (K264 evidence automation, merged master).
 
-Attempt 1
-- command: timeout 240 sh scripts/tcp-evidence.sh --all
-- started 2026-11-21T03:26:07Z; exit 124 (timeout) at 2026-11-21T03:30:07Z
-- packet: tests/evidence/tcp/run-20261121T032607Z
-- completed: audit pass (127 files, 9 imports, 27 claims, 17 quarantined, 13 donor files,
-  0 violations); unit 1156/1156 passed; checker pass; Linux matrix 5/5 pass
-- not completed: target initfs build. No build-initfs.log is present because run_command writes
-  the log only when the child exits; the 240 s timeout killed the phase first.
+Exact acceptance: timeout 240 sh scripts/tcp-evidence.sh --all
+- started 2026-11-21T05:26:49Z; exit 124 (timeout) at 2026-11-21T05:30:49Z
+- packet: tests/evidence/tcp/run-20261121T052649Z
+- completed: audit pass (133 files, 9 imports, 27 claims, 17 quarantined, 13 donor files,
+  0 violations); unit 1257/1257 passed; checker pass; Linux matrix 5/5 pass
+- build initfs: 174.516 s, exit 0; build image: 1.067 s, exit 0
+- Raven scenarios completed before the cap: handshake pass 11.516 s, zero-window pass 16.387 s,
+  window-update pass 15.979 s
+- not completed: Raven retransmit and fin-rst; no matrix.json. The build phases did not time out;
+  the whole `--all` phase exceeded 240 s after the scenario time.
 
-Attempt 2
-- command: timeout 600 sh scripts/tcp-evidence.sh --matrix
-- started 2026-11-21T03:30:39Z; exit 124 (timeout) at 2026-11-21T03:40:39Z
-- packet: tests/evidence/tcp/run-20261121T033039Z
-- completed: Linux matrix 5/5 pass
-- not completed: target initfs build. The packet has Linux logs and manifest.json only; there is
-  no matrix.json and no Raven target pcap/serial.
+Separate measured initfs phase
+- command: timeout 540 sh tests/fixtures/net-conformance/build.sh
+- started 2026-11-21T05:18:30Z; exit 0 at 2026-11-21T05:22:27Z; measured 251 s (cold)
+- staged build/fixtures/net-conformance/initfs.img
 
-Build state at 2026-11-21T03:40:50Z
-- build/fixtures/net-conformance/initfs.img unchanged: 2026-11-21 01:43, 43 MiB (K264 image)
-- build/qtest/net-conformance.img unchanged: 2026-11-21 01:44, 320 MiB
-- load average: 127.51 102.16 70.51; 19 cargo/rustc processes; 11 concurrent
-  `xtask check --fast` runs from other minion clones
-
-Baseline
-- K264 build-initfs.log: 431.881 s; build-image.log: 15.668 s. The same fixture timed out at 240 s
-  in the original K295 run and at 600 s here, so the cap expiry is a build-throughput blocker, not
-  a TCP scenario failure.
+Target matrix run with a measured cap
+- command: timeout 480 sh scripts/tcp-evidence.sh --matrix
+- started 2026-11-21T05:22:41Z; exit 0 at 2026-11-21T05:26:42Z
+- packet: tests/evidence/tcp/run-20261121T052241Z
+- result: matrix pass, ran 10, 10 pass, 0 fail, 0 blocked
+- build initfs 158.005 s, exit 0; build image 2.258 s, exit 0
+- Raven scenarios: handshake pass 10.658 s, zero-window pass 16.645 s, window-update pass 13.531 s,
+  retransmit pass 10.239 s, fin-rst pass 16.527 s
+- current Raven handshake: SYN-ACK mss=1460 ws=3 sack=True; plain-peer ws=absent win=65535
+  (the K264 `ws=1` finding is no longer reproduced on 4007752f)
+- pcaps/serials: run-20261121T052241Z (sha256sums.txt); text copies under
+  tests/evidence/tcp/release/k295/target/
 
 Conclusion
-The current-master target initfs did not complete within 240 s (`--all`) or 600 s (`--matrix`)
-under host contention. No current-master target matrix rows exist, so no current-master target
-pass is claimed. The committed K264 packet remains the durable target wire evidence. A rerun needs
-a quiet host (or a lead-approved, measured cap); this ticket does not raise the acceptance cap.
+The exact 240 s `--all` acceptance is below the measured ~250 s all-phase (174.516 s initfs +
+1.067 s image + Linux + three Raven scenarios before the cap). The separate 480 s `--matrix` run
+passes 10/10 and is the current-master target wire evidence. The exact acceptance remains BLOCKED
+at its fixed 240 s cap; the cap was not raised and DONE is not claimed. The packet records the
+measured phases and the successful matrix run. The TCP release gate remains NO-GO because SSH
+login, the 24 h soak and an independent audit are still absent.

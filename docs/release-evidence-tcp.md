@@ -3,26 +3,26 @@
 
 # Release evidence: TCP section (K295)
 
-Status: **ASSEMBLED; CURRENT-MASTER TARGET REVALIDATION BLOCKED.** The merged port entries, the
-current-master audit/unit/checker/Linux results and the committed K264 matrix packet are OBSERVED.
-The current-master target matrix is **BLOCKED**: both the 240 s `--all` acceptance and a
-proportional 600 s `--matrix` attempt expired during the target initfs build under host
-contention, with no target `matrix.json` produced. The committed K264 packet remains the durable
-target wire evidence. This is not a release sign-off.
-
-Branch `otto/K295`, merge `e033b23044189d2b8b3d475a80bcf121494c76bc` of current master
-`eee05a0788f8f04c906440b5ec5dada991f4e5d5`.
+Status: **ASSEMBLED; CURRENT-MASTER TARGET MATRIX 10/10; EXACT 240 s `--all` STILL TIMEOUT;
+RELEASE GATE NO-GO.** Branch `otto/K295` merges current master
+`2e8a873fd3a4e87b04d315cc9f1651f66b5364b1` as
+`4007752f639ad6b30ce49a0e135a09aa8bd28558`. The target matrix on the merge passes 10/10 under a
+measured 480 s cap (initfs 158.005 s, image 2.258 s). The ticket's exact
+`timeout 240 sh scripts/tcp-evidence.sh --all` still exits 124: the measured all-phase is ~250 s
+(initfs 174.516 s, image 1.067 s, Linux 5/5, three Raven scenarios before the cap). The cap was
+not raised and DONE is not claimed. This is not a release sign-off.
 
 Tag: **every row below is OBSERVED.** Each row names the artifact that supports it; the SHA-256
-register is `tests/evidence/tcp/release/manifest.json`. Work that is not complete is in **Open
-gaps**, not asserted as a release claim. There are no PROPOSED rows left in the manifest.
+register is `tests/evidence/tcp/release/manifest.json`. Unfinished work is under **Open gaps**,
+not asserted as release evidence. There are no PROPOSED rows.
 
 ## Ported files
 
-The eight landed FreeBSD/DragonFly entries are OBSERVED in `PROVENANCE.toml` (K268, K270 x2,
-K271 x2, K272, K276, K313). K279 changes only the netd readiness test and is covered by K272's
-`readiness.rs` entry. The exact per-file donor paths, revisions and licences are in the K264
-evidence register.
+The eight earlier landed FreeBSD/DragonFly entries are OBSERVED in `PROVENANCE.toml` (K268,
+K270 x2, K271 x2, K272, K276, K313), plus K279's netd test covered by K272. K269 (FreeBSD
+NewReno/CUBIC/RACK, merged `f6235c82`) is OBSERVED in the source and the K269 report, but its
+`PROVENANCE.toml` entry for `cc.rs`/`recovery.rs` is K264-owned and still absent; that is an open
+gap, not a completed provenance claim.
 
 | Claim | Tag | Artifact |
 |---|---|---|
@@ -34,55 +34,62 @@ evidence register.
 | K272: FreeBSD `sys/sys/socketvar.h` -> `src/readiness.rs` (BSD-3-Clause) | OBSERVED | `PROVENANCE.toml`; `crates/raven-tcpip/src/readiness.rs` |
 | K276: FreeBSD `tcp_syncache.c`/`.h`/`tcp_timer.c` -> `src/syncache.rs` (BSD-3-Clause) | OBSERVED | `PROVENANCE.toml`; `crates/raven-tcpip/src/syncache.rs` |
 | K313: FreeBSD `tcp_output.c`/`tcp_timer.c` -> `src/tcp_data.rs` (BSD-3-Clause) | OBSERVED | `PROVENANCE.toml`; `crates/raven-tcpip/src/tcp_data.rs` |
+| K269: FreeBSD `cc_newreno.c`/`cc.c`/`cc_cubic.c` -> `src/cc.rs`; `tcp_stacks/rack.c` core -> `src/recovery.rs` (merged `f6235c82`) | OBSERVED | `crates/raven-tcpip/src/cc.rs`; `src/recovery.rs`; `dave/reports/K269.md`; **PROVENANCE entry missing (gap)** |
 | K279: netd readiness test, covered by K272 | OBSERVED | `userland/servers/netd/src/netd_ut.rs`; K272 entry |
-| Quarantined ports: 17 claims (K254-K261, K265-K267, K269, K273-K275, K277, K278), no entries | OBSERVED | `tests/evidence/tcp/port-claims.json` |
+| Quarantined ports: K254-K261, K265-K267, K273-K275, K277, K278; the K264 intake also still lists K269 (stale) | OBSERVED | `tests/evidence/tcp/port-claims.json` |
 
-No NetBSD TCP entry exists; the NetBSD TCP files are NRL 4-clause NO-COPY and stay quarantined.
+RACK donor-function audit on the merge:
+
+| Audit | Tag | Result | Artifact |
+|---|---|---|---|
+| RACK acceptance | OBSERVED | `donors=219 register=219 target=218 accepted=219 gaps=0 missing=0 duplicate=0`; all 219 rows PASS; 218-row view excludes `tcp_addrack` (PASS) | `release/k295/logs/k295-rack-acceptance.log` |
+| RACK register | OBSERVED | `donors=219 rows=219 missing=0 unknown=0 duplicate=0 bad_owner=0 empty_rust=0 empty_test=0 empty_mutation=0 not_pass=0 missing_symbol=0 missing_test=0` | `release/k295/logs/k295-rack-register.log` |
 
 ## Matrix
 
-The committed K264 matrix packet (`tests/evidence/tcp/run-20261121T003615Z/`, commit
-`c3a2d951`) is OBSERVED: 10/10 ran, 9 pass, 1 finding. The current-master Linux side was
-revalidated on the K295 merge (5/5 pass). The current-master target side is BLOCKED.
+The current-master target matrix is the new wire evidence: 10/10 pass, including the five Raven
+scenarios. The K264 packet remains the historical comparison; its `ws=1` handshake finding is no
+longer reproduced on `4007752f` (current: `ws=3` only when the peer offers, plain-peer
+`ws=absent`).
 
 | Target/scenario | Tag | Result | Artifact |
 |---|---|---|---|
-| K264 Linux handshake, zero-window, window-update, retransmit, fin-rst | OBSERVED | 5/5 pass | `run-20261121T003615Z/pcaps/linux-*.pcap`; `sha256sums.txt` |
-| K264 Raven zero-window, window-update, retransmit, fin-rst | OBSERVED | 4/4 pass | `run-20261121T003615Z/serial/raven-*.log` |
-| K264 Raven handshake | OBSERVED | **finding:** `SYN-ACK mss=1460 ws=1 sack=True; plain-peer ws=1 win=65535` (Linux: `ws=absent win=64240`) | `run-20261121T003615Z/pcaps/raven-handshake.pcap`; `serial/raven-handshake.log` |
-| K295 current-master Linux revalidation | OBSERVED | 5/5 pass on merge `e033b230` | `release/k295/logs/matrix-linux-*.log` |
-| K295 current-master target revalidation | OBSERVED | **BLOCKED:** `--all` exit 124 at 240 s and `--matrix` exit 124 at 600 s during the target initfs build; no target `matrix.json`; host load 127.51 with 11 concurrent minion check-fast runs | `release/k295/target-revalidation.txt`; `run-20261121T032607Z/`; `run-20261121T033039Z/` |
-
-The handshake finding is a TCP port gate: Raven offers a window-scale option to a peer that did
-not offer one. The target build measured 431.881 s initfs + 15.668 s image in the K264 packet; the
-current-master rerun did not reach packing within either cap because the host was saturated.
+| Current-master Linux handshake, zero-window, window-update, retransmit, fin-rst | OBSERVED | 5/5 pass | `release/k295/target/logs/matrix-linux-*.log`; pcaps in `run-20261121T052241Z` |
+| Current-master Raven handshake | OBSERVED | **pass** `SYN-ACK mss=1460 ws=3 sack=True; plain-peer ws=absent win=65535` | `release/k295/target/serial/raven-handshake.log` |
+| Current-master Raven zero-window, window-update, retransmit, fin-rst | OBSERVED | 4/4 pass | `release/k295/target/serial/raven-*.log` |
+| Current-master matrix build | OBSERVED | initfs 158.005 s, image 2.258 s, 10/10 | `release/k295/target/matrix.json`; `logs/build-*.log` |
+| K264 matrix packet (historical) | OBSERVED | 10/10 ran, 9 pass, 1 handshake finding | `run-20261121T003615Z/matrix.json`; pcap/serial |
+| Exact 240 s `--all` | OBSERVED | **BLOCKED:** exit 124; initfs 174.516 s, image 1.067 s; Linux 5/5; Raven handshake/zero-window/window-update pass; retransmit/fin-rst not reached; no `matrix.json` | `release/k295/target-revalidation.txt`; `release/k295/logs/build-*.log` |
 
 ## Gates
 
 | Gate | Tag | Result | Artifact |
 |---|---|---|---|
-| K295 current-master audit | OBSERVED | 127 files, 9 imports (7 FreeBSD, 1 DragonFly, 1 smoltcp), 27 claims, 17 quarantined, 13 donor files, 0 violations | `release/k295/audit.json`; `audit.txt` |
-| K295 current-master unit | OBSERVED | **1156/1156 passed**, 0 skipped | `release/k295/unit.json`; `logs/unit.log` |
-| K295 current-master checker | OBSERVED | 2 negative fixtures, 1 positive, 2 mutations caught | `release/k295/checker.json`; `logs/checker.log` |
-| K295 current-master Linux matrix | OBSERVED | 5/5 pass | `release/k295/logs/matrix-linux-*.log` |
-| K264 matrix | OBSERVED | 10/10 ran, 9 pass, 1 handshake finding | `run-20261121T003615Z/matrix.json` |
-| K264 provenance | OBSERVED | 10565 files, 0 violations (K264 packet) | `docs/tcp-evidence.md`; K264 report |
-| K295 `make check-fast` (merge `e033b230`) | OBSERVED | **`check-fast: PASSED`**; guard 40.27 s, fmt 60.72 s, profiles 0.53 s; clippy/tests skipped (no changed host-testable packages) | K295 report; `/tmp/opencode/k295-rework-checkfast.log` |
-| K295 `tcp-evidence.sh --all` | OBSERVED | **TIMEOUT** at 240 s (target initfs build); audit/unit/checker/Linux completed | `release/k295/target-revalidation.txt`; `run-20261121T032607Z/` |
-| K295 target matrix warm run | OBSERVED | **TIMEOUT** at 600 s (target initfs build); Linux completed, no target matrix | `release/k295/target-revalidation.txt`; `run-20261121T033039Z/` |
+| Current-master audit | OBSERVED | 133 files, 9 imports (7 FreeBSD, 1 DragonFly, 1 smoltcp), 27 claims, 17 quarantined (K269 stale), 13 donor files, 0 violations | `release/k295/audit.json`; `audit.txt` |
+| Current-master unit | OBSERVED | **1257/1257 passed**, 0 skipped | `release/k295/unit.json`; `logs/unit.log` |
+| Current-master checker | OBSERVED | 2 negative fixtures, 1 positive, 2 mutations caught | `release/k295/checker.json`; `logs/checker.log` |
+| Current-master target matrix | OBSERVED | **10/10 pass**, 0 fail, 0 blocked; initfs 158.005 s, image 2.258 s | `release/k295/target/matrix.json` |
+| RACK acceptance/register | OBSERVED | 219/219/219 accepted, gaps=0, duplicate=0; register rows=219, missing=0 | `release/k295/logs/k295-rack-*.log` |
+| Exact `tcp-evidence.sh --all` | OBSERVED | **TIMEOUT** at 240 s; measured all-phase ~250 s; no cap raised | `release/k295/target-revalidation.txt` |
+| `make check-fast` | OBSERVED | run on the packet commit; quoted in the K295 report | K295 report |
+| `make evidence-check` | OBSERVED | **`evidence check: PASSED`**; K295 not in the reviewer-owned scope, so no K295 registry row | K295 report |
+
+**Release gate: NO-GO.** The matrix is now present, but the gate requires the matrix, SSH login, a
+24 h soak and an independent audit together. SSH login, the 24 h soak and the independent audit
+are not in this packet.
 
 ## Evidence packet
 
 * `tests/evidence/tcp/release/manifest.json` - one OBSERVED row per claim with artifact and SHA-256.
 * `tests/evidence/tcp/release/check.py` - validates every tag, artifact path and SHA-256;
-  `--selftest` proves a missing tag/artifact/hash row is rejected.
-* `tests/evidence/tcp/release/k295/` - current-master audit/unit/checker/Linux artifacts and the
-  target-revalidation blocker record.
-* `tests/evidence/tcp/release/k295/run-manifest.json` - host commit, revisions and input hash of
-  the current-master `--all` packet.
-* `tests/evidence/tcp/run-20261121T003615Z/` - the committed K264 matrix packet (target
-  pcaps/serials, build logs).
-* `tests/evidence/tcp/run-20261121T004851Z/` - the K264 clean audit/unit/checker packet.
+  `--selftest` proves missing tag/artifact/hash rows are rejected.
+* `tests/evidence/tcp/release/k295/` - current audit/unit/checker, Linux logs, measured build logs,
+  RACK audit logs and the acceptance record.
+* `tests/evidence/tcp/release/k295/target/` - current-master matrix.json, target serials, scenario
+  logs, summary and the pcap/serial hash register. The pcaps themselves stay in the generated
+  `run-20261121T052241Z/pcaps/` packet outside the K295 Owns globs.
+* `tests/evidence/tcp/run-20261121T003615Z/` - committed K264 matrix packet.
+* `tests/evidence/tcp/run-20261121T004851Z/` - K264 clean audit/unit/checker packet.
 
 Run:
 
@@ -91,22 +98,19 @@ timeout 30 python3 tests/evidence/tcp/release/check.py --selftest
 timeout 30 python3 tests/evidence/tcp/release/check.py --reports-root /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/tickets
 ```
 
-The K295 report carries the acceptance commands, exit codes, the host-contention blocker and the
-open gaps. The packet is not a release sign-off until the current-master target matrix runs to
-completion on a quiet host and the handshake finding is fixed or accepted as a blocker.
-
 ## Open gaps
 
-1. **Current-master target matrix (OBSERVED BLOCKED):** the 240 s `--all` and 600 s `--matrix`
-   attempts both expired during the target initfs build under host load 127.51; no target
-   `matrix.json`/pcaps/serials exist for `e033b230`. A quiet-host rerun (or a lead-approved
-   measured cap) is required. The K264 packet remains the durable target wire evidence.
-2. **Raven handshake window scale (OBSERVED finding):** Raven advertises `ws=1` to a plain peer;
-   a TCP port ticket must fix it or record it as a release blocker.
-3. **Quarantined ports (OBSERVED):** K254-K261, K265-K267, K269, K273-K275, K277 and K278 have no
-   provenance entries until reworked and resubmitted.
-4. **K271 naming (OBSERVED):** the report says `solisten_proto`; the pinned FreeBSD tree has
-   `solisten_clone`/`solisten_enqueue`. Reviewer confirmation remains.
-5. **Scope (OBSERVED):** K295 is not in the reviewer-owned `tickets/evidence/scope.txt`, so
-   `make evidence` has no K295 registry row yet.
-6. No 24 h, live SSH/tap or Pi 4 claim is made.
+1. **Exact 240 s acceptance (OBSERVED BLOCKED):** the measured all-phase is ~250 s (174.516 s
+   initfs + 1.067 s image + Linux + scenarios). The separate 480 s `--matrix` run passes 10/10;
+   the exact cap remains unmet. A lead-approved cap or a faster build is required; this ticket
+   does not raise it.
+2. **K269 provenance (OBSERVED):** the code merged in `f6235c82` but `PROVENANCE.toml` has no
+   `cc.rs`/`recovery.rs` entry (K264-owned, outside K295 Owns). The K264 intake still lists K269
+   quarantined; the packet records the code and the missing entry separately.
+3. **Release gate NO-GO (OBSERVED):** matrix is present; SSH login, 24 h soak and independent
+   audit are absent.
+4. **Remaining quarantined ports (OBSERVED):** K254-K261, K265-K267, K273-K275, K277, K278.
+5. **K271 naming (OBSERVED):** `solisten_proto` vs the pinned FreeBSD
+   `solisten_clone`/`solisten_enqueue`; reviewer confirmation remains.
+6. **Scope (OBSERVED):** K295 is not in the reviewer-owned `tickets/evidence/scope.txt`.
+7. No 24 h, live SSH/tap or Pi 4 claim is made.

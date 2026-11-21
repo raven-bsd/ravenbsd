@@ -1,9 +1,9 @@
-$ sh /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/scripts/net-conformance.sh --scenario zero-window --baseline linux --pcap /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T032607Z/pcaps/linux-zero-window.pcap --serial /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T032607Z/serial/linux-zero-window.log
-started: 2026-11-21T03:26:34Z
+$ sh /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/scripts/net-conformance.sh --scenario zero-window --baseline linux --pcap /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/pcaps/linux-zero-window.pcap --serial /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/serial/linux-zero-window.log
+started: 2026-11-21T05:26:51Z
 timeout: 300s
 exit: 0
-duration: 4.444s
+duration: 4.432s
 --- stdout ---
-net-conformance: zero-window pass (4.41s) probe=0B-walk seq=0; after-reopen=44B; total=44/44; frames=1; replayed-probe=no
-net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T032607Z/pcaps/linux-zero-window.pcap
+net-conformance: zero-window pass (4.40s) probe=0B-walk seq=0; after-reopen=44B; total=44/44; frames=1; replayed-probe=no
+net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/pcaps/linux-zero-window.pcap
 --- stderr ---

@@ -1,6 +1,6 @@
 {
   "command": "/usr/bin/python3 scripts/tcp-evidence_ut.py",
-  "duration_s": 0.062,
+  "duration_s": 0.04,
   "exit": 0,
   "log": "logs/checker.log",
   "name": "checker",
