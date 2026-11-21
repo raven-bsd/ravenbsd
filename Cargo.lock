@@ -1010,6 +1010,15 @@ name = "rack-loss-model"
 version = "0.1.0"
 
 [[package]]
+name = "rack-output-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-tlp-model",
+ "rack-vtable-model",
+ "raven-tcpip",
+]
+
+[[package]]
 name = "rack-recovery-model"
 version = "0.1.0"
 dependencies = [
