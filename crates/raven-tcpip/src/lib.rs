@@ -68,6 +68,7 @@ mod signature;
 mod socket;
 mod stack;
 mod syncache;
+mod syncookie;
 mod table;
 mod tcp_data;
 mod tcp_mss;
@@ -119,6 +120,11 @@ pub use signature::{AoAlgorithm, AoKey, DigestProvider, NoDigest};
 #[cfg(feature = "tcp-ao")]
 pub use signature::{hmac_sha1, hmac_sha256};
 pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};
+pub use syncookie::{
+    CookieAck, CookieConn, CookieRequest, ExpandedCookie, MSS_TABLE, SYNCOOKIE_LIFETIME_MS,
+    SYNCOOKIE_SECRET_SIZE, SyncacheSnapshot, Syncookie, SyncookiePolicy, SyncookieSecret,
+    TCP_MAX_WINDOW, WSCALE_TABLE, syncookie_cmp,
+};
 pub use table::{
     ConnectionKey, ConnectionTable, ListenerKey, ListenerTable, PortAllocator, Rebind,
     TimeWaitTable, rebind_decision,
