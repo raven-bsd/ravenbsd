@@ -43,6 +43,6 @@ pub fn match_drivers<'a>(devices: &[DeviceInfo], drivers: &'a [DriverSpec]) -> V
                 })
         })
         .collect();
-    matched.sort_by(|left, right| left.device.name().cmp(&right.device.name()));
+    matched.sort_by_key(|left| left.device.name());
     matched
 }
