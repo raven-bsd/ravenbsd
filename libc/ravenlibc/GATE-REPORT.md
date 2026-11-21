@@ -7,7 +7,8 @@ Evaluated by `libc-gate` on 2026-11-18 (C74da round 3) from `origin/master` `021
 Every host-only row was re-run into `build/libc-gate/` with
 `RAVENBSD_RESOURCES=/home/bo/work/ravenos-workspace/ravenbsd-resources`; the table is
 `cargo run -q -p libc-gate -- verdict --out build/libc-gate`. The remaining NOT MET rows are
-G1 donor data (1.2, 1 of 4) and the size-budget lane (3.1, 63/13); the world rows (2.1/2.2) are
+G1 donor data (1.2, 1 of 4) and the size-budget lane (3.1, 12 pass / 63 fail at the C74z-S17
+base `08187a2b`); the world rows (2.1/2.2) are
 BLOCKED by the missing `results/x86_64/world.json` and H-11/H-12 data; 5.x are stale (no QEMU).
 C74in re-ran the full three-arch check on `d0429e95` and wrote `build/libc-gate-c74in/3.1.txt`;
 the 3.1 row uses that evidence. The earlier C74h/C74z-S17/C74ht/C74ia/C74ib/C74hj evidence
@@ -29,7 +30,7 @@ below.
 | 1 correctness | 1.7 lints (C16) | MET | build/libc-gate/1.7.txt | `libc-lint: ok (4288 files scanned)` (C74da round 3) |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate-audit/2.1.txt | harness/list present; blocked on missing `results/x86_64/world.json` plus H-11 tarballs and the H-12 freeze (C74hj; the rows.toml note still names the absent `Cargo.toml`, stale) |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate-audit/2.2.txt | harness present; the gate cannot run without `results/x86_64/world.json`, H-11 tarballs and the H-12 freeze; no synthetic results (C74hj) |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74in/3.1.txt | exit 1: 63 pass, 13 fail, 65 known, 99 skipped, 0 budget-only; all three `libc.so.1` budgets pass; 10 static invariants + P7 riscv64 server B (`.relro_padding` +3,848 from C74ij's +246 `.text`) + 2 riscv64 P9 static rows (C74in) |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z-s17/3.1.txt | exit 1: 12 pass, 63 fail, 63 known, 101 skipped, 0 budget-only; 52 budget rows (16 x86_64, 19 aarch64, 17 riscv64) + 11 invariants (10 static ceilings + `INV-LIBC-SO-S` x86_64). The 17 C74dl rows are a subset; the rest is post-freeze libc growth after `e4a9a456` (C74z-S17) and needs a new re-freeze audit (C74z-S17 re-run) |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate-audit/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable (C74hj) |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate-audit/4.1.txt | exit 0 (C74hj) |
 | 4 hardening | 4.2 fuzz soak (C10) | MET | build/libc-gate-audit/4.2.txt | 14 targets soaked >= 3600 s with zero crashes; `inet_text` 3601 s, 261,966,448 runs (C74k/C74hj) |
@@ -58,8 +59,8 @@ MET checks: symbol coverage, the packed symbol list, the target-case symbol audi
 differential oracle, the 31 host unit-test crates, the bounded Miri row (721 tests, 6/6 pass), the
 lint sweep (4288 files clean), fuzz replay and the 14-target soak, the hardened allocator default,
 page coverage, the render lint, the existing docs gate and `libc(7)`.
-The gate cannot close because of G1 (1.2, 1 of 4), the size-budget lane (3.1; 63 pass, 13 fail,
-65 known, 99 skipped) and the blocked world rows (2.1/2.2).
+The gate cannot close because of G1 (1.2, 1 of 4), the size-budget lane (3.1; 12 pass, 63 fail,
+63 known, 101 skipped at the C74z-S17 base) and the blocked world rows (2.1/2.2).
 
 `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` are green. The historical C74h
 target failures were P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tzname);

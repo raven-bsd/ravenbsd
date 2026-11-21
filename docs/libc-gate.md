@@ -48,9 +48,10 @@ The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 * MET: 1.1, 1.1.pack, 1.1.audit, 1.4, 1.5, 1.6, 1.7, 4.1, 4.2, 4.3, 6.1, 6.2, 6.3, 6.4.
   1.4 is the 27/27 oracle run with `RAVENBSD_RESOURCES` and the C74ij `strftime %s` fix.
 * NOT MET: 1.2 (G1 **1/4**: C2 51.7 %, C3 34.4 %, C4 40.0 %, C5 94.7 % MET, C6 unvendored),
-  3.1 (63 pass, 13 fail, 65 known, 99 skipped, 0 budget-only; all three `libc.so.1` budgets
-  pass, the 10 static invariants, the P7 riscv64 server B row and two riscv64 P9 static rows
-  remain; no budget raised).
+  3.1 (12 pass, 63 fail, 63 known, 101 skipped, 0 budget-only on the C74z-S17 base
+  `08187a2b`: 52 budget rows — 16 x86_64, 19 aarch64, 17 riscv64 — plus 11 invariants, the 10
+  static ceilings and `INV-LIBC-SO-S` x86_64. The 17 C74dl rows are a subset; the rest is
+  post-freeze libc growth after `e4a9a456`; no budget was raised by this re-run).
 * BLOCKED: 2.1/2.2 (`results/x86_64/world.json`, H-11 tarballs and H-12 freeze absent).
 * STALE this round: 5.1, 5.3 (no QEMU; the 24 h soak owns it). The committed C74u/C74ae
   evidence remains green but was not re-run; 5.2 was re-run and is MET (C74n: 31.3 s
@@ -85,9 +86,12 @@ rows. C74ib's aarch64 DSO study is historical (C74id/C74ij brought aarch64 S to 
 budget was raised. C74in's full three-arch rebuild on `d0429e95` confirms 63/13 and attributes
 the P7 riscv64 server B row to `.relro_padding`, not `.bss`: `.bss` is 11,552 in both builds,
 while C74ij's +246-byte `.text` moved the RELRO start across the `0x22000` page boundary and
-added 3,848 bytes of padding. Owner otto/C74ij; the 15,953 B budget option is not applied. The
-gate cannot close until G1, the invariant/P7-riscv B decision and the blocked world rows are
-resolved by their owners.
+added 3,848 bytes of padding. Owner otto/C74ij; the 15,953 B budget option is not applied.
+C74z-S17 re-ran the check on `08187a2b` (2026-11-21): **12 pass / 63 fail / 63 known / 101
+skipped**; the 13-fail C74in state is historical. The 52 budget rows are post-`e4a9a456` libc
+growth (K222/K226/K230/K232/K237-K250/K370 and the socket/fd work); a new re-freeze audit is
+required, not a blanket 103 percent. The gate cannot close until G1, the budget/invariant
+decisions and the blocked world rows are resolved by their owners.
 
 ## 3.1 size triage (C74da round 3 on `02152587`; C74w/C74z/C74z-S17/C74ht/C74ia/C74ib historical)
 
@@ -129,6 +133,6 @@ invariant ceiling is changed.
   artifacts and leave `budget_* = 0` and `status = ok`; the console and
   `build/libc-gate-c74in/3.1.txt` are the check evidence.
 
-3.1 stays NOT MET with exactly 13 real fails. The exact 13-row table and P7 attribution are in
-the C74in section of `tests/libc/size/TRIAGE.md`; the dynamic budget diff is in C74ia and the
-riscv P9 review values are in C74in.
+3.1 stays NOT MET: on the C74z-S17 base the residual is 63 (52 budget + 11 invariant); the exact
+table is `build/libc-gate-c74z-s17/3.1.txt` and the C74z-S17 section of
+`tests/libc/size/TRIAGE.md`.

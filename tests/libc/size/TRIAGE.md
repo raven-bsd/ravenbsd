@@ -1115,3 +1115,28 @@ changed by C39m.
 The exhaustive `ucd_oracle::every_code_point_agrees_with_the_oracle` test compares the new
 lookup against the independent UCD-derived oracle for every code point in 0..=0x10FFFF (137
 ctype tests pass, including the generator-freshness and table-budget checks).
+
+## C74z-S17 re-run on `08187a2b` (2026-11-21)
+
+C74z-S17's mechanical work is already on master: `e4a9a456` applied the 17 C74dl budget/layout
+rows at measured + 3 percent, and C74cx `e76b1d01` replaced the P7-R-14 member matcher with the
+iconv lifecycle `forbid_symbols` list. This section records the re-run requested by the ticket on
+the directive base `08187a2b`.
+
+`cargo xtask libc-size --check` → **12 pass / 63 fail / 63 known / 101 skipped / 0 budget-only**
+(evidence `build/libc-gate-c74z-s17/3.1.txt`, sha256
+`133da792bb2ca89e9af42e300898c8fdd1749e67aacca1d08b894d3318ea720c`). The 63 are:
+
+| Class | Count | Detail |
+|---|---:|---|
+| Budget rows | 52 | 16 x86_64, 19 aarch64, 17 riscv64 (S/F/B) |
+| Invariants | 11 | the 10 static ceilings (`INV-S-P2-P0` x2 aarch64 + x2 riscv64; `INV-S-P3-P2` x2 x86_64 + x2 aarch64 + x2 riscv64) + `INV-LIBC-SO-S` x86_64 |
+
+Examples of the drift since the `e4a9a456` freeze: P0 x86_64 tiny S 61,798 > 53,407, B 14,472 >
+12,435; P9 x86_64 server S 1,301,917 > 1,295,089; P2 aarch64 tiny S 108,539 > 95,769; P3 riscv64
+server S 89,687 > 82,917. The 17 C74dl rows are a subset; the other 35 are post-freeze libc growth
+from K222/K226/K230/K232/K237-K250/K370 and the socket/fd work, none of which re-froze 3.1.
+
+The 10 invariant ceilings are unchanged, as the ticket requires. A blanket 103 percent on the 52
+rows is not applied: C74dl's per-row audit covers only 17 of them, so a new re-freeze audit is the
+next action (owner: carl/C43 + size lane).
