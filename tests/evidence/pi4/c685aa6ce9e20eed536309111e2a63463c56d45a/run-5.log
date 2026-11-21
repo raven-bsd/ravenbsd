@@ -1,0 +1,122 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI Misc Device" from VenHw(93E34C7E-B50E-11DF-9223-2443DFD72085,00): Not Found
+BdsDxe: loading Boot0002 "UEFI Misc Device 2" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0002 "UEFI Misc Device 2" from PciRoot(0x0)/Pci(0x2,0x0)
+loader: RavenBSD loader 0.1 (aarch64)
+loader: RavenBSD loader 0.1 (aarch64)
+loader: memory map: 17 regions
+platform: gicd=0x8000000 gicc=0x8010000 timer=30 uart=0x9000000 gic=fallback uart=fallback
+frames: base=262144 count=131072 free=102414 reserved=28658
+paging: kernel tables active (HHDM 576 MiB, reclaimed 51 MiB)
+heap: 4096 KiB
+console: PL011 rx irq 33 (level)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+smp: 1 cpus online
+time: generic timer 62 MHz
+timer: 1000 Hz
+RavenBSD kernel 0.1 (aarch64) c685aa6ce 2026-11-21
+mem: 400 MiB usable in 6 regions
+cmdline: console=ttyS0 loglevel=info
+process: starting /init
+process: /init entry=0x401000 sp=0x7fffffffde60
+sched: running (1 cpu, slice 10 ms)
+svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
+pcid: acpi blob: no such file or directory
+svcd: logd up
+pcid: acpi blob: no such file or directory
+pcid: acpi blob: no such file or directory
+pcid: acpi blob: no such file or directory
+pcid: acpi blob: no such file or directory
+pcid: acpi blob: no such file or directory
+svcd: pcid crash loop, giving up
+rtc: 2026-11-21 22:43:53 (epoch 1795301033s)
+1795301035.336 nulld: started
+svcd: nulld up
+1795301035.482 ramfsd: started
+svcd: ramfsd up
+1795301035.511 randd: started
+1795301035.536 zerod: started
+svcd: randd up
+devd: pci: no such file or directory
+svcd: zerod up
+svcd: devd failed: exited before it became ready
+1795301035.762 initfsd: started
+svcd: initfsd up
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
+svcd: consd up
+1795301036.048 sysd: started
+svcd: sysd up
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: nic: open nic:info: no such file or directory; waiting for the driver
+netd: hostname raven
+netd: event add: bad handle or file descriptor
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: nic: open nic:info: no such file or directory; waiting for the driver
+netd: hostname raven
+netd: event add: bad handle or file descriptor
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: nic: open nic:info: no such file or directory; waiting for the driver
+netd: hostname raven
+netd: event add: bad handle or file descriptor
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: nic: open nic:info: no such file or directory; waiting for the driver
+netd: hostname raven
+netd: event add: bad handle or file descriptor
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: nic: open nic:info: no such file or directory; waiting for the driver
+netd: hostname raven
+netd: event add: bad handle or file descriptor
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: nic: open nic:info: no such file or directory; waiting for the driver
+netd: hostname raven
+netd: event add: bad handle or file descriptor
+svcd: netd crash loop, giving up
+resolvd: lease eth0: no such file or directory
+resolvd: lease not ready; retrying in the background
+resolvd: lease eth0: no such file or directory
+1795301043.547 resolvd: started
+svcd: resolvd up
+R A V E N   B S D
+--------------------------------------------------------------------------------
+000.04  pcid                fail
+000.05  consd               ok
+000.06  sysd                ok
+000.13  vfsd                ok
+000.16  logd                ok
+000.24  netd                fail
+000.29  randd               ok
+000.30  ramfsd              ok
+000.35  nulld               ok
+000.37  zerod               ok
+000.83  devd                fail
+000.90  initfsd             ok
+005.20  resolvd             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 aarch64
+svcd: boot report: 10 up, 3 failed
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# eraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+init exited (0)
