@@ -62,6 +62,7 @@ mod rack_misc;
 mod rack_os;
 mod rack_output;
 mod rack_sack;
+mod rack_transport;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -138,6 +139,11 @@ pub use rack_output::{RackOutput, TimerResult};
 pub use rack_sack::{
     RACK_ACKED, RACK_DSACK_HANDLING, RACK_SACK_PASSED, RACK_WAS_LOST, RACK_WAS_SACKPASS, RackSack,
     SackSegment,
+pub use rack_transport::{
+    AddRackMode, AddRackOutcome, HptsStart, HptsStartOutcome, HwTlsOutcome, MAX_HPTS_TIMEOUT_US,
+    RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
+    TimerStopOutcome, rack_ctloutput, rack_hw_tls_change, rack_process_timers, rack_pru_options,
+    rack_start_hpts_timer, rack_stop_all_timers, rack_switch_failed, rack_wake_check, tcp_addrack,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
