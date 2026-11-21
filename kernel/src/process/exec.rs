@@ -60,6 +60,11 @@ pub struct ExecContext {
 /// from that range. `argv`/`envp` are already copied into kernel storage; `path` is the
 /// `AT_EXECFN` spelling. `close` is the caller's CLOEXEC handle list; pipe ends created with
 /// `O_CLOEXEC` are added automatically.
+// `PROC_EXEC` supplies eight distinct inputs (caller, header, image range, path, argv, envp and
+// the close list) and has one caller in `kernel/src/syscall/exec.rs`. Grouping them into a context
+// would change that cross-module API, which is outside K418's Owns; the ticket permits this
+// narrowly scoped exception. No other lint is suppressed.
+#[allow(clippy::too_many_arguments)]
 pub fn replace_image_from_user(
     caller: &Arc<Process>,
     header: &[u8],
