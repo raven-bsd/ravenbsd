@@ -1009,6 +1009,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rack-vtable-model"
+version = "0.1.0"
+
+[[package]]
 name = "raven"
 version = "0.1.0"
 dependencies = [

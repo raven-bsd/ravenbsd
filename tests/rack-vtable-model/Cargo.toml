@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "rack-vtable-model"
+version = "0.1.0"
+description = "Host-only independent model of the FreeBSD tcp_function_block RACK vtable."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
