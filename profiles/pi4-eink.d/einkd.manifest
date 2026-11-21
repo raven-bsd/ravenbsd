@@ -1,15 +1,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 E-Ink demo service. It is ordered after getty and the network/resolver/platform/SPI
-# schemes so no panel access happens on the boot/getty path. The panel BUSY wait stays here, not
-# in platd. `spi0d` is launched by devd and publishes `spi:`; `platd` drives DC/RST/BUSY.
+# Pi 4 E-Ink dry-run service. E1e stages the BSP binary but keeps panel/network access off
+# until E4: the service is disabled by default and runs only the static dry-run/once path when
+# started explicitly. It is ordered after getty so it can never run on the boot/getty path; the
+# dry-run mode needs no network, and the real `--config` mode returns the hardware-not-built
+# error until E4 supplies the SPI/GPIO adapter.
 name = "einkd"
 exec = "/sbin/einkd"
-args = ["einkd", "--config=/etc/einkd.conf"]
-needs = ["getty", "scheme:net", "scheme:resolv", "scheme:plat", "scheme:spi"]
+args = ["einkd", "--dry-run", "--once"]
+needs = ["getty"]
 readiness = "none"
-restart = "on-failure"
-max_restarts = 3
+restart = "never"
+max_restarts = 0
 required = false
-enable = true
+enable = false

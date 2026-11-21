@@ -134,13 +134,21 @@ E1d supplies a real 8x16 ASCII font and a layout helper in `einkd`:
 `userland/init/services/einkd.toml` is `enable = false` with `needs = ["getty", "netd"]`,
 `restart = "never"` and `required = false`, so a normal release boot does not touch a missing
 panel and einkd never precedes login/network. The release profile stages the binary and manifest
-but leaves it disabled. The `einkd-supervision` qtest logs in normally, starts einkd explicitly
-via the static `disk-tool-svcctl` test tool, asserts the dry-run lines and exits the login shell;
-the boot/login transcript is unchanged.
+but leaves it disabled.
 
 `profiles/pi4-eink.toml` is the Pi 4 hardware staging profile (extends `base` with the Pi UART;
 the profile loader allows one inheritance level, so the full `pi4-release` service stack remains
-its own profile). It stages the same disabled binary/manifest; panel access stays off until E4.
+its own profile). It stages the BSP binary and `profiles/pi4-eink.d/einkd.manifest`, which is
+`--dry-run --once`, `needs = ["getty"]`, `restart = "never"` and `enable = false`; panel/network
+access stays off until E4.
+
+`einkd-supervision` is the aarch64 BSP fixture: it boots a minimal initfs that stages the BSP
+binary and starts it with `--dry-run --once`, asserting the five markers and `init exited (0)`.
+RPI1 retired the earlier x86 release-login variant because the generic x86 release no longer
+stages the Pi 4-only binary. A `pi4-eink` release-login variant was attempted during E1e and is
+blocked in QEMU by `platd: hardware backend unavailable` (the Pi 4 `platd` backend has no QEMU
+implementation), so a login/ordering transcript on that profile remains an E4/QEMU gap; the
+manifest ordering above is the integration contract and the fixture proves the service path.
 
 **Hardware adapter boundary:** `Uc8179Panel` expects `raven_eink::Transport`/`Delay`; E4
 implements those over the E1b `raven-spi` core plus the DC/RST/BUSY GPIO client. `einkd` owns the
@@ -207,7 +215,7 @@ E-Ink service disposition.
 | Illumos/SMF design | Dependency-aware start after network/time | `tick(ready)` gate; NTP-corrected `Clock`; E1e manifest after getty/netd | E4 hardware adapter |
 | `ravenbsd-eink` / `ravenbsd-pi-spi` (first-party, ravenbsd-rpi) | UC8179 encoder + BCM SPI transport | `Uc8179Panel` adapter and host mocks | E2 mapped SPI/GPIO transport |
 | `platd` GPIO design | DC/RST/BUSY ownership, no slow work in platd | Documented contract; no platd edit | E2/E3 GPIO client decision |
-| E1e service integration | Disabled-by-default service, explicit after-login start, dry-run panel | `einkd.toml`, `--dry-run --once`, `einkd-supervision` qtest | E4 SPI/GPIO/panel evidence |
+| E1e service integration | Disabled-by-default service, explicit after-login start, dry-run panel | `einkd.toml`, `pi4-eink.d/einkd.manifest`, `--dry-run --once`, aarch64 `einkd-supervision` fixture | E4 SPI/GPIO/panel evidence; `pi4-eink` login qtest blocked by the QEMU `platd` backend |
 
 ## 10. Open inputs
 
