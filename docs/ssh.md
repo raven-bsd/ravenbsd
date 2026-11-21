@@ -7,12 +7,12 @@ SSH is the upstream OpenSSH 10.6p2 add-on (DR-65). The Raven tree does not vendo
 implementation and does not implement SSH in Rust. K200 owns `addons/ssh/**` and the source pin;
 K195 stages the built binaries as a release service and owns the login gate.
 
-Status: **build and service staging DONE; host-to-guest login BLOCKED** on the libc `pipe(2)`
-primitive (K370) and pipe poll readiness. The release image now boots with the uid/gid 74 `sshd`
-privilege-separation account, the `sshd` service manifest, the host-key one-shot and the K196
-`ptyd`: `sshd` starts and listens on TCP 22, and the first connection fails before the SSH banner
-because upstream `monitor_openfds` calls `pipe(2)`, which the target libc still stubs with
-`ENOSYS`.
+Status: **build, service staging and the `sshd` account are DONE; the host-to-guest login is
+BLOCKED** on kernel pipe poll/event readiness. With the account and K370's libc `pipe(2)` in
+place, `sshd` starts, listens on TCP 22 and creates the monitor pipes; the first connection then
+dies before the SSH banner because upstream `monitor_read` polls the monitor log **pipe** with
+`poll(2)`, and the kernel does not expose pipe endpoints to the event queue
+(`monitor_read: poll: Bad file descriptor`).
 
 ## Pinned source
 
@@ -113,30 +113,35 @@ ssh -o StrictHostKeyChecking=no raven@10.0.2.15 ls
 ## Blockers
 
 One primitive remains before a login can be claimed; it is outside K195's Owns
-(`tests/ssh/** tests/qtest/cases/ssh-* profiles/ssh.d/** profiles/release.d/** docs/ssh.md`) and
-is tracked as **K370** (libc `pipe`/`pipe2` over the kernel `PIPE2`).
+(`tests/ssh/** tests/qtest/cases/ssh-* profiles/ssh.d/** profiles/release.d/** docs/ssh.md`).
 
-1. **libc `pipe(2)`/`pipe2(2)` return `ENOSYS`.** The kernel already implements `PIPE2` (`0x6f`,
-   `kernel/src/syscall/mod.rs`); the libc wrapper is a stub
-   (`libc/ravenlibc/crates/raven-libc-platform/src/platform.rs` `pipe`/`pipe2`, and the syscall
-   binding in `raven-libc-sys/src/sys.rs`). Upstream calls `pipe(2)` first in
-   `monitor.c:1929` `monitor_openfds()` (called by `monitor_init()`, monitor.c:1944), before the
-   SSH banner, and again in `session.c` `do_exec_no_pty` for a command session's stdio.
-   Guest evidence — the daemon log of a boot with the account staged and one connection attempt:
+1. **Pipe endpoints are not poll/event sources (kernel).** K370 added the libc `pipe(2)`/`pipe2(2)`
+   binding over `PIPE2` (0x6f), and `tests/ssh/pipe-probe.sh` now passes (`pipe-probe: ok`). The
+   next upstream call is a poll: `monitor.c:509-511` puts the monitor **log pipe**
+   (`pmonitor->m_log_recvfd`, created by `monitor.c:1929 monitor_openfds`) into
+   `poll(pfd, 2, -1)` with `POLLIN`; the server reads it with `monitor_read_log` while the session
+   runs, and `session.c` `do_exec_no_pty` polls its three stdio pipes as well.
+   `kernel/src/syscall/event.rs` `source_from_handle` has no `Object::Pipe` arm (line 322 falls
+   through to `Err(Errno::EBADF)`) and `readiness` (line 335 area) has no pipe case;
+   `kernel/src/process/pipe.rs` has no readable/writable readiness or wake (`kernel/src/process/duplex.rs:237`
+   `readiness` and its `writable` helper are the model). Guest evidence — daemon log of a boot
+   with the account and K370 staged, after one host connection:
 
    ```text
    Server listening on 0.0.0.0 port 22.
-   monitor_openfds: pipe: Function not implemented
+   monitor_read: poll: Bad file descriptor
+   cleanup_exit: kill(23): Function not implemented
    ```
 
-   The host client sees `kex_exchange_identification: Connection closed by remote host`, and the
-   independent probe prints `pipe-probe: ENOSYS` (`tests/ssh/pipe-probe.sh`).
-2. **Pipe endpoints are not poll/event sources.** `sshd`/`sshd-session` poll their session pipes.
-   `kernel/src/syscall/event.rs` has no `Object::Pipe` arm and `kernel/src/process/pipe.rs` has
-   no readable/writable readiness (see `event.rs` `readiness`). This belongs with K370.
+   The host OpenSSH client sees `kex_exchange_identification: Connection closed by remote host`
+   or `Connection timed out during banner exchange`, depending on where the failing child is
+   reaped. The secondary `kill(23)` line is the production signal model: `kill`/`killpg` are
+   PG-44 procd RPCs and `SigCaps::PRODUCTION.proc_kill` is false
+   (`libc/ravenlibc/crates/raven-libc-signal/src/kernel.rs`), so sshd's cleanup cannot signal its
+   privsep child; it is not the banner blocker.
 
 K223's per-process root/`chroot` (the `/var/empty` chroot), K196's fork/PTY, the K206/K210/K211
-AF_UNIX pair and the `sshd` account are in place; they are not blockers.
+AF_UNIX pair, K370's libc `pipe(2)` and the `sshd` account are in place; they are not blockers.
 
 ## Donor reconciliation (DR-52)
 
