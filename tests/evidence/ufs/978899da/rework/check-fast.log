@@ -1,0 +1,12 @@
+==> guard
+==> fmt
+==> clippy (changed): skipped (no changed host-testable packages)
+==> tests (changed, parallel): skipped (no changed host-testable packages)
+==> profiles
+check-fast summary:
+  ok       guard (exit 0, 21.20s)
+  ok       fmt (exit 0, 29.92s)
+  skipped  clippy (changed) (no changed host-testable packages)
+  skipped  tests (changed, parallel) (no changed host-testable packages)
+  ok       profiles (exit 0, 0.38s)
+check-fast: PASSED
