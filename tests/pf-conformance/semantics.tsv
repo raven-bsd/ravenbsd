@@ -13,7 +13,7 @@ nat|FreeBSD sys/netpfil/pf/pf_lb.c:pf_get_transaddr,pf_map_addr; sys/netpfil/pf/
 rdr|FreeBSD sys/netpfil/pf/pf_lb.c:pf_get_transaddr,pf_map_addr; sys/netpfil/pf/pf.c:pf_test_state|destination translation before filtering; reply restores the wire destination (K273 executed)
 ipv6|FreeBSD sys/netpfil/pf/pf.c:pf_test,pf_setup_pdesc (AF_INET6),pf_test_state|inet6 rule match and state key for TCP/UDP (K273 executed)
 fragment|OpenBSD sys/net/pf_norm.c:pf_reassemble,pf_normalize_ip; FreeBSD sys/netpfil/pf/pf_norm.c|incomplete fragments are queued (PF_PASS, *m0=NULL) and the datagram is filtered once; the reassembly queue is not in raven-pf 0.1.0, so this scenario is donor-only
-fragment-no-scrub|FreeBSD sys/netpfil/pf/pf.c:5997-6002 pf_match_rule PF_VPROTO_FRAGMENT|a rule with src/dst `port_op` fails for a fragment, so the default block is correct; raven-pf 0.1.0 skips the port attrs and admits it - recorded KNOWN divergence, reported to the pf lane
+fragment-no-scrub|FreeBSD sys/netpfil/pf/pf.c:5997-6002 pf_match_rule PF_VPROTO_FRAGMENT|a rule with src/dst `port_op` fails for a fragment, so the default block is correct; K380 fixed `Rule::matches` to reject the port rule (the KNOWN entry is gone)
 malformed-unknown-keyword|OpenBSD sys/net/pf.c default-block path; NetBSD dist/pf/sbin/pfctl/parse.y|unknown protocol rejects the ruleset; no partial load
 malformed-bad-address|NetBSD dist/pf/sbin/pfctl/parse.y|bad IP address rejects the ruleset; no partial load
 malformed-bad-port|NetBSD dist/pf/sbin/pfctl/parse.y|out-of-range port rejects the ruleset; no partial load
