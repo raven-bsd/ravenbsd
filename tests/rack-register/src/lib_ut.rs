@@ -40,7 +40,18 @@ fn proposed_register_covers_all_219_rows_without_group_reports() {
     let source = SourceIndex::load().expect("source");
     let report = check::check(&donor, &rows, &source);
     assert_eq!(rows.len(), 219);
-    assert!(report.is_ok(), "{}", report.render());
+    assert!(!report.is_ok(), "the K269 gap must remain visible");
+    assert_eq!(
+        report.not_pass,
+        vec!["rack_cong_signal".to_owned(), "rack_update_prr".to_owned()]
+    );
+    assert!(report.missing.is_empty());
+    assert!(report.duplicates.is_empty());
+    assert!(report.empty_rust.is_empty());
+    assert!(report.empty_test.is_empty());
+    assert!(report.empty_mutation.is_empty());
+    assert!(report.missing_symbol.is_empty());
+    assert!(report.missing_test.is_empty());
 }
 
 #[test]

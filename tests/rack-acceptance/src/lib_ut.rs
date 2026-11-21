@@ -56,6 +56,26 @@ fn audit_produces_the_exact_219_row_status_and_218_target() {
 }
 
 #[test]
+fn the_k269_rows_remain_visible_gaps() {
+    let donor = register::load_donor().expect("donor");
+    let register_rows = register::load_register().expect("register");
+    let source = SourceIndex::load().expect("source");
+    let report = audit::run(&donor, &register_rows, &source, &[]);
+    assert_eq!(report.accepted, 217);
+    assert_eq!(report.duplicates, Vec::<String>::new());
+    assert_eq!(report.gaps.len(), 2);
+    for function in ["rack_cong_signal", "rack_update_prr"] {
+        assert!(
+            report
+                .gaps
+                .iter()
+                .any(|gap| gap.function == function && gap.owner == "K269"),
+            "{function} must stay a K269 gap"
+        );
+    }
+}
+
+#[test]
 fn a_missing_mapping_is_an_owned_gap() {
     let donor = vec![Function {
         line: 1,
@@ -83,7 +103,7 @@ fn a_missing_mapping_is_an_owned_gap() {
 }
 
 #[test]
-fn duplicate_group_claims_are_flagged() {
+fn register_rows_win_over_historical_group_claims() {
     let donor = vec![Function {
         line: 1,
         name: "rack_log_gpset".to_owned(),
@@ -115,8 +135,29 @@ fn duplicate_group_claims_are_flagged() {
         },
     ];
     let report = audit::run(&donor, &register, &source, &groups);
-    assert_eq!(report.duplicates, vec!["rack_log_gpset".to_owned()]);
+    assert!(report.duplicates.is_empty(), "register owner wins");
     assert_eq!(report.accepted, 1);
+}
+
+#[test]
+fn duplicate_register_rows_are_flagged() {
+    let donor = vec![Function {
+        line: 1,
+        name: "rack_log_gpset".to_owned(),
+    }];
+    let row = RegisterRow {
+        number: 1,
+        function: "rack_log_gpset".to_owned(),
+        owner: "K329".to_owned(),
+        rust: "crate::rack_log::rack_log_gpset".to_owned(),
+        test: "donor_rack_log_gpset".to_owned(),
+        mutation: "event suppression".to_owned(),
+        status: "PASS".to_owned(),
+    };
+    let register = vec![row.clone(), row];
+    let source = SourceIndex::load().expect("source");
+    let report = audit::run(&donor, &register, &source, &[]);
+    assert_eq!(report.duplicates, vec!["rack_log_gpset".to_owned()]);
 }
 
 #[test]
