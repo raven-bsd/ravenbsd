@@ -1002,6 +1002,10 @@ name = "rack-coverage"
 version = "0.1.0"
 
 [[package]]
+name = "rack-loss-model"
+version = "0.1.0"
+
+[[package]]
 name = "raven"
 version = "0.1.0"
 dependencies = [
