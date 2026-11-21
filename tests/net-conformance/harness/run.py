@@ -39,6 +39,9 @@ SCENARIOS = (
     "window-update",
     "retransmit",
     "fin-rst",
+    "ecn",
+    "pmtu-blackhole",
+    "plpmtud",
 )
 RESULT_RE = re.compile(
     r"net-conformance:\s+(?P<scenario>\S+)\s+(?P<result>pass|fail)\s+"
