@@ -136,6 +136,10 @@ pub use tcp_mss::{
 };
 pub use tcp_notify::{TcpNotify, TcpNotifyOutcome, TcpStateChange};
 pub use tcp_state::TcpState;
+pub use tcp_timer::{
+    KeepOutcome, RexmtAction, RexmtOutcome, TimerState, TwoMslOutcome, tcp_timer_2msl,
+    tcp_timer_keep, tcp_timer_rexmt,
+};
 pub use time::{Duration, Instant};
 
 #[cfg(any(test, feature = "testutil"))]
