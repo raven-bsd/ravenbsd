@@ -12,6 +12,7 @@ timeout_secs = 240
 pre = [
     "sh tests/fixtures/b12-netd/build.sh",
     "sh tests/fixtures/b12-netd/udp_echo_start.sh 47001",
+    "sh tests/qtest/cases/pf-kvm-fixture/nat_echo_start.sh 47004",
 ]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
@@ -22,7 +23,7 @@ qemu_extra = [
 expect_exit = "success"
 
 [[expect]]
-regex = '^netd: pf loaded rules=2 nat=0$'
+regex = '^netd: pf loaded rules=3 nat=1$'
 
 [[expect]]
 regex = '^netd: interface eth0 10\.0\.2\.15/24$'
