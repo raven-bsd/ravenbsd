@@ -303,6 +303,7 @@ members = [
     "tests/tcp-ecn-model",
     "tests/tcp-window-model",
     "tests/tcp-sack-model",
+    "tests/tcp-teardown-model",
     "tests/tcpip/conformance",
     "tests/tcpip/fuzz-replay",
     "tests/tcpip/interop",
