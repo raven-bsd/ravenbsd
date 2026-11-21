@@ -60,7 +60,6 @@ mod rack_hpts;
 mod rack_log;
 mod rack_misc;
 mod rack_os;
-mod rack_pipe;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -132,14 +131,6 @@ pub use rack_misc::{
 };
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
-};
-pub use rack_pipe::{
-    CC_NDUPACK, EXIT_RECOVERY_MASK, IN_RECOVERY_MASK, RACK_ACKED, RACK_DELAYED_ACK_TIME,
-    RACK_INITIAL_RTO, RACK_MUST_RXT, RACK_NUM_OF_RETRANS, RACK_PRR_ADDBACKMAX,
-    RACK_REORDER_FADE_DEFAULT, RACK_RTO_MAX, RACK_SACK_PASSED, RACK_TLP_MIN, RACK_TO_REXT,
-    RACK_WAS_LOST, RACK_WAS_SACKPASS, RackPipe, RackPipeState, RackSendmap, TF_CONGRECOVERY,
-    TF_FASTRECOVERY, TF_WASCRECOVERY, TF_WASFRECOVERY, TF2_ECN_PERMIT, TF2_ECN_SND_CWR, TLP_USE_ID,
-    TLP_USE_TWO_ONE, TLP_USE_TWO_TWO, tstmp_ge, tstmp_lt,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
