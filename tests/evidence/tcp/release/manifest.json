@@ -1,0 +1,185 @@
+{
+  "ticket": "K295",
+  "generated": "2026-11-21T02:42:00Z",
+  "commit": "3780558005d9b32673ce67c321f05fb1d4a6f624",
+  "claims": [
+    {
+      "id": "K295-E01",
+      "claim": "Eight landed FreeBSD/DragonFly TCP entries in PROVENANCE.toml; no NetBSD TCP entry",
+      "tag": "OBSERVED",
+      "artifact": "PROVENANCE.toml",
+      "sha256": "2abedcd564b4c61a728343fb9342f9bc08941dc56b902f7177b32a1b5d161d65"
+    },
+    {
+      "id": "K295-E02",
+      "claim": "Port-claim intake: 27 claims, 10 landed, 17 quarantined",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/port-claims.json",
+      "sha256": "a4054684d928019290b126f20f03f5c863fd5556728907009254069ccc73abd0"
+    },
+    {
+      "id": "K295-E03",
+      "claim": "K264 matrix packet: 10/10 ran, 9 pass, 1 handshake finding",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/run-20261121T003615Z/matrix.json",
+      "sha256": "d3a190c669fcc062b8103c4b46dde00a4c4d90b7d7407c99160f63123388f3d9"
+    },
+    {
+      "id": "K295-E04",
+      "claim": "Raven handshake finding pcap",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/run-20261121T003615Z/pcaps/raven-handshake.pcap",
+      "sha256": "e0c330e270184b5f41af84365212b962da760d30e186cf3232aa872a817079da"
+    },
+    {
+      "id": "K295-E05",
+      "claim": "Raven handshake finding serial transcript",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/run-20261121T003615Z/serial/raven-handshake.log",
+      "sha256": "36b45eecd3302a50c20fa62c9faa53f7edb46a100118206f89323f55d1161994"
+    },
+    {
+      "id": "K295-E06",
+      "claim": "K264 matrix packet SHA-256 register",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/run-20261121T003615Z/sha256sums.txt",
+      "sha256": "d866e1a680e3203d6cbad98d38b14ff029de9e3e13155d4cb1b87796744833c1"
+    },
+    {
+      "id": "K295-E07",
+      "claim": "K264 initfs build measured 431.881 s",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/run-20261121T003615Z/logs/build-initfs.log",
+      "sha256": "30d667656bbb2b7b7b6ce67318cae33251b2adce4e86ed4bbab3e51b7e32bff2"
+    },
+    {
+      "id": "K295-E08",
+      "claim": "K264 image build measured 15.668 s",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/run-20261121T003615Z/logs/build-image.log",
+      "sha256": "61b72bc15cc2c52bff39685de0a82e231338081aa71f604906edd711d6c9ea9c"
+    },
+    {
+      "id": "K295-E09",
+      "claim": "K295 current audit: 9 imports, 27 claims, 17 quarantined, 0 violations",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/k295/audit.json",
+      "sha256": "e3c43303f5f0450960bef14967b6216a0f3eaae66329d756d3bbfc4cb483d91c"
+    },
+    {
+      "id": "K295-E10",
+      "claim": "K295 current unit: 930/930 passed",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/k295/unit.json",
+      "sha256": "8f66a6baacf7ff924fec4873f5acd4bf71e3bebdb13ef884d800e9184839d9f5"
+    },
+    {
+      "id": "K295-E11",
+      "claim": "K295 checker: 2 negative fixtures, 1 positive, 2 mutations caught",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/k295/checker.json",
+      "sha256": "ad68036b82d574f6606bf07ee7e53c4bd0fb7c449dddcc6ae7c8ca5fff3f2bfc"
+    },
+    {
+      "id": "K295-E12",
+      "claim": "K295 Linux handshake pass",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/k295/logs/matrix-linux-handshake.log",
+      "sha256": "9f01cba6feb3336215c9e591d12526aa9d7fd874a97406bba0aaa73f8803d343"
+    },
+    {
+      "id": "K295-E13",
+      "claim": "K295 Linux zero-window pass",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/k295/logs/matrix-linux-zero-window.log",
+      "sha256": "4b5ffa329f7e06bafafdd121a939e0ba3bdedd0cb9819e1cdcc71d678c51c19b"
+    },
+    {
+      "id": "K295-E14",
+      "claim": "K295 Linux window-update pass",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/k295/logs/matrix-linux-window-update.log",
+      "sha256": "92eb31ed764bfeac67a1281c265edbfca6ae8e3b108a5b427703fa42b58d194b"
+    },
+    {
+      "id": "K295-E15",
+      "claim": "K295 Linux retransmit pass",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/k295/logs/matrix-linux-retransmit.log",
+      "sha256": "e1c96d4db5ab3574e9d6c7869415279834bb8c173523b601aa19e8cc1f211a63"
+    },
+    {
+      "id": "K295-E16",
+      "claim": "K295 Linux fin-rst pass",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/k295/logs/matrix-linux-fin-rst.log",
+      "sha256": "297b54f16bea624c7612d78db068d894dacab7c3e2dcb613963417e7248c4fb5"
+    },
+    {
+      "id": "K295-E17",
+      "claim": "K295 --all target matrix TIMEOUT at 240 s during the initfs build; rerun with a measured cap above 431.881 s",
+      "tag": "PROPOSED",
+      "artifact": "tests/evidence/tcp/release/k295/run-manifest.json",
+      "sha256": "26f0b36d0c1a16bec225d70346714b6b004856ba4e6fad1e51368ce7e4495f1a"
+    },
+    {
+      "id": "K295-E18",
+      "claim": "Raven handshake window-scale fix",
+      "tag": "PROPOSED",
+      "artifact": "tests/evidence/tcp/run-20261121T003615Z/pcaps/raven-handshake.pcap",
+      "sha256": "e0c330e270184b5f41af84365212b962da760d30e186cf3232aa872a817079da"
+    },
+    {
+      "id": "K295-E19",
+      "claim": "Quarantined ports K254-K261, K265-K267, K269, K273-K275, K277, K278 pending rework",
+      "tag": "PROPOSED",
+      "artifact": "tests/evidence/tcp/port-claims.json",
+      "sha256": "a4054684d928019290b126f20f03f5c863fd5556728907009254069ccc73abd0"
+    },
+    {
+      "id": "K295-E20",
+      "claim": "Release evidence TCP section",
+      "tag": "OBSERVED",
+      "artifact": "docs/release-evidence-tcp.md",
+      "sha256": "b62d05fc46dd6498ba7374b299b306ab35048820354be5f80a09e795fb7a6147"
+    },
+    {
+      "id": "K295-E21",
+      "claim": "Release packet layout and tag contract",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/README.md",
+      "sha256": "b5816e447a2873d2ed3cf807155a2179f06178452bb9ada1891c73c6c4636de9"
+    },
+    {
+      "id": "K295-E22",
+      "claim": "Release evidence validator",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/release/check.py",
+      "sha256": "ce911c10df39c2eafabfaa8d56f28fdace2930b5c2c2f641ed596e1f5995a30c"
+    },
+    {
+      "id": "K295-E23",
+      "claim": "K264 clean audit packet (audit/unit/checker)",
+      "tag": "OBSERVED",
+      "artifact": "tests/evidence/tcp/run-20261121T004851Z/audit.json",
+      "sha256": "14d4ebd134472a1e749bd12f281d911c49a918ab0c86dda07f14dd15952e74ff"
+    },
+    {
+      "id": "K295-E24",
+      "claim": "K264 TCP provenance and evidence register",
+      "tag": "OBSERVED",
+      "artifact": "docs/tcp-evidence.md",
+      "sha256": "638462279bd5792649ff516df1c2ce170d05ee99b5910c5b05578cd275e29030"
+    }
+  ],
+  "reports": [
+    {"ticket": "K264", "path": "otto/reports/K264.md", "sha256": "f58450e0ec1bdcb778d4eabd5674f8068bbe935ea45add690b132b80ef521cdb"},
+    {"ticket": "K268", "path": "stuart/reports/K268.md", "sha256": "e2cecd158b87f4a416431c2b5c179c8384bd13383b2019e06bef71de1d12fc2a"},
+    {"ticket": "K270", "path": "mel/reports/K270.md", "sha256": "c7fa406fe93570d029fb93d7880e5864fc71fb83e7e440d382b99ea934c2a5b2"},
+    {"ticket": "K271", "path": "kevin/reports/K271.md", "sha256": "51fec78c01c173598b7d34f5a86ba95fad9f4a8198a58b76e174514b0cf719a4"},
+    {"ticket": "K272", "path": "tim/reports/K272.md", "sha256": "252cebe9602e32ea7caa7186d8727f3822ccb01e24e951ef50a311040d29a3b1"},
+    {"ticket": "K276", "path": "kevin/reports/K276.md", "sha256": "1e0ad4a13623170c6dfb876543567585d474ccd70714712f651c64c9625aafc5"},
+    {"ticket": "K279", "path": "tim/reports/K279.md", "sha256": "8ead7ca694fdd15e54ee2ea31c7022b21ef8bea2b0a471283547ed28ca317760"},
+    {"ticket": "K313", "path": "lance/reports/K313.md", "sha256": "3153cdbaaa077058be27e4d36ea68eb4ef44b9e9e62583f0da4f000e32fed2d4"}
+  ]
+}

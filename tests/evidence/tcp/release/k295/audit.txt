@@ -1,0 +1,43 @@
+tcp-provenance: pass
+netbsd_revision: 36eddebcc36cb0775aa2962005b9c05419a6ff01 (NO-COPY / quarantined)
+freebsd_revision: 133344405f532bd54ff3629a77d4c4e062f01fdb
+dragonfly_revision: 94448f622a06cde90ba42d688e9cab2448ad9ab3
+files_scanned: 101
+imports: 9 (netbsd: 0, freebsd: 7, dragonfly: 1, other: 1)
+claims: 27
+quarantined: 17 (K254, K255, K256, K257, K258, K259, K260, K261, K265, K266, K267, K269, K273, K274, K275, K277, K278)
+donor_files: 13
+donor_missing: 0
+rejected_entries: 0
+violations: 0
+warnings: 1
+  donor freebsd: verified head=133344405f532bd54ff3629a77d4c4e062f01fdb expected=133344405f532bd54ff3629a77d4c4e062f01fdb
+  donor dragonfly: verified head=94448f622a06cde90ba42d688e9cab2448ad9ab3 expected=94448f622a06cde90ba42d688e9cab2448ad9ab3
+  claim K253: test-only/landed
+  claim K254: port/quarantined
+  claim K255: port/quarantined
+  claim K256: port/quarantined
+  claim K257: port/quarantined
+  claim K258: port/quarantined
+  claim K259: port/quarantined
+  claim K260: port/quarantined
+  claim K261: port/quarantined
+  claim K262: test-only/landed
+  claim K263: test-only/landed
+  claim K265: port/quarantined
+  claim K266: port/quarantined
+  claim K267: port/quarantined
+  claim K268: port/landed
+  claim K269: port/quarantined
+  claim K270: port/landed
+  claim K271: port/landed
+  claim K272: port/landed
+  claim K273: port/quarantined
+  claim K274: port/quarantined
+  claim K275: port/quarantined
+  claim K276: port/landed
+  claim K277: port/quarantined
+  claim K278: port/quarantined
+  claim K279: test-only/landed
+  claim K313: port/landed
+  warning: donors lock not found at /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd-resources/donors.lock; revision check skipped
