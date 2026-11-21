@@ -1,0 +1,18 @@
+{
+  "case": "login-aarch64",
+  "arch": "aarch64",
+  "result": "pass",
+  "duration_ms": 34613,
+  "exit_status": null,
+  "matched": [
+    "^R A V E N   B S D$",
+    "^-{10,}$",
+    "^Welcome to RavenBSD 0\\.1 aarch64$",
+    "(?i)^.*login: ?root",
+    "(?i)^password: ?$",
+    "^raven# ",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}
