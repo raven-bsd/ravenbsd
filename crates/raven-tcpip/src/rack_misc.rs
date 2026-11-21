@@ -310,6 +310,106 @@ pub struct RackMisc {
     pub autosndbuf_max: u32,
     /// `initialized`.
     pub initialized: bool,
+    /// Saved NewReno beta.
+    pub saved_beta: u32,
+    /// Saved NewReno ECN beta.
+    pub saved_beta_ecn: u32,
+    /// `rc_pacing_cc_set`.
+    pub pacing_cc_set: bool,
+    /// The CC is NewReno.
+    pub cc_is_newreno: bool,
+    /// Recovery multiplier (`rack_per_of_gp_rec`).
+    pub per_gp_rec: u32,
+    /// Congestion-avoidance multiplier.
+    pub per_gp_ca: u32,
+    /// Slow-start multiplier.
+    pub per_gp_ss: u32,
+    /// Dynamic multiplier enabled.
+    pub gp_dyn_mul: bool,
+    /// A fixed rate is configured.
+    pub use_fixed_rate: bool,
+    /// Probe-RTT is active.
+    pub in_probe_rtt: bool,
+    /// Last computed goodput bandwidth.
+    pub last_gp_comp_bw: u64,
+    /// Loss counter.
+    pub loss_count: u32,
+    /// Loss counter at the start of the measurement.
+    pub loss_at_start: u32,
+    /// Bandwidth reduction is active.
+    pub gp_bwred: bool,
+    /// Timely decrease count.
+    pub gp_timely_dec_cnt: u32,
+    /// No-push-at-min-RTT mode.
+    pub no_push_at_mrtt: u32,
+    /// PRR send count.
+    pub prr_sndcnt: u32,
+    /// Output is wanted.
+    pub wanted_output: bool,
+    /// Lowest RTT in the ACK.
+    pub rtt_lowest: u32,
+    /// Highest RTT in the ACK.
+    pub rtt_highest: u32,
+    /// RTT total.
+    pub rtt_tot: u64,
+    /// RTT sample count.
+    pub rtt_cnt: u32,
+    /// A valid RTT sample exists.
+    pub rtt_valid: bool,
+    /// Best microsecond RTT.
+    pub best_us_rtt: u32,
+    /// Confidence of `best_us_rtt`.
+    pub rtt_confidence: u8,
+    /// Retransmit count of `best_us_rtt`.
+    pub best_rtr_cnt: u16,
+    /// Rate sample method (0 lowest, 1 highest, 2 average).
+    pub rate_sample_method: u8,
+    /// Minimum RTT filter.
+    pub min_rtt_us: u32,
+    /// Time of the last lower RTT.
+    pub lower_rtt_us_cts: u32,
+    /// Last TLP ACKed start.
+    pub last_tlp_acked_start: u32,
+    /// Last TLP ACKed end.
+    pub last_tlp_acked_end: u32,
+    /// Goodput measurement is in progress.
+    pub gput_inprog: bool,
+    /// Goodput ACK.
+    pub gput_ack: u32,
+    /// Goodput cumulative ACK timestamp.
+    pub gp_cumack_ts: u64,
+    /// App-limited needs set.
+    pub app_limited_needs_set: bool,
+    /// Dragged bottom flag.
+    pub dragged_bottom: bool,
+    /// Current round.
+    pub current_round: u32,
+    /// Last round ACK.
+    pub last_round_ack: u32,
+    /// Fast output is in progress.
+    pub fast_output: bool,
+    /// Bytes left to send in fast output.
+    pub fsb_left_to_send: u32,
+    /// Fast output has started.
+    pub fast_output_started: bool,
+    /// Data after close is allowed.
+    pub allow_data_after_close: bool,
+    /// Pending request completions.
+    pub reqs: Vec<(u32, u32)>,
+    /// Forced ACK is active.
+    pub forced_ack: bool,
+    /// Forced ACK timestamp.
+    pub forced_ack_ts: u64,
+    /// Probe was not answered.
+    pub probe_not_answered: bool,
+    /// A window collapse is active.
+    pub has_collapsed: bool,
+    /// Last collapse point.
+    pub last_collapse_point: u32,
+    /// High collapse point.
+    pub high_collapse_point: u32,
+    /// Collapse point is valid.
+    pub collapse_point_valid: bool,
 }
 
 impl Default for RackMisc {
@@ -378,6 +478,56 @@ impl RackMisc {
             autosndbuf_inc: 1024,
             autosndbuf_max: 2 * 1024 * 1024,
             initialized: false,
+            saved_beta: 0,
+            saved_beta_ecn: 0,
+            pacing_cc_set: false,
+            cc_is_newreno: true,
+            per_gp_rec: 100,
+            per_gp_ca: 100,
+            per_gp_ss: 100,
+            gp_dyn_mul: false,
+            use_fixed_rate: false,
+            in_probe_rtt: false,
+            last_gp_comp_bw: 0,
+            loss_count: 0,
+            loss_at_start: 0,
+            gp_bwred: false,
+            gp_timely_dec_cnt: 0,
+            no_push_at_mrtt: 0,
+            prr_sndcnt: 0,
+            wanted_output: false,
+            rtt_lowest: u32::MAX,
+            rtt_highest: 0,
+            rtt_tot: 0,
+            rtt_cnt: 0,
+            rtt_valid: false,
+            best_us_rtt: u32::MAX,
+            rtt_confidence: 0,
+            best_rtr_cnt: 0,
+            rate_sample_method: 2,
+            min_rtt_us: u32::MAX,
+            lower_rtt_us_cts: 0,
+            last_tlp_acked_start: 0,
+            last_tlp_acked_end: 0,
+            gput_inprog: false,
+            gput_ack: 0,
+            gp_cumack_ts: 0,
+            app_limited_needs_set: false,
+            dragged_bottom: false,
+            current_round: 0,
+            last_round_ack: 0,
+            fast_output: false,
+            fsb_left_to_send: 0,
+            fast_output_started: false,
+            allow_data_after_close: false,
+            reqs: Vec::new(),
+            forced_ack: false,
+            forced_ack_ts: 0,
+            probe_not_answered: false,
+            has_collapsed: false,
+            last_collapse_point: 0,
+            high_collapse_point: 0,
+            collapse_point_valid: false,
         }
     }
 
@@ -928,6 +1078,422 @@ impl RackMisc {
         } else {
             Ok(())
         }
+    }
+
+    /// FreeBSD `rc_init_window`: the RFC 6928 initial window for the MSS.
+    #[must_use]
+    pub fn rc_init_window(&self) -> u32 {
+        let mss = u32::from(self.tp.t_maxseg.max(1));
+        (10 * mss).min((2 * mss).max(14_600))
+    }
+
+    /// FreeBSD `rack_swap_beta_values`: exchange the saved beta with the CC.
+    pub fn rack_swap_beta_values(&mut self, beta: u32, beta_ecn: u32) -> bool {
+        self.pacing_cc_set = true;
+        if !self.cc_is_newreno {
+            return false;
+        }
+        self.saved_beta = beta;
+        self.saved_beta_ecn = beta_ecn;
+        true
+    }
+
+    /// FreeBSD `rack_validate_multipliers_at_or_above100`.
+    pub fn rack_validate_multipliers_at_or_above100(&mut self) -> u32 {
+        let mut changed = 0;
+        for percent in [
+            &mut self.per_gp_rec,
+            &mut self.per_gp_ca,
+            &mut self.per_gp_ss,
+        ] {
+            if *percent < 100 {
+                *percent = 100;
+                changed += 1;
+            }
+        }
+        changed
+    }
+
+    /// FreeBSD `rack_validate_multipliers_at_or_below_100`.
+    pub fn rack_validate_multipliers_at_or_below_100(&mut self) -> u32 {
+        let mut changed = 0;
+        for percent in [&mut self.per_gp_ca, &mut self.per_gp_ss] {
+            if *percent > 100 {
+                *percent = 100;
+                changed += 1;
+            }
+        }
+        changed
+    }
+
+    /// FreeBSD `rack_update_multiplier`: one measurement-driven multiplier step.
+    pub fn rack_update_multiplier(
+        &mut self,
+        timely_says: i32,
+        last_bw_est: u64,
+        _rtt: u32,
+        _rtt_diff: i32,
+    ) -> i32 {
+        if !self.gp_dyn_mul || self.use_fixed_rate || self.in_probe_rtt || !self.always_pace {
+            return 0;
+        }
+        let losses = self.loss_count.saturating_sub(self.loss_at_start);
+        if losses > 0 {
+            return 0;
+        }
+        if last_bw_est > self.last_gp_comp_bw {
+            self.last_gp_comp_bw = last_bw_est;
+            self.gp_bwred = false;
+            self.gp_timely_dec_cnt = 0;
+            1
+        } else if last_bw_est < self.last_gp_comp_bw {
+            if timely_says == 2 && self.no_push_at_mrtt > 1 {
+                self.rack_validate_multipliers_at_or_below_100();
+            }
+            self.gp_bwred = true;
+            if self.gp_timely_dec_cnt < 6 {
+                self.gp_timely_dec_cnt += 1;
+                2
+            } else {
+                -1
+            }
+        } else {
+            0
+        }
+    }
+
+    /// FreeBSD `tcp_rack_partialack`.
+    pub fn tcp_rack_partialack(&mut self) -> bool {
+        if self.prr_sndcnt > 0 || self.no_prr {
+            self.wanted_output = true;
+        }
+        self.wanted_output
+    }
+
+    /// FreeBSD `rack_cc_after_idle`.
+    pub fn rack_cc_after_idle(&mut self) {
+        let iw = if self.tp.snd_cwnd == 1 {
+            u32::from(self.tp.t_maxseg)
+        } else {
+            self.rc_init_window()
+        };
+        if self.tp.snd_cwnd < iw {
+            self.tp.snd_cwnd = iw;
+        }
+    }
+
+    /// FreeBSD `rack_adjust_orig_mlen`.
+    pub fn rack_adjust_orig_mlen(&mut self, id: u64) -> bool {
+        let Some(map) = self.sendmaps.get_mut(&id) else {
+            return false;
+        };
+        if map.orig_t_space > 0 {
+            map.soff = map.soff.saturating_sub(map.orig_t_space);
+            map.orig_m_len = map.orig_m_len.saturating_add(map.orig_t_space);
+            map.orig_t_space = 0;
+            return true;
+        }
+        false
+    }
+
+    /// FreeBSD `rack_setup_offset_for_rsm`.
+    pub fn rack_setup_offset_for_rsm(&mut self, src: u64, dst: u64) -> bool {
+        let Some(source) = self.sendmaps.get(&src) else {
+            return false;
+        };
+        let soff = source
+            .soff
+            .saturating_add(source.end.saturating_sub(source.start));
+        let orig = source.orig_m_len;
+        let tspace = source.orig_t_space;
+        let Some(target) = self.sendmaps.get_mut(&dst) else {
+            return false;
+        };
+        target.soff = soff;
+        target.orig_m_len = orig;
+        target.orig_t_space = tspace;
+        true
+    }
+
+    /// FreeBSD `rack_send_ack_challange`.
+    pub fn rack_send_ack_challange(&mut self) -> bool {
+        if !self.forced_ack {
+            self.forced_ack = true;
+            self.forced_ack_ts = self.os.tcp_get_usecs().max(1);
+        } else {
+            self.probe_not_answered = true;
+        }
+        self.tp.t_flags &= !0x0020; // TF_DELACK
+        true
+    }
+
+    /// FreeBSD `rack_convert_rtts`.
+    pub fn rack_convert_rtts(&mut self) {
+        let rto = self
+            .tp
+            .t_srtt
+            .saturating_add(4u32.saturating_mul(self.tp.t_rttvar.max(1)))
+            .clamp(30_000, 4_000_000);
+        self.tp.t_rxtcur = rto;
+    }
+
+    /// FreeBSD `rack_cc_conn_init`.
+    pub fn rack_cc_conn_init(&mut self) {
+        if self.tp.snd_ssthresh < self.snd_wnd {
+            self.tp.snd_ssthresh = self.snd_wnd;
+        }
+        let iw = self.rc_init_window();
+        if iw < self.tp.snd_cwnd {
+            self.tp.snd_cwnd = iw;
+        }
+    }
+
+    /// FreeBSD `tcp_rack_xmit_timer`.
+    pub fn tcp_rack_xmit_timer(
+        &mut self,
+        rtt: i32,
+        _len: u32,
+        us_rtt: u32,
+        confidence: u8,
+        _rsm: Option<u64>,
+        rtrcnt: u16,
+    ) -> u32 {
+        let rtt_u = u32::try_from(rtt.max(1)).unwrap_or(u32::MAX);
+        self.rtt_lowest = self.rtt_lowest.min(rtt_u);
+        self.rtt_highest = self.rtt_highest.max(rtt_u);
+        if (self.best_us_rtt == u32::MAX || us_rtt < self.best_us_rtt)
+            && (self.rtt_confidence == 0 || confidence != 0)
+        {
+            self.best_us_rtt = us_rtt;
+            self.rtt_confidence = confidence;
+            self.best_rtr_cnt = rtrcnt;
+        }
+        self.rtt_valid = true;
+        self.rtt_tot = self.rtt_tot.saturating_add(u64::from(rtt_u));
+        self.rtt_cnt = self.rtt_cnt.saturating_add(1);
+        self.best_us_rtt
+    }
+
+    /// FreeBSD `tcp_rack_xmit_timer_commit`.
+    pub fn tcp_rack_xmit_timer_commit(&mut self) -> u32 {
+        if !self.rtt_valid || self.rtt_cnt == 0 {
+            return 0;
+        }
+        let rtt = match self.rate_sample_method {
+            0 => self.rtt_lowest,
+            1 => self.rtt_highest,
+            _ => u32::try_from(self.rtt_tot / u64::from(self.rtt_cnt)).unwrap_or(1),
+        }
+        .max(1);
+        self.tp.t_srtt = if self.tp.t_srtt == 0 {
+            rtt
+        } else {
+            (self.tp.t_srtt.saturating_mul(7).saturating_add(rtt)) / 8
+        };
+        let delta = self.tp.t_srtt.abs_diff(rtt);
+        self.tp.t_rttvar = if self.tp.t_rttvar == 0 {
+            rtt / 2
+        } else {
+            (self.tp.t_rttvar.saturating_mul(7).saturating_add(delta)) / 8
+        }
+        .max(1);
+        self.tp.t_rxtcur = self
+            .tp
+            .t_srtt
+            .saturating_add(4u32.saturating_mul(self.tp.t_rttvar))
+            .clamp(30_000, 4_000_000);
+        rtt
+    }
+
+    /// FreeBSD `rack_apply_updated_usrtt`.
+    pub fn rack_apply_updated_usrtt(&mut self, us_rtt: u32, us_cts: u32) -> bool {
+        if us_rtt < self.min_rtt_us {
+            self.min_rtt_us = us_rtt;
+            self.lower_rtt_us_cts = us_cts;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// FreeBSD `is_rsm_inside_declared_tlp_block`.
+    #[must_use]
+    pub fn is_rsm_inside_declared_tlp_block(&self, start: u32, end: u32) -> bool {
+        end >= self.last_tlp_acked_start && start <= self.last_tlp_acked_end
+    }
+
+    /// FreeBSD `rack_rsm_sender_update`.
+    pub fn rack_rsm_sender_update(&mut self, id: u64) -> bool {
+        if !self.gput_inprog || self.app_limited_needs_set {
+            return false;
+        }
+        let Some(map) = self.sendmaps.get(&id) else {
+            return false;
+        };
+        let end = map.end;
+        let ts = map.last_sent();
+        if end > self.gput_ack {
+            self.gput_ack = end;
+        }
+        if ts > self.gp_cumack_ts {
+            self.gp_cumack_ts = ts;
+            return true;
+        }
+        false
+    }
+
+    /// FreeBSD `rack_check_bottom_drag`.
+    pub fn rack_check_bottom_drag(&mut self, sbavail: u32, flight: u32) -> bool {
+        let mss = u32::from(self.tp.t_maxseg.max(1));
+        if self.tp.snd_max == self.tp.snd_una
+            || (sbavail > 4 * mss && flight <= 4 * mss && self.snd_wnd > 2 * mss)
+        {
+            self.rack_validate_multipliers_at_or_above100();
+            self.dragged_bottom = true;
+            return true;
+        }
+        false
+    }
+
+    /// FreeBSD `rack_adjust_sendmap_head`.
+    pub fn rack_adjust_sendmap_head(&mut self) -> usize {
+        let mut adjusted = 0;
+        for map in self.sendmaps.values_mut() {
+            if map.start <= self.tp.snd_una && self.tp.snd_una < map.end {
+                map.soff = 0;
+                map.orig_m_len = map.end.saturating_sub(self.tp.snd_una);
+                adjusted += 1;
+            }
+        }
+        adjusted
+    }
+
+    /// FreeBSD `rack_req_check_for_comp`.
+    pub fn rack_req_check_for_comp(&mut self, ack: u32) -> usize {
+        let before = self.reqs.len();
+        self.reqs.retain(|(_, end)| *end > ack);
+        before.saturating_sub(self.reqs.len())
+    }
+
+    /// FreeBSD `rack_collapsed_window`.
+    pub fn rack_collapsed_window(&mut self, _out: u32, ack: u32) {
+        self.last_collapse_point = ack.wrapping_add(self.snd_wnd);
+        self.high_collapse_point = self.tp.snd_max;
+        self.has_collapsed = true;
+        self.collapse_point_valid = true;
+    }
+
+    /// FreeBSD `rack_un_collapse_window`.
+    pub fn rack_un_collapse_window(&mut self) -> usize {
+        self.has_collapsed = false;
+        let point = self.last_collapse_point;
+        let mut count = 0;
+        for map in self.sendmaps.values_mut() {
+            if map.end > point {
+                map.flags |= RACK_RWND_COLLAPSED;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// FreeBSD `rack_validate_fo_sendwin_up`.
+    pub fn rack_validate_fo_sendwin_up(&mut self, out: u32) -> bool {
+        if !self.fast_output {
+            return false;
+        }
+        if out.saturating_add(self.fsb_left_to_send) > self.snd_wnd {
+            if out >= self.snd_wnd {
+                self.fast_output = false;
+            } else {
+                self.fsb_left_to_send = self.snd_wnd - out;
+                if self.fsb_left_to_send < u32::from(self.tp.t_maxseg) {
+                    self.fast_output = false;
+                }
+            }
+        }
+        self.fast_output
+    }
+
+    /// FreeBSD `rack_check_data_after_close`.
+    pub fn rack_check_data_after_close(&mut self, tlen: u32) -> bool {
+        if tlen > 0 && !self.allow_data_after_close {
+            self.tp.t_state = TCPS_CLOSED;
+            return true;
+        }
+        false
+    }
+
+    /// FreeBSD `rack_new_round_starts`.
+    pub fn rack_new_round_starts(&mut self) -> u32 {
+        self.current_round = self.current_round.saturating_add(1);
+        self.roundends = self.roundends.saturating_add(1);
+        self.current_round
+    }
+
+    /// FreeBSD `rack_new_round_setup`.
+    pub fn rack_new_round_setup(&mut self, ack: u32) -> u32 {
+        self.last_round_ack = ack;
+        self.current_round
+    }
+
+    /// FreeBSD `rack_fo_base_copym`.
+    pub fn rack_fo_base_copym(&mut self, len: u32) -> Option<MbufId> {
+        let id = self.os.m_getcl(0)?;
+        if len > 0 {
+            let bytes = alloc::vec![0u8; usize::try_from(len).unwrap_or(0)];
+            if !self.os.mbufs.write(id, 0, &bytes) || !self.os.mbufs.set_len(id, bytes.len()) {
+                return None;
+            }
+        }
+        Some(id)
+    }
+
+    /// FreeBSD `rack_fo_m_copym`.
+    pub fn rack_fo_m_copym(&mut self, id: MbufId, off: u32, len: u32) -> Option<MbufId> {
+        let off = usize::try_from(off).unwrap_or(0);
+        let len = usize::try_from(len).unwrap_or(0);
+        self.os.mbufs.m_copym(Some(id), off, len)
+    }
+
+    /// FreeBSD `rack_check_queue_level`.
+    pub fn rack_check_queue_level(&mut self, level: u32) -> bool {
+        self.high_rwnd = self.high_rwnd.max(level);
+        level >= self.snd_cwnd.max(1)
+    }
+
+    /// FreeBSD `rack_fast_output`.
+    pub fn rack_fast_output(&mut self) -> bool {
+        if !self.fast_output || self.os.sbavail() == 0 {
+            return false;
+        }
+        self.fsb_left_to_send = self.snd_wnd.min(self.snd_cwnd);
+        true
+    }
+
+    /// FreeBSD `rack_setup_fast_output`.
+    pub fn rack_setup_fast_output(&mut self) -> bool {
+        self.fast_output_started = true;
+        self.fast_output = self.snd_wnd > 0 && self.snd_cwnd > 0 && self.os.sbavail() > 0;
+        if self.fast_output {
+            self.fsb_left_to_send = self.snd_wnd.min(self.snd_cwnd);
+            self.fsb.initialized = true;
+        }
+        self.fast_output
+    }
+
+    /// FreeBSD `rack_check_collapsed`.
+    #[must_use]
+    pub fn rack_check_collapsed(&self) -> bool {
+        self.has_collapsed && self.collapse_point_valid
+    }
+
+    /// FreeBSD `rack_validate_sizes`.
+    pub fn rack_validate_sizes(&self, len: u32, mss: u32) -> Result<(), Errno> {
+        if len == 0 || mss == 0 || len > mss.saturating_mul(64) {
+            return Err(Errno::EINVAL);
+        }
+        Ok(())
     }
 }
 
