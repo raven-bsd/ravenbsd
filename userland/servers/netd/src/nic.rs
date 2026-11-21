@@ -21,7 +21,7 @@ use raven_scheme::Client;
 use virtio_net::{ControlInfo, MAX_FRAME_LEN, RING_RX_BUFFERS, frame_desc};
 
 use crate::network::StaticConfig;
-use crate::{Loopback, Netd, NicConfig};
+use crate::{FilterPolicy, Loopback, Netd, NicConfig};
 
 /// Address QEMU user-mode assigns to the guest.
 pub const GUEST_ADDR: [u8; 4] = [10, 0, 2, 15];
@@ -68,9 +68,10 @@ pub fn attach(
     now_ms: i64,
     mode: NicMode,
     static_config: Option<StaticConfig>,
+    filter: Option<FilterPolicy>,
 ) -> Result<NicConfig, String> {
     let (device, config) = NicDevice::open(mode, static_config.as_ref())?;
-    netd.attach_nic(device, config, now_ms);
+    netd.attach_nic_with_filter(device, config, now_ms, filter);
     if let Some(static_config) = static_config {
         netd.set_nic_dns(static_config.dns);
     }

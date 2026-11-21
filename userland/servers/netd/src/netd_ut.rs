@@ -1160,3 +1160,18 @@ fn file_references_keep_the_socket_alive_until_the_last_close() {
     assert_eq!(netd.socket_files(), files - 1);
     assert_eq!(netd.close(accepted), Err(Errno::EBADF));
 }
+
+#[test]
+fn a_filtered_server_drains_the_shared_filter_log() {
+    let policy = crate::FilterPolicy::from_text("set default pass\npass in on lo all\n").unwrap();
+    policy
+        .log()
+        .borrow_mut()
+        .push(alloc::string::String::from("netd: pf test"));
+    let mut netd = Netd::with_filter(Loopback::new(NIC_MAC), NIC_MAC, 0, Some(policy));
+    assert_eq!(
+        netd.take_filter_log(),
+        alloc::vec![alloc::string::String::from("netd: pf test")]
+    );
+    assert!(netd.take_filter_log().is_empty());
+}

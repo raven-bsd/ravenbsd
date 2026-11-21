@@ -1,5 +1,8 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: BSD-2-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+// Portions ported from FreeBSD sys/netpfil/pf/pf_lb.c (BSD-2-Clause):
+// Copyright (c) 2001 Daniel Hartmeier, Copyright (c) 2002-2008 Henning Brauer.
+// All rights reserved. Full donor notice and revision: PROVENANCE.toml, docs/pf.md section 13.
 
 //! NAT and redirect (RDR) rule evaluation.
 //!

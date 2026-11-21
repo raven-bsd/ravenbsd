@@ -3,7 +3,8 @@
 
 # Packet filter (`raven-pf`)
 
-Status: K273 port of the FreeBSD pf userspace core, 2026-11-21. Evidence tags:
+Status: K273 port of the FreeBSD pf userspace core with the `netd` frame hook, 2026-11-21
+(rework round 1). Evidence tags:
 **OBSERVED** (read or measured), **PROPOSED** (not implemented yet), **UNVERIFIED** (not
 exercised on a target).
 
@@ -12,8 +13,8 @@ exercised on a target).
 `netd` owns the `net:` socket server and the `lo`/`eth0` stacks (`architecture/07-network.md`
 section 1). The filter must sit on the ingress/egress path before TCP/IP processing. K273
 implements the complete host-testable pf core: rules, state, NAT/redirect, tables, counters and
-logging, IPv4 and IPv6. The `netd` call-site is **PROPOSED** (section 12) because
-`userland/servers/netd/**` and `profiles/**` are outside the ticket's Owns-globs.
+logging, IPv4 and IPv6, and wires it into `netd` at the `raven-tcpip` device boundary (section
+12). The `pf-core` QEMU case passes with one allowed stateful flow and one blocked, logged flow.
 
 ## 2. Scope
 
@@ -31,7 +32,11 @@ Implemented (**OBSERVED**, host tests in `crates/raven-pf/src/*_ut.rs` and
 * `PFRES_*` reason counters, per-rule counters, bounded packet log and the `pf.h` constants /
   status block a pfctl client needs;
 * fail-closed behaviour: a malformed rule, an unknown table, a failed translation or a full
-  state table drops the packet and is counted/logged; wire input never panics.
+  state table drops the packet and is counted/logged; wire input never panics;
+* the `netd` ingress/egress hook: `/etc/pf.conf` loaded at start (malformed config refuses to
+  start), one `Engine` per interface, `Block` drops the frame, `Decision.translation` rewrites
+  addresses/ports and fixes the IPv4/TCP/UDP checksums, and the bounded log is drained to the
+  serial log.
 
 Deferred (documented limits):
 
@@ -40,7 +45,7 @@ Deferred (documented limits):
 * address ranges (`PF_ADDR_RANGE`), `no-route`/`urpf-failed`/dynamic interface address kinds;
 * cross-family `af-to` translation, ICMP/ICMPv6 identifier NAT, fragment reassembly and the
   fragment cache (a fragmented packet is filtered on addresses only and creates no state);
-* the in-guest `netd` hook (section 12) and the QEMU case (skipped; see the ticket report).
+* fragment reassembly/cache: a fragment is filtered on addresses only and creates no state.
 
 ## 3. Donor map
 
@@ -211,23 +216,35 @@ atomics. No allocation happens on the input path beyond state/log-table operatio
 | translation cannot allocate | `Block`, `PFRES_MAPFAILED`, forced log |
 | fragmented packet | filtered on addresses only, no state |
 | wire/random parser input | no panic (4000-case fuzz test) |
+| `/etc/pf.conf` present but malformed | `netd` logs the line and exits 1 before registering `net:` |
+| hook cannot express a translation (fragment/ICMPv6) | frame dropped, `translate-unsupported` logged |
 
-## 12. netd hook (PROPOSED, follow-up)
+## 12. netd hook (wired)
 
-The hook is intentionally not wired in K273: its files are outside the ticket's Owns-globs.
-The follow-up must:
+`userland/servers/netd/src/filter.rs` wraps the `raven-tcpip` [`Device`]:
 
-1. add `filter` to the module list in `userland/servers/netd/src/lib.rs`;
-2. add the `raven-pf` dependency to `userland/servers/netd/Cargo.toml`;
-3. in the frame path (`netd::Netd` in `userland/servers/netd/src/netd.rs`, fed by
-   `raven-netcore`/`nic.rs`), build a `Packet` before the TCP/IP stack consumes the frame and
-   call `Engine::evaluate`; on `Verdict::Block` drop the frame and count it; on
-   `Decision::translation` rewrite the addresses/ports before forwarding;
-4. keep one `Engine` per interface set, load `/etc/pf.conf` at start and fail closed if parsing
-   fails;
-5. drain `Engine::drain_logs()` to the log device;
-6. add a QEMU profile/workload that shows one blocked and one allowed flow, and replace the
-   `skip` in `tests/qtest/cases/pf-core.toml`.
+* `FilterDevice::receive` parses each ingress Ethernet/IP frame, calls
+  `Engine::evaluate(.., Direction::In, ..)` and either forwards it, drops it
+  (`Verdict::Block`) or forwards a rewritten copy (`Decision.translation`);
+* `FilterDevice::transmit` fills the egress frame, filters it the same way and drops or rewrites
+  before the inner device queues it;
+* one `Engine` (and one `Ruleset` clone) exists per interface: `lo` is wrapped by
+  `Netd::with_filter`, `eth0` by `Netd::attach_nic_with_filter`; both share one log handle;
+* `netd` loads `file:/etc/pf.conf` then `initfs:/etc/pf.conf` at start. Absent means no filter;
+  malformed means `netd` prints `netd: pf config: <line>: <error>; refusing to start` and exits
+  before registering `net:`;
+* `netd` drains `Engine` log records after every poll and prints
+  `netd: pf <pass|block> <in|out> <iface> <proto> <src>:<sport> -> <dst>:<dport> [reason=..]`;
+* NAT/RDR rewrites the IPv4/IPv6 addresses and TCP/UDP ports and recomputes the IPv4 header and
+  L4 checksums; packets whose checksum cannot be fixed safely (fragments, ICMPv6) are dropped
+  fail-closed.
+
+The profile lives in `profiles/pf.toml` + `profiles/pf.d/` (initfsd, pcid, devd, virtio-net,
+netd, the `pf-probe` manifest and `/etc/pf.conf`). `tests/qtest/cases/pf-core.toml` runs it
+under QEMU user networking with the host UDP echo on `10.0.2.2:47001`; the probe sends one
+allowed flow (echoed, stateful reply admitted) and one blocked flow (logged on the serial
+console). The case asserts the netd boot lines, both flows, the drop record and `init exited
+(0)`; it forbids panics.
 
 ## 13. Provenance
 
@@ -237,6 +254,9 @@ The follow-up must:
 * `src/nat.rs`: the `pf_get_sport()` search and `pf_get_transaddr()` redirect-port formula are
   transcribed from `sys/netpfil/pf/pf_lb.c` (BSD-2-Clause); recorded in `PROVENANCE.toml`,
   tier A, modified (Rust, bounded vectors, deterministic cursors, no mbuf/pool plumbing).
+* `userland/servers/netd/src/filter.rs` is original Raven plumbing at the `Device` boundary; no
+  donor file describes this userspace hook, so no new provenance entry applies (the pf
+  algorithms it calls are covered above).
 * `src/ast.rs`, `src/address.rs`, `src/table.rs`, `src/state.rs`, `src/engine.rs`,
   `src/parser.rs`, `src/log.rs`: semantic ports of the donor functions named in section 3,
   written in Rust without kernel structs, mbufs, locks or routing hooks; no literal donor text

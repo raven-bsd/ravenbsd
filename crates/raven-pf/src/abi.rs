@@ -1,5 +1,8 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: BSD-2-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+// Portions ported from FreeBSD sys/netpfil/pf/pf.h (BSD-2-Clause):
+// Copyright (c) 2001 Daniel Hartmeier. All rights reserved.
+// Full donor notice and revision: PROVENANCE.toml, docs/pf.md section 13.
 
 //! The pfctl-compatible ABI surface: constants, address representation and status block.
 //!
