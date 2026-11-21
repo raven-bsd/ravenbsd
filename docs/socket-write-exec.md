@@ -22,6 +22,7 @@ earlier markers arrive, so a missing variant blocks the guest at the correspondi
 ```sh
 sh tests/fixtures/socket-write-exec/build.sh
 cargo xtask qtest --case socket-write-exec --arch x86_64
+sh tests/fixtures/socket-write-exec/run-tap.sh      # accepted-socket shape over the K194 tap
 ```
 
 The fixture overlays two static C binaries (`/bin/socket-write-exec`,
@@ -52,26 +53,49 @@ The host log shows `same=b'SAME'`, `fork=b'FORK'`, `exec=b'EXEC'`, `read=b'READ'
 `second=b'SECOND'`, `verified all variants`. The generic post-exec write path is healthy: the
 fork+exec child writes through the inherited connected socket, and a read-then-write works.
 
-## Accepted-socket note for K195
+## Accepted-socket over the tap (K195 shape)
 
-The first revision used the K195 shape directly (guest listener + `hostfwd`). It did **not** reach
-the variants: QEMU's hostfwd/slirp closed the first host connection immediately after the TCP
-handshake, the one-shot guest accepted that stale connection, wrote `SAME`/`FORK`/`EXEC` into the
-closed peer, and then blocked on the `READ` trigger. The pcap shows the host-side FIN right after
-the handshake and a later RST:
+The first revision used the K195 shape through `hostfwd` and was confounded by the proxy: QEMU's
+slirp closed the first host connection immediately after the TCP handshake, so the one-shot guest
+accepted a stale connection, wrote `SAME`/`FORK`/`EXEC` into the closed peer, and blocked on the
+`READ` trigger. The pcap shows the host-side FIN right after the handshake and a later RST. That
+is the hostfwd path, not a write variant.
 
-```text
-10.0.2.2.34896 > 10.0.2.15.23096: Flags [S], ...
-10.0.2.15.23096 > 10.0.2.2.34896: Flags [S.], ...
-10.0.2.2.34896 > 10.0.2.15.23096: Flags [F.], ...
-...
-10.0.2.2.34896 > 10.0.2.15.23096: Flags [R.], ...
+The accepted shape now runs on the **K194 tap** (`run-tap.sh` brings up `ravenbr0`/`ravendemo0`,
+runs the qtest, and tears it down):
+
+```sh
+sh tests/fixtures/socket-write-exec/run-tap.sh
 ```
 
-That is the hostfwd/slirp path, not a failing write variant. The connected-socket fixture removes
-that proxy and proves the five writes. The **accepted** fd shape (K195's sshd session) still needs
-the K194 tap: the next K195 run should use the same five markers over the tap, with the host
-connecting to `10.0.2.15:23096`, to separate an accepted-fd/exec defect from the hostfwd proxy.
+The guest owns the listener; the host peer connects to `10.0.2.15:23096` and verifies the same
+five markers. Result: **pass**.
+
+```text
+socket-write-exec: listening port=23096
+socket-write-exec: accepted fd=1
+socket-write-exec: same sent
+socket-write-exec: fork sent
+socket-write-exec: exec sent
+socket-write-exec: read request
+socket-write-exec: read sent
+socket-write-exec: second sent
+socket-write-exec: host done
+socket-write-exec: done
+```
+
+Host log: `same=b'SAME'`, `fork=b'FORK'`, `exec=b'EXEC'`, `read=b'READ'`,
+`second=b'SECOND'`, `verified all variants`.
+
+## Conclusion for K195
+
+The generic scheme-socket write path is healthy in both shapes: connected socket (guest → host)
+and accepted socket (host → guest over the tap), including a forked child, a fork+exec child on
+the inherited fd, a read-then-write, and a second write after the host acknowledges. The remaining
+K195 delta is therefore **OpenSSH-specific**, not the fd/exec/socket plumbing: the session child's
+channel output is composed in `serverloop.c` (`channel_output_poll`/`server_loop2`, with the
+confirmation recorded around `serverloop.c:650-660`) and held in the `channels.c` output buffer;
+that POLLOUT-gated flush is the next trace for K195/K409. No product fix is made here.
 
 ## Limits
 

@@ -2,16 +2,19 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K408 host peer: listen for the guest connection and verify the five write variants in order.
-# The READ/ACK2/DONE triggers are sent only after the earlier markers arrive, so a missing
-# variant leaves the guest blocked at the corresponding serial marker.
+# K408 host peer. In `listen` mode (default) it waits for the connected-socket guest. In
+# `connect` mode it connects to the guest's accepted listener over the K194 tap (10.0.2.15:23096).
+# Both modes verify the five write markers in order and send the READ/ACK2/DONE triggers only
+# after the earlier markers arrive.
 
+import os
 import socket
 import sys
+import time
 
-HOST = "0.0.0.0"
 PORT = 23096
 ACCEPT_SECONDS = 160
+CONNECT_SECONDS = 120
 IO_SECONDS = 30
 
 
@@ -30,27 +33,8 @@ def read_exact(connection, length):
     return bytes(data)
 
 
-def main():
-    log_path = "build/fixtures/socket-write-exec/host.log"
-    result_path = "build/fixtures/socket-write-exec/host.result"
-    open(log_path, "w", encoding="utf-8").close()
-
-    listener = socket.socket()
-    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listener.bind((HOST, PORT))
-    listener.listen(1)
-    listener.settimeout(ACCEPT_SECONDS)
-    log(log_path, f"listening {HOST}:{PORT}")
-    try:
-        connection, address = listener.accept()
-    except OSError as error:
-        log(log_path, f"accept error: {error}")
-        with open(result_path, "w", encoding="utf-8") as handle:
-            handle.write("1\n")
-        return 1
-    log(log_path, f"accepted {address}")
+def verify(connection, log_path, result_path):
     connection.settimeout(IO_SECONDS)
-
     steps = [
         ("same", 4, b"SAME"),
         ("fork", 4, b"FORK"),
@@ -82,6 +66,55 @@ def main():
         with open(result_path, "w", encoding="utf-8") as handle:
             handle.write("1\n")
         return 1
+
+
+def connect_guest(log_path):
+    host = os.environ.get("SOCKET_WRITE_EXEC_HOST", "10.0.2.15")
+    deadline = time.monotonic() + CONNECT_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            return socket.create_connection((host, PORT), timeout=3)
+        except OSError as error:
+            log(log_path, f"connect retry: {error}")
+            time.sleep(0.2)
+    return None
+
+
+def main():
+    log_path = "build/fixtures/socket-write-exec/host.log"
+    result_path = "build/fixtures/socket-write-exec/host.result"
+    mode = os.environ.get("SOCKET_WRITE_EXEC_HOST_MODE", "listen")
+    open(log_path, "w", encoding="utf-8").close()
+
+    if mode == "connect":
+        log(log_path, "connecting to the guest listener")
+        connection = connect_guest(log_path)
+        if connection is None:
+            log(log_path, "connect timeout")
+            with open(result_path, "w", encoding="utf-8") as handle:
+                handle.write("1\n")
+            return 1
+        try:
+            return verify(connection, log_path, result_path)
+        finally:
+            connection.close()
+
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("0.0.0.0", PORT))
+    listener.listen(1)
+    listener.settimeout(ACCEPT_SECONDS)
+    log(log_path, f"listening 0.0.0.0:{PORT}")
+    try:
+        connection, address = listener.accept()
+    except OSError as error:
+        log(log_path, f"accept error: {error}")
+        with open(result_path, "w", encoding="utf-8") as handle:
+            handle.write("1\n")
+        return 1
+    log(log_path, f"accepted {address}")
+    try:
+        return verify(connection, log_path, result_path)
     finally:
         connection.close()
         listener.close()

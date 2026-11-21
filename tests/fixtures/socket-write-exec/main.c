@@ -125,12 +125,14 @@ static int wait_for_child(pid_t pid, const char *name) {
     return 0;
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     struct sockaddr_in address;
     int connection;
     int attempt;
+    int accept_mode;
     unsigned char trigger[8];
 
+    accept_mode = argc > 1 && strcmp(argv[1], "--accept") == 0;
     connection = socket(AF_INET, SOCK_STREAM, 0);
     if (connection < 0) {
         say_value("socket-write-exec: socket errno=", errno, "\n");
@@ -139,21 +141,50 @@ int main(void) {
     memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
     address.sin_port = htons(PORT);
-    if (inet_pton(AF_INET, HOST_IP, &address.sin_addr) != 1) {
-        say("socket-write-exec: bad host address\n");
-        return 1;
-    }
-    for (attempt = 0; attempt < 100; attempt++) {
-        if (connect(connection, (const struct sockaddr *)&address, sizeof(address)) == 0) {
-            break;
+    if (accept_mode) {
+        // K195 shape: the guest owns the listener and the host connects over the tap.
+        int listener = connection;
+        int accepted;
+
+        address.sin_addr.s_addr = htonl(0);
+        if (bind(listener, (const struct sockaddr *)&address, sizeof(address)) < 0) {
+            say_value("socket-write-exec: bind errno=", errno, "\n");
+            return 1;
         }
-        usleep(100000);
+        if (listen(listener, 8) < 0) {
+            say_value("socket-write-exec: listen errno=", errno, "\n");
+            return 1;
+        }
+        say("socket-write-exec: listening port=23096\n");
+        for (;;) {
+            accepted = accept(listener, NULL, NULL);
+            if (accepted >= 0) {
+                break;
+            }
+            if (errno != EINTR) {
+                say_value("socket-write-exec: accept errno=", errno, "\n");
+                return 1;
+            }
+        }
+        connection = accepted;
+        say_value("socket-write-exec: accepted fd=", connection, "\n");
+    } else {
+        if (inet_pton(AF_INET, HOST_IP, &address.sin_addr) != 1) {
+            say("socket-write-exec: bad host address\n");
+            return 1;
+        }
+        for (attempt = 0; attempt < 100; attempt++) {
+            if (connect(connection, (const struct sockaddr *)&address, sizeof(address)) == 0) {
+                break;
+            }
+            usleep(100000);
+        }
+        if (attempt == 100) {
+            say_value("socket-write-exec: connect errno=", errno, "\n");
+            return 1;
+        }
+        say_value("socket-write-exec: connected fd=", connection, "\n");
     }
-    if (attempt == 100) {
-        say_value("socket-write-exec: connect errno=", errno, "\n");
-        return 1;
-    }
-    say_value("socket-write-exec: connected fd=", connection, "\n");
 
     // 1. Same-process write on the accepted socket.
     if (write_marker(connection, "SAME") != 0) {

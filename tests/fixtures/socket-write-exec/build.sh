@@ -13,10 +13,25 @@ cd "$root"
 out=build/fixtures/socket-write-exec
 mkdir -p "$out"
 arch=${RAVEN_QT_ARCH:-x86_64}
+mode=${SOCKET_WRITE_EXEC_MODE:-connect}
 if [ "$arch" != x86_64 ]; then
     echo "socket-write-exec fixture: x86_64 only" >&2
     exit 77
 fi
+case "$mode" in
+connect)
+    manifest=socket-write-exec.toml
+    image=initfs.img
+    ;;
+accept)
+    manifest=socket-write-exec-tap.toml
+    image=initfs-tap.img
+    ;;
+*)
+    echo "socket-write-exec fixture: unknown mode $mode" >&2
+    exit 2
+    ;;
+esac
 
 sysroot=$root/build/$arch/sysroot
 if [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$sysroot/usr/lib/crt1.o" ]; then
@@ -89,9 +104,9 @@ cp build/"$arch"/initfs.img "$out/base.img"
 cargo build -q -p raven-b70-overlay
 target_dir=${CARGO_TARGET_DIR:-$root/target}
 overlay=$target_dir/debug/raven-b70-overlay
-"$overlay" "$out/base.img" "$out/initfs.img" \
+"$overlay" "$out/base.img" "$out/$image" \
     "/bin/socket-write-exec=$out/socket-write-exec:0755" \
     "/bin/socket-write-exec-child=$out/socket-write-exec-child:0755" \
-    "/etc/services.d/socket-write-exec.toml=$root/tests/fixtures/socket-write-exec/socket-write-exec.toml"
+    "/etc/services.d/socket-write-exec.toml=$root/tests/fixtures/socket-write-exec/$manifest"
 
-echo "socket-write-exec fixture: staged $out/initfs.img"
+echo "socket-write-exec fixture: staged $out/$image (mode=$mode)"
