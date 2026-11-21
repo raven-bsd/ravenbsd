@@ -52,6 +52,13 @@ const WORKER_START_DEADLINE_NS: u64 = 10_000_000_000;
 /// Emit pending worker phases while the run is in progress; a cap kill then preserves where the
 /// workers were instead of only `setup ok`.
 const WORKER_PROGRESS_NS: u64 = 5_000_000_000;
+/// Total worker deadline: measured 151 s green run, 44/50 iterations at 180 s under the
+/// K391 trace, so a 240 s bound is the measured p99 + margin. A true hang is caught by the
+/// per-worker no-progress bound below, not by widening this cap.
+const WORKER_DEADLINE_NS: u64 = 240_000_000_000;
+/// A worker that does not advance its (iteration, phase) for this long is a stall, not a slow
+/// TCG sample. This keeps the deadline honest when a single worker is wedged.
+const WORKER_STALL_NS: u64 = 120_000_000_000;
 
 const OP_CREATE: usize = 0;
 const OP_WRITE: usize = 1;
@@ -584,17 +591,21 @@ fn wait_scheme(scheme: &str) -> Result<(), String> {
 
 fn setup() -> Result<(), String> {
     for dir in [START, "/tmp/smp-fs/work", "/tmp/smp-fs/race"] {
+        println!("smp-fs: setup mkdir {dir}");
         match fs::mkdir(dir, 0o755) {
             Ok(()) | Err(Errno::EEXIST) => {}
             Err(error) => return Err(format!("mkdir {dir}: {}", error.description())),
         }
+        println!("smp-fs: setup mkdir ok {dir}");
     }
     for index in 0..MOUNT_WORKERS {
         let dir = format!("{START}/mnt{index}");
+        println!("smp-fs: setup mkdir {dir}");
         match fs::mkdir(&dir, 0o755) {
             Ok(()) | Err(Errno::EEXIST) => {}
             Err(error) => return Err(format!("mkdir {dir}: {}", error.description())),
         }
+        println!("smp-fs: setup mkdir ok {dir}");
     }
     println!("smp-fs: setup ok");
     Ok(())
@@ -605,7 +616,13 @@ fn pending_started() -> Vec<String> {
         .iter()
         .enumerate()
         .filter(|(_, flag)| !flag.load(Ordering::Acquire))
-        .map(|(index, _)| format!("{index}:{}", PHASES[index].load(Ordering::Relaxed)))
+        .map(|(index, _)| {
+            format!(
+                "{index}:{}:{}",
+                PHASES[index].load(Ordering::Relaxed),
+                CURRENT[index].load(Ordering::Relaxed)
+            )
+        })
         .collect()
 }
 
@@ -614,7 +631,13 @@ fn pending_workers() -> Vec<String> {
         .iter()
         .enumerate()
         .filter(|(_, flag)| !flag.load(Ordering::Acquire))
-        .map(|(index, _)| format!("{index}:{}", PHASES[index].load(Ordering::Relaxed)))
+        .map(|(index, _)| {
+            format!(
+                "{index}:{}:{}",
+                PHASES[index].load(Ordering::Relaxed),
+                CURRENT[index].load(Ordering::Relaxed)
+            )
+        })
         .collect()
 }
 
@@ -653,8 +676,10 @@ fn start_workers() -> Result<(), String> {
 }
 
 fn wait_workers() -> Result<(), String> {
-    let deadline = now_ns().saturating_add(180_000_000_000);
+    let deadline = now_ns().saturating_add(WORKER_DEADLINE_NS);
     let mut next_progress = now_ns().saturating_add(WORKER_PROGRESS_NS);
+    let mut last_state = [usize::MAX; WORKERS];
+    let mut last_seen = [0u64; WORKERS];
     loop {
         if FINISHED.iter().all(|flag| flag.load(Ordering::Acquire)) {
             return Ok(());
@@ -663,6 +688,22 @@ fn wait_workers() -> Result<(), String> {
         if now > deadline {
             let pending = pending_workers();
             return Err(format!("worker timeout pending={pending:?}"));
+        }
+        for slot in 0..WORKERS {
+            if FINISHED[slot].load(Ordering::Acquire) {
+                continue;
+            }
+            let state =
+                (CURRENT[slot].load(Ordering::Relaxed) << 8) | PHASES[slot].load(Ordering::Relaxed);
+            if state != last_state[slot] {
+                last_state[slot] = state;
+                last_seen[slot] = now;
+            } else if now.saturating_sub(last_seen[slot]) > WORKER_STALL_NS {
+                let pending = pending_workers();
+                return Err(format!(
+                    "worker stall slot={slot} state={state:#x} pending={pending:?}"
+                ));
+            }
         }
         if now >= next_progress {
             let finished = FINISHED
