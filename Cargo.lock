@@ -1021,6 +1021,13 @@ name = "rack-audit-models"
 version = "0.1.0"
 
 [[package]]
+name = "rack-audit-output-retransmit"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+]
+
+[[package]]
 name = "rack-audit-replay-union"
 version = "0.1.0"
 dependencies = [

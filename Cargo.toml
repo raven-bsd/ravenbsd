@@ -322,6 +322,7 @@ members = [
     "tests/rack-replay",
     "tests/rack-acceptance",
     "tests/cc-model",
+    "tests/rack-audit-output-retransmit",
     "tests/tcpip/conformance",
     "tests/tcpip/fuzz-replay",
     "tests/tcpip/interop",
