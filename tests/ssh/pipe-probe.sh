@@ -108,11 +108,11 @@ timeout 120 qemu-system-x86_64 -machine q35 -m 512M -smp 2 \
 echo "pipe-probe: transcript"
 tail -n 12 "$serial"
 
-if grep -q '^pipe-probe: ok$' "$serial"; then
+if tr -d '\r' <"$serial" | grep -qx 'pipe-probe: ok'; then
     echo "pipe-probe: PASS (pipe(2) works)"
     exit 0
 fi
-if grep -q '^pipe-probe: ENOSYS$' "$serial"; then
+if tr -d '\r' <"$serial" | grep -qx 'pipe-probe: ENOSYS'; then
     echo "pipe-probe: BLOCKED (libc pipe(2) returns ENOSYS; see tests/ssh/pipe-probe.sh)"
     exit 1
 fi
