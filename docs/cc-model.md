@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # CUBIC/NewReno/RACK congestion-control model (K341)
 
 Host-only reference model for the K269 congestion-control port. This is test/evidence code, not

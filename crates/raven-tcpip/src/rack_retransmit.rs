@@ -80,6 +80,7 @@ pub const SACKED: u8 = 2;
 /// The remote endpoint ACKed this send-map entry.
 pub const RACK_ACKED: u32 = 0x0000_0001;
 /// A timeout occurred on this send-map entry (`RACK_TO_REXT`).
+#[allow(dead_code)]
 pub const RACK_TO_REXT: u32 = 0x0000_0002;
 /// More retransmissions than the transmit-time array can hold.
 pub const RACK_OVERMAX: u32 = 0x0000_0008;
@@ -94,6 +95,7 @@ pub const RACK_TLP: u32 = 0x0000_0080;
 /// The peer collapsed the receive window on this segment.
 pub const RACK_RWND_COLLAPSED: u32 = 0x0000_0100;
 /// The sender became application limited after this segment.
+#[allow(dead_code)]
 pub const RACK_APP_LIMITED: u32 = 0x0000_0200;
 /// A retransmission timeout undid the ACK but the RTT was already sampled.
 pub const RACK_WAS_ACKED: u32 = 0x0000_0400;
@@ -102,6 +104,7 @@ pub const RACK_HAD_PUSH: u32 = 0x0000_8000;
 /// The retransmit timer requires this entry to be sent.
 pub const RACK_MUST_RXT: u32 = 0x0001_0000;
 /// The path MTU changed on this entry.
+#[allow(dead_code)]
 pub const RACK_PMTU_CHG: u32 = 0x0010_0000;
 /// RACK considers this entry lost.
 pub const RACK_WAS_LOST: u32 = 0x0040_0000;

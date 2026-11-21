@@ -63,10 +63,10 @@ mod rack_misc;
 mod rack_os;
 mod rack_output;
 mod rack_pipe;
-mod rack_sack;
-mod rack_transport;
 mod rack_retransmit;
+mod rack_sack;
 mod rack_state;
+mod rack_transport;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -102,7 +102,8 @@ pub use ecn::{
     ECN_CE, ECN_ECT0, ECN_ECT1, ECN_MASK, ECN_NOTECT, EcnCounters, EcnState, TH_ACK, TH_AE, TH_CWR,
     TH_ECE, TH_SYN, get_ace, set_ace,
 };
-pub use event::{Event, PollResult, SocketId};
+pub use event::Event;
+pub use event::{PollResult, SocketId};
 pub use hostcache::{
     DEFAULT_BUCKET_LIMIT, DEFAULT_EXPIRE_MS, DEFAULT_HASHSIZE, DEFAULT_PRUNE_MS, HostKey,
     HostMetrics, Hostcache,
@@ -153,22 +154,15 @@ pub use rack_output::{RackOutput, TimerResult};
 pub use rack_pipe::{
     CC_NDUPACK, EXIT_RECOVERY_MASK, IN_RECOVERY_MASK, RACK_DELAYED_ACK_TIME, RACK_PRR_ADDBACKMAX,
     RACK_REORDER_FADE_DEFAULT, RACK_RTO_MAX, RACK_TLP_MIN, RackPipe, RackPipeState,
-    TF_CONGRECOVERY, TF_FASTRECOVERY, TF_WASCRECOVERY, TF_WASFRECOVERY, TF2_ECN_PERMIT,
-    TF2_ECN_SND_CWR, TLP_USE_ID, TLP_USE_TWO_ONE, TLP_USE_TWO_TWO, tstmp_ge, tstmp_lt,
+    TF_CONGRECOVERY, TF_WASCRECOVERY, TF_WASFRECOVERY, TF2_ECN_PERMIT, TF2_ECN_SND_CWR, TLP_USE_ID,
+    TLP_USE_TWO_ONE, TLP_USE_TWO_TWO, tstmp_ge, tstmp_lt,
+};
+pub use rack_retransmit::{
+    AckOutcome, CUM_ACKED, DUP_ACK_THRESHOLD, EntryResult, FastAck, MAX_LINKHDR, MHLEN, ProcessAck,
+    RACK_RTO_MIN, RackRetransmit, RackSendMap, RackTransmission, RetransmitError, Rsm, SACKED,
+    TH_PUSH,
 };
 pub use rack_sack::{RACK_DSACK_HANDLING, RackSack, SackSegment};
-pub use rack_transport::{
-    AddRackMode, AddRackOutcome, HptsStart, HptsStartOutcome, HwTlsOutcome, MAX_HPTS_TIMEOUT_US,
-    RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
-    TimerStopOutcome, rack_ctloutput, rack_hw_tls_change, rack_process_timers, rack_pru_options,
-    rack_start_hpts_timer, rack_stop_all_timers, rack_switch_failed, rack_wake_check, tcp_addrack,
-pub use rack_retransmit::{
-    AckOutcome, CUM_ACKED, DUP_ACK_THRESHOLD, EntryResult, FastAck, MAX_LINKHDR, MHLEN,
-    PACE_MAX_IP_BYTES, ProcessAck, RACK_ACKED, RACK_APP_LIMITED, RACK_HAD_PUSH, RACK_HAS_FIN,
-    RACK_MUST_RXT, RACK_NUM_OF_RETRANS, RACK_OVERMAX, RACK_PMTU_CHG, RACK_RTO_MAX, RACK_RTO_MIN,
-    RACK_RWND_COLLAPSED, RACK_SACK_PASSED, RACK_SENT_FP, RACK_TLP, RACK_TO_REXT, RACK_WAS_ACKED,
-    RACK_WAS_LOST, RACK_WAS_SACKPASS, RackRetransmit, RackSendMap, RackTransmission,
-    RetransmitError, Rsm, SACKED, TH_PUSH,
 pub use rack_state::{
     TCPS_CLOSING, TCPS_FIN_WAIT_1, TCPS_FIN_WAIT_2, TCPS_LAST_ACK, TCPS_TIME_WAIT,
     rack_do_close_wait, rack_do_closing, rack_do_compressed_ack_processing, rack_do_established,
@@ -176,6 +170,12 @@ pub use rack_state::{
     rack_do_segment_nounlock, rack_do_syn_recv, rack_do_syn_sent, rack_do_win_updates,
     rack_handle_delayed_ack, rack_handle_might_revert, rack_handle_probe_response,
     rack_process_data, rack_process_option,
+};
+pub use rack_transport::{
+    AddRackMode, AddRackOutcome, HptsStart, HptsStartOutcome, HwTlsOutcome, MAX_HPTS_TIMEOUT_US,
+    RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
+    TimerStopOutcome, rack_ctloutput, rack_hw_tls_change, rack_process_timers, rack_pru_options,
+    rack_start_hpts_timer, rack_stop_all_timers, rack_switch_failed, rack_wake_check, tcp_addrack,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
