@@ -41,7 +41,7 @@ fn rack_find_high_nonack_skips_acked_and_fin_segments() {
     assert_eq!(model.rack_find_high_nonack(ids[2]), Some(ids[2]));
     assert!(model.map.mark_acked(ids[2], &mut model.sacked));
     if let Some(entry) = model.map.find_id_mut(ids[1]) {
-        entry.r_flags |= RACK_HAS_FIN;
+        entry.flags |= RACK_HAS_FIN;
     }
     assert_eq!(
         model.rack_find_high_nonack(ids[2]),
@@ -58,25 +58,25 @@ fn rack_update_rsm_counts_retransmits_and_moves_time_order() {
     let ids = fill(&mut model);
     model.rack_update_rsm(ids[0], 2_000, RACK_SENT_FP, 1_000);
     let entry = model.map.find_id(ids[0]).expect("entry");
-    assert_eq!(entry.r_rtr_cnt, 2);
-    assert_eq!(entry.r_act_rxt_cnt, 1);
-    assert_eq!(entry.r_dupack, 0);
-    assert_eq!(entry.r_rtr_bytes, 1_000);
-    assert_eq!(entry.r_tim_lastsent[1], 2_000);
-    assert_eq!(entry.r_bas, 1);
-    assert_eq!(entry.r_fas, 3_000);
+    assert_eq!(entry.rtr_cnt, 2);
+    assert_eq!(entry.act_rxt_cnt, 1);
+    assert_eq!(entry.dupack, 0);
+    assert_eq!(entry.rtr_bytes, 1_000);
+    assert_eq!(entry.tim_lastsent[1], 2_000);
+    assert_eq!(entry.bas, 1);
+    assert_eq!(entry.fas, 3_000);
     assert_eq!(model.holes_rxt, 1_000);
     assert_eq!(model.map.tmap.last(), Some(&ids[0]), "moved to the tail");
 
     model.rack_update_rsm(ids[0], 2_100, RACK_SENT_FP, 1_000);
     model.rack_update_rsm(ids[0], 2_200, RACK_SENT_FP, 1_000);
     let entry = model.map.find_id(ids[0]).expect("entry");
-    assert_eq!(entry.r_rtr_cnt, RACK_NUM_OF_RETRANS as u8);
-    assert_ne!(entry.r_flags & RACK_OVERMAX, 0);
-    assert_eq!(entry.r_tim_lastsent[2], 2_200);
+    assert_eq!(entry.rtr_cnt, RACK_NUM_OF_RETRANS as u8);
+    assert_ne!(entry.flags & RACK_OVERMAX, 0);
+    assert_eq!(entry.tim_lastsent[2], 2_200);
 
     if let Some(entry) = model.map.find_id_mut(ids[0]) {
-        entry.r_flags |= RACK_WAS_LOST | RACK_ACKED | RACK_MUST_RXT | RACK_SACK_PASSED;
+        entry.flags |= RACK_WAS_LOST | RACK_ACKED | RACK_MUST_RXT | RACK_SACK_PASSED;
     }
     model.considered_lost = 1_000;
     model.sacked = 1_000;
@@ -85,16 +85,123 @@ fn rack_update_rsm_counts_retransmits_and_moves_time_order() {
     model.snd_max_at_rto = 4_000;
     model.rack_update_rsm(ids[0], 2_300, RACK_SENT_FP, 1_000);
     let entry = model.map.find_id(ids[0]).expect("entry");
-    assert_eq!(entry.r_flags & RACK_WAS_LOST, 0);
-    assert_eq!(entry.r_flags & RACK_ACKED, 0);
-    assert_eq!(entry.r_flags & RACK_MUST_RXT, 0);
-    assert_eq!(entry.r_flags & RACK_SACK_PASSED, 0);
-    assert_ne!(entry.r_flags & RACK_WAS_SACKPASS, 0);
+    assert_eq!(entry.flags & RACK_WAS_LOST, 0);
+    assert_eq!(entry.flags & RACK_ACKED, 0);
+    assert_eq!(entry.flags & RACK_MUST_RXT, 0);
+    assert_eq!(entry.flags & RACK_SACK_PASSED, 0);
+    assert_ne!(entry.flags & RACK_WAS_SACKPASS, 0);
     assert_eq!(model.considered_lost, 0);
     assert_eq!(model.sacked, 0);
     assert_eq!(model.out_at_rto, 0);
     assert!(model.must_retran, "the RTO ceiling was not reached");
     assert_eq!(model.recovery_rxt_cnt, 1_000);
+}
+
+#[test]
+fn rack_need_set_test_advances_the_goodput_window() {
+    let mut model = base_model();
+    let ids = fill(&mut model);
+    model.stack.tp.t_flags |= TF_GPUTINPROG;
+    model.gput_seq = 1_500;
+    model.gput_ts = 100;
+    model.gput_ack = 1_500;
+    model.act_rcv_time = 5_000;
+    model.rack_need_set_test(ids[0], 2_000, RACK_USE_END);
+    assert_eq!(model.gput_seq, 2_000);
+    assert_eq!(model.gput_ts, 5_000);
+    assert_eq!(model.gput_ack, 12_000);
+    assert_eq!(model.gp_output_ts, 1_100);
+    assert!(!model.app_limited_needs_set);
+    assert_eq!(model.gp_logs, 1);
+    assert_eq!(model.gp_marks_tended, 1);
+
+    // The sequence at snd_max has not been sent: stay app-limited.
+    model.gput_seq = 3_000;
+    model.gput_ts = 200;
+    model.gput_ack = 3_000;
+    model.rack_need_set_test(ids[2], 4_000, RACK_USE_END);
+    assert_eq!(model.gput_seq, 4_000);
+    assert!(model.app_limited_needs_set);
+    assert_eq!(model.gp_output_ts, 1_200);
+
+    // A retransmitted entry has an ambiguous timestamp and must not move the window.
+    let retransmitted = fill(&mut model)[0];
+    model.rack_update_rsm(retransmitted, 2_000, RACK_SENT_FP, 1_000);
+    model.gput_seq = 1_500;
+    model.gput_ts = 300;
+    model.gput_ack = 1_500;
+    let before = (model.gput_seq, model.gput_ts, model.gput_ack);
+    model.rack_need_set_test(retransmitted, 4_000, RACK_USE_END);
+    assert_eq!((model.gput_seq, model.gput_ts, model.gput_ack), before);
+}
+
+#[test]
+fn rack_check_reorder_ack_undoes_spurious_recovery() {
+    let mut model = base_model();
+    let id = model.send(1_000, 2_000, 1_000);
+    model.rack_update_rsm(id, 2_000, RACK_SENT_FP, 1_000);
+    if let Some(entry) = model.map.find_id_mut(id) {
+        entry.flags |= RACK_WAS_SACKPASS;
+    }
+    model.in_fast_recovery = true;
+    model.stack.tp.t_srtt = 800;
+    model.recovery_rxt_cnt = 1_000;
+    model.ssthresh_at_erec = 5_000;
+    model.might_revert = true;
+    model.retran_during_recovery = 1_000;
+    assert!(model.rack_check_reorder_ack(id, 2_000, 2_300, true));
+    assert_eq!(model.reorder_ts, 2_300);
+    assert_eq!(model.recovery_rxt_cnt, 0);
+    assert_eq!(model.stack.tp.snd_ssthresh, 5_000);
+    assert!(!model.in_fast_recovery);
+    assert!(!model.might_revert);
+    assert_eq!(model.retran_during_recovery, 0);
+    assert_eq!(model.prr_logs, 2);
+
+    // Too slow to be a reordered ACK.
+    let mut late = base_model();
+    let id = late.send(1_000, 2_000, 1_000);
+    late.rack_update_rsm(id, 2_000, RACK_SENT_FP, 1_000);
+    if let Some(entry) = late.map.find_id_mut(id) {
+        entry.flags |= RACK_WAS_SACKPASS;
+    }
+    late.in_fast_recovery = true;
+    late.stack.tp.t_srtt = 800;
+    assert!(!late.rack_check_reorder_ack(id, 2_000, 3_000, true));
+
+    // Without the exit permission the retransmit count is decremented but recovery stays.
+    let mut held = base_model();
+    let id = held.send(1_000, 2_000, 1_000);
+    held.rack_update_rsm(id, 2_000, RACK_SENT_FP, 1_000);
+    if let Some(entry) = held.map.find_id_mut(id) {
+        entry.flags |= RACK_WAS_SACKPASS;
+    }
+    held.in_fast_recovery = true;
+    held.stack.tp.t_srtt = 800;
+    held.recovery_rxt_cnt = 1_000;
+    assert!(held.rack_check_reorder_ack(id, 2_000, 2_300, false));
+    assert_eq!(held.recovery_rxt_cnt, 0);
+    assert!(held.in_fast_recovery);
+
+    // The guard set: no recovery flag, wrong retransmit count, or no SACK-pass flag.
+    let mut idle = base_model();
+    let id = idle.send(1_000, 2_000, 1_000);
+    idle.rack_update_rsm(id, 2_000, RACK_SENT_FP, 1_000);
+    if let Some(entry) = idle.map.find_id_mut(id) {
+        entry.flags |= RACK_WAS_SACKPASS;
+    }
+    idle.stack.tp.t_srtt = 800;
+    assert!(!idle.rack_check_reorder_ack(id, 2_000, 2_300, true));
+    idle.in_fast_recovery = true;
+    if let Some(entry) = idle.map.find_id_mut(id) {
+        entry.rtr_cnt = 1;
+    }
+    assert!(!idle.rack_check_reorder_ack(id, 2_000, 2_300, true));
+    if let Some(entry) = idle.map.find_id_mut(id) {
+        entry.rtr_cnt = 2;
+        entry.flags &= !RACK_WAS_SACKPASS;
+    }
+    assert!(!idle.rack_check_reorder_ack(id, 2_000, 2_300, true));
 }
 
 #[test]
@@ -106,12 +213,12 @@ fn rack_update_entry_splits_partial_and_reports_overhang() {
     assert_eq!(result.remaining, 0);
     let tail = result.split.expect("split tail");
     let head = model.map.find_id(id).expect("head");
-    assert_eq!((head.r_start, head.r_end), (1_000, 1_500));
-    assert_eq!(head.r_rtr_cnt, 2);
+    assert_eq!((head.start, head.end), (1_000, 1_500));
+    assert_eq!(head.rtr_cnt, 2);
     let tail = model.map.find_id(tail).expect("tail");
-    assert_eq!((tail.r_start, tail.r_end), (1_500, 3_000));
+    assert_eq!((tail.start, tail.end), (1_500, 3_000));
     assert_eq!(
-        tail.r_rtr_cnt, 1,
+        tail.rtr_cnt, 1,
         "the tail keeps the original transmit count"
     );
 
@@ -126,7 +233,7 @@ fn rack_update_entry_splits_partial_and_reports_overhang() {
             split: None,
         }
     );
-    assert_eq!(full.map.find_id(id).expect("entry").r_rtr_cnt, 2);
+    assert_eq!(full.map.find_id(id).expect("entry").rtr_cnt, 2);
 
     let mut overhang = RackRetransmit::new(1_000);
     let id = overhang.send(1_000, 2_000, 1_000);
@@ -177,7 +284,7 @@ fn rack_update_rtt_tracks_the_minimum_and_rejects_spurious_samples() {
 
     let no_rtt = model.send(4_000, 5_000, 5_000);
     if let Some(entry) = model.map.find_id_mut(no_rtt) {
-        entry.r_no_rtt_allowed = true;
+        entry.no_rtt_allowed = true;
     }
     assert_eq!(
         model.rack_update_rtt(no_rtt, Some(700), 5_700, SACKED, 0),
@@ -258,7 +365,7 @@ fn rack_strike_dupack_retransmits_on_the_third_dupack() {
     assert_eq!(model.rack_strike_dupack(1_000, 0, 5_000), None);
     assert_eq!(model.rack_strike_dupack(1_000, 0, 5_000), None);
     assert_eq!(model.rack_strike_dupack(1_000, 0, 5_000), Some(ids[0]));
-    assert_eq!(model.map.find_id(ids[0]).expect("entry").r_dupack, 3);
+    assert_eq!(model.map.find_id(ids[0]).expect("entry").dupack, 3);
     assert!(model.in_fast_recovery);
     assert!(model.want_output);
     assert!(model.timer_override);
@@ -268,7 +375,7 @@ fn rack_strike_dupack_retransmits_on_the_third_dupack() {
     let ids = fill(&mut sack);
     sack.rack_min_rtt = 100;
     if let Some(entry) = sack.map.find_id_mut(ids[0]) {
-        entry.r_flags |= RACK_SACK_PASSED;
+        entry.flags |= RACK_SACK_PASSED;
     }
     assert_eq!(sack.rack_strike_dupack(1_000, 300, 1_100), None);
     assert_eq!(sack.rack_strike_dupack(1_000, 300, 1_100), None);
@@ -282,7 +389,7 @@ fn rack_strike_dupack_retransmits_on_the_third_dupack() {
     let ids = fill(&mut sack);
     sack.rack_min_rtt = 100;
     if let Some(entry) = sack.map.find_id_mut(ids[0]) {
-        entry.r_flags |= RACK_SACK_PASSED;
+        entry.flags |= RACK_SACK_PASSED;
     }
     assert_eq!(sack.rack_strike_dupack(1_000, 300, 1_200), None);
     assert_eq!(sack.rack_strike_dupack(1_000, 300, 1_200), None);
@@ -342,7 +449,7 @@ fn rack_process_ack_advances_una_and_exits_recovery() {
     assert_eq!(outcome.acked, 1_000);
     assert!(!outcome.post_recovery);
     assert_eq!(model.stack.tp.snd_una, 2_000);
-    assert_eq!(model.map.segments.first().expect("head").r_start, 2_000);
+    assert_eq!(model.map.segments.first().expect("head").start, 2_000);
 
     let duplicate = model.rack_process_ack(2_000, 65_535, 0, &[], 0, 2_100);
     assert!(matches!(duplicate, ProcessAck::Duplicate { .. }));
@@ -401,7 +508,7 @@ fn rack_fastack_accepts_only_clean_advancing_acks() {
     }));
     assert_eq!(clean.stack.tp.snd_una, 2_000);
     assert_eq!(clean.snd_wnd, 4_000);
-    assert_eq!(clean.map.segments.first().expect("head").r_start, 2_000);
+    assert_eq!(clean.map.segments.first().expect("head").start, 2_000);
     assert_eq!(clean.dupacks, 0);
     assert!(clean.want_output);
     assert_eq!(clean.hpts.rack_timer_cancel(clean.id), 0);
@@ -441,8 +548,8 @@ fn rack_fast_rsm_output_builds_one_mss_and_a_tlp_probe() {
     assert!(!tx.tlp);
     assert_eq!(tx.map_updates, 1);
     let entry = model.map.find_id(ids[0]).expect("entry");
-    assert_eq!(entry.r_rtr_cnt, 2);
-    assert_eq!(entry.r_tim_lastsent[1], 5_000);
+    assert_eq!(entry.rtr_cnt, 2);
+    assert_eq!(entry.tim_lastsent[1], 5_000);
     assert_eq!(model.prr_sndcnt, 2_000);
     assert_eq!(model.retran_during_recovery, 1_000);
     assert_eq!(model.sndrexmitpack, 1);
@@ -457,7 +564,7 @@ fn rack_fast_rsm_output_builds_one_mss_and_a_tlp_probe() {
     assert!(tx.tlp);
     assert_eq!(tx.len, 1_000);
     assert_ne!(
-        model.map.find_id(ids[1]).expect("entry").r_flags & RACK_TLP,
+        model.map.find_id(ids[1]).expect("entry").flags & RACK_TLP,
         0
     );
     assert_eq!(model.tlp_retran, 1);
@@ -470,7 +577,7 @@ fn rack_fast_rsm_output_builds_one_mss_and_a_tlp_probe() {
         Err(RetransmitError::NoSegment)
     );
     if let Some(entry) = model.map.find_id_mut(ids[2]) {
-        entry.r_flags |= RACK_HAS_FIN;
+        entry.flags |= RACK_HAS_FIN;
     }
     assert_eq!(
         model.rack_fast_rsm_output(ids[2], 1_000, false, 7_000, 40),
@@ -496,7 +603,7 @@ fn rack_fast_rsm_output_uses_tso_across_adjacent_segments() {
     assert_eq!(tx.map_updates, 3);
     for id in ids {
         assert_eq!(
-            model.map.find_id(id).expect("entry").r_rtr_cnt,
+            model.map.find_id(id).expect("entry").rtr_cnt,
             2,
             "every covered send-map entry is updated"
         );
