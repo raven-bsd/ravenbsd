@@ -4,22 +4,22 @@
 # pf stateful filter KVM/TCG qtests (K296)
 
 Status: host/QEMU evidence, 2026-11-21. **OBSERVED** on `origin/master` `6af246ac` (the K273
-merge). No product behavior is changed by this ticket.
+merge) plus the K296 rework. No product behavior is changed by this ticket.
 
 ## Purpose
 
 K273 wires the userspace pf core into netd's virtio frame path. K296 runs that same stateful
 filter under KVM `-smp 2`, KVM `-smp 4` and TCG `-smp 4`, with the merged `pf` profile and the
 existing one-shot probe. The cases are derived from `tests/qtest/cases/pf-core.toml`; the
-accelerator and CPU count are the only differences.
+accelerator and CPU count are the only differences. The rework adds an in-guest NAT flow.
 
 ## Cases
 
 | Case | File | Accelerator | CPUs | Timeout | Result | Duration |
 |---|---|---|---|---|---:|---:|
-| `pf-kvm2` | `tests/qtest/cases/pf-kvm.toml` | KVM (`-enable-kvm -cpu host`) | 2 | 300 s | PASS | 24.36 s |
-| `pf-kvm4` | `tests/qtest/cases/pf-kvm4.toml` | KVM (`-enable-kvm -cpu host`) | 4 | 300 s | PASS | 27.16 s |
-| `pf-tcg4` | `tests/qtest/cases/pf-tcg4.toml` | TCG (no `-enable-kvm`) | 4 | 420 s | PASS | 79.92 s |
+| `pf-kvm2` | `tests/qtest/cases/pf-kvm.toml` | KVM (`-enable-kvm -cpu host`) | 2 | 300 s | PASS | 17.06 s |
+| `pf-kvm4` | `tests/qtest/cases/pf-kvm4.toml` | KVM (`-enable-kvm -cpu host`) | 4 | 300 s | PASS | 11.72 s |
+| `pf-tcg4` | `tests/qtest/cases/pf-tcg4.toml` | TCG (no `-enable-kvm`) | 4 | 420 s | PASS | 80.08 s |
 
 The ticket's acceptance path is `tests/qtest/cases/pf-kvm.toml`; that file's case name is
 `pf-kvm2` so the lane's case-name matrix is `pf-kvm2`, `pf-kvm4`, `pf-tcg4`.
@@ -27,8 +27,9 @@ The ticket's acceptance path is `tests/qtest/cases/pf-kvm.toml`; that file's cas
 Each case asserts:
 
 * the guest CPU count (`^smp: 2 cpus online$` or `^smp: 4 cpus online$`);
-* `netd: pf loaded rules=2 nat=0`;
+* `netd: pf loaded rules=3 nat=1`;
 * the stateful allowed UDP flow through the host echo (`pf: allowed flow ok`);
+* the NAT flow (`pf: nat flow ok port=NNNNN`) through the `nat` rule and the host NAT echo;
 * the blocked UDP flow and its serial log line
   (`netd: pf block out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002 reason=match`);
 * `pf: ok`, `svcd: settled`, `init exited (0)`;
@@ -39,27 +40,30 @@ Each case asserts:
 ```text
 # build/qtest/pf-kvm2.log
 22: smp: 2 cpus online
-61: netd: pf loaded rules=2 nat=0
+61: netd: pf loaded rules=3 nat=1
 71: pf: allowed flow ok
-73: netd: pf block out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002 reason=match
-74: pf: ok
-78: init exited (0)
+73: pf: nat flow ok port=59816
+75: netd: pf block out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002 reason=match
+76: pf: ok
+80: init exited (0)
 
 # build/qtest/pf-kvm4.log
 24: smp: 4 cpus online
-63: netd: pf loaded rules=2 nat=0
+63: netd: pf loaded rules=3 nat=1
 73: pf: allowed flow ok
-75: netd: pf block out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002 reason=match
-76: pf: ok
-80: init exited (0)
+75: pf: nat flow ok port=54028
+77: netd: pf block out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002 reason=match
+78: pf: ok
+82: init exited (0)
 
 # build/qtest/pf-tcg4.log
 24: smp: 4 cpus online
-63: netd: pf loaded rules=2 nat=0
+63: netd: pf loaded rules=3 nat=1
 73: pf: allowed flow ok
-75: netd: pf block out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002 reason=match
-76: pf: ok
-80: init exited (0)
+75: pf: nat flow ok port=44118
+77: netd: pf block out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002 reason=match
+78: pf: ok
+82: init exited (0)
 ```
 
 `build/qtest/<case>.json` records `result=pass`, `exit_status=33`, zero unmatched expectations
@@ -67,43 +71,55 @@ and zero forbidden hits. Artifacts:
 
 | Artifact | sha256 |
 |---|---|
-| `build/qtest/pf-kvm2.log` | `fbc1322ec149b546a190ae5188f0a2b1b4d00876dcbefc684f1e2d263300aa07` |
-| `build/qtest/pf-kvm2.json` | `379abf6f57004e567c0bad68c9da913a5dc2abb592c7912c24a0dbbbca9488d4` |
-| `build/qtest/pf-kvm4.log` | `93441b66bb0fd9049a70f2df0406224730e1ad579347f689131a3271a025e75b` |
-| `build/qtest/pf-kvm4.json` | `1198adb52f2cd88040cd1a3722e584f06ee5790399fdf0a145fd17735a4adf99` |
-| `build/qtest/pf-tcg4.log` | `305bda96ddee35ad327df06474f5d039cb03c1d9c2fed0016bdd738b14598800` |
-| `build/qtest/pf-tcg4.json` | `a78cddcd4960c91ab20c6ae4b21b311040d721fe5f5496d84cf644a474259c1d` |
-| `build/qtest/pf-kvm2.img` | `6c24adf58bf114c81c861e20cbefdefa8b719f35f806d5cb9862fea723d6ff4e` |
+| `build/qtest/pf-kvm2.log` | `37ab65c6db4fac65564ed27286a95acd6864383768a43a61bdf4ece8f3b2d050` |
+| `build/qtest/pf-kvm2.json` | `f0dfe9b72da61b0a1f19f9e36c393ae351ab3260979432094f6201b4e24abd5c` |
+| `build/qtest/pf-kvm4.log` | `98b2c1f4f9e4156a5ac7836d04774dcbec9a64e883c3ade025fca09b0c6891f3` |
+| `build/qtest/pf-kvm4.json` | `1c118b11c00e2a9091dfb20852a102a9d21b265b13d4577d76a737a5f6a94af5` |
+| `build/qtest/pf-tcg4.log` | `951ecf15c2039f238b19f4a72d4ce8ada2327e31d48f43c5bb27b60dfa6d90ab` |
+| `build/qtest/pf-tcg4.json` | `0a8d03bec070f0248c8286ec915715fd5cfc8668aff761100adbc15e5022ad72` |
+| `build/qtest/pf-core.log` | `0af45d7f4bea2af07f12376cb67cb837d0a5e9f21038b297a56147bf4e2d7b7c` |
+| `build/qtest/pf-core.json` | `9e91db144a6b31aec23b36412421921d1319cca914bb288cf67e47693d8d181a` |
 
-The image hash is the same for all three cases (the profile is the same; only QEMU options
-differ).
+## NAT flow
+
+The merged `pf` profile now carries:
+
+```text
+pass out on eth0 proto udp from any to any port 47004 keep state
+nat on eth0 proto udp from any to 10.0.2.2 port 47004 -> 10.0.2.15
+```
+
+The `tests/fixtures/b12-netd/src/main.rs` `pf` phase adds `check_pf_nat`: it binds
+`10.0.2.15:7204`, sends a UDP datagram to `10.0.2.2:47004`, and reads the reply. The host NAT
+echo (`tests/qtest/cases/pf-kvm-fixture/nat_echo.py`) replies with the source port it observed.
+The probe asserts the reply comes from the original `47004` endpoint and that the observed source
+port differs from its local `7204`, then prints `pf: nat flow ok port=NNNNN`.
+
+The host echo log (`/tmp/k296-nat-echo.log`) records the datagram, for example:
+
+```text
+nat-echo ('127.0.0.1', 36108)
+```
+
+**Evidence limitation:** QEMU user-mode networking (SLIRP) also rewrites the outbound source port,
+so the host-observed port is not by itself a pf-specific translation proof. The case's primary
+NAT assertions are the `nat=1` load line and the matching `nat` rule with the stateful flow; the
+port value is a sanity check. A translation-specific test independent of SLIRP would need an
+inbound `rdr` rule plus a host-forwarded sender (next step, not part of this rework).
 
 ## Mutation/negative check
 
-The 47002 `block quick` rule in `profiles/pf.d/pf.conf` was temporarily changed to `pass quick`
-and `pf-kvm2` was run. The serial output changed to
-`netd: pf pass out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002`; the `pf block` expectation was
-unmatched and the case failed (`result=fail`, exit 1). The rule was restored, the profile diff is
-clean, and `pf-kvm2` passed again (69.05 s, the image rebuild included).
+The `nat` rule was temporarily commented out and `pf-kvm2` was run. `netd` then reported
+`netd: pf loaded rules=3 nat=0`; the `nat=1` expectation was unmatched and the case failed
+(`result=fail`, exit 1). The rule was restored, the profile diff is clean, and `pf-kvm2` passed
+again (17.06 s, `pf: nat flow ok port=59816`).
 
-## NAT gap
+## pf-core compatibility
 
-The merged profile has no NAT rule; all three cases correctly load `nat=0`. The contract's
-"allow/block/NAT state tests" are therefore only allow/block/state under KVM/TCG; the in-guest
-NAT path is not exercised by these cases. The host K273 `raven-pf`/`netd` tests cover NAT
-translation (`filter_ut::nat_rewrites_the_source_and_both_checksums`,
-`filter_ut::a_nat_reply_is_rewritten_back_to_the_internal_tuple`, `filter_ut::redirect_*`), but
-that is not an in-guest qtest.
-
-To add a real in-guest NAT case, two files outside K296's Owns need a change:
-
-1. `profiles/pf.d/pf.conf`: add a NAT rule, for example
-   `nat on eth0 from any to any -> 10.0.2.15` (same guest address, translated source port), so
-   `netd: pf loaded rules=3 nat=1` and the stateful reply is reverse-translated.
-2. `tests/fixtures/b12-netd/src/main.rs`: add a NAT assertion in the `pf` phase (or a new phase)
-   that proves the translated tuple, or a serial line from netd that prints the translation.
-
-The lead owns the profile/probe files; this ticket reports the exact paths and does not edit them.
+The shared `pf` profile now loads `rules=3 nat=1`, so the existing `tests/qtest/cases/pf-core.toml`
+load-line expectation was updated from `rules=2 nat=0` to `rules=3 nat=1`, and its `pre` starts
+the same one-shot NAT echo. `pf-core` still passes (`pf-core: pass`, 87.05 s, `pf: nat flow ok
+port=36108`). This is a shared-profile consequence, not a new product behavior.
 
 ## Ticket command spelling
 
@@ -130,5 +146,6 @@ No donor code is copied. The QEMU harness and these cases are first-party test c
 timeout 600 cargo xtask qtest --case tests/qtest/cases/pf-kvm.toml --arch x86_64
 timeout 600 cargo xtask qtest --case tests/qtest/cases/pf-kvm4.toml --arch x86_64
 timeout 600 cargo xtask qtest --case tests/qtest/cases/pf-tcg4.toml --arch x86_64
+timeout 600 cargo xtask qtest --case tests/qtest/cases/pf-core.toml --arch x86_64
 timeout 420 make check-fast
 ```
