@@ -309,6 +309,7 @@ members = [
     "tests/rack-audit-replay-union",
     "tests/rack-audit-state-pipe",
     "tests/rack-coverage",
+    "tests/rack-flags",
     "tests/rack-pipe-matrix",
     "tests/rack-audit-misc-transport",
     "tests/rack-misc-matrix",
