@@ -14,7 +14,7 @@ a repeatable A/B check, not a one-off hash.
 ## Usage
 
 ```
-timeout 360 sh scripts/release-repro.sh
+timeout 720 sh scripts/release-repro.sh
 ```
 
 The script requires a **clean worktree** at the commit under test. It builds the x86_64 release
@@ -45,7 +45,10 @@ commit, sizes and hashes. On a mismatch the script records the first differing b
 relaxes the comparison.
 
 Exit: `0` byte-identical, `1` mismatch/build failure/dirty tree, `2` bad invocation. A cap expiry
-(the acceptance `timeout 360`) is a failure/BLOCKED with the preserved build log, not a retry.
+(the acceptance `timeout 720`) is a failure/BLOCKED with the preserved build log, not a retry with
+a larger cap. The cap arithmetic is two measured cold builds plus margin: `2 * 315232 ms +
+90000 ms = 720464 ms`, hence the 720 s acceptance cap. In a loaded window the measured build is
+slower; the cap is not raised to hide that.
 
 ## Wave base and after the fix
 
@@ -70,6 +73,29 @@ At `f382f0a6` (base `d1ad5ca8`), `timeout 360 sh scripts/release-repro.sh` hit t
 Host state at start: load 10.70/8.92/11.46, one other QEMU. At the cap: load 31.80, two QEMU,
 cargo/rustc active. No A/B conclusion; per the rule the cap expiry is a failure/BLOCKED, not a
 retry. The after-K139 run (below) remains the release evidence.
+
+## After-K139 attempt (2026-11-21)
+
+K139 is merged in current master (`63efc104`). The after-K139 run at
+`978899da233994fe46d4fe7e7ff94f98ce633f94` used the K150 measured 720 s cap:
+
+```
+timeout 720 sh scripts/release-repro.sh
+```
+
+`SOURCE_DATE_EPOCH=1795274353` (HEAD commit time), branch `otto/K150`, nproc 20, host load
+20.69/25.02/35.37 at start, 3 QEMU processes.
+
+| Build | Start UTC | End UTC | Elapsed ms | Size | SHA-256 | rc |
+|---|---|---|---:|---:|---|---:|
+| A | 2026-11-21T15:27:21Z | 2026-11-21T15:35:43Z | 502012 | 335544320 | `3a45fb20c371dbbddb32cd9550a5023b478f0ce9b62421c6ab8ae6b407e7e97e` | 0 |
+| B | - | not completed at cap | - | - | - | - |
+
+Result: **BLOCKED (loaded window / cap expiry).** Build A alone took 502 s, not the measured
+315 s; two such builds would need about `2 * 502012 + 90000 = 1094 s`, above the 720 s cap. The
+script did not produce `b.img`, so there is no A/B equality result and no after-K139 release
+evidence yet. The cap was not raised and the run was not retried. A quiet-window rerun with the
+same 720 s cap is required; the wave-base pair remains the 360 s cap failure above.
 
 ## Donor reconciliation
 
