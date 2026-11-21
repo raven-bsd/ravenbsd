@@ -148,17 +148,26 @@ fn a_port_condition_never_matches_icmp() {
 }
 
 #[test]
-fn fragments_skip_port_conditions() {
-    let mut rule = rule(Action::Pass, None);
-    rule.protocol = Protocol::Tcp;
-    rule.destination.port = PortSpec::Equal(443);
+fn fragments_never_match_port_conditions() {
+    // Donor pf_match_rule(): PF_VPROTO_FRAGMENT fails a rule that names a
+    // source or destination port (`PF_TEST_ATTRIB((r->src.port_op ||
+    // r->dst.port_op), fail)`). A fragment can match an address-only rule.
+    let mut port_rule = rule(Action::Pass, None);
+    port_rule.protocol = Protocol::Tcp;
+    port_rule.destination.port = PortSpec::Equal(443);
     let mut fragment = packet(Direction::In, "eth0", Protocol::Tcp);
     fragment.fragment = true;
     fragment.destination_port = 0;
-    assert!(rule.matches(&fragment, &[]));
+    assert!(!port_rule.matches(&fragment, &[]));
     let mut plain = packet(Direction::In, "eth0", Protocol::Tcp);
     plain.destination_port = 0;
-    assert!(!rule.matches(&plain, &[]));
+    assert!(!port_rule.matches(&plain, &[]));
+
+    let mut address_only = rule(Action::Pass, None);
+    address_only.protocol = Protocol::Tcp;
+    address_only.destination.address = AddrSpec::parse("192.0.2.0/24").unwrap();
+    assert!(address_only.matches(&fragment, &[]));
+    assert!(address_only.matches(&plain, &[]));
 }
 
 #[test]

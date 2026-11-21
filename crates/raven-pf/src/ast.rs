@@ -336,8 +336,13 @@ impl Rule {
             return false;
         }
         if packet.fragment {
-            // Donor `pf_match_rule()` skips every per-protocol attribute (ports and flags)
-            // for fragments; only the addresses are compared.
+            // Donor `pf_match_rule()` (`PF_VPROTO_FRAGMENT`) fails a rule that names a
+            // source or destination port: `PF_TEST_ATTRIB((r->src.port_op ||
+            // r->dst.port_op), fail)`. A fragment can still match an address-only rule;
+            // TCP flags and other per-protocol attributes are likewise not evaluated.
+            if self.source.port != PortSpec::Any || self.destination.port != PortSpec::Any {
+                return false;
+            }
             return self.source.address.matches(packet.source, tables)
                 && self.destination.address.matches(packet.destination, tables);
         }

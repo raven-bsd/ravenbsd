@@ -1,0 +1,80 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=103090 reserved=27982
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: xsave 576 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 2 cpus, 1 ioapics, 5 overrides
+apic: id 0 (x2apic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2702 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: xsave 576 bytes
+smp: 2 cpus online
+RavenBSD kernel 0.1 (x86_64) f469b2fd 2026-11-21
+mem: 402 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x462324 sp=0x7fffffffde60
+sched: running (2 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=324 spawn=350 first_poll=373 deadline=5350 stalled=0 ready_at=381
+pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+pcid: devices=6
+svcd: pcid up
+svcd: pcid timing: generation=1 start=334 spawn=395 first_poll=414 deadline=60395 stalled=0 ready_at=494
+rtc: 2026-11-21 16:31:37 (epoch 1795278697s)
+1795278698.180 initfsd: started
+devd: devices=6
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=510 spawn=569 first_poll=585 deadline=120569 stalled=0 ready_at=1185
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+devd: driver virtio-net irq line=11
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=11
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+svcd: devd up
+svcd: devd timing: generation=1 start=500 spawn=542 first_poll=561 deadline=60542 stalled=0 ready_at=1240
+netd: pf loaded rules=3 nat=1
+netd: interface eth0 10.0.2.15/24
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+svcd: netd timing: generation=1 start=1240 spawn=1469 first_poll=1470 deadline=61469 stalled=0 ready_at=1480
+netd: iface eth0 10.0.2.15/24
+netd: readiness event
+netd: ping 10.0.2.2 rtt=24ms
+netd: readiness event
+pf: allowed flow ok
+netd: readiness event
+pf: nat flow ok port=34963
+pf: blocked datagram sent
+netd: pf block out eth0 udp 10.0.2.15:7201 -> 10.0.2.2:47002 reason=match
+pf: ok
+svcd: pf-probe up
+svcd: pf-probe timing: generation=1 start=1485 spawn=1516 first_poll=none deadline=6516 stalled=0 ready_at=1778
+svcd: settled
+init exited (0)
