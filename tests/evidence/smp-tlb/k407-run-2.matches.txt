@@ -1,0 +1,10 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+smp: tlb shootdown timeout on cpu 0 seq=3762 last=3761 flushes=3743 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=107 state_age_ms=107 ack_after_ms=18446744073709551615 ack_age_ms=107
+smp: tlb shootdown timeout on cpu 0 seq=3763 last=3761 flushes=3743 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=214 state_age_ms=214 ack_after_ms=18446744073709551615 ack_age_ms=214
+smp: tlb shootdown timeout on cpu 0 seq=3764 last=3761 flushes=3743 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=323 state_age_ms=323 ack_after_ms=18446744073709551615 ack_age_ms=323
+smp: tlb shootdown timeout on cpu 0 seq=3765 last=3761 flushes=3743 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=430 state_age_ms=430 ack_after_ms=18446744073709551615 ack_age_ms=430
+smp: tlb shootdown timeout on cpu 0 seq=3766 last=3761 flushes=3743 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=537 state_age_ms=537 ack_after_ms=18446744073709551615 ack_age_ms=537
+smp: tlb shootdown timeout on cpu 0 seq=3767 last=3761 flushes=3743 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=643 state_age_ms=643 ack_after_ms=18446744073709551615 ack_age_ms=643
+EXCEPTION: nmi with no pending shootdown
+EXCEPTION: nmi with no pending shootdown
+smp-fs: failed worker timeout pending=["0:14", "1:14", "2:15", "3:14", "4:30", "5:31", "6:31", "7:31"]
