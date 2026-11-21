@@ -128,12 +128,31 @@ def run_session(argv: list[str], expect: str, timeout: float = 45) -> float:
     started = time.monotonic()
     child = pexpect.spawn(argv[0], argv[1:], cwd=str(ROOT), encoding="utf-8",
                           timeout=timeout)
-    with open(RUN / "client.log", "a", encoding="utf-8") as logfile:
+    log_path = RUN / "client.log"
+    with open(log_path, "a", encoding="utf-8") as logfile:
         child.logfile = logfile
-        child.expect(r"(?i)password:\s*")
+        try:
+            child.expect(r"(?i)password:\s*")
+        except (pexpect.EOF, pexpect.TIMEOUT) as error:
+            child.close(force=True)
+            raise RuntimeError(
+                f"command session: connection failed before the password prompt "
+                f"({type(error).__name__}); the client log names the stage: {log_path}"
+            ) from None
         child.sendline(PASSWORD)
-        child.expect(expect)
-        child.expect(pexpect.EOF)
+        try:
+            child.expect(expect)
+        except (pexpect.EOF, pexpect.TIMEOUT):
+            child.close(force=True)
+            raise RuntimeError(
+                f"command session: no expected output `{expect}` after authentication; "
+                f"see {log_path}"
+            ) from None
+        try:
+            child.expect(pexpect.EOF)
+        except pexpect.TIMEOUT:
+            child.close(force=True)
+            raise RuntimeError(f"command session: session did not close; see {log_path}") from None
     child.close()
     if child.exitstatus not in (0, None):
         raise RuntimeError(f"ssh session exit {child.exitstatus}")
@@ -147,15 +166,22 @@ def command_session(command: str) -> float:
 def interactive_session() -> None:
     child = pexpect.spawn(ssh_base()[0], ssh_base()[1:] + ["-tt"], cwd=str(ROOT),
                           encoding="utf-8", timeout=45)
-    with open(RUN / "client.log", "a", encoding="utf-8") as logfile:
+    log_path = RUN / "client.log"
+    with open(log_path, "a", encoding="utf-8") as logfile:
         child.logfile = logfile
-        child.expect(r"(?i)password:\s*")
-        child.sendline(PASSWORD)
-        child.expect(r"[\$#] $")
-        child.sendline("pwd")
-        child.expect(rf"^/home/{USER}\s*$")
-        child.sendline("exit")
-        child.expect(pexpect.EOF)
+        try:
+            child.expect(r"(?i)password:\s*")
+            child.sendline(PASSWORD)
+            child.expect(r"[\$#] $")
+            child.sendline("pwd")
+            child.expect(rf"^/home/{USER}\s*$")
+            child.sendline("exit")
+            child.expect(pexpect.EOF)
+        except (pexpect.EOF, pexpect.TIMEOUT) as error:
+            child.close(force=True)
+            raise RuntimeError(
+                f"interactive -tt session failed ({type(error).__name__}); see {log_path}"
+            ) from None
     child.close()
     log("interactive", "pwd/exit through a PTY ok")
 
@@ -163,13 +189,28 @@ def interactive_session() -> None:
 def wrong_password() -> None:
     child = pexpect.spawn(ssh_base()[0], ssh_base()[1:] + ["uname", "-a"],
                           cwd=str(ROOT), encoding="utf-8", timeout=45)
-    with open(RUN / "client.log", "a", encoding="utf-8") as logfile:
+    log_path = RUN / "client.log"
+    with open(log_path, "a", encoding="utf-8") as logfile:
         child.logfile = logfile
-        child.expect(r"(?i)password:\s*")
+        try:
+            child.expect(r"(?i)password:\s*")
+        except (pexpect.EOF, pexpect.TIMEOUT) as error:
+            child.close(force=True)
+            raise RuntimeError(
+                f"wrong-password check: no password prompt ({type(error).__name__}); "
+                f"see {log_path}"
+            ) from None
         child.sendline("wrong")
-        index = child.expect(
-            [r"(?i)permission denied", r"(?i)password:\s*", r"[\$#] ",
-             pexpect.EOF, pexpect.TIMEOUT], timeout=30)
+        try:
+            index = child.expect(
+                [r"(?i)permission denied", r"(?i)password:\s*", r"[\$#] ",
+                 pexpect.EOF, pexpect.TIMEOUT], timeout=30)
+        except (pexpect.EOF, pexpect.TIMEOUT) as error:
+            child.close(force=True)
+            raise RuntimeError(
+                f"wrong-password check ended without a verdict ({type(error).__name__}); "
+                f"see {log_path}"
+            ) from None
     child.close(force=True)
     if index == 2:
         raise RuntimeError("wrong password reached a shell")

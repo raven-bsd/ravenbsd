@@ -7,11 +7,12 @@ SSH is the upstream OpenSSH 10.6p2 add-on (DR-65). The Raven tree does not vendo
 implementation and does not implement SSH in Rust. K200 owns `addons/ssh/**` and the source pin;
 K195 stages the built binaries as a release service and owns the login gate.
 
-Status: **build and service staging DONE; host-to-guest login BLOCKED** on three platform
-primitives that are outside this ticket's Owns (see [Blockers](#blockers)). The release image
-boots with the `sshd` service manifest, the host-key one-shot and the K196 `ptyd`; `sshd` itself
-exits before it listens because the image has no `sshd` privilege-separation account, and a
-command session would still fail on the libc `pipe(2)` stub.
+Status: **build and service staging DONE; host-to-guest login BLOCKED** on the libc `pipe(2)`
+primitive (K370) and pipe poll readiness. The release image now boots with the uid/gid 74 `sshd`
+privilege-separation account, the `sshd` service manifest, the host-key one-shot and the K196
+`ptyd`: `sshd` starts and listens on TCP 22, and the first connection fails before the SSH banner
+because upstream `monitor_openfds` calls `pipe(2)`, which the target libc still stubs with
+`ENOSYS`.
 
 ## Pinned source
 
@@ -47,6 +48,7 @@ the RavenBSD static binaries (`sshd -V` hangs), so the version evidence is the g
 | `/etc/ssh/sshd_config` | `profiles/ssh.d/sshd_config` |
 | `/etc/services.d/{sshd,ssh-hostkeys,ptyd}.toml` | `profiles/ssh.d/*.service.manifest` |
 | `/sbin/ptyd` | `raven-ptyd` (K196 pty scheme) |
+| `/etc/passwd`, `/etc/group` | `profiles/ssh.d/{passwd,group}` (root, uid/gid 74 `sshd`, raven) |
 | `/var/empty/.keep`, `/etc/ssh/.keep` | directory anchors |
 
 `sshd` and its one-shot services are `required = false` and `restart = "never"`: a failed SSH
@@ -67,6 +69,12 @@ unaffected until the platform primitives land.
   the foreground for svcd, `-E` writes the daemon log to the writable `/tmp` (services start
   with no stdio fds), and `-f` pins the target config because the compiled-in `SSHDIR` is the
   host build directory.
+
+The release account database (`profiles/ssh.d/{passwd,group}`, wired by
+`profiles/release.d/login.toml`) keeps `root` and the unprivileged `raven` account (K229) and adds
+the standard OpenSSH privilege-separation account: `sshd:x:74:74:SSH privilege
+separation:/var/empty:/bin/false` (group `sshd:x:74:`). Running as root, `sshd` refuses to start
+without `getpwnam("sshd")`; the account is a system account with no password and no shell.
 
 Demo policy (`profiles/ssh.d/sshd_config`): `PermitRootLogin yes` and
 `PasswordAuthentication yes` with the image password from `docs/auth.md` (`raven`); `root` and
@@ -104,27 +112,31 @@ ssh -o StrictHostKeyChecking=no raven@10.0.2.15 ls
 
 ## Blockers
 
-Three primitives are required before any login can be claimed. All are outside K195's Owns
-(`tests/ssh/** tests/qtest/cases/ssh-* profiles/ssh.d/** profiles/release.d/** docs/ssh.md`);
-the exact paths are listed for the lead's prerequisite ticket or Owns extension.
+One primitive remains before a login can be claimed; it is outside K195's Owns
+(`tests/ssh/** tests/qtest/cases/ssh-* profiles/ssh.d/** profiles/release.d/** docs/ssh.md`) and
+is tracked as **K370** (libc `pipe`/`pipe2` over the kernel `PIPE2`).
 
-1. **No `sshd` privilege-separation account.** Running as root, `sshd` requires
-   `getpwnam("sshd")` and `/var/empty` (`sshd.c` main: "Privilege separation user sshd does not
-   exist"; `sshd-auth.c`, `sshd-session.c`). `/var/empty` is staged; `etc/passwd` and `etc/group`
-   have only `root` and `raven` and are outside this ticket's Owns. Guest evidence:
-   `/tmp/sshd.log` = `Privilege separation user sshd does not exist`.
-2. **libc `pipe(2)`/`pipe2(2)` return `ENOSYS`.** Upstream `session.c` `do_exec_no_pty`
-   allocates a command session's stdio with three `pipe(2)` calls. The kernel already implements
-   `PIPE2` (`0x6f`, `kernel/src/syscall/mod.rs`); only the libc wrapper is a stub
+1. **libc `pipe(2)`/`pipe2(2)` return `ENOSYS`.** The kernel already implements `PIPE2` (`0x6f`,
+   `kernel/src/syscall/mod.rs`); the libc wrapper is a stub
    (`libc/ravenlibc/crates/raven-libc-platform/src/platform.rs` `pipe`/`pipe2`, and the syscall
-   binding in `raven-libc-sys/src/sys.rs`). Guest evidence: `tests/ssh/pipe-probe.sh` prints
-   `pipe-probe: ENOSYS`.
-3. **Pipe endpoints are not poll/event sources.** `sshd`/`sshd-session` poll their session pipes.
-   `kernel/src/syscall/event.rs` has no `Object::Pipe` arm and `kernel/src/process/pipe.rs` has
-   no readable/writable readiness (see `event.rs` `readiness`).
+   binding in `raven-libc-sys/src/sys.rs`). Upstream calls `pipe(2)` first in
+   `monitor.c:1929` `monitor_openfds()` (called by `monitor_init()`, monitor.c:1944), before the
+   SSH banner, and again in `session.c` `do_exec_no_pty` for a command session's stdio.
+   Guest evidence — the daemon log of a boot with the account staged and one connection attempt:
 
-K223's per-process root/`chroot` (the `/var/empty` chroot) and K196's fork/PTY are in master and
-are not blockers.
+   ```text
+   Server listening on 0.0.0.0 port 22.
+   monitor_openfds: pipe: Function not implemented
+   ```
+
+   The host client sees `kex_exchange_identification: Connection closed by remote host`, and the
+   independent probe prints `pipe-probe: ENOSYS` (`tests/ssh/pipe-probe.sh`).
+2. **Pipe endpoints are not poll/event sources.** `sshd`/`sshd-session` poll their session pipes.
+   `kernel/src/syscall/event.rs` has no `Object::Pipe` arm and `kernel/src/process/pipe.rs` has
+   no readable/writable readiness (see `event.rs` `readiness`). This belongs with K370.
+
+K223's per-process root/`chroot` (the `/var/empty` chroot), K196's fork/PTY, the K206/K210/K211
+AF_UNIX pair and the `sshd` account are in place; they are not blockers.
 
 ## Donor reconciliation (DR-52)
 
