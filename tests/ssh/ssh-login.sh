@@ -8,9 +8,13 @@
 #
 #   sh tests/ssh/ssh-login.sh
 #
-# The helper brings up the bridge/tap as root with passwordless sudo, drives the
-# real host OpenSSH client against the guest (tests/ssh/ssh-login.py) and tears
-# the bridge down. It refuses cleanly when sudo is unavailable.
+# The helper brings up the bridge/tap as root with passwordless sudo, then runs
+# the whole gate in one command: a raw byte probe with the K375 fake peer
+# tracer, ten `ssh raven@<guest> ls` command sessions (RAVEN_SSH_REPEAT), the
+# wrong-password refusal and the `ssh -tt` PTY case. A failure is classified and
+# quoted with its evidence: a = banner not received, b = TX wedge (0 bytes),
+# c = auth refused, d = session/command failure. Exit codes: 0 pass, 2 setup,
+# 10/11/12/13 for a/b/c/d. The bridge is always torn down.
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)

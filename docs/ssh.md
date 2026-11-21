@@ -90,26 +90,34 @@ reachable from the host at `10.0.2.15`:
 
 ```sh
 cargo xtask image --arch x86_64 --profile release --output build/qtest/ssh-login.img
-timeout 300 cargo xtask qtest --case ssh-login --arch x86_64 --no-build
+timeout 300 sh tests/ssh/ssh-login.sh
 ```
 
-The qtest pre-step (`tests/ssh/ssh-login.sh`) brings the bridge up with passwordless sudo, boots
-the prebuilt image on the tap, and drives the real host OpenSSH client
-(`tests/ssh/ssh-login.py`):
+`tests/ssh/ssh-login.sh` is the whole gate in one command. It brings the bridge up with
+passwordless sudo, then runs, against one boot:
 
-* `ssh raven@10.0.2.15 uname -a` must return the RavenBSD uname;
-* `ssh -tt raven@10.0.2.15` must serve `pwd`/`exit` through a PTY;
-* a wrong password must be refused without reaching a shell;
-* the host key is captured before and after a second boot (ephemeral on the initfs demo).
+* a raw byte probe with the K375 fake peer tracer (`tests/fixtures/ssh-peer`) before, between and
+  after the sessions, to see whether the guest answers a banner+KEXINIT+ECDH exchange;
+* ten `ssh raven@10.0.2.15 ls` command sessions (`RAVEN_SSH_REPEAT` overrides the count);
+* the `ssh -tt` PTY case (`pwd`/`exit`);
+* the wrong-password refusal.
 
-`RAVEN_SSH_REPEAT=10 sh tests/ssh/ssh-login.sh` runs the command session ten times and reports
-the wall-time p50/p90 for the 0.1.0 release gate. The direct command, once unblocked, is:
+A failure is classified and quoted with its evidence (client line, raw-probe transcript, guest
+serial), and `build/ssh/login-test/classification.txt` carries the table:
 
-```sh
-sh tests/ssh/ssh-login.sh
-# or, with the bridge already up and the image booted on the tap:
-ssh -o StrictHostKeyChecking=no raven@10.0.2.15 ls
-```
+| Class | Meaning | Exit |
+|---|---|---|
+| `a` | banner not received (bytes arrived, no usable SSH banner) | 10 |
+| `b` | TX wedge: the fresh peer read 0 bytes (or only the banner with no SSH record), netd `TxError::Busy` territory | 11 |
+| `c` | auth refused (password prompt reached, password rejected or a wrong password accepted) | 12 |
+| `d` | session/command failure (authenticated, command or PTY did not complete) | 13 |
+
+`0` is a full pass (10/10 command sessions + PTY + wrong-password refusal); `2` is a setup error.
+While K382 (virtio-net TX) is open the gate is expected to exit 11 with class `b` and the 0-byte
+evidence; login stays unclaimed until the 10/10 run passes after K382.
+
+The qtest wrapper (`timeout 300 cargo xtask qtest --case ssh-login --arch x86_64 --no-build`) runs
+the same script as its pre-step, so a failed gate carries the class into the qtest result.
 
 ## Blockers
 
