@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "window-scale"
+port = 24001
+baseline = "timeout 180 sudo -n python3 tests/net-conformance/baselines/linux/run.py --scenario window-scale"
+donor = [
+  "NetBSD sys/netinet/tcp_output.c:tcp_output (SYN/SYN-ACK MSS/WS/SACK option emission)",
+  "NetBSD sys/netinet/tcp_input.c:tcp_input/tcp_dooptions (option negotiation)",
+]
+rfcs = ["RFC 7323 section 2.2 (window scale option)", "RFC 7323 section 2.3 (scale factor)"]
+
+[[expect]]
+step = "peer SYN offers MSS 1460, SACK permitted and WS shift 7"
+packet = "SYN"
+assert = "server SYN-ACK has mss=1460, sack=True, wscale=7"
+
+[[expect]]
+step = "peer completes the handshake with ACK"
+packet = "ACK"
+assert = "SYN-ACK seq+1 acknowledged; no RST"
+
+[[expect]]
+step = "window field in SYN-ACK"
+packet = "SYN-ACK"
+assert = "win <= 65535; the SYN-ACK window is not scaled by the offered factor"

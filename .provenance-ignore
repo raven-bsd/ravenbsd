@@ -27,6 +27,10 @@ tests/libc/fuzz/corpus/
 # B54: binary Pi 5 DTB fixtures; tests/fixtures/pi5/generate.py regenerates them from the
 # documented trees, and the readable .dts/README stay under the SPDX check.
 tests/fixtures/pi5/*.dtb
+
+# K263: Linux baseline pcaps are binary wire evidence captured from the kernel; the
+# readable .log files and scenario .toml stay under the SPDX/provenance check.
+tests/net-conformance/results/linux/*.pcap
 userland/uutils/
 
 # C64h: the vendored brush crates keep their upstream headers, and the first-party delta doc sits
