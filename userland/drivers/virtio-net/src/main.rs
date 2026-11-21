@@ -769,7 +769,7 @@ mod program {
                 if TX_STALL.load(Ordering::Acquire) {
                     // Test-only mutation: leave the used entry unread and the frame in flight.
                     self.tx_waits = self.tx_waits.wrapping_add(1);
-                    if self.tx_waits % 100 == 0 {
+                    if self.tx_waits.is_multiple_of(100) {
                         raven_rt::println!(
                             "virtio-net: tx-wait used={used} expected={} avail={} fired={} isr={:#x}",
                             self.tx.used,
@@ -807,7 +807,7 @@ mod program {
                     TX_FRAMES.fetch_add(1, Ordering::AcqRel);
                 } else {
                     self.tx_waits = self.tx_waits.wrapping_add(1);
-                    if self.tx_waits % 100 == 0 {
+                    if self.tx_waits.is_multiple_of(100) {
                         raven_rt::println!(
                             "virtio-net: tx-wait used={used} expected={} avail={} fired={} isr={:#x}",
                             self.tx.used,
