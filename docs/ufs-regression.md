@@ -98,6 +98,33 @@ Last verified good sha: `18700ffb` (merge of `bob/S110`, which added the gate).
 * `raven-ufs` refusals and image hashes (`make ufs-selftest`) and the host gate
   (`make check-fast`).
 
+## Rework round 1 re-run (2026-11-21)
+
+Only the five failed cases were re-run on `978899da` (evidence:
+`tests/evidence/ufs/978899da/rework/`). Classification first, from the recorded
+serials: none of the five is a boot timeout and none shows a UFS error; four are
+the stale `init exited (0)` expectation and one is the `devd`/`blockd` IRQ
+failure. The confirming runs reproduce exactly that:
+
+| Case | Re-run result | First failing line |
+|---|---|---|
+| `ufs-root` | FAIL 112 s | `step 23 (^init exited \(0\)$) failed` |
+| `ufs-update` | FAIL 65 s | `step 15 (^init exited \(0\)$) failed` |
+| `ufs-update-persist` | FAIL 61 s | `step 10 (^init exited \(0\)$) failed` |
+| `disk-tools` | FAIL 135 s | `step 7 (^blockd running [0-9]+$) failed` |
+| `ufs-full` | FAIL 124 s | `step 32 (^init exited \(0\)$) failed` |
+
+One intermediate `ufs-update` boot failed after the pivot with `login: unable to
+start the session shell` / `svcd: getty failed: input/output error`. That boot
+ran while a QEMU from an earlier cap-expired attempt was still alive; after
+killing it and rebuilding the baseline root disk, the same case booted
+`k185-first` and stopped only at `init exited (0)`. The transient is recorded in
+`rework/ufs-update-r2.log`; it did not reproduce on the clean boot.
+
+The verdict stays **BLOCKED**: the two deterministic gate defects above are not
+UFS regressions, so re-running cannot turn the gate green. They need a one-shot
+demo boot profile (or an expectation update) and a virtio IRQ/MSI-X fix.
+
 ## Follow-up owners
 
 * Case expectation vs K234 session policy: the `qemu-ufs` one-shot boot gate

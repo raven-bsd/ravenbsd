@@ -1,0 +1,70 @@
+    Blocking waiting for file lock on package cache
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running `target/debug/xtask qtest --case ufs-full --arch x86_64`
+ufs-full: fail
+--- serial (last 40 lines) ---
+Mediasize: 500187648
+Sectorsize: 512
+Scheme: GPT
+  start  size  index  name
+   2048 450560       1  ESP
+ 452608 524288       2  ufs-root
+                                                                                ~
+raven# raven# nraven# neraven# newraven# newfraven# newfsraven# newfs raven# newfs -raven# newfs -hraven# newfs -h
+usage: newfs [-O 1|2] [-b block] [-f frag] [-s size] [-L label] [block:0]
+                                                                                2 ~
+raven# raven# lsblkraven# lsblkraven# ls raven# ls /raven# ls /braven# ls /biraven# ls /binraven# ls /bin/raven# ls /bin/eraven# ls /bin/edraven# ls /bin/ed
+/bin/ed
+                                                                                ~
+raven# raven# draven# dfraven# df raven# df -raven# df -hraven# df -h raven# df -h /raven# df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+ufs:            240M   41M  199M  17% /
+                                                                                ~
+raven# raven# mraven# moraven# mouraven# mounraven# mountraven# mount
+ufs: on /
+ramfs: on /tmp
+null: on /dev/null
+zero: on /dev/zero
+rand: on /dev/random
+rand: on /dev/urandom
+                                                                                ~
+raven# raven# pwdraven# piraven# pinraven# pingraven# ping raven# ping 1raven# ping 10raven# ping 10.raven# ping 10.0raven# ping 10.0.raven# ping 10.0.2raven# ping 10.0.2.raven# ping 10.0.2.2raven# ping 10.0.2.2
+ping: 10.0.2.2 seq=1 rtt=24ms
+ping: interval seq=2 waited=1000ms
+ping: 10.0.2.2 seq=2 rtt=14ms
+ping: interval seq=3 waited=1000ms
+ping: 10.0.2.2 seq=3 rtt=16ms
+ping: interval seq=4 waited=1001ms
+ping: 10.0.2.2 seq=4 rtt=20ms
+ping: 4 packets transmitted, 4 received, 0% packet loss
+ping: rtt min/avg/max = 14/18/24 ms
+                                                                                ~
+raven# raven# eraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+RavenBSD 0.1 (x86_64) (tty:console)
+login: 
+--- unmatched expectations ---
+^init exited \(0\)$
+--- result ---
+step 32 (^init exited \(0\)$) failed: no matching serial line within 30 s
+last 20 serial line(s):
+ramfs: on /tmp
+null: on /dev/null
+zero: on /dev/zero
+rand: on /dev/random
+rand: on /dev/urandom
+                                                                                ~
+raven# raven# pwdraven# piraven# pinraven# pingraven# ping raven# ping 1raven# ping 10raven# ping 10.raven# ping 10.0raven# ping 10.0.raven# ping 10.0.2raven# ping 10.0.2.raven# ping 10.0.2.2raven# ping 10.0.2.2
+ping: 10.0.2.2 seq=1 rtt=24ms
+ping: interval seq=2 waited=1000ms
+ping: 10.0.2.2 seq=2 rtt=14ms
+ping: interval seq=3 waited=1000ms
+ping: 10.0.2.2 seq=3 rtt=16ms
+ping: interval seq=4 waited=1001ms
+ping: 10.0.2.2 seq=4 rtt=20ms
+ping: 4 packets transmitted, 4 received, 0% packet loss
+ping: rtt min/avg/max = 14/18/24 ms
+                                                                                ~
+raven# raven# eraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+RavenBSD 0.1 (x86_64) (tty:console)

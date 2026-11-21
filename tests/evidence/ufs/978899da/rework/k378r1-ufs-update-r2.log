@@ -1,0 +1,74 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.32s
+     Running `target/debug/xtask qtest --case ufs-update --arch x86_64 --no-build`
+ufs-update: fail
+--- serial (last 40 lines) ---
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=37647 spawn=37654 first_poll=37656 deadline=97654 stalled=0 ready_at=37687
+svcd: root pivoted to UFS at /
+svcd: root services=13 added=4
+svcd: service plan: logd pcid consd devd initfsd netd nulld ramfsd randd sysd zerod blockd vfsd fsd-ufs getty resolvd
+svcd: consd up
+svcd: consd timing: generation=1 start=37997 spawn=38098 first_poll=38100 deadline=98098 stalled=0 ready_at=38104
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: interface eth0 10.0.2.15/24
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+svcd: netd timing: generation=1 start=38108 spawn=38799 first_poll=38802 deadline=98799 stalled=0 ready_at=38891
+1795283355.006 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=38902 spawn=39003 first_poll=39005 deadline=44003 stalled=0 ready_at=39015
+resolvd: wrote file:/etc/resolv.conf
+resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199720ms rebind=75599720ms expires=86399720ms
+resolvd: resolv.conf=nameserver 10.0.2.3
+1795283355.302 resolvd: started
+svcd: resolvd up
+svcd: resolvd timing: generation=1 start=39017 spawn=39158 first_poll=39158 deadline=99158 stalled=0 ready_at=39306
+svcd: all services up
+svcd: getty up
+RavenBSD 0.1 (x86_64) (tty:console)
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+login: unable to start the session shell
+svcd: getty failed: input/output error
+--- unmatched expectations ---
+^k185-first$
+^ufs: +2[0-4][0-9]M +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$
+^ufs: on /$
+^init exited \(0\)$
+--- result ---
+step 5 (^raven# $) failed: no matching serial line within 60 s
+last 20 serial line(s):
+svcd: sysd timing: generation=1 start=38902 spawn=39003 first_poll=39005 deadline=44003 stalled=0 ready_at=39015
+resolvd: wrote file:/etc/resolv.conf
+resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199720ms rebind=75599720ms expires=86399720ms
+resolvd: resolv.conf=nameserver 10.0.2.3
+1795283355.302 resolvd: started
+svcd: resolvd up
+svcd: resolvd timing: generation=1 start=39017 spawn=39158 first_poll=39158 deadline=99158 stalled=0 ready_at=39306
+svcd: all services up
+svcd: getty up
+RavenBSD 0.1 (x86_64) (tty:console)
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+login: unable to start the session shell
+svcd: getty failed: input/output error

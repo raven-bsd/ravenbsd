@@ -1,0 +1,69 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running `target/debug/xtask qtest --case ufs-update-persist --arch x86_64 --no-build`
+ufs-update-persist: fail
+--- serial (last 40 lines) ---
+svcd: root pivoted to UFS at /
+svcd: root services=13 added=4
+svcd: service plan: logd pcid consd devd initfsd netd nulld ramfsd randd sysd zerod blockd vfsd fsd-ufs getty resolvd
+svcd: consd up
+svcd: consd timing: generation=1 start=12686 spawn=12734 first_poll=12736 deadline=72734 stalled=0 ready_at=12738
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: interface eth0 10.0.2.15/24
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+svcd: netd timing: generation=1 start=12741 spawn=13032 first_poll=13033 deadline=73032 stalled=0 ready_at=13135
+1795284090.188 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=13140 spawn=13186 first_poll=13187 deadline=18186 stalled=0 ready_at=13191
+resolvd: wrote file:/etc/resolv.conf
+resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199872ms rebind=75599872ms expires=86399872ms
+resolvd: resolv.conf=nameserver 10.0.2.3
+1795284090.324 resolvd: started
+svcd: resolvd up
+svcd: resolvd timing: generation=1 start=13194 spawn=13257 first_poll=13258 deadline=73257 stalled=0 ready_at=13328
+svcd: all services up
+svcd: getty up
+RavenBSD 0.1 (x86_64) (tty:console)
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# /raven# /braven# /biraven# /binraven# /bin/raven# /bin/craven# /bin/caraven# /bin/catraven# /bin/cat raven# /bin/cat /raven# /bin/cat /eraven# /bin/cat /etraven# /bin/cat /etcraven# /bin/cat /etc/raven# /bin/cat /etc/uraven# /bin/cat /etc/ufraven# /bin/cat /etc/ufsraven# /bin/cat /etc/ufs-raven# /bin/cat /etc/ufs-uraven# /bin/cat /etc/ufs-upraven# /bin/cat /etc/ufs-updraven# /bin/cat /etc/ufs-updaraven# /bin/cat /etc/ufs-updatraven# /bin/cat /etc/ufs-updateraven# /bin/cat /etc/ufs-update.raven# /bin/cat /etc/ufs-update.traven# /bin/cat /etc/ufs-update.txraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txt
+k185-second
+                                                                                /
+raven# raven# eraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+RavenBSD 0.1 (x86_64) (tty:console)
+login: 
+--- unmatched expectations ---
+^init exited \(0\)$
+--- result ---
+step 10 (^init exited \(0\)$) failed: no matching serial line within 30 s
+last 20 serial line(s):
+svcd: resolvd up
+svcd: resolvd timing: generation=1 start=13194 spawn=13257 first_poll=13258 deadline=73257 stalled=0 ready_at=13328
+svcd: all services up
+svcd: getty up
+RavenBSD 0.1 (x86_64) (tty:console)
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# /raven# /braven# /biraven# /binraven# /bin/raven# /bin/craven# /bin/caraven# /bin/catraven# /bin/cat raven# /bin/cat /raven# /bin/cat /eraven# /bin/cat /etraven# /bin/cat /etcraven# /bin/cat /etc/raven# /bin/cat /etc/uraven# /bin/cat /etc/ufraven# /bin/cat /etc/ufsraven# /bin/cat /etc/ufs-raven# /bin/cat /etc/ufs-uraven# /bin/cat /etc/ufs-upraven# /bin/cat /etc/ufs-updraven# /bin/cat /etc/ufs-updaraven# /bin/cat /etc/ufs-updatraven# /bin/cat /etc/ufs-updateraven# /bin/cat /etc/ufs-update.raven# /bin/cat /etc/ufs-update.traven# /bin/cat /etc/ufs-update.txraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txt
+k185-second
+                                                                                /
+raven# raven# eraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+RavenBSD 0.1 (x86_64) (tty:console)

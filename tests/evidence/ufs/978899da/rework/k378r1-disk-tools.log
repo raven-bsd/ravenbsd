@@ -1,0 +1,75 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.37s
+     Running `target/debug/xtask qtest --case disk-tools --arch x86_64 --no-build`
+disk-tools: fail
+--- serial (last 40 lines) ---
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: nic: open nic:info: no such file or directory; waiting for the driver
+netd: hostname raven
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+resolvd: lease eth0: no such device
+resolvd: lease not ready; retrying in the background
+1795282853.051 resolvd: started
+resolvd: lease eth0: no such device
+svcd: resolvd up
+svcd: boot report: 12 up, 1 failed
+svcd: getty up
+RavenBSD 0.1 (x86_64) (tty:console)
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# /raven# /sraven# /sbraven# /sbiraven# /sbinraven# /sbin/raven# /sbin/draven# /sbin/diraven# /sbin/disraven# /sbin/diskraven# /sbin/disk-raven# /sbin/disk-traven# /sbin/disk-toraven# /sbin/disk-tooraven# /sbin/disk-toolraven# /sbin/disk-tool-raven# /sbin/disk-tool-sraven# /sbin/disk-tool-svraven# /sbin/disk-tool-svcraven# /sbin/disk-tool-svccraven# /sbin/disk-tool-svcctraven# /sbin/disk-tool-svcctlraven# /sbin/disk-tool-svcctl raven# /sbin/disk-tool-svcctl sraven# /sbin/disk-tool-svcctl straven# /sbin/disk-tool-svcctl staraven# /sbin/disk-tool-svcctl starraven# /sbin/disk-tool-svcctl startraven# /sbin/disk-tool-svcctl start raven# /sbin/disk-tool-svcctl start braven# /sbin/disk-tool-svcctl start blraven# /sbin/disk-tool-svcctl start bloraven# /sbin/disk-tool-svcctl start blocraven# /sbin/disk-tool-svcctl start blockraven# /sbin/disk-tool-svcctl start blockdraven# /sbin/disk-tool-svcctl start blockd
+blockd: waiting for disk:0: no such file or directory
+svcctl: blockd: timed out waiting for the operation
+                                                                                1 /
+raven# blockd: still waiting for disk:0 after 50: no such file or directory
+blockd: still waiting for disk:0 after 100: no such file or directory
+blockd: still waiting for disk:0 after 150: no such file or directory
+blockd: still waiting for disk:0 after 200: no such file or directory
+blockd: still waiting for disk:0 after 250: no such file or directory
+blockd: still waiting for disk:0 after 300: no such file or directory
+blockd: still waiting for disk:0 after 350: no such file or directory
+blockd: still waiting for disk:0 after 400: no such file or directory
+blockd: still waiting for disk:0 after 450: no such file or directory
+blockd: still waiting for disk:0 after 500: no such file or directory
+blockd: still waiting for disk:0 after 550: no such file or directory
+svcd: blockd failed: readiness timeout
+--- unmatched expectations ---
+^block0 [0-9]+ 32835 disk$
+^block0p1 [0-9]+ 32768 part ufs-root$
+^Scheme: GPT$
+^\s*34\s+32768\s+1\s+ufs-root$
+^newfs: block:0 UFS2 block=4096 frag=512 size=16777216 label=$
+read:s110-disk-ok$
+^init exited \(0\)$
+--- result ---
+step 7 (^blockd running [0-9]+$) failed: no matching serial line within 120 s
+last 20 serial line(s):
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# /raven# /sraven# /sbraven# /sbiraven# /sbinraven# /sbin/raven# /sbin/draven# /sbin/diraven# /sbin/disraven# /sbin/diskraven# /sbin/disk-raven# /sbin/disk-traven# /sbin/disk-toraven# /sbin/disk-tooraven# /sbin/disk-toolraven# /sbin/disk-tool-raven# /sbin/disk-tool-sraven# /sbin/disk-tool-svraven# /sbin/disk-tool-svcraven# /sbin/disk-tool-svccraven# /sbin/disk-tool-svcctraven# /sbin/disk-tool-svcctlraven# /sbin/disk-tool-svcctl raven# /sbin/disk-tool-svcctl sraven# /sbin/disk-tool-svcctl straven# /sbin/disk-tool-svcctl staraven# /sbin/disk-tool-svcctl starraven# /sbin/disk-tool-svcctl startraven# /sbin/disk-tool-svcctl start raven# /sbin/disk-tool-svcctl start braven# /sbin/disk-tool-svcctl start blraven# /sbin/disk-tool-svcctl start bloraven# /sbin/disk-tool-svcctl start blocraven# /sbin/disk-tool-svcctl start blockraven# /sbin/disk-tool-svcctl start blockdraven# /sbin/disk-tool-svcctl start blockd
+blockd: waiting for disk:0: no such file or directory
+svcctl: blockd: timed out waiting for the operation
+                                                                                1 /
+raven# blockd: still waiting for disk:0 after 50: no such file or directory
+blockd: still waiting for disk:0 after 100: no such file or directory
+blockd: still waiting for disk:0 after 150: no such file or directory
+blockd: still waiting for disk:0 after 200: no such file or directory
+blockd: still waiting for disk:0 after 250: no such file or directory
+blockd: still waiting for disk:0 after 300: no such file or directory
+blockd: still waiting for disk:0 after 350: no such file or directory
+blockd: still waiting for disk:0 after 400: no such file or directory
+blockd: still waiting for disk:0 after 450: no such file or directory
+blockd: still waiting for disk:0 after 500: no such file or directory
+blockd: still waiting for disk:0 after 550: no such file or directory
+svcd: blockd failed: readiness timeout

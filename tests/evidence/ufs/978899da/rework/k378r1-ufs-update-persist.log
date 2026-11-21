@@ -1,0 +1,11 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.72s
+     Running `target/debug/xtask qtest --case ufs-update-persist --arch x86_64 --no-build`
+ufs-update-persist: fail
+--- serial (last 40 lines) ---
+--- unmatched expectations ---
+^svcd: root pivoted to UFS at /$
+^k185-second$
+^init exited \(0\)$
+--- result ---
+step 1 ((?i)^.*login: ?$) failed: the process exited before this step finished
+no serial output before the failure
