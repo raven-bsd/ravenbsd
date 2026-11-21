@@ -27,3 +27,10 @@ a8b21d3a8e0bef12e370cfd08dc41e62ef0346a1de7d67f3bc35b1af70d4ed84  tests/evidence
 6367593e949e62890d0d794dc290b4cc81585991bdfc9407093f337e1ff4e95d  tests/evidence/release-host/postpf-pf.serial.log
 6bea8c1bad18d26d6c96ceed2f6aff3caed9548e6cbfe043ea0aa295b231738c  tests/evidence/release-host/pf-merged-hashes.txt
 d08f93e927e8e747db5e55108de654ea16a1cf8b842aecc4ba8afe644d970e13  tests/evidence/release-host/supply-chain-tarball.sha256
+addec918bebf02044464e2c2458e8f7f3e4b3fa8f561daf0bde52982bec92c67  tests/evidence/release-host/cold-start/README.md
+bbdeb13d289a9a98c0a2a2dcbb08957c6bfd4698a90f08c0f265099e441d0b1f  tests/evidence/release-host/cold-start/run.log
+13ee07d81673397e0c3befc2fec61bc4699446594add4b15a5c78d27b5775de3  tests/evidence/release-host/cold-start/kvm-smp4-sample1.log
+480fcaba5a86a940585170acce163836fff860588105f0bfe0d4328a4396b0cc  tests/evidence/release-host/cold-start/kvm-smp4-sample2.log
+ae3a2958a3a650c700b97b7290a2ab9f33ef2caccb0c6e3593c925ac8ef52535  tests/evidence/release-host/cold-start/kvm-smp4-sample3.log
+124c112d9b0d4a9382f9390e0407aa3cd63ffda95613915afaee3b0abadd682f  tests/evidence/release-host/cold-start/kvm-smp4-sample4.log
+8ca3bc31893658f19afb01b83857cf0ac02af36e7702f78c2fba0dcd08143a8d  tests/evidence/release-host/cold-start/kvm-smp4-sample5.log
