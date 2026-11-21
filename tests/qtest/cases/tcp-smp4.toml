@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K284: TCP socket path under KVM SMP, four CPUs. Derived from the K230 socket-inet case: same
+# fixture (guest listener + hostfwd echo flow), same boot cmdline, same expectations; the only
+# differences are the accelerator and the explicit CPU count (`-smp 4`, matching the harness
+# default but named in the case contract). The guest boots four CPUs and then runs the TCP
+# connect/send/recv/close path on the SMP kernel.
+
+name = "tcp-smp4"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+initfs = "build/fixtures/socket-inet/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-enable-kvm",
+    "-cpu",
+    "host",
+    "-smp",
+    "4",
+    "-nic",
+    "none",
+    "-netdev",
+    "user,id=n0,hostfwd=tcp:127.0.0.1:23080-:23080",
+    "-device",
+    "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/fixtures/socket-inet/build.sh",
+    "sh tests/fixtures/socket-inet/start-host-echo.sh",
+]
+
+# Four CPUs came online before any socket activity.
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^socket-inet: socket fd=[0-9]+$'
+
+[[expect]]
+regex = '^socket-inet: bind ok$'
+
+[[expect]]
+regex = '^socket-inet: listen ok$'
+
+[[expect]]
+regex = '^socket-inet: listening port=23080$'
+
+# The real profile also runs getty, so the console login prompt can share the serial line.
+[[expect]]
+regex = '^.*socket-inet: poll revents=1$'
+
+# The newline-less accept line can share the getty login prompt.
+[[expect]]
+regex = '^.*socket-inet: accept fd=[0-9]+$'
+
+[[expect]]
+regex = '^socket-inet: accepted peer=[0-9.]+:[0-9]+$'
+
+[[expect]]
+regex = '^socket-inet: echo received bytes=19 payload=socket-inet-payload$'
+
+[[expect]]
+regex = '^socket-inet: echo sent$'
+
+[[expect]]
+regex = '^socket-inet: host ack socket-inet-ack$'
+
+[[expect]]
+regex = '^socket-inet: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)socket-inet: fail|panic|EXCEPTION'
