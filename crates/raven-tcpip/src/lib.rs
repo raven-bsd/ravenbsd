@@ -65,6 +65,7 @@ mod rack_output;
 mod rack_pipe;
 mod rack_sack;
 mod rack_transport;
+mod rack_retransmit;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -160,6 +161,13 @@ pub use rack_transport::{
     RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
     TimerStopOutcome, rack_ctloutput, rack_hw_tls_change, rack_process_timers, rack_pru_options,
     rack_start_hpts_timer, rack_stop_all_timers, rack_switch_failed, rack_wake_check, tcp_addrack,
+pub use rack_retransmit::{
+    AckOutcome, CUM_ACKED, DUP_ACK_THRESHOLD, EntryResult, FastAck, MAX_LINKHDR, MHLEN,
+    PACE_MAX_IP_BYTES, ProcessAck, RACK_ACKED, RACK_APP_LIMITED, RACK_HAD_PUSH, RACK_HAS_FIN,
+    RACK_MUST_RXT, RACK_NUM_OF_RETRANS, RACK_OVERMAX, RACK_PMTU_CHG, RACK_RTO_MAX, RACK_RTO_MIN,
+    RACK_RWND_COLLAPSED, RACK_SACK_PASSED, RACK_SENT_FP, RACK_TLP, RACK_TO_REXT, RACK_WAS_ACKED,
+    RACK_WAS_LOST, RACK_WAS_SACKPASS, RackRetransmit, RackSendMap, RackTransmission,
+    RetransmitError, Rsm, SACKED, TH_PUSH,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
