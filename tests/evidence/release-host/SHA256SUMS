@@ -9,7 +9,7 @@ ce45123b5193edd1b2aa8a741c42cb0d279d8c9dbe59e1c4bc6f0d1e1651c32c  docs/ls-stat-l
 395faf2aa6f71b005286d8e938b9d35a7ce222c0bee5625d3925f63057c5adda  docs/at-phdr-link.md
 2f65931c4c5e661364ea96406eb52e27dd4155ec04c340d1b31faf6d09598707  docs/mpsc-wake.md
 88e6fcd36fe668c19f46489ad5245d07fc17f8636a17870322eeb768ab8074c9  docs/releases/0.1.0-notes.md
-de9a32d9a5ad45f739d92e642184c81f30d3cd4fc7ec4c156461e31e7c731fcf  docs/releases/0.1.0-freeze-checklist.md
+478a7e067022df2f6618a96e530529c0bd1e1e47126d564f177021a74c7fca1f  docs/releases/0.1.0-freeze-checklist.md
 17a95df16ed10320d43e41a5a11c27ec81458400198b128b7dc639f50bc10c46  docs/kernel-gate.md
 19b667bbb53fdb5da94252c215902e19f43232a4d65a1dffb106cfedac93acc8  docs/posix/CONFORMANCE.md
 cf59ad921923f06d0914d6d3951707189dba2d257c1ae3ff804d351fe56bfc69  docs/release-images.md
