@@ -63,6 +63,7 @@ mod rack_os;
 mod rack_output;
 mod rack_sack;
 mod rack_transport;
+mod rack_pipe;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -125,12 +126,16 @@ pub use rack_hpts::{
 };
 pub use rack_log::{Counter as RackLogCounter, LogEntry as RackLogEntry, RackLog};
 pub use rack_misc::{
-    ACK_FLAG, DeferredOption, FIN_FLAG, FsbBlock, MiscQuery, RACK_APP_LIMITED, RACK_DEFERRED_MAX,
-    RACK_FREE_CACHE, RACK_FREE_CNT_MAX, RACK_HAD_PUSH, RACK_HAS_FIN, RACK_HAS_SYN, RACK_MUST_RXT,
-    RACK_PMTU_CHG, RACK_RWND_COLLAPSED, RACK_TLP, RST_FLAG, RackMisc, RackSendmap, RackTcpInfo,
-    TCP_DEFER_OPTIONS, TCP_NO_PRR, TCP_RACK_ABC_VAL, TCP_RACK_DSACK_OPT, TCP_RACK_FORCE_MSEG,
-    TCP_RACK_HI_BETA, TCP_RACK_MBUF_QUEUE, TCP_RACK_MEASURE_CNT, TCP_RACK_PACE_TO_FILL,
-    TCP_RACK_PROFILE, TCP_RACK_SET_RXT_OPTIONS, TCP_RACK_TIMER_SLOP, TCP_USE_CMP_ACKS,
+    ACK_FLAG, DeferredOption, FIN_FLAG, FsbBlock, MiscQuery, RACK_ACKED, RACK_APP_LIMITED,
+    RACK_DEFERRED, RACK_DEFERRED_MAX, RACK_FREE_CACHE, RACK_FREE_CNT_MAX, RACK_HAD_PUSH,
+    RACK_HAS_FIN, RACK_HAS_SYN, RACK_IN_GP_WIN, RACK_INITIAL_RTO, RACK_IS_PCM, RACK_MERGED,
+    RACK_MUST_RXT, RACK_NUM_OF_RETRANS, RACK_OVERMAX, RACK_PMTU_CHG, RACK_RWND_COLLAPSED,
+    RACK_SACK_PASSED, RACK_SENT_FP, RACK_SENT_SP, RACK_SENT_W_DSACK, RACK_SHUFFLED, RACK_STRADDLE,
+    RACK_TLP, RACK_TO_REXT, RACK_WAS_ACKED, RACK_WAS_LOST, RACK_WAS_SACKPASS, RST_FLAG, RackMisc,
+    RackSendmap, RackTcpInfo, TCP_DEFER_OPTIONS, TCP_NO_PRR, TCP_RACK_ABC_VAL, TCP_RACK_DSACK_OPT,
+    TCP_RACK_FORCE_MSEG, TCP_RACK_HI_BETA, TCP_RACK_MBUF_QUEUE, TCP_RACK_MEASURE_CNT,
+    TCP_RACK_PACE_TO_FILL, TCP_RACK_PROFILE, TCP_RACK_SET_RXT_OPTIONS, TCP_RACK_TIMER_SLOP,
+    TCP_USE_CMP_ACKS,
 };
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
@@ -145,6 +150,11 @@ pub use rack_transport::{
     RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
     TimerStopOutcome, rack_ctloutput, rack_hw_tls_change, rack_process_timers, rack_pru_options,
     rack_start_hpts_timer, rack_stop_all_timers, rack_switch_failed, rack_wake_check, tcp_addrack,
+pub use rack_pipe::{
+    CC_NDUPACK, EXIT_RECOVERY_MASK, IN_RECOVERY_MASK, RACK_DELAYED_ACK_TIME, RACK_PRR_ADDBACKMAX,
+    RACK_REORDER_FADE_DEFAULT, RACK_RTO_MAX, RACK_TLP_MIN, RackPipe, RackPipeState,
+    TF_CONGRECOVERY, TF_FASTRECOVERY, TF_WASCRECOVERY, TF_WASFRECOVERY, TF2_ECN_PERMIT,
+    TF2_ECN_SND_CWR, TLP_USE_ID, TLP_USE_TWO_ONE, TLP_USE_TWO_TWO, tstmp_ge, tstmp_lt,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
