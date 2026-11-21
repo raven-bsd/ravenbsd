@@ -228,7 +228,7 @@ title = "core-servers regression"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "qtest", "--case", "core-servers", "--arch", "x86_64"]
-note = "C74n: minimal `core-servers` profile, 300 s case limit; in-tree run passes in 36-77 s (coretest: ok, init exited 0)."
+note = "C74n on 6af246ac: minimal `core-servers` profile, 300 s case limit; in-tree qtest passes in 31.3 s (coretest: ok, svcd: settled, init exited 0)."
 evidence = "build/libc-gate/5.2.core-servers.txt"
 source = "LEAD-TICKET-CHECKLIST 8"
 
@@ -239,7 +239,7 @@ title = "file-tools regression"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "qtest", "--case", "file-tools", "--arch", "x86_64"]
-note = "C74v: minimal `core-servers-files` profile; df reads `/etc/mounts` via the RavenBSD read_fs_list and tooltest exits 0."
+note = "C74n on 6af246ac: `file-tools-test` stages `/bin/raven-tooltest` and `/etc/services.d/tooltest.toml`; in-tree qtest passes in 53.3 s with `tooltest: ok`, `svcd: settled`, `init exited (0)`."
 evidence = "build/libc-gate/5.2.file-tools.txt"
 source = "LEAD-TICKET-CHECKLIST 8"
 
