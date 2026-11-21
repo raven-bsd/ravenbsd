@@ -3,149 +3,120 @@
 
 # TCP provenance and evidence (K264)
 
-Status: **PARTIAL (rework round 1).** The NetBSD TCP files are NRL 4-clause **NO-COPY**. No
-NetBSD TCP provenance entry exists or may be added. The permitted donors are **FreeBSD
-`sys/netinet`** (BSD-3-Clause, no advertising; `cc/cc_newreno.c` is BSD-2-Clause) and
-**DragonFly `sys/netinet/tcp_sack.c`** (BSD-3-Clause). Every NetBSD-derived port branch/report is
-quarantined until it is reworked against those donors. The port reports currently contain no
-FreeBSD/DragonFly entry, so this packet adds no `PROVENANCE.toml` entry. The K253 packet matrix is
-still blocked because the harness is not merged into `origin/master`.
+Status: **DONE.** The FreeBSD/DragonFly entries for the landed ports are validated and added; the
+packet-level matrix ran all ten cases. One TCP finding remains outside K264: the Raven handshake
+advertises a window-scale option to a peer that did not negotiate it. The incomplete ports stay
+quarantined and contribute no entry.
 
-## Commands and results
+## Results
 
-All commands are foreground with an explicit cap.
+| Gate | Result |
+|---|---|
+| audit | **pass**: 8 imports (6 FreeBSD, 1 DragonFly, 1 pre-existing smoltcp/0BSD), 17 quarantined claims, 11 donor files, 0 violations, 0 donor-missing |
+| matrix | **ran 10/10**: Linux 5/5 pass; Raven zero-window, window-update, retransmit, fin-rst pass; Raven handshake **finding** |
+| unit | **710/710 passed**, 0 skipped |
+| checker | **pass**: 2 negative fixtures rejected, 1 valid fixture accepted, 2 mutations caught |
+| provenance | 10468 files, 0 violations |
+| `make check-fast` | **`check-fast: PASSED`** |
 
-| Command | Cap | Exit | Result |
+## Landed provenance entries
+
+The exact entries from the landed reports were added to `PROVENANCE.toml`:
+
+| Ticket | File | Donor | Licence |
 |---|---|---|---|
-| `sh scripts/tcp-evidence.sh --selftest` | 60 s | 0 | `PASS netbsd_imports=0 quarantined=8 claims=11 matrix_blocker=detected` |
-| `cargo nextest run -p raven-tcpip` | 180 s | 0 | **647 tests run: 647 passed, 0 skipped** |
-| `sh scripts/tcp-evidence.sh --audit --reports-root <tickets> --freebsd-root <fb> --dragonfly-root <df>` | 120 s | 0 | **pass**: 67 files, 0 NetBSD imports, 8 quarantined claims, 15 donor files verified, 2 rejected entries, 0 violations |
-| `sh scripts/tcp-evidence.sh --all ...` | 240 s | 2 | audit pass, unit pass, matrix blocked |
-| `make check-fast` | 420 s | 0 | **`check-fast: PASSED`** |
+| K268 | `crates/raven-tcpip/src/sack.rs` | DragonFly `sys/netinet/tcp_sack.c` | BSD-3-Clause |
+| K270 | `crates/raven-tcpip/src/ecn.rs` | FreeBSD `tcp_ecn.c`, `tcp_ecn.h`, `tcp.h` | BSD-3-Clause |
+| K270 | `crates/raven-tcpip/src/pmtu.rs` | FreeBSD `tcp_input.c`, `tcp_subr.c`, `ip_icmp.c`, `tcp_var.h`, `tcp.h` | BSD-3-Clause |
+| K271 | `crates/raven-tcpip/src/socket.rs` | FreeBSD `tcp_usrreq.c`, `tcp_subr.c`, `uipc_socket.c` | BSD-3-Clause |
+| K271 | `crates/raven-tcpip/src/listen.rs` | FreeBSD `uipc_socket.c` | BSD-3-Clause |
+| K272 | `crates/raven-tcpip/src/readiness.rs` | FreeBSD `sys/sys/socketvar.h` | BSD-3-Clause |
+| K276 | `crates/raven-tcpip/src/syncache.rs` | FreeBSD `tcp_syncache.c`, `tcp_syncache.h`, `tcp_timer.c` | BSD-3-Clause |
 
-## Why NetBSD TCP is quarantined
+K279 changes only the netd readiness test and is covered by K272's `readiness.rs` entry; it adds no
+separate import. The pre-existing smoltcp DHCP entry (`src/dhcp.rs`, 0BSD) is unrelated.
 
-The pinned NetBSD tree (`36eddebcc36cb0775aa2962005b9c05419a6ff01`) has a second copyright block
-in the key TCP files:
+The pinned donors are FreeBSD `133344405f532bd54ff3629a77d4c4e062f01fdb` and DragonFly
+`94448f622a06cde90ba42d688e9cab2448ad9ab3`. The sparse worktrees are read through the pinned git
+objects. The donor audit checks the files, the licence class and the named functions (for example
+DragonFly `tcp_sack_update_lostseq`/`tcp_sack_islost`, FreeBSD `tcp_usr_connect`/`tcp_usr_close`,
+`syncache_add`/`syncache_expand`, `soreadable`/`sowriteable`).
 
-| NetBSD donor | Header | Decision |
-|---|---|---|
-| `sys/netinet/tcp_output.c` | WIDE 3-clause **plus NRL 4-clause advertising** | **NO-COPY** |
-| `sys/netinet/tcp_input.c` | WIDE 3-clause **plus NRL 4-clause advertising** | **NO-COPY** |
-| `sys/netinet/tcp_congctl.c` | NetBSD/WIDE **plus NRL 4-clause advertising** | **NO-COPY** |
-| `sys/netinet/tcp_sack.c` | NetBSD/UCB **plus NRL 4-clause advertising** | **NO-COPY** |
-| `sys/netinet/tcp_var.h` | NRL 4-clause advertising | **NO-COPY** |
+## Quarantine
 
-A four-clause file is NO-COPY under the project donor rules. The audit therefore rejects any
-`upstream = "netbsd"` import under `crates/raven-tcpip`, and the intake marks every NetBSD-derived
-branch/report quarantined:
+No NetBSD TCP entry exists. The NRL 4-clause NetBSD files remain NO-COPY. The following tickets are
+quarantined and contribute no entry: K254-K261 (superseded NetBSD-derived attempts), K265, K266,
+K267, K269, K273, K274, K275, K277 and K278 (not landed/incomplete). K265's merge is reverted on
+master; K266/K267/K278 are DONE reports but not in the landed list.
+
+## Matrix evidence
+
+The matrix builds the net-conformance initfs and image once, then runs the five scenarios against
+Linux and Raven with `--no-build`:
 
 ```text
-K254 jerry/K254   K255 carl/K255    K256 mark/K256    K257 stuart/K257
-K258 dave/K258    K259 mel/K259     K260 kevin/K260   K261 tim/K261
+build initfs: 431.881 s, exit 0 (logs/build-initfs.log)
+build image:   15.668 s, exit 0 (logs/build-image.log)
+linux  handshake     pass (1.141 s)
+linux  zero-window   pass (5.006 s)
+linux  window-update pass (5.386 s)
+linux  retransmit    pass (1.339 s)
+linux  fin-rst       pass (4.128 s)
+raven  handshake     FAIL (35.149 s): SYN-ACK mss=1460 ws=1 sack=True; plain-peer ws=1 win=65535
+raven  zero-window   pass (27.493 s)
+raven  window-update pass (17.924 s)
+raven  retransmit    pass (27.258 s)
+raven  fin-rst       pass (46.574 s)
 ```
 
-K258's clean-room implementation and K259's two proposed NetBSD entries are held; K259's ecn.rs
-and pmtu.rs entries are **rejected** because they cite the NRL files. K260's report is DONE but
-still NetBSD-derived, so it is quarantined rather than accepted with a missing entry.
+The Linux reference for the same handshake is `SYN-ACK mss=1460 ws=7 sack=True; plain-peer
+ws=absent win=64240`. The Raven stack offers a window-scale option to a peer that did not offer
+one; this is a TCP port finding, not a K264 evidence blocker. The pcap is
+`tests/evidence/tcp/run-20261121T003615Z/pcaps/raven-handshake.pcap`; the serial is
+`tests/evidence/tcp/run-20261121T003615Z/serial/raven-handshake.log`.
 
-## Permitted donors
+The first matrix attempt timed out at 1200 s because the runner rebuilt inside every target
+scenario after a 300 s timeout; the preserved log is
+`/tmp/opencode/k264-matrix-timeout-001455Z`. The fix builds once and uses `--no-build` for all
+target scenarios; the complete run took about 620 s inside the same 1200 s cap.
 
-The audit reads the pinned donor revisions from the checkout's git objects, so the sparse
-worktrees do not hide the files:
+## Evidence packets
 
-| Donor | Revision | Licence | Files checked |
-|---|---|---|---|
-| FreeBSD | `133344405f532bd54ff3629a77d4c4e062f01fdb` | BSD-3-Clause (cc_newreno BSD-2-Clause) | `sys/netinet/tcp_output.c`, `tcp_input.c`, `tcp_timer.c`, `tcp_subr.c`, `tcp_usrreq.c`, `cc/cc_newreno.c`; `sys/sys/socketvar.h`; `sys/kern/sys_socket.c`, `uipc_socket.c` |
-| DragonFly | `94448f622a06cde90ba42d688e9cab2448ad9ab3` | BSD-3-Clause | `sys/netinet/tcp_sack.c` |
+* `tests/evidence/tcp/run-20261121T003615Z/` - matrix packet: `matrix.json`, ten pcaps, five
+  serial logs, build logs and `sha256sums.txt`. Manifest commit `c3a2d951`, `dirty: yes` because the
+  entries/claims were committed in `3cda2923` immediately after the run; `manifest.json` records
+  the input hashes.
+* `tests/evidence/tcp/run-20261121T004851Z/` - clean audit/unit/checker packet: `audit.json`,
+  `audit.txt`, `unit.json` (710/710), `logs/checker.log`, `summary.json`, `sha256sums.txt`.
+  Manifest commit `3cda2923`, `dirty: no`.
 
-No advertising clause is present in either donor's checked files. The donor HEADs match the
-pins; the audit records `source=git` for the sparse files.
-
-## Provenance entries
-
-`PROVENANCE.toml` still has **no** `crates/raven-tcpip` NetBSD import. The only entry under the
-crate is the pre-existing smoltcp DHCP client (`src/dhcp.rs`, 0BSD, tier A, revision
-`8b0e5c85...`), unrelated to TCP.
-
-No FreeBSD/DragonFly entry is added yet: the current port reports and branches still map NetBSD
-`tcp_input.c`/`tcp_output.c`/`tcp_sack.c`, and adding a FreeBSD/DragonFly entry for that code would
-be a false provenance claim. A reworked port report must send the exact entry; the audit will add
-it only with `status=landed` and the matching code in the same commit.
-
-## Port-claim intake
-
-A reworked report must send one entry per product file:
-
-```toml
-[[import]]
-path = "crates/raven-tcpip/src/<file>.rs"
-upstream = "freebsd"          # or "dragonfly" for tcp_sack
-upstream_path = "sys/netinet/<donor>.c"
-upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
-license = "BSD-3-Clause"      # BSD-2-Clause for cc/cc_newreno.c
-tier = "A"
-copied = "YYYY-MM-DD"
-modified = true
-notes = "<donor functions and every divergence>"
-```
-
-Then flip the claim from `quarantined` to `landed` in the same commit. The audit fails if a
-NetBSD import appears, if a quarantined claim gains an import, if a landed claim lacks one, or if
-the donor symbol/licence does not match the pinned donor.
-
-## Evidence packet
-
-A run writes `tests/evidence/tcp/run-<UTC>/`:
-
-```text
-manifest.json          commit, dirty state, host tools, input and donor revisions
-audit.txt/audit.json   NetBSD quarantine, FreeBSD/DragonFly donors, claims, violations
-unit.json              nextest counts and exit
-logs/unit.log          full nextest output
-matrix.json            per-target/per-scenario status (blocked when K253 is absent)
-matrix-blocked.txt     the exact missing path and owner
-summary.json/summary.txt  overall result and exit
-command.log            phase and command index
-sha256sums.txt         SHA-256 of every packet file
-```
-
-The packet is immutable evidence: `sha256sums.txt` covers it, and `manifest.json` records the
-commit and donor pins. Editing a packet after the run invalidates its hashes.
+Every packet has a SHA-256 manifest; `sha256sums.txt` covers the artifact set.
 
 ## Reproduce
 
 ```sh
 timeout 60  sh scripts/tcp-evidence.sh --selftest
-timeout 180 cargo nextest run -p raven-tcpip
+timeout 30  python3 scripts/tcp-evidence_ut.py
 timeout 120 sh scripts/tcp-evidence.sh --audit \
     --reports-root /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/tickets \
     --freebsd-root /home/bo/work/ravenos-workspace/ravenbsd-resources/freebsd \
     --dragonfly-root /home/bo/work/ravenos-workspace/ravenbsd-resources/dragonfly
-timeout 240 sh scripts/tcp-evidence.sh --all \
+timeout 1200 sh scripts/tcp-evidence.sh --matrix
+timeout 240 sh scripts/tcp-evidence.sh --audit --unit --checker \
     --reports-root /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/tickets \
     --freebsd-root /home/bo/work/ravenos-workspace/ravenbsd-resources/freebsd \
     --dragonfly-root /home/bo/work/ravenos-workspace/ravenbsd-resources/dragonfly
 ```
 
-The matrix becomes available when `scripts/net-conformance.sh` lands (K253, branch `bob/K253`
-`ef5c1158`, not merged). Measure its runtime then and use that measurement plus a margin for the
-cap.
-
-## Checker regression tests
-
-`python3 scripts/tcp-evidence_ut.py` runs three fixtures: a landed port with its required entry
-deleted, a NetBSD/NRL import, and a valid FreeBSD import. The checker must reject the first two and
-accept the third. The test then mutates a temporary copy of the checker to remove the NetBSD rule
-and the missing-entry rule; the bad fixtures must pass under those mutants, proving the test catches
-the regression. The output is stored as the `checker` phase in the evidence packet.
+The matrix cap is the measured cold run + margin; the build is cached after the first run. A
+cap expiry is a failure with the preserved log, not a reason to raise it.
 
 ## Limits
 
-* No 24 h or live SSH/tap claim is made here; live SSH is the Bob integration gate.
-* No product, kernel, libc or network code is changed by K264.
-* The donor audit reads the pinned donor objects and checks the licence class and symbol presence,
-  not copied-expression similarity; the literal-port reviewers remain responsible for the
-  file-by-file review.
-* The packet is partial until the NetBSD-derived ports are reworked against FreeBSD/DragonFly and
-  K253 lands; the tool records that state instead of hiding it.
+* The handshake window-scale finding is a TCP port gap; it needs a TCP ticket and wire evidence.
+* The quarantined ports must be reworked and resubmit their exact entries.
+* K271's report notes name `solisten_proto`; the pinned FreeBSD tree has
+  `solisten_clone`/`solisten_enqueue`, which are the verified symbols. Reviewer confirmation is
+  still required for that naming divergence.
+* No 24 h or live SSH/tap claim is made here; live SSH remains the integration gate.
+* No product code is changed by K264; the only product file touched is `PROVENANCE.toml`.

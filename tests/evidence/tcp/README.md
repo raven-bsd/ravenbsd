@@ -34,12 +34,15 @@ timeout 240 sh scripts/tcp-evidence.sh --all \
     --reports-root /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/tickets \
     --freebsd-root /home/bo/work/ravenos-workspace/ravenbsd-resources/freebsd \
     --dragonfly-root /home/bo/work/ravenos-workspace/ravenbsd-resources/dragonfly
+timeout 1200 sh scripts/tcp-evidence.sh --matrix
 ```
 
-`--all` runs the audit, the unit suite and the matrix in one packet. The matrix is recorded as
-`blocked` when `scripts/net-conformance.sh` is absent (K253 not merged) or the host cannot create
-the tap namespace; it is never recorded as a pass. The sparse donor worktrees are read through
-`git show HEAD:<path>` at the pinned revision.
+`--all` runs the audit, the unit suite, the checker and the matrix in one packet. The matrix
+builds the net-conformance initfs/image once and runs the five target scenarios with `--no-build`;
+the first matrix attempt timed out because it rebuilt inside each target scenario. The matrix is
+recorded as `blocked` when `scripts/net-conformance.sh` is absent (K253 not merged) or the host
+cannot create the tap namespace; a scenario failure is recorded as a TCP finding, not as a K264
+blocker. The sparse donor worktrees are read through `git show HEAD:<path>` at the pinned revision.
 
 ## Intake rule
 
