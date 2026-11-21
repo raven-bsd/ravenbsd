@@ -57,6 +57,7 @@ mod observability;
 mod plpmtud_live;
 mod pmtu;
 mod rack_os;
+mod rack_hpts;
 mod readiness;
 mod reassembly;
 mod recovery;
@@ -113,6 +114,10 @@ pub use pmtu::{
 };
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
+pub use rack_hpts::{
+    HPTS_USECS_PER_SLOT, HptsCallback, NUM_OF_HPTSI_SLOTS, PACE_TMR_DELACK, PACE_TMR_KEEP,
+    PACE_TMR_MASK, PACE_TMR_PERSIT, PACE_TMR_RACK, PACE_TMR_RXT, PACE_TMR_TLP, RackHpts,
+    RackTimeout, hpts_usec_to_slots, rack_timeout_action,
 };
 pub use readiness::Readiness;
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
