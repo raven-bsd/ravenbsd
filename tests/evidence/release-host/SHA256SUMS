@@ -34,3 +34,10 @@ bbdeb13d289a9a98c0a2a2dcbb08957c6bfd4698a90f08c0f265099e441d0b1f  tests/evidence
 ae3a2958a3a650c700b97b7290a2ab9f33ef2caccb0c6e3593c925ac8ef52535  tests/evidence/release-host/cold-start/kvm-smp4-sample3.log
 124c112d9b0d4a9382f9390e0407aa3cd63ffda95613915afaee3b0abadd682f  tests/evidence/release-host/cold-start/kvm-smp4-sample4.log
 8ca3bc31893658f19afb01b83857cf0ac02af36e7702f78c2fba0dcd08143a8d  tests/evidence/release-host/cold-start/kvm-smp4-sample5.log
+1c52a3c071744132f2b702bace5212e3d7c5284f300e16727368ca8ab4d7404b  tests/evidence/release-host/cold-start-boot/README.md
+b0f832278464b3006a3083e1c225a27bc9b3e817d8270dbe434800c9da78894d  tests/evidence/release-host/cold-start-boot/run.log
+cb234e0163e46ae914e6a2083ceb0c9b7de6e4d4df316859581c87bc9489f732  tests/evidence/release-host/cold-start-boot/run-1.log
+e6e5ae42c1672515499312e9a2441e358e8200300df41772526e6024525cc00c  tests/evidence/release-host/cold-start-boot/run-2.log
+fcfdd05a00dfd118011f9e40c9d9f958de0e53f9349d003e3e9a89b5e181a96c  tests/evidence/release-host/cold-start-boot/run-3.log
+87ab4824eb12acc4df509fa2987a7da4dda820700b125b90b96bb87d81e65577  tests/evidence/release-host/cold-start-boot/run-4.log
+61289a8d4370c912317bbf8928ed51382ef373635d4c9ba973298aea10320215  tests/evidence/release-host/cold-start-boot/run-5.log
