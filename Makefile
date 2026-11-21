@@ -32,7 +32,7 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs soak-smoke soak-24h \
+	posix-gaps posix-check toolchain clean distclean check-fast check-build ufs-selftest qemu-ufs soak-smoke soak-24h \
 	tcp-soak-smoke tcp-soak-24h
 
 help:
@@ -54,6 +54,11 @@ check:
 # or the working tree. Seconds, not minutes. The full `make check` stays the checkpoint gate.
 check-fast:
 	@$(XTASK) check --fast --changed
+
+# Pre-tag gate: compile every host workspace test target, do not run tests. Closes the
+# check-fast changed-package blind spot (K394/K400). Run after check-fast and before the qtests.
+check-build:
+	@sh tests/release/workspace-build/run.sh
 
 # Host-only UFS image/partition updater proof: GPT/ESP+UFS, put/rm/mkdir/sync,
 # fsck and the safety refusals. No board and no whole-image copy.

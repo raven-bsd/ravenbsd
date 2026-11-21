@@ -13,6 +13,7 @@ run|Boot the selected profile in QEMU
 group:Test
 check|Full gate: stable guard, fmt, clippy, tests, provenance
 check-fast|Fast changed-package gate for everyday edits
+check-build|Compile all workspace test targets (pre-tag: check-fast, check-build, qtests)
 check-full|Full allocator stress gate
 guard|Stable-Rust guard only
 test|Full check plus every QEMU integration test
