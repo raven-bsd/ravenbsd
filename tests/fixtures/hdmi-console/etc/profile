@@ -1,0 +1,5 @@
+PATH=/bin:/sbin
+HOME=/
+TERM=vt100
+USER=root
+SHELL=/bin/rsh

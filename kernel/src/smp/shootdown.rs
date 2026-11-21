@@ -89,6 +89,7 @@ static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static PENDING: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 static ACKED: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 static LAST: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
+static LAST_TIME: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 static FLUSHES: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 
 /// Arm the one-shot timeout injection used by the `concurrency-stress` test.
@@ -118,6 +119,7 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
 
     let _guard = ActiveGuard::acquire();
     let inject = INJECT_FAILURE.swap(0, Ordering::AcqRel) != 0;
+    let start = time::now_ns();
     let sequence = SEQUENCE.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
     ADDRESS.store(addr, Ordering::SeqCst);
     LENGTH.store(len, Ordering::SeqCst);
@@ -146,7 +148,7 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
     // The caller may be inside a syscall or page fault with IF clear. Re-enable interrupts only
     // while waiting so a target that is spinning on the address-space lock can still take the
     // IPI. `ActiveGuard::drop` restores the caller's original IF.
-    let deadline = time::now_ns().saturating_add(100_000_000);
+    let deadline = start.saturating_add(100_000_000);
     ap_start::enable_local_interrupts();
     let mut all_acked = true;
     cpu = 0;
@@ -165,13 +167,20 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
                     let page_fault_phase = percpu::page_fault_phase(cpu);
                     let wait_phase = percpu::wait_phase(cpu);
                     let now = time::now_ns();
+                    let ack_time = LAST_TIME[cpu].load(Ordering::SeqCst);
                     kprintln!(
-                        "smp: tlb shootdown timeout on cpu {cpu} seq={sequence} last={} flushes={} state={state} syscall={in_syscall} pf={page_fault} pfp={page_fault_phase} wq={wait_phase} nr={syscall_number:#x} user_if={} irq_age_ms={} state_age_ms={}",
+                        "smp: tlb shootdown timeout on cpu {cpu} seq={sequence} last={} flushes={} state={state} syscall={in_syscall} pf={page_fault} pfp={page_fault_phase} wq={wait_phase} nr={syscall_number:#x} user_if={} irq_age_ms={} state_age_ms={} ack_after_ms={} ack_age_ms={}",
                         LAST[cpu].load(Ordering::SeqCst),
                         flush_count(cpu),
                         (user_flags >> 9) & 1,
                         now.saturating_sub(last_irq) / 1_000_000,
-                        now.saturating_sub(last_state) / 1_000_000
+                        now.saturating_sub(last_state) / 1_000_000,
+                        if ack_time >= start {
+                            ack_time.saturating_sub(start) / 1_000_000
+                        } else {
+                            u64::MAX
+                        },
+                        now.saturating_sub(ack_time) / 1_000_000
                     );
                     all_acked = false;
                     break;
@@ -186,18 +195,23 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
 }
 
 /// Handle a TLB IPI on the current CPU.
-pub fn handle_ipi() {
+///
+/// Returns true when a pending shootdown was found and acknowledged. The NMI handler uses the
+/// result to distinguish a shootdown from an unexpected non-maskable interrupt.
+pub fn handle_ipi() -> bool {
     let cpu = percpu::this_cpu();
     let sequence = PENDING[cpu].load(Ordering::SeqCst);
     if sequence == 0 || LAST[cpu].load(Ordering::SeqCst) == sequence {
-        return;
+        return false;
     }
     let addr = ADDRESS.load(Ordering::SeqCst);
     let len = LENGTH.load(Ordering::SeqCst);
     ap_start::flush_range_local(addr, len);
     FLUSHES[cpu].fetch_add(1, Ordering::SeqCst);
     LAST[cpu].store(sequence, Ordering::SeqCst);
+    LAST_TIME[cpu].store(time::now_ns(), Ordering::SeqCst);
     ACKED[cpu].store(sequence, Ordering::SeqCst);
+    true
 }
 
 /// Number of TLB IPIs handled by `cpu` (self-test diagnostics).

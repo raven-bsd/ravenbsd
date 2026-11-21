@@ -1,0 +1,40 @@
+
+   Compiling raven-at-fixture v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/posix/utility/at/fixture)
+error[E0432]: unresolved import `raven_rt::spawn::spawn`
+   --> tests/posix/utility/at/fixture/src/main.rs:18:37
+    |
+ 18 | use raven_rt::spawn::{SpawnOptions, spawn};
+    |                                     ^^^^^ no `spawn` in `spawn`
+    |
+note: found an item that was configured out
+   --> userland/rt/src/spawn.rs:118:8
+    |
+117 | #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    |          -------------------------------------------- the item is gated here
+118 | pub fn spawn(
+    |        ^^^^^
+
+error[E0425]: cannot find value `TargetSpool` in crate `at`
+   --> tests/posix/utility/at/fixture/src/main.rs:54:25
+    |
+ 54 |     let mut spool = at::TargetSpool;
+    |                         ^^^^^^^^^^^ not found in `at`
+    |
+note: found an item that was configured out
+   --> userland/bin/at/src/lib.rs:623:12
+    |
+621 | #[cfg(target_os = "none")]
+    |       ------------------ the item is gated behind the `none` feature
+622 | #[derive(Clone, Copy, Debug, Default)]
+623 | pub struct TargetSpool;
+    |            ^^^^^^^^^^^
+
+error[E0152]: duplicate lang item in crate `std` (which `test` depends on): `panic_impl`
+  |
+  = note: the lang item is first defined in crate `raven_rt` (which `raven_at_fixture` depends on)
+  = note: first definition in `raven_rt` loaded from /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-3ac44c8a3e75c778.rlib
+  = note: second definition in `std` loaded from /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.so, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rlib, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rmeta
+
+Some errors have detailed explanations: E0152, E0425, E0432.
+For more information about an error, try `rustc --explain E0152`.
+error: could not compile `raven-at-fixture` (bin "raven-at-fixture" test) due to 3 previous errors

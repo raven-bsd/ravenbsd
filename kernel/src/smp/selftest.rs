@@ -41,6 +41,59 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 static SEEN: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
 static DONE: AtomicU32 = AtomicU32::new(0);
 
+/// S159: target readiness for the deterministic IF=0 TLB shootdown test.
+#[cfg(target_arch = "x86_64")]
+static IF0_READY: AtomicU32 = AtomicU32::new(0);
+/// S159: target completion for the deterministic IF=0 TLB shootdown test.
+#[cfg(target_arch = "x86_64")]
+static IF0_DONE: AtomicU32 = AtomicU32::new(0);
+
+/// K393: target readiness for the simulated syscall `swapgs` window.
+#[cfg(target_arch = "x86_64")]
+static SWAPGS_READY: AtomicU32 = AtomicU32::new(0);
+/// K393: release the simulated `swapgs` window after the shootdown.
+#[cfg(target_arch = "x86_64")]
+static SWAPGS_RELEASE: AtomicU32 = AtomicU32::new(0);
+/// K393: target completion for the simulated `swapgs` window.
+#[cfg(target_arch = "x86_64")]
+static SWAPGS_DONE: AtomicU32 = AtomicU32::new(0);
+/// K393: the handler left the simulated GS pair unchanged.
+#[cfg(target_arch = "x86_64")]
+static SWAPGS_OK: AtomicU32 = AtomicU32::new(0);
+
+/// K393: concurrent shooter completion.
+#[cfg(target_arch = "x86_64")]
+static NESTED_DONE: AtomicU32 = AtomicU32::new(0);
+/// K393: concurrent shooter failure count.
+#[cfg(target_arch = "x86_64")]
+static NESTED_FAIL: AtomicU32 = AtomicU32::new(0);
+
+/// K393: absent/invalid `KERNEL_GS_BASE` stage and handshake.
+#[cfg(target_arch = "x86_64")]
+static GS_READY: AtomicU32 = AtomicU32::new(0);
+/// K393: release the absent/invalid `KERNEL_GS_BASE` stage.
+#[cfg(target_arch = "x86_64")]
+static GS_RELEASE: AtomicU32 = AtomicU32::new(0);
+/// K393: target completion for the absent/invalid `KERNEL_GS_BASE` stages.
+#[cfg(target_arch = "x86_64")]
+static GS_DONE: AtomicU32 = AtomicU32::new(0);
+/// K393: both `KERNEL_GS_BASE` patterns left the GS pair unchanged.
+#[cfg(target_arch = "x86_64")]
+static GS_OK: AtomicU32 = AtomicU32::new(0);
+
+/// `IA32_GS_BASE` architectural MSR.
+#[cfg(target_arch = "x86_64")]
+const IA32_GS_BASE: u32 = 0xC000_0101;
+/// `IA32_KERNEL_GS_BASE` architectural MSR.
+#[cfg(target_arch = "x86_64")]
+const IA32_KERNEL_GS_BASE: u32 = 0xC000_0102;
+/// Non-canonical-user-like value for the absent/invalid `KERNEL_GS_BASE` pattern.
+#[cfg(target_arch = "x86_64")]
+const INVALID_KERNEL_GS_BASE: u64 = 0x0000_dead_beef_0000;
+/// Concurrent shootdown rounds per shooter in the nesting test.
+#[cfg(target_arch = "x86_64")]
+const NESTED_ROUNDS: u32 = 16;
+
 /// Read by both CPUs in the concurrent call-probe test.
 static PROBE_BYTE: u8 = 0x5a;
 static PROBE_DONE: AtomicU32 = AtomicU32::new(0);
@@ -151,6 +204,40 @@ fn monitor() {
             boot::exit_qemu(0x11);
         }
     }
+    // Let the probe threads leave CPU1 before the next pinned edge target is queued there.
+    sleep::sleep_ns(20_000_000);
+    #[cfg(target_arch = "x86_64")]
+    match gs_pattern_test(cpus) {
+        Ok(patterns) => kprintln!("selftest: smp tlb gs ok absent={patterns} invalid={patterns}"),
+        Err(reason) => {
+            kprintln!("selftest: smp tlb gs failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    match swapgs_window_test(cpus) {
+        Ok(elapsed_ms) => kprintln!("selftest: smp tlb swapgs ok elapsed_ms={elapsed_ms}"),
+        Err(reason) => {
+            kprintln!("selftest: smp tlb swapgs failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    match nested_shootdown_test(cpus) {
+        Ok(rounds) => kprintln!("selftest: smp tlb nested ok rounds={rounds}"),
+        Err(reason) => {
+            kprintln!("selftest: smp tlb nested failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    match if0_shootdown_test(cpus) {
+        Ok(elapsed_ms) => kprintln!("selftest: smp tlb if0 ok elapsed_ms={elapsed_ms}"),
+        Err(reason) => {
+            kprintln!("selftest: smp tlb if0 failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
     kprintln!(
         "selftest: smp ok cpus={cpus} switches={}",
         sched::switch_count()
@@ -180,6 +267,248 @@ fn probe_worker(cpu: usize) {
     }
     PROBE_DONE.fetch_add(1, Ordering::SeqCst);
     sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn if0_target() {
+    // Intentional: hold IF clear across the S113/S159 shootdown deadline. This is the
+    // deterministic reproducer for a target that cannot take a fixed TLB IPI.
+    crate::arch::x86_64::ap_start::disable_local_interrupts();
+    core::sync::atomic::fence(Ordering::SeqCst);
+    IF0_READY.store(1, Ordering::SeqCst);
+    let start = sleep::now_ns();
+    while sleep::now_ns().saturating_sub(start) < 150_000_000 {
+        core::hint::spin_loop();
+    }
+    crate::arch::x86_64::ap_start::enable_local_interrupts();
+    IF0_DONE.store(1, Ordering::SeqCst);
+    sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn if0_shootdown_test(cpus: usize) -> Result<u64, &'static str> {
+    if cpus < 2 {
+        return Ok(0);
+    }
+    IF0_READY.store(0, Ordering::SeqCst);
+    IF0_DONE.store(0, Ordering::SeqCst);
+    if sched::spawn_kernel_on(1, "smp-if0", if0_target).is_err() {
+        return Err("cannot spawn IF=0 target");
+    }
+    let start = sleep::now_ns();
+    while IF0_READY.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("IF=0 target not ready");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    let start = sleep::now_ns();
+    let flushed = shootdown::flush_range(TLB_TEST_BASE, frame::PAGE_SIZE);
+    let elapsed_ms = sleep::now_ns().saturating_sub(start) / 1_000_000;
+    if !flushed {
+        return Err("IF=0 shootdown timed out");
+    }
+    let start = sleep::now_ns();
+    while IF0_DONE.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("IF=0 target did not finish");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    Ok(elapsed_ms)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn swapgs_window_target() {
+    let kernel_gs = crate::arch::x86_64::ap_start::rdmsr(IA32_GS_BASE);
+    let old_kernel_gs = crate::arch::x86_64::ap_start::rdmsr(IA32_KERNEL_GS_BASE);
+    // Simulate the architectural pre-`swapgs` window: the user base is loaded in GS_BASE and
+    // the kernel per-CPU block is parked in the privileged KERNEL_GS_BASE. IF is clear so a
+    // timer interrupt cannot use the absent per-CPU base; the NMI is non-maskable.
+    crate::arch::x86_64::ap_start::disable_local_interrupts();
+    crate::arch::x86_64::ap_start::wrmsr(IA32_GS_BASE, 0);
+    crate::arch::x86_64::ap_start::wrmsr(IA32_KERNEL_GS_BASE, kernel_gs);
+    core::sync::atomic::fence(Ordering::SeqCst);
+    SWAPGS_READY.store(1, Ordering::SeqCst);
+    while SWAPGS_RELEASE.load(Ordering::SeqCst) == 0 {
+        core::hint::spin_loop();
+    }
+    let gs = crate::arch::x86_64::ap_start::rdmsr(IA32_GS_BASE);
+    let kernel = crate::arch::x86_64::ap_start::rdmsr(IA32_KERNEL_GS_BASE);
+    SWAPGS_OK.store(u32::from(gs == 0 && kernel == kernel_gs), Ordering::SeqCst);
+    // Restore the original pair before any interrupt can observe the simulated state.
+    crate::arch::x86_64::ap_start::wrmsr(IA32_KERNEL_GS_BASE, old_kernel_gs);
+    crate::arch::x86_64::ap_start::wrmsr(IA32_GS_BASE, kernel_gs);
+    crate::arch::x86_64::ap_start::enable_local_interrupts();
+    SWAPGS_DONE.store(1, Ordering::SeqCst);
+    sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn swapgs_window_test(cpus: usize) -> Result<u64, &'static str> {
+    if cpus < 2 {
+        return Err("needs at least 2 CPUs");
+    }
+    SWAPGS_READY.store(0, Ordering::SeqCst);
+    SWAPGS_RELEASE.store(0, Ordering::SeqCst);
+    SWAPGS_DONE.store(0, Ordering::SeqCst);
+    SWAPGS_OK.store(0, Ordering::SeqCst);
+    if sched::spawn_kernel_on(1, "smp-swapgs", swapgs_window_target).is_err() {
+        return Err("cannot spawn swapgs target");
+    }
+    let start = sleep::now_ns();
+    while SWAPGS_READY.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("swapgs target not ready");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    let start = sleep::now_ns();
+    let flushed = shootdown::flush_range(TLB_TEST_BASE, frame::PAGE_SIZE);
+    let elapsed_ms = sleep::now_ns().saturating_sub(start) / 1_000_000;
+    SWAPGS_RELEASE.store(1, Ordering::SeqCst);
+    let start = sleep::now_ns();
+    while SWAPGS_DONE.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("swapgs target did not finish");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    if !flushed {
+        return Err("swapgs shootdown timed out");
+    }
+    if SWAPGS_OK.load(Ordering::SeqCst) == 0 {
+        return Err("swapgs handler did not restore the GS pair");
+    }
+    sleep::sleep_ns(10_000_000);
+    Ok(elapsed_ms)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn nested_shooter() {
+    let mut round = 0u32;
+    while round < NESTED_ROUNDS {
+        if !shootdown::flush_range(TLB_TEST_BASE, frame::PAGE_SIZE) {
+            NESTED_FAIL.fetch_add(1, Ordering::SeqCst);
+        }
+        round = round.saturating_add(1);
+    }
+    NESTED_DONE.fetch_add(1, Ordering::SeqCst);
+    sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn nested_shootdown_test(cpus: usize) -> Result<u32, &'static str> {
+    if cpus < 3 {
+        return Err("needs at least 3 CPUs");
+    }
+    NESTED_DONE.store(0, Ordering::SeqCst);
+    NESTED_FAIL.store(0, Ordering::SeqCst);
+    if sched::spawn_kernel_on(1, "smp-nested-1", nested_shooter).is_err() {
+        return Err("cannot spawn nested shooter 1");
+    }
+    if sched::spawn_kernel_on(2, "smp-nested-2", nested_shooter).is_err() {
+        return Err("cannot spawn nested shooter 2");
+    }
+    let start = sleep::now_ns();
+    while NESTED_DONE.load(Ordering::SeqCst) < 2 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("nested shooters timed out");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    if NESTED_FAIL.load(Ordering::SeqCst) != 0 {
+        return Err("nested shootdown returned false");
+    }
+    // Let both shooters leave their CPUs before the stale-NMI probe targets CPU 1.
+    sleep::sleep_ns(10_000_000);
+    // A second NMI with no new sequence must be a no-op: the handler must not double-ack it.
+    let before = shootdown::flush_count(1);
+    crate::arch::x86_64::apic::send_nmi(crate::arch::x86_64::ap_start::apic_id(1));
+    sleep::sleep_ns(20_000_000);
+    if shootdown::flush_count(1) != before {
+        return Err("duplicate NMI acknowledged a stale shootdown");
+    }
+    sleep::sleep_ns(10_000_000);
+    Ok(NESTED_ROUNDS.saturating_mul(2))
+}
+
+#[cfg(target_arch = "x86_64")]
+fn gs_pattern_target() {
+    let kernel_gs = crate::arch::x86_64::ap_start::rdmsr(IA32_GS_BASE);
+    let old_kernel_gs = crate::arch::x86_64::ap_start::rdmsr(IA32_KERNEL_GS_BASE);
+    crate::arch::x86_64::ap_start::disable_local_interrupts();
+    // Absent pattern: KERNEL_GS_BASE is zero while the kernel GS base is live.
+    crate::arch::x86_64::ap_start::wrmsr(IA32_KERNEL_GS_BASE, 0);
+    core::sync::atomic::fence(Ordering::SeqCst);
+    GS_READY.store(1, Ordering::SeqCst);
+    while GS_RELEASE.load(Ordering::SeqCst) == 0 {
+        core::hint::spin_loop();
+    }
+    let absent = crate::arch::x86_64::ap_start::rdmsr(IA32_GS_BASE) == kernel_gs
+        && crate::arch::x86_64::ap_start::rdmsr(IA32_KERNEL_GS_BASE) == 0;
+    // Invalid pattern: a non-kernel KERNEL_GS_BASE must not trigger a swap.
+    crate::arch::x86_64::ap_start::wrmsr(IA32_KERNEL_GS_BASE, INVALID_KERNEL_GS_BASE);
+    GS_RELEASE.store(0, Ordering::SeqCst);
+    core::sync::atomic::fence(Ordering::SeqCst);
+    GS_READY.store(2, Ordering::SeqCst);
+    while GS_RELEASE.load(Ordering::SeqCst) == 0 {
+        core::hint::spin_loop();
+    }
+    let invalid = crate::arch::x86_64::ap_start::rdmsr(IA32_GS_BASE) == kernel_gs
+        && crate::arch::x86_64::ap_start::rdmsr(IA32_KERNEL_GS_BASE) == INVALID_KERNEL_GS_BASE;
+    GS_OK.store(u32::from(absent && invalid), Ordering::SeqCst);
+    crate::arch::x86_64::ap_start::wrmsr(IA32_KERNEL_GS_BASE, old_kernel_gs);
+    crate::arch::x86_64::ap_start::enable_local_interrupts();
+    GS_DONE.store(1, Ordering::SeqCst);
+    sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn gs_pattern_test(cpus: usize) -> Result<u32, &'static str> {
+    if cpus < 2 {
+        return Err("needs at least 2 CPUs");
+    }
+    GS_READY.store(0, Ordering::SeqCst);
+    GS_RELEASE.store(0, Ordering::SeqCst);
+    GS_DONE.store(0, Ordering::SeqCst);
+    GS_OK.store(0, Ordering::SeqCst);
+    if sched::spawn_kernel_on(1, "smp-gs-pattern", gs_pattern_target).is_err() {
+        return Err("cannot spawn GS pattern target");
+    }
+    let start = sleep::now_ns();
+    while GS_READY.load(Ordering::SeqCst) != 1 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("GS absent pattern not ready");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    let absent = shootdown::flush_range(TLB_TEST_BASE, frame::PAGE_SIZE);
+    GS_RELEASE.store(1, Ordering::SeqCst);
+    let start = sleep::now_ns();
+    while GS_READY.load(Ordering::SeqCst) != 2 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("GS invalid pattern not ready");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    let invalid = shootdown::flush_range(TLB_TEST_BASE, frame::PAGE_SIZE);
+    GS_RELEASE.store(1, Ordering::SeqCst);
+    let start = sleep::now_ns();
+    while GS_DONE.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("GS pattern target did not finish");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    if !absent || !invalid {
+        return Err("GS pattern shootdown timed out");
+    }
+    if GS_OK.load(Ordering::SeqCst) == 0 {
+        return Err("GS pattern handler changed the GS pair");
+    }
+    sleep::sleep_ns(10_000_000);
+    Ok(1)
 }
 
 fn call_probe_test(cpus: usize) -> Result<u32, &'static str> {
