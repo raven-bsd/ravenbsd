@@ -42,3 +42,8 @@ userland/uutils/
 # under the MIT import. The K26c import records the upstream sources and licences.
 userland/brush/vendor/
 userland/brush/ravenbsd-libc-delta.md
+
+# K264: generated evidence run directories (JSON/log/TXT/pcap) are not source; the evidence
+# scripts, README, port-claims.json and docs stay under the SPDX/provenance check. The K263
+# baseline pcaps follow the rule above.
+tests/evidence/tcp/run-*/**
