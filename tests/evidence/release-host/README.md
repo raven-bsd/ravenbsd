@@ -29,7 +29,7 @@ host image or QEMU run is not a board result.
 | pipe-poll | K370, K372 | `f3c10013` | OBSERVED | **PASS pipe; SSH BLOCKED** | `pipe-poll` qtest pass; `raven-libc-platform` 584/584; K195 tap 0/10 (netd queued-TX) | `docs/pipe-poll.md` | `33b151bd1c910e8f3b5c1585ebe6d0a9c6bb0162cdef44fc79af69a477da8a48` |
 | image-x86_64 | REL6 | `fd394ff3` | UNVERIFIED | **PINNED** | image hash recorded at the old product commit; not rebuilt at `b8169cce` | `docs/release-images.md` | `cf59ad921923f06d0914d6d3951707189dba2d257c1ae3ff804d351fe56bfc69` |
 | image-aarch64 | REL6 | `fd394ff3` | UNVERIFIED | **PINNED** | image hash recorded at the old product commit; not rebuilt at `b8169cce` | `docs/release-images.md` | `cf59ad921923f06d0914d6d3951707189dba2d257c1ae3ff804d351fe56bfc69` |
-| cold-start | K135/K139 | `63efc104` | UNVERIFIED | **PENDING** | no 5/5 <1 s sample in the packet; board `QEMU boot <1 s` MET | `docs/releases/0.1.0-notes.md` | `88e6fcd36fe668c19f46489ad5245d07fc17f8636a17870322eeb768ab8074c9` |
+| cold-start | K135/K139, S116b | `b04e71ad` | OBSERVED | **PASS** | 5/5 KVM4 release-image samples: `login_ms` median 57.2/p90 61.1, `password_ms` 105.8/112.9; image sha `a993cd2c...`; load1 20.55-23.93 | `tests/evidence/release-host/cold-start/README.md` | `addec918bebf02044464e2c2458e8f7f3e4b3fa8f561daf0bde52982bec92c67` |
 | pi4-board | owner hardware | - | HARDWARE/UNVERIFIED | **HARDWARE** | no board log/serial/photo; host image is not a board result | none | - |
 
 ## Release board NO-GO / HARDWARE rows
