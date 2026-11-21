@@ -1013,6 +1013,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rack-audit-log-bbr"
+version = "0.1.0"
+
+[[package]]
 name = "rack-audit-misc-transport"
 version = "0.1.0"
 

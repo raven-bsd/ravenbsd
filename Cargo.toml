@@ -321,6 +321,7 @@ members = [
     "tests/rack-vtable-model",
     "tests/rack-audit-models",
     "tests/rack-output-matrix",
+    "tests/rack-audit-log-bbr",
     "tests/rack-replay",
     "tests/rack-acceptance",
     "tests/rack-register",
