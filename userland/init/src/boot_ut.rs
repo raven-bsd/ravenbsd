@@ -27,6 +27,19 @@ fn rows() -> Vec<Row> {
 }
 
 #[test]
+fn no_color_or_dumb_selects_the_plain_transcript() {
+    for (no_color, term_dumb) in [(true, false), (false, true), (true, true)] {
+        crate::configure_boot_plain(no_color, term_dumb);
+        assert!(
+            plain_requested(),
+            "NO_COLOR={no_color} TERM=dumb={term_dumb}"
+        );
+    }
+    crate::configure_boot_plain(false, false);
+    assert!(!plain_requested(), "a colour terminal selects ANSI");
+}
+
+#[test]
 fn plain_screen_has_the_exact_golden_bytes() {
     let expected = format!(
         "R A V E N   B S D\n{RULE}\n000.00  svcd                ok\n001.25  vfsd                ok\n002.00  optional            warn\n{RULE}\n\nWelcome to RavenBSD 0.1 x86_64\n"
