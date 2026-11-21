@@ -714,9 +714,10 @@ fn syn_received_state_is_visible_for_a_half_open_connection() {
     let listener = stack.tcp_listen(80, 2).expect("listen");
     let frame = tcp_frame(B, A, 1234, 80, 100, 0, TcpFlags::SYN);
     stack.test_inject_frame(&frame, Instant::ZERO);
-    let half_open = stack.test_listener_half_open(listener);
-    assert_eq!(half_open.len(), 1);
-    assert_eq!(stack.tcp_state(half_open[0]), Ok(TcpState::SynReceived));
+    stack.poll(Instant::ZERO);
+    assert_eq!(stack.test_syncache_len(), 1);
+    assert!(stack.test_listener_half_open(listener).is_empty());
+    assert!(stack.test_syncache_entry(1234).is_some());
 }
 
 #[test]
@@ -808,25 +809,21 @@ fn syn_received_final_ack_processes_payload() {
     let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
     b.test_inject_frame(&syn, Instant::ZERO);
     b.poll(Instant::ZERO);
-    let half_open = b.test_listener_half_open(listener);
-    assert_eq!(half_open.len(), 1, "one half-open connection");
-    let half = half_open[0];
-    let iss = b.test_tcp_iss(half).expect("iss");
-    let rcv_nxt = b.test_tcp_rcv_nxt(half).expect("rcv_nxt");
+    let (iss, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
 
     let ack = tcp_frame_payload(
         B,
         A,
         40_000,
         80,
-        rcv_nxt,
+        irs.wrapping_add(1),
         iss.wrapping_add(1),
         TcpFlags::ACK,
         b"hello",
     );
     b.test_inject_frame(&ack, Instant::from_millis(10));
     b.poll(Instant::from_millis(10));
-    assert_eq!(b.tcp_state(half), Ok(TcpState::Established));
+    assert_eq!(b.test_syncache_len(), 0);
     let accepted = b
         .tcp_accept(listener)
         .expect("accept")
@@ -848,16 +845,14 @@ fn duplicate_syn_with_other_sequence_does_not_close_syn_received() {
     let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
     b.test_inject_frame(&syn, Instant::ZERO);
     b.poll(Instant::ZERO);
-    let half = b.test_listener_half_open(listener)[0];
-    let iss = b.test_tcp_iss(half).expect("iss");
-    let rcv_nxt = b.test_tcp_rcv_nxt(half).expect("rcv_nxt");
+    let (iss, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
 
     let forged = tcp_frame(B, A, 40_000, 80, 1_000, 0, TcpFlags::SYN);
     b.test_inject_frame(&forged, Instant::from_millis(10));
     assert_eq!(
-        b.tcp_state(half),
-        Ok(TcpState::SynReceived),
-        "a non-matching SYN must not close the half-open connection"
+        b.test_syncache_len(),
+        1,
+        "a duplicate SYN must not remove the syncache entry"
     );
 
     let ack = tcp_frame(
@@ -865,12 +860,13 @@ fn duplicate_syn_with_other_sequence_does_not_close_syn_received() {
         A,
         40_000,
         80,
-        rcv_nxt,
+        irs.wrapping_add(1),
         iss.wrapping_add(1),
         TcpFlags::ACK,
     );
     b.test_inject_frame(&ack, Instant::from_millis(20));
-    assert_eq!(b.tcp_state(half), Ok(TcpState::Established));
+    b.poll(Instant::from_millis(20));
+    assert_eq!(b.test_syncache_len(), 0);
     assert!(b.tcp_accept(listener).expect("accept").is_some());
 }
 
@@ -879,17 +875,16 @@ fn duplicate_syn_with_other_sequence_does_not_close_syn_received() {
 #[test]
 fn syn_below_irs_in_syn_received_gets_reset_ack() {
     let mut b = stack4();
-    let listener = b.tcp_listen(80, 4).expect("listen");
+    let _listener = b.tcp_listen(80, 4).expect("listen");
     let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
     b.test_inject_frame(&syn, Instant::ZERO);
     b.poll(Instant::ZERO);
-    let half = b.test_listener_half_open(listener)[0];
     b.test_clear_trace();
 
     let land = tcp_frame(B, A, 40_000, 80, 99, 0, TcpFlags::SYN);
     b.test_inject_frame(&land, Instant::from_millis(10));
     b.poll(Instant::from_millis(10));
-    assert_eq!(b.tcp_state(half), Ok(TcpState::SynReceived));
+    assert_eq!(b.test_syncache_len(), 1);
     let reply = trace_tcp(&b)
         .into_iter()
         .find(|(flags, _, _)| flags.rst())
@@ -903,16 +898,15 @@ fn syn_below_irs_in_syn_received_gets_reset_ack() {
 #[test]
 fn rst_in_syn_received_records_econnrefused() {
     let mut b = stack4();
-    let listener = b.tcp_listen(80, 4).expect("listen");
+    let _listener = b.tcp_listen(80, 4).expect("listen");
     let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
     b.test_inject_frame(&syn, Instant::ZERO);
     b.poll(Instant::ZERO);
-    let half = b.test_listener_half_open(listener)[0];
-    let rcv_nxt = b.test_tcp_rcv_nxt(half).expect("rcv_nxt");
-    let rst = tcp_frame(B, A, 40_000, 80, rcv_nxt, 0, TcpFlags::RST);
+    let (_, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
+    let rst = tcp_frame(B, A, 40_000, 80, irs.wrapping_add(1), 0, TcpFlags::RST);
     b.test_inject_frame(&rst, Instant::from_millis(10));
-    assert_eq!(b.tcp_state(half), Ok(TcpState::Closed));
-    assert_eq!(b.tcp_error(half), Ok(Some(Errno::ECONNREFUSED)));
+    b.poll(Instant::from_millis(10));
+    assert_eq!(b.test_syncache_len(), 0, "a valid RST aborts the entry");
 }
 
 /// RFC 5961 RST validation uses `last_ack_sent` as well as `RCV.NXT`.  A small
@@ -952,19 +946,17 @@ fn rst_at_last_ack_sent_closes_a_connection_with_a_held_ack() {
 #[test]
 fn syn_received_bad_ack_gets_a_reset() {
     let mut b = stack4();
-    let listener = b.tcp_listen(80, 4).expect("listen");
+    let _listener = b.tcp_listen(80, 4).expect("listen");
     let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
     b.test_inject_frame(&syn, Instant::ZERO);
     b.poll(Instant::ZERO);
-    let half = b.test_listener_half_open(listener)[0];
-    let iss = b.test_tcp_iss(half).expect("iss");
-    let rcv_nxt = b.test_tcp_rcv_nxt(half).expect("rcv_nxt");
+    let (iss, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
     b.test_clear_trace();
 
-    let bad = tcp_frame(B, A, 40_000, 80, rcv_nxt, iss, TcpFlags::ACK);
+    let bad = tcp_frame(B, A, 40_000, 80, irs.wrapping_add(1), iss, TcpFlags::ACK);
     b.test_inject_frame(&bad, Instant::from_millis(10));
     b.poll(Instant::from_millis(10));
-    assert_eq!(b.tcp_state(half), Ok(TcpState::SynReceived));
+    assert_eq!(b.test_syncache_len(), 1, "a bad ACK keeps the entry");
     assert!(
         trace_tcp(&b).iter().any(|(flags, _, _)| flags.rst()),
         "an ACK that ignores the SYN gets a RST"

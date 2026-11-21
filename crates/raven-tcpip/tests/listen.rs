@@ -7,7 +7,10 @@
 
 mod common;
 
-use common::{A, B, address, handshake, inject_segment, pair, pump_ms, trace_link_tcp};
+use common::{
+    A, B, address, handshake, inject_segment, inject_segment_with_options, pair, pump_ms,
+    trace_link_tcp,
+};
 use raven_abi::errno::Errno;
 use raven_tcpip::{
     AcceptQueue, HalfOpen, HalfOpenQueue, Instant, IpAddr, Ipv4Addr, IsnGenerator, SocketId,
@@ -435,23 +438,58 @@ fn close_established_flushes_the_receive_queue() {
 }
 
 #[test]
+fn listener_syn_creates_syncache_entry_without_connection() {
+    let (_link, _a, mut b) = pair();
+    let listener = b.tcp_listen(80, 4).expect("listen");
+    inject_segment_with_options(
+        &mut b,
+        A,
+        B,
+        40_000,
+        80,
+        100,
+        0,
+        TcpFlags::SYN,
+        &[],
+        &[2, 4, 0x05, 0xb4, 4, 2, 8, 10, 0, 0, 0, 1, 3, 3, 7, 1, 1],
+    );
+    b.poll(Instant::ZERO);
+    assert_eq!(b.test_syncache_len(), 1);
+    assert!(b.test_listener_half_open(listener).is_empty());
+    let (iss, irs, sack, timestamp) = b.test_syncache_entry(40_000).expect("entry");
+    assert_ne!(iss, 0);
+    assert_eq!(irs, 100);
+    assert!(sack);
+    assert!(timestamp);
+}
+
+#[test]
 fn close_embryonic_syn_received_sends_no_fin() {
     let (link, _a, mut b) = pair();
-    let listener = b.tcp_listen(80, 2).expect("listen");
+    b.tcp_listen(80, 2).expect("listen");
     inject_segment(&mut b, A, B, 40_000, 80, 100, 0, TcpFlags::SYN, &[]);
     b.poll(Instant::ZERO);
-    let child = b.test_listener_half_open(listener)[0];
-    assert_eq!(b.tcp_state(child), Ok(TcpState::SynReceived));
+    let (_, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
     let mark = link.trace().entries().len();
-    b.close(child).expect("close");
-    assert_eq!(b.tcp_state(child), Ok(TcpState::Closed));
+    inject_segment(
+        &mut b,
+        A,
+        B,
+        40_000,
+        80,
+        irs.wrapping_add(1),
+        0,
+        TcpFlags::RST,
+        &[],
+    );
+    b.poll(Instant::ZERO);
+    assert_eq!(b.test_syncache_len(), 0);
     assert!(
         !trace_link_tcp(&link, mark)
             .iter()
             .any(|(flags, _, _, _)| flags.fin()),
-        "tcp_disconnect calls tcp_close below TCPS_ESTABLISHED"
+        "an embryonic RST aborts the syncache entry without a FIN"
     );
-    assert!(b.test_listener_half_open(listener).is_empty());
 }
 
 #[test]
@@ -477,24 +515,22 @@ fn shutdown_write_on_syn_received_defers_the_fin_until_established() {
     let listener = b.tcp_listen(80, 2).expect("listen");
     inject_segment(&mut b, A, B, 40_000, 80, 100, 0, TcpFlags::SYN, &[]);
     b.poll(Instant::ZERO);
-    let child = b.test_listener_half_open(listener)[0];
+    let (iss, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
     let mark = link.trace().entries().len();
-    b.shutdown_write(child).expect("shutdown");
-    assert_eq!(b.tcp_state(child), Ok(TcpState::SynReceived));
+    assert_eq!(b.test_syncache_len(), 1);
     assert!(
         !trace_link_tcp(&link, mark)
             .iter()
             .any(|(flags, _, _, _)| flags.fin()),
-        "tcp_usrclosed sets TF_NEEDFIN for SYN_RECEIVED instead of sending the FIN now"
+        "a syncache entry sends no FIN before promotion"
     );
-    let iss = b.test_tcp_iss(child).expect("iss");
     inject_segment(
         &mut b,
         A,
         B,
         40_000,
         80,
-        101,
+        irs.wrapping_add(1),
         iss.wrapping_add(1),
         TcpFlags::ACK,
         &[],
@@ -502,12 +538,17 @@ fn shutdown_write_on_syn_received_defers_the_fin_until_established() {
     for millis in 1..20 {
         b.poll(Instant::from_millis(millis));
     }
-    assert_eq!(b.tcp_state(child), Ok(TcpState::FinWait1));
+    assert_eq!(b.test_syncache_len(), 0);
+    let accepted = b
+        .tcp_accept(listener)
+        .expect("accept")
+        .expect("promoted connection");
+    assert_eq!(b.tcp_state(accepted), Ok(TcpState::Established));
     assert!(
-        trace_link_tcp(&link, mark)
+        !trace_link_tcp(&link, mark)
             .iter()
             .any(|(flags, _, _, _)| flags.fin()),
-        "the deferred FIN is emitted once the connection reaches ESTABLISHED"
+        "promotion itself does not send a FIN"
     );
 }
 
@@ -538,12 +579,8 @@ fn close_listener_aborts_queued_children() {
     let (_link, _a, mut b) = pair();
     let listener = b.tcp_listen(80, 4).expect("listen");
     let completed = b.test_pending_connection(listener).expect("completed");
-    inject_segment(&mut b, A, B, 40_002, 80, 100, 0, TcpFlags::SYN, &[]);
-    b.poll(Instant::ZERO);
-    let partial = b.test_listener_half_open(listener)[0];
     b.close(listener).expect("close listener");
     assert_eq!(b.tcp_state(completed), Ok(TcpState::Closed));
-    assert_eq!(b.tcp_state(partial), Ok(TcpState::Closed));
     assert_eq!(b.tcp_accept(listener), Err(Errno::EBADF));
 }
 
