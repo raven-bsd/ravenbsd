@@ -212,3 +212,71 @@ fn every_vector_sequence_is_present() {
     assert_eq!(samples, 54);
     assert_eq!(timeouts, 12);
 }
+
+#[test]
+fn freebsd_rexmtval_is_srtt_plus_four_rttvar() {
+    let mut estimator = RtoEstimator::new(1_000, 30, 64_000, 1);
+    assert_eq!(estimator.rexmtval_ms(), 1_000, "seeded initial value");
+    estimator.sample(100);
+    assert_eq!(estimator.rexmtval_ms(), 300);
+    estimator.sample(200);
+    // srtt = 100 + (200 - 100) / 8 = 113 (rounded up); rttvar = (3 * 50 + 100) / 4 = 63.
+    assert_eq!(estimator.srtt_ms(), 113);
+    assert_eq!(estimator.rttvar_ms(), 63);
+    assert_eq!(estimator.rexmtval_ms(), 363);
+}
+
+#[test]
+fn freebsd_backoff_uses_the_doubling_table_and_cpu_slop() {
+    let mut estimator = RtoEstimator::new(1_000, 30, 64_000, 1);
+    estimator.sample(400);
+    assert_eq!(estimator.rexmtval_ms(), 1_200);
+    assert_eq!(estimator.backoff_ms(1, 30, 200, 64_000), 2_600);
+    assert_eq!(estimator.backoff_ms(2, 30, 200, 64_000), 5_000);
+    assert_eq!(estimator.backoff_ms(3, 30, 200, 64_000), 9_800);
+    assert_eq!(estimator.backoff_ms(4, 30, 200, 64_000), 19_400);
+    assert_eq!(estimator.backoff_ms(5, 30, 200, 64_000), 38_600);
+    assert_eq!(estimator.backoff_ms(6, 30, 200, 64_000), 64_000);
+    assert_eq!(estimator.backoff_ms(12, 30, 200, 64_000), 64_000);
+}
+
+#[test]
+fn freebsd_initial_rto_is_one_second() {
+    let estimator = RtoEstimator::new(1_000, 30, 64_000, 1);
+    assert_eq!(estimator.rexmtval_ms(), 1_000);
+    assert_eq!(estimator.backoff_ms(1, 30, 200, 64_000), 2_200);
+    assert_eq!(estimator.backoff_ms(2, 30, 200, 64_000), 4_200);
+}
+
+#[test]
+fn freebsd_rangeset_clamps_after_adding_the_slop() {
+    assert_eq!(RtoEstimator::rangeset(0, 30, 64_000), 30);
+    assert_eq!(RtoEstimator::rangeset(5_000, 30, 64_000), 5_000);
+    assert_eq!(RtoEstimator::rangeset(90_000, 30, 64_000), 64_000);
+    assert_eq!(RtoEstimator::rangeset(0, 5_000, 1_000), 1_000);
+    assert_eq!(
+        RtoEstimator::backoff_from_ms(1_000, 1, 30, 0, 60_000),
+        2_000
+    );
+    assert_eq!(
+        RtoEstimator::backoff_from_ms(1_000, 12, 30, 0, 60_000),
+        60_000
+    );
+    assert_eq!(
+        RtoEstimator::backoff_from_ms(0, 1, 30, 200, 64_000),
+        260,
+        "rttmin then slop"
+    );
+}
+
+#[test]
+fn freebsd_invalidate_restarts_the_next_sample() {
+    let mut estimator = RtoEstimator::new(1_000, 30, 64_000, 1);
+    estimator.sample(400);
+    assert_eq!(estimator.rexmtval_ms(), 1_200);
+    estimator.invalidate_srtt();
+    estimator.sample(200);
+    assert_eq!(estimator.srtt_ms(), 200);
+    assert_eq!(estimator.rttvar_ms(), 100);
+    assert_eq!(estimator.rexmtval_ms(), 600);
+}
