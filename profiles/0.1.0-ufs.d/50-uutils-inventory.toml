@@ -2,9 +2,10 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # K414: complete the uutils staging for the product profile. The shell fragment stages
-# the original 19; these 11 are built by `cargo xtask build uutils` and were not staged.
-# The inventory script enumerates all 108 source utilities and reports the 78 names
-# that are not built yet as gaps (a product ticket, not a silent omission).
+# the original 19; these 9 are built by `cargo xtask build uutils` and were not staged.
+# `/bin/sleep` and `/bin/date` stay the first-party raven-sleep/raven-date from the
+# shell profile. The inventory script enumerates all 108 source utilities and reports
+# the 78 names that are not built yet as gaps (a product ticket, not a silent omission).
 
 [[initfs.files]]
 src = "build/{arch}/uutils/ln"
@@ -27,18 +28,6 @@ generated = true
 [[initfs.files]]
 src = "build/{arch}/uutils/dirname"
 path = "/bin/dirname"
-mode = 0o755
-generated = true
-
-[[initfs.files]]
-src = "build/{arch}/uutils/sleep"
-path = "/bin/sleep"
-mode = 0o755
-generated = true
-
-[[initfs.files]]
-src = "build/{arch}/uutils/date"
-path = "/bin/date"
 mode = 0o755
 generated = true
 
