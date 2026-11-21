@@ -40,21 +40,21 @@ K320 supplies the DSACK rules (TLP-caused DSACK excluded, one round, persist 16,
 recovery). K326 (BBR/pacing) and K327 (transport vtable) are different domains; this matrix does
 not duplicate their models.
 
-## Finding: SACK flag bits do not match the public `rack_misc` values
+## Canonical SACK flag bits
 
-The matrix pins a real integration mismatch for the K336 owner:
+K349/K364 unified `rack_sack.rs` with the canonical `rack_types.rs` flags. The matrix now imports
+the public constants and asserts the sendmap uses them:
 
-| Flag | `rack_sack.rs` | public `rack_misc.rs` |
-|---|---:|---:|
-| `RACK_ACKED` | 0x01 | 0x01 |
-| `RACK_SACK_PASSED` | 0x02 | 0x10 |
-| `RACK_WAS_SACKPASS` | 0x04 | 0x20 |
-| `RACK_WAS_LOST` | 0x08 | 0x400000 |
-| `RACK_RWND_COLLAPSED` | 0x10 | 0x100 |
+| Flag | Canonical value |
+|---|---:|
+| `RACK_ACKED` | 0x000001 |
+| `RACK_SACK_PASSED` | 0x000010 |
+| `RACK_WAS_SACKPASS` | 0x000020 |
+| `RACK_WAS_LOST` | 0x400000 |
+| `RACK_RWND_COLLAPSED` | 0x000100 |
 
-The merged `RackSack` is internally consistent, but external consumers importing the public
-`raven_tcpip::RACK_*` flags see different bits. `k336_flag_bits_differ_from_public_rack_misc_constants`
-records the mismatch without modifying product source; the group owner must unify the constants.
+`k336_flag_bits_match_public_rack_constants` verifies the product and matrix agree; the previous
+K347 mismatch finding is resolved by the canonical type migration.
 
 ## Donors
 

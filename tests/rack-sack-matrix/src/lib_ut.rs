@@ -5,15 +5,9 @@
 
 use std::fs;
 
-use raven_tcpip::RackSack;
+use raven_tcpip::{RACK_ACKED, RACK_SACK_PASSED, RACK_WAS_LOST, RackSack};
 
 use crate::reference::ReferenceSack;
-
-// K336's private `rack_sack.rs` flag values. They currently differ from the public
-// `rack_misc` constants; that mismatch is recorded as a finding below and reported to K336.
-const SACK_ACKED: u32 = 0x01;
-const SACK_SACK_PASSED: u32 = 0x02;
-const SACK_WAS_LOST: u32 = 0x08;
 
 fn product() -> RackSack {
     let mut sack = RackSack::new();
@@ -66,9 +60,9 @@ fn sack_block_split_merge_and_flags() {
     assert_eq!(sack.sacked_bytes(), 100);
     assert_eq!(sack.stack.sacked, 100);
     assert_eq!(sack.sendmap[&0].end, 50);
-    assert_eq!(sack.sendmap[&50].flags & SACK_ACKED, SACK_ACKED);
-    assert_eq!(sack.sendmap[&150].flags & SACK_ACKED, 0);
-    assert_eq!(sack.sendmap[&0].flags & SACK_WAS_LOST, SACK_WAS_LOST);
+    assert_eq!(sack.sendmap[&50].flags & RACK_ACKED, RACK_ACKED);
+    assert_eq!(sack.sendmap[&150].flags & RACK_ACKED, 0);
+    assert_eq!(sack.sendmap[&0].flags & RACK_WAS_LOST, RACK_WAS_LOST);
 }
 
 #[test]
@@ -76,14 +70,16 @@ fn sack_passed_threshold_and_stop() {
     let mut sack = product();
     sack.threshold_us = 100;
     for key in [0u32, 1_000, 2_000] {
-        sack.sendmap.get_mut(&key).expect("segment").last_sent_us = 0;
+        let segment = sack.sendmap.get_mut(&key).expect("segment");
+        let slot = usize::from(segment.rtr_cnt.saturating_sub(1));
+        segment.tim_lastsent[slot] = 0;
     }
     assert_eq!(sack.rack_log_sack_passed(3_000, 100), 3_000);
     assert_eq!(sack.stack.considered_lost, 3_000);
     for key in [0u32, 1_000, 2_000] {
         let segment = &sack.sendmap[&key];
-        assert_eq!(segment.flags & SACK_WAS_LOST, SACK_WAS_LOST);
-        assert_eq!(segment.flags & SACK_SACK_PASSED, SACK_SACK_PASSED);
+        assert_eq!(segment.flags & RACK_WAS_LOST, RACK_WAS_LOST);
+        assert_eq!(segment.flags & RACK_SACK_PASSED, RACK_SACK_PASSED);
     }
     assert_eq!(sack.rack_log_sack_passed(3_000, 200), 0);
 }
@@ -152,18 +148,15 @@ fn sack_filter_and_k314_log_event() {
 }
 
 #[test]
-fn k336_flag_bits_differ_from_public_rack_misc_constants() {
+fn k336_flag_bits_match_public_rack_constants() {
     let mut sack = product();
     sack.threshold_us = 0;
     assert_eq!(sack.rack_log_sack_passed(1_000, 0), 1_000);
     let flags = sack.sendmap[&0].flags;
-    assert_eq!(flags & SACK_WAS_LOST, SACK_WAS_LOST);
-    // Finding for the K336 owner: the merged SACK module uses 0x08 for WAS_LOST and
-    // 0x02 for SACK_PASSED, while the public rack_misc constants are 0x400000 and 0x10.
-    assert_eq!(raven_tcpip::RACK_WAS_LOST, 0x0040_0000);
-    assert_eq!(raven_tcpip::RACK_SACK_PASSED, 0x0000_0010);
-    assert_eq!(flags & raven_tcpip::RACK_WAS_LOST, 0);
-    assert_eq!(flags & raven_tcpip::RACK_SACK_PASSED, 0);
+    assert_eq!(flags & RACK_WAS_LOST, RACK_WAS_LOST);
+    assert_eq!(RACK_ACKED, 0x0000_0001);
+    assert_eq!(RACK_SACK_PASSED, 0x0000_0010);
+    assert_eq!(RACK_WAS_LOST, 0x0040_0000);
 }
 
 #[test]
