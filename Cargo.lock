@@ -1041,6 +1041,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rack-audit-sack-sockopt"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
 name = "rack-audit-state-pipe"
 version = "0.1.0"
 dependencies = [
