@@ -46,7 +46,7 @@ use crate::rack_types::{
     PACE_MAX_IP_BYTES, RACK_ACKED, RACK_HAD_PUSH, RACK_HAS_FIN, RACK_HAS_SYN, RACK_MUST_RXT,
     RACK_NUM_OF_RETRANS, RACK_OVERMAX, RACK_RTO_MAX, RACK_RTO_MIN, RACK_RWND_COLLAPSED,
     RACK_SACK_PASSED, RACK_SENT_FP, RACK_TLP, RACK_WAS_ACKED, RACK_WAS_LOST, RACK_WAS_SACKPASS,
-    RackSendmap,
+    RackSendmap, TF_CONGRECOVERY, TF_FASTRECOVERY,
 };
 use crate::rack_vtable::{
     RackStack, TCPS_CLOSE_WAIT, TCPS_ESTABLISHED, TCPS_SYN_RECEIVED, TCPS_SYN_SENT, TF_SENTFIN,
@@ -76,6 +76,18 @@ pub const CUM_ACKED: u8 = 1;
 pub const SACKED: u8 = 2;
 /// The TCP PUSH flag.
 pub const TH_PUSH: u16 = 0x08;
+/// `TF_GPUTINPROG`: a goodput measurement is in progress.
+pub const TF_GPUTINPROG: u32 = 0x0000_8000;
+/// `RACK_USE_BEG`: the measurement starts at the left edge of the send-map entry.
+pub const RACK_USE_BEG: u8 = 1;
+/// `RACK_USE_END`: the measurement starts at the right edge.
+pub const RACK_USE_END: u8 = 2;
+/// `RACK_USE_END_OR_THACK`: the measurement starts at the ACK or the right edge.
+pub const RACK_USE_END_OR_THACK: u8 = 3;
+/// `MIN_GP_WIN`: a goodput measurement needs at least six MSS.
+pub const MIN_GP_WIN: u32 = 6;
+/// `rack_rtt_divisor` default.
+pub const RACK_RTT_DIVISOR: u32 = 2;
 
 /// The sequence-ordered send map with the donor time-order list.
 #[derive(Clone, Debug, Default)]
@@ -425,6 +437,44 @@ pub struct RackRetransmit {
     pub tlp_retran: u64,
     /// `rack_tlp_retran_bytes`.
     pub tlp_retran_bytes: u64,
+    /// `tp->gput_seq`.
+    pub gput_seq: u32,
+    /// `tp->gput_ts`.
+    pub gput_ts: u32,
+    /// `tp->gput_ack`.
+    pub gput_ack: u32,
+    /// `rack->app_limited_needs_set`.
+    pub app_limited_needs_set: bool,
+    /// `rack->r_ctl.rc_gp_output_ts`.
+    pub gp_output_ts: u32,
+    /// `rack->rc_gp_filled`.
+    pub gp_filled: bool,
+    /// `rack->in_probe_rtt`.
+    pub in_probe_rtt: bool,
+    /// `rack->measure_saw_probe_rtt`.
+    pub measure_saw_probe_rtt: bool,
+    /// `rack->r_ctl.rc_probertt_sndmax_atexit`.
+    pub probertt_sndmax_atexit: u32,
+    /// `rack->r_ctl.rc_app_limited_cnt`.
+    pub app_limited_cnt: u32,
+    /// `rack_get_measure_window` result used by the filled measurement.
+    pub measure_window: u32,
+    /// `rc_init_window` result for the current MSS.
+    pub initial_window: u32,
+    /// `rack->r_ctl.act_rcv_time` in microseconds.
+    pub act_rcv_time: u32,
+    /// `rack_rtt_divisor`.
+    pub rtt_divisor: u32,
+    /// `rack->r_ctl.rc_ssthresh_at_erec`.
+    pub ssthresh_at_erec: u32,
+    /// `rack->r_might_revert`.
+    pub might_revert: bool,
+    /// Number of `rack_tend_gp_marks` calls made by `rack_need_set_test`.
+    pub gp_marks_tended: u32,
+    /// Number of `rack_log_gpset` calls made by `rack_need_set_test`.
+    pub gp_logs: u32,
+    /// Number of `rack_log_to_prr` calls made by `rack_check_reorder_ack`.
+    pub prr_logs: u32,
 }
 
 impl Default for RackRetransmit {
@@ -448,6 +498,7 @@ impl RackRetransmit {
         let mut hpts = RackHpts::new(0);
         hpts.tcp_hpts_init(1);
         let pace_min_segs = u32::from(mss);
+        let initial_window = rc_init_window(u32::from(mss));
         Self {
             stack,
             hpts,
@@ -514,6 +565,25 @@ impl RackRetransmit {
             sndrexmitbyte: 0,
             tlp_retran: 0,
             tlp_retran_bytes: 0,
+            gput_seq: 0,
+            gput_ts: 0,
+            gput_ack: 0,
+            app_limited_needs_set: false,
+            gp_output_ts: 0,
+            gp_filled: false,
+            in_probe_rtt: false,
+            measure_saw_probe_rtt: false,
+            probertt_sndmax_atexit: 0,
+            app_limited_cnt: 0,
+            measure_window: initial_window,
+            initial_window,
+            act_rcv_time: 0,
+            rtt_divisor: RACK_RTT_DIVISOR,
+            ssthresh_at_erec: 0,
+            might_revert: false,
+            gp_marks_tended: 0,
+            gp_logs: 0,
+            prr_logs: 0,
         }
     }
 
@@ -573,6 +643,128 @@ impl RackRetransmit {
             .rev()
             .find(|entry| entry.flags & (RACK_ACKED | RACK_HAS_FIN) == 0)
             .map(|entry| entry.id)
+    }
+
+    /// `rack_need_set_test`: move the goodput measurement window after an ACK.
+    ///
+    /// `use_which` is `RACK_USE_BEG`, `RACK_USE_END` or `RACK_USE_END_OR_THACK`.
+    /// The donor logging calls become the `gp_logs`/`gp_marks_tended` counters.
+    pub fn rack_need_set_test(&mut self, id: u32, th_ack: u32, use_which: u8) {
+        let Some(rsm) = self.map.find_id(id).cloned() else {
+            return;
+        };
+        if self.stack.tp.t_flags & TF_GPUTINPROG == 0 || !seq_ge(rsm.end, self.gput_seq) {
+            return;
+        }
+        if rsm.rtr_cnt > 1 {
+            // A retransmission has an ambiguous transmit timestamp.
+            return;
+        }
+        let seq = self.gput_seq;
+        let ts = self.gput_ts;
+        self.app_limited_needs_set = false;
+        self.gput_ts = self.act_rcv_time;
+        if use_which == RACK_USE_BEG && seq_ge(rsm.start, self.gput_seq) {
+            self.gput_seq = rsm.start;
+        }
+        if use_which == RACK_USE_END && seq_ge(rsm.end, self.gput_seq) {
+            self.gput_seq = rsm.end;
+        }
+        if use_which == RACK_USE_END_OR_THACK {
+            self.gput_seq = if seq_gt(th_ack, rsm.end) {
+                th_ack
+            } else {
+                rsm.end
+            };
+        }
+        let next_sent = if seq_lt(self.gput_seq, self.stack.tp.snd_max) {
+            self.map
+                .covering(self.gput_seq)
+                .map(|entry| entry.tim_lastsent[0] as u32)
+        } else {
+            None
+        };
+        if let Some(ts) = next_sent {
+            self.gp_output_ts = ts;
+        } else {
+            self.gp_output_ts = rsm.tim_lastsent[0] as u32;
+            self.app_limited_needs_set = true;
+        }
+        if seq_gt(self.gput_seq, self.gput_ack) {
+            let window = if self.gp_filled {
+                self.measure_window
+            } else {
+                self.initial_window
+                    .max(MIN_GP_WIN.saturating_mul(u32::from(self.stack.tp.t_maxseg)))
+            };
+            self.gput_ack = self.gput_seq.saturating_add(window);
+        }
+        if !self.in_probe_rtt
+            && self.measure_saw_probe_rtt
+            && seq_ge(self.gput_seq, self.probertt_sndmax_atexit)
+        {
+            self.measure_saw_probe_rtt = false;
+        }
+        self.gp_logs = self.gp_logs.saturating_add(1);
+        if self.gp_filled {
+            let minimum = self
+                .initial_window
+                .max(MIN_GP_WIN.saturating_mul(u32::from(self.stack.tp.t_maxseg)));
+            if self.gput_ack.saturating_sub(self.gput_seq) < minimum {
+                let ideal = self.measure_window.max(self.initial_window);
+                if ideal > self.stack.os.sbavail() {
+                    self.stack.tp.t_flags &= !TF_GPUTINPROG;
+                    self.gp_logs = self.gp_logs.saturating_add(1);
+                } else {
+                    self.gput_ack = self.gput_seq.saturating_add(ideal);
+                }
+            }
+        }
+        self.gp_marks_tended = self.gp_marks_tended.saturating_add(1);
+        let _ = (seq, ts);
+    }
+
+    /// `rack_check_reorder_ack`: undo a spurious recovery retransmission on a reordered ACK.
+    pub fn rack_check_reorder_ack(
+        &mut self,
+        id: u32,
+        the_end: u32,
+        cts: u32,
+        can_exit_recovery: bool,
+    ) -> bool {
+        let Some(rsm) = self.map.find_id(id).cloned() else {
+            return false;
+        };
+        if self.rtt_divisor == 0 || rsm.rtr_cnt != 2 {
+            return false;
+        }
+        let in_recovery = self.in_fast_recovery || self.in_cong_recovery;
+        if !in_recovery || rsm.flags & RACK_WAS_SACKPASS == 0 {
+            return false;
+        }
+        let mut fractional = self.stack.tp.t_srtt / self.rtt_divisor;
+        if fractional == 0 {
+            fractional = 1;
+        }
+        let index = usize::from(rsm.rtr_cnt.saturating_sub(1));
+        let snt_to_ack = cts.wrapping_sub(rsm.tim_lastsent[index] as u32);
+        if snt_to_ack > fractional {
+            return false;
+        }
+        self.reorder_ts = cts;
+        let removed = the_end.wrapping_sub(rsm.start);
+        self.recovery_rxt_cnt = self.recovery_rxt_cnt.saturating_sub(removed);
+        self.prr_logs = self.prr_logs.saturating_add(1);
+        if can_exit_recovery && self.recovery_rxt_cnt == 0 {
+            self.stack.tp.snd_ssthresh = self.ssthresh_at_erec;
+            self.stack.tp.t_flags &= !(TF_FASTRECOVERY | TF_CONGRECOVERY);
+            self.in_fast_recovery = false;
+            self.in_cong_recovery = false;
+            self.might_revert = false;
+            self.retran_during_recovery = 0;
+            self.prr_logs = self.prr_logs.saturating_add(1);
+        }
+        true
     }
 
     /// `rack_update_rsm`: account one retransmission of a send-map entry.
@@ -940,6 +1132,7 @@ impl RackRetransmit {
         now_us: u64,
     ) -> ProcessAck {
         self.stack.os.now_us = i64::try_from(now_us).unwrap_or(i64::MAX);
+        self.act_rcv_time = u32::try_from(now_us).unwrap_or(u32::MAX);
         if seq_lt(ack, self.stack.tp.snd_una) {
             if self.stack.tp.snd_una.wrapping_sub(ack) > 0
                 && self.reorder_ts == 0
@@ -1016,6 +1209,7 @@ impl RackRetransmit {
             now_us,
             timestamp_ok,
         } = input;
+        self.act_rcv_time = u32::try_from(now_us).unwrap_or(u32::MAX);
         let _ = tlen;
         if !seq_gt(ack, self.stack.tp.snd_una)
             || seq_gt(ack, self.stack.tp.snd_max)
@@ -1272,6 +1466,16 @@ fn tcp_outflags(state: u8) -> u16 {
         TCPS_FIN_WAIT_1 | TCPS_FIN_WAIT_2 | TCPS_CLOSING | TCPS_LAST_ACK => TH_FIN | TH_ACK,
         _ => TH_ACK,
     }
+}
+
+/// `tcp_compute_initwnd` with the FreeBSD default `V_tcp_initcwnd_segments = 10`.
+fn rc_init_window(maxseg: u32) -> u32 {
+    let maxseg = maxseg.max(1);
+    let segments = 10u32;
+    segments.saturating_mul(maxseg).min(
+        2u32.saturating_mul(maxseg)
+            .max(segments.saturating_mul(1460)),
+    )
 }
 
 fn seq_gt(a: u32, b: u32) -> bool {
