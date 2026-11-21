@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K386 target probe: configured mode, raven-fb blitter/scroll, mailbox fallback.
+# It runs before getty (which svcd holds back), so its markers precede the login prompt.
+name = "hdmi-console"
+exec = "/sbin/hdmi-console-probe"
+needs = []
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false

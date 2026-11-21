@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-hdmi-console-probe"
+version = "0.1.0"
+description = "K386 target probe: config mode, raven-fb blitter/scroll and mailbox fallback."
+edition = "2024"
+license = "BSD-3-Clause"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "hdmi-console-probe"
+path = "src/main.rs"
+
+[dependencies]
+raven-fb = { path = "../../../../crates/raven-fb" }
+raven-initfs = { path = "../../../../crates/raven-initfs" }
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
