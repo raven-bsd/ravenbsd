@@ -41,11 +41,16 @@ echo "tcp-ready"
 n=0
 while [ "$n" -lt "$cycles" ]; do
     n=$((n + 1))
+    # Rotate the listener port each cycle: the socket that closed first sits in
+    # TIME_WAIT on its port and a fresh listener on the same port fails with
+    # "address in use" until the wait expires.
+    p=$(( port + n % 50 ))
     echo "tcp-cycle: $n"
+    echo "tcp-port: $p"
 
-    /sbin/nc -l -p "$port" -e -w 30 &
+    /sbin/nc -l -p "$p" -e -w 30 &
     /bin/sleep 1
-    /sbin/nc -s "$payload" -n 14 -w 30 127.0.0.1 "$port"
+    /sbin/nc -s "$payload" -n 14 -w 30 127.0.0.1 "$p"
     echo "tcp-echo: $?"
     wait
     echo "tcp-wait: $?"
