@@ -41,6 +41,13 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 static SEEN: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
 static DONE: AtomicU32 = AtomicU32::new(0);
 
+/// S159: target readiness for the deterministic IF=0 TLB shootdown test.
+#[cfg(target_arch = "x86_64")]
+static IF0_READY: AtomicU32 = AtomicU32::new(0);
+/// S159: target completion for the deterministic IF=0 TLB shootdown test.
+#[cfg(target_arch = "x86_64")]
+static IF0_DONE: AtomicU32 = AtomicU32::new(0);
+
 /// Read by both CPUs in the concurrent call-probe test.
 static PROBE_BYTE: u8 = 0x5a;
 static PROBE_DONE: AtomicU32 = AtomicU32::new(0);
@@ -151,6 +158,14 @@ fn monitor() {
             boot::exit_qemu(0x11);
         }
     }
+    #[cfg(target_arch = "x86_64")]
+    match if0_shootdown_test(cpus) {
+        Ok(elapsed_ms) => kprintln!("selftest: smp tlb if0 ok elapsed_ms={elapsed_ms}"),
+        Err(reason) => {
+            kprintln!("selftest: smp tlb if0 failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
     kprintln!(
         "selftest: smp ok cpus={cpus} switches={}",
         sched::switch_count()
@@ -180,6 +195,55 @@ fn probe_worker(cpu: usize) {
     }
     PROBE_DONE.fetch_add(1, Ordering::SeqCst);
     sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn if0_target() {
+    // Intentional: hold IF clear across the S113/S159 shootdown deadline. This is the
+    // deterministic reproducer for a target that cannot take a fixed TLB IPI.
+    crate::arch::x86_64::ap_start::disable_local_interrupts();
+    core::sync::atomic::fence(Ordering::SeqCst);
+    IF0_READY.store(1, Ordering::SeqCst);
+    let start = sleep::now_ns();
+    while sleep::now_ns().saturating_sub(start) < 150_000_000 {
+        core::hint::spin_loop();
+    }
+    crate::arch::x86_64::ap_start::enable_local_interrupts();
+    IF0_DONE.store(1, Ordering::SeqCst);
+    sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn if0_shootdown_test(cpus: usize) -> Result<u64, &'static str> {
+    if cpus < 2 {
+        return Ok(0);
+    }
+    IF0_READY.store(0, Ordering::SeqCst);
+    IF0_DONE.store(0, Ordering::SeqCst);
+    if sched::spawn_kernel_on(1, "smp-if0", if0_target).is_err() {
+        return Err("cannot spawn IF=0 target");
+    }
+    let start = sleep::now_ns();
+    while IF0_READY.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("IF=0 target not ready");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    let start = sleep::now_ns();
+    let flushed = shootdown::flush_range(TLB_TEST_BASE, frame::PAGE_SIZE);
+    let elapsed_ms = sleep::now_ns().saturating_sub(start) / 1_000_000;
+    if !flushed {
+        return Err("IF=0 shootdown timed out");
+    }
+    let start = sleep::now_ns();
+    while IF0_DONE.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("IF=0 target did not finish");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    Ok(elapsed_ms)
 }
 
 fn call_probe_test(cpus: usize) -> Result<u32, &'static str> {
