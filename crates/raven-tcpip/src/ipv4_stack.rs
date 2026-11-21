@@ -225,9 +225,13 @@ impl<D: Device> Stack<D> {
                 packet.payload(),
                 now,
             ) {
-                Ok(Some(datagram)) => {
-                    self.deliver_ipv4(source, destination, packet.protocol(), &datagram)
-                }
+                Ok(Some(datagram)) => self.deliver_ipv4(
+                    source,
+                    destination,
+                    packet.protocol(),
+                    packet.ecn(),
+                    &datagram,
+                ),
                 Ok(None) => {}
                 Err(_) => {
                     self.counters.reassembly_overflows =
@@ -237,7 +241,13 @@ impl<D: Device> Stack<D> {
             }
             return;
         }
-        self.deliver_ipv4(source, destination, packet.protocol(), packet.payload());
+        self.deliver_ipv4(
+            source,
+            destination,
+            packet.protocol(),
+            packet.ecn(),
+            packet.payload(),
+        );
     }
 
     fn deliver_ipv4(
@@ -245,6 +255,7 @@ impl<D: Device> Stack<D> {
         source: Ipv4Addr,
         destination: Ipv4Addr,
         protocol: u8,
+        ecn: u8,
         payload: &[u8],
     ) {
         #[cfg(any(test, feature = "testutil"))]
@@ -253,6 +264,7 @@ impl<D: Device> Stack<D> {
             6 => self.tcp_input(
                 crate::ipv6_stack::IpAddr::V4(source),
                 crate::ipv6_stack::IpAddr::V4(destination),
+                ecn,
                 payload,
                 self.now,
             ),
@@ -273,7 +285,7 @@ impl<D: Device> Stack<D> {
         let route = *self.routes.lookup(destination).ok_or(Errno::ENETUNREACH)?;
         let next_hop = route.gateway.unwrap_or(destination);
         if next_hop == config.addr {
-            self.deliver_ipv4(config.addr, destination, protocol, payload);
+            self.deliver_ipv4(config.addr, destination, protocol, 0, payload);
             return Ok(());
         }
         let resolved = self
