@@ -1,0 +1,15 @@
+utc=2026-11-21T05:22:28Z
+context=smp-boot-soak
+loadavg=21.65 24.20 15.60 3/2291 797982
+nproc=20
+max_load=100
+wait_secs=300
+qemu:
+none
+jobs:
+none
+kvm=crw-rw----+ 1 root kvm 10, 232 Nov 21 05:27 /dev/kvm
+qemu_version=QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)
+free:
+               total        used        free      shared  buff/cache   available
+Mem:            31Gi        12Gi       4,3Gi       371Mi        13Gi        17Gi

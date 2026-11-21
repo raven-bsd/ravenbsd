@@ -1,0 +1,93 @@
+2.818234 [2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+2.822679 BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+2.823566 BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+2.823749 loader: RavenBSD loader 0.1 (x86_64)
+2.824006 loader: RavenBSD loader 0.1 (x86_64)
+3.158416 loader: memory map: 26 regions
+3.161357 frames: base=256 count=131072 free=103709 reserved=27363
+3.162642 paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+3.164583 heap: 4096 KiB
+3.184412 vtd: disabled (iommu=on not set); DMA unprotected
+3.184530 fpu: xsave 576 bytes
+3.184737 acpi: mcfg base=0xb0000000 buses=0-255
+3.184918 acpi: 4 cpus, 1 ioapics, 5 overrides
+3.185064 apic: id 0 (x2apic)
+3.185595 keyboard: i8042 irq 1 gsi 1 vector 0x23
+3.185874 console: rx irq 4 gsi 4 vector 0x22 (active-high)
+3.211487 cyclic: ok fired=3 order=5ms,10ms,15ms
+3.211569 time: tsc 2721 MHz (pit)
+3.211690 time: tsc not invariant
+3.211765 timer: 1000 Hz
+3.232877 fpu: xsave 576 bytes
+3.243563 fpu: xsave 576 bytes
+3.254157 fpu: xsave 576 bytes
+3.254274 smp: 4 cpus online
+3.254612 RavenBSD kernel 0.1 (x86_64) 2e8a873f 2026-11-21
+3.254781 mem: 405 MiB usable in 7 regions
+3.254966 cmdline: console=ttyS0 loglevel=info
+3.255459 process: starting /init
+3.255734 process: /init entry=0x41a890 sp=0x7fffffffde60
+3.255946 sched: running (4 cpus, slice 10 ms)
+3.280833 svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
+3.295727 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+3.295847 svcd: logd up
+3.296405 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+3.296932 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+3.297461 pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+3.297993 pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+3.298519 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+3.298615 pcid: devices=6
+3.306831 svcd: pcid up
+3.379524 rtc: unavailable
+3.379524 0.181 nulld: started
+3.379643 0.181 initfsd: started
+3.379753 svcd: nulld up
+3.379888 0.181 ramfsd: started
+3.380010 svcd: initfsd up
+3.380151 0.181 randd: started
+3.380345 0.181 zerod: started
+3.380463 svcd: randd up
+3.380631 svcd: zerod up
+3.380808 devd: devices=6
+3.381207 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+3.381575 devd: driver virtio-net bar=4 size=16384
+3.381938 devd: driver virtio-net dma bus=0x100000 len=65536
+3.382367 devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+3.382881 devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+3.383118 devd: driver virtio-net irq line=11
+3.383860 virtio-net: id=1af4:1041
+3.384314 virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+3.384586 virtio-net: dma len=65536 bus=0x100000 irq=11
+3.384988 virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+3.385237 virtio-net: queue0 rx size=8
+3.385411 virtio-net: queue1 tx size=8
+3.385838 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+3.386293 virtio-net: serving nic:
+3.386399 svcd: ramfsd up
+3.396321 svcd: devd up
+3.398439 vfsd: mounted / on initfs:
+3.398639 vfsd: mounted /tmp on ramfs:
+3.398858 vfsd: mounted /dev/null on null:
+3.399080 vfsd: mounted /dev/zero on zero:
+3.399307 vfsd: mounted /dev/random on rand:
+3.399541 vfsd: mounted /dev/urandom on rand:
+3.408763 svcd: vfsd up
+3.414265 svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
+3.416253 svcd: consd up
+3.422678 0.223 sysd: started
+3.422865 svcd: sysd up
+3.429766 netd: network config mode=dhcp hostname=raven
+3.430126 netd: hostname raven
+3.430331 netd: interface eth0 10.0.2.15/24
+3.430522 netd: interface lo 127.0.0.1/8
+3.430598 netd: ready
+3.440130 svcd: netd up
+3.544722 resolvd: write file:/etc/resolv.conf: read-only file system
+3.545980 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199910ms rebind=75599910ms expires=86399910ms
+3.546393 resolvd: resolv.conf=nameserver 10.0.2.3
+3.546971 0.346 resolvd: started
+3.547307 svcd: resolvd up
+3.549231 svcd: all services up
+3.549385 svcd: getty up
+3.586739 RavenBSD 0.1 (x86_64) (tty:console)
+3.586981 login:
