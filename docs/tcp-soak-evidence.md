@@ -90,11 +90,13 @@ case `scripts/tcp-soak.sh` builds it from the clean checkout at HEAD.
 The soak guest runs 4 KVM vCPUs that share host CPU time with everything else
 on the machine. When the host is oversubscribed, every guest wall-clock
 measurement — including the workload's `sleep`s — stretches in host time.
-Measured (K300, 2026-11-21, 20-core host): under a sustained load average of
-~65 the workload's 10 s interval cycles ran at a steady 33.2 s host period
-(a uniform ~3.0 x stretch), and the driver's host deadline failed the run at
-cycle 8 of 12; on the same image under a load average of ~16 the same run
-completed 12/12 cycles at an 11.1 s host period in 150 s. Run the 24 h soak
+Measured (K300, 2026-11-21, 20-core host): with the 15-minute load average at
+~69 (3.5 x oversubscription, covering the run window 03:53-03:58Z) the
+workload's 10 s interval cycles ran at a steady 33.2 s host period (a uniform
+~3.0 x guest-time stretch), and the driver's host deadline failed the run at
+cycle 8 of 12; on the same image with the 1-minute load average dropping from
+~28 to ~16 the same run completed 12/12 cycles at an 11.1 s host period in
+150 s. The image bytes were identical in both runs. Run the 24 h soak
 on a quiet host, or expect the workload to finish in proportionally more
 wall time (and to hit the driver deadline early under heavy contention).
 The runner's 300 s stall threshold sits above the stretched-cycle silence
