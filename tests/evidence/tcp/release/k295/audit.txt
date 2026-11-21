@@ -2,7 +2,7 @@ tcp-provenance: pass
 netbsd_revision: 36eddebcc36cb0775aa2962005b9c05419a6ff01 (NO-COPY / quarantined)
 freebsd_revision: 133344405f532bd54ff3629a77d4c4e062f01fdb
 dragonfly_revision: 94448f622a06cde90ba42d688e9cab2448ad9ab3
-files_scanned: 101
+files_scanned: 127
 imports: 9 (netbsd: 0, freebsd: 7, dragonfly: 1, other: 1)
 claims: 27
 quarantined: 17 (K254, K255, K256, K257, K258, K259, K260, K261, K265, K266, K267, K269, K273, K274, K275, K277, K278)

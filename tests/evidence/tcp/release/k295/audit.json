@@ -750,7 +750,7 @@
     }
   ],
   "dragonfly_revision": "94448f622a06cde90ba42d688e9cab2448ad9ab3",
-  "files_scanned": 101,
+  "files_scanned": 127,
   "freebsd_imports": [
     {
       "copied": "2026-11-21",

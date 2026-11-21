@@ -1,0 +1,39 @@
+K295 current-master target revalidation: BLOCKED (target build timeout under host contention)
+
+Host: otto/K295 merge e033b23044189d2b8b3d475a80bcf121494c76bc of origin/master
+eee05a0788f8f04c906440b5ec5dada991f4e5d5 (2026-11-21T03:26:02Z).
+Tool: scripts/tcp-evidence.sh (K264 evidence automation, merged master).
+
+Attempt 1
+- command: timeout 240 sh scripts/tcp-evidence.sh --all
+- started 2026-11-21T03:26:07Z; exit 124 (timeout) at 2026-11-21T03:30:07Z
+- packet: tests/evidence/tcp/run-20261121T032607Z
+- completed: audit pass (127 files, 9 imports, 27 claims, 17 quarantined, 13 donor files,
+  0 violations); unit 1156/1156 passed; checker pass; Linux matrix 5/5 pass
+- not completed: target initfs build. No build-initfs.log is present because run_command writes
+  the log only when the child exits; the 240 s timeout killed the phase first.
+
+Attempt 2
+- command: timeout 600 sh scripts/tcp-evidence.sh --matrix
+- started 2026-11-21T03:30:39Z; exit 124 (timeout) at 2026-11-21T03:40:39Z
+- packet: tests/evidence/tcp/run-20261121T033039Z
+- completed: Linux matrix 5/5 pass
+- not completed: target initfs build. The packet has Linux logs and manifest.json only; there is
+  no matrix.json and no Raven target pcap/serial.
+
+Build state at 2026-11-21T03:40:50Z
+- build/fixtures/net-conformance/initfs.img unchanged: 2026-11-21 01:43, 43 MiB (K264 image)
+- build/qtest/net-conformance.img unchanged: 2026-11-21 01:44, 320 MiB
+- load average: 127.51 102.16 70.51; 19 cargo/rustc processes; 11 concurrent
+  `xtask check --fast` runs from other minion clones
+
+Baseline
+- K264 build-initfs.log: 431.881 s; build-image.log: 15.668 s. The same fixture timed out at 240 s
+  in the original K295 run and at 600 s here, so the cap expiry is a build-throughput blocker, not
+  a TCP scenario failure.
+
+Conclusion
+The current-master target initfs did not complete within 240 s (`--all`) or 600 s (`--matrix`)
+under host contention. No current-master target matrix rows exist, so no current-master target
+pass is claimed. The committed K264 packet remains the durable target wire evidence. A rerun needs
+a quiet host (or a lead-approved, measured cap); this ticket does not raise the acceptance cap.

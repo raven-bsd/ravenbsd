@@ -1,13 +1,13 @@
 {
   "command": "cargo nextest run -p raven-tcpip",
   "counts": {
-    "duration_s": 0.557,
+    "duration_s": 0.685,
     "failed": 0,
-    "passed": 930,
-    "run": 930,
+    "passed": 1156,
+    "run": 1156,
     "skipped": 0
   },
-  "duration_s": 8.876,
+  "duration_s": 20.079,
   "exit": 0,
   "log": "logs/unit.log",
   "name": "unit",
