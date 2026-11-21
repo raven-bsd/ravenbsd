@@ -2085,7 +2085,11 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if segment.syn() {
-                            if seq_gt(segment.seq, connection.irs) {
+                            let rfc6191 = segment.tsval.is_some_and(|tsval| {
+                                connection.timestamps
+                                    && (connection.ts_recent.wrapping_sub(tsval) as i32) < 0
+                            });
+                            if rfc6191 || seq_gt(segment.seq, connection.rcv_nxt) {
                                 connection.irs = segment.seq;
                                 connection.rcv_nxt = segment.seq.wrapping_add(1);
                                 let iss = connection.iss.wrapping_add(0x0100_0000);

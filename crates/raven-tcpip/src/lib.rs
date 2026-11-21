@@ -57,6 +57,7 @@ mod observability;
 mod plpmtud_live;
 mod pmtu;
 mod rack_hpts;
+mod rack_os;
 mod readiness;
 mod reassembly;
 mod recovery;
@@ -116,6 +117,9 @@ pub use rack_hpts::{
     PACE_TMR_MASK, PACE_TMR_PERSIT, PACE_TMR_RACK, PACE_TMR_RXT, PACE_TMR_TLP, RackHpts,
     RackTimeout, hpts_usec_to_slots, rack_timeout_action,
 };
+pub use rack_os::{
+    CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
+};
 pub use readiness::Readiness;
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
 pub use route::{Route, RouteTable};
@@ -142,6 +146,10 @@ pub use tcp_mss::{
 };
 pub use tcp_notify::{TcpNotify, TcpNotifyOutcome, TcpStateChange};
 pub use tcp_state::TcpState;
+pub use tcp_timer::{
+    KeepOutcome, RexmtAction, RexmtOutcome, TimerState, TwoMslOutcome, tcp_timer_2msl,
+    tcp_timer_keep, tcp_timer_rexmt,
+};
 pub use time::{Duration, Instant};
 
 #[cfg(any(test, feature = "testutil"))]

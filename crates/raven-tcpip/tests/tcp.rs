@@ -784,6 +784,28 @@ fn time_wait_ignores_rst() {
 }
 
 #[test]
+fn time_wait_rejects_a_syn_that_does_not_advance_rcv_nxt() {
+    let (_link, mut a, mut b) = pair();
+    let socket = handshake(&mut a, &mut b);
+    let accepted = b
+        .tcp_accept(raven_tcpip::SocketId(1))
+        .expect("accept")
+        .expect("conn");
+    a.shutdown_write(socket).expect("a close");
+    drive(&mut a, &mut b, &[200, 250, 300, 350]);
+    b.shutdown_write(accepted).expect("b close");
+    drive(&mut a, &mut b, &[350, 400, 450, 500]);
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::TimeWait));
+    let rcv_nxt = a.test_tcp_rcv_nxt(socket).expect("rcv_nxt");
+    // FreeBSD tcp_twcheck recycles only when SEG.SEQ > RCV.NXT; a SYN at RCV.NXT
+    // is a retransmission of the old connection and must not reopen it.
+    let frame = tcp_frame(B, A, 80, 40_000, rcv_nxt, 0, TcpFlags::SYN);
+    a.test_inject_frame(&frame, Instant::from_millis(501));
+    a.poll(Instant::from_millis(501));
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::TimeWait));
+}
+
+#[test]
 fn syn_sent_unacceptable_ack_gets_a_reset() {
     let (link, mut a, _b) = pair();
     let socket = a
