@@ -153,6 +153,20 @@ fn sequence_wrap_maps_to_relative_offsets() {
 }
 
 #[test]
+fn k268_sacked_bytes_above_counts_a_block_byte_at_the_point() {
+    // K268 finding: `SackScoreboard::sacked_bytes_above` includes the byte
+    // at `point`, while RFC 6675 "above SeqNum" is strict. The reference and
+    // the product therefore differ by one at a block start. This is reported
+    // to K268; the model does not patch product source.
+    let mut board = SackScoreboard::new(100, 0, 0, 10, 3, 64);
+    board.insert_block(50, 70);
+    assert_eq!(board.sacked_bytes_above(50), 20);
+    let mut reference = SackedSet::new(100);
+    reference.insert(50, 70);
+    assert_eq!(reference.sacked_bytes_above(50), 19);
+}
+
+#[test]
 fn a_board_built_from_the_reference_has_the_same_pipe_and_lost_bytes() {
     let mut reference = SackedSet::new(400);
     reference.insert(100, 160);
