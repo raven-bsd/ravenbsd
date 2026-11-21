@@ -298,6 +298,7 @@ members = [
     "tests/net/packetdrill-harness",
     "tests/net-conformance/timers",
     "tests/tcp-loss-model",
+    "tests/rack-recovery-model",
     "tests/tcpip",
     "tests/tcp-output-stress",
     "tests/tcp-model",
