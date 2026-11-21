@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# OpenSSH server policy for the 0.1.0 remote-access demo.
+#
+# This is the upstream sshd_config (OpenSSH 10.6p2) with the minimum demo policy:
+# root and the unprivileged `raven` account may log in with the image password.
+# There is no empty password, no shipped key, and no authorized_keys fallback
+# (AuthorizedKeysFile none); the host key is generated at boot and never shipped.
+# Do not expose this demo to an untrusted network.
+#
+# Paths are absolute target paths. The K200 build's compiled-in SSHDIR is an
+# absolute host build path, so every file the daemon reads is named here.
+
+Port 22
+ListenAddress 0.0.0.0
+PidFile /tmp/sshd.pid
+HostKey /tmp/ssh/ssh_host_ed25519_key
+PermitRootLogin yes
+AllowUsers root raven
+PasswordAuthentication yes
+PermitEmptyPasswords no
+KbdInteractiveAuthentication no
+AuthorizedKeysFile none
+StrictModes no
+PrintMotd no
+UseDNS no
+LogLevel INFO

@@ -1,0 +1,22 @@
+pipe-probe: compile
+pipe-probe: initfs
+pipe-probe: image
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.54s
+     Running `target/debug/xtask image --arch x86_64 --profile base --cmdline 'console=ttyS0 test-exit=1' --initfs /home/bo/work/ravenos-workspace/minions/tim/ravenbsd/build/ssh/pipe-probe-initfs.img --output /home/bo/work/ravenos-workspace/minions/tim/ravenbsd/build/ssh/pipe-probe.img`
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.57s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.53s
+pipe-probe: boot
+pipe-probe: transcript
+RavenBSD kernel 0.1 (x86_64) ce3bb3c4-dirty 2026-11-21
+mem: 449 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x41a890 sp=0x7fffffffde60
+sched: running (2 cpus, slice 10 ms)
+pipe-probe: pipe fd
+pipe-probe: ok
+svcd: pipe-probe up
+svcd: pipe-probe timing: generation=1 start=202 spawn=347 first_poll=none deadline=5347 stalled=0 ready_at=408
+svcd: settled
+init exited (0)
+pipe-probe: PASS (pipe(2) works)
