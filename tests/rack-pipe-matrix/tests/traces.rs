@@ -28,7 +28,7 @@ fn workspace_path(relative: &str) -> PathBuf {
 }
 
 fn entry(start: u32, end: u32, last: u32) -> RackSendmap {
-    RackSendmap::new(start, end, last)
+    RackSendmap::new(start, end, last.into())
 }
 
 #[test]
