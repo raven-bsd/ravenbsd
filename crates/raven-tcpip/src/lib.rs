@@ -57,6 +57,7 @@ mod observability;
 mod plpmtud_live;
 mod pmtu;
 mod rack_hpts;
+mod rack_misc;
 mod rack_os;
 mod rack_vtable;
 mod readiness;
@@ -117,6 +118,14 @@ pub use rack_hpts::{
     HPTS_USECS_PER_SLOT, HptsCallback, NUM_OF_HPTSI_SLOTS, PACE_TMR_DELACK, PACE_TMR_KEEP,
     PACE_TMR_MASK, PACE_TMR_PERSIT, PACE_TMR_RACK, PACE_TMR_RXT, PACE_TMR_TLP, RackHpts,
     RackTimeout, hpts_usec_to_slots, rack_timeout_action,
+};
+pub use rack_misc::{
+    ACK_FLAG, DeferredOption, FIN_FLAG, FsbBlock, MiscQuery, RACK_APP_LIMITED, RACK_DEFERRED_MAX,
+    RACK_FREE_CACHE, RACK_FREE_CNT_MAX, RACK_HAD_PUSH, RACK_HAS_FIN, RACK_HAS_SYN, RACK_MUST_RXT,
+    RACK_PMTU_CHG, RACK_RWND_COLLAPSED, RACK_TLP, RST_FLAG, RackMisc, RackSendmap, RackTcpInfo,
+    TCP_DEFER_OPTIONS, TCP_NO_PRR, TCP_RACK_ABC_VAL, TCP_RACK_DSACK_OPT, TCP_RACK_FORCE_MSEG,
+    TCP_RACK_HI_BETA, TCP_RACK_MBUF_QUEUE, TCP_RACK_MEASURE_CNT, TCP_RACK_PACE_TO_FILL,
+    TCP_RACK_PROFILE, TCP_RACK_SET_RXT_OPTIONS, TCP_RACK_TIMER_SLOP, TCP_USE_CMP_ACKS,
 };
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
