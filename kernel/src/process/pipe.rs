@@ -19,6 +19,7 @@ use raven_abi::errno::Errno;
 use raven_usercopy::UserSlice;
 use spin::Mutex;
 
+use crate::event::evq_core::{HUP, READABLE, WRITABLE};
 use crate::process;
 use crate::sched;
 use crate::sched::wait::WaitQueue;
@@ -77,6 +78,29 @@ impl PipeEnd {
         self.cloexec
     }
 
+    /// Current EVQ readiness bits for this pipe end.
+    ///
+    /// Read end: data is `READABLE`; a closed writer is `READABLE|HUP` (a read returns EOF);
+    /// otherwise it is not ready. Write end: no reader is `HUP`; any free ring space is
+    /// `WRITABLE`; a full ring is not ready.
+    pub fn readiness(&self) -> u32 {
+        let state = self.pipe.state.lock();
+        if self.writer {
+            if state.read_ends == 0 {
+                return HUP;
+            }
+            return if state.ring.free() != 0 { WRITABLE } else { 0 };
+        }
+        let mut events = 0;
+        if !state.ring.is_empty() {
+            events |= READABLE;
+        }
+        if state.write_ends == 0 {
+            events |= READABLE | HUP;
+        }
+        events
+    }
+
     /// Wake and remove every pipe waiter owned by `process_id`.
     ///
     /// A thread blocked in `read`/`write` holds this endpoint's `Arc` and a wait-queue entry;
@@ -104,6 +128,8 @@ impl PipeEnd {
         if let Some(empty) = ring::Ring::new(1) {
             state.ring = empty;
         }
+        drop(state);
+        crate::event::notify_all();
     }
 }
 
@@ -124,6 +150,7 @@ impl Drop for PipeEnd {
         if wake_readers {
             self.pipe.readers.wake_all();
         }
+        crate::event::notify_all();
     }
 }
 
@@ -228,6 +255,7 @@ pub fn read(end: &Arc<PipeEnd>, destination: UserSlice) -> Result<usize, Errno> 
         state.ring.consume(copied);
         drop(state);
         end.pipe.writers.wake_all();
+        crate::event::notify_all();
         return Ok(copied);
     }
 }
@@ -299,6 +327,7 @@ pub fn write(end: &Arc<PipeEnd>, source: UserSlice) -> Result<usize, Errno> {
         state.ring.produce(copied);
         drop(state);
         end.pipe.readers.wake_all();
+        crate::event::notify_all();
         done = done.saturating_add(copied);
         if done >= total {
             return Ok(done);
