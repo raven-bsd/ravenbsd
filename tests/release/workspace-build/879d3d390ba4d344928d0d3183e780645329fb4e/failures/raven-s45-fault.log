@@ -1,0 +1,17 @@
+
+   Compiling raven-s45-fault v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/qtest/cases/signal-fault-fixture)
+error[E0432]: unresolved import `raven_rt::spawn::spawn_with`
+  --> tests/qtest/cases/signal-fault-fixture/src/main.rs:26:44
+   |
+26 | use raven_rt::spawn::{RtSys, SpawnOptions, spawn_with};
+   |                                            ^^^^^^^^^^ no `spawn_with` in `spawn`
+
+error[E0152]: duplicate lang item in crate `std` (which `test` depends on): `panic_impl`
+  |
+  = note: the lang item is first defined in crate `raven_rt` (which `raven_s45_fault` depends on)
+  = note: first definition in `raven_rt` loaded from /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-3ac44c8a3e75c778.rlib
+  = note: second definition in `std` loaded from /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.so, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rlib, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rmeta
+
+Some errors have detailed explanations: E0152, E0432.
+For more information about an error, try `rustc --explain E0152`.
+error: could not compile `raven-s45-fault` (bin "raven-s45-fault" test) due to 2 previous errors

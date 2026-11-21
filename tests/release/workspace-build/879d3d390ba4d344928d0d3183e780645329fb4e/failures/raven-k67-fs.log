@@ -1,0 +1,34 @@
+
+   Compiling raven-k67-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/fixtures/k67-fs)
+error[E0152]: duplicate lang item in crate `std` (which `test` depends on): `panic_impl`
+  |
+  = note: the lang item is first defined in crate `raven_rt` (which `raven_k67_client` depends on)
+  = note: first definition in `raven_rt` loaded from /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-3ac44c8a3e75c778.rlib
+  = note: second definition in `std` loaded from /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.so, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rlib, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rmeta
+
+For more information about this error, try `rustc --explain E0152`.
+error: could not compile `raven-k67-fs` (bin "raven-k67-client" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0432]: unresolved import `raven_rt::spawn::spawn`
+   --> tests/fixtures/k67-fs/src/bin/init.rs:21:44
+    |
+ 21 | use raven_rt::spawn::{RtSys, SpawnOptions, spawn};
+    |                                            ^^^^^ no `spawn` in `spawn`
+    |
+note: found an item that was configured out
+   --> userland/rt/src/spawn.rs:118:8
+    |
+117 | #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    |          -------------------------------------------- the item is gated here
+118 | pub fn spawn(
+    |        ^^^^^
+
+error[E0152]: duplicate lang item in crate `std` (which `test` depends on): `panic_impl`
+  |
+  = note: the lang item is first defined in crate `raven_rt` (which `raven_k67_fs` depends on)
+  = note: first definition in `raven_rt` loaded from /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-3ac44c8a3e75c778.rlib
+  = note: second definition in `std` loaded from /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.so, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rlib, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rmeta
+
+Some errors have detailed explanations: E0152, E0432.
+For more information about an error, try `rustc --explain E0152`.
+error: could not compile `raven-k67-fs` (bin "raven-k67-fs" test) due to 2 previous errors
