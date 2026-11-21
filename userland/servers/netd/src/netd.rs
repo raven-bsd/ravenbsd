@@ -1246,7 +1246,12 @@ impl<D: Device> Netd<D> {
             Call::Poll => self.readiness(file),
             // The target glue creates the S26 event handle and attaches it; the pure core has no
             // kernel handle table.
-            Call::Event => Err(Errno::EOPNOTSUPP),
+            Call::Event => {
+                // K195 DIAGNOSTIC (temporary): prove the event request reaches the plain call
+                // path (the attach path is the only one that serves it).
+                raven_rt::println!("k195e file={file} Call::Event -> EOPNOTSUPP");
+                Err(Errno::EOPNOTSUPP)
+            }
         };
         match result {
             Ok(response_value) => self.write_response(response, &response_value),
