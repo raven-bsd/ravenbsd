@@ -1,0 +1,2 @@
+package	step	lint	file_line	owner
+ed	clippy user programs x86_64	clippy::while_let_on_iterator	userland/bin/ed/src/lib.rs:220:9	Phil/K421 or Kevin/ed

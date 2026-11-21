@@ -1,0 +1,14 @@
+step	exit	seconds	result
+guard	0	16.32	ok
+fmt	0	13.49	ok
+clippy-host	0	4.27	ok
+tests-host	0	77.73	ok: 13009 run, 13009 passed, 4 skipped
+tests-doc	0	5.19	ok
+profiles	0	0.12	ok
+provenance	0	45.18	ok
+clippy-kernel-x86_64	0	2.65	ok
+clippy-kernel-aarch64	0	2.56	ok
+clippy-user-programs-x86_64	101	3.60	FAILED: ed while_let_on_iterator
+clippy-loader-x86_64	0	0.73	ok
+docs	0	0.29	ok
+check-fast	0	175.55	PASSED (not evidence: --fast skips target clippy)
