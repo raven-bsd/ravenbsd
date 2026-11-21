@@ -89,11 +89,11 @@ mod program {
                 for line in output.text.lines() {
                     raven_rt::println!("{line}");
                 }
-                if let (Some(path), Some(dump)) = (&options.write, output.dump) {
-                    if let Err(error) = write_file(path, &dump) {
-                        raven_rt::eprintln!("tcpdump: {path}: {}", error.description());
-                        return 1;
-                    }
+                if let (Some(path), Some(dump)) = (&options.write, output.dump)
+                    && let Err(error) = write_file(path, &dump)
+                {
+                    raven_rt::eprintln!("tcpdump: {path}: {}", error.description());
+                    return 1;
                 }
                 0
             }
