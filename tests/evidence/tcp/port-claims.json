@@ -340,6 +340,21 @@
       "paths": ["userland/servers/netd/src/netd_ut.rs"],
       "donor": "Covered by K272 readiness.rs FreeBSD socketvar.h; K279 adds only the netd test",
       "note": "Merged in d575eb0f; no separate product entry"
+    },
+    {
+      "ticket": "K313",
+      "lane": "lance",
+      "kind": "port",
+      "status": "landed",
+      "copy": "permitted",
+      "report": "lance/reports/K313.md",
+      "paths": ["crates/raven-tcpip/src/tcp_data.rs"],
+      "donor": "FreeBSD tcp_output.c/tcp_timer.c: tcp_default_output, tcp_setpersist, tcp_timer_persist",
+      "donor_checks": [
+        {"upstream": "freebsd", "file": "sys/netinet/tcp_output.c", "symbols": ["tcp_setpersist"]},
+        {"upstream": "freebsd", "file": "sys/netinet/tcp_timer.c", "symbols": ["tcp_timer_persist"]}
+      ],
+      "note": "Merged in 3ad7a817; exact entry in PROVENANCE.toml"
     }
   ]
 }

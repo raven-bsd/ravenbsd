@@ -12,9 +12,9 @@ quarantined and contribute no entry.
 
 | Gate | Result |
 |---|---|
-| audit | **pass**: 8 imports (6 FreeBSD, 1 DragonFly, 1 pre-existing smoltcp/0BSD), 17 quarantined claims, 11 donor files, 0 violations, 0 donor-missing |
+| audit | **pass**: 9 imports (7 FreeBSD, 1 DragonFly, 1 pre-existing smoltcp/0BSD), 27 claims (17 quarantined), 13 donor files, 0 violations, 0 donor-missing |
 | matrix | **ran 10/10**: Linux 5/5 pass; Raven zero-window, window-update, retransmit, fin-rst pass; Raven handshake **finding** |
-| unit | **710/710 passed**, 0 skipped |
+| unit | **891/891 passed**, 0 skipped (merged master) |
 | checker | **pass**: 2 negative fixtures rejected, 1 valid fixture accepted, 2 mutations caught |
 | provenance | 0 violations; generated evidence run directories are excluded, while scripts/README/port-claims/docs stay scanned |
 | `make check-fast` | **`check-fast: PASSED`** |
@@ -32,9 +32,11 @@ The exact entries from the landed reports were added to `PROVENANCE.toml`:
 | K271 | `crates/raven-tcpip/src/listen.rs` | FreeBSD `uipc_socket.c` | BSD-3-Clause |
 | K272 | `crates/raven-tcpip/src/readiness.rs` | FreeBSD `sys/sys/socketvar.h` | BSD-3-Clause |
 | K276 | `crates/raven-tcpip/src/syncache.rs` | FreeBSD `tcp_syncache.c`, `tcp_syncache.h`, `tcp_timer.c` | BSD-3-Clause |
+| K313 | `crates/raven-tcpip/src/tcp_data.rs` | FreeBSD `tcp_output.c`, `tcp_timer.c`: `tcp_default_output`, `tcp_setpersist`, `tcp_timer_persist` | BSD-3-Clause |
 
 K279 changes only the netd readiness test and is covered by K272's `readiness.rs` entry; it adds no
-separate import. The pre-existing smoltcp DHCP entry (`src/dhcp.rs`, 0BSD) is unrelated.
+separate import. K313 (`tcp_data.rs`, merged master) is in the same claim file as a landed FreeBSD
+port. The pre-existing smoltcp DHCP entry (`src/dhcp.rs`, 0BSD) is unrelated.
 
 The pinned donors are FreeBSD `133344405f532bd54ff3629a77d4c4e062f01fdb` and DragonFly
 `94448f622a06cde90ba42d688e9cab2448ad9ab3`. The sparse worktrees are read through the pinned git
