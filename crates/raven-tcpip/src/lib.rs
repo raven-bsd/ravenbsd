@@ -58,6 +58,7 @@ mod plpmtud_live;
 mod pmtu;
 mod rack_hpts;
 mod rack_os;
+mod rack_state;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -120,6 +121,14 @@ pub use rack_hpts::{
 };
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
+};
+pub use rack_state::{
+    TCPS_CLOSING, TCPS_FIN_WAIT_1, TCPS_FIN_WAIT_2, TCPS_LAST_ACK, TCPS_TIME_WAIT,
+    rack_do_close_wait, rack_do_closing, rack_do_compressed_ack_processing, rack_do_established,
+    rack_do_fastnewdata, rack_do_fin_wait_1, rack_do_fin_wait_2, rack_do_lastack, rack_do_segment,
+    rack_do_segment_nounlock, rack_do_syn_recv, rack_do_syn_sent, rack_do_win_updates,
+    rack_handle_delayed_ack, rack_handle_might_revert, rack_handle_probe_response,
+    rack_process_data, rack_process_option,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
