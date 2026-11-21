@@ -104,8 +104,6 @@ pub(crate) struct OutputPlan {
     /// `off = snd_nxt - snd_una`.
     #[allow(dead_code)]
     pub off: i64,
-    /// The queue offset the segment starts at (`off`, or `max(pipe, off)` after SACK).
-    pub boundary: i64,
     /// Sendable bytes before the MSS cap, used as the PLPMTUD room.
     pub room: i64,
     /// Sendable bytes after the MSS cap.
@@ -198,7 +196,6 @@ pub(crate) fn freebsd_output_plan(
     }
     OutputPlan {
         off,
-        boundary,
         room,
         len,
         send,
@@ -389,7 +386,7 @@ impl<D: Device> Stack<D> {
                 let cwnd = connection.cc.cwnd();
                 let plan = freebsd_output_plan(connection, sbavail, cwnd, force);
                 arm_persist = plan.arm_persist;
-                let boundary = plan.boundary;
+                let off = plan.off;
                 let mut len = plan.len;
 
                 // PLPMTUD probes may exceed MSS; the search only asks for a size the window
@@ -441,7 +438,11 @@ impl<D: Device> Stack<D> {
                     }
                     None
                 } else {
-                    let start = usize::try_from(boundary).unwrap_or(usize::MAX);
+                    // FreeBSD `tcp_build_datapkt` always starts the payload at `off`
+                    // (snd_nxt - snd_una). The SACK pipe only shortens `len`; it must not
+                    // move the payload start, or the segment is mislabeled and the peer
+                    // duplicates the overlap.
+                    let start = usize::try_from(off).unwrap_or(usize::MAX);
                     let payload = queue_range(
                         &record.tx,
                         start,

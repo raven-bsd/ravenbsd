@@ -104,7 +104,10 @@ fn a_retransmission_below_the_high_water_is_sent() {
     connection.snd_nxt = 1_100;
     connection.snd_max = Some(3_000);
     let plan = freebsd_output_plan(&mut connection, 500, 10_000, false);
-    assert_eq!(plan.boundary, 100);
+    assert_eq!(
+        plan.off, 100,
+        "the payload always starts at snd_nxt, not the SACK pipe"
+    );
     assert_eq!(plan.len, 400, "the unsent tail");
     assert!(plan.send, "snd_nxt < snd_max opens the gate");
 }
