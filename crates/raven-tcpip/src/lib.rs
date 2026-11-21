@@ -73,6 +73,7 @@ mod table;
 mod tcp_data;
 mod tcp_mss;
 mod tcp_notify;
+pub mod tcp_respond;
 mod tcp_state;
 mod tcp_timer;
 mod time;
