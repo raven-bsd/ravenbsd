@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "timer-retransmit"
+port = 24100
+baseline = "host-side: timeout 120 cargo nextest run -p tcp-timer-conformance rto_retransmits_same_sequence_with_backoff_before_drop"
+donor = [
+  "FreeBSD sys/netinet/tcp_timer.c:tcp_timer_rexmt (RTO/backoff and snd_nxt rewind)",
+]
+rfcs = ["RFC 6298 section 5 (retransmission timer and exponential backoff)"]
+
+[[expect]]
+step = "peer completes the handshake and the server queues 44 bytes"
+packet = "data"
+assert = "first data segment carries 44 bytes at SYN-ACK sequence+1"
+
+[[expect]]
+step = "peer withholds the ACK for the first data segment"
+packet = "data"
+assert = "a retransmission with the same sequence and payload arrives within 0.5..4 s"
+
+[[expect]]
+step = "peer keeps withholding the ACK"
+packet = "data"
+assert = "successive retransmissions have equal sequence/payload and non-decreasing intervals"
+
+[[expect]]
+step = "peer ACKs the retransmission"
+packet = "ACK"
+assert = "the stream completes with exactly 44 bytes and no duplicate delivered byte"
