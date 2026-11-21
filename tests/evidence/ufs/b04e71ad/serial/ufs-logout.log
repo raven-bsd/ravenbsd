@@ -1,0 +1,70 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running `target/debug/xtask qtest --case ufs-logout --arch x86_64 --no-build`
+ufs-logout: fail
+--- serial (last 40 lines) ---
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+devd: driver virtio-blk bar=4 size=16384
+devd: driver virtio-blk dma bus=0x181000 len=65536
+devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=5
+devd: driver virtio-blk msix vector=65 table=0x0 bar=1
+virtio-blk: id=1af4:1042
+virtio-blk: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-blk: msix table=0x0 bar=1 vector=1
+virtio-blk: capacity=524355 sector_size=512 ro=0
+virtio-blk: features=0x00000200 version1=1
+virtio-blk: queue0 size=8 notify=0x0
+virtio-blk: dma bus=0x181000 len=65536 irq=0
+virtio-blk: registered disk
+svcd: devd up
+svcd: devd timing: generation=1 start=270 spawn=285 first_poll=302 deadline=60285 stalled=0 ready_at=456
+blockd: remote disk=disk:0 sectors=524355 ro=0
+blockd: gpt ok partitions=1
+blockd: part 1 ufs-root 34..524321
+1795300168.519 blockd: started
+svcd: blockd up
+svcd: blockd timing: generation=1 start=456 spawn=467 first_poll=469 deadline=60467 stalled=0 ready_at=527
+svcd: fsd-ufs failed: readiness timeout
+svcd: fsd-ufs timing: generation=1 start=528 spawn=538 first_poll=539 deadline=60538 stalled=0 finished_at=60546
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=60556 spawn=60563 first_poll=60565 deadline=120563 stalled=0 ready_at=60596
+svcd: root pivot: /: no UFS root device (no such file or directory); staying on the initfs
+svcd: consd up
+svcd: consd timing: generation=1 start=60614 spawn=60621 first_poll=60623 deadline=120621 stalled=0 ready_at=60626
+1795300228.636 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=60630 spawn=60634 first_poll=60635 deadline=65634 stalled=0 ready_at=60641
+--- unmatched expectations ---
+^svcd: root pivoted to UFS at /$
+^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$
+--- result ---
+step 1 ((?i)^.*login: ?$) failed: the case timed out after 90 s before this step finished
+last 20 serial line(s):
+blockd: part 1 ufs-root 34..524321
+1795300168.519 blockd: started
+svcd: blockd up
+svcd: blockd timing: generation=1 start=456 spawn=467 first_poll=469 deadline=60467 stalled=0 ready_at=527
+svcd: fsd-ufs failed: readiness timeout
+svcd: fsd-ufs timing: generation=1 start=528 spawn=538 first_poll=539 deadline=60538 stalled=0 finished_at=60546
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=60556 spawn=60563 first_poll=60565 deadline=120563 stalled=0 ready_at=60596
+svcd: root pivot: /: no UFS root device (no such file or directory); staying on the initfs
+svcd: consd up
+svcd: consd timing: generation=1 start=60614 spawn=60621 first_poll=60623 deadline=120621 stalled=0 ready_at=60626
+1795300228.636 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=60630 spawn=60634 first_poll=60635 deadline=65634 stalled=0 ready_at=60641

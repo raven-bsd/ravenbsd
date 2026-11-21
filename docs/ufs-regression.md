@@ -13,6 +13,50 @@ tree, but two independent regressions make the release gate red: four
 on a virtio legacy-IRQ conflict. Evidence and exact serials:
 `tests/evidence/ufs/978899da/`.
 
+## Latest verdict — merged master `b04e71ad` (2026-11-21)
+
+Re-verified on `origin/master` `b04e71ad` (merged into `mel/K378` at
+`5a59da2e`; source identical to `b04e71ad`). Evidence:
+`tests/evidence/ufs/b04e71ad/`.
+
+Result: **BLOCKED**. UFS is green; the gate is red on three non-UFS defects.
+
+| Gate | Result | `duration_ms` | Evidence |
+|---|---|---:|---|
+| `ufs-disk` | PASS | 258291 | `serial/ufs-disk.log` |
+| `ufs-disk-persist` | PASS | 47346 | `serial/ufs-disk-persist.log` |
+| `ufs-disk-ufs1` | PASS | 98607 | `serial/ufs-disk-ufs1.log` |
+| `ufs-root` | FAIL | 79891 | `serial/ufs-root.log` |
+| `ufs-logout` | FAIL | 90303 | `serial/ufs-logout.log`, `serial/ufs-logout-r2.log` |
+| `disk-tools` | FAIL | 134473 | `serial/disk-tools.log` |
+| `ufs-update` | FAIL | 65241 | `serial/ufs-update.log` |
+| `ufs-update-persist` | FAIL | 73704 | `serial/ufs-update-persist.log` |
+| `ufs-full` | FAIL | 408023 | `serial/ufs-full.log` |
+| `make ufs-selftest` | PASS | ~1000 | `serial/ufs-selftest.log` |
+| `make check-fast` | PASS | 22000 | `serial/check-fast.log` |
+
+The three defects, none of them UFS:
+
+1. **K234 one-shot expectation** — `ufs-root`, `ufs-update`,
+   `ufs-update-persist` and `ufs-full` match every product step and stop only at
+   the post-`exit 0` `init exited (0)` expectation; the demo getty restarts by
+   design.
+2. **K374 login banner** — `ufs-logout` completes both logins and returns to
+   `login:`, but the expected `RavenBSD 0.1 (x86_64) (tty:console)` line is
+   replaced by the styled boot screen ending in
+   `Welcome to RavenBSD 0.1 x86_64` (`userland/init/src/bootscreen.rs:119`,
+   merged `7971d65f`). The case expectation is stale.
+3. **virtio legacy IRQ** — `disk-tools` boots with virtio-blk and virtio-net on
+   the same legacy IRQ 11; the second claim returns `EBUSY`, `devd` exits before
+   ready, and `blockd` never sees `disk:0`.
+
+One transient: the first `ufs-logout` boot hit `fsd-ufs: readiness timeout` at
+60 s under host load 16-21 with four other QEMU guests; the re-run pivoted and
+completed both logins, then failed only on the K374 banner. Recorded in
+`serial/ufs-logout.log`.
+
+## Previous run — `978899da`
+
 ## Gates
 
 | Gate | Result | `duration_ms` | Evidence |

@@ -1,0 +1,48 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running `target/debug/xtask qtest --case ufs-logout --arch x86_64 --no-build`
+ufs-logout: timeout
+--- serial (last 40 lines) ---
+000.06  blockd              ok
+000.07  logd                ok
+000.07  zerod               ok
+000.07  randd               ok
+000.09  nulld               ok
+000.09  ramfsd              ok
+000.11  initfsd             ok
+000.13  consd               ok
+000.13  sysd                ok
+000.17  devd                ok
+000.30  resolvd             ok
+000.81  netd                ok
+022.84  fsd-ufs             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# eraven# exraven# exiraven# exitraven# exit
+exit
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# exitraven# exitraven# exitraven# exitraven# exit
+exit
+login: 
+--- unmatched expectations ---
+^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$
+--- result ---
+timed out after 90 s (expected timeout); unmatched expectations: ^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$

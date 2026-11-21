@@ -1,0 +1,1372 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.60s
+     Running `target/debug/xtask image --arch x86_64 --profile qemu-ufs --cmdline 'console=ttyS0 test-exit=1' --output build/qtest/ufs-update.img`
+==> build loader x86_64 (x86_64-unknown-uefi, release, lto=fat)
+    Finished `release` profile [optimized] target(s) in 0.37s
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/loader.efi
+==> build kernel x86_64 (x86_64-unknown-none, release, lto=fat)
+    Finished `release` profile [optimized] target(s) in 0.46s
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/kernel.elf
+==> build user x86_64 (x86_64-unknown-none, release, lto=false (code-model=small))
+   Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-abi)
+   Compiling raven-initfs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-initfs)
+   Compiling raven-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-elf)
+   Compiling raven-trace-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-trace-core)
+   Compiling raven-tty-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tty-core)
+   Compiling raven-proto-tty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-tty)
+   Compiling raven-proto-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-fs)
+   Compiling raven-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-ipc)
+   Compiling raven-proto-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-net)
+   Compiling raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-scheme)
+   Compiling raven-vfs-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-vfs-core)
+   Compiling raven-ramfs-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-ramfs-core)
+   Compiling raven-spawn v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-spawn)
+   Compiling raven-rt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/rt)
+   Compiling raven-driver v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-driver)
+   Compiling trace v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/trace)
+   Compiling raven-uname v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/uname)
+   Compiling raven-consd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/consd)
+   Compiling raven-zerod v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/zerod)
+   Compiling raven-devd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/devd)
+   Compiling raven-initfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/initfsd)
+   Compiling raven-logd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/logd)
+   Compiling raven-randd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/randd)
+   Compiling raven-sysd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/sysd)
+   Compiling raven-nulld v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/nulld)
+   Compiling raven-init v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/init)
+   Compiling fsd-ufs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/fsd-ufs)
+   Compiling virtio-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/drivers/virtio-net)
+   Compiling virtio-blk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/drivers/virtio-blk)
+   Compiling raven-ramfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/ramfsd)
+   Compiling raven-vfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/vfsd)
+   Compiling raven-pcid v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/pcid)
+   Compiling raven-blockd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/blockd)
+    Finished `release` profile [optimized] target(s) in 4.06s
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-init
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-uname
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-logd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-sysd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-randd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-zerod
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-nulld
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-consd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-initfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-ramfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-vfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-pcid
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-devd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/virtio-blk
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/virtio-net
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-blockd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/fsd-ufs
+==> build user x86_64 (x86_64-unknown-none, release, lto=false (code-model=small))
+   Compiling raven-echo v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/echo)
+    Finished `release` profile [optimized] target(s) in 0.26s
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-echo
+==> libc x86_64: packing missing prerequisites (build/x86_64/libc.so.1, build/x86_64/ld-elf.so.1)
+warning: unused imports: `c_int` and `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/call_once.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^  ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `mutex::Mutex`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_broadcast.rs:6:42
+  |
+6 | use raven_libc_thread::{c11, cond::Cond, mutex::Mutex};
+  |                                          ^^^^^^^^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_destroy.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_destroy.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `mutex::Mutex`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_destroy.rs:6:42
+  |
+6 | use raven_libc_thread::{c11, cond::Cond, mutex::Mutex};
+  |                                          ^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_init.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `mutex::Mutex`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_init.rs:6:42
+  |
+6 | use raven_libc_thread::{c11, cond::Cond, mutex::Mutex};
+  |                                          ^^^^^^^^^^^^
+
+warning: unused import: `mutex::Mutex`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/cnd_signal.rs:6:42
+  |
+6 | use raven_libc_thread::{c11, cond::Cond, mutex::Mutex};
+  |                                          ^^^^^^^^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/mtx_destroy.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/mtx_destroy.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/mtx_init.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `c_int` and `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_current.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^  ^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_detach.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_detach.rs:6:5
+  |
+6 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_equal.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_equal.rs:6:5
+  |
+6 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_exit.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_join.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_join.rs:6:5
+  |
+6 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_sleep.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused imports: `c_int` and `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/thrd_yield.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^  ^^^^^^
+
+warning: unused import: `raven_libc_thread::thread::once::Once`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_create.rs:7:5
+  |
+7 | use raven_libc_thread::thread::once::Once;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `c_int` and `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_delete.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^  ^^^^^^
+
+warning: unused import: `raven_libc_thread::thread::once::Once`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_delete.rs:7:5
+  |
+7 | use raven_libc_thread::thread::once::Once;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_get.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^
+
+warning: unused import: `raven_libc_thread::thread::once::Once`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_get.rs:7:5
+  |
+7 | use raven_libc_thread::thread::once::Once;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::thread::once::Once`
+ --> libc/ravenlibc/crates/raven-libc/src/threads/tss_set.rs:7:5
+  |
+7 | use raven_libc_thread::thread::once::Once;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_proc::local_backend::LocalBackend`
+  --> libc/ravenlibc/crates/raven-libc/src/ffi/procbackend.rs:20:5
+   |
+20 | use raven_libc_proc::local_backend::LocalBackend;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/platform/readlink.rs:4:25
+  |
+4 | use core::ffi::{c_char, c_int};
+  |                         ^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/_pthread_cleanup_pop.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/_pthread_cleanup_push.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::mutex as m`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_cond_broadcast.rs:6:5
+  |
+6 | use raven_libc_thread::mutex as m;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::mutex as m`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_cond_destroy.rs:6:5
+  |
+6 | use raven_libc_thread::mutex as m;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::mutex as m`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_cond_init.rs:6:5
+  |
+6 | use raven_libc_thread::mutex as m;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::mutex as m`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_cond_signal.rs:6:5
+  |
+6 | use raven_libc_thread::mutex as m;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_detach.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_detach.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `attr as a`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_detach.rs:6:39
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                       ^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getaffinity_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getattr_np.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getattr_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `self`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getattr_np.rs:6:33
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                 ^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getconcurrency.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getcpuclockid.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getcpuclockid.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `attr as a` and `self`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getcpuclockid.rs:6:33
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                 ^^^^  ^^^^^^^^^
+
+warning: unused import: `c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_getspecific.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_join.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `attr as a`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_join.rs:6:39
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                       ^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_key_delete.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_setaffinity_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_setconcurrency.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `core::ffi::c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_testcancel.rs:4:5
+  |
+4 | use core::ffi::c_int;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_timedjoin_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `attr as a`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_timedjoin_np.rs:6:39
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                       ^^^^^^^^^
+
+warning: unused import: `raven_libc_thread::raw::SysKernel`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_tryjoin_np.rs:5:5
+  |
+5 | use raven_libc_thread::raw::SysKernel;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `attr as a`
+ --> libc/ravenlibc/crates/raven-libc/src/pthread/pthread_tryjoin_np.rs:6:39
+  |
+6 | use raven_libc_thread::thread::{self, attr as a};
+  |                                       ^^^^^^^^^
+
+warning: unused import: `file_from_ptr`
+  --> libc/ravenlibc/crates/raven-libc/src/stdio/tmpfile.rs:10:30
+   |
+10 | use raven_libc_stdio::{Fail, file_from_ptr};
+   |                              ^^^^^^^^^^^^^
+
+warning: unused import: `c_void`
+ --> libc/ravenlibc/crates/raven-libc/src/stdio/vswscanf.rs:4:24
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                        ^^^^^^
+
+warning: unused import: `c_char`
+ --> libc/ravenlibc/crates/raven-libc/src/stdio/vwprintf.rs:6:17
+  |
+6 | use core::ffi::{c_char, c_int, c_void};
+  |                 ^^^^^^
+
+warning: unused import: `c_int`
+ --> libc/ravenlibc/crates/raven-libc/src/stdio/wide_ops/getwc_unlocked.rs:4:17
+  |
+4 | use core::ffi::{c_int, c_void};
+  |                 ^^^^^
+
+warning: variable does not need to be mutable
+  --> libc/ravenlibc/crates/raven-libc/src/pwd/putspent.rs:70:9
+   |
+70 |     let mut ok = push(out, &mut position, name)
+   |         ----^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `position` is never read
+  --> libc/ravenlibc/crates/raven-libc/src/stdlib/ecvt_r.rs:43:24
+   |
+43 |     let mut position = 0usize;
+   |                        ^^^^^^ this value is reassigned later and never used
+...
+49 |                 position = 3;
+   |                 ------------ `position` is overwritten here before the previous value is read
+   |
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> libc/ravenlibc/crates/raven-libc/src/wchar/wcstold.rs:13:9
+   |
+13 |     let mut converted: *mut c_char = core::ptr::null_mut();
+   |         ----^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: function `fail` is never used
+  --> libc/ravenlibc/crates/raven-libc/src/stdio/popen.rs:22:4
+   |
+22 | fn fail(error: raven_libc_platform::Errno) -> c_int {
+   |    ^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `raven-libc` (lib) generated 65 warnings (run `cargo fix --lib -p raven-libc` to apply 63 suggestions)
+    Finished `libc-a-server` profile [optimized] target(s) in 0.21s
+libc-pack: build: ok
+libc-pack: members: ok
+libc-pack: pack: ok (2636 members, 1451 raven_libc)
+libc-pack: symbols: ok (mkmap: merge: ok (1727 public, 30 private))
+libc-pack: map: ok
+    Finished `libc-a` profile [optimized] target(s) in 0.17s
+libc-pack: crt: ok (8 objects)
+libc-stubs: wrote build/x86_64/stubs/libbsd.a
+libc-stubs: wrote build/x86_64/stubs/libbsd.so
+libc-stubs: wrote build/x86_64/stubs/libcompat.a
+libc-stubs: wrote build/x86_64/stubs/libcompat.so
+libc-stubs: wrote build/x86_64/stubs/libcrypt.a
+libc-stubs: wrote build/x86_64/stubs/libcrypt.so
+libc-stubs: wrote build/x86_64/stubs/libdl.a
+libc-stubs: wrote build/x86_64/stubs/libdl.so
+libc-stubs: wrote build/x86_64/stubs/libexecinfo.a
+libc-stubs: wrote build/x86_64/stubs/libexecinfo.so
+libc-stubs: wrote build/x86_64/stubs/libgen.a
+libc-stubs: wrote build/x86_64/stubs/libgen.so
+libc-stubs: wrote build/x86_64/stubs/libintl.a
+libc-stubs: wrote build/x86_64/stubs/libintl.so
+libc-stubs: wrote build/x86_64/stubs/libm.a
+libc-stubs: wrote build/x86_64/stubs/libm.so
+libc-stubs: wrote build/x86_64/stubs/libnsl.a
+libc-stubs: wrote build/x86_64/stubs/libnsl.so
+libc-stubs: wrote build/x86_64/stubs/libposix4.a
+libc-stubs: wrote build/x86_64/stubs/libposix4.so
+libc-stubs: wrote build/x86_64/stubs/libpthread.a
+libc-stubs: wrote build/x86_64/stubs/libpthread.so
+libc-stubs: wrote build/x86_64/stubs/libresolv.a
+libc-stubs: wrote build/x86_64/stubs/libresolv.so
+libc-stubs: wrote build/x86_64/stubs/librpcsvc.a
+libc-stubs: wrote build/x86_64/stubs/librpcsvc.so
+libc-stubs: wrote build/x86_64/stubs/librt.a
+libc-stubs: wrote build/x86_64/stubs/librt.so
+libc-stubs: wrote build/x86_64/stubs/libsocket.a
+libc-stubs: wrote build/x86_64/stubs/libsocket.so
+libc-stubs: wrote build/x86_64/stubs/libssp.a
+libc-stubs: wrote build/x86_64/stubs/libssp.so
+libc-stubs: wrote build/x86_64/stubs/libssp_nonshared.a
+libc-stubs: wrote build/x86_64/stubs/libssp_nonshared.so
+libc-stubs: wrote build/x86_64/stubs/libthread.a
+libc-stubs: wrote build/x86_64/stubs/libthread.so
+libc-stubs: wrote build/x86_64/stubs/libutil.a
+libc-stubs: wrote build/x86_64/stubs/libutil.so
+libc-stubs: wrote build/x86_64/stubs/libxnet.a
+libc-stubs: wrote build/x86_64/stubs/libxnet.so
+libc-pack: stubs: ok (40 files)
+libc-pack: sysroot: ok
+libc-link: mkmap: ok
+libc-link: libc.so.1: ok
+warning: struct `TlsDescIndex` is never constructed
+  --> libc/ravenlibc/ld/src/raw/memview.rs:18:8
+   |
+18 | struct TlsDescIndex {
+   |        ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `new` is never used
+  --> libc/ravenlibc/ld/src/raw/memview.rs:24:14
+   |
+23 | impl TlsDescIndex {
+   | ----------------- associated function in this implementation
+24 |     const fn new() -> Self {
+   |              ^^^
+
+warning: static `TLS_DESC_INDICES` is never used
+  --> libc/ravenlibc/ld/src/raw/memview.rs:32:8
+   |
+32 | static TLS_DESC_INDICES: [TlsDescIndex; 64] = [const { TlsDescIndex::new() }; 64];
+   |        ^^^^^^^^^^^^^^^^
+
+warning: static `TLS_DESC_NEXT` is never used
+  --> libc/ravenlibc/ld/src/raw/memview.rs:33:8
+   |
+33 | static TLS_DESC_NEXT: AtomicUsize = AtomicUsize::new(0);
+   |        ^^^^^^^^^^^^^
+
+warning: `raven-libc-rtld` (lib) generated 4 warnings
+    Finished `libc-so` profile [optimized] target(s) in 0.16s
+libc-link: ld-elf.so.1: ok
+libc-link: loader manifest: /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/loader-manifest.toml
+libc-link: sysroot: ok
+==> brush x86_64: building missing staging binary (build/x86_64/brush)
+warning: rustix@1.1.5: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
+warning: rustix@1.1.5: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling libc v0.2.186 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc)
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling serde_core v1.0.229
+   Compiling stable_deref_trait v1.2.1
+   Compiling smallvec v1.16.2
+   Compiling strsim v0.11.1
+   Compiling ident_case v1.0.1
+   Compiling autocfg v1.5.1
+   Compiling rustix v1.1.5 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/vendor/rustix)
+   Compiling thiserror v2.0.21
+   Compiling log v0.4.34
+   Compiling once_cell v1.21.4
+   Compiling parking_lot_core v0.9.12
+   Compiling scopeguard v1.2.0
+   Compiling siphasher v1.0.4
+   Compiling rand_core v0.6.4
+   Compiling getrandom v0.4.3
+   Compiling rand_core v0.10.1
+   Compiling fnv v1.0.7
+   Compiling pin-project-lite v0.2.17
+   Compiling serde v1.0.229
+   Compiling lock_api v0.4.14
+   Compiling zerocopy v0.8.59
+   Compiling cfg_aliases v0.2.2
+   Compiling rand v0.8.8
+   Compiling phf_shared v0.11.3
+   Compiling version_check v0.9.5
+   Compiling prettyplease v0.3.0
+   Compiling tracing-core v0.1.36
+   Compiling futures-sink v0.3.34
+   Compiling nix v0.31.3 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/vendor/nix)
+   Compiling futures-core v0.3.34
+   Compiling writeable v0.6.4
+   Compiling equivalent v1.0.2
+   Compiling foldhash v0.2.0
+   Compiling futures-io v0.3.34
+   Compiling num-traits v0.2.19
+   Compiling minimal-lexical v0.2.1
+   Compiling slab v0.4.12
+   Compiling futures-channel v0.3.34
+   Compiling peg-runtime v0.8.6
+   Compiling heck v0.5.0
+   Compiling allocator-api2 v0.2.21
+   Compiling ahash v0.8.12
+   Compiling futures-task v0.3.34
+   Compiling utf8parse v0.2.2
+   Compiling anstyle-parse v1.0.0
+   Compiling bit-vec v0.8.0
+   Compiling signal-hook v0.3.18
+   Compiling colorchoice v1.0.5
+   Compiling anstyle v1.0.14
+   Compiling litemap v0.8.3
+   Compiling anstyle-query v1.1.5
+   Compiling aho-corasick v1.1.5
+warning: struct `rlimit` is never constructed
+   --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:323:16
+    |
+323 |     pub struct rlimit {
+    |                ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+    = note: this warning originates in the macro `s` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: struct `pollfd` is never constructed
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:1944:16
+     |
+1944 |     pub struct pollfd {
+     |                ^^^^^^
+     |
+     = note: this warning originates in the macro `s` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: function `flock` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:1901:12
+     |
+1901 |     pub fn flock(fd: c_int, operation: c_int) -> c_int;
+     |            ^^^^^
+
+warning: function `fsync` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2139:12
+     |
+2139 |     pub fn fsync(fd: c_int) -> c_int;
+     |            ^^^^^
+
+warning: function `confstr` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2155:12
+     |
+2155 |     pub fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t;
+     |            ^^^^^^^
+
+warning: function `gethostname` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2156:12
+     |
+2156 |     pub fn gethostname(name: *mut c_char, len: size_t) -> c_int;
+     |            ^^^^^^^^^^^
+
+warning: function `ttyname_r` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2157:12
+     |
+2157 |     pub fn ttyname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
+     |            ^^^^^^^^^
+
+warning: function `tcgetattr` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2158:12
+     |
+2158 |     pub fn tcgetattr(fd: c_int, termios_p: *mut crate::termios) -> c_int;
+     |            ^^^^^^^^^
+
+warning: function `tcsetattr` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2159:12
+     |
+2159 |     pub fn tcsetattr(
+     |            ^^^^^^^^^
+
+warning: function `tcgetpgrp` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2164:12
+     |
+2164 |     pub fn tcgetpgrp(fd: c_int) -> crate::pid_t;
+     |            ^^^^^^^^^
+
+warning: function `tcsetpgrp` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2165:12
+     |
+2165 |     pub fn tcsetpgrp(fd: c_int, pgrp: crate::pid_t) -> c_int;
+     |            ^^^^^^^^^
+
+warning: function `killpg` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2166:12
+     |
+2166 |     pub fn killpg(pgrp: crate::pid_t, sig: c_int) -> c_int;
+     |            ^^^^^^
+
+warning: function `cfmakeraw` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2167:12
+     |
+2167 |     pub fn cfmakeraw(termios_p: *mut crate::termios);
+     |            ^^^^^^^^^
+
+warning: function `truncate` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2168:12
+     |
+2168 |     pub fn truncate(path: *const c_char, length: off_t) -> c_int;
+     |            ^^^^^^^^
+
+warning: function `readlink` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2169:12
+     |
+2169 |     pub fn readlink(path: *const c_char, buf: *mut c_char, bufsiz: size_t) -> ssize_t;
+     |            ^^^^^^^^
+
+warning: function `chdir` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2170:12
+     |
+2170 |     pub fn chdir(path: *const c_char) -> c_int;
+     |            ^^^^^
+
+warning: function `chroot` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2171:12
+     |
+2171 |     pub fn chroot(path: *const c_char) -> c_int;
+     |            ^^^^^^
+
+warning: function `umask` is never used
+    --> /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:2172:12
+     |
+2172 |     pub fn umask(mask: crate::mode_t) -> crate::mode_t;
+     |            ^^^^^
+
+   Compiling cached_proc_macro_types v1.0.0
+   Compiling either v1.18.0
+   Compiling unicode-segmentation v1.13.3
+   Compiling errno v0.3.14
+warning: `libc` (lib) generated 18 warnings
+   Compiling mio v1.2.4 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/vendor/mio)
+   Compiling winnow v1.0.4
+   Compiling cpufeatures v0.3.1
+   Compiling phf_generator v0.11.3
+   Compiling nom v7.1.3
+   Compiling hashbrown v0.16.1
+   Compiling regex-syntax v0.8.11
+   Compiling rustc-hash v2.1.3
+   Compiling arrayvec v0.7.8
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling parking_lot v0.12.5
+   Compiling syn v3.0.6
+   Compiling syn v2.0.119
+   Compiling phf_codegen v0.11.3
+   Compiling web-time v1.1.0
+   Compiling iana-time-zone v0.1.65
+   Compiling icu_locale_fallback_data v2.3.0
+   Compiling peg-macros v0.8.6
+warning: unused variable: `backlog`
+  --> vendor/mio/src/sys/unix/uds/listener.rs:36:9
+   |
+36 |     let backlog = -1;
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_backlog`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling triomphe v0.1.16
+   Compiling type-map v0.5.1
+   Compiling terminfo v0.9.0
+   Compiling anstream v1.0.0
+   Compiling utf8-chars v3.0.7
+   Compiling convert_case v0.10.0
+   Compiling itertools v0.15.0
+   Compiling chacha20 v0.10.2
+warning: `mio` (lib) generated 1 warning (run `cargo fix --lib -p mio` to apply 1 suggestion)
+   Compiling signal-hook-registry v1.4.8
+   Compiling bit-set v0.8.0
+   Compiling phf v0.11.3
+   Compiling socket2 v0.6.5 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/vendor/socket2)
+   Compiling archery v1.2.3
+   Compiling icu_locale_data v2.3.0
+   Compiling bytes v1.12.1
+   Compiling unicode-width v0.2.3
+   Compiling indenter v0.3.4
+   Compiling libm v0.2.16
+   Compiling rpds v1.2.1
+   Compiling rand v0.10.3
+   Compiling num-integer v0.1.47
+   Compiling hostname v0.4.2
+   Compiling uzers v0.12.2 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/vendor/uzers)
+   Compiling bigdecimal v0.4.11
+   Compiling object v0.37.3
+   Compiling litrs v1.0.0
+   Compiling utf8_iter v1.0.4
+   Compiling clap_lex v1.1.1
+   Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-abi)
+   Compiling self_cell v1.3.0
+   Compiling normalize-path v0.2.2
+   Compiling peg v0.8.6
+   Compiling num-bigint v0.4.8
+   Compiling signal-hook-mio v0.2.5
+   Compiling vte v0.14.1
+   Compiling uucore v0.12.0
+   Compiling gimli v0.32.3
+   Compiling nu-ansi-term v0.50.3
+   Compiling adler2 v2.0.1
+   Compiling rlimit v0.11.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/vendor/rlimit)
+   Compiling miniz_oxide v0.8.9
+   Compiling raven-proto-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-fs)
+   Compiling document-features v0.2.12
+   Compiling raven-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-ipc)
+   Compiling strip-ansi-escapes v0.2.1
+   Compiling toml_parser v1.1.5+spec-1.1.0
+   Compiling os_display v0.1.4
+   Compiling uucore_procs v0.12.0
+   Compiling nibble_vec v0.1.0
+   Compiling unicode-xid v0.2.6
+   Compiling regex-automata v0.4.18
+   Compiling endian-type v0.2.0
+   Compiling toml_writer v1.1.3+spec-1.1.0
+   Compiling hashbrown v0.17.1
+   Compiling konst_macro_rules v0.2.19
+   Compiling brush-interactive v0.4.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/brush-interactive)
+   Compiling bitflags v2.13.2
+   Compiling toml_datetime v1.1.2+spec-1.1.0
+   Compiling serde_spanned v1.1.2
+   Compiling lazy_static v1.5.1
+   Compiling rustc-demangle v0.1.28
+   Compiling unit-prefix v0.5.2
+   Compiling toml v1.1.8+spec-1.1.0
+   Compiling sharded-slab v0.1.7
+   Compiling konst v0.2.20
+   Compiling radix_trie v0.3.0
+   Compiling const_format_proc_macros v0.2.37
+   Compiling raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-scheme)
+   Compiling indexmap v2.14.2
+   Compiling sysinfo v0.38.4
+   Compiling tracing-log v0.2.0
+   Compiling uuid v1.26.1
+   Compiling thread_local v1.1.10
+   Compiling brush-shell v0.4.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/brush-shell)
+   Compiling raven-getrandom v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/raven-getrandom)
+   Compiling etcetera v0.11.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling terminal_size v0.4.4
+   Compiling clap_builder v4.6.7
+   Compiling const_format v0.2.37
+   Compiling darling_core v0.20.11
+   Compiling synstructure v0.14.0
+   Compiling darling_core v0.24.1
+   Compiling strum_macros v0.28.0
+   Compiling tracing-attributes v0.1.31
+   Compiling color-print-proc-macro v0.3.7
+   Compiling derive_more-impl v2.1.1
+   Compiling winnow-args-derive v0.6.0
+   Compiling addr2line v0.25.1
+   Compiling git-version-macro v0.3.9
+   Compiling color-print v0.3.7
+   Compiling derive_more v2.1.1
+   Compiling git-version v0.3.9
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerovec-derive v0.11.6
+   Compiling displaydoc v0.2.7
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling futures-macro v0.3.34
+   Compiling tokio-macros v2.7.2
+   Compiling fancy-regex v0.20.0
+   Compiling async-recursion v1.2.0
+   Compiling tracing v0.1.44
+   Compiling tokio v1.54.1 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/vendor/tokio)
+   Compiling zerotrie v0.2.5
+   Compiling async-trait v0.1.92
+   Compiling futures-util v0.3.34
+   Compiling inherent v1.0.14
+   Compiling clap v4.6.7
+   Compiling backtrace v0.3.76
+   Compiling zerofrom v0.1.8
+   Compiling yoke v0.8.3
+   Compiling fluent-syntax v0.12.0
+   Compiling command-fds v0.3.3
+   Compiling strum v0.28.0
+   Compiling darling_macro v0.20.11
+   Compiling zerovec v0.11.8
+   Compiling darling v0.20.11
+   Compiling cached_proc_macro v2.0.0
+   Compiling darling_macro v0.24.1
+   Compiling darling v0.24.1
+   Compiling bon-macros v3.10.3
+   Compiling cached v2.0.2
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling icu_collections v2.3.0
+   Compiling unic-langid-impl v0.9.6
+   Compiling icu_locale_core v2.3.0
+   Compiling chrono v0.4.45
+   Compiling crossterm v0.29.0
+   Compiling human-panic v2.0.8
+   Compiling winnow-args v0.6.0
+   Compiling unic-langid v0.9.6
+   Compiling intl_pluralrules v7.0.2
+   Compiling fluent-langneg v0.13.1
+   Compiling intl-memoizer v0.5.3
+   Compiling fluent-bundle v0.16.0
+   Compiling fluent v0.17.0
+   Compiling futures-executor v0.3.34
+   Compiling icu_provider v2.3.1
+   Compiling futures v0.3.34
+   Compiling icu_locale_fallback v2.3.0
+   Compiling reedline v0.52.1
+   Compiling icu_locale v2.3.1
+   Compiling bon v3.10.3
+   Compiling brush-parser v0.4.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/brush-parser)
+   Compiling brush-core v0.5.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/brush-core)
+   Compiling brush-winnow-args-adapter v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/brush-winnow-args-adapter)
+   Compiling brush-builtins v0.2.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/brush/brush-builtins)
+    Finished `release` profile [optimized] target(s) in 1m 59s
+/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/brush: Strict plan = Ok(1662)
+/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/brush
+==> uutils x86_64: building missing staging slice (ls, cat, cp, mv, rm, mkdir, rmdir, touch, stat, df, echo, head, tail, sort, du, id, wc, true, false)
+==> uutils x86_64 (x86_64-unknown-ravenbsd, release)
+warning: rustix@1.1.6: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
+warning: rustix@1.1.6: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling stable_deref_trait v1.2.1
+   Compiling either v1.19.0
+   Compiling libc v0.2.191 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/libc-ravenbsd)
+   Compiling litemap v0.8.3
+   Compiling icu_locale_fallback_data v2.4.0
+   Compiling libm v0.2.16
+   Compiling autocfg v1.5.1
+   Compiling cfg-if v1.0.5
+   Compiling bitflags v2.13.2
+   Compiling smallvec v1.16.1
+   Compiling memchr v2.8.3
+   Compiling rustix v1.1.6 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/rustix-ravenbsd)
+   Compiling cfg_aliases v0.2.2
+   Compiling icu_calendar_data v2.4.0
+   Compiling icu_time_data v2.4.0
+   Compiling getrandom v0.4.3
+   Compiling utf8_iter v1.0.4
+   Compiling thiserror v2.0.21
+   Compiling rand_core v0.10.1
+   Compiling unicode-width v0.2.3
+   Compiling utf8parse v0.2.2
+   Compiling rustc-hash v2.1.3
+   Compiling icu_decimal_data v2.4.0
+   Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-abi)
+   Compiling icu_normalizer_data v2.4.0
+   Compiling icu_plurals_data v2.4.0
+   Compiling anstyle-parse v1.0.0
+   Compiling nix v0.31.3 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/nix-ravenbsd)
+   Compiling type-map v0.5.1
+   Compiling icu_locale_data v2.4.0
+   Compiling icu_collator_data v2.4.0
+   Compiling colorchoice v1.0.5
+   Compiling jiff-core v0.1.4
+   Compiling writeable v0.6.4
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling num-traits v0.2.19
+   Compiling icu_datetime_data v2.4.0
+   Compiling anstyle v1.0.14
+   Compiling anstyle-query v1.1.5
+   Compiling raven-proto-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-proto-fs)
+   Compiling raven-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-ipc)
+   Compiling bigdecimal v0.4.11
+   Compiling clap_lex v1.1.1
+   Compiling same-file v1.0.6
+   Compiling utf16_iter v1.0.5
+   Compiling strsim v0.11.1
+   Compiling self_cell v1.3.0
+   Compiling write16 v1.0.0
+   Compiling walkdir v2.5.0
+   Compiling uucore v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uucore)
+   Compiling unit-prefix v0.5.2
+   Compiling anstream v1.0.0
+   Compiling itertools v0.15.0
+   Compiling os_display v0.1.4
+   Compiling glob v0.3.4
+   Compiling raven-theme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-theme)
+warning: struct `rlimit` is never constructed
+   --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:322:16
+    |
+322 |     pub struct rlimit {
+    |                ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+    = note: this warning originates in the macro `s` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: struct `pollfd` is never constructed
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:1943:16
+     |
+1943 |     pub struct pollfd {
+     |                ^^^^^^
+     |
+     = note: this warning originates in the macro `s` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: function `flock` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:1900:12
+     |
+1900 |     pub fn flock(fd: c_int, operation: c_int) -> c_int;
+     |            ^^^^^
+
+warning: function `fsync` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2138:12
+     |
+2138 |     pub fn fsync(fd: c_int) -> c_int;
+     |            ^^^^^
+
+warning: function `confstr` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2154:12
+     |
+2154 |     pub fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t;
+     |            ^^^^^^^
+
+warning: function `gethostname` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2155:12
+     |
+2155 |     pub fn gethostname(name: *mut c_char, len: size_t) -> c_int;
+     |            ^^^^^^^^^^^
+
+warning: function `ttyname_r` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2156:12
+     |
+2156 |     pub fn ttyname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
+     |            ^^^^^^^^^
+
+warning: function `tcgetattr` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2157:12
+     |
+2157 |     pub fn tcgetattr(fd: c_int, termios_p: *mut crate::termios) -> c_int;
+     |            ^^^^^^^^^
+
+warning: function `tcsetattr` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2158:12
+     |
+2158 |     pub fn tcsetattr(
+     |            ^^^^^^^^^
+
+warning: function `tcgetpgrp` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2163:12
+     |
+2163 |     pub fn tcgetpgrp(fd: c_int) -> crate::pid_t;
+     |            ^^^^^^^^^
+
+warning: function `tcsetpgrp` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2164:12
+     |
+2164 |     pub fn tcsetpgrp(fd: c_int, pgrp: crate::pid_t) -> c_int;
+     |            ^^^^^^^^^
+
+warning: function `killpg` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2165:12
+     |
+2165 |     pub fn killpg(pgrp: crate::pid_t, sig: c_int) -> c_int;
+     |            ^^^^^^
+
+warning: function `cfmakeraw` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2166:12
+     |
+2166 |     pub fn cfmakeraw(termios_p: *mut crate::termios);
+     |            ^^^^^^^^^
+
+warning: function `truncate` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2167:12
+     |
+2167 |     pub fn truncate(path: *const c_char, length: off_t) -> c_int;
+     |            ^^^^^^^^
+
+warning: function `readlink` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2168:12
+     |
+2168 |     pub fn readlink(path: *const c_char, buf: *mut c_char, bufsiz: size_t) -> ssize_t;
+     |            ^^^^^^^^
+
+warning: function `chdir` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2169:12
+     |
+2169 |     pub fn chdir(path: *const c_char) -> c_int;
+     |            ^^^^^
+
+warning: function `chroot` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2170:12
+     |
+2170 |     pub fn chroot(path: *const c_char) -> c_int;
+     |            ^^^^^^
+
+warning: function `umask` is never used
+    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:2171:12
+     |
+2171 |     pub fn umask(mask: crate::mode_t) -> crate::mode_t;
+     |            ^^^^^
+
+warning: `libc` (lib) generated 18 warnings
+   Compiling errno v0.3.14
+   Compiling raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-scheme)
+   Compiling raven-output v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-output)
+   Compiling syn v3.0.9
+   Compiling dunce v1.0.5
+   Compiling uucore_procs v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uucore_procs)
+   Compiling portable-atomic v1.15.0
+   Compiling crossbeam-utils v0.8.23
+   Compiling console v0.16.6
+   Compiling crossbeam-epoch v0.9.21
+   Compiling crossbeam-deque v0.8.8
+   Compiling winnow v1.0.4
+   Compiling rayon-core v1.13.0
+   Compiling filetime v0.2.29
+   Compiling bytecount v0.6.9
+   Compiling raven-getrandom v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/toolchain/raven-getrandom)
+   Compiling rlimit v0.11.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/rlimit-ravenbsd)
+   Compiling cpufeatures v0.3.1
+   Compiling aho-corasick v1.1.5
+   Compiling notify-types v2.1.0
+   Compiling ansi-width v0.1.1
+   Compiling nu-ansi-term v0.50.3
+   Compiling chacha20 v0.10.2
+   Compiling log v0.4.34
+   Compiling fastrand v2.5.0
+   Compiling once_cell v1.21.4
+   Compiling core_maths v0.1.1
+   Compiling notify v8.2.2
+   Compiling rand v0.10.3
+   Compiling uutils_term_grid v0.8.1
+   Compiling num-integer v0.1.47
+   Compiling bstr v1.13.1
+   Compiling nom v8.0.0
+   Compiling hostname v0.4.2
+   Compiling foldhash v0.2.0
+   Compiling jiff v0.2.41
+   Compiling num-bigint v0.4.8
+   Compiling indicatif v0.18.6
+   Compiling ctrlc v3.5.2
+   Compiling lscolors v0.21.0
+   Compiling terminal_size v0.4.4
+   Compiling tempfile v3.27.0
+   Compiling clap_builder v4.6.7
+   Compiling synstructure v0.14.0
+   Compiling rayon v1.12.0
+   Compiling displaydoc v0.2.7
+   Compiling zerovec-derive v0.11.7
+   Compiling thiserror-impl v2.0.21
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerofrom v0.1.8
+   Compiling calendrical_calculations v0.2.4
+   Compiling fixed_decimal v0.7.3
+   Compiling yoke v0.8.4
+   Compiling zerotrie v0.2.5
+   Compiling zerovec v0.11.9
+   Compiling fluent-syntax v0.12.0
+   Compiling clap v4.6.7
+   Compiling parse_datetime v0.17.0
+   Compiling tinystr v0.8.5
+   Compiling potential_utf v0.1.6
+   Compiling icu_pattern v0.5.1
+   Compiling icu_collections v2.4.0
+   Compiling icu_locale_core v2.4.0
+   Compiling unic-langid-impl v0.9.6
+   Compiling unic-langid v0.9.6
+   Compiling fluent-langneg v0.13.1
+   Compiling intl_pluralrules v7.0.2
+   Compiling intl-memoizer v0.5.3
+   Compiling fluent-bundle v0.16.0
+   Compiling icu_provider v2.4.0
+   Compiling fluent v0.17.0
+   Compiling icu_locale_fallback v2.4.0
+   Compiling icu_normalizer v2.4.0
+   Compiling icu_properties v2.4.0
+   Compiling icu_calendar v2.4.0
+   Compiling icu_plurals v2.4.0
+   Compiling icu_decimal v2.4.0
+   Compiling icu_locale v2.4.0
+   Compiling icu_collator v2.4.0
+   Compiling icu_time v2.4.0
+   Compiling jiff-icu v0.2.4
+   Compiling icu_datetime v2.4.0
+warning: static `MOUNT_OPT_BIND` is never used
+  --> src/uucore/src/lib/features/fsext/mod.rs:18:8
+   |
+18 | static MOUNT_OPT_BIND: &str = "bind";
+   |        ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `is_dummy_filesystem` is never used
+   --> src/uucore/src/lib/features/fsext/mod.rs:291:4
+    |
+291 | fn is_dummy_filesystem(fs_type: &str, mount_option: &str) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `is_remote_filesystem` is never used
+   --> src/uucore/src/lib/features/fsext/mod.rs:314:4
+    |
+314 | fn is_remote_filesystem(dev_name: &str, fs_type: &str) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `mount_dev_id` is never used
+   --> src/uucore/src/lib/features/fsext/mod.rs:329:4
+    |
+329 | fn mount_dev_id(mount_dir: &OsStr) -> String {
+    |    ^^^^^^^^^^^^
+
+   Compiling uu_pwd v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/pwd)
+   Compiling uu_true v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/true)
+   Compiling uu_df v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/df)
+   Compiling uu_stat v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/stat)
+   Compiling uu_touch v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/touch)
+   Compiling uu_du v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/du)
+   Compiling uu_ls v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/ls)
+   Compiling uu_echo v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/echo)
+   Compiling uu_rmdir v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/rmdir)
+   Compiling uu_tail v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/tail)
+   Compiling uu_mv v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/mv)
+   Compiling uu_sort v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/sort)
+   Compiling uu_mkdir v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/mkdir)
+   Compiling uu_sleep v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/sleep)
+   Compiling uu_false v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/false)
+   Compiling uu_head v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/head)
+   Compiling uu_id v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/id)
+   Compiling uu_wc v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/wc)
+   Compiling uu_tr v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/tr)
+warning: unnecessary qualification
+    --> src/uu/du/src/du.rs:1143:24
+     |
+1143 |     let Ok(metadata) = std::fs::symlink_metadata(path) else {
+     |                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+     |
+1143 -     let Ok(metadata) = std::fs::symlink_metadata(path) else {
+1143 +     let Ok(metadata) = fs::symlink_metadata(path) else {
+     |
+
+warning: unnecessary qualification
+    --> src/uu/du/src/du.rs:1150:26
+     |
+1150 |     if let Ok(entries) = std::fs::read_dir(path) {
+     |                          ^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1150 -     if let Ok(entries) = std::fs::read_dir(path) {
+1150 +     if let Ok(entries) = fs::read_dir(path) {
+     |
+
+   Compiling uu_cat v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/cat)
+   Compiling uu_dirname v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/dirname)
+   Compiling uu_ln v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/ln)
+   Compiling uu_basename v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/basename)
+   Compiling uu_chmod v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/chmod)
+   Compiling uu_date v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/date)
+   Compiling uu_cut v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/cut)
+   Compiling uu_env v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/env)
+   Compiling uu_chown v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/chown)
+   Compiling uu_cp v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/cp)
+   Compiling uu_rm v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/uutils/src/uu/rm)
+warning: `uu_du` (lib) generated 2 warnings (run `cargo fix --lib -p uu_du` to apply 2 suggestions)
+warning: `uucore` (lib) generated 4 warnings
+    Finished `release` profile [optimized] target(s) in 1m 07s
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/ls
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/cat
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/cp
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/mv
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/rm
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/ln
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/mkdir
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/rmdir
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/touch
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/stat
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/df
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/du
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/echo
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/pwd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/basename
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/dirname
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/true
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/false
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/sleep
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/date
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/head
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/tail
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/wc
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/sort
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/cut
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/tr
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/env
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/id
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/chmod
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/uutils/chown
+==> build user x86_64 (x86_64-unknown-none, release, lto=false (code-model=small))
+   Compiling typenum v1.20.1
+   Compiling base64ct v1.8.3
+   Compiling cmov v0.5.4
+   Compiling cfg-if v1.0.5
+   Compiling cpufeatures v0.3.1
+   Compiling password-hash v0.6.1
+   Compiling raven-http-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-http-net)
+   Compiling raven-shutdown v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/shutdown)
+   Compiling raven-tcpip v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tcpip)
+   Compiling raven-tool-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-tool-core)
+   Compiling raven-sleep v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/sleep)
+   Compiling man v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/man)
+   Compiling raven-ps v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/ps)
+   Compiling raven-route v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/route)
+   Compiling raven-ifconfig v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/ifconfig)
+   Compiling resolvd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/resolvd)
+   Compiling raven-dmesg v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/dmesg)
+   Compiling raven-hostname v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/hostname)
+   Compiling raven-auth v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-auth)
+   Compiling raven-date v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/date)
+   Compiling raven-netstat v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/netstat)
+   Compiling raven-mount v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/mount)
+   Compiling raven-umount v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/umount)
+   Compiling curl v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/curl)
+   Compiling raven-ping v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/ping)
+   Compiling ctutils v0.4.8
+   Compiling ed v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/ed)
+   Compiling mcf v0.6.0
+   Compiling wget v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/wget)
+   Compiling raven-reboot v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/reboot)
+   Compiling raven-poweroff v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/poweroff)
+   Compiling raven-svcctl v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/svcctl)
+   Compiling raven-rsh v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/rsh)
+   Compiling hybrid-array v0.4.15
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling digest v0.11.3
+   Compiling sha2 v0.11.1
+   Compiling sha-crypt v0.6.0
+   Compiling login v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/login)
+   Compiling raven-netcore v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/crates/raven-netcore)
+   Compiling raven-getty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/bin/getty)
+   Compiling netd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/userland/servers/netd)
+    Finished `release` profile [optimized] target(s) in 7.25s
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-init
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-uname
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-svcctl
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-logd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-sysd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-randd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-zerod
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-nulld
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-initfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-ramfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-vfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-consd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-rsh
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/ed
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-sleep
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-date
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-hostname
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-dmesg
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-mount
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-umount
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-ps
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/curl
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/wget
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/man
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-getty
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/login
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/virtio-net
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/netd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/resolvd
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-ifconfig
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-ping
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-route
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-netstat
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-shutdown
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-reboot
+    /media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/user/raven-poweroff
+/media/bo/Rustworx/work/ravenbsd-minions/mel/ravenbsd/build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2
+build/qtest/ufs-update.img

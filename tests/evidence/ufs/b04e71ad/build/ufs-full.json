@@ -1,0 +1,27 @@
+{
+  "case": "ufs-full",
+  "arch": "x86_64",
+  "result": "fail",
+  "duration_ms": 408023,
+  "exit_status": null,
+  "matched": [
+    "^svcd: root pivoted to UFS at /$",
+    "^cd=0$",
+    "^/root$",
+    "^block0 500187648 976929 disk$",
+    "^block0p1 230686720 450560 part ESP$",
+    "^block0p2 268435456 524288 part ufs-root$",
+    "2048\\s+450560\\s+1\\s+ESP",
+    "452608\\s+524288\\s+2\\s+ufs-root",
+    "^usage: newfs",
+    "^/bin/ed$",
+    "^ufs: +2[0-4][0-9]M +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$",
+    "^ufs: on /$",
+    "^ping: 10\\.0\\.2\\.2 seq=1 rtt=[0-9]+ms$",
+    "^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$"
+  ],
+  "unmatched": [
+    "^init exited \\(0\\)$"
+  ],
+  "forbidden_hits": []
+}

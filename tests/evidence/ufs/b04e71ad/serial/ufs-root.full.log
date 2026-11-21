@@ -1,0 +1,243 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: failed to load Boot0002 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0): Not Found
+BdsDxe: loading Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 24 regions
+frames: base=256 count=131072 free=114747 reserved=16325
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2710 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 5a59da2e 2026-11-21
+mem: 448 MiB usable in 6 regions
+cmdline: console=ttyS0 loglevel=info
+process: starting /init
+process: /init entry=0x41c134 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod blockd fsd-ufs vfsd
+svcd: logd up
+svcd: logd timing: generation=1 start=110 spawn=118 first_poll=123 deadline=5118 stalled=0 ready_at=154
+pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:03.0 vendor=0x1af4 device=0x1042 class=0x01 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+pcid: devices=7
+svcd: pcid up
+svcd: pcid timing: generation=1 start=118 spawn=138 first_poll=160 deadline=60138 stalled=0 ready_at=181
+rtc: 2026-11-21 22:28:08 (epoch 1795300088s)
+1795300088.231 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=188 spawn=203 first_poll=210 deadline=120203 stalled=0 ready_at=242
+1795300088.248 nulld: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=211 spawn=226 first_poll=229 deadline=5226 stalled=0 ready_at=263
+1795300088.270 ramfsd: started
+1795300088.277 randd: started
+svcd: randd up
+svcd: randd timing: generation=1 start=241 spawn=256 first_poll=260 deadline=5256 stalled=0 ready_at=281
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=234 spawn=257 first_poll=264 deadline=5257 stalled=0 ready_at=283
+1795300088.286 zerod: started
+svcd: zerod up
+svcd: zerod timing: generation=1 start=244 spawn=266 first_poll=267 deadline=5266 stalled=0 ready_at=290
+devd: devices=7
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: matched 00:03.0 vendor=0x1af4 device=0x1042 irq_line=11 irq_pin=1
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix vector=64 table=0x0 bar=1
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=0
+virtio-net: msix table=0x0 bar=1 vector=1
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+devd: driver virtio-blk bar=4 size=16384
+devd: driver virtio-blk dma bus=0x181000 len=65536
+devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=5
+devd: driver virtio-blk msix vector=65 table=0x0 bar=1
+virtio-blk: id=1af4:1042
+virtio-blk: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-blk: msix table=0x0 bar=1 vector=1
+virtio-blk: capacity=524355 sector_size=512 ro=0
+virtio-blk: features=0x00000200 version1=1
+virtio-blk: queue0 size=8 notify=0x0
+virtio-blk: dma bus=0x181000 len=65536 irq=0
+virtio-blk: registered disk
+svcd: devd up
+svcd: devd timing: generation=1 start=184 spawn=188 first_poll=199 deadline=60188 stalled=0 ready_at=357
+blockd: remote disk=disk:0 sectors=524355 ro=0
+blockd: gpt ok partitions=1
+blockd: part 1 ufs-root 34..524321
+1795300088.427 blockd: started
+svcd: blockd up
+svcd: blockd timing: generation=1 start=361 spawn=368 first_poll=370 deadline=60368 stalled=0 ready_at=438
+fsd-ufs: mounted block:0 partition 1 as ufs: (268435456 bytes)
+fsd-ufs: mode=rw journal=none
+1795300103.114 fsd-ufs: started
+svcd: fsd-ufs up
+svcd: fsd-ufs timing: generation=1 start=439 spawn=467 first_poll=469 deadline=60467 stalled=0 ready_at=15125
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=15129 spawn=15135 first_poll=15137 deadline=75135 stalled=0 ready_at=15167
+svcd: root pivoted to UFS at /
+svcd: root services=13 added=4
+svcd: service plan: logd pcid consd devd initfsd netd nulld ramfsd randd sysd zerod blockd vfsd fsd-ufs getty resolvd
+svcd: consd up
+svcd: consd timing: generation=1 start=15460 spawn=15532 first_poll=15535 deadline=75532 stalled=0 ready_at=15538
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: interface eth0 10.0.2.15/24
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+svcd: netd timing: generation=1 start=15540 spawn=15901 first_poll=15902 deadline=75901 stalled=0 ready_at=15956
+1795300104.020 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=15957 spawn=16018 first_poll=16019 deadline=21018 stalled=0 ready_at=16024
+resolvd: wrote file:/etc/resolv.conf
+resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199857ms rebind=75599857ms expires=86399857ms
+resolvd: resolv.conf=nameserver 10.0.2.3
+1795300104.177 resolvd: started
+svcd: resolvd up
+svcd: resolvd timing: generation=1 start=16026 spawn=16102 first_poll=16103 deadline=76102 stalled=0 ready_at=16184
+R A V E N   B S D
+--------------------------------------------------------------------------------
+000.04  vfsd                ok
+000.04  randd               ok
+000.04  logd                ok
+000.05  zerod               ok
+000.05  ramfsd              ok
+000.05  nulld               ok
+000.05  initfsd             ok
+000.06  pcid                ok
+000.07  sysd                ok
+000.08  blockd              ok
+000.08  consd               ok
+000.16  resolvd             ok
+000.17  devd                ok
+000.42  netd                ok
+014.69  fsd-ufs             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# /raven# /braven# /biraven# /binraven# /bin/raven# /bin/uraven# /bin/unraven# /bin/unaraven# /bin/unamraven# /bin/unameraven# /bin/uname raven# /bin/uname -raven# /bin/uname -araven# /bin/uname -a
+RavenBSD raven 0.1 RavenBSD 0.1 (BASE) #1: 5a59da2e 2026-11-21 x86_64
+                                                                                /
+raven# raven# /bin/uname -araven# /bin/uname -araven# /bin/uname -araven# /bin/uname -araven# /bin/uname -araven# /bin/lraven# /bin/lsraven# /bin/ls raven# /bin/ls -raven# /bin/ls -lraven# /bin/ls -laraven# /bin/ls -lahraven# /bin/ls -lah raven# /bin/ls -lah /raven# /bin/ls -lah /
+total 230K
+drwxrwxr-x 10 root root  512 Jan  1  1970 ./
+drwxrwxr-x 10 root root  512 Jan  1  1970 ../
+drwxrwxr-x  2 root root 1.0K Jan  1  1970 bin/
+drwxrwxr-x  2 root root  512 Jan  1  1970 dev/
+drwxrwxr-x  5 root root  512 Jan  1  1970 etc/
+-rwxr-xr-x  1 root root 221K Jan  1  1970 init
+drwx------  2 root root  512 Jan  1 00:00 lost+found/
+drwxrwxr-x  2 root root  512 Jan  1  1970 root/
+drwxrwxr-x  2 root root  512 Jan  1  1970 sbin/
+drwxr-xr-x  2 root root    0 Nov 21  2026 tmp/
+drwxrwxr-x  4 root root  512 Jan  1  1970 usr/
+                                                                                /
+raven# raven# /bin/ls -lah /raven# /bin/ls -lah /raven# /bin/ls -lah /raven# /bin/ls -lah /raven# /bin/ls -lah /raven# /bin/ls -lah /raven# /bin/ls -lah /raven# /bin/ls -lah /raven# /bin/ls /raven# /bin/ls /braven# /bin/ls /biraven# /bin/ls /binraven# /bin/ls /bin
+brush
+cat
+cp
+curl
+date
+df
+du
+echo
+ed
+false
+getty
+head
+hostname
+id
+login
+ls
+lsblk
+man
+mkdir
+mv
+ps
+rm
+rmdir
+rsh
+sleep
+sort
+stat
+svcctl
+tail
+touch
+true
+uname
+wc
+wget
+                                                                                /
+raven# raven# /bin/ls /binraven# /bin/ls /binraven# /bin/ls /binraven# /bin/ls /binraven# /bin/ls /binraven# /bin/draven# /bin/dfraven# /bin/df raven# /bin/df -raven# /bin/df -hraven# /bin/df -h
+Filesystem      Size  Used Avail Use% Mounted on
+ufs:            240M   41M  199M  17% /
+ramfs:           16M     0   16M   0% /tmp
+                                                                                /
+raven# raven# /bin/df -hraven# /sraven# /sbraven# /sbiraven# /sbinraven# /sbin/raven# /sbin/mraven# /sbin/moraven# /sbin/mouraven# /sbin/mounraven# /sbin/mountraven# /sbin/mount
+ufs: on /
+ramfs: on /tmp
+null: on /dev/null
+zero: on /dev/zero
+rand: on /dev/random
+rand: on /dev/urandom
+                                                                                /
+raven# raven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/mountraven# /sbin/praven# /sbin/piraven# /sbin/pinraven# /sbin/pingraven# /sbin/ping raven# /sbin/ping 1raven# /sbin/ping 10raven# /sbin/ping 10.raven# /sbin/ping 10.0raven# /sbin/ping 10.0.raven# /sbin/ping 10.0.2raven# /sbin/ping 10.0.2.raven# /sbin/ping 10.0.2.2raven# /sbin/ping 10.0.2.2
+ping: 10.0.2.2 seq=1 rtt=23ms
+ping: interval seq=2 waited=1001ms
+ping: 10.0.2.2 seq=2 rtt=11ms
+ping: interval seq=3 waited=1000ms
+ping: 10.0.2.2 seq=3 rtt=19ms
+ping: interval seq=4 waited=1001ms
+ping: 10.0.2.2 seq=4 rtt=10ms
+ping: 4 packets transmitted, 4 received, 0% packet loss
+ping: rtt min/avg/max = 10/15/23 ms
+                                                                                /
+raven# raven# eraven# ecraven# echraven# echoraven# echo raven# echo kraven# echo k1raven# echo k17raven# echo k176raven# echo k176-raven# echo k176-praven# echo k176-peraven# echo k176-perraven# echo k176-persraven# echo k176-persiraven# echo k176-persisraven# echo k176-persistraven# echo k176-persist raven# echo k176-persist >raven# echo k176-persist > raven# echo k176-persist > /raven# echo k176-persist > /praven# echo k176-persist > /peraven# echo k176-persist > /perraven# echo k176-persist > /persraven# echo k176-persist > /persiraven# echo k176-persist > /persisraven# echo k176-persist > /persistraven# echo k176-persist > /persist-raven# echo k176-persist > /persist-mraven# echo k176-persist > /persist-maraven# echo k176-persist > /persist-marraven# echo k176-persist > /persist-markraven# echo k176-persist > /persist-markeraven# echo k176-persist > /persist-markerraven# echo k176-persist > /persist-marker raven# echo k176-persist > /persist-marker &raven# echo k176-persist > /persist-marker &&raven# echo k176-persist > /persist-marker && raven# echo k176-persist > /persist-marker && craven# echo k176-persist > /persist-marker && caraven# echo k176-persist > /persist-marker && catraven# echo k176-persist > /persist-marker && cat raven# echo k176-persist > /persist-marker && cat /raven# echo k176-persist > /persist-marker && cat /praven# echo k176-persist > /persist-marker && cat /peraven# echo k176-persist > /persist-marker && cat /perraven# echo k176-persist > /persist-marker && cat /persraven# echo k176-persist > /persist-marker && cat /persiraven# echo k176-persist > /persist-marker && cat /persisraven# echo k176-persist > /persist-marker && cat /persistraven# echo k176-persist > /persist-marker && cat /persist-raven# echo k176-persist > /persist-marker && cat /persist-mraven# echo k176-persist > /persist-marker && cat /persist-maraven# echo k176-persist > /persist-marker && cat /persist-marraven# echo k176-persist > /persist-marker && cat /persist-markraven# echo k176-persist > /persist-marker && cat /persist-markeraven# echo k176-persist > /persist-marker && cat /persist-markerraven# echo k176-persist > /persist-marker && cat /persist-marker
+k176-persist
+                                                                                /
+raven# raven# echo k176-persist > /persist-marker && cat /persist-markerraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+login: 

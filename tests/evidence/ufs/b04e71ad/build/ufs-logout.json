@@ -1,0 +1,16 @@
+{
+  "case": "ufs-logout",
+  "arch": "x86_64",
+  "result": "timeout",
+  "duration_ms": 90303,
+  "exit_status": null,
+  "matched": [
+    "^loader: RavenBSD loader 0\\.1 \\(x86_64\\)$",
+    "^RavenBSD kernel 0\\.1 \\(x86_64\\)",
+    "^svcd: root pivoted to UFS at /$"
+  ],
+  "unmatched": [
+    "^RavenBSD 0\\.1 \\(x86_64\\) \\(tty:console\\)$"
+  ],
+  "forbidden_hits": []
+}

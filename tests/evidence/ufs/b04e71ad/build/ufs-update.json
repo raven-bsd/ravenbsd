@@ -1,0 +1,17 @@
+{
+  "case": "ufs-update",
+  "arch": "x86_64",
+  "result": "fail",
+  "duration_ms": 65241,
+  "exit_status": null,
+  "matched": [
+    "^svcd: root pivoted to UFS at /$",
+    "^k185-first$",
+    "^ufs: +2[0-4][0-9]M +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$",
+    "^ufs: on /$"
+  ],
+  "unmatched": [
+    "^init exited \\(0\\)$"
+  ],
+  "forbidden_hits": []
+}

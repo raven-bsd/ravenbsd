@@ -1,0 +1,22 @@
+{
+  "case": "disk-tools",
+  "arch": "x86_64",
+  "result": "fail",
+  "duration_ms": 134473,
+  "exit_status": null,
+  "matched": [
+    "^loader: RavenBSD loader 0\\.1 \\(x86_64\\)$",
+    "^RavenBSD kernel 0\\.1 \\(x86_64\\)",
+    "(?i)^password: ?$"
+  ],
+  "unmatched": [
+    "^block0 [0-9]+ 32835 disk$",
+    "^block0p1 [0-9]+ 32768 part ufs-root$",
+    "^Scheme: GPT$",
+    "^\\s*34\\s+32768\\s+1\\s+ufs-root$",
+    "^newfs: block:0 UFS2 block=4096 frag=512 size=16777216 label=$",
+    "read:s110-disk-ok$",
+    "^init exited \\(0\\)$"
+  ],
+  "forbidden_hits": []
+}

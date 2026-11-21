@@ -1,0 +1,214 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0)
+BdsDxe: starting Boot0002 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 24 regions
+frames: base=256 count=131072 free=114767 reserved=16305
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2700 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 5a59da2e 2026-11-21
+mem: 448 MiB usable in 6 regions
+cmdline: console=ttyS0 loglevel=info
+process: starting /init
+process: /init entry=0x41c134 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod blockd fsd-ufs vfsd
+pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:03.0 vendor=0x1af4 device=0x1042 class=0x01 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+pcid: devices=7
+svcd: logd up
+svcd: logd timing: generation=1 start=206 spawn=230 first_poll=235 deadline=5230 stalled=0 ready_at=286
+svcd: pcid up
+svcd: pcid timing: generation=1 start=219 spawn=278 first_poll=285 deadline=60278 stalled=0 ready_at=292
+rtc: 2026-11-21 22:42:27 (epoch 1795300947s)
+1795300947.326 initfsd: started
+1795300947.336 nulld: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=316 spawn=321 first_poll=322 deadline=5321 stalled=0 ready_at=346
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=297 spawn=316 first_poll=318 deadline=120316 stalled=0 ready_at=348
+1795300947.349 ramfsd: started
+1795300947.353 zerod: started
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=321 spawn=336 first_poll=339 deadline=5336 stalled=0 ready_at=355
+1795300947.356 randd: started
+svcd: zerod up
+svcd: zerod timing: generation=1 start=327 spawn=345 first_poll=346 deadline=5345 stalled=0 ready_at=359
+svcd: randd up
+svcd: randd timing: generation=1 start=324 spawn=339 first_poll=342 deadline=5339 stalled=0 ready_at=360
+devd: devices=7
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: matched 00:03.0 vendor=0x1af4 device=0x1042 irq_line=11 irq_pin=1
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix vector=64 table=0x0 bar=1
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=0
+virtio-net: msix table=0x0 bar=1 vector=1
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+devd: driver virtio-blk bar=4 size=16384
+devd: driver virtio-blk dma bus=0x181000 len=65536
+devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=5
+devd: driver virtio-blk msix vector=65 table=0x0 bar=1
+virtio-blk: id=1af4:1042
+virtio-blk: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-blk: msix table=0x0 bar=1 vector=1
+virtio-blk: capacity=976929 sector_size=512 ro=0
+virtio-blk: features=0x00000200 version1=1
+virtio-blk: queue0 size=8 notify=0x0
+virtio-blk: dma bus=0x181000 len=65536 irq=0
+virtio-blk: registered disk
+svcd: devd up
+svcd: devd timing: generation=1 start=295 spawn=304 first_poll=307 deadline=60304 stalled=0 ready_at=408
+blockd: remote disk=disk:0 sectors=976929 ro=0
+blockd: gpt ok partitions=2
+blockd: part 1 ESP 2048..452607
+blockd: part 2 ufs-root 452608..976895
+1795300947.458 blockd: started
+svcd: blockd up
+svcd: blockd timing: generation=1 start=412 spawn=418 first_poll=419 deadline=60418 stalled=0 ready_at=464
+fsd-ufs: mounted block:0 partition 2 as ufs: (268435456 bytes)
+fsd-ufs: mode=rw journal=none
+1795300979.934 fsd-ufs: started
+svcd: fsd-ufs up
+svcd: fsd-ufs timing: generation=1 start=465 spawn=474 first_poll=475 deadline=60474 stalled=0 ready_at=32976
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=32982 spawn=32998 first_poll=33008 deadline=92998 stalled=0 ready_at=33147
+svcd: root pivoted to UFS at /
+svcd: root services=13 added=4
+svcd: service plan: logd pcid consd devd initfsd netd nulld ramfsd randd sysd zerod blockd vfsd fsd-ufs getty resolvd
+svcd: consd up
+svcd: consd timing: generation=1 start=34458 spawn=34796 first_poll=34801 deadline=94796 stalled=0 ready_at=34827
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: interface eth0 10.0.2.15/24
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+svcd: netd timing: generation=1 start=34832 spawn=37216 first_poll=37222 deadline=97216 stalled=0 ready_at=37464
+1795300984.922 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=37469 spawn=37915 first_poll=37921 deadline=42915 stalled=0 ready_at=37956
+resolvd: wrote file:/etc/resolv.conf
+resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43198884ms rebind=75598884ms expires=86398884ms
+resolvd: resolv.conf=nameserver 10.0.2.3
+1795300985.998 resolvd: started
+svcd: resolvd up
+svcd: resolvd timing: generation=1 start=37975 spawn=38502 first_poll=38504 deadline=98502 stalled=0 ready_at=39096
+R A V E N   B S D
+--------------------------------------------------------------------------------
+000.03  nulld               ok
+000.03  zerod               ok
+000.03  ramfsd              ok
+000.04  randd               ok
+000.05  initfsd             ok
+000.05  blockd              ok
+000.07  pcid                ok
+000.08  logd                ok
+000.11  devd                ok
+000.17  vfsd                ok
+000.37  consd               ok
+000.49  sysd                ok
+001.12  resolvd             ok
+002.63  netd                ok
+032.51  fsd-ufs             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# craven# cdraven# cd raven# cd /raven# cd /rraven# cd /roraven# cd /rooraven# cd /rootraven# cd /root;raven# cd /root; raven# cd /root; eraven# cd /root; ecraven# cd /root; echraven# cd /root; echoraven# cd /root; echo raven# cd /root; echo craven# cd /root; echo cdraven# cd /root; echo cd=raven# cd /root; echo cd=$raven# cd /root; echo cd=$?raven# cd /root; echo cd=$?
+cd=0
+                                                                                ~
+raven# raven# praven# pwraven# pwdraven# pwd
+/root
+lsblk
+                                                                                ~
+raven# raven# lraven# lsraven# lsbraven# lsblraven# lsblkraven# lsblk
+NAME SIZE SECTORS TYPE
+block0 500187648 976929 disk
+block0p1 230686720 450560 part ESP
+block0p2 268435456 524288 part ufs-root
+                                                                                ~
+raven# raven# graven# gpraven# gparaven# gparraven# gpartraven# gpart raven# gpart sraven# gpart shraven# gpart shoraven# gpart showraven# gpart show raven# gpart show braven# gpart show blraven# gpart show bloraven# gpart show blocraven# gpart show blockraven# gpart show block:raven# gpart show block:0raven# gpart show block:0
+Geom name: block0
+Mediasize: 500187648
+Sectorsize: 512
+Scheme: GPT
+  start  size  index  name
+   2048 450560       1  ESP
+ 452608 524288       2  ufs-root
+                                                                                ~
+raven# raven# nraven# neraven# newraven# newfraven# newfsraven# newfs raven# newfs -raven# newfs -hraven# newfs -h
+usage: newfs [-O 1|2] [-b block] [-f frag] [-s size] [-L label] [block:0]
+                                                                                2 ~
+raven# raven# lsblkraven# lsblkraven# ls raven# ls /raven# ls /braven# ls /biraven# ls /binraven# ls /bin/raven# ls /bin/eraven# ls /bin/edraven# ls /bin/ed
+/bin/ed
+                                                                                ~
+raven# raven# draven# dfraven# df raven# df -raven# df -hraven# df -h raven# df -h /raven# df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+ufs:            240M   41M  199M  17% /
+                                                                                ~
+raven# raven# mraven# moraven# mouraven# mounraven# mountraven# mount
+ufs: on /
+ramfs: on /tmp
+null: on /dev/null
+zero: on /dev/zero
+rand: on /dev/random
+rand: on /dev/urandom
+                                                                                ~
+raven# raven# pwdraven# piraven# pinraven# pingraven# ping raven# ping 1raven# ping 10raven# ping 10.raven# ping 10.0raven# ping 10.0.raven# ping 10.0.2raven# ping 10.0.2.raven# ping 10.0.2.2raven# ping 10.0.2.2
+ping: 10.0.2.2 seq=1 rtt=29ms
+ping: interval seq=2 waited=1002ms
+ping: 10.0.2.2 seq=2 rtt=9ms
+ping: interval seq=3 waited=1001ms
+ping: 10.0.2.2 seq=3 rtt=21ms
+ping: interval seq=4 waited=1000ms
+ping: 10.0.2.2 seq=4 rtt=16ms
+ping: 4 packets transmitted, 4 received, 0% packet loss
+ping: rtt min/avg/max = 9/18/29 ms
+                                                                                ~
+raven# raven# eraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+login: 

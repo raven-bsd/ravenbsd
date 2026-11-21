@@ -1,0 +1,23 @@
+{
+  "case": "ufs-root",
+  "arch": "x86_64",
+  "result": "fail",
+  "duration_ms": 79891,
+  "exit_status": null,
+  "matched": [
+    "^loader: RavenBSD loader 0\\.1 \\(x86_64\\)$",
+    "^RavenBSD kernel 0\\.1 \\(x86_64\\)",
+    "^svcd: root pivoted to UFS at /$",
+    "(?i)^password: ?$",
+    "^brush$",
+    "^ls$",
+    "^ufs: +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$",
+    "^ufs: on /$",
+    "^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$",
+    "^k176-persist$"
+  ],
+  "unmatched": [
+    "^init exited \\(0\\)$"
+  ],
+  "forbidden_hits": []
+}
