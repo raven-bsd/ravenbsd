@@ -206,6 +206,7 @@ members = [
     "userland/bin/getconf",
     "userland/bin/env",
     "userland/bin/kill",
+    "userland/bin/kstat",
     "userland/bin/nice",
     "userland/bin/nohup",
     "userland/bin/logger",

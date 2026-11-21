@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# KSTAT1: typed kernel statistics over the existing bounded DTrace statistics syscall. The tool
+# reads real per-CPU ring counters, proves a known CLOCK_GET delta, rejects a malformed name,
+# prints human and NDJSON records, and reads again while a worker thread is busy.
+
+name = "kstat"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/kstat/build.sh"]
+initfs = "build/fixtures/kstat/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^kstat: accuracy delta=[0-9]+ min=64 ok$'
+
+[[expect]]
+regex = '^kstat: bad-name rejected$'
+
+[[expect]]
+regex = '^kstat: read_ns=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:cpu0:produced type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:cpu0:consumed type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:cpu0:dropped type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:cpu0:capacity type=uint64 unit=count value=4096$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:global:produced type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:global:consumed type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:global:dropped type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:global:capacity type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=dtrace:global:cpus type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: ndjson \{"name":"dtrace:cpu0:produced","type":"uint64","unit":"count","value":[0-9]+\}$'
+
+[[expect]]
+regex = '^kstat: busy ok$'
+
+[[expect]]
+regex = '^kstat: ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|kstat: fail|fake'
