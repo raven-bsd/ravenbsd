@@ -15,19 +15,21 @@ apic: id 0 (xapic)
 keyboard: i8042 irq 1 gsi 1 vector 0x23
 console: rx irq 4 gsi 4 vector 0x22 (active-high)
 cyclic: ok fired=3 order=5ms,10ms,15ms
-time: tsc 2707 MHz (pit)
+time: tsc 2703 MHz (pit)
 time: tsc not invariant
 timer: 1000 Hz
 fpu: fxsave 512 bytes
 fpu: fxsave 512 bytes
 fpu: fxsave 512 bytes
 smp: 4 cpus online
-RavenBSD kernel 0.1 (x86_64) 4007752f-dirty 2026-11-21
+RavenBSD kernel 0.1 (x86_64) e7b21a24-dirty 2026-11-21
 mem: 405 MiB usable in 8 regions
 cmdline: console=ttyS0 loglevel=info
 process: starting /init
 process: /init entry=0x41a890 sp=0x7fffffffde60
 sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=425 spawn=506 first_poll=520 deadline=5506 stalled=0 ready_at=577
 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
@@ -36,30 +38,28 @@ pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_li
 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
 pcid: devices=6
 svcd: pcid up
-svcd: pcid timing: generation=1 start=461 spawn=522 first_poll=554 deadline=60522 stalled=0 ready_at=588
-svcd: logd up
-svcd: logd timing: generation=1 start=417 spawn=480 first_poll=501 deadline=5480 stalled=0 ready_at=592
-svcd: consd up
-svcd: consd timing: generation=1 start=594 spawn=656 first_poll=674 deadline=60656 stalled=0 ready_at=822
-rtc: 2026-11-21 05:25:54 (epoch 1795238754s)
-1795238754.993 nulld: started
+svcd: pcid timing: generation=1 start=471 spawn=531 first_poll=544 deadline=60531 stalled=0 ready_at=587
+rtc: 2026-11-21 05:39:24 (epoch 1795239564s)
+1795239564.887 nulld: started
 svcd: nulld up
-svcd: nulld timing: generation=1 start=675 spawn=1046 first_poll=1086 deadline=6046 stalled=0 ready_at=1200
-1795238755.204 ramfsd: started
-1795238755.254 randd: started
-svcd: ramfsd up
-svcd: ramfsd timing: generation=1 start=696 spawn=988 first_poll=1117 deadline=5988 stalled=0 ready_at=1263
+svcd: nulld timing: generation=1 start=621 spawn=679 first_poll=820 deadline=5679 stalled=0 ready_at=923
+svcd: consd up
+svcd: consd timing: generation=1 start=590 spawn=605 first_poll=617 deadline=60605 stalled=0 ready_at=923
+1795239565.017 ramfsd: started
+1795239565.023 randd: started
+1795239565.038 initfsd: started
 svcd: randd up
-svcd: randd timing: generation=1 start=998 spawn=1082 first_poll=1202 deadline=6082 stalled=0 ready_at=1270
-1795238755.276 sysd: started
-1795238755.294 zerod: started
-svcd: sysd up
-svcd: sysd timing: generation=1 start=1096 spawn=1156 first_poll=1162 deadline=6156 stalled=0 ready_at=1305
-svcd: zerod up
-svcd: zerod timing: generation=1 start=1113 spawn=1228 first_poll=1232 deadline=6228 stalled=0 ready_at=1353
-1795238755.377 initfsd: started
+svcd: randd timing: generation=1 start=934 spawn=947 first_poll=958 deadline=5947 stalled=0 ready_at=1040
 svcd: initfsd up
-svcd: initfsd timing: generation=1 start=623 spawn=699 first_poll=1045 deadline=120699 stalled=0 ready_at=1386
+svcd: initfsd timing: generation=1 start=608 spawn=944 first_poll=947 deadline=120944 stalled=0 ready_at=1046
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=830 spawn=890 first_poll=922 deadline=5890 stalled=0 ready_at=1053
+1795239565.054 zerod: started
+1795239565.060 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=968 spawn=1026 first_poll=1029 deadline=6026 stalled=0 ready_at=1069
+svcd: zerod up
+svcd: zerod timing: generation=1 start=987 spawn=1014 first_poll=1022 deadline=6014 stalled=0 ready_at=1073
 devd: devices=6
 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
 devd: driver virtio-net bar=4 size=16384
@@ -76,36 +76,35 @@ virtio-net: queue1 tx size=8
 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
 virtio-net: serving nic:
 svcd: devd up
-svcd: devd timing: generation=1 start=609 spawn=659 first_poll=680 deadline=60659 stalled=0 ready_at=1531
+svcd: devd timing: generation=1 start=599 spawn=832 first_poll=885 deadline=60832 stalled=0 ready_at=1147
+netd: network config mode=static hostname=raven-static
 vfsd: mounted / on initfs:
 vfsd: mounted /tmp on ramfs:
 vfsd: mounted /dev/null on null:
-netd: network config mode=static hostname=raven-static
 vfsd: mounted /dev/zero on zero:
-vfsd: mounted /dev/random on rand:
-vfsd: mounted /dev/urandom on rand:
 netd: hostname raven-static
 netd: interface eth0 10.0.2.15/24
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
 netd: interface lo 127.0.0.1/8
 netd: ready
 svcd: netd up
-svcd: netd timing: generation=1 start=1532 spawn=1601 first_poll=1632 deadline=61601 stalled=0 ready_at=1784
+svcd: netd timing: generation=1 start=1147 spawn=1177 first_poll=1199 deadline=61177 stalled=0 ready_at=1274
 svcd: vfsd up
-svcd: vfsd timing: generation=1 start=1539 spawn=1598 first_poll=1604 deadline=61598 stalled=0 ready_at=1811
+svcd: vfsd timing: generation=1 start=1151 spawn=1193 first_poll=1198 deadline=61193 stalled=0 ready_at=1290
 svcd: netconf up
-svcd: netconf timing: generation=1 start=1817 spawn=1921 first_poll=none deadline=none stalled=0 ready_at=1921
+svcd: netconf timing: generation=1 start=1293 spawn=1341 first_poll=none deadline=none stalled=0 ready_at=1341
 netconf: socket fd=3
 netconf: listening port=23090
 resolvd: write file:/etc/resolv.conf: read-only file system
 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=unknown rebind=unknown expires=unknown
 resolvd: resolv.conf=nameserver 10.0.2.3
-1795238756.161 resolvd: started
+1795239565.484 resolvd: started
 svcd: resolvd up
-svcd: resolvd timing: generation=1 start=1820 spawn=1883 first_poll=1893 deadline=61883 stalled=0 ready_at=2170
+svcd: resolvd timing: generation=1 start=1302 spawn=1338 first_poll=1342 deadline=61338 stalled=0 ready_at=1496
 svcd: all services up
 svcd: getty up
 RavenBSD 0.1 (x86_64) (tty:console)
 login: netconf: accepted fd=4
 netconf: write=44 errno=0
 netconf: peer-event=1 read=-1
-netconf: closed

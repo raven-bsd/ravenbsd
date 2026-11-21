@@ -1,9 +1,9 @@
-$ sh /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/scripts/net-conformance.sh --scenario fin-rst --baseline linux --pcap /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/pcaps/linux-fin-rst.pcap --serial /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/serial/linux-fin-rst.log
-started: 2026-11-21T05:22:51Z
+$ sh /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/scripts/net-conformance.sh --scenario fin-rst --baseline linux --pcap /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-fin-rst.pcap --serial /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/serial/linux-fin-rst.log
+started: 2026-11-21T05:35:47Z
 timeout: 300s
 exit: 0
-duration: 3.242s
+duration: 3.188s
 --- stdout ---
-net-conformance: fin-rst pass (3.21s) delivered=44/44; peer-close=FIN
-net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/pcaps/linux-fin-rst.pcap
+net-conformance: fin-rst pass (3.16s) delivered=44/44; peer-close=FIN
+net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-fin-rst.pcap
 --- stderr ---

@@ -1,12 +1,12 @@
 $ sh tests/fixtures/net-conformance/build.sh
-started: 2026-11-21T05:27:03Z
+started: 2026-11-21T05:35:50Z
 timeout: 600s
 exit: 0
-duration: 174.516s
+duration: 192.361s
 --- stdout ---
 net-conformance fixture: staged build/fixtures/net-conformance/initfs.img
 --- stderr ---
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s
      Running `target/debug/xtask initfs --arch x86_64 --profile network-config-test`
 warning: unused imports: `c_int` and `c_void`
  --> libc/ravenlibc/crates/raven-libc/src/threads/call_once.rs:4:17
@@ -414,8 +414,8 @@ warning: function `fail` is never used
    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
 
 warning: `raven-libc` (lib) generated 65 warnings (run `cargo fix --lib -p raven-libc` to apply 63 suggestions)
-    Finished `libc-a-server` profile [optimized] target(s) in 0.16s
-    Finished `libc-a` profile [optimized] target(s) in 0.14s
+    Finished `libc-a-server` profile [optimized] target(s) in 0.14s
+    Finished `libc-a` profile [optimized] target(s) in 0.13s
 warning: struct `TlsDescIndex` is never constructed
   --> libc/ravenlibc/ld/src/raw/memview.rs:18:8
    |
@@ -445,7 +445,7 @@ warning: static `TLS_DESC_NEXT` is never used
    |        ^^^^^^^^^^^^^
 
 warning: `raven-libc-rtld` (lib) generated 4 warnings
-    Finished `libc-so` profile [optimized] target(s) in 0.15s
+    Finished `libc-so` profile [optimized] target(s) in 0.14s
 warning: rustix@1.1.5: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
 warning: rustix@1.1.5: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
    Compiling proc-macro2 v1.0.107
@@ -465,51 +465,48 @@ warning: rustix@1.1.5: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-most
    Compiling log v0.4.34
    Compiling parking_lot_core v0.9.12
    Compiling once_cell v1.21.4
-   Compiling serde v1.0.229
    Compiling getrandom v0.4.3
-   Compiling rand_core v0.6.4
-   Compiling fnv v1.0.7
-   Compiling rand_core v0.10.1
-   Compiling pin-project-lite v0.2.17
-   Compiling siphasher v1.0.4
    Compiling scopeguard v1.2.0
-   Compiling cfg_aliases v0.2.2
-   Compiling prettyplease v0.3.0
+   Compiling siphasher v1.0.4
+   Compiling rand_core v0.10.1
+   Compiling rand_core v0.6.4
+   Compiling serde v1.0.229
+   Compiling fnv v1.0.7
+   Compiling pin-project-lite v0.2.17
    Compiling lock_api v0.4.14
    Compiling zerocopy v0.8.59
-   Compiling rand v0.8.8
+   Compiling cfg_aliases v0.2.2
    Compiling version_check v0.9.5
-   Compiling nix v0.31.3 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/vendor/nix)
-   Compiling tracing-core v0.1.36
-   Compiling equivalent v1.0.2
-   Compiling futures-sink v0.3.34
-   Compiling writeable v0.6.4
-   Compiling futures-core v0.3.34
-   Compiling futures-io v0.3.34
+   Compiling prettyplease v0.3.0
    Compiling phf_shared v0.11.3
-   Compiling foldhash v0.2.0
-   Compiling peg-runtime v0.8.6
-   Compiling allocator-api2 v0.2.21
-   Compiling futures-task v0.3.34
-   Compiling futures-channel v0.3.34
+   Compiling rand v0.8.8
+   Compiling nix v0.31.3 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/vendor/nix)
+   Compiling futures-sink v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling writeable v0.6.4
+   Compiling equivalent v1.0.2
+   Compiling tracing-core v0.1.36
+   Compiling futures-io v0.3.34
    Compiling heck v0.5.0
-   Compiling num-traits v0.2.19
+   Compiling foldhash v0.2.0
    Compiling utf8parse v0.2.2
+   Compiling futures-channel v0.3.34
+   Compiling allocator-api2 v0.2.21
+   Compiling num-traits v0.2.19
    Compiling minimal-lexical v0.2.1
    Compiling slab v0.4.12
+   Compiling peg-runtime v0.8.6
    Compiling ahash v0.8.12
+   Compiling futures-task v0.3.34
    Compiling anstyle-parse v1.0.0
+   Compiling web-time v1.1.0
    Compiling either v1.18.0
-   Compiling icu_locale_fallback_data v2.3.0
+   Compiling anstyle v1.0.14
    Compiling aho-corasick v1.1.5
-   Compiling cpufeatures v0.3.1
-   Compiling unicode-segmentation v1.13.3
-   Compiling is_terminal_polyfill v1.70.2
-   Compiling anstyle-query v1.1.5
-   Compiling cached_proc_macro_types v1.0.0
-   Compiling litemap v0.8.3
-   Compiling regex-syntax v0.8.11
+   Compiling arrayvec v0.7.8
+   Compiling signal-hook v0.3.18
    Compiling bit-vec v0.8.0
+   Compiling regex-syntax v0.8.11
 warning: struct `rlimit` is never constructed
    --> /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/toolchain/vendor/libc/src/unix/ravenbsd/mod.rs:323:16
     |
@@ -623,26 +620,22 @@ warning: function `umask` is never used
 2172 |     pub fn umask(mask: crate::mode_t) -> crate::mode_t;
      |            ^^^^^
 
-   Compiling phf_generator v0.11.3
-   Compiling anstyle v1.0.14
-   Compiling signal-hook v0.3.18
+   Compiling hashbrown v0.16.1
    Compiling errno v0.3.14
 warning: `libc` (lib) generated 18 warnings
    Compiling mio v1.2.4 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/vendor/mio)
-   Compiling phf_codegen v0.11.3
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling unicode-segmentation v1.13.3
+   Compiling phf_generator v0.11.3
+   Compiling litemap v0.8.3
    Compiling rustc-hash v2.1.3
-   Compiling hashbrown v0.16.1
-   Compiling triomphe v0.1.16
-   Compiling colorchoice v1.0.5
-   Compiling web-time v1.1.0
-   Compiling terminfo v0.9.0
-   Compiling arrayvec v0.7.8
-   Compiling winnow v1.0.4
-   Compiling syn v3.0.6
-   Compiling syn v2.0.119
-   Compiling parking_lot v0.12.5
+   Compiling cpufeatures v0.3.1
+   Compiling phf_codegen v0.11.3
+   Compiling cached_proc_macro_types v1.0.0
    Compiling iana-time-zone v0.1.65
-   Compiling peg-macros v0.8.6
+   Compiling triomphe v0.1.16
+   Compiling parking_lot v0.12.5
+   Compiling winnow v1.0.4
 warning: unused variable: `backlog`
   --> vendor/mio/src/sys/unix/uds/listener.rs:36:9
    |
@@ -651,98 +644,107 @@ warning: unused variable: `backlog`
    |
    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
 
+   Compiling syn v3.0.6
+   Compiling syn v2.0.119
+   Compiling terminfo v0.9.0
    Compiling nom v7.1.3
-   Compiling convert_case v0.10.0
-   Compiling utf8-chars v3.0.7
+   Compiling peg-macros v0.8.6
+   Compiling colorchoice v1.0.5
+   Compiling icu_locale_fallback_data v2.3.0
+   Compiling anstyle-query v1.1.5
+   Compiling chacha20 v0.10.2
    Compiling archery v1.2.3
+   Compiling convert_case v0.10.0
    Compiling anstream v1.0.0
    Compiling type-map v0.5.1
+warning: `mio` (lib) generated 1 warning (run `cargo fix --lib -p mio` to apply 1 suggestion)
+   Compiling utf8-chars v3.0.7
+   Compiling itertools v0.15.0
    Compiling bit-set v0.8.0
    Compiling signal-hook-registry v1.4.8
    Compiling phf v0.11.3
-warning: `mio` (lib) generated 1 warning (run `cargo fix --lib -p mio` to apply 1 suggestion)
    Compiling socket2 v0.6.5 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/vendor/socket2)
-   Compiling itertools v0.15.0
-   Compiling chacha20 v0.10.2
+   Compiling libm v0.2.16
+   Compiling indenter v0.3.4
    Compiling unicode-width v0.2.3
    Compiling icu_locale_data v2.3.0
-   Compiling libm v0.2.16
    Compiling bytes v1.12.1
-   Compiling indenter v0.3.4
-   Compiling num-integer v0.1.47
    Compiling rand v0.10.3
+   Compiling num-integer v0.1.47
    Compiling rpds v1.2.1
-   Compiling hostname v0.4.2
    Compiling uzers v0.12.2 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/vendor/uzers)
+   Compiling hostname v0.4.2
    Compiling bigdecimal v0.4.11
-   Compiling self_cell v1.3.0
-   Compiling litrs v1.0.0
    Compiling object v0.37.3
    Compiling clap_lex v1.1.1
-   Compiling normalize-path v0.2.2
+   Compiling self_cell v1.3.0
+   Compiling litrs v1.0.0
    Compiling utf8_iter v1.0.4
    Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-abi)
+   Compiling normalize-path v0.2.2
    Compiling num-bigint v0.4.8
    Compiling signal-hook-mio v0.2.5
    Compiling vte v0.14.1
-   Compiling peg v0.8.6
-   Compiling document-features v0.2.12
+   Compiling gimli v0.32.3
    Compiling adler2 v2.0.1
    Compiling uucore v0.12.0
-   Compiling gimli v0.32.3
    Compiling rlimit v0.11.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/vendor/rlimit)
    Compiling nu-ansi-term v0.50.3
-   Compiling miniz_oxide v0.8.9
    Compiling strip-ansi-escapes v0.2.1
-   Compiling raven-proto-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-proto-fs)
-   Compiling raven-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-ipc)
-   Compiling regex-automata v0.4.18
+   Compiling peg v0.8.6
+   Compiling miniz_oxide v0.8.9
    Compiling toml_parser v1.1.5+spec-1.1.0
+   Compiling document-features v0.2.12
+   Compiling raven-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-ipc)
+   Compiling raven-proto-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-proto-fs)
    Compiling os_display v0.1.4
    Compiling uucore_procs v0.12.0
+   Compiling nibble_vec v0.1.0
+   Compiling regex-automata v0.4.18
+   Compiling hashbrown v0.17.1
+   Compiling brush-interactive v0.4.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/brush-interactive)
+   Compiling lazy_static v1.5.1
+   Compiling unicode-xid v0.2.6
+   Compiling rustc-demangle v0.1.28
+   Compiling toml_writer v1.1.3+spec-1.1.0
+   Compiling konst_macro_rules v0.2.19
+   Compiling unit-prefix v0.5.2
    Compiling bitflags v2.13.2
    Compiling toml_datetime v1.1.2+spec-1.1.0
    Compiling serde_spanned v1.1.2
-   Compiling nibble_vec v0.1.0
-   Compiling lazy_static v1.5.1
-   Compiling konst_macro_rules v0.2.19
-   Compiling toml_writer v1.1.3+spec-1.1.0
-   Compiling unit-prefix v0.5.2
-   Compiling brush-interactive v0.4.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/brush-interactive)
    Compiling endian-type v0.2.0
-   Compiling unicode-xid v0.2.6
-   Compiling hashbrown v0.17.1
-   Compiling rustc-demangle v0.1.28
-   Compiling const_format_proc_macros v0.2.37
-   Compiling toml v1.1.8+spec-1.1.0
-   Compiling radix_trie v0.3.0
    Compiling konst v0.2.20
-   Compiling sharded-slab v0.1.7
    Compiling raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-scheme)
-   Compiling sysinfo v0.38.4
-   Compiling terminal_size v0.4.4
-   Compiling tracing-log v0.2.0
-   Compiling clap_builder v4.6.7
-   Compiling uuid v1.26.1
+   Compiling const_format_proc_macros v0.2.37
+   Compiling sharded-slab v0.1.7
+   Compiling radix_trie v0.3.0
+   Compiling toml v1.1.8+spec-1.1.0
    Compiling indexmap v2.14.2
+   Compiling sysinfo v0.38.4
+   Compiling tracing-log v0.2.0
+   Compiling uuid v1.26.1
    Compiling thread_local v1.1.10
    Compiling brush-shell v0.4.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/brush-shell)
    Compiling raven-getrandom v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/toolchain/raven-getrandom)
-   Compiling const_format v0.2.37
    Compiling etcetera v0.11.0
    Compiling tracing-subscriber v0.3.23
+   Compiling const_format v0.2.37
    Compiling darling_core v0.20.11
+   Compiling terminal_size v0.4.4
+   Compiling clap_builder v4.6.7
    Compiling synstructure v0.14.0
    Compiling darling_core v0.24.1
-   Compiling tracing-attributes v0.1.31
    Compiling strum_macros v0.28.0
+   Compiling tracing-attributes v0.1.31
    Compiling color-print-proc-macro v0.3.7
    Compiling derive_more-impl v2.1.1
    Compiling winnow-args-derive v0.6.0
-   Compiling addr2line v0.25.1
    Compiling git-version-macro v0.3.9
-   Compiling git-version v0.3.9
    Compiling derive_more v2.1.1
+   Compiling addr2line v0.25.1
+   Compiling color-print v0.3.7
+   Compiling git-version v0.3.9
+   Compiling tracing v0.1.44
    Compiling zerofrom-derive v0.1.8
    Compiling yoke-derive v0.8.4
    Compiling zerovec-derive v0.11.6
@@ -750,123 +752,122 @@ warning: `mio` (lib) generated 1 warning (run `cargo fix --lib -p mio` to apply 
    Compiling thiserror-impl v2.0.21
    Compiling serde_derive v1.0.229
    Compiling futures-macro v0.3.34
-   Compiling tokio-macros v2.7.2
-   Compiling color-print v0.3.7
-   Compiling tracing v0.1.44
-   Compiling inherent v1.0.14
-   Compiling fancy-regex v0.20.0
-   Compiling async-trait v0.1.92
-   Compiling tokio v1.54.1 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/vendor/tokio)
-   Compiling zerotrie v0.2.5
-   Compiling futures-util v0.3.34
-   Compiling async-recursion v1.2.0
-   Compiling clap v4.6.7
-   Compiling zerofrom v0.1.8
    Compiling darling_macro v0.20.11
-   Compiling yoke v0.8.3
-   Compiling strum v0.28.0
-   Compiling command-fds v0.3.3
-   Compiling fluent-syntax v0.12.0
+   Compiling tokio-macros v2.7.2
+   Compiling fancy-regex v0.20.0
    Compiling darling v0.20.11
    Compiling cached_proc_macro v2.0.0
-   Compiling zerovec v0.11.8
+   Compiling async-recursion v1.2.0
+   Compiling async-trait v0.1.92
+   Compiling zerotrie v0.2.5
+   Compiling inherent v1.0.14
+   Compiling tokio v1.54.1 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/vendor/tokio)
+   Compiling futures-util v0.3.34
    Compiling backtrace v0.3.76
+   Compiling strum v0.28.0
+   Compiling clap v4.6.7
+   Compiling zerofrom v0.1.8
+   Compiling yoke v0.8.3
+   Compiling fluent-syntax v0.12.0
+   Compiling command-fds v0.3.3
+   Compiling zerovec v0.11.8
    Compiling darling_macro v0.24.1
+   Compiling cached v2.0.2
    Compiling darling v0.24.1
    Compiling bon-macros v3.10.3
-   Compiling cached v2.0.2
-   Compiling winnow-args v0.6.0
    Compiling tinystr v0.8.4
    Compiling potential_utf v0.1.6
+   Compiling winnow-args v0.6.0
+   Compiling icu_collections v2.3.0
    Compiling chrono v0.4.45
    Compiling crossterm v0.29.0
    Compiling human-panic v2.0.8
-   Compiling icu_collections v2.3.0
    Compiling unic-langid-impl v0.9.6
    Compiling icu_locale_core v2.3.0
    Compiling unic-langid v0.9.6
-   Compiling intl_pluralrules v7.0.2
    Compiling intl-memoizer v0.5.3
    Compiling fluent-langneg v0.13.1
+   Compiling intl_pluralrules v7.0.2
    Compiling fluent-bundle v0.16.0
-   Compiling icu_provider v2.3.1
-   Compiling fluent v0.17.0
    Compiling bon v3.10.3
-   Compiling futures-executor v0.3.34
-   Compiling icu_locale_fallback v2.3.0
+   Compiling fluent v0.17.0
    Compiling brush-parser v0.4.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/brush-parser)
-   Compiling futures v0.3.34
-   Compiling icu_locale v2.3.1
    Compiling reedline v0.52.1
+   Compiling icu_provider v2.3.1
+   Compiling icu_locale_fallback v2.3.0
+   Compiling icu_locale v2.3.1
+   Compiling futures-executor v0.3.34
+   Compiling futures v0.3.34
    Compiling brush-core v0.5.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/brush-core)
    Compiling brush-winnow-args-adapter v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/brush-winnow-args-adapter)
    Compiling brush-builtins v0.2.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/brush/brush-builtins)
-    Finished `release` profile [optimized] target(s) in 1m 38s
+    Finished `release` profile [optimized] target(s) in 1m 57s
 warning: rustix@1.1.6: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
 warning: rustix@1.1.6: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
    Compiling proc-macro2 v1.0.107
-   Compiling unicode-ident v1.0.26
    Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
    Compiling stable_deref_trait v1.2.1
    Compiling either v1.19.0
    Compiling libc v0.2.191 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/libc-ravenbsd)
    Compiling litemap v0.8.3
    Compiling icu_locale_fallback_data v2.4.0
-   Compiling bitflags v2.13.2
-   Compiling autocfg v1.5.1
    Compiling cfg-if v1.0.5
    Compiling libm v0.2.16
+   Compiling bitflags v2.13.2
+   Compiling autocfg v1.5.1
    Compiling smallvec v1.16.1
    Compiling memchr v2.8.3
-   Compiling rustix v1.1.6 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/rustix-ravenbsd)
    Compiling cfg_aliases v0.2.2
+   Compiling rustix v1.1.6 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/rustix-ravenbsd)
    Compiling icu_calendar_data v2.4.0
-   Compiling icu_time_data v2.4.0
    Compiling unicode-width v0.2.3
-   Compiling utf8_iter v1.0.4
-   Compiling getrandom v0.4.3
    Compiling rand_core v0.10.1
    Compiling thiserror v2.0.21
+   Compiling getrandom v0.4.3
+   Compiling utf8_iter v1.0.4
+   Compiling icu_time_data v2.4.0
    Compiling icu_normalizer_data v2.4.0
-   Compiling utf8parse v0.2.2
-   Compiling writeable v0.6.4
-   Compiling icu_plurals_data v2.4.0
    Compiling icu_decimal_data v2.4.0
-   Compiling rustc-hash v2.1.3
+   Compiling utf8parse v0.2.2
    Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-abi)
-   Compiling anstyle-parse v1.0.0
+   Compiling icu_plurals_data v2.4.0
+   Compiling rustc-hash v2.1.3
    Compiling nix v0.31.3 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/nix-ravenbsd)
-   Compiling anstyle v1.0.14
-   Compiling icu_collator_data v2.4.0
-   Compiling type-map v0.5.1
-   Compiling colorchoice v1.0.5
    Compiling jiff-core v0.1.4
+   Compiling writeable v0.6.4
+   Compiling anstyle-parse v1.0.0
    Compiling icu_locale_data v2.4.0
-   Compiling anstyle-query v1.1.5
    Compiling is_terminal_polyfill v1.70.2
    Compiling icu_datetime_data v2.4.0
-   Compiling num-traits v0.2.19
-   Compiling bigdecimal v0.4.11
+   Compiling colorchoice v1.0.5
+   Compiling icu_collator_data v2.4.0
+   Compiling anstyle-query v1.1.5
+   Compiling anstyle v1.0.14
    Compiling raven-proto-fs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-proto-fs)
    Compiling raven-ipc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-ipc)
-   Compiling write16 v1.0.0
-   Compiling same-file v1.0.6
-   Compiling clap_lex v1.1.1
+   Compiling type-map v0.5.1
+   Compiling num-traits v0.2.19
+   Compiling bigdecimal v0.4.11
+   Compiling self_cell v1.3.0
    Compiling utf16_iter v1.0.5
    Compiling strsim v0.11.1
-   Compiling self_cell v1.3.0
-   Compiling anstream v1.0.0
+   Compiling same-file v1.0.6
+   Compiling clap_lex v1.1.1
+   Compiling write16 v1.0.0
    Compiling walkdir v2.5.0
    Compiling uucore v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uucore)
    Compiling unit-prefix v0.5.2
-   Compiling os_display v0.1.4
    Compiling itertools v0.15.0
+   Compiling anstream v1.0.0
+   Compiling os_display v0.1.4
+   Compiling raven-output v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-output)
    Compiling dunce v1.0.5
    Compiling glob v0.3.4
-   Compiling raven-output v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-output)
+   Compiling raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-scheme)
    Compiling raven-theme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-theme)
    Compiling portable-atomic v1.15.0
-   Compiling raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-scheme)
+   Compiling crossbeam-utils v0.8.23
 warning: struct `rlimit` is never constructed
    --> libc-ravenbsd/src/unix/ravenbsd/mod.rs:322:16
     |
@@ -980,62 +981,60 @@ warning: function `umask` is never used
 2171 |     pub fn umask(mask: crate::mode_t) -> crate::mode_t;
      |            ^^^^^
 
-   Compiling crossbeam-utils v0.8.23
-warning: `libc` (lib) generated 18 warnings
-   Compiling errno v0.3.14
-   Compiling console v0.16.6
    Compiling crossbeam-epoch v0.9.21
    Compiling crossbeam-deque v0.8.8
+   Compiling errno v0.3.14
+warning: `libc` (lib) generated 18 warnings
+   Compiling console v0.16.6
+   Compiling winnow v1.0.4
    Compiling raven-getrandom v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/toolchain/raven-getrandom)
    Compiling rayon-core v1.13.0
-   Compiling winnow v1.0.4
    Compiling filetime v0.2.29
    Compiling bytecount v0.6.9
-   Compiling cpufeatures v0.3.1
    Compiling rlimit v0.11.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/rlimit-ravenbsd)
+   Compiling cpufeatures v0.3.1
+   Compiling aho-corasick v1.1.5
+   Compiling notify-types v2.1.0
+   Compiling ansi-width v0.1.1
    Compiling syn v3.0.9
    Compiling chacha20 v0.10.2
-   Compiling aho-corasick v1.1.5
-   Compiling ansi-width v0.1.1
    Compiling uucore_procs v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uucore_procs)
-   Compiling notify-types v2.1.0
-   Compiling fastrand v2.5.0
    Compiling log v0.4.34
-   Compiling nu-ansi-term v0.50.3
+   Compiling fastrand v2.5.0
    Compiling once_cell v1.21.4
-   Compiling rand v0.10.3
-   Compiling core_maths v0.1.1
+   Compiling nu-ansi-term v0.50.3
    Compiling uutils_term_grid v0.8.1
-   Compiling hostname v0.4.2
-   Compiling num-integer v0.1.47
    Compiling notify v8.2.2
-   Compiling jiff v0.2.41
-   Compiling nom v8.0.0
+   Compiling core_maths v0.1.1
+   Compiling rand v0.10.3
+   Compiling hostname v0.4.2
    Compiling bstr v1.13.1
+   Compiling nom v8.0.0
+   Compiling num-integer v0.1.47
+   Compiling jiff v0.2.41
    Compiling foldhash v0.2.0
    Compiling indicatif v0.18.6
    Compiling num-bigint v0.4.8
    Compiling ctrlc v3.5.2
    Compiling rayon v1.12.0
+   Compiling lscolors v0.21.0
+   Compiling synstructure v0.14.0
    Compiling terminal_size v0.4.4
    Compiling tempfile v3.27.0
    Compiling clap_builder v4.6.7
-   Compiling lscolors v0.21.0
-   Compiling synstructure v0.14.0
-   Compiling parse_datetime v0.17.0
-   Compiling zerofrom-derive v0.1.8
-   Compiling yoke-derive v0.8.4
    Compiling displaydoc v0.2.7
    Compiling zerovec-derive v0.11.7
    Compiling thiserror-impl v2.0.21
-   Compiling clap v4.6.7
-   Compiling zerofrom v0.1.8
-   Compiling yoke v0.8.4
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
    Compiling calendrical_calculations v0.2.4
    Compiling fixed_decimal v0.7.3
-   Compiling zerotrie v0.2.5
-   Compiling zerovec v0.11.9
+   Compiling zerofrom v0.1.8
+   Compiling yoke v0.8.4
    Compiling fluent-syntax v0.12.0
+   Compiling zerovec v0.11.9
+   Compiling zerotrie v0.2.5
+   Compiling parse_datetime v0.17.0
    Compiling tinystr v0.8.5
    Compiling potential_utf v0.1.6
    Compiling icu_pattern v0.5.1
@@ -1043,9 +1042,10 @@ warning: `libc` (lib) generated 18 warnings
    Compiling icu_locale_core v2.4.0
    Compiling unic-langid-impl v0.9.6
    Compiling unic-langid v0.9.6
-   Compiling intl-memoizer v0.5.3
    Compiling intl_pluralrules v7.0.2
    Compiling fluent-langneg v0.13.1
+   Compiling intl-memoizer v0.5.3
+   Compiling clap v4.6.7
    Compiling fluent-bundle v0.16.0
    Compiling fluent v0.17.0
    Compiling icu_provider v2.4.0
@@ -1086,25 +1086,35 @@ warning: function `mount_dev_id` is never used
 329 | fn mount_dev_id(mount_dir: &OsStr) -> String {
     |    ^^^^^^^^^^^^
 
-   Compiling uu_wc v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/wc)
-   Compiling uu_mv v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/mv)
-   Compiling uu_false v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/false)
-   Compiling uu_rmdir v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/rmdir)
-   Compiling uu_basename v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/basename)
-   Compiling uu_ln v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/ln)
-   Compiling uu_tr v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/tr)
-   Compiling uu_pwd v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/pwd)
-   Compiling uu_cat v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/cat)
-   Compiling uu_sleep v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/sleep)
-   Compiling uu_dirname v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/dirname)
-   Compiling uu_rm v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/rm)
-   Compiling uu_stat v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/stat)
-   Compiling uu_sort v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/sort)
    Compiling uu_id v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/id)
+   Compiling uu_head v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/head)
+   Compiling uu_env v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/env)
+   Compiling uu_rm v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/rm)
+   Compiling uu_wc v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/wc)
+   Compiling uu_rmdir v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/rmdir)
+   Compiling uu_pwd v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/pwd)
+   Compiling uu_ln v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/ln)
+   Compiling uu_df v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/df)
+   Compiling uu_touch v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/touch)
+   Compiling uu_tail v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/tail)
    Compiling uu_cp v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/cp)
-   Compiling uu_du v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/du)
-   Compiling uu_echo v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/echo)
+   Compiling uu_chmod v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/chmod)
+   Compiling uu_false v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/false)
+   Compiling uu_chown v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/chown)
+   Compiling uu_sort v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/sort)
    Compiling uu_date v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/date)
+   Compiling uu_echo v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/echo)
+   Compiling uu_sleep v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/sleep)
+   Compiling uu_mv v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/mv)
+   Compiling uu_ls v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/ls)
+   Compiling uu_dirname v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/dirname)
+   Compiling uu_true v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/true)
+   Compiling uu_cut v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/cut)
+   Compiling uu_stat v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/stat)
+   Compiling uu_mkdir v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/mkdir)
+   Compiling uu_tr v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/tr)
+   Compiling uu_cat v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/cat)
+   Compiling uu_du v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/du)
 warning: unnecessary qualification
     --> src/uu/du/src/du.rs:1143:24
      |
@@ -1130,23 +1140,13 @@ help: remove the unnecessary path segments
 1150 +     if let Ok(entries) = fs::read_dir(path) {
      |
 
-   Compiling uu_chmod v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/chmod)
-   Compiling uu_head v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/head)
-   Compiling uu_true v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/true)
-   Compiling uu_tail v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/tail)
-   Compiling uu_chown v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/chown)
-   Compiling uu_df v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/df)
-   Compiling uu_ls v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/ls)
-   Compiling uu_env v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/env)
-   Compiling uu_touch v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/touch)
-   Compiling uu_cut v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/cut)
-   Compiling uu_mkdir v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/mkdir)
+   Compiling uu_basename v0.13.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/uutils/src/uu/basename)
 warning: `uu_du` (lib) generated 2 warnings (run `cargo fix --lib -p uu_du` to apply 2 suggestions)
 warning: `uucore` (lib) generated 4 warnings
-    Finished `release` profile [optimized] target(s) in 58.81s
+    Finished `release` profile [optimized] target(s) in 56.71s
    Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-abi)
-   Compiling raven-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-elf)
    Compiling raven-initfs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-initfs)
+   Compiling raven-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-elf)
    Compiling raven-trace-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-trace-core)
    Compiling raven-tty-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-tty-core)
    Compiling raven-proto-tty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-proto-tty)
@@ -1155,51 +1155,51 @@ warning: `uucore` (lib) generated 4 warnings
    Compiling raven-proto-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-proto-net)
    Compiling raven-tcpip v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-tcpip)
    Compiling raven-scheme v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-scheme)
-   Compiling raven-ramfs-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-ramfs-core)
    Compiling raven-vfs-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-vfs-core)
+   Compiling raven-ramfs-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-ramfs-core)
    Compiling raven-spawn v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-spawn)
    Compiling raven-rt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/rt)
    Compiling raven-http-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-http-net)
    Compiling raven-driver v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-driver)
    Compiling raven-uname v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/uname)
    Compiling raven-tool-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-tool-core)
-   Compiling raven-logd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/logd)
+   Compiling raven-route v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/route)
+   Compiling raven-consd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/consd)
+   Compiling raven-initfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/initfsd)
+   Compiling raven-ifconfig v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/ifconfig)
+   Compiling resolvd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/resolvd)
+   Compiling raven-zerod v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/zerod)
    Compiling raven-date v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/date)
    Compiling raven-devd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/devd)
-   Compiling raven-sysd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/sysd)
+   Compiling raven-dmesg v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/dmesg)
+   Compiling raven-logd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/logd)
    Compiling raven-hostname v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/hostname)
-   Compiling raven-consd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/consd)
-   Compiling raven-umount v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/umount)
    Compiling raven-netstat v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/netstat)
-   Compiling raven-mount v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/mount)
-   Compiling raven-nulld v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/nulld)
-   Compiling raven-zerod v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/zerod)
-   Compiling resolvd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/resolvd)
+   Compiling man v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/man)
+   Compiling raven-init v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/init)
+   Compiling raven-sysd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/sysd)
    Compiling raven-randd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/randd)
+   Compiling raven-sleep v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/sleep)
    Compiling virtio-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/drivers/virtio-net)
    Compiling curl v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/curl)
-   Compiling raven-init v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/init)
-   Compiling ed v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/ed)
    Compiling raven-ping v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/ping)
-   Compiling raven-dmesg v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/dmesg)
-   Compiling man v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/man)
-   Compiling raven-initfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/initfsd)
-   Compiling raven-sleep v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/sleep)
-   Compiling raven-ifconfig v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/ifconfig)
-   Compiling raven-route v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/route)
+   Compiling ed v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/ed)
+   Compiling raven-mount v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/mount)
+   Compiling raven-nulld v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/nulld)
+   Compiling raven-umount v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/umount)
    Compiling raven-ps v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/ps)
    Compiling wget v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/wget)
    Compiling raven-rsh v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/rsh)
-   Compiling raven-vfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/vfsd)
-   Compiling raven-pcid v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/pcid)
-   Compiling raven-ramfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/ramfsd)
    Compiling raven-svcctl v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/svcctl)
+   Compiling raven-pcid v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/pcid)
+   Compiling raven-vfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/vfsd)
+   Compiling raven-ramfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/ramfsd)
    Compiling raven-netcore v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-netcore)
    Compiling netd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/servers/netd)
-    Finished `release` profile [optimized] target(s) in 6.59s
+    Finished `release` profile [optimized] target(s) in 6.44s
    Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-abi)
-   Compiling raven-initfs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-initfs)
    Compiling raven-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-elf)
+   Compiling raven-initfs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-initfs)
    Compiling raven-tty-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-tty-core)
    Compiling raven-trace-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-trace-core)
    Compiling raven-proto-tty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/crates/raven-proto-tty)
@@ -1210,4 +1210,4 @@ warning: `uucore` (lib) generated 4 warnings
    Compiling raven-rt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/rt)
    Compiling login v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/login)
    Compiling raven-getty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/userland/bin/getty)
-    Finished `release` profile [optimized] target(s) in 1.17s
+    Finished `release` profile [optimized] target(s) in 1.20s

@@ -1,8 +1,8 @@
 $ cargo xtask image --arch x86_64 --profile network-config-test --initfs build/fixtures/net-conformance/initfs.img --output build/qtest/net-conformance.img
-started: 2026-11-21T05:29:58Z
+started: 2026-11-21T05:39:03Z
 timeout: 180s
 exit: 0
-duration: 1.067s
+duration: 1.937s
 --- stdout ---
 ==> build loader x86_64 (x86_64-unknown-uefi)
     /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/build/x86_64/loader-debug.efi
@@ -10,7 +10,8 @@ duration: 1.067s
     /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/build/x86_64/kernel-debug.elf
 build/qtest/net-conformance.img
 --- stderr ---
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.17s
      Running `target/debug/xtask image --arch x86_64 --profile network-config-test --initfs build/fixtures/net-conformance/initfs.img --output build/qtest/net-conformance.img`
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s
+   Compiling raven-kernel v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/kernel)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.98s

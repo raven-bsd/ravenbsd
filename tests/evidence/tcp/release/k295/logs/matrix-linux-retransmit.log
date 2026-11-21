@@ -1,9 +1,9 @@
-$ sh /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/scripts/net-conformance.sh --scenario retransmit --baseline linux --pcap /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/pcaps/linux-retransmit.pcap --serial /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/serial/linux-retransmit.log
-started: 2026-11-21T05:27:00Z
+$ sh /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/scripts/net-conformance.sh --scenario retransmit --baseline linux --pcap /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-retransmit.pcap --serial /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/serial/linux-retransmit.log
+started: 2026-11-21T05:35:47Z
 timeout: 300s
 exit: 0
-duration: 0.408s
+duration: 0.4s
 --- stdout ---
-net-conformance: retransmit pass (0.38s) first=44B seq+0; retransmit=yes
-net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/pcaps/linux-retransmit.pcap
+net-conformance: retransmit pass (0.37s) first=44B seq+0; retransmit=yes
+net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-retransmit.pcap
 --- stderr ---

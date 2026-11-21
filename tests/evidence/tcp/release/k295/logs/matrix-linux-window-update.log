@@ -1,9 +1,9 @@
-$ sh /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/scripts/net-conformance.sh --scenario window-update --baseline linux --pcap /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/pcaps/linux-window-update.pcap --serial /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/serial/linux-window-update.log
-started: 2026-11-21T05:26:55Z
+$ sh /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/scripts/net-conformance.sh --scenario window-update --baseline linux --pcap /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-window-update.pcap --serial /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/serial/linux-window-update.log
+started: 2026-11-21T05:35:42Z
 timeout: 300s
 exit: 0
-duration: 4.592s
+duration: 4.594s
 --- stdout ---
 net-conformance: window-update pass (4.56s) delivered=44/44 frames=1
-net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052649Z/pcaps/linux-window-update.pcap
+net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-window-update.pcap
 --- stderr ---

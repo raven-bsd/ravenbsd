@@ -1,8 +1,8 @@
 $ /usr/bin/python3 scripts/tcp-evidence_ut.py
-started: 2026-11-21T05:26:51Z
+started: 2026-11-21T05:35:38Z
 timeout: 30s
 exit: 0
-duration: 0.04s
+duration: 0.046s
 --- stdout ---
 tcp-evidence-tests: negative missing-entry -> FAIL (expected)
 tcp-evidence-tests: negative netbsd-import -> FAIL (expected)

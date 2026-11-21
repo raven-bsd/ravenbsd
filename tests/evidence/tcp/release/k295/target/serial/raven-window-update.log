@@ -4,7 +4,7 @@ BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x
 loader: RavenBSD loader 0.1 (x86_64)
 loader: RavenBSD loader 0.1 (x86_64)
 loader: memory map: 28 regions
-frames: base=256 count=131072 free=103814 reserved=27258
+frames: base=256 count=131072 free=103817 reserved=27255
 paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
 heap: 4096 KiB
 vtd: disabled (iommu=on not set); DMA unprotected
@@ -15,21 +15,21 @@ apic: id 0 (xapic)
 keyboard: i8042 irq 1 gsi 1 vector 0x23
 console: rx irq 4 gsi 4 vector 0x22 (active-high)
 cyclic: ok fired=3 order=5ms,10ms,15ms
-time: tsc 2699 MHz (pit)
+time: tsc 2706 MHz (pit)
 time: tsc not invariant
 timer: 1000 Hz
 fpu: fxsave 512 bytes
 fpu: fxsave 512 bytes
 fpu: fxsave 512 bytes
 smp: 4 cpus online
-RavenBSD kernel 0.1 (x86_64) 4007752f-dirty 2026-11-21
+RavenBSD kernel 0.1 (x86_64) e7b21a24-dirty 2026-11-21
 mem: 405 MiB usable in 8 regions
 cmdline: console=ttyS0 loglevel=info
 process: starting /init
 process: /init entry=0x41a890 sp=0x7fffffffde60
 sched: running (4 cpus, slice 10 ms)
 svcd: logd up
-svcd: logd timing: generation=1 start=296 spawn=345 first_poll=349 deadline=5345 stalled=0 ready_at=380
+svcd: logd timing: generation=1 start=304 spawn=348 first_poll=359 deadline=5348 stalled=0 ready_at=394
 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
@@ -38,28 +38,28 @@ pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_li
 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
 pcid: devices=6
 svcd: pcid up
-svcd: pcid timing: generation=1 start=329 spawn=364 first_poll=384 deadline=60364 stalled=0 ready_at=419
+svcd: pcid timing: generation=1 start=339 spawn=390 first_poll=415 deadline=60390 stalled=0 ready_at=425
 svcd: consd up
-svcd: consd timing: generation=1 start=423 spawn=433 first_poll=439 deadline=60433 stalled=0 ready_at=577
-rtc: 2026-11-21 05:26:08 (epoch 1795238768s)
-1795238768.645 ramfsd: started
-1795238768.805 randd: started
-svcd: ramfsd up
-svcd: ramfsd timing: generation=1 start=543 spawn=578 first_poll=581 deadline=5578 stalled=0 ready_at=808
+svcd: consd timing: generation=1 start=431 spawn=443 first_poll=449 deadline=60443 stalled=0 ready_at=529
+rtc: 2026-11-21 05:39:39 (epoch 1795239579s)
+1795239579.810 ramfsd: started
+1795239579.826 randd: started
+1795239579.842 sysd: started
 svcd: randd up
-svcd: randd timing: generation=1 start=582 spawn=627 first_poll=640 deadline=5627 stalled=0 ready_at=833
-1795238768.871 nulld: started
-1795238768.936 sysd: started
-1795238768.959 zerod: started
-svcd: sysd up
-svcd: sysd timing: generation=1 start=641 spawn=931 first_poll=940 deadline=5931 stalled=0 ready_at=965
-svcd: nulld up
-svcd: nulld timing: generation=1 start=530 spawn=807 first_poll=884 deadline=5807 stalled=0 ready_at=976
+svcd: randd timing: generation=1 start=611 spawn=673 first_poll=690 deadline=5673 stalled=0 ready_at=844
+1795239579.854 zerod: started
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=541 spawn=613 first_poll=644 deadline=5613 stalled=0 ready_at=855
 svcd: zerod up
-svcd: zerod timing: generation=1 start=713 spawn=882 first_poll=923 deadline=5882 stalled=0 ready_at=999
-1795238769.000 initfsd: started
+svcd: zerod timing: generation=1 start=693 spawn=736 first_poll=767 deadline=5736 stalled=0 ready_at=874
+1795239579.876 nulld: started
+1795239579.884 initfsd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=621 spawn=642 first_poll=682 deadline=5642 stalled=0 ready_at=900
 svcd: initfsd up
-svcd: initfsd timing: generation=1 start=518 spawn=579 first_poll=583 deadline=120579 stalled=0 ready_at=1013
+svcd: initfsd timing: generation=1 start=452 spawn=542 first_poll=610 deadline=120542 stalled=0 ready_at=901
+svcd: nulld up
+svcd: nulld timing: generation=1 start=463 spawn=691 first_poll=715 deadline=5691 stalled=0 ready_at=905
 devd: devices=6
 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
 devd: driver virtio-net bar=4 size=16384
@@ -76,34 +76,36 @@ virtio-net: queue1 tx size=8
 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
 virtio-net: serving nic:
 svcd: devd up
-svcd: devd timing: generation=1 start=431 spawn=450 first_poll=505 deadline=60450 stalled=0 ready_at=1102
-netd: network config mode=static hostname=raven-static
+svcd: devd timing: generation=1 start=441 spawn=527 first_poll=540 deadline=60527 stalled=0 ready_at=1072
 vfsd: mounted / on initfs:
+netd: network config mode=static hostname=raven-static
 vfsd: mounted /tmp on ramfs:
 vfsd: mounted /dev/null on null:
 vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
 netd: hostname raven-static
 netd: interface eth0 10.0.2.15/24
-vfsd: mounted /dev/random on rand:
 netd: interface lo 127.0.0.1/8
 netd: ready
 svcd: netd up
-svcd: netd timing: generation=1 start=1104 spawn=1142 first_poll=1148 deadline=61142 stalled=0 ready_at=1253
-vfsd: mounted /dev/urandom on rand:
+svcd: netd timing: generation=1 start=1074 spawn=1137 first_poll=1165 deadline=61137 stalled=0 ready_at=1313
 svcd: vfsd up
-svcd: vfsd timing: generation=1 start=1114 spawn=1165 first_poll=1170 deadline=61165 stalled=0 ready_at=1293
+svcd: vfsd timing: generation=1 start=1079 spawn=1149 first_poll=1166 deadline=61149 stalled=0 ready_at=1332
 svcd: netconf up
-svcd: netconf timing: generation=1 start=1296 spawn=1341 first_poll=none deadline=none stalled=0 ready_at=1341
+svcd: netconf timing: generation=1 start=1340 spawn=1434 first_poll=none deadline=none stalled=0 ready_at=1434
 netconf: socket fd=3
 netconf: listening port=23090
 resolvd: write file:/etc/resolv.conf: read-only file system
 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=unknown rebind=unknown expires=unknown
 resolvd: resolv.conf=nameserver 10.0.2.3
-1795238769.539 resolvd: started
+1795239580.657 resolvd: started
 svcd: resolvd up
-svcd: resolvd timing: generation=1 start=1300 spawn=1342 first_poll=1344 deadline=61342 stalled=0 ready_at=1554
+svcd: resolvd timing: generation=1 start=1344 spawn=1389 first_poll=1396 deadline=61389 stalled=0 ready_at=1672
 svcd: all services up
 svcd: getty up
 RavenBSD 0.1 (x86_64) (tty:console)
 login: netconf: accepted fd=4
 netconf: write=44 errno=0
+netconf: peer-event=1 read=-1
+netconf: closed

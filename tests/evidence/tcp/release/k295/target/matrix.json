@@ -3,14 +3,14 @@
   "build": {
     "image": {
       "command": "cargo xtask image --arch x86_64 --profile network-config-test --initfs build/fixtures/net-conformance/initfs.img --output build/qtest/net-conformance.img",
-      "duration_s": 2.258,
+      "duration_s": 1.937,
       "exit": 0,
       "log": "logs/build-image.log",
       "timed_out": false
     },
     "initfs": {
       "command": "sh tests/fixtures/net-conformance/build.sh",
-      "duration_s": 158.005,
+      "duration_s": 192.361,
       "exit": 0,
       "log": "logs/build-initfs.log",
       "timed_out": false
@@ -24,8 +24,8 @@
   "reason": null,
   "scenarios": [
     {
-      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/pcaps/linux-handshake.pcap",
-      "duration_s": 0.276,
+      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-handshake.pcap",
+      "duration_s": 0.213,
       "exit": 0,
       "log": "logs/matrix-linux-handshake.log",
       "pcap": "pcaps/linux-handshake.pcap",
@@ -35,8 +35,8 @@
       "target": "linux"
     },
     {
-      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/pcaps/linux-zero-window.pcap",
-      "duration_s": 4.44,
+      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-zero-window.pcap",
+      "duration_s": 4.457,
       "exit": 0,
       "log": "logs/matrix-linux-zero-window.log",
       "pcap": "pcaps/linux-zero-window.pcap",
@@ -46,8 +46,8 @@
       "target": "linux"
     },
     {
-      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/pcaps/linux-window-update.pcap",
-      "duration_s": 4.643,
+      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-window-update.pcap",
+      "duration_s": 4.594,
       "exit": 0,
       "log": "logs/matrix-linux-window-update.log",
       "pcap": "pcaps/linux-window-update.pcap",
@@ -57,8 +57,8 @@
       "target": "linux"
     },
     {
-      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/pcaps/linux-retransmit.pcap",
-      "duration_s": 0.423,
+      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-retransmit.pcap",
+      "duration_s": 0.4,
       "exit": 0,
       "log": "logs/matrix-linux-retransmit.log",
       "pcap": "pcaps/linux-retransmit.pcap",
@@ -68,8 +68,8 @@
       "target": "linux"
     },
     {
-      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/pcaps/linux-fin-rst.pcap",
-      "duration_s": 3.242,
+      "detail": "net-conformance: pcap=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/pcaps/linux-fin-rst.pcap",
+      "duration_s": 3.188,
       "exit": 0,
       "log": "logs/matrix-linux-fin-rst.log",
       "pcap": "pcaps/linux-fin-rst.pcap",
@@ -79,8 +79,8 @@
       "target": "linux"
     },
     {
-      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/serial/raven-handshake.log",
-      "duration_s": 10.658,
+      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/serial/raven-handshake.log",
+      "duration_s": 11.231,
       "exit": 0,
       "log": "logs/matrix-raven-handshake.log",
       "pcap": "pcaps/raven-handshake.pcap",
@@ -90,8 +90,8 @@
       "target": "raven"
     },
     {
-      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/serial/raven-zero-window.log",
-      "duration_s": 16.645,
+      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/serial/raven-zero-window.log",
+      "duration_s": 15.583,
       "exit": 0,
       "log": "logs/matrix-raven-zero-window.log",
       "pcap": "pcaps/raven-zero-window.pcap",
@@ -101,8 +101,8 @@
       "target": "raven"
     },
     {
-      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/serial/raven-window-update.log",
-      "duration_s": 13.531,
+      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/serial/raven-window-update.log",
+      "duration_s": 13.955,
       "exit": 0,
       "log": "logs/matrix-raven-window-update.log",
       "pcap": "pcaps/raven-window-update.pcap",
@@ -112,8 +112,8 @@
       "target": "raven"
     },
     {
-      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/serial/raven-retransmit.log",
-      "duration_s": 10.239,
+      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/serial/raven-retransmit.log",
+      "duration_s": 11.639,
       "exit": 0,
       "log": "logs/matrix-raven-retransmit.log",
       "pcap": "pcaps/raven-retransmit.pcap",
@@ -123,8 +123,8 @@
       "target": "raven"
     },
     {
-      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T052241Z/serial/raven-fin-rst.log",
-      "duration_s": 16.527,
+      "detail": "net-conformance: serial=/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T053533Z/serial/raven-fin-rst.log",
+      "duration_s": 11.181,
       "exit": 0,
       "log": "logs/matrix-raven-fin-rst.log",
       "pcap": "pcaps/raven-fin-rst.pcap",
