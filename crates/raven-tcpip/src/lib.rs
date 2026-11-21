@@ -56,6 +56,7 @@ mod neighbor;
 mod observability;
 mod plpmtud_live;
 mod pmtu;
+mod rack_hpts;
 mod readiness;
 mod reassembly;
 mod recovery;
@@ -109,6 +110,11 @@ pub use pmtu::{
     IPV4_FLOOR, IPV6_FLOOR, IpFamily, MssUpdate, MtuCache, Plpmtud, PlpmtudState, TCP_MINMSS,
     TCP_MSS_DEFAULT, floor_for, mss_headers, mss_update, mssopt, next_pmtu, next_pmtu6,
     on_icmp_frag_needed, on_icmp6_frag_needed, probe_sequence,
+};
+pub use rack_hpts::{
+    HPTS_USECS_PER_SLOT, HptsCallback, NUM_OF_HPTSI_SLOTS, PACE_TMR_DELACK, PACE_TMR_KEEP,
+    PACE_TMR_MASK, PACE_TMR_PERSIT, PACE_TMR_RACK, PACE_TMR_RXT, PACE_TMR_TLP, RackHpts,
+    RackTimeout, hpts_usec_to_slots, rack_timeout_action,
 };
 pub use readiness::Readiness;
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
