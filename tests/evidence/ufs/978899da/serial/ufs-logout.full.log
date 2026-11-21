@@ -1,0 +1,159 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: failed to load Boot0002 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0): Not Found
+BdsDxe: loading Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 24 regions
+frames: base=256 count=131072 free=114755 reserved=16317
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2699 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 978899da 2026-11-21
+mem: 448 MiB usable in 6 regions
+cmdline: console=ttyS0 loglevel=info
+process: starting /init
+process: /init entry=0x41a890 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod blockd fsd-ufs vfsd
+svcd: logd up
+svcd: logd timing: generation=1 start=121 spawn=131 first_poll=134 deadline=5131 stalled=0 ready_at=154
+pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:03.0 vendor=0x1af4 device=0x1042 class=0x01 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+pcid: devices=7
+svcd: pcid up
+svcd: pcid timing: generation=1 start=128 spawn=142 first_poll=155 deadline=60142 stalled=0 ready_at=184
+rtc: 2026-11-21 16:56:56 (epoch 1795280216s)
+1795280216.248 nulld: started
+1795280216.252 ramfsd: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=209 spawn=219 first_poll=224 deadline=5219 stalled=0 ready_at=257
+1795280216.259 initfsd: started
+1795280216.261 randd: started
+svcd: randd up
+svcd: randd timing: generation=1 start=224 spawn=237 first_poll=241 deadline=5237 stalled=0 ready_at=264
+1795280216.264 zerod: started
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=218 spawn=224 first_poll=233 deadline=5224 stalled=0 ready_at=271
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=192 spawn=207 first_poll=209 deadline=120207 stalled=0 ready_at=271
+svcd: zerod up
+svcd: zerod timing: generation=1 start=233 spawn=240 first_poll=241 deadline=5240 stalled=0 ready_at=274
+devd: devices=7
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: matched 00:03.0 vendor=0x1af4 device=0x1042 irq_line=11 irq_pin=1
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix vector=64 table=0x0 bar=1
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=0
+virtio-net: msix table=0x0 bar=1 vector=1
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+devd: driver virtio-blk bar=4 size=16384
+devd: driver virtio-blk dma bus=0x180000 len=65536
+devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=5
+devd: driver virtio-blk msix vector=65 table=0x0 bar=1
+virtio-blk: id=1af4:1042
+virtio-blk: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-blk: msix table=0x0 bar=1 vector=1
+virtio-blk: capacity=524355 sector_size=512 ro=0
+virtio-blk: features=0x00000200 version1=1
+virtio-blk: queue0 size=8 notify=0x0
+virtio-blk: dma bus=0x180000 len=65536 irq=0
+virtio-blk: registered disk
+svcd: devd up
+svcd: devd timing: generation=1 start=189 spawn=202 first_poll=205 deadline=60202 stalled=0 ready_at=332
+blockd: remote disk=disk:0 sectors=524355 ro=0
+blockd: gpt ok partitions=1
+blockd: part 1 ufs-root 34..524321
+1795280216.383 blockd: started
+svcd: blockd up
+svcd: blockd timing: generation=1 start=333 spawn=340 first_poll=343 deadline=60340 stalled=0 ready_at=388
+fsd-ufs: mounted block:0 partition 1 as ufs: (268435456 bytes)
+fsd-ufs: repaired 1 findings on block:0
+fsd-ufs: mode=rw journal=none
+1795280246.315 fsd-ufs: started
+svcd: fsd-ufs up
+svcd: fsd-ufs timing: generation=1 start=390 spawn=397 first_poll=398 deadline=60397 stalled=0 ready_at=30326
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=30328 spawn=30331 first_poll=30333 deadline=90331 stalled=0 ready_at=30348
+svcd: root pivoted to UFS at /
+svcd: root services=13 added=4
+svcd: service plan: logd pcid consd devd initfsd netd nulld ramfsd randd sysd zerod blockd vfsd fsd-ufs getty resolvd
+svcd: consd up
+svcd: consd timing: generation=1 start=30518 spawn=30566 first_poll=30567 deadline=90566 stalled=0 ready_at=30569
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: interface eth0 10.0.2.15/24
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+svcd: netd timing: generation=1 start=30572 spawn=30874 first_poll=30876 deadline=90874 stalled=0 ready_at=30935
+1795280246.994 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=30940 spawn=30991 first_poll=30992 deadline=35991 stalled=0 ready_at=30998
+resolvd: wrote file:/etc/resolv.conf
+resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199842ms rebind=75599842ms expires=86399842ms
+resolvd: resolv.conf=nameserver 10.0.2.3
+1795280247.161 resolvd: started
+svcd: resolvd up
+svcd: resolvd timing: generation=1 start=31002 spawn=31081 first_poll=31085 deadline=91081 stalled=0 ready_at=31165
+svcd: all services up
+svcd: getty up
+RavenBSD 0.1 (x86_64) (tty:console)
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# eraven# exraven# exiraven# exitraven# exit
+exit
+RavenBSD 0.1 (x86_64) (tty:console)
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# exitraven# exitraven# exitraven# exitraven# exit
+exit
+RavenBSD 0.1 (x86_64) (tty:console)
+login: 
