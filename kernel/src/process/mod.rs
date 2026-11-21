@@ -301,6 +301,14 @@ pub struct Process {
     pub limits: Mutex<[Rlimit; RLIMIT_COUNT]>,
     /// Process start time in nanoseconds.
     pub start_ns: u64,
+    /// Last syscall number entered by a thread of this process (K391 diagnostic).
+    pub last_syscall: AtomicU64,
+    /// User PC at the last syscall entry of this process (K391 diagnostic).
+    pub last_pc: AtomicU64,
+    /// Blocking token of the last blocked thread of this process (K391 diagnostic).
+    pub wait_object: AtomicU64,
+    /// Number of threads of this process currently inside a syscall (K391 diagnostic).
+    pub in_syscall: AtomicU32,
     /// Accumulated kernel/syscall time.
     pub system_ns: AtomicU64,
     /// Accumulated user time (not sampled yet; zero).
@@ -455,6 +463,10 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(default_limits()),
         start_ns: 0,
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -520,6 +532,10 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(limits),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -578,6 +594,10 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         reaped: AtomicBool::new(false),
         limits: Mutex::new(limits),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -870,6 +890,10 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(default_limits()),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),

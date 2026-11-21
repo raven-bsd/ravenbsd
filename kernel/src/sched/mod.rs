@@ -627,6 +627,21 @@ pub fn yield_now() {
 }
 
 /// Sleep until the monotonic `deadline`; returns 0 or `-ETIMEDOUT`.
+/// Clear the process-level diagnostic token if it still names this thread's block.
+///
+/// A process can have several blocked threads; comparing before clearing keeps another
+/// thread's more recent token intact. Single-threaded servers then read `wait_object != 0` as
+/// "currently blocked" (K391 diagnostic).
+fn note_unblock(current: &Thread) {
+    let token = current.block_token.load(Ordering::SeqCst);
+    let _ = current.process.wait_object.compare_exchange(
+        token,
+        0,
+        Ordering::Relaxed,
+        Ordering::Relaxed,
+    );
+}
+
 pub fn sleep_until(deadline: u64) -> isize {
     if !INITIALIZED.load(Ordering::Acquire) {
         return 0;
@@ -664,15 +679,21 @@ pub fn sleep_until(deadline: u64) -> isize {
     }
     current.interruptible.store(true, Ordering::SeqCst);
     current.set_state(ThreadState::Blocked);
+    current
+        .process
+        .wait_object
+        .store(current.block_token.load(Ordering::SeqCst), Ordering::Relaxed);
     if current.pending_wake.swap(false, Ordering::SeqCst) {
         cancel_sleep(token);
         current.set_state(ThreadState::Running);
+        note_unblock(&current);
         current.interruptible.store(false, Ordering::SeqCst);
         return current.wake_status.load(Ordering::SeqCst) as isize;
     }
     if kick_pending(&current) {
         cancel_sleep(token);
         current.set_state(ThreadState::Running);
+        note_unblock(&current);
         current.interruptible.store(false, Ordering::SeqCst);
         return Errno::EINTR.to_ret();
     }
@@ -682,6 +703,7 @@ pub fn sleep_until(deadline: u64) -> isize {
     if current.process.exiting.load(Ordering::Acquire) {
         exit_thread(0);
     }
+    note_unblock(&current);
     current.interruptible.store(false, Ordering::SeqCst);
     if kick_pending(&current) {
         return Errno::EINTR.to_ret();
@@ -807,13 +829,19 @@ pub fn block_current() -> isize {
         return Errno::EINTR.to_ret();
     }
     current.set_state(ThreadState::Blocked);
+    current
+        .process
+        .wait_object
+        .store(current.block_token.load(Ordering::SeqCst), Ordering::Relaxed);
     if current.pending_wake.swap(false, Ordering::SeqCst) {
         current.set_state(ThreadState::Running);
+        note_unblock(&current);
         current.interruptible.store(false, Ordering::SeqCst);
         return current.wake_status.load(Ordering::SeqCst) as isize;
     }
     if current.interruptible.load(Ordering::Acquire) && kick_pending(&current) {
         current.set_state(ThreadState::Running);
+        note_unblock(&current);
         current.interruptible.store(false, Ordering::SeqCst);
         return Errno::EINTR.to_ret();
     }
@@ -823,6 +851,7 @@ pub fn block_current() -> isize {
     if current.process.exiting.load(Ordering::Acquire) {
         exit_thread(0);
     }
+    note_unblock(&current);
     current.interruptible.store(false, Ordering::SeqCst);
     if kick_pending(&current) {
         return Errno::EINTR.to_ret();

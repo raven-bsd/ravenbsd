@@ -85,6 +85,39 @@ static LAT: [[[AtomicU64; ITERATIONS]; OP_COUNT]; FILE_WORKERS] =
     [const { [const { [const { AtomicU64::new(0) }; ITERATIONS] }; OP_COUNT] }; FILE_WORKERS];
 static MOUNT_LAT: [[AtomicU64; ITERATIONS]; MOUNT_WORKERS] =
     [const { [const { AtomicU64::new(0) }; ITERATIONS] }; MOUNT_WORKERS];
+static VFSD_PID: AtomicU64 = AtomicU64::new(0);
+static RAMFSD_PID: AtomicU64 = AtomicU64::new(0);
+
+const PROC_PID_INFO: usize = 0x3A;
+const PROC_HANDLE_INFO: usize = 0x3E;
+const PROC_INFO_WORDS: usize = 47;
+
+fn handle_pid(handle: Handle) -> Option<u64> {
+    // SAFETY: PROC_HANDLE_INFO reads one scalar from the live handle value.
+    let result = unsafe { sys::syscall1(PROC_HANDLE_INFO, handle.0 as usize) };
+    (result >= 0).then(|| u64::try_from(result).unwrap_or(0))
+}
+
+fn dump_proc_info(label: &str, pid: u64) {
+    let mut words = [0u64; PROC_INFO_WORDS];
+    // SAFETY: the kernel writes at most PROC_INFO_WORDS u64 words to this live array.
+    let result = unsafe {
+        sys::syscall3(
+            PROC_PID_INFO,
+            pid as usize,
+            words.as_mut_ptr() as usize,
+            PROC_INFO_WORDS,
+        )
+    };
+    if result < 0 {
+        println!("smp-fs: proc-info {label} pid={pid} error={result}");
+        return;
+    }
+    println!(
+        "smp-fs: proc-info {label} pid={pid} state={} runnable={} syscall={:#x} pc={:#x} wait={:#x} in_syscall={}",
+        words[41], words[42], words[43], words[44], words[45], words[46]
+    );
+}
 
 #[repr(align(16))]
 struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);
@@ -566,8 +599,15 @@ fn start_services() -> Result<(), String> {
         } else {
             &[]
         };
-        spawn(&initfs, path, &SpawnOptions { args: &[], env })
+        let handle = spawn(&initfs, path, &SpawnOptions { args: &[], env })
             .map_err(|_| format!("spawn {path}"))?;
+        if let Some(pid) = handle_pid(handle) {
+            match path {
+                "/sbin/ramfsd" => RAMFSD_PID.store(pid, Ordering::Release),
+                "/sbin/vfsd" => VFSD_PID.store(pid, Ordering::Release),
+                _ => {}
+            }
+        }
         let scheme = match path {
             "/sbin/initfsd" => "initfs:",
             "/sbin/ramfsd" => "ramfs:",
@@ -676,6 +716,9 @@ fn start_workers() -> Result<(), String> {
 }
 
 fn dump_vfs_diagnostics() {
+    dump_proc_info("vfsd", VFSD_PID.load(Ordering::Acquire));
+    dump_proc_info("ramfsd", RAMFSD_PID.load(Ordering::Acquire));
+    dump_proc_info("self", 0);
     println!("smp-fs: diag request start");
     let _ = fs::open(&file_path("__diag__"), O_RDONLY);
     println!("smp-fs: diag request done");

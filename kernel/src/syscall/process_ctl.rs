@@ -166,8 +166,8 @@ pub const PROC_SETCRED: usize = 0x38;
 pub const PROC_PID_INFO: usize = 0x3A;
 /// Raw `proc_set_command(proc, name, len) -> 0` number (P2o).
 pub const PROC_SET_COMMAND: usize = 0x45;
-/// Maximum `PROC_PID_INFO` words: eight identity words plus a 256-byte name and NUL.
-pub const PROC_INFO_MAX_WORDS: usize = 41;
+/// Maximum `PROC_PID_INFO` words: eight identity words, a 256-byte name, and six K391 words.
+pub const PROC_INFO_MAX_WORDS: usize = 47;
 /// Raw `proc_setcred_ex(which, a, b, c, groups, count) -> 0` number.
 pub const PROC_SETCRED_EX: usize = 0x3B;
 /// Raw `proc_cred_info(out, count) -> 0` number.
@@ -236,7 +236,8 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
     }
     if count > 8 {
         let command = target.command.lock();
-        let capacity = length.saturating_sub(64).saturating_sub(1);
+        // The name area stays at byte 64; the K391 diagnostic words start at byte 328.
+        let capacity = length.saturating_sub(64).saturating_sub(1).min(256);
         let mut end = 0usize;
         for (index, character) in command.char_indices() {
             let next = index.saturating_add(character.len_utf8());
@@ -250,6 +251,33 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
             command.as_bytes().get(..end),
         ) {
             slot.copy_from_slice(source);
+        }
+    }
+    if count >= PROC_INFO_MAX_WORDS {
+        let state = match *target.state.lock() {
+            ProcessState::Created => 0u64,
+            ProcessState::Running => 1u64,
+            ProcessState::Exited => 2u64,
+        };
+        let runnable = u64::from(
+            target.threads.load(Ordering::Acquire) > 0
+                && !target.exiting.load(Ordering::Acquire),
+        );
+        let diagnostics = [
+            state,
+            runnable,
+            target.last_syscall.load(Ordering::Relaxed),
+            target.last_pc.load(Ordering::Relaxed),
+            target.wait_object.load(Ordering::Relaxed),
+            u64::from(target.in_syscall.load(Ordering::Relaxed)),
+        ];
+        for (chunk, value) in bytes
+            .get_mut(328..376)
+            .ok_or(Errno::EINVAL)?
+            .chunks_exact_mut(8)
+            .zip(diagnostics)
+        {
+            chunk.copy_from_slice(&value.to_le_bytes());
         }
     }
     Ok(bytes)
