@@ -32,7 +32,7 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs demo soak-smoke soak-24h \
+	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs demo demo-build soak-smoke soak-24h \
 	tcp-soak-smoke tcp-soak-24h
 
 help:
@@ -115,6 +115,10 @@ qemu-ufs:
 
 # Owner demo: build the one-disk UFS image and boot it interactively on the real K194 tap.
 demo: qemu-ufs
+
+# Rebuild the one-disk UFS demo image from a clean tree without booting it.
+demo-build:
+	@sh scripts/qemu-ufs.sh --build-only
 
 soak-smoke:
 	@sh scripts/soak.sh --duration $(SOAK_SECONDS) --interval $(SOAK_INTERVAL) --profile $(SOAK_PROFILE)
