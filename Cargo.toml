@@ -322,6 +322,7 @@ members = [
     "tests/rack-loss-model",
     "tests/rack-bbr-model",
     "tests/rack-vtable-model",
+    "tests/rack-sack-matrix",
     "tests/rack-audit-models",
     "tests/rack-output-matrix",
     "tests/rack-audit-log-bbr",

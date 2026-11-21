@@ -1137,6 +1137,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rack-sack-matrix"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
 name = "rack-sockopt"
 version = "0.1.0"
 dependencies = [
