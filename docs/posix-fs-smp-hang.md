@@ -78,7 +78,26 @@ to the kernel/owner rather than guessing a kernel patch.
 | S113 TLB repro | 10/10 PASS, `tlb_stale=0`, worst 4.98 s |
 | 20/20 TCG4 green | **not achieved**; the stall is intermittent |
 
-## 6. Gaps
+## 6. Stall diagnostic run (rework 1)
+
+The fixture now dumps `file:__diag__` on a stall; `vfsd` records a bounded 16-entry op ring and
+prints it on that path. A hard stall was captured at low load (start 8.8, end 11.0):
+
+```text
+smp-fs: progress finished=0/8 pending=["0:23:26", "1:24:26", "2:24:26", "3:24:26", "4:37:36", ...]
+smp-fs: diag request start
+```
+
+The diagnostic request itself never completes, and the vfsd serial has no further `vfsd:` or
+`vfsd-diag:` line after startup. All file workers are stopped in mmap phases (23/24) and the mount
+workers in mount phases (37/38). Because vfsd is a single-threaded server, the queued diagnostic
+open cannot be served while its active handler is blocked; this classifies the visible state as
+**vfsd/ramfsd reply missing or vfsd blocked in a forwarded `file:` call**, not a fixture deadline
+and not a TLB event. The exact last forwarded request (mount/umount vs mmap/read) and the kernel
+wait queue of the blocked thread are still not captured; the vfsd ring is written but cannot be
+printed from the stuck server.
+
+## 7. Gaps
 
 * A stall was not captured with `VFSD_TRACE`; the last vfsd request during the stop is still
   missing. Need a trace-enabled run that stalls, or a kernel-side wait-queue dump for the stuck

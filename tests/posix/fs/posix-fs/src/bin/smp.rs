@@ -675,6 +675,12 @@ fn start_workers() -> Result<(), String> {
     }
 }
 
+fn dump_vfs_diagnostics() {
+    println!("smp-fs: diag request start");
+    let _ = fs::open(&file_path("__diag__"), O_RDONLY);
+    println!("smp-fs: diag request done");
+}
+
 fn wait_workers() -> Result<(), String> {
     let deadline = now_ns().saturating_add(WORKER_DEADLINE_NS);
     let mut next_progress = now_ns().saturating_add(WORKER_PROGRESS_NS);
@@ -687,6 +693,7 @@ fn wait_workers() -> Result<(), String> {
         let now = now_ns();
         if now > deadline {
             let pending = pending_workers();
+            dump_vfs_diagnostics();
             return Err(format!("worker timeout pending={pending:?}"));
         }
         for slot in 0..WORKERS {
@@ -700,6 +707,7 @@ fn wait_workers() -> Result<(), String> {
                 last_seen[slot] = now;
             } else if now.saturating_sub(last_seen[slot]) > WORKER_STALL_NS {
                 let pending = pending_workers();
+                dump_vfs_diagnostics();
                 return Err(format!(
                     "worker stall slot={slot} state={state:#x} pending={pending:?}"
                 ));
