@@ -314,6 +314,7 @@ members = [
     "tests/rack-loss-model",
     "tests/rack-bbr-model",
     "tests/rack-vtable-model",
+    "tests/rack-replay",
     "tests/tcpip/conformance",
     "tests/tcpip/fuzz-replay",
     "tests/tcpip/interop",
