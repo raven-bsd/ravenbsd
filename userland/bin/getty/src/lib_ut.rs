@@ -207,13 +207,8 @@ fn an_unknown_autologin_account_falls_back_to_the_prompt() {
 }
 
 #[test]
-fn the_banner_names_the_target_arch() {
-    #[cfg(target_arch = "x86_64")]
-    assert!(BANNER.contains("x86_64"));
-    #[cfg(target_arch = "aarch64")]
-    assert!(BANNER.contains("aarch64"));
-    #[cfg(target_arch = "riscv64")]
-    assert!(BANNER.contains("riscv64"));
+fn getty_does_not_repeat_the_init_boot_banner() {
+    assert_eq!(BANNER, "", "init owns the styled boot screen");
 }
 
 #[test]

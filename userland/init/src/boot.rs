@@ -394,33 +394,56 @@ fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) ->
 
 /// Print the concise boot report and the health marker before the login starts.
 fn print_boot_report(core: &Arc<Mutex<Core>>, skip: usize) {
-    let (up, failed) = {
+    let (up, failed, rows) = {
         let guard = core.lock();
         let mut up = 0usize;
         let mut failed = 0usize;
+        let mut rows = Vec::new();
+        let now = now_ms();
         for (index, service) in guard.supervisor.services().iter().enumerate() {
             if !service.enable || index == skip {
                 continue;
             }
-            let ready = guard
-                .supervisor
-                .runtime()
-                .get(index)
-                .is_some_and(|runtime| {
-                    runtime.state == State::Running
-                        || (service.restart == Restart::Never && !service.required)
-                });
+            let runtime = guard.supervisor.runtime().get(index);
+            let ready = runtime.is_some_and(|runtime| {
+                runtime.state == State::Running
+                    || (service.restart == Restart::Never && !service.required)
+            });
             if ready {
                 up = up.saturating_add(1);
             } else {
                 failed = failed.saturating_add(1);
             }
+            let elapsed_ms = runtime
+                .map(|runtime| {
+                    let started = runtime.ready_timing.start_ms.unwrap_or(now);
+                    runtime
+                        .ready_timing
+                        .finished_ms
+                        .unwrap_or(now)
+                        .saturating_sub(started)
+                })
+                .unwrap_or(0);
+            let status = if ready {
+                crate::bootscreen::Status::Ok
+            } else if service.required {
+                crate::bootscreen::Status::Fail
+            } else {
+                crate::bootscreen::Status::Warn
+            };
+            rows.push(crate::bootscreen::Row {
+                elapsed_ms,
+                name: service.name.clone(),
+                status,
+            });
         }
-        (up, failed)
+        (up, failed, rows)
     };
-    if failed == 0 {
-        raven_rt::println!("svcd: all services up");
-    } else {
+    raven_rt::print!(
+        "{}",
+        crate::bootscreen::render(boot_arch(), &rows, boot_color())
+    );
+    if failed > 0 {
         raven_rt::println!("svcd: boot report: {up} up, {failed} failed");
     }
     let (health_due, health) = {
@@ -441,6 +464,25 @@ fn print_boot_report(core: &Arc<Mutex<Core>>, skip: usize) {
             }
         }
     }
+}
+
+fn boot_arch() -> &'static str {
+    #[cfg(target_arch = "x86_64")]
+    {
+        "x86_64"
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        "aarch64"
+    }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        "unknown"
+    }
+}
+
+fn boot_color() -> bool {
+    !crate::bootscreen::plain_requested()
 }
 
 /// Select the bootstrap services and every dependency they need by service name or scheme.
