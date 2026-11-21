@@ -3,11 +3,15 @@
 
 # Typed kernel statistics (KSTAT1)
 
-Status: **OBSERVED** by `cargo nextest run -p raven-kstat` and the `kstat` qtest. The typed
-record, stable naming, bounded snapshot and human/NDJSON tool are implemented. The first consumer
-is the existing DTrace per-CPU ring statistics read through the bounded `DTRACE_STATS` syscall
-(0x94). The scheduler/IPC/VM/console kernel provider remains an open gap because
-`kernel/src/main.rs` and `kernel/src/syscall` are outside KSTAT1's Owns.
+Status: **DONE** — OBSERVED by `cargo nextest run -p raven-kstat`, the `kstat` and
+`trace-context` qtests, and the measured 900 s `make check-fast` run. The typed record, stable
+naming, bounded snapshot and human/NDJSON tool are implemented. The first consumer is the existing
+DTrace per-CPU ring statistics read through the bounded `DTRACE_STATS` syscall (0x94).
+
+Effective Owns for this ticket: the ticket's `kernel/src/kstat/**`, `crates/raven-kstat/**`,
+`userland/bin/kstat/**`, `tests/qtest/cases/kstat*` and `docs/kstat.md`, plus
+`docs/man1/kstat.1` (added for the docs gate). The scheduler/IPC/VM/console console-consumer
+provider is a **named follow-up**, not an edit in KSTAT1: see the follow-up section below.
 
 ## Schema
 
@@ -66,14 +70,30 @@ against the header contract (recorded divergence). New files are first-party BSD
 carry the SPDX header; no `PROVENANCE.toml` import entry is needed because no donor source was
 copied.
 
+## Follow-up (named, not an edit)
+
+The scheduler/IPC/VM/console console-consumer provider is not part of KSTAT1. It needs a kernel
+hook and the public counter calls:
+
+* `kernel/src/main.rs` (`mod kstat;`);
+* `kernel/src/syscall/mod.rs` (dispatch; or an extension of `kernel/src/syscall/dtrace.rs`);
+* `kernel/src/sched/mod.rs` (`switches()`);
+* `kernel/src/ipc/capture.rs` (`slot_stats()`);
+* `kernel/src/memory/frame.rs` (`stats()`);
+* `kernel/src/console.rs` (`dropped()`).
+
+The shared `kernel/src/kstat/mod.rs` model is ready; the follow-up wires these as providers
+without changing the already-tested DTrace consumer.
+
 ## Running
 
 ```sh
 timeout 120 cargo nextest run -p raven-kstat
 timeout 120 cargo xtask qtest --case kstat --arch x86_64
 timeout 90 cargo xtask qtest --case trace-context --arch x86_64
-timeout 240 make check-fast
+timeout 900 make check-fast
 ```
 
-The report with the raw qtest counts, the read-cost measurement, mutation evidence and the
-scheduler/IPC/VM/console gap is `tickets/tim/reports/KSTAT1.md`.
+The report with the raw qtest counts, the read-cost measurement, the measured 900 s check-fast
+result, mutation evidence and the named console-consumer follow-up is
+`tickets/tim/reports/KSTAT1.md`.
