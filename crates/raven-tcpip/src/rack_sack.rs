@@ -23,58 +23,22 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::RackStack;
+use crate::rack_types::{
+    RACK_ACKED, RACK_RWND_COLLAPSED, RACK_SACK_PASSED, RACK_WAS_LOST, RACK_WAS_SACKPASS,
+    RackSendmap,
+};
 use crate::rack_vtable::RackPortState;
 use crate::seq::{seq_ge, seq_gt, seq_le, seq_lt};
 
 /// FreeBSD `RACK_DSACK_HANDLING`.
 pub const RACK_DSACK_HANDLING: u32 = 64;
 
-/// `RACK_ACKED`.
-pub const RACK_ACKED: u32 = 0x01;
-/// `RACK_SACK_PASSED`.
-pub const RACK_SACK_PASSED: u32 = 0x02;
-/// `RACK_WAS_SACKPASS`.
-pub const RACK_WAS_SACKPASS: u32 = 0x04;
-/// `RACK_WAS_LOST`.
-pub const RACK_WAS_LOST: u32 = 0x08;
-/// `RACK_RWND_COLLAPSED`.
-pub const RACK_RWND_COLLAPSED: u32 = 0x10;
-
-/// One entry in the range sendmap (`struct rack_sendmap` subset).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SackSegment {
-    /// First sequence byte.
-    pub start: u32,
-    /// One past the last sequence byte.
-    pub end: u32,
-    /// Last transmission time in microseconds.
-    pub last_sent_us: u32,
-    /// Retransmission count.
-    pub rtr_cnt: u8,
-    /// `r_flags` subset.
-    pub flags: u32,
-}
-
-impl SackSegment {
-    /// Number of sequence bytes in the range.
-    #[must_use]
-    pub const fn len(&self) -> u32 {
-        self.end.wrapping_sub(self.start)
-    }
-
-    /// Whether the range is empty.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.start == self.end
-    }
-}
-
 /// The K336 SACK/DSACK context over the K313/K314/K318 types.
 pub struct RackSack {
     /// K318 stack/vtable context (contains the K314 OS and K313 HPTS/pacing state).
     pub stack: RackStack,
     /// Range sendmap keyed by `r_start`.
-    pub sendmap: BTreeMap<u32, SackSegment>,
+    pub sendmap: BTreeMap<u32, RackSendmap>,
     /// SACKed ranges, sorted/merged.
     pub sacked_ranges: Vec<(u32, u32)>,
     /// `rack_sf` SACK-filter ranges.
@@ -152,16 +116,9 @@ impl RackSack {
     /// Insert a sendmap range (test/oracle setup helper).
     pub fn insert_segment(&mut self, start: u32, end: u32, last_sent_us: u32, rtr_cnt: u8) {
         if seq_lt(start, end) {
-            self.sendmap.insert(
-                start,
-                SackSegment {
-                    start,
-                    end,
-                    last_sent_us,
-                    rtr_cnt,
-                    flags: 0,
-                },
-            );
+            let mut segment = RackSendmap::new(start, end, u64::from(last_sent_us));
+            segment.rtr_cnt = rtr_cnt;
+            self.sendmap.insert(start, segment);
         }
     }
 
@@ -219,7 +176,7 @@ impl RackSack {
                 continue;
             }
             if segment.flags & RACK_WAS_LOST == 0
-                && segment.last_sent_us.saturating_add(threshold) <= cts
+                && (segment.last_sent() as u32).saturating_add(threshold) <= cts
             {
                 segment.flags |= RACK_WAS_LOST;
                 lost = lost.saturating_add(segment.len());
@@ -272,14 +229,14 @@ impl RackSack {
                 segment.end
             };
             if seq_lt(segment.start, split_start) {
-                let head = SackSegment {
+                let head = RackSendmap {
                     start: segment.start,
                     end: split_start,
                     ..segment
                 };
                 self.sendmap.insert(head.start, head);
             }
-            let mut acked = SackSegment {
+            let mut acked = RackSendmap {
                 start: split_start,
                 end: split_end,
                 ..segment
@@ -287,7 +244,7 @@ impl RackSack {
             acked.flags |= RACK_ACKED;
             self.sendmap.insert(acked.start, acked);
             if seq_lt(split_end, segment.end) {
-                let tail = SackSegment {
+                let tail = RackSendmap {
                     start: split_end,
                     end: segment.end,
                     flags: segment.flags & !(RACK_ACKED | RACK_SACK_PASSED),
@@ -358,7 +315,7 @@ impl RackSack {
                 freed = freed.saturating_add(segment.len());
             } else if seq_lt(segment.start, th_ack) {
                 self.sendmap.remove(&key);
-                let trimmed = SackSegment {
+                let trimmed = RackSendmap {
                     start: th_ack,
                     ..segment
                 };
