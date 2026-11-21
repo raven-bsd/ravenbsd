@@ -69,6 +69,7 @@ mod stack;
 mod syncache;
 mod table;
 mod tcp_data;
+mod tcp_notify;
 mod tcp_state;
 mod tcp_timer;
 mod time;
@@ -116,6 +117,7 @@ pub use table::{
     ConnectionKey, ConnectionTable, ListenerKey, ListenerTable, PortAllocator, Rebind,
     TimeWaitTable, rebind_decision,
 };
+pub use tcp_notify::{TcpNotify, TcpNotifyOutcome, TcpStateChange};
 pub use tcp_state::TcpState;
 pub use time::{Duration, Instant};
 
