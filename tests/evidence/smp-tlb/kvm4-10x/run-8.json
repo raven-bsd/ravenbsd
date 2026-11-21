@@ -1,0 +1,24 @@
+{
+  "case": "posix-fs-smp-kvm4",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 30998,
+  "exit_status": 33,
+  "matched": [
+    "^smp: 4 cpus online$",
+    "^smp-fs: services ok$",
+    "^smp-fs: setup ok$",
+    "^smp-fs: latency create_us p50=\\d+ p90=\\d+ max=\\d+$",
+    "^smp-fs: latency write_us p50=\\d+ p90=\\d+ max=\\d+$",
+    "^smp-fs: latency read_us p50=\\d+ p90=\\d+ max=\\d+$",
+    "^smp-fs: latency rename_us p50=\\d+ p90=\\d+ max=\\d+$",
+    "^smp-fs: latency mmap_us p50=\\d+ p90=\\d+ max=\\d+$",
+    "^smp-fs: latency unlink_us p50=\\d+ p90=\\d+ max=\\d+$",
+    "^smp-fs: latency mount_us p50=\\d+ p90=\\d+ max=\\d+$",
+    "^smp-fs: race successes=50/50$",
+    "^smp-fs: done workers=8 iterations=50$",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}

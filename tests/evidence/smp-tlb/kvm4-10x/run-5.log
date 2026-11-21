@@ -1,0 +1,51 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=114541 reserved=16531
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: xsave 576 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (x2apic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2795 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: xsave 576 bytes
+fpu: xsave 576 bytes
+fpu: xsave 576 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 0b3bb7d1f 2026-11-21
+mem: 447 MiB usable in 7 regions
+cmdline: console=ttyS0 test-exit=1 smp_user=on
+process: starting /init
+process: /init entry=0x407090 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+rtc: 2026-11-21 22:31:29 (epoch 1795300289s)
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: skipped /dev/null on null:: timed out
+vfsd: skipped /dev/zero on zero:: timed out
+vfsd: skipped /dev/random on rand:: timed out
+smp-fs: services ok
+smp-fs: setup ok
+smp-fs: workers started workers=8
+smp-fs: progress finished=0/8 pending=["0:16", "1:40", "2:40", "3:40", "4:32", "5:32", "6:32", "7:32"]
+smp-fs: latency create_us p50=4311 p90=6913 max=11465
+smp-fs: latency write_us p50=6012 p90=9555 max=12148
+smp-fs: latency read_us p50=15723 p90=23617 max=37972
+smp-fs: latency rename_us p50=14674 p90=20808 max=184543
+smp-fs: latency mmap_us p50=48864 p90=68536 max=86204
+smp-fs: latency unlink_us p50=11862 p90=16644 max=22474
+smp-fs: latency mount_us p50=93283 p90=144814 max=267403
+smp-fs: race successes=50/50
+smp-fs: done workers=8 iterations=50
+smp-fs: ok
+init exited (0)

@@ -116,6 +116,30 @@ test with `duplicate NMI acknowledged a stale shootdown`. The merged entry itsel
 the tests are the K393 deliverable. The pinned targets are settled briefly before the next
 target is queued on the same CPU; that is test sequencing, not product behaviour.
 
+## K407: KVM4 10x reliability sample
+
+Clean-build sample on the merged tree `0b3bb7d1f` (kernel banner has no `-dirty` suffix), KVM
+`-smp 4`, ten runs of `posix-fs-smp-kvm4`:
+
+| Run | Exit | Duration s | Host load1 | TLB/fault lines |
+|---:|---:|---:|---:|---:|
+| 1 | 0 | 32 | 18.77 | 0 |
+| 2 | 0 | 49 | 16.13 | 0 |
+| 3 | 0 | 28 | 21.47 | 0 |
+| 4 | 0 | 32 | 16.21 | 0 |
+| 5 | 0 | 34 | 15.54 | 0 |
+| 6 | 0 | 32 | 16.43 | 0 |
+| 7 | 0 | 30 | 14.42 | 0 |
+| 8 | 0 | 32 | 13.68 | 0 |
+| 9 | 0 | 46 | 16.89 | 0 |
+| 10 | 0 | 30 | 21.26 | 0 |
+
+**10/10 pass**, p50 32 s, p90 46 s, max 49 s. Every serial has `race successes=50/50`,
+`done workers=8 iterations=50` and `init exited (0)`; none has a `tlb`, `panic`, `EXCEPTION` or
+`smp-fs: failed` line. This extends the single KVM4 pass in the S159 matrix to a ten-run sample
+on the merged tree. Artifacts: `tests/evidence/smp-tlb/kvm4-10x/` (`meta.tsv`, `SHA256SUMS`,
+per-run serial and JSON).
+
 ## Donor reconciliation
 
 The TLB completion protocol is from NetBSD `sys/arch/x86/x86/x86_tlb.c`
