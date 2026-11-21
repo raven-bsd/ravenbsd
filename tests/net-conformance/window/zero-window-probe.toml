@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "zero-window-probe"
+harness = "zero-window"
+donor = [
+  "FreeBSD sys/netinet/tcp_output.c: tcp_output persist gate (sendwin == 0)",
+  "FreeBSD sys/netinet/tcp_timer.c: tcp_timer_persist (probe scheduling)",
+]
+rfcs = ["RFC 9293 section 3.8.6.1 (zero-window probe)", "RFC 9293 section 3.7 (window updates)"]
+
+[[expect]]
+step = "peer advertises a zero window after the handshake"
+packet = "ACK"
+assert = "ack=server_isn+1, window=0"
+
+[[expect]]
+step = "server sends a persist/window probe without accepting new data"
+packet = "probe"
+assert = "zero-length walk at server_isn or one data byte at server_isn+1"
+
+[[expect]]
+step = "peer reopens the window"
+packet = "ACK"
+assert = "ack=server_isn+1, window != 0"
+
+[[expect]]
+step = "server resumes at the probe point, not before it"
+packet = "data"
+assert = "one 44-byte segment; seq=server_isn+1 after a 0B walk; probe byte + remaining 43 bytes after a 1B probe; no replay"
