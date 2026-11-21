@@ -70,7 +70,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 300
+timeout_secs = 120
 
 [[step]]
 send = "/bin/df -h /\n"
