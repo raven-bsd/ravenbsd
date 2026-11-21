@@ -60,6 +60,7 @@ mod rack_hpts;
 mod rack_log;
 mod rack_misc;
 mod rack_os;
+mod rack_output;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -132,6 +133,7 @@ pub use rack_misc::{
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
 };
+pub use rack_output::{RackOutput, TimerResult};
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
     RACK_RXT_SCOREBOARD_CLEAR_THRESH, RL_MIN_DIVISOR, RackFunctionBlock, RackOptions,
