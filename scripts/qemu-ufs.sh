@@ -42,18 +42,11 @@ clean=0
 if git diff --quiet && git diff --cached --quiet; then
     clean=1
 fi
-if [ "$clean" -eq 1 ] && [ -f "$qcow2" ] && [ -f "$preflight" ] && [ -f "$stamp" ] &&
+if [ "$build_only" -eq 1 ] && [ "$clean" -eq 1 ] &&
+    [ -f "$qcow2" ] && [ -f "$preflight" ] && [ -f "$stamp" ] &&
     [ "$(cat "$stamp")" = "$head" ]; then
-    if [ "$build_only" -eq 1 ]; then
-        printf '%s\n' "$qcow2"
-        exit 0
-    fi
-    exec "$demo/run.sh" "$@"
-fi
-if [ "$build_only" -eq 0 ] && [ "$clean" -eq 0 ] && [ -f "$qcow2" ] && [ -f "$preflight" ]; then
-    echo "qemu-ufs: worktree is dirty; booting the existing demo image from $(cat "$stamp" 2>/dev/null || echo unknown)" >&2
-    echo "qemu-ufs: run 'scripts/qemu-ufs.sh --build-only' from a clean tree to rebuild" >&2
-    exec "$demo/run.sh" "$@"
+    printf '%s\n' "$qcow2"
+    exit 0
 fi
 
 # The bootable UFS root carries the same static disk tools as the S99 demo.
