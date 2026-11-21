@@ -197,6 +197,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc-model-audit"
+version = "0.1.0"
+dependencies = [
+ "cc-model",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
