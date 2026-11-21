@@ -64,29 +64,8 @@ impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
     }
 
     fn event(&self, ofd: u32, s: Sock) {
-        // K195 DIAGNOSTIC (temporary): the event attach for an accepted/connected socket.
-        match crate::backend_platform::event_handle(self.platform.backend(), s) {
-            Ok(event) => {
-                let set = self.platform.set_ofd_event(ofd, event);
-                let text = alloc::format!(
-                    "k195a sock={} attach=ok event={} set={}\n",
-                    s.0,
-                    event.0,
-                    match &set {
-                        Ok(()) => alloc::format!("ok"),
-                        Err(error) => alloc::format!("err={}", error.0),
-                    }
-                );
-                let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
-            }
-            Err(error) => {
-                let text = alloc::format!(
-                    "k195a sock={} attach=err errno={}\n",
-                    s.0,
-                    error.0
-                );
-                let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
-            }
+        if let Ok(event) = crate::backend_platform::event_handle(self.platform.backend(), s) {
+            let _ = self.platform.set_ofd_event(ofd, event);
         }
     }
     fn resolve(&self, fd: i32) -> Result<FdInfo, Errno> {
