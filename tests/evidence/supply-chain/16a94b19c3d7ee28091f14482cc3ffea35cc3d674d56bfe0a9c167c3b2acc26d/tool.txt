@@ -1,0 +1,5 @@
+K390 supply-chain evidence
+tool: cargo-deny 0.22.0
+install: timeout 900 cargo install cargo-deny --version 0.22.0 --locked
+install_measured_seconds: 247.11
+date_utc: 2026-11-21

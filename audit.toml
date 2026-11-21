@@ -9,6 +9,10 @@
 #
 # Keep this file as the reviewed-exception mechanism: every future entry needs an advisory ID,
 # an owner, a reason/reachability note and an expiry date. No blanket ignore.
+#
+# K390: the only current exception is a licence exception, not an advisory: `ucs2 0.3.3`
+# (MPL-2.0) in the UEFI loader. It is registered in deny.toml with owner/reason/expiry
+# (expiry 2026-12-31, owner sign-off required). The advisory ignore list stays empty.
 
 [advisories]
 ignore = []

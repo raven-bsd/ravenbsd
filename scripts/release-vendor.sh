@@ -13,13 +13,26 @@
 # never fetched silently by a release build.
 #
 # The full snapshot is too large to commit. The script records it as
-# `build/release/vendor-full.tar.zst` with a SHA-256 in `vendor/manifest.toml`; upload that
-# artifact to the release evidence store and record the URL alongside the checksum.
+# `build/release/vendor-full.tar.zst` with a SHA-256 in `vendor/manifest.toml`. The publish URL is
+# a required input for a release run (`--url` or `RAVEN_VENDOR_ARTIFACT_URL`); without it the
+# manifest records `artifact_url = "UNPUBLISHED"` and the run exits non-zero. `--local` verifies
+# the existing tarball checksum without a URL and without rebuilding.
 
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 cd "$root"
+
+usage() {
+    cat <<'EOF'
+usage: sh scripts/release-vendor.sh [--check | --local | --reuse] [--url URL]
+
+  --check  verify the committed layout only; no build
+  --local  verify the existing artifact SHA-256 against vendor/manifest.toml; no URL, no build
+  --reuse  rewrite the manifest from the existing vendor tree/artifact; no vendor rebuild
+  --url    publish URL recorded in the manifest (or set RAVEN_VENDOR_ARTIFACT_URL)
+EOF
+}
 
 vendor_dir=vendor
 parts=build/release/vendor-parts
@@ -27,25 +40,76 @@ artifact=build/release/vendor-full.tar.zst
 sbom=$vendor_dir/sbom.cdx.json
 manifest=$vendor_dir/manifest.toml
 check=0
-case "${1:-}" in
-    --check) check=1 ;;
-    -h|--help)
-        echo "usage: sh scripts/release-vendor.sh [--check]"
-        exit 0
-        ;;
-    "")
-        ;;
-    *)
-        echo "release-vendor: unknown argument: $1" >&2
-        exit 2
-        ;;
-esac
+local=0
+reuse=0
+url=${RAVEN_VENDOR_ARTIFACT_URL:-}
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --check) check=1 ;;
+        --local) local=1 ;;
+        --reuse) reuse=1 ;;
+        --url)
+            shift
+            [ "$#" -ge 1 ] || { echo "release-vendor: --url needs a value" >&2; exit 2; }
+            url=$1
+            ;;
+        --url=*) url=${1#--url=} ;;
+        -h|--help) usage; exit 0 ;;
+        *)
+            echo "release-vendor: unknown argument: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+if [ "$check" -eq 1 ] && [ "$local" -eq 1 ]; then
+    echo "release-vendor: --check and --local are mutually exclusive" >&2
+    exit 2
+fi
+if [ "$check" -eq 1 ] && [ "$reuse" -eq 1 ]; then
+    echo "release-vendor: --check and --reuse are mutually exclusive" >&2
+    exit 2
+fi
+if [ -n "$url" ]; then
+    case "$url" in
+        https://*) ;;
+        *)
+            echo "release-vendor: --url must be an https:// URL (got: $url)" >&2
+            exit 2
+            ;;
+    esac
+fi
 
 command -v cargo >/dev/null 2>&1 || { echo "release-vendor: cargo not found" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "release-vendor: python3 not found" >&2; exit 1; }
 [ -f Cargo.lock ] || { echo "release-vendor: Cargo.lock is missing" >&2; exit 1; }
 [ -f userland/brush/Cargo.lock ] || { echo "release-vendor: brush Cargo.lock is missing" >&2; exit 1; }
 [ -f userland/uutils/Cargo.lock ] || { echo "release-vendor: uutils Cargo.lock is missing" >&2; exit 1; }
+
+file_sha256() {
+    python3 - "$1" <<'PY'
+import hashlib
+import sys
+
+digest = hashlib.sha256()
+with open(sys.argv[1], "rb") as handle:
+    for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+        digest.update(chunk)
+print(digest.hexdigest())
+PY
+}
+
+manifest_artifact_sha256() {
+    python3 - "$1" <<'PY'
+import re
+import sys
+
+text = open(sys.argv[1], encoding="utf-8").read()
+match = re.search(r'^artifact_sha256\s*=\s*"([0-9a-f]{64})"', text, re.MULTILINE)
+print(match.group(1) if match else "")
+PY
+}
 
 verify_layout() {
     [ -d "$vendor_dir" ] || { echo "release-vendor: $vendor_dir is missing" >&2; exit 1; }
@@ -63,6 +127,73 @@ verify_layout() {
     [ -f deny.toml ] || { echo "release-vendor: deny.toml is missing" >&2; exit 1; }
     echo "release-vendor: layout ok ($vendor_dir)"
 }
+
+if [ "$local" -eq 1 ]; then
+    [ -f "$artifact" ] || {
+        echo "release-vendor: local artifact is missing: $artifact" >&2
+        exit 1
+    }
+    [ -f "$manifest" ] || {
+        echo "release-vendor: local manifest is missing: $manifest" >&2
+        exit 1
+    }
+    expected=$(manifest_artifact_sha256 "$manifest")
+    [ -n "$expected" ] || {
+        echo "release-vendor: $manifest has no artifact_sha256" >&2
+        exit 1
+    }
+    actual=$(file_sha256 "$artifact")
+    if [ "$actual" != "$expected" ]; then
+        echo "release-vendor: artifact sha256 mismatch" >&2
+        echo "  expected: $expected" >&2
+        echo "  actual:   $actual" >&2
+        exit 1
+    fi
+    echo "release-vendor: local artifact sha256=$actual match"
+    exit 0
+fi
+
+if [ "$reuse" -eq 1 ]; then
+    [ -f "$manifest" ] || { echo "release-vendor: --reuse needs $manifest" >&2; exit 1; }
+    [ -f "$artifact" ] || { echo "release-vendor: --reuse needs $artifact" >&2; exit 1; }
+    [ -d "$vendor_dir" ] || { echo "release-vendor: --reuse needs $vendor_dir" >&2; exit 1; }
+    [ -f "$sbom" ] || { echo "release-vendor: --reuse needs $sbom" >&2; exit 1; }
+    expected=$(manifest_artifact_sha256 "$manifest")
+    actual=$(file_sha256 "$artifact")
+    if [ "$actual" != "$expected" ]; then
+        echo "release-vendor: artifact sha256 mismatch" >&2
+        echo "  expected: $expected" >&2
+        echo "  actual:   $actual" >&2
+        exit 1
+    fi
+    # Publishing an existing snapshot must not silently rewrite its lock hashes to the current
+    # tree. Keep every recorded field and change only the publish URL.
+    python3 - "$manifest" "${url:-UNPUBLISHED}" <<'PY'
+import sys
+
+path, artifact_url = sys.argv[1:3]
+lines = open(path, encoding="utf-8").read().splitlines()
+out = []
+found = False
+for line in lines:
+    if line.startswith("artifact_url = "):
+        out.append(f'artifact_url = "{artifact_url}"')
+        found = True
+    else:
+        out.append(line)
+if not found:
+    out.append(f'artifact_url = "{artifact_url}"')
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write("\n".join(out) + "\n")
+PY
+    verify_layout
+    if [ -z "$url" ]; then
+        echo "release-vendor: UNPUBLISHED: pass --url or RAVEN_VENDOR_ARTIFACT_URL for a release build" >&2
+        exit 1
+    fi
+    echo "release-vendor: PASS url=$url"
+    exit 0
+fi
 
 if [ "$check" -eq 1 ]; then
     verify_layout
@@ -185,13 +316,14 @@ tar --zstd -cf "$artifact" -C "$vendor_dir" .
 
 echo "==> manifest: $manifest"
 python3 - Cargo.lock userland/brush/Cargo.lock userland/uutils/Cargo.lock \
-    "$vendor_dir" "$sbom" "$artifact" "$manifest" <<'PY'
+    "$vendor_dir" "$sbom" "$artifact" "$manifest" "${url:-UNPUBLISHED}" <<'PY'
 import datetime
 import hashlib
 import os
 import sys
 
-root_lock, brush_lock, uutils_lock, vendor_dir, sbom_path, artifact_path, manifest_path = sys.argv[1:8]
+root_lock, brush_lock, uutils_lock, vendor_dir, sbom_path, artifact_path, manifest_path, \
+    artifact_url = sys.argv[1:9]
 
 def sha256(path):
     return hashlib.sha256(open(path, "rb").read()).hexdigest()
@@ -221,9 +353,13 @@ with open(manifest_path, "w", encoding="utf-8") as handle:
     handle.write(f'sbom_sha256 = "{sha256(sbom_path)}"\n')
     handle.write(f'artifact = "{artifact_path}"\n')
     handle.write(f'artifact_sha256 = "{sha256(artifact_path)}"\n')
-    handle.write('artifact_url = "release evidence store: vendor-full.tar.zst"\n')
+    handle.write(f'artifact_url = "{artifact_url}"\n')
 print(f"release-vendor: vendored_crates={crates} artifact_sha256={sha256(artifact_path)}")
 PY
 
 verify_layout
-echo "release-vendor: PASS"
+if [ -z "$url" ]; then
+    echo "release-vendor: UNPUBLISHED: pass --url or RAVEN_VENDOR_ARTIFACT_URL for a release build" >&2
+    exit 1
+fi
+echo "release-vendor: PASS url=$url"

@@ -13,6 +13,21 @@ ignore = []
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# First-party workspace crates use path dependencies with no version requirement. This option
+# keeps the wildcard ban for external registry dependencies (cargo-deny does not apply it to
+# public crates) while allowing the in-tree workspace edges.
+allow-wildcard-paths = true
+#
+# K390 ban finding register (NOT suppressed; the check stays deny):
+# finding: 321 first-party wildcard path dependencies in ~300 workspace crates that do not
+#          declare `publish = false`; cargo-deny only permits wildcard path edges for private
+#          crates. No external registry wildcard is in the graph.
+# owner:   Bo Maryniuk (owner/build lane)
+# reason:  in-tree first-party path edges, not registry wildcards; the release graph is pinned by
+#          the three committed Cargo.lock files and the vendor snapshot.
+# fix:     mark every workspace member `publish = false` (workspace metadata ticket) or add the
+#          per-crate skip entries. Do not downgrade the lint to warn or allow.
+# expiry:  2026-12-31.
 
 [licenses]
 allow = [
@@ -28,6 +43,21 @@ allow = [
     "Zlib",
 ]
 confidence-threshold = 0.8
+
+# K390 exception register. Cargo-deny enforces the scope; the owner/reason/expiry are reviewed
+# here and in docs/supply-chain.md section 10. No blanket ignore.
+#
+# crate:        ucs2 0.3.3
+# licence:      MPL-2.0 (file-level copyleft; tier B)
+# owner:        Bo Maryniuk (owner) - sign-off required before the 0.1.0 tag
+# reason:       unmodified dependency of the in-tree UEFI loader (raven-loader -> uefi -> ucs2);
+#               no Raven source is combined into an MPL-licensed file
+# reachability: only the UEFI loader's string conversion; not network-facing
+# expiry:       2026-12-31 (re-review or replace the dependency)
+[[licenses.exceptions]]
+name = "ucs2"
+version = "=0.3.3"
+allow = ["MPL-2.0"]
 
 [sources]
 unknown-registry = "deny"

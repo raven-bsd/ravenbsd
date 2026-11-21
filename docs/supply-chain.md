@@ -198,20 +198,63 @@ inherit `--config`; the `CARGO_SOURCE_*` environment carries the same vendored s
 `.cargo/audit.toml` is a symlink to the reviewed root `audit.toml`; `cargo audit` reads that path.
 `deny.toml` carries the same advisory exceptions plus the bans/licences/sources policy.
 
-### Audit exceptions
+### Audit and deny exceptions
 
-All five current advisories are name/version collisions with the first-party workspace utilities
-`userland/bin/tar` and `userland/bin/time` (both `0.1.0`, `publish = false`). No upstream
-`tar-rs`/`time` crate is linked or shipped. SC2 renames the utilities to `raven-tar`/`raven-time`;
-these exceptions expire 2027-02-28. No blanket ignore.
+The SC2 rename to `raven-tar`/`raven-time` removed the five former cargo-audit name/version
+false positives. `audit.toml` has `[advisories] ignore = []`; there is no advisory exception.
 
-| ID | Owner | Reachability | Expiry |
+The only current exception is a **licence** exception, not an advisory: `ucs2 0.3.3` (MPL-2.0),
+pulled by `raven-loader -> uefi 0.41.0 -> ucs2`. It is registered in `deny.toml` as a
+`[[licenses.exceptions]]` row scoped to that exact version, with owner Bo Maryniuk (owner sign-off
+required), reason (unmodified dependency; no Raven source combined into an MPL file), reachability
+(UEFI string conversion only) and expiry **2026-12-31**. No blanket ignore.
+
+### K390 publish-ready vendor manifest and cargo-deny
+
+The vendor manifest is fail-closed. `scripts/release-vendor.sh` never invents a store URL:
+
+| State | Command | Manifest | Exit |
 |---|---|---|---|
-| RUSTSEC-2018-0002 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
-| RUSTSEC-2021-0080 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
-| RUSTSEC-2026-0067 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
-| RUSTSEC-2026-0068 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
-| RUSTSEC-2020-0071 | kevin | first-party `time` utility; no time crate code | 2027-02-28 |
+| unpublished | `sh scripts/release-vendor.sh [--reuse]` | `artifact_url = "UNPUBLISHED"` | **1** (release build fails closed) |
+| published | `sh scripts/release-vendor.sh --reuse --url https://…/vendor-full.tar.zst` (or `RAVEN_VENDOR_ARTIFACT_URL`) | the exact URL | 0 |
+| local | `sh scripts/release-vendor.sh --local` | reads the recorded `artifact_sha256`; no URL, no build | 0 on match, 1 on mismatch |
+| layout | `sh scripts/release-vendor.sh --check` | no build | 0/1 |
+
+The URL must be `https://`; any other scheme is rejected. `--reuse` rewrites the manifest from the
+existing vendor tree/artifact without rebuilding the 1.2 GiB graph; use it after uploading the
+tarball. A full run without `--url` still hashes the artifact, writes `UNPUBLISHED`, and exits
+non-zero.
+
+**Owner publish step**
+
+1. Upload `build/release/vendor-full.tar.zst` to the release evidence store (do not commit it).
+2. Rerun `sh scripts/release-vendor.sh --reuse --url https://<store>/vendor-full.tar.zst`
+   (or set `RAVEN_VENDOR_ARTIFACT_URL`) and confirm exit 0; the manifest records the URL and the
+   local SHA-256.
+3. Verify offline without the URL: `sh scripts/release-vendor.sh --local`.
+4. Build the release image from the snapshot with `CARGO_NET_OFFLINE=true` and the
+   `CARGO_SOURCE_*` variables in the SC1 section above.
+
+**Enforcement**
+
+Pinned tool: `cargo-deny 0.22.0`, installed with
+`timeout 900 cargo install cargo-deny --version 0.22.0 --locked` (measured **247.11 s**).
+Run `cargo deny check` against `deny.toml`. K390's first execution (2026-11-21) produced:
+
+```text
+advisories ok, bans FAILED, licenses ok, sources ok
+```
+
+- `advisories`, `licenses` (with the scoped `ucs2` exception) and `sources` pass.
+- `bans` fails on **321 first-party wildcard path dependencies** in ~300 workspace crates that do
+  not declare `publish = false`; cargo-deny's `allow-wildcard-paths` only covers private crates.
+  No external registry wildcard is present. The finding is **not suppressed**: owner Bo Maryniuk,
+  reason (in-tree path edges pinned by the three committed locks and the vendor snapshot), fix
+  (mark each workspace member private or add the per-crate skip), expiry **2026-12-31**. The gate
+  stays red until the workspace metadata is fixed; downgrading the lint to `warn`/`allow` is not
+  acceptable.
+- Evidence: `tests/evidence/supply-chain/16a94b19c3d7ee28091f14482cc3ffea35cc3d674d56bfe0a9c167c3b2acc26d/`
+  (artifact SHA-256, local-check log, deny log, manifest copy).
 
 ## 11. Metrics
 
