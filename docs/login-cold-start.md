@@ -53,6 +53,33 @@ failing qtest in the default suite. The after-fix 20/20 run belongs to the next 
 
 No donor code is involved; the method is a serial-console timing measurement.
 
+## K149 after-fix matrix: BLOCKED on host load (2026-11-21)
+
+K149 requires the after-fix matrix on an **idle** host: 20/20 TCG4 and 20/20 KVM2
+samples with each step's median and p90 under 1 s (target 300 ms). The harness and
+the release image are ready, but the host was not idle for the whole window
+(1-min load 112–171 on 20 cores; other lanes were building/booting), so neither
+matrix completed inside its ticket cap. Loaded-host samples are not an idle PASS.
+
+Image: `build/login-cold-start/release.img`, commit `978899da`,
+sha256 `e18870b9ff3c5ff0d870b805881659215a61d05cac18cd4f82ba62c5c516d687`.
+
+| Config | Command (cap) | Result |
+|---|---|---|
+| TCG `-smp 4` | `timeout 300 sh scripts/login-cold-start.sh --accel tcg --smp 4 --samples 20` | BLOCKED: exit 124 (300 s) at sample 6/20, load 121–171 |
+| KVM `-smp 2` | `timeout 240 sh scripts/login-cold-start.sh --accel kvm --smp 2 --samples 20` | BLOCKED: exit 124 (240 s) at sample 16/20, load 62–82 |
+
+Partial data (loaded host, **not** an idle verdict):
+
+* KVM2 15/20 samples ok: `login:`→`Password:` 58–63 ms, password→prompt
+  150–363 ms.
+* TCG4 6 attempts: 2 ok (`login:` 371/627 ms, password 8731/14822 ms),
+  4 harness timeouts/EOF.
+
+Per-sample serial logs are under `build/login-cold-start/<UTC>/`. The idle rerun
+is the remaining acceptance step; `scripts/login-cold-start.sh` and the image can
+be reused as-is.
+
 ## Files
 
 * `scripts/login-cold-start.sh` — shell entry point.
