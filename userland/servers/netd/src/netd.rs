@@ -1529,6 +1529,15 @@ impl<D: Device> Netd<D> {
         if ready.error {
             bits |= READY_ERROR;
         }
+        // K195 DIAGNOSTIC (temporary, not a product change): the live readiness answer
+        // netd gives the libc poll for this socket file.
+        raven_rt::println!(
+            "k195r file={file} readable={} writable={} hup={} error={} bits={bits}",
+            ready.readable,
+            ready.writable,
+            ready.hup,
+            ready.error
+        );
         Ok(Response::Value(bits))
     }
 

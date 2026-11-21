@@ -117,6 +117,14 @@ pub fn poll<B: SysBackend, L: Lock>(
         let Some(bits) = live_readiness(backend, registration.reference.poll_handle()) else {
             continue;
         };
+        // K195 DIAGNOSTIC (temporary): the live bits for a scheme socket at poll time.
+        {
+            let text = alloc::format!(
+                "k195p handle={} live={bits}\n",
+                registration.reference.poll_handle().0
+            );
+            let _ = raven_libc_sys::sys::debug_write(text.as_bytes());
+        }
         ready = ready.saturating_add(apply_bits(registration, fds, bits));
     }
     if ready > 0 {
