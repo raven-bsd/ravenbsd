@@ -152,6 +152,8 @@ fn ctx() -> Ctx {
         buffer_len: 0,
         response_len: 0,
         credentials: Credentials::ROOT,
+        // The fake filesystem has no per-process root prefix (K224): zero is unrooted.
+        root_len: 0,
         trace_id: 0,
     }
 }
