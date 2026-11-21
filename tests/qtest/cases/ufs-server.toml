@@ -49,7 +49,7 @@ regex = '^netd: pf loaded rules=[0-9]+ nat=[0-9]+$'
 regex = '^netd: interface eth0 10\.0\.2\.15/24$'
 
 [[expect]]
-regex = '(?i)^.*login: ?$'
+regex = '(?i)^.*login:'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|no UFS root device|uutils: .* MISSING|uutils: inventory FAILED'
@@ -99,11 +99,19 @@ wait = '^df-ok$'
 timeout_secs = 30
 
 [[step]]
-send = "test -x /bin/lsblk && test -x /sbin/newfs && test -x /sbin/gpart && test -x /bin/df && test -x /bin/stat && echo disk-tools-ok\n"
+send = "test -x /bin/lsblk && test -x /sbin/newfs && test -x /sbin/gpart && echo disk-tools-1\n"
 delay_ms = 100
 
 [[step]]
-wait = '^disk-tools-ok$'
+wait = '^disk-tools-1$'
+timeout_secs = 30
+
+[[step]]
+send = "test -x /bin/df && test -x /bin/stat && echo disk-tools-2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^disk-tools-2$'
 timeout_secs = 30
 
 [[step]]
@@ -131,11 +139,15 @@ wait = '^pfctl-ok$'
 timeout_secs = 30
 
 [[step]]
-send = "/sbin/ifconfig eth0\n"
+send = "/sbin/ifconfig eth0 && echo ifconfig-ok\n"
 delay_ms = 100
 
 [[step]]
-wait = '^inet 10\.0\.2\.15/24$'
+wait = '^ifconfig: eth0 .*inet 10\.0\.2\.15 '
+timeout_secs = 30
+
+[[step]]
+wait = '^ifconfig-ok$'
 timeout_secs = 30
 
 [[step]]
