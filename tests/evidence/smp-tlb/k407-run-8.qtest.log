@@ -1,0 +1,48 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running `target/debug/xtask qtest --case posix-fs-smp-kvm4 --arch x86_64`
+posix-fs-smp-kvm4: fail
+--- serial (last 40 lines) ---
+mem: 447 MiB usable in 7 regions
+cmdline: console=ttyS0 test-exit=1 smp_user=on
+process: starting /init
+process: /init entry=0x407090 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+rtc: 2026-11-21 22:09:28 (epoch 1795298968s)
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: skipped /dev/null on null:: timed out
+vfsd: skipped /dev/zero on zero:: timed out
+vfsd: skipped /dev/random on rand:: timed out
+smp-fs: services ok
+smp-fs: setup ok
+smp-fs: workers started workers=8
+smp-fs: progress finished=0/8 pending=["0:14", "1:14", "2:14", "3:14", "4:35", "5:35", "6:35", "7:34"]
+smp-fs: progress finished=0/8 pending=["0:16", "1:16", "2:16", "3:24", "4:32", "5:32", "6:32", "7:32"]
+smp-fs: progress finished=0/8 pending=["0:40", "1:40", "2:40", "3:16", "4:31", "5:31", "6:31", "7:31"]
+smp-fs: progress finished=0/8 pending=["0:14", "1:14", "2:14", "3:14", "4:37", "5:37", "6:37", "7:37"]
+smp: tlb shootdown timeout on cpu 0 seq=15678 last=15677 flushes=15613 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=100 state_age_ms=100 ack_after_ms=18446744073709551615 ack_age_ms=100
+smp: tlb shootdown timeout on cpu 0 seq=15679 last=15677 flushes=15613 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=203 state_age_ms=203 ack_after_ms=18446744073709551615 ack_age_ms=203
+smp: tlb shootdown timeout on cpu 0 seq=15680 last=15677 flushes=15613 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=307 state_age_ms=306 ack_after_ms=18446744073709551615 ack_age_ms=306
+smp: tlb shootdown timeout on cpu 0 seq=15681 last=15677 flushes=15613 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=410 state_age_ms=410 ack_after_ms=18446744073709551615 ack_age_ms=410
+smp: tlb shootdown timeout on cpu 0 seq=15682 last=15677 flushes=15613 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=514 state_age_ms=514 ack_after_ms=18446744073709551615 ack_age_ms=514
+smp: tlb shootdown timeout on cpu 0 seq=15683 last=15677 flushes=15613 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=617 state_age_ms=617 ack_after_ms=18446744073709551615 ack_age_ms=617
+smp: tlb shootdown timeout on cpu 0 seq=15684 last=15677 flushes=15613 state=1 syscall=1 pf=0 pfp=0 wq=0 nr=0x62 user_if=1 irq_age_ms=720 state_age_ms=719 ack_after_ms=18446744073709551615 ack_age_ms=720
+EXCEPTION: nmi with no pending shootdown
+smp-fs: progress finished=4/8 pending=["0:24", "1:24", "2:16", "3:24"]
+smp-fs: progress finished=4/8 pending=["0:14", "1:14", "2:14", "3:13"]
+smp-fs: progress finished=4/8 pending=["0:13", "1:13", "2:13", "3:13"]
+smp-fs: latency create_us p50=14338 p90=45980 max=103283
+smp-fs: latency write_us p50=19735 p90=56569 max=180682
+smp-fs: latency read_us p50=55159 p90=184128 max=269359
+smp-fs: latency rename_us p50=72874 p90=166016 max=267413
+smp-fs: latency mmap_us p50=259196 p90=518710 max=707279
+smp-fs: latency unlink_us p50=64826 p90=184230 max=263190
+smp-fs: latency mount_us p50=225567 p90=1091936 max=1398919
+smp-fs: race successes=50/50
+smp-fs: done workers=8 iterations=50
+smp-fs: ok
+init exited (0)
+--- forbidden hits ---
+EXCEPTION: nmi with no pending shootdown
+--- result ---
+exit status 33; 1 forbidden line(s) matched
