@@ -1,0 +1,38 @@
+pi4-ui-evidence: image=build/aarch64/ravenbsd-pi4-sd.img
+pi4-ui-evidence: commit=0f5232f061424550d0ef889568d7c4d6796cee16
+pi4-ui-evidence: image_sha256=5aca161509d40f6a8fbf2cad6a5ab338e00c94c1907518818778c6f5775aafa6
+pi4-install: UFS path /etc/services.d/netd.toml ok
+pi4-install: UFS path /root/.keep ok
+pi4-install: image check PASS sha256=5aca161509d40f6a8fbf2cad6a5ab338e00c94c1907518818778c6f5775aafa6
+pi4-install: board evidence remains UNVERIFIED (SD3)
+pi4-release: SD FAT+UFS layout PASS
+pi4-release: image check PASS (board gates remain UNVERIFIED)
+  fixup4.dat 5512
+  LICENCE.broadcom 1594
+  overlays/disable-bt.dtbo 1073
+pi4-manifest: PASSED
+pi4-ui-evidence: board BLOCKED: no /dev/ttyUSB* or /dev/ttyACM* adapter
+pi4-ui-evidence: block devices (owner chooses the SD card; do not guess):
+NAME                                             SIZE TYPE  MOUNTPOINTS
+loop0                                              4K loop  /snap/bare/5
+loop1                                           79,6M loop  /snap/chatgpt-desktop/7
+loop2                                           89,3M loop  /snap/chatgpt-desktop/8
+loop3                                          118,8M loop  /snap/telegram-desktop/7190
+loop4                                          390,2M loop  /snap/content-snap-core22/11
+loop5                                          105,1M loop  /snap/core/17284
+loop6                                          105,2M loop  /snap/core/17292
+loop7                                           55,5M loop  /snap/core18/2999
+loop8                                           55,5M loop  /snap/core18/3084
+loop9                                           63,8M loop  /snap/core20/2866
+loop10                                          63,8M loop  /snap/core20/2922
+loop11                                         398,4M loop  /snap/content-snap-core22/13
+loop12                                            74M loop  /snap/core22/2955
+loop13                                         222,4M loop  /snap/slack/270
+loop14                                          66,8M loop  /snap/core24/2124
+loop15                                          66,8M loop  /snap/core24/2307
+loop16                                          60,6M loop  /snap/core26/646
+loop17                                          49,3M loop  /snap/cups/1268
+loop18                                          50,7M loop  /snap/cups/1277
+pi4-ui-evidence: provider fb:console present (kernel DEBUG_WRITE mirror)
+pi4-ui-evidence: provider kbd:console present
+pi4-ui-evidence: host image checks PASS; provider checks PASS; board evidence BLOCKED (owner hardware/photo)
