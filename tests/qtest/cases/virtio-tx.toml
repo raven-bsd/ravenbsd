@@ -30,7 +30,7 @@ regex = '^virtio-tx: connected$'
 unordered = true
 
 [[expect]]
-regex = '^virtio-tx: sent=32768$'
+regex = '^virtio-tx: sent=32768 elapsed_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
@@ -39,6 +39,14 @@ unordered = true
 
 [[expect]]
 regex = '^virtio-tx: done$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: irq tx fired=[1-9]'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: irq progress fired=([2-9][0-9]|[1-9][0-9]{2,}) '
 unordered = true
 
 [[forbid]]

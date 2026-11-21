@@ -113,6 +113,9 @@ mod program {
     static TX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_DROPS: AtomicU64 = AtomicU64::new(0);
     static TX_STALL: AtomicBool = AtomicBool::new(false);
+    static IRQ_TX_LOGGED: AtomicBool = AtomicBool::new(false);
+    static IRQ_PROGRESS_LOGGED: AtomicBool = AtomicBool::new(false);
+    static IRQ_TOTAL: AtomicU64 = AtomicU64::new(0);
 
     fn main(args: raven_rt::Args) -> i32 {
         match run(args) {
@@ -646,6 +649,22 @@ mod program {
                 let isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
                 self.last_isr = isr;
                 let _ = self.irq.ack();
+                let tx = TX_FRAMES.load(Ordering::Acquire);
+                if tx > 0 && !IRQ_TX_LOGGED.swap(true, Ordering::AcqRel) {
+                    raven_rt::println!(
+                        "virtio-net: irq tx fired={fired} isr={isr:#x} tx={tx} rx={}",
+                        RX_FRAMES.load(Ordering::Acquire)
+                    );
+                }
+                let total = IRQ_TOTAL.fetch_add(fired as u64, Ordering::AcqRel)
+                    + u64::try_from(fired).unwrap_or(0);
+                if total >= 24 && !IRQ_PROGRESS_LOGGED.swap(true, Ordering::AcqRel) {
+                    raven_rt::println!(
+                        "virtio-net: irq progress fired={total} tx={} rx={}",
+                        TX_FRAMES.load(Ordering::Acquire),
+                        RX_FRAMES.load(Ordering::Acquire)
+                    );
+                }
             }
             self.update_link()?;
             if !STARTED.load(Ordering::Acquire) {
