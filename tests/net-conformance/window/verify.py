@@ -210,6 +210,15 @@ def zero_window(frames: list[dict], require_data_probe: bool) -> tuple[str, str]
     assert reopen is not None, "no window reopen after the probe"
 
     reopen_position = frames.index(reopen)
+    probes = [
+        frame for frame in frames[position + 1:reopen_position]
+        if is_server(frame)
+        and (
+            (frame["seq"] == server_isn and not frame["payload"])
+            or (frame["seq"] == accept and len(frame["payload"]) == 1)
+        )
+    ]
+    assert len(probes) == 1, f"{len(probes)} probes before the reopen; replayed probe"
     data = [
         frame for frame in frames[reopen_position + 1:]
         if is_server(frame) and frame["payload"]
