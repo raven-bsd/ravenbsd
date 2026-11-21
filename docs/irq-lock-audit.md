@@ -340,6 +340,12 @@ The negative fixture in `tests/smp/irq-lock-audit/run.sh` builds a temporary fak
 undocumented `IrqSpinLock` and a new `.lock()` site; `--check` must reject both, and accept the
 unchanged fixture. The fixture never edits `kernel/src`.
 
+`SAFE` in this document means **process-context only**: the lock is a blocking `Mutex` or a leaf
+spin lock, and the §2 vector-entry walk found no edge from an IRQ/exception handler to it. It is
+not a claim that the lock is contention-free or free of priority inversion. The checker catches a
+new lock or call site, but it cannot see a new **call edge** from a vector handler; the §2 table
+must be re-walked whenever a new IRQ callback or driver ISR is added.
+
 The runtime regression for the fixed TLB class remains `tests/smp/memory` (the S101 four-way
 concurrent unmap barrier; every `smp: tlb shootdown timeout` line is forbidden). No existing TLB
 or memory check was weakened.
