@@ -1,0 +1,7 @@
+{
+  "log": null,
+  "name": "matrix",
+  "reason": "scripts/net-conformance.sh is absent (K253 harness not merged)",
+  "scenarios": [],
+  "status": "blocked"
+}
