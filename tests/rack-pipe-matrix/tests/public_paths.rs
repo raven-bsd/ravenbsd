@@ -29,7 +29,7 @@ fn base() -> RackPipe {
 }
 
 fn entry(start: u32, end: u32, last: u32, flags: u32) -> RackSendmap {
-    let mut rsm = RackSendmap::new(start, end, last);
+    let mut rsm = RackSendmap::new(start, end, u64::from(last));
     rsm.flags = flags;
     rsm
 }
