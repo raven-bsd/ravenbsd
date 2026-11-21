@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K408 post-exec socket-write service (tap accepted-socket shape). The guest owns the listener and
+# the host connects over the K194 tap; the fork+exec child writes on the accepted fd.
+
+name = "socket-write-exec"
+exec = "/bin/socket-write-exec"
+args = ["/bin/socket-write-exec", "--accept"]
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
