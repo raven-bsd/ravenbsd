@@ -38,6 +38,7 @@ userland/uutils/
 userland/brush/vendor/
 userland/brush/ravenbsd-libc-delta.md
 
-# K264: matrix pcaps are binary wire evidence; the packet logs/JSON and the evidence scripts stay
-# under the SPDX/provenance check. The K263 baseline pcaps follow the same rule above.
-tests/evidence/tcp/run-*/pcaps/*.pcap
+# K264: generated evidence run directories (JSON/log/TXT/pcap) are not source; the evidence
+# scripts, README, port-claims.json and docs stay under the SPDX/provenance check. The K263
+# baseline pcaps follow the rule above.
+tests/evidence/tcp/run-*/**

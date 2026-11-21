@@ -16,7 +16,7 @@ quarantined and contribute no entry.
 | matrix | **ran 10/10**: Linux 5/5 pass; Raven zero-window, window-update, retransmit, fin-rst pass; Raven handshake **finding** |
 | unit | **710/710 passed**, 0 skipped |
 | checker | **pass**: 2 negative fixtures rejected, 1 valid fixture accepted, 2 mutations caught |
-| provenance | 10468 files, 0 violations |
+| provenance | 0 violations; generated evidence run directories are excluded, while scripts/README/port-claims/docs stay scanned |
 | `make check-fast` | **`check-fast: PASSED`** |
 
 ## Landed provenance entries
@@ -119,4 +119,6 @@ cap expiry is a failure with the preserved log, not a reason to raise it.
   `solisten_clone`/`solisten_enqueue`, which are the verified symbols. Reviewer confirmation is
   still required for that naming divergence.
 * No 24 h or live SSH/tap claim is made here; live SSH remains the integration gate.
-* No product code is changed by K264; the only product file touched is `PROVENANCE.toml`.
+* No product code is changed by K264; the only product-tree files touched are `PROVENANCE.toml`
+  and the evidence-config `.provenance-ignore`. Generated `tests/evidence/tcp/run-*` directories
+  are provenance-ignored; the scripts, README, port-claims and docs stay scanned.
