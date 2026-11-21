@@ -23,7 +23,11 @@ fn addresses_comments_and_negation_parse() {
 fn malformed_lines_report_their_number() {
     let error = parse_table_file("10.0.0.1\nnonsense\n").expect_err("must fail");
     assert_eq!(error.line, 2);
-    assert!(error.message.contains("invalid address `nonsense'"), "{}", error.message);
+    assert!(
+        error.message.contains("invalid address `nonsense'"),
+        "{}",
+        error.message
+    );
 }
 
 #[test]

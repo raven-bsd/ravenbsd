@@ -46,8 +46,7 @@ mod program {
     impl raven_pfctl::FileLoader for RuntimeLoader {
         fn read(&self, path: &str) -> Result<String, String> {
             let full = with_file_scheme(&fs::resolve(path));
-            let bytes = fs::read_to_vec(&full)
-                .map_err(|error| error.description().to_string())?;
+            let bytes = fs::read_to_vec(&full).map_err(|error| error.description().to_string())?;
             String::from_utf8(bytes).map_err(|_| String::from("file is not valid UTF-8"))
         }
     }

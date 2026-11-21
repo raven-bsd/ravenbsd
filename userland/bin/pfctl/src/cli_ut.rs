@@ -29,10 +29,7 @@ fn loader() -> MemoryLoader {
         String::from("table.txt"),
         String::from("10.0.0.1\n!10.0.0.2\n"),
     );
-    files.insert(
-        String::from("bad.conf"),
-        String::from("pass frobnicate\n"),
-    );
+    files.insert(String::from("bad.conf"), String::from("pass frobnicate\n"));
     MemoryLoader { files }
 }
 
@@ -87,7 +84,11 @@ fn a_missing_file_is_an_error() {
 fn no_action_prints_usage_and_exits_one() {
     let outcome = run(&args(&[]), &loader());
     assert_eq!(outcome.exit_code, 1);
-    assert!(outcome.stderr.contains("usage: pfctl"), "{}", outcome.stderr);
+    assert!(
+        outcome.stderr.contains("usage: pfctl"),
+        "{}",
+        outcome.stderr
+    );
 }
 
 #[test]
@@ -153,13 +154,21 @@ fn an_undefined_macro_is_a_line_numbered_error() {
         },
     );
     assert_eq!(outcome.exit_code, 1);
-    assert!(outcome.stderr.contains("undefined.conf:1:"), "{}", outcome.stderr);
+    assert!(
+        outcome.stderr.contains("undefined.conf:1:"),
+        "{}",
+        outcome.stderr
+    );
     assert!(outcome.stderr.contains("missing"), "{}", outcome.stderr);
 }
 
 #[test]
 fn unknown_options_are_refused() {
-    let outcome = run(&args(&["-Z"]), &loader());
+    let outcome = run(&args(&["-Q"]), &loader());
     assert_eq!(outcome.exit_code, 1);
-    assert!(outcome.stderr.contains("unknown option"), "{}", outcome.stderr);
+    assert!(
+        outcome.stderr.contains("unknown option"),
+        "{}",
+        outcome.stderr
+    );
 }

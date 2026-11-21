@@ -21,7 +21,10 @@ fn macros_expand_in_order() {
     let Statement::Rule(rule) = &config.statements[1] else {
         panic!("expected a rule");
     };
-    assert_eq!(rule.interface.as_ref().map(|iface| iface.name.as_str()), Some("em0"));
+    assert_eq!(
+        rule.interface.as_ref().map(|iface| iface.name.as_str()),
+        Some("em0")
+    );
 }
 
 #[test]
@@ -42,7 +45,11 @@ fn macros_expand_recursively_and_detect_cycles() {
 fn an_undefined_macro_is_line_numbered() {
     let error = parse_error("pass in all\npass in on $nope all\n");
     assert_eq!(error.line, 2);
-    assert!(error.message.contains("is not defined"), "{}", error.message);
+    assert!(
+        error.message.contains("is not defined"),
+        "{}",
+        error.message
+    );
 }
 
 #[test]
@@ -58,7 +65,10 @@ fn d_macros_seed_the_table() {
     let Statement::Rule(rule) = &config.statements[0] else {
         panic!("expected a rule");
     };
-    assert_eq!(rule.interface.as_ref().map(|iface| iface.name.as_str()), Some("em1"));
+    assert_eq!(
+        rule.interface.as_ref().map(|iface| iface.name.as_str()),
+        Some("em1")
+    );
 }
 
 #[test]
@@ -69,7 +79,10 @@ fn tables_parse_flags_entries_and_files() {
     let Statement::Table(table) = &config.statements[0] else {
         panic!("expected a table");
     };
-    assert_eq!(table.flags, vec![TableFlag::Const, TableFlag::Persist, TableFlag::Counters]);
+    assert_eq!(
+        table.flags,
+        vec![TableFlag::Const, TableFlag::Persist, TableFlag::Counters]
+    );
     assert_eq!(table.entries.len(), 2);
     let TableEntry::Address { negative, .. } = &table.entries[1] else {
         panic!("expected an address");
@@ -123,7 +136,9 @@ fn rules_parse_every_supported_clause() {
     assert!(rule.interface.as_ref().expect("interface").negative);
     assert_eq!(rule.state, StateMode::Keep);
     assert_eq!(
-        rule.flags.as_ref().map(|flags| (flags.set.as_str(), flags.mask.as_str())),
+        rule.flags
+            .as_ref()
+            .map(|flags| (flags.set.as_str(), flags.mask.as_str())),
         Some(("S", "SA"))
     );
 }
@@ -174,13 +189,21 @@ fn nat_rdr_and_no_forms_parse() {
 #[test]
 fn a_nat_rule_without_a_target_fails() {
     let error = parse_error("nat on em0 from any to any\n");
-    assert!(error.message.contains("requires `-> address'"), "{}", error.message);
+    assert!(
+        error.message.contains("requires `-> address'"),
+        "{}",
+        error.message
+    );
 }
 
 #[test]
 fn a_no_rule_with_a_target_fails() {
     let error = parse_error("no nat on em0 from any to any -> 10.0.0.1\n");
-    assert!(error.message.contains("does not take `->'"), "{}", error.message);
+    assert!(
+        error.message.contains("does not take `->'"),
+        "{}",
+        error.message
+    );
 }
 
 #[test]
@@ -195,11 +218,23 @@ fn include_without_a_loader_is_kept() {
 #[test]
 fn unknown_directives_and_junk_are_bounded_errors() {
     let error = parse_error("frobnicate in all\n");
-    assert!(error.message.contains("unknown directive"), "{}", error.message);
+    assert!(
+        error.message.contains("unknown directive"),
+        "{}",
+        error.message
+    );
     let error = parse_error("pass in all junk\n");
-    assert!(error.message.contains("unexpected token"), "{}", error.message);
+    assert!(
+        error.message.contains("unexpected token"),
+        "{}",
+        error.message
+    );
     let error = parse_error("pass in proto sctp all\n");
-    assert!(error.message.contains("unsupported protocol"), "{}", error.message);
+    assert!(
+        error.message.contains("unsupported protocol"),
+        "{}",
+        error.message
+    );
 }
 
 #[test]
@@ -209,15 +244,16 @@ fn ports_ranges_and_operators_are_validated() {
     let error = parse_error("pass in from any port 2000:1000 to any\n");
     assert!(error.message.contains("inverted"), "{}", error.message);
     let error = parse_error("pass in from any port > 80:90 to any\n");
-    assert!(error.message.contains("comparison operator"), "{}", error.message);
+    assert!(
+        error.message.contains("comparison operator"),
+        "{}",
+        error.message
+    );
     let config = parse("pass in from any port 1000:2000 to any\n");
     let Statement::Rule(rule) = &config.statements[0] else {
         panic!("expected a rule");
     };
-    assert_eq!(
-        rule.source.items[0].port,
-        Some(PortSpec::Range(1000, 2000))
-    );
+    assert_eq!(rule.source.items[0].port, Some(PortSpec::Range(1000, 2000)));
 }
 
 #[test]
@@ -225,7 +261,11 @@ fn flags_must_be_a_valid_subset() {
     let error = parse_error("pass in proto tcp flags A/S keep state\n");
     assert!(error.message.contains("subset"), "{}", error.message);
     let error = parse_error("pass in proto tcp flags Z/SA keep state\n");
-    assert!(error.message.contains("invalid TCP flag"), "{}", error.message);
+    assert!(
+        error.message.contains("invalid TCP flag"),
+        "{}",
+        error.message
+    );
     let config = parse("pass in proto tcp flags any\n");
     let Statement::Rule(rule) = &config.statements[0] else {
         panic!("expected a rule");
@@ -236,7 +276,9 @@ fn flags_must_be_a_valid_subset() {
         panic!("expected a rule");
     };
     assert_eq!(
-        rule.flags.as_ref().map(|flags| (flags.set.as_str(), flags.mask.as_str())),
+        rule.flags
+            .as_ref()
+            .map(|flags| (flags.set.as_str(), flags.mask.as_str())),
         Some(("", "SA"))
     );
 }

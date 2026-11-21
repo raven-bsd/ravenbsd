@@ -15,9 +15,9 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use crate::ast::{
-    Action, AddressFamily, AddrItem, AddrPortSpec, Config, Direction, FlagsSpec, HostAddr, IfaceRef,
-    NatKind, NatRule, OptionDirective, Policy, PolicyValue, PoolOption, PortSpec, Protocol, Rule,
-    StateMode, StatePolicyValue, Statement, TableDef, TableEntry, TableFlag,
+    Action, AddrItem, AddrPortSpec, AddressFamily, Config, Direction, FlagsSpec, HostAddr,
+    IfaceRef, NatKind, NatRule, OptionDirective, Policy, PolicyValue, PoolOption, PortSpec,
+    Protocol, Rule, StateMode, StatePolicyValue, Statement, TableDef, TableEntry, TableFlag,
 };
 
 /// Print a whole configuration, one statement per line, with a final newline.
@@ -226,7 +226,10 @@ fn print_nat(rule: &NatRule) -> String {
             });
         }
     }
-    let _ = matches!(rule.kind, NatKind::NoNat | NatKind::NoRdr | NatKind::NoBinat);
+    let _ = matches!(
+        rule.kind,
+        NatKind::NoNat | NatKind::NoRdr | NatKind::NoBinat
+    );
     out
 }
 

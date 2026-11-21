@@ -17,12 +17,12 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use crate::ast::{
-    is_address_literal, Action, AddressFamily, AddrItem, AddrPortSpec, Config, Direction,
-    FlagsSpec, HostAddr, IfaceRef, NatKind, NatRule, OptionDirective, Policy, PolicyValue, PoolOption,
-    PortSpec, Protocol, Redirect, Rule, StateMode, StatePolicyValue, Statement, TableDef,
-    TableEntry, TableFlag,
+    Action, AddrItem, AddrPortSpec, AddressFamily, Config, Direction, FlagsSpec, HostAddr,
+    IfaceRef, NatKind, NatRule, OptionDirective, Policy, PolicyValue, PoolOption, PortSpec,
+    Protocol, Redirect, Rule, StateMode, StatePolicyValue, Statement, TableDef, TableEntry,
+    TableFlag, is_address_literal,
 };
-use crate::lexer::{tokenize, Spanned, Token};
+use crate::lexer::{Spanned, Token, tokenize};
 
 /// Maximum include nesting depth.
 pub const MAX_INCLUDE_DEPTH: usize = 8;
@@ -393,17 +393,16 @@ impl Parser<'_> {
                         if self.depth >= MAX_INCLUDE_DEPTH {
                             return Err(self.err("include nesting is too deep"));
                         }
-                        let text = loader
-                            .read(&path)
-                            .map_err(|error| self.err(format!("cannot read include {path}: {error}")))?;
+                        let text = loader.read(&path).map_err(|error| {
+                            self.err(format!("cannot read include {path}: {error}"))
+                        })?;
                         let tokens = tokenize(&text).map_err(|error| ParseError {
                             file: Some(path.clone()),
                             line: error.line,
                             message: error.message,
                         })?;
                         let mut child_macros = self.macros.clone();
-                        let tokens =
-                            expand_macros(tokens, &mut child_macros, &Some(path.clone()))?;
+                        let tokens = expand_macros(tokens, &mut child_macros, &Some(path.clone()))?;
                         let mut child = Parser {
                             tokens,
                             index: 0,
@@ -465,7 +464,9 @@ impl Parser<'_> {
                     }
                     "nat" => statements.push(Statement::Nat(self.parse_nat_rule(NatKind::NoNat)?)),
                     "rdr" => statements.push(Statement::Nat(self.parse_nat_rule(NatKind::NoRdr)?)),
-                    "binat" => statements.push(Statement::Nat(self.parse_nat_rule(NatKind::NoBinat)?)),
+                    "binat" => {
+                        statements.push(Statement::Nat(self.parse_nat_rule(NatKind::NoBinat)?))
+                    }
                     other => return Err(self.err(format!("unknown `no {other}' directive"))),
                 }
             }
@@ -532,9 +533,7 @@ impl Parser<'_> {
                     let negative = self.eat_punct(&Token::Bang);
                     let word = self.expect_word("an address")?;
                     if !is_address_literal(&word) {
-                        return Err(self.err(format!(
-                            "invalid address `{word}' in table <{name}>"
-                        )));
+                        return Err(self.err(format!("invalid address `{word}' in table <{name}>")));
                     }
                     entries.push(TableEntry::Address {
                         negative,
@@ -828,9 +827,10 @@ impl Parser<'_> {
         let mut port = None;
         if self.eat_word("port") {
             let word = self.expect_word("a port number")?;
-            port = Some(parse_port_number(&word).ok_or_else(|| {
-                self.err(format!("invalid translated port `{word}'"))
-            })?);
+            port = Some(
+                parse_port_number(&word)
+                    .ok_or_else(|| self.err(format!("invalid translated port `{word}'")))?,
+            );
         }
         let pool = if self.eat_word("round-robin") {
             Some(PoolOption::RoundRobin)
@@ -953,9 +953,7 @@ impl Parser<'_> {
                 return Err(self.err(format!("`{word}' addresses are not supported")));
             }
             if word.contains('-') && !word.contains('/') {
-                return Err(self.err(format!(
-                    "address ranges are not supported (`{word}')"
-                )));
+                return Err(self.err(format!("address ranges are not supported (`{word}')")));
             }
             if !is_address_literal(&word) {
                 return Err(self.err(format!(
@@ -1036,8 +1034,8 @@ impl Parser<'_> {
             if operator.is_some() {
                 return Err(self.err("a port range does not take a comparison operator"));
             }
-            let low = parse_port_number(low)
-                .ok_or_else(|| self.err(format!("invalid port `{low}'")))?;
+            let low =
+                parse_port_number(low).ok_or_else(|| self.err(format!("invalid port `{low}'")))?;
             let high = parse_port_number(high)
                 .ok_or_else(|| self.err(format!("invalid port `{high}'")))?;
             if low > high {
@@ -1045,8 +1043,8 @@ impl Parser<'_> {
             }
             return Ok(PortSpec::Range(low, high));
         }
-        let port = parse_port_number(&word)
-            .ok_or_else(|| self.err(format!("invalid port `{word}'")))?;
+        let port =
+            parse_port_number(&word).ok_or_else(|| self.err(format!("invalid port `{word}'")))?;
         Ok(match operator {
             None | Some(Token::Eq) => PortSpec::Eq(port),
             Some(Token::Ne) => PortSpec::Ne(port),

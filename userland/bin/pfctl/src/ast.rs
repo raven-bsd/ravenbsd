@@ -446,10 +446,7 @@ fn group_count(text: &str) -> Option<usize> {
     }
     let mut count = 0;
     for group in text.split(':') {
-        if group.is_empty()
-            || group.len() > 4
-            || !group.chars().all(|ch| ch.is_ascii_hexdigit())
-        {
+        if group.is_empty() || group.len() > 4 || !group.chars().all(|ch| ch.is_ascii_hexdigit()) {
             return None;
         }
         count += 1;
@@ -463,7 +460,9 @@ pub fn is_address_literal(text: &str) -> bool {
     match text.split_once('/') {
         None => is_ipv4(text) || is_ipv6(text),
         Some((address, prefix)) => {
-            if prefix.is_empty() || prefix.len() > 3 || !prefix.chars().all(|ch| ch.is_ascii_digit())
+            if prefix.is_empty()
+                || prefix.len() > 3
+                || !prefix.chars().all(|ch| ch.is_ascii_digit())
             {
                 return false;
             }

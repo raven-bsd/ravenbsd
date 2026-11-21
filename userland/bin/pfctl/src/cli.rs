@@ -14,9 +14,9 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use crate::ast::{HostAddr, Statement, TableDef, TableEntry};
-use crate::parser::{parse_with, FileLoader, ParseOptions};
-use crate::table::parse_table_file;
+use crate::parser::{FileLoader, ParseOptions, parse_with};
 use crate::print::{print_config, print_statement};
+use crate::table::parse_table_file;
 
 /// Usage text.
 pub const USAGE: &str = "\
@@ -110,9 +110,7 @@ fn parse_args(args: &[String]) -> Result<Options, String> {
                                     "macro definition `{value}' is not name=value"
                                 ));
                             };
-                            options
-                                .macros
-                                .push((name.to_string(), value.to_string()));
+                            options.macros.push((name.to_string(), value.to_string()));
                         }
                         't' => options.table = Some(value),
                         'T' => options.table_op = Some(parse_table_op(&value)?),

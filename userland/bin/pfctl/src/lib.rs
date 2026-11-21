@@ -31,9 +31,10 @@ pub mod print;
 pub mod table;
 
 pub use ast::{
-    Action, AddrItem, AddrPortSpec, AddressFamily, Config, Direction, FlagsSpec, HostAddr, IfaceRef,
-    NatKind, NatRule, OptionDirective, Policy, PolicyValue, PoolOption, PortSpec, Protocol,
-    Redirect, Rule, StateMode, StatePolicyValue, Statement, TableDef, TableEntry, TableFlag,
+    Action, AddrItem, AddrPortSpec, AddressFamily, Config, Direction, FlagsSpec, HostAddr,
+    IfaceRef, NatKind, NatRule, OptionDirective, Policy, PolicyValue, PoolOption, PortSpec,
+    Protocol, Redirect, Rule, StateMode, StatePolicyValue, Statement, TableDef, TableEntry,
+    TableFlag,
 };
 pub use cli::{Outcome, run};
 pub use parser::{

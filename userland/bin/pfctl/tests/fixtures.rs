@@ -14,8 +14,7 @@ fn fixture_dir() -> PathBuf {
 }
 
 fn read(name: &str) -> String {
-    fs::read_to_string(fixture_dir().join(name))
-        .unwrap_or_else(|error| panic!("{name}: {error}"))
+    fs::read_to_string(fixture_dir().join(name)).unwrap_or_else(|error| panic!("{name}: {error}"))
 }
 
 struct IncludeLoader;
@@ -43,8 +42,8 @@ fn printed_config_round_trips_through_the_parser() {
 #[test]
 fn includes_expand_in_place() {
     let text = read("includes/main.conf");
-    let config = parse_config_with_loader(&text, "main.conf", &IncludeLoader)
-        .expect("include expansion");
+    let config =
+        parse_config_with_loader(&text, "main.conf", &IncludeLoader).expect("include expansion");
     assert_eq!(print_config(&config), read("includes/main.conf.stdout"));
 }
 
@@ -57,7 +56,10 @@ fn invalid_fixtures_fail_with_line_numbers() {
         if path.extension().and_then(|value| value.to_str()) != Some("conf") {
             continue;
         }
-        let name = path.file_name().and_then(|value| value.to_str()).expect("name");
+        let name = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .expect("name");
         let expected = fs::read_to_string(path.with_extension("conf.err"))
             .unwrap_or_else(|error| panic!("{name}.err: {error}"));
         let mut fields = expected.trim().splitn(2, '|');
