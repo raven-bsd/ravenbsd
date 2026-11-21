@@ -1,35 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
-// The `soreadable`/`sowriteable` predicate mapping is derived from FreeBSD
-// `sys/sys/socketvar.h`:
-//
-// Copyright (c) 1982, 1986, 1990, 1993
-//	The Regents of the University of California.  All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions
-// are met:
-// 1. Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-// 2. Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-// 3. Neither the name of the University nor the names of its contributors
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
-// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-// OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-// OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-// SUCH DAMAGE.
+// Ported from NetBSD at donor revision 36eddebcc36cb0775aa2962005b9c05419a6ff01:
+//   sys/sys/socketvar.h:450-472      soreadable, sowritable
+//   sys/kern/uipc_socket.c:2427-2474  sodopoll, sopoll
+//   sys/sys/poll.h:48-53             POLLIN/POLLPRI/POLLOUT/POLLRDNORM/POLLRDBAND
+//   sys/sys/socketvar.h:193-201      SS_ISCONNECTED/SS_CANTSENDMORE/SS_CANTRCVMORE/
+//                                     SS_POLLRDBAND
+// BSD-3-Clause. The NetBSD predicates are ported literally; the Raven socket
+// record and the K244 netd seam replace `struct socket`/selectors.
 
 //! Live, non-consuming socket readiness.
 //!
@@ -38,17 +17,18 @@
 //! [`crate::Stack::poll`] uses to generate edges, without reading, accepting, popping a datagram,
 //! clearing an error or allocating a socket.
 //!
-//! The `soreadable`/`sowriteable` predicate mapping below is a Rust port of FreeBSD
-//! `sys/sys/socketvar.h` (SPDX-License-Identifier: BSD-3-Clause; Copyright (c) 1982, 1986, 1990,
-//! 1993 The Regents of the University of California). RavenBSD modifications remain under the
-//! file's BSD-3-Clause notice. The FreeBSD `sopoll` registration/recheck is not in the sparse
-//! FreeBSD checkout; that part is clean-room from the existing K244 netd seam and the Illumos
-//! `so_poll` behaviour. No NetBSD code is used.
+//! The `soreadable`/`sowritable` predicates and the `sodopoll`/`sopoll` event
+//! mapping are a literal Rust port of NetBSD `sys/sys/socketvar.h` and
+//! `sys/kern/uipc_socket.c` (BSD-3-Clause, NetBSD revision in the file header).
+//! The selectors are represented by the K244 netd seam: `sopoll` reports the
+//! live mask and whether the caller would have recorded a read/write wakeup.
+//! No stored edge mask decides the live query.
 
 use raven_abi::errno::Errno;
 
 use crate::SocketId;
 use crate::device::Device;
+use crate::event::{POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRNORM};
 use crate::socket::{Kind, SocketRecord};
 use crate::stack::Stack;
 
@@ -86,17 +66,13 @@ pub(crate) struct Levels {
     pub(crate) closed: bool,
 }
 
-/// FreeBSD `sb_lowat` for the read and write socket buffers.
-///
-/// Raven has one fixed low-water mark; the bounded queues make a value of one byte the
-/// equivalent of FreeBSD's default `sb_lowat`.
+/// NetBSD `sb_lowat` for the read and write socket buffers (default 1 byte).
 const SB_LOWAT: usize = 1;
 
-/// FreeBSD `SS_ISCONNECTED` for a Raven TCP record.
+/// NetBSD `SS_ISCONNECTED` mapped from the Raven TCP state.
 ///
-/// A TCP connection is connected after the handshake; SYN-SENT/SYN-RECEIVED and CLOSED are not.
-/// LISTEN has no connection. The state set is the RFC 9293 established set already used by the
-/// Raven TCP state machine, not a new state machine.
+/// A TCP connection is connected after the handshake; SYN-SENT/SYN-RECEIVED and
+/// CLOSED are not. LISTEN has no connection.
 fn tcp_connected(connection: &crate::tcp_state::TcpConnection) -> bool {
     matches!(
         connection.state,
@@ -110,51 +86,69 @@ fn tcp_connected(connection: &crate::tcp_state::TcpConnection) -> bool {
     )
 }
 
-/// FreeBSD `SBS_CANTRCVMORE`: the peer finished sending, or the connection is fully closed.
+/// NetBSD `SS_CANTRCVMORE`: the peer finished sending or the socket is closed.
 fn cannot_receive_more(record: &SocketRecord) -> bool {
     record.closed
         || record.peer_closed
         || matches!(&record.kind, Kind::Tcp(connection) if connection.peer_fin)
 }
 
-/// FreeBSD `SS_ISCONNECTED || !(pr_flags & PR_CONNREQUIRED)`.
+/// NetBSD `SS_ISCONNECTED || !(pr_flags & PR_CONNREQUIRED)`.
 fn connected_or_no_connection(record: &SocketRecord) -> bool {
     match &record.kind {
-        // TCP requires a connection; LISTEN is not connected.
         Kind::Tcp(connection) => tcp_connected(connection),
-        // UDP does not require a connection (PR_CONNREQUIRED is not set).
         Kind::Udp { .. } => true,
-        // The Raven ICMP record is an echo-reply queue, not a FreeBSD raw socket; it has no
-        // write path and therefore keeps the K244 non-writable contract.
         Kind::Listener { .. } | Kind::Icmp { .. } => false,
     }
 }
 
-/// FreeBSD `SBS_CANTSENDMORE`: a local write shutdown or a completed/disconnected close.
+/// NetBSD `SS_CANTSENDMORE`: a local write shutdown or a completed close.
 fn cannot_send_more(record: &SocketRecord) -> bool {
     record.tx_shutdown || record.closed || record.peer_closed
 }
 
-/// Compute the level of one record with the FreeBSD socket predicates.
-pub(crate) fn socket_levels(record: &SocketRecord) -> Levels {
+/// NetBSD `soreadable`: can a read return data, EOF or a pending error?
+fn soreadable(record: &SocketRecord) -> bool {
     let listener_backlog =
         matches!(&record.kind, Kind::Listener { pending, .. } if !pending.is_empty());
     let datagram_queue =
         matches!(&record.kind, Kind::Udp { datagrams, .. } if !datagrams.is_empty());
-    let readable = record.forced_readable
-        || record.rx.len() >= SB_LOWAT
+    record.rx.len() >= SB_LOWAT
+        || record.forced_readable
         || datagram_queue
         || cannot_receive_more(record)
         || listener_backlog
-        || record.error.is_some();
-    let writable = (record.tx.len() < record.tx_cap && connected_or_no_connection(record))
+        || record.error.is_some()
+}
+
+/// NetBSD `sowritable`: can a write make progress (or fail on a shutdown/error)?
+fn sowritable(record: &SocketRecord) -> bool {
+    (record.tx.len() < record.tx_cap && connected_or_no_connection(record))
         || cannot_send_more(record)
-        || record.error.is_some();
-    let closed = record.closed || record.peer_closed;
+        || record.error.is_some()
+}
+
+/// NetBSD `sodopoll`: map the live predicates to poll event bits.
+pub(crate) fn sodopoll(record: &SocketRecord, events: u16) -> u16 {
+    let mut revents = 0u16;
+    if events & (POLLIN | POLLRDNORM) != 0 && soreadable(record) {
+        revents |= events & (POLLIN | POLLRDNORM);
+    }
+    if events & (POLLOUT | POLLWRNORM) != 0 && sowritable(record) {
+        revents |= events & (POLLOUT | POLLWRNORM);
+    }
+    // NetBSD has no priority-band queue in this Raven socket record, so
+    // SS_POLLRDBAND is never set; the event bits are accepted but not returned.
+    revents
+}
+
+/// Compute the levels from the NetBSD predicates; the edge path and the live
+/// query both use these functions.
+pub(crate) fn socket_levels(record: &SocketRecord) -> Levels {
     Levels {
-        readable,
-        writable,
-        closed,
+        readable: soreadable(record),
+        writable: sowritable(record),
+        closed: record.closed || record.peer_closed,
     }
 }
 
@@ -173,6 +167,28 @@ impl<D: Device> Stack<D> {
             hup: levels.closed,
             error: record.error.is_some(),
         })
+    }
+
+    /// NetBSD `sodopoll`: return the live event bits for the requested events.
+    pub fn sodopoll(&self, socket: SocketId, events: u16) -> Result<u16, Errno> {
+        let record = self.sockets.record(socket)?;
+        Ok(sodopoll(record, events))
+    }
+
+    /// NetBSD `sopoll`: live mask plus the wakeup registration the caller would
+    /// make when the mask is zero.
+    ///
+    /// The K244 netd seam owns the actual selector registration; this method
+    /// reports the two booleans so the seam can arm only the needed direction.
+    pub fn sopoll(&self, socket: SocketId, events: u16) -> Result<(u16, bool, bool), Errno> {
+        let record = self.sockets.record(socket)?;
+        let revents = sodopoll(record, events);
+        if revents != 0 {
+            return Ok((revents, false, false));
+        }
+        let register_read = events & (POLLIN | POLLPRI | POLLRDNORM | POLLRDBAND) != 0;
+        let register_write = events & (POLLOUT | POLLWRNORM) != 0;
+        Ok((revents, register_read, register_write))
     }
 }
 

@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 
 use super::*;
 use crate::Ipv4Config;
+use crate::event::{POLLIN, POLLOUT, POLLRDBAND, POLLRDNORM, POLLWRNORM};
 use crate::stack::{Ipv4Addr, StackConfig};
 use crate::testutil::LoopbackDevice;
 use crate::time::Instant;
@@ -184,6 +185,73 @@ fn a_peer_fin_is_readable_without_claiming_a_full_hangup() {
     stack.test_set_closed(connection, true).expect("full close");
     let hup = stack.readiness(connection).expect("hup");
     assert!(hup.hup, "a full peer close is a hangup");
+}
+
+#[test]
+fn sodopoll_maps_the_netbsd_event_bits() {
+    let (mut stack, connection) = established();
+    assert_eq!(
+        stack
+            .sodopoll(connection, POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM)
+            .expect("poll"),
+        POLLOUT
+    );
+    stack.test_push_rx(connection, b"x").expect("push");
+    assert_eq!(
+        stack
+            .sodopoll(connection, POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM)
+            .expect("poll"),
+        POLLIN | POLLRDNORM | POLLOUT
+    );
+    assert_eq!(
+        stack.sodopoll(connection, POLLRDBAND).expect("rdband"),
+        0,
+        "Raven has no priority-band queue"
+    );
+}
+
+#[test]
+fn sopoll_registers_only_the_unready_directions() {
+    let (stack, connection) = established();
+    let (mask, read, write) = stack.sopoll(connection, POLLOUT).expect("poll out");
+    assert_eq!(mask, POLLOUT);
+    assert!(!read && !write, "a ready socket is not registered");
+
+    let (mask, read, write) = stack.sopoll(connection, POLLIN).expect("poll in");
+    assert_eq!(mask, 0);
+    assert!(read && !write, "the idle read direction is registered");
+
+    let (mask, read, write) = stack
+        .sopoll(connection, POLLIN | POLLOUT)
+        .expect("poll both");
+    assert_eq!(mask, POLLOUT);
+    assert!(!read && !write);
+}
+
+#[test]
+fn sopoll_uses_the_live_predicate_not_the_stored_edge_baseline() {
+    let (mut stack, connection) = established();
+    {
+        let record = stack.sockets.record_mut(connection).expect("record");
+        record.prev_readable = true;
+        record.prev_writable = false;
+    }
+    let (mask, read, _) = stack.sopoll(connection, POLLIN).expect("poll");
+    assert_eq!(mask, 0, "stored edge baseline must not mask the live query");
+    assert!(read);
+}
+
+#[test]
+fn netbsd_sowritable_requires_a_connection_or_a_shutdown() {
+    let (mut stack, connection) = established();
+    assert!(stack.readiness(connection).expect("idle").writable);
+    stack.shutdown_write(connection).expect("shutdown");
+    let shut = stack.readiness(connection).expect("shut");
+    assert!(
+        shut.writable,
+        "NetBSD sowritable returns true for SS_CANTSENDMORE"
+    );
+    assert_eq!(stack.sodopoll(connection, POLLOUT).expect("poll"), POLLOUT);
 }
 
 #[test]

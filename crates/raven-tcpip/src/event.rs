@@ -5,6 +5,19 @@
 
 use raven_abi::errno::Errno;
 
+/// NetBSD `POLLIN`: data/EOF/error readable.
+pub const POLLIN: u16 = 0x0001;
+/// NetBSD `POLLPRI`: priority data.
+pub const POLLPRI: u16 = 0x0002;
+/// NetBSD `POLLOUT`: write space.
+pub const POLLOUT: u16 = 0x0004;
+/// NetBSD `POLLRDNORM`: normal data.
+pub const POLLRDNORM: u16 = 0x0040;
+/// NetBSD `POLLWRNORM` is an alias of `POLLOUT`.
+pub const POLLWRNORM: u16 = POLLOUT;
+/// NetBSD `POLLRDBAND`: priority band data.
+pub const POLLRDBAND: u16 = 0x0080;
+
 /// A socket identifier.
 ///
 /// Ids are allocated monotonically and never reused until the `u32` counter wraps. Callers may
