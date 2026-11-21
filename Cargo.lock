@@ -4189,6 +4189,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcp-loss-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
+]
+
+[[package]]
 name = "tcp-output-stress"
 version = "0.1.0"
 dependencies = [
