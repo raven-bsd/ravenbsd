@@ -656,6 +656,16 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// The negotiated window scale, if the peer offered WS (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_negotiated_wscale(&self, socket: SocketId) -> Option<Option<u8>> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some(connection.negotiated_wscale),
+            _ => None,
+        }
+    }
+
     /// Whether SACK-permitted was negotiated (host tests).
     #[cfg(any(test, feature = "testutil"))]
     #[must_use]
@@ -2619,7 +2629,7 @@ impl<D: Device> Stack<D> {
             };
             let remote = connection.remote.ok_or(Errno::ENOTCONN)?;
             let tsval = u32::try_from(self.now.as_millis()).unwrap_or(0);
-            let options = syn_options(connection, tsval, connection.ts_recent);
+            let options = syn_options(connection, tsval, connection.ts_recent, true);
             (
                 connection.local,
                 remote,
@@ -2664,7 +2674,12 @@ impl<D: Device> Stack<D> {
                 connection.rcv_wnd,
                 {
                     let tsval = u32::try_from(self.now.as_millis()).unwrap_or(0);
-                    syn_options(connection, tsval, connection.ts_recent)
+                    syn_options(
+                        connection,
+                        tsval,
+                        connection.ts_recent,
+                        connection.negotiated_wscale.is_some(),
+                    )
                 },
             )
         };
@@ -3728,8 +3743,12 @@ fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment<'_>, now:
         connection.peer_mss = clamped;
         connection.mss = connection.peer_mss.min(connection.our_mss);
     }
-    if connection.offer_wscale {
-        connection.snd_wscale = segment.wscale.unwrap_or(0).min(14);
+    if connection.offer_wscale
+        && let Some(peer_scale) = segment.wscale
+    {
+        // RFC 7323 §2.2: scaling is negotiated only when the peer offered WS.
+        // A plain SYN/ACK leaves snd_wscale at 0 and negotiated_wscale unset.
+        connection.snd_wscale = peer_scale.min(14);
         connection.negotiated_wscale = Some(connection.snd_wscale);
     }
     if segment.sack_permitted && connection.offer_sack {
@@ -3754,7 +3773,12 @@ fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment<'_>, now:
         .max(1);
 }
 
-fn syn_options(connection: &TcpConnection, tsval: u32, tsecr: u32) -> Vec<u8> {
+fn syn_options(
+    connection: &TcpConnection,
+    tsval: u32,
+    tsecr: u32,
+    include_wscale: bool,
+) -> Vec<u8> {
     let mut options = Vec::new();
     options.extend_from_slice(&[2, 4]);
     options.extend_from_slice(&connection.our_mss.to_be_bytes());
@@ -3768,7 +3792,7 @@ fn syn_options(connection: &TcpConnection, tsval: u32, tsecr: u32) -> Vec<u8> {
         options.extend_from_slice(&tsecr.to_be_bytes());
         options.extend_from_slice(&[1, 1]);
     }
-    if connection.offer_wscale {
+    if connection.offer_wscale && include_wscale {
         options.extend_from_slice(&[3, 3, connection.rcv_wscale]);
     }
     options.push(0);
