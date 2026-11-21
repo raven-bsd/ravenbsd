@@ -42,6 +42,19 @@ die() {
 command -v clang >/dev/null 2>&1 || die "clang is required"
 command -v qemu-system-x86_64 >/dev/null 2>&1 || die "qemu-system-x86_64 is required"
 
+# The link is lld-based; the distributed ld.lld may live in the Rust toolchain.
+if ! command -v ld.lld >/dev/null 2>&1; then
+    host=$(rustc -vV 2>/dev/null | sed -n 's/^host: //p' || true)
+    if [ -n "$host" ]; then
+        lld_dir=$(rustc --print sysroot 2>/dev/null)/lib/rustlib/$host/bin/gcc-ld
+        if [ -x "$lld_dir/ld.lld" ]; then
+            PATH="$lld_dir:$PATH"
+            export PATH
+        fi
+    fi
+fi
+command -v ld.lld >/dev/null 2>&1 || die "ld.lld is required"
+
 code=${RAVEN_OVMF_CODE:-/usr/share/OVMF/OVMF_CODE_4M.fd}
 [ -f "$code" ] || code=/usr/share/OVMF/OVMF_CODE.fd
 vars_src=${RAVEN_OVMF_VARS:-/usr/share/OVMF/OVMF_VARS_4M.fd}
