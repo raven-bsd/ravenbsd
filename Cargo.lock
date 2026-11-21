@@ -1018,6 +1018,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rack-sockopt"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
 name = "rack-tlp-model"
 version = "0.1.0"
 dependencies = [
