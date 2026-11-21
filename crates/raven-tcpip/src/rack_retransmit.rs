@@ -42,6 +42,12 @@
 use alloc::vec::Vec;
 
 use crate::rack_hpts::{PACE_TMR_RXT, RackHpts};
+use crate::rack_types::{
+    PACE_MAX_IP_BYTES, RACK_ACKED, RACK_HAD_PUSH, RACK_HAS_FIN, RACK_HAS_SYN, RACK_MUST_RXT,
+    RACK_NUM_OF_RETRANS, RACK_OVERMAX, RACK_RTO_MAX, RACK_RTO_MIN, RACK_RWND_COLLAPSED,
+    RACK_SACK_PASSED, RACK_SENT_FP, RACK_TLP, RACK_WAS_ACKED, RACK_WAS_LOST, RACK_WAS_SACKPASS,
+    RackSendmap, TF_CONGRECOVERY, TF_FASTRECOVERY,
+};
 use crate::rack_vtable::{
     RackStack, TCPS_CLOSE_WAIT, TCPS_ESTABLISHED, TCPS_SYN_RECEIVED, TCPS_SYN_SENT, TF_SENTFIN,
     TH_ACK, TH_FIN, TH_RST,
@@ -58,150 +64,36 @@ const TCPS_LAST_ACK: u8 = 10;
 /// The TCP SYN flag; `rack_vtable` does not re-export it.
 const TH_SYN: u16 = 0x02;
 
-/// `RACK_NUM_OF_RETRANS`, the transmitted-time slots kept per send-map entry.
-pub const RACK_NUM_OF_RETRANS: usize = 3;
 /// `DUP_ACK_THRESHOLD`, the duplicate-ACK threshold.
 pub const DUP_ACK_THRESHOLD: u8 = 3;
 /// `MHLEN`, the mbuf header length used by the fast-output size guard.
 pub const MHLEN: u32 = 224;
 /// `max_linkhdr`, the link-layer header space used by the fast-output size guard.
 pub const MAX_LINKHDR: u32 = 14;
-/// `PACE_MAX_IP_BYTES`, the pacing-size ceiling.
-pub const PACE_MAX_IP_BYTES: u32 = 65_535;
-/// `rack_rto_min`, 30 ms in microseconds.
-pub const RACK_RTO_MIN: u32 = 30_000;
-/// `rack_rto_max`, 4 s in microseconds.
-pub const RACK_RTO_MAX: u32 = 4_000_000;
 /// `CUM_ACKED`, a cumulative-ACK RTT sample.
 pub const CUM_ACKED: u8 = 1;
 /// `SACKED`, a SACK RTT sample.
 pub const SACKED: u8 = 2;
-
-/// The remote endpoint ACKed this send-map entry.
-pub const RACK_ACKED: u32 = 0x0000_0001;
-/// A timeout occurred on this send-map entry (`RACK_TO_REXT`).
-#[allow(dead_code)]
-pub const RACK_TO_REXT: u32 = 0x0000_0002;
-/// More retransmissions than the transmit-time array can hold.
-pub const RACK_OVERMAX: u32 = 0x0000_0008;
-/// A SACK was done above this block.
-pub const RACK_SACK_PASSED: u32 = 0x0000_0010;
-/// This entry was retransmitted because of a SACK pass.
-pub const RACK_WAS_SACKPASS: u32 = 0x0000_0020;
-/// The segment carries a FIN.
-pub const RACK_HAS_FIN: u32 = 0x0000_0040;
-/// The segment was sent as a tail-loss probe.
-pub const RACK_TLP: u32 = 0x0000_0080;
-/// The peer collapsed the receive window on this segment.
-pub const RACK_RWND_COLLAPSED: u32 = 0x0000_0100;
-/// The sender became application limited after this segment.
-#[allow(dead_code)]
-pub const RACK_APP_LIMITED: u32 = 0x0000_0200;
-/// A retransmission timeout undid the ACK but the RTT was already sampled.
-pub const RACK_WAS_ACKED: u32 = 0x0000_0400;
-/// The original transmission carried PUSH.
-pub const RACK_HAD_PUSH: u32 = 0x0000_8000;
-/// The retransmit timer requires this entry to be sent.
-pub const RACK_MUST_RXT: u32 = 0x0001_0000;
-/// The path MTU changed on this entry.
-#[allow(dead_code)]
-pub const RACK_PMTU_CHG: u32 = 0x0010_0000;
-/// RACK considers this entry lost.
-pub const RACK_WAS_LOST: u32 = 0x0040_0000;
-/// A fast-path transmission (`RACK_SENT_FP`).
-pub const RACK_SENT_FP: u32 = 0x0000_4000;
 /// The TCP PUSH flag.
 pub const TH_PUSH: u16 = 0x08;
-
-/// One `struct rack_sendmap` entry.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Rsm {
-    /// Stable entry identifier (the donor pointer identity).
-    pub id: u32,
-    /// First sequence number.
-    pub r_start: u32,
-    /// One past the last sequence number.
-    pub r_end: u32,
-    /// Retransmitted bytes.
-    pub r_rtr_bytes: u32,
-    /// `RACK_*` flags.
-    pub r_flags: u32,
-    /// Number of transmit-time slots used.
-    pub r_rtr_cnt: u8,
-    /// Total number of transmissions.
-    pub r_act_rxt_cnt: u32,
-    /// Duplicate-ACK count.
-    pub r_dupack: u8,
-    /// Whether the entry is linked in the time-order list.
-    pub r_in_tmap: bool,
-    /// RTT sampling is disabled for this entry.
-    pub r_no_rtt_allowed: bool,
-    /// KTLS transmit state.
-    pub r_hw_tls: bool,
-    /// Transmit timestamps, µs.
-    pub r_tim_lastsent: [u64; RACK_NUM_OF_RETRANS],
-    /// ACK arrival timestamp, µs.
-    pub r_ack_arrival: u64,
-    /// Flight size at send.
-    pub r_fas: u32,
-    /// Burst size at send.
-    pub r_bas: u8,
-}
-
-impl Rsm {
-    /// Create an entry with one transmit timestamp.
-    #[must_use]
-    pub const fn new(id: u32, start: u32, end: u32, ts: u64) -> Self {
-        let mut r_tim_lastsent = [0; RACK_NUM_OF_RETRANS];
-        r_tim_lastsent[0] = ts;
-        Self {
-            id,
-            r_start: start,
-            r_end: end,
-            r_rtr_bytes: 0,
-            r_flags: 0,
-            r_rtr_cnt: 1,
-            r_act_rxt_cnt: 0,
-            r_dupack: 0,
-            r_in_tmap: true,
-            r_no_rtt_allowed: false,
-            r_hw_tls: false,
-            r_tim_lastsent,
-            r_ack_arrival: 0,
-            r_fas: 0,
-            r_bas: 0,
-        }
-    }
-
-    /// Segment length in bytes.
-    #[must_use]
-    pub const fn len(&self) -> u32 {
-        self.r_end.saturating_sub(self.r_start)
-    }
-
-    /// Whether the entry covers no sequence space.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.r_end <= self.r_start
-    }
-
-    /// The most recent transmit timestamp.
-    #[must_use]
-    pub const fn last_sent(&self) -> u64 {
-        let index = if self.r_rtr_cnt == 0 {
-            0
-        } else {
-            self.r_rtr_cnt as usize - 1
-        };
-        self.r_tim_lastsent[index]
-    }
-}
+/// `TF_GPUTINPROG`: a goodput measurement is in progress.
+pub const TF_GPUTINPROG: u32 = 0x0000_8000;
+/// `RACK_USE_BEG`: the measurement starts at the left edge of the send-map entry.
+pub const RACK_USE_BEG: u8 = 1;
+/// `RACK_USE_END`: the measurement starts at the right edge.
+pub const RACK_USE_END: u8 = 2;
+/// `RACK_USE_END_OR_THACK`: the measurement starts at the ACK or the right edge.
+pub const RACK_USE_END_OR_THACK: u8 = 3;
+/// `MIN_GP_WIN`: a goodput measurement needs at least six MSS.
+pub const MIN_GP_WIN: u32 = 6;
+/// `rack_rtt_divisor` default.
+pub const RACK_RTT_DIVISOR: u32 = 2;
 
 /// The sequence-ordered send map with the donor time-order list.
 #[derive(Clone, Debug, Default)]
 pub struct RackSendMap {
     /// Sequence-ordered entries.
-    pub segments: Vec<Rsm>,
+    pub segments: Vec<RackSendmap>,
     /// Time-order entry identifiers (`rc_tmap`).
     pub tmap: Vec<u32>,
     next_id: u32,
@@ -212,35 +104,36 @@ impl RackSendMap {
     pub fn insert(&mut self, start: u32, end: u32, ts: u64) -> u32 {
         self.next_id = self.next_id.saturating_add(1);
         let id = self.next_id;
-        let index = self.segments.partition_point(|entry| entry.r_start < start);
-        self.segments.insert(index, Rsm::new(id, start, end, ts));
+        let index = self.segments.partition_point(|entry| entry.start < start);
+        self.segments
+            .insert(index, RackSendmap::with_id(id, start, end, ts));
         self.tmap.push(id);
         id
     }
 
     /// Find an entry by sequence start.
     #[must_use]
-    pub fn find(&self, start: u32) -> Option<&Rsm> {
-        self.segments.iter().find(|entry| entry.r_start == start)
+    pub fn find(&self, start: u32) -> Option<&RackSendmap> {
+        self.segments.iter().find(|entry| entry.start == start)
     }
 
     /// Find an entry by identifier.
     #[must_use]
-    pub fn find_id(&self, id: u32) -> Option<&Rsm> {
+    pub fn find_id(&self, id: u32) -> Option<&RackSendmap> {
         self.segments.iter().find(|entry| entry.id == id)
     }
 
     /// Mutably find an entry by identifier.
-    pub fn find_id_mut(&mut self, id: u32) -> Option<&mut Rsm> {
+    pub fn find_id_mut(&mut self, id: u32) -> Option<&mut RackSendmap> {
         self.segments.iter_mut().find(|entry| entry.id == id)
     }
 
     /// Find the entry covering `seq`.
     #[must_use]
-    pub fn covering(&self, seq: u32) -> Option<&Rsm> {
+    pub fn covering(&self, seq: u32) -> Option<&RackSendmap> {
         self.segments
             .iter()
-            .find(|entry| seq_ge(seq, entry.r_start) && seq_lt(seq, entry.r_end))
+            .find(|entry| seq_ge(seq, entry.start) && seq_lt(seq, entry.end))
     }
 
     /// Remove an entry from both orders.
@@ -260,10 +153,10 @@ impl RackSendMap {
         let Some(entry) = self.find_id_mut(id) else {
             return false;
         };
-        if entry.r_flags & RACK_ACKED != 0 {
+        if entry.flags & RACK_ACKED != 0 {
             return false;
         }
-        entry.r_flags |= RACK_ACKED;
+        entry.flags |= RACK_ACKED;
         *sacked = sacked.saturating_add(entry.len());
         true
     }
@@ -272,16 +165,16 @@ impl RackSendMap {
     pub fn ack_through(&mut self, ack: u32, sacked: &mut u32) {
         let mut removed = Vec::new();
         for entry in &mut self.segments {
-            if seq_le(entry.r_end, ack) {
-                if entry.r_flags & RACK_ACKED != 0 {
+            if seq_le(entry.end, ack) {
+                if entry.flags & RACK_ACKED != 0 {
                     *sacked = sacked.saturating_sub(entry.len());
                 }
                 removed.push(entry.id);
-            } else if seq_lt(entry.r_start, ack) {
-                if entry.r_flags & RACK_ACKED != 0 {
-                    *sacked = sacked.saturating_sub(ack.wrapping_sub(entry.r_start));
+            } else if seq_lt(entry.start, ack) {
+                if entry.flags & RACK_ACKED != 0 {
+                    *sacked = sacked.saturating_sub(ack.wrapping_sub(entry.start));
                 }
-                entry.r_start = ack;
+                entry.start = ack;
             }
         }
         self.segments.retain(|entry| !removed.contains(&entry.id));
@@ -296,23 +189,23 @@ impl RackSendMap {
         let Some(tail) = self.find_id_mut(tail_id) else {
             return;
         };
-        tail.r_rtr_cnt = source.r_rtr_cnt;
-        tail.r_act_rxt_cnt = source.r_act_rxt_cnt;
-        tail.r_flags = source.r_flags;
-        tail.r_dupack = source.r_dupack;
-        tail.r_no_rtt_allowed = source.r_no_rtt_allowed;
-        tail.r_hw_tls = source.r_hw_tls;
-        tail.r_rtr_bytes = 0;
-        tail.r_fas = source.r_fas;
-        tail.r_bas = source.r_bas;
-        tail.r_tim_lastsent = source.r_tim_lastsent;
-        tail.r_flags &= !0x0000_0800; // RACK_HAS_SYN stays on the left edge.
+        tail.rtr_cnt = source.rtr_cnt;
+        tail.act_rxt_cnt = source.act_rxt_cnt;
+        tail.flags = source.flags;
+        tail.dupack = source.dupack;
+        tail.no_rtt_allowed = source.no_rtt_allowed;
+        tail.hw_tls = source.hw_tls;
+        tail.rtr_bytes = 0;
+        tail.fas = source.fas;
+        tail.bas = source.bas;
+        tail.tim_lastsent = source.tim_lastsent;
+        tail.flags &= !RACK_HAS_SYN; // RACK_HAS_SYN stays on the left edge.
     }
 
     /// Clear the right-edge flags after a split.
     fn clear_edge_flags(&mut self, id: u32) {
         if let Some(entry) = self.find_id_mut(id) {
-            entry.r_flags &= !(RACK_HAS_FIN | RACK_HAD_PUSH);
+            entry.flags &= !(RACK_HAS_FIN | RACK_HAD_PUSH);
         }
     }
 }
@@ -544,6 +437,44 @@ pub struct RackRetransmit {
     pub tlp_retran: u64,
     /// `rack_tlp_retran_bytes`.
     pub tlp_retran_bytes: u64,
+    /// `tp->gput_seq`.
+    pub gput_seq: u32,
+    /// `tp->gput_ts`.
+    pub gput_ts: u32,
+    /// `tp->gput_ack`.
+    pub gput_ack: u32,
+    /// `rack->app_limited_needs_set`.
+    pub app_limited_needs_set: bool,
+    /// `rack->r_ctl.rc_gp_output_ts`.
+    pub gp_output_ts: u32,
+    /// `rack->rc_gp_filled`.
+    pub gp_filled: bool,
+    /// `rack->in_probe_rtt`.
+    pub in_probe_rtt: bool,
+    /// `rack->measure_saw_probe_rtt`.
+    pub measure_saw_probe_rtt: bool,
+    /// `rack->r_ctl.rc_probertt_sndmax_atexit`.
+    pub probertt_sndmax_atexit: u32,
+    /// `rack->r_ctl.rc_app_limited_cnt`.
+    pub app_limited_cnt: u32,
+    /// `rack_get_measure_window` result used by the filled measurement.
+    pub measure_window: u32,
+    /// `rc_init_window` result for the current MSS.
+    pub initial_window: u32,
+    /// `rack->r_ctl.act_rcv_time` in microseconds.
+    pub act_rcv_time: u32,
+    /// `rack_rtt_divisor`.
+    pub rtt_divisor: u32,
+    /// `rack->r_ctl.rc_ssthresh_at_erec`.
+    pub ssthresh_at_erec: u32,
+    /// `rack->r_might_revert`.
+    pub might_revert: bool,
+    /// Number of `rack_tend_gp_marks` calls made by `rack_need_set_test`.
+    pub gp_marks_tended: u32,
+    /// Number of `rack_log_gpset` calls made by `rack_need_set_test`.
+    pub gp_logs: u32,
+    /// Number of `rack_log_to_prr` calls made by `rack_check_reorder_ack`.
+    pub prr_logs: u32,
 }
 
 impl Default for RackRetransmit {
@@ -567,6 +498,7 @@ impl RackRetransmit {
         let mut hpts = RackHpts::new(0);
         hpts.tcp_hpts_init(1);
         let pace_min_segs = u32::from(mss);
+        let initial_window = rc_init_window(u32::from(mss));
         Self {
             stack,
             hpts,
@@ -633,6 +565,25 @@ impl RackRetransmit {
             sndrexmitbyte: 0,
             tlp_retran: 0,
             tlp_retran_bytes: 0,
+            gput_seq: 0,
+            gput_ts: 0,
+            gput_ack: 0,
+            app_limited_needs_set: false,
+            gp_output_ts: 0,
+            gp_filled: false,
+            in_probe_rtt: false,
+            measure_saw_probe_rtt: false,
+            probertt_sndmax_atexit: 0,
+            app_limited_cnt: 0,
+            measure_window: initial_window,
+            initial_window,
+            act_rcv_time: 0,
+            rtt_divisor: RACK_RTT_DIVISOR,
+            ssthresh_at_erec: 0,
+            might_revert: false,
+            gp_marks_tended: 0,
+            gp_logs: 0,
+            prr_logs: 0,
         }
     }
 
@@ -641,7 +592,7 @@ impl RackRetransmit {
         let id = self.map.insert(start, end, now_us);
         let flight = self.flight_size();
         if let Some(entry) = self.map.find_id_mut(id) {
-            entry.r_fas = flight;
+            entry.fas = flight;
         }
         if seq_gt(end, self.stack.tp.snd_max) {
             self.stack.tp.snd_max = end;
@@ -679,7 +630,7 @@ impl RackRetransmit {
         self.map.tmap.iter().copied().find(|id| {
             self.map
                 .find_id(*id)
-                .is_some_and(|entry| entry.r_flags & RACK_ACKED == 0)
+                .is_some_and(|entry| entry.flags & RACK_ACKED == 0)
         })
     }
 
@@ -690,8 +641,130 @@ impl RackRetransmit {
         self.map.segments[..=start]
             .iter()
             .rev()
-            .find(|entry| entry.r_flags & (RACK_ACKED | RACK_HAS_FIN) == 0)
+            .find(|entry| entry.flags & (RACK_ACKED | RACK_HAS_FIN) == 0)
             .map(|entry| entry.id)
+    }
+
+    /// `rack_need_set_test`: move the goodput measurement window after an ACK.
+    ///
+    /// `use_which` is `RACK_USE_BEG`, `RACK_USE_END` or `RACK_USE_END_OR_THACK`.
+    /// The donor logging calls become the `gp_logs`/`gp_marks_tended` counters.
+    pub fn rack_need_set_test(&mut self, id: u32, th_ack: u32, use_which: u8) {
+        let Some(rsm) = self.map.find_id(id).cloned() else {
+            return;
+        };
+        if self.stack.tp.t_flags & TF_GPUTINPROG == 0 || !seq_ge(rsm.end, self.gput_seq) {
+            return;
+        }
+        if rsm.rtr_cnt > 1 {
+            // A retransmission has an ambiguous transmit timestamp.
+            return;
+        }
+        let seq = self.gput_seq;
+        let ts = self.gput_ts;
+        self.app_limited_needs_set = false;
+        self.gput_ts = self.act_rcv_time;
+        if use_which == RACK_USE_BEG && seq_ge(rsm.start, self.gput_seq) {
+            self.gput_seq = rsm.start;
+        }
+        if use_which == RACK_USE_END && seq_ge(rsm.end, self.gput_seq) {
+            self.gput_seq = rsm.end;
+        }
+        if use_which == RACK_USE_END_OR_THACK {
+            self.gput_seq = if seq_gt(th_ack, rsm.end) {
+                th_ack
+            } else {
+                rsm.end
+            };
+        }
+        let next_sent = if seq_lt(self.gput_seq, self.stack.tp.snd_max) {
+            self.map
+                .covering(self.gput_seq)
+                .map(|entry| entry.tim_lastsent[0] as u32)
+        } else {
+            None
+        };
+        if let Some(ts) = next_sent {
+            self.gp_output_ts = ts;
+        } else {
+            self.gp_output_ts = rsm.tim_lastsent[0] as u32;
+            self.app_limited_needs_set = true;
+        }
+        if seq_gt(self.gput_seq, self.gput_ack) {
+            let window = if self.gp_filled {
+                self.measure_window
+            } else {
+                self.initial_window
+                    .max(MIN_GP_WIN.saturating_mul(u32::from(self.stack.tp.t_maxseg)))
+            };
+            self.gput_ack = self.gput_seq.saturating_add(window);
+        }
+        if !self.in_probe_rtt
+            && self.measure_saw_probe_rtt
+            && seq_ge(self.gput_seq, self.probertt_sndmax_atexit)
+        {
+            self.measure_saw_probe_rtt = false;
+        }
+        self.gp_logs = self.gp_logs.saturating_add(1);
+        if self.gp_filled {
+            let minimum = self
+                .initial_window
+                .max(MIN_GP_WIN.saturating_mul(u32::from(self.stack.tp.t_maxseg)));
+            if self.gput_ack.saturating_sub(self.gput_seq) < minimum {
+                let ideal = self.measure_window.max(self.initial_window);
+                if ideal > self.stack.os.sbavail() {
+                    self.stack.tp.t_flags &= !TF_GPUTINPROG;
+                    self.gp_logs = self.gp_logs.saturating_add(1);
+                } else {
+                    self.gput_ack = self.gput_seq.saturating_add(ideal);
+                }
+            }
+        }
+        self.gp_marks_tended = self.gp_marks_tended.saturating_add(1);
+        let _ = (seq, ts);
+    }
+
+    /// `rack_check_reorder_ack`: undo a spurious recovery retransmission on a reordered ACK.
+    pub fn rack_check_reorder_ack(
+        &mut self,
+        id: u32,
+        the_end: u32,
+        cts: u32,
+        can_exit_recovery: bool,
+    ) -> bool {
+        let Some(rsm) = self.map.find_id(id).cloned() else {
+            return false;
+        };
+        if self.rtt_divisor == 0 || rsm.rtr_cnt != 2 {
+            return false;
+        }
+        let in_recovery = self.in_fast_recovery || self.in_cong_recovery;
+        if !in_recovery || rsm.flags & RACK_WAS_SACKPASS == 0 {
+            return false;
+        }
+        let mut fractional = self.stack.tp.t_srtt / self.rtt_divisor;
+        if fractional == 0 {
+            fractional = 1;
+        }
+        let index = usize::from(rsm.rtr_cnt.saturating_sub(1));
+        let snt_to_ack = cts.wrapping_sub(rsm.tim_lastsent[index] as u32);
+        if snt_to_ack > fractional {
+            return false;
+        }
+        self.reorder_ts = cts;
+        let removed = the_end.wrapping_sub(rsm.start);
+        self.recovery_rxt_cnt = self.recovery_rxt_cnt.saturating_sub(removed);
+        self.prr_logs = self.prr_logs.saturating_add(1);
+        if can_exit_recovery && self.recovery_rxt_cnt == 0 {
+            self.stack.tp.snd_ssthresh = self.ssthresh_at_erec;
+            self.stack.tp.t_flags &= !(TF_FASTRECOVERY | TF_CONGRECOVERY);
+            self.in_fast_recovery = false;
+            self.in_cong_recovery = false;
+            self.might_revert = false;
+            self.retran_during_recovery = 0;
+            self.prr_logs = self.prr_logs.saturating_add(1);
+        }
+        true
     }
 
     /// `rack_update_rsm`: account one retransmission of a send-map entry.
@@ -700,43 +773,43 @@ impl RackRetransmit {
         let Some(entry) = self.map.find_id_mut(id) else {
             return;
         };
-        entry.r_rtr_cnt = entry.r_rtr_cnt.saturating_add(1);
-        if entry.r_rtr_cnt as usize > RACK_NUM_OF_RETRANS {
-            entry.r_rtr_cnt = RACK_NUM_OF_RETRANS as u8;
-            entry.r_flags |= RACK_OVERMAX;
+        entry.rtr_cnt = entry.rtr_cnt.saturating_add(1);
+        if entry.rtr_cnt as usize > RACK_NUM_OF_RETRANS {
+            entry.rtr_cnt = RACK_NUM_OF_RETRANS as u8;
+            entry.flags |= RACK_OVERMAX;
         }
-        entry.r_act_rxt_cnt = entry.r_act_rxt_cnt.saturating_add(1);
-        entry.r_dupack = 0;
+        entry.act_rxt_cnt = entry.act_rxt_cnt.saturating_add(1);
+        entry.dupack = 0;
         let len = entry.len();
         let mut holes = 0;
-        if entry.r_rtr_cnt > 1 && entry.r_flags & RACK_TLP == 0 {
+        if entry.rtr_cnt > 1 && entry.flags & RACK_TLP == 0 {
             holes = len;
-            entry.r_rtr_bytes = entry.r_rtr_bytes.saturating_add(len);
+            entry.rtr_bytes = entry.rtr_bytes.saturating_add(len);
         }
-        let was_lost = entry.r_flags & RACK_WAS_LOST != 0;
+        let was_lost = entry.flags & RACK_WAS_LOST != 0;
         if was_lost {
-            entry.r_flags &= !RACK_WAS_LOST;
+            entry.flags &= !RACK_WAS_LOST;
         }
-        let index = entry.r_rtr_cnt as usize - 1;
-        entry.r_tim_lastsent[index] = ts;
-        entry.r_fas = flight;
-        let was_acked = entry.r_flags & RACK_ACKED != 0;
+        let index = entry.rtr_cnt as usize - 1;
+        entry.tim_lastsent[index] = ts;
+        entry.fas = flight;
+        let was_acked = entry.flags & RACK_ACKED != 0;
         if was_acked {
-            entry.r_flags &= !RACK_ACKED;
+            entry.flags &= !RACK_ACKED;
         }
-        entry.r_in_tmap = true;
+        entry.in_tmap = true;
         let segsiz = segsiz.max(1);
-        entry.r_bas = u8::try_from(len.div_ceil(segsiz)).unwrap_or(u8::MAX);
-        let must_rxt = entry.r_flags & RACK_MUST_RXT != 0;
-        let reaches_rto_max = seq_ge(entry.r_end, self.snd_max_at_rto);
+        entry.bas = u8::try_from(len.div_ceil(segsiz)).unwrap_or(u8::MAX);
+        let must_rxt = entry.flags & RACK_MUST_RXT != 0;
+        let reaches_rto_max = seq_ge(entry.end, self.snd_max_at_rto);
         if must_rxt {
-            entry.r_flags &= !RACK_MUST_RXT;
+            entry.flags &= !RACK_MUST_RXT;
         }
-        entry.r_flags &= !RACK_RWND_COLLAPSED;
-        let sack_passed = entry.r_flags & RACK_SACK_PASSED != 0;
+        entry.flags &= !RACK_RWND_COLLAPSED;
+        let sack_passed = entry.flags & RACK_SACK_PASSED != 0;
         if sack_passed {
-            entry.r_flags &= !RACK_SACK_PASSED;
-            entry.r_flags |= RACK_WAS_SACKPASS;
+            entry.flags &= !RACK_SACK_PASSED;
+            entry.flags |= RACK_WAS_SACKPASS;
         }
         self.holes_rxt = self.holes_rxt.saturating_add(holes);
         if was_lost {
@@ -776,8 +849,8 @@ impl RackRetransmit {
                 split: None,
             };
         };
-        let start = entry.r_start;
-        let end = entry.r_end;
+        let start = entry.start;
+        let end = entry.end;
         let c_end = start.saturating_add(len);
         if seq_ge(c_end, end) {
             self.rack_update_rsm(id, ts, add_flag, segsiz);
@@ -798,7 +871,7 @@ impl RackRetransmit {
         let tail = self.map.insert(c_end, end, ts);
         self.map.clone_tail(tail, id);
         if let Some(entry) = self.map.find_id_mut(id) {
-            entry.r_end = c_end;
+            entry.end = c_end;
         }
         self.map.clear_edge_flags(id);
         self.rack_update_rsm(id, ts, add_flag, segsiz);
@@ -819,16 +892,16 @@ impl RackRetransmit {
         th_ack: u32,
     ) -> Option<u32> {
         let entry = self.map.find_id(id)?;
-        if entry.r_flags & (RACK_ACKED | RACK_WAS_ACKED) != 0 || entry.r_no_rtt_allowed {
+        if entry.flags & (RACK_ACKED | RACK_WAS_ACKED) != 0 || entry.no_rtt_allowed {
             return None;
         }
         let last = entry.last_sent();
-        let count = entry.r_rtr_cnt;
+        let count = entry.rtr_cnt;
         let _len_acked = if ack_type == CUM_ACKED {
-            if seq_gt(th_ack, entry.r_end) {
+            if seq_gt(th_ack, entry.end) {
                 entry.len()
             } else {
-                th_ack.wrapping_sub(entry.r_start)
+                th_ack.wrapping_sub(entry.start)
             }
         } else {
             entry.len()
@@ -944,18 +1017,18 @@ impl RackRetransmit {
     pub fn rack_strike_dupack(&mut self, th_ack: u32, thresh: u32, now_us: u64) -> Option<u32> {
         let id = self.map.tmap.iter().copied().find(|id| {
             self.map.find_id(*id).is_some_and(|entry| {
-                entry.r_dupack < DUP_ACK_THRESHOLD && entry.r_flags & RACK_MUST_RXT == 0
+                entry.dupack < DUP_ACK_THRESHOLD && entry.flags & RACK_MUST_RXT == 0
             })
         })?;
         if let Some(entry) = self.map.find_id_mut(id)
-            && entry.r_dupack < u8::MAX
+            && entry.dupack < u8::MAX
         {
-            entry.r_dupack = entry.r_dupack.saturating_add(1);
+            entry.dupack = entry.dupack.saturating_add(1);
         }
         let ready = self
             .map
             .find_id(id)
-            .is_some_and(|entry| entry.r_dupack >= DUP_ACK_THRESHOLD);
+            .is_some_and(|entry| entry.dupack >= DUP_ACK_THRESHOLD);
         if !ready {
             return None;
         }
@@ -979,28 +1052,28 @@ impl RackRetransmit {
         if self
             .map
             .find_id(id)
-            .is_some_and(|entry| entry.r_flags & RACK_ACKED != 0)
+            .is_some_and(|entry| entry.flags & RACK_ACKED != 0)
         {
             id = self.rack_find_lowest_rsm()?;
         }
         let entry = self.map.find_id(id)?;
-        if self.must_retran && entry.r_flags & RACK_MUST_RXT != 0 {
+        if self.must_retran && entry.flags & RACK_MUST_RXT != 0 {
             return Some(id);
         }
-        if !self.sack_permit && entry.r_dupack >= DUP_ACK_THRESHOLD {
+        if !self.sack_permit && entry.dupack >= DUP_ACK_THRESHOLD {
             return Some(id);
         }
-        if entry.r_flags & RACK_ACKED != 0 {
+        if entry.flags & RACK_ACKED != 0 {
             return None;
         }
-        if entry.r_flags & RACK_SACK_PASSED == 0 && entry.r_dupack < DUP_ACK_THRESHOLD {
+        if entry.flags & RACK_SACK_PASSED == 0 && entry.dupack < DUP_ACK_THRESHOLD {
             return None;
         }
         let low = entry.last_sent();
         if now_us <= low || now_us.saturating_sub(low) < u64::from(thresh) {
             return None;
         }
-        if entry.r_dupack >= DUP_ACK_THRESHOLD || entry.r_flags & RACK_SACK_PASSED != 0 {
+        if entry.dupack >= DUP_ACK_THRESHOLD || entry.flags & RACK_SACK_PASSED != 0 {
             self.fast_output = false;
             return Some(id);
         }
@@ -1059,6 +1132,7 @@ impl RackRetransmit {
         now_us: u64,
     ) -> ProcessAck {
         self.stack.os.now_us = i64::try_from(now_us).unwrap_or(i64::MAX);
+        self.act_rcv_time = u32::try_from(now_us).unwrap_or(u32::MAX);
         if seq_lt(ack, self.stack.tp.snd_una) {
             if self.stack.tp.snd_una.wrapping_sub(ack) > 0
                 && self.reorder_ts == 0
@@ -1135,6 +1209,7 @@ impl RackRetransmit {
             now_us,
             timestamp_ok,
         } = input;
+        self.act_rcv_time = u32::try_from(now_us).unwrap_or(u32::MAX);
         let _ = tlen;
         if !seq_gt(ack, self.stack.tp.snd_una)
             || seq_gt(ack, self.stack.tp.snd_max)
@@ -1202,14 +1277,14 @@ impl RackRetransmit {
         }
         if doing_tlp {
             if let Some(entry) = self.map.find_id_mut(id) {
-                entry.r_flags |= RACK_TLP;
+                entry.flags |= RACK_TLP;
             }
         } else if let Some(entry) = self.map.find_id_mut(id) {
-            entry.r_flags &= !RACK_TLP;
+            entry.flags &= !RACK_TLP;
         }
         let entry = self.map.find_id(id).ok_or(RetransmitError::NoSegment)?;
         let mut flags = tcp_outflags(self.stack.tp.t_state);
-        if flags & (TH_SYN | TH_RST) != 0 || entry.r_flags & RACK_HAS_FIN != 0 {
+        if flags & (TH_SYN | TH_RST) != 0 || entry.flags & RACK_HAS_FIN != 0 {
             return Err(RetransmitError::Unsendable);
         }
         flags &= !TH_FIN;
@@ -1235,11 +1310,11 @@ impl RackRetransmit {
         if len == 0 || len <= MHLEN.saturating_sub(hdrlen).saturating_sub(MAX_LINKHDR) {
             return Err(RetransmitError::TooShort);
         }
-        if entry.r_flags & RACK_HAD_PUSH != 0 && len == entry.len() {
+        if entry.flags & RACK_HAD_PUSH != 0 && len == entry.len() {
             flags |= TH_PUSH;
         }
-        let seq = entry.r_start;
-        if entry.r_flags & RACK_TLP != 0 {
+        let seq = entry.start;
+        if entry.flags & RACK_TLP != 0 {
             self.tlp_retran = self.tlp_retran.saturating_add(1);
             self.tlp_retran_bytes = self.tlp_retran_bytes.saturating_add(u64::from(len));
         } else {
@@ -1283,7 +1358,7 @@ impl RackRetransmit {
             let Some((id, start, end)) = self
                 .map
                 .covering(cursor)
-                .map(|entry| (entry.id, entry.r_start, entry.r_end))
+                .map(|entry| (entry.id, entry.start, entry.end))
             else {
                 break;
             };
@@ -1299,7 +1374,7 @@ impl RackRetransmit {
                 let tail = self.map.insert(cursor, end, now_us);
                 self.map.clone_tail(tail, id);
                 if let Some(entry) = self.map.find_id_mut(id) {
-                    entry.r_end = cursor;
+                    entry.end = cursor;
                 }
                 self.map.clear_edge_flags(id);
                 let result = self.rack_update_entry(tail, now_us, remaining, RACK_SENT_FP, segsiz);
@@ -1391,6 +1466,16 @@ fn tcp_outflags(state: u8) -> u16 {
         TCPS_FIN_WAIT_1 | TCPS_FIN_WAIT_2 | TCPS_CLOSING | TCPS_LAST_ACK => TH_FIN | TH_ACK,
         _ => TH_ACK,
     }
+}
+
+/// `tcp_compute_initwnd` with the FreeBSD default `V_tcp_initcwnd_segments = 10`.
+fn rc_init_window(maxseg: u32) -> u32 {
+    let maxseg = maxseg.max(1);
+    let segments = 10u32;
+    segments.saturating_mul(maxseg).min(
+        2u32.saturating_mul(maxseg)
+            .max(segments.saturating_mul(1460)),
+    )
 }
 
 fn seq_gt(a: u32, b: u32) -> bool {

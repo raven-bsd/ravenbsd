@@ -21,35 +21,20 @@
 use alloc::vec::Vec;
 
 use crate::rack_hpts::RackHpts;
-use crate::rack_misc::{
-    RACK_ACKED, RACK_INITIAL_RTO, RACK_SACK_PASSED, RACK_WAS_LOST, RACK_WAS_SACKPASS, RackSendmap,
+use crate::rack_types::{
+    RACK_ACKED, RACK_DELAYED_ACK_TIME, RACK_INITIAL_RTO, RACK_PRR_ADDBACKMAX,
+    RACK_REORDER_FADE_DEFAULT, RACK_RTO_MAX, RACK_SACK_PASSED, RACK_TLP_MIN, RACK_WAS_LOST,
+    RACK_WAS_SACKPASS, RackSendmap, TF_CONGRECOVERY, TF_FASTRECOVERY, TF_WASCRECOVERY,
+    TF_WASFRECOVERY,
 };
 use crate::rack_vtable::{RackStack, TCPS_ESTABLISHED, TF_SENTFIN};
 
-/// `rack_tlp_min` (10 ms).
-pub const RACK_TLP_MIN: u32 = 10_000;
-/// `rack_rto_max` (4 s).
-pub const RACK_RTO_MAX: u32 = 4_000_000;
-/// `rack_delayed_ack_time` (40 ms).
-pub const RACK_DELAYED_ACK_TIME: u32 = 40_000;
-/// `rack_prr_addbackmax`.
-pub const RACK_PRR_ADDBACKMAX: u32 = 2;
-/// `rack_reorder_fade` default (60 s).
-pub const RACK_REORDER_FADE_DEFAULT: u32 = 60_000_000;
 /// `TLP_USE_ID`.
 pub const TLP_USE_ID: u8 = 1;
 /// `TLP_USE_TWO_ONE`.
 pub const TLP_USE_TWO_ONE: u8 = 2;
 /// `TLP_USE_TWO_TWO`.
 pub const TLP_USE_TWO_TWO: u8 = 3;
-/// `TF_FASTRECOVERY`.
-pub const TF_FASTRECOVERY: u32 = 0x0010_0000;
-/// `TF_WASFRECOVERY`.
-pub const TF_WASFRECOVERY: u32 = 0x0020_0000;
-/// `TF_CONGRECOVERY`.
-pub const TF_CONGRECOVERY: u32 = 0x2000_0000;
-/// `TF_WASCRECOVERY`.
-pub const TF_WASCRECOVERY: u32 = 0x4000_0000;
 /// `TF2_ECN_PERMIT`.
 pub const TF2_ECN_PERMIT: u32 = 0x0000_0020;
 /// `TF2_ECN_SND_CWR`.
@@ -359,7 +344,7 @@ impl RackPipe {
                     let idx = usize::from(rsm.rtr_cnt.saturating_sub(1));
                     let nidx = usize::from(previous.rtr_cnt.saturating_sub(1));
                     let gap = if rsm.tim_lastsent[nidx] >= previous.tim_lastsent[idx] {
-                        rsm.tim_lastsent[nidx].wrapping_sub(previous.tim_lastsent[idx])
+                        (rsm.tim_lastsent[nidx] - previous.tim_lastsent[idx]) as u32
                     } else {
                         0
                     };
@@ -398,7 +383,7 @@ impl RackPipe {
             if rsm.flags & RACK_WAS_LOST != 0 {
                 continue;
             }
-            let expires = base.last_sent().wrapping_add(thresh);
+            let expires = (base.last_sent() as u32).wrapping_add(thresh);
             if tstmp_lt(expires, cts) || expires == cts {
                 rsm.flags |= RACK_WAS_LOST;
                 self.stack.considered_lost = self.stack.considered_lost.saturating_add(rsm.len());
@@ -432,10 +417,11 @@ impl RackPipe {
         let rsm = self.sendmap[index];
         let idx = usize::from(rsm.rtr_cnt.saturating_sub(1));
         let thresh = self.rack_calc_thresh_rack(self.rack_grab_rtt(), tsused);
-        if tstmp_lt(tsused, rsm.tim_lastsent[idx]) {
+        let last_sent = rsm.tim_lastsent[idx] as u32;
+        if tstmp_lt(tsused, last_sent) {
             return None;
         }
-        if tsused.wrapping_sub(rsm.tim_lastsent[idx]) < thresh {
+        if tsused.wrapping_sub(last_sent) < thresh {
             return None;
         }
         self.rack_enter_recovery();
