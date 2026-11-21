@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K386 test-only getty manifest. It replaces the shell-test rsh service so the same
+# fixture exercises the production getty/login path on both architectures.
+name = "getty"
+exec = "/sbin/getty"
+args = []
+needs = ["consd", "vfsd", "ramfsd", "initfsd"]
+grants = ["initfs"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
