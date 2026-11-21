@@ -58,6 +58,7 @@ mod plpmtud_live;
 mod pmtu;
 mod rack_hpts;
 mod rack_os;
+mod rack_sack;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -120,6 +121,10 @@ pub use rack_hpts::{
 };
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
+};
+pub use rack_sack::{
+    RACK_ACKED, RACK_DSACK_HANDLING, RACK_RWND_COLLAPSED, RACK_SACK_PASSED, RACK_TLP,
+    RACK_WAS_LOST, RACK_WAS_SACKPASS, RackSack, SackSegment,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
