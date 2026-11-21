@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K096b host-only aarch64 release boot evidence. The current release image prints the styled
+# screen and `Welcome to RavenBSD 0.1 aarch64`; it no longer prints the stale
+# `RavenBSD 0.1 (aarch64) (tty:console)` line that `login-aarch64.toml` still expects.
+# This case records the current login/prompt/clean-exit contract without weakening any product
+# test; the stale `login-aarch64` expectation is a separate finding for its owner.
+
+name = "k096b-aarch64-login"
+arch = "aarch64"
+profile = "release"
+timeout_secs = 180
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(aarch64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(aarch64\)'
+
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 aarch64$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^raven# '
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
