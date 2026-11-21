@@ -56,8 +56,17 @@ mod neighbor;
 mod observability;
 mod plpmtud_live;
 mod pmtu;
+mod rack_bbr;
 mod rack_hpts;
+mod rack_log;
+mod rack_misc;
 mod rack_os;
+mod rack_output;
+mod rack_pipe;
+mod rack_retransmit;
+mod rack_sack;
+mod rack_state;
+mod rack_transport;
 mod rack_vtable;
 mod readiness;
 mod reassembly;
@@ -93,7 +102,8 @@ pub use ecn::{
     ECN_CE, ECN_ECT0, ECN_ECT1, ECN_MASK, ECN_NOTECT, EcnCounters, EcnState, TH_ACK, TH_AE, TH_CWR,
     TH_ECE, TH_SYN, get_ace, set_ace,
 };
-pub use event::{Event, PollResult, SocketId};
+pub use event::Event;
+pub use event::{PollResult, SocketId};
 pub use hostcache::{
     DEFAULT_BUCKET_LIMIT, DEFAULT_EXPIRE_MS, DEFAULT_HASHSIZE, DEFAULT_PRUNE_MS, HostKey,
     HostMetrics, Hostcache,
@@ -113,13 +123,59 @@ pub use pmtu::{
     TCP_MSS_DEFAULT, floor_for, mss_headers, mss_update, mssopt, next_pmtu, next_pmtu6,
     on_icmp_frag_needed, on_icmp6_frag_needed, probe_sequence,
 };
+pub use rack_bbr::{
+    BBR_UNIT, BbrLogEvent, BbrRack, BbrTunables, GpSample, HYBRID_CSPR, HYBRID_CU, HYBRID_ENABLE,
+    HYBRID_H_MS, HYBRID_SETMSS, HYBRID_WASSET, HybridRequest, MIN_GP_WIN, PACE_MAX_IP_BYTES,
+    Quality, RACK_MIN_BW, RACK_REQ_AVG, RACK_TIMELY_CNT_BOOST, SendfileTrack, TF_FASTRECOVERY,
+    TF_GPUTINPROG,
+};
 pub use rack_hpts::{
     HPTS_USECS_PER_SLOT, HptsCallback, NUM_OF_HPTSI_SLOTS, PACE_TMR_DELACK, PACE_TMR_KEEP,
     PACE_TMR_MASK, PACE_TMR_PERSIT, PACE_TMR_RACK, PACE_TMR_RXT, PACE_TMR_TLP, RackHpts,
     RackTimeout, hpts_usec_to_slots, rack_timeout_action,
 };
+pub use rack_log::{Counter as RackLogCounter, LogEntry as RackLogEntry, RackLog};
+pub use rack_misc::{
+    ACK_FLAG, DeferredOption, FIN_FLAG, FsbBlock, MiscQuery, RACK_ACKED, RACK_APP_LIMITED,
+    RACK_DEFERRED, RACK_DEFERRED_MAX, RACK_FREE_CACHE, RACK_FREE_CNT_MAX, RACK_HAD_PUSH,
+    RACK_HAS_FIN, RACK_HAS_SYN, RACK_IN_GP_WIN, RACK_INITIAL_RTO, RACK_IS_PCM, RACK_MERGED,
+    RACK_MUST_RXT, RACK_NUM_OF_RETRANS, RACK_OVERMAX, RACK_PMTU_CHG, RACK_RWND_COLLAPSED,
+    RACK_SACK_PASSED, RACK_SENT_FP, RACK_SENT_SP, RACK_SENT_W_DSACK, RACK_SHUFFLED, RACK_STRADDLE,
+    RACK_TLP, RACK_TO_REXT, RACK_WAS_ACKED, RACK_WAS_LOST, RACK_WAS_SACKPASS, RST_FLAG, RackMisc,
+    RackSendmap, RackTcpInfo, TCP_DEFER_OPTIONS, TCP_NO_PRR, TCP_RACK_ABC_VAL, TCP_RACK_DSACK_OPT,
+    TCP_RACK_FORCE_MSEG, TCP_RACK_HI_BETA, TCP_RACK_MBUF_QUEUE, TCP_RACK_MEASURE_CNT,
+    TCP_RACK_PACE_TO_FILL, TCP_RACK_PROFILE, TCP_RACK_SET_RXT_OPTIONS, TCP_RACK_TIMER_SLOP,
+    TCP_USE_CMP_ACKS,
+};
 pub use rack_os::{
     CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
+};
+pub use rack_output::{RackOutput, TimerResult};
+pub use rack_pipe::{
+    CC_NDUPACK, EXIT_RECOVERY_MASK, IN_RECOVERY_MASK, RACK_DELAYED_ACK_TIME, RACK_PRR_ADDBACKMAX,
+    RACK_REORDER_FADE_DEFAULT, RACK_RTO_MAX, RACK_TLP_MIN, RackPipe, RackPipeState,
+    TF_CONGRECOVERY, TF_WASCRECOVERY, TF_WASFRECOVERY, TF2_ECN_PERMIT, TF2_ECN_SND_CWR, TLP_USE_ID,
+    TLP_USE_TWO_ONE, TLP_USE_TWO_TWO, tstmp_ge, tstmp_lt,
+};
+pub use rack_retransmit::{
+    AckOutcome, CUM_ACKED, DUP_ACK_THRESHOLD, EntryResult, FastAck, MAX_LINKHDR, MHLEN, ProcessAck,
+    RACK_RTO_MIN, RackRetransmit, RackSendMap, RackTransmission, RetransmitError, Rsm, SACKED,
+    TH_PUSH,
+};
+pub use rack_sack::{RACK_DSACK_HANDLING, RackSack, SackSegment};
+pub use rack_state::{
+    TCPS_CLOSING, TCPS_FIN_WAIT_1, TCPS_FIN_WAIT_2, TCPS_LAST_ACK, TCPS_TIME_WAIT,
+    rack_do_close_wait, rack_do_closing, rack_do_compressed_ack_processing, rack_do_established,
+    rack_do_fastnewdata, rack_do_fin_wait_1, rack_do_fin_wait_2, rack_do_lastack, rack_do_segment,
+    rack_do_segment_nounlock, rack_do_syn_recv, rack_do_syn_sent, rack_do_win_updates,
+    rack_handle_delayed_ack, rack_handle_might_revert, rack_handle_probe_response,
+    rack_process_data, rack_process_option,
+};
+pub use rack_transport::{
+    AddRackMode, AddRackOutcome, HptsStart, HptsStartOutcome, HwTlsOutcome, MAX_HPTS_TIMEOUT_US,
+    RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
+    TimerStopOutcome, rack_ctloutput, rack_hw_tls_change, rack_process_timers, rack_pru_options,
+    rack_start_hpts_timer, rack_stop_all_timers, rack_switch_failed, rack_wake_check, tcp_addrack,
 };
 pub use rack_vtable::{
     IPPROTO_TCP, MAX_USER_SET_SEG, PACE_PKT_OUTPUT, PRUS_OOB, RACK_DEFAULT_PACING_DIVISOR,
