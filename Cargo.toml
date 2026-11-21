@@ -310,6 +310,7 @@ members = [
     "tests/rack-coverage",
     "tests/rack-pipe-matrix",
     "tests/rack-audit-misc-transport",
+    "tests/rack-misc-matrix",
     "tests/rack-sockopt",
     "tests/tcp-teardown-model",
     "tests/tcp-usrreq-model",
