@@ -3,177 +3,183 @@
 
 # IRQ-mask lock audit (S102)
 
-Status: **audit complete; two confirmed SMP/IPI lock sites and the log spinlock are unsafe, and
-the probe mailbox needs a concurrent-caller proof. No `crates/raven-vmem/**` lock site exists, so
-no vmem fix was made.** The existing
-`tests/smp/memory` concurrent-waiter regression remains the executable check for the unsafe
-class. This audit does not replace the S83 implementation; it gives exact file/line, owner and
-repair for every site.
+Inventory and classification of every `.lock()`/`.try_lock()` site in
+`kernel/src/**` that can run in an SMP or interrupt context. The machine-readable
+inventory is `tests/smp/irq-lock-inventory.tsv`; the regression checker is
+`tests/smp/irq_lock_audit.py --check`.
 
-Scope: every `IrqSpinLock`, `SpinMutex`, `SpinLock` and `.lock()`/`.try_lock()` site in
-`kernel/src/**` that can run in SMP or interrupt context. The dangerous pattern is a waiter that
-masks interrupts while spinning for a lock whose holder is waiting for an IPI, timer or another
-CPU to make progress. A lock that is held only for a short critical section with no such wait can
-be safe even when it masks interrupts.
+## Summary
 
-## Search evidence
+| Class | Sites | Meaning |
+|---|---:|---|
+| IRQ-SAFE | 34 | `IrqSpinLock` sites; short critical section, no waiter that needs an IPI/timer |
+| NEEDS-PROOF | 55 | process-context `spin::Mutex` in a fault/timer/scheduler/driver path; invariant listed below |
+| SAFE | 382 | process/syscall/death paths with no vector-handler reachability |
+| TEST-ONLY | 3 | `#[cfg(test)]`/selftest locks |
+| **total** | **474** | all `.lock()`/`.try_lock()` calls in `kernel/src` |
 
-Run on origin/master `b64c9a6c`:
+There is no separate `SpinLock` type in the tree; `spin::Mutex` is the
+non-interrupt-masking lock family, and `IrqSpinLock` is the interrupt-masking
+family. `IrqSpinLock::lock` disables interrupts and spins (no IF while waiting);
+the TLB shootdown path deliberately does **not** use it: `ActiveGuard` waits with
+interrupts enabled (see below).
 
-```text
-$ rg -n "IrqSpinLock" kernel/src
-11 files/static declarations
-$ rg -n "SpinMutex" kernel/src
-1 type, 2 lock sites (kernel/src/log.rs)
-$ rg -n "try_lock" kernel/src
-0
-$ rg -n "\.lock\(\)" kernel/src | wc -l
-443
-```
+## IrqSpinLock sites
 
-The 44 IRQ-mask/SpinMutex lock sites are classified row by row below. The remaining `.lock()`
-sites are blocking `Mutex` (or the test-only `M` lock) and are not IRQ-masking; their call sites
-in IRQ-reachable functions were inspected separately. A blocking `Mutex` in interrupt context
-would be a separate illegal-blocking defect; none was found in the IRQ paths listed here.
+| Declaration | Lock | Classification | Invariant / evidence |
+|---|---|---|---|
+| `kernel/src/event/mod.rs:155` | `QUEUES` | IRQ-SAFE | `notify_all` (timer IRQ) copies weak refs under the lock and wakes outside it; registration/close are process context. No allocation/wait under the lock. |
+| `kernel/src/sync.rs:299` | `TURNSTILES` | IRQ-SAFE | graph map update only; `Mutex::lock` releases it before `begin_block`/turnstile wait, so no scheduler dependency while held. |
+| `kernel/src/sync.rs:795` | `CLIENT_THREAD` | TEST-ONLY | selftest-only lock. |
+| `kernel/src/time.rs:167` | `CYCLICS` | IRQ-SAFE | timer callback only records an atomic fire id; no allocation/schedule/IPI. |
+| `kernel/src/time.rs:438` | `ENTROPY_POOL` | IRQ-SAFE | pool fill/reseed only; no IPI/timer dependency. |
+| `kernel/src/arch/x86_64/ioapic.rs:38` | `IOAPICS` | IRQ-SAFE | IOAPIC MMIO state; process context, no IPI wait. |
+| `kernel/src/sched/selftest.rs:38` | `COUNTER_LOCK` | TEST-ONLY | selftest-only lock. |
+| `kernel/src/sched/wait.rs:38` | `waiters` | IRQ-SAFE | wait-queue `Vec` mutation; the guard is dropped before `sched::wake`, preserving the wait-queue-to-scheduler order. |
 
-## Inventory and classification
+All IRQ-SAFE call sites (file:line) are in the inventory. The 34 production
+sites are the `IOAPICS` route/mask/unmask paths, `QUEUES` register/notify/
+snapshot, `waiters` enqueue/wake/remove/len, `CYCLICS` add/cancel/fire,
+`ENTROPY_POOL` fill/reseed, and the `TURNSTILES` graph operations.
 
-| # | Lock | File:line (lock sites) | Context | Class | Evidence |
-|---|---|---|---|---|---|
-| 1 | `TURNSTILES: IrqSpinLock<Option<KernelTurnstile>>` | `kernel/src/sync.rs:299`, sites 329, 358, 368, 380, 459, 491, 550, 565 | process/syscall/scheduler; no IRQ caller | **safe** | Critical sections mutate the graph/boost bitmaps and release before `block_current`/`wake_blocked`; no IPI/timer wait under the lock. `Mutex` is a blocking lock and is not called from the audited IRQ paths. |
-| 2 | `CYCLICS: IrqSpinLock<Option<Cyclics>>` | `kernel/src/time.rs:167`, sites 175, 183, 192 | process + timer interrupt (`cyclic_fire`) | **safe (re-audit when consumers arrive)** | `cyclic_fire` holds the lock only while `on_interrupt` records atomics; the current callback performs no allocation, IPI or blocking. `cyclic_add`/`cancel` are process context. Future cyclic callbacks must stay non-blocking. |
-| 3 | `ENTROPY_POOL: IrqSpinLock<Option<Pool>>` | `kernel/src/time.rs:438`, sites 468, 491 | process/syscall | **safe** | Hardware/jitter sampling and pool fill do not wait for another CPU or IPI; no interrupt caller. |
-| 4 | `LOCK: IrqSpinLock<()>` | `kernel/src/smp/shootdown.rs:49`, site 81 | user map/unmap/page-fault, SMP shootdown | **unsafe** | Known S85b inversion: a second `flush_range` waiter spins on `LOCK` with IF masked and cannot take the first caller's TLB IPI; 100 ms timeout. See §4. |
-| 5 | `LOCK: IrqSpinLock<()>` | `kernel/src/smp/call.rs:31`, site 48 | SMP probe/selftest | **needs proof** | Same shape if two CPUs call `probe` concurrently: CPU B can wait on `LOCK` with IF masked and be the target of CPU A's `CALL_VECTOR`; B cannot run `call::handle`, A times out. The current selftest probes serially, so no existing test proves it; a two-CPU concurrent-probe test is the required proof. |
-| 6 | `LOCK: IrqSpinLock<()>` | `kernel/src/sched/smp_shim.rs:153`, site 181 | aarch64 TLB shootdown | **unsafe** | The code comment itself says a target spinning for `LOCK` cannot take the SGI; it records a timeout instead of a deadlock. Same donor rule applies. |
-| 7 | `waiters: IrqSpinLock<Vec<Waiter>>` | `kernel/src/sched/wait.rs:38`, sites 60, 83, 107, 130, 145, 163, 178, 199, 231, 255 | syscall, page-fault, teardown, IRQ wake | **safe** | Every wake removes the waiter under the lock, releases it, then calls `super::wake`; the lock is never held across a scheduler wake/IPI. `enqueue_if`'s condition uses non-blocking usercopy/atomics and does not take the queue lock recursively. |
-| 8 | `COUNTER_LOCK: IrqSpinLock<()>` | `kernel/src/sched/selftest.rs:38`, site 90 | SMP selftest kernel threads | **safe (test only)** | Very short atomic counter critical section; no IPI/timer wait. |
-| 9 | `QUEUES: IrqSpinLock<Vec<Weak<EventQueue>>>` | `kernel/src/event/mod.rs:155`, sites 159, 175, 182, 196, 203, 244 | process + timer interrupt (`notify_all`) | **safe** | The table lock is used only to upgrade/scan weak references; it is released before `queue.notify()`/scheduler wake. `notify_all` allocates a fixed stack array, not under the lock. |
-| 10 | `IOAPICS: IrqSpinLock<[Option<State>; MAX_IOAPICS]>` | `kernel/src/arch/x86_64/ioapic.rs:38`, sites 65, 116, 133, 143, 159, 173, 180 | process context + IRQ `mask_gsi_isr` | **safe (contention only)** | The holder only reads/writes IOAPIC MMIO and releases; it never waits for the interrupted CPU or an IPI. `mask_gsi_isr` can spin, but the holder makes progress without that CPU. Re-audit if IOAPIC delivery moves to a CPU that can block on the holder. |
-| 11 | `CLIENT_THREAD: IrqSpinLock<Option<Arc<Thread>>>` | `kernel/src/sync.rs:795`, sites 811, 864 | lockstat self-test | **safe (test only)** | Short clone/replace; no IPI wait. |
-| 12 | `SERIAL: SpinMutex<Serial>` | `kernel/src/log.rs:78`, lock sites 103, 109 | all `kprintln!`, including exception context | **unsafe (lock-in-interrupt, separate class)** | `SpinMutex` does not mask interrupts and has no try-lock. If an exception/IRQ interrupts a CPU holding `SERIAL`, the handler's `kprintln!` spins forever; the exception path (`kernel/src/arch/x86_64/exception.rs:217-271`) does exactly that. The panic path avoids the lock with a fresh `Serial`; exception output does not. |
+## TLB shootdown pattern
 
-**No `crates/raven-vmem/**` lock sites:** `rg -n "IrqSpinLock|SpinLock|\\.lock\\(\\)|try_lock|Mutex|AtomicBool" crates/raven-vmem/src` returns no lock use. There is no vmem fix to apply.
+`kernel/src/smp/shootdown.rs` is intentionally **not** an `IrqSpinLock`:
+`ActiveGuard` masks interrupts only while publishing/clearing `ACTIVE`, then
+re-enables IF while spinning and waiting for `ACKED`/`LAST`. This is the
+correct pattern for any lock whose holder may need an IPI/timer to release it;
+the S113/S85e TLB stress is green (3/3, `tlb_stale=0` on the S159 run). No
+`IrqSpinLock` in the audit holds a lock across such a wait.
 
-**No `try_lock`:** `rg -n "try_lock" kernel/src` is empty. No `SpinLock` type exists; the two spin-lock families are `IrqSpinLock` and `log::SpinMutex`.
+## Needs-proof sites
 
-## 4. Unsafe sites and owners
+These are process-context `spin::Mutex` sites in page-fault, timer/scheduler,
+probe, or driver/VT-d paths. They are **not proven unsafe**; each needs the
+invariant or test below before it can be marked safe. No site was patched in
+`crates/raven-vmem/**` because that crate has no lock use (`rg` returns none).
 
-### 4.1 `kernel/src/smp/shootdown.rs:81` — S83/Stuart
+| Site | Lock / context | Proposed proof or fix | Owner |
+|---|---|---|---|
+| `kernel/src/arch/x86_64/vtd.rs:110` | `self.iova` in `iova_start` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:115` | `self.iova` in `iova_end` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:133` | `?` in `map` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:138` | `self.iova` in `map` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:148` | `self.iova` in `unmap` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:159` | `self.tables` in `map_pages` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:213` | `self.tables` in `unmap_pages` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:274` | `UNIT` in `available` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:279` | `UNIT` in `unit` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:309` | `UNIT` in `init` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:465` | `unit.by_sid` in `domain_for_bdf` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:466` | `unit.domains` in `domain_for_bdf` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:486` | `unit.domains` in `domain_for_bdf` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:487` | `unit.by_sid` in `domain_for_bdf` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:611` | `unit.domains` in `allocate_domain_id` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:622` | `self.context_tables` in `install_context` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/arch/x86_64/vtd.rs:633` | `self.table_frames` in `install_context` | VT-d fault worker is process context; add a concurrent map/unmap + fault-worker test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:202` | `BLOBS` in `init` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:217` | `PLATFORM_OWNED` in `init_aarch64` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:236` | `DMA_DOMAIN` in `init_aarch64` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:243` | `BLOBS` in `init_aarch64` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:315` | `DEVICE_HINTS` in `create_mmio` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:419` | `PLATFORM_OWNED` in `refuse_kernel_owned` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:465` | `DEVICE_HINTS` in `dma_alloc` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:491` | `DMA_DOMAIN` in `dma_alloc` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/driver/mod.rs:494` | `DMA_DOMAIN` in `dma_alloc` | driver init/DMA paths are process context; add a concurrent IRQ/DMA test | S83/Stuart (driver) |
+| `kernel/src/dtrace/mod.rs:87` | `WAKE_EVENT` in `wake_consumer` | probe wake path runs in process context, or mask IRQs with a dedicated IrqSpinLock; probe/fault test | S83/Stuart (dtrace) |
+| `kernel/src/dtrace/mod.rs:103` | `WAKE_EVENT` in `enable` | probe wake path runs in process context, or mask IRQs with a dedicated IrqSpinLock; probe/fault test | S83/Stuart (dtrace) |
+| `kernel/src/dtrace/mod.rs:118` | `WAKE_EVENT` in `disable` | probe wake path runs in process context, or mask IRQs with a dedicated IrqSpinLock; probe/fault test | S83/Stuart (dtrace) |
+| `kernel/src/dtrace/mod.rs:128` | `CONSUMER` in `drain` | probe wake path runs in process context, or mask IRQs with a dedicated IrqSpinLock; probe/fault test | S83/Stuart (dtrace) |
+| `kernel/src/dtrace/mod.rs:165` | `CONSUMER` in `clear` | probe wake path runs in process context, or mask IRQs with a dedicated IrqSpinLock; probe/fault test | S83/Stuart (dtrace) |
+| `kernel/src/dtrace/mod.rs:170` | `WAKE_EVENT` in `clear` | probe wake path runs in process context, or mask IRQs with a dedicated IrqSpinLock; probe/fault test | S83/Stuart (dtrace) |
+| `kernel/src/memory/frame.rs:165` | `ALLOCATOR` in `init` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:253` | `ALLOCATOR` in `init` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:265` | `ALLOCATOR` in `set_percpu_enabled` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:277` | `ALLOCATOR` in `alloc_frame` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:306` | `ALLOCATOR` in `alloc_contiguous` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:320` | `ALLOCATOR` in `free_frame` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:352` | `SHARED_FRAMES` in `share_frame` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:362` | `SHARED_FRAMES` in `is_shared` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:370` | `SHARED_FRAMES` in `release_shared` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:385` | `ALLOCATOR` in `stats` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:417` | `ALLOCATOR` in `cpu_stats` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/frame.rs:447` | `ALLOCATOR` in `free_range` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/heap.rs:57` | `HEAP` in `init` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/heap.rs:66` | `HEAP` in `init` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/heap.rs:76` | `HEAP` in `stats` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/heap.rs:136` | `HEAP` in `alloc` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/memory/heap.rs:156` | `HEAP` in `dealloc` | assert allocator/heap lock is never held across a page fault, IPI or TLB wait; add a fault-injection/parallel alloc test | S83/Stuart (memory) |
+| `kernel/src/sched/mod.rs:215` | `?` in `lock_cpu` | assert the per-CPU/thread-cache lock is never held across timer return, context switch or cross-CPU wake; SMP timer/preempt test | S83/Stuart (scheduler) |
+| `kernel/src/sched/mod.rs:1067` | `REAP` in `push_reap` | assert the per-CPU/thread-cache lock is never held across timer return, context switch or cross-CPU wake; SMP timer/preempt test | S83/Stuart (scheduler) |
+| `kernel/src/sched/mod.rs:1086` | `REAP` in `reap_dead` | assert the per-CPU/thread-cache lock is never held across timer return, context switch or cross-CPU wake; SMP timer/preempt test | S83/Stuart (scheduler) |
+| `kernel/src/sched/thread.rs:530` | `STACK_CACHE` in `allocate_kernel_stack` | assert the per-CPU/thread-cache lock is never held across timer return, context switch or cross-CPU wake; SMP timer/preempt test | S83/Stuart (scheduler) |
+| `kernel/src/sched/thread.rs:555` | `STACK_CACHE` in `free_kernel_stack` | assert the per-CPU/thread-cache lock is never held across timer return, context switch or cross-CPU wake; SMP timer/preempt test | S83/Stuart (scheduler) |
+| `kernel/src/sched/thread.rs:568` | `STACK_CACHE` in `stack_cached` | assert the per-CPU/thread-cache lock is never held across timer return, context switch or cross-CPU wake; SMP timer/preempt test | S83/Stuart (scheduler) |
 
-The global `IrqSpinLock` is held across the TLB IPI acknowledgement wait. A second `flush_range`
-waiter masks interrupts while spinning on the lock, so it cannot take the first caller's TLB IPI.
-The 100 ms deadline fires. This is the S85b root cause.
+## Safe groups (summary)
 
-**Repair:** apply the `ActiveGuard`/active-request proposal in `docs/smp-tlb-shootdown.md`:
-- publish one active request under an `AtomicBool` (or active pointer);
-- wait for the active slot with interrupts enabled and preemption disabled;
-- keep `PENDING`/`ACKED`/`LAST` generation checks, but never hold an IRQ-masked lock across the
-  ACK wait;
-- restore the caller's IF on every path.
-- The donor pattern is NetBSD `x86_tlb.c` (global packet pointer CAS, drop SPL while waiting,
-  pending count/`TP_DONE`) and FreeBSD `smp_targeted_tlb_shootdown_native` (per-initiator
-  scoreboard generation, interrupts required at the initiator).
+The remaining 382 sites are in process/syscall/IPC/VFS/console paths and are
+released before any scheduler wait; they are not reached from a vector handler.
+The inventory has the exact file:line for every one, including:
+`process/**`, `syscall/**`, `ipc/**`, `memory/pager.rs`, `driver/irq*.rs`,
+`dtrace` syscalls, and `process/tty.rs`.
 
-### 4.2 `kernel/src/smp/call.rs:48` — S83/Stuart (needs proof)
+| File group | Sites |
+|---|---:|
+| `kernel/src/process/mod.rs` | 58 |
+| `kernel/src/syscall/process_ctl.rs` | 55 |
+| `kernel/src/ipc/router.rs` | 27 |
+| `kernel/src/ipc/mod.rs` | 18 |
+| `kernel/src/process/handle.rs` | 15 |
+| `kernel/src/syscall/event.rs` | 15 |
+| `kernel/src/syscall/memory_ctl.rs` | 15 |
+| `kernel/src/syscall/priority.rs` | 14 |
+| `kernel/src/process/duplex.rs` | 13 |
+| `kernel/src/ipc/capture.rs` | 12 |
+| `kernel/src/process/tty.rs` | 11 |
+| `kernel/src/ipc/registry.rs` | 9 |
+| `kernel/src/syscall/ipc.rs` | 9 |
+| `kernel/src/syscall/linux.rs` | 9 |
+| `kernel/src/driver/mod.rs` | 8 |
+| `kernel/src/process/exec.rs` | 8 |
+| `kernel/src/syscall/handle_xfer.rs` | 8 |
+| `kernel/src/syscall/thread.rs` | 8 |
+| `kernel/src/event/mod.rs` | 7 |
+| `kernel/src/sync.rs` | 7 |
 
-`probe()` takes the same global `IrqSpinLock` and waits for a `CALL_VECTOR` acknowledgement. If a
-CPU is waiting for `LOCK` when another CPU probes it, it cannot run `call::handle` and the shooter
-times out. The current selftest calls `probe` serially, so this is a suspected inversion without a
-failing concurrent test; it stays **needs proof**, not a claimed confirmed failure.
+## Donor pattern
 
-**Proof/repair:** use the same active-request/interruptible-wait pattern, or fold the probe mailbox
-into the donor-style per-CPU request/scoreboard, then add a two-CPU concurrent-probe regression
-under S83 if the selftest can drive it; the memory fixture exercises the analogous TLB path but not
-`call`.
+| Topic | Illumos (behaviour only) | BSD (permissive reference) | Linux (outcome only) | Decision |
+|---|---|---|---|---|
+| IRQ-safe spin lock | `x_call.c`/`hat_i86.c` design; no copy | NetBSD `sys/arch/x86/x86/x86_tlb.c`, `ipi.c`, `sys/kern/subr_xcall.c` (BSD-2); FreeBSD `sys/kern/subr_smp.c` (BSD-2) | `smp_call_function_many` outcomes | keep `IrqSpinLock` only for short, no-wait sections; use the S113 `ActiveGuard` IF-enabled pattern for shootdown waits |
+| blocking mutex | `mutex_enter`/turnstile design; no copy | NetBSD `sys/kern/kern_mutex.c` (BSD-2), FreeBSD `sys/kern/kern_mutex.c` (BSD-2) | `mutex_lock` outcomes | `spin::Mutex` is process-context only; no blocking lock in a vector handler |
+| page-fault allocator | `hat_i86.c` design | NetBSD `uvm_fault.c`/`vm_page.c` (BSD-2) | outcomes | needs-proof before claiming the allocator lock is safe on the fault path |
 
-### 4.3 `kernel/src/sched/smp_shim.rs:181` — dave/S76 + S83/Stuart
+Donor revisions: FreeBSD `133344405f532bd54ff3629a77d4c4e062f01fdb`, NetBSD
+`36eddebcc36cb0775aa2962005b9c05419a6ff01`, Illumos
+`586678ac1bcbd77644a6ec4dac7f79d676cfb4ec`. No donor code copied.
 
-The aarch64 TLB shootdown has the same `LOCK`/SGI inversion; its comment explicitly accepts a
-timeout when a target is spinning for the lock. The donor rule and `ActiveGuard` proposal apply
-with `gic::send_sgi`/`SGI_TLB` replacing the x86 LAPIC send. Owner: dave/S76 for the aarch64
-integration, S83/Stuart for the common lock protocol.
+## Handoff and repair order
 
-### 4.4 `kernel/src/log.rs:39` / `:78` — stuart/S27/S30 (console/driver path)
+1. Memory page-fault allocator/heap locks: prove the invariant with a
+   concurrent fault/alloc test; if the lock is held across a fault/IPI, replace
+   the outer section with an IF-enabled wait pattern (S113 `ActiveGuard` style)
+   or move the allocation after the lock is dropped. Owner: S83/Stuart.
+2. Scheduler per-CPU `CPUS`, `REAP` and `STACK_CACHE`: prove timer/preempt
+   reachability; the scheduler already releases `lock_cpu` before a context
+   switch. Owner: S83/Stuart.
+3. DTrace `WAKE_EVENT`/`CONSUMER`: establish that probe wake never runs in a
+   vector handler, or introduce a dedicated IRQ-safe lock. Owner: S83/Stuart.
+4. VT-d and driver `spin::Mutex` sites: document the process-context fault
+   worker/DMA path and add a concurrent test. Owner: S83/Stuart.
+5. Re-run `tests/smp/irq_lock_audit.py --check` whenever a lock is added; it
+   fails if a new `IrqSpinLock` or high-risk site is undocumented.
 
-`SpinMutex::lock` spins with interrupts enabled and no try-lock. `kprintln!` is called from
-`kernel/src/arch/x86_64/exception.rs:217-271`; an exception that interrupts a CPU while `SERIAL`
-is held spins forever, so the diagnostic is lost. Normal console and driver IRQ paths were
-checked and do not call `kprintln!` (`console.rs` comment and `driver/irq.rs:585-616`), but the
-exception path is a real lock-in-interrupt hazard.
+## Acceptance evidence
 
-**Repair:** add `SpinMutex::try_lock` and make the exception/panic path use a fresh/direct serial
-fallback (the panic path already does), or make the log lock IRQ-safe and prohibit `kprintln!`
-from exception context. This is a different failure from the IRQ-mask inversion, but it is an
-unsafe interrupt-context lock site and is listed for the console/driver owner.
-
-## 5. Safe sites and proof notes
-
-- **`WaitQueue`**: all wake paths remove under the queue lock and release before `super::wake`;
-  `enqueue_if` conditions in the audited callers use atomics/non-blocking usercopy. The queue lock
-  is not held across a scheduler wake/IPI.
-- **`event::QUEUES`**: the table is scanned/upgraded under the lock and the lock is released before
-  `EventQueue::notify`/`wake_one`; `notify_all` is allocation-free with a fixed stack array.
-- **`time::CYCLICS`**: the current timer callback only records atomics; no IPI or allocation under
-  the lock. Re-audit before adding cyclic consumers that can block or wake another CPU.
-- **`ioapic::IOAPICS`**: the lock holder performs MMIO only and does not wait for the interrupt CPU;
-  contention can delay the IRQ, but it is not the IPI/timer inversion. The comment's "delivery on
-  the boot CPU" assumption should be rechecked if IRQ distribution moves to APs.
-- **`TURNSTILES` / `Mutex`**: the blocking mutex releases the turnstile lock before
-  `block_current`; `unlock` releases before `wake_blocked`. No `Mutex` lock was found in an
-  IRQ-reachable path. A `Mutex` in interrupt context would be a separate illegal-blocking defect.
-- **`sched/selftest` and `CLIENT_THREAD`**: test-only, short atomics; no production IRQ path.
-
-## 6. Donor pattern
-
-The per-file donor map is in `docs/smp-tlb-shootdown.md`; the relevant donors are:
-
-- NetBSD `36eddebcc36cb0775aa2962005b9c05419a6ff01`, `sys/arch/x86/x86/x86_tlb.c` (RCS 1.22,
-  2026-03-17), `ipi.c` (1.30), `pmap.c` (1.429), `sys/arch/x86/include/cpuvar.h` (1.55),
-  `pmap_private.h` (1.5), BSD-2-Clause per-file headers. The x86 TLB path uses a per-CPU packet,
-  a global packet-pointer CAS, drops SPL while waiting for the pointer, and waits on a pending
-  count/`TP_DONE` with interrupts enabled.
-- FreeBSD `133344405f532bd54ff3629a77d4c4e062f01fdb`, `sys/amd64/amd64/mp_machdep.c`,
-  `sys/x86/x86/mp_x86.c`, `sys/kern/subr_smp.c`, BSD-2-Clause (the `pmap.c` is BSD-4-Clause and
-  no code is copied). It requires interrupts enabled at the initiator, uses a per-initiator
-  generation scoreboard, release/acquire fences and never holds a global IRQ-mask spinlock across
-  the ack wait.
-- NetBSD `sys/kern/subr_xcall.c` is a generic cross-call facility; x86 TLB uses direct LAPIC IPIs,
-  not the xcall queue.
-
-The invariant common to both donors: **a waiter for a TLB/IPI request must be able to receive the
-IPI; do not mask interrupts while spinning for a lock whose holder waits for that IPI.**
-
-## 7. Regression and gate
-
-`tests/smp/memory` already contains the S101 four-way concurrent unmap barrier. It drives four
-threads into the unmap/flush path together and forbids every `smp: tlb shootdown timeout` line;
-no existing check was weakened. The current pre-S83 result is a failure by design:
-
-```text
-$ sh tests/smp/memory/run.sh tcg --iterations 1
-exit 1; 108 `smp: tlb shootdown timeout` lines
-log: build/smp-memory/tcg/run-1/smp-memory.log
-```
-
-The user-level stress summary (`alloc_ops=256`, `fault_pages=512`, `maps=32`, `forks=4`,
-`tlb_rounds=64`, `tlb_stale=0`) and `init exited (0)` are clean; the failure is the kernel lock
-protocol. No new fixture was needed for the `call`/`smp_shim`/`log` sites because they are kernel
-internals; S83/S76 must add their own regression where they can be driven from the test surface.
-
-After S83 (and the matching aarch64 owner), the gate is 50/50 TCG plus KVM `-smp 2/4`, with no
-timeout; `kernel/src/smp/**` and driver fixes are not made here.
-
-## 8. Acceptance
-
-```sh
-cargo nextest run -p raven-vmem          # 16/16 passed
-sh tests/smp/memory/run.sh tcg --iterations 1   # expected fail pre-S83, 108 timeouts
-make check-fast                          # PASSED
-make provenance                          # 0 violations
-```
-
-Acceptance for this audit is the complete table above plus exact owner/file/repair for every
-unsafe site. No high-risk unknown is left unlisted; the only "needs proof" item is the
-`SpinMutex` exception path, which is classified unsafe rather than silently accepted. The audit
-does not claim a fix or a post-S83 pass.
+| Command | Result |
+|---|---|
+| `python3 tests/smp/irq_lock_audit.py --check` | PASS (474 sites, 34 IRQ-safe, 55 needs-proof, 0 undocumented) |
+| `cargo nextest run -p raven-vmem` | PASS (see report) |
+| `sh tests/smp/memory/run.sh tcg --iterations 1` | PASS on this tree (see report; the S83 pre-fix failure is not reproducible) |
+| `make check-fast` | PASSED (see report) |
