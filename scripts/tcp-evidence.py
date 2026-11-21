@@ -59,6 +59,8 @@ ALLOWED_LICENSES = {
 }
 UNIT_TIMEOUT = 180
 SCENARIO_TIMEOUT = 300
+BUILD_TIMEOUT = 600
+IMAGE_TIMEOUT = 180
 VERSION_TIMEOUT = 10
 SCENARIOS = ("handshake", "zero-window", "window-update", "retransmit", "fin-rst")
 
@@ -762,57 +764,116 @@ def phase_matrix(root: Path, packet: Path) -> dict:
         return data
 
     conformance = conformance_path(root)
-    rows: list[dict] = []
-    built = False
-    for target in ("linux", "raven"):
+
+    def run_scenario(target: str, scenario: str) -> dict:
+        log = packet / "logs" / f"matrix-{target}-{scenario}.log"
+        pcap = packet / "pcaps" / f"{target}-{scenario}.pcap"
+        serial = packet / "serial" / f"{target}-{scenario}.log"
+        pcap.parent.mkdir(parents=True, exist_ok=True)
+        serial.parent.mkdir(parents=True, exist_ok=True)
+        command = ["sh", str(conformance), "--scenario", scenario]
+        if target == "linux":
+            command += ["--baseline", "linux"]
+        else:
+            command += ["--target", "raven", "--no-build"]
+        command += ["--pcap", str(pcap), "--serial", str(serial)]
+        run = run_command(command, SCENARIO_TIMEOUT, log, root)
+        if run["exit"] == 0:
+            status = "pass"
+        elif run["exit"] in (77, 124):
+            status = "blocked"
+        else:
+            status = "fail"
+        detail = ""
+        for line in reversed((run["stdout"] + "\n" + run["stderr"]).splitlines()):
+            if line.strip():
+                detail = line.strip()[:300]
+                break
+        return {
+            "target": target,
+            "scenario": scenario,
+            "status": status,
+            "exit": run["exit"],
+            "duration_s": run["duration_s"],
+            "detail": detail,
+            "log": str(log.relative_to(packet)),
+            "pcap": str(pcap.relative_to(packet)) if pcap.is_file() else None,
+            "serial": str(serial.relative_to(packet)) if serial.is_file() else None,
+        }
+
+    rows: list[dict] = [run_scenario("linux", scenario) for scenario in SCENARIOS]
+
+    initfs = run_command(
+        ["sh", "tests/fixtures/net-conformance/build.sh"],
+        BUILD_TIMEOUT,
+        packet / "logs" / "build-initfs.log",
+        root,
+    )
+    image = run_command(
+        [
+            "cargo", "xtask", "image", "--arch", "x86_64", "--profile", "network-config-test",
+            "--initfs", "build/fixtures/net-conformance/initfs.img",
+            "--output", "build/qtest/net-conformance.img",
+        ],
+        IMAGE_TIMEOUT,
+        packet / "logs" / "build-image.log",
+        root,
+    )
+    build_ok = initfs["exit"] == 0 and image["exit"] == 0
+    build = {
+        "ok": build_ok,
+        "initfs": {
+            "command": initfs["command"],
+            "exit": initfs["exit"],
+            "duration_s": initfs["duration_s"],
+            "timed_out": initfs["timed_out"],
+            "log": "logs/build-initfs.log",
+        },
+        "image": {
+            "command": image["command"],
+            "exit": image["exit"],
+            "duration_s": image["duration_s"],
+            "timed_out": image["timed_out"],
+            "log": "logs/build-image.log",
+        },
+    }
+    if build_ok:
+        rows.extend(run_scenario("raven", scenario) for scenario in SCENARIOS)
+    else:
         for scenario in SCENARIOS:
-            log = packet / "logs" / f"matrix-{target}-{scenario}.log"
-            pcap = packet / "pcaps" / f"{target}-{scenario}.pcap"
-            serial = packet / "serial" / f"{target}-{scenario}.log"
-            pcap.parent.mkdir(parents=True, exist_ok=True)
-            serial.parent.mkdir(parents=True, exist_ok=True)
-            command = ["sh", str(conformance), "--scenario", scenario]
-            if target == "linux":
-                command += ["--baseline", "linux"]
-            else:
-                command += ["--target", "raven"]
-                if built:
-                    command += ["--no-build"]
-            command += ["--pcap", str(pcap), "--serial", str(serial)]
-            run = run_command(command, SCENARIO_TIMEOUT, log, root)
-            if target == "raven" and run["exit"] == 0:
-                built = True
-            if run["exit"] == 0:
-                status = "pass"
-            elif run["exit"] in (77, 124):
-                status = "blocked"
-            else:
-                status = "fail"
-            detail = ""
-            for line in reversed((run["stdout"] + "\n" + run["stderr"]).splitlines()):
-                if line.strip():
-                    detail = line.strip()[:300]
-                    break
             rows.append(
                 {
-                    "target": target,
+                    "target": "raven",
                     "scenario": scenario,
-                    "status": status,
-                    "exit": run["exit"],
-                    "duration_s": run["duration_s"],
-                    "detail": detail,
-                    "log": str(log.relative_to(packet)),
-                    "pcap": str(pcap.relative_to(packet)) if pcap.is_file() else None,
-                    "serial": str(serial.relative_to(packet)) if serial.is_file() else None,
+                    "status": "blocked",
+                    "exit": None,
+                    "duration_s": None,
+                    "detail": "target build failed; see logs/build-*.log",
+                    "log": None,
+                    "pcap": None,
+                    "serial": None,
                 }
             )
-    if any(row["status"] == "fail" for row in rows):
-        status = "fail"
-    elif any(row["status"] == "blocked" for row in rows):
+
+    failed = [row for row in rows if row["status"] == "fail"]
+    blocked = [row for row in rows if row["status"] == "blocked"]
+    if blocked:
         status = "blocked"
+        reason = "target build failed or a scenario was blocked by a prerequisite/timeout; see matrix.json"
     else:
         status = "pass"
-    data = {"name": "matrix", "status": status, "reason": None, "scenarios": rows}
+        reason = None
+    data = {
+        "name": "matrix",
+        "status": status,
+        "reason": reason,
+        "ran": len(rows) == len(SCENARIOS) * 2 and not blocked,
+        "passed": len(rows) - len(failed) - len(blocked),
+        "failed": len(failed),
+        "blocked": len(blocked),
+        "build": build,
+        "scenarios": rows,
+    }
     (packet / "matrix.json").write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return data
 
@@ -907,8 +968,12 @@ def summarize(packet: Path, info: dict, phases: list[dict]) -> int:
             counts = phase["counts"]
             if counts.get("run") is not None:
                 extra = f" {counts['passed']}/{counts['run']} passed, {counts['failed']} failed"
-        if phase["name"] == "matrix" and phase.get("reason"):
-            extra = f" ({phase['reason']})"
+        if phase["name"] == "matrix":
+            if phase.get("reason"):
+                extra = f" ({phase['reason']})"
+            elif phase.get("ran"):
+                total = phase["passed"] + phase["failed"]
+                extra = f" (ran {total}, {phase['passed']} pass, {phase['failed']} fail)"
         lines.append(f"{phase['name']}: {phase['status']}{extra}")
     lines.append(f"packet: {packet}")
     lines.append(f"exit: {exit_code}")
@@ -1007,9 +1072,9 @@ upstream = "dragonfly"
     if result["netbsd_imports"]:
         print("tcp-evidence-selftest: FAIL NetBSD TCP import present", file=sys.stderr)
         return 1
-    if len(result["quarantined"]) != 8:
+    if len(result["quarantined"]) != 17:
         print(
-            f"tcp-evidence-selftest: FAIL expected 8 quarantined claims, got {result['quarantined']}",
+            f"tcp-evidence-selftest: FAIL expected 17 quarantined claims, got {result['quarantined']}",
             file=sys.stderr,
         )
         return 1
@@ -1018,7 +1083,7 @@ upstream = "dragonfly"
         return 1
     doc = load_claims(claims)
     tickets = {claim.get("ticket") for claim in doc.get("claims", [])}
-    needed = {f"K{number}" for number in range(253, 264)}
+    needed = {f"K{number}" for number in list(range(253, 264)) + list(range(265, 280))}
     missing = sorted(needed - tickets)
     if missing:
         print(f"tcp-evidence-selftest: FAIL claims missing {missing}", file=sys.stderr)
@@ -1041,7 +1106,7 @@ upstream = "dragonfly"
         return 1
     print(
         "tcp-evidence-selftest: PASS "
-        f"netbsd_imports=0 quarantined=8 claims={len(doc.get('claims', []))} "
+        f"netbsd_imports=0 quarantined=17 claims={len(doc.get('claims', []))} "
         "matrix_blocker=detected"
     )
     return 0
