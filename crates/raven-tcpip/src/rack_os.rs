@@ -417,7 +417,13 @@ impl MbufPool {
             };
             let mut chunk = vec![0u8; take];
             self.m_copydata(Some(id), start, take, &mut chunk).ok()?;
-            let new_id = self.m_get(M_NOWAIT)?;
+            // Donor `m_copym` shares an external cluster for a large chunk; the software
+            // model copies it into an external mbuf so the live length fits.
+            let new_id = if take > MLEN {
+                self.allocate(take, M_EXT)?
+            } else {
+                self.m_get(M_NOWAIT)?
+            };
             if let Some(new) = self.mbuf_mut(new_id) {
                 new.data[..take].copy_from_slice(&chunk);
                 new.len = take;
@@ -633,19 +639,15 @@ impl SockBuf {
                 mem = mem.saturating_add(mbuf_mem);
                 remaining -= mbuf_len;
             } else {
-                // Split the front: copy the removed prefix, keep the rest in place.
+                // Split the front: copy the removed prefix into a new chain (FreeBSD
+                // `m_split`/`m_copym`), keep the rest in place.
                 let take = remaining;
-                let Some(new_id) = pool.m_get(M_NOWAIT) else {
+                let Some(copy) = pool.m_copym(Some(head), 0, take) else {
                     break;
                 };
-                let mut prefix = vec![0u8; take];
-                if pool.m_copydata(Some(head), 0, take, &mut prefix).is_err() {
-                    pool.m_free(new_id);
-                    break;
-                }
-                if let Some(new) = pool.mbuf_mut(new_id) {
-                    new.data[..take].copy_from_slice(&prefix);
-                    new.len = take;
+                let mut copy_tail = copy;
+                while let Some(next) = pool.mbuf(copy_tail).and_then(|mbuf| mbuf.next) {
+                    copy_tail = next;
                 }
                 if let Some(mbuf) = pool.mbuf_mut(head) {
                     mbuf.off += take;
@@ -653,12 +655,12 @@ impl SockBuf {
                 }
                 if let Some(tail) = removed_tail {
                     if let Some(parent) = pool.mbuf_mut(tail) {
-                        parent.next = Some(new_id);
+                        parent.next = Some(copy);
                     }
                 } else {
-                    removed_head = Some(new_id);
+                    removed_head = Some(copy);
                 }
-                removed_tail = Some(new_id);
+                removed_tail = Some(copy_tail);
                 bytes += take;
                 // The original mbuf stays in the buffer with a shorter live region; the
                 // removed prefix is caller-owned and not charged to sb_mbcnt.
