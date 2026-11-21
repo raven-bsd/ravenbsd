@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K371 post-K273 release network regression: the pf profile loads
+# /etc/pf.conf, admits the allowed ICMP flow (`netd: ping 10.0.2.2`), admits
+# the stateful UDP echo flow, drops the quick-logged UDP 47002 flow and prints
+# the `netd: pf block` record. The pre-step starts the host UDP/NAT echoes; the
+# probe is the same one-shot `pf` probe used by K273/K296.
+
+name = "net-postpf-pf"
+arch = "x86_64"
+profile = "pf"
+timeout_secs = 300
+pre = [
+    "sh tests/fixtures/b12-netd/build.sh",
+    "sh tests/fixtures/b12-netd/udp_echo_start.sh 47001",
+    "sh tests/qtest/cases/pf-kvm-fixture/nat_echo_start.sh 47004",
+]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^netd: pf loaded rules=3 nat=1$'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: interface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^netd: ready$'
+
+[[expect]]
+regex = '^svcd: netd up$'
+
+[[expect]]
+regex = '^netd: iface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^pf: allowed flow ok$'
+
+[[expect]]
+regex = '^pf: blocked datagram sent$'
+
+[[expect]]
+regex = '^netd: pf block out eth0 udp 10\.0\.2\.15:7201 -> 10\.0\.2\.2:47002 reason=match$'
+unordered = true
+
+[[expect]]
+regex = '^pf: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
