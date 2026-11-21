@@ -4,8 +4,8 @@
 [package]
 name = "raven-rmm"
 version = "0.1.0"
-description = "x86-64 page-table mapper for RavenBSD, ported from Redox rmm."
-# Internal kernel crate: not a public API, not published. See DR-63/S117.
+description = "Page-table mapper for RavenBSD (NetBSD pmap design)."
+# Internal kernel crate: not a public API, not published.
 publish = false
 edition.workspace = true
 license.workspace = true

@@ -288,6 +288,21 @@ fn unmap_2m_returns_physical_base() {
 }
 
 #[test]
+fn unmap_2m_frees_both_empty_intermediate_tables() {
+    let mut harness = Harness::new(64);
+    let address = virt(0x0000_0000_4000_0000);
+    harness.with(|mapper| {
+        let before = mapper.allocator_mut().freed_count();
+        mapper
+            .map(address, phys(512), PageFlags::kernel_rw(), PageSize::Size2M)
+            .unwrap();
+        assert_eq!(mapper.allocator_mut().freed_count(), before);
+        mapper.unmap(address).unwrap();
+        assert_eq!(mapper.allocator_mut().freed_count(), before + 2);
+    });
+}
+
+#[test]
 fn unmap_frees_empty_intermediate_tables() {
     let mut harness = Harness::new(64);
     let address = virt(0x0000_0000_5000_0000);

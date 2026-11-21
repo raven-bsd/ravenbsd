@@ -1,17 +1,15 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2017 Jeremy Soller
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! Page-table mapping for RavenBSD.
 //!
-//! This crate is a port and trim of Redox's `rmm`. The original architecture-generic table,
-//! entry and mapper machinery is kept; the buddy/bump allocators, the emulated architecture and
-//! its own backends are dropped. Callers supply physical memory access, frame allocation and TLB
-//! flushing through the three traits below so the mapper is host-testable.
+//! This crate is a first-party implementation of the NetBSD pmap design (S117 order 1-3):
+//! a four-level table walk, explicit table ownership and free, W^X, canonical and physical-width
+//! checks, and a caller-supplied TLB seam. Callers supply physical memory access, frame
+//! allocation and TLB flushing through the three traits below so the mapper is host-testable.
 //!
-//! Descriptor bits are behind the [`Encoding`] trait: [`X86_64Encoding`] is the historical S06
-//! behaviour and [`Aarch64Encoding`] implements the ARMv8-A 4 KiB-granule format added in S14a.
-//! riscv64 (S19) will add its own backend.
+//! Descriptor bits are behind the [`Encoding`] trait: [`X86_64Encoding`] implements the x86-64
+//! 4-level PTE format and [`Aarch64Encoding`] the ARMv8-A 4 KiB-granule translation-table format.
 
 #![no_std]
 

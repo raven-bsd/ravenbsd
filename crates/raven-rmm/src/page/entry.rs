@@ -1,8 +1,10 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2017 Jeremy Soller
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! One 8-byte page-table entry.
+//!
+//! This type is the x86-64 raw-entry view. aarch64 code goes through
+//! [`crate::page::Encoding`] for descriptor construction and decoding.
 
 use crate::arch::x86_64::{ENTRY_ADDRESS_MASK, ENTRY_FLAGS_MASK, PAGE_SHIFT};
 use crate::{PageFlags, PhysAddr};

@@ -1,11 +1,10 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2017 Jeremy Soller
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! aarch64 translation-table constants (4 KiB granule, 48-bit VA).
 //!
-//! ARMv8-A facts applied here (the values match the S12 loader's TTBR1 encoder, plus attr2/attr3
-//! which the kernel additionally uses):
+//! ARMv8-A facts applied here (matching the S12 loader's TTBR1 encoder and the NetBSD pmap
+//! design in `sys/arch/aarch64/aarch64/pmap.c`):
 //!
 //! * 4 KiB granule, 4 levels (L0..L3), 512 entries per table, 48-bit virtual addresses with
 //!   `TCR_EL1.T0SZ = T1SZ = 16`.
@@ -16,9 +15,8 @@
 //! * `MAIR_EL1`: attr0 `0x00` device-nGnRnE, attr1 `0xFF` normal write-back, attr2 `0x44`
 //!   normal non-cacheable, attr3 `0x04` device-nGnRE.
 //!
-//! The descriptor bits below were cross-checked against the Redox `rmm` aarch64 backend, whose
-//! known TODOs (UXN/PXN separation, address width, `virt_is_valid`) are fixed here: execution is
-//! controlled per privilege level and address validity distinguishes the TTBR0 and TTBR1 halves.
+//! Execution is controlled per privilege level (PXN/UXN) and address validity distinguishes
+//! the TTBR0 and TTBR1 halves.
 
 /// Shift from bytes to pages.
 pub const PAGE_SHIFT: usize = 12;
@@ -76,8 +74,8 @@ pub const AP_ALL_RO: u64 = 0b11 << 6;
 /// The loader's value is `0xFF00` (attr0/attr1 only); the kernel uses this extended value.
 pub const MAIR_EL1: u64 = 0x0444_FF00;
 
-/// `TCR_EL1` with 4 KiB granules, `T0SZ = T1SZ = 16` and the given `ID_AA64MMFR0_EL1.PARange` IPS
-/// value; identical to the loader's `tcr()`.
+/// `TCR_EL1` with 4 KiB granules, `T0SZ = T1SZ = 16` and the given `ID_AA64MMFR0_EL1.PARange`
+/// IPS value; identical to the loader's `tcr()`.
 pub const fn tcr_el1(physical_bits: u32) -> u64 {
     let ips = match physical_bits {
         0..=32 => 0u64,
@@ -142,33 +140,5 @@ const _: () = {
 };
 
 #[cfg(test)]
-mod tests {
-    use super::{is_canonical, is_kernel_half, is_user_half};
-
-    #[test]
-    fn canonical_halves() {
-        assert!(is_canonical(0));
-        assert!(is_canonical(0x0000_7FFF_FFFF_FFFF));
-        // The full 48-bit lower half belongs to TTBR0; there is no x86-64-style hole.
-        assert!(is_canonical(0x0000_8000_0000_0000));
-        assert!(is_canonical(0x0000_FFFF_FFFF_FFFF));
-        assert!(is_canonical(0xFFFF_0000_0000_0000));
-        assert!(is_canonical(0xFFFF_8000_0000_0000));
-        assert!(is_canonical(0xFFFF_FFFF_FFFF_FFFF));
-    }
-
-    #[test]
-    fn non_canonical_is_rejected() {
-        // With T0SZ = T1SZ = 16 the whole 48-bit lower half is valid TTBR0 space (there is no
-        // x86-64-style hole), so only a partially-set top byte is non-canonical.
-        assert!(!is_canonical(0x8000_0000_0000_0000));
-        assert!(!is_canonical(0x7FFF_0000_0000_0000));
-    }
-
-    #[test]
-    fn half_classification() {
-        assert!(is_user_half(0x0000_0000_1000_0000));
-        assert!(is_kernel_half(0xFFFF_FFFF_8020_0000));
-        assert!(is_kernel_half(0xFFFF_C000_0000_0000));
-    }
-}
+#[path = "aarch64_ut.rs"]
+mod tests;

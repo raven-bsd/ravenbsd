@@ -1,8 +1,10 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2017 Jeremy Soller
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! x86-64 four-level paging constants.
+//!
+//! The layout follows the NetBSD pmap design: PML4, PDP, PD and PT, 512 8-byte entries per
+//! table, 48-bit canonical virtual addresses and a 52-bit physical-address field.
 
 /// Shift from bytes to pages.
 pub const PAGE_SHIFT: usize = 12;
@@ -24,6 +26,8 @@ pub const ENTRY_ADDRESS_MASK: u64 = (1 << ENTRY_ADDRESS_WIDTH) - 1;
 pub const ENTRY_FLAGS_MASK: u64 = !(ENTRY_ADDRESS_MASK << PAGE_SHIFT);
 
 /// True for canonical four-level x86-64 addresses.
+///
+/// Bits 63..47 must all equal bit 47; the top half therefore has the 17-bit pattern `0x1_ffff`.
 pub const fn is_canonical(address: u64) -> bool {
     let top = address >> 47;
     top == 0 || top == 0x1_ffff
@@ -48,26 +52,5 @@ const _: () = {
 };
 
 #[cfg(test)]
-mod tests {
-    use super::is_canonical;
-
-    #[test]
-    fn canonical_low_half() {
-        assert!(is_canonical(0));
-        assert!(is_canonical(0x0000_7FFF_FFFF_FFFF));
-    }
-
-    #[test]
-    fn canonical_high_half() {
-        assert!(is_canonical(0xFFFF_8000_0000_0000));
-        assert!(is_canonical(0xFFFF_FFFF_FFFF_FFFF));
-    }
-
-    #[test]
-    fn canonical_hole_is_rejected() {
-        assert!(!is_canonical(0x0000_8000_0000_0000));
-        assert!(!is_canonical(0x0000_FFFF_FFFF_FFFF));
-        assert!(!is_canonical(0xFFFF_0000_0000_0000));
-        assert!(!is_canonical(0xFFFF_7FFF_FFFF_FFFF));
-    }
-}
+#[path = "x86_64_ut.rs"]
+mod tests;

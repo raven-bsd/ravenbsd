@@ -1,12 +1,12 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# RM1 host model harness
+# RMM host model harness
 
 This directory is the fixed-corpus driver for the `raven-rmm` adversarial model in
 `crates/raven-rmm/tests/rmm_model.rs`. It is not a boot-time benchmark.
 
-The model uses three fixed seeds (`0x123456789abcdef0`, `0x0badf00ddeadbeef`,
+The harness was introduced by RM1 and is retained by the RM2 first-party mapper. The model uses three fixed seeds (`0x123456789abcdef0`, `0x0badf00ddeadbeef`,
 `0xa5a55a5a12344321`) over a low and a high virtual half, for both `X86_64Encoding` and
 `Aarch64Encoding`. It mixes 4 KiB and 2 MiB map/unmap/protect/translate operations, double-map
 and huge/4K conflicts, the deliberate 1 GiB rejection, table recycle, OOM rollback, direct-map
@@ -21,5 +21,5 @@ timeout 40 sh tests/rmm/run-model.sh
 
 `RMM_MODEL_OPS` sets the iterations per seed/base/encoding (default 10,000; the harness default
 for the long run is 50,000). The test prints per-corpus `ops`, `p50_ns` and `p90_ns`; copy the
-recorded output into the RM1 report. A cap expiry is a timeout and is reported as `BLOCKED`; do
+recorded output into the current ticket report. A cap expiry is a timeout and is reported as `BLOCKED`; do
 not raise the cap without a measured runtime.

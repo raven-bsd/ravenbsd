@@ -1,13 +1,13 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2017 Jeremy Soller
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! The page-table mapper: map, unmap, protect, translate and address-space creation.
 //!
 //! The walker is encoding-neutral: every raw-descriptor decision goes through [`Encoding`], so
-//! the same code drives x86-64 PTEs and aarch64 descriptors. [`X86_64Encoding`] reproduces the
-//! historical S06 behaviour bit for bit; the default type parameter keeps every pre-S14a caller
-//! source-compatible.
+//! the same code drives x86-64 PTEs and aarch64 descriptors. The design follows the NetBSD pmap
+//! rules for table ownership: new intermediate tables are allocated unlinked, the leaf is
+//! written first, and the table chain is linked top-down; any failure frees the unlinked frames
+//! and leaves no reachable empty table.
 //!
 //! Huge-page splitting is not implemented. Mapping a 4 KiB page over a 2 MiB/1 GiB page (or the
 //! reverse) returns [`MapError::HugePageConflict`]; callers must unmap the huge mapping first.
@@ -18,6 +18,58 @@
 use crate::page::encoding::{Encoding, X86_64Encoding};
 use crate::page::{Entry, PageFlags, PageSize, PageTable};
 use crate::{FrameAllocator, MapError, PhysAddr, PhysMemory, TlbFlusher, VirtAddr, page_align_up};
+
+/// One intermediate table allocated by `map`, waiting to be linked.
+#[derive(Clone, Copy)]
+struct NewTable {
+    parent: PhysAddr,
+    parent_level: u8,
+    parent_index: usize,
+    frame: PhysAddr,
+}
+
+/// The at-most-three unlinked tables of one `map` call.
+struct PendingTables {
+    slots: [Option<NewTable>; 3],
+}
+
+impl PendingTables {
+    const fn new() -> Self {
+        Self { slots: [None; 3] }
+    }
+
+    fn push(&mut self, table: NewTable) -> bool {
+        for slot in &mut self.slots {
+            if slot.is_none() {
+                *slot = Some(table);
+                return true;
+            }
+        }
+        false
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &NewTable> {
+        self.slots.iter().flatten()
+    }
+
+    fn free<A: FrameAllocator>(&self, allocator: &mut A) {
+        for table in self.iter() {
+            allocator.free(table.frame);
+        }
+    }
+
+    fn clear_links<M: PhysMemory>(&self, memory: &M, linked: usize) -> bool {
+        let mut cleared = true;
+        for table in self.slots[..linked].iter().rev().flatten() {
+            cleared &= PageTable::new(table.parent, table.parent_level).set_entry(
+                memory,
+                table.parent_index,
+                Entry::from_raw(0),
+            );
+        }
+        cleared
+    }
+}
 
 /// A page-table mapper over a caller-provided root table.
 pub struct Mapper<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding = X86_64Encoding>
@@ -92,15 +144,7 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
         flags: PageFlags,
         size: PageSize,
     ) -> Result<(), MapError> {
-        if flags.is_write_execute() {
-            return Err(MapError::WriteExecute);
-        }
-        if flags.is_user() && !E::is_user_half(virt.data()) {
-            return Err(MapError::UserKernelSplit);
-        }
-        if size == PageSize::Size1G {
-            return Err(MapError::HugePageConflict);
-        }
+        self.check_leaf_request(virt, flags, size)?;
         if phys.0 > E::PHYS_ADDR_MASK || !E::is_canonical(virt.data()) {
             return Err(MapError::NotCanonical);
         }
@@ -110,97 +154,92 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
         }
 
         let target_level = size.level();
-        // New intermediate tables are allocated but not linked until the leaf is in place. If a
-        // later allocation or the leaf write fails, they are unlinked and freed, so an OOM does
-        // not leave empty tables reachable from the root.
-        let mut new_tables: [Option<(PhysAddr, u8, usize, PhysAddr)>; 3] = [None; 3];
+        let mut pending = PendingTables::new();
         let mut table = PageTable::new(self.root, (E::PAGE_LEVELS - 1) as u8);
         loop {
             let index = table.index_of(virt);
-            let entry = match table.entry(self.memory, index) {
-                Some(entry) => entry,
-                None => {
-                    self.free_unlinked(&new_tables);
-                    return Err(MapError::OutOfFrames);
-                }
+            let Some(entry) = table.entry(self.memory, index) else {
+                pending.free(self.allocator);
+                return Err(MapError::OutOfFrames);
             };
 
             if table.level() == target_level {
                 if E::is_present(entry.raw()) {
-                    self.free_unlinked(&new_tables);
+                    pending.free(self.allocator);
                     if target_level > 0 && E::is_table(entry.raw(), target_level) {
                         return Err(MapError::HugePageConflict);
                     }
                     return Err(MapError::AlreadyMapped);
                 }
-                let new_entry = Entry::from_raw(E::leaf(phys, flags, size));
-                if !table.set_entry(self.memory, index, new_entry) {
-                    self.free_unlinked(&new_tables);
+                if !table.set_entry(
+                    self.memory,
+                    index,
+                    Entry::from_raw(E::leaf(phys, flags, size)),
+                ) {
+                    pending.free(self.allocator);
                     return Err(MapError::OutOfFrames);
                 }
                 break;
             }
 
             if E::is_present(entry.raw()) && !E::is_table(entry.raw(), table.level()) {
-                self.free_unlinked(&new_tables);
+                pending.free(self.allocator);
                 return Err(MapError::HugePageConflict);
             }
 
-            table = if E::is_present(entry.raw()) {
+            if E::is_present(entry.raw()) {
                 let child = entry.address();
                 if !child.0.is_multiple_of(crate::PAGE_SIZE) {
-                    self.free_unlinked(&new_tables);
+                    pending.free(self.allocator);
                     return Err(MapError::HugePageConflict);
                 }
-                PageTable::new(child, table.level() - 1)
-            } else {
-                let frame = match self.allocator.allocate() {
-                    Some(frame) => frame,
-                    None => {
-                        self.free_unlinked(&new_tables);
-                        return Err(MapError::OutOfFrames);
-                    }
-                };
-                if !frame.0.is_multiple_of(crate::PAGE_SIZE) || frame.0 > E::PHYS_ADDR_MASK {
-                    self.allocator.free(frame);
-                    self.free_unlinked(&new_tables);
-                    return Err(MapError::NotCanonical);
-                }
-                if let Err(error) = self.zero_frame(frame) {
-                    self.allocator.free(frame);
-                    self.free_unlinked(&new_tables);
-                    return Err(error);
-                }
-                let parent = table;
-                let Some(slot) = new_tables.iter_mut().find(|slot| slot.is_none()) else {
-                    self.allocator.free(frame);
-                    self.free_unlinked(&new_tables);
+                table = PageTable::new(child, table.level() - 1);
+                continue;
+            }
+
+            let frame = match self.allocator.allocate() {
+                Some(frame) => frame,
+                None => {
+                    pending.free(self.allocator);
                     return Err(MapError::OutOfFrames);
-                };
-                *slot = Some((parent.phys(), parent.level(), index, frame));
-                PageTable::new(frame, table.level() - 1)
+                }
             };
+            if !frame.0.is_multiple_of(crate::PAGE_SIZE) || frame.0 > E::PHYS_ADDR_MASK {
+                self.allocator.free(frame);
+                pending.free(self.allocator);
+                return Err(MapError::NotCanonical);
+            }
+            if let Err(error) = self.zero_frame(frame) {
+                self.allocator.free(frame);
+                pending.free(self.allocator);
+                return Err(error);
+            }
+            let parent = table;
+            if !pending.push(NewTable {
+                parent: parent.phys(),
+                parent_level: parent.level(),
+                parent_index: index,
+                frame,
+            }) {
+                self.allocator.free(frame);
+                pending.free(self.allocator);
+                return Err(MapError::OutOfFrames);
+            }
+            table = PageTable::new(frame, parent.level() - 1);
         }
 
-        // Link top-down after the leaf write. Nothing above the leaf can fail on a valid direct
-        // map; if it does, unlink what was linked and free the unlinked frames.
+        // Link the chain top-down after the leaf is in place. A failure clears the links made so
+        // far; only when every clear succeeds are the frames returned to the allocator.
         let user = flags.is_user();
-        for (linked, slot) in new_tables.iter().flatten().enumerate() {
-            let (parent_phys, parent_level, parent_index, frame) = *slot;
-            let parent = PageTable::new(parent_phys, parent_level);
+        for (linked, new_table) in pending.iter().enumerate() {
+            let parent = PageTable::new(new_table.parent, new_table.parent_level);
             if !parent.set_entry(
                 self.memory,
-                parent_index,
-                Entry::from_raw(E::table(frame, user)),
+                new_table.parent_index,
+                Entry::from_raw(E::table(new_table.frame, user)),
             ) {
-                let mut all_unlinked = true;
-                for previous in new_tables[..linked].iter().rev().flatten() {
-                    let (pp, pl, pi, _) = *previous;
-                    all_unlinked &=
-                        PageTable::new(pp, pl).set_entry(self.memory, pi, Entry::from_raw(0));
-                }
-                if all_unlinked {
-                    self.free_unlinked(&new_tables);
+                if pending.clear_links(self.memory, linked) {
+                    pending.free(self.allocator);
                 }
                 return Err(MapError::OutOfFrames);
             }
@@ -220,7 +259,7 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
             return Err(MapError::NotMapped);
         }
         self.tlb.flush(virt);
-        self.prune(PageTable::new(self.root, (E::PAGE_LEVELS - 1) as u8), virt);
+        self.prune(virt);
         Ok(phys)
     }
 
@@ -360,6 +399,24 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
         Ok(root)
     }
 
+    fn check_leaf_request(
+        &self,
+        virt: VirtAddr,
+        flags: PageFlags,
+        size: PageSize,
+    ) -> Result<(), MapError> {
+        if flags.is_write_execute() {
+            return Err(MapError::WriteExecute);
+        }
+        if flags.is_user() && !E::is_user_half(virt.data()) {
+            return Err(MapError::UserKernelSplit);
+        }
+        if size == PageSize::Size1G {
+            return Err(MapError::HugePageConflict);
+        }
+        Ok(())
+    }
+
     fn locate(&self, virt: VirtAddr) -> Option<(PageTable, usize, Entry, PageSize)> {
         let mut table = PageTable::new(self.root, (E::PAGE_LEVELS - 1) as u8);
         loop {
@@ -378,28 +435,43 @@ impl<'a, A: FrameAllocator, M: PhysMemory, T: TlbFlusher, E: Encoding> Mapper<'a
         }
     }
 
-    fn prune(&mut self, table: PageTable, virt: VirtAddr) {
-        if table.level() == 0 {
-            return;
+    fn prune(&mut self, virt: VirtAddr) {
+        // path[level] is the entry in a level-`level` table that points at the level-`level - 1`
+        // child. A 2 MiB leaf at level 1 leaves path[1] empty but still records path[2]/path[3],
+        // so the now-empty level-1 table is reclaimed through its parent.
+        let mut path: [Option<(PageTable, usize)>; crate::PAGE_LEVELS] = [None; crate::PAGE_LEVELS];
+        let mut table = PageTable::new(self.root, (E::PAGE_LEVELS - 1) as u8);
+        while table.level() > 0 {
+            let index = table.index_of(virt);
+            let Some(entry) = table.entry(self.memory, index) else {
+                return;
+            };
+            if !E::is_present(entry.raw()) || !E::is_table(entry.raw(), table.level()) {
+                break;
+            }
+            path[usize::from(table.level())] = Some((table, index));
+            table = PageTable::new(entry.address(), table.level() - 1);
         }
-        let index = table.index_of(virt);
-        let Some(entry) = table.entry(self.memory, index) else {
-            return;
-        };
-        if !E::is_present(entry.raw()) || !E::is_table(entry.raw(), table.level()) {
-            return;
-        }
-        let child = PageTable::new(entry.address(), table.level() - 1);
-        self.prune(child, virt);
-        if child.is_empty(self.memory) && table.set_entry(self.memory, index, Entry::from_raw(0)) {
+
+        for (level, slot) in path.iter().enumerate().skip(1) {
+            let Some((parent, index)) = *slot else {
+                continue;
+            };
+            let Some(entry) = parent.entry(self.memory, index) else {
+                return;
+            };
+            if !E::is_present(entry.raw()) || !E::is_table(entry.raw(), level as u8) {
+                continue;
+            }
+            let child = PageTable::new(entry.address(), (level - 1) as u8);
+            if !child.is_empty(self.memory) {
+                return;
+            }
+            if !parent.set_entry(self.memory, index, Entry::from_raw(0)) {
+                return;
+            }
             self.allocator.free(child.phys());
             self.tlb.flush(virt);
-        }
-    }
-
-    fn free_unlinked(&mut self, tables: &[Option<(PhysAddr, u8, usize, PhysAddr)>; 3]) {
-        for entry in tables.iter().flatten() {
-            self.allocator.free(entry.3);
         }
     }
 

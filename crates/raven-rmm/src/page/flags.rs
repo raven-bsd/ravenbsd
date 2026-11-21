@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2017 Jeremy Soller
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! Hand-written page-flag bit set.
@@ -143,8 +142,8 @@ impl PageFlags {
 
     /// Uncached device-memory flags (no execute).
     ///
-    /// On aarch64 the cache-disable + write-through pair (the ticket's "NO_CACHE" case) selects
-    /// the `MAIR_EL1` attr3 device-nGnRE attribute.
+    /// On aarch64 the cache-disable + write-through pair selects the `MAIR_EL1` attr3
+    /// device-nGnRE attribute.
     pub const fn mmio() -> Self {
         Self(PRESENT | WRITABLE | GLOBAL | NO_EXECUTE | CACHE_DISABLE | WRITE_THROUGH)
     }

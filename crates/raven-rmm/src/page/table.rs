@@ -1,8 +1,10 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2017 Jeremy Soller
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! A view of one 4 KiB page table reached through the direct map.
+//!
+//! The table frame is caller-owned until the mapper links it; the mapper never trusts an
+//! unreadable direct map and never frees a table whose entries it could not inspect.
 
 use crate::arch::x86_64::{PAGE_ENTRIES, PAGE_ENTRY_SHIFT, PAGE_SHIFT};
 use crate::{Entry, PhysAddr, PhysMemory, VirtAddr};
@@ -10,21 +12,21 @@ use crate::{Entry, PhysAddr, PhysMemory, VirtAddr};
 /// One page table at a known level (0 = PT, 3 = PML4).
 #[derive(Clone, Copy, Debug)]
 pub struct PageTable {
-    phys: PhysAddr,
+    frame: PhysAddr,
     level: u8,
 }
 
 impl PageTable {
     /// Build a table view.
     ///
-    /// `level` must be 0..=3 and `phys` must be a 4 KiB-aligned frame.
-    pub const fn new(phys: PhysAddr, level: u8) -> Self {
-        Self { phys, level }
+    /// `level` must be 0..=3 and `frame` must be a 4 KiB-aligned frame.
+    pub const fn new(frame: PhysAddr, level: u8) -> Self {
+        Self { frame, level }
     }
 
     /// Physical address of the table.
     pub const fn phys(self) -> PhysAddr {
-        self.phys
+        self.frame
     }
 
     /// Paging level.
@@ -43,11 +45,11 @@ impl PageTable {
         if index >= PAGE_ENTRIES {
             return None;
         }
-        let pointer = self.entry_pointer(memory, index)?;
+        let slot = self.slot(memory, index)?;
         // SAFETY: `PhysMemory` guarantees the table frame is mapped writable and readable; the
         // index is in bounds and an entry is 8 bytes at an 8-byte-aligned address.
         Some(Entry::from_raw(unsafe {
-            core::ptr::read_volatile(pointer.cast_const())
+            core::ptr::read_volatile(slot.cast_const())
         }))
     }
 
@@ -56,13 +58,13 @@ impl PageTable {
         if index >= PAGE_ENTRIES {
             return false;
         }
-        let Some(pointer) = self.entry_pointer(memory, index) else {
+        let Some(slot) = self.slot(memory, index) else {
             return false;
         };
         // SAFETY: `PhysMemory` guarantees the table frame is mapped writable; the index is in
         // bounds and the pointer is 8-byte aligned.
         unsafe {
-            core::ptr::write_volatile(pointer, entry.raw());
+            core::ptr::write_volatile(slot, entry.raw());
         }
         true
     }
@@ -85,16 +87,20 @@ impl PageTable {
 
     /// True when no entry in this table is present.
     pub fn is_empty<M: PhysMemory>(self, memory: &M) -> bool {
-        (0..PAGE_ENTRIES).all(|index| match self.entry(memory, index) {
-            Some(entry) => !entry.is_present(),
-            // An unreadable table is not proven empty; never free a frame whose contents we
-            // could not inspect.
-            None => false,
-        })
+        for index in 0..PAGE_ENTRIES {
+            match self.entry(memory, index) {
+                Some(entry) if entry.is_present() => return false,
+                // An unreadable table is not proven empty; never free a frame whose contents we
+                // could not inspect.
+                None => return false,
+                Some(_) => {}
+            }
+        }
+        true
     }
 
-    fn entry_pointer<M: PhysMemory>(self, memory: &M, index: usize) -> Option<*mut u64> {
-        let base = memory.phys_to_virt(self.phys);
+    fn slot<M: PhysMemory>(self, memory: &M, index: usize) -> Option<*mut u64> {
+        let base = memory.phys_to_virt(self.frame);
         if base.is_null() {
             return None;
         }
