@@ -1,0 +1,19 @@
+{
+  "case": "smp-memory",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 23436,
+  "exit_status": 33,
+  "matched": [
+    "^smp-user: cpu [1-9] first user thread pid=\\d+ tid=\\d+$",
+    "^smp-memory: start workers=3$",
+    "^smp-memory: tlb map=0x[0-9a-f]+ alias=0x[0-9a-f]+$",
+    "^smp-memory: concurrent-shootdown waiters=4$",
+    "^smp-memory: workers ready$",
+    "^smp-memory: summary alloc_ops=\\d+ fault_pages=\\d+ maps=\\d+ forks=4 tlb_rounds=64 tlb_stale=0$",
+    "^smp-memory: ok$",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}
