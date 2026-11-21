@@ -124,14 +124,15 @@ host load 9.8-59: **8 pass, 2 fail**. The serials and per-run summary are in
 
 | Run | Result | Failure |
 |---:|---|---|
-| 2 | FAIL | S85e fixture worker deadline; two stale-NMI diagnostics |
+| 2 | FAIL | six `smp: tlb shootdown timeout` lines on CPU 0; the fixture worker deadline follows the stall; two stale-NMI diagnostics |
 | 8 | FAIL | six `smp: tlb shootdown timeout` lines on CPU 0; fixture green |
 
-Run 8's lines show `irq_age_ms` 203, 307, 410, 514, 617 and 720 with `ack_after_ms=MAX` and
-`last` stuck at the previous sequence. The target vCPU was not scheduled for 720 ms; this is a
-host KVM stall, not a guest IF=0/TLB delivery defect. The 100 ms deadline is unchanged. The
-KVM4 10x sample is therefore not a clean TLB gate; K391 owns the fixture stall and a quiet-host
-rerun is required before the release gate.
+Both failures show the same CPU 0 pattern: `irq_age_ms` 100, 203, 307, 410, 514, 617, 720 with
+`ack_after_ms=MAX` and `last` stuck at the previous sequence. The target vCPU was not scheduled
+for up to 720 ms; this is a host KVM stall, not a guest IF=0/TLB delivery defect. The 100 ms
+deadline is unchanged. The KVM4 10x sample is therefore **8/10, with two TLB-stall failures**;
+it is not a clean TLB gate. K391 owns the fixture stall and a quiet-host rerun is required before
+the release gate.
 
 ## Donor reconciliation
 

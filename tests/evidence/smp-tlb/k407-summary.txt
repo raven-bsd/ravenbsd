@@ -11,4 +11,4 @@ run=7 rc=0 start=2026-11-21T22:08:22Z end=2026-11-21T22:09:23Z load_start=22.57 
 run=8 rc=1 start=2026-11-21T22:09:23Z end=2026-11-21T22:10:23Z load_start=27.25 31.07 21.14 load_end=26.37 29.96 21.37
 run=9 rc=0 start=2026-11-21T22:10:23Z end=2026-11-21T22:11:00Z load_start=26.37 29.96 21.37 load_end=20.55 28.16 21.13
 run=10 rc=0 start=2026-11-21T22:11:00Z end=2026-11-21T22:11:30Z load_start=20.55 28.16 21.13 load_end=14.97 26.08 20.66
-summary pass=8 fail=2 tlb_timeout_runs=1 fixture_fail_runs=1 stale_nmi_runs=2
+summary pass=8 fail=2 tlb_timeout_runs=2 fixture_fail_runs=1 stale_nmi_runs=2
