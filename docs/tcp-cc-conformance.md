@@ -47,10 +47,11 @@ distinct tap when another lane is running the same harness.
 | `congestion-avoidance` | 0 | `post-recovery bursts=1460,1460 additive-limit=yes` | `ae094cb8678428cf2d7a80eedc3346093582ec57c706e698dd3435a1fd9d4627` |
 | `reordering` | 0 | `stale-ack=ignored spurious-segment=no` | `52cf4ee23a71c67085e5cbc6d05d3fdb2f870f4dec1528581cc48928df6bab8f` |
 
-The required K253 retransmit scenario also passes against the existing image:
-`first=44B seq+0; retransmit=yes` (56.98 s). The full net-conformance image
-rebuild exceeded the 300 s acceptance cap while rebuilding userland, so that
-run used `--no-build`; the CC image above was built from the current tree.
+The required K253 retransmit scenario passes on both sides: the Raven target
+`first=44B seq+0; retransmit=yes` (423.03 s including the full image build;
+the first 300 s attempt expired in the userland build), and the Linux baseline
+`first=44B seq+0; retransmit=yes` (0.53 s). The CC image above was built from
+the current tree in 743.84 s.
 
 ## Donor reconciliation
 
