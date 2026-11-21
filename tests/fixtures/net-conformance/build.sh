@@ -81,7 +81,8 @@ cargo xtask initfs --arch "$arch" --profile network-config-test > /dev/null
 cp build/"$arch"/initfs.img "$out/base.img"
 
 cargo build -q -p raven-b70-overlay
-overlay=$root/target/debug/raven-b70-overlay
+target_dir=${CARGO_TARGET_DIR:-$root/target}
+overlay=$target_dir/debug/raven-b70-overlay
 "$overlay" "$out/base.img" "$out/initfs.img" \
     "/bin/netconf=$out/netconf:0755" \
     "/etc/services.d/netconf.toml=$root/tests/fixtures/net-conformance/netconf.toml"
