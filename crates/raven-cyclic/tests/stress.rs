@@ -117,7 +117,7 @@ fn stress_cyclic_reprogram() {
         assert_eq!(cyclics.backend().programmed, Some(base + 100));
         assert!(cyclics.cancel(earlier));
         assert_eq!(cyclics.backend().programmed, Some(base + 500));
-        let earliest = cyclics.add(spec(base + 50, 0));
+        let _earliest = cyclics.add(spec(base + 50, 0));
         assert_eq!(cyclics.backend().programmed, Some(base + 50));
         let start = Instant::now();
         cyclics.on_interrupt(base + 50, |_| {});
