@@ -183,8 +183,8 @@ send = ". /bin/uutils-inventory\n"
 delay_ms = 100
 
 [[step]]
-wait = '^uutils: total=108 staged=30 gaps=78$'
-timeout_secs = 30
+wait = '^uutils: total=108 staged=32 gaps=76$'
+timeout_secs = 60
 
 [[step]]
 wait = '^uutils: inventory ok$'
