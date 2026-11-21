@@ -35,6 +35,8 @@ pub struct RowAudit {
     pub test: String,
     /// Mutation found/claimed.
     pub mutation: String,
+    /// Register status (`PASS` or `GAP K269`).
+    pub status: String,
     /// The Rust mapping exists in the product source.
     pub mapping_found: bool,
     /// A named test exists in the product source.
@@ -162,14 +164,15 @@ impl AcceptanceReport {
     #[must_use]
     pub fn render_rows(&self) -> String {
         let mut text = String::from(
-            "row\tfunction\towner\trust\ttest\tmutation\tmapping\ttest_ok\tmut_ok\tpass\n",
+            "row\tfunction\towner\tstatus\trust\ttest\tmutation\tmapping\ttest_ok\tmut_ok\tpass\n",
         );
         for row in &self.rows {
             text.push_str(&format!(
-                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                 row.number,
                 row.function,
                 row.owner,
+                row.status,
                 row.rust,
                 row.test,
                 row.mutation,
@@ -207,25 +210,28 @@ pub fn run(
         .map(|row| row.function.clone())
         .collect();
 
+    // The register is the reconciled union. Group reports are historical inputs and may only
+    // fill functions that are absent from the register; they never override or duplicate a
+    // canonical row.
     let mut by_function: BTreeMap<&str, Vec<&GroupRow>> = BTreeMap::new();
     for row in group_rows {
-        by_function
-            .entry(row.function.as_str())
-            .or_default()
-            .push(row);
-    }
-
-    let mut duplicates = Vec::new();
-    for (function, rows) in &by_function {
-        let groups: BTreeSet<&str> = rows
-            .iter()
-            .filter(|row| !placeholder(&row.rust) || !placeholder(&row.test))
-            .map(|row| row.group.as_str())
-            .collect();
-        if groups.len() > 1 {
-            duplicates.push((*function).to_owned());
+        if !register_names.contains(row.function.as_str()) {
+            by_function
+                .entry(row.function.as_str())
+                .or_default()
+                .push(row);
         }
     }
+
+    let mut register_counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for row in register {
+        *register_counts.entry(row.function.as_str()).or_default() += 1;
+    }
+    let mut duplicates: Vec<String> = register_counts
+        .iter()
+        .filter(|(_, count)| **count > 1)
+        .map(|(name, _)| (*name).to_owned())
+        .collect();
     duplicates.sort();
 
     let mut audits = Vec::new();
@@ -297,7 +303,12 @@ pub fn run(
             source.has_test_for(&row.function)
         };
         let mutation_present = !placeholder(&mutation);
-        let pass = owner_known(&row.owner) && mapping_found && test_found && mutation_present;
+        let status_pass = row.status.trim().eq_ignore_ascii_case("PASS");
+        let pass = owner_known(&row.owner)
+            && mapping_found
+            && test_found
+            && mutation_present
+            && status_pass;
         let mut groups: Vec<String> = claims.iter().map(|claim| claim.group.clone()).collect();
         groups.sort();
         groups.dedup();
@@ -308,6 +319,7 @@ pub fn run(
             rust,
             test,
             mutation,
+            status: row.status.clone(),
             mapping_found,
             test_found,
             mutation_present,
@@ -332,6 +344,9 @@ pub fn run(
             }
             if !row.mutation_present {
                 reasons.push("no mutation".to_owned());
+            }
+            if !row.status.trim().eq_ignore_ascii_case("PASS") {
+                reasons.push(format!("status {}", row.status));
             }
             Gap {
                 function: row.function.clone(),

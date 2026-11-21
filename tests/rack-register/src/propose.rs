@@ -90,7 +90,14 @@ pub fn propose(
                 rust,
                 test,
                 mutation,
-                status: "PASS".to_owned(),
+                status: if matches!(
+                    function.name.as_str(),
+                    "rack_cong_signal" | "rack_update_prr"
+                ) {
+                    "GAP K269".to_owned()
+                } else {
+                    "PASS".to_owned()
+                },
             }
         })
         .collect()
