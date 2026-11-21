@@ -8,7 +8,9 @@
 name = "ufs-full"
 arch = "x86_64"
 profile = "qemu-ufs"
-timeout_secs = 240
+# K413: the demo getty restarts by design (K234); the case ends at the bounded
+# timeout after proving the restart, not at an `init exited` line.
+timeout_secs = 180
 pre = ["sh scripts/qemu-ufs.sh --build-only"]
 image = "build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2"
 disk_if = "virtio"
@@ -20,10 +22,20 @@ qemu_extra = [
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     "-global", "virtio-blk-pci.disable-legacy=on",
 ]
-expect_exit = "success"
+expect_exit = "timeout"
 
 [[expect]]
 regex = '^svcd: root pivoted to UFS at /$'
+
+# K374: the styled boot screen is printed before the login prompt.
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^-{80}$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 x86_64$'
 
 [[expect]]
 regex = '^cd=0$'
@@ -64,8 +76,8 @@ regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
 [[expect]]
 regex = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
 
-[[expect]]
-regex = '^init exited \(0\)$'
+[[forbid]]
+regex = '^init exited'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|no UFS root device|cannot access'
@@ -194,6 +206,36 @@ timeout_secs = 30
 send = "exit 0\n"
 delay_ms = 100
 
+# K234: the getty restarts; `login:` returning is the real marker. A second
+# login proves the one-disk root still serves a working session.
 [[step]]
-wait = '^init exited \(0\)$'
+wait = '(?i)^login: ?$'
+timeout_secs = 60
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "echo one-disk-restart-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^one-disk-restart-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
 timeout_secs = 30

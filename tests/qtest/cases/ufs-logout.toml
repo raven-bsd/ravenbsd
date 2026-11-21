@@ -29,8 +29,15 @@ regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 [[expect]]
 regex = '^svcd: root pivoted to UFS at /$'
 
+# K374: the styled boot screen replaced the old single-line getty banner.
 [[expect]]
-regex = '^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$'
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^-{80}$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 x86_64$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
