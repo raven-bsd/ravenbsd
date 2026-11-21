@@ -51,6 +51,22 @@ correct pattern for any lock whose holder may need an IPI/timer to release it;
 the S113/S85e TLB stress is green (3/3, `tlb_stale=0` on the S159 run). No
 `IrqSpinLock` in the audit holds a lock across such a wait.
 
+## Prior S85b/S113 findings on current master
+
+The earlier S102 audit (on `b64c9a6c`) recorded these sites; the current tree has
+since received the S113/S85e fixes, and this re-audit verifies the closure:
+
+| Prior site | Current state | Evidence |
+|---|---|---|
+| `kernel/src/smp/shootdown.rs` global `LOCK: IrqSpinLock<()>` held across the TLB ACK wait | fixed: `ActiveGuard`/`ACTIVE` publishes under IF mask, waits for the active slot and ACKs with interrupts enabled, restores IF on drop | source header + S159 TLB stress `tlb_stale=0` |
+| `kernel/src/smp/call.rs:48` probe `LOCK` wait | fixed: `ActiveGuard`/`ACTIVE`; the probe ACK wait enables IF | source header + SMP probe selftest |
+| `kernel/src/sched/smp_shim.rs:181` aarch64 TLB `LOCK` wait | fixed: same `ACTIVE` guard and IF-enabled ACK wait for `SGI_TLB` | source header |
+| `kernel/src/log.rs` `SpinMutex` spins with interrupts enabled and exception output takes it | fixed: `SpinMutex::try_lock` exists; `kprintln_emergency!` uses the try-lock + direct `Serial` fallback; normal IRQ paths do not log | `kernel/src/log.rs:140-190`, `kernel/src/arch/x86_64/exception.rs:217-271` |
+
+There is no current `IrqSpinLock` held across a TLB/probe acknowledgement wait in
+the audited x86-64 path. The TLB stress (S159) and the S113 probe selftest are the
+negative checks for the fixed class.
+
 ## Needs-proof sites
 
 These are process-context `spin::Mutex` sites in page-fault, timer/scheduler,
