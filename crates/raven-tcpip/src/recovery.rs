@@ -144,6 +144,14 @@ pub struct RackContext {
     pub ssthresh: u32,
     /// Receiver window.
     pub snd_wnd: u32,
+    /// Current RTO in microseconds; `0` falls back to `2 * SRTT`.
+    pub rto_us: u32,
+    /// Segments acknowledged by this event (`t_ccv.nsegs`).
+    pub nsegs: u16,
+    /// The sender was cwnd limited (`CCF_CWND_LIMITED`).
+    pub cwnd_limited: bool,
+    /// Early-recovery ACK cap (`rc_early_recovery_segs`).
+    pub early_recovery_segs: u16,
     /// Duplicate-ACK threshold.
     pub dup_thresh: u32,
     /// SACK is permitted on this connection (`TF_SACK_PERMIT`).
@@ -221,6 +229,18 @@ pub struct RackOutcome {
     pub spurious: bool,
     /// PRR send allowance after the event.
     pub prr_sndcnt: u32,
+    /// Bytes passed to congestion control (`t_ccv.bytes_this_ack`).
+    pub cc_acked: u32,
+    /// The sender was cwnd limited at this ACK.
+    pub cwnd_limited: bool,
+    /// ABC reached a full window (`CCF_ABC_SENTAWND`).
+    pub abc_sent_awnd: bool,
+    /// The ACK was a duplicate.
+    pub dup_ack: bool,
+    /// The ACK only partly drained recovery.
+    pub partial_recovery: bool,
+    /// The recovery-exit ssthresh restored by a reordering ACK.
+    pub restored_ssthresh: Option<u32>,
 }
 
 /// A FreeBSD `ccsignal_t`-style RACK congestion signal.
@@ -252,6 +272,35 @@ pub struct RackCongOutcome {
     /// Send a CWR.
     pub send_cwr: bool,
 }
+
+/// Which RACK timer `rack_timer_start` selected.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RackTimerKind {
+    /// Retransmission timer (`PACE_TMR_RXT`).
+    Rxt,
+    /// RACK reordering timer (`PACE_TMR_RACK`).
+    Rack,
+    /// Tail-loss-probe timer (`PACE_TMR_TLP`).
+    Tlp,
+}
+
+/// Sans-IO result of `rack_timer_start`; HPTS insertion is the K313 interface.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RackTimerPlan {
+    /// Timer to arm.
+    pub kind: RackTimerKind,
+    /// Delay in microseconds.
+    pub delay_us: u32,
+    /// Donor `PACE_TMR_*` flag value.
+    pub flags: u32,
+}
+
+/// `PACE_TMR_RXT` from `tcp_hpts.h`.
+pub const PACE_TMR_RXT: u32 = 0x01;
+/// `PACE_TMR_RACK` from `tcp_hpts.h`.
+pub const PACE_TMR_RACK: u32 = 0x02;
+/// `PACE_TMR_TLP` from `tcp_hpts.h`.
+pub const PACE_TMR_TLP: u32 = 0x04;
 
 /// Per-segment RACK transmission bookkeeping.
 #[derive(Clone, Debug)]
@@ -334,6 +383,16 @@ pub struct Rack {
     pub last_sent_tlp: Option<(u32, u32)>,
     /// Last TLP-covered range that was cumulatively ACKed.
     pub last_tlp_acked: Option<(u32, u32)>,
+    /// ABC bytes accumulated (`t_bytes_acked`).
+    pub t_bytes_acked: u32,
+    /// ssthresh at recovery entry (`rc_ssthresh_at_erec`).
+    pub recover_ssthresh: u32,
+    /// ssthresh before an RTO (`rto_ssthresh`).
+    pub rto_ssthresh: u32,
+    /// Last ssthresh restored by a reordering exit.
+    pub last_ssthresh: u32,
+    /// TLP threshold divisor (`rc_tlp_threshold`, default 1).
+    pub tlp_threshold: u32,
     /// Snapshot for `CC_RTO_ERR`.
     undo: Option<(bool, u32, u32, u32, u32)>,
 }
@@ -382,6 +441,11 @@ impl Rack {
             tlp_count: 0,
             last_sent_tlp: None,
             last_tlp_acked: None,
+            t_bytes_acked: 0,
+            recover_ssthresh: 0,
+            rto_ssthresh: 0,
+            last_ssthresh: 0,
+            tlp_threshold: 1,
             undo: None,
         }
     }
@@ -481,6 +545,7 @@ impl Rack {
     pub fn process_ack(&mut self, ctx: &RackContext) -> RackOutcome {
         let mut outcome = RackOutcome::default();
         let now_us = ctx.event_us().max(1);
+        let old_una = self.snd_una;
         self.srtt_us = ctx.srtt_us();
         self.update_context_tuning(ctx);
         if ctx.snd_max != 0 {
@@ -492,9 +557,44 @@ impl Rack {
         if seq_gt(ctx.ack, self.snd_max) {
             return outcome;
         }
+        if seq_lt(ctx.ack, self.snd_una) {
+            // Old ACK: a reordering signal, but not a new cumulative point.
+            if ctx.snd_wnd > ctx.mss {
+                self.reorder_ts_us = now_us.max(1);
+            }
+            return outcome;
+        }
         if seq_gt(ctx.ack, self.snd_una) {
             outcome.acked = ctx.ack.wrapping_sub(self.snd_una);
             self.process_to_cumack(ctx, ctx.ack, now_us, &mut outcome);
+        }
+        outcome.cc_acked = outcome.acked;
+        outcome.cwnd_limited = ctx.cwnd <= ctx.snd_wnd;
+        if self.in_recovery && ctx.early_recovery_segs > 0 {
+            let cap = u32::from(ctx.early_recovery_segs).saturating_mul(ctx.mss);
+            outcome.cc_acked = outcome.cc_acked.min(cap);
+        }
+        if ctx.cwnd > ctx.ssthresh {
+            let abc = outcome.acked.min(
+                u32::from(ctx.nsegs.max(1))
+                    .saturating_mul(2)
+                    .saturating_mul(ctx.mss),
+            );
+            self.t_bytes_acked = self.t_bytes_acked.saturating_add(abc);
+            if self.t_bytes_acked >= ctx.cwnd {
+                self.t_bytes_acked = self.t_bytes_acked.saturating_sub(ctx.cwnd);
+                outcome.abc_sent_awnd = true;
+            }
+        } else {
+            self.t_bytes_acked = 0;
+        }
+        if ctx.ack == old_una && ctx.sack_count == 0 {
+            outcome.dup_ack = true;
+            let _ = self.strike_dupack();
+            outcome.cc_acked = 0;
+        }
+        if self.in_recovery && seq_lt(ctx.ack, self.recover) {
+            outcome.partial_recovery = true;
         }
 
         let mut dsack_seen = false;
@@ -522,8 +622,10 @@ impl Rack {
 
         self.declare_losses(ctx, now_us, &mut outcome);
         if self.in_recovery && seq_ge(ctx.ack, self.recover) {
-            self.exit_recovery();
+            let pipe = self.compute_pipe(ctx.ack);
+            let _ = self.rack_post_recovery(ctx, pipe);
             outcome.recovered = true;
+            outcome.restored_ssthresh = Some(self.last_ssthresh);
         }
         if outcome.acked > 0 {
             self.tlp_deadline_us = None;
@@ -579,6 +681,74 @@ impl Rack {
         } else {
             ctx.ssthresh
         }
+    }
+
+    /// FreeBSD `rack_post_recovery`: recovery-exit window plus the PRR/DSACK/RTO bookkeeping.
+    pub fn rack_post_recovery(&mut self, ctx: &RackContext, pipe: u32) -> u32 {
+        let cwnd = self.post_recovery(ctx, pipe);
+        if self.dsack_persist > 0 {
+            self.dsack_persist -= 1;
+            if self.num_dsack > 0 && self.dsack_persist == 0 {
+                self.num_dsack = 0;
+            }
+        }
+        self.last_ssthresh = ctx.ssthresh.max(self.rto_ssthresh);
+        self.exit_recovery();
+        cwnd
+    }
+
+    /// FreeBSD `rack_calc_thresh_tlp`.
+    #[must_use]
+    pub fn rack_calc_thresh_tlp(&self, ctx: &RackContext) -> u32 {
+        let srtt = ctx.srtt_us().max(1);
+        let thresh = if self.tlp_threshold != 0 {
+            srtt.saturating_add(srtt / self.tlp_threshold.max(1))
+        } else {
+            srtt.saturating_mul(2)
+        };
+        thresh.clamp(1, RACK_RTO_MAX_US)
+    }
+
+    /// FreeBSD `rack_timer_start`: choose the next RACK/RXT/TLP timer as a sans-IO plan.
+    pub fn rack_timer_start(&mut self, ctx: &RackContext) -> Option<RackTimerPlan> {
+        let now_us = ctx.event_us().max(1);
+        if self.entries.iter().all(|entry| entry.sacked) && self.snd_una == self.snd_max {
+            return None;
+        }
+        if !ctx.sack_permitted {
+            let delay = if ctx.rto_us != 0 {
+                ctx.rto_us
+            } else {
+                ctx.srtt_us().saturating_mul(2).max(1)
+            };
+            return Some(RackTimerPlan {
+                kind: RackTimerKind::Rxt,
+                delay_us: delay,
+                flags: PACE_TMR_RXT,
+            });
+        }
+        if let Some(deadline) = self.tlp_deadline_us
+            && !self.in_recovery
+        {
+            return Some(RackTimerPlan {
+                kind: RackTimerKind::Tlp,
+                delay_us: u32::try_from(deadline.saturating_sub(now_us))
+                    .unwrap_or(u32::MAX)
+                    .max(1),
+                flags: PACE_TMR_TLP,
+            });
+        }
+        let index = self.oldest_unacked_index()?;
+        let entry = self.entries[index];
+        let thresh = u64::from(self.reorder_threshold_us(ctx, now_us));
+        let expire = entry.last_xmit_us().max(1).saturating_add(thresh);
+        Some(RackTimerPlan {
+            kind: RackTimerKind::Rack,
+            delay_us: u32::try_from(expire.saturating_sub(now_us))
+                .unwrap_or(u32::MAX)
+                .max(1),
+            flags: PACE_TMR_RACK,
+        })
     }
 
     /// Update the reordering window from an observed ACK gap, bounded by SRTT.
@@ -716,7 +886,15 @@ impl Rack {
 
     /// FreeBSD `rack_strike_dupack`: add one duplicate-ACK strike to the oldest hole.
     pub fn strike_dupack(&mut self) -> Option<(u32, u32)> {
-        let index = self.oldest_unacked_index()?;
+        let index = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| {
+                !entry.sacked && entry.dupack < RACK_DUP_THRESHOLD && !entry.must_rxt
+            })
+            .min_by_key(|(_, entry)| entry.last_xmit_us())
+            .map(|(index, _)| index)?;
         if self.entries[index].dupack < u8::MAX {
             self.entries[index].dupack = self.entries[index].dupack.saturating_add(1);
         }
@@ -827,6 +1005,7 @@ impl Rack {
                 ));
                 self.exit_recovery();
                 self.prr_sndcnt = 0;
+                self.rto_ssthresh = ctx.ssthresh;
                 result.cwnd = ctx.mss.max(1);
                 result.ssthresh = ctx.ssthresh;
                 result.in_recovery = false;
@@ -993,22 +1172,33 @@ impl Rack {
             self.recover = self.snd_una;
         }
         // FreeBSD `rack_peer_reneges`: the peer cum-ACKs the start of a previously SACKed range.
-        if let Some(entry) = self.entries.first().copied()
-            && entry.start == ack
-            && entry.sacked
+        if self
+            .entries
+            .first()
+            .is_some_and(|entry| entry.start == ack && entry.sacked)
         {
-            let reneged = entry.len();
-            self.sacked_bytes = self.sacked_bytes.saturating_sub(reneged);
-            for entry in &mut self.entries {
-                if entry.sacked && entry.start == ack {
-                    entry.sacked = false;
-                    entry.sack_passed = false;
-                    entry.was_sacked = false;
-                    entry.lost = false;
-                }
-            }
-            outcome.reneged = reneged;
+            outcome.reneged = self.rack_peer_reneges(ack);
         }
+    }
+
+    /// FreeBSD `rack_peer_reneges`: clear contiguous SACKed ranges the peer has reneged.
+    pub fn rack_peer_reneges(&mut self, ack: u32) -> u32 {
+        let mut reneged = 0u32;
+        for entry in &mut self.entries {
+            if entry.start < ack {
+                continue;
+            }
+            if !entry.sacked {
+                break;
+            }
+            entry.sacked = false;
+            entry.sack_passed = false;
+            entry.was_sacked = false;
+            entry.lost = false;
+            reneged = reneged.saturating_add(entry.len());
+        }
+        self.sacked_bytes = self.sacked_bytes.saturating_sub(reneged);
+        reneged
     }
 
     fn process_sack_block(
@@ -1088,8 +1278,10 @@ impl Rack {
             }
         }
         if exit {
+            self.last_ssthresh = self.recover_ssthresh;
             self.exit_recovery();
             outcome.recovered = true;
+            outcome.restored_ssthresh = Some(self.last_ssthresh);
         }
     }
 
@@ -1141,6 +1333,7 @@ impl Rack {
         self.recovery_rxt_cnt = 0;
         self.retran_during_recovery = 0;
         self.dsack_byte_cnt = 0;
+        self.recover_ssthresh = ctx.ssthresh;
     }
 
     fn exit_recovery(&mut self) {
@@ -1148,12 +1341,6 @@ impl Rack {
         self.prr_sndcnt = 0;
         self.prr_delivered = 0;
         self.prr_out = 0;
-        if self.dsack_persist > 0 {
-            self.dsack_persist -= 1;
-            if self.dsack_persist == 0 {
-                self.num_dsack = 0;
-            }
-        }
     }
 
     fn update_rsm(&mut self, entry: &mut RackEntry, now_us: u64, now_ms: u32) {
@@ -1207,6 +1394,114 @@ impl Rack {
         self.holes_rxt = self
             .holes_rxt
             .saturating_sub(entry.rtr_bytes.min(entry.len()));
+    }
+
+    /// Donor-name view of `ack_received`.
+    pub fn rack_ack_received(&mut self, ctx: &RackContext) -> RackOutcome {
+        self.process_ack(ctx)
+    }
+
+    /// Donor-name view of `process_ack`.
+    pub fn rack_process_ack(&mut self, ctx: &RackContext) -> RackOutcome {
+        self.process_ack(ctx)
+    }
+
+    /// Donor-name view of `update_entry`.
+    pub fn rack_update_entry(&mut self, start: u32, len: u32, now_ms: u32) {
+        self.update_entry(start, len, now_ms);
+    }
+
+    /// Donor-name view of `update_rsm` for one range.
+    pub fn rack_update_rsm(&mut self, start: u32, now_ms: u32) {
+        if let Some(index) = self.index_for(start) {
+            let mut entry = self.entries[index];
+            let now_us = u64::from(now_ms).saturating_mul(1_000);
+            self.update_rsm(&mut entry, now_us, now_ms);
+            self.entries[index] = entry;
+        }
+    }
+
+    /// Donor-name view of `update_rtt`.
+    pub fn rack_update_rtt(&mut self, entry: &RackEntry, ctx: &RackContext) -> Option<u32> {
+        let now_us = ctx.event_us().max(1);
+        self.update_rtt(entry, ctx, now_us)
+    }
+
+    /// Donor-name view of `note_dsack`.
+    pub fn rack_note_dsack(
+        &mut self,
+        start: u32,
+        end: u32,
+        ctx: &RackContext,
+        outcome: &mut RackOutcome,
+    ) {
+        self.note_dsack(start, end, ctx, outcome);
+    }
+
+    /// Donor-name view of `calc_thresh_rack`.
+    pub fn rack_calc_thresh_rack(&mut self, ctx: &RackContext) -> u32 {
+        let now_us = ctx.event_us().max(1);
+        self.reorder_threshold_us(ctx, now_us)
+    }
+
+    /// Donor-name view of `proc_sack_blk`.
+    pub fn rack_proc_sack_blk(&mut self, ctx: &RackContext, start: u32, end: u32) -> RackOutcome {
+        let now_us = ctx.event_us().max(1);
+        let mut outcome = RackOutcome::default();
+        self.process_sack_block(ctx, start, end, now_us, &mut outcome);
+        outcome
+    }
+
+    /// FreeBSD `rack_log_sack_passed`: mark ranges older than a SACKed range.
+    pub fn rack_log_sack_passed(&mut self, ctx: &RackContext, end: u32, outcome: &mut RackOutcome) {
+        let now_us = ctx.event_us().max(1);
+        let thresh = u64::from(self.reorder_threshold_us(ctx, now_us));
+        for entry in &mut self.entries {
+            if entry.sacked || entry.start >= end {
+                continue;
+            }
+            if !entry.sack_passed {
+                entry.sack_passed = true;
+                entry.was_sacked = false;
+                if !entry.was_lost && now_us.saturating_sub(entry.last_xmit_us().max(1)) >= thresh {
+                    entry.was_lost = true;
+                    self.considered_lost = self.considered_lost.saturating_add(entry.len());
+                }
+                self.reorder_ts_us = now_us.max(1);
+            }
+        }
+        let _ = outcome;
+    }
+
+    /// Donor-name view of `process_to_cumack`.
+    pub fn rack_process_to_cumack(&mut self, ctx: &RackContext, ack: u32) -> RackOutcome {
+        let now_us = ctx.event_us().max(1);
+        let mut outcome = RackOutcome::default();
+        self.process_to_cumack(ctx, ack, now_us, &mut outcome);
+        outcome
+    }
+
+    /// Donor-name view of `check_reorder_ack`.
+    pub fn rack_check_reorder_ack(&mut self, ctx: &RackContext) -> bool {
+        let now_us = ctx.event_us().max(1);
+        let mut outcome = RackOutcome::default();
+        self.check_reorder_exit(ctx, now_us, &mut outcome);
+        outcome.recovered
+    }
+
+    /// Donor-name view of `strike_dupack`.
+    pub fn rack_strike_dupack(&mut self) -> Option<(u32, u32)> {
+        self.strike_dupack()
+    }
+
+    /// Donor-name view of `tcp_rack_output`.
+    pub fn tcp_rack_output(&mut self, ctx: &RackContext) -> Option<(u32, u32)> {
+        self.next_retransmit(ctx)
+    }
+
+    /// Donor-name view of `update_prr`.
+    pub fn rack_update_prr(&mut self, changed: u32, ctx: &RackContext) -> u32 {
+        self.update_prr(changed, ctx)
     }
 }
 

@@ -452,3 +452,205 @@ fn rack_strike_dupack_returns_a_range_at_the_threshold() {
     assert_eq!(rack.strike_dupack(), Some((1_000, 2_000)));
     assert_eq!(rack.entries[0].dupack, RACK_DUP_THRESHOLD);
 }
+
+#[test]
+fn rack_ack_received_duplicate_ack_strikes_the_oldest_hole() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    let mut ctx = context(10, 20);
+    ctx.ack = 0;
+    ctx.snd_max = 2_000;
+    let outcome = rack.ack_received(&ctx);
+    assert!(outcome.dup_ack);
+    assert_eq!(rack.entries[0].dupack, 1);
+}
+
+#[test]
+fn rack_ack_received_old_ack_marks_reordering_without_advancing() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    rack.snd_una = 2_000;
+    rack.snd_max = 2_000;
+    let mut ctx = context(10, 20);
+    ctx.ack = 1_000;
+    ctx.snd_wnd = 10_000;
+    ctx.snd_max = 2_000;
+    let outcome = rack.ack_received(&ctx);
+    assert_eq!(outcome.acked, 0);
+    assert_eq!(rack.snd_una, 2_000);
+    assert!(rack.reorder_ts_us > 0);
+}
+
+#[test]
+fn rack_ack_received_reports_abc_sent_awnd() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    rack.t_bytes_acked = 2_999;
+    let mut ctx = context(10, 20);
+    ctx.ack = 1_000;
+    ctx.snd_max = 2_000;
+    ctx.cwnd = 3_000;
+    ctx.ssthresh = 2_000;
+    ctx.mss = 1_460;
+    let outcome = rack.ack_received(&ctx);
+    assert!(outcome.abc_sent_awnd);
+    assert_eq!(rack.t_bytes_acked, 999);
+}
+
+#[test]
+fn rack_ack_received_caps_early_recovery_cc_bytes() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 3_000, 0);
+    rack.in_recovery = true;
+    let mut ctx = context(10, 20);
+    ctx.ack = 2_000;
+    ctx.snd_max = 3_000;
+    ctx.early_recovery_segs = 1;
+    ctx.mss = 1_000;
+    let outcome = rack.ack_received(&ctx);
+    assert_eq!(outcome.acked, 2_000);
+    assert_eq!(outcome.cc_acked, 1_000);
+}
+
+#[test]
+fn rack_post_recovery_restores_rto_ssthresh_and_ages_dsack() {
+    let mut rack = Rack::new(10);
+    rack.in_recovery = true;
+    rack.rto_ssthresh = 8_000;
+    rack.dsack_persist = 2;
+    rack.num_dsack = 3;
+    let mut ctx = context(10, 20);
+    ctx.ssthresh = 5_000;
+    ctx.mss = 1_000;
+    let cwnd = rack.rack_post_recovery(&ctx, 100);
+    assert_eq!(cwnd, 2_000);
+    assert_eq!(rack.last_ssthresh, 8_000);
+    assert_eq!(rack.dsack_persist, 1);
+    assert!(!rack.in_recovery);
+}
+
+#[test]
+fn rack_calc_thresh_tlp_uses_the_donor_threshold() {
+    let mut rack = Rack::new(10);
+    let ctx = context(0, 40);
+    assert_eq!(rack.rack_calc_thresh_tlp(&ctx), 80_000);
+    rack.tlp_threshold = 2;
+    assert_eq!(rack.rack_calc_thresh_tlp(&ctx), 60_000);
+    rack.tlp_threshold = 0;
+    assert_eq!(rack.rack_calc_thresh_tlp(&ctx), 80_000);
+}
+
+#[test]
+fn rack_timer_start_selects_rxt_rack_and_tlp() {
+    let mut rack = Rack::new(10);
+    let mut ctx = context(100, 40);
+    ctx.sack_permitted = false;
+    assert_eq!(rack.rack_timer_start(&ctx), None);
+    rack.send(1_000, 2_000, 0);
+    let rxt = rack.rack_timer_start(&ctx).expect("rxt");
+    assert_eq!(rxt.kind, RackTimerKind::Rxt);
+    assert_eq!(rxt.flags, PACE_TMR_RXT);
+    ctx.sack_permitted = true;
+    let rack_timer = rack.rack_timer_start(&ctx).expect("rack");
+    assert_eq!(rack_timer.kind, RackTimerKind::Rack);
+    rack.tlp_arm(&ctx);
+    let tlp = rack.rack_timer_start(&ctx).expect("tlp");
+    assert_eq!(tlp.kind, RackTimerKind::Tlp);
+    assert_eq!(tlp.flags, PACE_TMR_TLP);
+}
+
+#[test]
+fn rack_peer_reneges_clears_contiguous_sacked_ranges() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    rack.mark_sacked(1_000, 1_500);
+    rack.mark_sacked(1_500, 2_000);
+    assert_eq!(rack.sacked_bytes, 1_000);
+    assert_eq!(rack.rack_peer_reneges(1_000), 1_000);
+    assert_eq!(rack.sacked_bytes, 0);
+    assert!(rack.entries.iter().all(|entry| !entry.sacked));
+}
+
+#[test]
+fn rack_strike_dupack_skips_ranges_already_at_the_threshold() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    rack.send(2_000, 3_000, 0);
+    rack.entries[0].dupack = RACK_DUP_THRESHOLD;
+    assert_eq!(rack.rack_strike_dupack(), None);
+    assert_eq!(rack.entries[1].dupack, 1);
+    assert_eq!(rack.rack_strike_dupack(), None);
+    assert_eq!(rack.rack_strike_dupack(), Some((2_000, 3_000)));
+}
+
+#[test]
+fn rack_update_rsm_records_was_sackpass_and_clears_sacked() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    rack.entries[0].sack_passed = true;
+    rack.rack_update_rsm(1_000, 10);
+    assert!(!rack.entries[0].sack_passed);
+    assert!(rack.entries[0].was_sacked);
+    assert_eq!(rack.recovery_rxt_cnt, 1_000);
+}
+
+#[test]
+fn rack_log_sack_passed_marks_only_older_ranges() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    rack.send(2_000, 3_000, 0);
+    rack.send(3_000, 4_000, 0);
+    let ctx = context(100, 40);
+    let mut outcome = RackOutcome::default();
+    rack.rack_log_sack_passed(&ctx, 2_500, &mut outcome);
+    assert!(rack.entries[0].sack_passed);
+    assert!(rack.entries[1].sack_passed);
+    assert!(!rack.entries[2].sack_passed);
+}
+
+#[test]
+fn rack_proc_sack_blk_partial_is_idempotent() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 3_000, 0);
+    let ctx = context(50, 20);
+    let first = rack.rack_proc_sack_blk(&ctx, 1_200, 1_800);
+    assert_eq!(first.sacked, 600);
+    let second = rack.rack_proc_sack_blk(&ctx, 1_200, 1_800);
+    assert_eq!(second.sacked, 0);
+    assert_eq!(rack.sacked_bytes, 600);
+}
+
+#[test]
+fn rack_process_to_cumack_trims_a_partial_range() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    let ctx = context(50, 20);
+    let outcome = rack.rack_process_to_cumack(&ctx, 1_500);
+    assert_eq!(outcome.acked, 0);
+    assert_eq!(rack.snd_una, 1_500);
+    assert_eq!(rack.entries[0].start, 1_500);
+}
+
+#[test]
+fn rack_tcp_rack_output_prefers_must_retransmit() {
+    let mut rack = Rack::new(10);
+    rack.send(1_000, 2_000, 0);
+    rack.entries[0].must_rxt = true;
+    let mut ctx = context(0, 20);
+    ctx.sack_permitted = false;
+    assert_eq!(rack.tcp_rack_output(&ctx), Some((1_000, 2_000)));
+}
+
+#[test]
+fn rack_update_prr_high_pipe_uses_the_recovery_fraction() {
+    let mut rack = Rack::new(10);
+    rack.in_recovery = true;
+    rack.snd_max = 10_000;
+    rack.snd_una = 1_000;
+    rack.recover_fs = 9_000;
+    let mut ctx = context(10, 20);
+    ctx.ack = 1_000;
+    ctx.ssthresh = 4_000;
+    ctx.mss = 1_000;
+    assert_eq!(rack.rack_update_prr(900, &ctx), 401);
+}
