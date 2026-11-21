@@ -35,12 +35,18 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
     #[must_use]
     pub fn dl_phdr_info(&self, id: ObjId) -> Option<DlPhdrInfo> {
         let object = self.object(id)?;
-        let name = object
-            .names
-            .iter()
-            .take(object.name_count)
-            .next()
-            .map_or(core::ptr::null(), |name| name.as_bytes().as_ptr());
+        let first = object.names.iter().take(object.name_count).next();
+        let first_empty = first.is_some_and(|name| name.as_bytes().is_empty());
+        let name = if first_empty && Some(id) == Some(self.scope.main) {
+            core::ptr::null()
+        } else {
+            object
+                .names
+                .iter()
+                .take(object.name_count)
+                .find(|name| !name.as_bytes().is_empty())
+                .map_or(core::ptr::null(), |name| name.as_bytes().as_ptr())
+        };
         Some(DlPhdrInfo {
             dlpi_addr: usize::try_from(object.mapped.base).ok()?,
             dlpi_name: name,
