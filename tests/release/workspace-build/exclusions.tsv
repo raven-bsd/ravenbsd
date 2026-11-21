@@ -2,7 +2,6 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 # K395 workspace-build classification; consumed by K400 check-build.
 # package	owner
-fsd-ufs	K394
 raven-at-fixture	K401
 raven-b14-tools	K401
 raven-b14b-diag	K401
@@ -74,6 +73,3 @@ raven-trace-context	K401
 raven-trace-demo	K401
 raven-tty-fixture	K401
 raven-usercopy-cow	K401
-raven-blockd	K402
-raven-ramfsd	K402
-raven-pi4-platd	K403
