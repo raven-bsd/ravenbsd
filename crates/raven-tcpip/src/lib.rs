@@ -56,6 +56,7 @@ mod neighbor;
 mod observability;
 mod plpmtud_live;
 mod pmtu;
+mod rack_os;
 mod readiness;
 mod reassembly;
 mod recovery;
@@ -109,6 +110,9 @@ pub use pmtu::{
     IPV4_FLOOR, IPV6_FLOOR, IpFamily, MssUpdate, MtuCache, Plpmtud, PlpmtudState, TCP_MINMSS,
     TCP_MSS_DEFAULT, floor_for, mss_headers, mss_update, mssopt, next_pmtu, next_pmtu6,
     on_icmp_frag_needed, on_icmp6_frag_needed, probe_sequence,
+};
+pub use rack_os::{
+    CounterU64, MbufId, PacingMethod, RackOs, RackOsError, RackStacks, RackTcpcb, SysctlValue,
 };
 pub use readiness::Readiness;
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
