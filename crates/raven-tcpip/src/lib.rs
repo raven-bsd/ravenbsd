@@ -103,7 +103,7 @@ pub use isn::{IsnConn, IsnEntropy, IsnState};
 pub use listen::{AcceptQueue, HalfOpen, HalfOpenQueue, IsnGenerator, ListenStats, SynCookie};
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use observability::{
-    Counters, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,
+    Counters, HostcacheInfo, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,
 };
 pub use pmtu::{
     IPV4_FLOOR, IPV6_FLOOR, IpFamily, MssUpdate, MtuCache, Plpmtud, PlpmtudState, TCP_MINMSS,
