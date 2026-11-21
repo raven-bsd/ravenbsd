@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K285: stage the guest TCP workload script the host driver runs after login
+# (see scripts/tcp-soak-driver.py).
+
+[[initfs.files]]
+src = "profiles/tcp-soak.d/tcp-soak-workload.sh"
+path = "/etc/tcp-soak-workload.sh"
+mode = 0o755
