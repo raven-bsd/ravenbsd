@@ -3,11 +3,15 @@
 
 # Pollable pipe endpoints (K372)
 
-Status: **OBSERVED**. `pipe-poll` makes an empty writable pipe `POLLOUT`, a written pipe
-`POLLIN`, a closed writer `POLLHUP`/EOF, and wakes a blocked poll from a forked writer. The
-K195 `ssh-login` tap now gets past the immediate pipe-poll close and stops at the next,
-unrelated netd queued-TX banner timeout. The pipe endpoint is a real `EVQ` source; the libc
-`poll` glue already handled `OfdKind::Pipe` and needed no change.
+Status: **OBSERVED** for the K372 pipe poll. `pipe-poll` makes an empty writable pipe `POLLOUT`,
+a written pipe `POLLIN`, a closed writer `POLLHUP`/EOF, and wakes a blocked poll from a forked
+writer. The pipe endpoint is a real `EVQ` source; the libc `poll` glue already handled
+`OfdKind::Pipe` and needed no change. The K195 `ssh-login` gate is **separate**: with
+`RAVEN_SSH_REPEAT=10` the server reaches `svcd: sshd up`, netd ready and TCP 22, but the host
+still times out during the SSH banner exchange before auth; the owner `ssh raven@... ls` 10/10
+was not reached (0/10), and the PTY/wrong-password checks are not reached. No SSH login is
+claimed. The exact remaining primitive is the netd queued-TX flush/doorbell from the prior K195
+trace (`tx=(44, 0, 37, 4454)` queued, not flushed).
 
 ## Why
 
@@ -24,9 +28,9 @@ fd was not pollable and `sshd` closed the connection before the SSH banner.
 * `kernel/src/process/pipe.rs`: `PipeEnd::readiness` returns the EVQ bits (read end:
   `READABLE`, closed writer `READABLE|HUP`; write end: `WRITABLE` with free space, `HUP` with
   no reader); `read`/`write`/`Drop`/`retire` call `crate::event::notify_all()` after the pipe
-  state change. This file is the ticket's one Owns exception: the pipe state is private, so the
-  event readiness cannot be implemented in `event.rs` alone; the directive note explicitly asks
-  for the kernel event/poll readiness.
+  state change. The updated K372 ticket now includes this file and
+  `libc/ravenlibc/crates/raven-libc-platform/src/poll/poll.rs` in its Owns; the libc file needed
+  no edit. The earlier Owns omission is resolved.
 * `libc/ravenlibc/crates/raven-libc-platform/src/poll/poll.rs` already had the
   `OfdKind::Pipe` branch and maps `EV_READABLE`/`EV_WRITABLE`/`EV_HUP` to
   `POLLIN`/`POLLOUT`/`POLLHUP`; no libc edit was needed. The acceptance
@@ -76,5 +80,12 @@ timeout 900 make check-fast
 
 The first command was red before the fix (`pipe-poll: fail pollout`, exit 1); after the fix it
 is `pipe-poll: pass`. The mutation (temporary pipe readiness -> 0) reproduces the red and was
-reverted. The K195 tap result and the remaining netd queued-TX blocker are in
+reverted.
+
+The K195 gate is separate. `RAVEN_SSH_REPEAT=10` against the K372 image reaches
+`svcd: sshd up`, netd ready and TCP 22, but the host still times out during the SSH banner
+exchange before auth; the owner `ssh raven@... ls` 10/10 was not reached (0/10), and the
+`ssh -tt`/wrong-password checks are not reached. The exact remaining primitive is the netd
+queued-TX flush/doorbell (prior K195 bob rounds 32-33, `tx=(44, 0, 37, 4454)` queued but not
+flushed). No SSH login is claimed; the K195 gate remains separate. The report is
 `tickets/tim/reports/K372.md`.
