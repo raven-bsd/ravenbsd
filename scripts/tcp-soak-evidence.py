@@ -346,7 +346,10 @@ def run_soak(args):
         )
         return EXIT_USAGE
 
-    evidence, error = collect(run_dir, image=args.image or None)
+    # Without an explicit --image, hash the default image the K285 entry
+    # point uses, so the evidence names the exact bytes that were booted.
+    image = args.image or str(root / "build" / "tcp-soak" / "image.img")
+    evidence, error = collect(run_dir, image=image)
     if error is not None:
         print(
             f"tcp-soak-evidence: FAIL evidence collection: {error}", file=sys.stderr
