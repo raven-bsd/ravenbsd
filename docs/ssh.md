@@ -7,11 +7,13 @@ SSH is the upstream OpenSSH 10.6p2 add-on (DR-65). The Raven tree does not vendo
 implementation and does not implement SSH in Rust. K200 owns `addons/ssh/**` and the source pin;
 K195 stages the built binaries as a release service and owns the login gate.
 
-Status: **build and service staging DONE; host-to-guest login BLOCKED** on three platform
-primitives that are outside this ticket's Owns (see [Blockers](#blockers)). The release image
-boots with the `sshd` service manifest, the host-key one-shot and the K196 `ptyd`; `sshd` itself
-exits before it listens because the image has no `sshd` privilege-separation account, and a
-command session would still fail on the libc `pipe(2)` stub.
+Status: **build and service staging DONE; host-to-guest login BLOCKED** on the platform pipe
+poll/event readiness, then the netd queued-TX flush (see [Blockers](#blockers)). The release
+image boots with the `sshd` service manifest, the host-key one-shot and the K196 `ptyd`; the
+`sshd` privilege-separation account is staged by this ticket and the libc `pipe(2)` is fixed by
+K370. The current `ssh-login` pre-step reaches `svcd: sshd up` and an accepted TCP 22 connection,
+but closes at `kex_exchange_identification: Connection closed by remote host` before the SSH
+banner. The initfs demo's `/tmp/ssh` host key is ephemeral; UFS persistence is not claimed.
 
 ## Pinned source
 
@@ -93,6 +95,12 @@ the prebuilt image on the tap, and drives the real host OpenSSH client
 * a wrong password must be refused without reaching a shell;
 * the host key is captured before and after a second boot (ephemeral on the initfs demo).
 
+The current pre-step exits 3: the serial has `svcd: sshd up` and `netd: ready`, the TCP 22
+connection is accepted, and the client closes at `kex_exchange_identification: Connection closed
+by remote host` before the banner. This is the pipe poll/event gap; the prior guest
+`/tmp/sshd.log` line is `monitor_read: poll: Bad file descriptor`. After that, the netd
+queued-TX flush is the next gate.
+
 `RAVEN_SSH_REPEAT=10 sh tests/ssh/ssh-login.sh` runs the command session ten times and reports
 the wall-time p50/p90 for the 0.1.0 release gate. The direct command, once unblocked, is:
 
@@ -104,27 +112,29 @@ ssh -o StrictHostKeyChecking=no raven@10.0.2.15 ls
 
 ## Blockers
 
-Three primitives are required before any login can be claimed. All are outside K195's Owns
-(`tests/ssh/** tests/qtest/cases/ssh-* profiles/ssh.d/** profiles/release.d/** docs/ssh.md`);
-the exact paths are listed for the lead's prerequisite ticket or Owns extension.
-
-1. **No `sshd` privilege-separation account.** Running as root, `sshd` requires
-   `getpwnam("sshd")` and `/var/empty` (`sshd.c` main: "Privilege separation user sshd does not
-   exist"; `sshd-auth.c`, `sshd-session.c`). `/var/empty` is staged; `etc/passwd` and `etc/group`
-   have only `root` and `raven` and are outside this ticket's Owns. Guest evidence:
-   `/tmp/sshd.log` = `Privilege separation user sshd does not exist`.
-2. **libc `pipe(2)`/`pipe2(2)` return `ENOSYS`.** Upstream `session.c` `do_exec_no_pty`
-   allocates a command session's stdio with three `pipe(2)` calls. The kernel already implements
-   `PIPE2` (`0x6f`, `kernel/src/syscall/mod.rs`); only the libc wrapper is a stub
-   (`libc/ravenlibc/crates/raven-libc-platform/src/platform.rs` `pipe`/`pipe2`, and the syscall
-   binding in `raven-libc-sys/src/sys.rs`). Guest evidence: `tests/ssh/pipe-probe.sh` prints
-   `pipe-probe: ENOSYS`.
-3. **Pipe endpoints are not poll/event sources.** `sshd`/`sshd-session` poll their session pipes.
-   `kernel/src/syscall/event.rs` has no `Object::Pipe` arm and `kernel/src/process/pipe.rs` has
-   no readable/writable readiness (see `event.rs` `readiness`).
-
-K223's per-process root/`chroot` (the `/var/empty` chroot) and K196's fork/PTY are in master and
-are not blockers.
+1. **RESOLVED — `sshd` privilege-separation account.** `profiles/ssh.d/passwd`/`group` and
+   `profiles/release.d/login.toml` stage root,
+   `sshd:x:74:74:SSH privilege separation:/var/empty:/bin/false` and `raven`; `/var/empty` is
+   staged. The current image reaches `svcd: sshd up` and accepts TCP 22.
+2. **RESOLVED — libc `pipe(2)`/`pipe2(2)`.** K370 binds `PIPE2` (0x6f); the target
+   `tests/ssh/pipe-probe.sh` round-trips a pipe. This is not the current gate.
+3. **OPEN — pipe endpoints are not poll/event sources.** `kernel/src/syscall/event.rs`
+   `source_from_handle`/`readiness` has no `Object::Pipe` arm and `kernel/src/process/pipe.rs`
+   does not publish readable/writable readiness to the event path. Upstream
+   `addons/ssh/openssh/monitor.c` `monitor_openfds()` (1907) / `monitor_read()` (495, poll at
+   509-511) and `session.c` `do_exec_no_pty` poll those pipes. The prior `/tmp/sshd.log` evidence
+   is `monitor_read: poll: Bad file descriptor`; the current `ssh-login` client closes at
+   `kex_exchange_identification: Connection closed by remote host`. The exact files are
+   `kernel/src/syscall/event.rs` and `kernel/src/process/pipe.rs`, outside K195's Owns.
+4. **NEXT — netd queued-TX flush/doorbell.** Once the pipe poll is fixed, the prior K195
+   hostfwd trace (`tickets/bob/reports/K195.md` rounds 32-33) shows the server's 44-byte
+   channel-open confirmation queued in netd TX (`tx=(44, 0, 37, 4454)`) but not flushed; the
+   client times out and the child exits 255. This is a netd/TCP egress issue, outside K195's
+   Owns.
+5. **FOLLOW-UP — UFS host-key persistence.** The release image is initfs-only; the demo host
+   key is generated in `/tmp/ssh` and is ephemeral. The K193 UFS qcow2 image/staging is not in
+   this clone, so persistence is not claimed; the ticket explicitly permits the ephemeral
+   initfs demo.
 
 ## Donor reconciliation (DR-52)
 

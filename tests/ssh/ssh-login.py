@@ -54,6 +54,17 @@ def log(kind: str, text: str) -> None:
     print(f"ssh-login: {kind}: {text}", flush=True)
 
 
+def client_stage() -> str:
+    try:
+        lines = (RUN / "client.log").read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return "no client log"
+    for line in reversed(lines):
+        if line.strip():
+            return line.strip()
+    return "no client output"
+
+
 def qemu_boot(index: int) -> tuple[subprocess.Popen, Path]:
     RUN.mkdir(parents=True, exist_ok=True)
     vars_path = RUN / f"vars-{index}.fd"
@@ -128,12 +139,16 @@ def run_session(argv: list[str], expect: str, timeout: float = 45) -> float:
     started = time.monotonic()
     child = pexpect.spawn(argv[0], argv[1:], cwd=str(ROOT), encoding="utf-8",
                           timeout=timeout)
-    with open(RUN / "client.log", "a", encoding="utf-8") as logfile:
-        child.logfile = logfile
-        child.expect(r"(?i)password:\s*")
-        child.sendline(PASSWORD)
-        child.expect(expect)
-        child.expect(pexpect.EOF)
+    try:
+        with open(RUN / "client.log", "a", encoding="utf-8") as logfile:
+            child.logfile = logfile
+            child.expect(r"(?i)password:\s*")
+            child.sendline(PASSWORD)
+            child.expect(expect)
+            child.expect(pexpect.EOF)
+    except (pexpect.exceptions.TIMEOUT, pexpect.exceptions.EOF) as error:
+        child.close(force=True)
+        raise RuntimeError(f"command session: {client_stage()}") from error
     child.close()
     if child.exitstatus not in (0, None):
         raise RuntimeError(f"ssh session exit {child.exitstatus}")
@@ -147,15 +162,19 @@ def command_session(command: str) -> float:
 def interactive_session() -> None:
     child = pexpect.spawn(ssh_base()[0], ssh_base()[1:] + ["-tt"], cwd=str(ROOT),
                           encoding="utf-8", timeout=45)
-    with open(RUN / "client.log", "a", encoding="utf-8") as logfile:
-        child.logfile = logfile
-        child.expect(r"(?i)password:\s*")
-        child.sendline(PASSWORD)
-        child.expect(r"[\$#] $")
-        child.sendline("pwd")
-        child.expect(rf"^/home/{USER}\s*$")
-        child.sendline("exit")
-        child.expect(pexpect.EOF)
+    try:
+        with open(RUN / "client.log", "a", encoding="utf-8") as logfile:
+            child.logfile = logfile
+            child.expect(r"(?i)password:\s*")
+            child.sendline(PASSWORD)
+            child.expect(r"[\$#] $")
+            child.sendline("pwd")
+            child.expect(rf"^/home/{USER}\s*$")
+            child.sendline("exit")
+            child.expect(pexpect.EOF)
+    except (pexpect.exceptions.TIMEOUT, pexpect.exceptions.EOF) as error:
+        child.close(force=True)
+        raise RuntimeError(f"interactive session: {client_stage()}") from error
     child.close()
     log("interactive", "pwd/exit through a PTY ok")
 

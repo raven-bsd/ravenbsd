@@ -1,0 +1,4 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running `target/debug/xtask qtest --case ssh-login --arch x86_64 --no-build`
+ssh-login: error
+  pre[0] `sh tests/ssh/ssh-login.sh` failed with exit status: 3: ssh-login: FAIL: command session: Connection closed by 10.0.2.15 port 22
