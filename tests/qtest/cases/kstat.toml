@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# KSTAT1: typed kernel statistics (kstats). This is the bounded acceptance case. The pre step
+# checks for the three product surfaces the ticket owns; until the kernel read-path and userland
+# surfaces exist it fails before QEMU, which is the test-first proof recorded in the report.
+
+name = "kstat"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/kstat/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^kstat: name=scheduler:cpu0:syscalls type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=ipc:messages type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=vm:frames type=uint64 unit=bytes value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: name=console:dropped type=uint64 unit=count value=[0-9]+$'
+
+[[expect]]
+regex = '^kstat: ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|kstat: fail|fake'
