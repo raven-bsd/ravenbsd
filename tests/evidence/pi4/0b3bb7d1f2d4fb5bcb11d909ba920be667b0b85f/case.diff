@@ -1,0 +1,19 @@
+diff --git a/tests/qtest/cases/login-aarch64.toml b/tests/qtest/cases/login-aarch64.toml
+index 249a9b9d..4261db72 100644
+--- a/tests/qtest/cases/login-aarch64.toml
++++ b/tests/qtest/cases/login-aarch64.toml
+@@ -14,7 +14,13 @@ qemu_extra = []
+ expect_exit = "success"
+ 
+ [[expect]]
+-regex = '^RavenBSD 0\.1 \(aarch64\) \(tty:console\)$'
++regex = '^R A V E N   B S D$'
++
++[[expect]]
++regex = '^-{10,}$'
++
++[[expect]]
++regex = '^Welcome to RavenBSD 0\.1 aarch64$'
+ 
+ [[expect]]
+ regex = '(?i)^.*login: ?root'
