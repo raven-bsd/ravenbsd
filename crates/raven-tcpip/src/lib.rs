@@ -139,6 +139,7 @@ pub use rack_output::{RackOutput, TimerResult};
 pub use rack_sack::{
     RACK_ACKED, RACK_DSACK_HANDLING, RACK_SACK_PASSED, RACK_WAS_LOST, RACK_WAS_SACKPASS, RackSack,
     SackSegment,
+};
 pub use rack_transport::{
     AddRackMode, AddRackOutcome, HptsStart, HptsStartOutcome, HwTlsOutcome, MAX_HPTS_TIMEOUT_US,
     RackTransport, SwitchCaps, SwitchFailedOutcome, TimerProcess, TimerProcessResult,
