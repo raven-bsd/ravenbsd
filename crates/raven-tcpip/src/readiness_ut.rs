@@ -72,20 +72,20 @@ fn readable_and_writable_do_not_alias() {
     let shut = stack.readiness(connection).expect("shut");
     assert!(
         shut.writable,
-        "FreeBSD sowriteable keeps POLLOUT set on SBS_CANTSENDMORE; a write returns EPIPE"
+        "NetBSD sowritable keeps POLLOUT set on SS_CANTSENDMORE; a write returns EPIPE"
     );
 }
 
 #[test]
-fn an_error_is_readable_and_writable_like_freebsd_soreadable_sowriteable() {
+fn an_error_is_readable_and_writable_like_netbsd_soreadable_sowritable() {
     let (mut stack, connection) = established();
     stack
         .test_set_error(connection, Some(Errno::ECONNRESET))
         .expect("error");
 
     let ready = stack.readiness(connection).expect("ready");
-    assert!(ready.readable, "FreeBSD soreadable includes so_error");
-    assert!(ready.writable, "FreeBSD sowriteable includes so_error");
+    assert!(ready.readable, "NetBSD soreadable includes so_error");
+    assert!(ready.writable, "NetBSD sowritable includes so_error");
     assert!(ready.error);
     assert!(!ready.hup);
 }
@@ -99,7 +99,7 @@ fn a_connecting_socket_is_not_writable_until_connected() {
     let ready = stack.readiness(connection).expect("connecting");
     assert!(
         !ready.writable,
-        "FreeBSD sowriteable requires SS_ISCONNECTED for a connection-required socket; \
+        "NetBSD sowritable requires SS_ISCONNECTED for a connection-required socket; \
          state={:?} error={:?} ready={ready:?}",
         stack.tcp_state(connection),
         stack.tcp_error(connection)
@@ -302,6 +302,123 @@ fn a_close_event_is_emitted_once_and_not_stale() {
     assert!(
         !second.contains(&crate::Event::Closed(connection)),
         "stale close event: {second:?}"
+    );
+}
+
+#[test]
+fn sodopoll_reports_only_the_requested_directions() {
+    let (socket_stack, connection) = established();
+    let record = socket_stack.sockets.record(connection).expect("record");
+
+    assert_eq!(sodopoll(record, POLLIN), 0, "an idle read side has no bit");
+    assert_eq!(sodopoll(record, POLLOUT), POLLOUT);
+    assert_eq!(
+        sodopoll(record, POLLIN | POLLOUT),
+        POLLOUT,
+        "only the ready direction is raised"
+    );
+    assert_eq!(
+        sodopoll(record, POLLPRI | POLLRDBAND),
+        0,
+        "Raven has no SS_POLLRDBAND state"
+    );
+
+    // A listener with a queued connection is readable but never writable: requesting only
+    // POLLOUT must not leak the read bit.
+    let mut listener_stack = stack();
+    let listener = listener_stack.tcp_listen(7005, 4).expect("listen");
+    let _connection = listener_stack
+        .test_pending_connection(listener)
+        .expect("pending connection");
+    let record = listener_stack.sockets.record(listener).expect("listener");
+    assert_eq!(sodopoll(record, POLLIN), POLLIN);
+    assert_eq!(sodopoll(record, POLLOUT), 0);
+    assert_eq!(sodopoll(record, POLLPRI), 0);
+}
+
+#[test]
+fn soreadable_is_the_netbsd_accept_queue_for_a_listener() {
+    let mut stack = stack();
+    let listener = stack.tcp_listen(7000, 4).expect("listen");
+    let record = stack.sockets.record(listener).expect("empty listener");
+    assert!(!soreadable(record), "an empty so_q has no read bit");
+
+    let _connection = stack
+        .test_pending_connection(listener)
+        .expect("pending connection");
+    let record = stack.sockets.record(listener).expect("listener");
+    assert!(soreadable(record), "so_qlen != 0 is readable");
+}
+
+#[test]
+fn sowritable_is_netbsd_cantsendmore_and_a_listener_is_not_writable() {
+    let (mut stack, connection) = established();
+    let record = stack.sockets.record(connection).expect("record");
+    assert!(
+        sowritable(record),
+        "an idle established socket has send space"
+    );
+
+    stack.shutdown_write(connection).expect("shutdown");
+    let record = stack.sockets.record(connection).expect("record");
+    assert!(
+        sowritable(record),
+        "SS_CANTSENDMORE keeps POLLOUT set in NetBSD"
+    );
+
+    let listener = stack.tcp_listen(7001, 4).expect("listen");
+    let record = stack.sockets.record(listener).expect("listener");
+    assert!(
+        !sowritable(record),
+        "a listener is not SS_ISCONNECTED and keeps PR_CONNREQUIRED"
+    );
+}
+
+#[test]
+fn a_shutdown_connecting_socket_is_writable_through_cantsendmore() {
+    let mut stack = stack();
+    let connection = stack
+        .tcp_connect((Ipv4Addr::new([127, 0, 0, 2]), 7006), Some(7007))
+        .expect("connect");
+    let record = stack.sockets.record(connection).expect("connecting");
+    assert!(
+        !sowritable(record),
+        "SYN-SENT is not SS_ISCONNECTED and has no CANTSENDMORE yet"
+    );
+
+    stack.shutdown_write(connection).expect("shutdown");
+    let record = stack.sockets.record(connection).expect("shutdown");
+    assert!(
+        sowritable(record),
+        "soshutdown sets SS_CANTSENDMORE before the handshake completes"
+    );
+}
+
+#[test]
+fn the_query_and_the_edges_read_the_same_sopoll_result() {
+    let (mut stack, connection) = established();
+    stack.test_push_rx(connection, b"x").expect("push");
+    let record = stack.sockets.record(connection).expect("record");
+    let revents = sopoll(record);
+    let levels = socket_levels(record);
+    assert_eq!(levels.readable, revents & (POLLIN | POLLRDNORM) != 0);
+    assert_eq!(levels.writable, revents & POLLOUT != 0);
+
+    let ready = stack.readiness(connection).expect("ready");
+    assert_eq!(ready.readable, levels.readable);
+    assert_eq!(ready.writable, levels.writable);
+}
+
+#[test]
+fn a_queued_zero_length_udp_datagram_is_readable() {
+    let mut stack = stack();
+    let socket = stack.udp_bind(7003).expect("udp bind");
+    stack
+        .test_push_udp(socket, b"", (Ipv4Addr::new([127, 0, 0, 1]), 7004))
+        .expect("push empty datagram");
+    assert!(
+        stack.readiness(socket).expect("ready").readable,
+        "NetBSD sb_cc counts the address header of a zero-length datagram"
     );
 }
 
