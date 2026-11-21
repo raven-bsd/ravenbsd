@@ -1,0 +1,2 @@
+1700000000.000000 ARP, Request who-has 192.0.2.10 tell 10.0.0.5, length 28
+1700000000.001000 ARP, Reply 192.0.2.10 is-at 02:00:00:00:00:0b, length 28

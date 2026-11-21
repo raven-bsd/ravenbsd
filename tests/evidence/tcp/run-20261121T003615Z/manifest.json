@@ -1,0 +1,24 @@
+{
+  "claims": "/media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/port-claims.json",
+  "dragonfly_revision": "94448f622a06cde90ba42d688e9cab2448ad9ab3",
+  "dragonfly_root": "/home/bo/work/ravenos-workspace/ravenbsd-resources/dragonfly",
+  "freebsd_revision": "133344405f532bd54ff3629a77d4c4e062f01fdb",
+  "freebsd_root": "/home/bo/work/ravenos-workspace/ravenbsd-resources/freebsd",
+  "generated": "2026-11-21T00:36:16Z",
+  "host": {
+    "branch": "otto/K264",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "commit": "c3a2d95121253912f600442baaae3aa703c763cb",
+    "dirty": "yes",
+    "platform": "Linux-5.19.0-50-generic-x86_64-with-glibc2.35",
+    "python": "3.10.12",
+    "qemu": "QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "utc": "2026-11-21T00:36:15Z"
+  },
+  "inputs_sha256": "1b65b76149a0ba1878982d654789101c31338f9a9bf8b5b10a597bfab4ec520c",
+  "netbsd_revision": "36eddebcc36cb0775aa2962005b9c05419a6ff01",
+  "packet": "run-20261121T003615Z",
+  "reports_root": null,
+  "tool": "scripts/tcp-evidence.py"
+}

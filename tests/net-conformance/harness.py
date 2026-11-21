@@ -41,6 +41,9 @@ TCP_SYN = 0x02
 TCP_RST = 0x04
 TCP_PSH = 0x08
 TCP_ACK = 0x10
+TCP_ECE = 0x40
+TCP_CWR = 0x80
+IP_ECN_CE = 0x03
 
 RAVEN_GUEST = "10.0.2.15"
 RAVEN_HOST = "10.0.2.2"
@@ -148,6 +151,7 @@ def build_frame(
     options: bytes = b"",
     payload: bytes = b"",
     ident: int = 0,
+    tos: int = 0,
 ) -> bytes:
     tcp_length = 20 + len(options) + len(payload)
     offset = ((20 + len(options)) // 4) << 4
@@ -169,7 +173,7 @@ def build_frame(
     header = struct.pack(
         "!BBHHHBBH4s4s",
         0x45,
-        0,
+        tos & 0xFF,
         total,
         ident & 0xFFFF,
         0x4000,
@@ -223,6 +227,7 @@ def parse_frame(frame: bytes) -> dict | None:
         "type": "tcp",
         "src_ip": src_ip,
         "dst_ip": dst_ip,
+        "tos": frame[15],
         "sport": sport,
         "dport": dport,
         "seq": seq,
@@ -274,7 +279,8 @@ class RawPeer:
             self.pcap.close()
 
     def send(self, src_port: int, dst_port: int, seq: int, ack: int, flags: int,
-             window: int, options: bytes = b"", payload: bytes = b"") -> None:
+             window: int, options: bytes = b"", payload: bytes = b"",
+             tos: int = 0) -> None:
         frame = build_frame(
             self.mac,
             self.guest_mac,
@@ -289,6 +295,7 @@ class RawPeer:
             options,
             payload,
             ident=random.randrange(0xFFFF),
+            tos=tos,
         )
         self.sock.send(frame)
         if self.pcap:
@@ -348,12 +355,13 @@ class RawPeer:
 
 
 def handshake(peer: RawPeer, local_port: int, remote_port: int, final_window: int,
-              window_scale: int | None = 7) -> dict:
+              window_scale: int | None = 7, ecn: bool = False) -> dict:
     peer.our_port = local_port
     peer.peer_port = remote_port
     isn = random.randrange(1, 0x7FFFFFFF)
-    peer.send(local_port, remote_port, isn, 0, TCP_SYN, 65535,
-              tcp_options(1460, window_scale))
+    syn_flags = TCP_SYN | ((TCP_ECE | TCP_CWR) if ecn else 0)
+    peer.send(local_port, remote_port, isn, 0, syn_flags, 65535,
+              tcp_options(1460, window_scale), tos=0x02 if ecn else 0)
     synack = peer.wait(
         5.0, lambda p: p["flags"] & TCP_SYN and p["flags"] & TCP_ACK and p["ack"] == isn + 1
     )
@@ -366,6 +374,7 @@ def handshake(peer: RawPeer, local_port: int, remote_port: int, final_window: in
         "options": parse_tcp_options(synack["options"]),
         "synack": synack,
         "window_scale": window_scale,
+        "ecn": ecn,
     }
 
 
@@ -534,8 +543,24 @@ def scenario_fin_rst(peer: RawPeer, local_port: int, remote_port: int) -> tuple[
     return ok, detail
 
 
+def scenario_ecn(peer: RawPeer, local_port: int, remote_port: int) -> tuple[bool, str]:
+    state = handshake(peer, local_port, remote_port, 65535, ecn=True)
+    negotiated = bool(state["synack"]["flags"] & TCP_ECE)
+    if not negotiated:
+        reset(peer, state, local_port, remote_port)
+        return False, "SYN-ACK did not echo ECE; ECN was not negotiated"
+    peer.send(local_port, remote_port, state["isn"] + 1, state["server_isn"] + 1,
+              TCP_ACK | TCP_PSH, 65535, payload=b"ecn", tos=IP_ECN_CE)
+    echoed = peer.wait(3.0, lambda p: bool(p["flags"] & TCP_ECE) and not p["payload"])
+    reset(peer, state, local_port, remote_port)
+    if echoed is None:
+        return False, "CE-marked data did not produce an ECE ACK"
+    return True, "ECN negotiated; CE data echoed as ECE"
+
+
 SCENARIOS = {
     "handshake": scenario_handshake,
+    "ecn": scenario_ecn,
     "zero-window": scenario_zero_window,
     "window-update": scenario_window_update,
     "retransmit": scenario_retransmit,
@@ -547,6 +572,8 @@ NARROWED = {
     "partial-ack": "partial ACK needs a multi-segment server write and selective loss; the 44-byte fixture is one segment",
     "backlog": "the guest listener accepts one connection at a time; a multi-SYN backlog needs a second listener harness",
     "busy": "device/queue busy injection needs a driver shim outside this test-only ticket",
+    "pmtu-blackhole": "the fixture writes only 44 bytes, below every tested MTU, so a path-MTU decrease is not observable; needs a router namespace with a reduced MTU and suppressed ICMP frag-needed",
+    "plpmtud": "PLPMTUD probes are only emitted for writes above the probe floor; the 44-byte fixture cannot trigger one; needs a large-write fixture",
 }
 
 
@@ -569,6 +596,7 @@ def linux_netns_setup() -> tuple[subprocess.Popen, str, str]:
         run(nsenter + ["ip", "addr", "add", f"{LINUX_GUEST}/24", "dev", LINUX_IF_B])
         run(nsenter + ["ip", "link", "set", LINUX_IF_B, "up"])
         run(nsenter + ["ip", "link", "set", "lo", "up"])
+        run(nsenter + ["sysctl", "-qw", "net.ipv4.tcp_ecn=1"], check=False)
         run(nsenter + ["ip", "neigh", "replace", LINUX_HOST, "lladdr", LINUX_IF_A_MAC,
                        "dev", LINUX_IF_B])
         run(["ip", "neigh", "replace", LINUX_GUEST, "lladdr", LINUX_IF_B_MAC,

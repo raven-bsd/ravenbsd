@@ -1,0 +1,53 @@
+{
+  "label": "merged-tcg",
+  "commit": "0a641914",
+  "image": "build/qtest/net-conformance.img",
+  "image_sha256": "c428e598739e5df7bbee55b9a257206ed7837c6eaf04d7dda64f409b223d2a19",
+  "scenarios": [
+    {
+      "scenario": "handshake",
+      "exit": 0,
+      "pcap": "tests/net-conformance/results/merged/merged-tcg/handshake.pcap",
+      "serial": "tests/net-conformance/results/merged/merged-tcg/handshake-serial.log",
+      "result": "pass",
+      "detail": "SYN-ACK mss=1460 ws=3 sack=True; plain-peer ws=absent win=65535",
+      "seconds": "19.51s"
+    },
+    {
+      "scenario": "zero-window",
+      "exit": 0,
+      "pcap": "tests/net-conformance/results/merged/merged-tcg/zero-window.pcap",
+      "serial": "tests/net-conformance/results/merged/merged-tcg/zero-window-serial.log",
+      "result": "pass",
+      "detail": "probe=1B seq=1; after-reopen=43B; total=44/44; frames=1; replayed-probe=no",
+      "seconds": "20.59s"
+    },
+    {
+      "scenario": "window-update",
+      "exit": 0,
+      "pcap": "tests/net-conformance/results/merged/merged-tcg/window-update.pcap",
+      "serial": "tests/net-conformance/results/merged/merged-tcg/window-update-serial.log",
+      "result": "pass",
+      "detail": "delivered=44/44 frames=1",
+      "seconds": "17.63s"
+    },
+    {
+      "scenario": "retransmit",
+      "exit": 0,
+      "pcap": "tests/net-conformance/results/merged/merged-tcg/retransmit.pcap",
+      "serial": "tests/net-conformance/results/merged/merged-tcg/retransmit-serial.log",
+      "result": "pass",
+      "detail": "first=44B seq+0; retransmit=yes",
+      "seconds": "23.04s"
+    },
+    {
+      "scenario": "fin-rst",
+      "exit": 0,
+      "pcap": "tests/net-conformance/results/merged/merged-tcg/fin-rst.pcap",
+      "serial": "tests/net-conformance/results/merged/merged-tcg/fin-rst-serial.log",
+      "result": "pass",
+      "detail": "delivered=44/44; peer-close=FIN",
+      "seconds": "31.86s"
+    }
+  ]
+}

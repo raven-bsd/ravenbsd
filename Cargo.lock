@@ -190,6 +190,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "cc-model-audit"
+version = "0.1.0"
+dependencies = [
+ "cc-model",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -819,6 +833,7 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-netcore",
+ "raven-pf",
  "raven-proto-fs",
  "raven-proto-net",
  "raven-rt",
@@ -996,6 +1011,166 @@ name = "r-efi"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+
+[[package]]
+name = "rack-acceptance"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-replay",
+]
+
+[[package]]
+name = "rack-audit-log-bbr"
+version = "0.1.0"
+
+[[package]]
+name = "rack-audit-misc-transport"
+version = "0.1.0"
+
+[[package]]
+name = "rack-audit-models"
+version = "0.1.0"
+
+[[package]]
+name = "rack-audit-output-retransmit"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+]
+
+[[package]]
+name = "rack-audit-replay-union"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-replay",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-audit-sack-sockopt"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-audit-state-pipe"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-bbr-model"
+version = "0.1.0"
+
+[[package]]
+name = "rack-coverage"
+version = "0.1.0"
+
+[[package]]
+name = "rack-flags"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-loss-model"
+version = "0.1.0"
+
+[[package]]
+name = "rack-misc-matrix"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-output-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-tlp-model",
+ "rack-vtable-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-pipe-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-loss-model",
+ "rack-recovery-model",
+ "rack-tlp-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-recovery-model"
+version = "0.1.0"
+dependencies = [
+ "rack-tlp-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-register"
+version = "0.1.0"
+dependencies = [
+ "rack-acceptance",
+ "rack-coverage",
+]
+
+[[package]]
+name = "rack-replay"
+version = "0.1.0"
+dependencies = [
+ "rack-bbr-model",
+ "rack-coverage",
+ "rack-loss-model",
+ "rack-recovery-model",
+ "rack-tlp-model",
+ "rack-vtable-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-sack-matrix"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-sockopt"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-tlp-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-transport-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-tlp-model",
+ "rack-vtable-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-vtable-model"
+version = "0.1.0"
 
 [[package]]
 name = "raven"
@@ -3546,6 +3721,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpdump"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tcpip-wire",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-tcpip"
 version = "0.1.0"
 dependencies = [
@@ -3598,6 +3783,14 @@ dependencies = [
  "raven-abi",
  "raven-tcpip",
  "raven-tcpip-wire",
+]
+
+[[package]]
+name = "raven-tcpip-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+ "raven-tcpip-sim",
 ]
 
 [[package]]
@@ -4147,6 +4340,92 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "tcp-ecn-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "tcp-input-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
+]
+
+[[package]]
+name = "tcp-loss-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
+]
+
+[[package]]
+name = "tcp-output-stress"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
+name = "tcp-paws-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-wire",
+]
+
+[[package]]
+name = "tcp-sack-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "tcp-teardown-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
+name = "tcp-timer-conformance"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "tcp-usrreq-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
+name = "tcp-window-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
 ]
 
 [[package]]

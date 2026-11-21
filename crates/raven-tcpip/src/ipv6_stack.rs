@@ -568,7 +568,13 @@ impl<D: Device> Stack<D> {
             return;
         }
         match next {
-            6 => self.tcp_input(IpAddr::V6(source), IpAddr::V6(destination), upper, now),
+            6 => self.tcp_input(
+                IpAddr::V6(source),
+                IpAddr::V6(destination),
+                packet.traffic_class() & 0x03,
+                upper,
+                now,
+            ),
             58 => self.handle_icmpv6(
                 source,
                 destination,

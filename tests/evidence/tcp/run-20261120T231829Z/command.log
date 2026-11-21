@@ -1,0 +1,5 @@
+tcp-evidence packet: run-20261120T231829Z
+generated: 2026-11-20T23:18:31Z
+phase audit: pass
+phase unit: pass command='cargo nextest run -p raven-tcpip'
+phase matrix: blocked reason='scripts/net-conformance.sh is absent (K253 harness not merged)'

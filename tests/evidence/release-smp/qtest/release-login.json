@@ -1,0 +1,25 @@
+{
+  "case": "release-login",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 327696,
+  "exit_status": 33,
+  "matched": [
+    "^loader: RavenBSD loader 0\\.1 \\(x86_64\\)$",
+    "^RavenBSD kernel 0\\.1 \\(x86_64\\)",
+    "^svcd: all services up$",
+    "(?i)^.*login: ?root",
+    "(?i)^password: ?$",
+    "^/root$",
+    "^cat$",
+    "^ls$",
+    "^uname$",
+    "^RavenBSD \\S+ 0\\.1 RavenBSD 0\\.1 \\(\\S+\\) #\\d+: .+ x86_64$",
+    "^PID PPID UID GID CMD$",
+    "^ping: 10\\.0\\.2\\.2 seq=1 rtt=[0-9]+ms$",
+    "^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}

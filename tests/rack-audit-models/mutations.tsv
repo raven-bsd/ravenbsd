@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Mutation/negative evidence extracted from the group reports (K319/K320/K324/K326/K327).
+# group|donor|mutation|report
+loss|rack_calc_thresh_rack|DSACK term removed|K319 M1
+loss|rack_mark_lost|loss bound removed|K319 trace
+loss|rack_log_sack_passed|RACK loss push removed|K319 report
+tlp|rack_calc_thresh_tlp|2 ms PTO granularity removed|K320 mutation table
+tlp|rack_timeout_tlp|two-probe cap ignored|K320 mutation table
+tlp|rack_note_dsack|grow reo_wnd on every DSACK|K320 mutation table
+tlp|rack_peer_reneges|keep reneged ranges SACKed|K320 mutation table
+recovery|rack_exit_recovery|pipe + retransmitted removed|K324 mutation
+recovery|rack_cong_signal|recovery entry removed|K324 model matrix
+recovery|rack_process_to_cumack|cumack trim removed|K324 model matrix
+bbr|bbr_get_pacing_length|first ProbeBW gain 256|K326 mutation table
+bbr|bbr_get_target_cwnd|cwnd quanta omitted|K326 mutation table
+bbr|bbr_enter_probe_rtt|Probe-RTT half interval|K326 mutation table
+bbr|rack_make_timely_judgement|Timely high threshold 2x|K326 mutation table
+vtable|tfb_tcp_fb_init|switch_failed no-op|K327 mutation
+vtable|tfb_tcp_output|switch_failed no-op|K327 mutation
+vtable|tfb_tcp_handoff_ok|switch_failed no-op|K327 mutation
+vtable|tfb_compute_pipe|switch_failed no-op|K327 mutation
+vtable|tfb_switch_failed|switch_failed no-op|K327 mutation

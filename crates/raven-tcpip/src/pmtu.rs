@@ -100,23 +100,186 @@ pub fn floor_for(destination: IpAddr) -> u32 {
     }
 }
 
-/// Validate and clamp an ICMP-reported MTU against the quoted connection.
-///
-/// `quoted_matches` must be true only when the quoted header identifies a live
-/// connection; otherwise the report is ignored.
+/// FreeBSD `tcp_mssdflt`.
+pub const TCP_MSS_DEFAULT: u32 = 536;
+/// FreeBSD `TCP_MINMSS`.
+pub const TCP_MINMSS: u32 = 216;
+
+/// Address family used by the FreeBSD MSS helpers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IpFamily {
+    /// IPv4 (`struct tcpiphdr`).
+    V4,
+    /// IPv6 (IP6 header + TCP header).
+    V6,
+}
+
+/// IP plus TCP header bytes (`min_protoh` in `tcp_mss_update`).
 #[must_use]
-pub fn classic_update(
-    cached: Option<u32>,
-    reported: u32,
-    quoted_matches: bool,
-    destination: IpAddr,
-) -> Option<u32> {
-    if !quoted_matches {
-        return cached;
+pub fn mss_headers(family: IpFamily) -> u32 {
+    match family {
+        IpFamily::V4 => 40,
+        IpFamily::V6 => 60,
     }
-    let floor = floor_for(destination);
-    let value = reported.max(floor);
-    Some(cached.map_or(value, |old| old.min(value).max(floor)))
+}
+
+/// FreeBSD `tcp_mssopt`: the MSS option for an outgoing SYN.
+///
+/// `maxmtu` is the interface/route MTU, `hc_mtu` the host-cache MTU (0 when absent), and
+/// `default_mss` the family default. When both are known the smaller is used; when neither is
+/// known the default is returned.
+#[must_use]
+pub fn mssopt(maxmtu: u32, hc_mtu: u32, default_mss: u32, family: IpFamily) -> u32 {
+    if maxmtu == 0 && hc_mtu == 0 {
+        return default_mss;
+    }
+    let mtu = if maxmtu != 0 && hc_mtu != 0 {
+        maxmtu.min(hc_mtu)
+    } else {
+        maxmtu.max(hc_mtu)
+    };
+    mtu.saturating_sub(mss_headers(family))
+}
+
+/// Result of FreeBSD `tcp_mss_update` and the send-buffer part of `tcp_mss`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MssUpdate {
+    /// `t_maxseg` after the update.
+    pub maxseg: u32,
+    /// Whether `TF2_PROC_SACK_PROHIBIT` is required (`maxseg < tcp_mssdflt`).
+    pub sack_prohibit: bool,
+}
+
+/// FreeBSD `tcp_mss_update`/`tcp_mss` path and buffer calculation.
+///
+/// `offer` is the peer MSS option (0 when absent, -1 when no SYN has arrived), `mtuoffer` the
+/// ICMP MTU (use `u32::MAX` when absent), `maxmtu` the route/interface MTU, `hc_mtu` the cached
+/// path MTU, `send_buffer` `so_snd.sb_hiwat`. The result is clamped to at least 64 bytes and the
+/// 536-byte default controls the SACK prohibition bit.
+#[must_use]
+#[allow(clippy::too_many_arguments)] // Mirrors the FreeBSD tcp_mss_update inputs.
+pub fn mss_update(
+    offer: i32,
+    mtuoffer: u32,
+    maxmtu: u32,
+    hc_mtu: u32,
+    default_mss: u32,
+    minmss: u32,
+    path_mtu_discovery: bool,
+    local: bool,
+    send_buffer: u32,
+    family: IpFamily,
+) -> MssUpdate {
+    let min_protoh = mss_headers(family);
+    let mut offer = offer;
+    if mtuoffer != u32::MAX {
+        // FreeBSD: `offer = mtuoffer - min_protoh;` with signed `offer`.
+        offer = mtuoffer as i32 - min_protoh as i32;
+    }
+    if maxmtu == 0 {
+        return MssUpdate {
+            maxseg: default_mss,
+            sack_prohibit: default_mss < TCP_MSS_DEFAULT,
+        };
+    }
+    if offer == 0 {
+        offer = default_mss as i32;
+    } else {
+        // FreeBSD: `case -1` falls through to `default`, rounding up to `tcp_minmss`.
+        offer = offer.max(minmss as i32);
+    }
+    let mut mss = if hc_mtu != 0 {
+        hc_mtu.min(maxmtu).saturating_sub(min_protoh)
+    } else {
+        let mut value = maxmtu.saturating_sub(min_protoh);
+        if !path_mtu_discovery && !local {
+            value = value.min(default_mss);
+        }
+        value
+    };
+    mss = mss.min(offer.max(0) as u32).max(64);
+    if send_buffer < mss {
+        mss = send_buffer;
+    }
+    let maxseg = mss.max(64);
+    MssUpdate {
+        maxseg,
+        sack_prohibit: maxseg < TCP_MSS_DEFAULT,
+    }
+}
+
+/// FreeBSD `tcp_next_pmtu`: advertised next-hop MTU, fallback table step, and minimum.
+#[must_use]
+pub fn next_pmtu(reported: u32, ip_len: u32, minmss: u32) -> u32 {
+    let mut mtu = if reported != 0 {
+        reported
+    } else {
+        next_lower_mtu(ip_len)
+    };
+    let floor = minmss.saturating_add(40);
+    if mtu < floor {
+        mtu = floor;
+    }
+    mtu
+}
+
+/// The IP MTU plateaus from FreeBSD `ip_icmp.c` `ip_next_mtu` (RFC 1191).
+const MTU_PLATEAUS: [u32; 12] = [
+    65535, 32000, 17914, 8166, 4352, 2002, 1492, 1280, 1006, 508, 296, 68,
+];
+
+fn next_lower_mtu(ip_len: u32) -> u32 {
+    MTU_PLATEAUS
+        .iter()
+        .copied()
+        .find(|mtu| *mtu < ip_len)
+        .unwrap_or(0)
+}
+
+/// FreeBSD `tcp_ctlinput_with_port` need-fragmentation decision.
+///
+/// The quoted sequence must be in `[snd_una, snd_max)`. The new MTU is returned only when it is
+/// smaller than `maxseg + struct tcpiphdr`; otherwise the report leaves the path unchanged.
+#[must_use]
+pub fn on_icmp_frag_needed(
+    quoted_seq: u32,
+    snd_una: u32,
+    snd_max: u32,
+    reported_mtu: u32,
+    ip_len: u32,
+    maxseg: u32,
+    minmss: u32,
+) -> Option<u32> {
+    if quoted_seq < snd_una || quoted_seq >= snd_max {
+        return None;
+    }
+    let mtu = next_pmtu(reported_mtu, ip_len, minmss);
+    (mtu < maxseg.saturating_add(40)).then_some(mtu)
+}
+
+/// FreeBSD `tcp6_next_pmtu`: the advertised MTU, floored at `IPV6_MMTU`.
+#[must_use]
+pub fn next_pmtu6(reported: u32) -> u32 {
+    reported.max(IPV6_FLOOR)
+}
+
+/// FreeBSD `tcp6_ctlinput_with_port` need-fragmentation decision.
+///
+/// The quoted sequence must be in `[snd_una, snd_max)` and the MTU must be smaller than
+/// `maxseg + sizeof(struct tcphdr) + sizeof(struct ip6_hdr)`.
+#[must_use]
+pub fn on_icmp6_frag_needed(
+    quoted_seq: u32,
+    snd_una: u32,
+    snd_max: u32,
+    reported_mtu: u32,
+    maxseg: u32,
+) -> Option<u32> {
+    if quoted_seq < snd_una || quoted_seq >= snd_max {
+        return None;
+    }
+    let mtu = next_pmtu6(reported_mtu);
+    (mtu < maxseg.saturating_add(mss_headers(IpFamily::V6))).then_some(mtu)
 }
 
 /// The RFC 8899 PLPMTUD state.
@@ -185,6 +348,26 @@ impl Plpmtud {
         }
         let mid = self.low + (self.high - self.low) / 2;
         mid.max(self.low + 1)
+    }
+
+    /// The next probe size without consuming a probe from the budget.
+    ///
+    /// This lets the send path reject a probe that does not fit the current window without
+    /// losing search budget; `next_probe` remains the consuming entry point.
+    #[must_use]
+    pub fn next_probe_size(&self) -> Option<u32> {
+        if self.state != PlpmtudState::Searching || self.probes >= self.budget {
+            return None;
+        }
+        if self.high <= self.low + 1 {
+            if self.current < self.high {
+                Some(self.high)
+            } else {
+                None
+            }
+        } else {
+            Some((self.low + (self.high - self.low) / 2).max(self.low + 1))
+        }
     }
 
     /// The next probe size, or `None` when the search is complete/error.
