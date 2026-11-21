@@ -532,6 +532,22 @@ pub fn scheme_register(name: &[u8]) -> Result<(), Errno> {
     .map(|_| ())
 }
 
+/// Raw `PIPE2` syscall number (`pipe2(fds, flags)`); owned by the kernel because
+/// `crates/raven-abi` is a contract crate and does not expose the raw pipe numbers.
+const PIPE2: usize = 0x6f;
+
+/// `pipe2(fds, flags)`: create an in-kernel pipe and return its two handles.
+///
+/// The kernel validates the flags (`O_CLOEXEC`/`O_NONBLOCK`) and writes two handle ids into the
+/// caller's 8-byte buffer. This wrapper is the only safe entry point for the platform crate.
+pub fn pipe2(flags: u32) -> Result<(Handle, Handle), Errno> {
+    let mut fds = [0u32; 2];
+    // SAFETY: PIPE2 writes exactly two u32 handle ids into the live 8-byte buffer.
+    crate::errno::ret(unsafe { arch::syscall2(PIPE2, fds.as_mut_ptr() as usize, flags as usize) })?;
+    let [read, write] = fds;
+    Ok((Handle(read), Handle(write)))
+}
+
 /// Open `path` (bytes, no NUL, no UTF-8 requirement at this layer).
 pub fn open(path: &[u8], flags: u32) -> Result<Handle, Errno> {
     // SAFETY: OPEN reads `path.len()` bytes from the valid slice.
