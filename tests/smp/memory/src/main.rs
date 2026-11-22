@@ -40,6 +40,8 @@ const TLB_ROUNDS: u32 = 64;
 const FORK_ROUNDS: usize = 2;
 const POLL_LIMIT: u32 = 50_000_000;
 const PROC_FORK: usize = 0x39;
+/// Raw kernel `pipe(fds)` number (kernel-owned, not a `Syscall` variant).
+const PIPE: usize = 0x6e;
 
 /// End of the canonical user window (the same value as `raven-abi` layout).
 const USER_END: usize = 0x0000_7FFF_FFFF_F000;
@@ -402,6 +404,13 @@ fn memobj_create_raw(len: usize) -> Result<Handle, Errno> {
         .map(|value| Handle(value as u32))
 }
 
+fn pipe_create() -> Result<(Handle, Handle), Errno> {
+    let mut fds = [0u32; 2];
+    // SAFETY: PIPE writes two u32 handles into the live array.
+    Errno::from_ret(unsafe { sys::syscall1(PIPE, fds.as_mut_ptr() as usize) })?;
+    Ok((Handle(fds[0]), Handle(fds[1])))
+}
+
 fn current_sp() -> usize {
     let sp: usize;
     // SAFETY: reading RSP does not dereference memory and does not modify the stack.
@@ -562,6 +571,7 @@ fn contract_cow() -> Result<(), Errno> {
     let code = wait_child(child)?;
     // SAFETY: the static page is readable in the fixture's data VMA.
     let first = unsafe { core::ptr::addr_of!(CHILD_COW).cast::<u8>().read_volatile() };
+    // SAFETY: the static page is readable in the fixture's data VMA.
     let last = unsafe {
         core::ptr::addr_of!(CHILD_COW)
             .cast::<u8>()
@@ -712,34 +722,91 @@ fn contract_efault() -> Result<(), Errno> {
     let wrap = debug_write_raw(USER_END.saturating_sub(1), 2);
     let uname = uname_raw(1);
     let clock = clock_get_raw(clock::MONOTONIC as usize, 1);
+
+    // Direct PROT_NONE class: a valid user address whose leaf is present supervisor-only.
+    let none = match sys::map_anonymous(PAGE) {
+        Ok(address) => address,
+        Err(error) => {
+            println!("CONTRACT K7 FAIL protnone-map errno={}", error.0);
+            return Err(error);
+        }
+    };
+    if let Err(error) = protect(Handle::SELF_PROC, none, PAGE, 0) {
+        println!("CONTRACT K7 FAIL protnone-protect errno={}", error.0);
+        return Err(error);
+    }
+    let protnone_debug = debug_write_raw(none, 1);
+    let (pipe_r, pipe_w) = match pipe_create() {
+        Ok(pipe) => pipe,
+        Err(error) => {
+            println!("CONTRACT K7 FAIL pipe errno={}", error.0);
+            return Err(error);
+        }
+    };
+    // SAFETY: WRITE takes the pipe handle, the PROT_NONE user pointer and a length; the kernel
+    // validates both and returns EFAULT before copying.
+    let protnone_write = Errno::from_ret(unsafe {
+        sys::syscall3(Syscall::WRITE as usize, pipe_w.0 as usize, none, 1)
+    });
+    let protnone_uname = uname_raw(none);
+    let protnone_clock = clock_get_raw(clock::MONOTONIC as usize, none);
+    let _ = sys::handle_close(pipe_r);
+    let _ = sys::handle_close(pipe_w);
+    let _ = sys::unmap(Handle::SELF_PROC, none, PAGE);
+
     let low_err = low.as_ref().err().copied();
     let past_err = past.as_ref().err().copied();
     let wrap_err = wrap.as_ref().err().copied();
     let uname_err = uname.as_ref().err().copied();
     let clock_err = clock.as_ref().err().copied();
+    let protnone_debug_err = protnone_debug.as_ref().err().copied();
+    let protnone_write_err = protnone_write.as_ref().err().copied();
+    let protnone_uname_err = protnone_uname.as_ref().err().copied();
+    let protnone_clock_err = protnone_clock.as_ref().err().copied();
     let low_ok = matches!(low_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
     let past_ok = matches!(past_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
     let wrap_ok = matches!(wrap_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
     let uname_ok = matches!(uname_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
     let clock_ok = matches!(clock_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
-    if low_ok && past_ok && wrap_ok && uname_ok && clock_ok {
+    let protnone_debug_ok = protnone_debug_err == Some(Errno::EFAULT);
+    let protnone_write_ok = protnone_write_err == Some(Errno::EFAULT);
+    let protnone_uname_ok = protnone_uname_err == Some(Errno::EFAULT);
+    let protnone_clock_ok = protnone_clock_err == Some(Errno::EFAULT);
+    if low_ok
+        && past_ok
+        && wrap_ok
+        && uname_ok
+        && clock_ok
+        && protnone_debug_ok
+        && protnone_write_ok
+        && protnone_uname_ok
+        && protnone_clock_ok
+    {
         println!(
-            "CONTRACT K7 PASS low={:?} past={:?} wrap={:?} uname={:?} clock={:?}",
+            "CONTRACT K7 PASS low={:?} past={:?} wrap={:?} uname={:?} clock={:?} pnone-debug={:?} pnone-write={:?} pnone-uname={:?} pnone-clock={:?}",
             low_err.map(|error| error.0),
             past_err.map(|error| error.0),
             wrap_err.map(|error| error.0),
             uname_err.map(|error| error.0),
-            clock_err.map(|error| error.0)
+            clock_err.map(|error| error.0),
+            protnone_debug_err.map(|error| error.0),
+            protnone_write_err.map(|error| error.0),
+            protnone_uname_err.map(|error| error.0),
+            protnone_clock_err.map(|error| error.0)
         );
         Ok(())
     } else {
         println!(
-            "CONTRACT K7 FAIL low={:?} past={:?} wrap={:?} uname={:?} clock={:?}",
+            "CONTRACT K7 FAIL low={:?} past={:?} wrap={:?} uname={:?} clock={:?} pnone-debug={:?} pnone-write={:?} pnone-uname={:?} pnone-clock={:?}",
             low_err.map(|error| error.0),
             past_err.map(|error| error.0),
             wrap_err.map(|error| error.0),
             uname_err.map(|error| error.0),
-            clock_err.map(|error| error.0)
+            clock_err.map(|error| error.0),
+            protnone_debug_err.map(|error| error.0),
+            protnone_write_err.map(|error| error.0),
+            protnone_uname_err.map(|error| error.0),
+            protnone_clock_err.map(|error| error.0)
         );
         Err(Errno::EIO)
     }
