@@ -41,6 +41,8 @@ const PROTECT: usize = 0x42;
 
 /// Diagnostic flag for `duplex_pair`: write the ownership counters instead of creating a pair.
 const DUPLEX_DIAGNOSTIC: u32 = 0x8000_0000;
+/// Diagnostic flag for `duplex_pair`: run one cycle-collection pass, then write the counters.
+const DUPLEX_COLLECT: u32 = 0x4000_0000;
 /// Datagram mode.
 const DUPLEX_DATAGRAM: u32 = 1;
 /// `MSG_NOSIGNAL` (suppress the SIGPIPE queue on `EPIPE`).
@@ -172,6 +174,22 @@ fn stats() -> Result<Stats, Errno> {
         [
             (&mut value as *mut Stats) as usize,
             DUPLEX_DIAGNOSTIC as usize,
+            0,
+            0,
+            0,
+            0,
+        ],
+    ))?;
+    Ok(value)
+}
+
+fn collect() -> Result<Stats, Errno> {
+    let mut value = Stats::default();
+    checked(raw(
+        DUPLEX_PAIR,
+        [
+            (&mut value as *mut Stats) as usize,
+            (DUPLEX_DIAGNOSTIC | DUPLEX_COLLECT) as usize,
             0,
             0,
             0,
@@ -556,15 +574,65 @@ fn cycles(table: &mut Table) {
         let sent = sendmsg(left, b"s", &control[..control_len], DUPLEX_MSG_NOSIGNAL) == Ok(1);
         close(left);
         close(right);
+        let collected = collect().is_ok();
         let after = stats().unwrap_or_default().delta(before);
+        let value = u64::from(sent) | (u64::from(collected) << 1) | (u64::from(after.zero()) << 2);
         table.row(
             "cycles",
             "self-send-closed",
-            sent && after.zero(),
-            observed(after),
+            sent && collected && after.zero(),
+            value,
         );
     } else {
         table.row("cycles", "self-send-closed", false, u64::MAX);
+    }
+
+    // A reachable self-send must survive the collector: the receiving endpoint is still a live
+    // handle, so its receive queue is a root and the queued endpoint is reachable.
+    let before_reachable = stats().unwrap_or_default();
+    if let Ok((left, right)) = pair(0) {
+        let mut control = [0u8; 64];
+        let control_len = control_one(right, &mut control);
+        let sent = sendmsg(left, b"r", &control[..control_len], DUPLEX_MSG_NOSIGNAL) == Ok(1);
+        close(left);
+        let collected_while_reachable = collect().is_ok();
+        let retained = stats().unwrap_or_default().delta(before_reachable);
+        let retained_ok = retained.pairs == 1 && retained.ends == 1 && retained.pending == 1;
+        let mut data = [0u8; 8];
+        let mut received_control = [0u8; 64];
+        let delivered = match recvmsg(right, &mut data, &mut received_control) {
+            Ok((1, message)) if message.handle_count == 1 => {
+                match first_record_count(&received_control, message.control_len as usize) {
+                    Ok((_, raw)) => {
+                        close(Handle(raw));
+                        true
+                    }
+                    Err(_) => false,
+                }
+            }
+            _ => false,
+        };
+        close(right);
+        let collected_after = collect().is_ok();
+        let after = stats().unwrap_or_default().delta(before_reachable);
+        let value = u64::from(sent)
+            | (u64::from(collected_while_reachable) << 1)
+            | (u64::from(retained_ok) << 2)
+            | (u64::from(delivered) << 3)
+            | (u64::from(collected_after) << 4)
+            | (u64::from(after.zero()) << 5);
+        table.row(
+            "cycles",
+            "self-send-reachable-retained",
+            sent && collected_while_reachable
+                && retained_ok
+                && delivered
+                && collected_after
+                && after.zero(),
+            value,
+        );
+    } else {
+        table.row("cycles", "self-send-reachable-retained", false, u64::MAX);
     }
 
     // A reachable self-send is delivered and then reclaimed.
@@ -590,11 +658,12 @@ fn cycles(table: &mut Table) {
         };
         close(left);
         close(right);
+        let collected = collect().is_ok();
         let after = stats().unwrap_or_default().delta(before_delivered);
         table.row(
             "cycles",
             "self-send-delivered",
-            sent && delivered && after.zero(),
+            sent && delivered && collected && after.zero(),
             observed(after),
         );
     } else {
@@ -613,12 +682,17 @@ fn cycles(table: &mut Table) {
         close(a_right);
         close(b_left);
         close(b_right);
+        let collected = collect().is_ok();
         let after = stats().unwrap_or_default().delta(before_two);
+        let value = u64::from(sent_a)
+            | (u64::from(sent_b) << 1)
+            | (u64::from(collected) << 2)
+            | (u64::from(after.zero()) << 3);
         table.row(
             "cycles",
             "two-object-ring-closed",
-            sent_a && sent_b && after.zero(),
-            observed(after),
+            sent_a && sent_b && collected && after.zero(),
+            value,
         );
     } else {
         table.row("cycles", "two-object-ring-closed", false, u64::MAX);
@@ -642,12 +716,18 @@ fn cycles(table: &mut Table) {
         close(b_right);
         close(c_left);
         close(c_right);
+        let collected = collect().is_ok();
         let after = stats().unwrap_or_default().delta(before_three);
+        let value = u64::from(sent_a)
+            | (u64::from(sent_b) << 1)
+            | (u64::from(sent_c) << 2)
+            | (u64::from(collected) << 3)
+            | (u64::from(after.zero()) << 4);
         table.row(
             "cycles",
             "three-object-ring-closed",
-            sent_a && sent_b && sent_c && after.zero(),
-            observed(after),
+            sent_a && sent_b && sent_c && collected && after.zero(),
+            value,
         );
     } else {
         table.row("cycles", "three-object-ring-closed", false, u64::MAX);

@@ -17,7 +17,7 @@
 //! state lock held but never sleep.
 
 use alloc::collections::VecDeque;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -110,6 +110,265 @@ pub fn stats() -> Stats {
     }
 }
 
+/// Weak live-object registry used only by the explicit cycle collector.
+///
+/// The collector is triggered by `DUPLEX_COLLECT`, never by read/write/send/recv. Pair creation
+/// prunes the dead entries and registers the new pair/endpoints. The registry lock is the outermost
+/// lock in the collector; it is released before any pair state lock is taken.
+struct Registry {
+    pairs: Vec<Weak<Duplex>>,
+    ends: Vec<Weak<DuplexEnd>>,
+}
+
+impl Registry {
+    fn prune(&mut self) {
+        self.pairs.retain(|pair| pair.strong_count() > 0);
+        self.ends.retain(|end| end.strong_count() > 0);
+    }
+
+    fn register(&mut self, pair: &Arc<Duplex>, left: &Arc<DuplexEnd>, right: &Arc<DuplexEnd>) {
+        self.pairs.push(Arc::downgrade(pair));
+        self.ends.push(Arc::downgrade(left));
+        self.ends.push(Arc::downgrade(right));
+    }
+}
+
+/// Live pair/endpoint registry for the collector.
+static REGISTRY: Mutex<Registry> = Mutex::new(Registry {
+    pairs: Vec::new(),
+    ends: Vec::new(),
+});
+
+/// One endpoint snapshot used by the collector.
+struct EndInfo {
+    endpoint: Arc<DuplexEnd>,
+}
+
+/// A queue removed from an unreachable receive side, dropped after the state lock is released.
+///
+/// The payload is never read: the drop itself releases the pending handles and their endpoint
+/// references outside the state lock.
+#[allow(dead_code)]
+enum Disposal {
+    Controls(VecDeque<ControlMessage>),
+    Datagrams(VecDeque<DatagramMessage>),
+}
+
+fn endpoint_index(info: &[EndInfo], pointer: usize) -> Option<usize> {
+    info.iter()
+        .position(|entry| Arc::as_ptr(&entry.endpoint) as usize == pointer)
+}
+
+fn scan_handles(
+    handles: &[PendingHandle],
+    owner: usize,
+    info: &[EndInfo],
+    pending: &mut [usize],
+    edges: &mut Vec<(usize, usize)>,
+) {
+    for handle in handles {
+        if let Object::Duplex(end) = &handle.object {
+            let pointer = Arc::as_ptr(end) as usize;
+            if let Some(target) = endpoint_index(info, pointer) {
+                if let Some(slot) = pending.get_mut(target) {
+                    *slot = slot.saturating_add(1);
+                }
+                edges.push((owner, target));
+            }
+        }
+    }
+}
+
+fn scan_controls(
+    controls: &VecDeque<ControlMessage>,
+    owner: usize,
+    info: &[EndInfo],
+    pending: &mut [usize],
+    edges: &mut Vec<(usize, usize)>,
+) {
+    for control in controls {
+        scan_handles(&control.handles, owner, info, pending, edges);
+    }
+}
+
+fn scan_datagrams(
+    messages: &VecDeque<DatagramMessage>,
+    owner: usize,
+    info: &[EndInfo],
+    pending: &mut [usize],
+    edges: &mut Vec<(usize, usize)>,
+) {
+    for message in messages {
+        scan_handles(&message.handles, owner, info, pending, edges);
+    }
+}
+
+/// Reclaim unreachable duplex cycles.
+///
+/// Roots are endpoints with a strong reference that is not owned by a queued handle. The mark
+/// follows every receive queue that a reachable endpoint can read; a queue whose receiver is
+/// unmarked is taken out and dropped after the state lock is released. Reachable cyclic graphs are
+/// therefore never touched. Returns the number of receive queues cleared.
+///
+/// Cost: O(live pairs + queued handles), plus one allocation per snapshot. The registry lock is
+/// never held with a state lock and no wake happens under a state lock.
+pub fn collect_cycles() -> usize {
+    let (pairs, endpoints) = {
+        let mut registry = REGISTRY.lock();
+        registry.prune();
+        let mut pairs = Vec::new();
+        let mut endpoints = Vec::new();
+        if pairs.try_reserve(registry.pairs.len()).is_err()
+            || endpoints.try_reserve(registry.ends.len()).is_err()
+        {
+            return 0;
+        }
+        for weak in &registry.pairs {
+            if let Some(pair) = weak.upgrade() {
+                pairs.push(pair);
+            }
+        }
+        for weak in &registry.ends {
+            if let Some(endpoint) = weak.upgrade() {
+                endpoints.push(endpoint);
+            }
+        }
+        (pairs, endpoints)
+    };
+    if pairs.is_empty() {
+        return 0;
+    }
+
+    let mut info = Vec::new();
+    if info.try_reserve(endpoints.len()).is_err() {
+        return 0;
+    }
+    for endpoint in endpoints {
+        info.push(EndInfo { endpoint });
+    }
+    let mut pending = Vec::new();
+    if pending.try_reserve(info.len()).is_err() {
+        return 0;
+    }
+    pending.resize(info.len(), 0);
+
+    let mut edges = Vec::new();
+    if edges.try_reserve(info.len().saturating_mul(8)).is_err() {
+        return 0;
+    }
+
+    for pair in &pairs {
+        let mut left = None;
+        let mut right = None;
+        for (index, entry) in info.iter().enumerate() {
+            if Arc::ptr_eq(&entry.endpoint.pair, pair) {
+                match entry.endpoint.side {
+                    Side::Left => left = Some(index),
+                    Side::Right => right = Some(index),
+                }
+            }
+        }
+        let state = pair.state.lock();
+        if let Some(owner) = right {
+            match &state.left_to_right {
+                Buffer::Stream(buffer) => {
+                    scan_controls(&buffer.controls, owner, &info, &mut pending, &mut edges)
+                }
+                Buffer::Datagram(buffer) => {
+                    scan_datagrams(&buffer.queue, owner, &info, &mut pending, &mut edges)
+                }
+            }
+        }
+        if let Some(owner) = left {
+            match &state.right_to_left {
+                Buffer::Stream(buffer) => {
+                    scan_controls(&buffer.controls, owner, &info, &mut pending, &mut edges)
+                }
+                Buffer::Datagram(buffer) => {
+                    scan_datagrams(&buffer.queue, owner, &info, &mut pending, &mut edges)
+                }
+            }
+        }
+    }
+
+    let mut marked = Vec::new();
+    if marked.try_reserve(info.len()).is_err() {
+        return 0;
+    }
+    marked.resize(info.len(), false);
+    for (index, entry) in info.iter().enumerate() {
+        let strong = Arc::strong_count(&entry.endpoint);
+        let queued = pending.get(index).copied().unwrap_or(0);
+        let external = strong.saturating_sub(queued.saturating_add(1));
+        if external > 0
+            && let Some(slot) = marked.get_mut(index)
+        {
+            *slot = true;
+        }
+    }
+    loop {
+        let mut changed = false;
+        for (owner, target) in &edges {
+            let owner_marked = marked.get(*owner).copied().unwrap_or(false);
+            let target_marked = marked.get(*target).copied().unwrap_or(false);
+            if owner_marked && !target_marked {
+                if let Some(slot) = marked.get_mut(*target) {
+                    *slot = true;
+                }
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
+    let mut disposals = Vec::new();
+    for pair in &pairs {
+        let mut left = None;
+        let mut right = None;
+        for (index, entry) in info.iter().enumerate() {
+            if Arc::ptr_eq(&entry.endpoint.pair, pair) {
+                match entry.endpoint.side {
+                    Side::Left => left = Some(index),
+                    Side::Right => right = Some(index),
+                }
+            }
+        }
+        let mut found = Vec::new();
+        {
+            let mut state = pair.state.lock();
+            if right.is_none_or(|index| !marked.get(index).copied().unwrap_or(false)) {
+                match &mut state.left_to_right {
+                    Buffer::Stream(buffer) => {
+                        found.push(Disposal::Controls(core::mem::take(&mut buffer.controls)));
+                    }
+                    Buffer::Datagram(buffer) => {
+                        found.push(Disposal::Datagrams(core::mem::take(&mut buffer.queue)));
+                        buffer.bytes = 0;
+                    }
+                }
+            }
+            if left.is_none_or(|index| !marked.get(index).copied().unwrap_or(false)) {
+                match &mut state.right_to_left {
+                    Buffer::Stream(buffer) => {
+                        found.push(Disposal::Controls(core::mem::take(&mut buffer.controls)));
+                    }
+                    Buffer::Datagram(buffer) => {
+                        found.push(Disposal::Datagrams(core::mem::take(&mut buffer.queue)));
+                        buffer.bytes = 0;
+                    }
+                }
+            }
+        }
+        disposals.extend(found);
+    }
+
+    let cleared = disposals.len();
+    drop(disposals);
+    cleared
+}
+
 /// One side of a duplex pair.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
@@ -167,8 +426,12 @@ impl PendingHandle {
         let this = core::mem::ManuallyDrop::new(self);
         // SAFETY: `this` is consumed here, every field is read exactly once and the original
         // `PendingHandle` is never dropped, so no field is dropped twice.
-        let object = unsafe { core::ptr::read(&this.object) };
-        let lineage = unsafe { core::ptr::read(&this.lineage) };
+        let (object, lineage) = unsafe {
+            (
+                core::ptr::read(&this.object),
+                core::ptr::read(&this.lineage),
+            )
+        };
         LIVE_PENDING.fetch_sub(1, Ordering::AcqRel);
         (object, this.rights, lineage)
     }
@@ -609,12 +872,17 @@ pub fn create(flags: u32) -> Result<(Arc<DuplexEnd>, Arc<DuplexEnd>), Errno> {
         datagram,
     });
     let right = Arc::new(DuplexEnd {
-        pair,
+        pair: Arc::clone(&pair),
         side: Side::Right,
         nonblock,
         cloexec,
         datagram,
     });
+    {
+        let mut registry = REGISTRY.lock();
+        registry.prune();
+        registry.register(&pair, &left, &right);
+    }
     Ok((left, right))
 }
 
