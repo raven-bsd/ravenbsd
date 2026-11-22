@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K524: with no hardware seed the pool stays unseeded, AT_RANDOM is absent, and GETRANDOM is
+# EAGAIN; no jitter-derived bytes are served.
+
+name = "random-getrandom"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/random/build.sh"]
+initfs = "build/fixtures/random/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 entropy=none"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^entropy: source=none$'
+unordered = true
+
+[[expect]]
+regex = '^random: at-random absent$'
+
+[[expect]]
+regex = '^random: getrandom eagain$'
+
+[[expect]]
+regex = '^random: unseeded no-write=1$'
+
+[[expect]]
+regex = '^random: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|random: fail'

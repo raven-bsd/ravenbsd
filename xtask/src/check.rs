@@ -282,6 +282,12 @@ fn build_steps(workspace: &Workspace, fast: bool, changed: bool) -> Result<Vec<S
     } else {
         steps.extend(target_steps);
     }
+    steps.push(command_step(
+        "frozen writes",
+        &workspace.root,
+        "sh",
+        vec!["scripts/check-frozen-writes.sh".to_string()],
+    ));
     steps.push(Step {
         name: "docs".to_string(),
         kind: StepKind::Docs,

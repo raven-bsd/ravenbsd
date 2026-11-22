@@ -1089,7 +1089,7 @@ fn submit_checked(request: &Arc<PendingRequest>, bounded: bool) -> Result<(), Er
         .server
         .scheme_waiters
         .wake(request.server.id, 0, usize::MAX);
-    crate::event::notify_all();
+    crate::event::notify_source(Arc::as_ptr(&request.server) as usize as u64);
     Ok(())
 }
 

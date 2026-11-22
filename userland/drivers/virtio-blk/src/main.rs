@@ -239,7 +239,8 @@ mod program {
         // message per completion, this queue acknowledges by draining the used ring while it
         // polls, and the handle is closed only when the MSI-X table itself is released. No
         // acknowledgement may follow the close; the MSI-X vector therefore stays owned for the
-        // driver's lifetime and the kernel EOIs any in-flight completion.
+        // driver's lifetime and the kernel EOIs any in-flight completion. Close only the legacy
+        // line.
         if msix.is_none() {
             let _ = raven_rt::handle_close(IRQ_HANDLE);
         }

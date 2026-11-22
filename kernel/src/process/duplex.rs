@@ -17,7 +17,7 @@
 //! state lock held but never sleep.
 
 use alloc::collections::VecDeque;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -110,6 +110,277 @@ pub fn stats() -> Stats {
     }
 }
 
+/// Weak live-object registry used only by the explicit cycle collector.
+///
+/// The collector is triggered by `DUPLEX_COLLECT`, never by read/write/send/recv. Pair creation
+/// prunes the dead entries and registers the new pair/endpoints. The registry lock is the outermost
+/// lock in the collector; it is released before any pair state lock is taken.
+struct Registry {
+    pairs: Vec<Weak<Duplex>>,
+    ends: Vec<Weak<DuplexEnd>>,
+}
+
+impl Registry {
+    fn prune(&mut self) {
+        self.pairs.retain(|pair| pair.strong_count() > 0);
+        self.ends.retain(|end| end.strong_count() > 0);
+    }
+
+    fn register(&mut self, pair: &Arc<Duplex>, left: &Arc<DuplexEnd>, right: &Arc<DuplexEnd>) {
+        self.pairs.push(Arc::downgrade(pair));
+        self.ends.push(Arc::downgrade(left));
+        self.ends.push(Arc::downgrade(right));
+    }
+}
+
+/// Live pair/endpoint registry for the collector.
+static REGISTRY: Mutex<Registry> = Mutex::new(Registry {
+    pairs: Vec::new(),
+    ends: Vec::new(),
+});
+
+/// One endpoint snapshot used by the collector.
+struct EndInfo {
+    endpoint: Arc<DuplexEnd>,
+}
+
+/// A queue removed from an unreachable receive side, dropped after the state lock is released.
+///
+/// The payload is never read: the drop itself releases the pending handles and their endpoint
+/// references outside the state lock.
+#[allow(dead_code)]
+enum Disposal {
+    Controls(VecDeque<ControlMessage>),
+    Datagrams(VecDeque<DatagramMessage>),
+}
+
+fn endpoint_index(info: &[EndInfo], pointer: usize) -> Option<usize> {
+    info.iter()
+        .position(|entry| Arc::as_ptr(&entry.endpoint) as usize == pointer)
+}
+
+fn scan_handles(
+    handles: &[PendingHandle],
+    owner: usize,
+    info: &[EndInfo],
+    pending: &mut [usize],
+    edges: &mut Vec<(usize, usize)>,
+) {
+    for handle in handles {
+        if let Object::Duplex(end) = &handle.object {
+            let pointer = Arc::as_ptr(end) as usize;
+            if let Some(target) = endpoint_index(info, pointer) {
+                if let Some(slot) = pending.get_mut(target) {
+                    *slot = slot.saturating_add(1);
+                }
+                edges.push((owner, target));
+            }
+        }
+    }
+}
+
+fn scan_records(
+    records: &ControlRecords,
+    owner: usize,
+    info: &[EndInfo],
+    pending: &mut [usize],
+    edges: &mut Vec<(usize, usize)>,
+) {
+    for record in records {
+        scan_handles(record, owner, info, pending, edges);
+    }
+}
+
+fn scan_controls(
+    controls: &VecDeque<ControlMessage>,
+    owner: usize,
+    info: &[EndInfo],
+    pending: &mut [usize],
+    edges: &mut Vec<(usize, usize)>,
+) {
+    for control in controls {
+        scan_records(&control.records, owner, info, pending, edges);
+    }
+}
+
+fn scan_datagrams(
+    messages: &VecDeque<DatagramMessage>,
+    owner: usize,
+    info: &[EndInfo],
+    pending: &mut [usize],
+    edges: &mut Vec<(usize, usize)>,
+) {
+    for message in messages {
+        scan_records(&message.records, owner, info, pending, edges);
+    }
+}
+
+/// Reclaim unreachable duplex cycles.
+///
+/// Roots are endpoints with a strong reference that is not owned by a queued handle. The mark
+/// follows every receive queue that a reachable endpoint can read; a queue whose receiver is
+/// unmarked is taken out and dropped after the state lock is released. Reachable cyclic graphs are
+/// therefore never touched. Returns the number of receive queues cleared.
+///
+/// Cost: O(live pairs + queued handles), plus one allocation per snapshot. The registry lock is
+/// never held with a state lock and no wake happens under a state lock.
+pub fn collect_cycles() -> usize {
+    let (pairs, endpoints) = {
+        let mut registry = REGISTRY.lock();
+        registry.prune();
+        let mut pairs = Vec::new();
+        let mut endpoints = Vec::new();
+        if pairs.try_reserve(registry.pairs.len()).is_err()
+            || endpoints.try_reserve(registry.ends.len()).is_err()
+        {
+            return 0;
+        }
+        for weak in &registry.pairs {
+            if let Some(pair) = weak.upgrade() {
+                pairs.push(pair);
+            }
+        }
+        for weak in &registry.ends {
+            if let Some(endpoint) = weak.upgrade() {
+                endpoints.push(endpoint);
+            }
+        }
+        (pairs, endpoints)
+    };
+    if pairs.is_empty() {
+        return 0;
+    }
+
+    let mut info = Vec::new();
+    if info.try_reserve(endpoints.len()).is_err() {
+        return 0;
+    }
+    for endpoint in endpoints {
+        info.push(EndInfo { endpoint });
+    }
+    let mut pending = Vec::new();
+    if pending.try_reserve(info.len()).is_err() {
+        return 0;
+    }
+    pending.resize(info.len(), 0);
+
+    let mut edges = Vec::new();
+    if edges.try_reserve(info.len().saturating_mul(8)).is_err() {
+        return 0;
+    }
+
+    for pair in &pairs {
+        let mut left = None;
+        let mut right = None;
+        for (index, entry) in info.iter().enumerate() {
+            if Arc::ptr_eq(&entry.endpoint.pair, pair) {
+                match entry.endpoint.side {
+                    Side::Left => left = Some(index),
+                    Side::Right => right = Some(index),
+                }
+            }
+        }
+        let state = pair.state.lock();
+        if let Some(owner) = right {
+            match &state.left_to_right {
+                Buffer::Stream(buffer) => {
+                    scan_controls(&buffer.controls, owner, &info, &mut pending, &mut edges)
+                }
+                Buffer::Datagram(buffer) => {
+                    scan_datagrams(&buffer.queue, owner, &info, &mut pending, &mut edges)
+                }
+            }
+        }
+        if let Some(owner) = left {
+            match &state.right_to_left {
+                Buffer::Stream(buffer) => {
+                    scan_controls(&buffer.controls, owner, &info, &mut pending, &mut edges)
+                }
+                Buffer::Datagram(buffer) => {
+                    scan_datagrams(&buffer.queue, owner, &info, &mut pending, &mut edges)
+                }
+            }
+        }
+    }
+
+    let mut marked = Vec::new();
+    if marked.try_reserve(info.len()).is_err() {
+        return 0;
+    }
+    marked.resize(info.len(), false);
+    for (index, entry) in info.iter().enumerate() {
+        let strong = Arc::strong_count(&entry.endpoint);
+        let queued = pending.get(index).copied().unwrap_or(0);
+        let external = strong.saturating_sub(queued.saturating_add(1));
+        if external > 0
+            && let Some(slot) = marked.get_mut(index)
+        {
+            *slot = true;
+        }
+    }
+    loop {
+        let mut changed = false;
+        for (owner, target) in &edges {
+            let owner_marked = marked.get(*owner).copied().unwrap_or(false);
+            let target_marked = marked.get(*target).copied().unwrap_or(false);
+            if owner_marked && !target_marked {
+                if let Some(slot) = marked.get_mut(*target) {
+                    *slot = true;
+                }
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
+    let mut disposals = Vec::new();
+    for pair in &pairs {
+        let mut left = None;
+        let mut right = None;
+        for (index, entry) in info.iter().enumerate() {
+            if Arc::ptr_eq(&entry.endpoint.pair, pair) {
+                match entry.endpoint.side {
+                    Side::Left => left = Some(index),
+                    Side::Right => right = Some(index),
+                }
+            }
+        }
+        let mut found = Vec::new();
+        {
+            let mut state = pair.state.lock();
+            if right.is_none_or(|index| !marked.get(index).copied().unwrap_or(false)) {
+                match &mut state.left_to_right {
+                    Buffer::Stream(buffer) => {
+                        found.push(Disposal::Controls(core::mem::take(&mut buffer.controls)));
+                    }
+                    Buffer::Datagram(buffer) => {
+                        found.push(Disposal::Datagrams(core::mem::take(&mut buffer.queue)));
+                        buffer.bytes = 0;
+                    }
+                }
+            }
+            if left.is_none_or(|index| !marked.get(index).copied().unwrap_or(false)) {
+                match &mut state.right_to_left {
+                    Buffer::Stream(buffer) => {
+                        found.push(Disposal::Controls(core::mem::take(&mut buffer.controls)));
+                    }
+                    Buffer::Datagram(buffer) => {
+                        found.push(Disposal::Datagrams(core::mem::take(&mut buffer.queue)));
+                        buffer.bytes = 0;
+                    }
+                }
+            }
+        }
+        disposals.extend(found);
+    }
+
+    let cleared = disposals.len();
+    drop(disposals);
+    cleared
+}
+
 /// One side of a duplex pair.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
@@ -167,8 +438,12 @@ impl PendingHandle {
         let this = core::mem::ManuallyDrop::new(self);
         // SAFETY: `this` is consumed here, every field is read exactly once and the original
         // `PendingHandle` is never dropped, so no field is dropped twice.
-        let object = unsafe { core::ptr::read(&this.object) };
-        let lineage = unsafe { core::ptr::read(&this.lineage) };
+        let (object, lineage) = unsafe {
+            (
+                core::ptr::read(&this.object),
+                core::ptr::read(&this.lineage),
+            )
+        };
         LIVE_PENDING.fetch_sub(1, Ordering::AcqRel);
         (object, this.rights, lineage)
     }
@@ -180,20 +455,30 @@ impl Drop for PendingHandle {
     }
 }
 
+/// All control records carried by one send, keeping the sender's cmsg boundaries (K521).
+pub(crate) type ControlRecords = Vec<Vec<PendingHandle>>;
+
+/// Total handles carried across every record.
+fn record_handles(records: &ControlRecords) -> usize {
+    records
+        .iter()
+        .fold(0usize, |total, record| total.saturating_add(record.len()))
+}
+
 struct ControlMessage {
     /// Stream byte offset this ancillary record is attached to.
     offset: u64,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
 }
 
 impl ControlMessage {
-    fn new(offset: u64, handles: Vec<PendingHandle>) -> Self {
+    fn new(offset: u64, records: ControlRecords) -> Self {
         LIVE_CONTROLS.fetch_add(1, Ordering::AcqRel);
-        Self { offset, handles }
+        Self { offset, records }
     }
 
-    fn into_handles(mut self) -> Vec<PendingHandle> {
-        core::mem::take(&mut self.handles)
+    fn into_records(mut self) -> ControlRecords {
+        core::mem::take(&mut self.records)
     }
 }
 
@@ -249,7 +534,7 @@ impl StreamBuffer {
 
 struct DatagramMessage {
     data: Vec<u8>,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
 }
 
 /// One handle to a duplex endpoint.
@@ -262,6 +547,11 @@ pub struct DuplexEnd {
 }
 
 impl DuplexEnd {
+    /// Watcher key shared by both ends of this duplex pair.
+    pub(crate) fn event_key(&self) -> u64 {
+        crate::event::duplex_key(self.pair.id)
+    }
+
     /// True when the endpoint was created with `O_NONBLOCK`.
     #[allow(dead_code)] // F_GETFL reports it when fcntl lands
     pub const fn is_nonblock(&self) -> bool {
@@ -306,7 +596,7 @@ impl DuplexEnd {
             state.right_write_shutdown = true;
         }
         self.pair.wake_all();
-        event::notify_all();
+        event::notify_source(self.event_key());
     }
 
     /// Current EVQ readiness bits for this endpoint.
@@ -354,7 +644,7 @@ impl Drop for DuplexEnd {
             self.pair.left_readers.wake_all();
             self.pair.left_writers.wake_all();
         }
-        event::notify_all();
+        event::notify_source(self.event_key());
     }
 }
 
@@ -609,12 +899,17 @@ pub fn create(flags: u32) -> Result<(Arc<DuplexEnd>, Arc<DuplexEnd>), Errno> {
         datagram,
     });
     let right = Arc::new(DuplexEnd {
-        pair,
+        pair: Arc::clone(&pair),
         side: Side::Right,
         nonblock,
         cloexec,
         datagram,
     });
+    {
+        let mut registry = REGISTRY.lock();
+        registry.prune();
+        registry.register(&pair, &left, &right);
+    }
     Ok((left, right))
 }
 
@@ -661,7 +956,7 @@ pub fn read(end: &Arc<DuplexEnd>, destination: UserSlice) -> Result<usize, Errno
         state.incoming_mut(end.side).discard_controls_at_read();
         drop(state);
         end.pair.wake_writers(peer);
-        event::notify_all();
+        event::notify_source(end.event_key());
         return Ok(copied);
     }
 }
@@ -711,16 +1006,18 @@ fn read_datagram(
     Ok(copied)
 }
 
-/// Receive one chunk or datagram plus any attached `SCM_RIGHTS` handles.
+/// Receive one chunk or datagram plus the `SCM_RIGHTS` records attached to it.
 ///
-/// The control capacity is checked before consuming data or handles. A too-small buffer
-/// returns `EMSGSIZE` and leaves the message queued. The returned handles are installed by the
-/// caller after this function returns.
+/// The control capacity is checked before consuming data or handles; a too-small buffer returns
+/// `EMSGSIZE` and leaves the message queued. The caller either passes a capacity large enough for
+/// every record and truncates whole records itself (the syscall layer, K521), or gets the old
+/// all-or-nothing rejection. Records keep the sender's cmsg boundaries. The returned handles are
+/// installed by the caller after this function returns.
 pub fn recv(
     end: &Arc<DuplexEnd>,
     destination: UserSlice,
     control_capacity: usize,
-) -> Result<(usize, Vec<PendingHandle>), Errno> {
+) -> Result<(usize, ControlRecords), Errno> {
     let limit = usize::try_from(destination.length()).map_err(|_| Errno::EINVAL)?;
     loop {
         let mut state = end.pair.state.lock();
@@ -751,19 +1048,19 @@ pub fn recv(
             })?;
             continue;
         }
-        let (copied, handles) = match state.incoming_mut(end.side) {
+        let (copied, records) = match state.incoming_mut(end.side) {
             Buffer::Stream(buffer) => {
                 if buffer.control_ready() {
                     let needed = buffer
                         .controls
                         .front()
-                        .map_or(0, |control| control_size(control.handles.len()));
+                        .map_or(0, |control| control_size(record_handles(&control.records)));
                     if control_capacity < needed {
                         return Err(Errno::EMSGSIZE);
                     }
                     let copied = read_stream(buffer, destination, limit)?;
                     let control = buffer.controls.pop_front().ok_or(Errno::EINVAL)?;
-                    (copied, control.into_handles())
+                    (copied, control.into_records())
                 } else {
                     (read_stream(buffer, destination, limit)?, Vec::new())
                 }
@@ -772,7 +1069,7 @@ pub fn recv(
                 let Some(message) = buffer.queue.front() else {
                     return Err(Errno::EINVAL);
                 };
-                let needed = control_size(message.handles.len());
+                let needed = control_size(record_handles(&message.records));
                 if control_capacity < needed {
                     return Err(Errno::EMSGSIZE);
                 }
@@ -785,13 +1082,13 @@ pub fn recv(
                     return Err(Errno::EINVAL);
                 };
                 buffer.bytes = buffer.bytes.saturating_sub(length);
-                (copied, message.handles)
+                (copied, message.records)
             }
         };
         drop(state);
         end.pair.wake_writers(peer);
-        event::notify_all();
-        return Ok((copied, handles));
+        event::notify_source(end.event_key());
+        return Ok((copied, records));
     }
 }
 
@@ -812,39 +1109,40 @@ pub fn write(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno> {
     send(end, source, Vec::new(), 0)
 }
 
-/// Write `source` with an optional set of `SCM_RIGHTS` handles.
+/// Write `source` with optional `SCM_RIGHTS` records.
 ///
 /// `flags` currently accepts [`DUPLEX_MSG_NOSIGNAL`]; unknown flags are rejected by the syscall
-/// layer. Stream mode attaches the handles to the first byte of this send; a zero-length send is
-/// a control-only record. Datagram mode stores the handles with the one message.
+/// layer. Stream mode attaches the records to the first byte of this send; a zero-length send is
+/// a control-only record. Datagram mode stores the records with the one message. The sender's
+/// cmsg boundaries are preserved through the queue and on receive (K521).
 pub fn send(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
     flags: u32,
 ) -> Result<usize, Errno> {
-    if source.is_empty() && handles.is_empty() {
+    if source.is_empty() && records.is_empty() {
         return Ok(0);
     }
     let signal = flags & DUPLEX_MSG_NOSIGNAL == 0;
     if end.datagram {
-        write_datagram(end, source, handles, signal)
+        write_datagram(end, source, records, signal)
     } else {
-        write_stream(end, source, handles, signal)
+        write_stream(end, source, records, signal)
     }
 }
 
 fn write_stream(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
     signal: bool,
 ) -> Result<usize, Errno> {
     let total = usize::try_from(source.length()).map_err(|_| Errno::EINVAL)?;
-    let mut pending = if handles.is_empty() {
+    let mut pending = if records.is_empty() {
         None
     } else {
-        Some(handles)
+        Some(records)
     };
     let mut done = 0usize;
     loop {
@@ -902,14 +1200,14 @@ fn write_stream(
         } else {
             write_stream_ring(buffer, source, done, chunk)?
         };
-        if let Some(handles) = pending.take() {
+        if let Some(records) = pending.take() {
             buffer
                 .controls
-                .push_back(ControlMessage::new(offset, handles));
+                .push_back(ControlMessage::new(offset, records));
         }
         drop(state);
         end.pair.wake_readers(peer);
-        event::notify_all();
+        event::notify_source(end.event_key());
         done = done.saturating_add(copied);
         if done >= total {
             return Ok(done);
@@ -951,18 +1249,18 @@ fn write_stream_ring(
 fn write_datagram(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
     signal: bool,
 ) -> Result<usize, Errno> {
     let total = usize::try_from(source.length()).map_err(|_| Errno::EINVAL)?;
-    if total > DUPLEX_DATAGRAM_MAX || handles.len() > DUPLEX_MAX_HANDLES {
+    if total > DUPLEX_DATAGRAM_MAX || record_handles(&records) > DUPLEX_MAX_HANDLES {
         return Err(Errno::EMSGSIZE);
     }
     let mut data = Vec::new();
     data.try_reserve_exact(total).map_err(|_| Errno::ENOMEM)?;
     data.resize(total, 0);
     copy_from_user(&mut data, source)?;
-    let mut pending = Some(DatagramMessage { data, handles });
+    let mut pending = Some(DatagramMessage { data, records });
     loop {
         let mut state = end.pair.state.lock();
         let peer = end.side.peer();
@@ -997,7 +1295,7 @@ fn write_datagram(
         }
         drop(state);
         end.pair.wake_readers(peer);
-        event::notify_all();
+        event::notify_source(end.event_key());
         return Ok(total);
     }
 }
@@ -1031,7 +1329,7 @@ pub fn shutdown(end: &Arc<DuplexEnd>, how: u8) -> Result<(), Errno> {
         end.pair.wake_writers(end.side);
         end.pair.wake_readers(peer);
     }
-    event::notify_all();
+    event::notify_source(end.event_key());
     Ok(())
 }
 
