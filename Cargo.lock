@@ -3787,6 +3787,7 @@ dependencies = [
  "hmac",
  "md-5",
  "raven-abi",
+ "raven-mptcp",
  "raven-prng",
  "raven-tcpip-sim",
  "raven-tcpip-wire",
