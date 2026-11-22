@@ -568,11 +568,14 @@ fn contract_cow() -> Result<(), Errno> {
             .add(PAGE - 1)
             .read_volatile()
     };
+    let cow = core::ptr::addr_of!(CHILD_COW) as usize;
     if code == 0 && first == 0x11 && last == 0x11 {
-        println!("CONTRACT K3 PASS parent=0x11 child=0x22 status={code}");
+        println!("CONTRACT K3 PASS parent=0x11 child=0x22 status={code} cow=0x{cow:x}");
         Ok(())
     } else {
-        println!("CONTRACT K3 FAIL status={code} parent0={first:#x} parentN={last:#x} want=0x11");
+        println!(
+            "CONTRACT K3 FAIL status={code} parent0={first:#x} parentN={last:#x} want=0x11 cow=0x{cow:x}"
+        );
         Err(Errno::EIO)
     }
 }
