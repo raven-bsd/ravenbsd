@@ -8,7 +8,8 @@ pub mod tty;
 
 pub use net::{NetIoctl, net_ioctl};
 pub use tty::{
-    cfgetispeed, cfgetospeed, cfmakeraw, cfsetispeed, cfsetospeed, tcflush, tcgetattr, tcsetattr,
+    Winsize, cfgetispeed, cfgetospeed, cfmakeraw, cfsetispeed, cfsetospeed, tcflush, tcgetattr,
+    tcgetpgrp, tcgetwinsize, tcsetattr, tcsetpgrp, tcsetwinsize,
 };
 
 use raven_abi::errno::Errno;
@@ -46,7 +47,9 @@ pub fn ioctl<B: SysBackend, L: Lock>(
             platform.set_cloexec(fd, false)?;
             Ok(0)
         }
-        IoctlAction::TiocGWinsz | IoctlAction::FionRead => Err(Errno::ENOTTY),
+        IoctlAction::TiocGWinsz | IoctlAction::TiocSWinsz | IoctlAction::FionRead => {
+            Err(Errno::ENOTTY)
+        }
         IoctlAction::Unknown => Err(Errno::ENOTTY),
         // Pointer-bearing requests need `&mut Termios`; the shell calls `tcgetattr`.
         IoctlAction::TcGets | IoctlAction::TcSets | IoctlAction::TcSetSw | IoctlAction::TcSetSf => {

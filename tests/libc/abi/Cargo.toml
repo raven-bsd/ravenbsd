@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-abi-coverage"
+version = "0.1.0"
+description = "Normative-value coverage for the libc ABI constant groups."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+raven-libc-abi = { path = "../../../libc/ravenlibc/crates/raven-libc-abi" }

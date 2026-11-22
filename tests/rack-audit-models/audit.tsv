@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K358 audit manifest: group|donor|model_crate|source|token|test|mutation|k315_row
+loss|rack_calc_thresh_rack|tests/rack-loss-model|src/lib.rs|pub fn reo_wnd|reo_wnd_is_base_plus_reordering_and_dsack_bounded|DSACK term removed|yes
+loss|rack_mark_lost|tests/rack-loss-model|src/lib.rs|pub fn run|rack_marks_only_segments_older_than_a_later_sacked_one|loss bound removed|yes
+loss|rack_log_sack_passed|tests/rack-loss-model|src/lib.rs|sacked|retransmit_selects_lowest_lost_once_and_pipe_counts_it|RACK loss push removed|yes
+tlp|rack_calc_thresh_tlp|tests/rack-tlp-model|src/model.rs|pub fn pto|tlp_pto_and_threshold_follow_rfc8985_and_the_donor_cap|2 ms PTO granularity removed|yes
+tlp|rack_timeout_tlp|tests/rack-tlp-model|src/model.rs|pub fn poll|tlp_arms_fires_twice_and_disarms_on_ack|two-probe cap ignored|yes
+tlp|rack_note_dsack|tests/rack-tlp-model|src/model.rs|pub fn on_dsack|dsack_grows_reo_wnd_once_per_round_and_ignores_tlp_dsacks|grow reo_wnd on every DSACK|yes
+tlp|rack_peer_reneges|tests/rack-tlp-model|src/model.rs|pub fn on_renege|reneging_clears_sacked_ranges_and_allows_loss_again|keep reneged ranges SACKed|yes
+recovery|rack_exit_recovery|tests/rack-recovery-model|src/lib.rs|pub fn recompute|recovery_entry_exit_and_pipe_are_exact|pipe + retransmitted removed|yes
+recovery|rack_cong_signal|tests/rack-recovery-model|src/lib.rs|pub fn recompute|recovery_entry_exit_and_pipe_are_exact|recovery entry removed|yes
+recovery|rack_process_to_cumack|tests/rack-recovery-model|src/lib.rs|pub fn on_ack|recovery_entry_exit_and_pipe_are_exact|cumack trim removed|yes
+bbr|bbr_get_pacing_length|tests/rack-bbr-model|src/model.rs|pub fn pacing_len|pacing_and_target_cwnd_vectors_match_integer_bbr_math|first ProbeBW gain 256|no
+bbr|bbr_get_target_cwnd|tests/rack-bbr-model|src/model.rs|pub fn target_cwnd|pacing_and_target_cwnd_vectors_match_integer_bbr_math|cwnd quanta omitted|no
+bbr|bbr_enter_probe_rtt|tests/rack-bbr-model|src/model.rs|probe_rtt|probe_rtt_enters_after_ten_seconds_caps_cwnd_and_restores|Probe-RTT half interval|no
+bbr|rack_make_timely_judgement|tests/rack-bbr-model|src/model.rs|pub fn timely|timely_thresholds_and_decrease_gain_match_the_donor|Timely high threshold 2x|no
+vtable|tfb_tcp_fb_init|tests/rack-vtable-model|src/model.rs|pub fn init|init_fini_lifecycle_and_registration|switch_failed no-op|no
+vtable|tfb_tcp_output|tests/rack-vtable-model|src/model.rs|pub fn output|output_retransmits_then_sends_at_snd_max_and_arms_pacing|switch_failed no-op|no
+vtable|tfb_tcp_handoff_ok|tests/rack-vtable-model|src/model.rs|pub fn handoff_ok|handoff_matches_the_donor_state_rules|switch_failed no-op|no
+vtable|tfb_compute_pipe|tests/rack-vtable-model|src/model.rs|pub fn compute_pipe|query_pipe_stack_info_and_pru_options|switch_failed no-op|no
+vtable|tfb_switch_failed|tests/rack-vtable-model|src/model.rs|pub fn switch_failed|switch_failed_and_early_wake_follow_the_timer_flags|switch_failed no-op|no

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "duplicate-ack"
+port = 24003
+baseline = "timeout 180 sudo -n python3 tests/net-conformance/baselines/linux/run.py --scenario duplicate-ack"
+donor = [
+  "NetBSD sys/netinet/tcp_input.c:tcp_input (duplicate ACK threshold and retransmit)",
+  "NetBSD sys/netinet/tcp_output.c:tcp_output/tcp_setpersist (retransmit of the hole)",
+]
+rfcs = ["RFC 5681 section 3.2 (fast retransmit on three duplicate ACKs)"]
+
+[[expect]]
+step = "server writes 4 KiB in 1 KiB chunks with TCP_NODELAY and 40 ms spacing"
+packet = "data"
+assert = "first data segment carries 1024 bytes at the SYN-ACK seq+1"
+
+[[expect]]
+step = "peer ACKs only the first segment, then sends three duplicate ACKs for its end"
+packet = "ACK"
+assert = "server retransmits a data segment with seq == first_end within 2 s"
+
+[[expect]]
+step = "retransmitted segment"
+packet = "data"
+assert = "payload length 1024; seq equals the first unacknowledged byte"

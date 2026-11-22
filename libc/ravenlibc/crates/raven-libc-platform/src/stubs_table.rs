@@ -60,8 +60,6 @@ pub const STUBS: &[Stub] = &[
     Stub { name: "flock", gap: "PG-21", errno: 38 },
     Stub { name: "lockf", gap: "PG-21", errno: 38 },
     Stub { name: "lockf64", gap: "PG-21", errno: 38 },
-    Stub { name: "pipe", gap: "PG-35", errno: 38 },
-    Stub { name: "pipe2", gap: "PG-35", errno: 38 },
     Stub { name: "socketpair", gap: "PG-30", errno: 38 },
     Stub { name: "pselect", gap: "PG-26", errno: 38 },
     Stub { name: "ppoll", gap: "PG-26", errno: 38 },

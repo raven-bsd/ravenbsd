@@ -17,7 +17,7 @@ regex = '^vfsd: mounted / on initfs:$'
 regex = '^vfsd: mounted /tmp on ramfs:$'
 
 [[expect]]
-regex = '^vfsd: probe ok$'
+regex = '^(raven# )?vfsd: probe ok$'
 
 [[expect]]
 regex = '^svcd: settled$'

@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-tcpdump"
+version = "0.1.0"
+description = "RavenBSD tcpdump: offline pcap decode, filter and dump tool."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_tcpdump"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-tcpdump"
+path = "src/main.rs"
+
+[dependencies]
+raven-tcpip-wire = { path = "../../../crates/raven-tcpip-wire" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-rt = { path = "../../rt" }
+raven-tool-core = { path = "../../../crates/raven-tool-core" }
+
+[lints]
+workspace = true

@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "window-scale"
+harness = "handshake"
+donor = [
+  "FreeBSD sys/netinet/tcp_output.c:tcp_output (SYN/SYN-ACK MSS, WS and SACK emission)",
+  "FreeBSD sys/netinet/tcp_input.c:tcp_dooptions (option negotiation)",
+]
+rfcs = ["RFC 7323 section 2.2 (window scale option)", "RFC 7323 section 2.3 (scale factor)"]
+
+[[expect]]
+step = "peer SYN offers MSS 1460, SACK permitted and WS shift 7"
+packet = "SYN"
+assert = "client options mss=1460, sack=true, window_scale=7"
+
+[[expect]]
+step = "server answers the scaled peer"
+packet = "SYN-ACK"
+assert = "server mss=1460, sack=true, window_scale in 0..=14; ack=client_isn+1"
+
+[[expect]]
+step = "peer does not offer WS"
+packet = "SYN"
+assert = "server SYN-ACK omits the WS option and keeps an unscaled window <= 65535"

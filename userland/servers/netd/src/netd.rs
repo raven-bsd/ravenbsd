@@ -6,8 +6,10 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use alloc::string::String;
 use alloc::vec::Vec;
 
+use crate::filter::{FilterDevice, FilterLog, FilterPolicy, new_log};
 use crate::network::StaticConfig;
 use raven_abi::errno::Errno;
 use raven_netcore::{
@@ -459,7 +461,8 @@ struct NicControl {
 
 /// The host-testable `net:` server.
 pub struct Netd<D: Device> {
-    core: NetCore<D>,
+    core: NetCore<FilterDevice<D>>,
+    filter_log: FilterLog,
     nic: Option<Box<dyn SocketCore>>,
     nic_config: Option<NicConfig>,
     nic_control: Option<NicControl>,
@@ -481,10 +484,18 @@ impl<D: Device> Netd<D> {
     /// Create the server over `device` and configure IPv4 loopback.
     #[must_use]
     pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
-        let mut core = NetCore::new(device, mac, now_ms);
+        Self::with_filter(device, mac, now_ms, None)
+    }
+
+    /// Create the server with a packet-filter policy on the loopback interface.
+    #[must_use]
+    pub fn with_filter(device: D, mac: [u8; 6], now_ms: i64, policy: Option<FilterPolicy>) -> Self {
+        let filter_log = policy.as_ref().map_or_else(new_log, FilterPolicy::log);
+        let mut core = NetCore::new(FilterDevice::new(device, policy, "lo"), mac, now_ms);
         core.set_ipv4(Ipv4Addr::new(127, 0, 0, 1), 8, None);
         Self {
             core,
+            filter_log,
             nic: None,
             nic_config: None,
             nic_control: None,
@@ -507,7 +518,22 @@ impl<D: Device> Netd<D> {
 
     /// Attach the persistent NIC as a second socket core.
     pub fn attach_nic<N: Device + 'static>(&mut self, device: N, config: NicConfig, now_ms: i64) {
-        let mut core = NetCore::new(device, config.mac, now_ms);
+        self.attach_nic_with_filter(device, config, now_ms, None);
+    }
+
+    /// Attach the NIC with a packet-filter policy on `eth0`.
+    pub fn attach_nic_with_filter<N: Device + 'static>(
+        &mut self,
+        device: N,
+        config: NicConfig,
+        now_ms: i64,
+        policy: Option<FilterPolicy>,
+    ) {
+        let mut core = NetCore::new(
+            FilterDevice::new(device, policy, "eth0"),
+            config.mac,
+            now_ms,
+        );
         if config.is_configured() {
             core.set_ipv4(
                 Ipv4Addr::from_octets(config.addr),
@@ -726,6 +752,11 @@ impl<D: Device> Netd<D> {
         }
     }
 
+    /// Take the pending packet-filter log lines from every interface.
+    pub fn take_filter_log(&mut self) -> Vec<String> {
+        core::mem::take(&mut *self.filter_log.borrow_mut())
+    }
+
     /// Number of open socket files (control files are excluded).
     #[must_use]
     pub fn socket_files(&self) -> usize {
@@ -848,7 +879,12 @@ impl<D: Device> Netd<D> {
         }
         let id = id.ok_or(Errno::ENOTCONN)?;
         match transport {
-            Transport::Tcp => self.core_mut(interface).send(id, buffer),
+            // POSIX write on a connection whose peer has fully closed is EPIPE, not the
+            // core's internal not-connected state; the SSH session close path depends on it.
+            Transport::Tcp => match self.core_mut(interface).send(id, buffer) {
+                Err(Errno::ENOTCONN) => Err(Errno::EPIPE),
+                other => other,
+            },
             Transport::Udp => {
                 let to = peer.ok_or(Errno::EADDRNOTAVAIL)?;
                 self.core_mut(interface).udp_send_to(
@@ -1472,12 +1508,18 @@ impl<D: Device> Netd<D> {
     /// on that interface and socket id. A control file and a file without a socket have a defined
     /// error instead of a made-up "ready" bit.
     pub fn socket_readiness(&self, file: u64) -> Result<Readiness, Errno> {
-        let (interface, socket) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+        let (interface, socket, write_shutdown) = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
-            File::Socket(socket) => (socket.interface, socket.socket),
+            File::Socket(socket) => (socket.interface, socket.socket, socket.write_shutdown),
         };
         let id = socket.ok_or(Errno::ENOTCONN)?;
-        self.core_ref(interface).readiness(id)
+        let mut ready = self.core_ref(interface).readiness(id)?;
+        // A local SHUT_WR rejects every later write with EPIPE; the readiness query must report
+        // the same level, not the core's pre-shutdown send space.
+        if write_shutdown {
+            ready.writable = false;
+        }
+        Ok(ready)
     }
 
     /// Answer the live readiness query for an open socket file.

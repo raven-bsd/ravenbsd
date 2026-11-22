@@ -460,7 +460,13 @@ pub fn revoke_descendants(target: &Arc<LineageNode>, mask: Rights) {
     };
     for node in nodes {
         if !Arc::ptr_eq(&node, target) && node.is_descendant_of(target) {
-            node.revoke(mask);
+            // Contract C17: only a bit this lineage actually held can be "revoked" (EPERM).
+            // A descendant that never granted the bit keeps EACCES, so propagate the granted
+            // subset instead of marking the whole mask.
+            let propagated = node.granted().intersect(mask);
+            if propagated != Rights::NONE {
+                node.revoke(propagated);
+            }
         }
     }
 }

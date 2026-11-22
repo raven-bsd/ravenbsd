@@ -7909,6 +7909,17 @@ modified = true
 notes = "lock, mmap/minherit and _rs_forkdetect removed; state is caller-owned; getentropy replaced by Entropy; fork wipe of rs and rsx added (doc 15 3.A.1.1)"
 
 [[import]]
+path = "crates/raven-entropy/src/lib.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/crypt/arc4random.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-22"
+modified = true
+notes = "pure raven-entropy port of _rs_init/_rs_stir/_rs_rekey/_rs_random_buf, plus arc4random.h's _rs_allocate/_rs_forkdetect shape and the 8-byte-IV ChaCha from chacha_private.h (public domain, same revision); getentropy, mmap/minherit and the libc lock replaced by SeedSource, the caller lock and Pool::fork_child"
+
+[[import]]
 path = "libc/ravenlibc/crates/raven-libc-rand/src/platform.rs"
 upstream = "openbsd"
 upstream_path = "lib/libc/crypt/arc4random.h"
@@ -9568,3 +9579,117 @@ tier = "A"
 copied = "2026-11-20"
 modified = true
 notes = "The make_raw flag set is the literal NetBSD cfmakeraw port (IMAXBEL/IGNBRK/BRKINT/PARMRK/ISTRIP/INLCR/IGNCR/ICRNL/IXON, OPOST, ECHO/ECHONL/ICANON/ISIG/IEXTEN, CSIZE/PARENB clear and CS8); the TCSANOW mapping follows netbsd:lib/libc/termios/tcsetattr.c. The Rust termios guard, signal restore and safe API are first-party."
+
+[[import]]
+path = "crates/raven-tcpip/src/tcp_data.rs"
+upstream = "freebsd"
+upstream_path = "sys/netinet/tcp_output.c; sys/netinet/tcp_timer.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "tcp_default_output send gate (idle, sendwin=min(snd_wnd,snd_cwnd+SACK), len, closed-window rewind, TF_FORCEDATA one-byte persist probe, Nagle/SWS, sequence advance and ENOBUFS queue semantics), tcp_setpersist and tcp_timer_persist ported to the existing Rust TcpConnection/tx queue. Packet/option building and ACK/SYN output remain the existing send_tcp_packet/send_ack_for/send_syn_ack."
+
+[[import]]
+path = "crates/raven-tcpip/src/sack.rs"
+upstream = "dragonfly"
+upstream_path = "sys/netinet/tcp_sack.c"
+upstream_rev = "94448f622a06cde90ba42d688e9cab2448ad9ab3"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "DragonFly RFC 2018/2883/3517/6675 scoreboard functions ported to the existing Raven Rust types: update_lostseq/islost/has_sacked/bytes_below/compute_pipe/nextseg/fill_report plus DSACK and reneging; no C expression copied."
+
+[[import]]
+path = "crates/raven-tcpip/src/ecn.rs"
+upstream = "freebsd"
+upstream_path = "sys/netinet/tcp_ecn.c, sys/netinet/tcp_ecn.h, sys/netinet/tcp.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "tcp_ecn_input_syn_sent, tcp_ecn_input_parallel_syn, tcp_ecn_input_segment, tcp_ecn_output_syn_sent, tcp_ecn_output_established, tcp_ecn_get_ace and tcp_ecn_set_ace ported literally onto EcnState; TH_/IPTOS_ECN_ constants from tcp.h and tcp_ecn.h; the cc_ecnpkt_handler_flags callback and the CE handshake initial-window action stay with the caller because cc.rs is another lane."
+
+[[import]]
+path = "crates/raven-tcpip/src/pmtu.rs"
+upstream = "freebsd"
+upstream_path = "sys/netinet/tcp_input.c, sys/netinet/tcp_subr.c, sys/netinet/ip_icmp.c, sys/netinet/tcp_var.h, sys/netinet/tcp.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "tcp_mssopt, tcp_mss_update/tcp_mss (path MSS, tcp_minmss round-up, 64-byte floor, SACK prohibition, send-buffer clamp), tcp_next_pmtu and tcp_ctlinput_with_port EMSGSIZE, tcp6_next_pmtu and tcp6_ctlinput_with_port EMSGSIZE, plus the ip_next_mtu RFC 1191 plateaus ported literally; MtuCache and Plpmtud remain first-party RFC 8899 code."
+
+[[import]]
+path = "crates/raven-tcpip/src/socket.rs"
+upstream = "freebsd"
+upstream_path = "sys/netinet/tcp_usrreq.c, sys/netinet/tcp_subr.c, sys/kern/uipc_socket.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-20"
+modified = true
+notes = "FreeBSD TCP usrreq/socket path: tcp_usr_connect address-class rejection, tcp_usr_listen/solisten_proto backlog clamp, solisten_clone 3/2 queue bound, tcp_usr_shutdown TF_NEEDFIN deferral, tcp_usr_close/tcp_disconnect embryonic-vs-established split, soclose/soabort listener teardown, tcp_drop/tcp_close abort/close. Transpiled to Rust against TcpConnection/SocketTable; PCB, locking, TFO and socket-buffer internals are replaced by the Raven state machine. No C."
+
+[[import]]
+path = "crates/raven-tcpip/src/listen.rs"
+upstream = "freebsd"
+upstream_path = "sys/kern/uipc_socket.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-20"
+modified = true
+notes = "HalfOpenQueue::clear models soclose swapping sol_incomp out of a listening socket. The queue types themselves are Raven's bounded VecDeque; no FreeBSD code is copied."
+
+[[import]]
+path = "crates/raven-tcpip/src/readiness.rs"
+upstream = "freebsd"
+upstream_path = "sys/sys/socketvar.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "soreadabledata/_soreadable/soreadable/sowriteable predicate mapping ported to Rust; RavenBSD one-source socket_levels and tests; upstream 3-clause notice kept in the file; sopoll register/recheck clean-room; no NetBSD code."
+
+[[import]]
+path = "crates/raven-tcpip/src/syncache.rs"
+upstream = "freebsd"
+upstream_path = "sys/netinet/tcp_syncache.c, sys/netinet/tcp_syncache.h, sys/netinet/tcp_timer.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-20"
+modified = true
+notes = "FreeBSD TCP syncache port: syncache_add/insert/dup-SYN, hash buckets and limits, syncache_timeout/timer and tcp_backoff, syncache_expand ACK/timestamp promotion, syncache_chkrst RST validation, tcps_sc_* counters. The Rust module keeps the donor state machine and returns actions; packet output, TCB allocation and ISS generation stay in the stack. No C."
+
+# ---------------------------------------------------------------------------
+# K273 raven-pf userspace packet filter (donor map: docs/pf.md section 3).
+# ---------------------------------------------------------------------------
+
+[[import]]
+path = "crates/raven-pf/src/abi.rs"
+upstream = "freebsd"
+upstream_path = "sys/netpfil/pf/pf.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "Action/operation/pool/log/address/PFTM/PFRES constants, PFRES_NAMES, PFTM_*_VAL defaults and the pf_addr/pf_status shapes transcribed; namespaced Rust types, kernel-only fields and pfsync/pfctl ioctl transport omitted (deviation D-pf-abi-ioctl in docs/pf.md)."
+
+[[import]]
+path = "crates/raven-pf/src/nat.rs"
+upstream = "freebsd"
+upstream_path = "sys/netpfil/pf/pf_lb.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-21"
+modified = true
+notes = "pf_get_sport() port search and the pf_get_transaddr() redirect destination-port formula transcribed; Rust bounded vectors and deterministic cursors replace arc4random/mbuf/pool plumbing; no address-range, MAP-E or af-to paths."

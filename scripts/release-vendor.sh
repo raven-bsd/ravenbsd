@@ -27,19 +27,32 @@ artifact=build/release/vendor-full.tar.zst
 sbom=$vendor_dir/sbom.cdx.json
 manifest=$vendor_dir/manifest.toml
 check=0
-case "${1:-}" in
-    --check) check=1 ;;
-    -h|--help)
-        echo "usage: sh scripts/release-vendor.sh [--check]"
-        exit 0
-        ;;
-    "")
-        ;;
-    *)
-        echo "release-vendor: unknown argument: $1" >&2
-        exit 2
-        ;;
-esac
+local_check=0
+vendor_url=${RELEASE_VENDOR_URL:-}
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --check) check=1; shift ;;
+        --local) local_check=1; shift ;;
+        --url)
+            [ "$#" -ge 2 ] || { echo "release-vendor: --url needs a value" >&2; exit 2; }
+            vendor_url=$2
+            shift 2
+            ;;
+        -h|--help)
+            echo "usage: sh scripts/release-vendor.sh [--check | --local | --url URL]"
+            echo "  --check  verify the vendor layout only"
+            echo "  --local  verify build/release/vendor-full.tar.zst against the manifest SHA-256"
+            echo "  --url    publish URL recorded in vendor/manifest.toml (or RELEASE_VENDOR_URL)"
+            exit 0
+            ;;
+        *)
+            echo "release-vendor: unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+export RELEASE_VENDOR_URL="$vendor_url"
 
 command -v cargo >/dev/null 2>&1 || { echo "release-vendor: cargo not found" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "release-vendor: python3 not found" >&2; exit 1; }
@@ -63,6 +76,40 @@ verify_layout() {
     [ -f deny.toml ] || { echo "release-vendor: deny.toml is missing" >&2; exit 1; }
     echo "release-vendor: layout ok ($vendor_dir)"
 }
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    else
+        echo "release-vendor: sha256sum or shasum is required" >&2
+        return 1
+    fi
+}
+
+if [ "$local_check" -eq 1 ]; then
+    [ -f "$manifest" ] || {
+        echo "release-vendor: $manifest is missing; run a build or restore the manifest" >&2
+        exit 1
+    }
+    [ -f "$artifact" ] || {
+        echo "release-vendor: $artifact is missing; materialize the snapshot first" >&2
+        exit 1
+    }
+    recorded=$(sed -n 's/^artifact_sha256 = "\(.*\)"$/\1/p' "$manifest")
+    [ -n "$recorded" ] || {
+        echo "release-vendor: $manifest has no artifact_sha256" >&2
+        exit 1
+    }
+    actual=$(sha256_file "$artifact") || exit 1
+    if [ "$recorded" != "$actual" ]; then
+        echo "release-vendor: LOCAL SHA MISMATCH recorded=$recorded actual=$actual" >&2
+        exit 1
+    fi
+    echo "release-vendor: local artifact ok $artifact sha256=$actual"
+    exit 0
+fi
 
 if [ "$check" -eq 1 ]; then
     verify_layout
@@ -221,9 +268,13 @@ with open(manifest_path, "w", encoding="utf-8") as handle:
     handle.write(f'sbom_sha256 = "{sha256(sbom_path)}"\n')
     handle.write(f'artifact = "{artifact_path}"\n')
     handle.write(f'artifact_sha256 = "{sha256(artifact_path)}"\n')
-    handle.write('artifact_url = "release evidence store: vendor-full.tar.zst"\n')
+    handle.write(f'artifact_url = "{os.environ.get("RELEASE_VENDOR_URL") or "UNPUBLISHED"}"\n')
 print(f"release-vendor: vendored_crates={crates} artifact_sha256={sha256(artifact_path)}")
 PY
 
 verify_layout
-echo "release-vendor: PASS"
+if [ -z "$vendor_url" ]; then
+    echo "release-vendor: artifact_url UNPUBLISHED; pass --url or RELEASE_VENDOR_URL for a release" >&2
+    exit 1
+fi
+echo "release-vendor: PASS artifact_url=$vendor_url"

@@ -1,0 +1,19 @@
+ext_if = "em0"
+web_ports = "{ 80, 443 }"
+table <spam> persist { 10.0.0.0/8 !10.0.0.1 }
+table <web> { 192.0.2.10 192.0.2.11 }
+set block-policy return
+set require-order yes
+set state-policy floating
+set skip on lo0
+set optimization basic
+set loginterface em0
+set hostid 1
+set timeout tcp.first 120
+scrub in on em0 all
+pass in quick on em0 proto tcp from any to <web> port = 443 flags S/SA keep state
+pass in on em0 proto tcp from any to any port { 80, 443 } flags any keep state
+block return in quick all
+nat on em0 proto tcp from 10.0.0.0/8 to any -> 203.0.113.1
+rdr on em0 proto tcp from any to any port = 80 -> 192.0.2.10 port 8080
+anchor "spam"

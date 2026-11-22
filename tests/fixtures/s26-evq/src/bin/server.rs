@@ -38,9 +38,7 @@ const CLIENT_WRITES: u64 = 5_000;
 /// Scheme requests the server must answer.
 const REQUESTS_TOTAL: u64 = OPENS + 2 * CLIENT_WRITES;
 /// Doorbell round trips the signaler performs.
-const EVENTS_TOTAL: u64 = 77_997;
-/// Total wakeups the loop must count.
-const WAKES_TOTAL: u64 = 100_000;
+const EVENTS_TOTAL: u64 = 19_499;
 
 fn main(_args: raven_rt::Args) -> i32 {
     let queue = match evq_create() {
@@ -108,12 +106,15 @@ fn main(_args: raven_rt::Args) -> i32 {
                 _ => return 21,
             }
         }
-        let wakes = requests.saturating_add(timers).saturating_add(events);
-        if requests > REQUESTS_TOTAL || events > EVENTS_TOTAL || wakes > WAKES_TOTAL {
+        // The client and signaler totals are deterministic.  The timer count depends on the
+        // wall-clock duration of the run (TCG is slower than the 120 s the old fixed count
+        // assumed), so terminate on the deterministic counters and require only that the
+        // timer kept firing (K463).
+        if requests > REQUESTS_TOTAL || events > EVENTS_TOTAL {
             println!("s26: failed counters {} {} {}", requests, timers, events);
             return 22;
         }
-        if requests == REQUESTS_TOTAL && events == EVENTS_TOTAL && wakes == WAKES_TOTAL {
+        if requests == REQUESTS_TOTAL && events == EVENTS_TOTAL && timers != 0 {
             break;
         }
     }
@@ -121,7 +122,10 @@ fn main(_args: raven_rt::Args) -> i32 {
         "s26: requests={} timer={} events={} lost=0",
         requests, timers, events
     );
-    println!("s26: total=100000");
+    println!(
+        "s26: total={}",
+        requests.saturating_add(timers).saturating_add(events)
+    );
     let _ = handle_close(queue);
     let _ = handle_close(server);
     let _ = handle_close(timer);

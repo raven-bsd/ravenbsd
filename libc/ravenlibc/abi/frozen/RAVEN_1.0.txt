@@ -177,7 +177,7 @@ cgetustr F 531 x86_64
 chdir F 277 x86_64
 chmod F 294 x86_64
 chown F 279 x86_64
-chroot F 22 x86_64
+chroot F 102 x86_64
 cimag F 4 x86_64
 cimagf F 8 x86_64
 cimagl F 19 x86_64
@@ -328,10 +328,10 @@ eventfd_write F 97 x86_64
 execl F 336 x86_64
 execle F 336 x86_64
 execlp F 336 x86_64
-execv F 657 x86_64
-execve F 850 x86_64
-execvp F 657 x86_64
-execvpe F 850 x86_64
+execv F 601 x86_64
+execve F 803 x86_64
+execvp F 601 x86_64
+execvpe F 803 x86_64
 exit F 57 x86_64
 exp F 6 x86_64
 exp10 F 6 x86_64
@@ -390,7 +390,7 @@ fesetround F 6 x86_64
 fetestexcept F 6 x86_64
 fetestexceptflag F 9 x86_64
 feupdateenv F 6 x86_64
-fexecve F 777 x86_64
+fexecve F 640 x86_64
 fflush F 73 x86_64
 fflush_unlocked F 73 x86_64
 ffs F 105 x86_64
@@ -974,8 +974,8 @@ pclose F 352 x86_64
 perror F 5 x86_64
 personality F 264 x86_64
 pidfile F 147 x86_64
-pipe F 57 x86_64
-pipe2 F 57 x86_64
+pipe F 152 x86_64
+pipe2 F 256 x86_64
 pledge F 291 x86_64
 poll F 344 x86_64
 popen F 2200 x86_64
@@ -1027,7 +1027,7 @@ pown F 6 x86_64
 pownf F 6 x86_64
 powr F 6 x86_64
 powrf F 6 x86_64
-ppoll F 35 x86_64
+ppoll F 406 x86_64
 prctl F 336 x86_64
 pread F 306 x86_64
 pread64 F 306 x86_64
@@ -1154,6 +1154,7 @@ pthread_testcancel F 16 x86_64
 pthread_timedjoin_np F 264 x86_64
 pthread_tryjoin_np F 104 x86_64
 pthread_yield F 17 x86_64
+ptsname F 53 x86_64
 ptsname_r F 789 x86_64
 putc F 117 x86_64
 putc_unlocked F 117 x86_64
@@ -1516,11 +1517,11 @@ tcflush F 131 x86_64
 tcgetattr F 261 x86_64
 tcgetpgrp F 22 x86_64
 tcgetsid F 22 x86_64
-tcgetwinsize F 128 x86_64
+tcgetwinsize F 256 x86_64
 tcsendbreak F 84 x86_64
-tcsetattr F 277 x86_64
+tcsetattr F 148 x86_64
 tcsetpgrp F 22 x86_64
-tcsetwinsize F 96 x86_64
+tcsetwinsize F 130 x86_64
 tdelete F 297 x86_64
 tdestroy F 71 x86_64
 telldir F 33 x86_64

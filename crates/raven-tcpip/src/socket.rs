@@ -97,6 +97,8 @@ pub(crate) struct SocketTable {
     reported_chains: usize,
     released_ports: Vec<u16>,
     detached: Vec<(ConnectionKey, TimeWaitInfo, i64)>,
+    /// MPTCP subflow handles over plain-TCP sockets (MPTCP1b).
+    pub(crate) subflows: crate::mptcp_hooks::SubflowTable,
     next_id: u32,
     max: usize,
 }
@@ -121,6 +123,7 @@ impl SocketTable {
             reported_chains: 0,
             released_ports: Vec::new(),
             detached: Vec::new(),
+            subflows: crate::mptcp_hooks::SubflowTable::new(),
             next_id: 1,
             max,
         }
@@ -294,16 +297,22 @@ impl<D: Device> Stack<D> {
         }
         let rx_cap = self.recv_buffer_cap();
         let tx_cap = self.send_buffer_cap();
-        // NetBSD `solisten` stores `uimin(backlog, somaxconn)` as the listener's queue limit;
-        // `sonewconn` then refuses a child once both the partial and completed queues are over
-        // that limit. ACCEPT_QUEUE_CEILING is the `somaxconn` analogue here, and the partial
-        // queue is bounded by the same limit at SYN time.
+        // FreeBSD `sys/kern/uipc_socket.c:solisten_proto` clamps the backlog to `somaxconn`;
+        // `solisten_clone` refuses a child only when `sol_qlen > 3 * sol_qlimit / 2`.  The
+        // completed queue therefore holds up to `3 * backlog / 2 + 1` children before the
+        // overflow branch rejects the next clone.  ACCEPT_QUEUE_CEILING is the `somaxconn`
+        // analogue; the partial queue keeps the same backlog bound at SYN time.
         let backlog = backlog.clamp(1, ACCEPT_QUEUE_CEILING);
+        let completed_capacity = backlog
+            .saturating_mul(3)
+            .saturating_div(2)
+            .saturating_add(1)
+            .min(ACCEPT_QUEUE_CEILING);
         self.sockets.alloc(
             Kind::Listener {
                 port,
                 _backlog: backlog,
-                pending: AcceptQueue::new(ACCEPT_QUEUE_CEILING),
+                pending: AcceptQueue::new(completed_capacity),
                 half_open: HalfOpenQueue::new(backlog),
                 reported: 0,
             },
@@ -355,11 +364,23 @@ impl<D: Device> Stack<D> {
     }
 
     /// Start a TCP connection to `remote`.
+    ///
+    /// FreeBSD `sys/netinet/tcp_usrreq.c:tcp_usr_connect` rejects a multicast destination with
+    /// `EAFNOSUPPORT` and the limited broadcast address with `EACCES` before it enters the
+    /// connection state machine.  The address-family and sockaddr-length checks are carried by
+    /// the typed `IpAddr` API.
     pub fn tcp_connect<A: Into<IpAddr>>(
         &mut self,
         remote: (A, u16),
         local_port: Option<u16>,
     ) -> Result<SocketId, Errno> {
+        let remote = (remote.0.into(), remote.1);
+        match remote.0 {
+            IpAddr::V4(address) if address.is_multicast() => return Err(Errno::EAFNOSUPPORT),
+            IpAddr::V4(address) if address.is_broadcast() => return Err(Errno::EACCES),
+            IpAddr::V6(address) if address.is_multicast() => return Err(Errno::EAFNOSUPPORT),
+            _ => {}
+        }
         self.tcp_connect_internal(remote, local_port)
     }
 
@@ -392,30 +413,53 @@ impl<D: Device> Stack<D> {
     }
 
     /// Close the transmit half of a TCP connection.
+    ///
+    /// FreeBSD `sys/netinet/tcp_usrreq.c:tcp_usr_shutdown` returns `ENOTCONN` for a listener or
+    /// a socket that is not connected, marks the send side with `socantsendmore`, and runs
+    /// `tcp_usrclosed`.  An embryonic connection is not moved to a FIN state immediately:
+    /// `tcp_usrclosed` sets `TF_NEEDFIN` for `SYN_SENT`/`SYN_RECEIVED`, and the FIN is emitted
+    /// once the handshake completes.
     pub fn shutdown_write(&mut self, socket: SocketId) -> Result<(), Errno> {
-        {
+        let state = {
             let record = self.sockets.record(socket)?;
             if record.closed {
                 return Err(Errno::EBADF);
             }
-            if !matches!(record.kind, Kind::Tcp(_)) {
+            let Kind::Tcp(connection) = &record.kind else {
                 return Err(Errno::ENOTCONN);
-            }
+            };
+            connection.state
+        };
+        if matches!(
+            state,
+            crate::tcp_state::TcpState::Closed | crate::tcp_state::TcpState::Listen
+        ) {
+            return Err(Errno::ENOTCONN);
         }
         if let Ok(record) = self.sockets.record_mut(socket) {
             record.tx_shutdown = true;
         }
-        self.tcp_shutdown(socket)
+        match state {
+            crate::tcp_state::TcpState::SynSent | crate::tcp_state::TcpState::SynReceived => {
+                let record = self.sockets.record_mut(socket)?;
+                if let Kind::Tcp(connection) = &mut record.kind {
+                    // TF_NEEDFIN: tcp_output emits the FIN after the connection is established.
+                    connection.close_requested = true;
+                }
+                Ok(())
+            }
+            _ => self.tcp_shutdown(socket),
+        }
     }
 
     /// Close a socket and release its buffers.
     ///
-    /// TCP close follows NetBSD `sys/netinet/tcp_usrreq.c:tcp_disconnect1`: an embryonic
-    /// connection (`TCPS_HAVEESTABLISHED` is false, so `SYN_SENT`, `SYN_RECEIVED` or `CLOSED`)
-    /// is dropped by `tcp_close` without a FIN, while an established connection flushes its
-    /// receive buffer and runs `tcp_usrclosed` (FIN_WAIT_1 from ESTABLISHED, LAST_ACK from
-    /// CLOSE_WAIT). Data already queued for transmission is kept, as `tcp_close` does not
-    /// `sbflush` the send buffer; it drains before the FIN.
+    /// TCP close follows FreeBSD `sys/netinet/tcp_usrreq.c:tcp_usr_close` and `tcp_disconnect`:
+    /// a socket below `TCPS_ESTABLISHED` is dropped by `tcp_close` without a FIN, a
+    /// `TIME_WAIT` socket is left alone, and an established connection flushes its receive
+    /// buffer and runs `tcp_usrclosed` (`FIN_WAIT_1` from `ESTABLISHED`, `LAST_ACK` from
+    /// `CLOSE_WAIT`).  Queued send data is kept and drains before the FIN, as `tcp_disconnect`
+    /// never flushes `so_snd`.
     pub fn close(&mut self, socket: SocketId) -> Result<(), Errno> {
         if let Ok(record) = self.sockets.record(socket)
             && matches!(record.kind, Kind::Tcp(_))
@@ -443,9 +487,10 @@ impl<D: Device> Stack<D> {
         if let Kind::Udp { datagrams, .. } = &mut record.kind {
             datagrams.clear();
         }
-        // `sys/kern/uipc_socket.c:soclose` aborts every child still on `so_q0` and `so_q`; a
-        // synchronized child gets its RST through `tcp_abort`/`tcp_drop`, and the record is
-        // made reclaimable instead of being left as an unusable orphan.
+        // FreeBSD `sys/kern/uipc_socket.c:soclose` swaps both the incomplete and complete
+        // queues out of a listening socket and `soabort`s every child.  A synchronized child
+        // sends its RST through `tcp_usr_abort` -> `tcp_drop`, and the record becomes
+        // reclaimable instead of remaining an unusable orphan.
         for raw in orphans {
             let _ = self.abort(SocketId(raw));
             if let Some(child) = self.sockets.records.get_mut(&raw) {
@@ -455,7 +500,7 @@ impl<D: Device> Stack<D> {
         Ok(())
     }
 
-    /// `tcp_disconnect1` for a TCP socket.
+    /// FreeBSD `tcp_disconnect` for a TCP socket.
     fn tcp_disconnect(&mut self, socket: SocketId) -> Result<(), Errno> {
         let (state, app_closed) = {
             let record = self.sockets.record(socket)?;
@@ -467,16 +512,21 @@ impl<D: Device> Stack<D> {
         if app_closed {
             return Err(Errno::EBADF);
         }
-        // `TCPS_HAVEESTABLISHED` is `state >= TCPS_ESTABLISHED`; SYN_RECEIVED is still embryonic.
-        let established = !matches!(
+        if state == crate::tcp_state::TcpState::TimeWait {
+            // `tcp_usr_close` skips `tcp_disconnect` in TIME_WAIT; the 2MSL timer owns it.
+            let record = self.sockets.record_mut(socket)?;
+            record.tx_shutdown = true;
+            record.app_closed = true;
+            return Ok(());
+        }
+        if matches!(
             state,
             crate::tcp_state::TcpState::Closed
                 | crate::tcp_state::TcpState::Listen
                 | crate::tcp_state::TcpState::SynSent
                 | crate::tcp_state::TcpState::SynReceived
-        );
-        if !established {
-            // No FIN: NetBSD calls tcp_close for an embryonic connection, not tcp_usrclosed.
+        ) {
+            // `tcp_disconnect` calls `tcp_close` below TCPS_ESTABLISHED, so no FIN is emitted.
             self.release_embryonic(socket)?;
             return Ok(());
         }
@@ -490,12 +540,12 @@ impl<D: Device> Stack<D> {
         let record = self.sockets.record_mut(socket)?;
         record.tx_shutdown = true;
         record.app_closed = true;
-        // tcp_disconnect1 flushes so_rcv before entering the shutdown states.
+        // `tcp_disconnect` flushes so_rcv before entering the shutdown states; so_snd stays.
         record.rx.clear();
         Ok(())
     }
 
-    /// Drop an embryonic TCP record without emitting a FIN (`tcp_disconnect1` -> `tcp_close`).
+    /// Drop an embryonic TCP record without emitting a FIN (`tcp_disconnect` -> `tcp_close`).
     fn release_embryonic(&mut self, socket: SocketId) -> Result<(), Errno> {
         let raw = socket.0;
         let port = {
@@ -518,7 +568,7 @@ impl<D: Device> Stack<D> {
             && let Ok(record) = self.sockets.record_mut(SocketId(listener))
             && let Kind::Listener { half_open, .. } = &mut record.kind
         {
-            // soqremque(q0): the partial connection is no longer a backlog entry.
+            // `soabort` removes the child from the incomplete queue before it is freed.
             half_open.remove_socket(raw);
         }
         self.sockets.unindex(socket);

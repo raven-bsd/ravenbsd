@@ -37,10 +37,6 @@ pub const MAX_EXEC_IMAGE: usize = 16 * 1024 * 1024;
 const ET_EXEC: u16 = 2;
 /// `ET_DYN`: a position-independent executable or shared object.
 const ET_DYN: u16 = 3;
-/// Load bias for an `ET_DYN` main image; matches `raven-spawn`'s `MAIN_PIE_BASE`.
-const MAIN_PIE_BASE: u64 = 0x0000_1000_0000_0000;
-/// Load bias for a `PT_INTERP` image; matches `raven-spawn`'s `INTERP_BASE`.
-const INTERP_BASE: u64 = 0x0000_2000_0000_0000;
 /// Largest `PT_INTERP` image read from the initfs for one exec.
 const MAX_INTERP_IMAGE: usize = 2 * 1024 * 1024;
 
@@ -60,6 +56,11 @@ pub struct ExecContext {
 /// from that range. `argv`/`envp` are already copied into kernel storage; `path` is the
 /// `AT_EXECFN` spelling. `close` is the caller's CLOEXEC handle list; pipe ends created with
 /// `O_CLOEXEC` are added automatically.
+// `PROC_EXEC` supplies eight distinct inputs (caller, header, image range, path, argv, envp and
+// the close list) and has one caller in `kernel/src/syscall/exec.rs`. Grouping them into a context
+// would change that cross-module API, which is outside K418's Owns; the ticket permits this
+// narrowly scoped exception. No other lint is suppressed.
+#[allow(clippy::too_many_arguments)]
 pub fn replace_image_from_user(
     caller: &Arc<Process>,
     header: &[u8],
@@ -94,7 +95,7 @@ pub fn replace_image_from_user(
         .map_err(|_| Errno::ENOEXEC)?;
     let main_bias = match kind {
         ET_EXEC => 0,
-        ET_DYN => MAIN_PIE_BASE,
+        ET_DYN => crate::memory::aslr::pie_bias(),
         _ => return Err(Errno::ENOEXEC),
     };
     let main_entry = elf.entry().checked_add(main_bias).ok_or(Errno::ENOEXEC)?;
@@ -120,7 +121,7 @@ pub fn replace_image_from_user(
         None => (None, None),
     };
     let interpreter_bias = if interpreter.is_some() {
-        INTERP_BASE
+        crate::memory::aslr::interp_bias()
     } else {
         0
     };
@@ -208,6 +209,7 @@ pub fn replace_image_from_user(
         let _ = crate::event::close_handle(caller, handle);
     }
     caller.pending_signals.lock().clear();
+    caller.exec_done.store(true, Ordering::Release);
     let command = super::command_from_argv(argv, path);
     *caller.command.lock() = command;
     caller.pending_exec.lock().replace(ExecContext {

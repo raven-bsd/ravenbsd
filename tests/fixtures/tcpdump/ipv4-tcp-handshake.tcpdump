@@ -1,0 +1,8 @@
+1700000000.000000 IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [S], seq 1000, win 65535, options [mss 1460,sackOK,wscale 7,nop,nop,nop], length 0
+1700000000.001000 IP 192.0.2.10.80 > 10.0.0.5.40000: Flags [S.], seq 5000, ack 1001, win 64240, options [mss 1460,sackOK,wscale 7,nop,nop,nop], length 0
+1700000000.002000 IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [.], ack 1, win 65535, length 0
+1700000000.003000 IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [P.], seq 1:19, ack 1, win 65535, length 18: HTTP: GET / HTTP/1.0
+1700000000.004000 IP 192.0.2.10.80 > 10.0.0.5.40000: Flags [.], ack 19, win 65535, length 0
+1700000000.005000 IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [F.], seq 19, ack 1, win 65535, length 0
+1700000000.006000 IP 192.0.2.10.80 > 10.0.0.5.40000: Flags [F.], seq 1, ack 20, win 65535, length 0
+1700000000.007000 IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [.], ack 2, win 65535, length 0

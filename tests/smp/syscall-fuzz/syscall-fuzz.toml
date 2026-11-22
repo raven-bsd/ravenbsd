@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "syscall-fuzz"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/smp/syscall-fuzz/build.sh"]
+initfs = "build/syscall-fuzz/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = ["-cpu", "qemu64,+rdrand"]
+expect_exit = "success"
+
+# The fixture walks every ABI syscall with deterministic garbage vectors, then prints the table
+# hash and survives. Deviations are findings, not a test failure, so they are allowed on the line.
+[[expect]]
+regex = '^syscall-fuzz: start seed=0x[0-9a-f]+ syscalls=47$'
+
+[[expect]]
+regex = '^syscall-fuzz: summary rows=[0-9]+ deviations=[0-9]+ seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^syscall-fuzz: alive$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|setup-failed|syscall-fuzz: failed'

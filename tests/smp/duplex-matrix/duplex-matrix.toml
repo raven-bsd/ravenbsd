@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "duplex-matrix"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+pre = ["sh tests/smp/duplex-matrix/build.sh"]
+initfs = "build/duplex-matrix/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = []
+expect_exit = "success"
+
+# Expectations are ordered. The collector returns every closed cycle to baseline, while the
+# reachable-cyclic and delivered rows prove the mark does not reclaim a live graph.
+[[expect]]
+regex = '^duplex-matrix: start seed=0x[0-9a-f]+ fuzz-ops=10000 groups=7$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=fuzz name=stateful-10k ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=abandoned name=recv-bad-message-close-installed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=self-send-closed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=self-send-reachable-retained ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=self-send-delivered ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=two-object-ring-closed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=three-object-ring-closed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: summary rows=[0-9]+ deviations=0 seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^duplex-matrix: alive$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|setup-failed|duplex-matrix: fuzz-break'

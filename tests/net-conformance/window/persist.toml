@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "persist"
+harness = "zero-window"
+donor = [
+  "FreeBSD sys/netinet/tcp_timer.c: tcp_timer_persist and TCPTV_PERSMIN/TCPTV_PERSMAX",
+  "FreeBSD sys/netinet/tcp_output.c: tcp_setpersist and the persist backoff",
+]
+rfcs = ["RFC 9293 section 3.8.6.1 (zero-window probe)", "RFC 9293 section 3.8.6.2 (persist timer)"]
+
+[[expect]]
+step = "zero window is advertised while 44 bytes are queued"
+packet = "ACK"
+assert = "window=0; no data segment is emitted"
+
+[[expect]]
+step = "persist timer fires"
+packet = "probe"
+assert = "one probe before the reopen; accept a zero-length walk at server_isn or one byte at server_isn+1"
+
+[[expect]]
+step = "peer reopens"
+packet = "ACK"
+assert = "ack=server_isn+1, window != 0"
+
+[[expect]]
+step = "queued bytes resume at the probe point"
+packet = "data"
+assert = "probe byte plus remaining bytes equal the 44-byte payload; no probe replay"

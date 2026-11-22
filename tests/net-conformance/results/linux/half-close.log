@@ -1,0 +1,6 @@
+endpoint: READY
+server FIN 10.26.3.1:24005->10.26.3.2:37388 [AF] seq=795616979 ack=3257140888 win=502 len=0 mss=None ws=None sack=False
+RESULT half-close PASS half-close ACK+FIN seq=795616979 elapsed=0.19s
+PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/half-close.pcap
+endpoint: ACCEPTED ('10.26.3.2', 37388)
+endpoint: EOF

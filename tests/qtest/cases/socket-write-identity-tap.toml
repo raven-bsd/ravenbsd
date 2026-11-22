@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K431 S5 identity, SSH shape: the guest owns an accepted TCP connection on the K194 tap, duplicates
+# it onto fd 7/1/2, and fork+execs a child. The child asserts one netd file id (fstat st_ino) for
+# all three fds and writes a distinct sentinel on each. The host peer must receive the exact bytes
+# on the same connection; the fd 1/2 sentinels must not appear on the guest console. After the
+# child exits, the parent writes again on its still-open accepted fd and waits for the host DONE.
+
+name = "socket-write-identity-tap"
+arch = "x86_64"
+profile = "server"
+timeout_secs = 90
+initfs = "build/fixtures/socket-write-identity/initfs-ssh.img"
+boot_cmdline = "console=ttyS0 loglevel=info"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "tap,id=n0,ifname=k431tap0,script=no,downscript=no",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-write-identity/ssh.pcap",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/fixtures/socket-write-identity/build-ssh.sh",
+    "sh tests/fixtures/socket-write-identity/start-host.sh > build/fixtures/socket-write-identity/host.boot 2>&1 &",
+]
+
+[[expect]]
+regex = '^socket-write-identity: listening port=23097$'
+
+[[expect]]
+regex = '^socket-write-identity: accepted fd=[0-9]+$'
+
+[[expect]]
+regex = '^socket-write-identity: accepted ino=[0-9]+$'
+
+[[expect]]
+regex = '^socket-write-identity: shell status=0$'
+
+[[expect]]
+regex = '^socket-write-identity-child: ident ino=[0-9]+ fd7=7 fd0=0 fd1=1 fd2=2$'
+
+[[expect]]
+regex = '^socket-write-identity-child: pollout ready$'
+
+[[expect]]
+regex = '^socket-write-identity-child: chan sent$'
+
+[[expect]]
+regex = '^socket-write-identity-child: pong sent$'
+
+[[expect]]
+regex = '^socket-write-identity: child status=0$'
+
+[[expect]]
+regex = '^socket-write-identity: parent sent$'
+
+[[expect]]
+regex = '^socket-write-identity: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|ident mismatch|write errno|exec errno|pollout (timeout|failed)|host done missing|ID1-STDOUT|ID2-STDERR|ID7-CHAN|ID7-PONG|ID-PARENT'

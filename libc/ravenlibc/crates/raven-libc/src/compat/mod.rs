@@ -181,6 +181,7 @@ pub mod nvis;
 pub mod openpty;
 pub mod pidfile;
 pub mod posix_openpt;
+pub mod ptsname;
 pub mod ptsname_r;
 pub mod pty_state;
 pub mod pututxline;

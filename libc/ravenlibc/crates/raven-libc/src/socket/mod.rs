@@ -113,6 +113,16 @@ pub(crate) fn with_net<R>(f: impl FnOnce(&ShellNet) -> R) -> R {
     f(net())
 }
 
+/// Refresh the socket records' cached handles after the child's fork hook duplicated them.
+pub(crate) fn refresh_after_fork() {
+    with_net(|net| net.refresh_handles());
+}
+
+/// Publish the live socket records to the platform before `execve` serializes the fd map.
+pub(crate) fn sync_exec_meta() {
+    with_net(|net| net.sync_meta());
+}
+
 /// The ABI `struct mmsghdr`.
 #[repr(C)]
 pub(crate) struct Mmsghdr {

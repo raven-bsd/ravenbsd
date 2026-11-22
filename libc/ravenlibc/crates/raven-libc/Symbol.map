@@ -538,6 +538,7 @@ RAVEN_1.0 {
 		openpty;
 		pidfile;
 		posix_openpt;
+		ptsname;
 		ptsname_r;
 		pututxline;
 		readpassphrase;

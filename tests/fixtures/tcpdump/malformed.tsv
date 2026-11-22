@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Negative pcap fixtures: each file must be rejected, not decoded as a valid
+# packet. `expected` is the substring the fixture checker must see in the
+# parser error.
+# file|expected
+malformed-truncated.pcap|truncated frame
+malformed-bad-caplen.pcap|bad record lengths

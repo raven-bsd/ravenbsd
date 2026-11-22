@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K374: the styled boot screen is printed before getty's final login prompt.
+name = "boot-screen"
+arch = "x86_64"
+profile = "release"
+# getty waits at `login:`, so the expected outcome is the case timeout. 90 s is still ~90x the
+# measured boot and keeps the pre-build plus guest wait inside the prescribed 600 s outer cap.
+timeout_secs = 90
+pre = ["sh tests/release/check-loader.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+# devd needs a PCI device to bind; without a NIC it reports `no matching driver` and svcd
+# declares a readiness timeout, which would hide the screen behind a real service failure.
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "timeout"
+
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^-{10,}$'
+unordered = true
+
+[[expect]]
+regex = '^[0-9]{3}\.[0-9]{2}  \S+ +[a-z]+$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 x86_64$'
+
+[[step]]
+wait = '(?i)^login: ?$'
+timeout_secs = 90
+
+[[forbid]]
+regex = '^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|svcd: .*failed'

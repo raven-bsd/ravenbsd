@@ -84,6 +84,37 @@ pub const PROC_EXEC_CRED: usize = 0x3F;
 
 pub use crate::spawn_error::SpawnError;
 
+/// The final credentials a spawn publishes in the auxiliary vector.
+///
+/// The values are read from the target child after the kernel's `PROC_EXEC_CRED`
+/// transition (or from the caller on the no-credential path), so the vector never
+/// carries a zero default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProcessIdentity {
+    /// Real user id.
+    pub uid: u32,
+    /// Effective user id.
+    pub euid: u32,
+    /// Real group id.
+    pub gid: u32,
+    /// Effective group id.
+    pub egid: u32,
+}
+
+impl ProcessIdentity {
+    /// The host-test placeholder. The target always queries the kernel; this value is
+    /// compiled only for the host unit tests.
+    #[cfg(all(not(any(target_os = "none", target_os = "ravenbsd")), test))]
+    const fn host_test() -> Self {
+        Self {
+            uid: 0,
+            euid: 0,
+            gid: 0,
+            egid: 0,
+        }
+    }
+}
+
 /// The syscall surface used by [`spawn_with`].
 ///
 /// The real implementation is [`RtSys`]; tests use a recording mock.
@@ -495,7 +526,10 @@ fn image_scheme_path(path: &str) -> alloc_crate::string::String {
 ///
 /// `O_RDONLY` is zero at the C level, but the kernel's `OPEN` wire encoding uses bit 0 for read
 /// access; passing the raw zero flags is rejected.
-#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+#[cfg(any(
+    test,
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
+))]
 fn image_open_flags() -> Result<raven_proto_fs::OpenFlags, SpawnError> {
     raven_proto_fs::OpenFlags::from_linux(raven_proto_fs::O_RDONLY)
         .map_err(|_| SpawnError::Sys(Errno::EINVAL))
@@ -642,6 +676,52 @@ fn map_plan<S: Sys>(
     Ok(())
 }
 
+/// Read the final child identity from the kernel after the credential transition.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+fn child_identity(child: Handle) -> Result<ProcessIdentity, SpawnError> {
+    #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    {
+        return crate::sys::child_ids(child).map_err(SpawnError::Sys);
+    }
+    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
+    {
+        let _ = child;
+        Ok(ProcessIdentity::host_test())
+    }
+}
+
+/// `AT_SECURE` is set exactly when the file's setuid/setgid bit is applied and the
+/// mount did not ask for `EXEC_NOSUID`. The open image handle's `Stat` is the same
+/// inode the kernel checks.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+fn file_secure(file: Handle, nosuid: bool) -> Result<bool, SpawnError> {
+    #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
+    {
+        const S_ISUID: u32 = 0o4000;
+        const S_ISGID: u32 = 0o2000;
+        let stat = Client::new().fstat(file).map_err(SpawnError::Sys)?;
+        return Ok(!nosuid && stat.mode & (S_ISUID | S_ISGID) != 0);
+    }
+    #[cfg(not(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")))]
+    {
+        let _ = (file, nosuid);
+        Ok(false)
+    }
+}
+
+/// Read the caller identity for a spawn without a credential transition.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+fn caller_identity() -> Result<ProcessIdentity, SpawnError> {
+    #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    {
+        return crate::sys::self_ids().map_err(SpawnError::Sys);
+    }
+    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
+    {
+        Ok(ProcessIdentity::host_test())
+    }
+}
+
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[allow(clippy::too_many_arguments)] // the image pair, entry state and syscall sink
 fn spawn_elf<S: Sys>(
@@ -724,6 +804,7 @@ fn spawn_elf<S: Sys>(
         .ok_or(SpawnError::TooLarge)?;
     let stack_base_address = usize::try_from(stack_base).map_err(|_| SpawnError::TooLarge)?;
 
+    #[cfg(any(feature = "alloc", test))]
     let fdmap_info = if fdmap.is_empty() {
         None
     } else {
@@ -796,8 +877,61 @@ fn spawn_elf<S: Sys>(
         }
         Some((address as usize, entries.len()))
     };
-    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, libc, fdmap_info);
-    let random = random_bytes(&auxv as *const _ as usize);
+    // The fd map is an alloc-backed encoding; a no-alloc image cannot publish it.  Reject a
+    // non-empty map instead of silently dropping inherited descriptors (K463).
+    #[cfg(not(any(feature = "alloc", test)))]
+    let fdmap_info = match no_alloc_fdmap(fdmap) {
+        Ok(()) => None,
+        Err(error) => {
+            let _ = sys.handle_close(child);
+            return Err(error);
+        }
+    };
+    let (identity, secure) = if let Some((file, nosuid)) = exec {
+        if let Err(error) = sys.exec_cred(child, file, nosuid) {
+            let _ = sys.handle_close(child);
+            return Err(SpawnError::Sys(error));
+        }
+        let identity = match child_identity(child) {
+            Ok(identity) => identity,
+            Err(error) => {
+                let _ = sys.handle_close(child);
+                return Err(error);
+            }
+        };
+        let secure = match file_secure(file, nosuid) {
+            Ok(secure) => secure,
+            Err(error) => {
+                let _ = sys.handle_close(child);
+                return Err(error);
+            }
+        };
+        (identity, secure)
+    } else {
+        match caller_identity() {
+            Ok(identity) => (identity, false),
+            Err(error) => {
+                let _ = sys.handle_close(child);
+                return Err(error);
+            }
+        }
+    };
+    let (auxv, auxv_len) = build_auxv(
+        main_elf,
+        main_bias,
+        interp_bias,
+        libc,
+        fdmap_info,
+        identity,
+        secure,
+    );
+    let random = match random_bytes() {
+        Ok(random) => random,
+        Err(error) => {
+            let _ = sys.handle_close(child);
+            return Err(error);
+        }
+    };
 
     let memobj = match sys.memobj_create(STACK_SIZE) {
         Ok(handle) => handle,
@@ -894,12 +1028,6 @@ fn spawn_elf<S: Sys>(
             return Err(SpawnError::TooLarge);
         }
     };
-    if let Some((file, nosuid)) = exec
-        && let Err(error) = sys.exec_cred(child, file, nosuid)
-    {
-        let _ = sys.handle_close(child);
-        return Err(SpawnError::Sys(error));
-    }
     match sys.thread_create(child, entry_address, sp0, sp0) {
         Ok(thread) => {
             // The child keeps running; the caller only needs the process handle. Closing the
@@ -1599,7 +1727,24 @@ fn plan_image<'a>(
 /// Entries carry no path or status; the child's `restore_fdmap` creates unknown-kind OFDs with
 /// read/write status and the transferred handles. The loader only publishes this block for
 /// inherited stdio and ordinary file descriptors.
+/// Reject an inherited fd map when the crate is built without `alloc`.
+///
+/// The wire block is built in a heap `Vec`; a no-alloc image cannot publish it.  Empty is the
+/// common case and stays supported (K463).
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+#[allow(dead_code)] // ravenbsd target builds compile this for the no-alloc path; the alloc build uses encode_fdmap
+fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
+    if fdmap.is_empty() {
+        Ok(())
+    } else {
+        Err(SpawnError::Sys(Errno::ENOTSUP))
+    }
+}
+
+#[cfg(any(
+    test,
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
+))]
 fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
     let mut out = alloc_crate::vec::Vec::with_capacity(8usize.saturating_add(18 * entries.len()));
@@ -1628,6 +1773,8 @@ fn build_auxv(
     interp_bias: u64,
     libc: Option<u64>,
     fdmap: Option<(usize, usize)>,
+    identity: ProcessIdentity,
+    secure: bool,
 ) -> ([(usize, usize); MAX_AUXV], usize) {
     let mut auxv = [(0usize, 0usize); MAX_AUXV];
     let mut len = 0usize;
@@ -1652,14 +1799,14 @@ fn build_auxv(
         AT_ENTRY,
         usize::try_from(elf.entry().saturating_add(main_bias)).unwrap_or_default(),
     );
-    push(AT_UID, 0);
-    push(AT_EUID, 0);
-    push(AT_GID, 0);
-    push(AT_EGID, 0);
+    push(AT_UID, identity.uid as usize);
+    push(AT_EUID, identity.euid as usize);
+    push(AT_GID, identity.gid as usize);
+    push(AT_EGID, identity.egid as usize);
     push(AT_PLATFORM, 0);
     push(AT_HWCAP, 0);
     push(AT_CLKTCK, 100);
-    push(AT_SECURE, 0);
+    push(AT_SECURE, usize::from(secure));
     push(AT_RANDOM, 0);
     push(AT_HWCAP2, 0);
     push(AT_EXECFN, 0);
@@ -1937,27 +2084,21 @@ fn align_down(value: u64, align: u64) -> u64 {
 }
 
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
-/// Fill 16 bytes for `AT_RANDOM`.
+/// Fill 16 bytes for `AT_RANDOM` from the kernel's boot-seeded pool.
 ///
-/// The value mixes the monotonic clock with a parent address. It is deliberately not
-/// cryptographic yet; the S24/M2 integration only needs distinct bytes per spawned child.
-fn random_bytes(parent_address: usize) -> [u8; RANDOM_LEN] {
+/// A pool failure aborts the exec with the kernel's error; there is no clock/address
+/// fallback in this crate.
+fn random_bytes() -> Result<[u8; RANDOM_LEN], SpawnError> {
     #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-    let now = crate::sys::clock_get(raven_abi::types::clock::MONOTONIC).unwrap_or_default();
-    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
-    let now = raven_abi::types::Timespec::default();
-    let mut state = (now.tv_sec as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
-        ^ (now.tv_nsec as u64)
-        ^ (parent_address as u64);
-    let mut bytes = [0u8; RANDOM_LEN];
-    for chunk in bytes.chunks_mut(8) {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        let word = state.to_le_bytes();
-        chunk.copy_from_slice(&word[..chunk.len()]);
+    {
+        let mut bytes = [0u8; RANDOM_LEN];
+        crate::sys::getrandom(&mut bytes).map_err(SpawnError::Sys)?;
+        Ok(bytes)
     }
-    bytes
+    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
+    {
+        Ok([0u8; RANDOM_LEN])
+    }
 }
 
 #[cfg(test)]

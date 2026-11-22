@@ -163,8 +163,8 @@ C53/C57/C58.
 | `flock` | CALL(OP_FLOCK*) | TBD | PG-21 | dave | netbsd:lib/libc/sys/flock.2 |
 | `lockf` | fcntl record locks | TBD | PG-21 | dave | openbsd:lib/libc/gen/lockf.c |
 | `lockf64` | fcntl record locks | TBD | PG-21 | dave | openbsd:lib/libc/gen/lockf.c |
-| `pipe` | pipe: server | TBD | PG-35 | kevin | netbsd:tests/lib/libc/sys/t_pipe.c |
-| `pipe2` | pipe: server | TBD | PG-35 | kevin | netbsd:tests/lib/libc/sys/t_pipe2.c |
+| `pipe` | PIPE2 | EXISTS | - | kevin | netbsd:tests/lib/libc/sys/t_pipe.c |
+| `pipe2` | PIPE2 | EXISTS | - | kevin | netbsd:tests/lib/libc/sys/t_pipe2.c |
 | `socketpair` | uds: server | TBD | PG-30 | bob | 4.3BSD socketpair |
 | `ioctl` | libc dispatch | PARTIAL | PG-54 | dave | musl:src/misc/ioctl.c |
 | `select` | EVQ shim | PARTIAL | PG-25 | dave | mlibc:sys-select.cpp |

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
-//! `ptsname_r`: the `pty:slave/<id>` path of a master descriptor.
+//! `ptsname_r`: the `/dev/pts/<id>` path of a master descriptor.
 //!
-//! `posix_openpt` records the pair id per descriptor. The name is scheme-qualified because the
-//! pty server is a native scheme, and `openpty` opens it through the same `pty:` client.
+//! `posix_openpt` records the pair id per descriptor. The pty server is a native scheme; the
+//! `/dev/pts/<id>` name is mapped to `pty:slave/<id>` by the platform open path, so the public
+//! name matches the donor and `ssh -tt tty` reports the expected device.
 use core::ffi::{c_char, c_int};
 
 use raven_libc_abi::errno::{EBADF, ERANGE};
@@ -13,7 +14,7 @@ use super::posix_openpt::pair_for;
 
 /// Write `pty:slave/<id>` plus a NUL into `buffer`.
 fn slave_path(pair: u64, buffer: &mut [u8]) -> Result<usize, u16> {
-    const PREFIX: &[u8] = b"pty:slave/";
+    const PREFIX: &[u8] = b"/dev/pts/";
     let mut digits = [0u8; 20];
     let mut value = pair;
     let mut count = 0usize;

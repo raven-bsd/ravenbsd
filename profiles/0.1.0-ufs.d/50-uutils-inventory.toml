@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K414: complete the uutils staging for the product profile. The shell fragment stages
+# the original 19; these 9 are built by `cargo xtask build uutils` and were not staged.
+# `/bin/sleep` and `/bin/date` stay the first-party raven-sleep/raven-date from the
+# shell profile. The inventory script enumerates all 108 source utilities and reports
+# the 78 names that are not built yet as gaps (a product ticket, not a silent omission).
+
+[[initfs.files]]
+src = "build/{arch}/uutils/ln"
+path = "/bin/ln"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/pwd"
+path = "/bin/pwd"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/basename"
+path = "/bin/basename"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/dirname"
+path = "/bin/dirname"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/env"
+path = "/bin/env"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/chmod"
+path = "/bin/chmod"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/chown"
+path = "/bin/chown"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/cut"
+path = "/bin/cut"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/tr"
+path = "/bin/tr"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/0.1.0-ufs.d/uutils-inventory.sh"
+path = "/bin/uutils-inventory"
+mode = 0o755

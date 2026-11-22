@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K438 TCP half of the fd-passing contract: the guest connects to the host side of QEMU user
+# networking (10.0.2.2:23084), passes the connected TCP descriptor to a forked child with
+# sendmsg + SCM_RIGHTS over an AF_UNIX socketpair, drops every inherited copy, and the child sends
+# the payload through the received descriptor. The host server receives those exact bytes and
+# sends an acknowledgement, which the child reads back through the same received descriptor.
+
+name = "fdpass-tcp"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+initfs = "build/fixtures/fdpass-tcp/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/libc/target/build-fdpass-tcp.sh",
+    "sh tests/qtest/cases/fdpass-tcp/start-host.sh",
+]
+
+# The real profile runs getty, so the login prompt can prefix any console line.
+[[expect]]
+regex = '^.*fdpass: start$'
+
+[[expect]]
+regex = '^.*fdpass: tcp connected fd=[0-9]+$'
+
+[[expect]]
+regex = '^fdpass: tcp-child cmsg_len=20 level=1 type=1 count=1 controllen=20$'
+unordered = true
+
+[[expect]]
+regex = '^fdpass: tcp-child fd0=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^.*fdpass: tcp sent=1 sent_cmsg_len=20$'
+
+[[expect]]
+regex = '^fdpass: tcp-child ack=fdpass-tcp-ack$'
+unordered = true
+
+[[expect]]
+regex = '^.*fdpass: tcp child-status=0$'
+
+[[expect]]
+regex = '^.*fdpass: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)fdpass: fail|panic|EXCEPTION'
