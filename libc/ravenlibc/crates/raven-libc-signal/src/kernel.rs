@@ -9,6 +9,8 @@
 //! invented here: `SIGRETURN` 0x82 and the kick bits are the labelled PROPOSED PG-7 values.
 
 use raven_libc_abi::errno::Errno;
+#[cfg(target_os = "none")]
+use raven_libc_abi::generated::signal;
 use raven_libc_abi::structs::SiginfoT;
 
 use crate::errors::{EINVAL_ERR, ENOSYS_ERR, ETIMEDOUT_ERR};
@@ -93,14 +95,18 @@ pub struct SigCaps {
 }
 
 impl SigCaps {
-    /// The production capability set: no PG-7, PG-8, PG-10, PG-12 or PG-44 primitive exists.
+    /// The production capability set.
+    ///
+    /// On the Raven target the committed PG-7 `SIG_SETUP`/`THREAD_KICK`/`SIGRETURN` entry and
+    /// the PG-8 interruptible wait exist; `SIGRESEND`, stop and FP-in-frame do not. Host unit
+    /// tests keep every kernel bit false because there is no Raven kernel behind them.
     pub const PRODUCTION: Self = Self {
-        entry: false,
-        kick: false,
-        sigreturn: false,
+        entry: cfg!(target_os = "none"),
+        kick: cfg!(target_os = "none"),
+        sigreturn: cfg!(target_os = "none"),
         resend: false,
-        eintr: false,
-        proc_kill: false,
+        eintr: cfg!(target_os = "none"),
+        proc_kill: cfg!(target_os = "none"),
         stop: false,
         fp_in_frame: false,
     };
@@ -165,6 +171,7 @@ impl SysKernel {
         Self
     }
 
+    #[cfg_attr(target_os = "none", allow(dead_code))]
     fn notify(pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
         let _ = (pid, sig, info);
         Err(ENOSYS_ERR)
@@ -198,16 +205,11 @@ impl SigKernel for SysKernel {
     }
 
     fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
-        // PG-7 is absent: remember the address for the shell and report the gap. No number is
-        // fabricated; the shell checks `caps().entry` before calling this.
-        let _ = (ctx_area_offset, flags);
-        raw::set_entry_function(entry);
-        Err(ENOSYS_ERR)
+        raw::sig_setup(entry, ctx_area_offset, flags)
     }
 
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno> {
-        let _ = (handle, bits);
-        Err(ENOSYS_ERR)
+        raw::kick(handle, bits)
     }
 
     fn sigreturn(&self) -> ! {
@@ -220,12 +222,50 @@ impl SigKernel for SysKernel {
     }
 
     fn proc_kill(&self, pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
-        Self::notify(pid, sig, info)
+        #[cfg(target_os = "none")]
+        {
+            // The commit queue carries no siginfo payload; `kill`/`killpg` use the plain call.
+            if info.is_some() {
+                return Err(ENOSYS_ERR);
+            }
+            raven_libc_sys::signal::proc_signal(pid, sig).map_err(|error| Errno(error.0))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            Self::notify(pid, sig, info)
+        }
     }
 
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)> {
-        let _ = deliverable;
-        None
+        #[cfg(target_os = "none")]
+        {
+            let mut words = [0u64; 3];
+            let result =
+                raven_libc_sys::signal::proc_sigrecv(&mut words, raven_libc_sys::signal::WNOHANG);
+            let signo = result.ok()?;
+            if signo <= 0 {
+                return None;
+            }
+            let bit = 1u64.wrapping_shl((signo as u32).wrapping_sub(1) & 63);
+            if deliverable & bit == 0 {
+                // The kernel queue has no peek/requeue operation. A masked signal stays out of
+                // this entry; `sigprocmask` re-raises the thread pending set when it unmask.
+                return None;
+            }
+            let code = if signo == signal::SIGCHLD as i32 {
+                signal::CLD_EXITED
+            } else {
+                signal::SI_USER
+            };
+            let mut info = crate::frame::make_siginfo(signo, code);
+            crate::frame::set_si_pid(&mut info, words[1] as i32);
+            Some((signo, info))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            let _ = deliverable;
+            None
+        }
     }
 
     fn wait_for_kick(&self, deadline_ns: Option<u64>) -> Result<(), Errno> {
