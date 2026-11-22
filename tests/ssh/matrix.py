@@ -751,8 +751,12 @@ def row_s3_start() -> dict[str, object]:
 
 def console_login(console: SerialConsole) -> bool:
     """Log in as root/raven on the serial console."""
-    if console.wait_for(b"login:", 60) < 0:
-        return False
+    if console.wait_for(b"login:", 5) < 0:
+        # The prompt may have been printed before the socket connected; a newline makes getty
+        # print a fresh one.
+        console.send(b"\n")
+        if console.wait_for(b"login:", 30) < 0:
+            return False
     console.send(b"root\n")
     if console.wait_for(b"Password:", 20) < 0:
         return False
