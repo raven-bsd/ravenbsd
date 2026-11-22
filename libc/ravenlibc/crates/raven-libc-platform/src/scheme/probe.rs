@@ -40,11 +40,7 @@ pub(crate) fn socket_event<B: SysBackend>(backend: &B, handle: Handle) -> Result
     let mut encoded = [0u8; 64];
     let used = request.encode(&mut encoded).map_err(|_| Errno::EINVAL)?;
     let mut response = [0u8; 16];
-    let _ = backend.call(
-        handle,
-        encoded.get(..used).unwrap_or(&[]),
-        &mut response,
-    )?;
+    let _ = backend.call(handle, encoded.get(..used).unwrap_or(&[]), &mut response)?;
     let bytes: [u8; 4] = response
         .get(6..10)
         .ok_or(Errno::EPROTO)?
