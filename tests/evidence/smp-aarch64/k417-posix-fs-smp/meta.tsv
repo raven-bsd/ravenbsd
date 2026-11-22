@@ -1,8 +1,0 @@
-field	value
-command	cargo xtask qtest --case posix-fs-smp --arch aarch64
-exit	1
-qtest_result	fail
-qemu_exit_status	35
-error	kernel: error: invalid init ELF: ELF machine does not match
-kernel_banner	RavenBSD kernel 0.1 (aarch64) 4feacdb02 2026-11-21
-smp_line	smp: 1 cpus online

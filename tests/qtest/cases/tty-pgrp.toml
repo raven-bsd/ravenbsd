@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K493: tcgetpgrp/tcsetpgrp over the pty server's foreground group. The controller sets its own
+# pgrp, round-trips it, forks/execs a child that reads it, and checks non-tty ENOTTY, invalid
+# EINVAL and cross-session EPERM.
+
+name = "tty-pgrp"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/libc/target/build.sh tty-pgrp x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^tty-pgrp: start$'
+
+[[expect]]
+regex = '^tty-pgrp: get-initial pgrp=[0-9]+$'
+
+[[expect]]
+regex = '^tty-pgrp: set-own pgrp=[0-9]+ ok=1$'
+
+[[expect]]
+regex = '^tty-pgrp: child actual=[0-9]+ expected=[0-9]+ ok=1$'
+
+[[expect]]
+regex = '^tty-pgrp: child-exec ok$'
+
+[[expect]]
+regex = '^tty-pgrp: non-tty ENOTTY ok$'
+
+[[expect]]
+regex = '^tty-pgrp: invalid EINVAL ok$'
+
+[[expect]]
+regex = '^tty-pgrp: cross-session EPERM ok$'
+
+[[expect]]
+regex = '^tty-pgrp: setpgid\+tcsetpgrp ok$'
+
+[[expect]]
+regex = '^tty-pgrp: done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|tty-pgrp: FAIL|child exec failed'

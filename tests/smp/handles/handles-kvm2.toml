@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "smp-handles-kvm2"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/smp/handles/build.sh"]
+initfs = "build/smp/handles/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = ["-accel", "kvm", "-cpu", "host", "-smp", "2"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^handles: start$'
+
+[[expect]]
+regex = '^handles: race children=[1-9][0-9]* eperm=[1-9][0-9]* eacces=[0-9]+ usable=0 other=0$'
+
+[[expect]]
+regex = '^handles: closed children=[1-9][0-9]* eperm=[1-9][0-9]* eacces=[0-9]+ usable=0 other=0$'
+
+[[expect]]
+regex = '^handles: queued children=[1-9][0-9]* installed=[1-9][0-9]* usable=0 other=0$'
+
+[[expect]]
+regex = '^handles: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|handles: failed'

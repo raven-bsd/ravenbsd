@@ -100,6 +100,9 @@ pub enum Notice {
     Failed(usize, String),
     /// `svcd: <name> crash loop, giving up`
     CrashLoop(usize),
+    /// `svcd: <name> unavailable: <reason>`; a service that could not become ready, not a
+    /// running service that crashed.
+    Unavailable(usize, String),
 }
 
 /// A service the caller should start on a new worker thread.
@@ -239,6 +242,36 @@ impl Supervisor {
         self.boot_complete = true;
     }
 
+    /// Mark `root` and every enabled service or scheme provider it transitively needs.
+    ///
+    /// The getty closure is the boot-critical set: services outside it may be started but must
+    /// not hold the login past the boot budget. Scheme needs follow every enabled provider; a
+    /// disabled or absent provider contributes nothing.
+    pub fn dependency_closure(&self, root: usize) -> Vec<bool> {
+        let mut mark = alloc::vec![false; self.services.len()];
+        self.mark_dependencies(root, &mut mark);
+        mark
+    }
+
+    fn mark_dependencies(&self, index: usize, mark: &mut [bool]) {
+        if index >= self.services.len() || mark.get(index).copied().unwrap_or(true) {
+            return;
+        }
+        mark[index] = true;
+        for need in &self.services[index].needs {
+            if let Some(name) = need.strip_prefix("scheme:") {
+                let want = alloc::format!("scheme:{name}");
+                for (provider, service) in self.services.iter().enumerate() {
+                    if service.enable && service.provides.iter().any(|provide| provide == &want) {
+                        self.mark_dependencies(provider, mark);
+                    }
+                }
+            } else if let Some(dependent) = self.find(need) {
+                self.mark_dependencies(dependent, mark);
+            }
+        }
+    }
+
     /// True after [`Supervisor::set_boot_complete`].
     pub const fn boot_complete(&self) -> bool {
         self.boot_complete
@@ -342,9 +375,9 @@ impl Supervisor {
         if runtime.generation != generation || runtime.state != State::Starting {
             return Vec::new();
         }
-        runtime.state = State::Failed;
+        runtime.state = State::GaveUp;
         runtime.ready_deadline_ms = None;
-        alloc::vec![Notice::Failed(index, reason)]
+        alloc::vec![Notice::Unavailable(index, reason)]
     }
 
     /// Credit an unobserved stall to the readiness window.
@@ -387,10 +420,10 @@ impl Supervisor {
         if now < deadline {
             return Vec::new();
         }
-        runtime.state = State::Failed;
+        runtime.state = State::GaveUp;
         runtime.ready_deadline_ms = None;
         runtime.ready_timing.finished_ms = Some(now);
-        alloc::vec![Notice::Failed(index, "readiness timeout".to_string())]
+        alloc::vec![Notice::Unavailable(index, "readiness timeout".to_string())]
     }
 
     /// Record a child exit and apply the restart policy.
@@ -448,13 +481,13 @@ impl Supervisor {
         };
         if !restart {
             if runtime.state == State::Starting && service.readiness != Readiness::None {
-                runtime.state = State::Failed;
+                runtime.state = State::GaveUp;
                 runtime.ready_deadline_ms = None;
                 runtime.ready_timing.finished_ms = Some(now);
                 return ExitOutcome {
                     restart: None,
                     start: None,
-                    notices: alloc::vec![Notice::Failed(
+                    notices: alloc::vec![Notice::Unavailable(
                         index,
                         "exited before it became ready".to_string()
                     )],
@@ -475,10 +508,15 @@ impl Supervisor {
             runtime.state = State::GaveUp;
             runtime.ready_deadline_ms = None;
             runtime.ready_timing.finished_ms = Some(now);
+            let notice = if runtime.ever_ready {
+                Notice::CrashLoop(index)
+            } else {
+                Notice::Unavailable(index, "could not become ready".to_string())
+            };
             return ExitOutcome {
                 restart: None,
                 start: None,
-                notices: alloc::vec![Notice::CrashLoop(index)],
+                notices: alloc::vec![notice],
             };
         }
         runtime.restarts = runtime.restarts.saturating_add(1);

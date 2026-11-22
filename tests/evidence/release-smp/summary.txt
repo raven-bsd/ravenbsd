@@ -1,4 +1,0 @@
-kvm1 runs=10 p50_s=3.724 p90_s=3.789 worst_s=7.223
-kvm2 runs=10 p50_s=3.668 p90_s=4.762 worst_s=6.098
-kvm4 runs=10 p50_s=3.574 p90_s=4.163 worst_s=4.625
-tcg4 runs=10 p50_s=5.894 p90_s=8.931 worst_s=11.253

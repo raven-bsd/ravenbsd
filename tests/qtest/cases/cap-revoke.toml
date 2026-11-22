@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# S73 capability handoff and revocation demo: a controller transfers a reduced-rights MemObject to
-# a child, the child uses it (MAP ok, DUP denied), the controller revokes MAP (child sees EPERM),
-# and a second object proves the object is released only after the last live handle (alive after
-# source close, stale EBADF after close, slot reused safely). Runs on x86_64 and aarch64.
+# S73 capability handoff and revocation: a controller transfers two reduced-rights MemObject
+# handles to a child (MAP|READ|DUP and READ|DUP), forks that child, revokes MAP on the source
+# lineage, and both processes must reject every later MAP with EPERM while a right that was never
+# granted stays EACCES. A duplicate made before and after the revoke cannot regain MAP. The
+# lifetime case then proves the object survives the source close and a stale handle is EBADF.
 
 name = "cap-revoke"
 arch = "x86_64"
@@ -18,12 +19,83 @@ expect_exit = "success"
 
 [[expect]]
 regex = '^cap: use ok$'
+unordered = true
 
 [[expect]]
-regex = '^cap: reduced ok$'
+regex = '^cap: use ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: dup-before ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: dup-before ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: never-granted ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: never-granted ok$'
+unordered = true
 
 [[expect]]
 regex = '^cap: revoke eperm ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: revoke eperm ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: dup-before eperm ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: dup-before eperm ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: dup-after ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: dup-after ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: dup-after eacces ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: dup-after eacces ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: never-after eacces ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: never-after eacces ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: never-dup eacces ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: never-dup eacces ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: revoke client ok$'
+unordered = true
+
+[[expect]]
+regex = '^cap: revoke client ok$'
+unordered = true
 
 [[expect]]
 regex = '^cap: revoke case ok$'
@@ -47,4 +119,4 @@ regex = '^cap: lifetime case ok$'
 regex = '^cap: ok$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|cap: failed'
+regex = '(?i)panic|EXCEPTION|cap: failed|cap: .*unexpected'

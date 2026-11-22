@@ -1,3 +1,0 @@
-config	image	image_sha256	commit	start_utc	end_utc	duration_s	cycles	expected_cycles	result	stall_gap_s	panic	exception	fatal	tlb	nmi	restart	stall	log_dir
-tcp-soak	build/tcp-soak/image.img	0fa7c82d8987529e56a1de5c58d82d9e0037b544e77589d97b37127a8f2a8801	879d3d390ba4d344928d0d3183e780645329fb4e	2026-11-21T17:59:54Z	2026-11-21T18:11:50Z	715.322	60	60	pass	20.581	0	0	0	0	0	0	0	tcp-soak/
-freeze-soak	build/soak/image.img	11158e936c04063b1068971ebb60cd9be7f9b0b6215af1b98fa922f952ffec8d	879d3d390ba4d344928d0d3183e780645329fb4e	2026-11-21T18:11:53Z	2026-11-21T18:14:11Z	138.067	24	24	pass	15.344	0	0	0	0	0	0	0	freeze-soak/
