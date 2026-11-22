@@ -21,7 +21,16 @@ unordered = true
 regex = '^random: exec differ=1$'
 
 [[expect]]
+regex = '^random: fork-next=1$'
+
+[[expect]]
 regex = '^random: getrandom ok=1$'
+
+[[expect]]
+regex = '^random: full=1$'
+
+[[expect]]
+regex = '^random: burst=1000 collision=0$'
 
 [[expect]]
 regex = '^random: ok$'

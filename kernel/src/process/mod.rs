@@ -1850,7 +1850,7 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     drop(state);
     crate::process::tty::hangup_session_leader(process);
     notify_parent(process, true);
-    crate::event::notify_all();
+    crate::event::notify_source(Arc::as_ptr(process) as usize as u64);
     drop(irq);
     teardown(process, code, own_context);
     true
