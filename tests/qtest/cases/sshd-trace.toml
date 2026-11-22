@@ -1,43 +1,45 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K498: the pre-step boots the release image with the DEBUG3 sshd overlay, makes
-# one password login and one command over a private hostfwd port, and keeps the
-# QEMU serial log (the sshd -ddd trace) in build/fixtures/sshd-trace/serial.log.
-# The case then boots the same image as a console smoke. This is a trace, not a
-# fix and not a monitor/session result claim.
+# K498: boot the release image with a DEBUG3 sshd overlay, make one guest
+# loopback password login and one command that exits, and print the full sshd
+# debug log plus the client log to the serial console. The command output and
+# the client/session close are measured from the log; the case collects the
+# trace and does not assert a fix.
 
 name = "sshd-trace"
 arch = "x86_64"
 profile = "release"
-timeout_secs = 300
-pre = ["sh tests/fixtures/sshd-trace/run.sh"]
+timeout_secs = 600
+pre = ["sh tests/fixtures/sshd-trace/build.sh"]
 image = "build/fixtures/sshd-trace/sshd-trace.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = [
-    "-nic", "none",
-    "-netdev", "user,id=n0",
-    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
-]
+qemu_extra = ["-nic", "none"]
 expect_exit = "success"
 
 [[expect]]
 regex = '^svcd: sshd up$'
 
 [[expect]]
-regex = '(?i)^.*login: ?root'
+regex = '^sshd-trace: client-started$'
 
 [[expect]]
-regex = '(?i)^password: ?$'
+regex = '^sshd-trace: waited$'
 
 [[expect]]
-regex = '^raven# $'
+regex = '^sshd-trace-command-ok$'
+
+[[expect]]
+regex = '^sshd-trace: log-end$'
+
+[[expect]]
+regex = '^sshd-trace: done$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION'
+regex = '(?i)panic|EXCEPTION|sshd-trace: FAIL'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
@@ -58,6 +60,38 @@ delay_ms = 100
 [[step]]
 wait = '^raven# $'
 timeout_secs = 120
+
+[[step]]
+send = "DISPLAY=:0 SSH_ASKPASS=/etc/ssh/askpass.sh SSH_ASKPASS_REQUIRE=force /bin/ssh -p 22 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=password -o PubkeyAuthentication=no raven@127.0.0.1 'echo sshd-trace-command-ok' > /tmp/client.log 2>&1 & echo sshd-trace: client-started\n"
+delay_ms = 100
+
+[[step]]
+wait = '^sshd-trace: client-started$'
+timeout_secs = 30
+
+[[step]]
+send = "sleep 12; echo sshd-trace: waited\n"
+delay_ms = 100
+
+[[step]]
+wait = '^sshd-trace: waited$'
+timeout_secs = 60
+
+[[step]]
+send = "echo sshd-trace: client-log; cat /tmp/client.log; echo sshd-trace: sshd-log; cat /tmp/sshd-trace.log; echo sshd-trace: log-end\n"
+delay_ms = 100
+
+[[step]]
+wait = '^sshd-trace: log-end$'
+timeout_secs = 180
+
+[[step]]
+send = "echo sshd-trace: done\n"
+delay_ms = 100
+
+[[step]]
+wait = '^sshd-trace: done$'
+timeout_secs = 30
 
 [[step]]
 send = "exit 0\n"

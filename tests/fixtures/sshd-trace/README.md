@@ -3,16 +3,24 @@
 
 # sshd session-close trace (K498)
 
-This fixture drives the release image's upstream OpenSSH 10.6p2 `sshd` with `-D -ddd` on port
-2222. It starts the manual daemon from the guest root console, writes the debug log to
-`/tmp/sshd-trace.log`, and starts the guest's own `/bin/ssh` against `raven@127.0.0.1:2222`
-through a forced `SSH_ASKPASS` script. The client runs in the background so the console remains
-available to print both logs after the command child exits.
+This fixture boots the release image with the unmodified upstream OpenSSH 10.6p2 `sshd` built
+from the current tree. The overlay changes only test inputs: `/etc/ssh/sshd_config` gets
+`LogLevel DEBUG3`, the `sshd` service runs `-D -ddd -E /tmp/sshd-trace.log`, and
+`/etc/ssh/askpass.sh` is installed 0755 for the guest client.
 
-The qtest serial log is the artifact. It frames the sshd log with `sshd-trace: log-begin` and
-`sshd-trace: log-end`; the report quotes the six-step sequence and the first missing step with
-the OpenSSH source expectation.
+The qtest drives one password login and one command over guest loopback:
 
-The OpenSSH binaries are the unmodified add-on from `addons/ssh`; `build.sh` verifies their
-presence and uses the release image at `build/qtest/sshd-trace.img`. It does not patch sshd and
-does not touch `tests/ssh/**`.
+1. the root console starts `/bin/ssh ... raven@127.0.0.1 'echo sshd-trace-command-ok'` in the
+   background, with `SSH_ASKPASS_REQUIRE=force` so the image password comes from the askpass
+   helper and no `/dev/tty` prompt is needed;
+2. the console sleeps 12 s, then prints `/tmp/client.log` and the full
+   `/tmp/sshd-trace.log` between the `sshd-trace: client-log`/`sshd-trace: log-end` markers.
+
+The qtest serial log is the artifact. The report quotes the six-step session-close sequence and
+the first step the server loop does not reach, with the OpenSSH source expectation and the exact
+log line. The fixture is a trace: it does not patch sshd and does not touch `tests/ssh/**`.
+
+The guest has no `/bin/chmod`, so the overlay tool installs the askpass helper with mode 0755.
+The OpenSSH binaries are built by `sh addons/ssh/build.sh`; `build.sh` here verifies them,
+builds the release initfs when it is missing, overlays the three test files and wraps the
+overlay initfs in `build/fixtures/sshd-trace/sshd-trace.img`.
