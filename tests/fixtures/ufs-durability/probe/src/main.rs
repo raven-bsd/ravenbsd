@@ -38,11 +38,9 @@ mod program {
     entry!(main);
 
     const FILL_PATH: &str = "file:/mnt/k466-fill";
-    const TREE: &str = "file:/mnt/k466";
-    const DATA_PATH: &str = "file:/mnt/k466/data.bin";
-    const DIR: &str = "file:/mnt/k466/dir";
-    const ENTRY_PATH: &str = "file:/mnt/k466/dir/entry.txt";
-    const RENAMED_PATH: &str = "file:/mnt/k466/dir/renamed.txt";
+    const DATA_PATH: &str = "file:/mnt/k466-data.bin";
+    const ENTRY_PATH: &str = "file:/mnt/k466-entry.txt";
+    const RENAMED_PATH: &str = "file:/mnt/k466-renamed.txt";
 
     const CHUNK: usize = 4096;
     const PERSIST_CHUNKS: usize = 16;
@@ -249,8 +247,6 @@ mod program {
     }
 
     fn persist_write() -> Result<(), String> {
-        let _ = fs::mkdir(TREE, 0o755);
-        let _ = fs::mkdir(DIR, 0o755);
         let mut file = fs::open(DATA_PATH, O_CREAT | O_RDWR | O_TRUNC)
             .map_err(|error| format!("open data: {}", error.description()))?;
         let mut data = Vec::with_capacity(CHUNK * PERSIST_CHUNKS);
