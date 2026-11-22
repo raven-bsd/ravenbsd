@@ -185,6 +185,8 @@ pub struct Thread {
     pub pinned: AtomicBool,
     /// User TLS base (`IA32_FS_BASE` / `TPIDR_EL0`), installed on switch-in.
     pub tls_base: AtomicU64,
+    /// Monotonic timestamp when this user thread last entered user mode; zero in kernel mode.
+    pub user_enter_ns: AtomicU64,
     /// Sticky thread-kick bits (PG-8).
     pub kick_bits: AtomicU32,
     /// True while the thread is in an interruptible blocking wait.
@@ -356,6 +358,7 @@ impl Thread {
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
             tls_base: AtomicU64::new(0),
+            user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),
@@ -454,6 +457,7 @@ impl Thread {
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
             tls_base: AtomicU64::new(0),
+            user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),
@@ -507,6 +511,7 @@ impl Thread {
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
             tls_base: AtomicU64::new(0),
+            user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),

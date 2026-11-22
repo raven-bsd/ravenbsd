@@ -3076,6 +3076,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-times"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proto-audio"
 version = "0.1.0"
 dependencies = [
