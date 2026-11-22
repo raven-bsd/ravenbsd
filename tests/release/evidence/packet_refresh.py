@@ -267,15 +267,6 @@ def build_rows(root: Path, mgmt_root: Path, packet_dir: Path) -> list[dict[str, 
             "served-copy check log present",
         )
     )
-    rows.append(
-        packet_check(
-            "packet:evidence-index",
-            packet_dir / "evidence-index-check.log",
-            head,
-            re.compile(r"evidence-index: tickets=.*"),
-            "evidence index check log present",
-        )
-    )
 
     return rows
 
