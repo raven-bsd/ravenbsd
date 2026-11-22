@@ -58,6 +58,8 @@ MP_CAPABLE is rejected with `UnsupportedVersion` (fallback to TCP is the caller'
 | Linux `net/mptcp/options.c` | GPL-2.0 | `mptcp_parse_option`, `mptcp_write_options`, DSS/ADD_ADDR layouts | read-only oracle; no code copied |
 | Linux `net/mptcp/crypto.c` | GPL-2.0 | `mptcp_crypto_key_sha`, `mptcp_crypto_hmac_sha` ordering | read-only oracle; no code copied |
 | Linux `net/mptcp/pm.c`, `pm_netlink.c` | GPL-2.0 | path announce/remove/priority behaviour | read-only oracle; no code copied |
+| Linux `net/mptcp/protocol.c` | GPL-2.0 | connection send/receive queues and DATA_ACK behaviour | read-only oracle; no code copied |
+| Linux `net/mptcp/sched.c` | GPL-2.0 | active/backup subflow selection | read-only oracle; no code copied |
 | FreeBSD RACK | BSD-2 | send/receive hook shape only (`tcp_output.c`/`tcp_input.c` RACK paths) | later phase 2 structure, no code here |
 | Illumos | CDDL | no MPTCP implementation | no code read or copied |
 
@@ -76,6 +78,42 @@ timeout 900 make check-fast
 Byte-exact vectors live in `tests/mptcp/tests/vectors.rs`; unit tests live in each
 `crates/raven-mptcp/src/*_ut.rs`. The vector table covers every implemented subtype, every prefix
 of every vector must fail, and the fuzz replay checks accepted bytes re-encode canonically.
+
+## Meta-socket simulation (MPTCP1c)
+
+`meta::MetaSocket` is the connection-level data plane above the wire format. It is driven by the
+object-safe `meta::Subflow` trait, so a mock transport can exercise every failure mode without a
+kernel:
+
+* the send buffer is keyed by data sequence number; `send` chunks by MSS within the configured
+  send cap and `pump` assigns unsent ranges to the active path;
+* one active path is chosen (first alive regular path, otherwise an alive backup). A backup
+  carries no data while a regular path is alive; `set_backup`/`set_alive` re-run the scheduler;
+* a dead path's unacknowledged ranges are requeued and sent once on the new active path;
+  the receiver trims duplicate/overlapping DSN ranges, so the application sees each byte once;
+* the receive side buffers out-of-order ranges within the connection window and memory cap,
+  delivers in order, and tracks the connection Data ACK (`data_ack` = next expected DSN);
+* `close` sends a DATA_FIN, `on_mp_fail` discards data at/after the failed DSN (keeping a valid
+  prefix), and `on_fastclose` aborts and clears buffers;
+* every queue is bounded by the constructor caps; a full send buffer is `WouldBlock`, an
+  out-of-window range is `WindowViolation`, and over-cap receive memory is `MemoryLimit`.
+
+Scenario matrix (`crates/raven-mptcp/src/meta_ut.rs`, 11 tests):
+
+| Scenario | Assertion |
+|---|---|
+| backup while primary alive | only the regular subflow is used |
+| out-of-order + duplicates | byte-exact stream, one copy, ACK advances |
+| primary dies mid-stream | only unacked DSNs are reinjected on the backup, once |
+| slow/erroring primary | range stays pending, backup takes it when retired |
+| priority change | new primary carries subsequent data |
+| simultaneous FIN | both peers see DATA_FIN, read EOF |
+| MP_FAIL | data at/after the failed DSN is discarded, prefix kept |
+| fastclose | connection closes and buffers clear |
+| memory/window bounds | `WouldBlock`/`MemoryLimit`/`WindowViolation`, queue within cap |
+
+The mock subflows live only in `meta_ut.rs`; `raven-tcpip` and the kernel are untouched. MPTCP2
+adapts the real TCP subflow to the same `Subflow` trait.
 
 ## Phase 2 boundary
 

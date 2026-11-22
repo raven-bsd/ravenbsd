@@ -36,6 +36,7 @@ extern crate alloc;
 pub mod crypto;
 pub mod dss;
 pub mod handshake;
+pub mod meta;
 pub mod option;
 pub mod path;
 
@@ -45,6 +46,7 @@ pub use handshake::{
     MpCapableFlags, MpCapableHandshake, MpJoinAck, MpJoinInitiator, MpJoinResponder, MpJoinSyn,
     MpJoinSynAck,
 };
+pub use meta::{MetaSocket, Subflow};
 pub use option::{Address, MptcpOption, RemoveIds, TcpRstReason};
 pub use path::{MAX_PATHS, Path, PathManager};
 
@@ -76,4 +78,12 @@ pub enum Error {
     PathTableFull,
     /// The requested path does not exist.
     NotFound,
+    /// The send buffer is full; the caller should retry after an ACK.
+    WouldBlock,
+    /// The peer exceeded the connection-level receive window.
+    WindowViolation,
+    /// A queue would exceed its configured bound.
+    MemoryLimit,
+    /// The connection is closed.
+    Closed,
 }
