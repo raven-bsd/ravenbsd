@@ -10,10 +10,10 @@ use raven_abi::errno::Errno;
 use crate::Platform;
 use crate::backend::FakeSys;
 use crate::fd::inherit::{
-    ENTRY_LEN_V2, FDMAP_MAGIC, FDMAP_VERSION, FDMAP_VERSION_V1, FdMap, FdMapEntry, HEADER_LEN,
+    ENTRY_LEN_V3, FDMAP_MAGIC, FDMAP_VERSION, FDMAP_VERSION_V1, FdMap, FdMapEntry, HEADER_LEN,
     NO_PATH, entry_handle, transferable,
 };
-use crate::fd::ofd::OfdKind;
+use crate::fd::ofd::{OfdKind, SocketMeta};
 
 fn sample() -> FdMap {
     let mut first = FdMapEntry::new(0, 0x10, OfdKind::File, 0, 0);
@@ -46,12 +46,28 @@ fn round_trip_keeps_every_field() {
 }
 
 #[test]
+fn socket_metadata_round_trips() {
+    let mut entry = FdMapEntry::new(3, 0x44, OfdKind::Socket, 0, 2);
+    entry.socket = Some(SocketMeta {
+        domain: 1,
+        ty: 1,
+        proto: 0,
+        state: 5,
+    });
+    let map = FdMap {
+        entries: vec![entry],
+    };
+    let decoded = FdMap::decode(&map.encode().expect("encode")).expect("decode");
+    assert_eq!(decoded, map);
+}
+
+#[test]
 fn string_table_is_shared() {
     let mut map = sample();
     map.entries[1].path = Some(b"/tmp/a".to_vec());
     let bytes = map.encode().expect("encode");
     // Header + two entries + one NUL-terminated string.
-    assert_eq!(bytes.len(), HEADER_LEN + 2 * ENTRY_LEN_V2 + 14);
+    assert_eq!(bytes.len(), HEADER_LEN + 2 * ENTRY_LEN_V3 + 14);
     let decoded = FdMap::decode(&bytes).expect("decode");
     assert_eq!(
         decoded.entries[1].path.as_deref(),
@@ -156,6 +172,29 @@ fn restore_fdmap_shares_one_ofd_per_handle() {
     let _ = platform.close(1);
     assert!(platform.get(1).is_err());
     assert_eq!(platform.ofd_refs(), 0);
+}
+
+#[test]
+fn restored_socket_exposes_its_identity() {
+    let platform = Platform::new(FakeSys::new());
+    let mut entry = FdMapEntry::new(3, 0x51, OfdKind::Socket, 0, 2);
+    entry.socket = Some(SocketMeta {
+        domain: 1,
+        ty: 1,
+        proto: 0,
+        state: 5,
+    });
+    platform
+        .restore_fdmap(&FdMap {
+            entries: vec![entry],
+        })
+        .expect("restore");
+    let inherited = platform.inherited_sockets();
+    assert_eq!(inherited.len(), 1);
+    assert_eq!(inherited[0].fd, 3);
+    assert_eq!(inherited[0].socket.domain, 1);
+    assert_eq!(inherited[0].socket.ty, 1);
+    assert_eq!(inherited[0].socket.state, 5);
 }
 
 #[test]
