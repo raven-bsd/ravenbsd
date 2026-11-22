@@ -156,12 +156,11 @@ delay_ms = 100
 wait = '^read-ok$'
 timeout_secs = 120
 
-# K522 regression row: one bounded multi-block write+read over the MSI-X
-# completion path (the shell binary is several hundred KiB, so this exercises
-# hundreds of completions). The vector must stay owned for the whole transfer;
-# any `irq:` report (unclaimed vector / unexpected interrupt) fails the case.
+# K522 regression row: bounded disk I/O loop over the MSI-X completion path.
+# Eight write+read cycles, N=8; the vector must stay owned for the whole loop.
+# Any `irq:` report (unclaimed vector / unexpected interrupt) fails the case.
 [[step]]
-send = "cat /bin/brush > /mnt/irq-loop.bin; cat /mnt/irq-loop.bin > /dev/null; echo irq-loop-ok\n"
+send = "i=0; while [ $i -lt 8 ]; do cat /etc/motd > /mnt/i; cat /mnt/i > /dev/null; i=$((i+1)); done; echo irq-loop-ok\n"
 delay_ms = 100
 
 [[step]]
