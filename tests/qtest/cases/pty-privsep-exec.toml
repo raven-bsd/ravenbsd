@@ -24,6 +24,15 @@ regex = '^pty-privsep-exec: start uid=0$'
 regex = '^pty-privsep-exec: child start fd=[0-9]+ negative=0$'
 
 [[expect]]
+regex = '^pty-privsep-exec: child state tag=exec1 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child reexec fd=[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child state tag=exec2 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$'
+
+[[expect]]
 regex = '^pty-privsep-exec: child round=0 request=ok$'
 
 [[expect]]
@@ -64,6 +73,9 @@ regex = '^pty-privsep-exec: positive ok$'
 
 [[expect]]
 regex = '^pty-privsep-exec: child start fd=[0-9]+ negative=1$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child state tag=exec1 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$'
 
 [[expect]]
 regex = '^pty-privsep-exec: negative send errno=(9|32)$'

@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
@@ -225,6 +226,28 @@ static int monitor_main(int sock) {
     return 0;
 }
 
+static void report_state(const char *tag, int fd) {
+    struct stat inherited;
+    int fstat_rv = fstat(fd, &inherited);
+    int fstat_errno = errno;
+    int duplicated = dup(fd);
+    int dup_errno = errno;
+    if (duplicated >= 0)
+        close(duplicated);
+    int type = 0;
+    socklen_t length = (socklen_t)sizeof(type);
+    errno = 0;
+    int sockopt = getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &length);
+    int sockopt_errno = errno;
+    int flags = fcntl(fd, F_GETFD);
+    printf(
+        "pty-privsep-exec: child state tag=%s fstat=%d/%d dup=%d/%d getsockopt=%d/%d "
+        "type=%d fcntl=%d\n",
+        tag, fstat_rv, fstat_errno, duplicated, dup_errno, sockopt, sockopt_errno, type,
+        flags);
+    fflush(stdout);
+}
+
 static int session_child(int sock) {
     for (int round = 0; round < 2; round++) {
         if (send_frame(sock, REQ_PTY, NULL, 0) != 0)
@@ -298,7 +321,7 @@ static int exec_child(const char *tag, int fd, int negative) {
         return -1;
     if (child == 0) {
         char *argv[] = { "libc-test", "pty-privsep-exec-child", fd_text,
-                         negative ? "negative" : "positive", NULL };
+                         negative ? "negative" : "exec1", NULL };
         char *envp[] = { NULL };
         (void)execve("/bin/libc-test", argv, envp);
         _exit(127);
@@ -344,10 +367,24 @@ static int run_case(int negative) {
 int main(int argc, char **argv) {
     if (argc > 2 && strcmp(argv[1], "pty-privsep-exec-child") == 0) {
         int fd = atoi(argv[2]);
-        int negative = argc > 3 && strcmp(argv[3], "negative") == 0;
-        printf("pty-privsep-exec: child start fd=%d negative=%d\n", fd, negative);
+        const char *mode = argc > 3 ? argv[3] : "run";
+        int negative = strcmp(mode, "negative") == 0;
+        if (strcmp(mode, "run") == 0) {
+            printf("pty-privsep-exec: child reexec fd=%d\n", fd);
+        } else {
+            printf("pty-privsep-exec: child start fd=%d negative=%d\n", fd, negative);
+        }
         fflush(stdout);
-        return negative ? negative_child(fd) : session_child(fd);
+        report_state(strcmp(mode, "run") == 0 ? "exec2" : "exec1", fd);
+        if (strcmp(mode, "exec1") == 0) {
+            char *again[] = { "libc-test", "pty-privsep-exec-child", argv[2], "run", NULL };
+            char *envp[] = { NULL };
+            (void)execve("/bin/libc-test", again, envp);
+            _exit(127);
+        }
+        if (negative)
+            return negative_child(fd);
+        return session_child(fd);
     }
 
     printf("pty-privsep-exec: start uid=%d\n", (int)getuid());
