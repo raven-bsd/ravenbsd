@@ -56,7 +56,7 @@ send = "raven\n"
 delay_ms = 100
 
 [[step]]
-wait = '^raven# $'
+wait = '^\s*raven#\s*$'
 timeout_secs = 60
 
 [[step]]
