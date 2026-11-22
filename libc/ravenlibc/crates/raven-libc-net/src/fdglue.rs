@@ -2,12 +2,15 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! `SocketFds` over C55's `Platform` fd table.
+
+use alloc::vec::Vec;
+
 use crate::ErrnoExt;
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::fcntl::O_NONBLOCK;
 use raven_libc_platform::backend::SysBackend;
-use raven_libc_platform::fd::OfdKind;
+use raven_libc_platform::fd::{InheritedSocket, OfdKind, SocketMeta};
 use raven_libc_platform::lock::Lock;
 use raven_libc_platform::{Handle, Platform};
 
@@ -88,6 +91,14 @@ impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
 
     fn release(&self, _ofd: u32) {
         // The platform owns the OFD reference count and closes the handle at zero.
+    }
+
+    fn inherited(&self) -> Vec<InheritedSocket> {
+        self.platform.inherited_sockets()
+    }
+
+    fn set_meta(&self, ofd: u32, meta: SocketMeta) {
+        self.platform.set_ofd_socket_meta(ofd, meta);
     }
 }
 

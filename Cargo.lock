@@ -1857,6 +1857,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-init-worker-eintr"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-init",
+ "raven-initfs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-svc-manifest",
+]
+
+[[package]]
 name = "raven-initfs"
 version = "0.1.0"
 
@@ -3007,6 +3019,15 @@ name = "raven-proc-identity"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-pgrp"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
  "raven-rt",
 ]
 

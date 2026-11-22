@@ -20,11 +20,14 @@ mod program {
     use alloc::collections::BTreeMap;
 
     use raven_abi::errno::Errno;
+    use raven_abi::types::clock;
     use raven_proto_fs::{S_IFCHR, Stat};
     use raven_proto_tty::{self, Request, Response, decode_request, encode_response};
     use raven_ptyd::{Pairs, SignalSink};
     use raven_rt::entry;
+    use raven_rt::sys::{clock_get, nanosleep};
     use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
+    use raven_tty_core::{VMIN, VTIME};
 
     entry!(main);
 
@@ -44,6 +47,53 @@ mod program {
                 raven_rt::sys::syscall2(PROC_SIGNAL, pgrp as isize as usize, signo as usize)
             };
             Errno::from_ret(raw).map(|_| ())
+        }
+    }
+
+    /// Monotonic nanoseconds, or zero when the clock is unavailable.
+    fn now_ns() -> u64 {
+        clock_get(clock::MONOTONIC).map_or(0, |time| {
+            (time.tv_sec as u64)
+                .saturating_mul(1_000_000_000)
+                .saturating_add(time.tv_nsec as u64)
+        })
+    }
+
+    /// Slave read with `VMIN`/`VTIME` semantics.
+    ///
+    /// `VMIN`/`VTIME` are stored in the termios record; a slave read applies them here because
+    /// the scheme server is the only place with a clock. The loop yields 1 ms between polls, so
+    /// it does not busy-spin. `VTIME` is in deciseconds, as in termios. This mirrors the donor's
+    /// read timer outcome; it is not the donor's wait queue implementation.
+    fn read_slave_wait(
+        pty: &mut raven_ptyd::Pty<TargetSignal>,
+        buffer: &mut [u8],
+    ) -> Result<usize, Errno> {
+        let termios = pty.termios();
+        let vmin = usize::from(termios.cc(VMIN));
+        let vtime = u64::from(termios.cc(VTIME));
+        match pty.read_slave(buffer) {
+            Ok(count) => return Ok(count),
+            Err(Errno::EAGAIN) => {}
+            Err(error) => return Err(error),
+        }
+        if vmin == 0 && vtime == 0 {
+            return Err(Errno::EAGAIN);
+        }
+        let start = now_ns();
+        let limit = (vtime != 0).then_some(vtime.saturating_mul(100_000_000));
+        loop {
+            let _ = nanosleep(1_000_000);
+            match pty.read_slave(buffer) {
+                Ok(count) => return Ok(count),
+                Err(Errno::EAGAIN) => {}
+                Err(error) => return Err(error),
+            }
+            if let Some(limit) = limit
+                && now_ns().saturating_sub(start) >= limit
+            {
+                return Ok(0);
+            }
         }
     }
 
@@ -124,7 +174,7 @@ mod program {
             let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
             let count = match entry.role {
                 Role::Master => pty.read_master(buffer),
-                Role::Slave => pty.read_slave(buffer),
+                Role::Slave => read_slave_wait(pty, buffer),
             }
             .map_err(raven_scheme::HandlerError::Errno)?;
             Ok(count)
