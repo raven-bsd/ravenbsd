@@ -92,6 +92,16 @@ mod program {
         mount_generation: u32,
     }
 
+    #[derive(Clone, Copy)]
+    struct DiagEntry {
+        op: u8,
+        file: u64,
+        offset: u64,
+        len: u64,
+        request: u32,
+        accepted: bool,
+    }
+
     struct VfsHandler {
         table: MountTable,
         opens: OpenTable<Proxy>,
@@ -99,6 +109,8 @@ mod program {
         mount_generation: u32,
         probe: crate::trace::Probe,
         trace: bool,
+        diag: [Option<DiagEntry>; 16],
+        diag_len: usize,
     }
 
     impl VfsHandler {
@@ -110,7 +122,51 @@ mod program {
                 mount_generation: 1,
                 probe: crate::trace::Probe::server(),
                 trace,
+                diag: [None; 16],
+                diag_len: 0,
             }
+        }
+
+        fn note_diag(
+            &mut self,
+            op: u8,
+            file: u64,
+            offset: u64,
+            len: u64,
+            request: u32,
+            accepted: bool,
+        ) {
+            let index = self.diag_len % 16;
+            if let Some(slot) = self.diag.get_mut(index) {
+                *slot = Some(DiagEntry {
+                    op,
+                    file,
+                    offset,
+                    len,
+                    request,
+                    accepted,
+                });
+                self.diag_len = self.diag_len.saturating_add(1);
+            }
+        }
+
+        fn dump_diag(&self) {
+            println!("vfsd-diag: begin entries={}", self.diag_len.min(16));
+            let start = self.diag_len.saturating_sub(16);
+            for index in start..self.diag_len {
+                if let Some(entry) = self.diag.get(index % 16).copied().flatten() {
+                    println!(
+                        "vfsd-diag: op={} file={} off={} len={} req={} accepted={}",
+                        entry.op,
+                        entry.file,
+                        entry.offset,
+                        entry.len,
+                        entry.request,
+                        entry.accepted
+                    );
+                }
+            }
+            println!("vfsd-diag: end");
         }
 
         fn bump_mounts(&mut self) {
@@ -339,6 +395,7 @@ mod program {
             len: u64,
             shared: bool,
         ) -> HandlerResult<CallReply> {
+            self.note_diag(4, file, offset, len, 0, true);
             if self.trace {
                 println!(
                     "vfsd-trace: mmap file={file} offset={offset} len={len} shared={shared} open={}",
@@ -972,6 +1029,10 @@ mod program {
             _mode: u32,
             ctx: &Ctx,
         ) -> HandlerResult<Opened> {
+            if path == "__diag__" || path == "/__diag__" {
+                self.dump_diag();
+                return Err(Errno::EINVAL.into());
+            }
             self.probe.record(ctx.trace_id, OPEN_OPCODE);
             let (path, requires_dir) = self.normalize_request_path(path)?;
             let directory = requires_dir || flags.directory();
@@ -1036,6 +1097,7 @@ mod program {
                     path_for_trace, target_handle, ctx.trace_id, ctx.request.0
                 );
             }
+            self.note_diag(1, u64::from(target_handle), 0, 0, ctx.request.0, true);
             Ok(Opened::File(id))
         }
 
@@ -1061,6 +1123,14 @@ mod program {
             buffer: &mut [u8],
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
+            self.note_diag(
+                2,
+                file,
+                offset,
+                u64::try_from(buffer.len()).unwrap_or(0),
+                ctx.request.0,
+                true,
+            );
             self.probe.record(ctx.trace_id, READ_OPCODE);
             if !self.trace {
                 return self.read(file, offset, buffer);
@@ -1106,6 +1176,14 @@ mod program {
             buffer: &[u8],
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
+            self.note_diag(
+                3,
+                file,
+                offset,
+                u64::try_from(buffer.len()).unwrap_or(0),
+                ctx.request.0,
+                true,
+            );
             if !self.trace {
                 return self.write(file, offset, buffer);
             }

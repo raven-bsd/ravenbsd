@@ -56,7 +56,7 @@ static int phase(const char *tag) {
     if (openpty(&master, &slave, name, NULL, NULL) < 0)
         return fail("openpty", -1);
     printf("pty-alloc: %s master=%d slave=%d name=%s\n", tag, master, slave, name);
-    if (strncmp(name, "pty:slave/", 10) != 0)
+    if (strncmp(name, "/dev/pts/", 9) != 0)
         return fail("name", -1);
     if (grantpt(master) != 0)
         return fail("grantpt", -1);

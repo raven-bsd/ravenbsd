@@ -1156,6 +1156,7 @@ pthread_testcancel
 pthread_timedjoin_np
 pthread_tryjoin_np
 pthread_yield
+ptsname
 ptsname_r
 putc
 putc_unlocked

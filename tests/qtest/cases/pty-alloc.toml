@@ -17,10 +17,10 @@ expect_exit = "success"
 regex = '^pty-alloc: start uid=0$'
 
 [[expect]]
-regex = '^pty-alloc: root master=-?[0-9]+ slave=-?[0-9]+ name=pty:slave/[0-9]+$'
+regex = '^pty-alloc: root master=-?[0-9]+ slave=-?[0-9]+ name=/dev/pts/[0-9]+$'
 
 [[expect]]
-regex = '^pty-alloc: root ptsname=pty:slave/[0-9]+$'
+regex = '^pty-alloc: root ptsname=/dev/pts/[0-9]+$'
 
 [[expect]]
 regex = '^pty-alloc: root roundtrip=ok$'
@@ -29,10 +29,10 @@ regex = '^pty-alloc: root roundtrip=ok$'
 regex = '^pty-alloc: uid=1000$'
 
 [[expect]]
-regex = '^pty-alloc: user master=-?[0-9]+ slave=-?[0-9]+ name=pty:slave/[0-9]+$'
+regex = '^pty-alloc: user master=-?[0-9]+ slave=-?[0-9]+ name=/dev/pts/[0-9]+$'
 
 [[expect]]
-regex = '^pty-alloc: user ptsname=pty:slave/[0-9]+$'
+regex = '^pty-alloc: user ptsname=/dev/pts/[0-9]+$'
 
 [[expect]]
 regex = '^pty-alloc: user roundtrip=ok$'
