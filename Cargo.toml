@@ -95,6 +95,7 @@ members = [
     "tests/fixtures/k54-ufs/mkimage",
     "tests/fixtures/k54-ufs/probe",
     "tests/fixtures/k55-ufs/probe",
+    "tests/fixtures/ufs-durability/probe",
     "tests/fixtures/pi4-root/rw-probe",
     "tests/fixtures/b15-resolv/dnsd",
     "tests/fixtures/b15-resolv/probe",
