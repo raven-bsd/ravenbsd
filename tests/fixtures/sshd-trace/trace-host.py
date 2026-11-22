@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-"""K498 host-client sshd session-close trace over the isolated tap.
+"""K547 tap accepted-socket comparison in one boot.
 
-Boots the K498 DEBUG3 image with a private tap, makes one password login and
-one command from the host (the K194 tap path; slirp hostfwd is the known
-FIN/RST failure), and keeps the serial console, where the overlay sshd writes
-its full debug log. The first session's close state is recorded: a command that
-prints and then never closes is the S7/S5 symptom.
+Boots the K547 image with a private static tap, logs in to the guest console,
+runs the host tap client and the guest loopback client against the same sshd,
+and keeps the serial log. The host client result and the sshd `Connection from`
+line are the measurement; the guest loopback client is the control.
 """
 
 from __future__ import annotations
@@ -25,8 +24,7 @@ ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "build" / "fixtures" / "sshd-trace"
 IMAGE = OUT / "sshd-trace.img"
 SERIAL = OUT / "host-serial.log"
-CLIENT1 = OUT / "host-client1.log"
-SERVER_LOG = OUT / "host-sshd.log"
+CLIENT = OUT / "host-client.log"
 SUMMARY = OUT / "host-summary.txt"
 TAP = os.environ.get("RAVEN_TRACE_TAP", "ravetrace0")
 GUEST = os.environ.get("RAVEN_TRACE_GUEST", "10.0.2.15")
@@ -49,7 +47,19 @@ def wait_tcp(host: str, port: int, timeout: float) -> bool:
     return False
 
 
-def ssh(host: str, command: str, logfile: Path, close_timeout: int, expect: str) -> str:
+def probe_client(host: str) -> str:
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, 23147), timeout=3) as connection:
+                connection.settimeout(10)
+                return f"banner={connection.recv(32)!r}"
+        except OSError:
+            time.sleep(1)
+    return "no-connect"
+
+
+def host_client(host: str) -> str:
     child = pexpect.spawn(
         "ssh",
         [
@@ -61,21 +71,21 @@ def ssh(host: str, command: str, logfile: Path, close_timeout: int, expect: str)
             "-o", "ConnectTimeout=10",
             "-o", "NumberOfPasswordPrompts=1",
             f"raven@{host}",
-            command,
+            "echo sshd-trace-command-ok",
         ],
         encoding="utf-8",
         codec_errors="replace",
         timeout=30,
     )
     state = "no-password"
-    with open(logfile, "w", encoding="utf-8") as out:
+    with open(CLIENT, "w", encoding="utf-8") as out:
         child.logfile = out
         try:
             child.expect(r"(?i)password:\s*")
             child.sendline("raven")
-            child.expect(expect, timeout=30)
+            child.expect("sshd-trace-command-ok", timeout=30)
             state = "command-ok"
-            child.expect(pexpect.EOF, timeout=close_timeout)
+            child.expect(pexpect.EOF, timeout=20)
             state += "/closed"
         except pexpect.TIMEOUT:
             if state == "command-ok":
@@ -87,11 +97,20 @@ def ssh(host: str, command: str, logfile: Path, close_timeout: int, expect: str)
     return state
 
 
+def console(child: pexpect.spawn, command: str, marker: str, timeout: int) -> str:
+    child.sendline(command)
+    try:
+        child.expect(marker, timeout=timeout)
+        return "ok"
+    except pexpect.TIMEOUT:
+        return "timeout"
+
+
 def main() -> int:
     if not IMAGE.is_file():
         log("error", f"missing {IMAGE}; run tests/fixtures/sshd-trace/build.sh")
         return 2
-    for path in (SERIAL, CLIENT1, SERVER_LOG, SUMMARY):
+    for path in (SERIAL, CLIENT, SUMMARY):
         path.unlink(missing_ok=True)
     vars_path = OUT / "vars-host.fd"
     vars_path.write_bytes(OVMF_VARS.read_bytes())
@@ -108,44 +127,60 @@ def main() -> int:
     ]
     child = pexpect.spawn("qemu-system-x86_64", argv, cwd=str(ROOT),
                           encoding="utf-8", codec_errors="replace", timeout=240)
-    first = "not-run"
+    tap = "not-run"
+    loop = "not-run"
+    tap_tail = "not-run"
     with open(SERIAL, "w", encoding="utf-8") as serial:
         child.logfile = serial
         try:
             child.expect("svcd: getty up", timeout=240)
+            probe = probe_client(GUEST)
+            log("accept-probe", probe)
+            try:
+                child.expect("sshd-trace-accept: done", timeout=60)
+            except pexpect.TIMEOUT:
+                log("accept-probe", "done marker timeout")
+            child.expect(r"login: ?", timeout=120)
+            child.sendline("root")
+            child.expect(r"(?i)password: ?", timeout=30)
+            child.sendline("raven")
+            child.expect("raven# ", timeout=120)
+            log("console", "root login")
             if not wait_tcp(GUEST, 22, 120):
                 log("error", f"guest sshd did not accept on {GUEST}:22")
                 return 2
             log("ready", f"{GUEST}:22")
-            first = ssh(GUEST, "echo sshd-trace-command-ok", CLIENT1, 20,
-                        "sshd-trace-command-ok")
-            log("client1", first)
-            time.sleep(10)
+            tap = host_client(GUEST)
+            log("host-tap", tap)
+            tap_tail = console(child, "tail -30 /tmp/sshd-trace.log; M=Q; echo ${M}A",
+                               "QA", 90)
+            log("tap-log", tap_tail)
+            console(child, "/bin/brush /etc/ssh/trace-client.sh > /tmp/loop.log 2>&1 & "
+                           "M=Q; echo ${M}S", "QS", 90)
+            time.sleep(12)
+            loop_tail = console(child, "tail -30 /tmp/sshd-trace.log; M=Q; echo ${M}B",
+                                "QB", 90)
+            log("loop-log", loop_tail)
+            console(child, "cat /tmp/loop.log; M=Q; echo ${M}L", "QL", 60)
         finally:
             child.close(force=True)
     text = SERIAL.read_text(encoding="utf-8", errors="replace")
-    keep = []
-    for line in text.splitlines():
-        if (
-            "sshd" in line
-            or "debug1:" in line
-            or "debug2:" in line
-            or "debug3:" in line
-            or "Server listening" in line
-            or "Connection from" in line
-            or "Accepted" in line
-            or "Received" in line
-            or "session" in line
-            or "channel" in line
-        ):
-            keep.append(line)
-    SERVER_LOG.write_text("\n".join(keep) + "\n", encoding="utf-8")
-    collected = "Server listening" in text and "Connection from" in text
-    SUMMARY.write_text(f"client1={first}\ncollected={collected}\n", encoding="utf-8")
-    log("summary", f"client1={first} collected={collected}")
-    if not collected:
+    tap_connected = "Connection from 10.0.2.2" in text
+    loop_connected = "Connection from 127.0.0.1" in text
+    loop_ok = "sshd-trace-loop-ok" in text
+    loop = "ok" if loop_ok else "missing"
+    SUMMARY.write_text(
+        f"host_tap={tap}\ntap_tail={tap_tail}\ntap_connection_from={tap_connected}\n"
+        f"loop_connection_from={loop_connected}\nguest_loop={loop}\n"
+        f"accept_probe={probe}\n",
+        encoding="utf-8",
+    )
+    log("summary", f"host_tap={tap} tap_connection_from={tap_connected} "
+                   f"loop_connection_from={loop_connected} guest_loop={loop} "
+                   f"accept_probe={probe}")
+    if not loop_ok:
         return 2
-    log("logs", f"client1={CLIENT1} sshd={SERVER_LOG} serial={SERIAL} summary={SUMMARY}")
+    log("logs", f"serial={SERIAL} client={CLIENT} summary={SUMMARY}")
     return 0
 
 

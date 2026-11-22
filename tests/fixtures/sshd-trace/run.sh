@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K498: build the DEBUG3 overlay image, bring up an isolated K194-style
-# tap/bridge (no hostfwd: the slirp proxy is the known FIN/RST failure), run the
-# host SSH client trace, and tear the bridge down. The fixture owns the
-# ravenbrtrace/ravetrace0 names; it does not touch Ken's tests/ssh matrix or the
-# shared ravenbr0/ravendemo0.
+# K547: build the DEBUG3 overlay image, bring up an isolated private tap/bridge
+# (static 10.0.2.15/24, no hostfwd: the slirp proxy is the known FIN/RST
+# failure), run the host tap client and the guest loopback control in one boot,
+# and tear the bridge down. The fixture owns the ravenbrtrace/ravetrace0 names;
+# it does not touch Ken's tests/ssh matrix or the shared ravenbr0/ravendemo0.
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
