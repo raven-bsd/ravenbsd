@@ -21,6 +21,11 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$root"
 
+# One tap name for both the K194 helper and the QEMU boots: the tap must be
+# created for this user (qemu-net.sh uses $SUDO_USER) or QEMU cannot open it.
+RAVEN_QEMU_TAP=${RAVEN_QEMU_TAP:-ravendemo0}
+export RAVEN_QEMU_TAP
+
 image=${RAVEN_SSH_IMAGE:-build/qtest/ssh-login.img}
 [ -f "$image" ] || {
     echo "bootloop: missing $image; build it with" >&2

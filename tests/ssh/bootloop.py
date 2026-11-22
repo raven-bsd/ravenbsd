@@ -96,13 +96,18 @@ def boot(index: int) -> tuple[subprocess.Popen, Path]:
         "-netdev", f"tap,id=n0,ifname={TAP},script=no,downscript=no",
         "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     ]
-    child = subprocess.Popen(
-        argv, cwd=ROOT, start_new_session=True,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
+    qemu_err = boot_dir / "qemu.err"
+    with open(qemu_err, "wb") as err:
+        child = subprocess.Popen(
+            argv, cwd=ROOT, start_new_session=True,
+            stdout=subprocess.DEVNULL, stderr=err,
+        )
     if not wait_serial(serial, b"svcd: sshd up", 180):
         kill(child)
-        raise RuntimeError(f"boot {index}: sshd never started; serial {serial}")
+        tail = qemu_err.read_text(errors="replace").strip()[-400:]
+        raise RuntimeError(
+            f"boot {index}: sshd never started; serial {serial}; qemu.err={tail}"
+        )
     if not wait_serial(serial, b"netd: interface eth0 10.0.2.15/24", 30):
         kill(child)
         raise RuntimeError(f"boot {index}: netd never published 10.0.2.15")
