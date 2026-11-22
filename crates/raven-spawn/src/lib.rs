@@ -1628,6 +1628,7 @@ fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
 }
 
 #[cfg(any(feature = "alloc", test))]
+#[allow(dead_code)] // the caller is target-only; host tests exercise it
 fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
     let mut out = alloc_crate::vec::Vec::with_capacity(8usize.saturating_add(18 * entries.len()));

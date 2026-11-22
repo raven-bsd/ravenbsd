@@ -1,13 +1,13 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# VFS path robustness (K478)
+# VFS path robustness (K478 observed, K487 fixed)
 
-Status: **OBSERVED on base `c185d551`, x86-64, TCG `smp=4` and KVM `smp=2`.** The guest service
-`tests/smp/vfs-fuzz` runs under svcd after vfsd/initfsd on the `core-servers-files` profile. It
-issues malformed paths through the kernel `OPEN` path (libc and raw) and the vfsd `CALL` path
-(`lstat`/`readlink`), then chroots to `/etc` and repeats the escape attempts. It fixes nothing:
-**the chroot escape below is a P0 finding for the owning lane.**
+Status: **K478 observed the chroot escape on base `c185d551`; K487 fixed it on base `c765b13d`.**
+The guest service `tests/smp/vfs-fuzz` runs under svcd after vfsd/initfsd on the
+`core-servers-files` profile. It issues malformed paths through the kernel `OPEN` path (libc and
+raw) and the vfsd `CALL` path (`lstat`/`readlink`), then chroots to `/etc` and repeats the escape
+attempts. The chroot escape below was a P0; the regression rows now require `ENOENT`.
 
 ## Contract rows (OBSERVED)
 
@@ -32,7 +32,7 @@ issues malformed paths through the kernel `OPEN` path (libc and raw) and the vfs
 | CH01-CH02 | `open("/mounts")`, `open("/../mounts")` inside | success; the clamped path is the mount table, not `/init` |
 | CH03-CH04 | `open("/init")`, `open("/../init")` (fresh OPEN) | ENOENT (kernel root clamp works) |
 | CH05-CH06 | raw `file:/init`, `file:/../init` (fresh OPEN) | ENOENT (kernel root clamp works) |
-| **CH07-CH08** | **`lstat("/init")`, `lstat("/../init")` on the cached root** | **ESCAPE: resolves the real `/init` (mode 0100755, size 3238544)** |
+| CH07-CH10 | cached-root `lstat("/init")`, `/../init`, `/../../init`; in-root `lstat("/mounts")` | K478: ESCAPE (real `/init`); **K487: ENOENT/ENOENT/ENOENT; `/mounts` PASS** |
 
 The suite prints one `VFS <id> PASS|FAIL <detail>` line per row and a stable FNV-1a summary. The
 findings are reported; the service prints `vfs-fuzz: alive` and exits 0 so the determinism pair can
@@ -64,19 +64,32 @@ the vfsd `CALL` path through the libc's cached root handle:
   and cannot re-scope the path operation.
 
 Expected: `lstat("/init")` after `chroot("/etc")` returns ENOENT (or resolves under `/etc`), never
-the image's real `/init`. Proposed follow-up (PROPOSED, not fixed here): invalidate the libc cached
-root on `chroot`/`fchdir`, and make the vfsd path CALL apply the caller's current root (or carry a
-root generation in the CALL). Owner: libc/VFS lane; regression: this suite's CH07/CH08 rows.
+the image's real `/init`.
+
+### K487 fix (OBSERVED)
+
+* `libc/ravenlibc/crates/raven-libc/src/platform/chroot.rs`: after a successful `PROC_CHROOT`, call
+  `Platform::invalidate_root()`, so the cached `file:/` handle cannot outlive the transition.
+* `libc/ravenlibc/crates/raven-libc-platform/src/platform.rs`: the existing `invalidate_root` is
+  public for that call (the cache lives in this crate).
+* `userland/servers/vfsd/src/main.rs`: the `Proxy` records the caller root captured at open; every
+  path `CALL` (`Lstat`, `Readlink`, `Link`, `Rename`, `Access`, ...) resolves through `call_path`
+  (`normalize_under_root` when the root is not `/`), so an absolute payload path cannot be resolved
+  against the global mount table.
+
+With both changes CH07-CH09 return ENOENT and CH10 still succeeds; 43 rows, 0 deviations,
+0 escapes, `hash=0xd6701d1115e414ee`. Removing the invalidation reproduces CH07-CH09 with the real
+`/init` (`hash=0x2c1517a0497b12f7`).
 
 ## Determinism
 
 * Seed `0x4b343738`; the vectors are fixed; the table hash covers the row id, result and detail.
-* TCG: 41 rows, 2 deviations, 2 escapes, `hash=0x06517fb6f933c5fa`, two identical boots.
-* KVM2: the same 41 rows and hash, two identical boots.
-* The first TCG attempt after the final fixture edit hit the case's 120 s cap while the host was
-  running several other qtests (the log stops after P23, before the first `lstat`); the retry with
-  the same caps passed in 185.74 s. The timeout log is preserved and is host contention, not a
-  product failure.
+* K478 (pre-fix, 41 rows): TCG and KVM2 `hash=0x06517fb6f933c5fa`, 2 deviations, 2 escapes.
+* K487 (fixed, 43 rows): KVM2 `hash=0xd6701d1115e414ee`, 0 deviations, 0 escapes, two identical
+  boots. TCG is not rerun for K487; the ticket's gate is kvm2 + `posix-fs`.
+* The K478 first TCG attempt hit the case's 120 s cap while the host was running several other
+  qtests; the retry with the same caps passed. The timeout log is preserved and is host contention,
+  not a product failure.
 
 ## Coverage gaps
 
@@ -88,8 +101,10 @@ root generation in the CALL). Owner: libc/VFS lane; regression: this suite's CH0
   EINVAL as POSIX suggests for a non-symlink).
 * The chroot rows require euid 0; the service runs as root. If a future profile runs it unprivileged,
   the rows become a coverage gap (the suite records `chroot` failure).
-* The chroot escape uses the libc-cached root; a user-held `file:/` fd opened before chroot and a
-  raw CALL is the same family but not separately encoded.
+* The libc-cached root is invalidated on chroot (K487). A **user-held** `file:/` fd opened before
+  the chroot still carries `Proxy.root` from open time, so a raw CALL on that fd can resolve at the
+  old root. That is the POSIX fd-before-chroot family (an existing description is not revoked) and
+  is outside the libc cache; it is not encoded in this suite.
 
 ## Donor reconciliation
 
@@ -105,7 +120,9 @@ code was copied.
 | component/path limits | `NAME_MAX`, `PATH_MAX` | `sys/sys/param.h`, `vfs_lookup.c` | `sys/sys/param.h`, `vfs_lookup.c` | kernel scheme PATH_MAX=256 (P18); vfsd limits |
 | non-UTF-8 / NUL bytes | byte paths, NUL terminates | `copyinstr`/`namei` | `namei` | kernel `user_string` UTF-8 check; raw OPEN for NUL |
 
-## K478 report
+## Reports
 
-The full report is `tickets/bob/reports/K478.md`: the path table, the P0 with file:line, the hash,
-the gates, and the Evidence block K478-R01..R05.
+* K478 measurement: `tickets/bob/reports/K478.md` (the P0 with file:line, the pre-fix hash and the
+  path table).
+* K487 fix: `tickets/bob/reports/K487.md` (root cause, the invalidation + vfsd root scoping, the
+  red/green rows, the mutation, and the gates).
