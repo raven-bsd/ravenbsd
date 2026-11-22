@@ -16,7 +16,7 @@ use raven_proto_fs::{
     OpenFlags, S_IFBLK, S_IFCHR, S_IFDIR, S_IFIFO, S_IFLNK, S_IFMT, S_IFSOCK, SetTime, Stat,
     StatFs, StatVfs,
 };
-use raven_ramfs_core::{ROOT_INO, Ramfs, SpecialKind};
+use raven_ramfs_core::{Limits, ROOT_INO, Ramfs, SpecialKind};
 use raven_scheme::{CallReply, Ctx, Handler, HandlerError, HandlerResult, OpenTable, Opened};
 
 /// Aggregate open-file-description budget.
@@ -52,10 +52,20 @@ impl RamfsHandler {
         Self::with_trace(now, false)
     }
 
+    /// Create a handler with an explicit root directory mode.
+    pub fn with_root_mode(now: fn() -> i64, root_mode: u16) -> Self {
+        Self::with_trace_root_mode(now, false, root_mode)
+    }
+
     /// Create a handler with the optional request trace enabled.
     pub fn with_trace(now: fn() -> i64, trace: bool) -> Self {
+        Self::with_trace_root_mode(now, trace, 0o755)
+    }
+
+    /// Create a handler with an explicit root mode and optional request trace.
+    pub fn with_trace_root_mode(now: fn() -> i64, trace: bool, root_mode: u16) -> Self {
         Self {
-            fs: Ramfs::new(now()),
+            fs: Ramfs::with_root_mode(Limits::default(), now(), root_mode),
             opens: OpenTable::new(),
             refs: BTreeMap::new(),
             dir_generations: BTreeMap::new(),

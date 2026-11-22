@@ -1,3 +1,0 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.49s
-     Running `target/debug/xtask qtest --case posix-fs-smp-kvm4 --arch x86_64`
-posix-fs-smp-kvm4: pass

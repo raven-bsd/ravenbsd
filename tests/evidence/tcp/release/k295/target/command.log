@@ -1,6 +1,0 @@
-tcp-evidence packet: run-20261121T053533Z
-generated: 2026-11-21T05:40:08Z
-phase audit: pass
-phase unit: pass command='cargo nextest run -p raven-tcpip'
-phase checker: pass command='/usr/bin/python3 scripts/tcp-evidence_ut.py'
-phase matrix: pass

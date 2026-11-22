@@ -11,7 +11,6 @@ use raven_abi::layout::aarch64::{USER_END, USER_MIN};
 #[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::{Handle, Rights, map, memobj, prot};
-#[cfg(target_arch = "x86_64")]
 use raven_usercopy::UserSlice;
 use raven_vma::PAGE_SIZE;
 
@@ -20,7 +19,6 @@ use crate::memory::uspace::{InheritIdentity, MapInherit};
 use crate::process::handle::MmioRegion;
 use crate::process::{self, Process, handle::MemObject, handle::Object};
 use crate::syscall::SyscallFrame;
-#[cfg(target_arch = "x86_64")]
 use crate::usercopy::copy_from_user;
 
 /// Largest memory object accepted by `MEMOBJ_CREATE` (1 GiB).
@@ -71,14 +69,7 @@ pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let paged = flags & memobj::PAGER != 0;
     let object = if paged {
-        #[cfg(target_arch = "x86_64")]
-        {
-            MemObject::new_paged(len / PAGE_SIZE, &caller)?
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            return Err(Errno::ENOSYS);
-        }
+        MemObject::new_paged(len / PAGE_SIZE, &caller)?
     } else {
         MemObject::new(len / PAGE_SIZE)?
     };
@@ -98,7 +89,6 @@ pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
 }
 
 /// `pager_supply(object, offset, data, data_len) -> 0` (contract C18).
-#[cfg(target_arch = "x86_64")]
 pub fn pager_supply(frame: &SyscallFrame) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
@@ -128,12 +118,6 @@ pub fn pager_supply(frame: &SyscallFrame) -> Result<usize, Errno> {
     copy_from_user(&mut buffer, source)?;
     object.supply_page(offset / PAGE_SIZE, &buffer)?;
     Ok(0)
-}
-
-/// Pager-backed objects need the x86-64 scheme IPC transport.
-#[cfg(not(target_arch = "x86_64"))]
-pub fn pager_supply(_frame: &SyscallFrame) -> Result<usize, Errno> {
-    Err(Errno::ENOSYS)
 }
 
 /// `map(proc, memobj, offset, addr, len, flags) -> addr`.
@@ -219,9 +203,14 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
         }
         addr
     } else {
+        let hint = if addr == 0 {
+            address_space.mmap_base()
+        } else {
+            addr
+        };
         address_space
             .vmas()
-            .find_free(len, addr, PAGE_SIZE)
+            .find_free(len, hint, PAGE_SIZE)
             .ok_or(Errno::ENOMEM)?
     };
 

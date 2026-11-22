@@ -15,7 +15,7 @@ expect_exit = "success"
 regex = '^ipc-fuzz: start seed=0x[0-9a-f]+ groups=[0-9]+ packet=536$'
 
 [[expect]]
-regex = '^ipc-fuzz: summary rows=[0-9]+ deviations=[0-9]+ seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
+regex = '^ipc-fuzz: summary rows=[0-9]+ deviations=0 seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
 
 [[expect]]
 regex = '^ipc-fuzz: alive$'

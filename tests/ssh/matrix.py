@@ -54,6 +54,12 @@ BANNER_BOUND_S = 10.0
 REQUEST_TIMEOUT_S = 15
 S1_REPEAT_TIMEOUT_S = 8
 S4_ATTEMPTS = 5
+S4_ONLY_ATTEMPTS = 3
+S4_INPUT = b"K514-S4-POSTAUTH-2026-11-22\n"
+S4_FILE = "/tmp/k514-s4-input"
+S4_AUTH_BOUND_S = 30
+S4_READ_BOUND_S = 15
+S4_TOTAL_BOUND_S = 50
 S7_TIMEOUT_S = 30
 S7_WALL_BOUND_MS = 5000
 ECHO_PORT = 23097
@@ -919,6 +925,175 @@ def row_s4() -> None:
                + "; ".join(f"#{index + 1} {text}" for index, text in enumerate(failed)))
 
 
+def s4_only_attempt(number: int) -> dict[str, object]:
+    """One auth, one fixed line, server writes it to S4_FILE and reads it back."""
+    remote = f"cat > {S4_FILE}; cat {S4_FILE}"
+    argv = [
+        "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "ConnectTimeout=8",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-vv",
+        f"{ROOT_USER}@{HOST}",
+        remote,
+    ]
+    env = os.environ.copy()
+    env["SSH_ASKPASS"] = str(ASKPASS)
+    env["SSH_ASKPASS_REQUIRE"] = "force"
+    env["DISPLAY"] = ":0"
+    env["K434_SSH_PASSWORD"] = PASSWORD
+    stdout_path = OUT / f"s4-only-{number}.stdout"
+    stderr_path = OUT / f"s4-only-{number}.stderr"
+    started = time.monotonic()
+    auth_ms: float | None = None
+    write_ms: float | None = None
+    read_ms: float | None = None
+    auth_seen = False
+    input_sent = False
+    with open(stdout_path, "wb") as out_file, open(stderr_path, "wb") as err_file:
+        process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.PIPE,
+                                   stdout=out_file, stderr=err_file, env=env,
+                                   start_new_session=True)
+        auth_deadline = started + S4_AUTH_BOUND_S
+        read_deadline: float | None = None
+        while process.poll() is None and time.monotonic() - started < S4_TOTAL_BOUND_S:
+            now = time.monotonic()
+            if not auth_seen:
+                try:
+                    err = stderr_path.read_bytes()
+                except OSError:
+                    err = b""
+                if b"Authenticated to " in err:
+                    auth_seen = True
+                    auth_ms = (now - started) * 1000
+                    try:
+                        process.stdin.write(S4_INPUT)  # type: ignore[union-attr]
+                        process.stdin.flush()  # type: ignore[union-attr]
+                        process.stdin.close()  # type: ignore[union-attr]
+                        input_sent = True
+                        write_ms = (time.monotonic() - started) * 1000
+                        read_deadline = time.monotonic() + S4_READ_BOUND_S
+                    except (BrokenPipeError, OSError):
+                        break
+                elif now > auth_deadline:
+                    break
+            if input_sent:
+                try:
+                    size = stdout_path.stat().st_size
+                except FileNotFoundError:
+                    size = 0
+                if size >= len(S4_INPUT):
+                    read_ms = (time.monotonic() - started) * 1000
+                    break
+                if read_deadline is not None and now > read_deadline:
+                    break
+            time.sleep(0.02)
+        timed_out = process.poll() is None
+        if timed_out:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        returncode = process.wait()
+        try:
+            process.stdin.close()  # type: ignore[union-attr]
+        except (OSError, AttributeError):
+            pass
+    stdout = stdout_path.read_bytes()
+    stderr = stderr_path.read_bytes()
+    elapsed = (time.monotonic() - started) * 1000
+    text = stderr + stdout
+    exact = stdout == S4_INPUT
+    no_efault = b"EFAULT" not in text
+    if not auth_seen:
+        step = "auth"
+        result = "FAIL"
+    elif not input_sent:
+        step = "write"
+        result = "FAIL"
+    elif not no_efault:
+        step = "EFAULT"
+        result = "FAIL"
+    elif not exact:
+        step = "read"
+        result = "FAIL"
+    else:
+        step = "read"
+        result = "PASS"
+    if read_ms is None and result == "PASS":
+        read_ms = elapsed
+    detail = (f"bytes={literal(stdout)} auth_ms={auth_ms if auth_ms is not None else 'none'} "
+              f"write_ms={write_ms if write_ms is not None else 'none'} "
+              f"read_ms={read_ms if read_ms is not None else 'none'} "
+              f"exit_ms={elapsed:.0f} exit={returncode} step={step}")
+    log = OUT / f"s4-only-{number}.log"
+    log.write_text(
+        f"$ {' '.join(argv)}\n"
+        f"exit: {returncode}\n"
+        f"timed_out: {timed_out}\n"
+        f"auth_seen: {auth_seen}\n"
+        f"input_sent: {input_sent}\n"
+        f"auth_ms: {auth_ms}\n"
+        f"write_ms: {write_ms}\n"
+        f"read_ms: {read_ms}\n"
+        f"exit_ms: {elapsed:.0f}\n"
+        f"stdout_hex: {stdout.hex()}\n"
+        f"stdout_text: {stdout.decode('utf-8', 'replace')}\n"
+        f"stderr_text: {stderr.decode('utf-8', 'replace')}\n",
+        encoding="utf-8")
+    return {"result": result, "step": step, "detail": detail, "elapsed_ms": elapsed,
+            "stdout": stdout, "returncode": returncode, "auth_ms": auth_ms,
+            "write_ms": write_ms, "read_ms": read_ms}
+
+
+def row_s4_only() -> None:
+    """K514: three single-attempt auth-then-read proofs; all three must pass."""
+    results = [s4_only_attempt(number) for number in range(1, S4_ONLY_ATTEMPTS + 1)]
+    for number, result in enumerate(results, 1):
+        attempt("S4", number, "fresh",
+                f"Authenticated + exact {literal(S4_INPUT)} written to {S4_FILE} and read back; "
+                f"no EFAULT",
+                str(result["detail"]), float(result["elapsed_ms"]), str(result["result"]),
+                f"step={result['step']}; stdout_hex={bytes(result['stdout']).hex()}")  # type: ignore[arg-type]
+    passed = sum(1 for result in results if result["result"] == "PASS")
+    walls = [round(float(result["elapsed_ms"])) for result in results]
+    exits = [result["returncode"] for result in results]
+    if passed == S4_ONLY_ATTEMPTS:
+        record("S4", "PASS",
+               f"{passed}/{S4_ONLY_ATTEMPTS} attempts: exact {literal(S4_INPUT)} after auth; "
+               f"walls_ms={walls}; exits={exits}; every step recorded in attempts.tsv")
+    else:
+        first = next(result for result in results if result["result"] != "PASS")
+        record("S4", "FAIL",
+               f"{passed}/{S4_ONLY_ATTEMPTS} attempts; first failure step={first['step']}; "
+               f"walls_ms={walls}; exits={exits}; detail={first['detail']}")
+
+
+def row_mutation() -> None:
+    """K562: the 0755 image must fail the non-root /tmp create row."""
+    stat = ssh_run(["stat", "-c", "%a %U %G", "/tmp"], "k562-mutation-stat.log")
+    stat_text = stat["stdout"].decode("utf-8", "replace").strip()
+    create = ssh_run(["touch", "/tmp/k562-user"], "k562-mutation-create.log")
+    create_text = (create["stderr"] + create["stdout"]).decode("utf-8", "replace").strip()
+    mode_ok = stat_text == "755" or stat_text.startswith("755 ")
+    denied = create["returncode"] != 0 and "ermission denied" in create_text
+    observed = (f"stat={stat_text!r}; create_exit={create['returncode']}; "
+                f"create={create_text!r}")
+    attempt("K562-mutation", 1, "fresh",
+            "/tmp mode 755; non-root create fails Permission denied",
+            observed, float(create["elapsed_ms"]), "PASS" if mode_ok and denied else "FAIL")
+    if mode_ok and denied:
+        record("K562-mutation", "PASS",
+               f"`raven` sees /tmp `{stat_text}` and `touch /tmp/k562-user` fails "
+               f"`{create_text}` (0755 mutation observed)")
+    else:
+        record("K562-mutation", "FAIL",
+               f"mutation not observed: {observed}")
+
+
 def row_s5_s6() -> None:
     result = ssh_probe(["true"], "s5-vvv.log", extra=["-vvv"])
     text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
@@ -1443,6 +1618,8 @@ def main() -> int:
     if only:
         child = None
         console: SerialConsole | None = None
+        row_label = ("K562-mutation" if only == "mutation"
+                     else "S4" if only == "s4" else only)
         try:
             socket_only = only in ("s8", "s7")
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
@@ -1454,17 +1631,19 @@ def main() -> int:
             else:
                 lease_ok = serial_has(handle, SERIAL_LEASE, 60)  # type: ignore[arg-type]
             if not lease_ok:
-                record(only, "BLOCKED",
+                record(row_label, "BLOCKED",
                        f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
             elif not wait_tcp(22, 30):
-                record(only, "BLOCKED",
+                record(row_label, "BLOCKED",
                        "guest listener did not accept a TCP connection after svcd: sshd up")
             else:
                 time.sleep(0.5)
                 if only == "s1-repeat":
                     row_s1_repeat()
                 elif only == "s4":
-                    row_s4()
+                    row_s4_only()
+                elif only == "mutation":
+                    row_mutation()
                 elif only == "s7-exit":
                     row_s7_gate()
                 elif only == "s7":
@@ -1475,10 +1654,12 @@ def main() -> int:
                         record("S7", "BLOCKED", "console login failed before S7")
                 elif only == "s8":
                     row_s8()
+                elif only == "s5":
+                    row_s5_s6()
                 else:
                     record(only, "BLOCKED", f"unknown RAVEN_MATRIX_ONLY={only}")
         except Exception as error:  # noqa: BLE001 - isolate the only-mode boot
-            record(only, "BLOCKED", f"only-mode boot failed: {error}")
+            record(row_label, "BLOCKED", f"only-mode boot failed: {error}")
         finally:
             if child is not None:
                 kill(child)
