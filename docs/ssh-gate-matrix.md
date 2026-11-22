@@ -3,93 +3,84 @@
 
 # SSH gate matrix (S0-S8)
 
-Status: OBSERVED, 2026-11-22, rev 20. Base `origin/master` `1f2c0e64` (K431, K436, K437, K439,
-K433), merged into `ken/K434` at `340500a7d`; final code `f3712ad01`. Dedicated bridge/tap
-`kenbr0`/`kentap0`. The matrix is not green: S5, S5-session and S8 are red.
+Status: OBSERVED, 2026-11-22, rev 21. Base `origin/master` `e313c1df` (K431/K436/K437/K439/K433 +
+MPTCP), merged at `0a2069dea`; final code `3d6f4d43e`. Dedicated `kenbr0`/`kentap0`. The gate is not
+green: S5-session, S7's exit/wall assertion and S8 are red.
 
 Run: `timeout 900 env RAVEN_QEMU_BRIDGE=kenbr0 RAVEN_QEMU_TAP=kentap0 sh tests/ssh/matrix.sh`
-(exit 1; 3 red summary rows) and `timeout 900 make check-fast` (exit 0; `check-fast: PASSED`).
+(exit 1, 8:27) and `timeout 900 make check-fast` (exit 0; `check-fast: PASSED`).
 
 ## Matrix
 
-| Step | Test | Expectation (source) | Result | Exact assertion / artifact |
-|---|---|---|---|---|
-| S0 | guest TCP accept/echo over tap | BSD `accept`/`read`/`write` (C1) | PASS | 30/30 bytes `K434-S0-ECHO-0123456789abcdef\n`, 251 ms |
-| S1 | banner, fresh + control | OpenSSH `kex.c:1297`; `version.h:3` | PASS | `SSH-2.0-OpenSSH_10.6\r\n` (1118 ms), control 927 ms, client-first 929 ms |
-| S2 | KEXINIT | RFC 4251 section 6 | PASS | `total=960 packet_length=956 padding=9 payload=946 type=20` |
-| S3 | auth | OpenSSH `auth.c:264`, `auth-passwd.c:79` | PASS | wrong exit 255 + `Permission denied`; client `Authenticated to ...`; server `Accepted password for raven from UNKNOWN port 65535 ssh2` |
-| S4 | post-auth read | POSIX `read`; FreeBSD `soreceive` | PASS | `hostkeys-00@openssh.com`, no `EFAULT` |
-| S5 | confirmation + identity | POSIX `write`; FreeBSD `sosend`; K431 fixture | **FAIL** | confirmation delivery PASS; identity fixture exit 1, `rsh: tty:console: no such file or directory` |
-| S5-session | post-exec session | POSIX `read`/`write`; C10 | **FAIL** | no EPIPE; exit -9 at 15 s; fd4 `socket:[270179354]`, `pipe:[270155734]`; TCP peer `ESTAB 10.0.2.2:51364 -> 10.0.2.15:22` |
-| S6 | confirmation | RFC 4254 section 5.1 | PASS | `receive packet: type 91` + channel 0 |
-| S6-length | 44-byte plaintext | `channels.c:2198`/`:5085` | BLOCKED | not in the client log |
-| S7 | marker + 10/10 | gate C1-C10 | PASS | client received exactly `K434-SSH-MARKER-2026-11-22\n` on the single attempt and all ten; exit -9 after delivery is S5-session |
-| S7-routing | client receives, console does not | C5/C9/C10 fd routing | PASS | client exact marker; `max_console_new=0`; `console_total_delta=0` |
-| S8-pty-alloc | dynamic pty case | K430/K436 libc test | PASS | `pty-alloc: pass` |
-| S8 | PTY | POSIX `openpty`; OpenSSH `pty.c` | **FAIL** | `PTY allocation request failed on channel 0`; the test-only `/bin/tty` was not reached |
+| Row | Result | Exact assertion |
+|---|---|---|
+| S0 | PASS | `K434-S0-ECHO-0123456789abcdef\n` echoed 30/30 bytes, 223 ms |
+| S1 | PASS | `SSH-2.0-OpenSSH_10.6\r\n` attempt 1 (6776 ms), control 2026 ms, client-first 2220 ms |
+| S2 | PASS | `total=960 packet_length=956 padding=9 payload=946 type=20` |
+| S3 | PASS | wrong exit 255 + `Permission denied`; `Authenticated to ...`; server `Accepted password for raven from UNKNOWN port 65535 ssh2` |
+| S4 | PASS | `hostkeys-00@openssh.com`, no `EFAULT` |
+| S5 | PASS | confirmation delivery PASS; identity qtest PASS (`socket-write-identity-tap: pass`, exit 0) |
+| S5-session | **FAIL** | no EPIPE; exit -9 at 15 s; fd4 `pipe:[270353297]`; TCP peer `ESTAB` |
+| S6 | PASS | `receive packet: type 91` + `channel 0: open confirm rwindow 0 rmax 32768` |
+| S7 | **FAIL** | marker exact 11/11; console delta 0; all ten gate attempts exit -9 at ~30 s; walls `[30010, 30038, 30030, 30022, 30032, 30002, 30019, 30022, 30033, 30031]` ms |
+| S7-routing | PASS | client exact marker; `max_console_new=0`; `console_total_delta=0` |
+| S8-pty-alloc | PASS | `pty-alloc: pass` |
+| S8 | **FAIL** | `PTY allocation request failed on channel 0`; K438 pending; the test-only `/bin/tty` is not reached |
 
-## S5 identity fixture failure
+## S5 identity fixture (fixed in K434 Owns)
 
-K431's `socket-write-identity` qtest is now on master and was run directly:
-
-```text
-timeout 240 sh tests/fixtures/socket-write-identity/run-tap.sh   exit 1 (1:47)
-socket-write-identity: accepted fd=1
-socket-write-identity: accepted ino=5
-rsh: tty:console: no such file or directory
-socket-write-identity: shell status=1
-init exited (1)
-```
-
-The identity bytes were not reached; the failure is the fixture's shell opening `tty:console` in
-the `server` profile, which has no consd service. This is recorded as S5-identity FAIL.
-
-## S7 routing (K439)
-
-The exact bytes now arrive on the client channel:
+K431's identity fixture was missing `consd` in its static `server` image, so `rsh` failed with
+`rsh: tty:console: no such file or directory`. K434 stages `raven-consd` and a consd service in
+`tests/fixtures/socket-write-identity/build-ssh.sh`. The test now passes:
 
 ```text
-S7-marker     PASS  K434-SSH-MARKER-2026-11-22\n; console_new=0
-S7-10/10      PASS  10/10 exact marker; console_new=0 each
-S7-routing    PASS  client=K434-SSH-MARKER-2026-11-22\n; max_console_new=0;
-                    console_total_delta=0
+timeout 240 sh tests/fixtures/socket-write-identity/run-tap.sh   exit 0 (37.6 s)
+socket-write-identity-tap: pass
 ```
 
-The client still exits -9 after delivering the output; that completion failure is S5-session, not the
-marker or its routing.
+S5-identity and S5 are PASS.
 
-## S8 PTY
+## S7 exit/wall assertion
 
-`pty-alloc` passes. `ssh -tt raven@... tty` still returns
-`PTY allocation request failed on channel 0`. A test-only `/bin/tty` is staged from
-`tests/fixtures/ssh-tty` so the exact command can print `/dev/pts/N` if allocation succeeds; the
-failure occurs before the command runs.
+The client receives the exact marker and the console receives none, but the process does not exit.
+Each of the ten attempts is killed at the 30 s cap:
+
+```text
+S7-exit #1  FAIL  exit -9; wall=30010 ms; bytes=K434-SSH-MARKER-2026-11-22\n
+S7-exit #2  FAIL  exit -9; wall=30038 ms; bytes=K434-SSH-MARKER-2026-11-22\n
+...
+S7-exit #10 FAIL  exit -9; wall=30031 ms; bytes=K434-SSH-MARKER-2026-11-22\n
+```
+
+S7-routing is PASS on bytes/routing; S7 is FAIL because the gate requires exit 0 and wall <= 5000 ms.
+
+## S8
+
+`pty-alloc` passes; `ssh -tt raven@... tty` still returns
+`PTY allocation request failed on channel 0`. K438 (SCM_RIGHTS) is the owning fix and is not on
+master. The test-only `/bin/tty` from `tests/fixtures/ssh-tty` is staged but not reached.
 
 ## Artifacts (SHA-256)
 
 ```text
-fdffa0137620231c96e10b5a2d04281f629e420da57b6a9d62dcaee706ea30e8  build/ssh/matrix/matrix.tsv
-a606b3ce23d9b647be7bd0386ea10ec14854c1ed2ece8e6cd075246bcbfa4b7b  build/ssh/matrix/attempts.tsv
-6b340e694f7df9fcdb12c89ebc6cfb1c2ef224a4a01a14b2cb939c05ea8e04a0  build/ssh/matrix/serial.log
-cd3565b570aa6ce61e3811dddef645c689f6186f4d589b9e1ff2e710793ba85f  build/ssh/matrix/serial-echo.log
-cd3c9bb261545920b949e15436dc00a0f72ad76fdff7d2b04ed965a66c6b3646  build/ssh/matrix/s7-marker.log
-a0f99dde6ee41820b438aedfb764b0e26b06e358149085fbafc6d384b1f0f47b  build/ssh/matrix/s8-tt.log
-6c7dac5049f925d37920908e41c28c144faf07146526b92ddc86cc2e3d6da4e9  build/ssh/matrix/pty-alloc.log
-2e0988ec0b2be29f71b87553562da4c57f6bfe73f1b6e324177b581421c4ea0e  build/ssh/matrix/s5-vvv.log-probe.log
-5af00dc9e0eb5e2ba12417ac461c71107b328a706f817629b7def216a5e445f0  build/ssh/matrix/s5-vvv.log-strace.log
-b213ecf60a83c873029caed1b98feb40443a764d2d916d64a5397eaf0471bddf  build/ssh/matrix/socket-write-identity.log
-4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  build/ssh/matrix/socket-write-identity.exit
-2e4dd0b43e6dbc47697c10950abdfa42c6b3ef85364944ea0ab9f411db243a9b  matrix run log
+a92f59fd44bbdf24023ce02fd07d43314815c7afa5537164f79f5aeb6eace5ff  build/ssh/matrix/matrix.tsv
+4460965e6471c3c375c4fbfd7796eba0db79d59b12120bf31635731f6ce093d2  build/ssh/matrix/attempts.tsv
+b7827cd92dd4db2b57557fc5fac43bd5fc86ae31baef359c2e7c9be1df203f22  build/ssh/matrix/serial.log
+d35027f050a470a240546ff6a821bd68ffd3b2889ede63a46ca5e204356905a0  build/ssh/matrix/serial-echo.log
+6cb6c40a9cce4153e8545efb82a3360c2b42165df4cd091337a7f3bdc0182c63  build/ssh/matrix/s7-marker.log
+bba9c082f95bd771759f7b4b13ab89b34862bd55b592f91243d018e6c874823c  build/ssh/matrix/s8-tt.log
+c981a3d9d2e5ba35ae3371b8c6ca07c76374b3f2d7ac31d25a0a4e112287f827  build/ssh/matrix/pty-alloc.log
+90b1e0ae1509e70e3e4989ba33389b0221aa681a5da14ae1985e4c26987aa900  build/ssh/matrix/s5-vvv.log-probe.log
+68b6b73481e05bad739e15db8b99ac9c2877812c5ed4cd294e4724f8ca2d66b2  build/ssh/matrix/s5-vvv.log-strace.log
+a1e776d3be284f3dd42735f49228c2057c4461529702a55b1c259ed8fe326d69  build/ssh/matrix/socket-write-identity.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  build/ssh/matrix/socket-write-identity.exit
+ce426b92cec552d76368bcabb0dd8ba9a130636c858b522af4c1e1cebe14a9e6  matrix run log
 ```
-
-The K434 report carries gates, provenance and full open gaps.
 
 ## Open gaps
 
-- S5 identity: K431's fixture fails at `rsh: tty:console: no such file or directory` before the
-  identity bytes.
-- S5-session: no EPIPE; the client does not complete after exec (exit -9 at 15 s); fd4 socket/pipe,
-  TCP peer ESTAB, server-side handle not exposed.
-- S6 length: the 44-byte plaintext length is not observable from the client log.
-- S8: PTY allocation still fails after K436; the test-only `tty` is staged but not reached.
-- S3: server line reports `from UNKNOWN port 65535` (`getpeername` gap).
+- S7 gate exit: 10/10 exact bytes and console delta 0, but exit -9 at 30 s; wall times 30.0-30.05 s.
+- S5-session: no EPIPE; exit -9 at 15 s; fd4 pipe/socket; TCP peer ESTAB.
+- S8: PTY allocation fails; K438 SCM_RIGHTS pending.
+- S6 length: not observable from the client log.
+- S3 peer address: `from UNKNOWN port 65535`.

@@ -123,9 +123,10 @@ this deviation is recorded in the K434 report.
   and `forkpty` (`:139`) are the libutil convenience over that path.
 - Raven: ptyd supplies the `pty:` scheme pair; libc `openpty`/`grantpt`/`unlockpt`/`ptsname_r` must
   match the libutil sequence. K430 and K436 are merged; the `pty-alloc` and `pty-calls` qtests pass,
-  including `ptsname`/`ttyname` `/dev/pts/N`. The SSH path still answers
-  `PTY allocation request failed on channel 0`; a test-only `/bin/tty` is staged from
-  `tests/fixtures/ssh-tty` but the allocation fails before it runs, so S8 is not green.
+  including `ptsname`/`ttyname` `/dev/pts/N`. The SSH PTY request still answers
+  `PTY allocation request failed on channel 0`; K438 (SCM_RIGHTS) is the owning fix and is not on
+  master. A test-only `/bin/tty` is staged from `tests/fixtures/ssh-tty` but the allocation fails
+  before it runs.
 
 ### C10 exec
 
@@ -213,6 +214,18 @@ this deviation is recorded in the K434 report.
    before the command runs.
 4. **S5-session** remains: no EPIPE, exit -9 at 15 s, fd4 socket/pipe, TCP peer `ESTAB`; the
    server-side handle is not exposed.
+
+## Rev 21 observations (S7 exit/wall, S5 identity fixture)
+
+1. **S5 identity fixture fixed in K434's Owns.** K431's static `server` image had no consd, so
+   `rsh` failed at `tty:console`. Staging `raven-consd` and a consd service in
+   `tests/fixtures/socket-write-identity/build-ssh.sh` makes the identity qtest pass
+   (`socket-write-identity-tap: pass`).
+2. **S7 bytes and routing pass; the gate exit does not.** The client receives the exact marker on
+   the single attempt and 10/10, and the console delta is 0, but every attempt exits -9 at the 30 s
+   cap (walls 30.0-30.05 s). S7-routing is PASS; S7's exit/wall assertion is FAIL.
+3. **S8 waits for K438.** `pty-alloc`/`pty-calls` pass; `ssh -tt ... tty` still returns
+   `PTY allocation request failed`. K438 (SCM_RIGHTS) is not on master.
 
 ## Gaps (not evidence)
 
