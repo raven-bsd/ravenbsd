@@ -45,7 +45,7 @@ grep -q 'artifact stale: run cargo xtask libc-pack' "$err" || {
 echo "libc-stamp: source edit -> artifact stale"
 
 for fixture in socketpair-fixture itimer-fixture; do
-    if timeout 300 sh "tests/qtest/cases/$fixture/build.sh" > "$err.out" 2> "$err"; then
+    if timeout 300 sh "tests/qtest/cases/$fixture/build.sh" > /dev/null 2> "$err"; then
         echo "libc-stamp: expected $fixture to fail closed on the stale artifact" >&2
         exit 1
     fi

@@ -6,9 +6,10 @@
 Status: **the static `libc.a` and the dynamic `libc.so.1`/`ld-elf.so.1` are stamped with the libc
 source hash; `libc-pack --verify` and `libc-link --verify` fail closed with
 `artifact stale: run cargo xtask libc-pack` (or `libc-link`). `scripts/build.sh` verifies an existing
-stamp before it builds, and the stale-artifact regression is
-`tests/release/workspace-build/libc-stamp.sh`.** The consumers that still read the archive directly
-(the Rust emptiness test and the C fixture scripts) are a follow-up outside K441's Owns.
+stamp before it builds, the in-scope qtest fixture readers that consume the sysroot verify it before
+they link, and the stale-artifact regression is
+`tests/release/workspace-build/libc-stamp.sh`.** The remaining direct reader (`tests/libc/target/build.sh`,
+plus the Rust emptiness test) is a follow-up outside K441's Owns.
 
 ## The defect
 
@@ -67,11 +68,16 @@ stops.
 * `scripts/build.sh` checks an **existing** `libc.stamp` / `libc-dso.stamp` before building and
   stops with the documented message on a mismatch. A clean clone has no stamp and skips the check;
   the Rust userland build does not consume libc.
+* The qtest fixture readers that link the static sysroot directly
+  (`tests/qtest/cases/socketpair-fixture/build.sh`, `tests/qtest/cases/itimer-fixture/build.sh`) run
+  `libc-pack --verify` (and `libc-link --verify` when a DSO stamp exists) before linking. A clean
+  clone with no stamp skips the check and uses the existing build/refresh path.
 * `libc_pack::run` is the producer: the image/initfs path calls it and therefore always stages a
   fresh archive. `libc-link` is the DSO producer.
 * `tests/release/workspace-build/libc-stamp.sh` is the regression: it verifies a fresh artifact,
-  edits a libc source without rebuilding and requires the stale error, then reproduces the tiny-set
-  false red (`--set tiny` followed by a server `--verify`), rebuilds, and verifies green.
+  edits a libc source without rebuilding and requires the stale error from `--verify` **and** from
+  both fixture readers, then reproduces the tiny-set false red (`--set tiny` followed by a server
+  `--verify`), rebuilds, and verifies green.
 
 ## Regression
 
@@ -81,9 +87,9 @@ failed assertion does not leave the tree modified.
 
 ## Open gaps
 
-* The Rust `server_archive_exports_all_fifty_names` test and the C fixture scripts (`tests/libc/`,
-  `tests/qtest/cases/*-fixture/`) still read `build/<arch>/libc.a` or the sysroot directly; adding
-  the `--verify` call to those consumers is outside K441's Owns and is the next step.
+* The Rust `server_archive_exports_all_fifty_names` test and `tests/libc/target/build.sh` still read
+  `build/<arch>/libc.a` or the sysroot directly; adding `--verify` there is outside K441's Owns and
+  is the next step. The `tests/qtest/cases/*-fixture/` readers that consume the sysroot now verify.
   `archive_exports` itself builds its own archive (K437) and is unaffected.
 * The source hash is FNV-1a over sorted paths/contents for a cheap local check, not a
   cryptographic provenance hash; it is not a release signature.
