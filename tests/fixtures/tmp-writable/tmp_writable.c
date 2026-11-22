@@ -22,6 +22,8 @@ static int fail(const char *what) {
 int main(void) {
     struct stat st;
 
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     if (stat("/tmp", &st) != 0) {
         return fail("stat");
     }
@@ -66,17 +68,17 @@ int main(void) {
         printf("user-remove-denied errno=%d (%s)\n", errno, strerror(errno));
 
         if (mkdir("/tmp/k531-dir", 0755) != 0) {
-            printf("dir-create-denied errno=%d\n", errno);
+            printf("dir-create-denied errno=%d (%s)\n", errno, strerror(errno));
             _exit(3);
         }
         int mode_fd = open("/tmp/k531-dir/mode600", O_CREAT | O_WRONLY | O_TRUNC, 0600);
         if (mode_fd < 0) {
-            printf("file-create-denied errno=%d\n", errno);
+            printf("file-create-denied errno=%d (%s)\n", errno, strerror(errno));
             _exit(4);
         }
         close(mode_fd);
         if (chmod("/tmp/k531-dir/mode600", 0600) != 0) {
-            printf("file-chmod-denied errno=%d\n", errno);
+            printf("file-chmod-denied errno=%d (%s)\n", errno, strerror(errno));
             _exit(5);
         }
 
