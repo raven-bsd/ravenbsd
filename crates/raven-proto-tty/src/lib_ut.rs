@@ -202,6 +202,63 @@ fn trailing_bytes_are_ignored() {
 }
 
 #[test]
+fn the_termios_body_is_69_bytes() {
+    assert_eq!(TERMIOS_LEN, 69);
+}
+
+#[test]
+fn get_termios_golden_bytes() {
+    let mut bytes = [0xffu8; TERMIOS_LEN];
+    encode_get_termios_request(&mut bytes);
+    assert_eq!(&bytes[..12], &[1, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    assert!(bytes[12..].iter().all(|byte| *byte == 0));
+    assert_eq!(decode_termios_request(&bytes), Ok(TermiosRequest::Get));
+}
+
+#[test]
+fn set_termios_round_trips_every_field() {
+    let termios = Termios {
+        iflag: 0o000641,
+        oflag: 0o000005,
+        cflag: 0o000277,
+        lflag: 0o102013,
+        line: 0,
+        cc: [
+            3, 28, 127, 21, 4, 0, 1, 0, 17, 19, 26, 0, 18, 15, 23, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0,
+        ],
+        ispeed: 0o15,
+        ospeed: 0o16,
+    };
+    let mut bytes = [0u8; TERMIOS_LEN];
+    encode_set_termios_request(&termios, &mut bytes);
+    assert_eq!(&bytes[..4], &[1, 0, 7, 0]);
+    assert_eq!(&bytes[12..16], &0o000641u32.to_le_bytes());
+    assert_eq!(&bytes[16..20], &0o000005u32.to_le_bytes());
+    assert_eq!(&bytes[20..24], &0o000277u32.to_le_bytes());
+    assert_eq!(&bytes[24..28], &0o102013u32.to_le_bytes());
+    assert_eq!(bytes[28], 0);
+    assert_eq!(&bytes[29..61], &termios.cc);
+    assert_eq!(&bytes[61..65], &0o15u32.to_le_bytes());
+    assert_eq!(&bytes[65..69], &0o16u32.to_le_bytes());
+    assert_eq!(
+        decode_termios_request(&bytes),
+        Ok(TermiosRequest::Set { termios })
+    );
+    let mut response = [0u8; TERMIOS_LEN];
+    encode_termios_response(&termios, &mut response);
+    assert_eq!(decode_termios_response(&response), Ok(termios));
+}
+
+#[test]
+fn a_short_termios_body_is_truncated() {
+    let mut bytes = [0u8; CALL_LEN];
+    bytes[..4].copy_from_slice(&[1, 0, 6, 0]);
+    assert_eq!(decode_termios_request(&bytes), Err(TtyError::Truncated));
+    assert_eq!(decode_termios_response(&bytes), Err(TtyError::Truncated));
+}
+
+#[test]
 fn errors_have_descriptions() {
     for error in [
         TtyError::Truncated,

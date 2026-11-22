@@ -11,10 +11,46 @@ privsep exchange. The SSH server is the unmodified upstream OpenSSH 10.6p2 add-o
 
 | Layer | Location | Contract |
 |---|---|---|
-| pty scheme | `userland/servers/ptyd/` | One line discipline and two byte queues per pair; `pty:master[/N]` and `pty:slave[/N]`; `SET_MODE`/`GET_MODE`/`FLUSH`, foreground group and hangup |
+| pty scheme | `userland/servers/ptyd/` | One line discipline and two byte queues per pair; `pty:master[/N]` and `pty:slave[/N]`; `SET_MODE`/`GET_MODE`/`FLUSH`, the complete `GET_TERMIOS`/`SET_TERMIOS` record, foreground group and hangup |
 | libc pty calls | `libc/ravenlibc/crates/raven-libc/src/compat/` | `posix_openpt`, `grantpt`, `unlockpt`, `ptsname`, `ptsname_r`, `openpty` |
+| libc termios | `libc/ravenlibc/crates/raven-libc-platform/src/ioctl/tty.rs` | `tcgetattr`/`tcsetattr` over the full record; older console servers fall back to `GET_MODE`/`SET_MODE` |
 | identity | `ptyd` `fstat` | Pair `N` master inode `2N+1`, slave inode `2N+2`; both non-zero, role-distinct |
 | privsep exchange | OpenSSH `monitor_wrap.c`/`monitor.c`; test `tests/libc/c/libc-pty-monitor.c` | Monitor allocates the pty and returns the master/slave descriptors plus the name; the session opens the slave by name |
+
+## Termios round-trip (K444)
+
+OpenSSH's pty-req path applies the client's RFC 4254 section 8 mode word on the pty slave
+(`session.c:1888 session_pty_req` -> `ttymodes.c:342 ssh_tty_parse_modes` -> `tcgetattr`,
+parse, `tcsetattr(TCSANOW)` at `ttymodes.c:447`). The pty therefore carries the complete
+`struct termios`, not just canonical/raw and echo:
+
+| Wire offset | Field |
+|---|---|
+| 0 | version (`u16`, 1) |
+| 2 | op (`u16`: `GET_TERMIOS` 6, `SET_TERMIOS` 7) |
+| 4..20 | `c_iflag`, `c_oflag`, `c_cflag`, `c_lflag` (`u32` little-endian) |
+| 20 | `c_line` (`u8`) |
+| 21..53 | `c_cc[32]` |
+| 53..61 | ispeed, ospeed (`u32` little-endian) |
+
+A body is 69 bytes (`TERMIOS_LEN`). No struct memory is sent, so the ABI padding bytes never
+travel. `ptyd` keeps one record per pair, so the master and slave read the same attributes;
+`SET_TERMIOS` changes attributes only and never touches the queued output, which makes
+`TCSADRAIN` lossless by construction. The line discipline uses the NetBSD `ttyinput_wlock` /
+`ttyoutput` rules for `ICRNL`/`INLCR`/`IGNCR`/`ISTRIP`/`IXON`/`ISIG`/`ICANON`/`ECHO` and
+`OPOST`/`ONLCR`/`OCRNL`; bits with no hardware behind them are preserved exactly.
+
+The guest case sets the exact SSH-style record (including `VMIN`/`VTIME`, `c_cc` entries and
+distinct ispeed/ospeed), reads it back on the slave and master, and then queues output and
+applies a second `TCSADRAIN` record:
+
+```sh
+timeout 600 cargo xtask qtest --case termios --arch x86_64
+# termios: pass
+```
+
+Evidence: `tests/evidence/k444/<sha>/` contains the pass log and JSON, the pre-fix red unit
+log, the field-mutation qtest failure and `SHA256SUMS`.
 
 ## Privsep wire shape
 
@@ -47,4 +83,7 @@ request omits its type byte.
 `tests/qtest/cases/ssh-login.toml` (K195) with the release image built from
 `cargo xtask image --arch x86_64 --profile release --output build/qtest/ssh-login.img`.
 The guest-side `pty-monitor` test isolates the exchange itself; the host gate exercises the
-same path through the real OpenSSH monitor.
+same path through the real OpenSSH monitor. K444 settles the termios half of the pty-req
+contract; the host gate remains blocked at the K195 session-delivery stage (the OpenSSH add-on
+binaries are not staged in this clone, and the documented 0-byte TX/session failure predates
+this ticket), so no `ssh -tt` result is claimed here.

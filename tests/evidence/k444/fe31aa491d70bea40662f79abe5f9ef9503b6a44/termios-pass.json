@@ -1,0 +1,29 @@
+{
+  "case": "termios",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 39696,
+  "exit_status": 33,
+  "matched": [
+    "^termios: start uid=0$",
+    "^termios: slave-open fd=[1-9][0-9]*$",
+    "^termios: tcsetattr=0$",
+    "^termios: slave iflag=0?[0-7]+ ok$",
+    "^termios: slave oflag=0?[0-7]+ ok$",
+    "^termios: slave cflag=0?[0-7]+ ok$",
+    "^termios: slave lflag=0?[0-7]+ ok$",
+    "^termios: slave line=0+ ok$",
+    "^termios: slave ispeed=0?[0-7]+ ok$",
+    "^termios: slave ospeed=0?[0-7]+ ok$",
+    "^termios: slave c_cc=ok$",
+    "^termios: master=ok$",
+    "^termios: tcsadrain=0$",
+    "^termios: drain=ok$",
+    "^termios: drain iflag=0?[0-7]+ ok$",
+    "^termios: drain c_cc=ok$",
+    "^termios: ok$",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}

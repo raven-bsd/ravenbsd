@@ -1,0 +1,31 @@
+==> guard
+==> fmt
+==> clippy (changed)
+    Checking raven-libc-platform v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-platform)
+    Checking raven-qtest v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/tests/qtest)
+    Checking raven-libc-personality-solaris v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-solaris)
+    Checking raven-libc-personality-linux v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-linux)
+    Checking raven-libc-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-net)
+    Checking raven-libc-personality-bsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-bsd)
+    Checking raven-libc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.38s
+==> tests (changed, parallel)
+   Compiling raven-libc-personality-bsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-bsd)
+   Compiling raven-libc-personality-solaris v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-solaris)
+   Compiling raven-libc-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-net)
+   Compiling raven-libc-personality-linux v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-linux)
+   Compiling raven-libc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.44s
+────────────
+ Nextest run ID e0cecd08-9adf-4817-a327-0c07ef85a8aa with nextest profile: default
+    Starting 1058 tests across 11 binaries
+────────────
+     Summary [  70.789s] 1058 tests run: 1058 passed (1 slow), 0 skipped
+==> profiles
+check-fast summary:
+  ok       guard (exit 0, 25.35s)
+  ok       fmt (exit 0, 9.47s)
+  ok       clippy (changed) (exit 0, 3.45s)
+  ok       tests (changed, parallel) (exit 0, 75.73s)
+  ok       profiles (exit 0, 1.59s)
+check-fast: PASSED

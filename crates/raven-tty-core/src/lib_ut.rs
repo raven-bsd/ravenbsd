@@ -457,3 +457,116 @@ fn the_default_impl_matches_new() {
     );
     assert_eq!(Discipline::default().pending(), 0);
 }
+
+#[test]
+fn termios_default_is_the_ssh_terminal_shape() {
+    let termios = Termios::sane();
+    assert_ne!(termios.iflag & ICRNL, 0);
+    assert_ne!(termios.iflag & IXON, 0);
+    assert_ne!(termios.oflag & OPOST, 0);
+    assert_ne!(termios.oflag & ONLCR, 0);
+    assert_ne!(termios.cflag & CS8, 0);
+    assert_ne!(termios.cflag & CREAD, 0);
+    assert_ne!(termios.lflag & ICANON, 0);
+    assert_ne!(termios.lflag & ECHO, 0);
+    assert_ne!(termios.lflag & ISIG, 0);
+    assert_eq!(termios.cc[VMIN], 1);
+    assert_eq!(termios.cc[VTIME], 0);
+}
+
+#[test]
+fn set_termios_round_trips_every_field() {
+    let mut want = Termios::sane();
+    want.iflag = ICRNL | IXON | ISTRIP;
+    want.oflag = OPOST | ONLCR | OCRNL;
+    want.cflag = CS8 | CREAD | 0o15;
+    want.lflag = ISIG | ICANON | ECHO | IEXTEN;
+    want.cc[VERASE] = 0x08;
+    want.cc[VKILL] = 0x18;
+    want.cc[VMIN] = 7;
+    want.cc[VTIME] = 4;
+    want.ispeed = 0o15;
+    want.ospeed = 0o16;
+    let mut discipline = Discipline::new();
+    assert_eq!(discipline.set_termios(want), 0);
+    assert_eq!(discipline.termios(), want);
+}
+
+#[test]
+fn the_settings_view_changes_only_icanon_and_echo() {
+    let mut discipline = Discipline::new();
+    let mut want = Termios::sane();
+    want.cc[VINTR] = 0x07;
+    want.ispeed = 0o15;
+    assert_eq!(discipline.set_termios(want), 0);
+    discipline.set_settings(Settings {
+        mode: Mode::Raw,
+        echo: false,
+    });
+    let got = discipline.termios();
+    assert_eq!(got.iflag, want.iflag);
+    assert_eq!(got.oflag, want.oflag);
+    assert_eq!(got.cflag, want.cflag);
+    assert_eq!(got.cc, want.cc);
+    assert_eq!(got.ispeed, want.ispeed);
+    assert_eq!(got.ospeed, want.ospeed);
+    assert_eq!(got.lflag & (ICANON | ECHO), 0);
+}
+
+#[test]
+fn icrnl_translates_carriage_return() {
+    let mut discipline = Discipline::new();
+    let output = feed(&mut discipline, b"ls\r");
+    assert_eq!(lines(&output), vec![&b"ls\n"[..]]);
+}
+
+#[test]
+fn a_cleared_icrnl_keeps_carriage_return_as_data() {
+    let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.iflag &= !ICRNL;
+    discipline.set_termios(termios);
+    let output = feed(&mut discipline, b"a\r");
+    assert!(output.lines.is_empty());
+    assert_eq!(discipline.pending(), 2);
+}
+
+#[test]
+fn opost_onlcr_translates_output() {
+    let discipline = Discipline::new();
+    let mut out = Vec::new();
+    discipline.process_output(b"line\n", &mut out);
+    assert_eq!(out, b"line\r\n");
+}
+
+#[test]
+fn output_is_raw_without_opost() {
+    let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.oflag &= !OPOST;
+    discipline.set_termios(termios);
+    let mut out = Vec::new();
+    discipline.process_output(b"line\n", &mut out);
+    assert_eq!(out, b"line\n");
+}
+
+#[test]
+fn a_disabled_veol_does_not_complete_the_line() {
+    let mut discipline = Discipline::new();
+    assert_eq!(discipline.termios().cc[VEOL], VDISABLE);
+    let output = feed(&mut discipline, b"\0");
+    assert!(output.lines.is_empty());
+    assert_eq!(discipline.pending(), 1);
+}
+
+#[test]
+fn a_custom_verase_byte_erases() {
+    let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.cc[VERASE] = 0x18;
+    discipline.set_termios(termios);
+    feed(&mut discipline, b"ab");
+    let output = feed(&mut discipline, b"\x18");
+    assert_eq!(output.echo, b"\x08 \x08");
+    assert_eq!(discipline.pending(), 1);
+}

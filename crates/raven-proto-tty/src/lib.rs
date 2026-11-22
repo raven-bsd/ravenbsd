@@ -18,18 +18,26 @@
 //! (0 off, 1 on) and answers with the applied settings; `GET_MODE` answers with the current ones;
 //! `FLUSH` answers with the number of discarded input bytes in `arg0`. Unknown versions and ops
 //! are protocol errors the server maps to `-ENOSYS`.
+//!
+//! `GET_TERMIOS`/`SET_TERMIOS` carry the complete 60-byte ABI record field by field in a
+//! [`TERMIOS_LEN`]-byte body (K444). Every field is little-endian with a fixed offset; no struct
+//! memory is sent, so the ABI padding bytes never travel.
 
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-pub use raven_tty_core::{Mode, Settings};
+pub use raven_tty_core::{Mode, Settings, Termios};
 
 /// Protocol version carried in every request and response.
 pub const VERSION: u16 = 1;
 
-/// Encoded length of one request or response body, in bytes.
+/// Encoded length of one short request or response body, in bytes.
 pub const CALL_LEN: usize = 12;
+
+/// Encoded length of a `GET_TERMIOS`/`SET_TERMIOS` body: the 12-byte header followed by the
+/// four flag words, `c_line`, `c_cc[32]` and the two speeds.
+pub const TERMIOS_LEN: usize = CALL_LEN + 4 * 4 + 1 + 32 + 4 + 4;
 
 /// `SET_MODE(mode, echo)`.
 pub const OP_SET_MODE: u16 = 1;
@@ -41,6 +49,10 @@ pub const OP_FLUSH: u16 = 3;
 pub const OP_GET_WRITE: u16 = 4;
 /// `SET_WRITE(allowed)`.
 pub const OP_SET_WRITE: u16 = 5;
+/// `GET_TERMIOS`.
+pub const OP_GET_TERMIOS: u16 = 6;
+/// `SET_TERMIOS`.
+pub const OP_SET_TERMIOS: u16 = 7;
 
 const CANONICAL: u32 = 0;
 const RAW: u32 = 1;
@@ -57,6 +69,21 @@ pub enum Request {
     GetMode,
     /// Discard buffered input.
     Flush,
+}
+
+/// A complete-record request (`GET_TERMIOS`/`SET_TERMIOS`).
+///
+/// Kept separate from [`Request`] so the short-body server matches (`consd`, `login`, `talk`) do
+/// not have to grow match arms for a call they never issue.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TermiosRequest {
+    /// Ask for the complete terminal attribute record.
+    Get,
+    /// Install the complete terminal attribute record.
+    Set {
+        /// Requested attributes.
+        termios: Termios,
+    },
 }
 
 /// A typed control response.
@@ -172,6 +199,60 @@ pub fn encode_request(request: Request, out: &mut [u8; CALL_LEN]) {
     out[8..12].copy_from_slice(&arg1.to_le_bytes());
 }
 
+/// Encode `GET_TERMIOS` into a [`TERMIOS_LEN`] body.
+pub fn encode_get_termios_request(out: &mut [u8; TERMIOS_LEN]) {
+    put_header(OP_GET_TERMIOS, out);
+    out[CALL_LEN..].fill(0);
+}
+
+/// Encode `SET_TERMIOS` into a [`TERMIOS_LEN`] body.
+pub fn encode_set_termios_request(termios: &Termios, out: &mut [u8; TERMIOS_LEN]) {
+    put_header(OP_SET_TERMIOS, out);
+    put_termios(termios, out);
+}
+
+/// Encode a `GET_TERMIOS`/`SET_TERMIOS` answer into a [`TERMIOS_LEN`] body.
+pub fn encode_termios_response(termios: &Termios, out: &mut [u8; TERMIOS_LEN]) {
+    put_header(OP_GET_TERMIOS, out);
+    put_termios(termios, out);
+}
+
+fn put_header(op: u16, out: &mut [u8]) {
+    out[..2].copy_from_slice(&VERSION.to_le_bytes());
+    out[2..4].copy_from_slice(&op.to_le_bytes());
+    out[4..8].copy_from_slice(&0u32.to_le_bytes());
+    out[8..12].copy_from_slice(&0u32.to_le_bytes());
+}
+
+fn put_termios(termios: &Termios, out: &mut [u8; TERMIOS_LEN]) {
+    out[12..16].copy_from_slice(&termios.iflag.to_le_bytes());
+    out[16..20].copy_from_slice(&termios.oflag.to_le_bytes());
+    out[20..24].copy_from_slice(&termios.cflag.to_le_bytes());
+    out[24..28].copy_from_slice(&termios.lflag.to_le_bytes());
+    out[28] = termios.line;
+    out[29..61].copy_from_slice(&termios.cc);
+    out[61..65].copy_from_slice(&termios.ispeed.to_le_bytes());
+    out[65..69].copy_from_slice(&termios.ospeed.to_le_bytes());
+}
+
+fn termios_from(input: &[u8]) -> Result<Termios, TtyError> {
+    if input.len() < TERMIOS_LEN {
+        return Err(TtyError::Truncated);
+    }
+    let mut cc = [0u8; 32];
+    cc.copy_from_slice(&input[29..61]);
+    Ok(Termios {
+        iflag: u32::from_le_bytes([input[12], input[13], input[14], input[15]]),
+        oflag: u32::from_le_bytes([input[16], input[17], input[18], input[19]]),
+        cflag: u32::from_le_bytes([input[20], input[21], input[22], input[23]]),
+        lflag: u32::from_le_bytes([input[24], input[25], input[26], input[27]]),
+        line: input[28],
+        cc,
+        ispeed: u32::from_le_bytes([input[61], input[62], input[63], input[64]]),
+        ospeed: u32::from_le_bytes([input[65], input[66], input[67], input[68]]),
+    })
+}
+
 /// Decode a request body.
 pub fn decode_request(input: &[u8]) -> Result<Request, TtyError> {
     let (op, arg0, arg1) = header(input)?;
@@ -181,6 +262,32 @@ pub fn decode_request(input: &[u8]) -> Result<Request, TtyError> {
         }),
         OP_GET_MODE => Ok(Request::GetMode),
         OP_FLUSH => Ok(Request::Flush),
+        other => Err(TtyError::UnknownOp(other)),
+    }
+}
+
+/// Decode a `GET_TERMIOS`/`SET_TERMIOS` body.
+pub fn decode_termios_request(input: &[u8]) -> Result<TermiosRequest, TtyError> {
+    let (op, _, _) = header(input)?;
+    match op {
+        OP_GET_TERMIOS => {
+            if input.len() < TERMIOS_LEN {
+                return Err(TtyError::Truncated);
+            }
+            Ok(TermiosRequest::Get)
+        }
+        OP_SET_TERMIOS => Ok(TermiosRequest::Set {
+            termios: termios_from(input)?,
+        }),
+        other => Err(TtyError::UnknownOp(other)),
+    }
+}
+
+/// Decode a `GET_TERMIOS`/`SET_TERMIOS` answer body.
+pub fn decode_termios_response(input: &[u8]) -> Result<Termios, TtyError> {
+    let (op, _, _) = header(input)?;
+    match op {
+        OP_GET_TERMIOS | OP_SET_TERMIOS => termios_from(input),
         other => Err(TtyError::UnknownOp(other)),
     }
 }
