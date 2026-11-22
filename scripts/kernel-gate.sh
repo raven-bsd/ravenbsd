@@ -67,6 +67,7 @@ irq-dist-off|x86_64|stuart|irq
 locking|x86_64|lance|locking
 lockstat|x86_64|lance|locking
 ipc-donation|x86_64|lance|ipc
+duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator
 proc-death-cleanup|x86_64|stuart|process
