@@ -33,6 +33,9 @@ fn up_names(notices: &[Notice]) -> Vec<String> {
             Notice::Up(index) => alloc::format!("up {index}"),
             Notice::Failed(index, reason) => alloc::format!("failed {index} {reason}"),
             Notice::CrashLoop(index) => alloc::format!("crash {index}"),
+            Notice::Unavailable(index, reason) => {
+                alloc::format!("unavailable {index} {reason}")
+            }
         })
         .collect()
 }
@@ -115,8 +118,8 @@ fn readiness_timeout_is_not_premature() {
     supervisor.spawned(0, generation, Handle(7), 0);
     assert!(supervisor.readiness_timed_out(0, generation, 99).is_empty());
     let notices = supervisor.readiness_timed_out(0, generation, 100);
-    assert_eq!(up_names(&notices), ["failed 0 readiness timeout"]);
-    assert_eq!(supervisor.runtime()[0].state, State::Failed);
+    assert_eq!(up_names(&notices), ["unavailable 0 readiness timeout"]);
+    assert_eq!(supervisor.runtime()[0].state, State::GaveUp);
 }
 
 #[test]
@@ -170,9 +173,47 @@ fn exit_before_readiness_is_a_failure() {
     let notices = supervisor.exited(0, generation, 0, 10);
     assert_eq!(
         up_names(&notices.notices),
-        ["failed 0 exited before it became ready"]
+        ["unavailable 0 exited before it became ready"]
     );
-    assert_eq!(supervisor.runtime()[0].state, State::Failed);
+    assert_eq!(supervisor.runtime()[0].state, State::GaveUp);
+}
+
+#[test]
+fn startup_exit_after_restarts_is_unavailable() {
+    let mut manifest = service("a");
+    manifest.readiness = Readiness::Scheme;
+    manifest.restart = Restart::OnFailure;
+    manifest.max_restarts = 1;
+    manifest.restart_delay_ms = 1;
+    let mut supervisor = supervisor(vec![manifest]);
+    let mut generation = supervisor.start(0, 0).unwrap();
+    supervisor.spawned(0, generation, Handle(7), 0);
+    let first = supervisor.exited(0, generation, 1, 10);
+    generation = first.restart.expect("restart").generation;
+    assert!(supervisor.begin_restart(0, generation, 20));
+    supervisor.spawned(0, generation, Handle(8), 20);
+    let second = supervisor.exited(0, generation, 1, 30);
+    assert!(second.restart.is_none());
+    assert_eq!(
+        up_names(&second.notices),
+        ["unavailable 0 could not become ready"]
+    );
+    assert_eq!(supervisor.runtime()[0].state, State::GaveUp);
+}
+
+#[test]
+fn dependency_closure_follows_service_and_scheme_needs() {
+    let mut pcid = service("pcid");
+    pcid.provides = vec!["scheme:pci".to_string()];
+    let mut netd = with_needs("netd", &["scheme:pci"]);
+    netd.provides = vec!["scheme:net".to_string()];
+    let app = with_needs("app", &["scheme:net"]);
+    let unrelated = service("unrelated");
+    let supervisor = supervisor(vec![pcid, netd, app, unrelated]);
+    assert_eq!(
+        supervisor.dependency_closure(2),
+        alloc::vec![true, true, true, false]
+    );
 }
 
 #[test]
@@ -468,8 +509,8 @@ fn spawn_failure_is_reported_once() {
     let mut supervisor = supervisor(vec![running_with_restarts("a", 3)]);
     let generation = supervisor.start(0, 0).unwrap();
     let notices = supervisor.spawn_failed(0, generation, "no initfs".to_string());
-    assert_eq!(up_names(&notices), ["failed 0 no initfs"]);
-    assert_eq!(supervisor.runtime()[0].state, State::Failed);
+    assert_eq!(up_names(&notices), ["unavailable 0 no initfs"]);
+    assert_eq!(supervisor.runtime()[0].state, State::GaveUp);
     assert!(
         supervisor
             .spawn_failed(0, generation, "again".to_string())
@@ -821,7 +862,7 @@ fn stalled_poll_gap_extends_the_readiness_deadline() {
             .is_empty()
     );
     let notices = supervisor.readiness_timed_out(0, generation, 9_100);
-    assert_eq!(up_names(&notices), ["failed 0 readiness timeout"]);
+    assert_eq!(up_names(&notices), ["unavailable 0 readiness timeout"]);
     assert_eq!(supervisor.runtime()[0].ready_timing.stalled_ms, 4_000);
 }
 
@@ -856,5 +897,5 @@ fn a_ready_worker_still_times_out_a_hung_child() {
         );
     }
     let notices = supervisor.readiness_timed_out(0, generation, 5_100);
-    assert_eq!(up_names(&notices), ["failed 0 readiness timeout"]);
+    assert_eq!(up_names(&notices), ["unavailable 0 readiness timeout"]);
 }

@@ -55,14 +55,16 @@ HARD_FORBIDDEN = (
     ("randomization window", re.compile(r"randomization window", re.IGNORECASE)),
 )
 
-# Service state on the aarch64 release image. The ticket's boot contract is
-# login/no-panic/no-window-error; these lines are recorded as observations and
-# still quoted in the report, but do not by themselves fail the ASLR smoke.
-# x86-64 keeps them as hard failures (the K492 release standard).
-SERVICE_OBSERVATIONS = (
+# Service state on the aarch64 release image. The K546 boot contract records
+# these as observations; the K566 --service-gate makes a crash loop or a
+# `svcd: ... failed` line hard again, while the documented K502 ASLR fallback
+# stays an observation (K565 owns the entropy source).
+SERVICE_TOKENS = (
     ("crash loop", re.compile(r"svcd:.*crash loop", re.IGNORECASE)),
     ("restart", re.compile(r"restart", re.IGNORECASE)),
     ("service failed", re.compile(r"^svcd: .*failed", re.IGNORECASE)),
+)
+ASLR_FALLBACK = (
     ("aslr entropy fallback", re.compile(r"aslr: entropy unavailable", re.IGNORECASE)),
 )
 
@@ -125,7 +127,9 @@ class Scan:
     tail: str = ""
 
 
-def scan_serial(text: str, smp: int, arch: str = "x86_64") -> Scan:
+def scan_serial(
+    text: str, smp: int, arch: str = "x86_64", service_gate: bool = False
+) -> Scan:
     lines = text.splitlines()
     scan = Scan()
     for line in lines:
@@ -135,10 +139,10 @@ def scan_serial(text: str, smp: int, arch: str = "x86_64") -> Scan:
         if scan.smp_line is None and f"smp: {smp} cpus online" in stripped:
             scan.smp_line = stripped
     if arch == "aarch64":
-        hard = HARD_FORBIDDEN
-        observed = SERVICE_OBSERVATIONS
+        hard = HARD_FORBIDDEN + (SERVICE_TOKENS if service_gate else ())
+        observed = ASLR_FALLBACK if service_gate else SERVICE_TOKENS + ASLR_FALLBACK
     else:
-        hard = HARD_FORBIDDEN + SERVICE_OBSERVATIONS
+        hard = HARD_FORBIDDEN + SERVICE_TOKENS + ASLR_FALLBACK
         observed = ()
     for number, line in enumerate(lines, 1):
         for name, pattern in hard:
@@ -272,6 +276,7 @@ def run_boot(
     timeout: float,
     serial_dir: Path,
     firmware_vars: Path,
+    service_gate: bool,
 ) -> dict:
     accel, smp, _ = mode
     raw = serial_dir / f"{mode_label}-boot-{boot:02d}.log"
@@ -299,7 +304,7 @@ def run_boot(
     wall_s = round(time.monotonic() - start, 3)
     work.unlink(missing_ok=True)
     text = raw.read_text(encoding="utf-8", errors="replace") if raw.is_file() else ""
-    scan = scan_serial(text, smp, arch)
+    scan = scan_serial(text, smp, arch, service_gate)
     record = {
         "mode": mode_label,
         "boot": boot,
@@ -387,6 +392,19 @@ def selftest() -> int:
     assert aarch64_obs.observations and not aarch64_obs.forbidden, aarch64_obs
     aarch64_hard = scan_serial(clean_aarch64 + "KERNEL PANIC\n", 4, "aarch64")
     assert aarch64_hard.forbidden, aarch64_hard
+    aarch64_gate = scan_serial(
+        clean_aarch64 + "svcd: pcid crash loop, giving up\n", 4, "aarch64", True
+    )
+    assert aarch64_gate.forbidden, aarch64_gate
+    aarch64_gate_ok = scan_serial(
+        clean_aarch64
+        + "svcd: pcid unavailable: no PCI\n"
+        + "svcd: boot report: 13 up, 3 unavailable\n",
+        4,
+        "aarch64",
+        True,
+    )
+    assert not aarch64_gate_ok.forbidden, aarch64_gate_ok
     for token in (
         "KERNEL PANIC",
         "EXCEPTION: bad ELF",
@@ -428,6 +446,11 @@ def main(argv: list[str]) -> int:
         type=int,
         default=max(2, (os.cpu_count() or 4) // 4),
         help="CPU burner processes for the heavy boots",
+    )
+    parser.add_argument(
+        "--service-gate",
+        action="store_true",
+        help="K566: a crash loop or an svcd failed line is a hard boot failure",
     )
     parser.add_argument("--image", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
@@ -478,7 +501,7 @@ def main(argv: list[str]) -> int:
     print(
         f"k492: start utc={started} arch={args.arch} commit={commit} image={image} "
         f"sha256={image_hash} load1={load1()} nproc={os.cpu_count()} boots={args.boots} "
-        f"heavy={args.heavy}"
+        f"heavy={args.heavy} service_gate={args.service_gate}"
     )
     with boot_log.open("w", encoding="utf-8") as handle:
         handle.write(
@@ -509,6 +532,7 @@ def main(argv: list[str]) -> int:
                         timeout,
                         serial_dir,
                         firmware_vars,
+                        args.service_gate,
                     )
                     after = load1()
                     record["load1_before"] = before
@@ -549,6 +573,7 @@ def main(argv: list[str]) -> int:
         "boots_requested": args.boots,
         "heavy_boots": args.heavy,
         "load_processes": args.load_processes,
+        "service_gate": args.service_gate,
         "modes": labels,
         "failed": failed,
         "rows": rows,
