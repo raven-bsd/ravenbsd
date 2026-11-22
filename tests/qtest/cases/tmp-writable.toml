@@ -10,6 +10,7 @@
 name = "tmp-writable"
 arch = "x86_64"
 profile = "release"
+image = "build/qtest/tmp-writable.img"
 timeout_secs = 300
 boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
