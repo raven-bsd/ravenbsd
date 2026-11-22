@@ -585,3 +585,59 @@ fn newreno_slow_start_doubles_per_rtt() {
     }
     assert_eq!(newreno.cwnd(), 29_200);
 }
+
+// K258: NetBSD `tcp_newreno_fast_retransmit` does not enter recovery when the ACK is older than
+// `snd_high` (a false fast retransmit after a timeout). Behaviour read from NetBSD
+// `sys/netinet/tcp_congctl.c` at 36eddebcc (NRL 4-clause, no code copied); the arithmetic is the
+// permissive FreeBSD/RFC 5681 baseline already in this crate.
+#[test]
+fn netbsd_false_fast_retransmit_does_not_enter_recovery() {
+    let mut newreno = NewReno::new(1460, 14_600, 1_000_000, 1_000_000);
+    let entered = newreno.fast_retransmit(14_600, 20_000, 15_000, 20_000);
+    assert!(!entered);
+    assert!(!newreno.in_recovery());
+    assert_eq!(newreno.cwnd(), 14_600);
+    assert_eq!(newreno.ssthresh(), 1_000_000);
+}
+
+#[test]
+fn netbsd_fast_retransmit_enters_recovery_at_or_after_snd_high() {
+    let mut newreno = NewReno::new(1460, 14_600, 1_000_000, 1_000_000);
+    let entered = newreno.fast_retransmit(14_600, 20_000, 20_000, 20_000);
+    assert!(entered);
+    assert!(newreno.in_recovery());
+    // Reno multiplicative decrease: half the flight in segments, at least two MSS.
+    assert_eq!(newreno.ssthresh(), 7_300);
+    assert_eq!(newreno.cwnd(), 7_300 + 3 * 1460);
+}
+
+#[test]
+fn netbsd_complete_ack_uses_outstanding_data_below_ssthresh() {
+    let mut newreno = NewReno::new(1460, 14_600, 1_000_000, 1_000_000);
+    assert!(newreno.fast_retransmit(14_600, 30_000, 30_000, 30_000));
+    // Outstanding (snd_max - ack) = 2 MSS, below ssthresh 5 MSS: cwnd = outstanding + 1 MSS.
+    newreno.complete_ack(27_080, 30_000);
+    assert!(!newreno.in_recovery());
+    assert_eq!(newreno.cwnd(), 2 * 1460 + 1460);
+
+    let mut capped = NewReno::new(1460, 14_600, 1_000_000, 1_000_000);
+    assert!(capped.fast_retransmit(14_600, 30_000, 30_000, 30_000));
+    // Outstanding = 8 MSS, above ssthresh: cwnd drops to ssthresh.
+    capped.complete_ack(18_320, 30_000);
+    assert_eq!(capped.cwnd(), 7_300);
+}
+
+#[test]
+fn netbsd_slow_retransmit_uses_the_send_window_bound() {
+    let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
+    // win = min(snd_wnd, cwnd) / 2 / mss = min(14_600, 29_200) / 2 / 1460 = 5 MSS.
+    newreno.slow_retransmit(14_600);
+    assert_eq!(newreno.cwnd(), 1_460);
+    assert_eq!(newreno.ssthresh(), 5 * 1460);
+    assert!(!newreno.in_recovery());
+
+    // A tiny window still floors the threshold at two MSS.
+    let mut small = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
+    small.slow_retransmit(2 * 1460);
+    assert_eq!(small.ssthresh(), 2 * 1460);
+}

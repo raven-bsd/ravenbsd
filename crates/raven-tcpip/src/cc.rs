@@ -9,6 +9,12 @@
 //! CUBIC is adapted from FreeBSD `sys/netinet/cc/cc_cubic.c` and `cc_cubic.h` (BSD-2-Clause;
 //! Copyright (c) 2008-2010 Lawrence Stewart, Copyright (c) 2010 The FreeBSD Foundation).
 //! The Rust expression is first-party.
+//!
+//! K258 aligns the NewReno recovery hooks with NetBSD `sys/netinet/tcp_congctl.c` at
+//! `36eddebcc` (4-clause NRL: read-only, no code copied): [`NewReno::fast_retransmit`] refuses a
+//! false fast retransmit after a timeout, [`NewReno::complete_ack`] exits recovery from the
+//! outstanding data, and [`NewReno::slow_retransmit`] bounds the RTO threshold by the send window.
+//! The arithmetic is RFC 5681/6582 expressed in this crate's integer style.
 
 use crate::Duration;
 
@@ -155,6 +161,65 @@ impl NewReno {
     /// Set the duplicate-ACK threshold.
     pub fn set_dup_threshold(&mut self, threshold: u32) {
         self.dup_threshold = threshold.max(1);
+    }
+
+    /// NetBSD `tcp_newreno_fast_retransmit`: refuse a false fast retransmit after a timeout.
+    ///
+    /// Behaviour read from NetBSD `sys/netinet/tcp_congctl.c` at `36eddebcc` (NRL 4-clause; read
+    /// only, no code copied). An ACK older than `snd_high` in sequence space means the duplicate
+    /// ACK threshold was reached after a retransmit timeout; recovery must not start. Returns true
+    /// when recovery was entered, false for the refused false fast retransmit.
+    pub fn fast_retransmit(&mut self, flight: u32, snd_nxt: u32, ack: u32, snd_high: u32) -> bool {
+        if Self::seq_lt(ack, snd_high) {
+            self.recover = 0;
+            self.last_ack = None;
+            self.bytes_acked = 0;
+            self.in_recovery = false;
+            return false;
+        }
+        self.loss_fast_retransmit(flight, snd_nxt);
+        true
+    }
+
+    /// NetBSD NewReno complete ACK: exit recovery using the outstanding data.
+    ///
+    /// If `snd_max - ack` is below `ssthresh`, the window is that outstanding data plus one MSS;
+    /// otherwise it drops to `ssthresh`. Behaviour from NetBSD `tcp_congctl.c`
+    /// `tcp_newreno_fast_retransmit_newack` (read-only).
+    pub fn complete_ack(&mut self, ack: u32, snd_max: u32) {
+        if !self.in_recovery {
+            return;
+        }
+        let outstanding = snd_max.wrapping_sub(ack);
+        self.cwnd = if outstanding < self.ssthresh {
+            outstanding.saturating_add(self.mss)
+        } else {
+            self.ssthresh
+        };
+        self.in_recovery = false;
+        self.bytes_acked = 0;
+        self.last_ack = None;
+    }
+
+    /// NetBSD NewReno slow retransmit (RTO): one-MSS loss window and half of `min(snd_wnd, cwnd)`.
+    ///
+    /// The threshold is at least two MSS; recovery and the duplicate-ACK/ABC state are cleared.
+    /// Behaviour from NetBSD `tcp_congctl.c` `tcp_reno_slow_retransmit` (read-only).
+    pub fn slow_retransmit(&mut self, snd_wnd: u32) {
+        let win = snd_wnd.min(self.cwnd) / 2 / self.mss;
+        let win = win.max(2);
+        self.cwnd = self.mss;
+        self.ssthresh = win.saturating_mul(self.mss);
+        self.in_recovery = false;
+        self.in_rto = true;
+        self.bytes_acked = 0;
+        self.last_ack = None;
+        self.recover = 0;
+    }
+
+    /// RFC 1982 sequence comparison, NetBSD `SEQ_LT`.
+    fn seq_lt(a: u32, b: u32) -> bool {
+        (a.wrapping_sub(b) as i32) < 0
     }
 
     /// Apply a fast-retransmit loss event with the flight size at the event.
