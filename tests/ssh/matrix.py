@@ -59,6 +59,7 @@ S7_WALL_BOUND_MS = 5000
 ECHO_PORT = 23097
 ECHO_PAYLOAD = b"K434-S0-ECHO-0123456789abcdef\n"
 MARKER = b"K434-SSH-MARKER-2026-11-22\n"
+SERIAL_LEASE = b"resolvd: lease eth0 10.0.2.15"
 
 ROW_ORDER = [
     "S0", "S1", "S1-client-first", "S1-repeat", "S2", "S3", "S4", "S5", "S5-identity",
@@ -321,6 +322,24 @@ def wait_tcp(port: int, timeout_s: float) -> bool:
     return False
 
 
+def serial_has(serial: Path | SerialConsole, needle: bytes, timeout_s: float = 60) -> bool:
+    """Wait for a guest serial line (the DHCP lease) before any network probe."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if isinstance(serial, SerialConsole):
+            serial.pump()
+            data = bytes(serial.buffer)
+        else:
+            try:
+                data = serial.read_bytes()
+            except FileNotFoundError:
+                data = b""
+        if needle in data:
+            return True
+        time.sleep(0.1)
+    return False
+
+
 def row_s0() -> None:
     if not ECHO_IMAGE.is_file():
         record("S0", "BLOCKED",
@@ -333,6 +352,13 @@ def row_s0() -> None:
     try:
         child, serial = boot(ECHO_IMAGE, b"ssh-echo: listening", "serial-echo.log", "vars-echo.fd",
                              ready_timeout=180)
+        if not serial_has(serial, SERIAL_LEASE, 60):
+            record("S0", "FAIL",
+                   f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s; "
+                   f"serial-echo.log")
+            attempt("S0", 1, "fresh", literal(ECHO_PAYLOAD), "no guest lease", 0, "FAIL",
+                    "serial-echo.log")
+            return
         started = time.monotonic()
         connection = None
         error_text = ""
@@ -1411,7 +1437,13 @@ def main() -> int:
                                  socket_serial=socket_only)
             if socket_only:
                 console = handle  # type: ignore[assignment]
-            if not wait_tcp(22, 30):
+                lease_ok = serial_has(console, SERIAL_LEASE, 60)
+            else:
+                lease_ok = serial_has(handle, SERIAL_LEASE, 60)  # type: ignore[arg-type]
+            if not lease_ok:
+                record(only, "BLOCKED",
+                       f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+            elif not wait_tcp(22, 30):
                 record(only, "BLOCKED",
                        "guest listener did not accept a TCP connection after svcd: sshd up")
             else:
@@ -1451,9 +1483,12 @@ def main() -> int:
 
     repeat_child = None
     try:
-        repeat_child, _ = boot(IMAGE, b"svcd: sshd up", "serial-repeat.log",
-                               "vars-repeat.fd", ready_timeout=180)
-        if not wait_tcp(22, 30):
+        repeat_child, repeat_serial = boot(IMAGE, b"svcd: sshd up", "serial-repeat.log",
+                                           "vars-repeat.fd", ready_timeout=180)
+        if not serial_has(repeat_serial, SERIAL_LEASE, 60):
+            record("S1-repeat", "BLOCKED",
+                   f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+        elif not wait_tcp(22, 30):
             record("S1-repeat", "BLOCKED",
                    "guest listener did not accept a TCP connection after svcd: sshd up")
         else:
@@ -1472,7 +1507,13 @@ def main() -> int:
         s8_child, s8_console = boot(IMAGE, b"svcd: sshd up", "serial-s8.log",
                                     "vars-s8.fd", ready_timeout=180,
                                     socket_serial=True)
-        if not wait_tcp(22, 30):
+        if not serial_has(s8_console, SERIAL_LEASE, 60):
+            record("S8", "BLOCKED",
+                   f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+            record("S8-openpty-null", "BLOCKED", "guest network not ready")
+            record("S8-monitor", "BLOCKED", "guest network not ready")
+            record("S8-fds", "BLOCKED", "guest network not ready")
+        elif not wait_tcp(22, 30):
             record("S8", "BLOCKED",
                    "guest listener did not accept a TCP connection after svcd: sshd up")
         else:
@@ -1493,6 +1534,8 @@ def main() -> int:
     try:
         child, console = boot(IMAGE, b"svcd: sshd up", "serial.log", "vars.fd",
                               ready_timeout=180, socket_serial=True)
+        if not serial_has(console, SERIAL_LEASE, 60):
+            raise RuntimeError(f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
         row_s1()
         row_s2()
         s3_state = row_s3_start()

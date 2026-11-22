@@ -12,6 +12,7 @@
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+root_real=$(CDPATH= cd -- "$root" && pwd -P)
 cd "$root"
 
 bridge=ravenbr0
@@ -40,7 +41,17 @@ else
 fi
 
 up=0
+stale_qemu() {
+    # A cap expiry can leave QEMU orphaned because the test starts it in its own session. Only
+    # this clone's images are matched; another minion's QEMU keeps running.
+    timeout 5 pkill -TERM -f "qemu-system-x86_64.*$root_real/build/qtest/ssh-login.img" \
+        >/dev/null 2>&1 || true
+    timeout 5 pkill -TERM -f "qemu-system-x86_64.*$root_real/build/fixtures/ssh-echo/echo.img" \
+        >/dev/null 2>&1 || true
+    sleep 1
+}
 down() {
+    stale_qemu
     if [ "$up" -eq 1 ]; then
         if [ "$mode" = shared ]; then
             $SUDO sh scripts/qemu-net.sh down >/dev/null 2>&1 || true
@@ -56,6 +67,7 @@ down() {
 trap down EXIT HUP INT TERM
 
 mkdir -p build/ssh/matrix "$state"
+stale_qemu
 if [ -z "$only" ]; then
     # S8's dynamic pty case comes from merged K430. Its measured run after K442 is ~39 s.
     echo "matrix: running the pty-alloc qtest" >&2
