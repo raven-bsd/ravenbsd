@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K429 scheme-socket read EFAULT. The child inherits a socket and a heap buffer that was written
+# before fork, so its page is private copy-on-write. A valid read(32768) into that buffer must
+# resolve COW, not return EFAULT from the kernel capture.
+
+name = "socket-read-efault"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+initfs = "build/fixtures/socket-read-efault/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23082-:23082",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/fixtures/socket-read-efault/build.sh",
+    "sh tests/fixtures/socket-read-efault/start-host-echo.sh",
+]
+
+[[expect]]
+regex = '^socket-read-efault: listening port=23082$'
+
+[[expect]]
+regex = '^.*socket-read-efault: accepted fd=[0-9]+$'
+
+[[expect]]
+regex = '^socket-read-efault: child read ok bytes=19$'
+
+[[expect]]
+regex = '^socket-read-efault: child status=0$'
+
+[[expect]]
+regex = '^socket-read-efault: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)socket-read-efault: (child read errno|child poll timeout|fail)|panic|EXCEPTION'
