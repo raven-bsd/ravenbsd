@@ -128,14 +128,16 @@ if [ "$functional" -eq 1 ]; then
     load1=$(cut -d' ' -f1 /proc/loadavg)
     nproc=$(nproc 2>/dev/null || echo 4)
     max_load=$((nproc * 2))
+    max_qemu=$((nproc / 2))
+    [ "$max_qemu" -lt 2 ] && max_qemu=2
     qemu=$(ps -eo stat=,comm= 2>/dev/null \
         | awk '$1 !~ /^[ZX]/ && $2 ~ /^qemu-system-/ { n++ } END { print n + 0 }')
-    if [ "$qemu" -gt 2 ] ||
+    if [ "$qemu" -gt "$max_qemu" ] ||
         awk -v l="$load1" -v m="$max_load" 'BEGIN { exit !(l > m) }'; then
-        echo "kernel-gate: hygiene REFUSE functional qemu=$qemu load1=$load1 max_load=$max_load" >&2
+        echo "kernel-gate: hygiene REFUSE functional qemu=$qemu max_qemu=$max_qemu load1=$load1 max_load=$max_load" >&2
         exit 2
     fi
-    echo "kernel-gate: hygiene functional qemu=$qemu load1=$load1 max_load=$max_load"
+    echo "kernel-gate: hygiene functional qemu=$qemu max_qemu=$max_qemu load1=$load1 max_load=$max_load"
 else
     # shellcheck disable=SC2086
     sh tests/smp/boot/host-idle.sh \
