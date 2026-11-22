@@ -579,22 +579,85 @@ impl Thread {
 }
 
 /// Freed stacks awaiting reuse (S36).  A cached stack keeps its guard page unmapped; reuse
-/// skips the unmap.  The cache is deliberately bounded and never hands memory back to the heap:
-/// the heap block's guard page mapping was removed and cannot be restored without its lost
-/// physical frame, so deallocating would break the next allocation over the block.
+/// skips the unmap.  The cache is deliberately bounded by the live-thread admission bound
+/// ([`MAX_THREADS`]) and never hands memory back to the heap: the heap block's guard page mapping
+/// was removed and cannot be restored without its lost physical frame.  Every stack freed by a
+/// thread that was admitted under the bound therefore has a cache slot, so no `(base, top)` is
+/// dropped (K530).
 static STACK_CACHE: Mutex<Vec<(u64, u64)>> = Mutex::new(Vec::new());
-/// Maximum cached stacks; beyond this a freed stack stays allocated but unused.
-const STACK_CACHE_MAX: usize = 64;
+/// Maximum cached stacks. The sched-core admission bound is the only way to exceed it; every
+/// live thread has one stack and every freed stack is cached here.
+const STACK_CACHE_MAX: usize = MAX_THREADS;
 /// Stacks freshly carved from the heap since boot (diagnostic counter).
 static STACK_FRESH: AtomicU64 = AtomicU64::new(0);
+/// One-shot `s69-stackcheck` reuse probe.
+static STACK_SELFTEST_DONE: AtomicBool = AtomicBool::new(false);
+
+/// One-shot `s69-stackcheck` reuse probe: dirty a freed stack, reallocate it, and require the
+/// reused frames to be zero. Gated by the fixture command line so normal boots are unchanged.
+fn stack_selftest_once() {
+    if STACK_SELFTEST_DONE.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    if !paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s69-stackcheck")
+    {
+        return;
+    }
+    let Some((base, top)) = allocate_kernel_stack() else {
+        crate::kprintln!("stack-selftest: alloc fail");
+        return;
+    };
+    let Some(start) = base.checked_add(PAGE) else {
+        crate::kprintln!("stack-selftest: address fail");
+        return;
+    };
+    let Some(length) = usize::try_from(top.saturating_sub(start)).ok() else {
+        crate::kprintln!("stack-selftest: length fail");
+        return;
+    };
+    // SAFETY: the mapped stack region is `start..top`; the guard below `start` is not touched.
+    unsafe { core::ptr::write_bytes(start as *mut u8, 0xAA, length) };
+    free_kernel_stack(base, top);
+    let Some((base2, top2)) = allocate_kernel_stack() else {
+        crate::kprintln!("stack-selftest: realloc fail");
+        return;
+    };
+    let start2 = match base2.checked_add(PAGE) {
+        Some(value) => value,
+        None => return,
+    };
+    // SAFETY: the reused stack's mapped region is `start2..top2` and is owned by this probe.
+    let zero = unsafe { core::slice::from_raw_parts(start2 as *const u8, length) }
+        .iter()
+        .all(|byte| *byte == 0);
+    free_kernel_stack(base2, top2);
+    if zero {
+        crate::kprintln!("stack-selftest: reuse-zero ok");
+    } else {
+        crate::kprintln!("stack-selftest: reuse-stale");
+    }
+}
 
 /// Allocate a page-aligned kernel stack and unmap its lowest page as a guard.
 ///
 /// Returns `(base, top)`, or `None` when the heap or the kernel mapper fails.  A cached stack is
 /// reused first; its guard is already unmapped.
 pub fn allocate_kernel_stack() -> Option<(u64, u64)> {
-    if let Some(stack) = STACK_CACHE.lock().pop() {
-        return Some(stack);
+    stack_selftest_once();
+    if let Some((base, top)) = STACK_CACHE.lock().pop() {
+        // A cached stack was owned by a thread that may have left data in its kernel frames.
+        // Zero the mapped stack pages (never the unmapped guard at `base`) before the next
+        // owner starts on it (K530 reuse-content row).
+        let start = base.checked_add(PAGE)?;
+        let length = usize::try_from(top.checked_sub(start)?).ok()?;
+        if length != 0 {
+            // SAFETY: `start..top` is the mapped stack region of this cached stack; the guard
+            // page below `start` is deliberately excluded. The cache lock serialises ownership.
+            unsafe { core::ptr::write_bytes(start as *mut u8, 0, length) };
+        }
+        return Some((base, top));
     }
     let pages = STACK_RESERVED_PAGES;
     let size = usize::try_from(pages.checked_mul(PAGE)?).ok()?;
