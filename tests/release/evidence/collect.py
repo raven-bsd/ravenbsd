@@ -25,7 +25,7 @@ import mgmt
 
 ROOT = Path(__file__).resolve().parents[3]
 VERSION = "0.1.0"
-PACKET = ROOT / "docs/releases/0.1.0-evidence.md"
+PACKET_REL = "tickets/release/0.1.0-evidence.md"
 EVIDENCE = ROOT / "build/release" / VERSION
 RELEASE_IMAGES = ROOT / "docs/release-images.md"
 SMP_SOAK = ROOT / "docs/smp-boot-soak.md"
@@ -955,6 +955,8 @@ def packet_text(gates: list[Gate], head: str, dirty: bool, owner_attestation: bo
 def collect(args: argparse.Namespace) -> int:
     head = args.commit or head_commit()
     dirty = tree_dirty()
+    if args.packet is None:
+        args.packet = mgmt.require_root(ROOT) / PACKET_REL
     posix_report = args.posix_report or mgmt.require_file(
         ROOT, "architecture/product-data/posix-conformance.md"
     )
@@ -990,6 +992,8 @@ def collect(args: argparse.Namespace) -> int:
 
 
 def check(args: argparse.Namespace) -> int:
+    if args.packet is None:
+        args.packet = mgmt.require_root(ROOT) / PACKET_REL
     missing = []
     if not args.packet.is_file():
         missing.append(str(args.packet.relative_to(ROOT)))
@@ -1369,7 +1373,12 @@ def main(argv: list[str]) -> int:
     mode.add_argument("--record", action="store_true", help="alias for --collect")
     mode.add_argument("--record-qemu", action="store_true", help="alias for --qemu")
     parser.add_argument("--commit", help="evidence commit (default HEAD)")
-    parser.add_argument("--packet", type=Path, default=PACKET)
+    parser.add_argument(
+        "--packet",
+        type=Path,
+        default=None,
+        help="packet path (default RAVEN_MGMT_ROOT/tickets/release/0.1.0-evidence.md)",
+    )
     parser.add_argument(
         "--kernel-gate",
         type=Path,

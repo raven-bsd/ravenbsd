@@ -6,6 +6,7 @@
 #
 # Usage:
 #   scripts/release.sh --check       verify the release inputs (default)
+#   scripts/release.sh --dry-run     alias for --check; build nothing
 #   scripts/release.sh --candidate   build a development candidate image (base profile)
 #   scripts/release.sh --build       build the release image and manifest (requires --check)
 #   scripts/release.sh --verify      verify the files recorded in SHA256SUMS
@@ -38,9 +39,10 @@ MODE=check
 
 usage() {
 	cat <<'EOF'
-usage: scripts/release.sh [--check|--candidate|--build|--verify]
+usage: scripts/release.sh [--check|--dry-run|--candidate|--build|--verify]
 
   --check      verify the release profile, notes, QEMU/Pi 4 gates and provenance inputs
+  --dry-run    alias for --check; no build
   --candidate  build a base-profile development candidate with a manifest and hash
   --build      build the release image (requires --check) and write SHA256SUMS + manifest
   --verify     verify the hashes in the output directory
@@ -51,7 +53,7 @@ EOF
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-		--check) MODE=check ;;
+		--check|--dry-run) MODE=check ;;
 		--candidate) MODE=candidate ;;
 		--build) MODE=build ;;
 		--verify) MODE=verify ;;

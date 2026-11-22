@@ -23,6 +23,23 @@ fn main() -> std::process::ExitCode {
     }
 }
 
+fn mgmt_root(root: &std::path::Path) -> Result<PathBuf> {
+    let raw = std::env::var("RAVEN_MGMT_ROOT")
+        .ok()
+        .filter(|value| !value.is_empty());
+    let path = raw
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.parent().unwrap_or(root).join("ravenbsd-prjmgmt"));
+    if !path.is_dir() {
+        bail!(
+            "RAVEN_MGMT_ROOT: management root {} is not a directory; set RAVEN_MGMT_ROOT to the \
+             ravenbsd-prjmgmt checkout (no product docs fallback)",
+            path.display()
+        );
+    }
+    Ok(path)
+}
+
 fn run(args: Vec<String>) -> Result<u8> {
     let mut command = None;
     let mut root = PathBuf::from(".");
@@ -126,8 +143,9 @@ fn run(args: Vec<String>) -> Result<u8> {
             };
             let report = gate::run(&root, &profile_doc, &trace, &options)?;
             let text = gate::render(&report);
-            std::fs::write(root.join("docs/posix/CONFORMANCE.md"), text)
-                .context("cannot write CONFORMANCE.md")?;
+            let report_path =
+                mgmt_root(&root)?.join("architecture/product-data/posix-conformance.md");
+            std::fs::write(report_path, text).context("cannot write mgmt posix-conformance.md")?;
             if json {
                 println!("{}", gate::json(&report)?);
             } else {

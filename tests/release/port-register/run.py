@@ -27,8 +27,11 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tests/release/evidence"))
+import mgmt  # noqa: E402
+
 REGISTER = Path("tests/release/port-register/register.tsv")
-DOC = Path("docs/releases/0.1.0-port-register.md")
+DOC = Path("tickets/release/0.1.0-port-register.md")
 
 AREAS = ("kernel", "libc", "crates", "userland")
 SOURCE_EXTS = {".rs", ".c", ".h", ".s", ".ld", ".sh", ".toml", ".py", ".inc"}
@@ -618,7 +621,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     register_text = render_register(rows)
     doc_text = render_doc(rows)
     register_path = ROOT / REGISTER
-    doc_path = ROOT / DOC
+    doc_path = mgmt.require_root(ROOT) / DOC
 
     if args.write:
         register_path.parent.mkdir(parents=True, exist_ok=True)

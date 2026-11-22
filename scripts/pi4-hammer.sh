@@ -25,10 +25,11 @@ cd "$ROOT" || {
     echo "pi4-hammer: cannot enter repository root from $0" >&2
     exit 2
 }
+. "$ROOT/scripts/lib/mgmt.sh"
 
 WORK=build/pi4-hammer
 RESULTS=$WORK/results.tsv
-HOST_OUT=docs/pi4-test-matrix.md
+HOST_OUT=
 BOARD_OUT=$WORK/board-matrix.md
 IMAGE=build/aarch64/ravenbsd-pi4.img
 
@@ -47,10 +48,11 @@ usage:
   sh scripts/pi4-hammer.sh --board [--device TTY] [--log PATH]
 
   --host       build the aarch64 kernel and pi4 image, run the Pi 4 qtests and host packages,
-               run make check-fast, and write docs/pi4-test-matrix.md
+               run make check-fast, and write the matrix under RAVEN_MGMT_ROOT
   --board      capture/check the Pi 4 board evidence; no device or log writes the UNVERIFIED
                procedure only
-  --out PATH   matrix output path (host default: docs/pi4-test-matrix.md,
+  --out PATH   matrix output path (host default:
+               RAVEN_MGMT_ROOT/tickets/evidence/pi4-test-matrix.md,
                board default: build/pi4-hammer/board-matrix.md)
   --device TTY serial adapter for --board capture (default: /dev/ttyUSB0 when --board runs)
   --log PATH   serial log for --board (captures to build/pi4-hammer/serial.log when --device is set)
@@ -98,6 +100,10 @@ if [ -z "$MODE" ]; then
     echo "pi4-hammer: one of --host or --board is required" >&2
     usage >&2
     exit 2
+fi
+
+if [ -z "$OUT" ] && [ "$MODE" = host ]; then
+    HOST_OUT=$(mgmt_path tickets/evidence/pi4-test-matrix.md) || exit 2
 fi
 
 mkdir -p "$WORK" || exit 2

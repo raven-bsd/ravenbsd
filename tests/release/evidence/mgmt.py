@@ -28,9 +28,21 @@ def resolve_root(product_root: Path, env_value: str | None = None) -> Path:
     return (product_root.parent / DEFAULT_ROOT).resolve()
 
 
+def require_root(product_root: Path, env_value: str | None = None) -> Path:
+    """Return the management root, or exit naming RAVEN_MGMT_ROOT."""
+    root = resolve_root(product_root, env_value)
+    if not root.is_dir():
+        raise SystemExit(
+            f"release-evidence: RAVEN_MGMT_ROOT: management root {root} is not a directory; "
+            "set RAVEN_MGMT_ROOT to the ravenbsd-prjmgmt checkout "
+            "(no product docs fallback)"
+        )
+    return root
+
+
 def require_file(product_root: Path, relative: str, env_value: str | None = None) -> Path:
     """Return `relative` under the management root, or exit naming RAVEN_MGMT_ROOT."""
-    root = resolve_root(product_root, env_value)
+    root = require_root(product_root, env_value)
     path = root / relative
     if not path.is_file():
         raise SystemExit(

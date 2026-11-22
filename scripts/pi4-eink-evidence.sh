@@ -25,6 +25,7 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
 cd "$root"
+. "$root/scripts/lib/mgmt.sh"
 
 check_only=0
 dry_run=0
@@ -37,7 +38,7 @@ panel=
 url=
 ntp=
 refresh=
-out=tests/evidence/pi4-eink/evidence.md
+out=
 
 usage() {
     cat <<'EOF'
@@ -57,7 +58,7 @@ Board capture / evidence:
   --url <url>       fetched content URL
   --ntp <iso8601>   NTP-set UTC time, e.g. 2026-11-21T16:00:00Z
   --refresh <sec>   refresh interval in seconds (positive integer)
-  --out <path>      evidence Markdown (default tests/evidence/pi4-eink/evidence.md)
+  --out <path>      evidence Markdown (default RAVEN_MGMT_ROOT/tickets/evidence/pi4-eink/evidence.md)
   -h, --help        show this help
 
 Every required field must be present for exit 0. A missing field is an error, not a
@@ -138,6 +139,10 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+if [ -z "$out" ]; then
+    out=$(mgmt_path tickets/evidence/pi4-eink/evidence.md) || exit 2
+fi
+
 require_file() {
     if [ ! -f "$1" ]; then
         echo "pi4-eink-evidence: missing required file: $1" >&2
@@ -147,7 +152,8 @@ require_file() {
 
 host_checks() {
     require_file docs/releases/0.1.0-eink-evidence.md
-    require_file tests/evidence/pi4-eink/README.md
+    mgmt_readme=$(mgmt_require_file tickets/evidence/pi4-eink/README.md) || exit 2
+    require_file "$mgmt_readme"
     require_file scripts/board-pi4-check.sh
     require_file scripts/pi4-serial.sh
     require_file scripts/pi4-eink-evidence.sh
