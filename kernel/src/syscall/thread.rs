@@ -14,7 +14,7 @@ use raven_abi::syscall::{THREAD_CREATE_EX, ThreadCreateEx};
 use raven_abi::types::{Handle, Rights, prot};
 use raven_usercopy::{UserSlice, is_user_address};
 
-use crate::process::{self, ProcessState, handle::Object};
+use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
 use crate::sched::thread::ThreadState;
 use crate::syscall::SyscallFrame;
@@ -347,7 +347,7 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
         if offset == 0 || offset & 0xf != 0 || !is_user_address(offset as u64) {
             return Err(Errno::EFAULT);
         }
-        if UserSlice::new(offset as u64, context_size as u64).is_err() {
+        if !writable_context(&caller, offset as u64, context_size) {
             return Err(Errno::EFAULT);
         }
         (0, offset as u64)
@@ -358,6 +358,15 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
         }
         if offset & 0xf != 0 {
             return Err(Errno::EINVAL);
+        }
+        // The relative form resolves against this thread's TLS base. Reject an unset base or an
+        // area outside a writable VMA now: the kernel can return an error here, so it must not
+        // accept a context that would later force the delivery path to kill the process.
+        let Some(context) = thread.tls_base().checked_add(offset as u64) else {
+            return Err(Errno::EFAULT);
+        };
+        if !writable_context(&caller, context, context_size) {
+            return Err(Errno::EFAULT);
         }
         (offset, 0)
     };
@@ -381,6 +390,26 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
     thread.signal_flags.store(flags, Ordering::Release);
     thread.signal_entry.store(entry, Ordering::Release);
     Ok(0)
+}
+
+/// True when `address..address + size` is a writable user range of `process`.
+fn writable_context(process: &Arc<Process>, address: u64, size: usize) -> bool {
+    if address == 0 || UserSlice::new(address, u64::try_from(size).unwrap_or(u64::MAX)).is_err() {
+        return false;
+    }
+    let space = process.address_space.lock();
+    let Some(space) = space.as_ref() else {
+        return false;
+    };
+    let last = address
+        .saturating_add(u64::try_from(size).unwrap_or(u64::MAX))
+        .saturating_sub(1);
+    [address, last].iter().all(|address| {
+        space
+            .vmas()
+            .find(*address)
+            .is_some_and(|vma| vma.prot() & (prot::WRITE as u8) != 0)
+    })
 }
 
 /// `sigresend(sig: u32, info: usize, mask: u64) -> 0` (raw 0x84).
