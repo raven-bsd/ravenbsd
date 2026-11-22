@@ -11,6 +11,38 @@ when the behavior is broken. Donor reading is behavioural only; no donor code is
 Donor revisions: FreeBSD `133344405f532bd54ff3629a77d4c4e062f01fdb`, NetBSD
 `36eddebcc36cb0775aa2962005b9c05419a6ff01`.
 
+## K1-K6 guest conformance suite
+
+The primary artifact is `tests/smp/ssh-contract/`: one guest binary, one qtest, one runner. It
+prints `CONTRACT <id> PASS|FAIL <detail>` per row and exits non-zero on the first red row. The
+runner is:
+
+```sh
+timeout 600 sh tests/smp/ssh-contract/run.sh
+```
+
+Rows: K1 poll level (current, no cache/replay), K2 nonblocking read (EAGAIN/exact bytes/valid
+buffer), K3 nonblocking write (EAGAIN/partial/success delivered on the same socket), K4 dup and
+fork+exec identity/readiness, K5 PTY open/grant/unlock/ptsname/termios, K6 accept (accepted fd
+independent, listener still accepts two connections).
+
+State on 2026-11-22 (rev 85, base `b8472426`):
+
+| Row | Result | Detail |
+|---|---|---|
+| K1 | PASS | `level=current drain=no-replay hup=seen`; the Duplex write end registers as an EVQ source (`kernel/src/syscall/event.rs` no-rights arms) |
+| K2 | PASS | `partial=10/10/80 eagain=1 eof=0` |
+| K3 | PASS | `partial=positive eagain=1 delivered=4096` |
+| K4 | **FAIL** | the exec child polls, reads PING and writes PONG on the inherited socket, but its `_exit` never reaches `process::exit_process`; the parent's `waitpid` reports 0 for every iteration; watchdog prints `CONTRACT K4 FAIL child-exit-hang` |
+| K5 | known FAIL | libc exports `posix_openpt`, `grantpt`, `unlockpt` and `ptsname_r`, but **no `ptsname` symbol**; the suite declares it weak and would print `CONTRACT K5 FAIL ptsname symbol missing` (row not reached because K4 is first red) |
+| K6 | not reached | the host peer opens two connections; it is not exercised while K4 is red |
+
+The K4 defect is a libc/userspace exit hang after a poll on a duplex/socketpair; the kernel exit
+trace is not reached. It is outside K435's kernel/syscall/process Owns and is handed to the
+libc/K434 owner. The K5 missing `ptsname` is also libc (only `ptsname_r` exists). The K1-K3
+rows and their mutations are green; the K1 fix is the Duplex no-rights EVQ source arm.
+
+
 ## 1. poll/select readiness
 
 | Donor | Exact reference |

@@ -318,6 +318,11 @@ fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result
     if let Ok(Object::Pipe(_)) = process.handles.lock().get(handle, Rights::NONE) {
         return Ok(());
     }
+    // A duplex/socketpair end is pollable without the read/write data right: the write end
+    // carries WRITE, not READ, and POLLOUT must still register.
+    if let Ok(Object::Duplex(_)) = process.handles.lock().get(handle, Rights::NONE) {
+        return Ok(());
+    }
     match process.handles.lock().get(handle, Rights::READ)? {
         Object::Timer(_) | Object::UserEvent(_) | Object::Process(_) => Ok(()),
         Object::Irq(_) => Ok(()),
@@ -332,6 +337,10 @@ fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
     let table = process.handles.lock();
     // Both pipe ends are observable even though only the read end carries READ.
     if let Ok(Object::Pipe(end)) = table.get(handle, Rights::NONE) {
+        return end.readiness();
+    }
+    // Both duplex ends are observable even though only the read end carries READ.
+    if let Ok(Object::Duplex(end)) = table.get(handle, Rights::NONE) {
         return end.readiness();
     }
     match table.get(handle, Rights::READ) {

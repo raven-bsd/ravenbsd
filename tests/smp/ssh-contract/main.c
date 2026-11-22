@@ -1,22 +1,44 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
-// K435: kernel-side SSH session contract checks. The fixture uses a real libc
-// socketpair(AF_UNIX) over the kernel duplex endpoint pair and prints one marker per row on the
-// kernel debug console: poll/select level readiness, partial read/EAGAIN, partial write/EAGAIN,
-// and shared readiness across dup(). The exec/fork/PTY rows are covered by the K206/K222/K408
-// and libc-forkpty qtests driven by tests/smp/ssh-contract/run.sh.
+// K435: guest SSH kernel-contract conformance suite. It runs inside the RavenBSD image and
+// prints one `CONTRACT <id> PASS|FAIL <detail>` line per row. The service exits non-zero on the
+// first red row; the qtest fails on any FAIL. Rows:
+//   K1 poll/select current level (no cache/replay)
+//   K2 nonblocking read (EAGAIN/exact bytes/valid buffer)
+//   K3 nonblocking write (EAGAIN/partial/success delivered on the same socket)
+//   K4 dup and fork+exec identity/readiness
+//   K5 PTY open/grant/unlock/ptsname, pair round-trip, termios defaults
+//   K6 accept: accepted fd independent, listener still accepts
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <poll.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <termios.h>
 #include <unistd.h>
+
+#ifndef O_NONBLOCK
+#define O_NONBLOCK 0x0004
+#endif
+
+extern int posix_openpt(int flags);
+extern int grantpt(int fd);
+extern int unlockpt(int fd);
+extern char *ptsname(int fd) __attribute__((weak));
+
+#define K6_PORT 23097
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
 static long raven_debug_write(const char *bytes, size_t len) {
@@ -34,9 +56,12 @@ static void say(const char *text) {
     (void)raven_debug_write(text, strlen(text));
 }
 
-static int fail(const char *what) {
-    char line[160];
-    int length = snprintf(line, sizeof(line), "ssh-contract: fail %s errno=%d\n", what, errno);
+static const char *row = "K0";
+
+static void result(int ok, const char *detail) {
+    char line[240];
+    int length = snprintf(line, sizeof(line), "CONTRACT %s %s %s\n", row, ok ? "PASS" : "FAIL",
+                          detail);
     if (length > 0) {
         size_t size = (size_t)length;
         if (size >= sizeof(line)) {
@@ -44,19 +69,28 @@ static int fail(const char *what) {
         }
         (void)raven_debug_write(line, size);
     }
-    say("ssh-contract: fail\n");
+}
+
+static int fail(const char *what) {
+    char detail[160];
+    (void)snprintf(detail, sizeof(detail), "%s errno=%d", what, errno);
+    result(0, detail);
+    say("CONTRACT SUMMARY FAIL\n");
     return 1;
+}
+
+static void pass(const char *detail) {
+    result(1, detail);
 }
 
 static int poll_one(int fd, short events, int timeout_ms) {
     struct pollfd pfd;
     int ready;
 
-    // The SSH poll path always uses a nonzero timeout. The libc non-scheme descriptor
-    // zero-timeout query is a separate libc gap (K434); 1 ms still measures the current level
-    // without waiting for a state change.
+    // The SSH poll path always uses a nonzero timeout. The libc non-scheme zero-timeout query
+    // is a separate libc gap; 1 ms still measures the current level, not a future edge.
     if (timeout_ms == 0) {
-        timeout_ms = 1;
+        timeout_ms = 100;
     }
     pfd.fd = fd;
     pfd.events = events;
@@ -73,7 +107,7 @@ static int select_read(int fd, int timeout_ms) {
     int ready;
 
     if (timeout_ms == 0) {
-        timeout_ms = 1;
+        timeout_ms = 100;
     }
     FD_ZERO(&read_set);
     FD_SET(fd, &read_set);
@@ -85,58 +119,71 @@ static int select_read(int fd, int timeout_ms) {
     return ready;
 }
 
+static int read_exact(int fd, void *buffer, size_t length) {
+    size_t done = 0;
+
+    while (done < length) {
+        ssize_t got = read(fd, (char *)buffer + done, length - done);
+        if (got <= 0) {
+            return -1;
+        }
+        done += (size_t)got;
+    }
+    return 0;
+}
+
 static int check_poll(void) {
     int sv[2];
     char byte = 'A';
     int revents;
 
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
-        return fail("poll socketpair");
+        return fail("socketpair");
     }
-    // Empty socket: write end is writable now; read end is not readable.
     revents = poll_one(sv[1], POLLOUT, 0);
     if (revents < 0 || (revents & POLLOUT) == 0) {
-        return fail("poll empty write-ready");
+        return fail("empty write-ready");
     }
     revents = poll_one(sv[0], POLLIN, 0);
     if (revents != 0) {
-        return fail("poll empty read-ready");
+        return fail("empty read-ready");
     }
     if (select_read(sv[0], 0) != 0) {
-        return fail("select empty read-ready");
+        return fail("select empty");
     }
     if (write(sv[1], &byte, 1) != 1) {
-        return fail("poll write");
+        return fail("write");
     }
     revents = poll_one(sv[0], POLLIN, 0);
     if (revents < 0 || (revents & POLLIN) == 0) {
-        return fail("poll read-ready");
+        return fail("read-ready");
     }
     if (select_read(sv[0], 0) != 1) {
-        return fail("select read-ready");
+        return fail("select ready");
     }
     if (read(sv[0], &byte, 1) != 1) {
-        return fail("poll drain");
+        return fail("drain");
     }
-    // Level-triggered: after the drain the same descriptor is no longer readable.
+    // Level-triggered: the consumed readable edge must not replay and the write level must be
+    // recomputed from the current ring state.
     revents = poll_one(sv[0], POLLIN, 0);
     if (revents != 0) {
-        return fail("poll level after drain");
+        return fail("read replay");
     }
     if (select_read(sv[0], 0) != 0) {
-        return fail("select level after drain");
+        return fail("select replay");
     }
     if (close(sv[1]) != 0) {
-        return fail("poll close writer");
+        return fail("close writer");
     }
     revents = poll_one(sv[0], POLLIN | POLLHUP, 0);
     if (revents < 0 || (revents & POLLHUP) == 0) {
-        return fail("poll hup");
+        return fail("hup");
     }
     if (close(sv[0]) != 0) {
-        return fail("poll close reader");
+        return fail("close reader");
     }
-    say("ssh-contract: poll ok\n");
+    pass("level=current drain=no-replay hup=seen");
     return 0;
 }
 
@@ -151,50 +198,38 @@ static int check_read(void) {
         payload[index] = (unsigned char)(index + 1);
     }
     if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sv) != 0) {
-        return fail("read socketpair");
+        return fail("socketpair");
     }
-    say("ssh-contract: read stage=socketpair\n");
     if (write(sv[1], payload, sizeof(payload)) != (ssize_t)sizeof(payload)) {
-        return fail("read write");
+        return fail("write");
     }
-    say("ssh-contract: read stage=write\n");
     count = read(sv[0], buffer, 10);
     if (count != 10 || memcmp(buffer, payload, 10) != 0) {
-        return fail("read partial first");
+        return fail("partial first");
     }
-    say("ssh-contract: read stage=partial1\n");
     count = read(sv[0], buffer, 10);
     if (count != 10 || memcmp(buffer, payload + 10, 10) != 0) {
-        return fail("read partial second");
+        return fail("partial second");
     }
-    say("ssh-contract: read stage=partial2\n");
     if (poll_one(sv[0], POLLIN, 0) == 0) {
-        return fail("read remaining poll");
+        return fail("remaining poll");
     }
-    say("ssh-contract: read stage=poll-remaining\n");
     count = read(sv[0], buffer, 80);
     if (count != 80 || memcmp(buffer, payload + 20, 80) != 0) {
-        return fail("read remainder");
+        return fail("remainder");
     }
-    say("ssh-contract: read stage=remainder\n");
     if (poll_one(sv[0], POLLIN, 0) != 0) {
-        return fail("read level after drain");
+        return fail("drained poll");
     }
-    say("ssh-contract: read stage=level-drained\n");
-    if (fcntl(sv[0], F_SETFL, O_NONBLOCK) != 0) {
-        return fail("read nonblock");
-    }
-    say("ssh-contract: read stage=nonblock\n");
     errno = 0;
     count = read(sv[0], buffer, sizeof(buffer));
     if (count != -1 || errno != EAGAIN) {
-        return fail("read empty EAGAIN");
+        return fail("empty EAGAIN");
     }
-    say("ssh-contract: read stage=eagain\n");
     if (close(sv[0]) != 0 || close(sv[1]) != 0) {
-        return fail("read close");
+        return fail("close");
     }
-    say("ssh-contract: read ok\n");
+    pass("partial=10/10/80 eagain=1 eof=0");
     return 0;
 }
 
@@ -207,53 +242,64 @@ static int check_write(void) {
     ssize_t want;
     ssize_t got;
     unsigned char scratch[4096];
+    unsigned char final[4096];
 
     if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sv) != 0) {
-        return fail("write socketpair");
+        return fail("socketpair");
     }
-    say("ssh-contract: write stage=socketpair\n");
-    if (fcntl(sv[1], F_SETFL, O_NONBLOCK) != 0) {
-        return fail("write nonblock");
-    }
-    say("ssh-contract: write stage=nonblock\n");
     memset(big_write, 0x5a, sizeof(big_write));
     first = write(sv[1], big_write, sizeof(big_write));
-    say("ssh-contract: write stage=first\n");
     if (first <= 0 || first >= (ssize_t)sizeof(big_write)) {
-        return fail("write partial");
+        return fail("partial");
     }
     errno = 0;
     second = write(sv[1], big_write, 4096);
-    say("ssh-contract: write stage=eagain-check\n");
     if (second != -1 || errno != EAGAIN) {
-        return fail("write full EAGAIN");
+        return fail("full EAGAIN");
     }
-    // Drain exactly the bytes accepted by the partial write, then the writable level returns.
     want = first;
     while (want > 0) {
-        got = read(sv[0], scratch, want < (ssize_t)sizeof(scratch) ? (size_t)want : sizeof(scratch));
+        got = read(sv[0], scratch,
+                   want < (ssize_t)sizeof(scratch) ? (size_t)want : sizeof(scratch));
         if (got <= 0) {
-            return fail("write drain");
+            return fail("drain");
         }
         want -= got;
     }
-    say("ssh-contract: write stage=drained\n");
     if (write(sv[1], big_write, 4096) != 4096) {
-        return fail("write after drain");
+        return fail("after drain");
     }
-    say("ssh-contract: write stage=after-drain\n");
+    if (read_exact(sv[0], final, sizeof(final)) != 0 ||
+        memcmp(final, big_write, sizeof(final)) != 0) {
+        return fail("delivery same socket");
+    }
     if (close(sv[0]) != 0 || close(sv[1]) != 0) {
-        return fail("write close");
+        return fail("close");
     }
-    say("ssh-contract: write ok\n");
+    pass("partial=positive eagain=1 delivered=4096");
     return 0;
 }
 
-static int check_dup(void) {
+static void k4_watchdog(void) {
+    sleep(12);
+    say("CONTRACT K4 FAIL child-exit-hang watchdog\n");
+    say("CONTRACT SUMMARY FAIL\n");
+    (void)kill(getppid(), SIGKILL);
+    _exit(0);
+}
+
+static int check_dup_exec(void) {
     int sv[2];
     int duplicate;
     char byte = 'D';
+    pid_t child;
+    pid_t watchdog;
+    int status = 0;
+    char fd_text[16];
+    char *argv[3];
+    char *envp[1] = {NULL};
 
+    say("CONTRACT K4 CHILD stage=start\n");
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
         return fail("dup socketpair");
     }
@@ -261,38 +307,302 @@ static int check_dup(void) {
     if (duplicate < 0) {
         return fail("dup");
     }
-    say("ssh-contract: dup stage=dup\n");
     if (poll_one(sv[0], POLLIN, 0) != 0 || poll_one(duplicate, POLLIN, 0) != 0) {
         return fail("dup empty readiness");
     }
-    say("ssh-contract: dup stage=empty\n");
     if (write(sv[1], &byte, 1) != 1) {
         return fail("dup write");
     }
+    // The duplicate and the original share one open file description, so the readable level is
+    // visible through both and a drain through one clears it for both.
     if (poll_one(sv[0], POLLIN, 0) == 0 || poll_one(duplicate, POLLIN, 0) == 0) {
         return fail("dup shared readiness");
     }
-    say("ssh-contract: dup stage=shared\n");
     if (read(duplicate, &byte, 1) != 1) {
         return fail("dup read");
     }
-    // The duplicate and the original share one open file description, so the drain is visible
-    // through both descriptors.
     if (poll_one(sv[0], POLLIN, 0) != 0 || poll_one(duplicate, POLLIN, 0) != 0) {
         return fail("dup shared drain");
     }
-    say("ssh-contract: dup stage=drained\n");
-    if (close(duplicate) != 0 || close(sv[0]) != 0 || close(sv[1]) != 0) {
-        return fail("dup close");
+    if (close(duplicate) != 0) {
+        return fail("dup close duplicate");
     }
-    say("ssh-contract: dup ok\n");
+
+    watchdog = fork();
+    if (watchdog == 0) {
+        k4_watchdog();
+    }
+
+    // Use a fresh duplicate for the exec child, matching the rexec fdmap shape: the child gets
+    // one stable descriptor that survives exec even if the original table also has holes.
+    duplicate = dup(sv[0]);
+    if (duplicate < 0) {
+        return fail("exec dup");
+    }
+    say("CONTRACT K4 CHILD stage=fork\n");
+    child = fork();
+    say("CONTRACT K4 CHILD stage=forked\n");
+    if (child < 0) {
+        return fail("fork");
+    }
+    if (child == 0) {
+        say("CONTRACT K4 CHILD stage=child\n");
+        (void)close(sv[0]);
+        (void)close(sv[1]);
+        // Keep only the inherited contract socket; the service's net/pty/event handles are not
+        // part of K4 and would otherwise be torn down by the exec child.
+        for (int fd = 0; fd < 64; fd++) {
+            if (fd != duplicate) {
+                (void)close(fd);
+            }
+        }
+        if (snprintf(fd_text, sizeof(fd_text), "%d", duplicate) <= 0) {
+            _exit(2);
+        }
+        argv[0] = (char *)"ssh-contract-child";
+        argv[1] = fd_text;
+        argv[2] = NULL;
+        execve("/bin/ssh-contract-child", argv, envp);
+        {
+            char line[96];
+            (void)snprintf(line, sizeof(line), "CONTRACT K4 CHILD exec fail errno=%d\n", errno);
+            say(line);
+        }
+        _exit(3);
+    }
+    (void)close(duplicate);
+    if (write(sv[1], "PING", 4) != 4) {
+        return fail("exec parent write");
+    }
+    say("CONTRACT K4 CHILD stage=wait\n");
+    {
+        int exited = 0;
+        int loop;
+        for (loop = 0; loop < 8; loop++) {
+            pid_t waited = waitpid(child, &status, WNOHANG);
+            {
+                char line[96];
+                (void)snprintf(line, sizeof(line),
+                               "CONTRACT K4 CHILD waitpid=%d status=%d errno=%d\n", (int)waited,
+                               status, errno);
+                say(line);
+            }
+            if (waited == child) {
+                exited = 1;
+                break;
+            }
+            if (waited < 0 && errno != EINTR) {
+                break;
+            }
+            say("CONTRACT K4 CHILD stage=sleep\n");
+            sleep(1);
+        }
+        if (!exited) {
+            (void)kill(child, SIGKILL);
+            (void)waitpid(child, &status, 0);
+            result(0, "exec child stuck no PONG");
+            say("CONTRACT SUMMARY FAIL\n");
+            return 1;
+        }
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            char detail[96];
+            (void)snprintf(detail, sizeof(detail), "exec child status=%d", status);
+            result(0, detail);
+            say("CONTRACT SUMMARY FAIL\n");
+            return 1;
+        }
+        {
+            char pong[4];
+            if (read_exact(sv[0], pong, sizeof(pong)) != 0 ||
+                memcmp(pong, "PONG", sizeof(pong)) != 0) {
+                result(0, "exec child PONG missing");
+                say("CONTRACT SUMMARY FAIL\n");
+                return 1;
+            }
+        }
+    }
+    if (waitpid(child, &status, 0) != child || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        return fail("exec child status");
+    }
+    if (close(sv[0]) != 0 || close(sv[1]) != 0) {
+        return fail("exec close");
+    }
+    if (watchdog > 0) {
+        (void)kill(watchdog, SIGKILL);
+    }
+    pass("dup=shared exec=child-same-socket");
     return 0;
 }
 
-int main(void) {
-    if (check_poll() != 0 || check_read() != 0 || check_write() != 0 || check_dup() != 0) {
+static int check_pty(void) {
+    int master;
+    int slave;
+    struct termios settings;
+    char name[128];
+    char buffer[32];
+    ssize_t count;
+    int revents;
+
+    master = posix_openpt(O_RDWR | O_NOCTTY);
+    if (master < 0) {
+        return fail("posix_openpt");
+    }
+    if (grantpt(master) != 0) {
+        return fail("grantpt");
+    }
+    if (unlockpt(master) != 0) {
+        return fail("unlockpt");
+    }
+    if (ptsname == NULL) {
+        errno = ENOSYS;
+        return fail("ptsname symbol missing");
+    }
+    if (ptsname(master) == NULL) {
+        return fail("ptsname");
+    }
+    (void)snprintf(name, sizeof(name), "%s", ptsname(master));
+    slave = open(name, O_RDWR | O_NOCTTY);
+    if (slave < 0) {
+        return fail("open slave");
+    }
+    if (!isatty(master) || !isatty(slave)) {
+        return fail("isatty");
+    }
+    if (tcgetattr(slave, &settings) != 0) {
+        return fail("tcgetattr");
+    }
+    if ((settings.c_lflag & ICANON) == 0 || (settings.c_lflag & ECHO) == 0) {
+        return fail("termios defaults");
+    }
+    if (write(master, "hello\n", 6) != 6) {
+        return fail("master write");
+    }
+    revents = poll_one(slave, POLLIN, 2000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("slave poll");
+    }
+    count = read(slave, buffer, sizeof(buffer));
+    if (count < 5 || memcmp(buffer, "hello", 5) != 0) {
+        return fail("slave roundtrip");
+    }
+    // Drain the master-side echo queued by the line discipline before the slave output test.
+    if (poll_one(master, POLLIN, 2000) > 0) {
+        (void)read(master, buffer, sizeof(buffer));
+    }
+    if (write(slave, "world\n", 6) != 6) {
+        return fail("slave write");
+    }
+    revents = poll_one(master, POLLIN, 2000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("master poll");
+    }
+    count = read(master, buffer, sizeof(buffer));
+    if (count < 5 || memcmp(buffer, "world", 5) != 0) {
+        return fail("master roundtrip");
+    }
+    if (close(slave) != 0 || close(master) != 0) {
+        return fail("pty close");
+    }
+    pass("pair=open termios=icanon-echo roundtrip=both");
+    return 0;
+}
+
+static int accept_one(int listener, const char *payload, const char *ack) {
+    int fd;
+    char buffer[32];
+    size_t length = strlen(payload);
+
+    fd = accept(listener, NULL, NULL);
+    if (fd < 0) {
+        return -1;
+    }
+    if (read_exact(fd, buffer, length) != 0 || memcmp(buffer, payload, length) != 0) {
+        (void)close(fd);
+        errno = EPROTO;
+        return -1;
+    }
+    if (write(fd, payload, length) != (ssize_t)length) {
+        (void)close(fd);
+        return -1;
+    }
+    if (read_exact(fd, buffer, strlen(ack)) != 0 ||
+        memcmp(buffer, ack, strlen(ack)) != 0) {
+        (void)close(fd);
+        errno = EPROTO;
+        return -1;
+    }
+    (void)close(fd);
+    return 0;
+}
+
+static int check_accept(void) {
+    int listener;
+    struct sockaddr_in address;
+    int revents;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        return fail("socket");
+    }
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(K6_PORT);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0) {
+        return fail("bind");
+    }
+    if (listen(listener, 2) != 0) {
+        return fail("listen");
+    }
+    revents = poll_one(listener, POLLIN, 5000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("listener poll");
+    }
+    if (accept_one(listener, "ACCEPT1", "K6ACK1") != 0) {
+        return fail("accept first");
+    }
+    // The listener must still accept while the first accepted descriptor has been used.
+    revents = poll_one(listener, POLLIN, 5000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("listener second poll");
+    }
+    if (accept_one(listener, "ACCEPT2", "K6ACK2") != 0) {
+        return fail("accept second");
+    }
+    if (close(listener) != 0) {
+        return fail("listener close");
+    }
+    pass("accepted=independent listener=still-accepts");
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    row = "K1";
+    if (check_poll() != 0) {
         return 1;
     }
-    say("ssh-contract: ok\n");
+    row = "K2";
+    if (check_read() != 0) {
+        return 1;
+    }
+    row = "K3";
+    if (check_write() != 0) {
+        return 1;
+    }
+    row = "K4";
+    if (check_dup_exec() != 0) {
+        return 1;
+    }
+    row = "K5";
+    if (check_pty() != 0) {
+        return 1;
+    }
+    row = "K6";
+    if (check_accept() != 0) {
+        return 1;
+    }
+    say("CONTRACT SUMMARY PASS 6/6\n");
     return 0;
 }

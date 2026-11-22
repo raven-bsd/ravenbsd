@@ -1,39 +1,48 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# K435: SSH kernel-contract rows 1-3 and the dup readiness half of row 5. The fixture uses a
-# real libc socketpair over the kernel duplex endpoint pair. The PTY and fork/exec rows are run
-# by tests/smp/ssh-contract/run.sh through libc-forkpty and socketpair-exec/socket-write-exec.
+# K435: guest SSH kernel-contract conformance suite (K1-K6). The fixture runs on the
+# network-config-test profile with netd and ptyd; the host peer opens two TCP connections for K6.
 name = "ssh-contract"
 arch = "x86_64"
-profile = "base"
-timeout_secs = 180
-pre = ["sh tests/smp/ssh-contract/build.sh"]
+profile = "network-config-test"
+timeout_secs = 30
+pre = [
+    "sh tests/smp/ssh-contract/build.sh",
+    "sh tests/smp/ssh-contract/start-host.sh",
+]
 initfs = "build/fixtures/ssh-contract/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = []
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23097-:23097",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
 expect_exit = "success"
 
 [[expect]]
-regex = '^ssh-contract: poll ok$'
+regex = '^.*CONTRACT K1 PASS .*$'
 
 [[expect]]
-regex = '^ssh-contract: read ok$'
+regex = '^.*CONTRACT K2 PASS .*$'
 
 [[expect]]
-regex = '^ssh-contract: write ok$'
+regex = '^.*CONTRACT K3 PASS .*$'
 
 [[expect]]
-regex = '^ssh-contract: dup ok$'
+regex = '^.*CONTRACT K4 PASS .*$'
 
 [[expect]]
-regex = '^ssh-contract: ok$'
+regex = '^.*CONTRACT K5 PASS .*$'
 
 [[expect]]
-regex = '^svcd: settled$'
+regex = '^.*CONTRACT K6 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 6/6$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|ssh-contract: fail'
+regex = '(?i)CONTRACT K[1-6] FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'

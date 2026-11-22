@@ -2,13 +2,19 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# Build the K435 SSH kernel-contract fixture and pack build/fixtures/ssh-contract/initfs.img.
-# The fixture links the real libc and runs as a one-shot service on the base profile.
+# Build the K435 SSH kernel-contract guest suite and pack build/fixtures/ssh-contract/initfs.img.
+# The image is the network-config-test profile (virtio-net, netd static 10.0.2.15) with the ptyd
+# scheme and the one-shot contract services overlaid.
 
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
+
+# A previous hung qtest may still hold the K6 hostfwd port. The suite owns these artifacts;
+# clear the old host peer before rebuilding. Do not kill QEMU here: the qtest harness may have
+# already started its own instance before running the pre commands.
+pkill -f "ssh-contract/host_accept.py" 2>/dev/null || true
 
 out=build/fixtures/ssh-contract
 mkdir -p "$out"
@@ -59,37 +65,56 @@ if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
     builtins=1
 fi
 
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
-    -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
-    -c "$root/tests/smp/ssh-contract/main.c" -o "$out/main.o"
+for source in main child; do
+    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+        -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+        -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+        -c "$root/tests/smp/ssh-contract/$source.c" -o "$out/$source.o"
+done
 
-if [ -n "$builtins" ]; then
-    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-        -nostdlib -nostartfiles -static -T"$link_script" \
-        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/main.o" \
-        -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
-        "$sysroot/usr/lib/crtn.o" -o "$out/ssh-contract"
-else
-    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-        -nostdlib -nostartfiles -static -T"$link_script" \
-        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/main.o" \
-        -L"$sysroot/usr/lib" -lc \
-        "$sysroot/usr/lib/crtn.o" -o "$out/ssh-contract"
-fi
+link_one() {
+    object=$1
+    binary=$2
+    if [ -n "$builtins" ]; then
+        "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+            -nostdlib -nostartfiles -static -T"$link_script" \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$object" \
+            -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
+            "$sysroot/usr/lib/crtn.o" -o "$binary"
+    else
+        "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+            -nostdlib -nostartfiles -static -T"$link_script" \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$object" \
+            -L"$sysroot/usr/lib" -lc \
+            "$sysroot/usr/lib/crtn.o" -o "$binary"
+    fi
+}
 
+link_one "$out/main.o" "$out/ssh-contract"
+link_one "$out/child.o" "$out/ssh-contract-child"
+
+for tool in raven-init raven-ptyd; do
+    if [ ! -x "$root/build/$arch/user/$tool" ]; then
+        cargo xtask build user --arch "$arch" -p "$tool"
+    fi
+done
 init=$root/build/$arch/user/raven-init
-if [ ! -x "$init" ]; then
-    cargo xtask build user --arch "$arch" -p raven-init
-fi
+ptyd=$root/build/$arch/user/raven-ptyd
 
-cargo run -q -p raven-initfs --features std --example mkinitfs -- \
-    "$out/initfs.img" \
+cargo xtask initfs --arch "$arch" --profile network-config-test > /dev/null
+cp build/"$arch"/initfs.img "$out/base.img"
+
+cargo build -q -p raven-b70-overlay
+overlay=$root/target/debug/raven-b70-overlay
+"$overlay" "$out/base.img" "$out/initfs.img" \
     "/init=$init" \
-    "/bin/ssh-contract=$out/ssh-contract" \
+    "/bin/ssh-contract=$out/ssh-contract:0755" \
+    "/bin/ssh-contract-child=$out/ssh-contract-child:0755" \
+    "/sbin/ptyd=$ptyd:0755" \
     "/etc/services.d/ssh-contract.toml=$root/tests/smp/ssh-contract/ssh-contract.service.toml" \
+    "/etc/services.d/ptyd.toml=$root/tests/smp/ssh-contract/ptyd.service.toml" \
     "/etc/svcd.conf=$root/tests/smp/ssh-contract/ssh-contract.svcd.conf"
 
 echo "ssh-contract fixture: $out/initfs.img"
