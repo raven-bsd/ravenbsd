@@ -1112,14 +1112,19 @@ def row_s7(console: SerialConsole) -> None:
     server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s7-server.log",
                              user=ROOT_USER, timeout=8)
     server_log = server_capture["stdout"].decode("utf-8", "replace")
-    server_source = f"ssh exit {server_capture['returncode']}"
     (OUT / "s7-server.raw.log").write_text(server_log, encoding="utf-8")
     ps_capture = ssh_run(["ps", "-e"], "s7-ps.log", user=ROOT_USER, timeout=8)
     ps_log = ps_capture["stdout"].decode("utf-8", "replace")
     (OUT / "s7-ps.raw.log").write_text(ps_log, encoding="utf-8")
+    server_ok = server_capture["returncode"] == 0
+    ps_ok = ps_capture["returncode"] == 0
     accepted = server_log.count("Accepted password for raven ")
     closed = server_log.count("Connection closed")
     reset = server_log.count("Connection reset")
+    server_summary = (f"Accepted={accepted} Connection-closed={closed} reset={reset}"
+                      if server_ok else f"server log UNKNOWN (ssh exit "
+                                        f"{server_capture['returncode']})")
+    ps_summary = "ps captured" if ps_ok else f"ps UNKNOWN (exit {ps_capture['returncode']})"
     routing_ok = marker_ok and total_delta == 0
     attempt("S7-routing", 1, "fresh", "client exact marker; console receives none",
             f"client={literal(marker_run['stdout'])}; max_console_new={max_console_new}; "
@@ -1146,9 +1151,7 @@ def row_s7(console: SerialConsole) -> None:
                f"({literal(marker_run['stdout'])}); {passed}/10 exact; "
                f"console_total_delta={total_delta}; all_exit_ok={all_exit_ok}; "
                f"walls_ms={[round(value) for value in wall_ms]}; "
-               f"server capture={server_source} "
-               f"Accepted={accepted} Connection-closed={closed} reset={reset}; "
-               f"ps capture exit={ps_capture['returncode']} (gate; C1-C10)")
+               f"server={server_summary}; {ps_summary} (gate; C1-C10)")
 
 
 def ssh_pty_probe(console: SerialConsole | None, log_name: str,
@@ -1318,17 +1321,25 @@ def row_s8() -> None:
     server_log = server_capture["stdout"].decode("utf-8", "replace")
     (OUT / "s8-server.raw.log").write_text(server_log, encoding="utf-8")
     ps_during = str(result["during_ps"])
+    ps_ok = ps_capture["returncode"] == 0
     monitor_lines = [line.strip() for line in (ps_during + "\n" + ps_after).splitlines()
                      if "sshd-session" in line or "sshd-auth" in line]
-    monitor_alive = any("sshd-session" in line for line in ps_after.splitlines())
-    attempt("S8-monitor", 1, "fresh", "sshd-session row in the guest ps -e table",
-            f"alive_after={monitor_alive}; ps_capture_exit={ps_capture['returncode']}; "
-            f"during={monitor_lines[:4]}; after_rows={len(ps_after.splitlines())}",
-            0, "OBSERVED")
-    record("S8-monitor", "OBSERVED",
-           f"monitor alive after failure={monitor_alive}; "
-           f"ps capture exit={ps_capture['returncode']}; "
-           f"rows={monitor_lines[:4] or 'none'}; artifacts s8-ps-during.log/s8-ps.raw.log")
+    monitor_alive = any("sshd-session" in line for line in ps_after.splitlines()) if ps_ok else None
+    if ps_ok:
+        attempt("S8-monitor", 1, "fresh", "sshd-session row in the guest ps -e table",
+                f"alive_after={monitor_alive}; during={monitor_lines[:4]}; "
+                f"after_rows={len(ps_after.splitlines())}",
+                0, "OBSERVED")
+        record("S8-monitor", "OBSERVED",
+               f"monitor alive after failure={monitor_alive}; rows={monitor_lines[:4] or 'none'}; "
+               f"artifacts s8-ps-during.log/s8-ps.raw.log")
+    else:
+        attempt("S8-monitor", 1, "fresh", "sshd-session row in the guest ps -e table",
+                f"monitor state UNKNOWN: ps capture exit={ps_capture['returncode']}",
+                0, "BLOCKED")
+        record("S8-monitor", "BLOCKED",
+               f"monitor state UNKNOWN: ps capture exit={ps_capture['returncode']}; "
+               f"no /proc and no process-fd enumeration in this guest")
     fd_lines = [line.strip() for line in (ps_during + "\n" + server_log).splitlines()
                 if re.search(r"\b(fd|fd=)\b", line) or re.search(r"\bfd[= ]", line)]
     fd_note = ("no /proc and no fd-enumeration syscall exist in this guest "
