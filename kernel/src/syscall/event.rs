@@ -103,18 +103,20 @@ fn ctl(frame: &SyscallFrame) -> Result<usize, Errno> {
     let events = u32::try_from(frame.r10).map_err(|_| Errno::EINVAL)?;
     let process = process::current().ok_or(Errno::ESRCH)?;
     let queue = queue_from_handle(&process, queue_handle, Rights::WRITE)?;
-    let mut state = queue.state.lock();
-    let result = match u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)? {
-        ADD => {
-            source_from_handle(&process, source)?;
-            state.add(source.0, events, frame.r8)
-        }
-        MOD => {
-            source_from_handle(&process, source)?;
-            state.modify(source.0, events, frame.r8)
-        }
-        DEL if events == 0 && frame.r8 == 0 => state.delete(source.0),
+    let operation = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let spec = match operation {
+        ADD | MOD => Some(event::source_spec(&process, source)?),
+        DEL if events == 0 && frame.r8 == 0 => None,
         _ => return Err(Errno::EINVAL),
+    };
+    let result = {
+        let mut state = queue.state.lock();
+        match operation {
+            ADD => state.add(source.0, events, frame.r8),
+            MOD => state.modify(source.0, events, frame.r8),
+            DEL => state.delete(source.0),
+            _ => return Err(Errno::EINVAL),
+        }
     };
     result.map_err(|error| match error {
         crate::event::evq_core::Error::Full => Errno::ENOSPC,
@@ -122,6 +124,11 @@ fn ctl(frame: &SyscallFrame) -> Result<usize, Errno> {
         crate::event::evq_core::Error::Missing => Errno::ENOENT,
         crate::event::evq_core::Error::InvalidMask => Errno::EINVAL,
     })?;
+    match operation {
+        ADD => event::register_watch(&queue, &spec.ok_or(Errno::EINVAL)?, source),
+        DEL => event::remove_watch(process.id, source),
+        _ => {}
+    }
     Ok(0)
 }
 
@@ -283,7 +290,7 @@ fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
     let _ = frame.rsi;
     let _ = event.signal();
     // Donor `selnotify`: wake only the queues registered for this source object. This is process
-    // context, so it may evaluate the live level; the timer interrupt keeps `notify_all`.
+    // context, so it may evaluate the live level; the timer interrupt uses `notify_timers`.
     event::notify_event(&event);
     Ok(0)
 }
@@ -310,22 +317,6 @@ fn queue_from_handle(
 ) -> Result<Arc<EventQueue>, Errno> {
     match process.handles.lock().get(handle, right)? {
         Object::EventQueue(queue) => Ok(Arc::clone(queue)),
-        _ => Err(Errno::EBADF),
-    }
-}
-
-fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result<(), Errno> {
-    // A pipe end is a pollable source without needing the read/write data rights:
-    // the write handle carries WRITE, not READ, and poll must still observe it.
-    if let Ok(Object::Pipe(_)) = process.handles.lock().get(handle, Rights::NONE) {
-        return Ok(());
-    }
-    match process.handles.lock().get(handle, Rights::READ)? {
-        Object::Timer(_) | Object::UserEvent(_) | Object::Process(_) => Ok(()),
-        Object::Irq(_) => Ok(()),
-        Object::Duplex(_) => Ok(()),
-        #[cfg(target_arch = "x86_64")]
-        Object::SchemeFile(_) | Object::SchemeServer(_) => Ok(()),
         _ => Err(Errno::EBADF),
     }
 }
