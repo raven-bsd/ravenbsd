@@ -6,6 +6,10 @@
 //! The pty server names pairs by id; `ptsname_r` formats the `/dev/pts/<id>` path. POSIX
 //! `ptsname` returns a static buffer, so this shell copies the same name into a per-process
 //! buffer (no allocation on the pty path).
+//!
+//! This export must remain a defining member of the public static archive. `archive_exports`
+//! (K2) checks `Symbols.list` against `libc.a`; listing the name in `Symbols.list`/`Symbol.map`
+//! without a defining shell member is the K436 merge failure.
 
 use core::ffi::{c_char, c_int};
 use core::ptr::null_mut;
