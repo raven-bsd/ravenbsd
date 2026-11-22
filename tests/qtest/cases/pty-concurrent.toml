@@ -1,0 +1,101 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K489: ptyd concurrency. Pair A blocks a slave read; pair B's master write must complete its
+# slave round-trip within 500 ms. Eight pairs then block together and every master write is
+# serviced; a ninth pair allocates and closes. VMIN=0/VTIME=1 still returns 0 after ~100 ms.
+# `ptyd: files=0 pairs=0` at startup and after the last close proves the table is empty.
+name = "pty-concurrent"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-concurrent"]
+boot_cmdline = "console=ttyS0 test-exit=1 s24-framecheck=1 s25-handlecheck=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+
+[[expect]]
+regex = '^pty-concurrent: start uid=0 pairs=8 bound-ms=500$'
+
+[[expect]]
+regex = '^pty-concurrent: pair-a wall-ms=\d+ count=1$'
+
+[[expect]]
+regex = '^pty-concurrent: pair-b wall-ms=\d+ bound=500 byte=66$'
+
+[[expect]]
+regex = '^pty-concurrent: pairs=8 worst-ms=\d+ bound=500$'
+
+[[expect]]
+regex = '^pty-concurrent: ninth alloc-close ok$'
+
+[[expect]]
+regex = '^pty-concurrent: vtime index=0 count=0 wall-ms=\d+$'
+
+[[expect]]
+regex = '^pty-concurrent: vtime index=1 count=0 wall-ms=\d+$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: idle-start$'
+
+[[expect]]
+regex = '^pty-concurrent: idle-end$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: post-idle probe ok$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pass pairs=8 bound-ms=500$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[expect]]
+regex = '^ptyd: read-wait file=\d+ pair=\d+ vmin=1 vtime=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^ptyd: cpu user-ns=\d+ sys-ns=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^ptyd: cpu user-ns=\d+ sys-ns=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^s24: frames free=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^s24: frames free=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^s24: frames free=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^s24: frames free=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^s25: exit handles=0$'
+unordered = true
+
+[[expect]]
+regex = '^s25: exit handles=0$'
+unordered = true
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-concurrent: FAIL'

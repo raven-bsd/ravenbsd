@@ -18,6 +18,8 @@ extern crate alloc;
 #[cfg(target_os = "none")]
 mod program {
     use alloc::collections::BTreeMap;
+    use alloc::vec::Vec;
+    use core::sync::atomic::AtomicU32;
 
     use raven_abi::errno::Errno;
     use raven_abi::types::clock;
@@ -26,12 +28,18 @@ mod program {
     use raven_ptyd::{Pairs, SignalSink};
     use raven_rt::entry;
     use raven_rt::sys::{clock_get, nanosleep};
-    use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
+    use raven_scheme::{Completer, Ctx, Handler, HandlerError, HandlerResult, Opened, Server};
     use raven_tty_core::{VMIN, VTIME};
 
     entry!(main);
 
     const PROC_SIGNAL: usize = 0x4A;
+    /// Raw `proc_getrusage(who, out, count)` number; who=0 is this process.
+    const PROC_GETRUSAGE: usize = 0x4D;
+
+    /// Idle wait word; the server sleeps here when the S11 receive path returns without a
+    /// request instead of busy-spinning on scheduler kicks.
+    static IDLE_WORD: AtomicU32 = AtomicU32::new(0);
     const OP_SET_FG: u16 = 0x10;
     const OP_GET_FG: u16 = 0x11;
     const OP_HANGUP: u16 = 0x12;
@@ -50,6 +58,30 @@ mod program {
         }
     }
 
+    /// This process's user+system CPU time in nanoseconds, or zero when unavailable.
+    fn cpu_ns() -> (u64, u64) {
+        let mut values = [0u64; 8];
+        // SAFETY: GETRUSAGE writes eight u64 words into the live array and validates the count.
+        let raw = unsafe {
+            raven_rt::sys::syscall3(
+                PROC_GETRUSAGE,
+                0,
+                values.as_mut_ptr() as usize,
+                values.len(),
+            )
+        };
+        if raw < 0 {
+            (0, 0)
+        } else {
+            (values[0], values[1])
+        }
+    }
+
+    fn print_stats() {
+        let (user, system) = cpu_ns();
+        raven_rt::eprintln!("ptyd: cpu user-ns={user} sys-ns={system}");
+    }
+
     /// Monotonic nanoseconds, or zero when the clock is unavailable.
     fn now_ns() -> u64 {
         clock_get(clock::MONOTONIC).map_or(0, |time| {
@@ -59,29 +91,15 @@ mod program {
         })
     }
 
-    /// Slave read with `VMIN`/`VTIME` semantics.
-    ///
-    /// `VMIN`/`VTIME` are stored in the termios record; a slave read applies them here because
-    /// the scheme server is the only place with a clock. The loop yields 1 ms between polls, so
-    /// it does not busy-spin. `VTIME` is in deciseconds, as in termios. This mirrors the donor's
-    /// read timer outcome; it is not the donor's wait queue implementation.
-    fn read_slave_wait(
+    /// Synchronous VMIN=0/VTIME read timeout. It keeps the K485 `VMIN=0,VTIME=1` ~100 ms
+    /// contract without a timer thread; while it waits it can delay other pairs by at most VTIME.
+    fn read_slave_vtime(
         pty: &mut raven_ptyd::Pty<TargetSignal>,
         buffer: &mut [u8],
+        vtime: u64,
     ) -> Result<usize, Errno> {
-        let termios = pty.termios();
-        let vmin = usize::from(termios.cc(VMIN));
-        let vtime = u64::from(termios.cc(VTIME));
-        match pty.read_slave(buffer) {
-            Ok(count) => return Ok(count),
-            Err(Errno::EAGAIN) => {}
-            Err(error) => return Err(error),
-        }
-        if vmin == 0 && vtime == 0 {
-            return Err(Errno::EAGAIN);
-        }
         let start = now_ns();
-        let limit = (vtime != 0).then_some(vtime.saturating_mul(100_000_000));
+        let limit = vtime.saturating_mul(100_000_000);
         loop {
             let _ = nanosleep(1_000_000);
             match pty.read_slave(buffer) {
@@ -89,12 +107,24 @@ mod program {
                 Err(Errno::EAGAIN) => {}
                 Err(error) => return Err(error),
             }
-            if let Some(limit) = limit
-                && now_ns().saturating_sub(start) >= limit
-            {
+            if now_ns().saturating_sub(start) >= limit {
                 return Ok(0);
             }
         }
+    }
+
+    /// A slave read deferred while the server loop services other pairs.
+    ///
+    /// `ptr`/`len` are the client's captured read buffer in this server's address space. The
+    /// kernel keeps the capture mapped until the deferred reply is sent, so the completion path
+    /// copies into it before calling `Completer::complete`.
+    #[derive(Clone, Copy)]
+    struct PendingRead {
+        token: u64,
+        file: u64,
+        pair: u64,
+        ptr: usize,
+        len: usize,
     }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -112,6 +142,7 @@ mod program {
     struct HandlerImpl {
         pairs: Pairs<TargetSignal>,
         files: BTreeMap<u64, FileEntry>,
+        pending: Vec<PendingRead>,
         next: u64,
     }
 
@@ -120,7 +151,48 @@ mod program {
             Self {
                 pairs: Pairs::new(),
                 files: BTreeMap::new(),
+                pending: Vec::new(),
                 next: 1,
+            }
+        }
+
+        /// Wake deferred slave reads whose data arrived.
+        ///
+        /// The buffer pointer belongs to the client's capture and is valid until the deferred
+        /// reply is sent, so the copy happens before `complete`.
+        fn service_pending(&mut self, completer: &Completer) {
+            let mut index = 0usize;
+            while index < self.pending.len() {
+                let pending = self.pending[index];
+                if !self.files.contains_key(&pending.file) {
+                    self.pending.remove(index);
+                    let _ = completer.complete(pending.token, Err(Errno::EBADF));
+                    continue;
+                }
+                let Some(pty) = self.pairs.get_mut(pending.pair) else {
+                    self.pending.remove(index);
+                    let _ = completer.complete(pending.token, Ok(0));
+                    continue;
+                };
+                // SAFETY: the kernel keeps the read capture mapped for the deferred request; the
+                // handler keeps `ptr`/`len` from the original `&mut [u8]` and writes only before
+                // completing the request.
+                let buffer =
+                    unsafe { core::slice::from_raw_parts_mut(pending.ptr as *mut u8, pending.len) };
+                match pty.read_slave(buffer) {
+                    Ok(count) => {
+                        self.pending.remove(index);
+                        let _ = completer.complete(pending.token, Ok(count));
+                        continue;
+                    }
+                    Err(Errno::EAGAIN) => {}
+                    Err(error) => {
+                        self.pending.remove(index);
+                        let _ = completer.complete(pending.token, Err(error));
+                        continue;
+                    }
+                }
+                index = index.saturating_add(1);
             }
         }
 
@@ -172,12 +244,60 @@ mod program {
         fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
             let entry = self.file(file)?;
             let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
-            let count = match entry.role {
+            match entry.role {
                 Role::Master => pty.read_master(buffer),
-                Role::Slave => read_slave_wait(pty, buffer),
+                Role::Slave => pty.read_slave(buffer),
             }
-            .map_err(raven_scheme::HandlerError::Errno)?;
-            Ok(count)
+            .map_err(raven_scheme::HandlerError::Errno)
+        }
+
+        fn read_with(
+            &mut self,
+            file: u64,
+            _offset: u64,
+            buffer: &mut [u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<usize> {
+            let entry = self.file(file)?;
+            let (result, vmin, vtime) = {
+                let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+                let termios = pty.termios();
+                let result = match entry.role {
+                    Role::Master => pty.read_master(buffer),
+                    Role::Slave => pty.read_slave(buffer),
+                };
+                (
+                    result,
+                    usize::from(termios.cc(VMIN)),
+                    u64::from(termios.cc(VTIME)),
+                )
+            };
+            match result {
+                Ok(count) => Ok(count),
+                Err(Errno::EAGAIN) if entry.role == Role::Slave && vmin != 0 => {
+                    if buffer.is_empty() {
+                        return Ok(0);
+                    }
+                    let pending = PendingRead {
+                        token: ctx.token,
+                        file,
+                        pair: entry.pair,
+                        ptr: buffer.as_mut_ptr() as usize,
+                        len: buffer.len(),
+                    };
+                    self.pending.push(pending);
+                    raven_rt::eprintln!(
+                        "ptyd: read-wait file={file} pair={} vmin={vmin} vtime={vtime}",
+                        entry.pair
+                    );
+                    Err(HandlerError::Defer(ctx.token))
+                }
+                Err(Errno::EAGAIN) if entry.role == Role::Slave && vtime != 0 => {
+                    let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+                    read_slave_vtime(pty, buffer, vtime).map_err(Into::into)
+                }
+                Err(error) => Err(error.into()),
+            }
         }
 
         fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
@@ -314,6 +434,7 @@ mod program {
                 self.pairs.remove(entry.pair);
                 if self.files.is_empty() {
                     raven_rt::eprintln!("ptyd: files=0 pairs={}", self.pairs.len());
+                    print_stats();
                 }
             }
             Ok(())
@@ -337,10 +458,21 @@ mod program {
             }
         };
         let mut handler = HandlerImpl::new();
+        let completer = server.completer();
         raven_rt::eprintln!("ptyd: files=0 pairs=0");
+        print_stats();
         loop {
-            if let Some(packet) = server.poll(None) {
+            let packet = server.poll(None);
+            let had_request = packet.is_some();
+            if let Some(packet) = packet {
                 let _ = server.dispatch(packet, &mut handler);
+            }
+            handler.service_pending(&completer);
+            if !had_request {
+                // The S11 recv path can return without a request under a host-side kick;
+                // sleep 50 ms rather than busy-spin the server. A real request is still
+                // picked up on the next recv, far below the 500 ms contract.
+                let _ = raven_rt::sys::futex_wait(&IDLE_WORD, 0, Some(50_000_000));
             }
         }
     }
