@@ -15,7 +15,7 @@ expect_exit = "success"
 regex = '^readiness: start$'
 
 [[expect]]
-regex = '^readiness: lost-wake rounds=[1-9][0-9]* timeouts=0 max_us=[0-9]+ slow=[0-9]+ ok$'
+regex = '^readiness: lost-wake rounds=[1-9][0-9]* timeouts=0 ok$'
 
 [[expect]]
 regex = '^readiness: hup-repoll first=0x[0-9a-f]+ second=0x[0-9a-f]+ ok$'

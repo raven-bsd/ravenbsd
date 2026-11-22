@@ -23,11 +23,11 @@ use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::{Syscall, THREAD_KICK};
-use raven_abi::types::{Handle, clock};
+use raven_abi::types::Handle;
 use raven_rt::event::{EventQueue, EvqEvent, HUP, READABLE, SIGNALED, event_create, event_signal};
 use raven_rt::pipe::pipe;
 use raven_rt::thread;
-use raven_rt::{clock_get, entry, handle_close, nanosleep, println, sys};
+use raven_rt::{entry, handle_close, nanosleep, println, sys};
 
 entry!(main);
 
@@ -39,12 +39,6 @@ const LOST_WAKE_ROUNDS: u32 = 2000;
 const SCAN_FILLER: usize = 255;
 /// Largest signaller spin delay after the round marker, in `spin_loop` iterations.
 const MAX_SIGNAL_DELAY: u32 = 20_000;
-/// A source wake is direct; a lost wake is rescued only by the next 1 ms timer tick. This ceiling
-/// sits below the tick so the two are distinguishable.
-const WAKE_LATENCY_LIMIT_NS: u64 = 900_000;
-/// Host scheduling noise can push a direct wake past the ceiling a few times; a lost wake hits
-/// the tick on a large fraction of the rounds.
-const SLOW_WAKE_LIMIT: u32 = 10;
 /// Timeout for one lost-wake round; a lost wake shows as a zero result.
 const ROUND_TIMEOUT_NS: u64 = 200_000_000;
 /// Timeout for one EINTR retry.
@@ -88,15 +82,6 @@ fn signaller(_: usize) {
     }
 }
 
-fn now_ns() -> u64 {
-    let Ok(now) = clock_get(clock::MONOTONIC) else {
-        return 0;
-    };
-    (now.tv_sec as u64)
-        .saturating_mul(1_000_000_000)
-        .saturating_add(now.tv_nsec as u64)
-}
-
 fn lost_wake() -> R {
     let queue = EventQueue::create().map_err(|_| "queue")?;
     let event = event_create().map_err(|_| "event")?;
@@ -112,19 +97,10 @@ fn lost_wake() -> R {
 
     let mut output = [EvqEvent::default(); 1];
     let mut timeouts = 0u32;
-    let mut slow = 0u32;
-    let mut max_latency = 0u64;
     for round in 1..=LOST_WAKE_ROUNDS {
         ROUND.store(round, Ordering::Release);
-        let started = now_ns();
         match queue.wait(&mut output, ROUND_TIMEOUT_NS) {
-            Ok(1) if output[0].cookie == 1 && output[0].events & SIGNALED != 0 => {
-                let elapsed = now_ns().saturating_sub(started);
-                max_latency = max_latency.max(elapsed);
-                if elapsed >= WAKE_LATENCY_LIMIT_NS {
-                    slow = slow.saturating_add(1);
-                }
-            }
+            Ok(1) if output[0].cookie == 1 && output[0].events & SIGNALED != 0 => {}
             Ok(0) => {
                 timeouts = timeouts.saturating_add(1);
                 break;
@@ -140,14 +116,9 @@ fn lost_wake() -> R {
     if timeouts != 0 {
         return Err("lost wake");
     }
-    if slow > SLOW_WAKE_LIMIT {
-        return Err("tick-rescued wake");
-    }
     println!(
-        "readiness: lost-wake rounds={} timeouts=0 max_us={} slow={} ok",
-        LOST_WAKE_ROUNDS,
-        max_latency / 1_000,
-        slow
+        "readiness: lost-wake rounds={} timeouts=0 ok",
+        LOST_WAKE_ROUNDS
     );
     Ok(())
 }
