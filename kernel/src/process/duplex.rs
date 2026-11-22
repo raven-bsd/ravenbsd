@@ -151,10 +151,13 @@ impl StreamBuffer {
     }
 
     fn discard_controls_at_read(&mut self) {
+        // A control at `offset == read` belongs to the next unread byte, not to a byte this
+        // read consumed. A plain `read()` that stops exactly at that byte must leave the
+        // control for the following `recvmsg()`; only controls strictly before `read` are lost.
         while self
             .controls
             .front()
-            .is_some_and(|control| control.offset <= self.read)
+            .is_some_and(|control| control.offset < self.read)
         {
             let _ = self.controls.pop_front();
         }
