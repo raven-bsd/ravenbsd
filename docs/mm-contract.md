@@ -1,12 +1,13 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# Memory contract rows (K453)
+# Memory contract rows (K453/K475)
 
 The `tests/smp/memory` fixture now runs seven memory-contract rows after the S85b TLB/allocator
-stress. Each row prints `CONTRACT K1..K7 PASS|FAIL`, the fixture fails if any row is red, and the
-existing `smp-memory: ok`/`summary` and TLB `forbid` checks remain unchanged. The frame table uses
-the kernel's existing `s24-framecheck` evidence line after every child exit.
+stress. K475 adds the frame-exhaustion OOM injection row described below. Each row prints
+`CONTRACT K1..K7 PASS|FAIL`, the fixture fails if any row is red, and the existing
+`smp-memory: ok`/`summary` and TLB `forbid` checks remain unchanged. The frame table uses the
+kernel's existing `s24-framecheck` evidence line after every child exit.
 
 The rows are POSIX memory semantics with NetBSD uvm/sys_generic as the behaviour donor and FreeBSD
 `vm_fault` as the oracle. No donor code is copied; the tests are original Rust.
