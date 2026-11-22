@@ -356,13 +356,12 @@ fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
         Ok(Object::SchemeFile(file)) if *file.server.state.lock() == ProcessState::Exited => {
             event::HUP
         }
-        // K409: a live scheme file is a pollable source even when no event is attached. The
-        // scheme server owns the real level (sockets answer `Call::Poll`); the kernel must not
-        // report a dead source as `0`, which would make a fallback poll sleep forever. Reporting
-        // both directions is the conservative level for a live server; the libc live query still
-        // supplies the precise socket bits.
+        // K426: a live scheme file has no synchronous kernel poll op. Do not invent
+        // READABLE/WRITABLE here; the libc layer asks the scheme server (`Call::Poll`) and the
+        // attached event is only the wake hint. A source with no answer stays blocked until a
+        // real state-change wake.
         #[cfg(target_arch = "x86_64")]
-        Ok(Object::SchemeFile(_)) => event::READABLE | event::WRITABLE,
+        Ok(Object::SchemeFile(_)) => 0,
         _ => 0,
     }
 }

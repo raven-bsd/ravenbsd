@@ -38,6 +38,18 @@ pub fn poll<B: SysBackend, L: Lock>(
     fds: &mut [Pollfd],
     timeout_ms: i32,
 ) -> Result<usize, Errno> {
+    poll_impl(platform, fds, timeout_ms, false)
+}
+
+/// The poll loop. `hint_only` is used by the internal blocking-read retry: a scheme wake may
+/// return control without a live verdict (the read re-checks the real state); a caller-facing
+/// poll never sets `revents` from a hint.
+fn poll_impl<B: SysBackend, L: Lock>(
+    platform: &Platform<B, L>,
+    fds: &mut [Pollfd],
+    timeout_ms: i32,
+    hint_only: bool,
+) -> Result<usize, Errno> {
     if fds.len() > MAX_POLL_FDS {
         return Err(Errno::EINVAL);
     }
@@ -183,12 +195,16 @@ pub fn poll<B: SysBackend, L: Lock>(
             let Some(registration) = registrations.get(event.cookie as usize) else {
                 continue;
             };
-            if registration.scheme
-                && let Some(bits) = live_readiness(backend, registration.reference.handle())
-            {
-                // Only the current live directions are a verdict; a delivered event is a
-                // wake hint and may be stale.
-                fired = fired.saturating_add(apply_bits(registration, fds, bits));
+            if registration.scheme {
+                if let Some(bits) = live_readiness(backend, registration.reference.handle()) {
+                    // Only the current live directions are a verdict; a delivered event is a
+                    // wake hint and may be stale. If the live query is unavailable, the event
+                    // must not be converted into a fabricated readable/writable result.
+                    fired = fired.saturating_add(apply_bits(registration, fds, bits));
+                } else if hint_only {
+                    // A blocking read retries after this wake and re-checks the real state.
+                    fired = fired.saturating_add(1);
+                }
                 continue;
             }
             fired = fired.saturating_add(apply_mask(registration, fds, event.events));
@@ -305,7 +321,7 @@ pub fn wait_readable<B: SysBackend, L: Lock>(
         events: POLLIN as i16,
         revents: 0,
     }];
-    poll(platform, &mut fds, timeout_ms)
+    poll_impl(platform, &mut fds, timeout_ms, true)
 }
 
 /// Translate a kernel readiness mask into the caller's `poll` bits.

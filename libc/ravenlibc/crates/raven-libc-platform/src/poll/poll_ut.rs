@@ -258,8 +258,31 @@ fn poll_recovers_from_a_foreign_waiting_event_queue() {
         events: POLLIN as i16,
         revents: 0,
     }];
-    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
-    assert_eq!(fds[0].revents as i32, POLLIN);
+    // K426: recovering from EBUSY recreates the queue, but the surviving doorbell is still only
+    // a hint. With no live answer it must time out instead of becoming POLLIN.
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(0));
+    assert_eq!(fds[0].revents, 0);
+}
+
+#[test]
+fn a_signaled_doorbell_without_a_live_answer_is_not_readable() {
+    let platform = Platform::new(FakeSys::new());
+    let fd = platform
+        .install(Handle(7), OfdKind::Socket, 2, None, false)
+        .expect("install");
+    let ofd = platform.get(fd).expect("fd").index();
+    platform.set_ofd_event(ofd, Handle(9)).expect("event");
+    // The doorbell fires, but netd does not answer the live Call::Poll (the FakeSys call
+    // cannot decode a socket request). A wake is a hint only: poll must not turn the doorbell
+    // itself into POLLIN and must time out.
+    platform.backend().ready(Handle(9), EV_SIGNALED);
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 1), Ok(0));
+    assert_eq!(fds[0].revents, 0);
 }
 
 #[test]
