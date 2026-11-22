@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K155: std mpsc send blocks while the receiver waits. The std fixture runs as a normal shell
+# child (valid std fds) in the shell-test image; the condvar control runs first, then 20
+# unbounded and 20 bounded mpsc rounds.
+
+name = "mpsc-wake"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/mpsc-wake/build.sh"]
+initfs = "build/fixtures/mpsc-wake/shell-test-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|mpsc-wake: fail'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/mpsc-wake\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mpsc-wake: start$'
+timeout_secs = 15
+
+[[step]]
+wait = '^mpsc-wake: condvar ok$'
+timeout_secs = 20
+
+[[step]]
+wait = '^mpsc-wake: unbounded 20 ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^mpsc-wake: bounded 20 ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^mpsc-wake: done$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

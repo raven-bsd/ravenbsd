@@ -6,12 +6,15 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use alloc::string::String;
 use alloc::vec::Vec;
 
+use crate::filter::{FilterDevice, FilterLog, FilterPolicy, new_log};
+use crate::network::StaticConfig;
 use raven_abi::errno::Errno;
 use raven_netcore::{
-    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, RouteEntry,
-    SocketId, SocketState, SocketTransport,
+    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, Readiness,
+    RouteEntry, SocketId, SocketState, SocketTransport,
 };
 use raven_proto_fs::{S_IFSOCK, Stat};
 use raven_proto_net::{
@@ -21,7 +24,10 @@ use raven_proto_net::{
     SOCKET_STATE_ESTABLISHED, SOCKET_STATE_FIN_WAIT_1, SOCKET_STATE_FIN_WAIT_2, SOCKET_STATE_ICMP,
     SOCKET_STATE_LAST_ACK, SOCKET_STATE_LISTEN, SOCKET_STATE_SYN_RECEIVED, SOCKET_STATE_SYN_SENT,
     SOCKET_STATE_TIME_WAIT, SOCKET_STATE_UDP, SOCKET_TCP, SOCKET_UDP, SocketEntry, Transport, path,
-    socket::{Call, Endpoint, Response, SockOpt, SocketRequest},
+    socket::{
+        Call, Endpoint, READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE, Response, SockOpt,
+        SocketRequest,
+    },
 };
 
 /// Mode reported by `FSTAT` for a socket file.
@@ -60,6 +66,8 @@ pub enum NicAddressing {
     QemuUser,
     /// Platform NIC: no address is published until a validated DHCP lease arrives.
     DhcpFirst,
+    /// Explicit static address, prefix and gateway; no DHCP client is started.
+    Static,
 }
 
 /// Static NIC configuration supplied by the target glue after `nic:info`.
@@ -110,10 +118,36 @@ impl NicConfig {
         }
     }
 
+    /// The explicit static configuration: no DHCP, publish immediately.
+    #[must_use]
+    pub const fn static_config(
+        mac: [u8; 6],
+        mtu: u16,
+        addr: [u8; 4],
+        prefix: u8,
+        gateway: Option<[u8; 4]>,
+    ) -> Self {
+        Self {
+            mac,
+            mtu,
+            addr,
+            prefix,
+            gateway,
+            dhcp: false,
+            addressing: NicAddressing::Static,
+        }
+    }
+
     /// Whether this is the QEMU fixed-address mode.
     #[must_use]
     pub const fn is_qemu_user(self) -> bool {
         matches!(self.addressing, NicAddressing::QemuUser)
+    }
+
+    /// Whether the stack should configure an IPv4 address without waiting for DHCP.
+    #[must_use]
+    pub const fn is_configured(self) -> bool {
+        !matches!(self.addressing, NicAddressing::DhcpFirst)
     }
 }
 
@@ -133,6 +167,7 @@ trait SocketCore {
     fn add_route(&mut self, route: RouteEntry) -> Result<(), Errno>;
     fn delete_route(&mut self, dest: Ipv4Addr, prefix_len: u8) -> Result<(), Errno>;
     fn socket_table(&self) -> Vec<CoreSocket>;
+    fn readiness(&self, s: SocketId) -> Result<Readiness, Errno>;
     fn interface_counters(&self) -> Option<InterfaceCounters>;
     fn icmp_bind(&mut self, id: u16) -> Result<SocketId, Errno>;
     fn icmp_echo(
@@ -198,6 +233,10 @@ impl<D: Device> SocketCore for NetCore<D> {
 
     fn socket_table(&self) -> Vec<CoreSocket> {
         NetCore::socket_table(self)
+    }
+
+    fn readiness(&self, s: SocketId) -> Result<Readiness, Errno> {
+        NetCore::readiness(self, s)
     }
 
     fn interface_counters(&self) -> Option<InterfaceCounters> {
@@ -422,13 +461,18 @@ struct NicControl {
 
 /// The host-testable `net:` server.
 pub struct Netd<D: Device> {
-    core: NetCore<D>,
+    core: NetCore<FilterDevice<D>>,
+    filter_log: FilterLog,
     nic: Option<Box<dyn SocketCore>>,
     nic_config: Option<NicConfig>,
     nic_control: Option<NicControl>,
     nic_lease: Option<DhcpLease>,
+    nic_dns: Vec<[u8; 4]>,
     release_ping: Option<ReleasePing>,
     files: BTreeMap<u64, File>,
+    /// Open-file reference count per file id. `open`/`accept` starts at one, `dup`/fork adds
+    /// one, `close` drops one; the File/socket is released only at zero.
+    file_refs: BTreeMap<u64, u32>,
     next_file: u64,
     accepted: BTreeMap<u32, Accepted>,
     next_accept: u32,
@@ -440,16 +484,26 @@ impl<D: Device> Netd<D> {
     /// Create the server over `device` and configure IPv4 loopback.
     #[must_use]
     pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
-        let mut core = NetCore::new(device, mac, now_ms);
+        Self::with_filter(device, mac, now_ms, None)
+    }
+
+    /// Create the server with a packet-filter policy on the loopback interface.
+    #[must_use]
+    pub fn with_filter(device: D, mac: [u8; 6], now_ms: i64, policy: Option<FilterPolicy>) -> Self {
+        let filter_log = policy.as_ref().map_or_else(new_log, FilterPolicy::log);
+        let mut core = NetCore::new(FilterDevice::new(device, policy, "lo"), mac, now_ms);
         core.set_ipv4(Ipv4Addr::new(127, 0, 0, 1), 8, None);
         Self {
             core,
+            filter_log,
             nic: None,
             nic_config: None,
             nic_control: None,
             nic_lease: None,
+            nic_dns: Vec::new(),
             release_ping: None,
             files: BTreeMap::new(),
+            file_refs: BTreeMap::new(),
             next_file: 1,
             accepted: BTreeMap::new(),
             next_accept: 1,
@@ -464,8 +518,23 @@ impl<D: Device> Netd<D> {
 
     /// Attach the persistent NIC as a second socket core.
     pub fn attach_nic<N: Device + 'static>(&mut self, device: N, config: NicConfig, now_ms: i64) {
-        let mut core = NetCore::new(device, config.mac, now_ms);
-        if config.is_qemu_user() {
+        self.attach_nic_with_filter(device, config, now_ms, None);
+    }
+
+    /// Attach the NIC with a packet-filter policy on `eth0`.
+    pub fn attach_nic_with_filter<N: Device + 'static>(
+        &mut self,
+        device: N,
+        config: NicConfig,
+        now_ms: i64,
+        policy: Option<FilterPolicy>,
+    ) {
+        let mut core = NetCore::new(
+            FilterDevice::new(device, policy, "eth0"),
+            config.mac,
+            now_ms,
+        );
+        if config.is_configured() {
             core.set_ipv4(
                 Ipv4Addr::from_octets(config.addr),
                 config.prefix,
@@ -478,12 +547,50 @@ impl<D: Device> Netd<D> {
         self.nic = Some(Box::new(core));
         self.nic_config = Some(config);
         self.nic_lease = None;
-        self.nic_control = config.is_qemu_user().then_some(NicControl {
+        self.nic_dns.clear();
+        self.nic_control = config.is_configured().then_some(NicControl {
             addr: config.addr,
             prefix: config.prefix,
             gateway: config.gateway,
             up: true,
         });
+    }
+
+    /// Keep the configured DNS list for resolvd and publish a synthetic lease in static mode.
+    pub fn set_nic_dns(&mut self, dns: Vec<[u8; 4]>) {
+        self.nic_dns = dns;
+        self.nic_lease = self.static_lease();
+    }
+
+    /// Apply the static parameters after a late configuration read.
+    ///
+    /// The boot path reads the drop-in before attaching the NIC. This method exists for a
+    /// configuration that arrives after a default attach: it replaces the published address
+    /// and publishes the DNS list without restarting the stack.
+    pub fn apply_static(&mut self, config: &StaticConfig) {
+        let Some(nic_config) = self.nic_config else {
+            return;
+        };
+        let updated = NicConfig::static_config(
+            nic_config.mac,
+            nic_config.mtu,
+            config.addr,
+            config.prefix,
+            config.gateway,
+        );
+        self.nic_config = Some(updated);
+        self.nic_control = Some(NicControl {
+            addr: config.addr,
+            prefix: config.prefix,
+            gateway: config.gateway,
+            up: true,
+        });
+        self.core_mut(Interface::Nic).set_ipv4(
+            Ipv4Addr::from_octets(config.addr),
+            config.prefix,
+            config.gateway.map(Ipv4Addr::from_octets),
+        );
+        self.set_nic_dns(config.dns.clone());
     }
 
     /// Whether a NIC core is attached.
@@ -509,13 +616,34 @@ impl<D: Device> Netd<D> {
         Some(config)
     }
 
-    /// The live NIC DHCP lease, if the stack has one or a platform lease was applied.
+    /// The live NIC DHCP lease, if the stack has one or a static/platform lease was applied.
     #[must_use]
     pub fn dhcp_lease(&self) -> Option<DhcpLease> {
         self.nic
             .as_ref()
             .and_then(|nic| nic.dhcp_lease())
             .or_else(|| self.nic_lease.clone())
+    }
+
+    fn static_lease(&self) -> Option<DhcpLease> {
+        let config = self.nic_config?;
+        if !matches!(config.addressing, NicAddressing::Static) {
+            return None;
+        }
+        let control = self.nic_control.as_ref()?;
+        Some(DhcpLease {
+            address: Ipv4Addr::from_octets(control.addr),
+            prefix_len: control.prefix,
+            router: control.gateway.map(Ipv4Addr::from_octets),
+            dns: self
+                .nic_dns
+                .iter()
+                .map(|server| Ipv4Addr::from_octets(*server))
+                .collect(),
+            renew_at_ms: None,
+            rebind_at_ms: None,
+            expires_at_ms: None,
+        })
     }
 
     /// Apply one validated platform DHCP lease and publish `eth0`.
@@ -624,6 +752,11 @@ impl<D: Device> Netd<D> {
         }
     }
 
+    /// Take the pending packet-filter log lines from every interface.
+    pub fn take_filter_log(&mut self) -> Vec<String> {
+        core::mem::take(&mut *self.filter_log.borrow_mut())
+    }
+
     /// Number of open socket files (control files are excluded).
     #[must_use]
     pub fn socket_files(&self) -> usize {
@@ -698,6 +831,7 @@ impl<D: Device> Netd<D> {
         let id = self.next_file;
         self.next_file = self.next_file.checked_add(1).ok_or(Errno::ENFILE)?;
         self.files.insert(id, file);
+        self.file_refs.insert(id, 1);
         Ok(id)
     }
 
@@ -745,7 +879,12 @@ impl<D: Device> Netd<D> {
         }
         let id = id.ok_or(Errno::ENOTCONN)?;
         match transport {
-            Transport::Tcp => self.core_mut(interface).send(id, buffer),
+            // POSIX write on a connection whose peer has fully closed is EPIPE, not the
+            // core's internal not-connected state; the SSH session close path depends on it.
+            Transport::Tcp => match self.core_mut(interface).send(id, buffer) {
+                Err(Errno::ENOTCONN) => Err(Errno::EPIPE),
+                other => other,
+            },
             Transport::Udp => {
                 let to = peer.ok_or(Errno::EADDRNOTAVAIL)?;
                 self.core_mut(interface).udp_send_to(
@@ -788,20 +927,30 @@ impl<D: Device> Netd<D> {
         }
     }
 
-    /// Close `file` and its socket.
-    pub fn close(&mut self, file: u64) -> Result<(), Errno> {
+    /// Drop one reference to `file`; return `true` when this was the last one.
+    ///
+    /// The File, its core socket and its readiness event stay alive while any descriptor,
+    /// including a fork-inherited one, still names the file.
+    pub fn close(&mut self, file: u64) -> Result<bool, Errno> {
+        let refs = self.file_refs.get_mut(&file).ok_or(Errno::EBADF)?;
+        if *refs > 1 {
+            *refs -= 1;
+            return Ok(false);
+        }
+        self.file_refs.remove(&file);
         let file = self.files.remove(&file).ok_or(Errno::EBADF)?;
         if let File::Socket(socket) = file
             && let Some(id) = socket.socket
         {
             let _ = self.core_mut(socket.interface).close(id);
         }
-        Ok(())
+        Ok(true)
     }
 
-    /// Duplicate a file description; the kernel owns the handle duplication.
+    /// Account for a duplicate/fork-inherited reference to `file`.
     pub fn dup(&mut self, file: u64) -> Result<u64, Errno> {
-        self.files.get(&file).ok_or(Errno::EBADF)?;
+        let refs = self.file_refs.get_mut(&file).ok_or(Errno::EBADF)?;
+        *refs = refs.checked_add(1).ok_or(Errno::EMFILE)?;
         Ok(file)
     }
 
@@ -1097,6 +1246,7 @@ impl<D: Device> Netd<D> {
             Call::GetPeerName => self.endpoint_response(file, true),
             Call::SetSockOpt { opt, value } => self.set_option(file, opt, value),
             Call::GetSockOpt { opt } => self.get_option(file, opt),
+            Call::Poll => self.readiness(file),
             // The target glue creates the S26 event handle and attaches it; the pure core has no
             // kernel handle table.
             Call::Event => Err(Errno::EOPNOTSUPP),
@@ -1352,6 +1502,45 @@ impl<D: Device> Netd<D> {
         Ok(Response::Ok)
     }
 
+    /// Live readiness of the socket behind an open file.
+    ///
+    /// The file must already name a live socket on the same interface; the core predicate runs
+    /// on that interface and socket id. A control file and a file without a socket have a defined
+    /// error instead of a made-up "ready" bit.
+    pub fn socket_readiness(&self, file: u64) -> Result<Readiness, Errno> {
+        let (interface, socket, write_shutdown) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+            File::Control => return Err(Errno::EINVAL),
+            File::Socket(socket) => (socket.interface, socket.socket, socket.write_shutdown),
+        };
+        let id = socket.ok_or(Errno::ENOTCONN)?;
+        let mut ready = self.core_ref(interface).readiness(id)?;
+        // A local SHUT_WR rejects every later write with EPIPE; the readiness query must report
+        // the same level, not the core's pre-shutdown send space.
+        if write_shutdown {
+            ready.writable = false;
+        }
+        Ok(ready)
+    }
+
+    /// Answer the live readiness query for an open socket file.
+    fn readiness(&self, file: u64) -> Result<Response, Errno> {
+        let ready = self.socket_readiness(file)?;
+        let mut bits = 0i32;
+        if ready.readable {
+            bits |= READY_READABLE;
+        }
+        if ready.writable {
+            bits |= READY_WRITABLE;
+        }
+        if ready.hup {
+            bits |= READY_HUP;
+        }
+        if ready.error {
+            bits |= READY_ERROR;
+        }
+        Ok(Response::Value(bits))
+    }
+
     fn get_option(&mut self, file: u64, opt: SockOpt) -> Result<Response, Errno> {
         let socket = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
@@ -1527,7 +1716,14 @@ impl<D: Device> Netd<D> {
                 let Some(interface) = self.interface_for_name(name.as_str()) else {
                     return self.iface_error(response, Errno::ENODEV);
                 };
-                let Some(lease) = self.core_ref(interface).dhcp_lease() else {
+                // The NIC lease may be a live DHCP lease or the synthetic static lease that
+                // carries the configured DNS list to resolvd.
+                let lease = if interface == Interface::Nic {
+                    self.dhcp_lease()
+                } else {
+                    self.core_ref(interface).dhcp_lease()
+                };
+                let Some(lease) = lease else {
                     return self.iface_error(response, Errno::ENOENT);
                 };
                 let mut offset = 0usize;

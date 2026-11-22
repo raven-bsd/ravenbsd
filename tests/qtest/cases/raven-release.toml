@@ -1,0 +1,278 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K209: the release/UFS administration gate. Boot the real release profile, log in, assert the
+# target /usr/sbin/raven is executable, run the read-only net/status commands, then exercise the
+# config TUI dry-run and a real atomic save on the writable root. The TUI is the K197 first-party
+# implementation; this case does not fake a login or synthesize the drop-in.
+name = "raven-release"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/fixtures/modern-admin/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|EUNAVAILABLE|raven: config needs check|command not found'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 300
+
+[[step]]
+send = "[ -x /usr/sbin/raven ] && echo raven-present\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven-present$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "[ -e /bin/raven ] || echo bin-raven-absent\n"
+delay_ms = 100
+
+[[step]]
+wait = '^bin-raven-absent$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json net if\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"net\.if","name":"[^"]+","state":"up","address":"10\.0\.2\.15","prefix":24,'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven net route\n"
+delay_ms = 100
+
+[[step]]
+wait = '^default\s+10\.0\.2\.2\s+\S+'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven net status && echo net-status-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^net-status-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json status\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "raven --json status\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "export NO_COLOR=1 RAVEN_TUI=1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config --dry-run\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-release\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: dry-run plan=/etc/raven/conf\.d/network\.toml file=present$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-release\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: error: Read-only file system \(os error 30\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "export RAVEN_CONFIG_ROOT=/tmp/raven-release-test\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config --dry-run\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-release\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: dry-run plan=/tmp/raven-release-test/etc/raven/conf\.d/network\.toml file=absent$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-release\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: saved /tmp/raven-release-test/etc/raven/conf\.d/network\.toml$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /tmp/raven-release-test/etc/raven/conf.d/network.toml\n"
+delay_ms = 100
+
+[[step]]
+wait = '^hostname = "raven-release"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^mode = "dhcp"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

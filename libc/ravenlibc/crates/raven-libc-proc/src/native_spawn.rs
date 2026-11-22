@@ -19,8 +19,9 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use crate::backend::{EarlySpawn, WaitResult};
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use crate::errors::{E2BIG, ENOENT, ENOEXEC};
-use crate::errors::{EAGAIN, EINVAL, Errno};
+use crate::errors::{EAGAIN, EINVAL, ENAMETOOLONG, Errno};
 use crate::request::SpawnRequest;
+use crate::wait_status::kernel_wait_options;
 
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use raven_abi::errno::Errno as AbiErrno;
@@ -59,6 +60,7 @@ pub trait Loader {
         path: &str,
         argv: &[&str],
         env: &[&str],
+        cwd: &[u8],
         fdmap: &[(i32, u32)],
     ) -> Result<u32, Errno>;
     /// Wait for a child; a `WNOHANG` miss returns pid 0.
@@ -133,6 +135,12 @@ impl<L, H> NativeSpawner<L, H> {
 impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
     fn spawn(&self, request: &SpawnRequest) -> Result<i32, Errno> {
         let path = core::str::from_utf8(&request.path).map_err(|_| EINVAL)?;
+        if request.cwd.is_empty() || !request.cwd.starts_with(b"/") {
+            return Err(EINVAL);
+        }
+        if request.cwd.len() >= 4096 {
+            return Err(ENAMETOOLONG);
+        }
         let resolved = resolve_image_path(path, &request.cwd)?;
         let argv = strings(&request.argv)?;
         let envp = strings(&request.envp)?;
@@ -144,7 +152,9 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
                 .iter()
                 .map(|entry| (entry.fd, entry.handle))
                 .collect();
-            let handle = self.loader.load(&image, &resolved, &argv, &envp, &fds)?;
+            let handle = self
+                .loader
+                .load(&image, &resolved, &argv, &envp, &request.cwd, &fds)?;
             let pid = match self.info.pid_for_handle(handle) {
                 Ok(pid) => pid,
                 Err(error) => {
@@ -168,7 +178,9 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
 
     fn wait(&self, idtype: u32, id: i64, options: u32) -> Result<WaitResult, Errno> {
         let id = i32::try_from(id).map_err(|_| EINVAL)?;
-        let (pid, status) = self.loader.wait_ex(idtype, id, options)?;
+        let (pid, status) = self
+            .loader
+            .wait_ex(idtype, id, kernel_wait_options(options))?;
         if pid != 0
             && let Some(handle) = self.take(pid)
         {
@@ -217,6 +229,7 @@ fn map_spawn_error(error: raven_spawn::SpawnError) -> Errno {
         SpawnError::NotFound | SpawnError::FileNotFound => ENOENT,
         SpawnError::BadElf(_) | SpawnError::HasInterpreter => ENOEXEC,
         SpawnError::TooLarge => E2BIG,
+        SpawnError::BadCwd => EINVAL,
         SpawnError::Sys(error) => i32::from(error.0),
     }
 }
@@ -334,6 +347,7 @@ impl Loader for RtLoader {
         path: &str,
         argv: &[&str],
         env: &[&str],
+        cwd: &[u8],
         fdmap: &[(i32, u32)],
     ) -> Result<u32, Errno> {
         let options = raven_spawn::SpawnOptions { args: argv, env };
@@ -341,7 +355,7 @@ impl Loader for RtLoader {
             inner: raven_spawn::RtSys,
             command: command_name(argv, path),
         };
-        raven_spawn::spawn_image_with_fdmap(image, path, &options, fdmap, &mut sys)
+        raven_spawn::spawn_image_with_fdmap_cwd(image, path, &options, cwd, fdmap, &mut sys)
             .map(|handle| handle.0)
             .map_err(map_spawn_error)
     }

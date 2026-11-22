@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K512: `stat -f`/statvfs on the filesystem under test (K184: no f_type ->
+# UNKNOWN (0x0), never a panic).
+#
+# The old case booted `profile = "release"`, whose initfs needs
+# build/ssh/x86_64/bin/sshd and therefore could not build in a clean clone; it
+# was skipped and the audit row stayed UNTESTED. This case uses the smallest
+# vehicle that still proves the row: the shell-test image already stages the
+# uutils `stat` at /bin/stat, and the serial console shell runs it against `/`.
+# Field assertions cover block size, total/free/available blocks, inode totals
+# and f_namemax; the report cross-checks the total byte count against the
+# initfs image size.
+
+name = "stat-fs"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 240
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^\s*File: /$'
+
+[[expect]]
+regex = '^\s+ID: 0\s+Namelen: 255\s+Type: UNKNOWN \(0x0\)$'
+
+[[expect]]
+regex = '^\s*Block size: [1-9][0-9]*\s+Fundamental block size: [1-9][0-9]*$'
+
+[[expect]]
+regex = '^\s*Blocks: Total: [1-9][0-9]*\s+Free: [0-9]+\s+Available: [0-9]+$'
+
+[[expect]]
+regex = '^\s*Inodes: Total: [1-9][0-9]*\s+Free: [0-9]+$'
+
+[[expect]]
+regex = '^fs1=0$'
+
+[[expect]]
+regex = '^fs2=0$'
+
+[[expect]]
+regex = '^fs3=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|unimplemented'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/stat -f /; echo fs1=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/stat -f -c '%t' /; echo fs2=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/stat -f -c '%T' /; echo fs3=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = 'UNKNOWN \(0x0\)$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 45

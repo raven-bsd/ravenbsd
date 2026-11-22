@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# blockd over the EMMC2 driver's `disk:0`; the GPT scan reads the 1 MiB prefix.
+name = "blockd"
+exec = "/sbin/blockd"
+needs = ["scheme:disk", "devd"]
+provides = ["scheme:block"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+max_restarts = 3
+
+[env]
+BLOCKD_DISK = "disk:0"

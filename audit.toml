@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Reviewed advisory exceptions (DR-64). The list is empty as of SC2: the first-party utilities
+# `userland/bin/tar` and `userland/bin/time` are now the packages `raven-tar`/`raven-time`
+# (`publish = false`), so the advisory database no longer matches them by package name, and the
+# five former false positives (RUSTSEC-2018-0002, -2021-0080, -2026-0067, -2026-0068,
+# -2020-0071) were removed. No upstream `tar-rs` or `time` crate source is linked or shipped.
+#
+# Keep this file as the reviewed-exception mechanism: every future entry needs an advisory ID,
+# an owner, a reason/reachability note and an expiry date. No blanket ignore.
+
+[advisories]
+ignore = []
+
+# Licence exception register (DR-64). cargo-deny 0.22's `[[licenses.exceptions]]` schema accepts
+# only `allow`; the owner/reason/expiry live here and in docs/supply-chain.md.
+#
+# | crate | version | licence | owner | reason | expiry |
+# |---|---|---|---|---|---|
+# | ucs2 | 0.3.3 | MPL-2.0 | kevin | unmodified crates.io helper via uefi -> raven-loader; file-level copyleft, no Raven code derived | 2027-02-28 |

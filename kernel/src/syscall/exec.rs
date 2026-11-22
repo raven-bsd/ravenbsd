@@ -27,6 +27,12 @@ const MAX_COUNT: usize = 4096;
 const MAX_STRING: usize = 64 * 1024;
 const MAX_ARG_BYTES: usize = 128 * 1024;
 const MAX_HANDLES: usize = 65536;
+const ELF_HEADER_BYTES: usize = 64;
+const PHDR_BYTES: usize = 56;
+const MAX_PHDRS: usize = 64;
+/// Header + program headers + `PT_INTERP` only; the image itself stays in user memory.
+const MAX_HEADER_BYTES: usize = 64 * 1024;
+const PT_INTERP: u32 = 3;
 
 #[derive(Clone, Copy)]
 struct Request {
@@ -87,15 +93,7 @@ pub fn exec(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
 
     let image_len = usize::try_from(request.image_len).map_err(|_| Errno::EFBIG)?;
-    let mut image = Vec::new();
-    image
-        .try_reserve_exact(image_len)
-        .map_err(|_| Errno::ENOMEM)?;
-    image.resize(image_len, 0);
-    copy_from_user(
-        &mut image,
-        UserSlice::new(request.image, request.image_len)?,
-    )?;
+    let header = read_header(request.image, image_len)?;
 
     let path_len = usize::try_from(request.path_len).map_err(|_| Errno::ENAMETOOLONG)?;
     let mut path = Vec::new();
@@ -111,8 +109,125 @@ pub fn exec(frame: &SyscallFrame) -> Result<usize, Errno> {
     let envp = string_array(request.envp, request.envc, &mut total)?;
     let close = close_list(request.close_list, request.close_count)?;
 
-    exec::replace_image(&caller, &image, &path, &argv, &envp, &close)?;
+    exec::replace_image_from_user(
+        &caller,
+        &header,
+        request.image,
+        request.image_len,
+        &path,
+        &argv,
+        &envp,
+        &close,
+    )?;
     Ok(0)
+}
+
+/// Read the ELF header, the complete program-header table and any `PT_INTERP` string.
+///
+/// The returned buffer is at most [`MAX_HEADER_BYTES`]; the `PT_LOAD` bytes stay in the caller's
+/// image and are streamed by `load_segments_from_user`.
+fn read_header(image: u64, image_len: usize) -> Result<Vec<u8>, Errno> {
+    if image_len < ELF_HEADER_BYTES {
+        return Err(Errno::ENOEXEC);
+    }
+    let mut fixed = [0u8; ELF_HEADER_BYTES];
+    copy_from_user(&mut fixed, UserSlice::new(image, ELF_HEADER_BYTES as u64)?)?;
+    if !fixed.starts_with(b"\x7fELF") {
+        return Err(Errno::ENOEXEC);
+    }
+    let phoff = header_word(&fixed, 32).ok_or(Errno::ENOEXEC)?;
+    let phentsize = header_half(&fixed, 54).ok_or(Errno::ENOEXEC)?;
+    let phnum = header_half(&fixed, 56).ok_or(Errno::ENOEXEC)?;
+    if usize::from(phentsize) != PHDR_BYTES || phnum == 0 || usize::from(phnum) > MAX_PHDRS {
+        return Err(Errno::ENOEXEC);
+    }
+    let table_len = u64::from(phnum)
+        .checked_mul(PHDR_BYTES as u64)
+        .ok_or(Errno::ENOEXEC)?;
+    let table_end = phoff.checked_add(table_len).ok_or(Errno::ENOEXEC)?;
+    if table_end > image_len as u64 {
+        return Err(Errno::ENOEXEC);
+    }
+    if table_end > MAX_HEADER_BYTES as u64 {
+        return Err(Errno::EFBIG);
+    }
+    let mut header = Vec::new();
+    let table_end = usize::try_from(table_end).map_err(|_| Errno::EFBIG)?;
+    let header_len = table_end.max(ELF_HEADER_BYTES);
+    header
+        .try_reserve_exact(header_len)
+        .map_err(|_| Errno::ENOMEM)?;
+    header.resize(header_len, 0);
+    header
+        .get_mut(..ELF_HEADER_BYTES)
+        .ok_or(Errno::ENOEXEC)?
+        .copy_from_slice(&fixed);
+    let table_len = usize::try_from(table_len).map_err(|_| Errno::EFBIG)?;
+    let phoff = usize::try_from(phoff).map_err(|_| Errno::ENOEXEC)?;
+    let table = header
+        .get_mut(phoff..phoff.saturating_add(table_len))
+        .ok_or(Errno::ENOEXEC)?;
+    copy_from_user(
+        table,
+        UserSlice::new(
+            image.checked_add(phoff as u64).ok_or(Errno::EFAULT)?,
+            table_len as u64,
+        )?,
+    )?;
+
+    // A static OpenSSH helper has no PT_INTERP; a PIE image names one, and its bytes must be in
+    // the header buffer for the parser to return the path.
+    let mut index = 0usize;
+    while index < usize::from(phnum) {
+        let base = phoff
+            .checked_add(index.saturating_mul(PHDR_BYTES))
+            .ok_or(Errno::ENOEXEC)?;
+        let kind = header_u32(&header, base).ok_or(Errno::ENOEXEC)?;
+        if kind == PT_INTERP {
+            let offset = header_word(&header, base.saturating_add(8)).ok_or(Errno::ENOEXEC)?;
+            let len = header_word(&header, base.saturating_add(32)).ok_or(Errno::ENOEXEC)?;
+            let end = offset.checked_add(len).ok_or(Errno::ENOEXEC)?;
+            if end > image_len as u64 {
+                return Err(Errno::ENOEXEC);
+            }
+            if end > MAX_HEADER_BYTES as u64 {
+                return Err(Errno::EFBIG);
+            }
+            let end = usize::try_from(end).map_err(|_| Errno::EFBIG)?;
+            if end > header.len() {
+                header
+                    .try_reserve(end.saturating_sub(header.len()))
+                    .map_err(|_| Errno::ENOMEM)?;
+                header.resize(end, 0);
+            }
+            let start = usize::try_from(offset).map_err(|_| Errno::ENOEXEC)?;
+            let length = usize::try_from(len).map_err(|_| Errno::ENOEXEC)?;
+            let target = header
+                .get_mut(start..start.saturating_add(length))
+                .ok_or(Errno::ENOEXEC)?;
+            copy_from_user(
+                target,
+                UserSlice::new(image.checked_add(offset).ok_or(Errno::EFAULT)?, len)?,
+            )?;
+        }
+        index = index.saturating_add(1);
+    }
+    Ok(header)
+}
+
+fn header_half(bytes: &[u8], offset: usize) -> Option<u16> {
+    let end = offset.checked_add(2)?;
+    Some(u16::from_le_bytes(bytes.get(offset..end)?.try_into().ok()?))
+}
+
+fn header_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    let end = offset.checked_add(4)?;
+    Some(u32::from_le_bytes(bytes.get(offset..end)?.try_into().ok()?))
+}
+
+fn header_word(bytes: &[u8], offset: usize) -> Option<u64> {
+    let end = offset.checked_add(8)?;
+    Some(u64::from_le_bytes(bytes.get(offset..end)?.try_into().ok()?))
 }
 
 fn word(bytes: &[u8; REQUEST_BYTES], offset: usize) -> u64 {

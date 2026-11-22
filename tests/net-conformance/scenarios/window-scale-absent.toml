@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "window-scale-absent"
+port = 24002
+baseline = "timeout 180 sudo -n python3 tests/net-conformance/baselines/linux/run.py --scenario window-scale-absent"
+donor = [
+  "NetBSD sys/netinet/tcp_output.c:tcp_output (only emit WS when negotiated)",
+  "NetBSD sys/netinet/tcp_input.c:tcp_dooptions (peer did not offer WS)",
+]
+rfcs = ["RFC 7323 section 2.2 (WS is sent only when both offer it)"]
+
+[[expect]]
+step = "peer SYN has MSS and SACK but no WS option"
+packet = "SYN"
+assert = "server SYN-ACK has no WS option"
+
+[[expect]]
+step = "peer completes the handshake"
+packet = "ACK"
+assert = "server accepts; the unscaled window is not interpreted as scaled"

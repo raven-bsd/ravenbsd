@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S99 UFS stack: the virtio-blk driver, blockd over its disk: scheme, fsd-ufs
+# read-write on partition 1, and a vfsd ordered after fsd-ufs so the ufs:
+# scheme is in its snapshot.
+
+[[initfs.programs]]
+package = "virtio-blk"
+path = "/sbin/virtio-blk"
+
+[[initfs.programs]]
+package = "raven-blockd"
+path = "/sbin/blockd"
+
+[[initfs.programs]]
+package = "fsd-ufs"
+path = "/sbin/fsd-ufs"
+
+[[initfs.files]]
+src = "profiles/ufs-demo.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/fsd-ufs.toml"
+path = "/etc/services.d/fsd-ufs.toml"
+
+[[initfs.files]]
+src = "profiles/ufs-demo.d/vfsd-ufs.manifest"
+path = "/etc/services.d/vfsd-ufs.toml"

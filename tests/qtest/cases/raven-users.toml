@@ -1,0 +1,273 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K229: the writable-UFS users gate. Boot the one-disk demo qcow2 with a private copy that
+# carries the stub `/bin/tui-demo` (tests/fixtures/users/build.sh injects it), then drive the
+# `raven config` Users form: add musicbox with the stub as its passwd shell and console
+# autologin, verify the three account files, the $6$ hash, the home and autologin, read the JSON
+# list/show/check surface, authenticate with `/bin/login`, and run the passwd shell locally.
+# The `ssh musicbox@` end-to-end proof is K195 acceptance, not faked here.
+name = "raven-users"
+arch = "x86_64"
+profile = "qemu-ufs"
+timeout_secs = 360
+pre = ["sh tests/fixtures/users/build.sh"]
+image = "build/fixtures/users/raven-users.qcow2"
+disk_if = "virtio"
+disk_format = "qcow2"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-global", "virtio-blk-pci.disable-legacy=on",
+]
+expect_exit = "any"
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^power: poweroff$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|EUNAVAILABLE|Login incorrect|command not found'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 240
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 120
+
+[[step]]
+send = "mount\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "if [ -x /bin/tui-demo ]; then echo shell-ready; fi\n"
+delay_ms = 100
+
+[[step]]
+wait = '^shell-ready$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "export NO_COLOR=1 RAVEN_TUI=1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/users\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Users \(add\)$'
+timeout_secs = 30
+
+[[step]]
+send = "musicbox\t\t\t\t/bin/tui-demo\ttui-pass\ttui-pass\ty\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: saved /etc/passwd$'
+timeout_secs = 60
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/passwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^musicbox:x:1001:1001::/home/musicbox:/bin/tui-demo$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/shadow\n"
+delay_ms = 100
+
+[[step]]
+wait = '^musicbox:\$6\$[^:]+:'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/group\n"
+delay_ms = 100
+
+[[step]]
+wait = '^musicbox:x:1001:$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "if [ -d /home/musicbox ]; then echo home-ok; fi\n"
+delay_ms = 100
+
+[[step]]
+wait = '^home-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/raven/autologin.toml\n"
+delay_ms = 100
+
+[[step]]
+wait = '^user = "musicbox"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^enabled = true$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json users list\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{.*"kind":"user".*"name":"musicbox".*"shell":"/bin/tui-demo".*"autologin":true.*"password_set":true.*\}$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "raven --json users list\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{.*"kind":"user".*"name":"musicbox".*"shell":"/bin/tui-demo".*"autologin":true.*"password_set":true.*\}$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json users show musicbox\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{.*"kind":"user".*"name":"musicbox".*"home":"/home/musicbox".*"shell":"/bin/tui-demo".*\}$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json users check\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{.*"kind":"check".*"id":"users".*"status":"ok".*"users":3.*"groups":3.*\}$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/login musicbox\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "tui-pass\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD 0\.1\.0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/tui-demo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^tui-demo: ready$'
+timeout_secs = 30
+
+[[step]]
+wait = '^tui-demo: exit 0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/shutdown -p now\n"
+delay_ms = 100
+
+[[step]]
+wait = '^power: poweroff$'
+timeout_secs = 120

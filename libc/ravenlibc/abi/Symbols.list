@@ -32,6 +32,7 @@ __gnu_basename
 __h_errno_location
 __progname
 __progname_full
+__res_state
 __sigsetjmp
 __stack_chk_guard
 __xpg_strerror_r
@@ -477,6 +478,7 @@ free
 free_aligned_sized
 free_sized
 freeaddrinfo
+freeifaddrs
 freelocale
 freezero
 freopen
@@ -541,6 +543,7 @@ getcwd
 getdate
 getdelim
 getdents
+getdtablesize
 getegid
 getentropy
 getenv
@@ -566,7 +569,9 @@ gethostbyname_r
 gethostent
 gethostid
 gethostname
+getifaddrs
 getisax
+getitimer
 getline
 getlogin
 getlogin_r
@@ -585,6 +590,7 @@ getopt_long_only
 getpagesize
 getpayload
 getpayloadf
+getpeereid
 getpeername
 getpgid
 getpgrp
@@ -1150,6 +1156,7 @@ pthread_testcancel
 pthread_timedjoin_np
 pthread_tryjoin_np
 pthread_yield
+ptsname
 ptsname_r
 putc
 putc_unlocked
@@ -1213,6 +1220,7 @@ rename
 renameat
 renameat2
 res_init
+res_query
 rewind
 rewinddir
 rindex
@@ -1299,6 +1307,7 @@ setgroupent
 setgroups
 sethostent
 sethostname
+setitimer
 setjmp
 setlinebuf
 setlocale

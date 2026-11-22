@@ -131,12 +131,20 @@ impl Ramfs {
 
     /// Create a filesystem with explicit limits.
     pub fn with_limits(limits: Limits, now: i64) -> Self {
+        Self::with_root_mode(limits, now, 0o755)
+    }
+
+    /// Create a filesystem with explicit limits and an explicit root directory mode.
+    ///
+    /// The default remains [`Ramfs::with_limits`] (`0o755`). An image that mounts the ramfs at
+    /// `/tmp` passes `0o1777`; the sticky bit then applies through the normal permission checks.
+    pub fn with_root_mode(limits: Limits, now: i64, root_mode: u16) -> Self {
         let mut nodes = BTreeMap::new();
         nodes.insert(
             ROOT_INO,
             Node {
                 kind: NodeKind::Dir(BTreeMap::new()),
-                mode: 0o755,
+                mode: root_mode & 0o7777,
                 uid: 0,
                 gid: 0,
                 nlink: 2,
@@ -2086,3 +2094,7 @@ mod tests {
         model_seed(0x0f0e_0d0c_0b0a_0908);
     }
 }
+
+#[cfg(test)]
+#[path = "root_mode_ut.rs"]
+mod root_mode_tests;

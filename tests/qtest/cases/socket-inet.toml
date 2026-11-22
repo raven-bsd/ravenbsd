@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K230 AF_INET socket path: ravenlibc `socket(AF_INET, SOCK_STREAM, 0)` must return a usable fd,
+# bind/listen must create the scheme socket, and a hostfwd connection must be accepted and echoed
+# byte-for-byte. The fixture overlays a static C client on the release network profile; no
+# fork/exec is involved (K225 owns the accepted-fd exec path).
+
+name = "socket-inet"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+initfs = "build/fixtures/socket-inet/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23080-:23080",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/fixtures/socket-inet/build.sh",
+    "sh tests/fixtures/socket-inet/start-host-echo.sh",
+]
+
+[[expect]]
+regex = '^socket-inet: socket fd=[0-9]+$'
+
+[[expect]]
+regex = '^socket-inet: bind ok$'
+
+[[expect]]
+regex = '^socket-inet: listen ok$'
+
+[[expect]]
+regex = '^socket-inet: listening port=23080$'
+
+# The real profile also runs getty, so the console login prompt can share the serial line.
+[[expect]]
+regex = '^.*socket-inet: poll revents=1$'
+
+# The newline-less accept line can share the getty login prompt.
+[[expect]]
+regex = '^.*socket-inet: accept fd=[0-9]+$'
+
+[[expect]]
+regex = '^socket-inet: accepted peer=[0-9.]+:[0-9]+$'
+
+[[expect]]
+regex = '^socket-inet: echo received bytes=19 payload=socket-inet-payload$'
+
+[[expect]]
+regex = '^socket-inet: echo sent$'
+
+[[expect]]
+regex = '^socket-inet: host ack socket-inet-ack$'
+
+[[expect]]
+regex = '^socket-inet: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)socket-inet: fail|panic|EXCEPTION'

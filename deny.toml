@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# SC1/SC2: cargo-deny policy. The advisory list is empty after SC2 renamed the first-party
+# workspace utilities to `raven-tar`/`raven-time` (`publish = false`), removing the former
+# name-collision false positives; no upstream `tar-rs`/`time` source is linked. The structured
+# owner/reachability/expiry mechanism remains in `audit.toml` and `docs/supply-chain.md`.
+
+[advisories]
+db-urls = ["https://github.com/RustSec/advisory-db"]
+ignore = []
+
+[bans]
+multiple-versions = "warn"
+# 321 workspace members use versionless internal path deps and are not marked publish=false.
+# cargo-deny's allow-wildcard-paths only exempts private crates, and editing every Cargo.toml is
+# outside K390. Warn is the enforceable level for that internal-path gap; unknown registries and
+# git sources remain denied by [sources], and the weekly audit tracks registry wildcards.
+# Owner kevin; reviewed 2026-11-21; re-review 2027-02-28.
+wildcards = "warn"
+allow-wildcard-paths = true
+
+[licenses]
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.8
+
+# Reviewed exception (DR-64): ucs2 is an unmodified crates.io helper reached only through
+# uefi -> raven-loader. MPL-2.0 is file-level copyleft; no Raven source is derived from it.
+# Owner/reason/expiry are recorded in audit.toml; the installed cargo-deny exception schema
+# accepts only `allow` here.
+[[licenses.exceptions]]
+allow = ["MPL-2.0"]
+crate = "ucs2"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -8,7 +8,7 @@ use alloc::collections::BTreeMap;
 use raven_abi::errno::Errno;
 use raven_plat::gpio::{Function, PinConfig, Pull};
 use raven_plat::protocol::{
-    GPIO_LEVEL, GPIO_SET_FUNCTION, GPIO_SET_PULL, Resource, parse_resource,
+    GPIO_LEVEL, GPIO_SET_FUNCTION, GPIO_SET_LEVEL, GPIO_SET_PULL, Resource, parse_resource,
 };
 use raven_plat::{GpioArbiter, MAX_RNG_BYTES, Platform};
 use raven_proto_fs::{S_IFCHR, Stat};
@@ -136,6 +136,11 @@ impl<P: Platform> Handler for PlatHandler<P> {
                 let slot = response.first_mut().ok_or(Errno::E2BIG)?;
                 *slot = u8::from(level);
                 Ok(1)
+            }
+            GPIO_SET_LEVEL => {
+                let level = argument != 0;
+                self.configure(file, pin, |config| config.level = level)?;
+                Ok(0)
             }
             _ => Err(Errno::EINVAL.into()),
         }

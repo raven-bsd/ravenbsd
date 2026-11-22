@@ -2,11 +2,19 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! Ruleset AST and per-rule matching.
+//!
+//! Donor: `struct pf_rule` / `struct pf_rule_addr` in `sys/netpfil/pf/pf.h` and the
+//! attribute chain in `pf_match_rule()` (`sys/netpfil/pf/pf.c:5959`). The attribute
+//! order here mirrors the donor: direction, interface, address family, protocol,
+//! source, destination, then per-protocol ports. TCP flag-set conditions are part of
+//! the 0.1.0 state machine, not of rule matching.
 
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::address::{AddrSpec, Ipv4Addr, PortSpec};
+use crate::address::{AddrSpec, IpAddr, PortSpec};
+use crate::nat::NatTable;
+use crate::table::Table;
 
 /// Traffic direction relative to the host.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -15,6 +23,15 @@ pub enum Direction {
     In,
     /// Packets leaving the host.
     Out,
+}
+
+/// Address family of a rule.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Family {
+    /// IPv4.
+    Inet,
+    /// IPv6.
+    Inet6,
 }
 
 /// Transport protocol a rule applies to.
@@ -26,8 +43,18 @@ pub enum Protocol {
     Tcp,
     /// UDP.
     Udp,
-    /// ICMP.
+    /// ICMP for IPv4.
     Icmp,
+    /// ICMPv6.
+    Icmpv6,
+}
+
+impl Protocol {
+    /// True when the protocol carries ports.
+    #[must_use]
+    pub const fn has_ports(self) -> bool {
+        matches!(self, Self::Tcp | Self::Udp)
+    }
 }
 
 /// What the filter does with a matching packet.
@@ -76,8 +103,12 @@ pub mod tcp_flag {
     pub const SYN: u8 = 0x02;
     /// RST.
     pub const RST: u8 = 0x04;
+    /// PSH.
+    pub const PSH: u8 = 0x08;
     /// ACK.
     pub const ACK: u8 = 0x10;
+    /// URG.
+    pub const URG: u8 = 0x20;
 }
 
 /// One packet handed to the filter.
@@ -90,9 +121,9 @@ pub struct Packet<'a> {
     /// Transport protocol.
     pub protocol: Protocol,
     /// Source address.
-    pub source: Ipv4Addr,
+    pub source: IpAddr,
     /// Destination address.
-    pub destination: Ipv4Addr,
+    pub destination: IpAddr,
     /// Source port (zero for ICMP).
     pub source_port: u16,
     /// Destination port (zero for ICMP).
@@ -101,6 +132,8 @@ pub struct Packet<'a> {
     pub length: u32,
     /// TCP control bits (zero for other protocols).
     pub tcp_flags: u8,
+    /// An IP fragment. Donor `pf_match_rule()` skips the port conditions for fragments.
+    pub fragment: bool,
 }
 
 impl<'a> Packet<'a> {
@@ -110,9 +143,9 @@ impl<'a> Packet<'a> {
     pub fn tcp(
         direction: Direction,
         interface: &'a str,
-        source: Ipv4Addr,
+        source: impl Into<IpAddr>,
         source_port: u16,
-        destination: Ipv4Addr,
+        destination: impl Into<IpAddr>,
         destination_port: u16,
         tcp_flags: u8,
         length: u32,
@@ -121,12 +154,13 @@ impl<'a> Packet<'a> {
             direction,
             interface,
             protocol: Protocol::Tcp,
-            source,
-            destination,
+            source: source.into(),
+            destination: destination.into(),
             source_port,
             destination_port,
             length,
             tcp_flags,
+            fragment: false,
         }
     }
 
@@ -135,9 +169,9 @@ impl<'a> Packet<'a> {
     pub fn udp(
         direction: Direction,
         interface: &'a str,
-        source: Ipv4Addr,
+        source: impl Into<IpAddr>,
         source_port: u16,
-        destination: Ipv4Addr,
+        destination: impl Into<IpAddr>,
         destination_port: u16,
         length: u32,
     ) -> Self {
@@ -145,12 +179,13 @@ impl<'a> Packet<'a> {
             direction,
             interface,
             protocol: Protocol::Udp,
-            source,
-            destination,
+            source: source.into(),
+            destination: destination.into(),
             source_port,
             destination_port,
             length,
             tcp_flags: 0,
+            fragment: false,
         }
     }
 
@@ -159,20 +194,61 @@ impl<'a> Packet<'a> {
     pub fn icmp(
         direction: Direction,
         interface: &'a str,
-        source: Ipv4Addr,
-        destination: Ipv4Addr,
+        source: impl Into<IpAddr>,
+        destination: impl Into<IpAddr>,
         length: u32,
     ) -> Self {
         Self {
             direction,
             interface,
             protocol: Protocol::Icmp,
-            source,
-            destination,
+            source: source.into(),
+            destination: destination.into(),
             source_port: 0,
             destination_port: 0,
             length,
             tcp_flags: 0,
+            fragment: false,
+        }
+    }
+
+    /// Build an ICMPv6 packet.
+    #[must_use]
+    pub fn icmpv6(
+        direction: Direction,
+        interface: &'a str,
+        source: impl Into<IpAddr>,
+        destination: impl Into<IpAddr>,
+        length: u32,
+    ) -> Self {
+        Self {
+            direction,
+            interface,
+            protocol: Protocol::Icmpv6,
+            source: source.into(),
+            destination: destination.into(),
+            source_port: 0,
+            destination_port: 0,
+            length,
+            tcp_flags: 0,
+            fragment: false,
+        }
+    }
+
+    /// Mark the packet as an IP fragment.
+    #[must_use]
+    pub fn fragmented(mut self) -> Self {
+        self.fragment = true;
+        self
+    }
+
+    /// The address family of the packet.
+    #[must_use]
+    pub fn family(&self) -> Family {
+        if self.source.is_v4() {
+            Family::Inet
+        } else {
+            Family::Inet6
         }
     }
 }
@@ -196,8 +272,14 @@ impl AddrPort {
         }
     }
 
-    fn matches(&self, address: Ipv4Addr, port: u16, has_ports: bool) -> bool {
-        if !self.address.matches(address) {
+    pub(crate) fn matches(
+        &self,
+        address: IpAddr,
+        port: u16,
+        has_ports: bool,
+        tables: &[Table],
+    ) -> bool {
+        if !self.address.matches(address, tables) {
             return false;
         }
         if has_ports {
@@ -219,6 +301,8 @@ pub struct Rule {
     pub direction: Option<Direction>,
     /// Interface condition.
     pub interface: IfaceSpec,
+    /// Address family condition; `None` matches both.
+    pub family: Option<Family>,
     /// Protocol condition.
     pub protocol: Protocol,
     /// Source condition.
@@ -234,7 +318,7 @@ pub struct Rule {
 impl Rule {
     /// True when this rule applies to `packet`.
     #[must_use]
-    pub fn matches(&self, packet: &Packet<'_>) -> bool {
+    pub fn matches(&self, packet: &Packet<'_>, tables: &[Table]) -> bool {
         if let Some(direction) = self.direction
             && direction != packet.direction
         {
@@ -243,15 +327,34 @@ impl Rule {
         if !self.interface.matches(packet.interface) {
             return false;
         }
+        if let Some(family) = self.family
+            && family != packet.family()
+        {
+            return false;
+        }
         if self.protocol != Protocol::Any && self.protocol != packet.protocol {
             return false;
         }
-        let has_ports = matches!(packet.protocol, Protocol::Tcp | Protocol::Udp);
+        if packet.fragment {
+            // Donor `pf_match_rule()` (`PF_VPROTO_FRAGMENT`) fails a rule that names a
+            // source or destination port: `PF_TEST_ATTRIB((r->src.port_op ||
+            // r->dst.port_op), fail)`. A fragment can still match an address-only rule;
+            // TCP flags and other per-protocol attributes are likewise not evaluated.
+            if self.source.port != PortSpec::Any || self.destination.port != PortSpec::Any {
+                return false;
+            }
+            return self.source.address.matches(packet.source, tables)
+                && self.destination.address.matches(packet.destination, tables);
+        }
+        let has_ports = packet.protocol.has_ports();
         self.source
-            .matches(packet.source, packet.source_port, has_ports)
-            && self
-                .destination
-                .matches(packet.destination, packet.destination_port, has_ports)
+            .matches(packet.source, packet.source_port, has_ports, tables)
+            && self.destination.matches(
+                packet.destination,
+                packet.destination_port,
+                has_ports,
+                tables,
+            )
     }
 }
 
@@ -262,15 +365,21 @@ pub struct Ruleset {
     pub rules: Vec<Rule>,
     /// Verdict when no rule matches.
     pub default_action: Action,
+    /// Named address tables.
+    pub tables: Vec<Table>,
+    /// NAT and redirect rules.
+    pub nat: NatTable,
 }
 
 impl Ruleset {
-    /// An empty ruleset with the pf default: block.
+    /// An empty ruleset with the project default: block.
     #[must_use]
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
             default_action: Action::Block,
+            tables: Vec::new(),
+            nat: NatTable::new(),
         }
     }
 }

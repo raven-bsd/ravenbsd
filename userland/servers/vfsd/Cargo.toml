@@ -10,13 +10,15 @@ license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
-[target.'cfg(target_os = "none")'.dependencies]
+[dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
+raven-vfs-core = { path = "../../../crates/raven-vfs-core" }
+
+[target.'cfg(target_os = "none")'.dependencies]
 raven-pager = { path = "../../../crates/raven-pager" }
 raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
 raven-rt = { path = "../../rt", features = ["alloc"] }
 raven-scheme = { path = "../../../crates/raven-scheme" }
-raven-vfs-core = { path = "../../../crates/raven-vfs-core" }
 
 [lints]
 workspace = true

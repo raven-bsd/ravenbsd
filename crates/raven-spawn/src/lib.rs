@@ -63,7 +63,19 @@ pub struct SpawnOptions<'a> {
 ///
 /// Userland binaries are a few MiB even in a debug build; the bound keeps a hostile or corrupt
 /// server from making PID 1 allocate without limit.
-pub const MAX_FILE_IMAGE: usize = 8 * 1024 * 1024;
+pub const MAX_FILE_IMAGE: usize = 16 * 1024 * 1024;
+
+/// Chunk size for reading a `file:` image.
+///
+/// The file servers handle a multi-megabyte read in one request (the kernel capture window is
+/// 4 MiB), so a page-sized loop cost one IPC round trip per 4 KiB and dominated the spawn time:
+/// the 984 KiB `/bin/true` needed 240 round trips. One MiB keeps a 3.3 MiB tool at four reads
+/// while staying well inside both the capture window and [`MAX_FILE_IMAGE`].
+#[cfg(any(
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"),
+    test
+))]
+const IMAGE_READ_CHUNK: usize = 1024 * 1024;
 
 /// Raw `PROC_EXEC_CRED`: apply the setuid/setgid policy before the first thread starts.
 ///
@@ -186,6 +198,13 @@ pub fn spawn_with<S: Sys>(
         }
         None => None,
     };
+    // K139: pass the libc archive offset so the loader maps it from the initfs zero-copy
+    // instead of copying it through the file server. Only dynamic mains need it.
+    let libc = if interp.is_some() {
+        initfs.get("/lib/libc.so.1").map(|entry| entry.data_offset)
+    } else {
+        None
+    };
     spawn_elf(
         &main,
         main_steps,
@@ -194,6 +213,8 @@ pub fn spawn_with<S: Sys>(
         },
         main_bias,
         interp,
+        libc,
+        b"/",
         path,
         options,
         &[],
@@ -226,6 +247,8 @@ pub fn spawn_image_with<S: Sys>(
             ImageSource::Bytes(image),
             main_bias,
             None,
+            None,
+            b"/",
             path,
             options,
             &[],
@@ -261,6 +284,23 @@ pub fn spawn_image_with_fdmap<S: Sys>(
     fdmap: &[(i32, u32)],
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
+    spawn_image_with_fdmap_cwd(image, path, options, b"/", fdmap, sys)
+}
+
+/// Spawn an in-memory image with an explicit child working directory and `fdmap`.
+///
+/// The cwd is written as a NUL-terminated stack string and published as `AT_RAVEN_CWD`; the libc
+/// process start reads it before `main`. An empty, relative, NUL-containing or overlong cwd fails
+/// the spawn instead of silently starting in `/`.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+pub fn spawn_image_with_fdmap_cwd<S: Sys>(
+    image: &[u8],
+    path: &str,
+    options: &SpawnOptions<'_>,
+    cwd: &[u8],
+    fdmap: &[(i32, u32)],
+    sys: &mut S,
+) -> Result<Handle, SpawnError> {
     if image.len() > MAX_FILE_IMAGE {
         return Err(SpawnError::TooLarge);
     }
@@ -274,6 +314,8 @@ pub fn spawn_image_with_fdmap<S: Sys>(
         ImageSource::Bytes(image),
         main_bias,
         None,
+        None,
+        cwd,
         path,
         options,
         fdmap,
@@ -317,6 +359,8 @@ pub fn spawn_image_with_interp<S: Sys>(
         ImageSource::Bytes(image),
         main_bias,
         interp,
+        None,
+        b"/",
         path,
         options,
         &[],
@@ -358,6 +402,8 @@ pub fn spawn_image_with_exec<S: Sys>(
             ImageSource::Bytes(image),
             main_bias,
             None,
+            None,
+            b"/",
             path,
             options,
             &[],
@@ -375,6 +421,8 @@ pub fn spawn_image_with_exec<S: Sys>(
             ImageSource::Bytes(image),
             main_bias,
             Some((elf, steps, ImageSource::Bytes(&interpreter), bias)),
+            None,
+            b"/",
             path,
             options,
             &[],
@@ -395,24 +443,13 @@ pub fn spawn_image_with_exec<S: Sys>(
 #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 pub fn read_file_handle_at(file: Handle) -> Result<Vec<u8>, SpawnError> {
     let client = Client::new();
-    let mut data = Vec::new();
-    let mut buffer = [0u8; 4096];
+    let size = image_size(&client, file)?;
     let mut offset = 0u64;
-    loop {
-        let read = client
-            .pread(file, offset, &mut buffer)
-            .map_err(SpawnError::Sys)?;
-        if read == 0 {
-            return Ok(data);
-        }
-        let next = data.len().checked_add(read).ok_or(SpawnError::TooLarge)?;
-        if next > MAX_FILE_IMAGE {
-            return Err(SpawnError::TooLarge);
-        }
-        let chunk = buffer.get(..read).ok_or(SpawnError::TooLarge)?;
-        data.extend_from_slice(chunk);
+    collect_exact(size, |buffer| {
+        let read = client.pread(file, offset, buffer)?;
         offset = offset.saturating_add(read as u64);
-    }
+        Ok(read)
+    })
 }
 
 /// Spawn an ELF from an open scheme-file handle.
@@ -458,7 +495,10 @@ fn image_scheme_path(path: &str) -> alloc_crate::string::String {
 ///
 /// `O_RDONLY` is zero at the C level, but the kernel's `OPEN` wire encoding uses bit 0 for read
 /// access; passing the raw zero flags is rejected.
-#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+#[cfg(any(
+    test,
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
+))]
 fn image_open_flags() -> Result<raven_proto_fs::OpenFlags, SpawnError> {
     raven_proto_fs::OpenFlags::from_linux(raven_proto_fs::O_RDONLY)
         .map_err(|_| SpawnError::Sys(Errno::EINVAL))
@@ -487,22 +527,50 @@ pub fn read_file_image(path: &str) -> Result<Vec<u8>, SpawnError> {
 /// Read one open image handle to its end, bounded by [`MAX_FILE_IMAGE`].
 #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 fn read_image_handle(client: &Client, handle: Handle) -> Result<Vec<u8>, SpawnError> {
-    let mut data = Vec::new();
-    let mut buffer = [0u8; 4096];
-    loop {
-        let read = client
-            .read(handle, 0, &mut buffer)
-            .map_err(SpawnError::Sys)?;
-        if read == 0 {
-            return Ok(data);
+    let size = image_size(client, handle)?;
+    collect_exact(size, |buffer| client.read(handle, 0, buffer))
+}
+
+/// Return the image length from `FSTAT`, bounded by [`MAX_FILE_IMAGE`].
+///
+/// Knowing the length lets the reader request exactly the image bytes: an EOF probe on a
+/// multi-megabyte buffer otherwise costs the kernel a full capture mapping for no data.
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
+fn image_size(client: &Client, handle: Handle) -> Result<usize, SpawnError> {
+    let stat = client.fstat(handle).map_err(SpawnError::Sys)?;
+    let size = usize::try_from(stat.size).map_err(|_| SpawnError::TooLarge)?;
+    if size > MAX_FILE_IMAGE {
+        return Err(SpawnError::TooLarge);
+    }
+    Ok(size)
+}
+
+/// Read exactly `size` image bytes through `read` in [`IMAGE_READ_CHUNK`] pieces.
+#[cfg(any(
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"),
+    test
+))]
+fn collect_exact<F>(size: usize, mut read: F) -> Result<Vec<u8>, SpawnError>
+where
+    F: FnMut(&mut [u8]) -> Result<usize, Errno>,
+{
+    if size > MAX_FILE_IMAGE {
+        return Err(SpawnError::TooLarge);
+    }
+    let mut data = Vec::with_capacity(size);
+    let mut buffer = alloc_crate::vec![0u8; IMAGE_READ_CHUNK.min(size)];
+    while data.len() < size {
+        let remaining = size - data.len();
+        let want = remaining.min(buffer.len());
+        let read_len =
+            read(buffer.get_mut(..want).ok_or(SpawnError::TooLarge)?).map_err(SpawnError::Sys)?;
+        if read_len == 0 || read_len > want {
+            return Err(SpawnError::Sys(Errno::EIO));
         }
-        let next = data.len().checked_add(read).ok_or(SpawnError::TooLarge)?;
-        if next > MAX_FILE_IMAGE {
-            return Err(SpawnError::TooLarge);
-        }
-        let chunk = buffer.get(..read).ok_or(SpawnError::TooLarge)?;
+        let chunk = buffer.get(..read_len).ok_or(SpawnError::TooLarge)?;
         data.extend_from_slice(chunk);
     }
+    Ok(data)
 }
 
 /// One executable source.
@@ -585,6 +653,8 @@ fn spawn_elf<S: Sys>(
     main_source: ImageSource<'_>,
     main_bias: u64,
     interp: Option<(Elf<'_>, BiasedPlan, ImageSource<'_>, u64)>,
+    libc: Option<u64>,
+    cwd: &[u8],
     path: &str,
     options: &SpawnOptions<'_>,
     fdmap: &[(i32, u32)],
@@ -657,6 +727,7 @@ fn spawn_elf<S: Sys>(
         .ok_or(SpawnError::TooLarge)?;
     let stack_base_address = usize::try_from(stack_base).map_err(|_| SpawnError::TooLarge)?;
 
+    #[cfg(any(feature = "alloc", test))]
     let fdmap_info = if fdmap.is_empty() {
         None
     } else {
@@ -729,7 +800,17 @@ fn spawn_elf<S: Sys>(
         }
         Some((address as usize, entries.len()))
     };
-    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, fdmap_info);
+    // The fd map is an alloc-backed encoding; a no-alloc image cannot publish it.  Reject a
+    // non-empty map instead of silently dropping inherited descriptors (K463).
+    #[cfg(not(any(feature = "alloc", test)))]
+    let fdmap_info = match no_alloc_fdmap(fdmap) {
+        Ok(()) => None,
+        Err(error) => {
+            let _ = sys.handle_close(child);
+            return Err(error);
+        }
+    };
+    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, libc, fdmap_info);
     let random = random_bytes(&auxv as *const _ as usize);
 
     let memobj = match sys.memobj_create(STACK_SIZE) {
@@ -764,6 +845,7 @@ fn spawn_elf<S: Sys>(
         path,
         options.args,
         options.env,
+        cwd,
         &auxv[..auxv_len],
         &random,
         platform_name(),
@@ -793,7 +875,10 @@ fn spawn_elf<S: Sys>(
     };
     sys.write_parent_mem(write_address, image);
 
-    let child_flags = map::pack(prot::READ | prot::WRITE, map::SHARED | map::FIXED);
+    // The parent's scratch mapping above is SHARED only to populate the memory object. The
+    // child's stack must be private: `PROC_FORK` can only copy-on-write a private mapping, and a
+    // shared stack would let a forked child scribble over the parent's frames.
+    let child_flags = map::pack(prot::READ | prot::WRITE, map::FIXED);
     if let Err(error) = sys.map(
         child,
         memobj,
@@ -944,7 +1029,9 @@ fn copy_tail<S: Sys>(
     };
     sys.copy_mapping(scratch, source_map, len);
     let _ = sys.unmap(Handle::SELF_PROC, source_map, page);
-    let child_flags = map::pack(prot::READ | prot::WRITE, map::SHARED | map::FIXED);
+    // Writable program data must be private so a fork's COW sees the parent's pages; the
+    // parent's scratch mapping above still populates the shared object.
+    let child_flags = map::pack(prot::READ | prot::WRITE, map::FIXED);
     if let Err(error) = sys.map(child, object, 0, vaddr, page, child_flags) {
         let _ = sys.unmap(Handle::SELF_PROC, scratch, page);
         let _ = sys.handle_close(object);
@@ -1121,6 +1208,9 @@ fn handle_from_ret(result: isize) -> Result<Handle, Errno> {
 
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const PAGE: u64 = 4096;
+/// Longest accepted child cwd (including the trailing NUL).
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const MAX_CWD: usize = 4096;
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const WORD: usize = core::mem::size_of::<usize>();
 /// Minimum child stack: `ARG_MAX` (CR-15) plus the C8 arrays and headroom.
@@ -1138,6 +1228,12 @@ const AT_RAVEN_FDMAP: usize = 0x7003;
 /// Raven fd-inheritance entry count.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_FDMAP_N: usize = 0x7004;
+/// Initfs archive offset of the libc image (K139); the loader maps it zero-copy.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const AT_RAVEN_LIBC: usize = 0x7007;
+/// Child working-directory string pointer (K165).
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const AT_RAVEN_CWD: usize = 0x7005;
 /// Raven ABI revision.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RAVEN_ABI: usize = 0x7006;
@@ -1475,12 +1571,16 @@ fn page_ceil(value: u64) -> Option<u64> {
 
 /// Parse and plan one image. `interpreter` selects the `PT_INTERP` rules: the file must be
 /// `ET_DYN` and is based at [`INTERP_BASE`].
+///
+/// Parse at `0..USER_END`, not `USER_MIN..USER_END`: an `ET_DYN` image (including the release
+/// `ld-elf.so.1` interpreter) may have raw segments at `vaddr=0`. `plan_biased` applies the
+/// non-zero bias and then enforces `USER_MIN..USER_END`, so page 0 is never mapped.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn plan_image<'a>(
     data: &'a [u8],
     interpreter: bool,
 ) -> Result<(Elf<'a>, BiasedPlan, u64), SpawnError> {
-    let elf = Elf::parse(data, target_machine(), USER_MIN..USER_END).map_err(SpawnError::BadElf)?;
+    let elf = Elf::parse(data, target_machine(), 0..USER_END).map_err(SpawnError::BadElf)?;
     if let Some(path) = elf.interp()
         && !path.starts_with('/')
     {
@@ -1513,7 +1613,24 @@ fn plan_image<'a>(
 /// Entries carry no path or status; the child's `restore_fdmap` creates unknown-kind OFDs with
 /// read/write status and the transferred handles. The loader only publishes this block for
 /// inherited stdio and ordinary file descriptors.
+/// Reject an inherited fd map when the crate is built without `alloc`.
+///
+/// The wire block is built in a heap `Vec`; a no-alloc image cannot publish it.  Empty is the
+/// common case and stays supported (K463).
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+#[allow(dead_code)] // ravenbsd target builds compile this for the no-alloc path; the alloc build uses encode_fdmap
+fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
+    if fdmap.is_empty() {
+        Ok(())
+    } else {
+        Err(SpawnError::Sys(Errno::ENOTSUP))
+    }
+}
+
+#[cfg(any(
+    test,
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
+))]
 fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
     let mut out = alloc_crate::vec::Vec::with_capacity(8usize.saturating_add(18 * entries.len()));
@@ -1540,6 +1657,7 @@ fn build_auxv(
     elf: &Elf<'_>,
     main_bias: u64,
     interp_bias: u64,
+    libc: Option<u64>,
     fdmap: Option<(usize, usize)>,
 ) -> ([(usize, usize); MAX_AUXV], usize) {
     let mut auxv = [(0usize, 0usize); MAX_AUXV];
@@ -1577,6 +1695,10 @@ fn build_auxv(
     push(AT_HWCAP2, 0);
     push(AT_EXECFN, 0);
     push(AT_MINSIGSTKSZ, 8192);
+    push(AT_RAVEN_CWD, 0);
+    if let Some(offset) = libc {
+        push(AT_RAVEN_LIBC, usize::try_from(offset).unwrap_or_default());
+    }
     if let Some((address, count)) = fdmap {
         push(AT_RAVEN_FDMAP, address);
         push(AT_RAVEN_FDMAP_N, count);
@@ -1600,12 +1722,16 @@ fn build_stack(
     path: &str,
     args: &[&str],
     env: &[&str],
+    cwd: &[u8],
     auxv: &[(usize, usize)],
     random: &[u8; RANDOM_LEN],
     platform: &str,
 ) -> Result<(usize, u64), SpawnError> {
     if !stack_top.is_multiple_of(16) || buffer.is_empty() {
         return Err(SpawnError::TooLarge);
+    }
+    if cwd.is_empty() || !cwd.starts_with(b"/") || cwd.len() >= MAX_CWD || cwd.contains(&0) {
+        return Err(SpawnError::BadCwd);
     }
     let argc = if args.is_empty() { 1 } else { args.len() };
     let mut strings_len = 0usize;
@@ -1628,6 +1754,10 @@ fn build_stack(
     }
     strings_len = strings_len
         .checked_add(platform.len())
+        .and_then(|value| value.checked_add(1))
+        .ok_or(SpawnError::TooLarge)?;
+    strings_len = strings_len
+        .checked_add(cwd.len())
         .and_then(|value| value.checked_add(1))
         .ok_or(SpawnError::TooLarge)?;
 
@@ -1736,6 +1866,14 @@ fn build_stack(
         let _ = write_string(buffer, &mut cursor, platform, stack_base)?;
         start
     };
+    let cwd_text = core::str::from_utf8(cwd).map_err(|_| SpawnError::BadCwd)?;
+    let cwd_address = {
+        let start = stack_base
+            .checked_add(u64::try_from(cursor).map_err(|_| SpawnError::TooLarge)?)
+            .ok_or(SpawnError::TooLarge)?;
+        let _ = write_string(buffer, &mut cursor, cwd_text, stack_base)?;
+        start
+    };
     let random_offset =
         usize::try_from(random_start - stack_base).map_err(|_| SpawnError::TooLarge)?;
     let random_end = random_offset
@@ -1753,6 +1891,8 @@ fn build_stack(
             usize::try_from(platform_address).map_err(|_| SpawnError::TooLarge)?
         } else if *key == AT_EXECFN {
             argv_zero
+        } else if *key == AT_RAVEN_CWD {
+            usize::try_from(cwd_address).map_err(|_| SpawnError::TooLarge)?
         } else {
             *value
         };
@@ -1828,26 +1968,17 @@ fn align_down(value: u64, align: u64) -> u64 {
 }
 
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
-/// Fill 16 bytes for `AT_RANDOM`.
+/// Fill 16 bytes for `AT_RANDOM` from the kernel's boot-seeded pool.
 ///
-/// The value mixes the monotonic clock with a parent address. It is deliberately not
-/// cryptographic yet; the S24/M2 integration only needs distinct bytes per spawned child.
-fn random_bytes(parent_address: usize) -> [u8; RANDOM_LEN] {
+/// A platform with no hardware seed leaves the bytes zero and the child's `AT_RANDOM` auxv
+/// value is not usable; the pool, not a parent address or a clock, is the only source.
+fn random_bytes(_parent_address: usize) -> [u8; RANDOM_LEN] {
     #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-    let now = crate::sys::clock_get(raven_abi::types::clock::MONOTONIC).unwrap_or_default();
-    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
-    let now = raven_abi::types::Timespec::default();
-    let mut state = (now.tv_sec as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
-        ^ (now.tv_nsec as u64)
-        ^ (parent_address as u64);
     let mut bytes = [0u8; RANDOM_LEN];
-    for chunk in bytes.chunks_mut(8) {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        let word = state.to_le_bytes();
-        chunk.copy_from_slice(&word[..chunk.len()]);
-    }
+    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
+    let bytes = [0u8; RANDOM_LEN];
+    #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    let _ = crate::sys::getrandom(&mut bytes);
     bytes
 }
 

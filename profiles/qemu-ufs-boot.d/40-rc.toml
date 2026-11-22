@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K234: the bootstrap svcd reads /etc/svcd.conf once, before the UFS pivot, and
+# never re-reads it. Stage the demo policy (no exit_when_exits) so a normal getty
+# exit is restarted rather than ending init. The release profile keeps its own
+# one-shot svcd.conf for the release-login gate.
+
+[[initfs.files]]
+src = "profiles/qemu-ufs-boot.d/rc.conf"
+path = "/etc/rc.conf"
+
+[[initfs.files]]
+src = "profiles/qemu-ufs.d/svcd.conf"
+path = "/etc/svcd.conf"
+mode = 0o644

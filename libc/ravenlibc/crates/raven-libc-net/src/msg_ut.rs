@@ -73,6 +73,37 @@ fn udp_path_vector() {
 }
 
 #[test]
+fn mptcp_paths_select_the_mptcp_scheme() {
+    let mut buffer = [0u8; 64];
+    let endpoint = Endpoint {
+        ip: [10, 77, 1, 2],
+        port: 25021,
+    };
+    assert_eq!(
+        socket_path_proto(
+            crate::mptcp::IPPROTO_MPTCP,
+            SOCK_STREAM,
+            endpoint,
+            &mut buffer
+        )
+        .expect("mptcp endpoint"),
+        "net:mptcp/10.77.1.2:25021"
+    );
+    assert_eq!(
+        bare_path_proto(crate::mptcp::IPPROTO_MPTCP, SOCK_STREAM, &mut buffer).expect("mptcp bare"),
+        "net:mptcp"
+    );
+    assert_eq!(
+        socket_path_proto(0, SOCK_STREAM, endpoint, &mut buffer).expect("tcp endpoint"),
+        "net:tcp/10.77.1.2:25021"
+    );
+    assert_eq!(
+        bare_path_proto(0, SOCK_STREAM, &mut buffer).expect("tcp bare"),
+        "net:tcp"
+    );
+}
+
+#[test]
 fn port_zero_is_refused() {
     let mut buffer = [0u8; 64];
     assert_eq!(

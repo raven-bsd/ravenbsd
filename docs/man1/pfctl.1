@@ -1,0 +1,66 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 21, 2026
+.Dt PFCTL 1
+.Os RavenBSD
+.Sh NAME
+.Nm pfctl
+.Nd parse, print and verify pf.conf rulesets and table files
+.Sh SYNOPSIS
+.Nm
+.Op Fl n
+.Op Fl v
+.Op Fl f Ar file
+.Op Fl D Ar name=value
+.Op Fl t Ar table Op Fl T Ar command Op Fl f Ar file
+.Sh DESCRIPTION
+.Nm
+is the front-end of the FreeBSD pfctl tool port.
+It parses the supported pf.conf subset, prints the compact normalized form produced by
+.Dq pfctl -nv ,
+and parses table files.
+This build has no pf ABI yet, so every mutating action is refused and
+.Fl n
+is required; the ruleset is never loaded.
+.Pp
+The supported syntax, the canonical output form and the documented
+divergences are described in
+.Pa docs/pfctl.md .
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl n
+Dry run: parse and validate only.
+Required until the pf ABI lands.
+.It Fl v
+Print the normalized configuration (or table) to standard output.
+.It Fl f Ar file
+Read the configuration (or table file with
+.Fl T )
+from
+.Ar file .
+.It Fl D Ar name=value
+Define a macro before parsing.
+Repeatable.
+.It Fl t Ar table
+Select the table for
+.Fl T .
+.It Fl T Ar command
+Table command:
+.Cm add ,
+.Cm delete ,
+.Cm replace
+or
+.Cm test .
+.Cm show
+and
+.Cm flush
+need the pf ABI.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A parse, validation or usage error prints a line-numbered message
+.Pq file:line: message
+and exits 1.
+.Sh SEE ALSO
+.Xr tcpdump 1 ,
+.Xr pf.conf 5

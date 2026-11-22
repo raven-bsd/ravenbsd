@@ -211,7 +211,15 @@ fn insert_links(
     let next_address = next as *const Pthread as usize;
     raw::set_links(pthread, previous_address, next_address);
     raw::set_links(next, tcb, next_next);
-    raw::set_links(previous, previous_prev, tcb);
+    // A fresh list has `previous == next == main` and no separate tail: the new node becomes
+    // both the successor and the predecessor. Keeping `previous_prev` (which is `previous`
+    // itself here) would leave the creator's back link pointing at itself (S138 audit finding).
+    let previous_back = if next_address == previous_address {
+        tcb
+    } else {
+        previous_prev
+    };
+    raw::set_links(previous, previous_back, tcb);
 }
 
 /// `pthread_create`.

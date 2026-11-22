@@ -8,11 +8,12 @@ use std::vec::Vec;
 
 use crate::crc::crc32;
 use crate::format::{
-    ENTRY_CRC_OFFSET, ENTRY_DATA_LEN_OFFSET, ENTRY_DATA_OFF_OFFSET, ENTRY_MODE_OFFSET,
-    ENTRY_NAME_LEN_OFFSET, ENTRY_NAME_OFF_OFFSET, ENTRY_SIZE, HEADER_ENTRY_COUNT_OFFSET,
-    HEADER_ENTRY_SIZE_OFFSET, HEADER_NAMES_LEN_OFFSET, HEADER_NAMES_OFFSET, HEADER_SIZE,
-    HEADER_SIZE_OFFSET, HEADER_TOTAL_SIZE_OFFSET, HEADER_VERSION_OFFSET, MAGIC, PAGE_SIZE,
-    PathError, VERSION, align_up, validate_path,
+    DEFAULT_EPOCH, ENTRY_CRC_OFFSET, ENTRY_DATA_LEN_OFFSET, ENTRY_DATA_OFF_OFFSET,
+    ENTRY_MODE_OFFSET, ENTRY_MTIME_OFFSET, ENTRY_NAME_LEN_OFFSET, ENTRY_NAME_OFF_OFFSET,
+    ENTRY_SIZE, HEADER_ENTRY_COUNT_OFFSET, HEADER_ENTRY_SIZE_OFFSET, HEADER_EPOCH_OFFSET,
+    HEADER_NAMES_LEN_OFFSET, HEADER_NAMES_OFFSET, HEADER_SIZE, HEADER_SIZE_OFFSET,
+    HEADER_TOTAL_SIZE_OFFSET, HEADER_VERSION_OFFSET, MAGIC, PAGE_SIZE, PathError, VERSION,
+    align_up, validate_path,
 };
 
 /// Why a file cannot be added to an [`InitfsBuilder`].
@@ -103,20 +104,22 @@ struct BuildFile {
     path: String,
     data: Vec<u8>,
     mode: u32,
+    mtime: u64,
 }
 
 /// Deterministic builder for initfs images.
 ///
 /// Files are stored in insertion order and sorted by path when [`InitfsBuilder::build`] runs, so
-/// the output depends only on the set of `(path, data, mode)` tuples.
+/// the output depends only on the set of `(path, data, mode, mtime)` tuples and the image epoch.
 #[derive(Clone, Debug)]
 pub struct InitfsBuilder {
     files: Vec<BuildFile>,
     layout: Layout,
+    image_epoch: u64,
 }
 
 impl InitfsBuilder {
-    /// Create an empty builder.
+    /// Create an empty builder with the documented default epoch.
     pub fn new() -> Self {
         Self {
             files: Vec::new(),
@@ -126,7 +129,19 @@ impl InitfsBuilder {
                 data_start: PAGE_SIZE,
                 total: PAGE_SIZE,
             },
+            image_epoch: DEFAULT_EPOCH,
         }
+    }
+
+    /// Record the image build epoch (seconds since the Unix epoch).
+    ///
+    /// The value is written into the header and inherited by every entry whose own mtime is zero,
+    /// so no file falls back to 1970. Callers use the reproducible build time, never the host
+    /// clock.
+    #[must_use]
+    pub fn with_image_epoch(mut self, epoch: u64) -> Self {
+        self.image_epoch = epoch;
+        self
     }
 
     /// Add a file. Duplicate paths and invalid paths are rejected.
@@ -135,6 +150,17 @@ impl InitfsBuilder {
         path: &str,
         data: &[u8],
         mode: u32,
+    ) -> Result<&mut Self, BuildError> {
+        self.add_file_with_mtime(path, data, mode, 0)
+    }
+
+    /// Add a file with an explicit modification time; zero inherits the image epoch.
+    pub fn add_file_with_mtime(
+        &mut self,
+        path: &str,
+        data: &[u8],
+        mode: u32,
+        mtime: u64,
     ) -> Result<&mut Self, BuildError> {
         validate_path(path)?;
         if self.files.iter().any(|file| file.path == path) {
@@ -164,6 +190,7 @@ impl InitfsBuilder {
             path: path.to_owned(),
             data: data.to_vec(),
             mode,
+            mtime,
         });
         self.layout = layout;
         Ok(self)
@@ -202,6 +229,7 @@ impl InitfsBuilder {
             HEADER_TOTAL_SIZE_OFFSET,
             u64::try_from(layout.total).unwrap_or(u64::MAX),
         );
+        put_u64(&mut image, HEADER_EPOCH_OFFSET, self.image_epoch);
 
         let mut name_cursor = layout.names_offset;
         let mut data_cursor = layout.data_start;
@@ -237,6 +265,7 @@ impl InitfsBuilder {
             );
             put_u32(&mut image, base + ENTRY_MODE_OFFSET, file.mode);
             put_u32(&mut image, base + ENTRY_CRC_OFFSET, crc32(&file.data));
+            put_u64(&mut image, base + ENTRY_MTIME_OFFSET, file.mtime);
 
             put_bytes(&mut image, name_cursor, file.path.as_bytes());
             put_bytes(&mut image, data_cursor, &file.data);
@@ -274,217 +303,5 @@ fn put_u64(image: &mut [u8], offset: usize, value: u64) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{BuildError, InitfsBuilder, layout};
-    use crate::{Initfs, crc32};
-
-    fn build(files: &[(&str, &[u8], u32)]) -> Vec<u8> {
-        let mut builder = InitfsBuilder::new();
-        for (path, data, mode) in files {
-            builder.add_file(path, data, *mode).unwrap();
-        }
-        builder.build()
-    }
-
-    #[test]
-    fn zero_files_roundtrip() {
-        let image = InitfsBuilder::new().build();
-        assert_eq!(image.len(), 4096);
-        let initfs = Initfs::parse(&image).unwrap();
-        assert_eq!(initfs.len(), 0);
-        assert!(initfs.is_empty());
-        assert_eq!(initfs.entries().count(), 0);
-    }
-
-    #[test]
-    fn one_file_roundtrip() {
-        let image = build(&[("/init", b"hello", 0o755)]);
-        let initfs = Initfs::parse(&image).unwrap();
-        assert_eq!(initfs.len(), 1);
-        let entry = initfs.get("/init").unwrap();
-        assert_eq!(entry.path, "/init");
-        assert_eq!(entry.data, b"hello");
-        assert_eq!(entry.mode, 0o755);
-        assert_eq!(entry.data_offset, 4096);
-    }
-
-    #[test]
-    fn three_files_roundtrip_with_edge_sizes() {
-        let big = vec![0xA5u8; 10 * 1024];
-        let image = build(&[
-            ("/empty", b"", 0o644),
-            ("/one", b"x", 0o600),
-            ("/big", big.as_slice(), 0o755),
-        ]);
-        let initfs = Initfs::parse(&image).unwrap();
-        assert_eq!(initfs.len(), 3);
-        assert_eq!(initfs.get("/empty").unwrap().data, b"");
-        assert_eq!(initfs.get("/one").unwrap().data, b"x");
-        assert_eq!(initfs.get("/big").unwrap().data, &big[..]);
-    }
-
-    #[test]
-    fn hundred_files_roundtrip() {
-        let data: Vec<Vec<u8>> = (0..100).map(|index| vec![index as u8; index * 7]).collect();
-        let paths: Vec<String> = (0..100).map(|index| format!("/f{index:03}")).collect();
-        let mut builder = InitfsBuilder::new();
-        for (path, bytes) in paths.iter().zip(data.iter()) {
-            builder.add_file(path, bytes, 0o644).unwrap();
-        }
-        let image = builder.build();
-        let initfs = Initfs::parse(&image).unwrap();
-        assert_eq!(initfs.len(), 100);
-        for (path, bytes) in paths.iter().zip(data.iter()) {
-            assert_eq!(initfs.get(path).unwrap().data, &bytes[..]);
-        }
-    }
-
-    #[test]
-    fn insertion_order_does_not_change_bytes() {
-        let files = [
-            ("/bin/b", b"bbb".as_slice(), 0o755),
-            ("/init", b"init".as_slice(), 0o755),
-            ("/etc/a", b"aaa".as_slice(), 0o644),
-        ];
-        let forward = build(&files);
-        let mut reversed = files;
-        reversed.reverse();
-        let backward = build(&reversed);
-        assert_eq!(forward, backward);
-    }
-
-    #[test]
-    fn repeated_builds_are_identical() {
-        let files = [
-            ("/a", b"1".as_slice(), 0o644),
-            ("/b", b"2".as_slice(), 0o600),
-        ];
-        assert_eq!(build(&files), build(&files));
-    }
-
-    #[test]
-    fn duplicate_path_is_rejected() {
-        let mut builder = InitfsBuilder::new();
-        builder.add_file("/init", b"a", 0o755).unwrap();
-        assert_eq!(
-            builder.add_file("/init", b"b", 0o755).unwrap_err(),
-            BuildError::DuplicatePath
-        );
-    }
-
-    #[test]
-    fn path_not_absolute_is_rejected() {
-        let mut builder = InitfsBuilder::new();
-        assert_eq!(
-            builder.add_file("init", b"", 0o755).unwrap_err(),
-            BuildError::PathNotAbsolute
-        );
-    }
-
-    #[test]
-    fn empty_path_component_is_rejected() {
-        let mut builder = InitfsBuilder::new();
-        assert_eq!(
-            builder.add_file("/", b"", 0o755).unwrap_err(),
-            BuildError::EmptyPathComponent
-        );
-        assert_eq!(
-            builder.add_file("/bin/", b"", 0o755).unwrap_err(),
-            BuildError::EmptyPathComponent
-        );
-        assert_eq!(
-            builder.add_file("/bin//sh", b"", 0o755).unwrap_err(),
-            BuildError::EmptyPathComponent
-        );
-    }
-
-    #[test]
-    fn dot_component_is_rejected() {
-        let mut builder = InitfsBuilder::new();
-        assert_eq!(
-            builder.add_file("/a/../b", b"", 0o644).unwrap_err(),
-            BuildError::InvalidPathComponent
-        );
-        assert_eq!(
-            builder.add_file("/a/./b", b"", 0o644).unwrap_err(),
-            BuildError::InvalidPathComponent
-        );
-    }
-
-    #[test]
-    fn nul_in_path_is_rejected() {
-        let mut builder = InitfsBuilder::new();
-        assert_eq!(
-            builder.add_file("/a\0b", b"", 0o644).unwrap_err(),
-            BuildError::ContainsNul
-        );
-    }
-
-    #[test]
-    fn path_length_limit_is_enforced() {
-        let mut builder = InitfsBuilder::new();
-        let too_long = format!("/{}", "a".repeat(255));
-        assert_eq!(
-            builder.add_file(&too_long, b"", 0o644).unwrap_err(),
-            BuildError::PathTooLong
-        );
-
-        let max = format!("/{}", "a".repeat(254));
-        assert_eq!(max.len(), 255);
-        builder.add_file(&max, b"ok", 0o644).unwrap();
-        let image = builder.build();
-        let initfs = Initfs::parse(&image).unwrap();
-        assert_eq!(initfs.get(&max).unwrap().data, b"ok");
-    }
-
-    #[test]
-    fn layout_overflow_is_rejected() {
-        assert_eq!(layout(usize::MAX, 0, 0).unwrap_err(), BuildError::TooLarge);
-    }
-
-    #[test]
-    fn data_offsets_are_page_aligned_and_ordered() {
-        let big = vec![7u8; 4097];
-        let image = build(&[
-            ("/c", big.as_slice(), 0o644),
-            ("/a", b"", 0o644),
-            ("/b", b"x", 0o644),
-        ]);
-        let initfs = Initfs::parse(&image).unwrap();
-        let mut previous = 0u64;
-        for entry in initfs.entries() {
-            assert_eq!(entry.data_offset % 4096, 0, "{}", entry.path);
-            assert!(entry.data_offset >= previous, "{}", entry.path);
-            previous = entry.data_offset;
-        }
-    }
-
-    #[test]
-    fn unicode_paths_roundtrip() {
-        let image = build(&[("/bin/日本語", b"unicode", 0o755)]);
-        let initfs = Initfs::parse(&image).unwrap();
-        assert_eq!(initfs.get("/bin/日本語").unwrap().data, b"unicode");
-    }
-
-    #[test]
-    fn modes_and_crcs_are_preserved() {
-        let data = b"payload";
-        let image = build(&[("/init", data, 0o751)]);
-        let initfs = Initfs::parse(&image).unwrap();
-        let entry = initfs.get("/init").unwrap();
-        assert_eq!(entry.mode, 0o751);
-        assert_eq!(crc32(entry.data), crc32(data));
-    }
-
-    #[test]
-    fn entries_are_sorted_by_name() {
-        let image = build(&[
-            ("/z", b"z", 0o644),
-            ("/a", b"a", 0o644),
-            ("/m", b"m", 0o644),
-        ]);
-        let initfs = Initfs::parse(&image).unwrap();
-        let paths: Vec<&str> = initfs.entries().map(|entry| entry.path).collect();
-        assert_eq!(paths, vec!["/a", "/m", "/z"]);
-    }
-}
+#[path = "builder_ut.rs"]
+mod tests;

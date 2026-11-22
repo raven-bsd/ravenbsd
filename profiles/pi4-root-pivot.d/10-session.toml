@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Release login/session entries for the Pi 4 pivot payload: getty/login, the root
+# account files, and the release rc/svcd policy. The getty exits the session.
+
+[[initfs.programs]]
+package = "raven-getty"
+path = "/bin/getty"
+
+[[initfs.programs]]
+package = "login"
+path = "/bin/login"
+
+[[initfs.files]]
+src = "profiles/release.d/login.service.manifest"
+path = "/etc/services.d/getty.toml"
+
+[[initfs.files]]
+src = "etc/passwd"
+path = "/etc/passwd"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/group"
+path = "/etc/group"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/shadow"
+path = "/etc/shadow"
+mode = 0o600
+
+[[initfs.files]]
+src = "etc/profile"
+path = "/etc/profile"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/motd"
+path = "/etc/motd"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/release.d/rc.conf"
+path = "/etc/rc.conf"
+
+[[initfs.files]]
+src = "profiles/release.d/svcd.conf"
+path = "/etc/svcd.conf"
+mode = 0o644

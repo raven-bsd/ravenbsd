@@ -1,0 +1,193 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K160: shell cwd semantics in the release image. `cd bin` must move both the shell state and the
+# process cwd, so the external `ls` child lists /bin; a failed cd reports an error and keeps the
+# previous cwd; an absolute cd to /tmp makes child commands see /tmp.
+#
+# K165: the first external command after login can spend several seconds starting while svcd is
+# still bringing the release services up, so the file-tool waits use the same 30 s allowance as
+# release-login. This case checks cwd semantics, not latency (base-tools-ls-latency owns that).
+
+name = "shell-cwd"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^svcd: getty up$'
+
+[[expect]]
+regex = '(?i)^.*login:'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^/$'
+
+[[expect]]
+regex = '^/bin$'
+
+[[expect]]
+regex = '^ls$'
+
+[[expect]]
+regex = '(?i)cd:.*(no such|not found|does not exist)'
+
+[[expect]]
+regex = '^/tmp$'
+
+[[expect]]
+regex = '^cwd-marker$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 90
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "cd bin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/bin$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "ls\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ls$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cd /nonexistent\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)cd:.*(no such|not found|does not exist)'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/bin$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "cd /tmp\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/tmp$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "touch cwd-marker\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cwd-marker$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

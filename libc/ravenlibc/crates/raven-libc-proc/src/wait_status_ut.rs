@@ -4,7 +4,7 @@
 //! Host tests for the wait-status codec and the `wait4` mapping.
 
 use super::*;
-use crate::consts::{WCONTINUED, WNOHANG, WNOWAIT, WUNTRACED};
+use crate::consts::{KERNEL_WCONTINUED, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WUNTRACED};
 
 fn reference(raw: i32) -> Option<WaitStatus> {
     if raw == 0xffff {
@@ -208,4 +208,35 @@ fn wait4_keeps_wno_wait() {
         wait4_to_wait6(2, 0, WNOWAIT),
         Ok((IdType::Pid, 2, WNOWAIT | WEXITED))
     );
+}
+
+#[test]
+fn the_two_layer_continued_contract_is_pinned() {
+    assert_eq!(WCONTINUED, 8);
+    assert_eq!(WEXITED, 4);
+    assert_eq!(KERNEL_WCONTINUED, 4);
+    assert_eq!(kernel_wait_options(WCONTINUED), KERNEL_WCONTINUED);
+    assert_eq!(kernel_wait_options(WEXITED), 0);
+}
+
+#[test]
+fn the_kernel_word_maps_continued_to_the_raw_abi() {
+    assert_eq!(KERNEL_WCONTINUED, 4);
+    assert_eq!(kernel_wait_options(WCONTINUED), KERNEL_WCONTINUED);
+    assert_eq!(
+        kernel_wait_options(WNOHANG | WUNTRACED | WCONTINUED),
+        WNOHANG | WUNTRACED | KERNEL_WCONTINUED
+    );
+}
+
+#[test]
+fn the_kernel_word_drops_the_public_wexited_bit() {
+    assert_eq!(kernel_wait_options(WEXITED), 0);
+    assert_eq!(kernel_wait_options(WEXITED | WCONTINUED), KERNEL_WCONTINUED);
+}
+
+#[test]
+fn the_kernel_word_keeps_unsupported_bits_for_the_kernel_to_reject() {
+    assert_eq!(kernel_wait_options(WNOWAIT), WNOWAIT);
+    assert_eq!(kernel_wait_options(0x20), 0x20);
 }

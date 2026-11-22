@@ -377,6 +377,29 @@ image_check() {
     initfs_paths || return 1
     fdt_check || return 1
     manifest_check_release || return 1
+    has_ufs=$(python3 - "$image" <<'PY'
+import struct
+import sys
+
+data = open(sys.argv[1], "rb").read()
+if len(data) < 4096 or data[512:520] != b"EFI PART":
+    print("no")
+    raise SystemExit(0)
+entries_lba = struct.unpack_from("<Q", data, 512 + 72)[0]
+count, size = struct.unpack_from("<II", data, 512 + 80)
+ufs = bytes.fromhex("b67c6e51cf6ed6118ff800022d09712b")
+for index in range(count):
+    entry = data[entries_lba * 512 + index * size:entries_lba * 512 + (index + 1) * size]
+    if entry[:16] == ufs:
+        print("yes")
+        raise SystemExit(0)
+print("no")
+PY
+)
+    if [ "$has_ufs" = yes ]; then
+        sh scripts/pi4-install.sh --check -i "$image" || return 1
+        echo "pi4-release: SD FAT+UFS layout PASS"
+    fi
     echo "pi4-release: image check PASS (board gates remain UNVERIFIED)"
 }
 

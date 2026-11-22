@@ -131,6 +131,7 @@ pub struct Editor {
     undo: Option<Snapshot>,
     output: String,
     quit: bool,
+    pending: Option<Pending>,
 }
 
 #[derive(Clone, Debug)]
@@ -138,6 +139,20 @@ struct Snapshot {
     lines: Vec<String>,
     current: usize,
     modified: bool,
+}
+
+/// A multiline `a`, `i` or `c` block waiting for its terminating `.`.
+#[derive(Clone, Debug)]
+enum Pending {
+    Insert {
+        at: usize,
+        text: Vec<String>,
+    },
+    Change {
+        first: usize,
+        last: usize,
+        text: Vec<String>,
+    },
 }
 
 impl Editor {
@@ -153,6 +168,7 @@ impl Editor {
             undo: None,
             output: String::new(),
             quit: false,
+            pending: None,
         }
     }
 
@@ -179,6 +195,18 @@ impl Editor {
         core::mem::take(&mut self.output)
     }
 
+    /// Whether `q` has been executed.
+    #[must_use]
+    pub const fn quit(&self) -> bool {
+        self.quit
+    }
+
+    /// Whether an `a`, `i` or `c` block is still waiting for its `.`.
+    #[must_use]
+    pub const fn input_pending(&self) -> bool {
+        self.pending.is_some()
+    }
+
     /// Execute a newline-separated command script.
     ///
     /// # Errors
@@ -187,22 +215,63 @@ impl Editor {
     /// expression, an unsupported shell escape or a file I/O failure.
     pub fn execute(&mut self, script: &str, io: &mut dyn Io) -> Result<(), Error> {
         self.quit = false;
-        let mut lines = script.lines();
-        while let Some(line) = lines.next() {
+        self.pending = None;
+        for line in script.lines() {
             if self.quit {
                 break;
             }
-            self.command(line, &mut lines, io)?;
+            self.feed_line(line, io)?;
+        }
+        if self.pending.is_some() {
+            return Err(Error::MissingTerminator);
         }
         Ok(())
     }
 
-    fn command<'a>(
-        &mut self,
-        line: &str,
-        input: &mut impl Iterator<Item = &'a str>,
-        io: &mut dyn Io,
-    ) -> Result<(), Error> {
+    /// Process one input line, preserving an open `a`/`i`/`c` block between calls.
+    ///
+    /// This is the console path: the caller can flush output and stop on `q`
+    /// without waiting for an end-of-input marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] for an invalid address/command, a bad regular
+    /// expression, an unsupported shell escape or a file I/O failure.
+    pub fn feed_line(&mut self, line: &str, io: &mut dyn Io) -> Result<(), Error> {
+        if self.pending.is_some() {
+            if line == "." {
+                let pending = self.pending.take().ok_or(Error::BadCommand)?;
+                self.commit(pending);
+            } else if let Some(Pending::Insert { text, .. } | Pending::Change { text, .. }) =
+                self.pending.as_mut()
+            {
+                text.push(line.to_string());
+            }
+            return Ok(());
+        }
+        self.dispatch(line, io)
+    }
+
+    fn commit(&mut self, pending: Pending) {
+        match pending {
+            Pending::Insert { at, text } => {
+                self.snapshot();
+                let start = at.min(self.lines.len());
+                self.insert_lines(start, text);
+                self.current = start.saturating_add(1).min(self.lines.len());
+                self.modified = true;
+            }
+            Pending::Change { first, last, text } => {
+                self.snapshot();
+                self.lines.drain(first - 1..last);
+                self.insert_lines(first - 1, text);
+                self.current = first.min(self.lines.len());
+                self.modified = true;
+            }
+        }
+    }
+
+    fn dispatch(&mut self, line: &str, io: &mut dyn Io) -> Result<(), Error> {
         if line.is_empty() {
             if self.current < self.lines.len() {
                 self.current += 1;
@@ -219,30 +288,25 @@ impl Editor {
         match command {
             'a' => {
                 let at = self.single(address, true)?;
-                let text = collect_text(input)?;
-                self.snapshot();
-                let start = at.min(self.lines.len());
-                self.insert_lines(start, text);
-                self.current = start.saturating_add(1).min(self.lines.len());
-                self.modified = true;
+                self.pending = Some(Pending::Insert {
+                    at: at.min(self.lines.len()),
+                    text: Vec::new(),
+                });
             }
             'i' => {
                 let at = self.single(address, true)?;
-                let text = collect_text(input)?;
-                self.snapshot();
-                let start = at.saturating_sub(1).min(self.lines.len());
-                self.insert_lines(start, text);
-                self.current = start.saturating_add(1).min(self.lines.len());
-                self.modified = true;
+                self.pending = Some(Pending::Insert {
+                    at: at.saturating_sub(1).min(self.lines.len()),
+                    text: Vec::new(),
+                });
             }
             'c' => {
                 let (first, last) = self.range(address, false)?;
-                let text = collect_text(input)?;
-                self.snapshot();
-                self.lines.drain(first - 1..last);
-                self.insert_lines(first - 1, text);
-                self.current = first.min(self.lines.len());
-                self.modified = true;
+                self.pending = Some(Pending::Change {
+                    first,
+                    last,
+                    text: Vec::new(),
+                });
             }
             'd' => {
                 let (first, last) = self.range(address, false)?;
@@ -498,11 +562,14 @@ impl Editor {
         }
         for index in indices {
             self.current = index;
-            let mut empty = core::iter::empty::<&str>();
             if self.range("", false).is_err() {
                 continue;
             }
-            self.command(&command, &mut empty, io)?;
+            self.dispatch(&command, io)?;
+            if self.pending.is_some() {
+                self.pending = None;
+                return Err(Error::MissingTerminator);
+            }
         }
         Ok(())
     }
@@ -617,17 +684,6 @@ impl Default for Editor {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn collect_text<'a>(input: &mut impl Iterator<Item = &'a str>) -> Result<Vec<String>, Error> {
-    let mut lines = Vec::new();
-    for line in input {
-        if line == "." {
-            return Ok(lines);
-        }
-        lines.push(line.to_string());
-    }
-    Err(Error::MissingTerminator)
 }
 
 fn split_lines(text: &str) -> Vec<String> {

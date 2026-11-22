@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "reordering"
+runner = "tests/net-conformance/loss/run.sh"
+donor = ["FreeBSD sys/netinet/tcp_input.c: stale/duplicate ACK handling", "FreeBSD sys/netinet/tcp_output.c: send-window update"]
+rfcs = ["RFC 9293 section 3.7 (window/ACK ordering)"]
+
+[[expect]]
+step = "data is acknowledged"
+packet = "ACK"
+assert = "ack=server_isn+45"
+
+[[expect]]
+step = "a stale ACK below snd_una is delivered"
+packet = "ACK"
+assert = "ack=server_isn+1, then the current ACK is repeated"
+
+[[expect]]
+step = "the stale ACK is ignored"
+packet = "data"
+assert = "no spurious segment; the connection stays open without duplicate bytes"

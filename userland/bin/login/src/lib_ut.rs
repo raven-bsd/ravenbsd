@@ -13,7 +13,9 @@ fn root_passwd_entry_is_selected() {
     let entry = parse_root_passwd(text).expect("root entry");
     assert_eq!(entry.name, "root");
     assert_eq!(entry.home, "/");
-    assert_eq!(entry.shell, "/bin/rsh");
+    // The root session shell is login policy; the passwd field stays account metadata.
+    assert_eq!(entry.shell, DEFAULT_SHELL);
+    assert_eq!(entry.shell, "/bin/brush");
 }
 
 #[test]
@@ -53,6 +55,14 @@ fn the_rel1b_default_hash_verifies_raven() {
 }
 
 #[test]
+fn login_status_returns_retry_for_a_wrong_password_and_ok_for_raven() {
+    assert_eq!(login_status(ROOT_SHADOW, "root", "raven"), LOGIN_OK);
+    assert_eq!(login_status(ROOT_SHADOW, "root", "wrong"), LOGIN_RETRY);
+    assert_eq!(login_status(ROOT_SHADOW, "nobody", "raven"), LOGIN_RETRY);
+    assert_eq!(login_status(ROOT_SHADOW, "root", ""), LOGIN_RETRY);
+}
+
+#[test]
 fn other_accounts_and_locked_hashes_never_verify() {
     let other = "nobody:$6$rounds=5000$salt$hash:0:0:99999:7:0:0:0";
     assert!(!verify_root_password(other, "raven"));
@@ -60,6 +70,44 @@ fn other_accounts_and_locked_hashes_never_verify() {
     assert!(!verify_root_password(locked, "raven"));
     let star = "root:*:0:0:99999:7:0:0:0";
     assert!(!verify_root_password(star, "raven"));
+}
+
+#[test]
+fn any_account_with_a_shadow_record_can_authenticate() {
+    let alice_hash = "$6$rounds=5000$G3aRZtaEHFI9mxqPo3H6$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.";
+    let shadow = format!("{ROOT_SHADOW}\nalice:{alice_hash}:0:0:99999:7:0:0:0\n");
+    assert_eq!(login_status(&shadow, "alice", "raven"), LOGIN_OK);
+    assert_eq!(login_status(&shadow, "alice", "wrong"), LOGIN_RETRY);
+    assert_eq!(login_status(&shadow, "bob", "raven"), LOGIN_RETRY);
+}
+
+#[test]
+fn passwd_entries_are_looked_up_by_name() {
+    let text =
+        "root:x:0:0:root:/root:/bin/rsh\nalice:x:1000:1000:Alice:/home/alice:/bin/tui-demo\n";
+    let entries = parse_passwd(text);
+    assert_eq!(entries.len(), 2);
+    let alice = find_passwd(text, "alice").expect("alice");
+    assert_eq!(alice.home, "/home/alice");
+    assert_eq!(alice.shell, "/bin/tui-demo");
+    assert!(find_passwd(text, "bob").is_none());
+}
+
+#[test]
+fn autologin_is_parsed_and_invalid_users_disable_it() {
+    assert_eq!(
+        parse_autologin("[console]\nuser = \"musicbox\"\nenabled = true\n"),
+        Autologin {
+            enabled: true,
+            user: String::from("musicbox"),
+        }
+    );
+    assert!(!parse_autologin("user = \"musicbox\"\nenabled = false\n").enabled);
+    assert_eq!(
+        parse_autologin("user = \"bad:name\"\nenabled = true\n"),
+        Autologin::default()
+    );
+    assert_eq!(parse_autologin(""), Autologin::default());
 }
 
 #[test]

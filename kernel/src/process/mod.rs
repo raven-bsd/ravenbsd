@@ -6,6 +6,7 @@
 //! S08 has one thread per process. The process owns its address space and handle table; the
 //! single thread owns the kernel stack used by syscall and trap entry.
 
+pub mod duplex;
 pub mod exec;
 pub mod handle;
 pub mod pipe;
@@ -33,6 +34,7 @@ use raven_abi::types::{Handle, prot};
 use raven_elf::{Elf, ElfError, LoadMode, Machine, MapStep, StepKind};
 use raven_handles::HandleTable;
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
+use raven_usercopy::UserSlice;
 use raven_vma::Backing;
 use spin::Mutex;
 
@@ -57,6 +59,7 @@ use crate::memory::aspace::AddressSpace;
 use crate::memory::uspace::UserAddressSpace;
 use crate::memory::{frame, paging};
 use crate::sched::wait::WaitQueue;
+use crate::usercopy::copy_from_user;
 
 use self::handle::Object;
 use self::status::{RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
@@ -67,9 +70,7 @@ const PAGE: u64 = 4096;
 ///
 /// PG-49/PG-50: `raven_rt::spawn` sizes a child stack for `ARG_MAX` (128 KiB) plus the C8 arrays
 /// and headroom. The first process gets the same 256 KiB mapping.
-const USER_STACK_SIZE: u64 = 256 * 1024;
-/// Guard page at the top of the user range.
-const USER_GUARD: u64 = 4096;
+const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
@@ -168,6 +169,35 @@ impl ProcessIds {
     }
 }
 
+/// Resolve a client path against a per-process root.
+///
+/// Both `root` and `path` are lexical: `.` is dropped, `..` pops but clamps at the root, and
+/// the result is absolute and free of a trailing slash. A root of `/` is the unrooted view.
+pub(crate) fn resolve_root_path(root: &str, path: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            other => parts.push(other),
+        }
+    }
+    let mut result = String::new();
+    if root != "/" {
+        result.push_str(root);
+    }
+    for part in parts {
+        result.push('/');
+        result.push_str(part);
+    }
+    if result.is_empty() {
+        result.push('/');
+    }
+    result
+}
+
 /// Maximum command-name bytes stored in a process record.
 pub const MAX_COMMAND: usize = 256;
 
@@ -233,6 +263,8 @@ pub struct Process {
     pub waiters: WaitQueue,
     /// Visible scheme names (per-process namespace).
     pub namespace: Mutex<Namespace>,
+    /// Per-process root, normalized absolute and without a trailing slash (`"/"` is unrooted).
+    pub root: Mutex<String>,
     /// Scheme names registered by this process.
     pub schemes: Mutex<alloc::vec::Vec<Arc<SchemeServer>>>,
     /// Packets waiting for this process's `RECV`.
@@ -251,6 +283,8 @@ pub struct Process {
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
+    /// True once an exec has replaced this process image; a child then refuses `setpgid`.
+    pub exec_done: AtomicBool,
     /// Threads blocked in `PROC_SIGRECV`.
     pub signal_waiters: WaitQueue,
     /// Parents blocked in `PROC_WAIT_EX` on this process's children.
@@ -267,6 +301,28 @@ pub struct Process {
     pub limits: Mutex<[Rlimit; RLIMIT_COUNT]>,
     /// Process start time in nanoseconds.
     pub start_ns: u64,
+    /// Last syscall number entered by a thread of this process (K391 diagnostic).
+    pub last_syscall: AtomicU64,
+    /// User PC at the last syscall entry of this process (K391 diagnostic).
+    pub last_pc: AtomicU64,
+    /// Blocking token of the last blocked thread of this process (K391 diagnostic).
+    pub wait_object: AtomicU64,
+    /// Number of threads of this process currently inside a syscall (K391 diagnostic).
+    pub in_syscall: AtomicU32,
+    /// Last scheme request id this process submitted as a client (K391 diagnostic).
+    pub last_submit_id: AtomicU64,
+    /// Last scheme request id this process received as a server (K391 diagnostic).
+    pub last_recv_id: AtomicU64,
+    /// Last scheme request id this process replied to as a server (K391 diagnostic).
+    pub last_send_id: AtomicU64,
+    /// Wakeups that removed a waiter without enqueueing the thread (K391 diagnostic).
+    pub wake_fail: AtomicU32,
+    /// Packed `(reason, cpu, thread_state)` of the last failed wake (K391 diagnostic).
+    pub wake_fail_detail: AtomicU64,
+    /// Wakeups that found the thread still running and set `pending_wake` (K391 diagnostic).
+    pub wake_pending: AtomicU32,
+    /// CPU that received the last successful wakeup, or `u32::MAX` once it resumed (K391).
+    pub wake_last_cpu: AtomicU32,
     /// Accumulated kernel/syscall time.
     pub system_ns: AtomicU64,
     /// Accumulated user time (not sampled yet; zero).
@@ -403,6 +459,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(String::from("/")),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -412,6 +469,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -420,6 +478,17 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(default_limits()),
         start_ns: 0,
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -430,17 +499,24 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    let (namespace, ids, limits) = if let Some(parent) = current() {
+    let (namespace, root, ids, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
+        let root = parent.root.lock().clone();
         let ids = ProcessIds::inherited(&parent.ids.lock(), parent.id);
         let limits = *parent.limits.lock();
         (
             snapshot.child_snapshot(&ipc::registry::names()),
+            root,
             ids,
             limits,
         )
     } else {
-        (Namespace::root(), ProcessIds::kernel(), default_limits())
+        (
+            Namespace::root(),
+            String::from("/"),
+            ProcessIds::kernel(),
+            default_limits(),
+        )
     };
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
@@ -460,6 +536,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(namespace),
+        root: Mutex::new(root),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -469,6 +546,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -477,6 +555,17 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(limits),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -498,6 +587,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
     let personality = *source.personality.lock();
     let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
     let limits = *source.limits.lock();
+    let root = source.root.lock().clone();
     let child = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -516,6 +606,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(root),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -525,6 +616,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -533,6 +625,17 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         reaped: AtomicBool::new(false),
         limits: Mutex::new(limits),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -807,6 +910,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(String::from("/")),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -816,6 +920,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -824,6 +929,17 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(default_limits()),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -923,6 +1039,103 @@ fn map_step(
     Ok(())
 }
 
+/// Load an exec image directly from the caller's user range.
+///
+/// The ELF header and program-header table were copied into a small kernel buffer; this path
+/// copies each `PT_LOAD` page from the still-live caller image into a fresh frame, so the 4 MiB
+/// kernel heap never holds the multi-MiB image. The ranges were validated by
+/// [`raven_elf::Elf::parse_with_len`] and are checked again here.
+pub(crate) fn load_segments_from_user(
+    address_space: &mut UserAddressSpace,
+    elf: &Elf<'_>,
+    image_base: u64,
+    image_len: u64,
+    bias: u64,
+) -> Result<(), ProcessError> {
+    let plan =
+        raven_elf::plan_load_biased(elf, PAGE, bias, LoadMode::Copy).map_err(ProcessError::Elf)?;
+    for step in plan {
+        address_space
+            .vmas_mut()
+            .insert(step.vaddr, step.len, step.prot, Backing::Anonymous)
+            .map_err(|_| ProcessError::BadAddress)?;
+        let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
+        map_step_from_user(&mut mapper, image_base, image_len, step)?;
+    }
+    // The just-written code pages must be visible to instruction fetch before EL0 runs.
+    #[cfg(target_arch = "aarch64")]
+    crate::arch::mmu::icache_invalidate_all();
+    Ok(())
+}
+
+fn map_step_from_user(
+    mapper: &mut paging::KernelMapper<'_>,
+    image_base: u64,
+    image_len: u64,
+    step: MapStep,
+) -> Result<(), ProcessError> {
+    let flags = prot_flags(step.prot)?;
+    let pages = step.len / PAGE;
+    let mut page = 0u64;
+    while page < pages {
+        let vaddr = step
+            .vaddr
+            .checked_add(page.saturating_mul(PAGE))
+            .ok_or(ProcessError::BadAddress)?;
+        let virt = VirtAddr::new(vaddr).ok_or(ProcessError::BadAddress)?;
+        let physical = frame::alloc_zeroed_frame().ok_or(ProcessError::OutOfFrames)?;
+        let destination = frame::phys_to_virt(physical);
+        if destination.is_null() {
+            return Err(ProcessError::OutOfFrames);
+        }
+        match step.kind {
+            StepKind::File { offset } => {
+                let file_offset = offset
+                    .checked_add(page.saturating_mul(PAGE))
+                    .ok_or(ProcessError::BadAddress)?;
+                copy_user_range(destination, image_base, image_len, file_offset, PAGE)?;
+            }
+            StepKind::CopyTail { offset, len } => {
+                copy_user_range(destination, image_base, image_len, offset, len)?;
+            }
+            StepKind::Zero => {}
+        }
+        // Make the bytes written through the HHDM visible to instruction fetch.
+        #[cfg(target_arch = "aarch64")]
+        // SAFETY: `destination` is a whole 4 KiB frame mapped read/write through the HHDM.
+        unsafe {
+            crate::arch::mmu::dcache_clean_range(destination as u64, PAGE);
+        }
+        mapper
+            .map(virt, PhysAddr(physical.0), flags, PageSize::Size4K)
+            .map_err(ProcessError::Map)?;
+        page = page.saturating_add(1);
+    }
+    Ok(())
+}
+
+fn copy_user_range(
+    destination: *mut u8,
+    image_base: u64,
+    image_len: u64,
+    offset: u64,
+    length: u64,
+) -> Result<(), ProcessError> {
+    let end = offset.checked_add(length).ok_or(ProcessError::BadAddress)?;
+    if end > image_len {
+        return Err(ProcessError::BadAddress);
+    }
+    let address = image_base
+        .checked_add(offset)
+        .ok_or(ProcessError::BadAddress)?;
+    let length = usize::try_from(length).map_err(|_| ProcessError::BadAddress)?;
+    // SAFETY: `destination` is a freshly zeroed frame mapped read/write through the HHDM and
+    // `length` is at most one page; the slice is live for the duration of the copy.
+    let destination = unsafe { core::slice::from_raw_parts_mut(destination, length) };
+    let source = UserSlice::new(address, length as u64).map_err(|_| ProcessError::BadAddress)?;
+    copy_from_user(destination, source).map_err(|_| ProcessError::BadAddress)
+}
+
 fn file_bytes(data: &[u8], offset: u64, page: u64, length: u64) -> Result<&[u8], ProcessError> {
     let start = offset
         .checked_add(page.saturating_mul(PAGE))
@@ -1019,24 +1232,29 @@ fn build_stack(
         return Err(ProcessError::ArgTooLong);
     }
 
-    let stack_base = USER_END
-        .checked_sub(USER_STACK_SIZE + USER_GUARD)
-        .ok_or(ProcessError::BadAddress)?;
+    let stack_base = address_space.stack_base();
     let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
     let mut cursor = buffer.len();
 
-    let random = random16();
-    let random_start = cursor
-        .checked_sub(random.len())
-        .ok_or(ProcessError::ArgTooLong)?;
-    let random_slot = buffer
-        .get_mut(random_start..cursor)
-        .ok_or(ProcessError::BadAddress)?;
-    random_slot.copy_from_slice(&random);
-    cursor = random_start;
-    let random_address = stack_base
-        .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
-        .ok_or(ProcessError::BadAddress)?;
+    // AT_RANDOM comes from the same boot-seeded pool as GETRANDOM. On a platform with no
+    // hardware source the pool is unseeded and the pair is published as zero rather than a
+    // predictable fallback; GETRANDOM reports the documented EAGAIN.
+    let random_address = match random16() {
+        Some(random) => {
+            let random_start = cursor
+                .checked_sub(random.len())
+                .ok_or(ProcessError::ArgTooLong)?;
+            let random_slot = buffer
+                .get_mut(random_start..cursor)
+                .ok_or(ProcessError::BadAddress)?;
+            random_slot.copy_from_slice(&random);
+            cursor = random_start;
+            stack_base
+                .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
+                .ok_or(ProcessError::BadAddress)?
+        }
+        None => 0,
+    };
 
     let platform_address = place_bytes(&mut buffer, &mut cursor, stack_base, platform.as_bytes())?;
     let path_address = place_bytes(&mut buffer, &mut cursor, stack_base, path)?;
@@ -1224,80 +1442,14 @@ fn write_word(buffer: &mut [u8], cursor: &mut usize, value: u64) -> Result<(), P
     Ok(())
 }
 
-fn random16() -> [u8; 16] {
+/// 16 bytes for `AT_RANDOM` from the boot-seeded ChaCha20 pool.
+///
+/// `None` means the platform has no hardware entropy source; the auxv pair is then zero and
+/// `GETRANDOM` returns the documented `EAGAIN` instead of serving a predictable fallback.
+fn random16() -> Option<[u8; 16]> {
     let mut bytes = [0u8; 16];
-    #[cfg(target_arch = "x86_64")]
-    {
-        let features = core::arch::x86_64::__cpuid(1);
-        if features.ecx & (1 << 30) != 0 {
-            let mut chunk_index = 0usize;
-            while chunk_index < 2 {
-                let mut attempt: u32 = 0;
-                let mut filled = false;
-                while attempt < 10 {
-                    let value: u64;
-                    let ok: u8;
-                    // SAFETY: `rdrand` is available per CPUID.1:ECX[30] and has no memory side
-                    // effects. `setc` records the success flag.
-                    unsafe {
-                        core::arch::asm!(
-                            "rdrand {value}",
-                            "setc {ok}",
-                            value = out(reg) value,
-                            ok = out(reg_byte) ok,
-                            options(nomem, nostack),
-                        );
-                    }
-                    if ok != 0 {
-                        let start = chunk_index.saturating_mul(8);
-                        if let Some(slot) = bytes.get_mut(start..start.saturating_add(8)) {
-                            slot.copy_from_slice(&value.to_le_bytes());
-                        }
-                        filled = true;
-                        break;
-                    }
-                    attempt = attempt.saturating_add(1);
-                }
-                if !filled {
-                    break;
-                }
-                chunk_index = chunk_index.saturating_add(1);
-            }
-            if chunk_index == 2 {
-                return bytes;
-            }
-        }
-    }
-
-    let mut state = entropy_seed() ^ 0x9E37_79B9_7F4A_7C15;
-    let mut index = 0usize;
-    while index < bytes.len() {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        let word = state.to_le_bytes();
-        let end = index.saturating_add(8).min(bytes.len());
-        if let Some(slot) = bytes.get_mut(index..end) {
-            let copy = end.saturating_sub(index);
-            if let Some(source) = word.get(..copy) {
-                slot.copy_from_slice(source);
-            }
-        }
-        index = end;
-    }
-    bytes
-}
-
-/// Non-cryptographic fallback entropy: the architecture's free-running counter.
-#[cfg(target_arch = "x86_64")]
-fn entropy_seed() -> u64 {
-    tsc::read()
-}
-
-/// Non-cryptographic fallback entropy: the generic-timer physical counter.
-#[cfg(target_arch = "aarch64")]
-fn entropy_seed() -> u64 {
-    timer::read_counter()
+    crate::time::entropy_fill(&mut bytes).ok()?;
+    Some(bytes)
 }
 
 /// The ELF machine of the running kernel.
@@ -1345,7 +1497,12 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // entry whose process is gone is removed by `lookup_pid`.
     // Fail pending scheme requests and remove the registry entries while the server page tables
     // still exist, so capture mappings can be removed before the address space is released.
-    ipc::on_process_exit(process);
+    // The IPC/router/event teardown takes wait/scheduler locks; mask interrupts for it, but keep
+    // the address-space release interruptible for the TLB shootdown.
+    {
+        let _irq = crate::sync::critical();
+        ipc::on_process_exit(process);
+    }
     let address_space = process.address_space.lock().take();
     if let Some(mut address_space) = address_space {
         if own_context {
@@ -1359,8 +1516,12 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     }
     // A dead process can no longer call syscalls: drop its handle table so DMA buffers and
     // every other object release their resources even while a last reference to the process
-    // survives elsewhere (for example on the abandoned stack of its dead thread).
-    *process.handles.lock() = HandleTable::new();
+    // survives elsewhere (for example on the abandoned stack of its dead thread). Object drops
+    // can wake waiters and take the scheduler lock, so mask interrupts for this section.
+    {
+        let _irq = crate::sync::critical();
+        *process.handles.lock() = HandleTable::new();
+    }
     // S69 cleanup evidence: every kernel-owned resource count plus the process-local waiter and
     // request queues after the table was replaced.  The line is gated to fixture command names so
     // the ten-thousand-exit soak does not flood the serial log; the fixture sets them with
@@ -1436,7 +1597,9 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         }
         crate::arch::halt()
     }
-    kprintln!("process: {} exited ({code})", process.path);
+    // Keep the interactive console quiet for normal child exits: `init exited` above is the
+    // stable test marker. The per-process detail remains available with `log-level=debug`.
+    crate::kdebug!("process: {} exited ({code})", process.path);
     // The per-exit evidence prints belong to the dying thread's own context; a foreign teardown
     // (reaping an unstarted process, terminating another) must return to its caller without
     // them.
@@ -1509,6 +1672,7 @@ fn wake_process_waiters(process: &Arc<Process>) {
     // needs the pid registry and another process's handle table.
     let mut irqs: Vec<Arc<crate::driver::irq::Irq>> = Vec::new();
     let mut pipes: Vec<Arc<crate::process::pipe::PipeEnd>> = Vec::new();
+    let mut duplexes: Vec<Arc<crate::process::duplex::DuplexEnd>> = Vec::new();
     {
         let handles = process.handles.lock();
         handles.for_each_live(|_, object, _, _| match object {
@@ -1528,6 +1692,10 @@ fn wake_process_waiters(process: &Arc<Process>) {
             Object::Pipe(end) => {
                 end.wake_process(process.id);
                 pipes.push(Arc::clone(end));
+            }
+            Object::Duplex(end) => {
+                end.wake_process(process.id);
+                duplexes.push(Arc::clone(end));
             }
             Object::Memory(memory) => {
                 let _ = memory.page_waiters().wake_process(process.id);
@@ -1550,6 +1718,45 @@ fn wake_process_waiters(process: &Arc<Process>) {
             retired_pipe = Some(pipe);
         }
     }
+    let mut retired_duplex: Option<Arc<crate::process::duplex::DuplexEnd>> = None;
+    for duplex in duplexes {
+        let duplicate = retired_duplex
+            .as_ref()
+            .is_some_and(|retired| retired.same_pair(&duplex));
+        if !duplicate && !duplex_held_elsewhere(process, &duplex) {
+            duplex.retire();
+            retired_duplex = Some(duplex);
+        }
+    }
+}
+
+/// True when a live process other than `owner` still has a handle to the same duplex pair.
+fn duplex_held_elsewhere(
+    owner: &Arc<Process>,
+    duplex: &Arc<crate::process::duplex::DuplexEnd>,
+) -> bool {
+    let registry = PID_REGISTRY.lock();
+    for (id, weak) in registry.iter() {
+        if *id == owner.id {
+            continue;
+        }
+        let Some(other) = weak.upgrade() else {
+            continue;
+        };
+        let table = other.handles.lock();
+        let mut found = false;
+        table.for_each_live(|_, object, _, _| {
+            if let Object::Duplex(candidate) = object
+                && candidate.same_pair(duplex)
+            {
+                found = true;
+            }
+        });
+        if found {
+            return true;
+        }
+    }
+    false
 }
 
 /// True when a live process other than `owner` still has a handle to the same pipe.
@@ -1611,6 +1818,15 @@ fn irq_held_elsewhere(owner: &Arc<Process>, irq: &Arc<crate::driver::irq::Irq>) 
 ///
 /// Returns false when the process was already terminal (no resurrection, no second teardown).
 fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool {
+    // A process can die without the EXIT syscall (SIGKILL, a fault or OOM). POSIX record locks
+    // are owned by the process, so release them on the single teardown path before any waiter
+    // can observe a stale owner.
+    crate::syscall::record_lock::release_process(process.id);
+    // The state/wake graph takes the per-CPU scheduler lock through `sched::wake`. The syscall
+    // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
+    // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space
+    // release below stays interruptible so a target CPU can take a TLB IPI.
+    let irq = crate::sync::critical();
     let mut state = process.state.lock();
     if *state == ProcessState::Exited {
         return false;
@@ -1634,7 +1850,8 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     drop(state);
     crate::process::tty::hangup_session_leader(process);
     notify_parent(process, true);
-    crate::event::notify_all();
+    crate::event::notify_source(Arc::as_ptr(process) as usize as u64);
+    drop(irq);
     teardown(process, code, own_context);
     true
 }
@@ -1708,7 +1925,7 @@ pub fn exit_current(code: i32) -> ! {
 /// exception entry uses [`handle_page_fault_access`] so a read-only VMA write is rejected
 /// instead of paged in.
 pub fn handle_page_fault(cr2: u64) -> bool {
-    resolve_page_fault(cr2, true)
+    resolve_page_fault(cr2, true, false)
 }
 
 /// Resolve a user page fault with the faulting access kind.
@@ -1717,25 +1934,79 @@ pub fn handle_page_fault(cr2: u64) -> bool {
 /// re-acquires it after the supply to map the page.
 #[cfg(target_arch = "x86_64")]
 pub fn handle_page_fault_access(cr2: u64, write: bool) -> bool {
-    resolve_page_fault(cr2, write)
+    resolve_page_fault(cr2, write, true)
 }
 
-fn resolve_page_fault(cr2: u64, write: bool) -> bool {
+/// Page-fault handlers run through an interrupt gate, so the CPU clears IF on entry. The
+/// address-space lock is a blocking mutex and may wait for another CPU; keep the handler
+/// interruptible so a target CPU can still take an SMP TLB IPI. The original IF state is
+/// restored when the handler returns, and the per-CPU diagnostic is cleared on every exit.
+#[cfg(target_arch = "x86_64")]
+struct PageFaultGuard(u64);
+
+#[cfg(target_arch = "x86_64")]
+impl PageFaultGuard {
+    fn new() -> Self {
+        let flags = crate::arch::x86_64::ap_start::save_and_disable_local_interrupts();
+        crate::arch::x86_64::ap_start::enable_local_interrupts();
+        crate::sched::smp::percpu::note_page_fault(true);
+        Self(flags)
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+impl Drop for PageFaultGuard {
+    fn drop(&mut self) {
+        crate::sched::smp::percpu::note_page_fault(false);
+        crate::arch::x86_64::ap_start::restore_local_interrupts(self.0);
+    }
+}
+
+fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
+    let _ = interruptible;
+    #[cfg(target_arch = "x86_64")]
+    let _fault = if interruptible {
+        Some(PageFaultGuard::new())
+    } else {
+        // A usercopy fixup still holds the kernel-side critical state; keep it non-preemptible.
+        None
+    };
+    crate::sched::smp::percpu::note_page_fault_phase(1);
     let Some(process) = current() else {
         return false;
     };
     let outcome = {
-        let mut address_space = process.address_space.lock();
-        let Some(address_space) = address_space.as_mut() else {
-            return false;
+        crate::sched::smp::percpu::note_page_fault_phase(2);
+        let mut guard = process.address_space.lock();
+        crate::sched::smp::percpu::note_page_fault_phase(3);
+        // Only the lock wait needs to be interruptible. Keep the actual fault resolution
+        // non-preemptible while the address-space state is locked, then restore IF after the
+        // lock is released.
+        let hold = crate::sync::critical();
+        let outcome = match guard.as_mut() {
+            Some(address_space) => {
+                crate::sched::smp::percpu::note_page_fault_phase(4);
+                address_space.handle_fault(cr2, write)
+            }
+            None => {
+                drop(guard);
+                drop(hold);
+                return false;
+            }
         };
-        address_space.handle_fault(cr2, write)
+        drop(guard);
+        drop(hold);
+        outcome
     };
+    crate::sched::smp::percpu::note_page_fault_phase(5);
     match outcome {
         Ok(()) => true,
         #[cfg(target_arch = "x86_64")]
         Err(crate::memory::uspace::FaultError::Pager(fault)) => {
-            crate::memory::pager::service(&process, fault)
+            crate::sched::smp::percpu::note_page_fault_phase(6);
+            let resolved = crate::memory::pager::service(&process, fault);
+            crate::sched::smp::percpu::note_page_fault_phase(7);
+            resolved
         }
         #[cfg(not(target_arch = "x86_64"))]
         Err(crate::memory::uspace::FaultError::Pager(_)) => false,

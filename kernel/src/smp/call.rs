@@ -8,27 +8,60 @@
 //!
 //! # Locking and timeout discipline
 //!
-//! `LOCK` is an [`IrqSpinLock`], so the shooting CPU waits with interrupts masked.  The target's
-//! handler only touches this module's atomics and reads one byte; it never depends on the shooter
-//! taking an interrupt.  A missing acknowledgement is a 100 ms timeout: the per-CPU pending slot
-//! is cleared, the failure is logged, and `None` is returned.  No frame or slot is allocated, so a
-//! timeout cannot leak, and a late IPI sees an idle mailbox.
+//! One active probe is protected by [`ActiveGuard`]. A second shooter waits with interrupts
+//! enabled, so it can take the first shooter's probe IPI; the acknowledgement wait also runs
+//! with interrupts enabled. The target's handler only touches this module's atomics and reads
+//! one byte. A missing acknowledgement is a 100 ms timeout: the per-CPU pending slot is cleared,
+//! the failure is logged, and `None` is returned. No frame or slot is allocated, so a timeout
+//! cannot leak, and a late IPI sees an idle mailbox.
 //!
 //! Every index is bounded by `online_cpus() <= MAX_CPUS`, so the fixed per-CPU arrays are safe.
 
 #![allow(clippy::indexing_slicing)]
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::arch::x86_64::{ap_start, ipi};
 use crate::kprintln;
 use crate::sched::smp::percpu;
-use crate::sync::IrqSpinLock;
 use crate::time;
 
 use super::MAX_CPUS;
 
-static LOCK: IrqSpinLock<()> = IrqSpinLock::new(());
+/// One active probe. The shooter waits for it with interrupts enabled.
+static ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Serialises probes without masking interrupts while waiting for the active slot.
+struct ActiveGuard {
+    flags: u64,
+}
+
+impl ActiveGuard {
+    fn acquire() -> Self {
+        let flags = ap_start::save_and_disable_local_interrupts();
+        percpu::preempt_inc();
+        loop {
+            if !ACTIVE.swap(true, Ordering::Acquire) {
+                break;
+            }
+            // A waiter must be able to take the active probe's IPI.
+            ap_start::enable_local_interrupts();
+            while ACTIVE.load(Ordering::Acquire) {
+                core::hint::spin_loop();
+            }
+            ap_start::disable_local_interrupts();
+        }
+        Self { flags }
+    }
+}
+
+impl Drop for ActiveGuard {
+    fn drop(&mut self) {
+        ACTIVE.store(false, Ordering::Release);
+        percpu::preempt_dec();
+        ap_start::restore_local_interrupts(self.flags);
+    }
+}
 static ADDRESS: AtomicU64 = AtomicU64::new(0);
 static VALUE: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(u64::MAX) }; MAX_CPUS];
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -45,7 +78,7 @@ pub fn probe(cpu: usize, address: u64) -> Option<u8> {
         return Some(unsafe { ap_start::probe_read(address) });
     }
 
-    let _guard = LOCK.lock();
+    let _guard = ActiveGuard::acquire();
     let sequence = SEQUENCE.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
     ADDRESS.store(address, Ordering::SeqCst);
     VALUE[cpu].store(u64::MAX, Ordering::SeqCst);
@@ -54,15 +87,20 @@ pub fn probe(cpu: usize, address: u64) -> Option<u8> {
     ipi::send_call(cpu);
 
     let deadline = time::now_ns().saturating_add(100_000_000);
+    // The target may itself be waiting for the active slot or an IPI; wait with interrupts
+    // enabled so it can take this probe. The guard restores the caller's original IF.
+    ap_start::enable_local_interrupts();
     while ACKED[cpu].load(Ordering::SeqCst) != sequence {
         if time::now_ns() > deadline {
             // Idle the mailbox so a late IPI is ignored; the next probe uses a new sequence.
             PENDING[cpu].store(0, Ordering::SeqCst);
+            ap_start::disable_local_interrupts();
             kprintln!("smp: call probe timeout on cpu {cpu}");
             return None;
         }
         core::hint::spin_loop();
     }
+    ap_start::disable_local_interrupts();
     let value = VALUE[cpu].load(Ordering::SeqCst);
     if value == u64::MAX {
         None

@@ -313,11 +313,15 @@ fn canonical_fixture_is_structurally_sound() {
 }
 
 #[test]
-fn the_010_root_account_round_trips_byte_for_byte() {
+fn the_010_root_account_round_trips_canonically() {
     let image = Database::parse(ETC_PASSWD, ETC_GROUP, ETC_SHADOW).expect("0.1.0 image");
     assert_eq!(image.render_passwd(), ETC_PASSWD);
     assert_eq!(image.render_group(), ETC_GROUP);
-    assert_eq!(image.render_shadow(), ETC_SHADOW);
+    // Empty inactive/expire fields are the canonical "not set" and render as -1.
+    assert_eq!(
+        image.render_shadow(),
+        ETC_SHADOW.replace(":7:::", ":7:-1:-1:0")
+    );
     let root = image.user("root").expect("root");
     assert_eq!(root.uid, 0);
     assert_eq!(root.gid, 0);
@@ -325,15 +329,14 @@ fn the_010_root_account_round_trips_byte_for_byte() {
     // The 0.1.0 release sessions use rsh; U1's /bin/brush is the 0.2.0 target.
     assert_eq!(root.shell, "/bin/rsh");
     let shadow = image.shadow_by_name("root").expect("root shadow");
-    assert_eq!(shadow.hash, raven_auth::DEFAULT_ROOT_HASH);
-    assert!(raven_auth::verify_root_shadow(
-        ETC_SHADOW.trim_end_matches('\n'),
-        "raven"
-    ));
-    assert!(!raven_auth::verify_root_shadow(
-        ETC_SHADOW.trim_end_matches('\n'),
-        "wrong"
-    ));
+    // The image record is the canonical 16-character-salt hash, not the build-time
+    // DEFAULT_ROOT_HASH (which uses a different fixed salt).
+    let fields: Vec<&str> = shadow.hash.split('$').collect();
+    assert_eq!(fields.get(2), Some(&"rounds=5000"));
+    assert_eq!(fields.get(3).map(|salt| salt.len()), Some(16));
+    let root_line = ETC_SHADOW.lines().next().expect("root shadow line");
+    assert!(raven_auth::verify_root_shadow(root_line, "raven"));
+    assert!(!raven_auth::verify_root_shadow(root_line, "wrong"));
 }
 
 #[test]
@@ -345,8 +348,9 @@ fn the_010_image_can_add_a_regular_account_without_changing_root() {
     let outcome = image
         .add_user(&useradd_request(&options))
         .expect("add alice");
-    assert_eq!(outcome.user.uid, 1000);
-    assert_eq!(outcome.user.gid, 1000);
+    // The base image already ships raven (uid/gid 1000), so the next regular id is 1001.
+    assert_eq!(outcome.user.uid, 1001);
+    assert_eq!(outcome.user.gid, 1001);
     assert!(outcome.created_group);
     assert_eq!(image.user("root").expect("root"), &root_before);
     assert_eq!(image.shadow_by_name("root").expect("root"), &shadow_before);

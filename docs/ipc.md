@@ -117,3 +117,34 @@ flight, rights, the idle-server list and direct handoff (`R-IPC-12..18`), rings,
 compatibility façade. The `MsgHeader.trace_id` field (`R-IPC-4`) is likewise absent here: trace
 correlation belongs to Q2 `raven-trace-core` and Q3 trace-context-in-IPC, which layer the field on
 top of this state machine. This crate must not depend on `raven-abi` or the kernel.
+
+## 9. Kernel scheme capture pool (compatibility path)
+
+Status: OBSERVED (kernel `ipc::capture`). This is the resource model behind the S11 scheme
+packet router, not part of the pure `raven-chan` state machine.
+
+A cross-process `READ`/`WRITE` creates one capture. A `CALL` creates two captures: the request
+buffer and the reply buffer. Each capture is a page-rounded copy of a client range mapped into
+the server's reserved 4 MiB capture window.
+
+Captures are packed by page range into the window's virtual slots. A request and its reply can
+therefore share one slot when their combined pages fit; when they do not, the allocator uses
+another slot. This keeps a `CALL` from consuming two whole 4 MiB slots just because it has two
+buffers.
+
+Lifetime rules:
+
+* The request capture stays mapped until the server's `SEND` completes the request.
+* The reply capture stays mapped until the reply has been written and `copy_back` has run.
+* Completion copies back writable captures, then releases both ranges exactly once.
+* Copy-back verifies the page-table root and each page's original frame. A normal
+  `MAP`/`UNMAP`/`PROTECT` by another thread in the shared address space does not block an
+  unrelated capture; a changed page-table root (`exec`) or a replaced/unmapped page does.
+* A cancelled client keeps the mapping alive until the server retires or skips the request; a
+  late `SEND` releases it.
+* Releasing an already-free range is a no-op, so a double drop cannot hand the same pages to a
+  second capture.
+
+The `s125-capturecheck` command-line token prints the global active/high-water capture and page
+counters on pool exhaustion and at process exit. The counts are evidence for leak, double-free
+and capacity checks; they are not a policy retry.

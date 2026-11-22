@@ -6,6 +6,7 @@
 //! Keys are decoded from standard input, and the line is drawn on standard error,
 //! with VT100-style escape sequences or with backspaces alone.
 
+mod autosuggest;
 mod completion_list;
 mod input_backend;
 mod keymap;

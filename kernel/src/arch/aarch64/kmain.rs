@@ -23,6 +23,10 @@ use crate::{boot, kprintln, log, memory, sync, time};
 #[unsafe(no_mangle)]
 pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
     crate::arch::serial::init();
+    // HDMI1: start the HDMI display console before the first banner line. It fails closed to
+    // UART-only when the mailbox or the firmware property response is unavailable.
+    #[cfg(raven_pi4)]
+    crate::arch::aarch64::fb::init();
 
     let data = match boot::validate(boot) {
         Ok(data) => data,
@@ -88,6 +92,12 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
     if let Err(error) = gic::init(platform.gicd, platform.gicc) {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
+    }
+    // K166: route the PL011 receive line before interrupts are enabled, so DEBUG_READ and
+    // consd's UART reader can receive login input on aarch64.
+    match fdt::uart_irq(&platform) {
+        Some(uart_irq) => crate::arch::aarch64::console::init(uart_irq),
+        None => kprintln!("console: no PL011 interrupt id; DEBUG_READ stays empty"),
     }
     let frequency = match timer::init(platform.timer_ppi) {
         Ok(frequency) => frequency,

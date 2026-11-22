@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K223/K224: per-process root. The libc test creates a tree on /tmp, proves non-root and
+# file-target failures, chroots, checks absolute/.. confinement and getcwd, then proves rooted
+# symlink resolution (inside, absolute, ../ escape, dangling) and forks/execs the child that
+# inherits the root. The empty-root case runs in a separate child.
+
+name = "chroot"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/chroot/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^chroot: start$'
+
+[[expect]]
+regex = '^chroot: unrooted good=1$'
+
+[[expect]]
+regex = '^chroot: nonroot eperm=1$'
+
+[[expect]]
+regex = '^chroot: empty-root ok$'
+
+[[expect]]
+regex = '^chroot: chroot ok$'
+
+[[expect]]
+regex = '^chroot: cwd=/$'
+
+[[expect]]
+regex = '^chroot: inside=1 outside=0$'
+
+[[expect]]
+regex = '^chroot: dotdot=0$'
+
+[[expect]]
+regex = '^chroot: symlink inside=1 abs=1 escape=0 rel=0 dangling=0$'
+
+[[expect]]
+regex = '^chroot: notdir=1$'
+
+[[expect]]
+regex = '^chroot-child: inside=1 outside=0 symlink=1 escape=0$'
+
+[[expect]]
+regex = '^chroot: child ok$'
+
+[[expect]]
+regex = '^chroot: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|chroot: fail'

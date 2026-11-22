@@ -31,6 +31,7 @@ mod builder;
 mod testutil;
 
 pub use crc::crc32;
+pub use format::DEFAULT_EPOCH;
 pub use reader::{Entry, Initfs, InitfsError};
 
 #[cfg(feature = "std")]

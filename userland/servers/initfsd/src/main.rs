@@ -150,6 +150,14 @@ mod program {
             }
             let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
             match decoded.call {
+                Call::Lstat { path } => {
+                    let path = core::str::from_utf8(path).map_err(|_| Errno::EINVAL)?;
+                    let node = self.model.lookup(path)?;
+                    let stat = self.model.stat(node)?;
+                    CallResponse::Stat { status: 0, stat }
+                        .encode(response)
+                        .map_err(|_| Errno::EPROTO.into())
+                }
                 Call::Statfs => {
                     let statfs: StatFs = self.model.statfs();
                     CallResponse::StatFs { status: 0, statfs }
@@ -201,6 +209,7 @@ mod program {
             .map(|entry| FileEntry {
                 path: entry.path,
                 mode: entry.mode,
+                mtime: entry.mtime,
                 data: entry.data,
             })
             .collect();

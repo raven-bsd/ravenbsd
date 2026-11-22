@@ -46,7 +46,7 @@ mod program {
 
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
-    use raven_driver::{AccessError, ConfigRegion, DmaRegion, Irq, MmioRegion};
+    use raven_driver::{AccessError, Capability, DmaRegion, Irq, MmioRegion};
     use raven_proto_fs::{OpenFlags, S_IFREG, Stat};
     use raven_proto_net::ring::{
         BUFFER_SIZE, Ring, RingConsumer, RingHeader, RingLayout as B39Layout, RingProducer,
@@ -57,7 +57,7 @@ mod program {
     use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
     use virtio_net::common::{
         DEVICE_FEATURE, DEVICE_FEATURE_SELECT, DEVICE_STATUS, DRIVER_FEATURE,
-        DRIVER_FEATURE_SELECT, NUM_QUEUES, QUEUE_AVAIL, QUEUE_DESC, QUEUE_ENABLE,
+        DRIVER_FEATURE_SELECT, MSIX_CONFIG, NUM_QUEUES, QUEUE_AVAIL, QUEUE_DESC, QUEUE_ENABLE,
         QUEUE_MSIX_VECTOR, QUEUE_NOTIFY_OFF, QUEUE_SELECT, QUEUE_SIZE, QUEUE_USED,
     };
     use virtio_net::{
@@ -77,6 +77,7 @@ mod program {
     const CONFIG_HANDLE: Handle = Handle::new(4, 0);
     const DMA_HANDLE: Handle = Handle::new(5, 0);
     const IRQ_HANDLE: Handle = Handle::new(6, 0);
+    const MSIX_BAR_HANDLE: Handle = Handle::new(7, 0);
 
     const VIRTIO_VENDOR: u16 = 0x1AF4;
     const VIRTIO_NET_DEVICE: u16 = 0x1041;
@@ -92,6 +93,16 @@ mod program {
     /// Bounded pump wait: the frame rings are checked at least every 10 ms.
     const IRQ_PUMP_NS: u64 = 10_000_000;
 
+    /// MSI-X queue message and table location supplied by `devd`.
+    struct MsixInfo {
+        address_lo: u32,
+        address_hi: u32,
+        data: u32,
+        bar: usize,
+        bar_size: usize,
+        table: usize,
+    }
+
     static NIC: Mutex<Option<Nic>> = Mutex::new(None);
     static INFO: Mutex<Option<ControlInfo>> = Mutex::new(None);
     static STARTED: AtomicBool = AtomicBool::new(false);
@@ -101,6 +112,10 @@ mod program {
     static RX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_DROPS: AtomicU64 = AtomicU64::new(0);
+    static TX_STALL: AtomicBool = AtomicBool::new(false);
+    static IRQ_TX_LOGGED: AtomicBool = AtomicBool::new(false);
+    static IRQ_PROGRESS_LOGGED: AtomicBool = AtomicBool::new(false);
+    static IRQ_TOTAL: AtomicU64 = AtomicU64::new(0);
 
     fn main(args: raven_rt::Args) -> i32 {
         match run(args) {
@@ -119,6 +134,13 @@ mod program {
         let mut irq_line = 0u32;
         let mut test = false;
         let mut serve = false;
+        let mut msix = false;
+        let mut msix_addr_lo = None;
+        let mut msix_addr_hi = None;
+        let mut msix_data = None;
+        let mut msix_bar = None;
+        let mut msix_bar_size = None;
+        let mut msix_table = None;
         for argument in args.iter().skip(1) {
             if let Some(value) = argument.strip_prefix("bar=") {
                 bar_index = value
@@ -136,12 +158,68 @@ mod program {
                 irq_line = value
                     .parse()
                     .map_err(|_| format!("bad irq argument `{argument}`"))?;
+            } else if argument == "msix=1" || argument == "msix" {
+                msix = true;
+            } else if argument == "tx-stall" {
+                // Test-only mutation: drop TX completions so the qtest must catch the wedge.
+                TX_STALL.store(true, Ordering::Release);
+            } else if let Some(value) = argument.strip_prefix("msix_addr_lo=") {
+                msix_addr_lo = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_addr_lo argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_addr_hi=") {
+                msix_addr_hi = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_addr_hi argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_data=") {
+                msix_data = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_data argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_bar=") {
+                msix_bar = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_bar argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_bar_size=") {
+                msix_bar_size = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_bar_size argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_table=") {
+                msix_table = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_table argument `{argument}`"))?,
+                );
             } else if argument == "test" {
                 test = true;
             } else if argument == "serve" {
                 serve = true;
             }
         }
+        let msix = if msix {
+            Some(MsixInfo {
+                address_lo: msix_addr_lo
+                    .ok_or_else(|| "msix requested without msix_addr_lo".to_string())?,
+                address_hi: msix_addr_hi
+                    .ok_or_else(|| "msix requested without msix_addr_hi".to_string())?,
+                data: msix_data.ok_or_else(|| "msix requested without msix_data".to_string())?,
+                bar: msix_bar.ok_or_else(|| "msix requested without msix_bar".to_string())?,
+                bar_size: msix_bar_size
+                    .ok_or_else(|| "msix requested without msix_bar_size".to_string())?,
+                table: msix_table.ok_or_else(|| "msix requested without msix_table".to_string())?,
+            })
+        } else {
+            None
+        };
         if bar_size == 0 || dma_size < RING_REGION_OFFSET + RING_REGION_LEN {
             return Err("devd did not pass a usable BAR and DMA buffer".to_string());
         }
@@ -149,9 +227,9 @@ mod program {
         let bar_window = raven_rt::map_mmio_mut(BAR_HANDLE, bar_size)
             .map_err(|error| format!("bar map: {}", error.description()))?;
         let bar = MmioRegion::new(bar_window);
-        let config_window = raven_rt::map_mmio(CONFIG_HANDLE, raven_driver::PAGE)
+        let config_window = raven_rt::map_mmio_mut(CONFIG_HANDLE, raven_driver::PAGE)
             .map_err(|error| format!("config map: {}", error.description()))?;
-        let config = ConfigRegion::new(config_window);
+        let config = MmioRegion::new(config_window);
         let dma_info = raven_rt::dma_info(DMA_HANDLE)
             .map_err(|error| format!("dma info: {}", error.description()))?;
         let window = raven_rt::map_mmio_mut(DMA_HANDLE, dma_size)
@@ -161,9 +239,17 @@ mod program {
         let (region, _tail) = rest.split_at_mut(RING_REGION_LEN);
         let dma = DmaRegion::new(meta, dma_info.bus_addr);
         let irq = Irq::new(IRQ_HANDLE);
+        let msix_bar = match &msix {
+            Some(info) => {
+                let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)
+                    .map_err(|error| format!("msix bar map: {}", error.description()))?;
+                Some(MmioRegion::new(window))
+            }
+            None => None,
+        };
 
         let mut nic = Nic::open(
-            bar, config, dma, region, irq, bar_index, bar_size, dma_size, irq_line,
+            bar, config, dma, region, irq, bar_index, bar_size, dma_size, irq_line, msix, msix_bar,
         )?;
         if !test && !serve {
             // B13b compatibility: the old one-shot qtest profile passes no mode token.
@@ -289,6 +375,9 @@ mod program {
         rx_prod: u32,
         rx_cons_seen: u32,
         tx_busy: bool,
+        tx_waits: u32,
+        last_fired: usize,
+        last_isr: u8,
         broken: bool,
     }
 
@@ -296,7 +385,7 @@ mod program {
         #[allow(clippy::too_many_arguments)] // five handles plus the BAR/DMA geometry
         fn open(
             mut bar: MmioRegion,
-            config: ConfigRegion,
+            mut config: MmioRegion,
             mut dma: DmaRegion,
             region: &'static mut [u8],
             irq: Irq,
@@ -304,8 +393,11 @@ mod program {
             bar_size: usize,
             dma_len: usize,
             irq_line: u32,
+            msix: Option<MsixInfo>,
+            msix_bar: Option<MmioRegion>,
         ) -> Result<Self, String> {
-            let (vendor, device) = config.ids().map_err(describe)?;
+            let vendor = config.read_u16(0x00).map_err(describe)?;
+            let device = config.read_u16(0x02).map_err(describe)?;
             if vendor != VIRTIO_VENDOR || device != VIRTIO_NET_DEVICE {
                 return Err(format!(
                     "unexpected function {vendor:#06x}:{device:#06x}, expected 1af4:1041"
@@ -325,6 +417,21 @@ mod program {
                 dma.bus_address()
             );
             let features = reset_and_negotiate(&mut bar, &caps)?;
+            let msix_vector = match (msix, msix_bar) {
+                (Some(info), Some(mut table)) => {
+                    let cap = find_msix(&config)?.ok_or_else(|| {
+                        "MSI-X was requested but the function has no MSI-X capability".to_string()
+                    })?;
+                    configure_msix(&mut table, &mut config, &cap, &info)?;
+                    bar.write_u16(common(&caps, MSIX_CONFIG), 0)
+                        .map_err(describe)?;
+                    1
+                }
+                (Some(_), None) => {
+                    return Err("MSI-X table BAR was not transferred".to_string());
+                }
+                (None, _) => 0xFFFF,
+            };
             let mac = read_mac(&bar, &caps, &features)?;
             let (link, mtu) = read_status(&bar, &caps, &features)?;
             raven_rt::println!(
@@ -352,8 +459,8 @@ mod program {
                 return Err("DMA buffer is too small for the split queues".to_string());
             }
             let bus = dma.bus_address();
-            let rx_notify = program_queue(&mut bar, &caps, 0, &rx_layout, bus)?;
-            let tx_notify = program_queue(&mut bar, &caps, 1, &tx_layout, bus)?;
+            let rx_notify = program_queue(&mut bar, &caps, 0, &rx_layout, bus, msix_vector)?;
+            let tx_notify = program_queue(&mut bar, &caps, 1, &tx_layout, bus, msix_vector)?;
             raven_rt::println!("virtio-net: queue0 rx size={qsize}");
             raven_rt::println!("virtio-net: queue1 tx size={qsize}");
             raven_rt::println!(
@@ -426,6 +533,9 @@ mod program {
                 rx_prod: 0,
                 rx_cons_seen: 0,
                 tx_busy: false,
+                tx_waits: 0,
+                last_fired: 0,
+                last_isr: 0,
                 broken: false,
             };
             // The queues are programmed; the device is live from here.
@@ -534,9 +644,27 @@ mod program {
                 return Err("device is broken".to_string());
             }
             let fired = self.irq.wait(IRQ_PUMP_NS).unwrap_or(0);
+            self.last_fired = fired;
             if fired > 0 {
-                let _isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
+                let isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
+                self.last_isr = isr;
                 let _ = self.irq.ack();
+                let tx = TX_FRAMES.load(Ordering::Acquire);
+                if tx > 0 && !IRQ_TX_LOGGED.swap(true, Ordering::AcqRel) {
+                    raven_rt::println!(
+                        "virtio-net: irq tx fired={fired} isr={isr:#x} tx={tx} rx={}",
+                        RX_FRAMES.load(Ordering::Acquire)
+                    );
+                }
+                let total = IRQ_TOTAL.fetch_add(fired as u64, Ordering::AcqRel)
+                    + u64::try_from(fired).unwrap_or(0);
+                if total >= 24 && !IRQ_PROGRESS_LOGGED.swap(true, Ordering::AcqRel) {
+                    raven_rt::println!(
+                        "virtio-net: irq progress fired={total} tx={} rx={}",
+                        TX_FRAMES.load(Ordering::Acquire),
+                        RX_FRAMES.load(Ordering::Acquire)
+                    );
+                }
             }
             self.update_link()?;
             if !STARTED.load(Ordering::Acquire) {
@@ -638,6 +766,20 @@ mod program {
                     .dma
                     .read_u16(self.tx.layout.used_idx())
                     .map_err(describe)?;
+                if TX_STALL.load(Ordering::Acquire) {
+                    // Test-only mutation: leave the used entry unread and the frame in flight.
+                    self.tx_waits = self.tx_waits.wrapping_add(1);
+                    if self.tx_waits.is_multiple_of(100) {
+                        raven_rt::println!(
+                            "virtio-net: tx-wait used={used} expected={} avail={} fired={} isr={:#x}",
+                            self.tx.used,
+                            self.tx.avail,
+                            self.last_fired,
+                            self.last_isr
+                        );
+                    }
+                    return Ok(());
+                }
                 if used != self.tx.used {
                     if used.wrapping_sub(self.tx.used) != 1 {
                         return self.fail("TX used index drift".to_string());
@@ -661,7 +803,19 @@ mod program {
                         let _ = consumer.pop();
                     }
                     self.tx_busy = false;
+                    self.tx_waits = 0;
                     TX_FRAMES.fetch_add(1, Ordering::AcqRel);
+                } else {
+                    self.tx_waits = self.tx_waits.wrapping_add(1);
+                    if self.tx_waits.is_multiple_of(100) {
+                        raven_rt::println!(
+                            "virtio-net: tx-wait used={used} expected={} avail={} fired={} isr={:#x}",
+                            self.tx.used,
+                            self.tx.avail,
+                            self.last_fired,
+                            self.last_isr
+                        );
+                    }
                 }
                 return Ok(());
             }
@@ -1019,7 +1173,7 @@ mod program {
     }
 
     fn read_capabilities(
-        config: &ConfigRegion,
+        config: &MmioRegion,
         bar_index: usize,
         bar_size: usize,
     ) -> Result<Caps, String> {
@@ -1031,7 +1185,7 @@ mod program {
         // QEMU prepends each capability, so the chain runs from the highest offset down.
         let mut seen = [0u8; raven_driver::MAX_CAPABILITIES];
         let mut seen_len = 0usize;
-        let mut current = config.first_capability().map_err(describe)?;
+        let mut current = first_capability(config)?;
         while let Some(capability) = current {
             let offset = usize::from(capability.offset);
             if seen
@@ -1114,14 +1268,138 @@ mod program {
         })
     }
 
-    fn next_capability(
-        config: &ConfigRegion,
-        next: u8,
-    ) -> Result<Option<raven_driver::Capability>, String> {
+    fn next_capability(config: &MmioRegion, next: u8) -> Result<Option<Capability>, String> {
         if next == 0 {
             return Ok(None);
         }
-        config.capability(next).map_err(describe)
+        capability(config, next)
+    }
+
+    fn first_capability(config: &MmioRegion) -> Result<Option<Capability>, String> {
+        let status = config.read_u16(0x06).map_err(describe)?;
+        if status & (1 << 4) == 0 {
+            return Ok(None);
+        }
+        let pointer = config.read_u8(0x34).map_err(describe)? & 0xFC;
+        if pointer == 0 {
+            return Ok(None);
+        }
+        capability(config, pointer)
+    }
+
+    fn capability(config: &MmioRegion, offset: u8) -> Result<Option<Capability>, String> {
+        let offset = usize::from(offset);
+        if !offset.is_multiple_of(4) || offset < 0x40 || offset + 1 >= raven_driver::PAGE {
+            return Ok(None);
+        }
+        let id = config.read_u8(offset).map_err(describe)?;
+        if id == 0 {
+            return Ok(None);
+        }
+        let next = config.read_u8(offset + 1).map_err(describe)? & 0xFC;
+        Ok(Some(Capability {
+            id,
+            offset: offset as u8,
+            next,
+        }))
+    }
+
+    /// One function's MSI-X capability.
+    struct MsixCap {
+        offset: u8,
+        table_bar: usize,
+        table_offset: usize,
+        table_size: u16,
+    }
+
+    fn find_msix(config: &MmioRegion) -> Result<Option<MsixCap>, String> {
+        let mut current = first_capability(config)?;
+        let mut seen = [0u8; raven_driver::MAX_CAPABILITIES];
+        let mut seen_len = 0usize;
+        while let Some(capability) = current {
+            let offset = usize::from(capability.offset);
+            if seen
+                .get(..seen_len)
+                .unwrap_or(&[])
+                .contains(&capability.offset)
+            {
+                break;
+            }
+            let Some(slot) = seen.get_mut(seen_len) else {
+                break;
+            };
+            *slot = capability.offset;
+            seen_len = seen_len.saturating_add(1);
+            if capability.id == 0x11 {
+                let control = config.read_u16(offset + 2).map_err(describe)?;
+                let table = config.read_u32(offset + 4).map_err(describe)?;
+                return Ok(Some(MsixCap {
+                    offset: capability.offset,
+                    table_bar: usize::try_from(table & 7).unwrap_or(usize::MAX),
+                    table_offset: usize::try_from(table & !7).unwrap_or(usize::MAX),
+                    table_size: (control & 0x7FF).saturating_add(1),
+                }));
+            }
+            current = next_capability(config, capability.next)?;
+        }
+        Ok(None)
+    }
+
+    /// Program the MSI-X table for the RX/TX queue vector and enable MSI-X.
+    ///
+    /// Entry 0 is the configuration vector and is masked; entry 1 is shared by both queues.
+    fn configure_msix(
+        table: &mut MmioRegion,
+        config: &mut MmioRegion,
+        cap: &MsixCap,
+        info: &MsixInfo,
+    ) -> Result<(), String> {
+        if cap.table_bar != info.bar || cap.table_offset != info.table {
+            return Err(format!(
+                "MSI-X table is bar{} offset {:#x}, devd passed bar{} offset {:#x}",
+                cap.table_bar, cap.table_offset, info.bar, info.table
+            ));
+        }
+        if cap.table_size < 2 {
+            return Err(format!(
+                "MSI-X table has {} entries; need 2",
+                cap.table_size
+            ));
+        }
+        let end = info
+            .table
+            .checked_add(32)
+            .ok_or_else(|| "MSI-X table offset overflows".to_string())?;
+        if end > info.bar_size {
+            return Err("MSI-X table is outside the BAR".to_string());
+        }
+        table.write_u32(info.table, 0).map_err(describe)?;
+        table.write_u32(info.table + 4, 0).map_err(describe)?;
+        table.write_u32(info.table + 8, 0).map_err(describe)?;
+        table.write_u32(info.table + 12, 1).map_err(describe)?;
+        table
+            .write_u32(info.table + 16, info.address_lo)
+            .map_err(describe)?;
+        table
+            .write_u32(info.table + 20, info.address_hi)
+            .map_err(describe)?;
+        table
+            .write_u32(info.table + 24, info.data)
+            .map_err(describe)?;
+        table.write_u32(info.table + 28, 0).map_err(describe)?;
+        let offset = usize::from(cap.offset);
+        let control = config.read_u16(offset + 2).map_err(describe)?;
+        config
+            .write_u16(offset + 2, (control | 0x8000) & !0x4000)
+            .map_err(describe)?;
+        let command = config.read_u16(0x04).map_err(describe)?;
+        config.write_u16(0x04, command | 0x0400).map_err(describe)?;
+        raven_rt::println!(
+            "virtio-net: msix table={:#x} bar={} vector=1",
+            info.table,
+            info.bar
+        );
+        Ok(())
     }
 
     fn common(caps: &Caps, register: usize) -> usize {
@@ -1239,12 +1517,13 @@ mod program {
         queue: u16,
         layout: &SplitLayout,
         bus: u64,
+        msix_vector: u16,
     ) -> Result<usize, String> {
         bar.write_u16(common(caps, QUEUE_SELECT), queue)
             .map_err(describe)?;
         bar.write_u16(common(caps, QUEUE_SIZE), layout.size)
             .map_err(describe)?;
-        bar.write_u16(common(caps, QUEUE_MSIX_VECTOR), 0xFFFF)
+        bar.write_u16(common(caps, QUEUE_MSIX_VECTOR), msix_vector)
             .map_err(describe)?;
         bar.write_u64(common(caps, QUEUE_DESC), bus + layout.desc as u64)
             .map_err(describe)?;

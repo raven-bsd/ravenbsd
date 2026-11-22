@@ -181,6 +181,22 @@ syscalls! {
     IRQ_ACK = 0x76;
 }
 
+/// `proc_reboot(how: u32) -> !` powers off, halts or reboots the machine.
+///
+/// Root-only (`euid == 0`); `how` is a mask of [`RB_HALT`], [`RB_POWER_OFF`] and
+/// [`RB_AUTOBOOT`]. The variant is deliberately not in [`Syscall`], so existing exhaustive libc
+/// matches stay intact; the kernel dispatches the raw number before `Syscall::from_usize`.
+pub const PROC_REBOOT: usize = 0x46;
+
+/// Reboot to the normal multi-user state.
+pub const RB_AUTOBOOT: u32 = 0;
+/// Halt without powering off.
+pub const RB_HALT: u32 = 0x0000_0008;
+/// Power off if the platform supports it.
+pub const RB_POWER_OFF: u32 = 0x0000_4000;
+/// Mask of reboot flags accepted by [`PROC_REBOOT`].
+pub const RB_FLAGS: u32 = RB_HALT | RB_POWER_OFF;
+
 /// `trace_set(id: u64) -> 0`.
 ///
 /// Sets the calling thread's current trace id (`R-OBS-6`); zero clears it. Unprivileged: a thread
@@ -198,6 +214,13 @@ pub const TRACE_SET: usize = 0x0B;
 /// [`Syscall`] variant; the lock table lives in the kernel so close and process-exit release are
 /// exact.
 pub const RECORD_LOCK: usize = 0x0C;
+
+/// `proc_chroot(path: *const u8, len: usize) -> 0` sets the calling process's root.
+///
+/// Root-only (`euid == 0`); the path is resolved inside the current root, must name a directory
+/// and is stored as a normalized absolute path without a trailing slash. A raw constant, not a
+/// [`Syscall`] variant, so the existing exhaustive matches downstream stay intact.
+pub const PROC_CHROOT: usize = 0x0D;
 
 /// `msync(proc: Handle, addr: usize, len: usize, flags: usize) -> 0`.
 ///

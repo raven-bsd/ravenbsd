@@ -1,0 +1,199 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K193: the full bootable UFS demo. The case image is the demo qcow2: ONE GPT disk
+# (ESP first, 256 MiB UFS2 root second) attached as one virtio-blk drive. The release
+# userland, static disk tools, /root and network stack live on the UFS root.
+
+name = "ufs-full"
+arch = "x86_64"
+profile = "qemu-ufs"
+timeout_secs = 240
+pre = ["sh scripts/qemu-ufs.sh --build-only"]
+image = "build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2"
+disk_if = "virtio"
+disk_format = "qcow2"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-global", "virtio-blk-pci.disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '^cd=0$'
+
+[[expect]]
+regex = '^/root$'
+
+[[expect]]
+regex = '^block0 500187648 976929 disk$'
+
+[[expect]]
+regex = '^block0p1 230686720 450560 part ESP$'
+
+[[expect]]
+regex = '^block0p2 268435456 524288 part ufs-root$'
+
+[[expect]]
+regex = '2048\s+450560\s+1\s+ESP'
+
+[[expect]]
+regex = '452608\s+524288\s+2\s+ufs-root'
+
+[[expect]]
+regex = '^usage: newfs'
+
+[[expect]]
+regex = '^/bin/ed$'
+
+[[expect]]
+regex = '^ufs: +2[0-4][0-9]M +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|no UFS root device|cannot access'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "cd /root; echo cd=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cd=0$'
+timeout_secs = 30
+
+[[step]]
+send = "pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/root$'
+timeout_secs = 30
+
+[[step]]
+send = "lsblk\n"
+delay_ms = 100
+
+[[step]]
+wait = '^block0p2 268435456 524288 part ufs-root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "gpart show block:0\n"
+delay_ms = 100
+
+[[step]]
+wait = '452608\s+524288\s+2\s+ufs-root'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "newfs -h\n"
+delay_ms = 100
+
+[[step]]
+wait = '^usage: newfs'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls /bin/ed\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/bin/ed$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "df -h /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mount\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ping 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+timeout_secs = 60
+
+[[step]]
+wait = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

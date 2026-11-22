@@ -1,0 +1,21 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 18, 2026
+.Dt GPART 1
+.Os RavenBSD
+.Sh NAME
+.Nm gpart
+.Nd show GPT partitions
+.Sh SYNOPSIS
+.Nm
+.Cm show
+.Op Ar block:0
+.Sh DESCRIPTION
+Reads the geometry and GPT partition records from the
+.Dq block:
+scheme and prints the start sector, size, index and name for every partition.
+A device or protocol error exits non-zero and no table is invented.
+.Sh SEE ALSO
+.Xr lsblk 1 ,
+.Xr newfs 1 ,
+.Xr gpart 8

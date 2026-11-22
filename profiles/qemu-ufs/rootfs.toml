@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Rootfs spec for the QEMU UFS payload. The programs and files come from the
+# resolved qemu-ufs profile; this adds the root/device/tmp mount-point markers and
+# fixes a 256 MiB UFS2 image.
+
+size = 268435456
+
+[[files]]
+src = "profiles/qemu-ufs.d/root.keep"
+path = "/root/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/qemu-ufs.d/dev.keep"
+path = "/dev/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/qemu-ufs.d/tmp.keep"
+path = "/tmp/.keep"
+mode = 0o644
+
+# The payload's /etc/mounts overlays the shell profile's initfs-root table with the
+# post-pivot root (`/ ufs:`); mount and df read this file.
+[[files]]
+src = "profiles/qemu-ufs.d/mounts"
+path = "/etc/mounts"
+mode = 0o644

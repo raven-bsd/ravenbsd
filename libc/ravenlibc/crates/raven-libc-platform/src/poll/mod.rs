@@ -15,7 +15,7 @@ pub mod poll;
 pub mod select;
 
 pub use epoll::{EpollEvent, epoll_create1, epoll_ctl, epoll_pwait, epoll_pwait2, epoll_wait};
-pub use poll::{poll, ppoll};
+pub use poll::{poll, ppoll, wait_readable, wait_writable};
 pub use select::{pselect, select};
 
 /// Maximum registrations in one event queue (`raven-evq-core MAX_REGISTRATIONS`).
@@ -28,6 +28,7 @@ pub const FD_SETSIZE: usize = 1024;
 pub(crate) const EV_READABLE: u32 = 1;
 pub(crate) const EV_WRITABLE: u32 = 2;
 pub(crate) const EV_HUP: u32 = 4;
+pub(crate) const EV_SIGNALED: u32 = 8;
 
 #[cfg(test)]
 #[path = "poll_ut.rs"]

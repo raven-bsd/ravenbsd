@@ -1,0 +1,159 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K203: `ping NAME` resolves through the real resolv:/resolvd path before sending ICMP. The case
+# uses a loopback DNS fixture (127.0.0.1:53) staged into the release initfs with a test-only
+# /etc/resolv.conf; it answers ping.test with 10.0.2.2 so the ICMP echo is a real slirp reply.
+# Unknown names fail without ICMP; numeric ping keeps working. No hard-coded destination.
+# The test initfs also adds scheme:resolv to the getty needs: the stock release creates getty
+# before resolvd, so the login chain's scheme-namespace snapshot lacks resolv: (release-profile
+# finding outside this ticket).
+
+name = "ping-dns"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 280
+pre = ["sh tests/fixtures/ping-dns/build.sh --if-missing"]
+initfs = "build/fixtures/ping-dns/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^ping-dns-dnsd: ready$'
+
+[[expect]]
+regex = '^ping: ping\.test seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: 1 packets transmitted, 1 received, 0% packet loss$'
+
+[[expect]]
+regex = '^ping: cannot resolve missing\.test: unknown host$'
+
+[[expect]]
+regex = '^ping-status:1$'
+
+[[expect]]
+regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: 1 packets transmitted, 1 received, 0% packet loss$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|ping: invalid IPv4 address'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/ping-dns-dnsd >/tmp/ping-dns-dnsd.log 2>&1 &\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "sleep 1; cat /tmp/ping-dns-dnsd.log\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping-dns-dnsd: ready$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "/sbin/ping -c 1 ping.test\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: ping\.test seq=1 rtt=[0-9]+ms$'
+timeout_secs = 30
+
+[[step]]
+wait = '^ping: 1 packets transmitted, 1 received, 0% packet loss$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "/sbin/ping -c 1 missing.test; echo ping-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: cannot resolve missing\.test: unknown host$'
+timeout_secs = 30
+
+[[step]]
+wait = '^ping-status:1$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "/sbin/ping -c 1 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+timeout_secs = 30
+
+[[step]]
+wait = '^ping: 1 packets transmitted, 1 received, 0% packet loss$'
+timeout_secs = 10
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 10
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

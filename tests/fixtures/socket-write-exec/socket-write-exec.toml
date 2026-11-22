@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K408 post-exec socket-write service. Runs after netd publishes the net scheme; the host peer
+# drives the READ/ACK2/DONE triggers and verifies every marker.
+
+name = "socket-write-exec"
+exec = "/bin/socket-write-exec"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

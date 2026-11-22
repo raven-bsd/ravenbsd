@@ -58,6 +58,14 @@ pub trait SysBackend {
     fn write(&self, handle: Handle, buf: &[u8]) -> Result<usize, Errno>;
     /// Close a handle.
     fn close(&self, handle: Handle) -> Result<(), Errno>;
+    /// Close a kernel handle that is not a scheme file: an event, queue or timer.
+    ///
+    /// `CLOSE` is the scheme-file close; the kernel answers `EBADF` for other object kinds and
+    /// leaves the object open. [`RealSys`] uses `HANDLE_CLOSE`; the default forwards to
+    /// [`SysBackend::close`] for backends that do not distinguish them.
+    fn handle_close(&self, handle: Handle) -> Result<(), Errno> {
+        self.close(handle)
+    }
     /// Duplicate a handle with a rights mask.
     fn dup(&self, handle: Handle, rights: u32) -> Result<Handle, Errno>;
     /// Fill the 64-byte `FSTAT` record.
@@ -167,6 +175,10 @@ impl SysBackend for RealSys {
 
     fn close(&self, handle: Handle) -> Result<(), Errno> {
         raven_libc_sys::sys::close(handle)
+    }
+
+    fn handle_close(&self, handle: Handle) -> Result<(), Errno> {
+        raven_libc_sys::sys::handle_close(handle)
     }
 
     fn dup(&self, handle: Handle, rights: u32) -> Result<Handle, Errno> {
@@ -292,6 +304,7 @@ struct FakeNode {
     mode: u32,
     kind: OfdKind,
     target: Option<Vec<u8>>,
+    legacy_tty: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -313,7 +326,8 @@ struct FakeWorld {
     nodes: BTreeMap<Vec<u8>, FakeNode>,
     handles: BTreeMap<u32, u32>,
     open_files: BTreeMap<u32, FakeOpen>,
-    tty_settings: BTreeMap<Vec<u8>, raven_proto_tty::Settings>,
+    tty_termios: BTreeMap<Vec<u8>, raven_proto_tty::Termios>,
+    tty_winsize: BTreeMap<Vec<u8>, raven_proto_tty::Winsize>,
     next_handle: u32,
     next_file: u32,
     objects: BTreeMap<u32, Vec<u8>>,
@@ -356,7 +370,8 @@ impl FakeSys {
                 nodes: BTreeMap::new(),
                 handles: BTreeMap::new(),
                 open_files: BTreeMap::new(),
-                tty_settings: BTreeMap::new(),
+                tty_termios: BTreeMap::new(),
+                tty_winsize: BTreeMap::new(),
                 next_handle: 5,
                 next_file: 100,
                 objects: BTreeMap::new(),
@@ -411,6 +426,7 @@ impl FakeSys {
                 mode,
                 kind,
                 target: None,
+                legacy_tty: false,
             },
         );
     }
@@ -420,8 +436,26 @@ impl FakeSys {
         self.node(path, &[], 0o020_620, OfdKind::Tty);
         self.world
             .borrow_mut()
-            .tty_settings
-            .insert(key(path), raven_proto_tty::Settings::default());
+            .tty_termios
+            .insert(key(path), raven_proto_tty::Termios::sane());
+        self.world
+            .borrow_mut()
+            .tty_winsize
+            .insert(key(path), raven_proto_tty::Winsize::default());
+        self
+    }
+
+    /// Create a tty node that only understands the legacy `GET_MODE`/`SET_MODE` calls.
+    ///
+    /// The real console scheme is such a server: `GET_TERMIOS`/`SET_TERMIOS` answer `ENOSYS`
+    /// and libc falls back to the canonical/echo view.
+    pub fn tty_legacy(&self, path: &[u8]) -> &Self {
+        self.tty(path);
+        let mut world = self.world.borrow_mut();
+        if let Some(node) = world.nodes.get_mut(&key(path)) {
+            node.legacy_tty = true;
+        }
+        drop(world);
         self
     }
 
@@ -436,6 +470,7 @@ impl FakeSys {
                 mode: 0o100_644,
                 kind: OfdKind::File,
                 target: None,
+                legacy_tty: false,
             },
         );
         self
@@ -450,6 +485,7 @@ impl FakeSys {
                 mode: 0o100_644,
                 kind: OfdKind::File,
                 target: None,
+                legacy_tty: false,
             },
         );
         self
@@ -568,7 +604,29 @@ impl FakeSys {
     fn record(&self, op: u64) {
         self.world.borrow_mut().trace.push(op);
     }
+
+    fn close_in_world(&self, handle: Handle) -> Result<(), Errno> {
+        let mut world = self.world.borrow_mut();
+        let file = world.handles.remove(&handle.0).ok_or(Errno::EBADF)?;
+        if !world.handles.values().any(|candidate| *candidate == file) {
+            world.open_files.remove(&file);
+        }
+        Ok(())
+    }
+
+    /// How many handles were closed through `HANDLE_CLOSE` rather than `CLOSE`.
+    pub fn handle_close_calls(&self) -> usize {
+        self.world
+            .borrow()
+            .trace
+            .iter()
+            .filter(|op| **op == HANDLE_CLOSE_TRACE)
+            .count()
+    }
 }
+
+/// Trace tag for `FakeSys::handle_close` ("HCLS").
+const HANDLE_CLOSE_TRACE: u64 = 0x4843_4C53;
 
 fn key(path: &[u8]) -> Vec<u8> {
     let mut full = b"file:".to_vec();
@@ -603,6 +661,7 @@ impl SysBackend for FakeSys {
                     mode: 0o100_666,
                     kind: OfdKind::File,
                     target: None,
+                    legacy_tty: false,
                 };
                 world.nodes.insert(path.to_vec(), node.clone());
                 node
@@ -696,12 +755,13 @@ impl SysBackend for FakeSys {
     fn close(&self, handle: Handle) -> Result<(), Errno> {
         self.take_fault(Fault::Close)?;
         self.record(0x434C_4F53);
-        let mut world = self.world.borrow_mut();
-        let file = world.handles.remove(&handle.0).ok_or(Errno::EBADF)?;
-        if !world.handles.values().any(|candidate| *candidate == file) {
-            world.open_files.remove(&file);
-        }
-        Ok(())
+        self.close_in_world(handle)
+    }
+
+    fn handle_close(&self, handle: Handle) -> Result<(), Errno> {
+        self.take_fault(Fault::Close)?;
+        self.record(HANDLE_CLOSE_TRACE);
+        self.close_in_world(handle)
     }
 
     fn dup(&self, handle: Handle, _rights: u32) -> Result<Handle, Errno> {
@@ -783,27 +843,94 @@ impl SysBackend for FakeSys {
         let mut world = self.world.borrow_mut();
         let file = *world.handles.get(&handle.0).ok_or(Errno::EBADF)?;
         let open = world.open_files.get(&file).cloned().ok_or(Errno::EBADF)?;
-        if open.kind == OfdKind::Tty
-            && req.len() == raven_proto_tty::CALL_LEN
-            && raven_proto_tty::decode_request(req).is_ok()
-        {
-            let mut body = [0u8; raven_proto_tty::CALL_LEN];
-            let request = raven_proto_tty::decode_request(req).map_err(|_| Errno::EPROTO)?;
-            let settings = *world.tty_settings.entry(open.path.clone()).or_default();
-            let response = match request {
-                raven_proto_tty::Request::GetMode => raven_proto_tty::Response::Mode(settings),
-                raven_proto_tty::Request::SetMode { settings: new } => {
-                    world.tty_settings.insert(open.path.clone(), new);
-                    raven_proto_tty::Response::Mode(new)
+        if open.kind == OfdKind::Tty && req.len() >= raven_proto_tty::CALL_LEN {
+            let op = u16::from_le_bytes([req[2], req[3]]);
+            let legacy = world
+                .nodes
+                .get(&open.path)
+                .is_some_and(|node| node.legacy_tty);
+            if legacy
+                && matches!(
+                    op,
+                    raven_proto_tty::OP_GET_TERMIOS
+                        | raven_proto_tty::OP_SET_TERMIOS
+                        | raven_proto_tty::OP_GET_WINSIZE
+                        | raven_proto_tty::OP_SET_WINSIZE
+                )
+            {
+                return Err(Errno::ENOSYS);
+            }
+            if matches!(
+                op,
+                raven_proto_tty::OP_GET_WINSIZE | raven_proto_tty::OP_SET_WINSIZE
+            ) {
+                let mut winsize = *world.tty_winsize.entry(open.path.clone()).or_default();
+                match raven_proto_tty::decode_winsize_request(req) {
+                    Ok(raven_proto_tty::WinsizeRequest::Set { winsize: new }) => {
+                        winsize = new;
+                        world.tty_winsize.insert(open.path.clone(), winsize);
+                    }
+                    Ok(raven_proto_tty::WinsizeRequest::Get) => {}
+                    Err(_) => return Err(Errno::EPROTO),
                 }
-                raven_proto_tty::Request::Flush => raven_proto_tty::Response::Flushed { bytes: 0 },
-            };
-            raven_proto_tty::encode_response(response, &mut body);
-            let copied = body.len().min(resp.len());
-            resp.get_mut(..copied)
-                .ok_or(Errno::EINVAL)?
-                .copy_from_slice(body.get(..copied).unwrap_or(&[]));
-            return Ok(copied);
+                let mut body = [0u8; raven_proto_tty::WINSIZE_LEN];
+                raven_proto_tty::encode_winsize_response(&winsize, &mut body);
+                let copied = body.len().min(resp.len());
+                resp.get_mut(..copied)
+                    .ok_or(Errno::EINVAL)?
+                    .copy_from_slice(body.get(..copied).unwrap_or(&[]));
+                return Ok(copied);
+            }
+            if matches!(
+                op,
+                raven_proto_tty::OP_GET_TERMIOS | raven_proto_tty::OP_SET_TERMIOS
+            ) {
+                let mut termios = *world
+                    .tty_termios
+                    .entry(open.path.clone())
+                    .or_insert_with(raven_proto_tty::Termios::sane);
+                match raven_proto_tty::decode_termios_request(req) {
+                    Ok(raven_proto_tty::TermiosRequest::Set { termios: new }) => {
+                        termios = new;
+                        world.tty_termios.insert(open.path.clone(), termios);
+                    }
+                    Ok(raven_proto_tty::TermiosRequest::Get) => {}
+                    Err(_) => return Err(Errno::EPROTO),
+                }
+                let mut body = [0u8; raven_proto_tty::TERMIOS_LEN];
+                raven_proto_tty::encode_termios_response(&termios, &mut body);
+                let copied = body.len().min(resp.len());
+                resp.get_mut(..copied)
+                    .ok_or(Errno::EINVAL)?
+                    .copy_from_slice(body.get(..copied).unwrap_or(&[]));
+                return Ok(copied);
+            }
+            if let Ok(request) = raven_proto_tty::decode_request(req) {
+                let mut termios = *world
+                    .tty_termios
+                    .entry(open.path.clone())
+                    .or_insert_with(raven_proto_tty::Termios::sane);
+                let mut body = [0u8; raven_proto_tty::CALL_LEN];
+                let reply = match request {
+                    raven_proto_tty::Request::SetMode { settings } => {
+                        termios.set_settings(settings);
+                        world.tty_termios.insert(open.path.clone(), termios);
+                        raven_proto_tty::Response::Mode(settings)
+                    }
+                    raven_proto_tty::Request::GetMode => {
+                        raven_proto_tty::Response::Mode(termios.settings())
+                    }
+                    raven_proto_tty::Request::Flush => {
+                        raven_proto_tty::Response::Flushed { bytes: 0 }
+                    }
+                };
+                raven_proto_tty::encode_response(reply, &mut body);
+                let copied = body.len().min(resp.len());
+                resp.get_mut(..copied)
+                    .ok_or(Errno::EINVAL)?
+                    .copy_from_slice(body.get(..copied).unwrap_or(&[]));
+                return Ok(copied);
+            }
         }
         let request = raven_proto_fs::CallRequest::decode(req).map_err(|error| error.errno())?;
         if let raven_proto_fs::Call::Mmap { len, .. } = request.call {
@@ -844,6 +971,7 @@ impl SysBackend for FakeSys {
                         mode: raven_libc_abi::stat::S_IFDIR | (mode & 0o7777),
                         kind: OfdKind::Dir,
                         target: None,
+                        legacy_tty: false,
                     },
                 );
                 raven_proto_fs::CallResponse::Status(0)
@@ -878,6 +1006,7 @@ impl SysBackend for FakeSys {
                         mode: raven_libc_abi::stat::S_IFLNK | 0o777,
                         kind: OfdKind::File,
                         target: Some(target.to_vec()),
+                        legacy_tty: false,
                     },
                 );
                 raven_proto_fs::CallResponse::Status(0)
@@ -979,11 +1108,17 @@ impl SysBackend for FakeSys {
         const MOD: u32 = 2;
         const DEL: u32 = 3;
         match op {
-            ADD => registrations.push(FakeEvent {
-                handle: handle.0,
-                events,
-                cookie,
-            }),
+            ADD => {
+                // The kernel answers EEXIST to a second registration of the same handle.
+                if registrations.iter().any(|entry| entry.handle == handle.0) {
+                    return Err(Errno::EEXIST);
+                }
+                registrations.push(FakeEvent {
+                    handle: handle.0,
+                    events,
+                    cookie,
+                });
+            }
             DEL => registrations.retain(|entry| entry.handle != handle.0),
             MOD => {
                 for entry in registrations.iter_mut() {

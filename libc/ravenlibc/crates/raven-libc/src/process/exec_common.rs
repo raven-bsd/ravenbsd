@@ -31,7 +31,31 @@ pub(crate) fn run(
     search: bool,
 ) -> c_int {
     let backend = crate::ffi::procbackend::backend();
-    let cwd = crate::ffi::platform::global().cwd();
+    let platform = crate::ffi::platform::global();
+    let cwd = platform.cwd();
+    let mut envp = envp;
+    // The first-party `rsh` selects its standard streams from these variables (its pipeline
+    // children already receive them). A host that execs `rsh` directly, such as OpenSSH's command
+    // child, has only fd numbers; publish the current fd 0/1/2 scheme handles so the shell writes
+    // to the inherited pipes instead of falling back to the console. The current fd table is
+    // authoritative: replace stale inherited values rather than preserving them.
+    // The first-party `rsh` selects its standard streams from these variables (its pipeline
+    // children already receive them). A host that execs `rsh` directly, such as OpenSSH's command
+    // child, has only fd numbers; publish the current fd 0/1/2 scheme handles so the shell writes
+    // to the inherited pipes instead of falling back to the console. The current fd table is
+    // authoritative: replace stale inherited values rather than preserving them.
+    envp.retain(|row| {
+        !(row.starts_with(b"RSH_FD0=")
+            || row.starts_with(b"RSH_FD1=")
+            || row.starts_with(b"RSH_FD2="))
+    });
+    envp.extend(platform.stdio_env());
+    crate::socket::sync_exec_meta();
+    if let Ok(Some(fdmap)) = platform.exec_fdmap_env() {
+        let prefix = raven_libc_platform::fd::inherit::ENV_NAME;
+        envp.retain(|row| !row.starts_with(prefix));
+        envp.push(fdmap);
+    }
     if !search {
         let value = crate::ffi::map_proc::exec(&backend, &cwd, path, &argv, &envp, fd);
         return crate::ffi::ret::int(Err(crate::ffi::map_proc::error(value)));

@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K430: openpty over the pty: scheme. The libc-test profile stages ptyd; the
+# fixture allocates a pair as root and again as uid 1000 (the post-auth
+# sshd-session user), checks ptsname and a master/slave byte round-trip.
+
+name = "pty-alloc"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-alloc"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^pty-alloc: start uid=0$'
+
+[[expect]]
+regex = '^pty-alloc: root master=-?[0-9]+ slave=-?[0-9]+ name=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-alloc: root ptsname=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-alloc: root roundtrip=ok$'
+
+[[expect]]
+regex = '^pty-alloc: uid=1000$'
+
+[[expect]]
+regex = '^pty-alloc: user master=-?[0-9]+ slave=-?[0-9]+ name=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-alloc: user ptsname=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-alloc: user roundtrip=ok$'
+
+[[expect]]
+regex = '^pty-alloc: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-alloc: fail'

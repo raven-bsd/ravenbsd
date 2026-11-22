@@ -18,11 +18,15 @@ boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
 
-[[expect]]
-regex = '^svcd: all services up$'
-
+# K219: the rsh-ready and all-services-up lines arrive in either order (observed both ways
+# across runs); mark both unordered, keep every other assertion ordered.
 [[expect]]
 regex = '^rsh: ready$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: all services up$'
+unordered = true
 
 [[expect]]
 regex = '^RavenBSD raven 0\.1 .* x86_64$'
@@ -62,7 +66,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven --json status\n"
+send = "/usr/sbin/raven --json status\n"
 delay_ms = 100
 
 [[step]]
@@ -74,7 +78,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven doctor && echo raven doctor: ok\n"
+send = "/usr/sbin/raven doctor && echo raven doctor: ok\n"
 delay_ms = 100
 
 [[step]]
@@ -86,7 +90,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "raven config check && echo raven config check: ok\n"
+send = "/usr/sbin/raven config check && echo raven config check: ok\n"
 delay_ms = 100
 
 [[step]]

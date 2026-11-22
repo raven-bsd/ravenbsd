@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-tty"
+version = "0.1.0"
+description = "First-party raw terminal mode for the raven console TUI."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[target.'cfg(target_os = "ravenbsd")'.dependencies]
+raven-abi = { path = "../raven-abi" }
+raven-proto-fs = { path = "../raven-proto-fs" }
+raven-proto-tty = { path = "../raven-proto-tty" }
+raven-scheme = { path = "../raven-scheme" }
+
+[lints]
+workspace = true

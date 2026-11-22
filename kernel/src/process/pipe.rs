@@ -19,6 +19,7 @@ use raven_abi::errno::Errno;
 use raven_usercopy::UserSlice;
 use spin::Mutex;
 
+use crate::event::evq_core::{HUP, READABLE, WRITABLE};
 use crate::process;
 use crate::sched;
 use crate::sched::wait::WaitQueue;
@@ -27,7 +28,7 @@ use crate::usercopy::{copy_from_user, copy_to_user};
 // The ring's wrap arithmetic is bounded by the fixed capacity and cannot overflow.
 #[allow(clippy::arithmetic_side_effects)]
 #[path = "../../../crates/raven-ipc/src/pipe_ring.rs"]
-mod ring;
+pub(crate) mod ring;
 
 /// Pipe ring capacity in bytes.
 #[allow(dead_code)] // part of the primitive's documented contract; F_GETPIPE_SZ arrives later
@@ -60,6 +61,11 @@ pub struct PipeEnd {
 }
 
 impl PipeEnd {
+    /// Watcher key shared by both ends of this pipe.
+    pub(crate) fn event_key(&self) -> u64 {
+        crate::event::pipe_key(self.pipe.id)
+    }
+
     /// True for the read end.
     pub const fn is_reader(&self) -> bool {
         !self.writer
@@ -75,6 +81,29 @@ impl PipeEnd {
     #[allow(dead_code)] // consumed by the future exec close-on-exec sweep
     pub const fn is_cloexec(&self) -> bool {
         self.cloexec
+    }
+
+    /// Current EVQ readiness bits for this pipe end.
+    ///
+    /// Read end: data is `READABLE`; a closed writer is `READABLE|HUP` (a read returns EOF);
+    /// otherwise it is not ready. Write end: no reader is `HUP`; any free ring space is
+    /// `WRITABLE`; a full ring is not ready.
+    pub fn readiness(&self) -> u32 {
+        let state = self.pipe.state.lock();
+        if self.writer {
+            if state.read_ends == 0 {
+                return HUP;
+            }
+            return if state.ring.free() != 0 { WRITABLE } else { 0 };
+        }
+        let mut events = 0;
+        if !state.ring.is_empty() {
+            events |= READABLE;
+        }
+        if state.write_ends == 0 {
+            events |= READABLE | HUP;
+        }
+        events
     }
 
     /// Wake and remove every pipe waiter owned by `process_id`.
@@ -104,6 +133,8 @@ impl PipeEnd {
         if let Some(empty) = ring::Ring::new(1) {
             state.ring = empty;
         }
+        drop(state);
+        crate::event::notify_source(self.event_key());
     }
 }
 
@@ -124,6 +155,7 @@ impl Drop for PipeEnd {
         if wake_readers {
             self.pipe.readers.wake_all();
         }
+        crate::event::notify_source(self.event_key());
     }
 }
 
@@ -228,6 +260,7 @@ pub fn read(end: &Arc<PipeEnd>, destination: UserSlice) -> Result<usize, Errno> 
         state.ring.consume(copied);
         drop(state);
         end.pipe.writers.wake_all();
+        crate::event::notify_source(end.event_key());
         return Ok(copied);
     }
 }
@@ -299,6 +332,7 @@ pub fn write(end: &Arc<PipeEnd>, source: UserSlice) -> Result<usize, Errno> {
         state.ring.produce(copied);
         drop(state);
         end.pipe.readers.wake_all();
+        crate::event::notify_source(end.event_key());
         done = done.saturating_add(copied);
         if done >= total {
             return Ok(done);

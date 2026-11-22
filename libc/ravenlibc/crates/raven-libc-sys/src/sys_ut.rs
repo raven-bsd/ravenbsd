@@ -244,3 +244,15 @@ fn futex_wrappers_report_wake_counts() {
     assert_eq!(futex_wait(&word, 4, 0), Err(Errno::EAGAIN));
     assert_eq!(futex_wake(&word, 1), Ok(0));
 }
+
+#[cfg(feature = "host-fake")]
+#[test]
+fn pipe2_wrapper_returns_two_handles_and_rejects_bad_flags() {
+    let _guard = crate::fake::test_lock();
+    crate::fake::reset();
+    let (read, write) = pipe2(0).expect("pipe2");
+    assert_ne!(read, write);
+    handle_close(read).expect("close read");
+    handle_close(write).expect("close write");
+    assert_eq!(pipe2(0x4000_0000), Err(Errno::EINVAL));
+}

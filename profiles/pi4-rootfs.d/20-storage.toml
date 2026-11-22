@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# SD2 real storage stack for the Pi 4 UFS root.
+#
+# devd launches emmc2 from `/etc/drivers.toml` and transfers the MMIO window,
+# DMA buffer and GIC interrupt; the services below consume `disk:`, `block:` and
+# `ufs:`. svcd mounts `ufs:` at `/root` and merges `/root/etc/services.d` before
+# it starts the initfs plan, so the service set and `/etc` can come from the card.
+# The three storage programs are installed here because the parent profile only
+# supplies devd/platd/vfsd.
+
+[[initfs.programs]]
+package = "emmc2"
+path = "/sbin/emmc2"
+
+[[initfs.programs]]
+package = "raven-blockd"
+path = "/sbin/blockd"
+
+[[initfs.programs]]
+package = "fsd-ufs"
+path = "/sbin/fsd-ufs"
+
+[[initfs.files]]
+src = "userland/init/pi4-rootfs-drivers.conf"
+path = "/etc/drivers.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-rootfs.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-rootfs.d/fsd-ufs-rw.manifest"
+path = "/etc/services.d/fsd-ufs.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-rootfs.d/vfsd.manifest"
+path = "/etc/services.d/vfsd.toml"

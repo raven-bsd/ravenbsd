@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Pinned donor constants checked against the model source literals.
+# file|const|value
+tests/rack-bbr-model/src/model.rs|BBR_UNIT|256
+tests/rack-vtable-model/src/model.rs|TCP_FUNC_OUTPUT_CANDROP|2
+tests/rack-vtable-model/src/model.rs|TCP_FUNC_DEFAULT_OK|4
+tests/rack-vtable-model/src/model.rs|RL_MIN_DIVISOR|50
+tests/rack-vtable-model/src/model.rs|TCP_RACK_PACE_MAX_SEG|1054
+tests/rack-vtable-model/src/model.rs|TCP_RACK_PACING_DIVISOR|1146
+tests/rack-vtable-model/src/model.rs|TCP_RACK_PACE_MIN_SEG|1147
+tests/rack-vtable-model/src/model.rs|RXT_SCOREBOARD_CLEAR_THRESH|2

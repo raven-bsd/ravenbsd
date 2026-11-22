@@ -31,6 +31,22 @@ pub use raven_usb_hid::{
     SetupPacket, TransferRing,
 };
 
+/// The `kbd:` instance path the console server opens for keyboard input.
+pub const KBD_CONSOLE_PATH: &str = "console";
+
+/// True when an `OPEN` path names the console keyboard instance.
+///
+/// The scheme root is also accepted because the service manager opens it for readiness; it never
+/// carries bytes. The console consumer uses [`KBD_CONSOLE_PATH`].
+pub fn accepts_console_path(path: &str) -> bool {
+    let path = path.strip_prefix('/').unwrap_or(path);
+    path.is_empty() || path == KBD_CONSOLE_PATH
+}
+
+#[cfg(test)]
+#[path = "lib_ut.rs"]
+mod tests;
+
 /// The standard 63-byte boot-keyboard report descriptor.
 ///
 /// It is the descriptor the fake USB core and the bring-up tests hand to

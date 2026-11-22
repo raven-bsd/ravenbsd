@@ -147,7 +147,10 @@ pub fn run(args: raven_rt::Args) -> Result<(), String> {
     let mut service = KeyboardService::new(transport);
     service.init(&report).map_err(hid_text)?;
     let queued = service.poll().map_err(hid_text)?;
-    println!("pi4-xhci: keyboard boot protocol ok, keys={queued}");
+    let mut console = [0u8; 8];
+    let read = service.read_console(&mut console);
+    crate::kbd::push(console.get(..read).unwrap_or(&[]));
+    println!("pi4-xhci: keyboard boot protocol ok, keys={queued} console={read}");
     println!("pi4-xhci: real enumeration UNVERIFIED (board path)");
     Ok(())
 }

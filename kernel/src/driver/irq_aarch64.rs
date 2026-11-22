@@ -71,6 +71,11 @@ pub struct Irq {
 }
 
 impl Irq {
+    /// Stable watcher key shared with the IRQ_CREATE registration (the SPI state allocation).
+    pub(crate) fn event_key(&self) -> u64 {
+        Arc::as_ptr(&self.state) as usize as u64
+    }
+
     /// Firings accumulated since the last wait/ack.
     pub fn pending(&self) -> u64 {
         self.state.pending.load(Ordering::Acquire)
@@ -148,7 +153,7 @@ pub fn handle_spi(spi: u32) -> bool {
         let _ = gic::disable(spi);
     }
     state.pending.fetch_add(1, Ordering::AcqRel);
-    event::notify_all();
+    event::notify_source(published);
     true
 }
 
@@ -188,6 +193,7 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 return Err(Errno::EBUSY);
             }
             let configured = gic::set_priority(number, PRIORITY).is_ok()
+                // CPU 0 is the boot CPU index; the GIC driver converts it to ITARGETSR mask 1.
                 && gic::set_target(number, 0).is_ok()
                 && gic::configure_spi(number, route.level).is_ok()
                 && gic::disable(number).is_ok()

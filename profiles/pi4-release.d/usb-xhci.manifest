@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Bounded boot-time Pi 4 VL805/xHCI probe. `devd test` matches the PCI function, hands the
+# BAR/config/DMA/IRQ handles to pi4-xhci and exits; it does not register `dev` (the platform
+# devd owns that scheme) and it never blocks boot if the keyboard or PCIe bridge is absent.
+name = "usb-xhci"
+exec = "/sbin/devd"
+args = ["devd", "test"]
+needs = ["logd", "scheme:pci", "scheme:kbd"]
+readiness = "exit"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+enable = true
+required = false

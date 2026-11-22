@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
-//! `alarm`/`ualarm`: the libc timer table and the SIGALRM delivery thread.
+//! `alarm`/`ualarm`/`setitimer`/`getitimer`: one libc `ITIMER_REAL` timer and the SIGALRM
+//! delivery thread.
 //!
 //! The kernel timer object is an event-queue source, not an asynchronous signal. One detached
 //! libc thread waits on the timer event queue and queues `SIGALRM` through the kernel
-//! `PROC_SIGNAL` syscall; `pause`/`PROC_SIGRECV` consumes the queued signal. The pure deadline
-//! arithmetic lives in `raven-libc-proc`.
+//! `PROC_SIGNAL` syscall; `pause`/`PROC_SIGRECV` consumes the queued signal. The deadline and
+//! interval arithmetic is the first-party `raven-libc-time` `ITimer` model, shared by all four
+//! entry points so `alarm(2)` is exactly `setitimer(ITIMER_REAL, {n, 0})`.
 
 use core::cell::UnsafeCell;
 use core::ffi::{c_int, c_void};
@@ -14,27 +16,33 @@ use core::ptr;
 use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use raven_abi::types::Handle;
-use raven_libc_proc::alarm::Alarm;
+use raven_libc_abi::errno::Errno;
+use raven_libc_abi::structs::Timespec;
+use raven_libc_abi::time::ITIMER_REAL;
 use raven_libc_sys::sys::{EvqEvent, evq_create, evq_ctl, evq_wait, timer_create, timer_set};
+use raven_libc_time::itimer::ITimer;
+use raven_libc_time::timer::{ITimerSpec, Now};
 
 use crate::ffi::lock::SpinLock;
 
 const SIGALRM: i32 = 14;
 const CLOCK_MONOTONIC: u32 = 1;
+const CLOCK_REALTIME: u32 = 0;
 const EVQ_ADD: u32 = 1;
 const EVQ_SIGNALED: u32 = 8;
 
 struct State {
     lock: SpinLock,
-    alarm: UnsafeCell<Alarm>,
+    timer: UnsafeCell<ITimer>,
 }
 
-// SAFETY: `lock` serialises every access to `alarm`; the timer thread only reads the atomics.
+// SAFETY: `lock` serialises every access to the timer state; the delivery thread only reads the
+// atomics.
 unsafe impl Sync for State {}
 
 static STATE: State = State {
     lock: SpinLock::new(),
-    alarm: UnsafeCell::new(Alarm::new()),
+    timer: UnsafeCell::new(ITimer::new()),
 };
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static INTERVAL_NS: AtomicU64 = AtomicU64::new(0);
@@ -58,6 +66,30 @@ fn now_ns() -> u64 {
             .saturating_mul(1_000_000_000)
             .saturating_add(time.tv_nsec.max(0) as u64),
         Err(_) => 0,
+    }
+}
+
+fn realtime_now() -> Timespec {
+    match raven_libc_sys::sys::clock_get(CLOCK_REALTIME) {
+        // The syscall returns the kernel's `Timespec`; the model uses the libc ABI record.
+        Ok(time) => Timespec {
+            tv_sec: time.tv_sec,
+            tv_nsec: time.tv_nsec,
+        },
+        Err(_) => Timespec::ZERO,
+    }
+}
+
+fn ns_of(time: Timespec) -> u64 {
+    (time.tv_sec.max(0) as u64)
+        .saturating_mul(1_000_000_000)
+        .saturating_add(time.tv_nsec.max(0) as u64)
+}
+
+fn timespec_of(ns: u64) -> Timespec {
+    Timespec {
+        tv_sec: (ns / 1_000_000_000) as i64,
+        tv_nsec: (ns % 1_000_000_000) as i64,
     }
 }
 
@@ -136,37 +168,61 @@ extern "C" fn timer_thread(arg: *mut c_void) -> *mut c_void {
     }
 }
 
+/// Arm or cancel one interval timer and return the previous value.
+///
+/// Supports `ITIMER_REAL`; the model returns `EINVAL` for the other selectors.
+pub(crate) fn set_spec(which: i32, spec: ITimerSpec) -> Result<ITimerSpec, Errno> {
+    ensure_timer();
+    let now = Now {
+        clock: realtime_now(),
+        mono_ns: now_ns(),
+    };
+    STATE.lock.acquire();
+    // SAFETY: the lock above serialises every access to the timer cell.
+    let timer = unsafe { &mut *STATE.timer.get() };
+    let result = timer.setitimer(which, spec, now);
+    STATE.lock.release();
+    let previous = result?;
+    let initial_ns = ns_of(spec.value);
+    let interval_ns = ns_of(spec.interval);
+    INTERVAL_NS.store(interval_ns, Ordering::Release);
+    ACTIVE.store(initial_ns != 0, Ordering::Release);
+    arm(initial_ns, interval_ns);
+    Ok(previous)
+}
+
+/// Read one interval timer without changing it.
+pub(crate) fn get_spec(which: i32) -> Result<ITimerSpec, Errno> {
+    STATE.lock.acquire();
+    // SAFETY: the lock above serialises every access to the timer cell.
+    let timer = unsafe { &*STATE.timer.get() };
+    let result = timer.getitimer(which, now_ns());
+    STATE.lock.release();
+    result
+}
+
 /// Arm `alarm(seconds)` and return the previous remaining seconds.
 pub fn alarm(seconds: u32) -> u32 {
-    ensure_timer();
-    let now = now_ns();
-    STATE.lock.acquire();
-    // SAFETY: the lock above serialises every access to the alarm cell.
-    let alarm = unsafe { &mut *STATE.alarm.get() };
-    let previous = alarm.set(now, u64::from(seconds).saturating_mul(1_000_000_000));
-    INTERVAL_NS.store(0, Ordering::Release);
-    ACTIVE.store(alarm.active(), Ordering::Release);
-    let initial = u64::from(seconds).saturating_mul(1_000_000_000);
-    STATE.lock.release();
-    arm(initial, 0);
-    ceil_div(previous, 1_000_000_000)
+    let spec = ITimerSpec {
+        interval: Timespec::ZERO,
+        value: timespec_of(u64::from(seconds).saturating_mul(1_000_000_000)),
+    };
+    match set_spec(ITIMER_REAL, spec) {
+        Ok(previous) => ceil_div(ns_of(previous.value), 1_000_000_000),
+        Err(_) => 0,
+    }
 }
 
 /// Arm `ualarm(usec, interval_usec)` and return the previous remaining microseconds.
 pub fn ualarm(usec: u32, interval_usec: u32) -> u32 {
-    ensure_timer();
-    let now = now_ns();
-    let initial = u64::from(usec).saturating_mul(1_000);
-    let interval = u64::from(interval_usec).saturating_mul(1_000);
-    STATE.lock.acquire();
-    // SAFETY: the lock above serialises every access to the alarm cell.
-    let alarm = unsafe { &mut *STATE.alarm.get() };
-    let previous = alarm.set_interval(now, initial, interval);
-    INTERVAL_NS.store(interval, Ordering::Release);
-    ACTIVE.store(alarm.active(), Ordering::Release);
-    STATE.lock.release();
-    arm(initial, interval);
-    ceil_div(previous, 1_000)
+    let spec = ITimerSpec {
+        interval: timespec_of(u64::from(interval_usec).saturating_mul(1_000)),
+        value: timespec_of(u64::from(usec).saturating_mul(1_000)),
+    };
+    match set_spec(ITIMER_REAL, spec) {
+        Ok(previous) => ceil_div(ns_of(previous.value), 1_000),
+        Err(_) => 0,
+    }
 }
 
 /// `pause`: block until a queued signal arrives, then return `EINTR`.

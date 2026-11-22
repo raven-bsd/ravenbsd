@@ -14,6 +14,7 @@ pub mod ioapic;
 pub mod ipi;
 pub mod msi;
 pub mod pic;
+pub mod power;
 pub mod serial;
 mod start;
 pub mod syscall;
@@ -51,4 +52,14 @@ pub fn halt() -> ! {
             core::arch::asm!("cli", "hlt", options(nomem, nostack, preserves_flags),);
         }
     }
+}
+
+/// Power the machine off through ACPI S5 (or halt when the firmware has no PM1 block).
+pub fn poweroff() -> ! {
+    power::poweroff()
+}
+
+/// Reset the machine through the FADT reset register or the 0xcf9 fallback.
+pub fn reset() -> ! {
+    power::reset()
 }

@@ -1,0 +1,307 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K209: the writable-UFS administration gate. Boot the one-disk demo qcow2 (ESP first, UFS2 root
+# second) built by `scripts/qemu-ufs.sh --build-only`, log in as root/raven, and prove the target
+# `raven` client: /usr/sbin/raven, net if/route/status, --json status, config check/get, the config TUI
+# dry-run with file=present, and a real atomic save of /etc/raven/conf.d/network.toml on UFS.
+# Run `raven-release` (or `tests/fixtures/modern-admin/build.sh`) once first: the UFS profile stages
+# that target-built artifact and this case's single pre step only builds the UFS image and makes
+# a case-specific copy of the demo qcow2. The copy is what QEMU boots: the shared demo image must
+# stay clean for `raven-users`, which injects the stub into a raw copy of it.
+name = "raven-ufs"
+arch = "x86_64"
+profile = "qemu-ufs"
+timeout_secs = 360
+pre = ["sh scripts/qemu-ufs.sh --build-only >/dev/null && mkdir -p build/fixtures/raven-ufs && cp build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2 build/fixtures/raven-ufs/raven-ufs.qcow2"]
+image = "build/fixtures/raven-ufs/raven-ufs.qcow2"
+disk_if = "virtio"
+disk_format = "qcow2"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-global", "virtio-blk-pci.disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|EUNAVAILABLE|raven: config needs check|command not found'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 240
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 120
+
+[[step]]
+send = "mount\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "[ -x /usr/sbin/raven ] && echo raven-present\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven-present$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "[ -e /bin/raven ] || echo bin-raven-absent\n"
+delay_ms = 100
+
+[[step]]
+wait = '^bin-raven-absent$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json net if\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"net\.if","name":"[^"]+","state":"up","address":"10\.0\.2\.15","prefix":24,'
+timeout_secs = 60
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven net route\n"
+delay_ms = 100
+
+[[step]]
+wait = '^default\s+10\.0\.2\.2\s+\S+'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven net status && echo net-status-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^net-status-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --json status\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "raven --json status\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config check && echo config-check-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^config: ok \([1-9][0-9]* files\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^config-check-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config get network.hostname\n"
+delay_ms = 100
+
+[[step]]
+wait = '^network\.hostname = "raven"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config get network.mode\n"
+delay_ms = 100
+
+[[step]]
+wait = '^network\.mode = "dhcp"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "export NO_COLOR=1 RAVEN_TUI=1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config --dry-run\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-release\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: dry-run plan=/etc/raven/conf\.d/network\.toml file=present$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-release\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: saved /etc/raven/conf\.d/network\.toml$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/raven/conf.d/network.toml\n"
+delay_ms = 100
+
+[[step]]
+wait = '^hostname = "raven-release"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^mode = "dhcp"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config check && echo config-recheck-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^config-recheck-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config get network.hostname\n"
+delay_ms = 100
+
+[[step]]
+wait = '^network\.hostname = "raven-release"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

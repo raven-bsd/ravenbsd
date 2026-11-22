@@ -13,11 +13,16 @@
 
 extern crate alloc;
 
+mod filter;
 mod loopback;
 mod netd;
+pub mod network;
 #[cfg(target_os = "none")]
 pub mod nic;
 
+#[cfg(target_os = "none")]
+pub use filter::load as load_pf;
+pub use filter::{FilterDevice, FilterPolicy, LoadError, PF_CONF, format_log};
 pub use loopback::Loopback;
 pub use netd::{
     Interface, NetEvent, Netd, NicAddressing, NicConfig, ReleasePing, release_dhcp_line,

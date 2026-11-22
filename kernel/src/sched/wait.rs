@@ -57,15 +57,30 @@ impl WaitQueue {
         condition: impl FnOnce() -> Result<bool, Errno>,
     ) -> Result<bool, Errno> {
         let thread = super::current_thread().ok_or(Errno::ESRCH)?;
+        crate::sched::smp::percpu::note_wait_phase(1);
         let mut waiters = self.waiters.lock();
-        if !condition()? {
+        crate::sched::smp::percpu::note_wait_phase(2);
+        let queued = match condition() {
+            Ok(queued) => queued,
+            Err(error) => {
+                drop(waiters);
+                crate::sched::smp::percpu::note_wait_phase(0);
+                return Err(error);
+            }
+        };
+        if !queued {
+            drop(waiters);
+            crate::sched::smp::percpu::note_wait_phase(0);
             return Ok(false);
         }
+        crate::sched::smp::percpu::note_wait_phase(3);
         waiters.push(Waiter {
             space,
             addr,
             thread,
         });
+        drop(waiters);
+        crate::sched::smp::percpu::note_wait_phase(0);
         Ok(true)
     }
 
@@ -79,8 +94,10 @@ impl WaitQueue {
         let mut matched = 0usize;
         let mut count = 0usize;
         while matched < max {
+            crate::sched::smp::percpu::note_wait_phase(10);
             let waiter = {
                 let mut waiters = self.waiters.lock();
+                crate::sched::smp::percpu::note_wait_phase(11);
                 waiters
                     .iter()
                     .position(|waiter| waiter.space == space && waiter.addr == addr)
@@ -90,10 +107,12 @@ impl WaitQueue {
                 break;
             };
             matched = matched.saturating_add(1);
+            crate::sched::smp::percpu::note_wait_phase(12);
             if super::wake(thread, None, 0) {
                 count = count.saturating_add(1);
             }
         }
+        crate::sched::smp::percpu::note_wait_phase(0);
         count
     }
 
@@ -138,6 +157,14 @@ impl WaitQueue {
             }
         }
         count
+    }
+
+    /// Key of the oldest registered waiter (K391 diagnostic).
+    pub fn first_key(&self) -> Option<(u64, u64)> {
+        self.waiters
+            .lock()
+            .first()
+            .map(|waiter| (waiter.space, waiter.addr))
     }
 
     /// Remove a stale waiter after its timeout won the race.

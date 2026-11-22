@@ -13,7 +13,14 @@ PROFILE ?= base
 RELEASE ?= 0
 VERBOSE ?= 0
 SETUP_ARGS ?=
+SOAK_SECONDS ?= 120
+SOAK_INTERVAL ?= 5
+SOAK_PROFILE ?= release
+TCP_SOAK_SECONDS ?= 600
+TCP_SOAK_INTERVAL ?= 10
 BASE ?= origin/master
+HELP_SCRIPT ?= scripts/make-help.sh
+HELP_MANIFEST ?= scripts/help.txt
 
 export VERBOSE
 
@@ -24,10 +31,14 @@ XTASK = cargo run -q -p xtask --
 -include .raven-env.mk
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast
+.PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
+	posix-gaps posix-check toolchain clean distclean check-fast check-build ufs-selftest qemu-ufs soak-smoke soak-24h \
+	tcp-soak-smoke tcp-soak-24h info
 
 help:
+	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
+
+help-xtask:
 	@$(XTASK) help
 
 setup:
@@ -44,6 +55,16 @@ check:
 check-fast:
 	@$(XTASK) check --fast --changed
 
+# Pre-tag gate: compile every host workspace test target, do not run tests. Closes the
+# check-fast changed-package blind spot (K394/K400). Run after check-fast and before the qtests.
+check-build:
+	@sh tests/release/workspace-build/check.sh
+
+# Host-only UFS image/partition updater proof: GPT/ESP+UFS, put/rm/mkdir/sync,
+# fsck and the safety refusals. No board and no whole-image copy.
+ufs-selftest:
+	@sh scripts/raven-ufs-selftest.sh
+
 # Full allocator stress gate: the 1M-op model runs are ignored by the routine
 # `cargo test` in `check` and are executed here, at merge/release time.
 check-full:
@@ -58,6 +79,9 @@ check-full:
 release-gate:
 	@$(XTASK) check
 	@RAVEN_USER_RELEASE=1 $(XTASK) qtest --case release-login --arch x86_64
+
+soak-24h:
+	@sh scripts/soak.sh --duration 86400 --interval 30 --profile $(SOAK_PROFILE)
 
 check-full-if-needed:
 	@changed=$$(git diff --name-only $(BASE)...HEAD -- \
@@ -90,6 +114,21 @@ release:
 image:
 	@$(XTASK) image --arch $(ARCH) --platform $(PLATFORM) --profile $(PROFILE)
 
+# K176: QEMU UFS-root preflight (ESP bootstrap + a real UFS2 root disk).
+qemu-ufs:
+	@sh scripts/qemu-ufs.sh
+
+soak-smoke:
+	@sh scripts/soak.sh --duration $(SOAK_SECONDS) --interval $(SOAK_INTERVAL) --profile $(SOAK_PROFILE)
+
+# K285: bounded 10-minute TCP soak smoke on the tcp-soak profile image. The 24 h run is
+# owner-only: `timeout 90000 make tcp-soak-24h`.
+tcp-soak-smoke:
+	@sh scripts/tcp-soak.sh --duration $(TCP_SOAK_SECONDS) --interval $(TCP_SOAK_INTERVAL)
+
+tcp-soak-24h:
+	@sh scripts/tcp-soak.sh --duration 86400 --interval 30
+
 run:
 	@$(XTASK) run --arch $(ARCH) --profile $(PROFILE)
 
@@ -102,6 +141,11 @@ world:
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .
+
+# Code statistics: Rust code lines first, then the full tokei language table. The scan excludes
+# build output, Git, and vendor trees; the summary separates vendored uutils/brush from our code.
+info:
+	@sh scripts/info.sh
 
 posix-gaps:
 	@$(XTASK) posix-gaps

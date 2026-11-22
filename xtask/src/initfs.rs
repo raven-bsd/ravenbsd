@@ -6,13 +6,56 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use raven_initfs::InitfsBuilder;
 
 use crate::build::{self, Arch, Component};
-use crate::profiles::Profile;
+use crate::profiles::{Profile, Program};
 use crate::repo::Workspace;
 use crate::uutils;
+
+/// The reproducible initfs epoch.
+///
+/// `SOURCE_DATE_EPOCH` wins when the caller sets it for an A/B reproducible build; otherwise the
+/// commit timestamp is used. The host clock is never consulted. The last fallback is the
+/// documented default epoch, so an entry never falls back to 1970.
+pub(crate) fn image_epoch(root: &Path) -> u64 {
+    if let Some(epoch) = crate::image::source_date_epoch()
+        && let Ok(value) = u64::try_from(epoch)
+    {
+        return value;
+    }
+    crate::repo::head_info(root)
+        .ok()
+        .and_then(|head| u64::try_from(head.epoch).ok())
+        .unwrap_or(raven_initfs::DEFAULT_EPOCH)
+}
+
+/// Shell-visible first-party `/bin` tools that must be statically linked.
+///
+/// The release/shell userland links `/bin` programs as dynamic PIE, but libc `posix_spawn`
+/// refuses an interpreter image through `spawn_image_with_fdmap`; the shell would report a
+/// dynamic tool as "command not found". `/sbin` programs are static by path; this list covers
+/// the `/bin` tools the login shell runs. `raven-getty` and `login` stay dynamic so the release
+/// gate keeps exercising the loader and libc startup path.
+const STATIC_SHELL_PACKAGES: &[&str] = &[
+    "curl",
+    "ed",
+    "man",
+    "raven-date",
+    "raven-hostname",
+    "raven-ps",
+    "raven-rsh",
+    "raven-sleep",
+    "raven-svcctl",
+    "raven-uname",
+    "wget",
+];
+
+/// Whether a profile program is built static rather than PIE.
+fn program_is_static(program: &Program) -> bool {
+    !program.path.starts_with("/bin/") || STATIC_SHELL_PACKAGES.contains(&program.package.as_str())
+}
 
 /// Build `build/<arch>/initfs.img` from the profile's programs.
 pub(crate) fn run(root: &Path, arch: Arch, profile: &str) -> Result<u8> {
@@ -44,7 +87,7 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
                     .programs
                     .iter()
                     .find(|program| &program.package == package)
-                    .is_none_or(|program| !program.path.starts_with("/bin/"))
+                    .is_none_or(program_is_static)
             });
         if !static_packages.is_empty() {
             let code = build::run(
@@ -74,7 +117,7 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         }
     }
 
-    let mut builder = InitfsBuilder::new();
+    let mut builder = InitfsBuilder::new().with_image_epoch(image_epoch(root));
     for program in &profile.initfs.programs {
         let path = build::artifact_path(root, arch, Component::User, &program.package);
         let data = fs::read(&path).with_context(|| {
@@ -107,6 +150,7 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         builder.add_file(&file.path, &data, file.mode)?;
     }
     let image = builder.build();
+    verify_dynamic_payload(&image, root, arch, profile.initfs.dynamic)?;
     let output = root.join("build").join(arch.as_str()).join("initfs.img");
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent)
@@ -233,18 +277,59 @@ pub(crate) fn prerequisite_plan(
     }
 }
 
+/// Staged and target paths that a release image must not inherit from an older build.
+///
+/// `build/<arch>/brush`/`uutils` are copied into the image, the cargo target directories can
+/// carry a stale feature set, RUSTFLAGS or vendored dependency build, and the dynamic
+/// `libc.so.1`/`ld-elf.so.1` pair is linked from the current sources. A release image must be
+/// reproducible from the current checkout, not from whichever cache happens to exist.
+pub(crate) fn release_userspace_paths(root: &Path, arch: Arch) -> Vec<PathBuf> {
+    vec![
+        root.join(brush_path(arch)),
+        root.join("build").join(arch.as_str()).join("uutils"),
+        root.join("build")
+            .join("cargo")
+            .join(format!("brush-{}", arch.as_str())),
+        root.join("build")
+            .join("cargo")
+            .join(format!("uutils-{}", arch.as_str())),
+        root.join("build").join(arch.as_str()).join("libc.so.1"),
+        root.join("build").join(arch.as_str()).join("ld-elf.so.1"),
+        crate::libc_link::loader_manifest_path(root, arch.as_str()),
+    ]
+}
+
+fn purge_release_userspace(root: &Path, arch: Arch) -> Result<()> {
+    for path in release_userspace_paths(root, arch) {
+        if path.is_dir() {
+            fs::remove_dir_all(&path)
+                .with_context(|| format!("cannot remove {}", path.display()))?;
+        } else if path.exists() {
+            fs::remove_file(&path).with_context(|| format!("cannot remove {}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
 /// Ensure the libc pack, brush and uutils prerequisites exist before packing an initfs.
 ///
 /// Each step runs at most once per call and only when its outputs are missing. libc is checked
-/// first because brush and uutils link against its archive and crt objects.
+/// first because brush and uutils link against its archive and crt objects. A release profile
+/// discards the staged brush/uutils tree and their target caches first, so a stale binary or a
+/// stale feature/RUSTFLAGS target cannot be packed into the image.
 pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
+    let release = release_user_programs(
+        profile.initfs.release,
+        std::env::var("RAVEN_USER_RELEASE").ok().as_deref(),
+    );
+    if release {
+        purge_release_userspace(root, arch)?;
+    }
     let plan = prerequisite_plan(profile, arch, |source| root.join(source).is_file());
-    if !plan.libc.is_empty() {
-        ensure_libc(
-            root,
-            arch,
-            profile.initfs.dynamic && build::dynamic_supported(arch),
-        )?;
+    let dynamic = profile.initfs.dynamic && build::dynamic_supported(arch);
+    let manifest_stale = dynamic && !crate::libc_link::loader_manifest_matches(root, arch.as_str());
+    if !plan.libc.is_empty() || manifest_stale {
+        ensure_libc(root, arch, dynamic)?;
     }
     if plan.brush {
         ensure_brush(root, arch, profile)?;
@@ -305,26 +390,34 @@ where
     missing
 }
 
-/// Run the libc pack when the arch archive or a crt object is missing.
+/// Run the libc pack when the arch archive or a crt object is missing, or relink the dynamic
+/// loader when its manifest is missing or does not describe the file on disk.
 pub(crate) fn ensure_libc(root: &Path, arch: Arch, dynamic: bool) -> Result<()> {
+    let manifest_stale = dynamic && !crate::libc_link::loader_manifest_matches(root, arch.as_str());
     let missing = libc_missing(arch, dynamic, |source| root.join(source).is_file());
-    if missing.is_empty() {
+    if missing.is_empty() && !manifest_stale {
         return Ok(());
     }
-    println!(
-        "==> libc {}: packing missing prerequisites ({})",
-        arch.as_str(),
-        missing.join(", ")
-    );
-    let code = crate::libc_pack::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
-    if code != 0 {
-        bail!("libc-pack failed with exit code {code}");
+    if missing.is_empty() {
+        println!(
+            "==> libc {}: relinking the dynamic loader (missing or stale manifest)",
+            arch.as_str()
+        );
+    } else {
+        println!(
+            "==> libc {}: packing missing prerequisites ({})",
+            arch.as_str(),
+            missing.join(", ")
+        );
+        let code = crate::libc_pack::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
+        if code != 0 {
+            bail!("libc-pack failed with exit code {code}");
+        }
     }
-    if dynamic
-        && missing
-            .iter()
-            .any(|source| DYNAMIC_OUTPUTS.iter().any(|name| source.ends_with(name)))
-    {
+    let dynamic_missing = missing
+        .iter()
+        .any(|source| DYNAMIC_OUTPUTS.iter().any(|name| source.ends_with(name)));
+    if dynamic && (dynamic_missing || manifest_stale) {
         let code = crate::libc_link::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
         if code != 0 {
             bail!("libc-link failed with exit code {code}");
@@ -333,6 +426,74 @@ pub(crate) fn ensure_libc(root: &Path, arch: Arch, dynamic: bool) -> Result<()> 
     let missing = libc_missing(arch, dynamic, |source| root.join(source).is_file());
     if !missing.is_empty() {
         bail!("libc-pack did not produce: {}", missing.join(", "));
+    }
+    if dynamic {
+        verify_loader(root, arch)?;
+    }
+    Ok(())
+}
+
+/// Assert the loader on disk satisfies the K7 contract and its manifest.
+fn verify_loader(root: &Path, arch: Arch) -> Result<()> {
+    let loader = root.join("build").join(arch.as_str()).join("ld-elf.so.1");
+    if let Err(error) = crate::libc_link::check_elf(&loader, "loader") {
+        bail!("loader contract: {error}");
+    }
+    if !crate::libc_link::loader_manifest_matches(root, arch.as_str()) {
+        bail!(
+            "loader manifest is missing or does not match {}",
+            loader.display()
+        );
+    }
+    Ok(())
+}
+
+/// Assert the packed initfs carries the freshly built loader and its manifest contract.
+///
+/// The image builder calls this before writing the image, so a stale `build/<arch>/ld-elf.so.1`
+/// can neither be silently packed nor leave an image behind. `dynamic` profiles without a
+/// supported dynamic target are skipped.
+pub(crate) fn verify_dynamic_payload(
+    image: &[u8],
+    root: &Path,
+    arch: Arch,
+    dynamic: bool,
+) -> Result<()> {
+    if !dynamic || !build::dynamic_supported(arch) {
+        return Ok(());
+    }
+    let initfs = raven_initfs::Initfs::parse(image)
+        .map_err(|error| anyhow!("cannot parse the packed initfs: {error:?}"))?;
+    let loader = root.join("build").join(arch.as_str()).join("ld-elf.so.1");
+    let loader_bytes = fs::read(&loader)
+        .with_context(|| format!("cannot read the dynamic loader {}", loader.display()))?;
+    let entry = initfs
+        .get("/libexec/ld-elf.so.1")
+        .ok_or_else(|| anyhow!("initfs does not contain /libexec/ld-elf.so.1"))?;
+    if entry.data != loader_bytes.as_slice() {
+        bail!(
+            "the packed loader does not match the freshly built {}",
+            loader.display()
+        );
+    }
+    let manifest = crate::libc_link::read_loader_manifest(root, arch.as_str())
+        .ok_or_else(|| anyhow!("loader manifest missing for {}", loader.display()))?;
+    let expected_base = format!("0x{:x}", crate::libc_link::LOADER_IMAGE_BASE);
+    if manifest.image_base != expected_base {
+        bail!(
+            "loader manifest image_base is {}, expected {expected_base}",
+            manifest.image_base
+        );
+    }
+    if manifest.interpreter != crate::libc_link::LOADER_INTERPRETER {
+        bail!(
+            "loader manifest interpreter is {}, expected {}",
+            manifest.interpreter,
+            crate::libc_link::LOADER_INTERPRETER
+        );
+    }
+    if manifest.crc32 != format!("{:08x}", raven_initfs::crc32(&loader_bytes)) {
+        bail!("loader manifest crc32 does not match {}", loader.display());
     }
     Ok(())
 }
@@ -361,6 +522,8 @@ pub(crate) fn ensure_brush(root: &Path, arch: Arch, profile: &Profile) -> Result
 pub(crate) fn source_path(root: &Path, arch: Arch, source: &str) -> PathBuf {
     if source == "build/brush" {
         root.join(brush_path(arch))
+    } else if let Some(rest) = source.strip_prefix("build/{arch}/") {
+        root.join("build").join(arch.as_str()).join(rest)
     } else {
         root.join(source)
     }
@@ -373,7 +536,7 @@ pub(crate) fn source_path(root: &Path, arch: Arch, source: &str) -> PathBuf {
 /// The slice build is the same one `cargo xtask build uutils` runs; it is skipped when every
 /// referenced staging file already exists so normal image builds stay fast.
 pub(crate) fn ensure_uutils(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
-    let exists = |source: &str| root.join(source).is_file();
+    let exists = |source: &str| source_path(root, arch, source).is_file();
     let missing = uutils_missing(profile, arch, exists);
     if missing.is_empty() {
         return Ok(());
@@ -387,7 +550,7 @@ pub(crate) fn ensure_uutils(root: &Path, arch: Arch, profile: &Profile) -> Resul
     if code != 0 {
         bail!("uutils staging build failed with exit code {code}");
     }
-    let exists = |source: &str| root.join(source).is_file();
+    let exists = |source: &str| source_path(root, arch, source).is_file();
     let missing = uutils_missing(profile, arch, exists);
     if !missing.is_empty() {
         bail!(
@@ -400,8 +563,10 @@ pub(crate) fn ensure_uutils(root: &Path, arch: Arch, profile: &Profile) -> Resul
 
 /// The uutils name in a profile source such as `build/x86_64/uutils/ls`.
 fn uutils_source_name(arch: Arch, source: &str) -> Option<&str> {
-    let prefix = format!("build/{}/uutils/", arch.as_str());
-    let name = source.strip_prefix(&prefix)?;
+    let concrete = format!("build/{}/uutils/", arch.as_str());
+    let name = source
+        .strip_prefix(&concrete)
+        .or_else(|| source.strip_prefix("build/{arch}/uutils/"))?;
     if name.is_empty() || name.contains('/') {
         None
     } else {

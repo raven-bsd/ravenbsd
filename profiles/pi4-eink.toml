@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 hardware/demo profile for the 7.5-inch E-Ink panel. The loader permits one inheritance
+# level, so this extends `base` and reuses the release fragments by symlink (05-release-*.toml):
+# EMMC2/blockd staging, the network/service stack, getty/login and the platform drivers. The
+# 10-eink fragment adds the BSP-built binary, the service manifest and `/etc/einkd.conf`. The
+# service stays disabled until a launch path supplies the SPI0 handle and platd can drive
+# DC/RST; see `docs/eink-demo.md`.
+name = "pi4-eink"
+extends = "base"
+
+[initfs]
+dynamic = true
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

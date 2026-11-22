@@ -1,0 +1,250 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# E4 copy of pi4-release.d/20-userspace.toml; only the /etc/drivers.toml source differs so
+# pi4-eink can add the spi0d driver entry.
+#
+# Release service and tool set: the shell services, network stack and platform
+# service, plus the REL1c getty/login accounts. Paths already supplied by `base`
+# (`/init`, `/bin/uname`, `/bin/echo`, the `/etc/raven` files) are not repeated.
+[[initfs.programs]]
+package = "raven-svcctl"
+path = "/bin/svcctl"
+
+[[initfs.programs]]
+package = "raven-logd"
+path = "/sbin/logd"
+
+[[initfs.programs]]
+package = "raven-sysd"
+path = "/sbin/sysd"
+
+[[initfs.programs]]
+package = "raven-randd"
+path = "/sbin/randd"
+
+[[initfs.programs]]
+package = "raven-zerod"
+path = "/sbin/zerod"
+
+[[initfs.programs]]
+package = "raven-nulld"
+path = "/sbin/nulld"
+
+[[initfs.programs]]
+package = "raven-initfsd"
+path = "/sbin/initfsd"
+
+[[initfs.programs]]
+package = "raven-ramfsd"
+path = "/sbin/ramfsd"
+
+[[initfs.programs]]
+package = "raven-vfsd"
+path = "/sbin/vfsd"
+
+[[initfs.programs]]
+package = "raven-consd"
+path = "/sbin/consd"
+
+[[initfs.programs]]
+package = "raven-rsh"
+path = "/bin/rsh"
+
+[[initfs.programs]]
+package = "raven-sleep"
+path = "/bin/sleep"
+
+[[initfs.programs]]
+package = "raven-date"
+path = "/bin/date"
+
+[[initfs.programs]]
+package = "raven-hostname"
+path = "/bin/hostname"
+
+[[initfs.programs]]
+package = "raven-dmesg"
+path = "/sbin/dmesg"
+
+[[initfs.programs]]
+package = "raven-mount"
+path = "/sbin/mount"
+
+[[initfs.programs]]
+package = "raven-umount"
+path = "/sbin/umount"
+
+[[initfs.programs]]
+package = "raven-ps"
+path = "/bin/ps"
+
+[[initfs.programs]]
+package = "netd"
+path = "/sbin/netd"
+
+[[initfs.programs]]
+package = "resolvd"
+path = "/sbin/resolvd"
+
+[[initfs.programs]]
+package = "raven-ping"
+path = "/bin/ping"
+
+[[initfs.programs]]
+package = "raven-route"
+path = "/sbin/route"
+
+[[initfs.programs]]
+package = "raven-netstat"
+path = "/sbin/netstat"
+
+[[initfs.programs]]
+package = "raven-platd"
+path = "/sbin/platd"
+
+[[initfs.programs]]
+package = "raven-pcid"
+path = "/sbin/pcid"
+
+[[initfs.programs]]
+package = "raven-devd"
+path = "/sbin/devd"
+
+[[initfs.programs]]
+package = "genet"
+path = "/sbin/genet"
+
+[[initfs.programs]]
+package = "raven-getty"
+path = "/bin/getty"
+
+[[initfs.programs]]
+package = "login"
+path = "/bin/login"
+
+[[initfs.programs]]
+package = "pi4-xhci"
+path = "/sbin/pi4-xhci"
+
+[[initfs.programs]]
+package = "usb-hid"
+path = "/sbin/usb-hid"
+
+[[initfs.files]]
+src = "etc/services.d/logd.toml"
+path = "/etc/services.d/logd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/sysd.toml"
+path = "/etc/services.d/sysd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/randd.toml"
+path = "/etc/services.d/randd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/zerod.toml"
+path = "/etc/services.d/zerod.toml"
+
+[[initfs.files]]
+src = "etc/services.d/nulld.toml"
+path = "/etc/services.d/nulld.toml"
+
+[[initfs.files]]
+src = "etc/services.d/initfsd.toml"
+path = "/etc/services.d/initfsd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/ramfsd.toml"
+path = "/etc/services.d/ramfsd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/vfsd.toml"
+path = "/etc/services.d/vfsd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/consd.toml"
+path = "/etc/services.d/consd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/rsh.toml"
+path = "/etc/services.d/rsh.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/netd.manifest"
+path = "/etc/services.d/netd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/resolvd.toml"
+path = "/etc/services.d/resolvd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/platd.manifest"
+path = "/etc/services.d/platd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/pcid.toml"
+path = "/etc/services.d/pcid.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/devd.manifest"
+path = "/etc/services.d/devd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/genet.manifest"
+path = "/etc/services.d/genet.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-eink.d/drivers.conf"
+path = "/etc/drivers.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/getty.manifest"
+path = "/etc/services.d/getty.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/usb-hid.manifest"
+path = "/etc/services.d/usb-hid.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/usb-xhci.manifest"
+path = "/etc/services.d/usb-xhci.toml"
+
+[[initfs.files]]
+src = "etc/mounts"
+path = "/etc/mounts"
+
+[[initfs.files]]
+src = "etc/resolv.conf"
+path = "/etc/resolv.conf"
+
+[[initfs.files]]
+src = "etc/passwd"
+path = "/etc/passwd"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/group"
+path = "/etc/group"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/shadow"
+path = "/etc/shadow"
+mode = 0o600
+
+[[initfs.files]]
+src = "etc/profile"
+path = "/etc/profile"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/brush/brushrc"
+path = "/etc/brush/brushrc"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/motd"
+path = "/etc/motd"
+mode = 0o644

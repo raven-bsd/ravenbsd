@@ -18,7 +18,25 @@ pub mod protocol;
 pub mod registry;
 pub mod router;
 
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU32, AtomicU64, Ordering};
+
+/// K147 fixed-cost stage trace, enabled by `k147-trace` on the kernel command line.
+///
+/// The first call parses the command line once; every later check is a cached atomic load.
+pub(crate) fn trace_k147() -> bool {
+    static STATE: AtomicU8 = AtomicU8::new(0);
+    match STATE.load(Ordering::Relaxed) {
+        1 => false,
+        2 => true,
+        _ => {
+            let enabled = crate::memory::paging::cmdline()
+                .split_ascii_whitespace()
+                .any(|token| token == "k147-trace");
+            STATE.store(if enabled { 2 } else { 1 }, Ordering::Relaxed);
+            enabled
+        }
+    }
+}
 
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
@@ -417,6 +435,31 @@ pub fn on_process_exit(process: &Arc<Process>) {
         );
     }
 
+    // S125 evidence: server slot usage must return to zero, and the global high-water mark
+    // shows whether the pool is sized for two captures per concurrent CALL.
+    if crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s125-capturecheck")
+    {
+        let stats = capture::slot_stats();
+        let pool = process.capture_slots.lock().stats();
+        crate::kprintln!(
+            "s125: exit {} server_captures={} server_capture_peak={} server_pages={} server_page_peak={} active={} global_peak={} page_active={} page_peak={} acquires={} releases={} frames={}",
+            process.path,
+            pool.captures,
+            pool.capture_peak,
+            pool.pages,
+            pool.page_peak,
+            stats.active,
+            stats.peak,
+            stats.pages,
+            stats.page_peak,
+            stats.acquires,
+            stats.releases,
+            capture::frames_in_use()
+        );
+    }
+
     // S32 leak probe: capture frames still owned after the process's requests were drained.
     // Zero means every copy-backed capture was released exactly once.
     if crate::memory::paging::cmdline()
@@ -424,6 +467,15 @@ pub fn on_process_exit(process: &Arc<Process>) {
         .any(|token| token == "s32-capturecheck")
     {
         let stats = crate::memory::frame::stats();
+        // The init is the last process to exit; its line is the end-of-test baseline even when
+        // an intermediate cancelled capture is deliberately still mapped for an in-flight reply.
+        if process.path == "/init" {
+            crate::kprintln!(
+                "s32: final frames={} free_bytes={}",
+                capture::frames_in_use(),
+                stats.free_bytes
+            );
+        }
         crate::kprintln!(
             "s32: capture frames={} free_bytes={}",
             capture::frames_in_use(),

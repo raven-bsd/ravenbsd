@@ -1,0 +1,240 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K199: base curl/wget over raven-http/raven-http-net against a multi-request local HTTP server.
+# The base binaries stay C-free; the HTTPS fallback must be a clear EUNAVAILABLE.
+# K219: the fixture server uses port 18081; its /slow endpoint sleeps 5 s, so --max-time 1 must
+# return non-zero with real margin.
+
+name = "fetch-http"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/fixtures/fetch/build.sh http"]
+initfs = "build/fixtures/fetch/http-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "curl http://10.0.2.2:18081/known.txt; ec=$?; echo; echo curl-body=$ec\n"
+delay_ms = 100
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 60
+
+[[step]]
+wait = '^curl-body=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "touch /tmp/probe; echo touch=$?\n"
+delay_ms = 0
+
+[[step]]
+wait = '^touch=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "printf x > /tmp/probe2; echo redir=$?\n"
+delay_ms = 0
+
+[[step]]
+wait = '^redir=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "curl -o /tmp/curl-known.txt http://10.0.2.2:18081/known.txt; echo curl-o=$?; cat /tmp/curl-known.txt; echo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl-o=0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 30
+
+[[step]]
+send = "wget -O /tmp/wget-known.txt http://10.0.2.2:18081/known.txt; echo wget-o=$?; cat /tmp/wget-known.txt; echo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^wget: http://10\.0\.2\.2:18081/known\.txt -> /tmp/wget-known\.txt \(15 bytes\)$'
+timeout_secs = 60
+
+[[step]]
+wait = '^wget-o=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 30
+
+[[step]]
+send = "cd /tmp; wget http://10.0.2.2:18081/known.txt; echo wget-default=$?; cat known.txt; echo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^wget: http://10\.0\.2\.2:18081/known\.txt -> known\.txt \(15 bytes\)$'
+timeout_secs = 60
+
+[[step]]
+wait = '^wget-default=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 30
+
+[[step]]
+send = "curl -f http://10.0.2.2:18081/missing; echo curl-f=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl: HTTP status 404$'
+timeout_secs = 60
+
+[[step]]
+wait = '^curl-f=22$'
+timeout_secs = 30
+
+[[step]]
+send = "curl -L http://10.0.2.2:18081/redirect; echo; echo curl-l=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 60
+
+[[step]]
+wait = '^curl-l=0$'
+timeout_secs = 30
+
+[[step]]
+send = "curl -I http://10.0.2.2:18081/known.txt; echo curl-i=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^HTTP/1\.1 200 OK'
+timeout_secs = 60
+
+[[step]]
+wait = '^Content-Length: 15'
+timeout_secs = 30
+
+[[step]]
+wait = '^curl-i=0$'
+timeout_secs = 30
+
+[[step]]
+send = "curl -H 'X-Test: yes' http://10.0.2.2:18081/header; echo; echo curl-h=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^header=yes$'
+timeout_secs = 60
+
+[[step]]
+wait = '^curl-h=0$'
+timeout_secs = 30
+
+[[step]]
+send = "curl -s http://10.0.2.2:18081/insult.txt; echo; echo curl-insult=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^insult: your code is so slow it missed the TLB shootdown$'
+timeout_secs = 60
+
+[[step]]
+wait = '^curl-insult=0$'
+timeout_secs = 30
+
+[[step]]
+send = "curl --max-time 1 http://10.0.2.2:18081/slow; echo curl-slow=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl-slow=1$'
+timeout_secs = 60
+
+[[step]]
+send = "curl --max-time 2 http://10.0.2.99:18081/; echo curl-host=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl-host=[1-9][0-9]*$'
+timeout_secs = 60
+
+[[step]]
+send = "curl https://10.0.2.2:24443/known.txt; echo curl-https=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl: https unavailable \(EUNAVAILABLE\): TLS add-on not linked$'
+timeout_secs = 30
+
+[[step]]
+wait = '^curl-https=1$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|body-mismatch|status-mismatch'

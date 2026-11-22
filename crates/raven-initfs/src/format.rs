@@ -6,7 +6,18 @@
 /// Archive magic (`"RAVENFS1"`).
 pub(crate) const MAGIC: [u8; 8] = *b"RAVENFS1";
 /// Format version written into the header.
-pub(crate) const VERSION: u32 = 1;
+///
+/// Version 2 adds the image epoch and per-entry modification time in the former reserved bytes.
+/// The reader still accepts version 1, where both are absent and the documented default epoch is
+/// used.
+pub(crate) const VERSION: u32 = 2;
+/// The previous format version, accepted for reading.
+pub(crate) const LEGACY_VERSION: u32 = 1;
+/// Fallback modification time when an image records none: 2026-01-01T00:00:00Z.
+///
+/// Deterministic and host-clock-free. New images record the reproducible build epoch in the
+/// header, so this only applies to legacy version 1 images and builders that did not set one.
+pub const DEFAULT_EPOCH: u64 = 1_767_225_600;
 /// Size of the fixed header in bytes.
 pub(crate) const HEADER_SIZE: usize = 64;
 /// Size of one fixed entry in bytes.
@@ -23,8 +34,10 @@ pub(crate) const HEADER_ENTRY_SIZE_OFFSET: usize = 20;
 pub(crate) const HEADER_NAMES_OFFSET: usize = 24;
 pub(crate) const HEADER_NAMES_LEN_OFFSET: usize = 32;
 pub(crate) const HEADER_TOTAL_SIZE_OFFSET: usize = 40;
-pub(crate) const HEADER_RESERVED_OFFSET: usize = 48;
-pub(crate) const HEADER_RESERVED_LEN: usize = 16;
+/// Image build epoch (seconds since the Unix epoch) in version 2.
+pub(crate) const HEADER_EPOCH_OFFSET: usize = 48;
+pub(crate) const HEADER_RESERVED_OFFSET: usize = 56;
+pub(crate) const HEADER_RESERVED_LEN: usize = 8;
 
 pub(crate) const ENTRY_NAME_OFF_OFFSET: usize = 0;
 pub(crate) const ENTRY_NAME_LEN_OFFSET: usize = 4;
@@ -32,8 +45,10 @@ pub(crate) const ENTRY_DATA_OFF_OFFSET: usize = 8;
 pub(crate) const ENTRY_DATA_LEN_OFFSET: usize = 16;
 pub(crate) const ENTRY_MODE_OFFSET: usize = 24;
 pub(crate) const ENTRY_CRC_OFFSET: usize = 28;
-pub(crate) const ENTRY_RESERVED_OFFSET: usize = 32;
-pub(crate) const ENTRY_RESERVED_LEN: usize = 16;
+/// Per-entry modification time in version 2; zero inherits [`HEADER_EPOCH_OFFSET`].
+pub(crate) const ENTRY_MTIME_OFFSET: usize = 32;
+pub(crate) const ENTRY_RESERVED_OFFSET: usize = 40;
+pub(crate) const ENTRY_RESERVED_LEN: usize = 8;
 
 const _: () = {
     assert!(HEADER_SIZE == 64);
@@ -46,14 +61,16 @@ const _: () = {
     assert!(HEADER_ENTRY_SIZE_OFFSET + 4 == HEADER_NAMES_OFFSET);
     assert!(HEADER_NAMES_OFFSET + 8 == HEADER_NAMES_LEN_OFFSET);
     assert!(HEADER_NAMES_LEN_OFFSET + 8 == HEADER_TOTAL_SIZE_OFFSET);
-    assert!(HEADER_TOTAL_SIZE_OFFSET + 8 == HEADER_RESERVED_OFFSET);
+    assert!(HEADER_TOTAL_SIZE_OFFSET + 8 == HEADER_EPOCH_OFFSET);
+    assert!(HEADER_EPOCH_OFFSET + 8 == HEADER_RESERVED_OFFSET);
     assert!(HEADER_RESERVED_OFFSET + HEADER_RESERVED_LEN == HEADER_SIZE);
     assert!(ENTRY_NAME_OFF_OFFSET + 4 == ENTRY_NAME_LEN_OFFSET);
     assert!(ENTRY_NAME_LEN_OFFSET + 4 == ENTRY_DATA_OFF_OFFSET);
     assert!(ENTRY_DATA_OFF_OFFSET + 8 == ENTRY_DATA_LEN_OFFSET);
     assert!(ENTRY_DATA_LEN_OFFSET + 8 == ENTRY_MODE_OFFSET);
     assert!(ENTRY_MODE_OFFSET + 4 == ENTRY_CRC_OFFSET);
-    assert!(ENTRY_CRC_OFFSET + 4 == ENTRY_RESERVED_OFFSET);
+    assert!(ENTRY_CRC_OFFSET + 4 == ENTRY_MTIME_OFFSET);
+    assert!(ENTRY_MTIME_OFFSET + 8 == ENTRY_RESERVED_OFFSET);
     assert!(ENTRY_RESERVED_OFFSET + ENTRY_RESERVED_LEN == ENTRY_SIZE);
 };
 
@@ -126,63 +143,5 @@ pub(crate) fn read_u64(image: &[u8], offset: usize) -> Option<u64> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{NAME_MAX, PathError, validate_path};
-
-    #[test]
-    fn valid_paths_are_accepted() {
-        for path in [
-            "/init",
-            "/bin/hello",
-            "/sbin/init",
-            "/a/b-c_d.ef",
-            "/bin/日本語",
-            "/a b",
-        ] {
-            assert_eq!(validate_path(path), Ok(()), "{path}");
-        }
-    }
-
-    #[test]
-    fn path_must_be_absolute() {
-        assert_eq!(validate_path("bin/hello"), Err(PathError::NotAbsolute));
-        assert_eq!(validate_path(""), Err(PathError::NotAbsolute));
-    }
-
-    #[test]
-    fn root_alone_and_trailing_slash_are_rejected() {
-        assert_eq!(validate_path("/"), Err(PathError::EmptyComponent));
-        assert_eq!(validate_path("/bin/"), Err(PathError::EmptyComponent));
-        assert_eq!(validate_path("//"), Err(PathError::EmptyComponent));
-    }
-
-    #[test]
-    fn empty_components_are_rejected() {
-        assert_eq!(validate_path("/bin//sh"), Err(PathError::EmptyComponent));
-        assert_eq!(validate_path("/a//b/c"), Err(PathError::EmptyComponent));
-    }
-
-    #[test]
-    fn dot_components_are_rejected() {
-        assert_eq!(validate_path("/."), Err(PathError::InvalidComponent));
-        assert_eq!(validate_path("/.."), Err(PathError::InvalidComponent));
-        assert_eq!(validate_path("/a/./b"), Err(PathError::InvalidComponent));
-        assert_eq!(validate_path("/a/../b"), Err(PathError::InvalidComponent));
-    }
-
-    #[test]
-    fn nul_bytes_are_rejected() {
-        assert_eq!(validate_path("/a\0b"), Err(PathError::Nul));
-    }
-
-    #[test]
-    fn path_length_limit_is_bytes() {
-        let max = format!("/{}", "a".repeat(NAME_MAX - 1));
-        assert_eq!(max.len(), NAME_MAX);
-        assert_eq!(validate_path(&max), Ok(()));
-
-        let too_long = format!("/{}", "a".repeat(NAME_MAX));
-        assert_eq!(too_long.len(), NAME_MAX + 1);
-        assert_eq!(validate_path(&too_long), Err(PathError::TooLong));
-    }
-}
+#[path = "format_ut.rs"]
+mod tests;

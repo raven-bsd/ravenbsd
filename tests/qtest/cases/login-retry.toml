@@ -1,0 +1,222 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# SESSION1: a wrong root password is rejected with `Login incorrect`, getty prompts again, and the
+# next attempt reaches a full brush session. The session proves the profile environment, the
+# colored prompt text, completion and that `--help` is plain when stdout is a pipe.
+
+name = "login-retry"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+pre = ["cargo xtask build brush --arch x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$'
+
+[[expect]]
+regex = '^Login incorrect$'
+
+[[expect]]
+regex = '^shell=brush$'
+
+[[expect]]
+regex = '^path=/bin:/sbin:/usr/bin:/usr/sbin$'
+
+[[expect]]
+regex = '^home=/root$'
+
+[[expect]]
+regex = '^term=vt100$'
+
+[[expect]]
+regex = '^user=root$'
+
+[[expect]]
+regex = '^user-shell=/bin/brush$'
+
+[[expect]]
+regex = '^logname=root$'
+
+[[expect]]
+regex = '^profile=loaded$'
+
+[[expect]]
+regex = '^ps1=.*38;5;183.*raven#.*$'
+
+[[expect]]
+regex = "^complete -W 'help exit' raven-test$"
+
+[[expect]]
+regex = '^tty=yes$'
+
+[[expect]]
+regex = '^help-pipe=plain$'
+
+[[expect]]
+regex = '^Usage: brush'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|rsh: ready|login: .*failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "not-the-password\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Login incorrect$'
+timeout_secs = 30
+
+[[step]]
+wait = '(?i)^login: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "echo shell=$0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^shell=brush$'
+timeout_secs = 30
+
+[[step]]
+send = "printf 'path=%s\\n' \"$PATH\"\n"
+delay_ms = 100
+
+[[step]]
+wait = '^path=/bin:/sbin:/usr/bin:/usr/sbin$'
+timeout_secs = 30
+
+[[step]]
+send = "printf 'home=%s\\n' \"$HOME\"\n"
+delay_ms = 100
+
+[[step]]
+wait = '^home=/root$'
+timeout_secs = 30
+
+[[step]]
+send = "printf 'term=%s\\n' \"$TERM\"\n"
+delay_ms = 100
+
+[[step]]
+wait = '^term=vt100$'
+timeout_secs = 30
+
+[[step]]
+send = "printf 'user=%s\\n' \"$USER\"\n"
+delay_ms = 100
+
+[[step]]
+wait = '^user=root$'
+timeout_secs = 30
+
+[[step]]
+send = "printf 'user-shell=%s\\n' \"$SHELL\"\n"
+delay_ms = 100
+
+[[step]]
+wait = '^user-shell=/bin/brush$'
+timeout_secs = 30
+
+[[step]]
+send = "printf 'logname=%s\\n' \"$LOGNAME\"\n"
+delay_ms = 100
+
+[[step]]
+wait = '^logname=root$'
+timeout_secs = 30
+
+[[step]]
+send = "printf 'profile=%s\\n' \"$RAVEN_PROFILE\"\n"
+delay_ms = 100
+
+[[step]]
+wait = '^profile=loaded$'
+timeout_secs = 30
+
+[[step]]
+send = "printf 'ps1=%s\\n' \"$PS1\"\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ps1=.*38;5;183.*raven#.*$'
+timeout_secs = 30
+
+[[step]]
+send = "complete -p raven-test\n"
+delay_ms = 100
+
+[[step]]
+wait = "^complete -W 'help exit' raven-test$"
+timeout_secs = 30
+
+[[step]]
+send = "[ -t 1 ] && echo tty=yes || echo tty=no\n"
+delay_ms = 100
+
+[[step]]
+wait = '^tty=yes$'
+timeout_secs = 30
+
+[[step]]
+send = "H=$(/bin/brush --help); case \"$H\" in *$'\\e['*) echo help-pipe=color;; *) echo help-pipe=plain;; esac\n"
+delay_ms = 100
+
+[[step]]
+wait = '^help-pipe=plain$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --help\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Usage: brush'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

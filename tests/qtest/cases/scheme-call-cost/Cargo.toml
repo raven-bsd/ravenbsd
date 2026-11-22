@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-scheme-call-cost"
+version = "0.1.0"
+description = "K147 scheme call-cost benchmark fixture"
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+publish = false
+
+[workspace]
+
+[lib]
+name = "raven_scheme_call_cost"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-scheme-call-cost-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-scheme-call-cost-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "raven-scheme-call-cost-client"
+path = "src/bin/client.rs"
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-ipc = { path = "../../../../crates/raven-ipc" }
+raven-initfs = { path = "../../../../crates/raven-initfs" }
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc"] }
+raven-s11-echo = { path = "../../../fixtures/s11-echo" }

@@ -152,6 +152,31 @@ fn interrupt_echoes_caret_c_and_a_newline() {
 }
 
 #[test]
+fn quit_discards_the_line_and_echoes_caret_backslash() {
+    let mut discipline = Discipline::new();
+    feed(&mut discipline, b"half");
+    let output = feed(&mut discipline, b"\x1c");
+    assert_eq!(discipline.pending(), 0);
+    assert!(output.quit);
+    assert!(output.events.is_empty());
+    assert_eq!(output.echo, b"^\\\r\n");
+    assert!(output.lines.is_empty());
+}
+
+#[test]
+fn quit_does_not_echo_when_echo_is_off() {
+    let mut discipline = Discipline::new();
+    discipline.set_settings(Settings {
+        mode: Mode::Canonical,
+        echo: false,
+    });
+    let output = feed(&mut discipline, b"\x1c");
+    assert!(output.echo.is_empty());
+    assert!(output.quit);
+    assert!(output.events.is_empty());
+}
+
+#[test]
 fn interrupt_after_a_partial_line_raises_one_event() {
     let mut discipline = Discipline::new();
     feed(&mut discipline, b"ab");
@@ -242,10 +267,11 @@ fn without_echo_editing_still_happens() {
 #[test]
 fn raw_mode_passes_bytes_through() {
     let mut discipline = Discipline::new();
-    discipline.set_settings(Settings {
-        mode: Mode::Raw,
-        echo: true,
-    });
+    let mut termios = Termios::sane();
+    termios.iflag = 0;
+    termios.oflag = 0;
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
     let output = feed(&mut discipline, b"ab\r\n");
     assert_eq!(output.data, b"ab\r\n");
     assert!(output.lines.is_empty());
@@ -456,4 +482,158 @@ fn the_default_impl_matches_new() {
         Discipline::new().settings()
     );
     assert_eq!(Discipline::default().pending(), 0);
+}
+
+#[test]
+fn termios_default_is_the_ssh_terminal_shape() {
+    let termios = Termios::sane();
+    assert_ne!(termios.iflag & ICRNL, 0);
+    assert_ne!(termios.iflag & IXON, 0);
+    assert_ne!(termios.oflag & OPOST, 0);
+    assert_ne!(termios.oflag & ONLCR, 0);
+    assert_ne!(termios.cflag & CS8, 0);
+    assert_ne!(termios.cflag & CREAD, 0);
+    assert_ne!(termios.lflag & ICANON, 0);
+    assert_ne!(termios.lflag & ECHO, 0);
+    assert_ne!(termios.lflag & ISIG, 0);
+    assert_eq!(termios.cc[VMIN], 1);
+    assert_eq!(termios.cc[VTIME], 0);
+}
+
+#[test]
+fn set_termios_round_trips_every_field() {
+    let mut want = Termios::sane();
+    want.iflag = ICRNL | IXON | ISTRIP;
+    want.oflag = OPOST | ONLCR | OCRNL;
+    want.cflag = CS8 | CREAD | 0o15;
+    want.lflag = ISIG | ICANON | ECHO | IEXTEN;
+    want.cc[VERASE] = 0x08;
+    want.cc[VKILL] = 0x18;
+    want.cc[VMIN] = 7;
+    want.cc[VTIME] = 4;
+    want.ispeed = 0o15;
+    want.ospeed = 0o16;
+    let mut discipline = Discipline::new();
+    assert_eq!(discipline.set_termios(want), 0);
+    assert_eq!(discipline.termios(), want);
+}
+
+#[test]
+fn the_settings_view_changes_only_icanon_and_echo() {
+    let mut discipline = Discipline::new();
+    let mut want = Termios::sane();
+    want.cc[VINTR] = 0x07;
+    want.ispeed = 0o15;
+    assert_eq!(discipline.set_termios(want), 0);
+    discipline.set_settings(Settings {
+        mode: Mode::Raw,
+        echo: false,
+    });
+    let got = discipline.termios();
+    assert_eq!(got.iflag, want.iflag);
+    assert_eq!(got.oflag, want.oflag);
+    assert_eq!(got.cflag, want.cflag);
+    assert_eq!(got.cc, want.cc);
+    assert_eq!(got.ispeed, want.ispeed);
+    assert_eq!(got.ospeed, want.ospeed);
+    assert_eq!(got.lflag & (ICANON | ECHO), 0);
+}
+
+#[test]
+fn icrnl_translates_carriage_return() {
+    let mut discipline = Discipline::new();
+    let output = feed(&mut discipline, b"ls\r");
+    assert_eq!(lines(&output), vec![&b"ls\n"[..]]);
+}
+
+#[test]
+fn a_cleared_icrnl_keeps_carriage_return_as_data() {
+    let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.iflag &= !ICRNL;
+    discipline.set_termios(termios);
+    let output = feed(&mut discipline, b"a\r");
+    assert!(output.lines.is_empty());
+    assert_eq!(discipline.pending(), 2);
+}
+
+#[test]
+fn opost_onlcr_translates_output() {
+    let discipline = Discipline::new();
+    let mut out = Vec::new();
+    discipline.process_output(b"line\n", &mut out);
+    assert_eq!(out, b"line\r\n");
+}
+
+#[test]
+fn output_is_raw_without_opost() {
+    let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.oflag &= !OPOST;
+    discipline.set_termios(termios);
+    let mut out = Vec::new();
+    discipline.process_output(b"line\n", &mut out);
+    assert_eq!(out, b"line\n");
+}
+
+#[test]
+fn vwerase_removes_the_previous_word() {
+    let mut discipline = Discipline::new();
+    let output = feed(&mut discipline, b"one two\x17X\n");
+    assert_eq!(lines(&output), vec![&b"one X\n"[..]]);
+}
+
+#[test]
+fn raw_input_still_honours_translation_and_istrip() {
+    let mut crlf = Termios::sane();
+    crlf.iflag = ICRNL;
+    crlf.oflag = 0;
+    crlf.lflag = 0;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(crlf);
+    let output = feed(&mut discipline, b"\r");
+    assert_eq!(output.data, b"\n");
+
+    let mut strip = Termios::sane();
+    strip.iflag = ISTRIP;
+    strip.oflag = 0;
+    strip.lflag = 0;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(strip);
+    let output = feed(&mut discipline, &[0xff]);
+    assert_eq!(output.data, &[0x7f]);
+}
+
+#[test]
+fn a_fresh_winsize_is_zero() {
+    assert_eq!(
+        Winsize::default(),
+        Winsize {
+            row: 0,
+            col: 0,
+            xpixel: 0,
+            ypixel: 0
+        }
+    );
+}
+
+#[test]
+fn a_disabled_veol_does_not_complete_the_line() {
+    let mut discipline = Discipline::new();
+    assert_eq!(discipline.termios().cc[VEOL], VDISABLE);
+    let output = feed(&mut discipline, b"\0");
+    assert!(output.lines.is_empty());
+    assert_eq!(discipline.pending(), 1);
+}
+
+#[test]
+fn a_custom_verase_byte_erases() {
+    let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.cc[VERASE] = 0x18;
+    discipline.set_termios(termios);
+    feed(&mut discipline, b"ab");
+    let output = feed(&mut discipline, b"\x18");
+    assert_eq!(output.echo, b"\x08 \x08");
+    assert_eq!(discipline.pending(), 1);
 }

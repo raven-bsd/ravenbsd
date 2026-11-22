@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Rootfs spec for the Pi 4 SD UFS partition. The programs and files come from the
+# resolved pi4-rootfs profile; this file adds the root home marker, the post-pivot
+# mount table, the UFS-only proof marker and the /dev,/tmp keep points, and fixes
+# the image size. Keep the size a 4 KiB multiple.
+size = 268435456
+
+[[files]]
+src = "profiles/pi4-rootfs.d/root.keep"
+path = "/root/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/pi4-rootfs.d/dev.keep"
+path = "/dev/.keep"
+mode = 0o644
+
+[[files]]
+src = "profiles/pi4-rootfs.d/tmp.keep"
+path = "/tmp/.keep"
+mode = 0o644
+
+# The UFS payload's mount table replaces the initfs-root table; mount and df read
+# this file after svcd pivots `/` to ufs:.
+[[files]]
+src = "profiles/pi4-rootfs.d/rootfs-mounts"
+path = "/etc/mounts"
+mode = 0o644
+
+# A file that exists only on the UFS root. The pivot qtest reads it through `/`
+# to prove the post-pivot namespace is the card, not the initfs.
+[[files]]
+src = "profiles/pi4-rootfs.d/ufs-root-marker"
+path = "/etc/raven/ufs-root-marker"
+mode = 0o644

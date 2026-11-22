@@ -427,6 +427,8 @@ pub enum Object {
     SchemeRequest(Arc<PendingRequest>),
     /// One end of an in-kernel pipe (`PIPE`/`PIPE2`).
     Pipe(Arc<crate::process::pipe::PipeEnd>),
+    /// One end of a kernel duplex endpoint pair (`DUPLEX_PAIR`).
+    Duplex(Arc<crate::process::duplex::DuplexEnd>),
 }
 
 /// The kernel's handle table type.
@@ -458,7 +460,13 @@ pub fn revoke_descendants(target: &Arc<LineageNode>, mask: Rights) {
     };
     for node in nodes {
         if !Arc::ptr_eq(&node, target) && node.is_descendant_of(target) {
-            node.revoke(mask);
+            // Contract C17: only a bit this lineage actually held can be "revoked" (EPERM).
+            // A descendant that never granted the bit keeps EACCES, so propagate the granted
+            // subset instead of marking the whole mask.
+            let propagated = node.granted().intersect(mask);
+            if propagated != Rights::NONE {
+                node.revoke(propagated);
+            }
         }
     }
 }

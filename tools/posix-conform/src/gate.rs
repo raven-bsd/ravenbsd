@@ -74,6 +74,8 @@ pub struct GateReport {
     pub host_only: bool,
     /// UTC date string.
     pub date: String,
+    /// Repository commit the gate ran against, or `unknown`.
+    pub commit: String,
     /// Tool version.
     pub tool: String,
     /// Rows.
@@ -99,6 +101,8 @@ pub struct Options {
     pub json: bool,
     /// Skip QEMU target rows.
     pub host_only: bool,
+    /// Explicit commit override; `None` reads `git rev-parse HEAD`.
+    pub commit: Option<String>,
 }
 
 fn command_string(program: &str, args: &[String]) -> String {
@@ -157,6 +161,28 @@ fn last_line(text: &str) -> String {
         .unwrap_or("")
         .trim()
         .to_string()
+}
+
+/// Resolve the commit stamped into the report.
+///
+/// An explicit value wins; otherwise read `git rev-parse HEAD`. A missing git
+/// checkout or an empty answer is recorded as `unknown`, never an invented SHA.
+pub(crate) fn repository_commit(root: &Path, explicit: Option<&str>) -> String {
+    if let Some(commit) = explicit.map(str::trim).filter(|value| !value.is_empty()) {
+        return commit.to_string();
+    }
+    let args = vec!["rev-parse".to_string(), "HEAD".to_string()];
+    match run_process(root, "git", &args) {
+        Ok((true, text)) => {
+            let commit = last_line(&text);
+            if commit.is_empty() {
+                "unknown".to_string()
+            } else {
+                commit
+            }
+        }
+        _ => "unknown".to_string(),
+    }
 }
 
 fn utc_date(root: &Path) -> String {
@@ -876,6 +902,8 @@ fn apply_overlay(
         .into_iter()
         .map(|(area, meta)| (meta.id.as_str(), area))
         .collect();
+    // Many requirements cite the same evidence script; run each path once per gate.
+    let mut test_cache: BTreeMap<String, (bool, String)> = BTreeMap::new();
     for claim in &outcome.claims {
         let id = claim.id();
         let area = areas.get(id).copied().unwrap_or("overlay");
@@ -911,8 +939,16 @@ fn apply_overlay(
                 }
             }
             Claim::Test { path, .. } => {
-                let (ok, reason) = run_test_evidence(root, path)
-                    .unwrap_or_else(|error| (false, format!("{error:#}")));
+                let key = path.display().to_string();
+                let (ok, reason) = match test_cache.get(&key) {
+                    Some(hit) => hit.clone(),
+                    None => {
+                        let outcome = run_test_evidence(root, path)
+                            .unwrap_or_else(|error| (false, format!("{error:#}")));
+                        test_cache.insert(key, outcome.clone());
+                        outcome
+                    }
+                };
                 if ok {
                     (Verdict::Pass, claim.command(), String::new())
                 } else {
@@ -934,7 +970,7 @@ fn apply_overlay(
             &claim.id,
             area,
             Verdict::Fail,
-            "docs/posix/evidence".to_string(),
+            "mgmt posix/evidence".to_string(),
             claim.reason.clone(),
         );
     }
@@ -1000,6 +1036,7 @@ pub fn run(
         arch: options.arch.clone(),
         host_only: options.host_only,
         date: utc_date(root),
+        commit: repository_commit(root, options.commit.as_deref()),
         tool: format!("posix-conform {}", env!("CARGO_PKG_VERSION")),
         rows,
         pass,
@@ -1028,6 +1065,7 @@ pub fn render(report: &GateReport) -> String {
          A green `make check` with a red `posix-check` is not a release."
     );
     let _ = writeln!(output, "\n- Date: {}", report.date);
+    let _ = writeln!(output, "- Commit: `{}`", report.commit);
     let _ = writeln!(output, "- Profile: `{}`", report.profile);
     let _ = writeln!(output, "- Target: `{}`", report.arch);
     let _ = writeln!(

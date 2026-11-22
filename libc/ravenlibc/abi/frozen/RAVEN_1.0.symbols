@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1719
+# records: 1728
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -31,6 +31,7 @@ __gnu_basename F - all 2 -
 __h_errno_location F - all 2 -
 __progname F - all 2 -
 __progname_full F - all 2 -
+__res_state F - all 1 -
 __sigsetjmp F - all 2 -
 __stack_chk_guard F - all 3 -
 __xpg_strerror_r F - all 2 -
@@ -476,6 +477,7 @@ free F - all 0 malloc.h
 free_aligned_sized F - all 0 stdlib.h
 free_sized F - all 0 stdlib.h
 freeaddrinfo F - all 1 -
+freeifaddrs F - all 1 -
 freelocale F - all 1 -
 freezero F - all 1 -
 freopen F - all 0 stdio.h
@@ -540,6 +542,7 @@ getcwd F - all 0 unistd.h
 getdate F - all 0 time.h
 getdelim F - all 0 stdio.h
 getdents F - all 1 -
+getdtablesize F - all 1 -
 getegid F - all 0 unistd.h
 getentropy F - all 1 sys/random.h
 getenv F - all 0 stdlib.h
@@ -565,7 +568,9 @@ gethostbyname_r F - all 1 netdb.h
 gethostent F - all 1 netdb.h
 gethostid F - all 1 unistd.h
 gethostname F - all 0 unistd.h
+getifaddrs F - all 1 -
 getisax F - all 2 -
+getitimer F - all 0 sys/time.h
 getline F - all 0 stdio.h
 getlogin F - all 0 unistd.h
 getlogin_r F - all 1 -
@@ -584,6 +589,7 @@ getopt_long_only F - all 1 getopt.h
 getpagesize F - all 1 unistd.h
 getpayload F - all 3 -
 getpayloadf F - all 3 -
+getpeereid F - all 2 -
 getpeername F - all 1 sys/socket.h
 getpgid F - all 0 unistd.h
 getpgrp F - all 0 unistd.h
@@ -1149,6 +1155,7 @@ pthread_testcancel F - all 1 -
 pthread_timedjoin_np F - all 1 pthread.h
 pthread_tryjoin_np F - all 1 pthread.h
 pthread_yield F - all 1 -
+ptsname F - all 0 stdlib.h
 ptsname_r F - all 0 stdlib.h
 putc F - all 0 stdio.h
 putc_unlocked F - all 0 stdio.h
@@ -1212,6 +1219,7 @@ rename F - all 0 stdio.h
 renameat F - all 0 stdio.h
 renameat2 F - all 1 -
 res_init F - all 1 -
+res_query F - all 1 -
 rewind F - all 0 stdio.h
 rewinddir F - all 0 dirent.h
 rindex F - all 1 string.h
@@ -1298,6 +1306,7 @@ setgroupent F - all 2 -
 setgroups F - all 1 grp.h
 sethostent F - all 1 netdb.h
 sethostname F - all 1 unistd.h
+setitimer F - all 0 sys/time.h
 setjmp F - all 0 setjmp.h
 setlinebuf F - all 1 stdio.h
 setlocale F - all 0 locale.h

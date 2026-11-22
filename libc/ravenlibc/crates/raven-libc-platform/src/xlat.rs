@@ -256,6 +256,8 @@ pub enum IoctlAction {
     TcSetSf,
     /// Read the window size (`PG-54`).
     TiocGWinsz,
+    /// Write the window size (`PG-54`).
+    TiocSWinsz,
     /// Bytes available for reading.
     FionRead,
     /// Set `O_NONBLOCK` in the fd table.
@@ -278,6 +280,8 @@ pub const TCSETSW: u32 = 0x5403;
 pub const TCSETSF: u32 = 0x5404;
 /// `TIOCGWINSZ`.
 pub const TIOCGWINSZ: u32 = 0x5413;
+/// `TIOCSWINSZ`.
+pub const TIOCSWINSZ: u32 = 0x5414;
 /// `FIONREAD`.
 pub const FIONREAD: u32 = 0x541B;
 /// `FIONBIO`.
@@ -294,6 +298,7 @@ pub const IOCTL_REQUESTS: &[(&str, u32, IoctlAction)] = &[
     ("TCSETSW", TCSETSW, IoctlAction::TcSetSw),
     ("TCSETSF", TCSETSF, IoctlAction::TcSetSf),
     ("TIOCGWINSZ", TIOCGWINSZ, IoctlAction::TiocGWinsz),
+    ("TIOCSWINSZ", TIOCSWINSZ, IoctlAction::TiocSWinsz),
     ("FIONREAD", FIONREAD, IoctlAction::FionRead),
     ("FIONBIO", FIONBIO, IoctlAction::FionBio),
     ("FIONCLEX", FIONCLEX, IoctlAction::Fionclex),
@@ -308,6 +313,7 @@ pub fn ioctl_action(request: u32) -> IoctlAction {
         TCSETSW => IoctlAction::TcSetSw,
         TCSETSF => IoctlAction::TcSetSf,
         TIOCGWINSZ => IoctlAction::TiocGWinsz,
+        TIOCSWINSZ => IoctlAction::TiocSWinsz,
         FIONREAD => IoctlAction::FionRead,
         FIONBIO => IoctlAction::FionBio,
         FIONCLEX => IoctlAction::Fionclex,

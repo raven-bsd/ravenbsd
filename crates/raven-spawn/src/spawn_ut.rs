@@ -23,6 +23,7 @@ fn build(
         path,
         args,
         env,
+        b"/",
         auxv,
         &[0xAB; RANDOM_LEN],
         "x86_64",
@@ -186,6 +187,7 @@ fn overlong_strings_are_too_large() {
             "/child",
             &[&long],
             &[],
+            b"/",
             &[],
             &[0; 16],
             "x86_64"
@@ -205,6 +207,7 @@ fn too_many_arguments_are_too_large() {
             "/child",
             &names,
             &[],
+            b"/",
             &[],
             &[0; 16],
             "x86_64"
@@ -223,6 +226,7 @@ fn misaligned_stack_top_is_rejected() {
             "/child",
             &[],
             &[],
+            b"/",
             &[],
             &[0; 16],
             "x86_64"
@@ -241,6 +245,7 @@ fn small_buffer_is_rejected() {
             "/child",
             &["a"],
             &[],
+            b"/",
             &[],
             &[0; 16],
             "x86_64"
@@ -258,6 +263,7 @@ fn image_only_touches_the_top_of_the_buffer() {
         "/child",
         &["a"],
         &[],
+        b"/",
         &[],
         &[0; 16],
         "x86_64",
@@ -647,10 +653,8 @@ fn success_call_sequence() {
         other => panic!("expected child stack map, got {other:?}"),
     };
     assert_eq!(stack_base, usize::try_from(USER_END).unwrap() - STACK_SIZE);
-    assert_eq!(
-        flags,
-        map::pack(prot::READ | prot::WRITE, map::SHARED | map::FIXED)
-    );
+    // K196: the child stack is private so PROC_FORK can copy-on-write it.
+    assert_eq!(flags, map::pack(prot::READ | prot::WRITE, map::FIXED));
     assert_eq!(
         calls[6],
         Call::Unmap {
@@ -728,6 +732,46 @@ fn interp_elf() -> Vec<u8> {
     let mut elf = child_elf(false, false);
     put_u16(&mut elf, 16, 3);
     elf
+}
+
+/// The release `ld-elf.so.1` shape: an `ET_DYN` interpreter whose first `PT_LOAD` is at
+/// `vaddr=0`. The parser must accept the raw image; `plan_biased` applies `INTERP_BASE`.
+fn interp_elf_at_zero() -> Vec<u8> {
+    let mut elf = child_elf(false, false);
+    put_u16(&mut elf, 16, 3);
+    put_u64(&mut elf, 24, 0x100);
+    put_u64(&mut elf, 80, 0);
+    elf
+}
+
+#[test]
+fn interpreter_at_zero_parses_before_biasing() {
+    let interpreter = interp_elf_at_zero();
+    let raw = Elf::parse(&interpreter, target_machine(), USER_MIN..USER_END);
+    match raw {
+        Err(error) => assert_eq!(
+            error,
+            ElfError::SegmentOutsideUserRange,
+            "the old parse window must reject the raw vaddr-0 interpreter"
+        ),
+        Ok(_) => panic!("the old parse window unexpectedly accepted vaddr=0"),
+    }
+
+    let (_, plan, bias) = plan_image(&interpreter, true).expect("vaddr-0 interpreter must plan");
+    assert_eq!(bias, INTERP_BASE);
+    let mut steps = plan;
+    let first = steps
+        .next()
+        .expect("the interpreter has at least one load step");
+    assert_eq!(
+        first.vaddr, INTERP_BASE,
+        "the first step is the biased base, not page 0"
+    );
+    assert!(first.vaddr >= USER_MIN);
+    for step in steps {
+        assert!(step.vaddr >= USER_MIN);
+        assert!(step.vaddr.saturating_add(step.len) <= USER_END);
+    }
 }
 
 fn two_file_initfs(main: &[u8], interpreter: &[u8]) -> Vec<u8> {
@@ -864,7 +908,7 @@ fn auxv_has_the_pg50_keys_and_at_base() {
     let interpreter = interp_elf();
     let main = child_elf(true, false);
     let main_elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
-    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE, None);
+    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE, None, None);
     let pairs = &auxv[..len];
     let has = |key: usize, value: Option<usize>| {
         pairs
@@ -884,10 +928,19 @@ fn auxv_has_the_pg50_keys_and_at_base() {
 }
 
 #[test]
+fn no_alloc_fdmap_rejects_inherited_descriptors() {
+    assert_eq!(no_alloc_fdmap(&[]), Ok(()));
+    assert_eq!(
+        no_alloc_fdmap(&[(1, 7)]),
+        Err(SpawnError::Sys(Errno::ENOTSUP))
+    );
+}
+
+#[test]
 fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     let main = child_elf(false, false);
     let elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
-    let (auxv, len) = build_auxv(&elf, 0, 0, Some((0x7fff_0000, 2)));
+    let (auxv, len) = build_auxv(&elf, 0, 0, None, Some((0x7fff_0000, 2)));
     let pairs = &auxv[..len];
     let has = |key: usize, value: usize| pairs.iter().any(|(k, v)| *k == key && *v == value);
     assert!(has(0x7003, 0x7fff_0000));
@@ -1176,4 +1229,105 @@ fn exec_spawn_failure_closes_the_child_before_a_thread_starts() {
             .iter()
             .any(|call| matches!(call, Call::ThreadCreate { .. }))
     );
+}
+
+#[test]
+fn libc_auxv_carries_the_initfs_offset() {
+    let main = child_elf(false, false);
+    let elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
+    let (auxv, len) = build_auxv(&elf, 0, 0, Some(0x4000), None);
+    let pairs = &auxv[..len];
+    assert!(pairs.contains(&(AT_RAVEN_LIBC, 0x4000)));
+}
+
+#[test]
+fn cwd_is_published_as_at_raven_cwd() {
+    let mut buffer = vec![0u8; TEST_BUFFER];
+    let (_, sp0) = build_stack(
+        &mut buffer,
+        TEST_TOP,
+        "/child",
+        &[],
+        &[],
+        b"/bin",
+        &[(AT_RAVEN_CWD, 0)],
+        &[0; 16],
+        "x86_64",
+    )
+    .expect("stack image");
+    let argc = word(&buffer, sp0);
+    let word_size = WORD as u64;
+    let auxv0 = sp0 + word_size * (argc as u64 + 3);
+    let mut index = 0u64;
+    let mut cwd = None;
+    loop {
+        let key = word(&buffer, auxv0 + index * 2 * word_size);
+        if key == 0 {
+            break;
+        }
+        if key == AT_RAVEN_CWD {
+            cwd = Some(word(&buffer, auxv0 + (index * 2 + 1) * word_size));
+        }
+        index += 1;
+    }
+    let cwd = cwd.expect("AT_RAVEN_CWD is present");
+    assert_eq!(bytes_at(&buffer, cwd), b"/bin");
+}
+
+#[test]
+fn an_invalid_cwd_is_rejected_by_the_stack_builder() {
+    let mut buffer = vec![0u8; TEST_BUFFER];
+    for cwd in [b"".as_slice(), b"bin".as_slice(), b"/bad\0path".as_slice()] {
+        assert!(matches!(
+            build_stack(
+                &mut buffer,
+                TEST_TOP,
+                "/child",
+                &[],
+                &[],
+                cwd,
+                &[],
+                &[0; 16],
+                "x86_64"
+            ),
+            Err(SpawnError::BadCwd)
+        ));
+    }
+}
+
+#[test]
+fn a_megabyte_image_is_read_in_a_few_chunks() {
+    let size = 984_000usize;
+    let mut offset = 0usize;
+    let mut calls = 0usize;
+    let data = collect_exact(size, |buffer| {
+        calls += 1;
+        let length = (size - offset).min(buffer.len());
+        buffer.get_mut(..length).expect("chunk").fill(0x5A);
+        offset += length;
+        Ok(length)
+    })
+    .expect("read");
+    assert_eq!(data.len(), size);
+    assert_eq!(calls, 1, "one known-size read must not probe EOF");
+    assert!(data.iter().all(|byte| *byte == 0x5A));
+}
+
+#[test]
+fn an_image_larger_than_the_bound_is_rejected() {
+    let result = collect_exact(MAX_FILE_IMAGE + 1, |_buffer| Ok(0));
+    assert!(matches!(result, Err(SpawnError::TooLarge)));
+}
+
+#[test]
+fn a_short_read_is_an_io_error() {
+    let mut calls = 0usize;
+    let result = collect_exact(10, |buffer| {
+        calls += 1;
+        let length = if calls == 1 { 4 } else { 0 };
+        buffer.get_mut(..length).expect("chunk").fill(1);
+        Ok(length)
+    });
+    assert!(matches!(result, Err(SpawnError::Sys(Errno::EIO))));
+    assert_eq!(calls, 2);
 }

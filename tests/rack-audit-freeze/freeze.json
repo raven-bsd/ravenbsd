@@ -1,0 +1,70 @@
+{
+  "ticket": "K369",
+  "tool_commit": "59c7a9ad7df6d368de768b106ab9c3ea0990d882",
+  "base_master": "ddda93a5d9288db7a22eff2c2c8e0039727689a7",
+  "tool": {
+    "package": "rack-acceptance",
+    "commit": "59c7a9ad7df6d368de768b106ab9c3ea0990d882",
+    "main_sha256": "dad088cbcae680b96469803f4affaf191af982e11664704ef7d2541ad225e343"
+  },
+  "register": {
+    "path": "docs/rack-coverage.md",
+    "sha256": "d39d94a729354f810b0f6397f5a1a5e99ec4844182fbbd6df7ba6f4dc8f5c22e",
+    "rows": 219,
+    "status": "219 PASS"
+  },
+  "donor": {
+    "path": "/tmp/opencode/freebsd-rack.c",
+    "upstream": "freebsd",
+    "upstream_path": "sys/netinet/tcp_stacks/rack.c",
+    "upstream_rev": "133344405f532bd54ff3629a77d4c4e062f01fdb",
+    "sha256": "8c4a0b28b340216ac5de99c41dcb55f562439ee02314ca59a3ff9f2002b6d09e",
+    "functions": 219
+  },
+  "green": {
+    "command": "cargo run -q -p rack-acceptance -- --reports ../ravenbsd-prjmgmt/tickets --donor /tmp/opencode/freebsd-rack.c",
+    "exit": 0,
+    "summary": "donors=219 register=219 target=218 accepted=219 gaps=0 missing=0 duplicate=0 unknown=0",
+    "k315": "missing=0 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=0 not_pass=0",
+    "log": "acceptance.log",
+    "runtime_seconds": 3.28
+  },
+  "blank_test_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the rack_log_gpset test cell blanked",
+    "exit": 1,
+    "summary": "donors=219 register=219 target=218 accepted=219 gaps=0 missing=0 duplicate=0 unknown=0",
+    "k315": "missing=0 duplicate=0 unknown=0 empty_rust=0 empty_test=1 empty_mutation=0 not_pass=0",
+    "log": "blank-test.log",
+    "status": "PASS: the gate rejects the blank test cell"
+  },
+  "blank_rust_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the rack_log_gpset Rust mapping blanked",
+    "exit": 1,
+    "summary": "donors=219 register=219 target=218 accepted=219 gaps=0 missing=0 duplicate=0 unknown=0",
+    "k315": "missing=0 duplicate=0 unknown=0 empty_rust=1 empty_test=0 empty_mutation=0 not_pass=0",
+    "log": "blank-rust.log",
+    "status": "PASS: the gate rejects the blank Rust cell"
+  },
+  "blank_mutation_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the rack_log_gpset mutation cell blanked",
+    "exit": 1,
+    "summary": "donors=219 register=219 target=218 accepted=218 gaps=1 missing=0 duplicate=0 unknown=0",
+    "k315": "missing=0 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=1 not_pass=0",
+    "log": "blank-mutation.log",
+    "status": "PASS: the gate rejects the blank mutation cell"
+  },
+  "remove_row_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the tcp_addrack row removed",
+    "exit": 1,
+    "summary": "donors=219 register=218 target=218 accepted=218 gaps=0 missing=1 duplicate=0 unknown=0",
+    "k315": "missing=1 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=0 not_pass=0",
+    "log": "remove-row.log"
+  },
+  "mapping_removal_mutation": {
+    "input": "scratch worktree docs/rack-coverage.md with the rack_log_gpset Rust mapping replaced by missing_mapping",
+    "exit": 1,
+    "summary": "donors=219 register=219 target=218 accepted=218 gaps=1 missing=0 duplicate=0 unknown=0",
+    "k315": "missing=0 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=0 not_pass=0",
+    "log": "mapping-removal.log"
+  }
+}

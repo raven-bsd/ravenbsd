@@ -1,0 +1,149 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K182: Pi 4 UFS `/` pivot on the host-backed EMMC2 GPT+UFS image. The bootstrap
+# initfs has no release userland; emmc2 serves the card, blockd scans the GPT,
+# fsd-ufs mounts partition 1 read-write, vfsd snapshots ufs:, and svcd pivots `/`
+# to ufs:. The UFS-only marker and the login shell prove the post-pivot root.
+# QEMU has no BCM2711 EMMC2 model; the host image is served by `emmc2 test`.
+
+name = "pi4-root-pivot"
+arch = "aarch64"
+profile = "pi4-root-pivot"
+timeout_secs = 300
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = ["-m", "1024"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(aarch64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(aarch64\)'
+
+[[expect]]
+regex = '^emmc2: backend=memory image=initfs:/etc/pi4-root\.img sectors=[0-9]+$'
+
+[[expect]]
+regex = '^emmc2: registered disk$'
+
+[[expect]]
+regex = '^blockd: gpt ok partitions=1$'
+
+[[expect]]
+regex = '^blockd: part 1 ufs-root 34\.\.[0-9]+$'
+
+[[expect]]
+regex = '^fsd-ufs: mounted block:0 partition 1 as ufs: \([0-9]+ bytes\)$'
+
+[[expect]]
+regex = '^fsd-ufs: mode=rw journal=(none|active)$'
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^pi4-ufs-root$'
+
+[[expect]]
+regex = '^cat=0$'
+
+[[expect]]
+regex = '^uname=0$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^mount=0$'
+
+[[expect]]
+regex = '^k182-persist$'
+
+[[expect]]
+regex = '^persist=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|no UFS root device|pivot mount failed|staying on the initfs|fsd-ufs: .*failed|blockd: .*failed|bad file descriptor|ebadf'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/cat /etc/raven/ufs-root-marker; echo cat=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^pi4-ufs-root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^cat=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/uname -a; echo uname=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^uname=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/mount; echo mount=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^mount=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/echo k182-persist > /persist-marker && /bin/cat /persist-marker; echo persist=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^k182-persist$'
+timeout_secs = 30
+
+[[step]]
+wait = '^persist=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

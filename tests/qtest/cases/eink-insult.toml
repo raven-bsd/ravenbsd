@@ -1,0 +1,125 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K217: the E-Ink content fetch proof in one staged script. A deterministic host server
+# (127.0.0.1:18083, exposed to the guest as 10.0.2.2 through QEMU user networking) serves one
+# fixed insult line. The test initfs carries /etc/eink-insult.sh with all fetch, comparison, 404,
+# -f and redirect checks; the qtest sends that script once and waits for its unique markers, so
+# the per-character prompt redraw cannot drop a multi-command sequence.
+#
+# K219: the fixture uses the unique port 18083; the pre stops its previous pid, waits, and
+# verifies the listening socket before the guest boots.
+#
+# K199 stages /bin/curl and /bin/wget; K216 may make them static. Until then the K201 pre
+# overlays statically linked copies into the test initfs. The expected body is the server-owned
+# insult.txt staged at /etc/eink-insult.txt; it is not hard-coded in this qtest.
+
+name = "eink-insult"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 280
+pre = ["sh tests/fixtures/insult-server/build.sh"]
+initfs = "build/fixtures/insult-server/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^eink-body: .+$'
+
+[[expect]]
+regex = '^eink-cmp: ok$'
+
+[[expect]]
+regex = '^eink-404: HTTP/1\.1 404 Not Found'
+
+[[expect]]
+regex = '^eink-f: 22$'
+
+[[expect]]
+regex = '^eink-redirect: .+$'
+
+[[expect]]
+regex = '^eink-done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found|insult-server: failed|eink-cmp: FAIL'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/brush /etc/eink-insult.sh\n"
+delay_ms = 100
+
+[[step]]
+wait = '^eink-body: .+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^eink-cmp: ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^eink-404: HTTP/1\.1 404 Not Found'
+timeout_secs = 30
+
+[[step]]
+wait = '^eink-f: 22$'
+timeout_secs = 30
+
+[[step]]
+wait = '^eink-redirect: .+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^eink-done$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
