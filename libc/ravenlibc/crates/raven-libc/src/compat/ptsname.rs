@@ -39,3 +39,7 @@ pub unsafe extern "C" fn ptsname(fd: c_int) -> *mut c_char {
     // SAFETY: the same static buffer, now holding the NUL-terminated name.
     unsafe { core::ptr::addr_of_mut!(BUFFER).cast::<c_char>() }
 }
+
+#[cfg(test)]
+#[path = "ptsname_ut.rs"]
+mod tests;
