@@ -221,8 +221,14 @@ impl<T: Clone> HandleTable<T> {
 
     /// Insert an object whose rights derive from `parent`.
     ///
-    /// The stored rights are `parent.effective() & rights`; a child created after a revoke can
-    /// never regain a revoked bit. The returned handle's lineage node is available through
+    /// The child node keeps the **granted** mask: `parent.granted() & rights`, where callers
+    /// pass the current effective mask or a queued handle's send-time mask. The slot stores the
+    /// **currently effective** mask, `parent.effective() & granted`.
+    ///
+    /// This distinction is C17 for a queued `SCM_RIGHTS` handle: a right the sender held at send
+    /// time stays granted on the installed child, so an ancestor revoke that completed before
+    /// the install reports `EPERM`; a right the parent never had is absent from the granted mask
+    /// and reports `EACCES`. The returned handle's node is available through
     /// [`Self::lineage_node`] for the kernel's cross-process revocation registry.
     pub fn insert_derived(
         &mut self,
@@ -230,8 +236,9 @@ impl<T: Clone> HandleTable<T> {
         rights: Rights,
         parent: &Arc<LineageNode>,
     ) -> Result<Handle, Errno> {
-        let effective = parent.effective().intersect(rights);
-        let node = LineageNode::child(effective, parent);
+        let granted = parent.granted().intersect(rights);
+        let effective = parent.effective().intersect(granted);
+        let node = LineageNode::child(granted, parent);
         let index = self.allocate_index()?;
         Ok(self.fill(index, value, effective, node))
     }
@@ -383,9 +390,10 @@ impl<T: Clone> HandleTable<T> {
                 return Err(Errno::EBADF);
             }
             let value = slot.value.as_ref().ok_or(Errno::EBADF)?;
-            if !slot.rights.contains(Rights::DUP) {
-                return Err(Errno::EACCES);
-            }
+            // The node's effective mask is authoritative. `slot.rights` is the effective mask
+            // recorded at insert time and can be stale for a queued child whose granted bit was
+            // revoked before the install; the node still knows it was granted (EPERM), so do not
+            // short-circuit on the slot mask.
             let parent = slot.lineage.clone().ok_or(Errno::EBADF)?;
             let effective = parent.effective();
             if !effective.contains(Rights::DUP) {
