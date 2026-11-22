@@ -26,6 +26,17 @@ fn read_slave(pair: &mut Pty<Sink>) -> Vec<u8> {
 }
 
 #[test]
+fn pty_inode_is_nonzero_and_role_distinct() {
+    assert_eq!(inode(0, false), 1);
+    assert_eq!(inode(0, true), 2);
+    assert_eq!(inode(7, false), 15);
+    assert_eq!(inode(7, true), 16);
+    assert_ne!(inode(0, false), inode(0, true));
+    assert_ne!(inode(1, false), inode(0, true));
+    assert_ne!(inode(u64::MAX, false), 0);
+}
+
+#[test]
 fn pairs_have_independent_queues_and_settings() {
     let mut pairs = Pairs::<Sink>::new();
     assert!(pairs.is_empty());
