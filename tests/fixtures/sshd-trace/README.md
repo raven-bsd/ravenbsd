@@ -10,11 +10,15 @@ from the current tree. The overlay changes only test inputs: `/etc/ssh/sshd_conf
 
 The qtest drives one password login and one command over guest loopback:
 
-1. the root console starts `/bin/ssh ... raven@127.0.0.1 'echo sshd-trace-command-ok'` in the
-   background, with `SSH_ASKPASS_REQUIRE=force` so the image password comes from the askpass
-   helper and no `/dev/tty` prompt is needed;
+1. the root console starts `/etc/ssh/trace-client.sh` in the background; the script waits 2 s,
+   then runs `/bin/ssh ... raven@127.0.0.1 'echo sshd-trace-command-ok'` with
+   `SSH_ASKPASS_REQUIRE=force` so the image password comes from the askpass helper and no
+   `/dev/tty` prompt is needed. The long command lives in the script, so the brush line editor
+   only redraws the short launcher line;
 2. the console sleeps 12 s, then prints `/tmp/client.log` and the full
    `/tmp/sshd-trace.log` between the `sshd-trace: client-log`/`sshd-trace: log-end` markers.
+   The script writes `sshd-trace-client: exit=<n>` only when the client returns; a missing exit
+   marker is part of the close trace.
 
 The qtest serial log is the artifact. The report quotes the six-step session-close sequence and
 the first step the server loop does not reach, with the OpenSSH source expectation and the exact

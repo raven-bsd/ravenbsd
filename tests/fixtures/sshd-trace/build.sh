@@ -32,7 +32,8 @@ overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
 "$overlay" build/x86_64/initfs.img "$out/initfs.img" \
     "/etc/ssh/sshd_config=$root/tests/fixtures/sshd-trace/sshd_config:0644" \
     "/etc/services.d/sshd.toml=$root/tests/fixtures/sshd-trace/sshd.service.toml:0644" \
-    "/etc/ssh/askpass.sh=$root/tests/fixtures/sshd-trace/askpass.sh:0755"
+    "/etc/ssh/askpass.sh=$root/tests/fixtures/sshd-trace/askpass.sh:0755" \
+    "/etc/ssh/trace-client.sh=$root/tests/fixtures/sshd-trace/trace-client.sh:0755"
 
 image=$out/sshd-trace.img
 if [ ! -f "$image" ] || [ "$out/initfs.img" -nt "$image" ]; then
