@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
 name = "smp-readiness-kvm4"
 arch = "x86_64"
 profile = "base"
@@ -24,6 +27,21 @@ regex = '^readiness: hup-repoll first=0x[0-9a-f]+ second=0x[0-9a-f]+ ok$'
 
 [[expect]]
 regex = '^readiness: eintr retries=[1-9][0-9]* result=1 ok$'
+
+[[expect]]
+regex = '^readiness: net-server ready$'
+
+[[expect]]
+regex = '^net-server: bind$'
+
+[[expect]]
+regex = '^net-server: listen$'
+
+[[expect]]
+regex = '^net-child: bind=ok listen=ok$'
+
+[[expect]]
+regex = '^readiness: net-listen ok$'
 
 [[expect]]
 regex = '^readiness: done$'
