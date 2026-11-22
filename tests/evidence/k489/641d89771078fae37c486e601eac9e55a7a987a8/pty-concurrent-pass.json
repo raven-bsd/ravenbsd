@@ -1,0 +1,30 @@
+{
+  "case": "pty-concurrent",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 42974,
+  "exit_status": 33,
+  "matched": [
+    "^ptyd: files=0 pairs=0$",
+    "^pty-concurrent: start uid=0 blocked=8$",
+    "^pty-concurrent: B write=1 read=1 byte=66 wall_ms=[0-9]+$",
+    "^pty-concurrent: A read=1 byte=65 wall_ms=[0-9]+$",
+    "^pty-concurrent: pair A/B done$",
+    "^pty-concurrent: idle_ms=5000 blocked=8$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$",
+    "^ptyd: reader-wakes=[0-9]+$",
+    "^pty-concurrent: ninth pair ok$",
+    "^pty-concurrent: ok$",
+    "^ptyd: files=0 pairs=0$",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}
