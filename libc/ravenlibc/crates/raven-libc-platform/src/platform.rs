@@ -150,7 +150,17 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             Some(path) if is_tty_path(path) => OfdKind::Tty,
             _ => crate::scheme::probe_kind(&self.backend, handle),
         };
-        self.install(handle, kind, status, path, cloexec)
+        let fd = self.install(handle, kind, status, path, cloexec)?;
+        if kind == OfdKind::Socket {
+            // The transferred data handle does not carry the readiness event. Attach a fresh one
+            // so a blocking read on the adopted socket waits instead of returning EAGAIN; a
+            // server without Call::Event leaves the fd usable for non-blocking I/O.
+            let index = self.get(fd)?.index();
+            if let Ok(event) = crate::scheme::probe::socket_event(&self.backend, handle) {
+                let _ = self.set_ofd_event(index, event);
+            }
+        }
+        Ok(fd)
     }
 
     /// Configure the fdsan error level from `RAVEN_FDSAN` (H-9).

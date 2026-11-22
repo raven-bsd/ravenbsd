@@ -90,6 +90,16 @@ fn probe_leaves_files_unknown() {
 }
 
 #[test]
+fn probe_detects_a_socket() {
+    let fake = FakeSys::new();
+    fake.socket(b"/s");
+    let handle = fake
+        .open(b"file:/s", u32::from(raven_proto_fs::WIRE_OPEN_READ))
+        .expect("open");
+    assert_eq!(probe_kind(&fake, handle), OfdKind::Socket);
+}
+
+#[test]
 fn call_status_helper_is_used() {
     assert_eq!(xlat::call_status(0), Ok(()));
 }

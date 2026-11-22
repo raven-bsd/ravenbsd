@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K438: SCM_RIGHTS fd passing over AF_UNIX (OpenSSH monitor_fdpass). The guest passes a regular
+# file, a pty master, a connected TCP socket and two descriptors in one message, asserts the cmsg
+# fields and the exact errno for a truncated control buffer, and reads/writes through each
+# received fd. The host peer proves the TCP descriptor reaches the wire.
+
+name = "fdpass"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+initfs = "build/fixtures/fdpass/fdpass.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23082-:23082",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/qtest/cases/fdpass-fixture/build.sh",
+    "sh tests/qtest/cases/fdpass-fixture/start-host.sh",
+]
+
+[[expect]]
+regex = '^fdpass: start$'
+
+[[expect]]
+regex = '^fdpass: file fd=[0-9]+ received=[0-9]+ cmsg_len=[0-9]+ controllen=[0-9]+$'
+
+[[expect]]
+regex = '^fdpass: file roundtrip=ok$'
+
+[[expect]]
+regex = '^fdpass: pty master=-?[0-9]+ slave=-?[0-9]+ received=-?[0-9]+ controllen=[0-9]+$'
+
+[[expect]]
+regex = '^fdpass: pty roundtrip=ok$'
+
+[[expect]]
+regex = '^fdpass: tcp fd=-?[0-9]+ received=-?[0-9]+ controllen=[0-9]+$'
+
+[[expect]]
+regex = '^fdpass: tcp roundtrip=ok$'
+
+[[expect]]
+regex = '^fdpass: two fds first=-?[0-9]+ second=-?[0-9]+ cmsg_len=[0-9]+ controllen=[0-9]+$'
+
+[[expect]]
+regex = '^fdpass: two fds roundtrip=ok$'
+
+[[expect]]
+regex = '^fdpass: truncated errno=90 ok=1$'
+
+[[expect]]
+regex = '^fdpass: absent controllen=0 ok=1$'
+
+[[expect]]
+regex = '^fdpass: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fdpass: fail'

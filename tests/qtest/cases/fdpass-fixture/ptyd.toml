@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K438: the real pty server for the fdpass probe. It is a resident scheme; the one-shot
+# libc probe is the case's exit condition.
+
+name = "ptyd"
+exec = "/sbin/ptyd"
+needs = ["logd"]
+provides = ["scheme:pty"]
+readiness = "scheme"
+ready_timeout_ms = 30_000
+restart = "never"
+max_restarts = 0

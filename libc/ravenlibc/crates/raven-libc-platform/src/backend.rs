@@ -437,6 +437,12 @@ impl FakeSys {
         self
     }
 
+    /// Create a socket node (`FSTAT` reports `S_IFSOCK`), as a netd socket file does.
+    pub fn socket(&self, path: &[u8]) -> &Self {
+        self.node(path, &[], 0o140_666, OfdKind::Socket);
+        self
+    }
+
     /// Create a `sys:` value addressed as `sys:a/b`.
     pub fn sys(&self, path: &[u8], value: &[u8]) -> &Self {
         let mut full = b"sys:".to_vec();

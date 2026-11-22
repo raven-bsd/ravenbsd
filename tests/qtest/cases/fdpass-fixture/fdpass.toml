@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K438: one-shot SCM_RIGHTS probe. It needs the file namespace, the pty scheme and the net
+# scheme before it can pass a regular file, a pty master and a connected TCP socket.
+
+name = "fdpass"
+exec = "/bin/libc-test"
+needs = ["scheme:file", "scheme:pty", "scheme:net", "consd"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
