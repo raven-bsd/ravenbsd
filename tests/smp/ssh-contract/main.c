@@ -142,6 +142,25 @@ static int read_exact(int fd, void *buffer, size_t length) {
     return 0;
 }
 
+static int read_exact_trace(int fd, void *buffer, size_t length, ssize_t *last, int *last_errno) {
+    size_t done = 0;
+
+    *last = 0;
+    *last_errno = 0;
+    while (done < length) {
+        ssize_t got;
+        errno = 0;
+        got = read(fd, (char *)buffer + done, length - done);
+        *last = got;
+        *last_errno = errno;
+        if (got <= 0) {
+            return -1;
+        }
+        done += (size_t)got;
+    }
+    return 0;
+}
+
 static int check_poll(void) {
     int sv[2];
     char byte = 'A';
@@ -761,8 +780,24 @@ static int check_half_close(void) {
     if (send(conn, "HALF\n", 5, 0) != 5) {
         return fail("half greeting");
     }
-    if (read_exact(conn, data, sizeof(data)) != 0 || memcmp(data, "DATA", 4) != 0) {
-        return fail("half data");
+    revents = poll_one(conn, POLLIN | POLLHUP, 5000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "half pre-read poll revents=0x%x errno=%d",
+                       (unsigned)revents, errno);
+        return fail(detail);
+    }
+    {
+        ssize_t last = 0;
+        int read_errno = 0;
+        if (read_exact_trace(conn, data, sizeof(data), &last, &read_errno) != 0 ||
+            memcmp(data, "DATA", 4) != 0) {
+            char detail[96];
+            errno = read_errno;
+            (void)snprintf(detail, sizeof(detail), "half data got=%zd read_errno=%d",
+                           last, read_errno);
+            return fail(detail);
+        }
     }
     revents = poll_one(conn, POLLIN, 2000);
     if (revents < 0 || (revents & POLLIN) == 0) {
