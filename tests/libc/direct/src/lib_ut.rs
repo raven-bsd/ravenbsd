@@ -730,6 +730,156 @@ fn math_fdlibm_log_one() {
 }
 
 #[test]
+fn math_fdlibm_acos_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/acos.rs
+    assert_eq!(raven_libc_m::acos(1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_acosf_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/acosf.rs
+    assert_eq!(raven_libc_m::acosf(1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_acoshf_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/acoshf.rs
+    assert_eq!(raven_libc_m::acoshf(1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_asin_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/asin.rs
+    assert_eq!(raven_libc_m::asin(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_asinf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/asinf.rs
+    assert_eq!(raven_libc_m::asinf(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_asinhf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/asinhf.rs
+    assert_eq!(raven_libc_m::asinhf(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_atan2f_zero_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/atan2f.rs
+    assert_eq!(raven_libc_m::atan2f(0.0, 1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_atanf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/atanf.rs
+    assert_eq!(raven_libc_m::atanf(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_atanhf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/atanhf.rs
+    assert_eq!(raven_libc_m::atanhf(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_cosf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/cosf.rs
+    assert_eq!(raven_libc_m::cosf(0.0), 1.0);
+}
+
+#[test]
+fn math_fdlibm_cosh_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/cosh.rs
+    assert_eq!(raven_libc_m::cosh(0.0), 1.0);
+}
+
+#[test]
+fn math_fdlibm_coshf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/coshf.rs
+    assert_eq!(raven_libc_m::coshf(0.0), 1.0);
+}
+
+#[test]
+fn math_fdlibm_erf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/erf.rs
+    assert_eq!(raven_libc_m::erf(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_erff_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/erff.rs
+    assert_eq!(raven_libc_m::erff(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_exp10_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp10.rs
+    assert_eq!(raven_libc_m::exp10(0.0), 1.0);
+}
+
+#[test]
+fn math_fdlibm_exp2f_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp2f.rs
+    assert_eq!(raven_libc_m::exp2f(0.0), 1.0);
+}
+
+#[test]
+fn math_fdlibm_expf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expf.rs
+    assert_eq!(raven_libc_m::expf(0.0), 1.0);
+}
+
+#[test]
+fn math_fdlibm_expm1f_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expm1f.rs
+    assert_eq!(raven_libc_m::expm1f(0.0), 0.0);
+}
+
+#[test]
+fn math_generic_fma_basic() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/fma.rs
+    assert_eq!(raven_libc_m::fma(0.0, 0.0, 5.0), 5.0);
+}
+
+#[test]
+fn math_fdlibm_log10f_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log10f.rs
+    assert_eq!(raven_libc_m::log10f(1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_log1pf_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log1pf.rs
+    assert_eq!(raven_libc_m::log1pf(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_log2_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log2.rs
+    assert_eq!(raven_libc_m::log2(1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_log2f_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log2f.rs
+    assert_eq!(raven_libc_m::log2f(1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_logf_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/logf.rs
+    assert_eq!(raven_libc_m::logf(1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_tgammaf_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tgammaf.rs
+    assert_eq!(raven_libc_m::tgammaf(1.0), 1.0);
+}
+
+#[test]
 fn math_fdlibm_powf_one() {
     // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/powf.rs
     assert_eq!(raven_libc_m::powf(1.0, 3.0), 1.0);
