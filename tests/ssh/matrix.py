@@ -791,22 +791,28 @@ def row_s5_s6() -> None:
     attempt("S6-length", 1, "reuse", "44-byte plaintext packet",
             "not observable", 0, "BLOCKED",
             "client exposes type and recipient channel, not the packet length")
+    session_completed = result["returncode"] == 0 and not bool(result["timed_out"])
     observed = (f"strace=`{epipe_line}` errno={errno_text} fd4={fd_text} "
                 f"peer_state={peer_text}")
-    attempt("S5-session", 1, "fresh", "read(4) returns 0 at peer EOF; no EPIPE",
+    attempt("S5-session", 1, "fresh", "command session completes; no EPIPE",
             observed, float(result["elapsed_ms"]),
-            "FAIL" if epipe_line else "PASS",
-            f"server-side handle not exposed; exit {result['returncode']}")
+            "PASS" if session_completed and not epipe_line else "FAIL",
+            f"server-side handle not exposed; exit {result['returncode']}; "
+            f"timed_out={result['timed_out']}")
     if epipe_line:
         record("S5-session", "FAIL",
                f"after the confirmation the client reports `{epipe_line.strip()}`; "
                f"errno={errno_text}, fd4={fd_text}, peer_state={peer_text}, "
                f"exit {result['returncode']}; the server-side handle is not exposed "
                f"(post-exec/session path, not the confirmation)")
+    elif not session_completed:
+        record("S5-session", "FAIL",
+               f"no EPIPE, but the command session did not complete: exit "
+               f"{result['returncode']}, timed_out={result['timed_out']}, fd4={fd_text}, "
+               f"peer_state={peer_text} (post-exec/session path, not the confirmation)")
     else:
         record("S5-session", "PASS",
-               f"read completed without EPIPE (exit {result['returncode']}); fd4={fd_text}, "
-               f"peer_state={peer_text}")
+               f"command session completed exit 0; fd4={fd_text}, peer_state={peer_text}")
 
 
 def row_s7() -> None:
