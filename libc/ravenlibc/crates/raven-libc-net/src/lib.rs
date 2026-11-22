@@ -233,6 +233,22 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv> Net<B, F, E, NoUnix> {
 }
 
 impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
+    /// Re-resolve every socket record's cached handle after `fork`.
+    ///
+    /// The child's `fork_child_inherit` gives each socket OFD a fresh scheme handle. The
+    /// `SocketRec.sock` cache is used by later `CALL`s (including the `Call::Event` attach); if
+    /// it keeps the parent's handle, those calls can hit the server file after its parent handle
+    /// was released (EBADF). The fd's OFD is the authority.
+    pub fn refresh_handles(&self) {
+        let fds = &self.fds;
+        for (_, rec) in self.table.borrow_mut().iter_mut() {
+            if let Ok(info) = fds.resolve(rec.fd)
+                && info.sock.is_some()
+            {
+                rec.sock = info.sock;
+            }
+        }
+    }
     /// Build a net layer with an optional `AF_UNIX` backend.
     pub fn with_unix(backend: B, fds: F, env: E, unix: Option<U>) -> Self {
         Self {

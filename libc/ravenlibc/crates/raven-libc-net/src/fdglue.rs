@@ -64,7 +64,12 @@ impl<B: SysBackend, L: Lock> SocketFds for FdGlue<'_, B, L> {
     }
 
     fn event(&self, ofd: u32, s: Sock) {
-        if let Ok(event) = crate::backend_platform::event_handle(self.platform.backend(), s) {
+        // The OFD is the authority after fork_child_inherit; the passed Sock may be the parent's
+        // handle, which the server has already released (K409 EBADF).
+        let handle = self.platform.ofd_handle(ofd).unwrap_or(Handle(s.0));
+        if let Ok(event) =
+            crate::backend_platform::event_handle(self.platform.backend(), Sock(handle.0))
+        {
             let _ = self.platform.set_ofd_event(ofd, event);
         }
     }

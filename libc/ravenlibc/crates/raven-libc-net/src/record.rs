@@ -166,6 +166,11 @@ impl SocketTable {
     pub fn remove(&mut self, ofd: u32) -> Option<SocketRec> {
         self.records.remove(&ofd)
     }
+
+    /// Every record, keyed by OFD token, for the post-fork handle refresh.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&u32, &mut SocketRec)> {
+        self.records.iter_mut()
+    }
 }
 
 #[cfg(test)]
