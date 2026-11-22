@@ -775,6 +775,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         let handle = reference.handle();
         let blocking = reference.status() & fcntl::O_NONBLOCK as u32 == 0;
         let doorbell = reference.kind() == OfdKind::Socket && reference.poll_signaled();
+        let pipe = reference.kind() == OfdKind::Pipe;
         loop {
             let result = crate::intr::cancellable(|| {
                 crate::intr::run(
@@ -784,10 +785,10 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 )
             });
             match result {
-                Err(Errno::EAGAIN) if blocking && doorbell => {
-                    // The doorbell is a hint: netd may have drained the queue before this read.
-                    // POSIX requires a blocking socket read to wait, so wait for the next
-                    // readable event and retry instead of leaking EAGAIN to the caller.
+                Err(Errno::EAGAIN) if blocking && (doorbell || pipe) => {
+                    // The kernel pipe end is created non-blocking (there is no runtime setter);
+                    // POSIX blocking is emulated from the OFD status here. The socket doorbell is
+                    // also a hint: netd may have drained the queue before this read.
                     let ready = crate::poll::wait_readable(self, fd, -1)?;
                     if ready == 0 {
                         continue;
@@ -818,13 +819,54 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             return Err(Errno::EBADF);
         }
         let handle = reference.handle();
-        crate::intr::cancellable(|| {
-            crate::intr::run(
-                crate::intr::CallClass::Restartable,
-                crate::intr::restart_wanted(),
-                || self.backend.write(handle, buf),
-            )
-        })
+        let pipe = reference.kind() == OfdKind::Pipe;
+        let blocking = reference.status() & fcntl::O_NONBLOCK as u32 == 0;
+        if pipe && blocking && !buf.is_empty() {
+            // The kernel pipe end is always non-blocking (see `pipe2`); a blocking descriptor
+            // waits here for ring space and loops until every byte is accepted.
+            self.write_pipe_blocking(fd, handle, buf)
+        } else {
+            crate::intr::cancellable(|| {
+                crate::intr::run(
+                    crate::intr::CallClass::Restartable,
+                    crate::intr::restart_wanted(),
+                    || self.backend.write(handle, buf),
+                )
+            })
+        }
+    }
+
+    /// Emulate a blocking pipe write over the non-blocking kernel endpoint.
+    fn write_pipe_blocking(&self, fd: i32, handle: Handle, buf: &[u8]) -> Result<usize, Errno> {
+        let mut done = 0usize;
+        while done < buf.len() {
+            let remaining = &buf[done..];
+            let result = crate::intr::cancellable(|| {
+                crate::intr::run(
+                    crate::intr::CallClass::Restartable,
+                    crate::intr::restart_wanted(),
+                    || self.backend.write(handle, remaining),
+                )
+            });
+            match result {
+                Ok(0) => break,
+                Ok(count) => done = done.saturating_add(count.min(remaining.len())),
+                Err(Errno::EAGAIN) => {
+                    let ready = crate::poll::wait_writable(self, fd, -1)?;
+                    if ready == 0 {
+                        continue;
+                    }
+                }
+                Err(Errno::EINTR) if done == 0 && crate::intr::restart_wanted() => continue,
+                Err(error) => {
+                    if done == 0 {
+                        return Err(error);
+                    }
+                    break;
+                }
+            }
+        }
+        Ok(done)
     }
 
     /// `readv`: one request up to 64 KiB, then a loop for the rest.
@@ -1727,6 +1769,41 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok(Some(out))
     }
 
+    /// `RSH_FD0/1/2` environment entries for the shell's standard descriptors.
+    ///
+    /// The first-party `rsh` takes its standard streams as scheme handles in these variables. A
+    /// host that execs it directly (OpenSSH's command child) has only fd numbers, so publish the
+    /// current fd 0/1/2 handles. The caller's existing `RSH_FD*` values win.
+    pub fn stdio_env(&self) -> Vec<Vec<u8>> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        let mut out = Vec::new();
+        for (fd, entry) in entries {
+            let name = match fd {
+                0 => b"RSH_FD0".as_slice(),
+                1 => b"RSH_FD1".as_slice(),
+                2 => b"RSH_FD2".as_slice(),
+                _ => continue,
+            };
+            let Some(ofd) = arena.get(entry.ofd) else {
+                continue;
+            };
+            if !transferable(ofd.kind) {
+                continue;
+            }
+            let handle = ofd.handle.get();
+            if handle == Handle::NONE {
+                continue;
+            }
+            let mut row = Vec::new();
+            row.extend_from_slice(name);
+            row.push(b'=');
+            row.extend_from_slice(alloc::format!("{}", handle.0).as_bytes());
+            out.push(row);
+        }
+        out
+    }
+
     /// Close every descriptor marked `FD_CLOEXEC` after `execve` restored the table.
     ///
     /// The kernel keeps handles across exec; only the new libc knows which descriptors carried
@@ -1794,13 +1871,19 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     /// The kernel accepts only `O_CLOEXEC` and `O_NONBLOCK`; every other bit is `EINVAL`, not a
     /// silent ignore. `O_NONBLOCK` is recorded in both OFD status words and `O_CLOEXEC` in both
     /// fd-table entries.
+    ///
+    /// The kernel pipe end captures its blocking flag at creation and has no runtime setter, while
+    /// POSIX `fcntl(F_SETFL)` must change the open-file description. Create every kernel end
+    /// non-blocking and emulate blocking in `read`/`write` from the OFD status; a later
+    /// `F_SETFL(O_NONBLOCK)` then takes effect without a second kernel object.
     pub fn pipe2(&self, flags: i32) -> Result<(i32, i32), Errno> {
         let flags = u32::try_from(flags).map_err(|_| Errno::EINVAL)?;
         let known = (fcntl::O_CLOEXEC | fcntl::O_NONBLOCK) as u32;
         if flags & !known != 0 {
             return Err(Errno::EINVAL);
         }
-        let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(flags)?;
+        let kernel_flags = flags | fcntl::O_NONBLOCK as u32;
+        let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(kernel_flags)?;
         let cloexec = flags & fcntl::O_CLOEXEC as u32 != 0;
         let status = if flags & fcntl::O_NONBLOCK as u32 != 0 {
             fcntl::O_NONBLOCK as u32
