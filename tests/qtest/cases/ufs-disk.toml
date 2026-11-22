@@ -63,6 +63,9 @@ regex = '34\s+32768\s+1\s+ufs-root'
 regex = 's99-persist$'
 
 [[expect]]
+regex = '^irq-loop-ok$'
+
+[[expect]]
 regex = '^init exited \(0\)$'
 
 [[step]]
@@ -153,6 +156,21 @@ delay_ms = 100
 wait = '^read-ok$'
 timeout_secs = 30
 
+# K522 regression row: bounded disk I/O loop over the MSI-X completion path.
+# The vector must stay owned for the whole loop; any `irq:` report (unclaimed
+# vector / unexpected interrupt) fails the case below.
+[[step]]
+send = "for i in 1 2 3 4 5 6 7 8; do cat /etc/motd > /mnt/irq-loop.txt; cat /mnt/irq-loop.txt > /dev/null; done; echo irq-loop-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^irq-loop-ok$'
+timeout_secs = 120
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
 [[step]]
 send = "umount /mnt && echo umount-ok\n"
 delay_ms = 100
@@ -171,3 +189,8 @@ timeout_secs = 60
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|mount: .*error|mount: .*invalid|fsd-ufs: .*failed|blockd: .*failed'
+
+# K522: the MSI-X vector must stay owned; the kernel reports any free vector
+# that still fires as `irq: unclaimed vector` (or `irq: unexpected interrupt`).
+[[forbid]]
+regex = '^irq:'
