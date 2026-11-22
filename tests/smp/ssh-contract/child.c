@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
     struct pollfd pfd;
     char buffer[4];
     int ready;
+    const char *mode = argc > 2 ? argv[2] : "";
 
     if (argc < 2) {
         return 2;
@@ -70,6 +71,31 @@ int main(int argc, char **argv) {
         char line[80];
         (void)snprintf(line, sizeof(line), "CONTRACT K4 CHILD fd=%d\n", fd);
         say(line);
+    }
+    if (strcmp(mode, "eof") == 0) {
+        pfd.fd = fd;
+        pfd.events = POLLIN | POLLHUP;
+        pfd.revents = 0;
+        do {
+            ready = poll(&pfd, 1, 5000);
+        } while (ready < 0 && errno == EINTR);
+        if (ready <= 0) {
+            say("CONTRACT K8 CHILD poll timeout\n");
+            _exit(8);
+        }
+        {
+            char byte = 0;
+            ssize_t got = read(fd, &byte, 1);
+            char line[128];
+            (void)snprintf(line, sizeof(line),
+                           "CONTRACT K8 CHILD eof got=%d revents=0x%x errno=%d\n",
+                           (int)got, (unsigned)pfd.revents, errno);
+            say(line);
+            if (got != 0) {
+                _exit(9);
+            }
+        }
+        _exit(0);
     }
     pfd.fd = fd;
     pfd.events = POLLIN;
