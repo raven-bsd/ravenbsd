@@ -1,0 +1,240 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# K451 kernel gap register: area	contract	normative	raven	status	test	severity	proposed_ticket
+syscall-abi	SYS_EXIT=0x01: process-wide exit, no return	POSIX.1-2017 _exit; NetBSD sys/kern/kern_exit.c:exit1	kernel/src/syscall/mod.rs:279	PROVEN	tests/qtest/cases/posix-fs-smp.toml::case	P0	-
+syscall-abi	SYS_YIELD=0x02: yield keeps the thread runnable	NetBSD sys/kern/kern_synch.c:yield	kernel/src/syscall/basic.rs:38	PARTIAL	-	P1	yield: add a deterministic preemption probe
+syscall-abi	SYS_DEBUG_WRITE=0x03: bad pointer EFAULT, huge length EINVAL	NetBSD sys/kern/subr_prf.c:printf	kernel/src/syscall/basic.rs:42	PROVEN	tests/fixtures/syscall/src/main.rs::debug-write-efault	P1	-
+syscall-abi	SYS_CLOCK_GET=0x04: bad clock id EINVAL, bad pointer EFAULT	NetBSD sys/kern/kern_time.c:sys_clock_gettime	kernel/src/syscall/basic.rs:43	PROVEN	tests/fixtures/syscall/src/main.rs::clock-get-einval	P1	-
+syscall-abi	SYS_NANOSLEEP=0x05: sleeps at least the requested interval	NetBSD sys/kern/kern_time.c:sys_nanosleep	kernel/src/syscall/basic.rs:44	PROVEN	tests/qtest/cases/time-entropy.toml::case	P1	-
+syscall-abi	SYS_UNAME=0x06: bad pointer EFAULT, fills the record	NetBSD sys/kern/kern_syscalls.c:sys_uname	kernel/src/syscall/basic.rs:52	PROVEN	tests/fixtures/syscall/src/main.rs::uname-efault	P1	-
+syscall-abi	SYS_DEBUG_READ=0x07: bounded serial input with timeout	NetBSD sys/kern/tty.c:ttyread	kernel/src/syscall/mod.rs:289	UNTESTED	-	P1	debug_read: add a serial-input probe
+syscall-abi	SYS_GETRANDOM=0x08: entropy fill and flags validation	Linux drivers/char/random.c:get_random_bytes	kernel/src/syscall/mod.rs:263	PROVEN	tests/qtest/cases/time-entropy.toml::case	P1	-
+syscall-abi	SYS_CLOCK_SET=0x09: realtime only, monotonic rejected	NetBSD sys/kern/kern_time.c:sys_settimeofday	kernel/src/syscall/mod.rs:266	PROVEN	tests/qtest/cases/time-entropy.toml::case	P1	-
+syscall-abi	SYS_TRACE_SET=0x0B: set the calling thread trace id	Illumos usr/src/uts/common/dtrace/dtrace.c:dtrace_probe (CDDL, behaviour only)	kernel/src/syscall/mod.rs:270	PROVEN	tests/qtest/cases/trace-context.toml::case	P2	-
+syscall-abi	SYS_RECORD_LOCK=0x0C: advisory record-lock acquire/release	NetBSD sys/kern/sys_generic.c:sys_fcntl	kernel/src/syscall/mod.rs:274	UNTESTED	-	P2	record-lock: run the posix-fs-record-lock matrix
+syscall-abi	SYS_PROC_CHROOT=0x0D: chroot changes only the calling process root	NetBSD sys/kern/vfs_syscalls.c:sys_chroot	kernel/src/syscall/mod.rs:105	PROVEN	tests/qtest/cases/chroot.toml::case	P0	-
+syscall-abi	SYS_PAGER_SUPPLY=0x100: only the registered pager may supply a page	NetBSD uvm/uvm_pager.c:uvm_pager_putpages	kernel/src/syscall/mod.rs:295	PROVEN	tests/fixtures/syscall/src/main.rs::pager-supply-ebadf	P0	-
+syscall-abi	SYS_DUPLEX_PAIR=0x110: create a connected endpoint pair	Illumos usr/src/uts/common/doors/doors_client.c:door_create (CDDL, behaviour only)	kernel/src/syscall/mod.rs:123	UNTESTED	-	P1	duplex: run the endpoint pair probe
+syscall-abi	SYS_DUPLEX_SHUTDOWN=0x111: half-close one endpoint direction	Illumos usr/src/uts/common/doors/doors_client.c:door_revoke (CDDL, behaviour only)	kernel/src/syscall/mod.rs:126	UNTESTED	-	P1	duplex: prove shutdown half-close semantics
+syscall-abi	SYS_DUPLEX_SENDMSG=0x112: send with rights transfer and bounds	Illumos usr/src/uts/common/doors/doors_client.c:door_call (CDDL, behaviour only)	kernel/src/syscall/mod.rs:129	UNTESTED	-	P1	duplex: prove sendmsg bounds and rights
+syscall-abi	SYS_DUPLEX_RECVMSG=0x113: receive payload and rights, EOF on close	Illumos usr/src/uts/common/doors/doors_client.c:door_return (CDDL, behaviour only)	kernel/src/syscall/mod.rs:132	UNTESTED	-	P1	duplex: prove recvmsg EOF and rights
+syscall-abi	SYS_DUPLEX_PEERCRED=0x114: peer credentials match the sender	Illumos usr/src/uts/common/doors/doors_client.c:door_ucred (CDDL, behaviour only)	kernel/src/syscall/mod.rs:135	UNTESTED	-	P1	duplex: prove peer credential identity
+syscall-abi	SYS_PROC_CTTY_SET=0x1e0: attach a controlling terminal	NetBSD sys/kern/tty.c:sys_ioctl	kernel/src/syscall/mod.rs:165	PROVEN	tests/qtest/cases/proc-session.toml::case	P1	-
+syscall-abi	SYS_PROC_CTTY_GET=0x1e1: report the controlling terminal	NetBSD sys/kern/tty.c:sys_ioctl	kernel/src/syscall/mod.rs:168	PROVEN	tests/qtest/cases/proc-session.toml::case	P1	-
+syscall-abi	SYS_PROC_CTTY_SET_FG=0x1e2: foreground pgrp must be in the session	NetBSD sys/kern/tty.c:ttycheckbackground	kernel/src/syscall/mod.rs:171	PROVEN	tests/qtest/cases/proc-session.toml::case	P1	-
+syscall-abi	SYS_THREAD_CREATE=0x20: bad flags/ptr/handle rejected, thread starts	POSIX pthread_create; NetBSD sys/kern/kern_lwp.c:lwp_create	kernel/src/syscall/mod.rs:290	PROVEN	tests/fixtures/syscall/src/main.rs::thread-create-efault	P0	-
+syscall-abi	SYS_THREAD_EXIT=0x21: terminates the calling thread only	NetBSD sys/kern/kern_lwp.c:lwp_exit	kernel/src/syscall/mod.rs:291	PROVEN	tests/qtest/cases/posix-fs-smp.toml::case	P0	-
+syscall-abi	SYS_FUTEX=0x22: wait/wake exactly once; EAGAIN/EINVAL/EFAULT	NetBSD sys/kern/kern_futex.c:do_futex	kernel/src/syscall/mod.rs:288	PARTIAL	tests/fixtures/syscall/src/main.rs::futex-einval	P0	futex: run shared/robust futex probes
+syscall-abi	SYS_THREAD_SET_TLS=0x23: TLS base and clear word boundaries	NetBSD sys/arch/x86/x86/sys_machdep.c:sys_set_tls	kernel/src/syscall/mod.rs:234	PARTIAL	tests/fixtures/syscall/src/main.rs::thread-set-tls-efault	P1	thread: prove TLS base across context switches
+syscall-abi	SYS_THREAD_SELF=0x24: stable nonzero 30-bit tid	Linux kernel/fork.c:task_pid_vnr	kernel/src/syscall/mod.rs:240	PARTIAL	-	P1	thread-tid: run the tid stability probe
+syscall-abi	SYS_THREAD_EXIT_EX=0x25: clear word, unmap, futex wake, exit	Linux kernel/fork.c:do_exit	kernel/src/syscall/mod.rs:252	PARTIAL	-	P1	thread: prove THREAD_EXIT_EX atomic clear/unmap
+syscall-abi	SYS_ROBUST_LIST_SET=0x26: reject bad offsets/sizes	Linux kernel/futex/core.c:futex_set_robust_list	kernel/src/syscall/mod.rs:243	PARTIAL	tests/fixtures/syscall/src/main.rs::robust-list-einval	P1	robust-futex: run the owner-death probe
+syscall-abi	SYS_PROC_CREATE=0x30: bad flags EINVAL, empty process created	POSIX fork; NetBSD sys/kern/kern_fork.c:fork1	kernel/src/syscall/mod.rs:292	PROVEN	tests/fixtures/syscall/src/main.rs::proc-create-einval	P0	-
+syscall-abi	SYS_PROC_WAIT=0x31: stale handle EBADF, exact status delivered	POSIX waitpid; NetBSD sys/kern/kern_exit.c:sys_wait4	kernel/src/syscall/mod.rs:293	PROVEN	tests/fixtures/syscall/src/main.rs::proc-wait-ebadf	P0	-
+syscall-abi	SYS_PROC_TERMINATE=0x32: unauthorized terminate EPERM/EBADF	NetBSD sys/kern/kern_sig.c:kill	kernel/src/syscall/mod.rs:286	PROVEN	tests/fixtures/syscall/src/main.rs::proc-terminate-ebadf	P0	-
+syscall-abi	SYS_PROC_NAMESPACE=0x33: bad op EINVAL, bad pointer EFAULT	NetBSD sys/kern/vfs_syscalls.c:sys_chroot	kernel/src/syscall/mod.rs:287	PROVEN	tests/fixtures/syscall/src/main.rs::proc-namespace-op	P0	-
+syscall-abi	SYS_PROC_SET_PERSONALITY=0x34: bad personality EINVAL, stale handle EBADF	Linux kernel/exit.c:do_exit	kernel/src/syscall/mod.rs:231	PROVEN	tests/fixtures/syscall/src/main.rs::personality-einval	P1	-
+syscall-abi	SYS_PROC_SELF_INFO=0x35: identity words and command name bounded	POSIX getpid/getppid; NetBSD sys/kern/kern_prot.c:sys_getpid	kernel/src/syscall/mod.rs:174	PARTIAL	-	P1	proc-identity: run the self-info probe
+syscall-abi	SYS_PROC_SETPGID=0x36: same-session pgid only	POSIX setpgid; NetBSD sys/kern/kern_prot.c:sys_setpgid	kernel/src/syscall/mod.rs:177	PROVEN	tests/qtest/cases/proc-session.toml::case	P1	-
+syscall-abi	SYS_PROC_SETSID=0x37: new session, no existing leader	POSIX setsid; NetBSD sys/kern/kern_prot.c:sys_setsid	kernel/src/syscall/mod.rs:180	PROVEN	tests/qtest/cases/proc-session.toml::case	P1	-
+syscall-abi	SYS_PROC_SETCRED=0x38: setuid/setgid privilege checks	POSIX setuid; NetBSD sys/kern/kern_prot.c:sys_setuid	kernel/src/syscall/mod.rs:183	PROVEN	tests/qtest/cases/proc-credentials.toml::case	P0	-
+syscall-abi	SYS_PROC_FORK=0x39: fork address space, COW, child identity	NetBSD sys/kern/kern_fork.c:fork1	kernel/src/syscall/mod.rs:99	PROVEN	tests/qtest/cases/proc-fork.toml::case	P0	-
+syscall-abi	SYS_PROC_PID_INFO=0x3A: bounded words, ESRCH for a dead pid	Linux kernel/sys.c:do_task_stat	kernel/src/syscall/mod.rs:186	PARTIAL	-	P1	proc-identity: run the pid-info probe
+syscall-abi	SYS_PROC_SETCRED_EX=0x3B: extended ids/groups with privilege checks	POSIX setresuid/setgroups; NetBSD sys/kern/kern_prot.c:sys_setgroups	kernel/src/syscall/mod.rs:192	PROVEN	tests/qtest/cases/proc-credentials.toml::case	P0	-
+syscall-abi	SYS_PROC_CRED_INFO=0x3C: read back uid/euid/gid/egid/groups	NetBSD sys/kern/kern_prot.c:sys_getgroups	kernel/src/syscall/mod.rs:201	PROVEN	tests/qtest/cases/proc-credentials.toml::case	P0	-
+syscall-abi	SYS_PROC_GETGROUPS=0x3D: count and list bounds	NetBSD sys/kern/kern_prot.c:sys_getgroups	kernel/src/syscall/mod.rs:204	PROVEN	tests/qtest/cases/proc-credentials.toml::case	P0	-
+syscall-abi	SYS_PROC_HANDLE_INFO=0x3E: process/thread handle identity only	NetBSD sys/kern/kern_descrip.c:fget	kernel/src/syscall/mod.rs:195	PARTIAL	-	P1	proc-handle-info: run the handle identity probe
+syscall-abi	SYS_PROC_EXEC_CRED=0x3F: setuid/setgid bits, nosuid honoured	NetBSD sys/kern/kern_exec.c:execve	kernel/src/syscall/mod.rs:198	PROVEN	tests/qtest/cases/setuid.toml::case	P0	-
+syscall-abi	SYS_MAP=0x40: length/offset/address validation, W^X enforcement	NetBSD uvm/uvm_mmap.c:sys_mmap	kernel/src/syscall/mod.rs:296	PROVEN	tests/fixtures/syscall/src/main.rs::map-len-zero	P0	-
+syscall-abi	SYS_UNMAP=0x41: unmap owned ranges only, EINVAL on bad bounds	NetBSD uvm/uvm_mmap.c:sys_munmap	kernel/src/syscall/mod.rs:297	PROVEN	tests/fixtures/syscall/src/main.rs::unmap-ebadf	P0	-
+syscall-abi	SYS_PROTECT=0x42: protect owned ranges, reject W+X	NetBSD uvm/uvm_mmap.c:sys_mprotect	kernel/src/syscall/mod.rs:298	PROVEN	tests/fixtures/syscall/src/main.rs::protect-ebadf	P0	-
+syscall-abi	SYS_MEMOBJ_CREATE=0x43: page-multiple length, bad flags rejected	NetBSD uvm/uvm_device.c:uvm_memalloc	kernel/src/syscall/mod.rs:294	PROVEN	tests/fixtures/syscall/src/main.rs::memobj-create-zero	P0	-
+syscall-abi	SYS_MSYNC=0x44: flush a shared mapping without data loss	POSIX msync; NetBSD uvm/uvm_mmap.c:sys_msync	kernel/src/syscall/mod.rs:117	PARTIAL	tests/qtest/cases/posix-fs-smp.toml::case	P0	msync: add a persistent-file flush probe
+syscall-abi	SYS_PROC_SET_COMMAND=0x45: bounded UTF-8 command name	NetBSD sys/kern/kern_proc.c:sys___sysctl	kernel/src/syscall/mod.rs:189	UNTESTED	-	P2	proc: add a set-command bounds probe
+syscall-abi	SYS_PROC_REBOOT=0x46: privileged reboot/halt/poweroff	NetBSD sys/kern/kern_reboot.c:sys_reboot	kernel/src/syscall/mod.rs:102	UNTESTED	-	P1	reboot: run the poweroff/reboot cases
+syscall-abi	SYS_PROC_WAIT_EX=0x48: waitpid options, WNOHANG, exact status	POSIX waitpid; NetBSD sys/kern/kern_exit.c:sys_wait6	kernel/src/syscall/mod.rs:207	PARTIAL	-	P0	proc-wait: prove WNOHANG/WUNTRACED and two-child reap
+syscall-abi	SYS_PROC_GETPGID=0x49: report the process group	POSIX getpgid; NetBSD sys/kern/kern_prot.c:sys_getpgid	kernel/src/syscall/mod.rs:210	PROVEN	tests/qtest/cases/proc-session.toml::case	P1	-
+syscall-abi	SYS_PROC_SIGNAL=0x4A: signal authorization and SIGCHLD	POSIX kill; NetBSD sys/kern/kern_sig.c:kill	kernel/src/syscall/mod.rs:213	PROVEN	tests/qtest/cases/proc-signal.toml::case	P0	-
+syscall-abi	SYS_PROC_SIGRECV=0x4B: dequeue a pending signal	NetBSD sys/kern/kern_sig.c:sigget	kernel/src/syscall/mod.rs:216	PROVEN	tests/qtest/cases/proc-signal.toml::case	P0	-
+syscall-abi	SYS_PROC_TIMES=0x4C: user/system/child time accounting	POSIX times; NetBSD sys/kern/kern_resource.c:sys_times	kernel/src/syscall/mod.rs:219	UNTESTED	-	P1	proc: prove process time accounting
+syscall-abi	SYS_PROC_GETRUSAGE=0x4D: rusage fields and zeroing	POSIX getrusage; NetBSD sys/kern/kern_resource.c:sys_getrusage	kernel/src/syscall/mod.rs:222	UNTESTED	-	P1	proc: prove rusage accounting
+syscall-abi	SYS_PROC_GETRLIMIT=0x4E: report current and maximum limits	POSIX getrlimit; NetBSD sys/kern/kern_resource.c:sys_getrlimit	kernel/src/syscall/mod.rs:225	UNTESTED	-	P1	rlimit: prove get/set and privilege rules
+syscall-abi	SYS_PROC_SETRLIMIT=0x4F: privilege check, NEVER/INFINITY rules	POSIX setrlimit; NetBSD sys/kern/kern_resource.c:sys_setrlimit	kernel/src/syscall/mod.rs:228	UNTESTED	-	P0	rlimit: prove set limit, NOFILE and privilege rules
+syscall-abi	SYS_HANDLE_CLOSE=0x50: stale handle EBADF, one close per handle	POSIX close; NetBSD sys/kern/kern_descrip.c:closef	kernel/src/syscall/basic.rs:53	PROVEN	tests/fixtures/syscall/src/main.rs::handle-close-ebadf	P0	-
+syscall-abi	SYS_HANDLE_DUP=0x51: stale handle EBADF, mask intersection	POSIX dup; NetBSD sys/kern/kern_descrip.c:dupfdopen	kernel/src/syscall/basic.rs:54	PROVEN	tests/fixtures/syscall/src/main.rs::handle-dup-ebadf	P0	-
+syscall-abi	SYS_HANDLE_REVOKE=0x53: reduce rights without a privilege, derived handles follow	NetBSD sys/kern/kern_descrip.c:fdcopy	kernel/src/syscall/basic.rs:55	PROVEN	tests/fixtures/syscall/src/main.rs::revoke-signal	P0	-
+syscall-abi	SYS_HANDLE_TRANSFER=0x52: transfer rights never grow, no WRITE denied	NetBSD sys/kern/kern_descrip.c:fdcopy	kernel/src/syscall/mod.rs:299	PROVEN	tests/qtest/cases/handle-transfer.toml::case	P0	-
+syscall-abi	SYS_HANDLE_COPY=0x54: copy into another process with rights mask	NetBSD sys/kern/kern_descrip.c:dupfdopen	kernel/src/syscall/mod.rs:246	PROVEN	tests/qtest/cases/handle-copy.toml::case	P0	-
+syscall-abi	SYS_HANDLE_TRANSFER_FILE=0x55: transfer a file handle to a server	NetBSD sys/kern/kern_descrip.c:fdcopy	kernel/src/syscall/mod.rs:249	PARTIAL	-	P1	handle: prove file-handle transfer and revoke
+syscall-abi	SYS_EVQ_CREATE=0x58: flag validation, bounded queue	NetBSD sys/kern/kern_event.c:kqueue_create	kernel/src/syscall/mod.rs:306	PROVEN	tests/fixtures/syscall/src/main.rs::evq-create-flags	P1	-
+syscall-abi	SYS_EVQ_CTL=0x59: stale handle EBADF, add/delete bounds	NetBSD sys/kern/kern_event.c:kqueue_register	kernel/src/syscall/mod.rs:307	PROVEN	tests/fixtures/syscall/src/main.rs::evq-ctl-ebadf	P1	-
+syscall-abi	SYS_EVQ_WAIT=0x5A: timeout, level/edge re-evaluation, no lost event	NetBSD sys/kern/kern_event.c:kevent	kernel/src/syscall/mod.rs:308	PARTIAL	tests/fixtures/syscall/src/main.rs::evq-wait-ebadf	P0	evq: capture and fix the crash, then prove wait semantics
+syscall-abi	SYS_TIMER_CREATE=0x5B: clock id validation, monotonic/realtime	Illumos usr/src/uts/common/os/cyclic.c:cyclic_add (CDDL, behaviour only)	kernel/src/syscall/mod.rs:309	PROVEN	tests/fixtures/syscall/src/main.rs::timer-create-bad-clock	P1	-
+syscall-abi	SYS_EVENT_CREATE=0x5C: event flag validation	NetBSD sys/kern/kern_event.c:event_create	kernel/src/syscall/mod.rs:310	PROVEN	tests/fixtures/syscall/src/main.rs::event-create-flags	P1	-
+syscall-abi	SYS_EVENT_SIGNAL=0x5D: stale event handle EBADF	NetBSD sys/kern/kern_event.c:event_signal	kernel/src/syscall/mod.rs:311	PROVEN	tests/fixtures/syscall/src/main.rs::event-signal-ebadf	P1	-
+syscall-abi	SYS_TIMER_SET=0x5E: stale timer EBADF, disarm and rearm	Illumos usr/src/uts/common/os/cyclic.c:cyclic_reprogram (CDDL, behaviour only)	kernel/src/syscall/mod.rs:312	PROVEN	tests/fixtures/syscall/src/main.rs::timer-set-ebadf	P1	-
+syscall-abi	SYS_SCHEME_REGISTER=0x60: name validation and single owner	NetBSD sys/kern/vfs_syscalls.c:sys_mount	kernel/src/syscall/mod.rs:315	PROVEN	tests/fixtures/syscall/src/main.rs::scheme-register-efault	P0	-
+syscall-abi	SYS_OPEN=0x61: path bounds EFAULT, flags validation, scheme routing	POSIX open; NetBSD sys/kern/vfs_syscalls.c:sys_open	kernel/src/syscall/mod.rs:316	PROVEN	tests/fixtures/syscall/src/main.rs::open-efault	P0	-
+syscall-abi	SYS_READ=0x62: bad handle EBADF, user range EFAULT, short reads	POSIX read; NetBSD sys/kern/sys_generic.c:sys_read	kernel/src/syscall/mod.rs:317	PROVEN	tests/fixtures/syscall/src/main.rs::read-ebadf	P0	-
+syscall-abi	SYS_WRITE=0x63: bad handle EBADF, user range EFAULT, partial writes	POSIX write; NetBSD sys/kern/sys_generic.c:sys_write	kernel/src/syscall/mod.rs:318	PROVEN	tests/fixtures/syscall/src/main.rs::write-ebadf	P0	-
+syscall-abi	SYS_CLOSE=0x64: stale handle EBADF, one close per OFD	POSIX close; NetBSD sys/kern/kern_descrip.c:closef	kernel/src/syscall/mod.rs:319	PROVEN	tests/fixtures/syscall/src/main.rs::close-ebadf	P0	-
+syscall-abi	SYS_DUP=0x65: stale handle EBADF, rights mask intersection	POSIX dup; NetBSD sys/kern/kern_descrip.c:dupfdopen	kernel/src/syscall/mod.rs:320	PROVEN	tests/fixtures/syscall/src/main.rs::dup-ebadf	P0	-
+syscall-abi	SYS_FSTAT=0x66: stale handle EBADF, bounded stat record	POSIX fstat; NetBSD sys/kern/vfs_syscalls.c:sys_fstat	kernel/src/syscall/mod.rs:321	PROVEN	tests/fixtures/syscall/src/main.rs::fstat-ebadf	P0	-
+syscall-abi	SYS_CALL=0x67: stale request handle EBADF, reply bounds	NetBSD sys/kern/vfs_syscalls.c:sys_ioctl	kernel/src/syscall/mod.rs:322	PROVEN	tests/fixtures/syscall/src/main.rs::call-ebadf	P0	-
+syscall-abi	SYS_RECV=0x68: packet bounds, no request loss, waiter wake	NetBSD sys/kern/uipc_socket.c:soo_read	kernel/src/syscall/mod.rs:323	PARTIAL	tests/qtest/cases/fs-ipc.toml::case	P0	recv: prove no lost wake under contention (K391 merged)
+syscall-abi	SYS_SEND=0x69: reply bounds EINVAL, request identity	NetBSD sys/kern/uipc_socket.c:soo_write	kernel/src/syscall/mod.rs:324	PROVEN	tests/fixtures/syscall/src/main.rs::send-einval	P0	-
+syscall-abi	SYS_PROC_EXEC=0x6A: image load, argv/env, entry point	NetBSD sys/kern/kern_exec.c:execve	kernel/src/syscall/mod.rs:120	PROVEN	tests/qtest/cases/proc-exec.toml::case	P0	-
+syscall-abi	SYS_PREAD=0x6B: positional read leaves the OFD cursor	POSIX pread; NetBSD sys/kern/sys_generic.c:sys_pread	kernel/src/syscall/mod.rs:108	PROVEN	tests/qtest/cases/fs-contract.toml::case	P1	-
+syscall-abi	SYS_PWRITE=0x6C: positional write leaves the OFD cursor	POSIX pwrite; NetBSD sys/kern/sys_generic.c:sys_pwrite	kernel/src/syscall/mod.rs:111	PROVEN	tests/qtest/cases/fs-contract.toml::case	P1	-
+syscall-abi	SYS_SEEK=0x6D: whence validation, cursor bounds	POSIX lseek; NetBSD sys/kern/sys_generic.c:sys_lseek	kernel/src/syscall/mod.rs:114	PROVEN	tests/qtest/cases/fs-contract.toml::case	P1	-
+syscall-abi	SYS_PIPE=0x6E: two handles, byte-stream EOF	POSIX pipe; NetBSD sys/kern/sys_pipe.c:sys_pipe	kernel/src/syscall/mod.rs:138	PROVEN	tests/qtest/cases/pipe.toml::case	P1	-
+syscall-abi	SYS_PIPE2=0x6F: O_CLOEXEC/O_NONBLOCK flags	POSIX pipe2; NetBSD sys/kern/sys_pipe.c:sys_pipe2	kernel/src/syscall/mod.rs:141	PROVEN	tests/qtest/cases/pipe.toml::case	P1	-
+syscall-abi	SYS_MMIO_CREATE=0x70: device handle required, page bounds	FreeBSD sys/dev/pci/pci.c:pci_map_mem	kernel/src/syscall/mod.rs:300	PROVEN	tests/fixtures/syscall/src/main.rs::mmio-create-wrong-handle	P0	-
+syscall-abi	SYS_BOOT_BLOB=0x71: blob kind validation, initfs only	FreeBSD sys/kern/init_main.c:mi_startup	kernel/src/syscall/mod.rs:300	PROVEN	tests/fixtures/syscall/src/main.rs::boot-blob-kind	P1	-
+syscall-abi	SYS_DMA_ALLOC=0x72: zero/bad length EINVAL, physical bounds	FreeBSD sys/dev/virtio/virtio.c:virtqueue_dmamap_load	kernel/src/syscall/mod.rs:301	PROVEN	tests/fixtures/syscall/src/main.rs::dma-alloc-zero	P0	-
+syscall-abi	SYS_DMA_INFO=0x73: stale handle EBADF, bounded info record	FreeBSD sys/dev/virtio/virtio.c:virtqueue_dmamap_load	kernel/src/syscall/mod.rs:301	PROVEN	tests/fixtures/syscall/src/main.rs::dma-info-ebadf	P0	-
+syscall-abi	SYS_IRQ_CREATE=0x74: kind/trigger validation, one owner	FreeBSD sys/x86/x86/intr_machdep.c:intr_setup	kernel/src/syscall/mod.rs:302	PROVEN	tests/fixtures/syscall/src/main.rs::irq-create-kind	P0	-
+syscall-abi	SYS_IRQ_WAIT=0x75: stale IRQ EBADF, blocking/timeout	FreeBSD sys/x86/x86/intr_machdep.c:intr_event_handler_trampoline	kernel/src/syscall/mod.rs:302	PROVEN	tests/fixtures/syscall/src/main.rs::irq-wait-ebadf	P0	-
+syscall-abi	SYS_IRQ_ACK=0x76: stale IRQ EBADF, exactly one ack	FreeBSD sys/x86/x86/intr_machdep.c:intr_execute_handlers	kernel/src/syscall/mod.rs:302	PROVEN	tests/fixtures/syscall/src/main.rs::irq-ack-ebadf	P0	-
+syscall-abi	SYS_GETPRIORITY=0x78: POSIX nice range and errno	POSIX getpriority; NetBSD sys/kern/kern_resource.c:dosetprio	kernel/src/syscall/mod.rs:144	UNTESTED	-	P1	priority: run the proc-priority matrix
+syscall-abi	SYS_SETPRIORITY=0x79: range clamp, EPERM for others	POSIX setpriority; NetBSD sys/kern/kern_resource.c:dosetprio	kernel/src/syscall/mod.rs:147	UNTESTED	-	P1	priority: prove nice/priority authorization
+syscall-abi	SYS_NICE=0x7A: nice value clamp and inheritance	POSIX nice; NetBSD sys/kern/kern_resource.c:sys_nice	kernel/src/syscall/mod.rs:150	UNTESTED	-	P2	priority: prove nice clamp and fork inheritance
+syscall-abi	SYS_SCHED_GET_PRIORITY_MAX=0x7B: policy-specific maximum	POSIX sched_get_priority_max; NetBSD sys/kern/kern_resource.c:sys_sched_get_priority_max	kernel/src/syscall/mod.rs:153	UNTESTED	-	P2	sched: prove policy priority bounds
+syscall-abi	SYS_SCHED_GET_PRIORITY_MIN=0x7C: policy-specific minimum	POSIX sched_get_priority_min; NetBSD sys/kern/kern_resource.c:sys_sched_get_priority_min	kernel/src/syscall/mod.rs:156	UNTESTED	-	P2	sched: prove policy priority bounds
+syscall-abi	SYS_SCHED_SETSCHEDULER=0x7D: policy validation and EPERM	POSIX sched_setscheduler; NetBSD sys/kern/kern_resource.c:sys_sched_setscheduler	kernel/src/syscall/mod.rs:159	UNTESTED	-	P1	sched: prove policy switch authorization
+syscall-abi	SYS_SCHED_GETSCHEDULER=0x7E: report the active policy	POSIX sched_getscheduler; NetBSD sys/kern/kern_resource.c:sys_sched_getscheduler	kernel/src/syscall/mod.rs:162	UNTESTED	-	P2	sched: prove policy round-trip
+syscall-abi	SYS_SIG_SETUP=0x80: entry/offset/flags validation, no overwrite	POSIX sigaction; NetBSD sys/kern/kern_sig.c:sigaction1	kernel/src/syscall/mod.rs:255	PROVEN	tests/fixtures/syscall/src/main.rs::sig-setup-offset	P0	-
+syscall-abi	SYS_THREAD_KICK=0x81: zero/stale handle rejected, SIGNAL required	Linux kernel/signal.c:group_send_sig_info	kernel/src/syscall/mod.rs:237	PARTIAL	tests/fixtures/syscall/src/main.rs::thread-kick-ebadf	P0	kick-eintr: stop using the handle spawn closes, then prove EINTR
+syscall-abi	SYS_SIGRESEND=0x84: resend without a setup/signal EINVAL	POSIX sigreturn; NetBSD sys/kern/kern_sig.c:sigreturn1	kernel/src/syscall/mod.rs:258	PROVEN	tests/fixtures/syscall/src/main.rs::sigresend-no-setup	P0	-
+syscall-abi	unknown syscall number returns ENOSYS	POSIX ENOSYS; NetBSD sys/kern/kern_syscalls.c:syscall	kernel/src/syscall/mod.rs:326	PROVEN	tests/fixtures/syscall/src/main.rs::syscall	P1	-
+syscall-abi	ABI table matches the dispatch table	tests/abi/abi-v1.txt is the published contract	tests/abi/abi-v1.txt	PARTIAL	-	P1	abi: regenerate the table for PROC_CHROOT and PROC_REBOOT
+usercopy	copy_from_user rejects unmapped user ranges with EFAULT	NetBSD sys/kern/subr_copyin.c:copyin	kernel/src/usercopy.rs	PROVEN	crates/raven-usercopy/src/lib.rs::below_start_is_rejected	P0	-
+usercopy	copy_to_user rejects unmapped ranges with EFAULT	NetBSD sys/kern/subr_copyout.c:copyout	kernel/src/usercopy.rs	PROVEN	tests/fixtures/syscall/src/main.rs::clock-get-efault	P0	-
+usercopy	length overflow and isize::MAX are EINVAL, not panic	NetBSD sys/kern/subr_copyin.c:copyin	kernel/src/usercopy.rs	PROVEN	tests/fixtures/syscall/src/main.rs::debug-write-overflow	P0	-
+usercopy	kernel-half addresses are rejected	Linux arch/x86/lib/usercopy_64.c:__copy_user_flushcache	kernel/src/usercopy.rs	PROVEN	crates/raven-usercopy/src/lib.rs::kernel_half_is_rejected	P0	-
+usercopy	COW fault during copy-out is handled, not SIGSEGV	NetBSD uvm/uvm_fault.c:uvm_fault_internal	kernel/src/memory/uspace.rs	PROVEN	tests/qtest/cases/usercopy-cow.toml::case	P0	-
+usercopy	page-straddling copy is atomic at the fault boundary	NetBSD sys/kern/subr_copyin.c:copyin	kernel/src/usercopy.rs	PARTIAL	-	P0	usercopy: add a straddling-page probe
+usercopy	partial copy rollback on mid-copy fault	FreeBSD sys/kern/subr_uio.c:copyin	kernel/src/usercopy.rs	UNTESTED	-	P0	usercopy: prove no partial state after a mid-copy fault
+process	PROC_FORK copies address space with COW	NetBSD sys/kern/kern_fork.c:fork1	kernel/src/process/mod.rs	PROVEN	tests/qtest/cases/proc-fork.toml::case	P0	-
+process	PROC_EXEC replaces the image and starts at the ELF entry	NetBSD sys/kern/kern_exec.c:execve	kernel/src/process/exec.rs	PROVEN	tests/qtest/cases/proc-exec.toml::case	P0	-
+process	exit status and WEXITSTATUS are exact	POSIX waitpid; NetBSD sys/kern/kern_exit.c:exit1	kernel/src/process/mod.rs	PROVEN	tests/qtest/cases/proc-wait.toml::case	P0	-
+process	zombie retained until wait, then reaped	NetBSD sys/kern/kern_exit.c:exit1	kernel/src/process/mod.rs	PARTIAL	tests/qtest/cases/proc-wait.toml::case	P0	process-lifecycle: fix raven-spawn alloc build and run it
+process	orphans reparent to init without a stuck zombie	NetBSD sys/kern/kern_exit.c:exit1	kernel/src/process/mod.rs	UNTESTED	-	P0	process-lifecycle: prove orphan reparent and reap
+process	process teardown frees handles/aspace and fails pending IPC	NetBSD sys/kern/kern_exit.c:exit1	kernel/src/process/mod.rs	PARTIAL	-	P0	teardown: run the pending-IPC teardown case
+process	PROC_WAIT_EX WNOHANG and two-child reap	POSIX waitpid; NetBSD sys/kern/kern_exit.c:sys_wait6	kernel/src/syscall/process_ctl.rs	PARTIAL	-	P0	proc-wait: prove WNOHANG and simultaneous exits
+process	process times and rusage account user/system time	POSIX getrusage; NetBSD sys/kern/kern_resource.c:sys_getrusage	kernel/src/process/mod.rs	UNTESTED	-	P1	proc: prove times/rusage accounting
+process	rlimit inheritance and privilege rules	POSIX setrlimit; NetBSD sys/kern/kern_resource.c:sys_setrlimit	kernel/src/process/mod.rs	UNTESTED	-	P0	rlimit: prove set/get, NOFILE and privilege rules
+process	spawn attributes and fd map survive exec	NetBSD sys/kern/kern_exec.c:execve	crates/raven-spawn/src/lib.rs	UNTESTED	-	P0	spawn-attr: fix the raven-spawn build and run proc-spawn-attrs
+process	raven-spawn alloc-only helpers compile without feature=alloc (s36-lifecycle)	NetBSD sys/kern/kern_exec.c:execve	crates/raven-spawn/src/lib.rs:730	SUSPECT	tests/fixtures/s36-lifecycle/build.sh::build	P1	spawn: gate encode_fdmap on the alloc feature
+session	setpgid/setsid/getpgid obey session membership	POSIX setsid/setpgid; NetBSD sys/kern/kern_prot.c:sys_setpgid	kernel/src/process/mod.rs	PROVEN	tests/qtest/cases/proc-session.toml::case	P1	-
+session	controlling terminal set/get and foreground pgrp	NetBSD sys/kern/tty.c:ttycheckbackground	kernel/src/process/tty.rs	PROVEN	tests/qtest/cases/proc-session.toml::case	P1	-
+session	job-control stop/continue and SIGTTOU/SIGTTIN	POSIX job control; NetBSD sys/kern/tty.c:ttycheckbackground	kernel/src/process/tty.rs	UNTESTED	-	P1	tty-job-control: run and prove the job-control case
+session	pty-session open/close and controlling terminal handoff	NetBSD sys/kern/tty_pty.c:ptsopen	kernel/src/process/tty.rs	UNTESTED	-	P1	pty-session: run the pty session case
+session	orphaned process group receives SIGHUP/SIGCONT	POSIX job control; NetBSD sys/kern/kern_prot.c:sys_setpgid	kernel/src/process/mod.rs	UNTESTED	-	P1	proc-session: prove orphaned-pgrp signals
+signals	signal delivery invokes the registered handler	POSIX sigaction; NetBSD sys/kern/kern_sig.c:postsig	kernel/src/process/mod.rs	PROVEN	tests/qtest/cases/signal-entry.toml::case	P0	-
+signals	signal mask and pending set are preserved	POSIX sigprocmask; NetBSD sys/kern/kern_sigaction.c:sigprocmask1	kernel/src/process/mod.rs	PARTIAL	tests/qtest/cases/proc-signal.toml::case	P0	signals: prove mask/pending across fork and exec
+signals	EINTR from a blocking syscall	POSIX EINTR; NetBSD sys/kern/kern_sig.c:postsig	kernel/src/process/mod.rs	PARTIAL	tests/qtest/cases/signal-entry.toml::case	P0	kick-eintr: fix the fixture handle and prove EINTR
+signals	SA_RESTART resumes a restartable call	POSIX sigaction SA_RESTART; NetBSD sys/kern/kern_sig.c:postsig	kernel/src/process/mod.rs	UNTESTED	-	P0	signals: prove SA_RESTART vs EINTR per syscall
+signals	SIGCHLD to a task blocked in ppoll; one delivery per child	POSIX SIGCHLD; NetBSD sys/kern/kern_sig.c:postsig	kernel/src/process/mod.rs	UNTESTED	-	P0	K443: deliver SIGCHLD to ppoll exactly once
+signals	signal on a user fault is delivered, not lost	NetBSD sys/kern/kern_sig.c:postsig	kernel/src/process/mod.rs	PROVEN	tests/qtest/cases/signal-fault.toml::case	P0	-
+signals	sigresend restores the interrupted context	NetBSD sys/kern/kern_sig.c:sigreturn1	kernel/src/process/mod.rs	PROVEN	tests/qtest/cases/sigresend.toml::case	P0	-
+signals	SIGKILL is uncatchable and terminates all threads	POSIX kill; NetBSD sys/kern/kern_sig.c:kill	kernel/src/process/mod.rs	PARTIAL	tests/qtest/cases/proc-signal.toml::case	P0	signals: prove SIGKILL across threads
+mm	demand-zero anonymous faults	NetBSD uvm/uvm_fault.c:uvm_fault_internal	kernel/src/memory/aspace.rs	PROVEN	tests/qtest/cases/pager.toml::case	P0	-
+mm	COW faults preserve both mappings	NetBSD uvm/uvm_fault.c:uvm_fault_internal	kernel/src/memory/aspace.rs	PROVEN	tests/qtest/cases/usercopy-cow.toml::case	P0	-
+mm	file-backed mmap shares pages and flushes on msync	POSIX mmap/msync; NetBSD uvm/uvm_mmap.c:sys_mmap	kernel/src/memory/aspace.rs	PROVEN	tests/qtest/cases/posix-fs-smp.toml::case	P0	-
+mm	munmap and mprotect update the VMA and TLB	POSIX munmap/mprotect; NetBSD uvm/uvm_mmap.c:sys_munmap	kernel/src/memory/aspace.rs	PROVEN	tests/qtest/cases/libc-map.toml::case	P0	-
+mm	stack growth below the initial VMA	NetBSD uvm/uvm_mmap.c:uvm_map_grow	kernel/src/memory/aspace.rs	PARTIAL	tests/qtest/cases/smp-user.toml::case	P0	mm: prove stack growth and guard-page fault
+mm	OOM returns ENOMEM and does not panic	NetBSD uvm/uvm_page.c:uvm_pagealloc	kernel/src/memory/frame.rs	UNTESTED	-	P0	mm: inject OOM and prove clean ENOMEM
+mm	pager supply wakes exactly the faulting page	NetBSD uvm/uvm_pager.c:uvm_pager_getpages	kernel/src/memory/pager.rs	PROVEN	tests/qtest/cases/pager.toml::case	P0	-
+mm	frame allocator per-CPU cache and coalescing	NetBSD uvm/uvm_page.c:uvm_pagealloc	kernel/src/memory/frame.rs	PROVEN	crates/raven-frames/src/cache_ut.rs::four_cpu_million_operation_model	P0	-
+mm	vmem/kmem allocate, free, coalesce	NetBSD uvm/uvm_km.c:uvm_km_alloc	kernel/src/memory/heap.rs	PROVEN	crates/raven-vmem/src/arena_ut.rs::fragmentation_reports_scatter	P0	-
+mm	TLB shootdown completes on all CPUs	NetBSD sys/arch/x86/x86/pmap.c:pmap_tlb_shootdown	kernel/src/smp/shootdown.rs	PROVEN	tests/smp/memory/run.sh::tcg-3	P0	-
+mm	MSYNC flushes a shared file mapping without data loss	POSIX msync; NetBSD uvm/uvm_mmap.c:sys_msync	kernel/src/memory/aspace.rs	PARTIAL	tests/qtest/cases/posix-fs-smp.toml::case	P0	msync: prove persistent flush and error paths
+vfs-scheme	open/read/write/close round-trip through vfsd	POSIX read/write; NetBSD sys/kern/vfs_syscalls.c:sys_read	kernel/src/ipc/router.rs	PROVEN	tests/qtest/cases/posix-fs.toml::case	P0	-
+vfs-scheme	fstat returns size/mode and EOF	POSIX fstat; NetBSD sys/kern/vfs_syscalls.c:sys_fstat	kernel/src/ipc/router.rs	PROVEN	tests/qtest/cases/fs-contract.toml::case	P0	-
+vfs-scheme	OFD cursor shared by dup and moved by seek	POSIX lseek/dup; NetBSD sys/kern/sys_generic.c:sys_lseek	kernel/src/ipc/router.rs	PROVEN	tests/qtest/cases/fs-contract.toml::case	P0	-
+vfs-scheme	chroot and rooted traversal cannot escape	NetBSD sys/kern/vfs_lookup.c:namei	kernel/src/syscall/process_ctl.rs	PROVEN	tests/qtest/cases/chroot.toml::case	P0	-
+vfs-scheme	traversal refuses .. above the process root	NetBSD sys/kern/vfs_lookup.c:namei	kernel/src/syscall/process_ctl.rs	PROVEN	tests/qtest/cases/chroot.toml::case	P0	-
+vfs-scheme	path permissions and setuid execution	POSIX access; NetBSD sys/kern/vfs_syscalls.c:sys_access	userland/servers/vfsd/src/main.rs	PROVEN	tests/qtest/cases/setuid.toml::case	P0	-
+vfs-scheme	ENOSPC is reported, not silently dropped	POSIX ENOSPC; NetBSD sys/ufs/ffs/ffs_alloc.c:ffs_alloc	userland/servers/vfsd/src/main.rs	UNTESTED	-	P0	vfs: inject ENOSPC and prove the errno
+vfs-scheme	UFS2 read-write mount and persistence	FreeBSD sys/ufs/ffs/ffs_vfsops.c:ffs_mount	userland/servers/fsd-ufs	PROVEN	tests/qtest/cases/fsd-ufs-rw.toml::case	P0	-
+vfs-scheme	fsync flushes file data and metadata	POSIX fsync; NetBSD sys/ufs/ffs/ffs_vnops.c:ffs_fsync	userland/servers/vfsd/src/main.rs	UNTESTED	-	P0	vfs: prove fsync and crash-consistency
+vfs-scheme	mount/umount updates the namespace atomically	NetBSD sys/kern/vfs_syscalls.c:sys_mount	userland/servers/vfsd/src/main.rs	PROVEN	tests/qtest/cases/posix-fs-smp.toml::case	P0	-
+vfs-scheme	scheme register, attach and file-id lifetime	NetBSD sys/kern/vfs_syscalls.c:sys_mount	kernel/src/ipc/router.rs	PROVEN	tests/qtest/cases/scheme-echo.toml::case	P0	-
+vfs-scheme	capture slots are bounded and released	NetBSD sys/kern/sys_generic.c:sys_read	kernel/src/ipc/capture.rs	PARTIAL	tests/qtest/cases/fs-ipc.toml::case	P0	capture-lifetime: run the lifetime/bounds case
+vfs-scheme	scheme-file readiness is level-correct at poll time	NetBSD sys/kern/sys_select.c:selrecord	kernel/src/event/mod.rs	UNTESTED	-	P0	K426: live-read scheme readiness, no cached edge
+vfs-scheme	devfs nodes (/dev/null/zero/random) behave	NetBSD sys/kern/vfs_specfs.c:spec_open	userland/servers/vfsd/src/main.rs	PARTIAL	tests/qtest/cases/core-servers.toml::case	P2	core-servers: prove /dev/null and /dev/zero semantics
+vfs-scheme	symlink resolution and nofollow	POSIX symlink; NetBSD sys/kern/vfs_lookup.c:namei	userland/servers/vfsd/src/main.rs	PARTIAL	tests/qtest/cases/posix-fs.toml::case	P1	vfs: prove symlink loops and nofollow
+sched-smp	preemptive slices across CPUs	NetBSD sys/kern/kern_synch.c:mi_switch	kernel/src/sched/mod.rs	PROVEN	tests/qtest/cases/smp-user.toml::case	P0	-
+sched-smp	per-CPU state and AP bring-up	NetBSD sys/arch/x86/x86/cpu.c:cpu_attach	kernel/src/smp/bringup.rs	PROVEN	tests/qtest/cases/smp-boot.toml::case	P0	-
+sched-smp	priority run queue FIFO and bitmap	NetBSD sys/kern/kern_synch.c:mi_switch	crates/raven-sched-core/src/lib.rs	PROVEN	crates/raven-sched-core/src/lib.rs::runqueue_priority_order	P0	-
+sched-smp	turnstile handoff and priority donation	Illumos usr/src/uts/common/os/turnstile.c:turnstile_block (CDDL, behaviour only)	kernel/src/sync.rs	PROVEN	tests/qtest/cases/locking.toml::case	P0	-
+sched-smp	no lost wakeup in the wait queue	Illumos usr/src/uts/common/os/turnstile.c:turnstile_wakeup (CDDL, behaviour only)	kernel/src/sched/wait.rs	PROVEN	crates/raven-turnstile/tests/stress.rs::stress_no_lost_wakeup	P0	-
+sched-smp	TLB shootdown with IRQ masking	NetBSD sys/arch/x86/x86/pmap.c:pmap_tlb_shootdown	kernel/src/smp/shootdown.rs	PROVEN	tests/smp/memory/run.sh::tcg-3	P0	-
+sched-smp	SMP 4-CPU filesystem race matrix	NetBSD sys/kern/vfs_syscalls.c:sys_read	kernel/src	PROVEN	tests/qtest/cases/posix-fs-smp.toml::case	P0	-
+sched-smp	lockstat counters and turnstile probes	Illumos usr/src/uts/common/os/turnstile.c:turnstile_block (CDDL, behaviour only)	kernel/src/sync.rs	PARTIAL	-	P2	lockstat: run the lockstat case
+sched-smp	preemption disabled across kernel locks	NetBSD sys/kern/kern_mutex.c:mutex_enter	kernel/src/sync.rs	PARTIAL	tests/qtest/cases/smp-user.toml::case	P0	sched: prove preempt_count across blocking locks
+time	monotonic clock advances and is stable	POSIX clock_gettime; NetBSD sys/kern/kern_time.c:sys_clock_gettime	kernel/src/time.rs	PROVEN	tests/qtest/cases/time-entropy.toml::case	P1	-
+time	realtime clock and clock_set round-trip	POSIX clock_settime; NetBSD sys/kern/kern_time.c:sys_settimeofday	kernel/src/time.rs	PROVEN	tests/qtest/cases/time-entropy.toml::case	P1	-
+time	1000 Hz timer tick and sleep precision	NetBSD sys/kern/kern_clock.c:hardclock	kernel/src/time.rs	PROVEN	tests/qtest/cases/kernel-timer.toml::case	P1	-
+time	timer and event queue create/set/wait	Illumos usr/src/uts/common/os/cyclic.c:cyclic_add (CDDL, behaviour only)	kernel/src/event/mod.rs	PARTIAL	tests/fixtures/syscall/src/main.rs::timer-create-bad-clock	P1	evq: fix the crash and prove timer/event wait
+time	setitimer/alarm deliver exactly once	POSIX alarm/setitimer; NetBSD sys/kern/kern_time.c:sys_setitimer	kernel/src/time.rs	UNTESTED	-	P1	itimer: run the itimer and alarm cases
+time	entropy fill has a real source and no stall	Linux drivers/char/random.c:get_random_bytes	crates/raven-entropy/src/lib.rs	PROVEN	tests/qtest/cases/time-entropy.toml::case	P1	-
+time	cyclic timers reprogram without drift	Illumos usr/src/uts/common/os/cyclic.c:cyclic_reprogram (CDDL, behaviour only)	crates/raven-cyclic/src/lib.rs	PROVEN	crates/raven-cyclic/src/lib_ut.rs::fires_in_deadline_order	P2	-
+ipc	channel send/receive exactly once	Illumos usr/src/uts/common/doors/doors_client.c:door_call (CDDL, behaviour only)	crates/raven-chan/src/lib.rs	PROVEN	crates/raven-chan/src/channel_ut.rs::exhaustive_small_model_saturates_with_exactly_once_and_no_reply_after_cancel_or_death	P0	-
+ipc	ring buffer bounds and wraparound	NetBSD sys/kern/sys_pipe.c:pipe_write	crates/raven-ringbuf/src/lib.rs	PROVEN	crates/raven-ipc/src/pipe_ring_ut.rs::reads_wrap_in_fifo_order	P0	-
+ipc	blocking receive wakes on send and cancel	NetBSD sys/kern/uipc_socket.c:soo_read	kernel/src/sched/wait.rs	PROVEN	crates/raven-turnstile/tests/stress.rs::stress_no_lost_wakeup	P0	-
+ipc	rights are intersected on transfer and revoked everywhere	NetBSD sys/kern/kern_descrip.c:fdcopy	kernel/src/process/handle.rs	PARTIAL	tests/fixtures/syscall/src/main.rs::revoke-signal	P0	cap-revoke: run the positive revocation case
+ipc	event EOF/HUP wakes poll and read returns 0	NetBSD sys/kern/uipc_socket2.c:sowakeup	kernel/src/event/mod.rs	PROVEN	tests/qtest/cases/event-close.toml::case	P0	-
+ipc	capture capacity and copy-back are bounded	NetBSD sys/kern/sys_generic.c:sys_read	kernel/src/ipc/capture.rs	PARTIAL	tests/qtest/cases/fs-ipc.toml::case	P0	capture-lifetime: run the lifetime/bounds case
+ipc	event queue level/edge and close	NetBSD sys/kern/kern_event.c:kevent	crates/raven-evq-core/src/lib.rs	PROVEN	crates/raven-evq-core/src/lib.rs::edge_emits_once	P0	-
+ipc	duplex endpoint pair, shutdown, peercred	Illumos usr/src/uts/common/doors/doors_client.c:door_create (CDDL, behaviour only)	kernel/src/process/duplex.rs	UNTESTED	-	P1	duplex: run endpoint, shutdown and peercred cases
+ipc	pipe EOF and blocking read/write	POSIX pipe; NetBSD sys/kern/sys_pipe.c:pipe_read	kernel/src/process/pipe.rs	PROVEN	tests/qtest/cases/pipe.toml::case	P0	-
+ipc	pending IPC fails when the client/server dies	NetBSD sys/kern/kern_descrip.c:closef	kernel/src/ipc/router.rs	PARTIAL	-	P0	teardown-pending-ipc: run the teardown case
+ipc	scheme request delivery has no lost wake	NetBSD sys/kern/uipc_socket.c:soo_read	kernel/src/ipc/router.rs	PROVEN	tests/qtest/cases/posix-fs-smp.toml::case	P0	-
+drivers	virtio-blk request completion and bounds	FreeBSD sys/dev/virtio/block/virtio_blk.c:virtio_blk_request	userland/drivers/virtio-blk	PROVEN	tests/qtest/cases/virtio-blk.toml::case	P0	-
+drivers	virtio-net receive/transmit rings	FreeBSD sys/dev/virtio/network/if_vtnet.c:vtnet_txq	userland/drivers/virtio-net	PARTIAL	-	P0	virtio-net: run the network driver case
+drivers	PCI enumeration and BAR mapping	FreeBSD sys/dev/pci/pci.c:pci_alloc_resource	kernel/src/driver/mod.rs	PARTIAL	tests/qtest/cases/irq-dist.toml::case	P1	driver: prove PCI enumeration and BAR bounds
+drivers	UART console input/output	NetBSD sys/dev/ic/com.c:comintr	kernel/src/console.rs	PROVEN	tests/qtest/cases/console-input.toml::case	P1	-
+drivers	IRQ create/wait/ack and distribution	FreeBSD sys/x86/x86/intr_machdep.c:intr_execute_handlers	kernel/src/driver/irq.rs	PROVEN	tests/qtest/cases/irq-dist.toml::case	P0	-
+drivers	DMA allocation bounds and IOMMU fallback	FreeBSD sys/dev/virtio/virtio.c:virtqueue_dmamap_load	kernel/src/driver/mod.rs	UNTESTED	-	P0	driver-dma: fix raven-spawn alloc and run it
+drivers	MMIO window bounds and device capability	FreeBSD sys/dev/pci/pci.c:pci_map_mem	kernel/src/driver/mod.rs	UNTESTED	-	P0	driver-mmio: fix raven-spawn alloc and run it
+drivers	IRQ lifecycle and MSI/MSI-X	FreeBSD sys/x86/x86/intr_machdep.c:intr_setup	kernel/src/driver/irq.rs	UNTESTED	-	P0	driver-irq: fix raven-spawn alloc and run it
+drivers	aarch64 GIC/PL011 driver path	NetBSD sys/arch/arm/gic/gic.c:gic_init	kernel/src/arch/aarch64	UNTESTED	-	P1	aarch64: run driver-aarch64 and console cases
+boot-loader	boot memory map and usable regions	FreeBSD sys/amd64/amd64/machdep.c:hammer_time	crates/raven-bootinfo/src/lib.rs	PROVEN	tests/qtest/cases/kernel-early-boot.toml::case	P0	-
+boot-loader	kernel init order and service start	FreeBSD sys/kern/init_main.c:mi_startup	kernel/src/main.rs	PROVEN	tests/qtest/cases/kernel-early-boot.toml::case	P0	-
+boot-loader	panic path prints and stops, no silent reset	FreeBSD sys/kern/subr_prf.c:panic	kernel/src/log.rs	UNTESTED	-	P0	boot: add a controlled panic-path probe
+boot-loader	loader/testkernel handoff and entry state	FreeBSD sys/boot/common/loader.c:main	boot/loader/src/lib.rs	PARTIAL	-	P1	loader: run the loader-testkernel case
+boot-loader	early boot to user mode on x86_64	FreeBSD sys/amd64/amd64/machdep.c:hammer_time	kernel/src/arch/x86_64	PROVEN	tests/qtest/cases/kernel-early-boot.toml::case	P0	-
+boot-loader	SMP 4-CPU online count	NetBSD sys/arch/x86/x86/cpu.c:cpu_attach	kernel/src/smp/bringup.rs	PROVEN	tests/qtest/cases/smp-boot.toml::case	P0	-
+boot-loader	poweroff and reboot	NetBSD sys/kern/kern_reboot.c:sys_reboot	kernel/src/syscall/process_ctl.rs	UNTESTED	-	P1	boot: run poweroff/reboot cases
+boot-loader	aarch64 boot to login	NetBSD sys/arch/arm/arm32/machdep.c:initarm	kernel/src/arch/aarch64	PARTIAL	-	P0	aarch64: run the boot/login matrix
+security	uid/euid/gid/egid set and read back	POSIX setuid/setgid; NetBSD sys/kern/kern_prot.c:sys_setuid	kernel/src/process/mod.rs	PROVEN	tests/qtest/cases/proc-credentials.toml::case	P0	-
+security	exec setuid/setgid bits and nosuid	NetBSD sys/kern/kern_exec.c:execve	kernel/src/process/exec.rs	PROVEN	tests/qtest/cases/setuid.toml::case	P0	-
+security	supplementary groups bounded and correct	POSIX setgroups; NetBSD sys/kern/kern_prot.c:sys_setgroups	kernel/src/process/mod.rs	PROVEN	tests/qtest/cases/proc-credentials.toml::case	P0	-
+security	handle rights never grow and revocation is transitive	NetBSD sys/kern/kern_descrip.c:fdcopy	kernel/src/process/handle.rs	PARTIAL	tests/fixtures/syscall/src/main.rs::revoke-signal	P0	cap-revoke: run the positive revocation case
+security	fd table does not leak across exec	POSIX FD_CLOEXEC; NetBSD sys/kern/kern_exec.c:execve	kernel/src/process/exec.rs	UNTESTED	-	P0	closefrom: run the closefrom case
+security	closefrom closes exactly the requested range	FreeBSD sys/kern/kern_descrip.c:kern_close_range	kernel/src/syscall	UNTESTED	-	P1	closefrom: run the closefrom case
+security	ASLR for stack/mmap/PIE	Linux arch/x86/mm/mmap.c:arch_pick_mmap_layout	kernel/src/memory	MISSING	-	P2	aslr: implement and prove ASLR where the ABI allows
+security	chroot cannot escape by fd or ..	NetBSD sys/kern/vfs_lookup.c:namei	kernel/src/syscall/process_ctl.rs	PROVEN	tests/qtest/cases/chroot.toml::case	P0	-
+security	/usr/sbin/user-secure permission model	POSIX access; NetBSD sys/kern/vfs_syscalls.c:sys_access	userland	PARTIAL	-	P0	user-secure: run the secure permission case
+kstat-tracing	kstat counters are readable and stable	Illumos usr/src/uts/common/os/kstat.c:kstat_create (CDDL, behaviour only)	kernel/src/kstat/mod.rs	PROVEN	tests/qtest/cases/kstat.toml::case	P2	-
+kstat-tracing	trace context survives syscalls and IPC	Illumos usr/src/uts/common/dtrace/dtrace.c:dtrace_probe (CDDL, behaviour only)	kernel/src/syscall/trace.rs	PROVEN	tests/qtest/cases/trace-context.toml::case	P2	-
+kstat-tracing	DTrace ring records probes without loss	Illumos usr/src/uts/common/dtrace/dtrace.c:dtrace_probe (CDDL, behaviour only)	crates/raven-dtrace-core/src/lib.rs	PROVEN	tests/qtest/cases/dtrace-ring.toml::case	P2	-
+kstat-tracing	user DTrace consumer reads the ring	Illumos usr/src/uts/common/dtrace/dtrace.c:dtrace_probe (CDDL, behaviour only)	crates/raven-dtrace-user/src/lib.rs	PARTIAL	-	P2	dtrace: run the user consumer case
+kstat-tracing	syscall-entry probe fires before dispatch	Illumos usr/src/uts/common/dtrace/dtrace.c:dtrace_probe (CDDL, behaviour only)	kernel/src/syscall/mod.rs	PARTIAL	tests/qtest/cases/dtrace-ring.toml::case	P2	dtrace: prove the syscall probe ordering
+kstat-tracing	record-lock state is per-inode and released on exit	FreeBSD sys/kern/kern_lockf.c:lf_setlock	kernel/src/syscall/record_lock.rs	UNTESTED	-	P1	record-lock: run the posix-fs-record-lock matrix
+robustness	unknown syscall returns ENOSYS, never panics	POSIX ENOSYS; NetBSD sys/kern/kern_syscalls.c:syscall	kernel/src/syscall/mod.rs	PROVEN	tests/fixtures/syscall/src/main.rs::syscall	P0	-
+robustness	bad pointers/lengths/fds return EFAULT/EINVAL/EBADF	POSIX errno; NetBSD sys/kern/subr_copyin.c:copyin	kernel/src/usercopy.rs	PROVEN	tests/qtest/cases/syscall-negative.toml::case	P0	-
+robustness	malformed scheme packet returns EPROTO, no panic	NetBSD sys/kern/uipc_socket.c:soo_read	kernel/src/ipc/protocol.rs	PROVEN	crates/raven-proto-fs/src/call_ut.rs::statvfs_rejects_short_payloads	P0	-
+robustness	malformed ELF is rejected without panic	NetBSD sys/kern/exec_elf.c:exec_elf_makecmds	crates/raven-elf/src/parse_len_ut.rs	PROVEN	crates/raven-elf/src/parse_len_ut.rs::a_short_declared_file_length_is_rejected	P0	-
+robustness	handle table capacity returns EMFILE, no leak	POSIX EMFILE; NetBSD sys/kern/kern_descrip.c:fd_alloc	crates/raven-handles/src/lib.rs	PROVEN	crates/raven-handles/src/lib_ut.rs::capacity_is_enforced	P0	-
+robustness	ENOSPC on full filesystem returns the errno	POSIX ENOSPC; NetBSD sys/ufs/ffs/ffs_alloc.c:ffs_alloc	userland/servers/vfsd/src/main.rs	UNTESTED	-	P0	fs: inject ENOSPC and prove the errno
+robustness	OOM returns ENOMEM, no panic or silent kill	Linux mm/oom_kill.c:out_of_memory	kernel/src/memory/frame.rs	UNTESTED	-	P0	mm: inject OOM and prove clean ENOMEM
+robustness	fuzzed IPC message does not exceed capture bounds	NetBSD sys/kern/sys_generic.c:sys_read	kernel/src/ipc/capture.rs	PARTIAL	tests/qtest/cases/fs-ipc.toml::case	P0	fs-fuzz: run the replay corpus
+ssh-cleanup	signal delivery to ppoll (K443)	NetBSD sys/kern/kern_sig.c:postsig	kernel/src/process/mod.rs	PARTIAL	tests/qtest/cases/proc-signal.toml::case	P0	K443: SIGCHLD to ppoll, EINTR vs SA_RESTART
+ssh-cleanup	process reap exact pid/status (K443)	NetBSD sys/kern/kern_exit.c:sys_wait4	kernel/src/process/mod.rs	PARTIAL	tests/qtest/cases/proc-wait.toml::case	P0	K443: exact reap with simultaneous children
+ssh-cleanup	ppoll semantics under signals (K443)	NetBSD sys/kern/sys_select.c:sys_poll	kernel/src/event/mod.rs	UNTESTED	-	P0	K443: EINTR, re-evaluate level, no spin
+ssh-cleanup	event EOF/HUP after peer close (K440)	NetBSD sys/kern/uipc_socket2.c:sowakeup	kernel/src/event/mod.rs	PARTIAL	tests/qtest/cases/event-close.toml::case	P0	K440: EOF/read-0 and POLLHUP after full close
+ssh-cleanup	tty/termios round-trip and TCSADRAIN (K444)	NetBSD sys/kern/tty.c:ttyioctl	kernel/src/syscall/tty.rs	PARTIAL	-	P0	K444: TCSETS/TCGETS, VMIN/VTIME, speeds
+ssh-cleanup	scheme-file readiness at poll time (K426)	NetBSD sys/kern/sys_select.c:selrecord	kernel/src/event/mod.rs	UNTESTED	-	P0	K426: live readiness query, no cached edge
