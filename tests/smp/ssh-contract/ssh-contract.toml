@@ -7,7 +7,7 @@
 name = "ssh-contract"
 arch = "x86_64"
 profile = "network-config-test"
-timeout_secs = 30
+timeout_secs = 120
 pre = [
     "sh tests/smp/ssh-contract/build.sh",
     "sh tests/smp/ssh-contract/start-host.sh",
@@ -20,6 +20,9 @@ qemu_extra = [
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
 expect_exit = "success"
+
+[[expect]]
+regex = '^CONTRACT altstack ok$'
 
 [[expect]]
 regex = '^.*CONTRACT K1 PASS .*$'
@@ -52,10 +55,22 @@ regex = '^.*CONTRACT K9 PASS .*$'
 regex = '^.*CONTRACT K10 PASS .*$'
 
 [[expect]]
-regex = '^.*CONTRACT SUMMARY PASS 10/10$'
+regex = '^.*CONTRACT K11 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K12 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K13 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K14 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 14/14$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)CONTRACT K([1-9]|10) FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'
+regex = '(?i)CONTRACT K([1-9]|1[0-4]) FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'

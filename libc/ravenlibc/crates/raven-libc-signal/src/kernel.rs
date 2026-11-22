@@ -11,7 +11,7 @@
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::SiginfoT;
 
-use crate::errors::{EINVAL_ERR, ENOSYS_ERR, ETIMEDOUT_ERR};
+use crate::errors::{EINVAL_ERR, ETIMEDOUT_ERR};
 use crate::raw;
 
 /// Kick bit 0: look at the pending sets.
@@ -93,14 +93,16 @@ pub struct SigCaps {
 }
 
 impl SigCaps {
-    /// The production capability set: no PG-7, PG-8, PG-10, PG-12 or PG-44 primitive exists.
+    /// The production capability set: the kernel implements PG-7 (`SIG_SETUP`,
+    /// `THREAD_KICK`, `SIGRETURN`, `SIGRESEND`), PG-8 `EINTR` and PG-44 process signals.
+    /// Stop/continue and the FP frame are not claimed.
     pub const PRODUCTION: Self = Self {
-        entry: false,
-        kick: false,
-        sigreturn: false,
-        resend: false,
-        eintr: false,
-        proc_kill: false,
+        entry: true,
+        kick: true,
+        sigreturn: true,
+        resend: true,
+        eintr: true,
+        proc_kill: true,
         stop: false,
         fp_in_frame: false,
     };
@@ -164,16 +166,23 @@ impl SysKernel {
     pub const fn new() -> Self {
         Self
     }
-
-    fn notify(pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
-        let _ = (pid, sig, info);
-        Err(ENOSYS_ERR)
-    }
 }
 
 impl SigKernel for SysKernel {
     fn caps(&self) -> SigCaps {
-        SigCaps::PRODUCTION
+        // The kernel implements SIG_SETUP (0x80), THREAD_KICK (0x81), SIGRETURN (0x82),
+        // SIGRESEND (0x84) and PROC_SIGRECV (0x4B). Stop/continue and the FP frame are not
+        // claimed here.
+        SigCaps {
+            entry: true,
+            kick: true,
+            sigreturn: true,
+            resend: true,
+            eintr: true,
+            proc_kill: true,
+            stop: false,
+            fp_in_frame: false,
+        }
     }
 
     fn thread_pointer(&self) -> usize {
@@ -198,16 +207,12 @@ impl SigKernel for SysKernel {
     }
 
     fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
-        // PG-7 is absent: remember the address for the shell and report the gap. No number is
-        // fabricated; the shell checks `caps().entry` before calling this.
-        let _ = (ctx_area_offset, flags);
-        raw::set_entry_function(entry);
-        Err(ENOSYS_ERR)
+        raven_libc_sys::signal::sig_setup(entry, ctx_area_offset, flags)
+            .map_err(|error| Errno(error.0))
     }
 
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno> {
-        let _ = (handle, bits);
-        Err(ENOSYS_ERR)
+        raven_libc_sys::signal::thread_kick(handle, bits).map_err(|error| Errno(error.0))
     }
 
     fn sigreturn(&self) -> ! {
@@ -215,17 +220,34 @@ impl SigKernel for SysKernel {
     }
 
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno> {
-        let _ = (sig, info, mask);
-        Err(ENOSYS_ERR)
+        raven_libc_sys::signal::sigresend(sig as u32, info as *const SiginfoT as usize, mask)
+            .map_err(|error| Errno(error.0))
     }
 
     fn proc_kill(&self, pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
-        Self::notify(pid, sig, info)
+        let _ = info;
+        raven_libc_sys::signal::proc_signal(pid, sig).map_err(|error| Errno(error.0))
     }
 
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)> {
-        let _ = deliverable;
-        None
+        if deliverable == 0 {
+            return None;
+        }
+        let mut record = [0u64; 3];
+        let signo =
+            raven_libc_sys::signal::proc_sigrecv(&mut record, raven_libc_sys::signal::WNOHANG)
+                .ok()?;
+        let bit = crate::critical::signal_bit(signo);
+        if bit == 0 || bit & deliverable == 0 {
+            // The kernel queue does not carry the libc mask. Put a blocked signal back at the
+            // tail and let the next entry (after sigprocmask/kick) consume it.
+            let _ = raven_libc_sys::signal::proc_signal(0, signo);
+            return None;
+        }
+        let mut info =
+            crate::frame::user_siginfo(signo, raven_libc_abi::generated::signal::SI_USER);
+        crate::frame::set_si_pid(&mut info, record[1] as u32 as i32);
+        Some((signo, info))
     }
 
     fn wait_for_kick(&self, deadline_ns: Option<u64>) -> Result<(), Errno> {

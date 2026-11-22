@@ -84,6 +84,22 @@ pub fn kernel_wait_options(options: u32) -> u32 {
     kernel
 }
 
+/// The kernel `PROC_WAIT_EX` any-child id type.
+///
+/// The public `P_ALL` is 0 (and `P_PIDFD` is 3); the kernel uses 3 for any child. A wait for
+/// "any child" must translate, or the kernel rejects the selector with `EINVAL`.
+pub const KERNEL_P_ALL: u32 = 3;
+
+/// Translate the public id type to the kernel `PROC_WAIT_EX` id type.
+#[must_use]
+pub const fn kernel_idtype(idtype: u32) -> u32 {
+    if idtype == P_ALL {
+        KERNEL_P_ALL
+    } else {
+        idtype
+    }
+}
+
 /// The id-selection kind of `wait6`/`waitid`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]

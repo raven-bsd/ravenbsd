@@ -287,6 +287,10 @@ pub struct Process {
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
     /// Threads blocked in `PROC_SIGRECV`.
     pub signal_waiters: WaitQueue,
+    /// Thread that registered the kernel signal entry (`SIG_SETUP`); a process signal kicks it so
+    /// a blocking syscall returns `EINTR` and libc can run the handler. Weak: the thread owns
+    /// the process, so a strong edge would be a cycle.
+    pub signal_thread: Mutex<Weak<crate::sched::thread::Thread>>,
     /// Parents blocked in `PROC_WAIT_EX` on this process's children.
     pub child_waiters: WaitQueue,
     /// Non-zero stop signal while the process is stopped.
@@ -470,6 +474,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
         signal_waiters: WaitQueue::new(),
+        signal_thread: Mutex::new(Weak::new()),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
         stop_reported: AtomicBool::new(false),
@@ -546,6 +551,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
         signal_waiters: WaitQueue::new(),
+        signal_thread: Mutex::new(Weak::new()),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
         stop_reported: AtomicBool::new(false),
@@ -615,6 +621,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
         signal_waiters: WaitQueue::new(),
+        signal_thread: Mutex::new(Weak::new()),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
         stop_reported: AtomicBool::new(false),
@@ -770,12 +777,17 @@ impl Process {
         self.threads.fetch_sub(1, Ordering::AcqRel) <= 1
     }
 
-    /// Queue a signal and wake a `PROC_SIGRECV` waiter.
+    /// Queue a signal, wake a `PROC_SIGRECV` waiter, and kick the thread that registered the
+    /// `SIG_SETUP` entry so a blocking syscall returns `EINTR`.
     pub fn queue_signal(&self, signo: u32, sender: u64) {
         self.pending_signals
             .lock()
             .push_back(PendingSignal { signo, sender });
         self.signal_waiters.wake_all();
+        let target = self.signal_thread.lock().upgrade();
+        if let Some(thread) = target {
+            crate::syscall::thread::kick_thread(thread, crate::syscall::thread::KICK_CHECK);
+        }
     }
 
     /// Pop the oldest queued signal.
@@ -918,6 +930,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
         signal_waiters: WaitQueue::new(),
+        signal_thread: Mutex::new(Weak::new()),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
         stop_reported: AtomicBool::new(false),

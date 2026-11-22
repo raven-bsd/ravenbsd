@@ -95,10 +95,11 @@ link_one() {
 link_one "$out/main.o" "$out/ssh-contract"
 link_one "$out/child.o" "$out/ssh-contract-child"
 
+# Rebuild the user programs from the current tree on every invocation. Cargo is a no-op when
+# they are fresh; an existence-only check ran a stale `raven-ptyd` after K458 added `pty:ptmx`
+# and made K5's `posix_openpt` fail with ENOENT.
 for tool in raven-init raven-ptyd; do
-    if [ ! -x "$root/build/$arch/user/$tool" ]; then
-        cargo xtask build user --arch "$arch" -p "$tool"
-    fi
+    cargo xtask build user --arch "$arch" -p "$tool"
 done
 init=$root/build/$arch/user/raven-init
 ptyd=$root/build/$arch/user/raven-ptyd

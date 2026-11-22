@@ -8,6 +8,26 @@ use raven_libc_signal::DispTable;
 /// The process disposition table (C58 owns the state machine).
 pub(crate) static DISP: DispTable = DispTable::new();
 
+/// C-ABI body called by the kernel's `__raven_sigentry` stub.
+///
+/// `SIG_SETUP` resumes at the asm stub with the sticky kick bits in `rdi` and an optional fault
+/// record in `rsi`. The stub calls this function, which consumes the process queue through
+/// `SysKernel::take_process_pending`, runs the handler, and `SIGRETURN`s to the interrupted
+/// context.
+pub(crate) extern "C" fn raven_signal_entry(
+    bits: u32,
+    fault: *const raven_libc_signal::kernel::FaultRecord,
+) {
+    // SAFETY: the kernel passes a null pointer or a live FaultRecord for the duration of the
+    // entry; the copy ends before the handler runs.
+    let fault = if fault.is_null() {
+        None
+    } else {
+        Some(unsafe { *fault })
+    };
+    raven_libc_signal::signal_entry(&raven_libc_signal::SysKernel, &DISP, bits, fault);
+}
+
 #[path = "kill.rs"]
 mod kill;
 #[path = "killpg.rs"]

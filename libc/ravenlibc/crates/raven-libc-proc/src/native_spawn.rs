@@ -21,7 +21,7 @@ use crate::backend::{EarlySpawn, WaitResult};
 use crate::errors::{E2BIG, ENOENT, ENOEXEC};
 use crate::errors::{EAGAIN, EINVAL, ENAMETOOLONG, Errno};
 use crate::request::SpawnRequest;
-use crate::wait_status::kernel_wait_options;
+use crate::wait_status::{kernel_idtype, kernel_wait_options};
 
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use raven_abi::errno::Errno as AbiErrno;
@@ -178,9 +178,9 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
 
     fn wait(&self, idtype: u32, id: i64, options: u32) -> Result<WaitResult, Errno> {
         let id = i32::try_from(id).map_err(|_| EINVAL)?;
-        let (pid, status) = self
-            .loader
-            .wait_ex(idtype, id, kernel_wait_options(options))?;
+        let (pid, status) =
+            self.loader
+                .wait_ex(kernel_idtype(idtype), id, kernel_wait_options(options))?;
         if pid != 0
             && let Some(handle) = self.take(pid)
         {

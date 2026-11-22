@@ -240,3 +240,11 @@ fn the_kernel_word_keeps_unsupported_bits_for_the_kernel_to_reject() {
     assert_eq!(kernel_wait_options(WNOWAIT), WNOWAIT);
     assert_eq!(kernel_wait_options(0x20), 0x20);
 }
+
+#[test]
+fn the_kernel_any_child_id_is_three() {
+    assert_eq!(KERNEL_P_ALL, 3);
+    assert_eq!(kernel_idtype(P_ALL), KERNEL_P_ALL);
+    assert_eq!(kernel_idtype(P_PID), P_PID);
+    assert_eq!(kernel_idtype(P_PGID), P_PGID);
+}

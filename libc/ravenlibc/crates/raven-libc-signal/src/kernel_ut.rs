@@ -4,14 +4,14 @@
 use super::*;
 
 #[test]
-fn production_capability_matrix_is_all_false() {
+fn production_capability_matrix_claims_kernel_pg7() {
     let caps = SigKernel::caps(&SysKernel);
-    assert!(!caps.entry);
-    assert!(!caps.kick);
-    assert!(!caps.sigreturn);
-    assert!(!caps.resend);
-    assert!(!caps.eintr);
-    assert!(!caps.proc_kill);
+    assert!(caps.entry);
+    assert!(caps.kick);
+    assert!(caps.sigreturn);
+    assert!(caps.resend);
+    assert!(caps.eintr);
+    assert!(caps.proc_kill);
     assert!(!caps.stop);
     assert!(!caps.fp_in_frame);
     assert_eq!(caps, SigCaps::PRODUCTION);
@@ -26,13 +26,11 @@ fn host_capability_matrix_is_all_true_but_fp() {
 }
 
 #[test]
-fn missing_kernel_primitives_return_enosys() {
+fn empty_deliverable_does_not_consume_a_process_signal() {
+    // No bit is deliverable: `take_process_pending` must not call PROC_SIGRECV and must return
+    // None without touching the kernel queue.
     let kernel = SysKernel::new();
-    assert_eq!(kernel.kick(1, KICK_CHECK), Err(ENOSYS_ERR));
-    assert_eq!(kernel.sig_setup(0x1000, 0, 0), Err(ENOSYS_ERR));
-    assert_eq!(kernel.resend(1, &SiginfoT::ZERO, 0), Err(ENOSYS_ERR));
-    assert_eq!(kernel.proc_kill(1, 15, None), Err(ENOSYS_ERR));
-    assert_eq!(kernel.take_process_pending(!0), None);
+    assert_eq!(kernel.take_process_pending(0), None);
 }
 
 #[test]

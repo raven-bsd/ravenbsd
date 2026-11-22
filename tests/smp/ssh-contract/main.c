@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifndef O_NONBLOCK
@@ -510,31 +511,58 @@ static int check_pty(void) {
 }
 
 static int accept_one(int listener, const char *payload, const char *ack) {
-    int fd;
     char buffer[32];
     size_t length = strlen(payload);
 
-    fd = accept(listener, NULL, NULL);
-    if (fd < 0) {
-        return -1;
-    }
-    if (read_exact(fd, buffer, length) != 0 || memcmp(buffer, payload, length) != 0) {
+    // The host peer retries the hostfwd connection; a stale or aborted attempt can complete at
+    // the listener first. Drop a connection that does not speak the expected two-step exchange
+    // and wait for the real one.
+    for (int attempt = 0; attempt < 20; attempt++) {
+        int fd;
+        int revents;
+
+        revents = poll_one(listener, POLLIN, 1000);
+        if (revents < 0) {
+            return -1;
+        }
+        if (revents == 0) {
+            continue;
+        }
+        fd = accept(listener, NULL, NULL);
+        if (fd < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return -1;
+        }
+        revents = poll_one(fd, POLLIN, 1000);
+        if (revents <= 0) {
+            (void)close(fd);
+            continue;
+        }
+        if (read_exact(fd, buffer, length) != 0 || memcmp(buffer, payload, length) != 0) {
+            (void)close(fd);
+            continue;
+        }
+        if (write(fd, payload, length) != (ssize_t)length) {
+            (void)close(fd);
+            continue;
+        }
+        revents = poll_one(fd, POLLIN, 2000);
+        if (revents <= 0) {
+            (void)close(fd);
+            continue;
+        }
+        if (read_exact(fd, buffer, strlen(ack)) != 0 ||
+            memcmp(buffer, ack, strlen(ack)) != 0) {
+            (void)close(fd);
+            continue;
+        }
         (void)close(fd);
-        errno = EPROTO;
-        return -1;
+        return 0;
     }
-    if (write(fd, payload, length) != (ssize_t)length) {
-        (void)close(fd);
-        return -1;
-    }
-    if (read_exact(fd, buffer, strlen(ack)) != 0 ||
-        memcmp(buffer, ack, strlen(ack)) != 0) {
-        (void)close(fd);
-        errno = EPROTO;
-        return -1;
-    }
-    (void)close(fd);
-    return 0;
+    errno = ETIMEDOUT;
+    return -1;
 }
 
 static int check_accept(void) {
@@ -642,6 +670,21 @@ static int check_eof_pipe(void) {
     return 0;
 }
 
+/// Reap one known child, retrying the `EINTR` that a queued SIGCHLD can produce while another
+/// child event is being delivered.
+static int wait_specific(pid_t child, int *status) {
+    for (;;) {
+        pid_t reaped = waitpid(child, status, 0);
+        if (reaped == child) {
+            return 0;
+        }
+        if (reaped < 0 && errno == EINTR) {
+            continue;
+        }
+        return -1;
+    }
+}
+
 static int check_eof_socket(void) {
     int conn;
     int status = 0;
@@ -686,7 +729,8 @@ static int check_eof_socket(void) {
         execve("/bin/ssh-contract-child", argv, (char *const[]){NULL});
         _exit(4);
     }
-    if (waitpid(child, &status, 0) != child || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    if (wait_specific(child, &status) != 0 || !WIFEXITED(status) ||
+        WEXITSTATUS(status) != 0) {
         char detail[96];
         (void)snprintf(detail, sizeof(detail), "eof child status=%d", status);
         return fail(detail);
@@ -801,10 +845,295 @@ static int check_eof_level(void) {
     return 0;
 }
 
+static volatile sig_atomic_t sigchld_count;
+static int sigchld_pipe = -1;
+
+static char signal_stack[65536];
+
+static void install_signal_stack(void) {
+    stack_t stack;
+
+    memset(&stack, 0, sizeof(stack));
+    stack.ss_sp = signal_stack;
+    stack.ss_size = sizeof(signal_stack);
+    if (sigaltstack(&stack, NULL) != 0) {
+        say("CONTRACT altstack FAIL\n");
+    } else {
+        say("CONTRACT altstack ok\n");
+    }
+}
+
+static void on_sigchld(int signo) {
+    char byte = 'S';
+    (void)signo;
+    sigchld_count++;
+    if (sigchld_pipe >= 0) {
+        (void)write(sigchld_pipe, &byte, 1);
+    }
+}
+
+static int install_sigchld(int flags) {
+    struct sigaction action;
+
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = on_sigchld;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = flags | SA_ONSTACK;
+    return sigaction(SIGCHLD, &action, NULL);
+}
+
+// K11/K12: fork a child, block in ppoll on an idle socket and the self-pipe, and let the SIGCHLD
+// handler write one byte to the pipe. The OpenSSH loop retries EINTR and then sees the pipe.
+static int check_sigchld_ppoll(int flags, const char *label) {
+    int pv[2];
+    int sv[2];
+    int status = 0;
+    int first_eintr = -1;
+    char byte = 0;
+    pid_t child;
+    struct pollfd fds[2];
+
+    if (pipe(pv) != 0) {
+        return fail("sigchld pipe");
+    }
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("sigchld socketpair");
+    }
+    sigchld_count = 0;
+    sigchld_pipe = pv[1];
+    if (install_sigchld(flags) != 0) {
+        return fail("sigchld sigaction");
+    }
+    child = fork();
+    if (child < 0) {
+        return fail("sigchld fork");
+    }
+    if (child == 0) {
+        (void)usleep(120000);
+        _exit(7);
+    }
+    fds[0].fd = pv[0];
+    fds[0].events = POLLIN;
+    fds[0].revents = 0;
+    fds[1].fd = sv[0];
+    fds[1].events = POLLIN;
+    fds[1].revents = 0;
+    for (int attempt = 0; attempt < 20; attempt++) {
+        struct timespec timeout;
+        int ready;
+
+        timeout.tv_sec = 5;
+        timeout.tv_nsec = 0;
+        fds[0].revents = 0;
+        fds[1].revents = 0;
+        ready = ppoll(fds, 2, &timeout, NULL);
+        if (ready < 0) {
+            if (errno == EINTR) {
+                if (first_eintr < 0) {
+                    first_eintr = 1;
+                }
+                continue;
+            }
+            return fail("sigchld ppoll");
+        }
+        if (ready == 0) {
+            return fail("sigchld ppoll timeout");
+        }
+        if ((fds[0].revents & POLLIN) != 0) {
+            break;
+        }
+        return fail("sigchld wrong fd");
+    }
+    if (first_eintr < 0) {
+        first_eintr = 0;
+    }
+    if (read(pv[0], &byte, 1) != 1 || byte != 'S') {
+        return fail("sigchld pipe read");
+    }
+    pid_t reaped;
+    do {
+        reaped = waitpid(-1, &status, 0);
+    } while (reaped < 0 && errno == EINTR);
+    if (reaped != child || !WIFEXITED(status) || WEXITSTATUS(status) != 7) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "sigchld wait status=%d", status);
+        return fail(detail);
+    }
+    {
+        char detail[128];
+        (void)snprintf(
+            detail,
+            sizeof(detail),
+            "sigchld %s ppoll=pipe eintr=%d restart=%d count=%d",
+            label,
+            first_eintr,
+            (flags & SA_RESTART) != 0,
+            (int)sigchld_count
+        );
+        pass(detail);
+    }
+    sigchld_pipe = -1;
+    (void)close(pv[0]);
+    (void)close(pv[1]);
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    return 0;
+}
+
+// K13: after the handler fires, a nonblocking read of the self-pipe returns the byte, not EAGAIN.
+static int check_sigchld_pipe_nonblock(void) {
+    int pv[2];
+    int status = 0;
+    char byte = 0;
+    pid_t child;
+    struct pollfd fds[1];
+
+    if (pipe(pv) != 0) {
+        return fail("sigchld nonblock pipe");
+    }
+    if (fcntl(pv[0], F_SETFL, O_NONBLOCK) != 0) {
+        return fail("sigchld nonblock fcntl");
+    }
+    sigchld_count = 0;
+    sigchld_pipe = pv[1];
+    if (install_sigchld(0) != 0) {
+        return fail("sigchld nonblock sigaction");
+    }
+    child = fork();
+    if (child < 0) {
+        return fail("sigchld nonblock fork");
+    }
+    if (child == 0) {
+        (void)usleep(100000);
+        _exit(7);
+    }
+    fds[0].fd = pv[0];
+    fds[0].events = POLLIN;
+    fds[0].revents = 0;
+    for (int attempt = 0; attempt < 20; attempt++) {
+        struct timespec timeout;
+        int ready;
+
+        timeout.tv_sec = 5;
+        timeout.tv_nsec = 0;
+        fds[0].revents = 0;
+        ready = ppoll(fds, 1, &timeout, NULL);
+        if (ready < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return fail("sigchld nonblock ppoll");
+        }
+        if (ready == 0) {
+            return fail("sigchld nonblock timeout");
+        }
+        break;
+    }
+    if (read(pv[0], &byte, 1) != 1 || byte != 'S') {
+        return fail("sigchld nonblock read");
+    }
+    if (wait_specific(child, &status) != 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 7) {
+        return fail("sigchld nonblock wait");
+    }
+    pass("sigchld pipe nonblock read=1");
+    sigchld_pipe = -1;
+    (void)close(pv[0]);
+    (void)close(pv[1]);
+    return 0;
+}
+
+// K14: two children exit while the parent sleeps; both SIGCHLDs are queued, the handler runs
+// once per child, and both statuses are reaped.
+static int check_sigchld_two_children(void) {
+    int pv[2];
+    pid_t first;
+    pid_t second;
+    int status = 0;
+    int seen7 = 0;
+    int seen9 = 0;
+
+    if (pipe(pv) != 0) {
+        return fail("sigchld two pipe");
+    }
+    sigchld_count = 0;
+    sigchld_pipe = pv[1];
+    if (install_sigchld(0) != 0) {
+        return fail("sigchld two sigaction");
+    }
+    first = fork();
+    if (first < 0) {
+        return fail("sigchld two fork1");
+    }
+    if (first == 0) {
+        (void)usleep(50000);
+        _exit(7);
+    }
+    second = fork();
+    if (second < 0) {
+        return fail("sigchld two fork2");
+    }
+    if (second == 0) {
+        (void)usleep(150000);
+        _exit(9);
+    }
+    // Sleep through both exits. A signal interrupts poll(), and the loop still covers the full
+    // window, so both SIGCHLD deliveries happen while the parent is sleeping.
+    for (int slice = 0; slice < 20; slice++) {
+        (void)poll(NULL, 0, 20);
+    }
+    for (int reaped = 0; reaped < 2; reaped++) {
+        pid_t pid;
+        do {
+            pid = waitpid(-1, &status, 0);
+        } while (pid < 0 && errno == EINTR);
+        if (pid < 0) {
+            return fail("sigchld two wait");
+        }
+        if (!WIFEXITED(status)) {
+            return fail("sigchld two not-exited");
+        }
+        if (WEXITSTATUS(status) == 7) {
+            seen7++;
+        } else if (WEXITSTATUS(status) == 9) {
+            seen9++;
+        } else {
+            return fail("sigchld two status");
+        }
+    }
+    if (seen7 != 1 || seen9 != 1) {
+        return fail("sigchld two statuses");
+    }
+    if (sigchld_count != 2) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "sigchld two count=%d", (int)sigchld_count);
+        return fail(detail);
+    }
+    pass("sigchld two children count=2 statuses=7,9");
+    sigchld_pipe = -1;
+    (void)close(pv[0]);
+    (void)close(pv[1]);
+    return 0;
+}
+
+static void drain_children(void) {
+    int status;
+    for (;;) {
+        pid_t pid = waitpid(-1, &status, WNOHANG);
+        if (pid > 0) {
+            continue;
+        }
+        if (pid < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+}
+
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
     signal(SIGPIPE, SIG_IGN);
+    install_signal_stack();
     row = "K1";
     if (check_poll() != 0) {
         return 1;
@@ -845,6 +1174,23 @@ int main(int argc, char **argv) {
     if (check_eof_level() != 0) {
         return 1;
     }
-    say("CONTRACT SUMMARY PASS 10/10\n");
+    drain_children();
+    row = "K11";
+    if (check_sigchld_ppoll(0, "no-restart") != 0) {
+        return 1;
+    }
+    row = "K12";
+    if (check_sigchld_ppoll(SA_RESTART, "sa-restart") != 0) {
+        return 1;
+    }
+    row = "K13";
+    if (check_sigchld_pipe_nonblock() != 0) {
+        return 1;
+    }
+    row = "K14";
+    if (check_sigchld_two_children() != 0) {
+        return 1;
+    }
+    say("CONTRACT SUMMARY PASS 14/14\n");
     return 0;
 }

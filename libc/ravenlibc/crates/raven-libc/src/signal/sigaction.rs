@@ -4,6 +4,8 @@
 use core::ffi::c_int;
 
 use raven_libc_signal::Disposition;
+use raven_libc_signal::kernel::{SigKernel, SysKernel};
+use raven_libc_signal::raw;
 
 use super::DISP;
 
@@ -61,6 +63,17 @@ pub unsafe extern "C" fn sigaction(
                         restorer: 0,
                     };
                     (*old).mask[0] = previous.mask;
+                }
+            }
+            // Register the kernel entry once per thread. The kernel resumes at the asm stub,
+            // which calls `raven_signal_entry`; the context area is TLS-relative.
+            let kernel = SysKernel::new();
+            if kernel.caps().entry {
+                let tp = kernel.thread_pointer();
+                let ctx = raw::ctx_area(tp) as usize;
+                if ctx > tp {
+                    raw::set_entry_function(super::raven_signal_entry as usize);
+                    let _ = kernel.sig_setup(raw::sigentry_address(), ctx - tp, 0);
                 }
             }
             0

@@ -245,8 +245,22 @@ pub fn kick(frame: &SyscallFrame) -> Result<usize, Errno> {
     if thread.state() == ThreadState::Dead {
         return Err(Errno::ESRCH);
     }
-    if bits == 0 {
-        return Ok(0);
+    kick_thread(thread, bits);
+    Ok(0)
+}
+
+/// `SIG_SETUP`/signal bit 0: libc must inspect the pending signal set.
+pub const KICK_CHECK: u32 = 1;
+
+/// Set `bits` on `thread` and wake it with `EINTR` when it is interruptible.
+///
+/// The signal path calls this after queueing a process signal. A blocked syscall returns
+/// `EINTR`; the return-to-user path then enters the registered signal entry, and libc consumes
+/// the process signal and runs the handler. A running thread keeps the sticky bits for its next
+/// interruptible wait.
+pub fn kick_thread(thread: Arc<crate::sched::thread::Thread>, bits: u32) {
+    if bits == 0 || thread.state() == ThreadState::Dead {
+        return;
     }
     thread
         .kick_bits
@@ -261,7 +275,6 @@ pub fn kick(frame: &SyscallFrame) -> Result<usize, Errno> {
         let token = (token != 0).then_some(token);
         let _ = sched::wake(thread, token, Errno::EINTR.to_ret());
     }
-    Ok(0)
 }
 
 /// `thread_set_tls(thread, tp) -> 0`.
@@ -318,9 +331,6 @@ pub struct SignalEntry {
     pub mask: u64,
 }
 
-/// `THREAD_KICK` bit 0: inspect pending signal state.
-const KICK_CHECK: u32 = 1;
-
 /// `sig_setup(entry: usize, ctx_offset: usize, flags: u32) -> 0` (raw 0x80).
 ///
 /// Self-only and per thread. The entry must be inside an executable VMA of the
@@ -364,6 +374,7 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
         .store(offset as u64, Ordering::Release);
     thread.signal_flags.store(flags, Ordering::Release);
     thread.signal_entry.store(entry, Ordering::Release);
+    *caller.signal_thread.lock() = Arc::downgrade(&thread);
     Ok(0)
 }
 
