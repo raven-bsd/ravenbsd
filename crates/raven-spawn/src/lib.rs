@@ -495,7 +495,10 @@ fn image_scheme_path(path: &str) -> alloc_crate::string::String {
 ///
 /// `O_RDONLY` is zero at the C level, but the kernel's `OPEN` wire encoding uses bit 0 for read
 /// access; passing the raw zero flags is rejected.
-#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+#[cfg(any(
+    test,
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
+))]
 fn image_open_flags() -> Result<raven_proto_fs::OpenFlags, SpawnError> {
     raven_proto_fs::OpenFlags::from_linux(raven_proto_fs::O_RDONLY)
         .map_err(|_| SpawnError::Sys(Errno::EINVAL))
@@ -724,6 +727,7 @@ fn spawn_elf<S: Sys>(
         .ok_or(SpawnError::TooLarge)?;
     let stack_base_address = usize::try_from(stack_base).map_err(|_| SpawnError::TooLarge)?;
 
+    #[cfg(any(feature = "alloc", test))]
     let fdmap_info = if fdmap.is_empty() {
         None
     } else {
@@ -795,6 +799,16 @@ fn spawn_elf<S: Sys>(
             return Err(SpawnError::Sys(error));
         }
         Some((address as usize, entries.len()))
+    };
+    // The fd map is an alloc-backed encoding; a no-alloc image cannot publish it.  Reject a
+    // non-empty map instead of silently dropping inherited descriptors (K463).
+    #[cfg(not(any(feature = "alloc", test)))]
+    let fdmap_info = match no_alloc_fdmap(fdmap) {
+        Ok(()) => None,
+        Err(error) => {
+            let _ = sys.handle_close(child);
+            return Err(error);
+        }
     };
     let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, libc, fdmap_info);
     let random = random_bytes(&auxv as *const _ as usize);
@@ -1599,7 +1613,21 @@ fn plan_image<'a>(
 /// Entries carry no path or status; the child's `restore_fdmap` creates unknown-kind OFDs with
 /// read/write status and the transferred handles. The loader only publishes this block for
 /// inherited stdio and ordinary file descriptors.
+/// Reject an inherited fd map when the crate is built without `alloc`.
+///
+/// The wire block is built in a heap `Vec`; a no-alloc image cannot publish it.  Empty is the
+/// common case and stays supported (K463).
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+#[allow(dead_code)] // host tests exercise it; only the no-alloc target cfg calls it
+fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
+    if fdmap.is_empty() {
+        Ok(())
+    } else {
+        Err(SpawnError::Sys(Errno::ENOTSUP))
+    }
+}
+
+#[cfg(any(feature = "alloc", test))]
 fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
     let mut out = alloc_crate::vec::Vec::with_capacity(8usize.saturating_add(18 * entries.len()));
