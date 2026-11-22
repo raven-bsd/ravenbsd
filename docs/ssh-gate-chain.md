@@ -122,8 +122,9 @@ this deviation is recorded in the K434 report.
   termios defaults and returns `EBUSY` when the slave is already open. `openpty` (`lib/libutil/pty.c:63`)
   and `forkpty` (`:139`) are the libutil convenience over that path.
 - Raven: ptyd supplies the `pty:` scheme pair; libc `openpty`/`grantpt`/`unlockpt`/`ptsname_r` must
-  match the libutil sequence. Current `ssh -tt` answers `PTY allocation request failed on channel 0`
-  (K430, not merged at this base).
+  match the libutil sequence. K430 is merged and its `pty-alloc` qtest passes as root and uid 1000,
+  but `ssh -tt` still answers `PTY allocation request failed on channel 0`; the release image also
+  has no `tty` executable (`rsh: tty: command not found`), so S8 is not green.
 
 ### C10 exec
 
@@ -164,6 +165,22 @@ this deviation is recorded in the K434 report.
    failure is at this step (K430), not in OpenSSH.
 6. **Banner (S1).** The wire banner uses `SSH_VERSION` (`OpenSSH_10.6`), not `SSH_RELEASE`
    (`OpenSSH_10.6p2`). S1 asserts the source bytes.
+
+## Rev 18 observations (S5-session and S7 output path)
+
+1. **The previous S5-session EPIPE was the test stdin, not the socket.** With `stdin=/dev/null`,
+   strace recorded `read(4</dev/null<char 1:3>>, "", 32768) = 0`; `sshbuf_read`
+   (`addons/ssh/openssh/sshbuf-misc.c:340-353`) maps a zero-length read to `SSH_ERR_SYSTEM_ERROR`
+   with `errno = EPIPE`, so OpenSSH logged `Broken pipe`. The network socket fd 3 stayed `ESTAB`.
+   With a live stdin pipe there is no EPIPE; the client still does not complete and is killed at the
+   15 s cap. S5-session records that completion failure, the sampled fd4 `socket:`/`pipe:` target
+   and the `ESTAB` TCP peer.
+2. **S7 executes the command but loses its stdout.** The guest serial log contains the exact marker
+   `K434-SSH-MARKER-2026-11-22` 11 times (the single attempt plus 10/10), while every SSH client
+   stdout is 0 bytes. The session stdout is on the guest console, not the SSH channel.
+3. **S8 has two independent gaps.** The K430 `pty-alloc` qtest passes, but `ssh -tt ... tty` still
+   fails the PTY request and the release image has no `tty` executable (`rsh: tty: command not
+   found`). Rebuilding the static `sshd-session` against the merged libc did not change the result.
 
 ## Gaps (not evidence)
 
