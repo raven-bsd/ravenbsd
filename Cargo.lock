@@ -1502,6 +1502,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-console-input"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-coretest"
 version = "0.1.0"
 dependencies = [
