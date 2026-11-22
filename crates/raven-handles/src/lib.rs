@@ -14,8 +14,10 @@
 //! scheme reply attachment points at the node it was derived from; [`HandleTable::revoke_target`]
 //! records revoked bits on a node and the kernel walks the table's nodes to propagate the same
 //! mask to every descendant. A later lookup that needs a revoked bit returns `EPERM`, while a bit
-//! that was never granted keeps the old `EACCES`. The node holds no process or address-space
-//! reference, so S36 teardown is unaffected.
+//! that was never granted keeps the old `EACCES`. The effective mask is recomputed by walking the
+//! strong parent chain, so a revoke that completed before a descendant was registered still binds
+//! that descendant (K528). The node holds no process or address-space reference, so S36 teardown
+//! is unaffected.
 //!
 //! The table is generic so the kernel can store its object enum while host tests use a small test
 //! object.
@@ -80,14 +82,50 @@ impl LineageNode {
         self.rights
     }
 
-    /// Rights revoked by this node or an ancestor.
+    /// Rights granted to this node that are revoked by it or by any ancestor.
+    ///
+    /// The walk is the linearization point for revocation: a child registered *after* a revoke
+    /// completed still observes the ancestor's bits here, so the descendant registry snapshot in
+    /// the kernel is only a fan-out optimisation and cannot widen a revoked capability. The mask
+    /// is intersected with `rights` so a bit this node never held stays "never granted" and keeps
+    /// the `EACCES` side of the error split.
     pub fn revoked(&self) -> Rights {
-        Rights(self.revoked.load(Ordering::Acquire))
+        let mut mask = self.revoked.load(Ordering::Acquire);
+        let mut current = self.parent.as_ref();
+        while let Some(node) = current {
+            mask |= node.revoked.load(Ordering::Acquire);
+            current = node.parent.as_ref();
+        }
+        Rights(self.rights.0 & mask)
     }
 
-    /// Rights still usable: granted minus revoked.
+    /// Rights still usable: granted minus revoked by this node or any ancestor.
     pub fn effective(&self) -> Rights {
-        Rights(self.rights.0 & !self.revoked.load(Ordering::Acquire))
+        Rights(self.rights.0 & !self.revoked().0)
+    }
+
+    /// True when `needed` was granted and then revoked by this node or an ancestor.
+    ///
+    /// This is the `EPERM` side of the error split. A bit marked directly on this node counts
+    /// even when it is no longer in `rights`: a queued `SCM_RIGHTS` attachment stores the rights
+    /// at send time, while `insert_derived` stores the parent's effective mask at install time,
+    /// so the kernel copies the parent's revoke onto the child to keep the two cases apart. A bit
+    /// this node never held stays `false` (the caller returns `EACCES`).
+    pub fn is_revoked(&self, needed: Rights) -> bool {
+        if self.revoked.load(Ordering::Acquire) & needed.0 != 0 {
+            return true;
+        }
+        if self.rights.0 & needed.0 == 0 {
+            return false;
+        }
+        let mut current = self.parent.as_ref();
+        while let Some(node) = current {
+            if node.revoked.load(Ordering::Acquire) & needed.0 != 0 {
+                return true;
+            }
+            current = node.parent.as_ref();
+        }
+        false
     }
 
     /// Revoke `mask` on this node.  OR-ing is idempotent.
@@ -265,16 +303,16 @@ impl<T: Clone> HandleTable<T> {
             return Err(Errno::EBADF);
         }
         let value = slot.value.as_ref().ok_or(Errno::EBADF)?;
-        let (revoked, effective) = match slot.lineage.as_ref() {
-            Some(node) => (node.revoked(), node.effective()),
-            None => (Rights::NONE, slot.rights),
+        let effective = match slot.lineage.as_ref() {
+            Some(node) => node.effective(),
+            None => slot.rights,
         };
         if !effective.contains(needed) {
-            return Err(if (revoked.0 & needed.0) != 0 {
-                Errno::EPERM
-            } else {
-                Errno::EACCES
-            });
+            let revoked = slot
+                .lineage
+                .as_ref()
+                .is_some_and(|node| node.is_revoked(needed));
+            return Err(if revoked { Errno::EPERM } else { Errno::EACCES });
         }
         Ok((value, effective))
     }
@@ -366,7 +404,7 @@ impl<T: Clone> HandleTable<T> {
             let parent = slot.lineage.clone().ok_or(Errno::EBADF)?;
             let effective = parent.effective();
             if !effective.contains(Rights::DUP) {
-                return Err(if (parent.revoked().0 & Rights::DUP.0) != 0 {
+                return Err(if parent.is_revoked(Rights::DUP) {
                     Errno::EPERM
                 } else {
                     Errno::EACCES

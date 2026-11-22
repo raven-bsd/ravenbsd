@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K528 capability lineage on 4 CPUs: the ancestor-revoke race row runs with the scheduler spreading
+# the installer and revoker threads over four CPUs.
+
+name = "handles-kvm4"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/smp/handles/build.sh"]
+initfs = "build/handles/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^handles: start iterations=[0-9]+ installers=[0-9]+$'
+
+[[expect]]
+regex = '^handles: row name=queued-scm-rights ok=yes$'
+
+[[expect]]
+regex = '^handles: row name=closed-intermediate ok=yes$'
+
+[[expect]]
+regex = '^handles: row name=error-split ok=yes$'
+
+[[expect]]
+regex = '^handles: row name=ancestor-race ok=yes installs=[0-9]+$'
+
+[[expect]]
+regex = '^handles: summary rows=4 ok=yes$'
+
+[[expect]]
+regex = '^handles: alive$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|handles: FAIL'

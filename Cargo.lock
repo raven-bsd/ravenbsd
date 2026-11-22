@@ -1817,6 +1817,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-handles-smp"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-hostname"
 version = "0.1.0"
 dependencies = [
