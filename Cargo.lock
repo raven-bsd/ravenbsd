@@ -4117,6 +4117,16 @@ name = "raven-turnstile"
 version = "0.1.0"
 
 [[package]]
+name = "raven-ufs-durability-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-umount"
 version = "0.1.0"
 dependencies = [
