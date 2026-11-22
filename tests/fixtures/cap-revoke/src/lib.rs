@@ -169,6 +169,13 @@ pub fn transfer(process: Handle, object: Handle, mask: Rights) -> Result<Handle,
     ))
 }
 
+/// Fork `source` into a new process that shares the handle lineage nodes.
+///
+/// `PROC_FORK` is exposed as raw number `0x39` by the kernel until the ABI crate adds a variant.
+pub fn proc_fork(source: Handle) -> Result<Handle, Errno> {
+    handle(syscall2(0x39, source.0 as usize, 0))
+}
+
 /// Create a thread in `process`.
 pub fn thread_create(
     process: Handle,
@@ -251,13 +258,15 @@ pub fn stage(initfs: &Initfs<'_>, path: &str) -> Result<Staged, Errno> {
         STACK_SIZE,
         map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
     )?;
+    // The child stack is private: a `PROC_FORK` clone must get its own COW pages, not share the
+    // controller-built stack with the original thread.
     map_memory(
         child,
         stack,
         0,
         STACK_BASE,
         STACK_SIZE,
-        map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
+        map::pack(prot::READ | prot::WRITE, map::FIXED),
     )?;
     let stack_pointer = build_stack(scratch);
     unmap(Handle::SELF_PROC, STACK_SCRATCH, STACK_SIZE)?;
