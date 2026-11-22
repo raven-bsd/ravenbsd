@@ -97,6 +97,24 @@ impl Table {
         self.matches_at(address, tables, 0)
     }
 
+    /// Donor `pfr_match_addr` lookup: true when `address` is covered by any entry.
+    #[must_use]
+    pub fn lookup(&self, address: IpAddr, tables: &[Table]) -> bool {
+        self.matches(address, tables)
+    }
+
+    /// Delete one exact entry (donor `pfr_del_addrs` with `exact` matching).
+    ///
+    /// Returns `true` when an entry equal to `spec` was present and removed. A covering entry
+    /// (for example a subnet for a contained address) is not a match: deletion is exact.
+    pub fn delete(&mut self, spec: &AddrSpec) -> bool {
+        if let Some(index) = self.entries.iter().position(|entry| entry == spec) {
+            self.entries.remove(index);
+            return true;
+        }
+        false
+    }
+
     pub(crate) fn matches_at(&self, address: IpAddr, tables: &[Table], depth: u8) -> bool {
         self.entries
             .iter()

@@ -135,12 +135,30 @@ pub enum NatError {
     PoolExhausted,
 }
 
+/// Largest number of sticky source mappings kept by one NAT table.
+///
+/// The donor keeps the mapping in the state/source-node tree with its own timeouts; this crate
+/// has no timer ownership, so the mapping is a bounded FIFO and the oldest source is evicted.
+pub const MAX_STICKY_ENTRIES: usize = 1024;
+
 /// The NAT/RDR rule table.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct NatTable {
     rules: Vec<NatRule>,
+    /// Parallel to `rules`: the donor `PF_POOL_STICKYADDR` option per rule.
+    sticky: Vec<bool>,
+    /// Sticky source-to-address mappings, oldest first.
+    mappings: Vec<StickyMapping>,
     cursor: u64,
     address_cursor: u64,
+}
+
+/// One sticky source mapping (donor source-node equivalent).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct StickyMapping {
+    rule: usize,
+    source: IpAddr,
+    address: IpAddr,
 }
 
 impl NatTable {
@@ -149,6 +167,8 @@ impl NatTable {
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
+            sticky: Vec::new(),
+            mappings: Vec::new(),
             cursor: 0,
             address_cursor: 0,
         }
@@ -164,7 +184,28 @@ impl NatTable {
             return false;
         }
         self.rules.push(rule);
+        self.sticky.push(false);
         true
+    }
+
+    /// Set the donor `PF_POOL_STICKYADDR` option for rule `index`.
+    ///
+    /// Returns `false` for an out-of-range index. Turned on after [`Self::push`] so the parser
+    /// and callers can opt in without changing the rule struct.
+    pub fn set_sticky(&mut self, index: usize, sticky: bool) -> bool {
+        match self.sticky.get_mut(index) {
+            Some(slot) => {
+                *slot = sticky;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Whether rule `index` is sticky (`None` for an out-of-range index).
+    #[must_use]
+    pub fn sticky(&self, index: usize) -> Option<bool> {
+        self.sticky.get(index).copied()
     }
 
     /// The rules in configuration order.
@@ -217,7 +258,32 @@ impl NatTable {
         if rule.pool.addresses.is_empty() {
             return Err(NatError::NoAddress);
         }
-        let Some(address) = select_address(&mut self.address_cursor, &rule.pool, packet) else {
+        let sticky = self.sticky.get(index).copied().unwrap_or(false);
+        let mut address = if sticky {
+            self.mappings
+                .iter()
+                .find(|mapping| mapping.rule == index && mapping.source == packet.source)
+                .map(|mapping| mapping.address)
+        } else {
+            None
+        };
+        if address.is_none() {
+            address = select_address(&mut self.address_cursor, &rule.pool, packet);
+            if sticky
+                && rule.action == NatAction::Nat
+                && let Some(chosen) = address
+            {
+                if self.mappings.len() >= MAX_STICKY_ENTRIES {
+                    self.mappings.remove(0);
+                }
+                self.mappings.push(StickyMapping {
+                    rule: index,
+                    source: packet.source,
+                    address: chosen,
+                });
+            }
+        }
+        let Some(address) = address else {
             return Err(NatError::NoAddress);
         };
         let family_ok = match rule.action {
