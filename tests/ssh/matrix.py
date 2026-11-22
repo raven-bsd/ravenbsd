@@ -454,18 +454,28 @@ def ssh_run(command: list[str], log_name: str, user: str = USER,
     env["K434_SSH_PASSWORD"] = password
     started = time.monotonic()
     timed_out = False
-    try:
-        completed = subprocess.run(argv, cwd=ROOT, stdin=subprocess.DEVNULL,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   env=env, timeout=timeout, check=False)
-        returncode = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
-    except subprocess.TimeoutExpired as error:
-        timed_out = True
-        returncode = 124
-        stdout = error.stdout or b""
-        stderr = error.stderr or b""
+    stdout_path = OUT / f"{log_name}.stdout"
+    stderr_path = OUT / f"{log_name}.stderr"
+    with open(stdout_path, "wb") as out_file, open(stderr_path, "wb") as err_file:
+        process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.PIPE,
+                                   stdout=out_file, stderr=err_file, env=env,
+                                   start_new_session=True)
+        deadline = started + timeout
+        while process.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        timed_out = process.poll() is None
+        if timed_out:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        returncode = process.wait()
+        try:
+            process.stdin.close()  # type: ignore[union-attr]
+        except (OSError, AttributeError):
+            pass
+    stdout = stdout_path.read_bytes()
+    stderr = stderr_path.read_bytes()
     elapsed = (time.monotonic() - started) * 1000
     log = OUT / log_name
     log.write_text(
@@ -515,7 +525,7 @@ def ssh_probe(command: list[str], log_name: str, user: str = USER,
     started = time.monotonic()
     timed_out = False
     with open(stdout_path, "wb") as out_file, open(stderr_path, "wb") as err_file:
-        process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.DEVNULL,
+        process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.PIPE,
                                    stdout=out_file, stderr=err_file, env=env,
                                    start_new_session=True)
         deadline = started + timeout
@@ -572,6 +582,10 @@ def ssh_probe(command: list[str], log_name: str, user: str = USER,
             except ProcessLookupError:
                 pass
         returncode = process.wait()
+        try:
+            process.stdin.close()  # type: ignore[union-attr]
+        except (OSError, AttributeError):
+            pass
     elapsed = (time.monotonic() - started) * 1000
     stdout = stdout_path.read_bytes()
     stderr = stderr_path.read_bytes()
