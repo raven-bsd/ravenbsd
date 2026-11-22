@@ -321,55 +321,37 @@ fn start_and_wait(
     members: &[usize],
     critical: Option<&[bool]>,
 ) -> Option<i32> {
-    // Start the critical members first and wait for them before starting the rest of the wave.
-    // A non-critical prerequisite (netd before the sshd wave) must not race a critical one
-    // (ssh-hostkeys) and gain readiness time it would not have in the graph's own order.
-    let mut barrier: Vec<usize> = Vec::new();
-    let mut after: Vec<usize> = Vec::new();
     for &index in members {
-        if critical.is_some_and(|mask| !mask.get(index).copied().unwrap_or(false)) {
-            after.push(index);
-        } else {
-            barrier.push(index);
-        }
-    }
-    for &index in &barrier {
         let generation = { core.lock().supervisor.start(index, now_ms()) };
         if let Some(generation) = generation {
             spawn_worker(core, index, generation);
         }
     }
-    if !barrier.is_empty() {
-        loop {
-            pump(core);
-            if let Some(code) = core.lock().exit_code {
-                return Some(code);
-            }
-            let done = {
-                let guard = core.lock();
-                barrier.iter().all(|&index| {
-                    guard.supervisor.runtime().get(index).is_none_or(|runtime| {
-                        runtime.ever_ready
-                            || matches!(
-                                runtime.state,
-                                State::Failed | State::GaveUp | State::Stopped
-                            )
-                    })
+    loop {
+        pump(core);
+        if let Some(code) = core.lock().exit_code {
+            return Some(code);
+        }
+        let done = {
+            let guard = core.lock();
+            members.iter().all(|&index| {
+                if critical.is_some_and(|mask| !mask.get(index).copied().unwrap_or(false)) {
+                    return true;
+                }
+                guard.supervisor.runtime().get(index).is_none_or(|runtime| {
+                    runtime.ever_ready
+                        || matches!(
+                            runtime.state,
+                            State::Failed | State::GaveUp | State::Stopped
+                        )
                 })
-            };
-            if done {
-                break;
-            }
-            let _ = raven_rt::nanosleep(5_000_000);
+            })
+        };
+        if done {
+            return None;
         }
+        let _ = raven_rt::nanosleep(5_000_000);
     }
-    for &index in &after {
-        let generation = { core.lock().supervisor.start(index, now_ms()) };
-        if let Some(generation) = generation {
-            spawn_worker(core, index, generation);
-        }
-    }
-    None
 }
 
 /// True when the image asks for the per-service timing diagnostics.
