@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # SSH kernel contract: SIGCHLD and session close
 
 Status: K443 OBSERVED on x86-64. The guest fixture is
