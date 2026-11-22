@@ -95,10 +95,10 @@ link_one() {
 link_one "$out/main.o" "$out/ssh-contract"
 link_one "$out/child.o" "$out/ssh-contract-child"
 
+# Always rebuild the two servers: a fixture must not copy a stale ptyd that predates the
+# current `pty:ptmx` handler. Cargo is incremental when the sources are unchanged.
 for tool in raven-init raven-ptyd; do
-    if [ ! -x "$root/build/$arch/user/$tool" ]; then
-        cargo xtask build user --arch "$arch" -p "$tool"
-    fi
+    cargo xtask build user --arch "$arch" -p "$tool"
 done
 init=$root/build/$arch/user/raven-init
 ptyd=$root/build/$arch/user/raven-ptyd
