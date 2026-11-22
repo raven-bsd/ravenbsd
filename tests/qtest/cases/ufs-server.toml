@@ -195,6 +195,46 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
+send = "echo colour:$TERM:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^colour:xterm-256color:1$'
+timeout_secs = 60
+
+[[step]]
+send = "NO_COLOR=1; . /etc/profile; echo plain:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^plain:0$'
+timeout_secs = 60
+
+[[step]]
+send = "NO_COLOR=; . /etc/profile; echo restored:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^restored:1$'
+timeout_secs = 60
+
+[[step]]
+send = "TERM=dumb; . /etc/profile; echo dumb:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^dumb:0$'
+timeout_secs = 60
+
+[[step]]
+send = "TERM=xterm-256color; . /etc/profile; echo termrestored:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^termrestored:1$'
+timeout_secs = 60
+
+[[step]]
 send = "echo ufs-server-persist > /persist.txt\n"
 delay_ms = 100
 
