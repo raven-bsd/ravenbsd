@@ -610,6 +610,7 @@ fn stack_selftest_once() {
         crate::kprintln!("stack-selftest: alloc fail");
         return;
     };
+    let guard_first = guard_unmapped(base);
     let Some(start) = base.checked_add(PAGE) else {
         crate::kprintln!("stack-selftest: address fail");
         return;
@@ -629,16 +630,32 @@ fn stack_selftest_once() {
         Some(value) => value,
         None => return,
     };
+    // The reuse path must keep the guard page unmapped; a remapped guard would let an overflow
+    // run into the neighbouring heap block instead of faulting.
+    let guard_reused = guard_unmapped(base2);
     // SAFETY: the reused stack's mapped region is `start2..top2` and is owned by this probe.
     let zero = unsafe { core::slice::from_raw_parts(start2 as *const u8, length) }
         .iter()
         .all(|byte| *byte == 0);
     free_kernel_stack(base2, top2);
+    if guard_first && guard_reused {
+        crate::kprintln!("stack-selftest: guard-unmapped ok");
+    } else {
+        crate::kprintln!("stack-selftest: guard-mapped");
+    }
     if zero {
         crate::kprintln!("stack-selftest: reuse-zero ok");
     } else {
         crate::kprintln!("stack-selftest: reuse-stale");
     }
+}
+
+/// True when the guard page at `base` carries no mapping, so a stack overflow faults.
+fn guard_unmapped(base: u64) -> bool {
+    let Some(address) = VirtAddr::new(base) else {
+        return false;
+    };
+    paging::with_kernel_mapper(|mapper| mapper.translate(address).is_none()).unwrap_or(false)
 }
 
 /// Allocate a page-aligned kernel stack and unmap its lowest page as a guard.
