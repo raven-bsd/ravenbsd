@@ -551,6 +551,19 @@ fn output_is_raw_without_opost() {
 }
 
 #[test]
+fn a_fresh_winsize_is_zero() {
+    assert_eq!(
+        Winsize::default(),
+        Winsize {
+            row: 0,
+            col: 0,
+            xpixel: 0,
+            ypixel: 0
+        }
+    );
+}
+
+#[test]
 fn a_disabled_veol_does_not_complete_the_line() {
     let mut discipline = Discipline::new();
     assert_eq!(discipline.termios().cc[VEOL], VDISABLE);

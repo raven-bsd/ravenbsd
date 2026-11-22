@@ -11,7 +11,10 @@
 
 use raven_abi::errno::Errno;
 use raven_libc_abi::structs::Termios;
-use raven_proto_tty::{self, Request, Response, Settings, TERMIOS_LEN, Termios as WireTermios};
+pub use raven_proto_tty::Winsize;
+use raven_proto_tty::{
+    self, Request, Response, Settings, TERMIOS_LEN, Termios as WireTermios, WINSIZE_LEN,
+};
 
 use crate::backend::SysBackend;
 use crate::fd::ofd::OfdKind;
@@ -226,22 +229,59 @@ pub fn cfsetospeed(termios: &mut Termios, speed: u32) -> i32 {
     0
 }
 
-/// `tcgetwinsize`: `ENOSYS` until PG-54.
+/// `tcgetwinsize`: the pty window size, `ENOTTY` for a non-tty or a tty server without the call.
 pub fn tcgetwinsize<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fd: i32,
-) -> Result<(), Errno> {
-    let _ = platform.get(fd)?;
-    Err(Errno::ENOSYS)
+) -> Result<Winsize, Errno> {
+    let reference = platform.get(fd)?;
+    if reference.kind() != OfdKind::Tty {
+        return Err(Errno::ENOTTY);
+    }
+    let mut body = [0u8; WINSIZE_LEN];
+    raven_proto_tty::encode_get_winsize_request(&mut body);
+    let mut response = [0u8; WINSIZE_LEN];
+    let count = match platform
+        .backend()
+        .call(reference.handle(), &body, &mut response)
+    {
+        Err(Errno::ENOSYS) => return Err(Errno::ENOTTY),
+        other => other?,
+    };
+    if count < WINSIZE_LEN {
+        return Err(Errno::EPROTO);
+    }
+    raven_proto_tty::decode_winsize_response(response.get(..count).unwrap_or(&[]))
+        .map_err(|_| Errno::EPROTO)
 }
 
-/// `tcsetwinsize`: `ENOSYS` until PG-54.
+/// `tcsetwinsize`: store the pty window size, `ENOTTY` for a non-tty or a tty server without the
+/// call.
 pub fn tcsetwinsize<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fd: i32,
+    winsize: &Winsize,
 ) -> Result<(), Errno> {
-    let _ = platform.get(fd)?;
-    Err(Errno::ENOSYS)
+    let reference = platform.get(fd)?;
+    if reference.kind() != OfdKind::Tty {
+        return Err(Errno::ENOTTY);
+    }
+    let mut body = [0u8; WINSIZE_LEN];
+    raven_proto_tty::encode_set_winsize_request(winsize, &mut body);
+    let mut response = [0u8; WINSIZE_LEN];
+    let count = match platform
+        .backend()
+        .call(reference.handle(), &body, &mut response)
+    {
+        Err(Errno::ENOSYS) => return Err(Errno::ENOTTY),
+        other => other?,
+    };
+    if count < WINSIZE_LEN {
+        return Err(Errno::EPROTO);
+    }
+    raven_proto_tty::decode_winsize_response(response.get(..count).unwrap_or(&[]))
+        .map(|_| ())
+        .map_err(|_| Errno::EPROTO)
 }
 
 fn termios_from_settings(settings: Settings) -> Termios {

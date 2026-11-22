@@ -8,8 +8,9 @@ use raven_libc_abi::fcntl;
 
 use crate::backend::FakeSys;
 use crate::ioctl::tty::{
-    B38400, ECHO, ICANON, VMIN, VTIME, cfgetispeed, cfgetospeed, cfmakeraw, cfsetispeed,
-    cfsetospeed, default_termios, tcdrain, tcflush, tcgetattr, tcsetattr,
+    B38400, ECHO, ICANON, VMIN, VTIME, Winsize, cfgetispeed, cfgetospeed, cfmakeraw, cfsetispeed,
+    cfsetospeed, default_termios, tcdrain, tcflush, tcgetattr, tcgetwinsize, tcsetattr,
+    tcsetwinsize,
 };
 use crate::platform::Platform;
 
@@ -72,6 +73,68 @@ fn a_legacy_console_falls_back_to_get_mode_and_set_mode() {
     let after = tcgetattr(&platform, fd).expect("tcgetattr");
     assert_eq!(after.c_lflag & ICANON, 0);
     assert_eq!(after.c_lflag & ECHO, 0);
+}
+
+#[test]
+fn winsize_round_trips_all_four_fields() {
+    let (platform, fd) = tty_platform();
+    let first = Winsize {
+        row: 43,
+        col: 120,
+        xpixel: 0,
+        ypixel: 0,
+    };
+    tcsetwinsize(&platform, fd, &first).expect("tcsetwinsize");
+    assert_eq!(tcgetwinsize(&platform, fd), Ok(first));
+
+    let second = Winsize {
+        row: 24,
+        col: 80,
+        xpixel: 640,
+        ypixel: 480,
+    };
+    tcsetwinsize(&platform, fd, &second).expect("tcsetwinsize");
+    assert_eq!(tcgetwinsize(&platform, fd), Ok(second));
+
+    let zeros = Winsize::default();
+    tcsetwinsize(&platform, fd, &zeros).expect("tcsetwinsize");
+    assert_eq!(tcgetwinsize(&platform, fd), Ok(zeros));
+}
+
+#[test]
+fn a_fresh_tty_starts_at_zero_winsize() {
+    let (platform, fd) = tty_platform();
+    assert_eq!(tcgetwinsize(&platform, fd), Ok(Winsize::default()));
+}
+
+#[test]
+fn winsize_on_a_non_tty_is_enotty() {
+    let fake = FakeSys::new();
+    fake.file(b"/plain", b"x");
+    let platform = Platform::new(fake);
+    let fd = platform
+        .open(b"/plain", fcntl::O_RDONLY as u32, 0)
+        .expect("open");
+    assert_eq!(tcgetwinsize(&platform, fd), Err(Errno::ENOTTY));
+    assert_eq!(
+        tcsetwinsize(&platform, fd, &Winsize::default()),
+        Err(Errno::ENOTTY)
+    );
+}
+
+#[test]
+fn a_legacy_console_winsize_is_enotty_not_enosys() {
+    let fake = FakeSys::new();
+    fake.tty_legacy(b"/dev/tty");
+    let platform = Platform::new(fake);
+    let fd = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("open");
+    assert_eq!(tcgetwinsize(&platform, fd), Err(Errno::ENOTTY));
+    assert_eq!(
+        tcsetwinsize(&platform, fd, &Winsize::default()),
+        Err(Errno::ENOTTY)
+    );
 }
 
 #[test]

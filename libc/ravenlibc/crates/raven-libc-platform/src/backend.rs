@@ -327,6 +327,7 @@ struct FakeWorld {
     handles: BTreeMap<u32, u32>,
     open_files: BTreeMap<u32, FakeOpen>,
     tty_termios: BTreeMap<Vec<u8>, raven_proto_tty::Termios>,
+    tty_winsize: BTreeMap<Vec<u8>, raven_proto_tty::Winsize>,
     next_handle: u32,
     next_file: u32,
     objects: BTreeMap<u32, Vec<u8>>,
@@ -370,6 +371,7 @@ impl FakeSys {
                 handles: BTreeMap::new(),
                 open_files: BTreeMap::new(),
                 tty_termios: BTreeMap::new(),
+                tty_winsize: BTreeMap::new(),
                 next_handle: 5,
                 next_file: 100,
                 objects: BTreeMap::new(),
@@ -436,6 +438,10 @@ impl FakeSys {
             .borrow_mut()
             .tty_termios
             .insert(key(path), raven_proto_tty::Termios::sane());
+        self.world
+            .borrow_mut()
+            .tty_winsize
+            .insert(key(path), raven_proto_tty::Winsize::default());
         self
     }
 
@@ -846,10 +852,34 @@ impl SysBackend for FakeSys {
             if legacy
                 && matches!(
                     op,
-                    raven_proto_tty::OP_GET_TERMIOS | raven_proto_tty::OP_SET_TERMIOS
+                    raven_proto_tty::OP_GET_TERMIOS
+                        | raven_proto_tty::OP_SET_TERMIOS
+                        | raven_proto_tty::OP_GET_WINSIZE
+                        | raven_proto_tty::OP_SET_WINSIZE
                 )
             {
                 return Err(Errno::ENOSYS);
+            }
+            if matches!(
+                op,
+                raven_proto_tty::OP_GET_WINSIZE | raven_proto_tty::OP_SET_WINSIZE
+            ) {
+                let mut winsize = *world.tty_winsize.entry(open.path.clone()).or_default();
+                match raven_proto_tty::decode_winsize_request(req) {
+                    Ok(raven_proto_tty::WinsizeRequest::Set { winsize: new }) => {
+                        winsize = new;
+                        world.tty_winsize.insert(open.path.clone(), winsize);
+                    }
+                    Ok(raven_proto_tty::WinsizeRequest::Get) => {}
+                    Err(_) => return Err(Errno::EPROTO),
+                }
+                let mut body = [0u8; raven_proto_tty::WINSIZE_LEN];
+                raven_proto_tty::encode_winsize_response(&winsize, &mut body);
+                let copied = body.len().min(resp.len());
+                resp.get_mut(..copied)
+                    .ok_or(Errno::EINVAL)?
+                    .copy_from_slice(body.get(..copied).unwrap_or(&[]));
+                return Ok(copied);
             }
             if matches!(
                 op,

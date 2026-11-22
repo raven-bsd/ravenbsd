@@ -157,6 +157,13 @@ mod program {
             {
                 return Err(Errno::EINVAL.into());
             }
+            if matches!(
+                op,
+                raven_proto_tty::OP_GET_WINSIZE | raven_proto_tty::OP_SET_WINSIZE
+            ) && response.len() < raven_proto_tty::WINSIZE_LEN
+            {
+                return Err(Errno::EINVAL.into());
+            }
             let arg0 = u32::from_le_bytes([request[4], request[5], request[6], request[7]]);
             let arg1 = u32::from_le_bytes([request[8], request[9], request[10], request[11]]);
             match op {
@@ -188,6 +195,20 @@ mod program {
                     }
                     let mut body = [0u8; raven_proto_tty::TERMIOS_LEN];
                     raven_proto_tty::encode_termios_response(&pty.termios(), &mut body);
+                    response[..body.len()].copy_from_slice(&body);
+                    Ok(body.len())
+                }
+                raven_proto_tty::OP_GET_WINSIZE | raven_proto_tty::OP_SET_WINSIZE => {
+                    match raven_proto_tty::decode_winsize_request(request)
+                        .map_err(|_| Errno::EINVAL)?
+                    {
+                        raven_proto_tty::WinsizeRequest::Set { winsize } => {
+                            pty.set_winsize(winsize);
+                        }
+                        raven_proto_tty::WinsizeRequest::Get => {}
+                    }
+                    let mut body = [0u8; raven_proto_tty::WINSIZE_LEN];
+                    raven_proto_tty::encode_winsize_response(&pty.winsize(), &mut body);
                     response[..body.len()].copy_from_slice(&body);
                     Ok(body.len())
                 }

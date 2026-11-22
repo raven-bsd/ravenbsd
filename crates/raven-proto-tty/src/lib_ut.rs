@@ -259,6 +259,68 @@ fn a_short_termios_body_is_truncated() {
 }
 
 #[test]
+fn the_winsize_body_is_20_bytes() {
+    assert_eq!(WINSIZE_LEN, 20);
+}
+
+#[test]
+fn get_winsize_golden_bytes() {
+    let mut bytes = [0xffu8; WINSIZE_LEN];
+    encode_get_winsize_request(&mut bytes);
+    assert_eq!(&bytes[..12], &[1, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    assert!(bytes[12..].iter().all(|byte| *byte == 0));
+    assert_eq!(decode_winsize_request(&bytes), Ok(WinsizeRequest::Get));
+}
+
+#[test]
+fn set_winsize_round_trips_all_four_fields() {
+    for winsize in [
+        Winsize::default(),
+        Winsize {
+            row: 43,
+            col: 120,
+            xpixel: 0,
+            ypixel: 0,
+        },
+        Winsize {
+            row: 24,
+            col: 80,
+            xpixel: 640,
+            ypixel: 480,
+        },
+        Winsize {
+            row: u16::MAX,
+            col: 1,
+            xpixel: 2,
+            ypixel: u16::MAX,
+        },
+    ] {
+        let mut bytes = [0u8; WINSIZE_LEN];
+        encode_set_winsize_request(&winsize, &mut bytes);
+        assert_eq!(&bytes[..4], &[1, 0, 9, 0]);
+        assert_eq!(&bytes[12..14], &winsize.row.to_le_bytes());
+        assert_eq!(&bytes[14..16], &winsize.col.to_le_bytes());
+        assert_eq!(&bytes[16..18], &winsize.xpixel.to_le_bytes());
+        assert_eq!(&bytes[18..20], &winsize.ypixel.to_le_bytes());
+        assert_eq!(
+            decode_winsize_request(&bytes),
+            Ok(WinsizeRequest::Set { winsize })
+        );
+        let mut response = [0u8; WINSIZE_LEN];
+        encode_winsize_response(&winsize, &mut response);
+        assert_eq!(decode_winsize_response(&response), Ok(winsize));
+    }
+}
+
+#[test]
+fn a_short_winsize_body_is_truncated() {
+    let mut bytes = [0u8; CALL_LEN];
+    bytes[..4].copy_from_slice(&[1, 0, 8, 0]);
+    assert_eq!(decode_winsize_request(&bytes), Err(TtyError::Truncated));
+    assert_eq!(decode_winsize_response(&bytes), Err(TtyError::Truncated));
+}
+
+#[test]
 fn errors_have_descriptions() {
     for error in [
         TtyError::Truncated,

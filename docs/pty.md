@@ -11,9 +11,10 @@ privsep exchange. The SSH server is the unmodified upstream OpenSSH 10.6p2 add-o
 
 | Layer | Location | Contract |
 |---|---|---|
-| pty scheme | `userland/servers/ptyd/` | One line discipline and two byte queues per pair; `pty:master[/N]` and `pty:slave[/N]`; `SET_MODE`/`GET_MODE`/`FLUSH`, the complete `GET_TERMIOS`/`SET_TERMIOS` record, foreground group and hangup |
+| pty scheme | `userland/servers/ptyd/` | One line discipline and two byte queues per pair; `pty:master[/N]` and `pty:slave[/N]`; `SET_MODE`/`GET_MODE`/`FLUSH`, the complete `GET_TERMIOS`/`SET_TERMIOS` record, `GET_WINSIZE`/`SET_WINSIZE`, foreground group and hangup |
 | libc pty calls | `libc/ravenlibc/crates/raven-libc/src/compat/` | `posix_openpt`, `grantpt`, `unlockpt`, `ptsname`, `ptsname_r`, `openpty` |
 | libc termios | `libc/ravenlibc/crates/raven-libc-platform/src/ioctl/tty.rs` | `tcgetattr`/`tcsetattr` over the full record; older console servers fall back to `GET_MODE`/`SET_MODE` |
+| libc winsize | `libc/ravenlibc/crates/raven-libc-platform/src/ioctl/tty.rs` | `tcgetwinsize`/`tcsetwinsize` and the `TIOCGWINSZ`/`TIOCSWINSZ` ioctl path; non-tty -> `ENOTTY` |
 | identity | `ptyd` `fstat` | Pair `N` master inode `2N+1`, slave inode `2N+2`; both non-zero, role-distinct |
 | privsep exchange | OpenSSH `monitor_wrap.c`/`monitor.c`; test `tests/libc/c/libc-pty-monitor.c` | Monitor allocates the pty and returns the master/slave descriptors plus the name; the session opens the slave by name |
 
@@ -51,6 +52,36 @@ timeout 600 cargo xtask qtest --case termios --arch x86_64
 
 Evidence: `tests/evidence/k444/<sha>/` contains the pass log and JSON, the pre-fix red unit
 log, the field-mutation qtest failure and `SHA256SUMS`.
+
+## Window size (K455)
+
+OpenSSH sends the client's geometry in the pty request (`session.c` `pty_set_size` /
+`TIOCSWINSZ`). The pty stores one `struct winsize` per pair and returns it unchanged on both
+ends; a fresh pair starts at `0x0`, matching NetBSD. The four fields travel in a 20-byte body:
+
+| Wire offset | Field |
+|---|---|
+| 0 | version (`u16`, 1) |
+| 2 | op (`u16`: `GET_WINSIZE` 8, `SET_WINSIZE` 9) |
+| 4..8 | `arg0` (zero) |
+| 8..12 | `arg1` (zero) |
+| 12..14 | `ws_row` (`u16` little-endian) |
+| 14..16 | `ws_col` (`u16`) |
+| 16..18 | `ws_xpixel` (`u16`) |
+| 18..20 | `ws_ypixel` (`u16`) |
+
+`tcgetwinsize`/`tcsetwinsize` and `ioctl(TIOCGWINSZ/TIOCSWINSZ)` use the same record; a
+non-tty fd answers `ENOTTY`, never `ENOSYS`. The guest case sets 43x120x0x0 on the slave,
+reads it on slave/master and through the ioctl path, sets 24x80x640x480 from the master, sets
+zeros, and checks the non-tty errno:
+
+```sh
+timeout 600 cargo xtask qtest --case pty-winsize --arch x86_64
+# pty-winsize: pass
+```
+
+Evidence: `tests/evidence/k455/<sha>/` contains the pre-fix `ENOSYS` serial, the pass log and
+JSON, the `ws_col` mutation failure and `SHA256SUMS`.
 
 ## Privsep wire shape
 
