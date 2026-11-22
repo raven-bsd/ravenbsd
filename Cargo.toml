@@ -136,6 +136,7 @@ members = [
     "tests/libc/spawn",
     "tests/libc/toolchain-abi",
     "tests/libc/robust",
+    "tests/abi-completeness",
     "tests/user",
     "tests/user/image",
     "tests/ufs-powercut",
