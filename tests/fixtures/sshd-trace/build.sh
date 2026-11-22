@@ -29,14 +29,16 @@ fi
 out=build/fixtures/sshd-trace
 mkdir -p "$out"
 
-sysroot=build/x86_64/sysroot
+sysroot=build/ssh/x86_64/sysroot
 if [ ! -f "$sysroot/usr/lib/libc.a" ]; then
-    sysroot=build/ssh/x86_64/sysroot
+    sysroot=build/x86_64/sysroot
 fi
-if [ ! -f "$sysroot/usr/lib/libc.a" ]; then
-    echo "sshd-trace: missing libc sysroot (build/x86_64 or build/ssh/x86_64)" >&2
-    exit 2
-fi
+for file in crt1.o crti.o crtn.o libc.a libclang_rt.builtins.a; do
+    if [ ! -f "$sysroot/usr/lib/$file" ]; then
+        echo "sshd-trace: missing $sysroot/usr/lib/$file (run sh addons/ssh/build.sh)" >&2
+        exit 2
+    fi
+done
 
 find_lld() {
     if command -v ld.lld >/dev/null 2>&1; then
