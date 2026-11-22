@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# MPTCP2c1: the guest userland IPPROTO_MPTCP API contract. The probe requests an MPTCP
+# socket, adds a backup path, queries state, sends, closes and checks the exact errno for a
+# wrong socket type. On the current tree the first socket() call is the blocker; the case
+# fails on the missing fd line and the serial records the errno.
+
+name = "mptcp-api"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+initfs = "build/mptcp-api/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+pre = ["sh tests/mptcp/api/build.sh"]
+
+[[expect]]
+regex = '^mptcp-api: start$'
+
+[[expect]]
+regex = '^mptcp-api: socket fd=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: add-path id=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: backup id=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: info state=[0-9]+ subflows=[0-9]+ active=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: send=5$'
+
+[[expect]]
+regex = '^mptcp-api: close=ok$'
+
+[[expect]]
+regex = '^mptcp-api: wrong-type errno=(93|95)$'
+
+[[expect]]
+regex = '^mptcp-api: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)mptcp-api: fail|socket errno|add-path errno|backup errno|info errno|panic|EXCEPTION'

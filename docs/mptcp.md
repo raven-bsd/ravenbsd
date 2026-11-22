@@ -177,6 +177,43 @@ timeout 300 cargo nextest run -p raven-tcpip --features mptcp,testutil --test mp
 Receive reassembly across subflows is still the MPTCP2a MetaSocket path (DSS metadata out of
 band); the API `recv` reads the active real subflow until the wire DSS mapping lands in 2c.
 
+## Userland socket API (MPTCP2c1)
+
+The API contract the two-tap fixture needs is the Linux-shaped `socket(AF_INET/AF_INET6,
+SOCK_STREAM, IPPROTO_MPTCP)` plus a path-manager control and a state query. The guest probe is
+`tests/mptcp/api/main.c` and the qtest is `mptcp-api`; it is red on the current tree:
+
+```text
+mptcp-api: start
+mptcp-api: socket errno=93
+```
+
+The transport does not exist in the layers this ticket owns:
+
+* `raven-libc-net::validate_proto` accepts only protocol 0/6 for `SOCK_STREAM`, so libc rejects
+  `IPPROTO_MPTCP` (262) before it reaches `netd`.
+* `netd`/`raven-netcore` expose plain TCP/UDP only and attach one `nic:`; there is no MPTCP
+  socket, path-manager request or subflow query in the `net:` protocol.
+* `raven-tcpip::MptcpSocket` is a host-testable API over an in-process `Stack<Device>`. It is not
+  reachable from libc's `net:` handles, and `raven-mptcp::MetaSocket` stores `Box<dyn Subflow>`
+  (a `'static` transport), while libc's backend is a borrow of the process platform.
+
+A libc-only userspace framing over two plain `net:` TCP sockets is not a valid acceptance: it
+would be a new protocol, would not put MP_CAPABLE/MP_JOIN on the wire, and would not interoperate
+with the MPTCP2c Linux host peer. The correct owner is `netd`/`raven-netcore` (or the TCP wire
+path), which is outside this ticket's Owns.
+
+The intended API surface, documented here for the follow-up ticket:
+
+| Operation | Shape |
+|---|---|
+| create | `socket(AF_INET/AF_INET6, SOCK_STREAM, IPPROTO_MPTCP)` |
+| path add | `setsockopt(fd, SOL_MPTCP, MPTCP_PM_CMD_ADD_ADDR, struct mptcp_pm_addr ...)` |
+| path remove | `setsockopt(fd, SOL_MPTCP, MPTCP_PM_CMD_DEL_ADDR, id)` |
+| backup | `setsockopt(fd, SOL_MPTCP, MPTCP_PM_CMD_SET_FLAGS, backup flag)` |
+| state | `getsockopt(fd, SOL_MPTCP, MPTCP_INFO, ...)`; per-subflow ids via `MPTCP_SUBFLOW_ADDRS` |
+| fallback | an MP_CAPABLE negotiation failure keeps the connection on plain TCP |
+
 ## Phase 2 boundary
 
 Phase 2 owns the `raven-tcpip` subflow integration: hooking MP_CAPABLE/MP_JOIN into the TCP
