@@ -3,11 +3,11 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 """K498 host-client sshd session-close trace over the isolated tap.
 
-Boots the K498 DEBUG3 image with a private tap, makes one password login and
-one command from the host (the K194 tap path; slirp hostfwd is the known
-FIN/RST failure), then opens a second session and reads the full sshd debug log
-from the guest. The first session's close state is recorded: a command that
-prints and then never closes is the S7/S5 symptom.
+Boots the K498 DEBUG3 image with a private tap and a pty serial, logs in to the
+root console, makes one password login and one command from the host (the K194
+tap path; slirp hostfwd is the known FIN/RST failure), then reads the sshd debug
+log from the console. The first session's close state is recorded: a command
+that prints and then never closes is the S7/S5 symptom.
 """
 
 from __future__ import annotations
@@ -38,15 +38,6 @@ def log(kind: str, text: str) -> None:
     print(f"sshd-trace-host: {kind}: {text}", flush=True)
 
 
-def wait_serial(needle: str, timeout: float) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if SERIAL.is_file() and needle in SERIAL.read_text(encoding="utf-8", errors="replace"):
-            return True
-        time.sleep(0.5)
-    return False
-
-
 def wait_tcp(host: str, port: int, timeout: float) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -58,7 +49,7 @@ def wait_tcp(host: str, port: int, timeout: float) -> bool:
     return False
 
 
-def ssh(host: str, command: str, logfile: Path, close_timeout: int) -> str:
+def ssh(host: str, command: str, logfile: Path, close_timeout: int, expect: str) -> str:
     child = pexpect.spawn(
         "ssh",
         [
@@ -82,13 +73,12 @@ def ssh(host: str, command: str, logfile: Path, close_timeout: int) -> str:
         try:
             child.expect(r"(?i)password:\s*")
             child.sendline("raven")
-            child.expect("sshd-trace-command-ok" if command.startswith("echo") else "Server listening",
-                         timeout=30)
-            state = "command-ok" if command.startswith("echo") else "log-read"
+            child.expect(expect, timeout=30)
+            state = "command-ok"
             child.expect(pexpect.EOF, timeout=close_timeout)
             state += "/closed"
         except pexpect.TIMEOUT:
-            if state.endswith("ok") or state == "log-read":
+            if state == "command-ok":
                 state += "/close-timeout"
         except pexpect.EOF:
             state += "/eof"
@@ -107,7 +97,7 @@ def main() -> int:
     vars_path.write_bytes(OVMF_VARS.read_bytes())
     argv = [
         "-machine", "q35", "-m", "512M", "-smp", "4",
-        "-serial", f"file:{SERIAL}", "-display", "none", "-monitor", "none", "-no-reboot",
+        "-serial", "stdio", "-display", "none", "-monitor", "none", "-no-reboot",
         "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE}",
         "-drive", f"if=pflash,format=raw,file={vars_path}",
         "-drive", f"format=raw,file={IMAGE}",
@@ -116,34 +106,44 @@ def main() -> int:
         "-netdev", f"tap,id=n0,ifname={TAP},script=no,downscript=no",
         "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     ]
-    qemu = subprocess.Popen(
-        ["qemu-system-x86_64", *argv],
-        cwd=str(ROOT),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    child = pexpect.spawn("qemu-system-x86_64", argv, cwd=str(ROOT),
+                          encoding="utf-8", codec_errors="replace", timeout=240)
     first = "none"
     second = "none"
-    try:
-        if not wait_serial("svcd: getty up", 240):
-            log("error", "guest did not reach getty")
-            return 2
-        if not wait_tcp(GUEST, 22, 90):
-            log("error", f"guest sshd did not accept on {GUEST}:22")
-            return 2
-        log("ready", f"{GUEST}:22")
-        first = ssh(GUEST, "echo sshd-trace-command-ok", CLIENT1, 20)
-        log("client1", first)
-        second = ssh(GUEST, "cat /tmp/sshd-trace.log", SERVER_LOG, 20)
-        log("client2", second)
-        SUMMARY.write_text(f"client1={first}\nclient2={second}\n", encoding="utf-8")
-    finally:
-        qemu.terminate()
+    console = "none"
+    with open(SERIAL, "w", encoding="utf-8") as serial:
+        child.logfile = serial
         try:
-            qemu.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            qemu.kill()
-            qemu.wait(timeout=5)
+            child.expect("svcd: getty up", timeout=240)
+            child.expect(r"login: ?", timeout=120)
+            child.sendline("root")
+            child.expect(r"(?i)password: ?", timeout=30)
+            child.sendline("raven")
+            child.expect("raven# ", timeout=120)
+            log("console", "root login")
+            if not wait_tcp(GUEST, 22, 90):
+                log("error", f"guest sshd did not accept on {GUEST}:22")
+                return 2
+            log("ready", f"{GUEST}:22")
+            first = ssh(GUEST, "echo sshd-trace-command-ok", CLIENT1, 20,
+                        "sshd-trace-command-ok")
+            log("client1", first)
+            second = ssh(GUEST, "cat /tmp/sshd-trace.log", SERVER_LOG, 20,
+                         "Server listening")
+            log("client2", second)
+            child.sendline("cat /tmp/sshd-trace.log; M=Q; echo ${M}L")
+            try:
+                child.expect("QL", timeout=120)
+                console = "log-read"
+            except pexpect.TIMEOUT:
+                console = "log-timeout"
+            log("console", console)
+            SUMMARY.write_text(
+                f"client1={first}\nclient2={second}\nconsole={console}\n",
+                encoding="utf-8",
+            )
+        finally:
+            child.close(force=True)
     if "command-ok" not in first:
         log("error", f"client1 state {first}")
         return 2
