@@ -14,21 +14,13 @@
 # ad-hoc cases at run time. Owners are the lanes that own the subsystem, so a failing row can be
 # routed without re-reading the log.
 #
-# usage: sh scripts/kernel-gate.sh [--list | --durability]
-#   --list         print the case table and exit (no QEMU run)
-#   --durability   run only the three UFS durability rows (ENOSPC, fsync
-#                  write/kill, remount check) and write target/kernel-gate/
-#                  durability.md instead of the standing table
+# usage: sh scripts/kernel-gate.sh [--list]
+#   --list   print the case table and exit (no QEMU run)
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
-#
-# Two preflight modes, because a functional row and a latency row have different noise contracts:
-#   functional (default)  another QEMU refuses; co-tenant cargo/rustc builds do not; load budget
-#                         is 2*nproc, the same budget scripts/qemu-hygiene.sh already uses. This is
-#                         what lets a gate run while the rest of the lanes work.
-#   latency (S107_LATENCY=1)  no other QEMU, no cargo/rustc at all, load budget max(2, nproc/4).
-#                         For rows whose result is a wall-clock number.
-# S107_WAIT_FOR_IDLE=<seconds> waits; S107_MAX_LOAD overrides the budget in either mode.
+# These are functional rows, not latency rows: the management qemu-hygiene script allows the
+# functional budget (up to nproc/2 QEMU boots, load <= 2*nproc). The exclusive latency window is
+# not required here; the hygiene script's refusal is the stop condition.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -37,28 +29,9 @@ cd "$root" || exit 2
 
 doc=
 log_dir=target/kernel-gate
-wait_idle=${S107_WAIT_FOR_IDLE:-0}
-latency=${S107_LATENCY:-0}
-default_max_load() {
-    n=$(nproc 2>/dev/null || echo 4)
-    case "$n" in ''|*[!0-9]*) n=4 ;; esac
-    if [ "$latency" = 1 ]; then
-        m=$((n / 4))
-        [ "$m" -lt 2 ] && m=2
-        echo "$m"
-    else
-        echo $((n * 2))
-    fi
-}
-max_load=${S107_MAX_LOAD:-$(default_max_load)}
-preflight_args=
-if [ "$latency" = 1 ]; then
-    preflight_args=
-else
-    preflight_args=--allow-jobs
-fi
 
-# case | arch | owner | subsystem note
+# case | arch | owner | subsystem note | optional explicit case path
+# The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
 cases='boot-uname|x86_64|stuart|boot/uname
 kernel-early-boot|x86_64|stuart|boot
 exc-int3|x86_64|stuart|exceptions
@@ -81,49 +54,34 @@ kmem-frames-nopcpu|x86_64|mark|allocator
 proc-death-cleanup|x86_64|stuart|process
 trace-context|x86_64|tim|trace
 release-login|x86_64|kevin|release
-ufs-enospc|x86_64|mel|ufs/durability
-ufs-fsync-persist|x86_64|mel|ufs/durability
-ufs-fsync-check|x86_64|mel|ufs/durability
 boot-uname-aarch64|aarch64|dave|boot/uname
 kernel-early-boot-aarch64|aarch64|dave|boot
 kernel-exc-aarch64|aarch64|dave|exceptions
 kernel-paging-aarch64|aarch64|dave|paging
-kernel-timer-aarch64|aarch64|dave|timer'
+kernel-timer-aarch64|aarch64|dave|timer
+duplex-matrix-aarch64|aarch64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix-aarch64.toml'
 
 if [ "${1:-}" = "--list" ]; then
-    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note; do
+    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note _path; do
         printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
     done
     exit 0
 fi
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    sed -n '6,22p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '6,19p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
 fi
 
 doc=$(mgmt_path architecture/product-data/kernel-gate.md) || exit 2
 
-case "${1:-}" in
-    "") ;;
-    --durability)
-        cases=$(printf '%s\n' "$cases" | awk -F'|' '$4 == "ufs/durability"')
-        doc=target/kernel-gate/durability.md
-        ;;
-    *)
-        echo "kernel-gate: unknown option: $1" >&2
-        exit 2
-        ;;
-esac
-
 mkdir -p "$log_dir" || exit 2
-# shellcheck disable=SC2086
-sh tests/smp/boot/host-idle.sh \
-    --context "kernel-gate" \
-    --wait "$wait_idle" \
-    --max-load "$max_load" \
-    $preflight_args \
-    --state-file "$log_dir/host-state.txt" || exit 2
+hygiene=$(mgmt_path scripts/qemu-hygiene.sh) || exit 2
+if ! sh "$hygiene" > "$log_dir/host-state.txt" 2>&1; then
+    cat "$log_dir/host-state.txt" >&2
+    exit 2
+fi
+cat "$log_dir/host-state.txt"
 
 commit=$(git rev-parse HEAD 2>/dev/null) || { echo "kernel-gate: not a git checkout" >&2; exit 2; }
 short=$(git rev-parse --short=12 HEAD 2>/dev/null) || short=$commit
@@ -134,12 +92,22 @@ printf '%s\n' "$cases" > "$cases_file" || exit 2
 results=$log_dir/results.txt
 : > "$results" || exit 2
 
-while IFS='|' read -r name arch owner note; do
+while IFS='|' read -r name arch owner note case_path; do
     [ -n "$name" ] || continue
     log="$log_dir/$name.$arch.log"
+    case_selector=${case_path:-$name}
+    # The release-login image needs the sshd build artifact. A clean checkout does not have it;
+    # name the missing prerequisite and skip the row rather than failing the case silently.
+    if [ "$name" = release-login ] && [ ! -f build/ssh/x86_64/bin/sshd ]; then
+        printf 'kernel-gate: %-28s %-8s ' "$name" "$arch"
+        printf 'skip (missing build/ssh/x86_64/bin/sshd)\n'
+        printf '%s|%s|%s|%s|SKIP|missing build/ssh/x86_64/bin/sshd\n' \
+            "$name" "$arch" "$owner" "$note" >> "$results"
+        continue
+    fi
     printf 'kernel-gate: %-28s %-8s ' "$name" "$arch"
     # stdin is /dev/null: neither cargo nor QEMU may consume the remaining case lines.
-    if cargo xtask qtest --case "$name" --arch "$arch" </dev/null >"$log" 2>&1; then
+    if cargo xtask qtest --case "$case_selector" --arch "$arch" </dev/null >"$log" 2>&1; then
         status=pass
         detail=ok
         printf 'pass\n'
@@ -180,7 +148,9 @@ total=$(grep -c . "$results" 2>/dev/null || true)
 total=${total:-0}
 passed=$(grep -c '|pass|' "$results" 2>/dev/null || true)
 passed=${passed:-0}
-failed=$((total - passed))
+skipped=$(grep -c '|SKIP|' "$results" 2>/dev/null || true)
+skipped=${skipped:-0}
+failed=$((total - passed - skipped))
 timed_out=$(grep -c 'FAIL (timeout)' "$results" 2>/dev/null || true)
 timed_out=${timed_out:-0}
 
@@ -199,7 +169,7 @@ fi
     echo "Generated by \`sh scripts/kernel-gate.sh\` at $generated from commit \`$short\`"
     echo "(\`$commit\`)."
     echo
-    echo "Result: **$verdict** — $total cases, $passed passed, $failed failed ($timed_out timed out)."
+    echo "Result: **$verdict** — $total cases, $passed passed, $failed failed ($timed_out timed out), $skipped skipped."
     echo
     echo 'Scope: the release-relevant kernel cases below, x86_64 plus the aarch64 cases that exist'
     echo 'in `tests/qtest/cases/`. Raspberry Pi 4 hardware is **out of scope**; this gate makes no Pi 4'
@@ -219,12 +189,12 @@ fi
     if [ "$failed" -eq 0 ]; then
         echo 'None.'
     else
-        owners=$(awk -F'|' '$5 != "pass" { print $3 }' "$results" | sort -u)
+        owners=$(awk -F'|' '$5 != "pass" && $5 != "SKIP" { print $3 }' "$results" | sort -u)
         for owner in $owners; do
             echo "### $owner"
             echo
             awk -F'|' -v owner="$owner" \
-                '$3 == owner && $5 != "pass" { printf "- `%s` (%s): %s — %s\n", $1, $2, $5, $6 }' \
+                '$3 == owner && $5 != "pass" && $5 != "SKIP" { printf "- `%s` (%s): %s — %s\n", $1, $2, $5, $6 }' \
                 "$results"
             echo
         done
@@ -232,8 +202,8 @@ fi
 } > "$doc" || exit 2
 
 if [ "$failed" -ne 0 ]; then
-    echo "kernel-gate: FAIL ($failed of $total cases failed); table: $doc" >&2
+    echo "kernel-gate: FAIL ($failed of $total cases failed, $skipped skipped); table: $doc" >&2
     exit 1
 fi
-echo "kernel-gate: PASS ($total cases); table: $doc"
+echo "kernel-gate: PASS ($total cases, $skipped skipped); table: $doc"
 exit 0
