@@ -308,6 +308,21 @@ pub fn wait_readable<B: SysBackend, L: Lock>(
     poll(platform, &mut fds, timeout_ms)
 }
 
+/// Wait until `fd` is writable. Used to emulate a blocking pipe write over the non-blocking
+/// kernel pipe endpoint created by `Platform::pipe2`.
+pub fn wait_writable<B: SysBackend, L: Lock>(
+    platform: &Platform<B, L>,
+    fd: i32,
+    timeout_ms: i32,
+) -> Result<usize, Errno> {
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLOUT as i16,
+        revents: 0,
+    }];
+    poll(platform, &mut fds, timeout_ms)
+}
+
 /// Translate a kernel readiness mask into the caller's `poll` bits.
 fn delivered_revents(mask: u32, requested: i32) -> i16 {
     let mut revents = 0i16;

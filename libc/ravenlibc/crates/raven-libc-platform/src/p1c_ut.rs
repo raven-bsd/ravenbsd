@@ -74,6 +74,37 @@ fn exec_fdmap_env_carries_the_table_and_closes_cloexec() {
 }
 
 #[test]
+fn stdio_env_publishes_the_standard_fd_handles() {
+    let platform = platform();
+    let mut fds = Vec::new();
+    for _ in 0..3 {
+        fds.push(platform.open(b"/a", 0, 0).expect("open"));
+    }
+    let env = platform.stdio_env();
+    assert_eq!(env.len(), 3);
+    for (fd, name) in [
+        (fds[0], b"RSH_FD0".as_slice()),
+        (fds[1], b"RSH_FD1"),
+        (fds[2], b"RSH_FD2"),
+    ] {
+        let row = env
+            .iter()
+            .find(|row| row.starts_with(name))
+            .expect("standard fd row");
+        let separator = row
+            .iter()
+            .position(|byte| *byte == b'=')
+            .expect("separator");
+        assert_eq!(&row[..separator], name);
+        let handle = platform.get(fd).expect("fd").handle().0;
+        assert_eq!(&row[separator + 1..], handle.to_string().as_bytes());
+    }
+    for fd in fds {
+        let _ = platform.close(fd);
+    }
+}
+
+#[test]
 fn hostid_and_domainname_round_trip() {
     let platform = platform();
     assert_eq!(platform.gethostid(), 1234);

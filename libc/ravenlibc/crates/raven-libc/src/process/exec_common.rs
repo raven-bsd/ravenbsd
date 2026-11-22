@@ -34,6 +34,23 @@ pub(crate) fn run(
     let platform = crate::ffi::platform::global();
     let cwd = platform.cwd();
     let mut envp = envp;
+    // The first-party `rsh` selects its standard streams from these variables (its pipeline
+    // children already receive them). A host that execs `rsh` directly, such as OpenSSH's command
+    // child, has only fd numbers; publish the current fd 0/1/2 scheme handles so the shell writes
+    // to the inherited pipes instead of falling back to the console.
+    for entry in platform.stdio_env() {
+        let Some(separator) = entry.iter().position(|byte| *byte == b'=') else {
+            continue;
+        };
+        let name = &entry[..separator];
+        if envp
+            .iter()
+            .any(|row| row.starts_with(name) && row.get(name.len()) == Some(&b'='))
+        {
+            continue;
+        }
+        envp.push(entry);
+    }
     if let Ok(Some(fdmap)) = platform.exec_fdmap_env() {
         let prefix = raven_libc_platform::fd::inherit::ENV_NAME;
         envp.retain(|row| !row.starts_with(prefix));
