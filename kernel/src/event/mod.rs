@@ -11,10 +11,14 @@ use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use raven_abi::errno::Errno;
+use raven_abi::types::{Handle, Rights};
 use spin::Mutex;
 
+use crate::process::handle::Object;
+use crate::process::{Process, ProcessState};
 use crate::sched::wait::WaitQueue;
 use crate::sync::IrqSpinLock;
+use crate::time;
 
 pub use self::evq_core::SIGNALED;
 #[cfg(target_arch = "x86_64")]
@@ -184,6 +188,77 @@ pub fn live_queues() -> u64 {
         .filter_map(alloc::sync::Weak::upgrade)
         .filter(|queue| !queue.retired.load(Ordering::Acquire))
         .count() as u64
+}
+
+/// Level-true readiness for one registered source.
+///
+/// This is the `seltrue`/`sel_setevents` donor arm: the value is computed from live state at
+/// poll time, never cached. It is called from process context (the waiter's entry scan and the
+/// event-signal notification path), not from the timer interrupt.
+pub(crate) fn readiness(process: &Arc<Process>, handle: Handle) -> u32 {
+    let table = process.handles.lock();
+    // Both pipe ends are observable even though only the read end carries READ.
+    if let Ok(Object::Pipe(end)) = table.get(handle, Rights::NONE) {
+        return end.readiness();
+    }
+    match table.get(handle, Rights::READ) {
+        Ok(Object::Timer(timer)) if timer.peek(time::now_ns()) => SIGNALED,
+        Ok(Object::UserEvent(event)) if event.ready() => SIGNALED,
+        Ok(Object::Irq(irq)) if irq.pending() != 0 => SIGNALED,
+        Ok(Object::Process(target)) if *target.state.lock() == ProcessState::Exited => SIGNALED,
+        Ok(Object::Duplex(end)) => end.readiness(),
+        #[cfg(target_arch = "x86_64")]
+        Ok(Object::SchemeServer(server)) if !server.is_live() => HUP,
+        #[cfg(target_arch = "x86_64")]
+        Ok(Object::SchemeServer(server)) => server.owner.upgrade().map_or(HUP, |owner| {
+            if owner.scheme_queue.lock().is_empty() {
+                0
+            } else {
+                READABLE
+            }
+        }),
+        #[cfg(target_arch = "x86_64")]
+        Ok(Object::SchemeFile(file)) if *file.server.state.lock() == ProcessState::Exited => HUP,
+        // K409: a live scheme file is a pollable source even when no event is attached.
+        #[cfg(target_arch = "x86_64")]
+        Ok(Object::SchemeFile(_)) => READABLE | WRITABLE,
+        _ => 0,
+    }
+}
+
+/// Notify only the queues whose registration names this exact source object (`selnotify` for one
+/// selinfo).
+///
+/// Process-context only: this evaluates live readiness, which takes the process handle table and
+/// the queue state locks. The timer interrupt must keep using [`notify_all`], which only takes the
+/// IRQ-safe waiters lock.
+///
+/// A handle value is local to its process, so the source is identified by the object pointer, not
+/// by the signalling process's handle: the same user event reaches another process through a
+/// different handle number. The readiness check keeps the wake level-true and lets a queue whose
+/// same-numbered handle is a different object stay asleep.
+pub fn notify_event(source: &Arc<UserEvent>) {
+    let queues = queue_snapshot();
+    for queue in queues.iter().flatten() {
+        let Some(process) = crate::process::lookup_pid(queue.owner) else {
+            continue;
+        };
+        let ready = {
+            let state = queue.state.lock();
+            state.has_ready(|raw| {
+                let table = process.handles.lock();
+                match table.get(Handle(raw), Rights::NONE) {
+                    Ok(Object::UserEvent(event)) if Arc::ptr_eq(event, source) && event.ready() => {
+                        SIGNALED
+                    }
+                    _ => 0,
+                }
+            })
+        };
+        if ready {
+            let _ = queue.waiters.wake_one(queue.owner, 0);
+        }
+    }
 }
 
 /// Wake event-queue waiters after a source transition. The ready scan filters queues that do not

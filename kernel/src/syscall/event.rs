@@ -12,7 +12,7 @@ use raven_abi::types::{Handle, Rights, clock};
 use raven_usercopy::UserSlice;
 
 use crate::event::{self, EventQueue, Timer, UserEvent};
-use crate::process::{self, ProcessState, handle::Object};
+use crate::process::{self, handle::Object};
 use crate::syscall::SyscallFrame;
 use crate::time;
 use crate::usercopy::copy_to_user;
@@ -237,7 +237,7 @@ fn wait_once(
         Ok(!queue
             .state
             .lock()
-            .has_ready(|raw| readiness(process, Handle(raw))))
+            .has_ready(|raw| event::readiness(process, Handle(raw))))
     });
     match queued {
         Ok(true) => {
@@ -270,7 +270,7 @@ fn collect_ready(
     queue
         .state
         .lock()
-        .collect_sources(max, |raw| readiness(process, Handle(raw)))
+        .collect_sources(max, |raw| event::readiness(process, Handle(raw)))
 }
 
 fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
@@ -282,7 +282,9 @@ fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
     };
     let _ = frame.rsi;
     let _ = event.signal();
-    event::notify_all();
+    // Donor `selnotify`: wake only the queues registered for this source object. This is process
+    // context, so it may evaluate the live level; the timer interrupt keeps `notify_all`.
+    event::notify_event(&event);
     Ok(0)
 }
 
@@ -325,45 +327,6 @@ fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result
         #[cfg(target_arch = "x86_64")]
         Object::SchemeFile(_) | Object::SchemeServer(_) => Ok(()),
         _ => Err(Errno::EBADF),
-    }
-}
-
-fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
-    let table = process.handles.lock();
-    // Both pipe ends are observable even though only the read end carries READ.
-    if let Ok(Object::Pipe(end)) = table.get(handle, Rights::NONE) {
-        return end.readiness();
-    }
-    match table.get(handle, Rights::READ) {
-        Ok(Object::Timer(timer)) if timer.peek(time::now_ns()) => event::SIGNALED,
-        Ok(Object::UserEvent(event)) if event.ready() => event::SIGNALED,
-        Ok(Object::Irq(irq)) if irq.pending() != 0 => event::SIGNALED,
-        Ok(Object::Process(target)) if *target.state.lock() == ProcessState::Exited => {
-            event::SIGNALED
-        }
-        Ok(Object::Duplex(end)) => end.readiness(),
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::SchemeServer(server)) if !server.is_live() => event::HUP,
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::SchemeServer(server)) => server.owner.upgrade().map_or(event::HUP, |owner| {
-            if owner.scheme_queue.lock().is_empty() {
-                0
-            } else {
-                event::READABLE
-            }
-        }),
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::SchemeFile(file)) if *file.server.state.lock() == ProcessState::Exited => {
-            event::HUP
-        }
-        // K409: a live scheme file is a pollable source even when no event is attached. The
-        // scheme server owns the real level (sockets answer `Call::Poll`); the kernel must not
-        // report a dead source as `0`, which would make a fallback poll sleep forever. Reporting
-        // both directions is the conservative level for a live server; the libc live query still
-        // supplies the precise socket bits.
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::SchemeFile(_)) => event::READABLE | event::WRITABLE,
-        _ => 0,
     }
 }
 
