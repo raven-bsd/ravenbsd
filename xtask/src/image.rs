@@ -64,9 +64,7 @@ pub(crate) struct Overrides<'a> {
 /// A profile opts into the qemu-ufs-style payload by shipping a rootfs spec and a sibling
 /// `<name>-boot.toml` bootstrap profile. The image builder no longer keys on the profile name.
 fn ufs_boot_profile(root: &Path, profile_name: &str) -> Option<String> {
-    if crate::rootfs::spec_path(root, profile_name).is_none() {
-        return None;
-    }
+    crate::rootfs::spec_path(root, profile_name)?;
     let boot = root
         .join("profiles")
         .join(format!("{profile_name}-boot.toml"));
