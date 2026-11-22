@@ -879,7 +879,12 @@ impl<D: Device> Netd<D> {
         }
         let id = id.ok_or(Errno::ENOTCONN)?;
         match transport {
-            Transport::Tcp => self.core_mut(interface).send(id, buffer),
+            // POSIX write on a connection whose peer has fully closed is EPIPE, not the
+            // core's internal not-connected state; the SSH session close path depends on it.
+            Transport::Tcp => match self.core_mut(interface).send(id, buffer) {
+                Err(Errno::ENOTCONN) => Err(Errno::EPIPE),
+                other => other,
+            },
             Transport::Udp => {
                 let to = peer.ok_or(Errno::EADDRNOTAVAIL)?;
                 self.core_mut(interface).udp_send_to(
@@ -1503,12 +1508,18 @@ impl<D: Device> Netd<D> {
     /// on that interface and socket id. A control file and a file without a socket have a defined
     /// error instead of a made-up "ready" bit.
     pub fn socket_readiness(&self, file: u64) -> Result<Readiness, Errno> {
-        let (interface, socket) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+        let (interface, socket, write_shutdown) = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
-            File::Socket(socket) => (socket.interface, socket.socket),
+            File::Socket(socket) => (socket.interface, socket.socket, socket.write_shutdown),
         };
         let id = socket.ok_or(Errno::ENOTCONN)?;
-        self.core_ref(interface).readiness(id)
+        let mut ready = self.core_ref(interface).readiness(id)?;
+        // A local SHUT_WR rejects every later write with EPIPE; the readiness query must report
+        // the same level, not the core's pre-shutdown send space.
+        if write_shutdown {
+            ready.writable = false;
+        }
+        Ok(ready)
     }
 
     /// Answer the live readiness query for an open socket file.

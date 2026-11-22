@@ -10,6 +10,10 @@
 //   K4 dup and fork+exec identity/readiness
 //   K5 PTY open/grant/unlock/ptsname, pair round-trip, termios defaults
 //   K6 accept: accepted fd independent, listener still accepts
+//   K7 pipe EOF: close write -> POLLIN|POLLHUP, read 0
+//   K8 accepted+dup exec socket EOF: peer FIN -> readable, read 0, not writable
+//   K9 half-close: peer SHUT_WR -> readable/EOF, write allowed, then EPIPE + POLLHUP
+//   K10 poll after EOF is level-correct (reports on the next call)
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -36,9 +40,10 @@
 extern int posix_openpt(int flags);
 extern int grantpt(int fd);
 extern int unlockpt(int fd);
-extern char *ptsname(int fd) __attribute__((weak));
+extern char *ptsname(int fd);
 
 #define K6_PORT 23097
+#define KEOF_PORT 23098
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
 static long raven_debug_write(const char *bytes, size_t len) {
@@ -573,9 +578,233 @@ static int check_accept(void) {
     return 0;
 }
 
+static int eof_listener = -1;
+
+static int eof_listener_open(void) {
+    int listener;
+    struct sockaddr_in address;
+    int reuse = 1;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        return -1;
+    }
+    (void)setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(KEOF_PORT);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0 ||
+        listen(listener, 2) != 0) {
+        (void)close(listener);
+        return -1;
+    }
+    return listener;
+}
+
+static int accept_eof(void) {
+    int conn;
+
+    if (eof_listener < 0) {
+        errno = EBADF;
+        return -1;
+    }
+    if (poll_one(eof_listener, POLLIN, 5000) <= 0) {
+        errno = ETIMEDOUT;
+        return -1;
+    }
+    conn = accept(eof_listener, NULL, NULL);
+    return conn;
+}
+
+static int check_eof_pipe(void) {
+    int pv[2];
+    char byte = 0;
+    int revents;
+
+    if (pipe(pv) != 0) {
+        return fail("eof pipe");
+    }
+    if (close(pv[1]) != 0) {
+        return fail("eof pipe close write");
+    }
+    revents = poll_one(pv[0], POLLIN | POLLHUP, 2000);
+    if (revents < 0 || (revents & (POLLIN | POLLHUP)) != (POLLIN | POLLHUP)) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "pipe eof revents=0x%x", (unsigned)revents);
+        return fail(detail);
+    }
+    if (read(pv[0], &byte, 1) != 0) {
+        return fail("pipe eof read");
+    }
+    (void)close(pv[0]);
+    pass("pipe revents=POLLIN|POLLHUP read=0");
+    return 0;
+}
+
+static int check_eof_socket(void) {
+    int conn;
+    int status = 0;
+    pid_t child;
+    char fd_text[16];
+    char *argv[4];
+    char byte = 0;
+    int revents;
+
+    eof_listener = eof_listener_open();
+    if (eof_listener < 0) {
+        return fail("eof listener");
+    }
+    conn = accept_eof();
+    if (conn < 0) {
+        return fail("eof accept");
+    }
+    if (send(conn, "EOF\n", 4, 0) != 4) {
+        return fail("eof greeting");
+    }
+    child = fork();
+    if (child < 0) {
+        return fail("eof fork");
+    }
+    if (child == 0) {
+        (void)close(eof_listener);
+        if (dup2(conn, 7) < 0) {
+            _exit(2);
+        }
+        for (int fd = 0; fd < 64; fd++) {
+            if (fd != 7) {
+                (void)close(fd);
+            }
+        }
+        if (snprintf(fd_text, sizeof(fd_text), "%d", 7) <= 0) {
+            _exit(3);
+        }
+        argv[0] = (char *)"ssh-contract-child";
+        argv[1] = fd_text;
+        argv[2] = (char *)"eof";
+        argv[3] = NULL;
+        execve("/bin/ssh-contract-child", argv, (char *const[]){NULL});
+        _exit(4);
+    }
+    if (waitpid(child, &status, 0) != child || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "eof child status=%d", status);
+        return fail(detail);
+    }
+    revents = poll_one(conn, POLLIN | POLLHUP, 2000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "eof parent revents=0x%x", (unsigned)revents);
+        return fail(detail);
+    }
+    if (read(conn, &byte, 1) != 0) {
+        return fail("eof parent read");
+    }
+    if (shutdown(conn, SHUT_WR) != 0) {
+        return fail("eof shutdown write");
+    }
+    revents = poll_one(conn, POLLOUT, 500);
+    if ((revents & POLLOUT) != 0) {
+        return fail("eof socket writable");
+    }
+    (void)close(conn);
+    pass("accepted+dup exec read=0 hup=not-writable");
+    return 0;
+}
+
+static int check_half_close(void) {
+    int conn;
+    char data[4];
+    int revents;
+    ssize_t wrote;
+
+    conn = accept_eof();
+    if (conn < 0) {
+        return fail("half accept");
+    }
+    if (send(conn, "HALF\n", 5, 0) != 5) {
+        return fail("half greeting");
+    }
+    if (read_exact(conn, data, sizeof(data)) != 0 || memcmp(data, "DATA", 4) != 0) {
+        return fail("half data");
+    }
+    revents = poll_one(conn, POLLIN, 2000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("half readable");
+    }
+    if (read(conn, data, 1) != 0) {
+        return fail("half eof read");
+    }
+    revents = poll_one(conn, POLLOUT, 2000);
+    if (revents < 0 || (revents & POLLOUT) == 0) {
+        return fail("half writable");
+    }
+    wrote = write(conn, "HALFACK", 7);
+    if (wrote != 7) {
+        return fail("half ack write");
+    }
+    // The host closes after HALFACK. A first write after its close may be accepted locally and
+    // trigger the peer's RST; the next level/readiness query is the HUP, and the next write is
+    // the EPIPE the contract requires.
+    (void)poll(NULL, 0, 50);
+    wrote = write(conn, "X", 1);
+    revents = poll_one(conn, POLLIN | POLLHUP, 3000);
+    for (int attempt = 0; attempt < 50 && (revents & POLLHUP) == 0; attempt++) {
+        (void)poll(NULL, 0, 20);
+        revents = poll_one(conn, POLLIN | POLLHUP, 100);
+    }
+    if (revents < 0 || (revents & POLLHUP) == 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "half hup revents=0x%x", (unsigned)revents);
+        return fail(detail);
+    }
+    wrote = write(conn, "X", 1);
+    if (wrote >= 0 || errno != EPIPE) {
+        return fail("half write EPIPE");
+    }
+    (void)close(conn);
+    (void)close(eof_listener);
+    eof_listener = -1;
+    pass("half-close eof=0 writable then EPIPE|POLLHUP");
+    return 0;
+}
+
+static int check_eof_level(void) {
+    int pv[2];
+    char byte = 0;
+    int first;
+    int second;
+    int after;
+
+    if (pipe(pv) != 0) {
+        return fail("level pipe");
+    }
+    if (close(pv[1]) != 0) {
+        return fail("level close write");
+    }
+    first = poll_one(pv[0], POLLIN | POLLHUP, 2000);
+    second = poll_one(pv[0], POLLIN | POLLHUP, 2000);
+    if (first < 0 || second < 0 ||
+        (first & (POLLIN | POLLHUP)) != (POLLIN | POLLHUP) ||
+        (second & (POLLIN | POLLHUP)) != (POLLIN | POLLHUP)) {
+        return fail("level repeat");
+    }
+    if (read(pv[0], &byte, 1) != 0) {
+        return fail("level read");
+    }
+    after = poll_one(pv[0], POLLIN | POLLHUP, 2000);
+    if (after < 0 || (after & POLLHUP) == 0) {
+        return fail("level after read");
+    }
+    (void)close(pv[0]);
+    pass("pipe eof two polls + hup after read");
+    return 0;
+}
+
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
+    signal(SIGPIPE, SIG_IGN);
     row = "K1";
     if (check_poll() != 0) {
         return 1;
@@ -600,6 +829,22 @@ int main(int argc, char **argv) {
     if (check_accept() != 0) {
         return 1;
     }
-    say("CONTRACT SUMMARY PASS 6/6\n");
+    row = "K7";
+    if (check_eof_pipe() != 0) {
+        return 1;
+    }
+    row = "K8";
+    if (check_eof_socket() != 0) {
+        return 1;
+    }
+    row = "K9";
+    if (check_half_close() != 0) {
+        return 1;
+    }
+    row = "K10";
+    if (check_eof_level() != 0) {
+        return 1;
+    }
+    say("CONTRACT SUMMARY PASS 10/10\n");
     return 0;
 }
