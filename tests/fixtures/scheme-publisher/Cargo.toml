@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-scheme-publisher"
+version = "0.1.0"
+description = "K532 executable provenance and protected scheme publisher fixture."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+# Standalone workspace: the fixture is not a root workspace member.
+[workspace]
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_scheme_publisher"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-scheme-publisher-init"
+path = "src/init.rs"
+
+[[bin]]
+name = "raven-scheme-publisher-fake"
+path = "src/fake_server.rs"
+
+[[bin]]
+name = "raven-scheme-publisher-trusted"
+path = "src/trusted_publisher.rs"
+
+[[bin]]
+name = "raven-scheme-publisher-probe"
+path = "src/probe.rs"
+
+[[bin]]
+name = "raven-scheme-publisher-child"
+path = "src/child.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-rt = { path = "../../../userland/rt", features = ["alloc", "panic-handler"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
