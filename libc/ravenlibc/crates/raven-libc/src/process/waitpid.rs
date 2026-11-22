@@ -4,6 +4,28 @@
 use core::ffi::c_int;
 
 use raven_libc_abi::structs::Rusage;
+use raven_libc_proc::consts::{P_PGID, P_PID};
+
+/// The kernel `PROC_WAIT_EX` id type for "any child" (`docs/process-primitives.md`).
+///
+/// The public `idtype_t` (and `raven-libc-proc`'s `P_ALL`) is the Linux/BSD value 0; the kernel
+/// ABI spells any-child as 3. `P_PID` and `P_PGID` agree in both spaces.
+const KERNEL_P_ALL: u32 = 3;
+
+/// POSIX `waitpid` pid selection: `-1` is any child, `0` is the caller's group and a negative
+/// pid is the absolute process group (FreeBSD `kern_wait4`, NetBSD `sys_wait6`).
+#[must_use]
+pub(crate) fn wait_target(pid: c_int) -> (u32, i64) {
+    if pid > 0 {
+        (P_PID, i64::from(pid))
+    } else if pid == -1 {
+        (KERNEL_P_ALL, 0)
+    } else if pid == 0 {
+        (P_PGID, 0)
+    } else {
+        (P_PGID, i64::from(pid).saturating_neg())
+    }
+}
 
 /// Wait for `pid`.
 ///
@@ -11,13 +33,18 @@ use raven_libc_abi::structs::Rusage;
 /// `status` is NULL or writable.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn waitpid(pid: c_int, status: *mut c_int, options: c_int) -> c_int {
+    let (idtype, id) = wait_target(pid);
     let result = crate::ffi::map_proc::wait_status(
         &crate::ffi::procbackend::backend(),
-        raven_libc_proc::consts::P_PID,
-        i64::from(pid),
+        idtype,
+        id,
         options,
         status,
         core::ptr::null_mut::<Rusage>(),
     );
     crate::ffi::ret::int(result.map_err(crate::ffi::map_proc::error))
 }
+
+#[cfg(test)]
+#[path = "waitpid_ut.rs"]
+mod tests;

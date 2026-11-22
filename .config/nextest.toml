@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Fifteen lanes share this host. Nextest's default is one test per CPU, so every lane running a
+# suite at once put load 70-95 on 20 cores and gate rows timed out on the host, not on a defect.
+# Four threads per lane keeps the suites parallel without oversubscribing the machine; the
+# env NEXTEST_TEST_THREADS still overrides it for a deliberate full-width run.
+[profile.default]
+test-threads = 4
