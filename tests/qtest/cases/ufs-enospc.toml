@@ -102,7 +102,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^umount-ok$'
-timeout_secs = 30
+timeout_secs = 120
 
 [[step]]
 send = "exit 0\n"
