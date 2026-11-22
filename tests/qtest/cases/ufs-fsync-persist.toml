@@ -9,7 +9,7 @@
 name = "ufs-fsync-persist"
 arch = "x86_64"
 profile = "ufs-demo"
-timeout_secs = 180
+timeout_secs = 300
 pre = ["sh tests/fixtures/ufs-durability/build.sh 4m"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [

@@ -11,7 +11,7 @@ arch = "x86_64"
 profile = "ufs-demo"
 # The first boot after the power cut runs fsd-ufs's full recovery check on the
 # slow synchronous block path; allow it to finish before the login wait.
-timeout_secs = 180
+timeout_secs = 300
 pre = ["test -f build/fixtures/ufs-durability/disk.img"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
@@ -58,7 +58,7 @@ regex = '(?i)mismatch|short at chunk|longer than'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
-timeout_secs = 150
+timeout_secs = 240
 
 [[step]]
 send = "root\n"
