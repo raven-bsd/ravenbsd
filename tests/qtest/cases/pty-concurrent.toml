@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K489: a blocked slave read on one pair must not stall another pair, or the pty server.
+# Pair A blocks in read(VMIN=1); pair B writes and reads one byte with a wall bound.
+# Eight pairs block for a 5 s idle window; each then receives its byte. A ninth pair allocates
+# and closes; ptyd returns to files=0 pairs=0.
+
+name = "pty-concurrent"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-concurrent"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+
+[[expect]]
+regex = '^pty-concurrent: start uid=0 blocked=8$'
+
+[[expect]]
+regex = '^pty-concurrent: B write=1 read=1 byte=66 wall_ms=[0-9]+$'
+
+[[expect]]
+regex = '^pty-concurrent: A read=1 byte=65 wall_ms=[0-9]+$'
+
+[[expect]]
+regex = '^pty-concurrent: pair A/B done$'
+
+[[expect]]
+regex = '^pty-concurrent: idle_ms=5000 blocked=8$'
+
+[[expect]]
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^ptyd: reader-wakes=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: ninth pair ok$'
+
+[[expect]]
+regex = '^pty-concurrent: ok$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-concurrent: FAIL|pty-concurrent: timeout'

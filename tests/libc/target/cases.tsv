@@ -19,6 +19,7 @@ pty-winsize	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.s
 pty-churn	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
 pty-ssh-shape	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
 tty-discipline	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-concurrent	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
 pty-monitor	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
 fdpass	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
 closefrom	1 13 22 23 24 29 50 53	35 44 45 46 47 49	libc-test	static
