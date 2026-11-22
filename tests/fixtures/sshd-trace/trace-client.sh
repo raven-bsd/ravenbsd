@@ -10,6 +10,8 @@
 sleep 2
 DISPLAY=:0 SSH_ASKPASS=/bin/sshd-trace-askpass SSH_ASKPASS_REQUIRE=force \
     /bin/ssh -p 22 \
+    -o ConnectTimeout=10 \
+    -o ConnectionAttempts=1 \
     -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null \
     -o PreferredAuthentications=password \

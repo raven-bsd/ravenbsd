@@ -28,6 +28,15 @@ static const char *const markers[] = {
 	"session_unused",
 	"do_cleanup",
 	"debug3: send packet: type 98",
+	"Server listening",
+	"Bind to port",
+	"Connection from",
+	"Accepted",
+	"banner",
+	"kex_exchange_identification",
+	"sshd-session",
+	"fatal",
+	"error",
 };
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
