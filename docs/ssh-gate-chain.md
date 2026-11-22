@@ -122,11 +122,10 @@ this deviation is recorded in the K434 report.
   termios defaults and returns `EBUSY` when the slave is already open. `openpty` (`lib/libutil/pty.c:63`)
   and `forkpty` (`:139`) are the libutil convenience over that path.
 - Raven: ptyd supplies the `pty:` scheme pair; libc `openpty`/`grantpt`/`unlockpt`/`ptsname_r` must
-  match the libutil sequence. K430 and K436 are merged; the `pty-alloc` and `pty-calls` qtests pass,
-  including `ptsname`/`ttyname` `/dev/pts/N`. The SSH PTY request still answers
-  `PTY allocation request failed on channel 0`; K438 (SCM_RIGHTS) is the owning fix and is not on
-  master. A test-only `/bin/tty` is staged from `tests/fixtures/ssh-tty` but the allocation fails
-  before it runs.
+  match the libutil sequence. K430, K436 and K438 are merged; the `pty-alloc` and `pty-calls` qtests
+  pass, including `ptsname`/`ttyname` `/dev/pts/N`. The SSH PTY request still answers
+  `PTY allocation request failed on channel 0` on `87779be6`. A test-only `/bin/tty` is staged from
+  `tests/fixtures/ssh-tty` but the allocation fails before it runs.
 
 ### C10 exec
 
@@ -226,6 +225,18 @@ this deviation is recorded in the K434 report.
    cap (walls 30.0-30.05 s). S7-routing is PASS; S7's exit/wall assertion is FAIL.
 3. **S8 waits for K438.** `pty-alloc`/`pty-calls` pass; `ssh -tt ... tty` still returns
    `PTY allocation request failed`. K438 (SCM_RIGHTS) is not on master.
+
+## Rev 22 observations (K438 merged)
+
+1. **S8 still fails with K438.** `pty-alloc` passes; `ssh -tt ... tty` still returns
+   `PTY allocation request failed on channel 0` on `87779be6`. The test-only `/bin/tty` is staged
+   but not reached.
+2. **S7 gate bytes/exit split.** 7/10 attempts deliver the exact marker; attempts 7-9 exit 255 with
+   0 bytes (2155/8017/51 ms). The byte-correct attempts exit -9 at ~30 s. S7-routing is PASS;
+   S7's exit/bytes gate is FAIL.
+3. **S5 identity PASS.** The K431 fixture with staged consd passes
+   (`socket-write-identity-tap: pass`), so S5 is PASS.
+4. **S5-session** remains: no EPIPE, exit -9 at 15 s, fd4 socket/pipe, TCP peer `ESTAB`.
 
 ## Gaps (not evidence)
 
