@@ -31,7 +31,9 @@ LOGIN = "login:"
 PASSWORD = "Password:"
 PROMPT = "# "
 
-COMMAND = "echo K566-SSHD-BEGIN; cat /tmp/sshd.log; echo K566-SSHD-END"
+# The marker is computed by the shell so the typed command echo cannot match it.
+COMMAND = "cat /tmp/sshd.log 2>/dev/null; echo DONE-$((6*7))"
+MARKER = "DONE-42"
 
 
 def fail(message: str) -> int:
@@ -75,13 +77,19 @@ def main(argv: list[str]) -> int:
                 child.sendline(args.root_password)
                 child.expect(PROMPT, timeout=30)
                 child.sendline(COMMAND)
-                child.expect("K566-SSHD-END", timeout=30)
+                child.expect(MARKER, timeout=30)
             except (pexpect.EOF, pexpect.TIMEOUT) as error:
                 tail = (child.before or "")[-1200:]
                 print(tail, file=sys.stderr)
                 return fail(f"console wait: {type(error).__name__}")
             finally:
-                child.close(force=True)
+                try:
+                    child.close(force=True)
+                except Exception:  # noqa: BLE001 - QEMU may ignore TERM on a busy host
+                    try:
+                        child.kill(9)
+                    except Exception:  # noqa: BLE001 - the process is already gone
+                        pass
     finally:
         vars_path.unlink(missing_ok=True)
 
@@ -96,27 +104,23 @@ def main(argv: list[str]) -> int:
 
     netd_up = line_index("svcd: netd up")
     sshd_up = line_index("svcd: sshd up")
-    if netd_up is None:
-        return fail("no 'svcd: netd up' console line")
-    if sshd_up is None:
-        return fail("no 'svcd: sshd up' console line")
-    if netd_up > sshd_up:
-        return fail(f"netd_up_line={netd_up} after sshd_up_line={sshd_up}")
-
-    begin = text.find("K566-SSHD-BEGIN")
-    end = text.find("K566-SSHD-END")
-    if begin < 0 or end < begin:
-        return fail("sshd log section missing")
-    sshd_log = text[begin:end]
-    denied = "Permission denied" in sshd_log or "listen on [0.0.0.0]:22" in sshd_log
-    listening = "Server listening on 0.0.0.0 port 22." in sshd_log
+    denied = "Permission denied" in text or "listen on [0.0.0.0]:22" in text
+    listening = "Server listening on 0.0.0.0 port 22." in text
+    ordering = netd_up is not None and sshd_up is not None and netd_up < sshd_up
     print(
         "ssh-order: "
         f"netd_up_line={netd_up} sshd_up_line={sshd_up} "
+        f"ordering={'ok' if ordering else 'bad'} "
         f"listening={'ok' if listening else 'missing'} "
         f"denied={'yes' if denied else 'no'}",
         flush=True,
     )
+    if netd_up is None:
+        return fail("no 'svcd: netd up' console line")
+    if sshd_up is None:
+        return fail("no 'svcd: sshd up' console line")
+    if not ordering:
+        return fail(f"netd_up_line={netd_up} after sshd_up_line={sshd_up}")
     if denied:
         return fail("sshd logged Permission denied instead of listening")
     if not listening:

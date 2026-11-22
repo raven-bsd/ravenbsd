@@ -518,8 +518,22 @@ fn boot_color() -> bool {
 
 /// Select the bootstrap services and every dependency they need by service name or scheme.
 fn bootstrap_selection(services: &[Manifest]) -> Vec<bool> {
+    // `netd` must register `net:` before the full plan starts sshd; `ssh-hostkeys` must
+    // finish writing `/tmp/ssh/ssh_host_ed25519_key` before sshd loads it. Both are
+    // prerequisites of the SSH service and are cheap when the service is absent.
     const SEEDS: &[&str] = &[
-        "logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "blockd", "fsd-ufs", "vfsd", "devd",
+        "logd",
+        "initfsd",
+        "ramfsd",
+        "nulld",
+        "zerod",
+        "randd",
+        "blockd",
+        "fsd-ufs",
+        "vfsd",
+        "devd",
+        "netd",
+        "ssh-hostkeys",
     ];
     let mut selected = alloc::vec![false; services.len()];
     for seed in SEEDS {
