@@ -3058,6 +3058,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-reboot"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-registry"
 version = "0.1.0"
 dependencies = [
