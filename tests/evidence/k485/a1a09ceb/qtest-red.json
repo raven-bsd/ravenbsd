@@ -1,0 +1,41 @@
+{
+  "case": "tty-discipline",
+  "arch": "x86_64",
+  "result": "fail",
+  "duration_ms": 103432,
+  "exit_status": 35,
+  "matched": [
+    "^ptyd: files=0 pairs=0$",
+    "^tty-discipline: start uid=0$",
+    "^tty-discipline: row=canonical-erase ok$",
+    "^tty-discipline: row=canonical-kill ok$",
+    "^tty-discipline: row=canonical-eof ok$",
+    "^tty-discipline: row=canonical-eof-empty ok$",
+    "^tty-discipline: row=isig-intr-data ok$",
+    "^tty-discipline: row=isig-intr-echo ok$",
+    "^tty-discipline: row=isig-intr sigint=pgrp-unset not-measured$",
+    "^tty-discipline: row=opost-onlcr ok$",
+    "^tty-discipline: row=opost-off ok$",
+    "^tty-discipline: vmin1 read=1 byte=88 elapsed_ms=[0-9]+$",
+    "^tty-discipline: row=vmin1 ok$",
+    "^ptyd: files=0 pairs=0$"
+  ],
+  "unmatched": [
+    "^tty-discipline: row=canonical-werase ok$",
+    "^tty-discipline: row=isig-quit-data ok$",
+    "^tty-discipline: row=isig-quit-echo ok$",
+    "^tty-discipline: row=isig-quit sigquit=pgrp-unset not-measured$",
+    "^tty-discipline: row=icrnl ok$",
+    "^tty-discipline: row=inlcr ok$",
+    "^tty-discipline: row=igncr silent ok$",
+    "^tty-discipline: row=istrip ok$",
+    "^tty-discipline: vtime child count=0 elapsed_ms=[1-9][0-9]+$",
+    "^tty-discipline: row=vtime ok$",
+    "^tty-discipline: ok$",
+    "^init exited \\(0\\)$"
+  ],
+  "forbidden_hits": [
+    "tty-discipline: row=vtime FAIL status=256",
+    "tty-discipline: FAIL rows=7"
+  ]
+}

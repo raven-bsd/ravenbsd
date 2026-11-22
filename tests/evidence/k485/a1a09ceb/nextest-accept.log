@@ -1,0 +1,68 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+────────────
+ Nextest run ID 917d567b-09d3-4377-ab7c-25f96a8e244e with nextest profile: default
+    Starting 62 tests across 1 binary
+        PASS [   0.008s] ( 1/62) raven-tty-core tests::carriage_return_completes_a_line
+        PASS [   0.012s] ( 2/62) raven-tty-core tests::an_empty_chunk_produces_nothing
+        PASS [   0.013s] ( 3/62) raven-tty-core tests::a_disabled_veol_does_not_complete_the_line
+        PASS [   0.013s] ( 4/62) raven-tty-core tests::eof_on_a_non_empty_line_completes_it
+        PASS [   0.013s] ( 5/62) raven-tty-core tests::carriage_return_newline_completes_two_lines
+        PASS [   0.014s] ( 6/62) raven-tty-core tests::a_partial_line_survives_between_chunks
+        PASS [   0.015s] ( 7/62) raven-tty-core tests::an_empty_line_is_delivered_as_a_newline
+        PASS [   0.013s] ( 8/62) raven-tty-core tests::a_fresh_winsize_is_zero
+        PASS [   0.013s] ( 9/62) raven-tty-core tests::a_tab_is_inserted_verbatim
+        PASS [   0.017s] (10/62) raven-tty-core tests::a_line_edited_with_backspace_is_delivered_edited
+        PASS [   0.018s] (11/62) raven-tty-core tests::backspace_erases_and_echoes
+        PASS [   0.019s] (12/62) raven-tty-core tests::backspace_accepts_both_erase_bytes
+        PASS [   0.013s] (13/62) raven-tty-core tests::echo_can_be_disabled
+        PASS [   0.008s] (14/62) raven-tty-core tests::high_bytes_are_inserted_verbatim
+        PASS [   0.010s] (15/62) raven-tty-core tests::eof_then_more_input_still_completes_lines
+        PASS [   0.013s] (16/62) raven-tty-core tests::a_mode_switch_discards_the_pending_line
+        PASS [   0.007s] (17/62) raven-tty-core tests::isig_applies_without_canonical_mode
+        PASS [   0.006s] (18/62) raven-tty-core tests::kill_line_erases_the_whole_line
+        PASS [   0.017s] (19/62) raven-tty-core tests::a_custom_verase_byte_erases
+        PASS [   0.011s] (20/62) raven-tty-core tests::flush_reports_the_discarded_bytes
+        PASS [   0.006s] (21/62) raven-tty-core tests::kill_line_then_input_starts_a_new_line
+        PASS [   0.006s] (22/62) raven-tty-core tests::new_discipline_is_canonical_and_echoes
+        PASS [   0.010s] (23/62) raven-tty-core tests::kill_line_on_an_empty_line_does_nothing
+        PASS [   0.007s] (24/62) raven-tty-core tests::many_lines_in_one_chunk_all_arrive
+        PASS [   0.008s] (25/62) raven-tty-core tests::kill_then_backspace_does_nothing
+        PASS [   0.023s] (26/62) raven-tty-core tests::a_cleared_icrnl_keeps_carriage_return_as_data
+        PASS [   0.023s] (27/62) raven-tty-core tests::ctrl_l_is_passed_through
+        PASS [   0.024s] (28/62) raven-tty-core tests::backspace_on_an_empty_line_does_nothing
+        PASS [   0.021s] (29/62) raven-tty-core tests::eof_echoes_nothing
+        PASS [   0.018s] (30/62) raven-tty-core tests::flush_on_an_empty_line_reports_zero
+        PASS [   0.007s] (31/62) raven-tty-core tests::newline_completes_a_line
+        PASS [   0.007s] (32/62) raven-tty-core tests::output_is_raw_without_opost
+        PASS [   0.006s] (33/62) raven-tty-core tests::output_starts_empty
+        PASS [   0.005s] (34/62) raven-tty-core tests::raw_mode_does_not_echo
+        PASS [   0.007s] (35/62) raven-tty-core tests::quit_discards_the_line_and_is_not_data
+        PASS [   0.013s] (36/62) raven-tty-core tests::opost_onlcr_translates_output
+        PASS [   0.007s] (37/62) raven-tty-core tests::raw_then_canonical_round_trip
+        PASS [   0.004s] (38/62) raven-tty-core tests::the_bell_byte_is_inserted_like_any_other
+        PASS [   0.035s] (39/62) raven-tty-core tests::eof_on_an_empty_line_raises_end_of_file
+        PASS [   0.013s] (40/62) raven-tty-core tests::raw_mode_has_no_events
+        PASS [   0.013s] (41/62) raven-tty-core tests::several_lines_in_one_chunk_are_delivered_in_order
+        PASS [   0.014s] (42/62) raven-tty-core tests::raw_mode_does_not_edit
+        PASS [   0.014s] (43/62) raven-tty-core tests::set_termios_round_trips_every_field
+        PASS [   0.009s] (44/62) raven-tty-core tests::the_line_limit_accepts_exactly_max_bytes
+        PASS [   0.015s] (45/62) raven-tty-core tests::raw_mode_passes_bytes_through
+        PASS [   0.013s] (46/62) raven-tty-core tests::termios_default_is_the_ssh_terminal_shape
+        PASS [   0.008s] (47/62) raven-tty-core tests::the_settings_view_changes_only_icanon_and_echo
+        PASS [   0.009s] (48/62) raven-tty-core tests::the_line_limit_rings_the_bell_and_ignores_input
+        PASS [   0.018s] (49/62) raven-tty-core tests::raw_input_still_honours_translation_and_istrip
+        PASS [   0.006s] (50/62) raven-tty-core tests::the_terminator_is_normalised_to_newline
+        PASS [   0.006s] (51/62) raven-tty-core tests::without_echo_editing_still_happens
+        PASS [   0.013s] (52/62) raven-tty-core tests::the_same_mode_switch_does_not_discard
+        PASS [   0.015s] (53/62) raven-tty-core tests::the_default_impl_matches_new
+        PASS [   0.008s] (54/62) raven-tty-core tests::vwerase_is_gated_by_iexten
+        PASS [   0.006s] (55/62) raven-tty-core tests::vwerase_removes_the_previous_word
+        PASS [   0.045s] (56/62) raven-tty-core tests::interrupt_does_not_echo_when_echo_is_off
+        PASS [   0.046s] (57/62) raven-tty-core tests::interrupt_after_a_partial_line_raises_one_event
+        PASS [   0.045s] (58/62) raven-tty-core tests::interrupt_discards_the_line
+        PASS [   0.045s] (59/62) raven-tty-core tests::input_is_echoed_in_order
+        PASS [   0.045s] (60/62) raven-tty-core tests::interrupt_echoes_caret_c_and_a_newline
+        PASS [   0.046s] (61/62) raven-tty-core tests::icrnl_translates_carriage_return
+        PASS [   0.032s] (62/62) raven-tty-core tests::settings_round_trip
+────────────
+     Summary [   0.065s] 62 tests run: 62 passed, 0 skipped

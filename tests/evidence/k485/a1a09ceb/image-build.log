@@ -1,0 +1,26 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.64s
+     Running `target/debug/xtask image --arch x86_64 --profile libc-test --cmdline 'console=ttyS0 test-exit=1' --output build/qtest/tty-discipline.img`
+==> build loader x86_64 (x86_64-unknown-uefi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.41s
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/loader-debug.efi
+==> build kernel x86_64 (x86_64-unknown-none)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.38s
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/kernel-debug.elf
+==> build user x86_64 (x86_64-unknown-none)
+   Compiling raven-tty-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/crates/raven-tty-core)
+   Compiling raven-proto-tty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/crates/raven-proto-tty)
+   Compiling raven-ptyd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/userland/servers/ptyd)
+   Compiling raven-consd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/userland/servers/consd)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.53s
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-init
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-logd
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-sysd
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-randd
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-zerod
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-nulld
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-initfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-ramfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-vfsd
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-consd
+    /media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/user/raven-ptyd
+build/qtest/tty-discipline.img

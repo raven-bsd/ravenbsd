@@ -1,0 +1,106 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=107329 reserved=23743
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 3973 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) a1a09ceb 2026-11-22
+mem: 419 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x466d64 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=4068 spawn=4339 first_poll=4346 deadline=9339 stalled=0 ready_at=4404
+rtc: 2026-11-22 13:22:37 (epoch 1795353757s)
+1795353762.685 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=4540 spawn=5529 first_poll=5591 deadline=10529 stalled=0 ready_at=6084
+1795353763.087 nulld: started
+1795353763.129 zerod: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=4422 spawn=5760 first_poll=5819 deadline=10760 stalled=0 ready_at=6278
+svcd: zerod up
+svcd: zerod timing: generation=1 start=4563 spawn=5948 first_poll=6063 deadline=10948 stalled=0 ready_at=6350
+1795353763.445 randd: started
+1795353763.471 ramfsd: started
+svcd: randd up
+svcd: randd timing: generation=1 start=4497 spawn=6232 first_poll=6279 deadline=11232 stalled=0 ready_at=6504
+svcd: consd up
+svcd: consd timing: generation=1 start=4408 spawn=6215 first_poll=6276 deadline=66215 stalled=0 ready_at=6507
+ptyd: files=0 pairs=0
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=4478 spawn=6403 first_poll=6412 deadline=11403 stalled=0 ready_at=6678
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=4446 spawn=6610 first_poll=6646 deadline=36610 stalled=0 ready_at=6683
+ptyd: files=0 pairs=0
+1795353767.512 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=4413 spawn=6219 first_poll=6243 deadline=126219 stalled=0 ready_at=10531
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=10538 spawn=10825 first_poll=10831 deadline=70825 stalled=0 ready_at=10979
+tty-discipline: start uid=0
+tty-discipline: row=canonical-erase ok
+ptyd: files=0 pairs=0
+tty-discipline: row=canonical-kill ok
+ptyd: files=0 pairs=0
+tty-discipline: row=canonical-werase ok
+ptyd: files=0 pairs=0
+tty-discipline: row=canonical-eof ok
+tty-discipline: row=canonical-eof-empty ok
+ptyd: files=0 pairs=0
+tty-discipline: row=isig-intr-data ok
+tty-discipline: row=isig-intr-echo ok
+tty-discipline: row=isig-intr sigint=pgrp-unset not-measured
+ptyd: files=0 pairs=0
+tty-discipline: row=isig-quit-data ok
+tty-discipline: row=isig-quit-echo ok
+tty-discipline: row=isig-quit sigquit=pgrp-unset not-measured
+ptyd: files=0 pairs=0
+tty-discipline: row=opost-onlcr ok
+ptyd: files=0 pairs=0
+tty-discipline: row=opost-off ok
+ptyd: files=0 pairs=0
+tty-discipline: row=icrnl ok
+ptyd: files=0 pairs=0
+tty-discipline: row=inlcr ok
+ptyd: files=0 pairs=0
+tty-discipline: row=igncr silent ok
+ptyd: files=0 pairs=0
+tty-discipline: row=istrip ok
+ptyd: files=0 pairs=0
+tty-discipline: vmin1 read=1 byte=88 elapsed_ms=7
+tty-discipline: row=vmin1 ok
+ptyd: files=0 pairs=0
+tty-discipline: vtime child count=0 elapsed_ms=107
+tty-discipline: row=vtime ok
+ptyd: files=0 pairs=0
+tty-discipline: ok
+svcd: libc-test up
+svcd: libc-test timing: generation=1 start=10983 spawn=11369 first_poll=none deadline=71369 stalled=0 ready_at=12639
+svcd: settled
+init exited (0)

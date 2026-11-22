@@ -1,0 +1,97 @@
+   Compiling raven-tty-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/crates/raven-tty-core)
+warning: function `encode_fdmap` is never used
+    --> crates/raven-spawn/src/lib.rs:1631:4
+     |
+1631 | fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
+     |    ^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `raven-spawn` (lib) generated 1 warning
+   Compiling raven-proto-tty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/crates/raven-proto-tty)
+   Compiling raven-ptyd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/userland/servers/ptyd)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.88s
+────────────
+ Nextest run ID 96c02a17-6137-478a-8774-631188713d65 with nextest profile: default
+    Starting 79 tests across 3 binaries
+        PASS [   0.043s] ( 1/79) raven-ptyd pty::tests::the_complete_termios_round_trips
+        PASS [   0.043s] ( 2/79) raven-ptyd pairs::tests::removal_releases_only_the_named_pair
+        PASS [   0.037s] ( 3/79) raven-ptyd pairs::tests::allocation_uses_the_lowest_free_unit_and_reuses_it
+        PASS [   0.041s] ( 4/79) raven-ptyd pty::tests::hangup_makes_empty_reads_return_eof
+        PASS [   0.058s] ( 5/79) raven-ptyd pty::tests::a_fresh_pty_starts_at_zero_winsize
+        PASS [   0.028s] ( 6/79) raven-ptyd pty::tests::raw_mode_passes_bytes_without_echo
+        PASS [   0.063s] ( 7/79) raven-ptyd pty::tests::ctrl_backslash_signals_the_foreground_group_and_echoes
+        PASS [   0.030s] ( 8/79) raven-tty-core tests::a_line_edited_with_backspace_is_delivered_edited
+        PASS [   0.027s] ( 9/79) raven-tty-core tests::a_mode_switch_discards_the_pending_line
+        PASS [   0.044s] (10/79) raven-ptyd pty::tests::output_processing_obeys_onlcr
+        PASS [   0.045s] (11/79) raven-ptyd pty::tests::ctrl_c_signals_the_foreground_group_and_echoes
+        PASS [   0.038s] (12/79) raven-tty-core tests::a_fresh_winsize_is_zero
+        PASS [   0.021s] (13/79) raven-tty-core tests::an_empty_chunk_produces_nothing
+        PASS [   0.031s] (14/79) raven-tty-core tests::a_tab_is_inserted_verbatim
+        PASS [   0.016s] (15/79) raven-tty-core tests::backspace_on_an_empty_line_does_nothing
+        PASS [   0.017s] (16/79) raven-tty-core tests::backspace_erases_and_echoes
+        PASS [   0.082s] (17/79) raven-ptyd pty::tests::a_custom_verase_byte_edits_the_line
+        PASS [   0.032s] (18/79) raven-tty-core tests::an_empty_line_is_delivered_as_a_newline
+        PASS [   0.019s] (19/79) raven-tty-core tests::carriage_return_newline_completes_two_lines
+        PASS [   0.084s] (20/79) raven-ptyd pairs::tests::pty_inode_is_nonzero_and_role_distinct
+        PASS [   0.034s] (21/79) raven-tty-core tests::carriage_return_completes_a_line
+        PASS [   0.056s] (22/79) raven-tty-core tests::a_partial_line_survives_between_chunks
+        PASS [   0.045s] (23/79) raven-tty-core tests::backspace_accepts_both_erase_bytes
+        PASS [   0.090s] (24/79) raven-ptyd pairs::tests::pairs_have_independent_queues_and_settings
+        PASS [   0.096s] (25/79) raven-ptyd pty::tests::slave_output_is_readable_on_the_master
+        PASS [   0.093s] (26/79) raven-ptyd pty::tests::canonical_input_is_line_buffered_and_echoed
+        PASS [   0.090s] (27/79) raven-ptyd pty::tests::the_window_size_is_shared_by_master_and_slave
+        PASS [   0.095s] (28/79) raven-tty-core tests::a_disabled_veol_does_not_complete_the_line
+        PASS [   0.041s] (29/79) raven-tty-core tests::eof_echoes_nothing
+        PASS [   0.033s] (30/79) raven-tty-core tests::flush_on_an_empty_line_reports_zero
+        PASS [   0.026s] (31/79) raven-tty-core tests::high_bytes_are_inserted_verbatim
+        PASS [   0.105s] (32/79) raven-ptyd pty::tests::a_drain_set_does_not_discard_queued_output
+        PASS [   0.032s] (33/79) raven-tty-core tests::icrnl_translates_carriage_return
+        PASS [   0.061s] (34/79) raven-tty-core tests::eof_on_a_non_empty_line_completes_it
+        PASS [   0.060s] (35/79) raven-tty-core tests::eof_on_an_empty_line_raises_end_of_file
+        PASS [   0.061s] (36/79) raven-tty-core tests::echo_can_be_disabled
+        PASS [   0.066s] (37/79) raven-tty-core tests::ctrl_l_is_passed_through
+        PASS [   0.125s] (38/79) raven-ptyd pty::tests::echo_off_and_flush_drop_the_expected_bytes
+        PASS [   0.125s] (39/79) raven-tty-core tests::a_cleared_icrnl_keeps_carriage_return_as_data
+        PASS [   0.029s] (40/79) raven-tty-core tests::isig_applies_without_canonical_mode
+        PASS [   0.030s] (41/79) raven-tty-core tests::interrupt_echoes_caret_c_and_a_newline
+        PASS [   0.030s] (42/79) raven-tty-core tests::interrupt_does_not_echo_when_echo_is_off
+        PASS [   0.127s] (43/79) raven-tty-core tests::a_custom_verase_byte_erases
+        PASS [   0.031s] (44/79) raven-tty-core tests::kill_line_then_input_starts_a_new_line
+        PASS [   0.066s] (45/79) raven-tty-core tests::flush_reports_the_discarded_bytes
+        PASS [   0.023s] (46/79) raven-tty-core tests::output_is_raw_without_opost
+        PASS [   0.034s] (47/79) raven-tty-core tests::kill_then_backspace_does_nothing
+        PASS [   0.021s] (48/79) raven-tty-core tests::output_starts_empty
+        PASS [   0.025s] (49/79) raven-tty-core tests::new_discipline_is_canonical_and_echoes
+        PASS [   0.016s] (50/79) raven-tty-core tests::raw_mode_does_not_edit
+        PASS [   0.028s] (51/79) raven-tty-core tests::newline_completes_a_line
+        PASS [   0.049s] (52/79) raven-tty-core tests::kill_line_erases_the_whole_line
+        PASS [   0.048s] (53/79) raven-tty-core tests::kill_line_on_an_empty_line_does_nothing
+        PASS [   0.022s] (54/79) raven-tty-core tests::raw_mode_has_no_events
+        PASS [   0.044s] (55/79) raven-tty-core tests::many_lines_in_one_chunk_all_arrive
+        PASS [   0.069s] (56/79) raven-tty-core tests::interrupt_after_a_partial_line_raises_one_event
+        PASS [   0.092s] (57/79) raven-tty-core tests::eof_then_more_input_still_completes_lines
+        PASS [   0.071s] (58/79) raven-tty-core tests::input_is_echoed_in_order
+        PASS [   0.025s] (59/79) raven-tty-core tests::raw_mode_passes_bytes_through
+        PASS [   0.040s] (60/79) raven-tty-core tests::opost_onlcr_translates_output
+        PASS [   0.035s] (61/79) raven-tty-core tests::raw_input_still_honours_translation_and_istrip
+        PASS [   0.037s] (62/79) raven-tty-core tests::quit_discards_the_line_and_is_not_data
+        PASS [   0.032s] (63/79) raven-tty-core tests::settings_round_trip
+        PASS [   0.081s] (64/79) raven-tty-core tests::interrupt_discards_the_line
+        PASS [   0.039s] (65/79) raven-tty-core tests::raw_then_canonical_round_trip
+        PASS [   0.020s] (66/79) raven-tty-core tests::the_terminator_is_normalised_to_newline
+        PASS [   0.032s] (67/79) raven-tty-core tests::several_lines_in_one_chunk_are_delivered_in_order
+        PASS [   0.048s] (68/79) raven-tty-core tests::raw_mode_does_not_echo
+        PASS [   0.029s] (69/79) raven-tty-core tests::the_default_impl_matches_new
+        PASS [   0.035s] (70/79) raven-tty-core tests::set_termios_round_trips_every_field
+        PASS [   0.021s] (71/79) raven-tty-core tests::the_settings_view_changes_only_icanon_and_echo
+        PASS [   0.033s] (72/79) raven-tty-core tests::termios_default_is_the_ssh_terminal_shape
+        PASS [   0.021s] (73/79) raven-tty-core tests::vwerase_removes_the_previous_word
+        PASS [   0.031s] (74/79) raven-tty-core tests::the_line_limit_accepts_exactly_max_bytes
+        PASS [   0.032s] (75/79) raven-tty-core tests::the_line_limit_rings_the_bell_and_ignores_input
+        PASS [   0.024s] (76/79) raven-tty-core tests::vwerase_is_gated_by_iexten
+        PASS [   0.022s] (77/79) raven-tty-core tests::without_echo_editing_still_happens
+        PASS [   0.047s] (78/79) raven-tty-core tests::the_same_mode_switch_does_not_discard
+        PASS [   0.078s] (79/79) raven-tty-core tests::the_bell_byte_is_inserted_like_any_other
+────────────
+     Summary [   0.260s] 79 tests run: 79 passed, 0 skipped

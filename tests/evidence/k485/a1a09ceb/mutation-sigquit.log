@@ -1,0 +1,58 @@
+   Compiling raven-tty-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/crates/raven-tty-core)
+warning: function `encode_fdmap` is never used
+    --> crates/raven-spawn/src/lib.rs:1631:4
+     |
+1631 | fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
+     |    ^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `raven-spawn` (lib) generated 1 warning
+   Compiling raven-proto-tty v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/crates/raven-proto-tty)
+   Compiling raven-ptyd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/userland/servers/ptyd)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.66s
+────────────
+ Nextest run ID 1641a183-a1fb-4776-a8e1-7908d2964fdd with nextest profile: default
+    Starting 17 tests across 2 binaries
+        PASS [   0.007s] ( 1/17) raven-ptyd pty::tests::the_window_size_is_shared_by_master_and_slave
+        PASS [   0.007s] ( 2/17) raven-ptyd pairs::tests::removal_releases_only_the_named_pair
+        PASS [   0.007s] ( 3/17) raven-ptyd pairs::tests::allocation_uses_the_lowest_free_unit_and_reuses_it
+        PASS [   0.007s] ( 4/17) raven-ptyd pty::tests::a_custom_verase_byte_edits_the_line
+        PASS [   0.011s] ( 5/17) raven-ptyd pty::tests::a_drain_set_does_not_discard_queued_output
+        PASS [   0.012s] ( 6/17) raven-ptyd pty::tests::hangup_makes_empty_reads_return_eof
+        PASS [   0.012s] ( 7/17) raven-ptyd pty::tests::ctrl_c_signals_the_foreground_group_and_echoes
+        PASS [   0.014s] ( 8/17) raven-ptyd pty::tests::canonical_input_is_line_buffered_and_echoed
+        PASS [   0.015s] ( 9/17) raven-ptyd pty::tests::echo_off_and_flush_drop_the_expected_bytes
+        PASS [   0.015s] (10/17) raven-ptyd pairs::tests::pairs_have_independent_queues_and_settings
+        PASS [   0.015s] (11/17) raven-ptyd pty::tests::the_complete_termios_round_trips
+        PASS [   0.015s] (12/17) raven-ptyd pty::tests::slave_output_is_readable_on_the_master
+        PASS [   0.016s] (13/17) raven-ptyd pairs::tests::pty_inode_is_nonzero_and_role_distinct
+        PASS [   0.017s] (14/17) raven-ptyd pty::tests::raw_mode_passes_bytes_without_echo
+        FAIL [   0.014s] (15/17) raven-ptyd pty::tests::ctrl_backslash_signals_the_foreground_group_and_echoes
+  stdout ───
+
+    running 1 test
+    test pty::tests::ctrl_backslash_signals_the_foreground_group_and_echoes ... FAILED
+
+    failures:
+
+    failures:
+        pty::tests::ctrl_backslash_signals_the_foreground_group_and_echoes
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'pty::tests::ctrl_backslash_signals_the_foreground_group_and_echoes' (3916834) panicked at userland/servers/ptyd/src/pty_ut.rs:76:5:
+    assertion `left == right` failed
+      left: []
+     right: [(-42, 3)]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+  Cancelling due to test failure: 2 tests still running
+        PASS [   0.014s] (16/17) raven-ptyd pty::tests::a_fresh_pty_starts_at_zero_winsize
+        PASS [   0.051s] (17/17) raven-ptyd pty::tests::output_processing_obeys_onlcr
+────────────
+     Summary [   0.052s] 17 tests run: 16 passed, 1 failed, 0 skipped
+        FAIL [   0.014s] (15/17) raven-ptyd pty::tests::ctrl_backslash_signals_the_foreground_group_and_echoes
+error: test run failed
