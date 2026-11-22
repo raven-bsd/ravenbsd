@@ -780,7 +780,10 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
         let handle = reference.handle();
         let blocking = reference.status() & fcntl::O_NONBLOCK as u32 == 0;
-        let doorbell = reference.kind() == OfdKind::Socket && reference.poll_signaled();
+        // Any OFD with an attached scheme event is a waitable scheme socket. The kind is not a
+        // sufficient test: `scheme::probe_kind` reports `Unknown` for a net socket adopted from
+        // `SCM_RIGHTS`, even after its readiness event is attached (K438).
+        let doorbell = reference.poll_signaled();
         let pipe = reference.kind() == OfdKind::Pipe;
         loop {
             let result = crate::intr::cancellable(|| {

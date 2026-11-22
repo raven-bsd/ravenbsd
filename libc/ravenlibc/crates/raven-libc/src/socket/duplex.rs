@@ -232,8 +232,16 @@ impl UnixBackend for ShellUnix {
                     // object, whose receive queue is directly waitable (`sbwait`). Raven's
                     // scheme ABI splits that object from the client data handle, so the event
                     // handle must be re-created on adoption.
+                    // `probe_kind` recognises a tty and otherwise reports `Unknown`; a net
+                    // socket is not distinguishable from another scheme handle there. The
+                    // `Call::Event` probe is the discriminator: a net socket returns a valid
+                    // event, a plain file/duplex handle returns an error that is ignored.
                     if let Ok(reference) = platform.get(fd)
-                        && reference.kind() == raven_libc_platform::OfdKind::Socket
+                        && matches!(
+                            reference.kind(),
+                            raven_libc_platform::OfdKind::Socket
+                                | raven_libc_platform::OfdKind::Unknown
+                        )
                     {
                         let index = reference.index();
                         let data = reference.handle();
