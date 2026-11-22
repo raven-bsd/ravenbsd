@@ -50,13 +50,15 @@ ASKPASS = ROOT / "tests" / "ssh" / "askpass.sh"
 EXPECTED_BANNER = b"SSH-2.0-OpenSSH_10.6\r\n"
 BANNER_BOUND_S = 10.0
 REQUEST_TIMEOUT_S = 15
+S7_TIMEOUT_S = 30
+S7_WALL_BOUND_MS = 5000
 ECHO_PORT = 23097
 ECHO_PAYLOAD = b"K434-S0-ECHO-0123456789abcdef\n"
 MARKER = b"K434-SSH-MARKER-2026-11-22\n"
 
 ROW_ORDER = [
     "S0", "S1", "S1-client-first", "S2", "S3", "S4", "S5", "S5-identity",
-    "S5-session", "S6", "S6-length", "S7", "S7-routing", "S8", "S8-pty-alloc",
+    "S5-session", "S6", "S6-length", "S7", "S7-routing", "S7-exit", "S8", "S8-pty-alloc",
 ]
 
 rows: list[tuple[str, str, str]] = []
@@ -858,7 +860,8 @@ def console_marker_count(console: SerialConsole) -> int:
 
 def row_s7(console: SerialConsole) -> None:
     total_before = console_marker_count(console)
-    marker_run = ssh_run(["cat", "/tmp/ssh-marker"], "s7-marker.log")
+    marker_run = ssh_run(["cat", "/tmp/ssh-marker"], "s7-marker.log",
+                         timeout=S7_TIMEOUT_S)
     time.sleep(0.5)
     console_new = console_marker_count(console) - total_before
     marker_ok = marker_run["stdout"] == MARKER
@@ -868,20 +871,32 @@ def row_s7(console: SerialConsole) -> None:
             "PASS" if marker_ok and console_new == 0 else "FAIL",
             f"exit {marker_run['returncode']}")
     passed = 0
+    all_exit_ok = True
+    wall_ms: list[float] = []
     max_console_new = console_new
     for number in range(1, 11):
         before = console_marker_count(console)
-        session = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-run-{number}.log")
+        session = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-run-{number}.log",
+                          timeout=S7_TIMEOUT_S)
         time.sleep(0.5)
         after = console_marker_count(console)
         new_markers = after - before
         max_console_new = max(max_console_new, new_markers)
         ok = session["stdout"] == MARKER and new_markers == 0
         passed += 1 if ok else 0
+        elapsed = float(session["elapsed_ms"])
+        wall_ms.append(elapsed)
+        exit_ok = session["returncode"] == 0 and elapsed <= S7_WALL_BOUND_MS
+        all_exit_ok = all_exit_ok and exit_ok
         attempt("S7-10/10", number, "fresh", f"{literal(MARKER)}; console delta 0",
                 f"{literal(session['stdout'])}; console_new={new_markers}",
-                float(session["elapsed_ms"]), "PASS" if ok else "FAIL",
+                elapsed, "PASS" if ok else "FAIL",
                 f"exit {session['returncode']}")
+        attempt("S7-exit", number, "fresh",
+                f"exit 0; {literal(MARKER)}; wall <= {S7_WALL_BOUND_MS} ms",
+                f"exit {session['returncode']}; wall={elapsed:.0f} ms; "
+                f"bytes={literal(session['stdout'])}",
+                elapsed, "PASS" if exit_ok and session["stdout"] == MARKER else "FAIL")
     total_after = console_marker_count(console)
     total_delta = total_after - total_before
     routing_ok = marker_ok and total_delta == 0
@@ -892,24 +907,24 @@ def row_s7(console: SerialConsole) -> None:
     if routing_ok:
         record("S7-routing", "PASS",
                f"client received the exact marker; console total delta 0 "
-               f"(exit {marker_run['returncode']} after delivery is S5-session)")
+               f"(exit {marker_run['returncode']} is the S7-exit/S5-session fact)")
     else:
         if marker_run["stdout"] != MARKER:
             reason = f"client={literal(marker_run['stdout'])} (not the marker)"
         else:
             reason = f"console_total_delta={total_delta} (console also received the marker)"
         record("S7-routing", "FAIL", reason)
-    if marker_ok and passed == 10 and total_delta == 0:
+    if marker_ok and passed == 10 and total_delta == 0 and all_exit_ok:
         record("S7", "PASS",
                f"`cat /tmp/ssh-marker` returned exactly {literal(MARKER)} on the single attempt "
-               f"and on 10/10; console_total_delta=0; exit codes "
-               f"{marker_run['returncode']}/10 sessions are the S5-session completion fact")
+               f"and 10/10; console_total_delta=0; all exits 0 and walls <= "
+               f"{S7_WALL_BOUND_MS} ms")
     else:
         record("S7", "FAIL",
                f"marker {'exact' if marker_ok else 'mismatch/error'} "
-               f"({literal(marker_run['stdout'])}); {passed}/10 command sessions returned the "
-               f"exact marker; max_console_new={max_console_new}; "
-               f"console_total_delta={total_delta} (gate; C1-C10)")
+               f"({literal(marker_run['stdout'])}); {passed}/10 exact; "
+               f"console_total_delta={total_delta}; all_exit_ok={all_exit_ok}; "
+               f"walls_ms={[round(value) for value in wall_ms]} (gate; C1-C10)")
 
 
 def row_s8() -> None:
