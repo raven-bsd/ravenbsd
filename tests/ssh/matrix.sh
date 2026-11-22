@@ -14,6 +14,12 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$root"
 
+bridge=${RAVEN_QEMU_BRIDGE:-ravenbr0}
+tap=${RAVEN_QEMU_TAP:-ravendemo0}
+net() {
+    $SUDO env RAVEN_QEMU_BRIDGE="$bridge" RAVEN_QEMU_TAP="$tap" sh scripts/qemu-net.sh "$@"
+}
+
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=
 else
@@ -27,7 +33,7 @@ fi
 up=0
 down() {
     if [ "$up" -eq 1 ]; then
-        $SUDO sh scripts/qemu-net.sh down >/dev/null 2>&1 || true
+        net down >/dev/null 2>&1 || true
         up=0
     fi
 }
@@ -46,7 +52,7 @@ echo "$pty_exit" > build/ssh/matrix/pty-alloc.exit
 echo "matrix: building the S0 echo fixture" >&2
 timeout 120 sh tests/fixtures/ssh-echo/build.sh || echo "matrix: S0 fixture build failed" >&2
 
-$SUDO sh scripts/qemu-net.sh down >/dev/null 2>&1 || true
-$SUDO sh scripts/qemu-net.sh up
+net down >/dev/null 2>&1 || true
+net up
 up=1
-timeout 600 python3 tests/ssh/matrix.py
+RAVEN_QEMU_TAP="$tap" timeout 600 python3 tests/ssh/matrix.py
