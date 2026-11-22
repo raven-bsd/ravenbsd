@@ -27,6 +27,9 @@ pub struct Entry {
     pub site: String,
 }
 
+/// Known omissions keyed by `(number, name)` with their machine-readable reason.
+pub type KnownRegister = BTreeMap<(u64, String), String>;
+
 /// The measured model.
 #[derive(Clone, Debug, Default)]
 pub struct Model {
@@ -34,8 +37,8 @@ pub struct Model {
     pub dispatch: Vec<Entry>,
     /// Documented table rows.
     pub documented: Vec<Entry>,
-    /// Explicit reviewer-owned omissions.
-    pub known: BTreeSet<Entry>,
+    /// Explicit reviewer-owned omissions and their machine-readable reason.
+    pub known: KnownRegister,
     /// Reserved number ranges, inclusive.
     pub reserved: Vec<(u64, u64)>,
 }
@@ -261,11 +264,11 @@ pub fn parse_documented(root: &Path) -> Vec<Entry> {
     rows
 }
 
-/// Parse the machine-readable known-omission and reserved-range register.
+/// Parse the machine-readable known-omission and reserved-range register in `docs/syscall-abi.md`.
 #[must_use]
-pub fn parse_register(root: &Path) -> (BTreeSet<Entry>, Vec<(u64, u64)>) {
-    let text = read(&root.join("docs/abi-completeness.md"));
-    let mut known = BTreeSet::new();
+pub fn parse_register(root: &Path) -> (KnownRegister, Vec<(u64, u64)>) {
+    let text = read(&root.join("docs/syscall-abi.md"));
+    let mut known: KnownRegister = BTreeMap::new();
     let mut reserved = Vec::new();
     for line in text.lines() {
         if let Some(rest) = line
@@ -273,16 +276,13 @@ pub fn parse_register(root: &Path) -> (BTreeSet<Entry>, Vec<(u64, u64)>) {
             .map(|(_, rest)| rest)
         {
             let body = rest.split("-->").next().unwrap_or("").trim();
-            let mut parts = body.split_whitespace();
-            if let (Some(number), Some(name)) = (parts.next(), parts.next())
+            let mut parts = body.splitn(3, |c: char| c.is_whitespace());
+            if let (Some(number), Some(name), Some(reason)) =
+                (parts.next(), parts.next(), parts.next())
                 && let Some(number) = parse_hex(number)
                 && is_ident(name)
             {
-                known.insert(Entry {
-                    number,
-                    name: name.to_string(),
-                    site: String::new(),
-                });
+                known.insert((number, name.to_string()), reason.trim().to_string());
             }
         }
         if let Some(rest) = line
@@ -352,11 +352,7 @@ pub fn check(model: &Model) -> Vec<String> {
         .iter()
         .map(|entry| (entry.number, entry.name.clone()))
         .collect::<BTreeSet<_>>();
-    let known = model
-        .known
-        .iter()
-        .map(|entry| (entry.number, entry.name.clone()))
-        .collect::<BTreeSet<_>>();
+    let known = model.known.keys().cloned().collect::<BTreeSet<_>>();
 
     for (name, number) in [("PROC_CHROOT", 0x0D), ("PROC_REBOOT", 0x46)] {
         let key = (number, name.to_string());
@@ -365,14 +361,27 @@ pub fn check(model: &Model) -> Vec<String> {
                 "focus {name} ({number:#04x}) is not in the dispatch surface"
             ));
         }
-        if documented.contains(&key) {
+        if !documented.contains(&key) {
             errors.push(format!(
-                "focus {name} ({number:#04x}) is unexpectedly documented"
+                "focus {name} ({number:#04x}) is not in the documented table"
             ));
         }
-        if !known.contains(&key) {
+        if known.contains(&key) {
             errors.push(format!(
-                "focus {name} ({number:#04x}) is not registered as a known omission"
+                "focus {name} ({number:#04x}) is still registered as a known omission"
+            ));
+        }
+    }
+    for (key, reason) in &model.known {
+        if reason.is_empty() {
+            errors.push(format!(
+                "known omission {:#04x} {} has no machine-readable reason",
+                key.0, key.1
+            ));
+        } else if !(reason.starts_with("public:") || reason.starts_with("private:")) {
+            errors.push(format!(
+                "known omission {:#04x} {} has an unrecognised reason `{reason}`",
+                key.0, key.1
             ));
         }
     }
@@ -395,12 +404,11 @@ pub fn check(model: &Model) -> Vec<String> {
             ));
         }
     }
-    for entry in model.known.iter() {
-        let key = (entry.number, entry.name.clone());
-        if documented.contains(&key) || !dispatch.contains(&key) {
+    for key in model.known.keys() {
+        if documented.contains(key) || !dispatch.contains(key) {
             errors.push(format!(
                 "stale known omission: {:#04x} {} is now documented or absent from dispatch",
-                entry.number, entry.name
+                key.0, key.1
             ));
         }
     }
