@@ -414,6 +414,7 @@ if [ "$mode" = --check ]; then
             row=$(awk -F'\t' -v s="$served_rel" '!/^#/ && $1 == s { print; found = 1 } END { if (!found) exit 1 }' "$manifest" 2>/dev/null || true)
             if [ -z "$row" ]; then
                 printf 'served-copies: MANIFEST missing row %s; run: sh scripts/served-copies.sh --refresh\n' "$served_rel" >&2
+                stale=$((stale + 1))
                 failed=1
                 continue
             fi
@@ -425,6 +426,7 @@ EOF
                [ "$m_repo" != "$entry_repo" ] || \
                [ "$m_entry_mode" != "$entry_mode" ]; then
                 printf 'served-copies: MANIFEST stale %s; run: sh scripts/served-copies.sh --refresh\n' "$served_rel" >&2
+                stale=$((stale + 1))
                 failed=1
                 continue
             fi
@@ -432,6 +434,7 @@ EOF
             served_sha=$(sha256 "$served")
             if [ "$m_source_sha" != "$source_sha" ] || [ "$m_served_sha" != "$served_sha" ]; then
                 printf 'served-copies: MANIFEST stale %s; run: sh scripts/served-copies.sh --refresh\n' "$served_rel" >&2
+                stale=$((stale + 1))
                 failed=1
                 continue
             fi
@@ -443,6 +446,7 @@ EOF
             if [ "$m_commit" != "$row_commit" ]; then
                 printf 'served-copies: MANIFEST stale %s (source commit %s != %s); run: sh scripts/served-copies.sh --refresh\n' \
                     "$served_rel" "$m_commit" "$row_commit" >&2
+                stale=$((stale + 1))
                 failed=1
             fi
         fi
@@ -453,6 +457,7 @@ EOF
         if [ "$rows" -ne "$entry_count" ]; then
             printf 'served-copies: MANIFEST has %s rows, expected %s; run: sh scripts/served-copies.sh --refresh\n' \
                 "$rows" "$entry_count" >&2
+            stale=$((stale + 1))
             failed=1
         fi
     fi
