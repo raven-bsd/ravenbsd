@@ -21,8 +21,14 @@
 #                  durability.md instead of the standing table
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
-# The exclusive-host preflight refuses other QEMU/xtask/cargo/rustc or load > 2.0. Set
-# S107_WAIT_FOR_IDLE=<seconds> to wait for an idle host, or S107_MAX_LOAD to change the bound.
+#
+# Two preflight modes, because a functional row and a latency row have different noise contracts:
+#   functional (default)  another QEMU refuses; co-tenant cargo/rustc builds do not; load budget
+#                         is 2*nproc, the same budget scripts/qemu-hygiene.sh already uses. This is
+#                         what lets a gate run while the rest of the lanes work.
+#   latency (S107_LATENCY=1)  no other QEMU, no cargo/rustc at all, load budget max(2, nproc/4).
+#                         For rows whose result is a wall-clock number.
+# S107_WAIT_FOR_IDLE=<seconds> waits; S107_MAX_LOAD overrides the budget in either mode.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -32,14 +38,25 @@ cd "$root" || exit 2
 doc=
 log_dir=target/kernel-gate
 wait_idle=${S107_WAIT_FOR_IDLE:-0}
+latency=${S107_LATENCY:-0}
 default_max_load() {
     n=$(nproc 2>/dev/null || echo 4)
     case "$n" in ''|*[!0-9]*) n=4 ;; esac
-    m=$((n / 4))
-    [ "$m" -lt 2 ] && m=2
-    echo "$m"
+    if [ "$latency" = 1 ]; then
+        m=$((n / 4))
+        [ "$m" -lt 2 ] && m=2
+        echo "$m"
+    else
+        echo $((n * 2))
+    fi
 }
 max_load=${S107_MAX_LOAD:-$(default_max_load)}
+preflight_args=
+if [ "$latency" = 1 ]; then
+    preflight_args=
+else
+    preflight_args=--allow-jobs
+fi
 
 # case | arch | owner | subsystem note
 cases='boot-uname|x86_64|stuart|boot/uname
@@ -100,10 +117,12 @@ case "${1:-}" in
 esac
 
 mkdir -p "$log_dir" || exit 2
+# shellcheck disable=SC2086
 sh tests/smp/boot/host-idle.sh \
     --context "kernel-gate" \
     --wait "$wait_idle" \
     --max-load "$max_load" \
+    $preflight_args \
     --state-file "$log_dir/host-state.txt" || exit 2
 
 commit=$(git rev-parse HEAD 2>/dev/null) || { echo "kernel-gate: not a git checkout" >&2; exit 2; }
