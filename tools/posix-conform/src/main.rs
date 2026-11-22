@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result, bail};
 
 use posix_conform::gate;
+use posix_conform::mgmt;
 use posix_conform::model::{load_profile, load_trace, validate};
 use posix_conform::render::{check_current, generate};
 use posix_conform::seed;
@@ -21,23 +22,6 @@ fn main() -> std::process::ExitCode {
             std::process::ExitCode::from(2)
         }
     }
-}
-
-fn mgmt_root(root: &std::path::Path) -> Result<PathBuf> {
-    let raw = std::env::var("RAVEN_MGMT_ROOT")
-        .ok()
-        .filter(|value| !value.is_empty());
-    let path = raw
-        .map(PathBuf::from)
-        .unwrap_or_else(|| root.parent().unwrap_or(root).join("ravenbsd-prjmgmt"));
-    if !path.is_dir() {
-        bail!(
-            "RAVEN_MGMT_ROOT: management root {} is not a directory; set RAVEN_MGMT_ROOT to the \
-             ravenbsd-prjmgmt checkout (no product docs fallback)",
-            path.display()
-        );
-    }
-    Ok(path)
 }
 
 fn run(args: Vec<String>) -> Result<u8> {
@@ -110,18 +94,18 @@ fn run(args: Vec<String>) -> Result<u8> {
             Ok(0)
         }
         "generate" => {
-            let profile = load_profile(&root.join("docs/posix/profile.toml"))
+            let profile = load_profile(&mgmt::posix_dir(&root)?.join("profile.toml"))
                 .context("cannot load profile")?;
-            let trace = load_trace(&root.join("docs/posix/traceability.toml"))
+            let trace = load_trace(&mgmt::posix_dir(&root)?.join("traceability.toml"))
                 .context("cannot load traceability")?;
             validate(&root, &profile, &trace)?;
             generate(&root, &profile, &trace)?;
             Ok(0)
         }
         "check" => {
-            let profile = load_profile(&root.join("docs/posix/profile.toml"))
+            let profile = load_profile(&mgmt::posix_dir(&root)?.join("profile.toml"))
                 .context("cannot load profile")?;
-            let trace = load_trace(&root.join("docs/posix/traceability.toml"))
+            let trace = load_trace(&mgmt::posix_dir(&root)?.join("traceability.toml"))
                 .context("cannot load traceability")?;
             validate(&root, &profile, &trace)?;
             check_current(&root, &profile, &trace)?;
@@ -130,9 +114,9 @@ fn run(args: Vec<String>) -> Result<u8> {
             Ok(0)
         }
         "gate" => {
-            let profile_doc = load_profile(&root.join("docs/posix/profile.toml"))
+            let profile_doc = load_profile(&mgmt::posix_dir(&root)?.join("profile.toml"))
                 .context("cannot load profile")?;
-            let trace = load_trace(&root.join("docs/posix/traceability.toml"))
+            let trace = load_trace(&mgmt::posix_dir(&root)?.join("traceability.toml"))
                 .context("cannot load traceability")?;
             let options = gate::Options {
                 profile,
@@ -144,7 +128,7 @@ fn run(args: Vec<String>) -> Result<u8> {
             let report = gate::run(&root, &profile_doc, &trace, &options)?;
             let text = gate::render(&report);
             let report_path =
-                mgmt_root(&root)?.join("architecture/product-data/posix-conformance.md");
+                mgmt::root(&root)?.join("architecture/product-data/posix-conformance.md");
             std::fs::write(report_path, text).context("cannot write mgmt posix-conformance.md")?;
             if json {
                 println!("{}", gate::json(&report)?);

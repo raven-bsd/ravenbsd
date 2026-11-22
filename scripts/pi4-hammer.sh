@@ -368,7 +368,7 @@ sh scripts/pi4-hammer.sh --board --device /dev/ttyUSB0
 | GENET board markers | otto/O4 | `scripts/pi4-genet-evidence.sh build/pi4/<image-sha256>.log` | UNVERIFIED |
 | GENET/audio soak markers | otto/O6 | `scripts/pi4-soak.sh build/pi4/<image-sha256>.log` | UNVERIFIED |
 | Root mount | jerry/J5 | capture the log and look for `svcd: root mounted at /root` and `fsd-ufs: mounted block:` | UNVERIFIED (pi4-root case absent: J5 is blocked) |
-| PWM audio register read-backs | otto/B46 | follow `docs/pi4-audio.md` section 5 and record every register/counter | UNVERIFIED |
+| PWM audio register read-backs | otto/B46 | follow the Pi 4 audio note section 5 and record every register/counter | UNVERIFIED |
 
 A board row becomes PASS only when the captured log contains the helper's required markers. No
 line in this section is a hardware result until the owner attaches the log and audio recording.
@@ -495,7 +495,7 @@ write_board_matrix() {
             "${BOARD_LOG:-<log>}" "$SOAK_STATUS" "$SOAK_EVIDENCE"
         printf '| Root mount markers | jerry/J5 | inspect `%s` | **%s** | %s |\n' \
             "${BOARD_LOG:-<log>}" "$ROOT_STATUS" "$ROOT_EVIDENCE"
-        printf '| PWM audio register read-backs | otto/B46 | `docs/pi4-audio.md` section 5 | **%s** | %s |\n' \
+        printf '| PWM audio register read-backs | otto/B46 | `the Pi 4 audio note` section 5 | **%s** | %s |\n' \
             "$AUDIO_STATUS" "$AUDIO_EVIDENCE"
         printf '\n## Board procedure\n\n'
         printf '```sh\n'
@@ -520,7 +520,7 @@ board_mode() {
     ROOT_STATUS=UNVERIFIED
     ROOT_EVIDENCE="no captured log"
     AUDIO_STATUS=UNVERIFIED
-    AUDIO_EVIDENCE="no hardware marker script; follow docs/pi4-audio.md section 5"
+    AUDIO_EVIDENCE="no hardware marker script; follow the Pi 4 audio note section 5"
 
     if [ -n "$DEVICE" ] && [ -z "$BOARD_LOG" ]; then
         BOARD_LOG=$WORK/serial.log

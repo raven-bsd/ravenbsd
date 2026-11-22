@@ -156,18 +156,27 @@ pub struct Overlay {
 }
 
 impl Overlay {
-    /// Load the optional aggregate file and every `docs/posix/evidence/P1-P5.toml` or
-    /// `P<owner>-<batch>.toml` file.
+    /// Load the overlay from the management POSIX directory for `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the management root is absent or an overlay file is invalid.
+    pub fn load(root: &Path) -> Result<Self> {
+        Self::load_at(&crate::mgmt::posix_dir(root)?)
+    }
+
+    /// Load the optional aggregate file and every `evidence/P1-P5.toml` or
+    /// `P<owner>-<batch>.toml` file under an explicit management POSIX directory.
     ///
     /// Duplicate ids and files outside the P1-P5 owner split are hard errors. A missing overlay
     /// is an empty overlay, so the seed and gate keep working before owners add evidence.
-    pub fn load(root: &Path) -> Result<Self> {
+    pub fn load_at(posix: &Path) -> Result<Self> {
         let mut paths: Vec<(PathBuf, String)> = Vec::new();
-        let aggregate = root.join("docs/posix/evidence.toml");
+        let aggregate = posix.join("evidence.toml");
         if aggregate.is_file() {
             paths.push((aggregate, String::new()));
         }
-        let owner_dir = root.join("docs/posix/evidence");
+        let owner_dir = posix.join("evidence");
         if owner_dir.is_dir() {
             let mut owner_paths = Vec::new();
             for entry in std::fs::read_dir(&owner_dir)

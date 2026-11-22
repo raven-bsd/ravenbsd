@@ -151,7 +151,8 @@ require_file() {
 }
 
 host_checks() {
-    require_file docs/releases/0.1.0-eink-evidence.md
+    mgmt_eink=$(mgmt_require_file architecture/product-data/0.1.0-eink-evidence.md) || exit 2
+    require_file "$mgmt_eink"
     mgmt_readme=$(mgmt_require_file tickets/evidence/pi4-eink/README.md) || exit 2
     require_file "$mgmt_readme"
     require_file scripts/board-pi4-check.sh

@@ -27,13 +27,14 @@ ROOT = Path(__file__).resolve().parents[3]
 VERSION = "0.1.0"
 PACKET_REL = "tickets/release/0.1.0-evidence.md"
 EVIDENCE = ROOT / "build/release" / VERSION
-RELEASE_IMAGES = ROOT / "docs/release-images.md"
-SMP_SOAK = ROOT / "docs/smp-boot-soak.md"
-SMP_CLOSEOUT = ROOT / "docs/smp-closeout.md"
-RELEASE_NOTES = ROOT / "docs/releases/0.1.0-notes.md"
+MGMT = mgmt.resolve_root(ROOT)
+RELEASE_IMAGES = MGMT / "architecture/product-data/release-images.md"
+SMP_SOAK = MGMT / "architecture/product-data/smp-boot-soak.md"
+SMP_CLOSEOUT = MGMT / "architecture/product-data/smp-closeout.md"
+RELEASE_NOTES = MGMT / "architecture/product-data/release-notes-0.1.0.md"
 LIBC_REPORT = ROOT / "libc/ravenlibc/GATE-REPORT.md"
-LIBC_DECISIONS = ROOT / "docs/releases/0.1.0-libc-decisions.md"
-FREEZE_CHECKLIST = ROOT / "docs/releases/0.1.0-freeze-checklist.md"
+LIBC_DECISIONS = MGMT / "architecture/product-data/libc-decisions-0.1.0.md"
+FREEZE_CHECKLIST = MGMT / "architecture/product-data/freeze-checklist-0.1.0.md"
 PI4_DEFAULT = EVIDENCE / "pi4-serial.log"
 IMAGE_X86_DEFAULT = ROOT / "build/x86_64/ravenbsd-x86_64.img"
 IMAGE_AARCH64_DEFAULT = ROOT / "build/aarch64/ravenbsd-pi4.img"
@@ -168,7 +169,7 @@ def run_gate(name: str, argv: list[str], head: str, dirty: bool) -> Gate:
         started=result.started,
         ended=result.ended,
         exit_code=str(result.code),
-        evidence=str(log.relative_to(ROOT)),
+        evidence=display(log),
         sha256=sha256(log),
         note="exit 0; clean tree" if status == "PASS" else f"exit {result.code}; tree {'dirty' if dirty else 'clean'}",
     )
@@ -299,9 +300,9 @@ def libc_gate_from_log(
             f"(decision page); POSIX is the public libc gate"
         )
         return Gate(
-            "libc-gate", "DEFERRED", "read docs/releases/0.1.0-libc-decisions.md",
+            "libc-gate", "DEFERRED", f"read {display(LIBC_DECISIONS)}",
             started, ended, str(result_code),
-            str(decisions.relative_to(ROOT)), sha256(decisions), note
+            display(decisions), sha256(decisions), note
         )
     if missing >= 10 and met == 0 and not_met >= 10:
         counts = libc_committed_counts(decisions)
@@ -317,7 +318,7 @@ def libc_gate_from_log(
         return Gate(
             "libc-gate", "STALE", "cargo run -q -p libc-gate -- verdict",
             started, ended, str(result_code),
-            str(report.relative_to(ROOT)), sha256(report), note
+            display(report), sha256(report), note
         )
     if result_code == 0 and status_text == "MET":
         status = "PASS"
@@ -329,7 +330,7 @@ def libc_gate_from_log(
     return Gate(
         "libc-gate", status, "cargo run -q -p libc-gate -- verdict",
         started, ended, str(result_code),
-        str(log.relative_to(ROOT)), sha256(log), note
+        display(log), sha256(log), note
     )
 
 
@@ -371,7 +372,7 @@ def release_login_gate(head: str, run_qtests: bool) -> Gate:
         if result.code != 0:
             return Gate(
                 "release-login", "FAIL", "sh scripts/qemu-release.sh",
-                result.started, result.ended, code, str(log.relative_to(ROOT)),
+                result.started, result.ended, code, display(log),
                 sha256(log), f"exit {result.code}"
             )
     else:
@@ -380,31 +381,31 @@ def release_login_gate(head: str, run_qtests: bool) -> Gate:
         if not transcript.is_file():
             return Gate(
                 "release-login", "MISSING", "read build/qtest/release-login.log",
-                utc(), utc(), "recorded", str(transcript.relative_to(ROOT)), "",
+                utc(), utc(), "recorded", display(transcript), "",
                 "release-login transcript is missing; run --run-qtests"
             )
     recorded = parse_transcript_commit(transcript)
     if not recorded:
         return Gate(
             "release-login", "MISSING", "read release-login transcript", utc(), utc(),
-            code, str(transcript.relative_to(ROOT)), sha256(transcript),
+            code, display(transcript), sha256(transcript),
             "transcript has no kernel commit banner"
         )
     if not commit_is_current(recorded, head):
         return Gate(
             "release-login", "STALE", "read release-login transcript", utc(), utc(),
-            code, str(transcript.relative_to(ROOT)), sha256(transcript),
+            code, display(transcript), sha256(transcript),
             f"recorded at {recorded}; HEAD is {head}"
         )
     if not check_transcript(transcript):
         return Gate(
             "release-login", "FAIL", "tests/fixtures/release/check-transcript.sh", utc(), utc(),
-            code, str(transcript.relative_to(ROOT)), sha256(transcript),
+            code, display(transcript), sha256(transcript),
             "transcript shape check failed"
         )
     return Gate(
         "release-login", "PASS", "release-login transcript", utc(), utc(), code,
-        str(transcript.relative_to(ROOT)), sha256(transcript),
+        display(transcript), sha256(transcript),
         f"transcript at {recorded}"
     )
 
@@ -542,21 +543,21 @@ def libc_1cpu_gate(notes: Path, head: str, freeze: Path | None = None) -> Gate:
         if fixed:
             return Gate(
                 "libc-1cpu", "MET",
-                "read docs/releases/0.1.0-freeze-checklist.md", utc(), utc(), "",
-                str(freeze.relative_to(ROOT)), sha256(freeze),
+                f"read {display(freeze)}", utc(), utc(), "",
+                display(freeze), sha256(freeze),
                 "S132 FIXED; 1-CPU 3/3; libc-threads PASS (freeze checklist)",
             )
     text = read_text(notes)
     if not text:
         return Gate(
-            "libc-1cpu", "MISSING", "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
-            str(notes.relative_to(ROOT)), "", "release notes are missing"
+            "libc-1cpu", "MISSING", f"read {display(notes)}", utc(), utc(), "",
+            display(notes), "", "release notes are missing"
         )
     section = markdown_section(text, r"(?m)^### libc thread 1-CPU crash.*$")
     if not section:
         return Gate(
-            "libc-1cpu", "MISSING", "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
-            str(notes.relative_to(ROOT)), sha256(notes), "S132 1-CPU section is missing"
+            "libc-1cpu", "MISSING", f"read {display(notes)}", utc(), utc(), "",
+            display(notes), sha256(notes), "S132 1-CPU section is missing"
         )
     fault = re.search(r"page fault at (0x[0-9a-fA-F]+)", section)
     child = re.search(r"child exited \(?(-?\d+)\)?", section)
@@ -580,8 +581,8 @@ def libc_1cpu_gate(notes: Path, head: str, freeze: Path | None = None) -> Gate:
         status = "STALE"
         note = "S132 1-CPU section is ambiguous; no fault or clean result"
     return Gate(
-        "libc-1cpu", status, "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
-        str(notes.relative_to(ROOT)), sha256(notes), note
+        "libc-1cpu", status, f"read {display(notes)}", utc(), utc(), "",
+        display(notes), sha256(notes), note
     )
 
 
@@ -590,8 +591,8 @@ def cold_start_gate(notes: Path, head: str) -> Gate:
     text = read_text(notes)
     if not text:
         return Gate(
-            "cold-start", "MISSING", "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
-            str(notes.relative_to(ROOT)), "", "release notes are missing"
+            "cold-start", "MISSING", f"read {display(notes)}", utc(), utc(), "",
+            display(notes), "", "release notes are missing"
         )
     heading = re.search(r"(?m)^### Dynamic cold start / interactive login.*$", text)
     section = markdown_section(text, r"(?m)^### Dynamic cold start / interactive login.*$")
@@ -599,8 +600,8 @@ def cold_start_gate(notes: Path, head: str) -> Gate:
         section = markdown_section(text, r"(?m)^### Interactive shell.*$")
     if not section:
         return Gate(
-            "cold-start", "MISSING", "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
-            str(notes.relative_to(ROOT)), sha256(notes), "cold-start section is missing"
+            "cold-start", "MISSING", f"read {display(notes)}", utc(), utc(), "",
+            display(notes), sha256(notes), "cold-start section is missing"
         )
     spawn = re.search(
         r"`?spawn`?\s*(?:→|->)\s*`?main`?\s+takes\s+\**([0-9.]+)\s*(m?s)",
@@ -634,8 +635,8 @@ def cold_start_gate(notes: Path, head: str) -> Gate:
         status = "STALE"
         note = "cold-start state is ambiguous"
     return Gate(
-        "cold-start", status, "read docs/releases/0.1.0-notes.md", utc(), utc(), "",
-        str(notes.relative_to(ROOT)), sha256(notes), note
+        "cold-start", status, f"read {display(notes)}", utc(), utc(), "",
+        display(notes), sha256(notes), note
     )
 
 
@@ -650,27 +651,27 @@ def smp_soak_gate(
     closeout_text = read_text(closeout)
     if not soak_text:
         return Gate(
-            "smp-soak", "MISSING", "read docs/smp-boot-soak.md", utc(), utc(), "",
-            str(soak.relative_to(ROOT)), "", "soak document is missing"
+            "smp-soak", "MISSING", f"read {display(soak)}", utc(), utc(), "",
+            display(soak), "", "soak document is missing"
         )
     table = latest_soak_table(soak_text)
     if not table:
         return Gate(
-            "smp-soak", "STALE", "read docs/smp-boot-soak.md", utc(), utc(), "",
-            str(soak.relative_to(ROOT)), sha256(soak), "soak campaign table is missing or ambiguous"
+            "smp-soak", "STALE", f"read {display(soak)}", utc(), utc(), "",
+            display(soak), sha256(soak), "soak campaign table is missing or ambiguous"
         )
     notes_text = read_text(notes)
     notes_result = release_notes_soak(notes_text)
     if notes_result:
         kvm, tcg, extra_failures = notes_result
-        source = "docs/releases/0.1.0-notes.md (S107/S139)"
+        source = f"{display(notes)} (S107/S139)"
         evidence_path = notes
         evidence_sha = sha256(notes)
         campaign = ""
     else:
         kvm, tcg, section = table
         extra_failures = []
-        source = "docs/smp-boot-soak.md"
+        source = display(soak)
         evidence_path = soak
         evidence_sha = sha256(soak)
         campaign = re.search(r"Campaign at `([0-9a-f]{7,40})`", section)
@@ -709,8 +710,8 @@ def smp_soak_gate(
         note += f"; campaign {campaign.group(1)}"
     note += f"; source {source}"
     return Gate(
-        "smp-soak", status, f"read {evidence_path.relative_to(ROOT)}", utc(), utc(), "",
-        str(evidence_path.relative_to(ROOT)), evidence_sha, note
+        "smp-soak", status, f"read {display(evidence_path)}", utc(), utc(), "",
+        display(evidence_path), evidence_sha, note
     )
 
 
@@ -729,7 +730,7 @@ def dynamic_gate(arch: str, head: str, run_qtests: bool) -> Gate:
         if result.code != 0:
             return Gate(
                 name, "FAIL", f"cargo xtask qtest --case dynamic-userland --arch {arch}",
-                result.started, result.ended, code, str(evidence.relative_to(ROOT)),
+                result.started, result.ended, code, display(evidence),
                 sha256(evidence), f"exit {result.code}"
             )
     else:
@@ -737,25 +738,25 @@ def dynamic_gate(arch: str, head: str, run_qtests: bool) -> Gate:
         if not evidence.is_file():
             return Gate(
                 name, "MISSING", f"read build/qtest/dynamic-userland.log",
-                utc(), utc(), "recorded", str(evidence.relative_to(ROOT)), "",
+                utc(), utc(), "recorded", display(evidence), "",
                 f"no {arch} log; run --run-qtests"
             )
     recorded = parse_transcript_commit(evidence)
     if not recorded:
         return Gate(
             name, "MISSING", "read dynamic-userland log", utc(), utc(), code,
-            str(evidence.relative_to(ROOT)), sha256(evidence),
+            display(evidence), sha256(evidence),
             "log has no kernel commit banner"
         )
     if not commit_is_current(recorded, head):
         return Gate(
             name, "STALE", "read dynamic-userland log", utc(), utc(), code,
-            str(evidence.relative_to(ROOT)), sha256(evidence),
+            display(evidence), sha256(evidence),
             f"recorded at {recorded}; HEAD is {head}"
         )
     return Gate(
         name, "PASS", "dynamic-userland log", utc(), utc(), code,
-        str(evidence.relative_to(ROOT)), sha256(evidence),
+        display(evidence), sha256(evidence),
         f"transcript at {recorded}"
     )
 
@@ -802,8 +803,8 @@ def image_gate(name: str, path: Path, head: str, images_doc: Path = RELEASE_IMAG
         if digest and digest != recorded:
             note += f"; local build sha256={digest}"
         return Gate(
-            name, "PINNED", "read docs/release-images.md", utc(), utc(), "",
-            str(images_doc.relative_to(ROOT)), recorded, note
+            name, "PINNED", f"read {display(images_doc)}", utc(), utc(), "",
+            display(images_doc), recorded, note
         )
     if not path.is_file():
         if recorded and recorded_commit:
@@ -812,12 +813,12 @@ def image_gate(name: str, path: Path, head: str, images_doc: Path = RELEASE_IMAG
                 f"HEAD {head[:12] or 'unknown'}"
             )
             return Gate(
-                name, "UNPINNED", "read docs/release-images.md", utc(), utc(), "",
-                str(images_doc.relative_to(ROOT)), recorded, note
+                name, "UNPINNED", f"read {display(images_doc)}", utc(), utc(), "",
+                display(images_doc), recorded, note
             )
         return Gate(
-            name, "MISSING", f"sha256 {path.relative_to(ROOT)}", utc(), utc(), "",
-            str(path.relative_to(ROOT)), "", "image is missing"
+            name, "MISSING", f"sha256 {display(path)}", utc(), utc(), "",
+            display(path), "", "image is missing"
         )
     manifest = path.parent / "manifest.txt"
     manifest_commit = ""
@@ -835,16 +836,16 @@ def image_gate(name: str, path: Path, head: str, images_doc: Path = RELEASE_IMAG
             + (f" sha256={recorded}" if recorded else "")
         )
     return Gate(
-        name, status, f"sha256 {path.relative_to(ROOT)}", utc(), utc(), "",
-        str(path.relative_to(ROOT)), digest, note
+        name, status, f"sha256 {display(path)}", utc(), utc(), "",
+        display(path), digest, note
     )
 
 
 def board_gate(log: Path) -> Gate:
     if not log.is_file():
         return Gate(
-            "pi4-board", "MISSING", f"read {log.relative_to(ROOT)}", utc(), utc(), "",
-            str(log.relative_to(ROOT)), "", "no board log; Pi 4 remains UNVERIFIED"
+            "pi4-board", "MISSING", f"read {display(log)}", utc(), utc(), "",
+            display(log), "", "no board log; Pi 4 remains UNVERIFIED"
         )
     result = subprocess.run(
         ["sh", "scripts/board-pi4-check.sh", "--log", str(log)],
@@ -866,7 +867,7 @@ def board_gate(log: Path) -> Gate:
         note = "board checker found missing markers"
     return Gate(
         "pi4-board", status, "sh scripts/board-pi4-check.sh --log", utc(), utc(),
-        str(result.returncode), str(log.relative_to(ROOT)), sha256(log), note,
+        str(result.returncode), display(log), sha256(log), note,
         required=True,
     )
 
@@ -897,7 +898,7 @@ def packet_text(gates: list[Gate], head: str, dirty: bool, owner_attestation: bo
         f"- Verdict: **{verdict}**",
         "- Tag: **none** (this packet does not tag)",
         "- Scope: generated release evidence. Bob's readiness matrix in",
-        "  `docs/releases/0.1.0-readiness.md` remains a separate audit and is not replaced.",
+        "  The readiness matrix remains a separate audit and is not replaced.",
         "",
         "## Gate table",
         "",
@@ -953,6 +954,7 @@ def packet_text(gates: list[Gate], head: str, dirty: bool, owner_attestation: bo
 
 
 def collect(args: argparse.Namespace) -> int:
+    global RELEASE_IMAGES, SMP_SOAK, SMP_CLOSEOUT, RELEASE_NOTES, LIBC_DECISIONS, FREEZE_CHECKLIST
     head = args.commit or head_commit()
     dirty = tree_dirty()
     if args.packet is None:
@@ -962,6 +964,16 @@ def collect(args: argparse.Namespace) -> int:
     )
     kernel_gate = args.kernel_gate or mgmt.require_file(
         ROOT, "architecture/product-data/kernel-gate.md"
+    )
+    RELEASE_IMAGES = mgmt.require_file(ROOT, "architecture/product-data/release-images.md")
+    SMP_SOAK = mgmt.require_file(ROOT, "architecture/product-data/smp-boot-soak.md")
+    SMP_CLOSEOUT = mgmt.require_file(ROOT, "architecture/product-data/smp-closeout.md")
+    RELEASE_NOTES = mgmt.require_file(ROOT, "architecture/product-data/release-notes-0.1.0.md")
+    LIBC_DECISIONS = mgmt.require_file(
+        ROOT, "architecture/product-data/libc-decisions-0.1.0.md"
+    )
+    FREEZE_CHECKLIST = mgmt.require_file(
+        ROOT, "architecture/product-data/freeze-checklist-0.1.0.md"
     )
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     gates = []
@@ -996,7 +1008,7 @@ def check(args: argparse.Namespace) -> int:
         args.packet = mgmt.require_root(ROOT) / PACKET_REL
     missing = []
     if not args.packet.is_file():
-        missing.append(str(args.packet.relative_to(ROOT)))
+        missing.append(display(args.packet))
     text = read_text(args.packet)
     if "**NO-GO**" in text:
         for line in text.splitlines():
@@ -1031,17 +1043,17 @@ def record_qemu_mode(args: argparse.Namespace) -> int:
         f"version={VERSION}",
         f"commit={head}",
         f"working_tree={'dirty' if dirty else 'clean'}",
-        f"image={image.relative_to(ROOT)}",
+        f"image={display(image)}",
         f"image_sha256={image_hash}",
         f"provenance_sha256={sha256(ROOT / 'PROVENANCE.toml')}",
-        f"qemu_transcript={transcript.relative_to(ROOT)}",
+        f"qemu_transcript={display(transcript)}",
         f"qemu_transcript_sha256={sha256(transcript)}",
         f"qemu_gate={gate.status} ({gate.note})",
         "pi4_gate=UNVERIFIED (board log missing or owner attestation required)",
         "tag=none",
     ]
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"release-evidence: QEMU evidence: {out.relative_to(ROOT)}")
+    print(f"release-evidence: QEMU evidence: {display(out)}")
     print(f"release-evidence: release-login {gate.status}: {gate.note}")
     return 0 if gate.status == "PASS" and image_hash != "MISSING" else 1
 
