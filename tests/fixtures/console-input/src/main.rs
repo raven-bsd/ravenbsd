@@ -5,7 +5,7 @@
 //!
 //! The rows run in serial-console order: zero length, a bad user pointer with queued bytes,
 //! a small buffer over a ten-byte line, a 64-byte burst read in eight-byte chunks, a timed
-//! empty read, and a cross-process `THREAD_KICK` that interrupts a blocked read. Every marker
+//! empty read, and a cross-process `PROC_SIGNAL` that interrupts a blocked read. Every marker
 //! is printed only after the bytes were checked in the guest.
 
 #![no_std]
@@ -15,7 +15,7 @@
 use core::arch::asm;
 
 use raven_abi::errno::Errno;
-use raven_abi::syscall::{Syscall, THREAD_KICK};
+use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, clock};
 use raven_rt::entry;
 use raven_rt::println;
@@ -27,7 +27,10 @@ const PAGE: usize = 4096;
 const PROC_FORK: usize = 0x39;
 const PROC_HANDLE_INFO: usize = 0x3E;
 const PROC_WAIT_EX: usize = 0x48;
+const PROC_SIGNAL: usize = 0x4A;
+const PROC_SIGRECV: usize = 0x4B;
 const P_PID: usize = 1;
+const SIGUSR1: usize = 10;
 
 /// Let the qtest dialogue deliver the bytes before the guest reads them.
 const SETTLE_NS: u64 = 500_000_000;
@@ -175,17 +178,30 @@ fn thread_create(
     .map(|value| Handle(value as u32))
 }
 
-fn kick(thread: Handle, bits: u32) -> Result<(), Errno> {
+fn signal(pid: i32, signo: usize) -> Result<(), Errno> {
     checked(syscall6(
-        THREAD_KICK,
-        thread.0 as usize,
-        bits as usize,
+        PROC_SIGNAL,
+        pid as isize as usize,
+        signo,
         0,
         0,
         0,
         0,
     ))
     .map(|_| ())
+}
+
+fn sigrecv() -> Result<usize, Errno> {
+    let mut info = [0u64; 3];
+    checked(syscall6(
+        PROC_SIGRECV,
+        info.as_mut_ptr() as usize,
+        0,
+        0,
+        0,
+        0,
+        0,
+    ))
 }
 
 fn wait_ex(idtype: usize, id: i32, options: usize, status: &mut i32) -> Result<usize, Errno> {
@@ -319,6 +335,13 @@ extern "C" fn signal_child(_arg: usize) -> ! {
             sys::exit(1);
         }
     }
+    match sigrecv() {
+        Ok(signo) if signo == SIGUSR1 => println!("console-input: signal-recv={SIGUSR1}"),
+        _ => {
+            println!("console-input: fail signal-recv");
+            sys::exit(1);
+        }
+    }
     let count = match read_exact(&mut buffer, READ_TIMEOUT_NS * 2) {
         Ok(count) => count,
         Err(_) => {
@@ -338,10 +361,10 @@ fn signal_row() -> Result<(), &'static str> {
     println!("console-input: signal-start");
     let child = proc_fork(Handle::SELF_PROC).map_err(|_| "signal-fork")?;
     let pid = handle_info(child).map_err(|_| "signal-pid")?;
-    let thread = thread_create(child, signal_child as *const () as usize, stack_top(), 0)
+    let _thread = thread_create(child, signal_child as *const () as usize, stack_top(), 0)
         .map_err(|_| "signal-thread")?;
     sys::nanosleep(300_000_000).map_err(|_| "signal-sleep")?;
-    kick(thread, 1).map_err(|_| "signal-kick")?;
+    signal(pid as i32, SIGUSR1).map_err(|_| "signal-send")?;
     let mut status = 0i32;
     wait_ex(P_PID, pid as i32, 0, &mut status).map_err(|_| "signal-wait")?;
     if (status >> 8) & 0xff != 0 {

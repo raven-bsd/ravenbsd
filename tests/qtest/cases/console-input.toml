@@ -7,8 +7,8 @@
 #   3. a 4-byte buffer over a 10-byte line returns 4, 4, 2 with no loss or duplication;
 #   4. a 64-byte burst read in 8-byte chunks neither overruns nor loses the tail;
 #   5. a timed empty read returns 0 within a bounded interval;
-#   6. a cross-process THREAD_KICK interrupts a blocked read with EINTR and the queued bytes
-#      remain readable.
+#   6. a cross-process PROC_SIGNAL interrupts a blocked read with EINTR; PROC_SIGRECV still
+#      returns the queued signal and the console bytes remain readable.
 # The K503 line-discipline vehicle is preserved as console-input-shell.toml.
 
 name = "console-input"
@@ -41,6 +41,9 @@ regex = '^console-input: timeout=0 elapsed-ms=[0-9]+$'
 
 [[expect]]
 regex = '^console-input: signal-eintr=1$'
+
+[[expect]]
+regex = '^console-input: signal-recv=10$'
 
 [[expect]]
 regex = '^console-input: signal-tail=1$'
@@ -119,6 +122,10 @@ timeout_secs = 15
 
 [[step]]
 wait = '^console-input: signal-eintr=1$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: signal-recv=10$'
 timeout_secs = 15
 
 [[step]]

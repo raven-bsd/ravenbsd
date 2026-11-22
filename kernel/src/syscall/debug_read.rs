@@ -37,14 +37,11 @@ const PAGE: u64 = 4096;
 /// untouched, so the writable mapping is checked before the ring is consumed. This is
 /// deliberately stricter than NetBSD `ttread`, which takes the byte with `getc` before
 /// `ureadc` reports the fault.
-fn destination_writable(address: u64, length: u64) -> bool {
+fn destination_writable(process: &process::Process, address: u64, length: u64) -> bool {
     if length == 0 {
         return true;
     }
     let Some(end) = address.checked_add(length) else {
-        return false;
-    };
-    let Some(process) = process::current() else {
         return false;
     };
     let space = process.address_space.lock();
@@ -71,8 +68,10 @@ pub fn handle(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Ok(0);
     }
     let destination = UserSlice::new(frame.rdi, u64::try_from(length).map_err(|_| Errno::EINVAL)?)?;
+    let current = process::current().ok_or(Errno::ESRCH)?;
     let chunk = length.min(CHUNK);
     if !destination_writable(
+        &current,
         destination.address(),
         u64::try_from(chunk).map_err(|_| Errno::EINVAL)?,
     ) {
@@ -105,17 +104,44 @@ pub fn handle(frame: &SyscallFrame) -> Result<usize, Errno> {
             sched::end_block(token);
             return Err(Errno::EINTR);
         }
+        if current.has_pending_signal() {
+            sched::end_block(token);
+            return Err(Errno::EINTR);
+        }
         if let Some(deadline) = deadline {
             sched::add_sleep(token, deadline, Errno::ETIMEDOUT.to_ret());
         }
         let queued = console::waiters().enqueue_if(0, 0, || Ok(!console::available()));
         match queued {
             Ok(true) => {
+                // A queued process signal wakes this wait; the signal itself stays queued for
+                // `PROC_SIGRECV`, and the console bytes stay in the ring because nothing has
+                // been copied yet.
+                let signal_queued = current
+                    .signal_waiters
+                    .enqueue_if(current.id, 0, || Ok(!current.has_pending_signal()));
+                match signal_queued {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        console::waiters().remove(0, 0, thread_id);
+                        sched::end_block(token);
+                        return Err(Errno::EINTR);
+                    }
+                    Err(error) => {
+                        console::waiters().remove(0, 0, thread_id);
+                        sched::end_block(token);
+                        return Err(error);
+                    }
+                }
                 let status = sched::block_current();
                 let kicked = sched::take_kick();
                 console::waiters().remove(0, 0, thread_id);
+                current.signal_waiters.remove(current.id, 0, thread_id);
                 sched::end_block(token);
                 if status == Errno::EINTR.to_ret() || kicked {
+                    return Err(Errno::EINTR);
+                }
+                if current.has_pending_signal() {
                     return Err(Errno::EINTR);
                 }
                 if status == Errno::ETIMEDOUT.to_ret() {
