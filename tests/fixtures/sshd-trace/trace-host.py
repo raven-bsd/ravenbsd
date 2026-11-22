@@ -5,9 +5,9 @@
 
 Boots the K498 DEBUG3 image with a private tap, makes one password login and
 one command from the host (the K194 tap path; slirp hostfwd is the known
-FIN/RST failure), and lets the trace-only `sshd-trace-dump` service copy the
-full sshd debug log to the serial. The first session's close state is recorded:
-a command that prints and then never closes is the S7/S5 symptom.
+FIN/RST failure), and keeps the serial console, where the overlay sshd writes
+its full debug log. The first session's close state is recorded: a command that
+prints and then never closes is the S7/S5 symptom.
 """
 
 from __future__ import annotations
@@ -109,7 +109,6 @@ def main() -> int:
     child = pexpect.spawn("qemu-system-x86_64", argv, cwd=str(ROOT),
                           encoding="utf-8", codec_errors="replace", timeout=240)
     first = "not-run"
-    dumped = "timeout"
     with open(SERIAL, "w", encoding="utf-8") as serial:
         child.logfile = serial
         try:
@@ -120,23 +119,30 @@ def main() -> int:
             first = ssh(GUEST, "echo sshd-trace-command-ok", CLIENT1, 20,
                         "sshd-trace-command-ok")
             log("client1", first)
-            try:
-                child.expect("sshd-trace-dump: end", timeout=120)
-                dumped = "collected"
-            except pexpect.TIMEOUT:
-                dumped = "timeout"
-            log("dump", dumped)
+            time.sleep(10)
         finally:
             child.close(force=True)
     text = SERIAL.read_text(encoding="utf-8", errors="replace")
-    begin = "sshd-trace-dump: begin"
-    end = "sshd-trace-dump: end"
-    if begin in text and end in text:
-        body = text.split(begin, 1)[1].split(end, 1)[0]
-        SERVER_LOG.write_text(body.lstrip("\r\n"), encoding="utf-8")
-    SUMMARY.write_text(f"client1={first}\ndump={dumped}\n", encoding="utf-8")
-    log("summary", f"client1={first} dump={dumped}")
-    if dumped != "collected":
+    keep = []
+    for line in text.splitlines():
+        if (
+            "sshd" in line
+            or "debug1:" in line
+            or "debug2:" in line
+            or "debug3:" in line
+            or "Server listening" in line
+            or "Connection from" in line
+            or "Accepted" in line
+            or "Received" in line
+            or "session" in line
+            or "channel" in line
+        ):
+            keep.append(line)
+    SERVER_LOG.write_text("\n".join(keep) + "\n", encoding="utf-8")
+    collected = "Server listening" in text and "Connection from" in text
+    SUMMARY.write_text(f"client1={first}\ncollected={collected}\n", encoding="utf-8")
+    log("summary", f"client1={first} collected={collected}")
+    if not collected:
         return 2
     log("logs", f"client1={CLIENT1} sshd={SERVER_LOG} serial={SERIAL} summary={SUMMARY}")
     return 0
