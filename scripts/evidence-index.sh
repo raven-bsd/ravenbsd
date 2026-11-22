@@ -90,20 +90,13 @@ size_of() {
 }
 
 # Print the resolved path for a referenced artifact, or nothing when it does not exist.
+# A report path may be stale: K544's first pass only knew the flat evidence directory, while
+# most moved logs live under tickets/evidence/artifacts/<ticket>/. The lookup tries the direct
+# path, the ticket directory, the flat evidence directories, then a unique basename match.
 resolve_path() {
-    token=$1
-    case $token in
-        /*)
-            base=$(basename "$token")
-            for candidate in "$EVIDENCE/artifacts/$base" "$EVIDENCE/$base"; do
-                if [ -f "$candidate" ]; then
-                    printf '%s' "$candidate"
-                    return 0
-                fi
-            done
-            return 0
-            ;;
-    esac
+    ticket=$1
+    token=$2
+    base=$(basename -- "$token")
     case $token in
         tickets/evidence/*)
             if [ -f "$MGMT/$token" ]; then
@@ -111,17 +104,9 @@ resolve_path() {
                 return 0
             fi
             ;;
-    esac
-    for candidate in "$MGMT/$token" "$ROOT/$token"; do
-        if [ -f "$candidate" ]; then
-            printf '%s' "$candidate"
-            return 0
-        fi
-    done
-    case $token in
-        */*) return 0 ;;
+        /*) ;;
         *)
-            for candidate in "$EVIDENCE/artifacts/$token" "$EVIDENCE/$token"; do
+            for candidate in "$MGMT/$token" "$ROOT/$token"; do
                 if [ -f "$candidate" ]; then
                     printf '%s' "$candidate"
                     return 0
@@ -129,6 +114,17 @@ resolve_path() {
             done
             ;;
     esac
+    for candidate in "$EVIDENCE/artifacts/$ticket/$base" "$EVIDENCE/artifacts/$base" "$EVIDENCE/$base"; do
+        if [ -f "$candidate" ]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+    matches=$(find "$EVIDENCE" -type f -name "$base" 2>/dev/null || true)
+    count=$(printf '%s\n' "$matches" | grep -c . || true)
+    if [ "$count" -eq 1 ]; then
+        printf '%s' "$matches"
+    fi
     return 0
 }
 
@@ -136,15 +132,16 @@ resolve_path() {
 path_like() {
     printf '%s' "$1" | awk '
         length($0) == 0 { exit 1 }
-        /[ \t<>|$(),;*]/ { exit 1 }
+        /[ \t<>|$(),;*[]/ { exit 1 }
         /:[0-9]+(-[0-9]+)?$/ { exit 1 }
         /^(~|\/proc|\/sys|\/dev\/)/ { exit 1 }
         /^\./ { exit 1 }
+        /(^|\/)(tickets|tests)\/evidence\// { exit 0 }
         {
             base = $0
             sub(/^.*\//, "", base)
             if (base ~ /^\./) { exit 1 }
-            if (base ~ /\.[[:alnum:]]+$/) { exit 0 }
+            if (base ~ /\.(log|json|txt|csv|tsv|xml|pcap|pcapng|img|bin|iso|png|jpg|jpeg|svg|pdf|sha256|tar|gz|tgz|zip|zst|a|so|elf|map|out|serial|list)$/) { exit 0 }
         }
         { exit 1 }
     '
@@ -275,7 +272,7 @@ audit_root() {
         missing_here=0
         while IFS= read -r token; do
             [ -n "$token" ] || continue
-            resolved=$(resolve_path "$token")
+            resolved=$(resolve_path "$ticket" "$token")
             if [ -n "$resolved" ]; then
                 printf '%s\t%s\tOK\n' "$token" "$resolved" >>"$resolved_list"
             else
