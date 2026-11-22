@@ -17,6 +17,7 @@ One run = S0 boot (throw-away echo initfs) + one SSH boot on the K194 tap.
 from __future__ import annotations
 
 import hashlib
+import errno
 import os
 import re
 import shutil
@@ -480,6 +481,145 @@ def ssh_run(command: list[str], log_name: str, user: str = USER,
             "elapsed_ms": elapsed, "timed_out": timed_out, "argv": argv}
 
 
+def ssh_probe(command: list[str], log_name: str, user: str = USER,
+              password: str = PASSWORD, extra: list[str] | None = None,
+              timeout: int = REQUEST_TIMEOUT_S) -> dict[str, object]:
+    """Run one ssh session and sample its socket fd/state; trace read/write if strace exists."""
+    argv = [
+        "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "ConnectTimeout=8",
+        "-o", "NumberOfPasswordPrompts=1",
+    ]
+    if extra:
+        argv.extend(extra)
+    argv.append(f"{user}@{HOST}")
+    argv.extend(command)
+    env = os.environ.copy()
+    env["SSH_ASKPASS"] = str(ASKPASS)
+    env["SSH_ASKPASS_REQUIRE"] = "force"
+    env["DISPLAY"] = ":0"
+    env["K434_SSH_PASSWORD"] = password
+    strace = shutil.which("strace")
+    strace_log = OUT / f"{log_name}-strace.log"
+    if strace:
+        argv = [strace, "-f", "-tt", "-s", "0", "-yy",
+                "-e", "trace=read,write,close,shutdown",
+                "-o", str(strace_log)] + argv
+    stdout_path = OUT / f"{log_name}.stdout"
+    stderr_path = OUT / f"{log_name}.stderr"
+    snapshots: list[dict[str, object]] = []
+    started = time.monotonic()
+    timed_out = False
+    with open(stdout_path, "wb") as out_file, open(stderr_path, "wb") as err_file:
+        process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                   stdout=out_file, stderr=err_file, env=env,
+                                   start_new_session=True)
+        deadline = started + timeout
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                break
+            ssh_pid = 0
+            if strace:
+                try:
+                    children = subprocess.run(
+                        ["pgrep", "-P", str(process.pid)], capture_output=True,
+                        text=True, timeout=5, check=False).stdout.split()
+                    for child in children:
+                        try:
+                            comm = Path(f"/proc/{child}/comm").read_text().strip()
+                        except OSError:
+                            continue
+                        if comm == "ssh":
+                            ssh_pid = int(child)
+                            break
+                except (OSError, subprocess.SubprocessError):
+                    ssh_pid = 0
+            else:
+                ssh_pid = process.pid
+            fd4 = ""
+            if ssh_pid:
+                try:
+                    fd4 = os.readlink(f"/proc/{ssh_pid}/fd/4")
+                except OSError:
+                    fd4 = ""
+            ss_line = ""
+            if ssh_pid:
+                try:
+                    ss_output = subprocess.run(
+                        ["ss", "-H", "-tnp"], capture_output=True, text=True,
+                        timeout=5, check=False).stdout
+                    ss_line = " || ".join(
+                        line.strip() for line in ss_output.splitlines()
+                        if f"pid={ssh_pid}" in line)
+                except (OSError, subprocess.SubprocessError):
+                    ss_line = ""
+            if fd4 or ss_line:
+                snapshots.append({
+                    "t_ms": (time.monotonic() - started) * 1000,
+                    "pid": ssh_pid,
+                    "fd4": fd4,
+                    "ss": ss_line,
+                })
+            time.sleep(0.2)
+        timed_out = process.poll() is None
+        if timed_out:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        returncode = process.wait()
+    elapsed = (time.monotonic() - started) * 1000
+    stdout = stdout_path.read_bytes()
+    stderr = stderr_path.read_bytes()
+    strace_text = strace_log.read_text(errors="replace") if strace_log.is_file() else ""
+    epipe_lines = [line for line in strace_text.splitlines()
+                   if "read(4" in line and "EPIPE" in line]
+    eof_lines = [line for line in strace_text.splitlines()
+                 if "read(4" in line and line.rstrip().endswith("= 0")]
+    fd_targets = []
+    for item in snapshots:
+        target = str(item["fd4"])
+        if target and target not in fd_targets:
+            fd_targets.append(target)
+    peer_states = []
+    for item in snapshots:
+        state = str(item["ss"])
+        if state and state not in peer_states:
+            peer_states.append(state)
+    probe_log = OUT / f"{log_name}-probe.log"
+    with open(probe_log, "w", encoding="utf-8") as handle:
+        handle.write(f"strace: {strace or 'unavailable'}\n")
+        handle.write(f"errno_EPIPE: {errno.EPIPE} ({os.strerror(errno.EPIPE)})\n")
+        handle.write(f"exit: {returncode}\n")
+        handle.write(f"timed_out: {timed_out}\n")
+        for item in snapshots:
+            handle.write(f"t_ms={float(item['t_ms']):.0f} pid={item['pid']} "
+                         f"fd4={item['fd4']} ss={item['ss']}\n")
+        for line in epipe_lines:
+            handle.write(f"strace_epipe: {line}\n")
+        for line in eof_lines:
+            handle.write(f"strace_eof: {line}\n")
+    log = OUT / log_name
+    log.write_text(
+        f"$ {' '.join(argv)}\n"
+        f"exit: {returncode}\n"
+        f"timed_out: {timed_out}\n"
+        f"elapsed_ms: {elapsed:.0f}\n"
+        f"stdout_hex: {stdout.hex()}\n"
+        f"stdout_text: {stdout.decode('utf-8', 'replace')}\n"
+        f"stderr_text: {stderr.decode('utf-8', 'replace')}\n",
+        encoding="utf-8")
+    return {"returncode": returncode, "stdout": stdout, "stderr": stderr,
+            "elapsed_ms": elapsed, "timed_out": timed_out, "argv": argv,
+            "epipe_lines": epipe_lines, "eof_lines": eof_lines,
+            "fd_targets": fd_targets, "peer_states": peer_states,
+            "probe_log": probe_log, "strace_log": strace_log}
+
+
 def row_s3_start() -> dict[str, object]:
     good = ssh_run(["true"], "s3-raven.log", extra=["-v"])
     good_text = (good["stderr"] + good["stdout"]).decode("utf-8", "replace")
@@ -592,7 +732,7 @@ def row_s4() -> None:
 
 
 def row_s5_s6() -> None:
-    result = ssh_run(["true"], "s5-vvv.log", extra=["-vvv"])
+    result = ssh_probe(["true"], "s5-vvv.log", extra=["-vvv"])
     text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
     auth = "Authenticated to " in text and 'using "password"' in text
     open_confirm = "debug2: channel_input_open_confirmation: channel 0" in text
@@ -602,6 +742,14 @@ def row_s5_s6() -> None:
                         if "receive packet: type 91" in line), "")
     broken = next((line for line in text.splitlines()
                    if "read failed" in line), "")
+    epipe_lines = list(result["epipe_lines"])  # type: ignore[arg-type]
+    epipe_line = epipe_lines[0] if epipe_lines else broken
+    fd_targets = list(result["fd_targets"])  # type: ignore[arg-type]
+    peer_states = list(result["peer_states"])  # type: ignore[arg-type]
+    fd_text = ", ".join(fd_targets) if fd_targets else "not captured"
+    peer_text = " || ".join(peer_states) if peer_states else "not captured"
+    errno_text = "EPIPE (32)" if epipe_line and ("EPIPE" in epipe_line or "Broken pipe" in epipe_line) \
+        else "not observed"
     attempt("S5", 1, "fresh", "channel_input_open_confirmation + open confirm",
             confirm_line or f"exit {result['returncode']}",
             float(result["elapsed_ms"]), "PASS" if auth and open_confirm and confirm_line else "FAIL")
@@ -629,11 +777,22 @@ def row_s5_s6() -> None:
     attempt("S6-length", 1, "reuse", "44-byte plaintext packet",
             "not observable", 0, "BLOCKED",
             "client exposes type and recipient channel, not the packet length")
-    if broken:
+    observed = (f"strace=`{epipe_line}` errno={errno_text} fd4={fd_text} "
+                f"peer_state={peer_text}")
+    attempt("S5-session", 1, "fresh", "read(4) returns 0 at peer EOF; no EPIPE",
+            observed, float(result["elapsed_ms"]),
+            "FAIL" if epipe_line else "PASS",
+            f"server-side handle not exposed; exit {result['returncode']}")
+    if epipe_line:
         record("S5-session", "FAIL",
-               f"after the confirmation the client reports `{broken.strip()}`; command output "
-               f"never arrived (exit {result['returncode']}); this is the post-exec/session path, "
-               f"not the confirmation")
+               f"after the confirmation the client reports `{epipe_line.strip()}`; "
+               f"errno={errno_text}, fd4={fd_text}, peer_state={peer_text}, "
+               f"exit {result['returncode']}; the server-side handle is not exposed "
+               f"(post-exec/session path, not the confirmation)")
+    else:
+        record("S5-session", "PASS",
+               f"read completed without EPIPE (exit {result['returncode']}); fd4={fd_text}, "
+               f"peer_state={peer_text}")
 
 
 def row_s7() -> None:
@@ -644,44 +803,68 @@ def row_s7() -> None:
             f"exit {marker_run['returncode']}")
     passed = 0
     for number in range(1, 11):
-        session = ssh_run(["true"], f"s7-run-{number}.log")
-        ok = session["returncode"] == 0
+        session = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-run-{number}.log")
+        ok = session["returncode"] == 0 and session["stdout"] == MARKER
         passed += 1 if ok else 0
-        attempt("S7-10/10", number, "fresh", "exit 0", f"exit {session['returncode']}",
-                float(session["elapsed_ms"]), "PASS" if ok else "FAIL")
+        attempt("S7-10/10", number, "fresh", literal(MARKER),
+                literal(session["stdout"]), float(session["elapsed_ms"]),
+                "PASS" if ok else "FAIL", f"exit {session['returncode']}")
     if marker_ok and passed == 10:
         record("S7", "PASS",
-               f"`cat /tmp/ssh-marker` returned exactly {literal(MARKER)}; 10/10 command "
-               f"sessions exit 0 (gate; C1-C10)")
+               f"`cat /tmp/ssh-marker` returned exactly {literal(MARKER)} on the single attempt "
+               f"and on 10/10 command sessions (gate; C1-C10)")
     else:
         record("S7", "FAIL",
                f"marker {'exact' if marker_ok else 'mismatch/error'} "
-               f"({literal(marker_run['stdout'])}); {passed}/10 command sessions (gate; C1-C10)")
+               f"({literal(marker_run['stdout'])}); {passed}/10 command sessions returned the "
+               f"exact marker (gate; C1-C10)")
 
 
 def row_s8() -> None:
-    result = ssh_run(["-tt", "tty"], "s8-tt.log", extra=["-tt"])
+    exit_path = OUT / "pty-alloc.exit"
+    log_path = OUT / "pty-alloc.log"
+    pty_alloc_ok = False
+    if exit_path.is_file():
+        try:
+            pty_alloc_exit = int(exit_path.read_text(encoding="utf-8").strip())
+        except ValueError:
+            pty_alloc_exit = -1
+        pty_text = log_path.read_text(errors="replace") if log_path.is_file() else ""
+        last_line = next((line.strip() for line in reversed(pty_text.splitlines())
+                          if line.strip()), "no log line")
+        pty_alloc_ok = pty_alloc_exit == 0 and "pty-alloc: pass" in pty_text
+        attempt("S8-pty-alloc", 1, "fresh", "exit 0 + `pty-alloc: pass`",
+                f"exit {pty_alloc_exit}; {last_line}", 0,
+                "PASS" if pty_alloc_ok else "FAIL")
+    else:
+        attempt("S8-pty-alloc", 1, "fresh", "exit 0 + `pty-alloc: pass`",
+                "artifact missing", 0, "BLOCKED",
+                f"run `timeout 45 cargo xtask qtest --case pty-alloc --arch x86_64`")
+    result = ssh_run(["tty"], "s8-tt.log", extra=["-tt"])
     output = result["stdout"].decode("utf-8", "replace")
     error = result["stderr"].decode("utf-8", "replace")
     match = re.search(r"/dev/pts/[0-9]+", output)
-    if match:
-        record("S8", "PASS", f"`ssh -tt tty` returned {match.group(0)} (openpty; C9)")
-        attempt("S8", 1, "fresh", "/dev/pts/N", match.group(0), float(result["elapsed_ms"]),
-                "PASS")
+    if match and pty_alloc_ok:
+        record("S8", "PASS",
+               f"`ssh -tt tty` returned {match.group(0)}; `pty-alloc` qtest passed (openpty; C9)")
+        attempt("S8", 1, "fresh", "/dev/pts/N", match.group(0),
+                float(result["elapsed_ms"]), "PASS")
     elif "PTY allocation request failed" in error or "PTY allocation request failed" in output:
         record("S8", "FAIL",
-               "`PTY allocation request failed on channel 0` (pts_alloc/openpty; C9; K430 not "
-               "merged)")
+               "`PTY allocation request failed on channel 0` (pts_alloc/openpty; C9)")
         attempt("S8", 1, "fresh", "/dev/pts/N", "PTY allocation request failed",
+                float(result["elapsed_ms"]), "FAIL")
+    elif match and not pty_alloc_ok:
+        record("S8", "FAIL",
+               f"`ssh -tt tty` returned {match.group(0)}, but the pty-alloc qtest did not pass "
+               f"(openpty; C9)")
+        attempt("S8", 1, "fresh", "/dev/pts/N + pty-alloc pass", match.group(0),
                 float(result["elapsed_ms"]), "FAIL")
     else:
         record("S8", "FAIL",
                f"`ssh -tt tty` exit {result['returncode']}, no /dev/pts/N (openpty; C9)")
         attempt("S8", 1, "fresh", "/dev/pts/N", literal(result["stdout"][:80]),
                 float(result["elapsed_ms"]), "FAIL")
-    attempt("S8-pty-alloc", 1, "fresh", "tests/libc/c/libc-pty-alloc.c case passes",
-            "not on origin/master", 0, "BLOCKED",
-            "K430 tests/libc/c/libc-pty-alloc.c and tests/qtest/cases/pty-alloc.toml are not merged")
 
 
 def write_tables() -> None:
