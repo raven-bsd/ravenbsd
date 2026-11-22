@@ -47,6 +47,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", type=Path, required=True)
     parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument("--mode", choices=("tcg", "kvm2", "kvm4"), default="tcg")
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--root-password", default=os.environ.get("RAVEN_ROOT_PASSWORD", "raven"))
     args = parser.parse_args(argv)
@@ -62,7 +63,7 @@ def main(argv: list[str]) -> int:
     vars_path = out / ".vars.fd"
     shutil.copyfile(vars_source, vars_path)
     try:
-        command = soak_run.qemu_argv("x86_64", soak_run.MODES["tcg"], image, vars_path)
+        command = soak_run.qemu_argv("x86_64", soak_run.MODES[args.mode], image, vars_path)
         child = pexpect.spawn(
             command[0],
             command[1:],
