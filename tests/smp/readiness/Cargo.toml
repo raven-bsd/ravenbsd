@@ -6,7 +6,7 @@
 [package]
 name = "raven-smp-readiness"
 version = "0.1.0"
-description = "K543 readiness contract fixture: no lost wake, HUP re-poll, EINTR re-evaluation."
+description = "K543 readiness contract fixture: no lost wake, HUP re-poll, EINTR re-evaluation, and root net listen visibility."
 edition = "2024"
 license = "BSD-3-Clause"
 rust-version = "1.85"
@@ -18,6 +18,14 @@ target = "none"
 name = "smp-readiness-init"
 path = "src/main.rs"
 
+[[bin]]
+name = "smp-readiness-net-child"
+path = "src/net_child.rs"
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-proto-net = { path = "../../../crates/raven-proto-net" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
