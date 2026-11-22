@@ -35,7 +35,9 @@ if not IMAGE.is_absolute():
     IMAGE = ROOT / IMAGE
 if not ECHO_IMAGE.is_absolute():
     ECHO_IMAGE = ROOT / ECHO_IMAGE
-OUT = ROOT / "build" / "ssh" / "matrix"
+OUT = Path(os.environ.get("RAVEN_MATRIX_OUT", "build/ssh/matrix"))
+if not OUT.is_absolute():
+    OUT = ROOT / OUT
 OVMF_CODE = Path(os.environ.get("RAVEN_OVMF_CODE", "/usr/share/OVMF/OVMF_CODE_4M.fd"))
 OVMF_VARS = Path(os.environ.get("RAVEN_OVMF_VARS", "/usr/share/OVMF/OVMF_VARS_4M.fd"))
 TAP = os.environ.get("RAVEN_QEMU_TAP", "ravendemo0")
@@ -1097,6 +1099,32 @@ def row_s8() -> None:
                 float(result["elapsed_ms"]), "FAIL")
 
 
+def row_s7_gate() -> None:
+    walls: list[float] = []
+    exits: list[int] = []
+    passed = 0
+    for number in range(1, 11):
+        result = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-gate-{number}.log",
+                         timeout=S7_TIMEOUT_S)
+        elapsed = float(result["elapsed_ms"])
+        walls.append(elapsed)
+        exits.append(int(result["returncode"]))
+        ok = (result["returncode"] == 0 and result["stdout"] == MARKER
+              and elapsed <= S7_WALL_BOUND_MS)
+        passed += 1 if ok else 0
+        attempt("S7-exit", number, "fresh",
+                f"exit 0; {literal(MARKER)}; wall <= {S7_WALL_BOUND_MS} ms",
+                f"exit {result['returncode']}; wall={elapsed:.0f} ms; "
+                f"bytes={literal(result['stdout'])}",
+                elapsed, "PASS" if ok else "FAIL")
+    if passed == 10:
+        record("S7-exit", "PASS", f"10/10 exit 0; walls={[round(v) for v in walls]}")
+    else:
+        record("S7-exit", "FAIL",
+               f"{passed}/10 exit0+bytes+<=5s; walls={[round(v) for v in walls]}; "
+               f"exits={exits}")
+
+
 def write_tables() -> None:
     attempts_path = OUT / "attempts.tsv"
     columns = ["row", "attempt", "connection", "expected", "received", "elapsed_ms",
@@ -1128,6 +1156,35 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     for stale in OUT.glob("serial*.log"):
         stale.unlink()
+    only = os.environ.get("RAVEN_MATRIX_ONLY", "")
+    if only:
+        child = None
+        try:
+            child, _ = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
+                            "vars-only.fd", ready_timeout=180)
+            if not wait_tcp(22, 30):
+                record(only, "BLOCKED",
+                       "guest listener did not accept a TCP connection after svcd: sshd up")
+            else:
+                time.sleep(0.5)
+                if only == "s1-repeat":
+                    row_s1_repeat()
+                elif only == "s7-exit":
+                    row_s7_gate()
+                elif only == "s8":
+                    row_s8()
+                else:
+                    record(only, "BLOCKED", f"unknown RAVEN_MATRIX_ONLY={only}")
+        except Exception as error:  # noqa: BLE001 - isolate the only-mode boot
+            record(only, "BLOCKED", f"only-mode boot failed: {error}")
+        finally:
+            if child is not None:
+                kill(child)
+            time.sleep(2.0)
+        write_tables()
+        failed = [row for row, status, _ in rows if status in ("FAIL", "BLOCKED", "PARTIAL")]
+        print(f"matrix: {'RED' if failed else 'GREEN'} ({len(failed)} red rows)")
+        return 1 if failed else 0
     if not build_peer():
         print("matrix: cannot build the peer tracer", file=sys.stderr)
         return 2
