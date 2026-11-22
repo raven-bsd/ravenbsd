@@ -446,6 +446,7 @@ static ENTROPY_INIT: AtomicBool = AtomicBool::new(false);
 enum EntropySource {
     Rdrand,
     Rndr,
+    Jitter,
 }
 
 impl EntropySource {
@@ -453,16 +454,34 @@ impl EntropySource {
         match self {
             EntropySource::Rdrand => "rdrand",
             EntropySource::Rndr => "rndr",
+            EntropySource::Jitter => "jitter",
         }
     }
+
+    const fn is_weak(self) -> bool {
+        matches!(self, EntropySource::Jitter)
+    }
+}
+
+/// Measured timer-jitter bound for the software seed.
+#[derive(Clone, Copy)]
+struct JitterStats {
+    samples: u32,
+    nonzero: u32,
+    distinct: u32,
+    min_delta: u64,
+    max_delta: u64,
+    rtc: bool,
 }
 
 /// Fill `out` with pool bytes.
 ///
-/// The pool is seeded once at boot from RDRAND/RNDR. A pool that exhausts its re-key budget is
-/// stirred from a fresh hardware seed; if the platform has no hardware source, the call returns
-/// [`raven_entropy::Error::Unseeded`]/[`raven_entropy::Error::NeedsReseed`] and `GETRANDOM` maps
-/// that to `EAGAIN`. Timer jitter is never used as cryptographic material.
+/// The pool is seeded once at boot from RDRAND/RNDR; a platform without either uses the measured
+/// timer/RTC jitter fallback through [`raven_entropy::Pool::stir_weak`]. A pool that exhausts its
+/// re-key budget is stirred from the same ordered source selection. A truly source-less platform
+/// returns [`raven_entropy::Error::Unseeded`]/[`raven_entropy::Error::NeedsReseed`] and `GETRANDOM`
+/// maps that to `EAGAIN`. The jitter source is explicitly weak and is never reported as
+/// cryptographic.
 pub fn entropy_fill(out: &mut [u8]) -> Result<usize, raven_entropy::Error> {
     let mut guard = ENTROPY_POOL.lock();
     let Some(pool) = guard.as_mut() else {
@@ -471,10 +490,14 @@ pub fn entropy_fill(out: &mut [u8]) -> Result<usize, raven_entropy::Error> {
     match pool.fill(out) {
         Ok(written) => Ok(written),
         Err(raven_entropy::Error::NeedsReseed) => {
-            let Some((seed, _source)) = hardware_seed() else {
+            let Some((seed, source, _stats)) = seed_source() else {
                 return Err(raven_entropy::Error::NeedsReseed);
             };
-            pool.stir(raven_entropy::SeedSource::Hardware, &seed)?;
+            if source.is_weak() {
+                pool.stir_weak(&seed)?;
+            } else {
+                pool.stir(raven_entropy::SeedSource::Hardware, &seed)?;
+            }
             pool.fill(out)
         }
         Err(error) => Err(error),
@@ -488,24 +511,51 @@ fn entropy_init() {
     }
     if !entropy_disabled() {
         let mut pool = raven_entropy::Pool::new();
-        if let Some((seed, source)) = hardware_seed()
-            && pool
-                .stir(raven_entropy::SeedSource::Hardware, &seed)
-                .is_ok()
-        {
-            *ENTROPY_POOL.lock() = Some(pool);
-            kprintln!("entropy: source={}", source.name());
-            return;
+        if let Some((seed, source, stats)) = seed_source() {
+            let result = if source.is_weak() {
+                pool.stir_weak(&seed)
+            } else {
+                pool.stir(raven_entropy::SeedSource::Hardware, &seed)
+            };
+            if result.is_ok() {
+                *ENTROPY_POOL.lock() = Some(pool);
+                kprintln!("entropy: source={}", source.name());
+                if let Some(stats) = stats {
+                    kprintln!(
+                        "entropy: jitter samples={} nonzero={} distinct={} min={} max={} rtc={}",
+                        stats.samples,
+                        stats.nonzero,
+                        stats.distinct,
+                        stats.min_delta,
+                        stats.max_delta,
+                        u8::from(stats.rtc)
+                    );
+                }
+                return;
+            }
         }
     }
     kprintln!("entropy: source=none");
 }
 
-/// `entropy=none` disables the boot seed pass for the unseeded contract test.
+/// `entropy=none` disables both hardware and software seeding for the unseeded contract test.
 fn entropy_disabled() -> bool {
     crate::memory::paging::cmdline()
         .split_ascii_whitespace()
         .any(|token| token == "entropy=none")
+}
+
+/// Ordered seed selection: hardware first, then the measured software jitter fallback.
+fn seed_source() -> Option<(
+    [u8; raven_entropy::SEED_SIZE],
+    EntropySource,
+    Option<JitterStats>,
+)> {
+    if let Some((seed, source)) = hardware_seed() {
+        return Some((seed, source, None));
+    }
+    let (seed, stats) = software_seed()?;
+    Some((seed, EntropySource::Jitter, Some(stats)))
 }
 
 /// Sample a hardware entropy source and return the first 40 bytes as a seed.
@@ -525,6 +575,92 @@ fn seed_from(bytes: &[u8; 64]) -> [u8; raven_entropy::SEED_SIZE] {
     let mut seed = [0u8; raven_entropy::SEED_SIZE];
     seed.copy_from_slice(&bytes[..raven_entropy::SEED_SIZE]);
     seed
+}
+
+/// Collect the measured timer/RTC jitter fallback.
+///
+/// The sample count and observed delta range are returned so the boot log and report state the
+/// actual bound. There is no claim that this is a cryptographic source; it only keeps ASLR and
+/// early boot from using one fixed layout when the board has no RDRAND/RNDR.
+fn software_seed() -> Option<([u8; raven_entropy::SEED_SIZE], JitterStats)> {
+    const SAMPLES: usize = 64;
+    let mut seed = [0u8; raven_entropy::SEED_SIZE];
+    let mut deltas = [0u64; SAMPLES];
+    let mut previous = timer_counter();
+    let mut state = 0x9E37_79B9_7F4A_7C15u64;
+    let mut index = 0usize;
+    let mut min_delta = u64::MAX;
+    let mut max_delta = 0u64;
+    let mut nonzero = 0u32;
+    while index < SAMPLES {
+        for _ in 0..8 {
+            core::hint::spin_loop();
+        }
+        let current = timer_counter();
+        let delta = current.wrapping_sub(previous);
+        previous = current;
+        deltas[index] = delta;
+        min_delta = min_delta.min(delta);
+        max_delta = max_delta.max(delta);
+        if delta != 0 {
+            nonzero = nonzero.saturating_add(1);
+        }
+        state ^= delta.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        state = state.rotate_left(17) ^ (state >> 7);
+        let word = state ^ delta.rotate_left(23) ^ (current >> 17);
+        let offset = (index % 5).saturating_mul(8);
+        for (byte_index, byte) in word.to_le_bytes().iter().enumerate() {
+            seed[(offset + byte_index) % raven_entropy::SEED_SIZE] ^= byte;
+        }
+        index = index.saturating_add(1);
+    }
+
+    let mut distinct = 0u32;
+    for current in 0..SAMPLES {
+        if !deltas[..current].contains(&deltas[current]) {
+            distinct = distinct.saturating_add(1);
+        }
+    }
+
+    let rtc = rtc::read();
+    if let Some(ns) = rtc {
+        let bytes = ns.to_le_bytes();
+        for (index, byte) in bytes.iter().enumerate() {
+            seed[index % raven_entropy::SEED_SIZE] ^= byte;
+        }
+        let word = state.rotate_left(29) ^ ns.rotate_left(11);
+        for (index, byte) in word.to_le_bytes().iter().enumerate() {
+            seed[(32 + index) % raven_entropy::SEED_SIZE] ^= byte;
+        }
+    }
+
+    if nonzero == 0 && rtc.is_none() {
+        return None;
+    }
+    if seed.iter().all(|byte| *byte == 0) {
+        seed[0] = 0xA5;
+    }
+    let stats = JitterStats {
+        samples: u32::try_from(SAMPLES).unwrap_or(u32::MAX),
+        nonzero,
+        distinct,
+        min_delta,
+        max_delta,
+        rtc: rtc.is_some(),
+    };
+    Some((seed, stats))
+}
+
+/// The platform counter used for the jitter samples.
+#[cfg(target_arch = "x86_64")]
+fn timer_counter() -> u64 {
+    tsc::read()
+}
+
+/// The platform counter used for the jitter samples.
+#[cfg(target_arch = "aarch64")]
+fn timer_counter() -> u64 {
+    arch_timer::read_counter()
 }
 
 /// Read 64 bytes from RDRAND when the CPUID feature bit is present.
