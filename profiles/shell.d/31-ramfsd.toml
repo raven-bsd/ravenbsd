@@ -6,5 +6,10 @@ package = "raven-ramfsd"
 path = "/sbin/ramfsd"
 
 [[initfs.files]]
-src = "etc/services.d/ramfsd.toml"
+src = "profiles/shell.d/ramfsd.service.manifest"
 path = "/etc/services.d/ramfsd.toml"
+
+[[initfs.files]]
+src = "profiles/shell.d/tmpfs.service.manifest"
+path = "/etc/services.d/tmpfs.toml"
+mode = 0o644
