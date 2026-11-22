@@ -284,17 +284,23 @@ def strip_ansi(line: str) -> str:
     return re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", line).replace("\r", "")
 
 
-def ps_count(text: str, nonce: str) -> int | None:
-    begin = f"K509_PS_BEGIN_{nonce}"
-    end = f"K509_PS_END_{nonce}"
+def count_posix_rows(text: str) -> int | None:
     lines = [strip_ansi(line).strip() for line in text.splitlines()]
-    begin_at = max((index for index, line in enumerate(lines) if line == begin), default=-1)
-    end_at = max((index for index, line in enumerate(lines) if line == end), default=-1)
-    if begin_at < 0 or end_at <= begin_at:
+    starts = [
+        index for index, line in enumerate(lines)
+        if re.match(r"^PID\s+PPID\b", line) or (line.startswith("PID") and "CMD" in line)
+    ]
+    if not starts:
         return None
-    return sum(
-        1 for line in lines[begin_at + 1:end_at] if re.match(r"\d+\s+", line)
-    )
+    count = 0
+    for line in lines[starts[-1] + 1:]:
+        if not line:
+            continue
+        if re.match(r"^\d+\s+", line):
+            count += 1
+        elif count:
+            break
+    return count if count else None
 
 
 def frame_values(text: str) -> tuple[int | None, int | None, int | None]:
@@ -389,7 +395,6 @@ def run_iteration(
     serial = Serial(master, iter_dir / "serial.log", iter_dir / "serial.stamped.log")
     serial.start_reader()
     monitor = Monitor(stall)
-    nonce = f"{iteration:04d}{int(time.time() * 1000) % 100000:05d}"
     record = {
         "iteration": iteration,
         "mode": mode_name,
@@ -445,52 +450,53 @@ def run_iteration(
             return record
         monitor.progress()
 
-        nonce = f"{iteration:04d}{int(time.time() * 1000) % 100000:05d}"
-        ps_done = f"K509_PS_END_{nonce}"
-        serial.send(
-            f"M=K509_PS_BEGIN_; M=${{M}}{nonce}; echo \"$M\"; ps -e; "
-            f"N=K509_PS_END_; N=${{N}}{nonce}; echo \"$N\"\n"
-        )
-        if not serial.wait_text(ps_done, command_timeout, proc):
-            record["status"] = "stall" if monitor.stalled() else "command-timeout"
-            return record
-        monitor.progress()
-
-        frame_done = f"K509_FRAME_END_{nonce}"
-        serial.send(
-            f"M=K509_FRAME_END_; M=${{M}}{nonce}; /bin/uname -a; echo \"$M\"\n"
-        )
-        if not serial.wait_text(frame_done, command_timeout, proc):
-            record["status"] = "stall" if monitor.stalled() else "command-timeout"
-            return record
-        monitor.progress()
-
+        ssh_ok = False
+        processes = None
         if ssh and port is not None:
             if not serial.wait_text("svcd: sshd up", ssh_timeout, proc):
                 record["ssh"] = "unavailable"
                 record["ssh_detail"] = "sshd not up before ssh timeout"
             else:
-                ssh_ok = False
                 detail = "unavailable"
                 for attempt in range(2):
                     ssh_ok, detail, ssh_s = ssh_run(
                         port,
-                        "/bin/echo K509_SSH_OK; /bin/uname -a",
+                        "/bin/ps -e; /bin/uname -a; /bin/echo K509_SSH_OK",
                         iter_dir / f"ssh-{attempt + 1}.log",
                         command_timeout,
                     )
                     record["ssh_s"] = ssh_s
                     if ssh_ok:
+                        ssh_log = iter_dir / f"ssh-{attempt + 1}.log"
+                        ssh_text = ssh_log.read_text(errors="replace") if ssh_log.is_file() else ""
+                        processes = count_posix_rows(ssh_text)
                         break
                     time.sleep(1)
                 record["ssh"] = "ok" if ssh_ok else "unavailable"
                 record["ssh_detail"] = detail
+
+        if not ssh_ok:
+            # Serial fallback. Only short commands: the release shell's line
+            # editor drops characters from long pastes under load. Wait a fixed
+            # slice for the short command to finish instead of matching the
+            # prompt, which the line editor redraws before execution.
+            for command in ("ps -e\n", "/bin/uname -a\n"):
+                serial.send(command)
+                time.sleep(2.0)
+                monitor.progress()
+            processes = count_posix_rows(serial.text)
+
+        # The kernel prints `s24: frames free=` on each guest child exit; the
+        # SSH or serial command above has just created one.
+        time.sleep(0.5)
+        record["processes"] = processes
         record["status"] = "pass"
     finally:
         text = serial.text
         record["frames_boot"], record["frames_first"], record["frames_last"] = frame_values(text)
         record["handles"] = handle_value(text)
-        record["processes"] = ps_count(text, nonce)
+        if record["processes"] is None:
+            record["processes"] = count_posix_rows(text)
         record["forbidden"] = "; ".join(f"{name}: {line}" for name, line in scan_tokens(text))
         if record["status"] == "pass" and record["forbidden"]:
             record["status"] = "forbidden"
