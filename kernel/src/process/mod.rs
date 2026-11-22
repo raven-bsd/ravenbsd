@@ -1236,18 +1236,25 @@ fn build_stack(
     let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
     let mut cursor = buffer.len();
 
-    let random = random16();
-    let random_start = cursor
-        .checked_sub(random.len())
-        .ok_or(ProcessError::ArgTooLong)?;
-    let random_slot = buffer
-        .get_mut(random_start..cursor)
-        .ok_or(ProcessError::BadAddress)?;
-    random_slot.copy_from_slice(&random);
-    cursor = random_start;
-    let random_address = stack_base
-        .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
-        .ok_or(ProcessError::BadAddress)?;
+    // AT_RANDOM comes from the same boot-seeded pool as GETRANDOM. On a platform with no
+    // hardware source the pool is unseeded and the pair is published as zero rather than a
+    // predictable fallback; GETRANDOM reports the documented EAGAIN.
+    let random_address = match random16() {
+        Some(random) => {
+            let random_start = cursor
+                .checked_sub(random.len())
+                .ok_or(ProcessError::ArgTooLong)?;
+            let random_slot = buffer
+                .get_mut(random_start..cursor)
+                .ok_or(ProcessError::BadAddress)?;
+            random_slot.copy_from_slice(&random);
+            cursor = random_start;
+            stack_base
+                .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
+                .ok_or(ProcessError::BadAddress)?
+        }
+        None => 0,
+    };
 
     let platform_address = place_bytes(&mut buffer, &mut cursor, stack_base, platform.as_bytes())?;
     let path_address = place_bytes(&mut buffer, &mut cursor, stack_base, path)?;
@@ -1435,80 +1442,14 @@ fn write_word(buffer: &mut [u8], cursor: &mut usize, value: u64) -> Result<(), P
     Ok(())
 }
 
-fn random16() -> [u8; 16] {
+/// 16 bytes for `AT_RANDOM` from the boot-seeded ChaCha20 pool.
+///
+/// `None` means the platform has no hardware entropy source; the auxv pair is then zero and
+/// `GETRANDOM` returns the documented `EAGAIN` instead of serving a predictable fallback.
+fn random16() -> Option<[u8; 16]> {
     let mut bytes = [0u8; 16];
-    #[cfg(target_arch = "x86_64")]
-    {
-        let features = core::arch::x86_64::__cpuid(1);
-        if features.ecx & (1 << 30) != 0 {
-            let mut chunk_index = 0usize;
-            while chunk_index < 2 {
-                let mut attempt: u32 = 0;
-                let mut filled = false;
-                while attempt < 10 {
-                    let value: u64;
-                    let ok: u8;
-                    // SAFETY: `rdrand` is available per CPUID.1:ECX[30] and has no memory side
-                    // effects. `setc` records the success flag.
-                    unsafe {
-                        core::arch::asm!(
-                            "rdrand {value}",
-                            "setc {ok}",
-                            value = out(reg) value,
-                            ok = out(reg_byte) ok,
-                            options(nomem, nostack),
-                        );
-                    }
-                    if ok != 0 {
-                        let start = chunk_index.saturating_mul(8);
-                        if let Some(slot) = bytes.get_mut(start..start.saturating_add(8)) {
-                            slot.copy_from_slice(&value.to_le_bytes());
-                        }
-                        filled = true;
-                        break;
-                    }
-                    attempt = attempt.saturating_add(1);
-                }
-                if !filled {
-                    break;
-                }
-                chunk_index = chunk_index.saturating_add(1);
-            }
-            if chunk_index == 2 {
-                return bytes;
-            }
-        }
-    }
-
-    let mut state = entropy_seed() ^ 0x9E37_79B9_7F4A_7C15;
-    let mut index = 0usize;
-    while index < bytes.len() {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        let word = state.to_le_bytes();
-        let end = index.saturating_add(8).min(bytes.len());
-        if let Some(slot) = bytes.get_mut(index..end) {
-            let copy = end.saturating_sub(index);
-            if let Some(source) = word.get(..copy) {
-                slot.copy_from_slice(source);
-            }
-        }
-        index = end;
-    }
-    bytes
-}
-
-/// Non-cryptographic fallback entropy: the architecture's free-running counter.
-#[cfg(target_arch = "x86_64")]
-fn entropy_seed() -> u64 {
-    tsc::read()
-}
-
-/// Non-cryptographic fallback entropy: the generic-timer physical counter.
-#[cfg(target_arch = "aarch64")]
-fn entropy_seed() -> u64 {
-    timer::read_counter()
+    crate::time::entropy_fill(&mut bytes).ok()?;
+    Some(bytes)
 }
 
 /// The ELF machine of the running kernel.

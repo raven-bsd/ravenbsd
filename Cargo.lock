@@ -3253,6 +3253,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-random-pool"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-reboot"
 version = "0.1.0"
 dependencies = [
