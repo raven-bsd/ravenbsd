@@ -22,14 +22,14 @@ The `cap-revoke` guest case runs this sequence (`profile = base`,
 | 5 | controller | `HANDLE_REVOKE(object, MAP)` | success |
 | 6 | client | `MAP` handle 3, `MAP` the pre-revoke duplicate | `EPERM` in both processes |
 | 7 | client | `HANDLE_DUP` handle 3 after the revoke, then `MAP` it | dup succeeds; `MAP` is `EACCES` (a post-revoke node has only `READ`) |
-| 8 | client | `MAP` handle 4 and its duplicate | `EACCES` (never granted) |
+| 8 | client | `MAP` handle 4 and its duplicate | `EACCES` (never granted); both processes pass after the walk fix |
 | 9 | client | close every handle, exit | `cap: revoke client ok` twice (original + fork) |
 | 10 | controller | close the source; the lifetime case then closes the last handle | object alive while held, stale handle `EBADF`, kernel alive |
 
 ## Measured result (2026-11-22)
 
-The old probe passed but only tested handle 3. The strengthened probe is **red** at step 8 on
-both processes:
+The old probe passed but only tested handle 3. The strengthened probe was **red** before the fix
+on both processes:
 
 ```text
 cap: never-after errno=1
@@ -41,14 +41,29 @@ init exited (1)
 `errno=1` is `EPERM`. Handle 4 was created with `READ|DUP`, so `MAP` was never granted and the
 contract requires `EACCES`.
 
-## Cause and proposed fix (not applied: K435 owns the file)
+After the fix, both the original and the `PROC_FORK` clone print:
 
-`kernel/src/process/handle.rs:455 revoke_descendants` calls `node.revoke(mask)` on every
-descendant. A descendant that never granted a bit still records it as revoked, so the later
-lookup in `crates/raven-handles/src/lib.rs:268-277` sees `revoked & needed != 0` and returns
-`EPERM` instead of `EACCES`.
+```text
+cap: revoke eperm ok          (granted MAP, revoked)
+cap: dup-before eperm ok      (pre-revoke duplicate that held MAP, revoked)
+cap: dup-after ok
+cap: dup-after eacces ok      (post-revoke duplicate has READ only)
+cap: never-after eacces ok    (READ|DUP handle, MAP never granted)
+cap: never-dup eacces ok
+cap: revoke client ok
+...
+cap: ok
+init exited (0)
+```
 
-Minimal patch in `kernel/src/process/handle.rs:462-464`:
+## Fix
+
+`kernel/src/process/handle.rs:455 revoke_descendants` called `node.revoke(mask)` on every
+descendant. A descendant that never granted a bit recorded it as revoked, so the later lookup in
+`crates/raven-handles/src/lib.rs:268-277` saw `revoked & needed != 0` and returned `EPERM`
+instead of `EACCES`.
+
+The walk now propagates only the subset the descendant actually granted, before any revoke:
 
 ```rust
 for node in nodes {
@@ -61,14 +76,12 @@ for node in nodes {
 }
 ```
 
-`LineageNode::granted()` is the rights mask stored at creation, before any revoke. Propagating
-only the bits the descendant actually granted leaves a never-granted bit at `EACCES` and keeps
-the granted-and-revoked bit at `EPERM`. `crates/raven-handles/src/lib.rs:273` can additionally
-classify with `slot.rights & needed` as a defence in depth.
+`LineageNode::granted()` is the creation mask. A never-granted bit therefore stays `EACCES`,
+while a granted-and-revoked bit stays `EPERM`. `crates/raven-handles/src/lib.rs:273` can
+additionally classify with `slot.rights & needed` as defence in depth.
 
-The kernel's `kernel/src/syscall/**` and `kernel/src/process/**` are K443/K435; this ticket does
-not edit them. The `kernel/src/ipc/**` registry itself is correct; it records the nodes, and the
-over-revoke happens in the process-owned walk.
+The mutation restores `node.revoke(mask)` and makes R03 red again (`never-after errno=1` on both
+processes), proving the probe is not tautological.
 
 ## Fixture note
 

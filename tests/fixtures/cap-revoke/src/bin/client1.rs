@@ -48,8 +48,8 @@ fn main(_args: raven_rt::Args) -> i32 {
     }
     println!("cap: use ok");
 
-    // A pre-revoke duplicate is a descendant; the later revoke must reach it.
-    let dup_before = match dup(OBJ, Rights::READ) {
+    // A pre-revoke duplicate that also holds MAP is a descendant; the later revoke must reach it.
+    let dup_before = match dup(OBJ, Rights::MAP.union(Rights::READ).union(Rights::DUP)) {
         Ok(handle) => handle,
         Err(error) => return fail("dup-before", error),
     };
