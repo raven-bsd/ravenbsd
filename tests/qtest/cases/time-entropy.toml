@@ -10,6 +10,7 @@ timeout_secs = 120
 pre = ["sh tests/fixtures/time-entropy/build.sh"]
 initfs = "build/fixtures/time-entropy/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
 expect_exit = "success"
 
 [[expect]]
@@ -22,7 +23,8 @@ regex = '^time-entropy: realtime ok sec=\d+$'
 regex = '^time-entropy: clock_set ok$'
 
 [[expect]]
-regex = '^entropy: source=(rdrand|rndr|jitter)$'
+regex = '^entropy: source=(rdrand|rndr)$'
+unordered = true
 
 [[expect]]
 regex = '^time-entropy: getrandom ok$'
