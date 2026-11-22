@@ -21,7 +21,7 @@ use raven_rt::sys;
 entry!(main);
 
 const PAGE: usize = 4096;
-const STACK_LEN: usize = 16 * PAGE;
+const CHILD_STACK_LEN: usize = 64 * 1024;
 const POLL_LIMIT: u32 = 20_000_000;
 /// Raw kernel `pipe(fds)` number (kernel-owned, not a `Syscall` variant).
 const PIPE: usize = 0x6e;
@@ -42,6 +42,18 @@ static OOM_CHUNK_ADDR: [AtomicUsize; OOM_MAX_CHUNKS] =
     [const { AtomicUsize::new(0) }; OOM_MAX_CHUNKS];
 static OOM_CHUNK_PAGES_USED: [AtomicUsize; OOM_MAX_CHUNKS] =
     [const { AtomicUsize::new(0) }; OOM_MAX_CHUNKS];
+
+#[repr(align(16))]
+struct Stack(#[allow(dead_code)] [u8; CHILD_STACK_LEN]);
+
+// Writable `.bss`: the forked child's thread stack is inherited from the init image, so the
+// parent does not allocate a new frame after the baseline.
+static mut CHILD_STACK: Stack = Stack([0; CHILD_STACK_LEN]);
+
+fn child_stack_top() -> usize {
+    let base = core::ptr::addr_of_mut!(CHILD_STACK);
+    (base as usize).saturating_add(CHILD_STACK_LEN)
+}
 
 fn fail(message: &str) -> i32 {
     println!("smp-aarch64-memory: fail {message}");
@@ -207,13 +219,12 @@ extern "C" fn baseline_child_entry(_arg: usize) -> ! {
 
 /// Reap one trivial child before the OOM row. Its `s24: frames free=` line is the pre-injection
 /// baseline; the parent keeps the child's stack mapped through the row so both samples include it.
-fn baseline_child() -> Result<usize, Errno> {
-    let stack = sys::map_anonymous(STACK_LEN)?;
+fn baseline_child() -> Result<(), Errno> {
     let child = proc_fork()?;
     sys::thread_create(
         child,
         baseline_child_entry as *const () as usize,
-        stack.saturating_add(STACK_LEN),
+        child_stack_top(),
         0,
     )?;
     let code = proc_wait(child)?;
@@ -222,7 +233,7 @@ fn baseline_child() -> Result<usize, Errno> {
         println!("smp-aarch64-memory: fail baseline child code={code}");
         return Err(Errno::EIO);
     }
-    Ok(stack)
+    Ok(())
 }
 
 fn oom_pattern(chunk: usize, page: usize, seed: usize) -> u64 {
@@ -386,7 +397,7 @@ extern "C" fn oom_child_entry(packed: usize) -> ! {
     sys::exit(0)
 }
 
-fn oom_round(shared: usize, stack_a: usize, stack_b: usize, round: usize) -> Result<(), Errno> {
+fn oom_round(shared: usize, round: usize) -> Result<(), Errno> {
     // SAFETY: the shared page is mapped writable; the first two u32 words are the barrier.
     let ready = unsafe { &*(shared as *const AtomicU32) };
     // SAFETY: same shared page; `go` is the second u32.
@@ -423,14 +434,14 @@ fn oom_round(shared: usize, stack_a: usize, stack_b: usize, round: usize) -> Res
     sys::thread_create(
         first,
         oom_child_entry as *const () as usize,
-        stack_a.saturating_add(STACK_LEN),
+        child_stack_top(),
         (first_seed << 56) | shared,
     )?;
     let second = proc_fork()?;
     sys::thread_create(
         second,
         oom_child_entry as *const () as usize,
-        stack_b.saturating_add(STACK_LEN),
+        child_stack_top(),
         (second_seed << 56) | shared,
     )?;
 
@@ -480,10 +491,8 @@ fn oom_round(shared: usize, stack_a: usize, stack_b: usize, round: usize) -> Res
 fn oom_injection() -> Result<(), Errno> {
     let object = memobj_create(PAGE)?;
     let shared = map_shared(object, 0, 0, PAGE, false)?;
-    let stack_a = sys::map_anonymous(STACK_LEN)?;
-    let stack_b = sys::map_anonymous(STACK_LEN)?;
     for round in 1..=2usize {
-        oom_round(shared, stack_a, stack_b, round)?;
+        oom_round(shared, round)?;
     }
     Ok(())
 }
@@ -506,13 +515,10 @@ fn main(_args: raven_rt::Args) -> i32 {
         println!("smp-aarch64-copy: failed errno={}", error.0);
         return fail("usercopy");
     }
-    let _baseline_stack = match baseline_child() {
-        Ok(stack) => stack,
-        Err(error) => {
-            println!("smp-aarch64-memory: baseline failed errno={}", error.0);
-            return fail("baseline");
-        }
-    };
+    if let Err(error) = baseline_child() {
+        println!("smp-aarch64-memory: baseline failed errno={}", error.0);
+        return fail("baseline");
+    }
     if let Err(error) = oom_injection() {
         println!("smp-aarch64-oom: failed errno={}", error.0);
         return fail("oom");
