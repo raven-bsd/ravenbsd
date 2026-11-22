@@ -1,3 +1,0 @@
-tcp-evidence matrix: BLOCKED
-reason: scripts/net-conformance.sh is absent (K253 harness not merged)
-task: K253 (packet-level TCP conformance harness) must land before this phase can run.

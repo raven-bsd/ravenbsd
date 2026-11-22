@@ -272,6 +272,20 @@ impl Pool {
         if source == SeedSource::TimerJitter {
             return Err(Error::WeakSource);
         }
+        self.stir_seed(seed)
+    }
+
+    /// Install an explicitly weak software seed through the same OpenBSD `_rs_stir` construction.
+    ///
+    /// This exists only for the aarch64 boot fallback where no RDRAND/RNDR is available. The
+    /// caller must log the weak source and the measured jitter bound; this method makes no
+    /// cryptographic-strength claim. [`Pool::stir`] still rejects `SeedSource::TimerJitter`, so
+    /// the strict K523 gate is unchanged.
+    pub fn stir_weak(&mut self, seed: &[u8; SEED_SIZE]) -> Result<(), Error> {
+        self.stir_seed(seed)
+    }
+
+    fn stir_seed(&mut self, seed: &[u8; SEED_SIZE]) -> Result<(), Error> {
         if self.seeded {
             self.rekey(Some(seed));
         } else {

@@ -54,7 +54,14 @@ mod program {
             let raw = unsafe {
                 raven_rt::sys::syscall2(PROC_SIGNAL, pgrp as isize as usize, signo as usize)
             };
-            Errno::from_ret(raw).map(|_| ())
+            let result = Errno::from_ret(raw).map(|_| ());
+            match result {
+                Ok(()) => raven_rt::println!("ptyd: signal pgrp={pgrp} signo={signo} ok"),
+                Err(error) => {
+                    raven_rt::println!("ptyd: signal pgrp={pgrp} signo={signo} errno={error:?}");
+                }
+            }
+            result
         }
     }
 

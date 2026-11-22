@@ -15,8 +15,8 @@ Usage::
 
 The check is a reducer gate: adding a donor-marked file without regenerating the register
 makes it exit non-zero.  No product source or test is changed by this script.  The rendered
-summary is lead-maintained in ``ravenbsd-prjmgmt`` because ``docs/`` is frozen (AGENTS.md rule
-31); this tool writes only the machine-readable TSV.
+summary is lead-maintained in ``ravenbsd-prjmgmt`` because the product documentation tree is
+frozen (AGENTS.md rule 31); this tool writes only the machine-readable TSV.
 """
 
 from __future__ import annotations
