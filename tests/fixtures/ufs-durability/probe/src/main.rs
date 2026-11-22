@@ -109,7 +109,7 @@ mod program {
         Ok(())
     }
 
-    fn read_verified(path: &str, chunks: usize) -> Result<u64, String> {
+    fn read_verified(path: &str, chunks: usize, base: u32) -> Result<u64, String> {
         let mut file = fs::open(path, O_RDONLY)
             .map_err(|error| format!("open {path}: {}", error.description()))?;
         let mut hash = 0xcbf2_9ce4_8422_2325u64;
@@ -126,7 +126,7 @@ mod program {
                 }
                 read += got;
             }
-            let expected = chunk(index as u32);
+            let expected = chunk(base + index as u32);
             if buffer != expected {
                 return Err(format!("{path}: chunk {index} mismatch"));
             }
@@ -309,12 +309,12 @@ mod program {
     }
 
     fn persist_check() -> Result<(), String> {
-        let file_hash = read_verified(DATA_PATH, PERSIST_CHUNKS)?;
+        let file_hash = read_verified(DATA_PATH, PERSIST_CHUNKS, 0x100)?;
         raven_rt::println!(
             "k466: persist file=ok len={} checksum={file_hash:016x}",
             CHUNK * PERSIST_CHUNKS
         );
-        let entry_hash = read_verified(RENAMED_PATH, 1)?;
+        let entry_hash = read_verified(RENAMED_PATH, 1, 0x200)?;
         raven_rt::println!("k466: persist dir=ok rename=ok entry={entry_hash:016x}");
         Ok(())
     }
