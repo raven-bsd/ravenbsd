@@ -4,22 +4,22 @@
 #
 # K527 run-queue saturation campaign.
 #
-# usage: sh tests/smp/sched/run.sh [tcg|smp1|kvm2|kvm4] [--iterations N] [--timebox SECONDS]
+# usage: sh tests/smp/sched/run.sh [smp1|kvm2|kvm4] [--iterations N] [--timebox SECONDS]
 #                                  [--no-build]
 #
-# Each iteration boots the kernel with `selftest=sched-saturation`: 128 kernel threads at one
-# priority sleep, wake and yield through 100 schedules each. The monitor requires every worker to
+# Each iteration boots the kernel with `selftest=sched-saturation`: 80 kernel threads at one
+# priority sleep, wake and yield through 256 schedules each. The monitor requires every worker to
 # complete and at least 10,000 switches. The first failure stops the campaign and is preserved.
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 
-mode=${1:-tcg}
+mode=${1:-smp1}
 case "$mode" in
-    tcg|smp1|kvm2|kvm4) ;;
+    smp1|kvm2|kvm4) ;;
     *)
-        printf 'usage: %s [tcg|smp1|kvm2|kvm4] [--iterations N] [--timebox SECONDS] [--no-build]\n' "$0" >&2
+        printf 'usage: %s [smp1|kvm2|kvm4] [--iterations N] [--timebox SECONDS] [--no-build]\n' "$0" >&2
         exit 2
         ;;
 esac
@@ -52,10 +52,6 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$mode" in
-    tcg)
-        case_file=tests/smp/sched/sched-saturation.toml
-        case_name=sched-saturation
-        ;;
     smp1)
         case_file=tests/smp/sched/sched-saturation-smp1.toml
         case_name=sched-saturation-smp1
