@@ -48,6 +48,18 @@ def wait_tcp(host: str, port: int, timeout: float) -> bool:
     return False
 
 
+def probe_client(host: str) -> str:
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, 23147), timeout=3) as connection:
+                connection.settimeout(10)
+                return f"banner={connection.recv(32)!r}"
+        except OSError:
+            time.sleep(1)
+    return "no-connect"
+
+
 def host_client(host: str) -> str:
     child = pexpect.spawn(
         "ssh",
@@ -123,6 +135,12 @@ def main() -> int:
         child.logfile = serial
         try:
             child.expect("svcd: getty up", timeout=240)
+            probe = probe_client(GUEST)
+            log("accept-probe", probe)
+            try:
+                child.expect("sshd-trace-accept: done", timeout=60)
+            except pexpect.TIMEOUT:
+                log("accept-probe", "done marker timeout")
             child.expect(r"login: ?", timeout=120)
             child.sendline("root")
             child.expect(r"(?i)password: ?", timeout=30)
@@ -153,13 +171,14 @@ def main() -> int:
     loop = "ok" if loop_ok else "missing"
     SUMMARY.write_text(
         f"host_tap={tap}\ntap_tail={tap_tail}\nconnection_from={connected}\n"
-        f"guest_loop={loop}\n",
+        f"guest_loop={loop}\naccept_probe={probe}\n",
         encoding="utf-8",
     )
-    log("summary", f"host_tap={tap} connection_from={connected} guest_loop={loop}")
+    log("summary", f"host_tap={tap} connection_from={connected} guest_loop={loop} "
+                   f"accept_probe={probe}")
     if not loop_ok:
         return 2
-    log("logs", f"serial={SERIAL} client={CLIENT} guest={LOOP_LOG} summary={SUMMARY}")
+    log("logs", f"serial={SERIAL} client={CLIENT} summary={SUMMARY}")
     return 0
 
 

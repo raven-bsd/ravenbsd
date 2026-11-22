@@ -66,14 +66,26 @@ clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
     -L"$sysroot/usr/lib" -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack \
     -Wl,-z,retpolineplt -pie -lc -lclang_rt.builtins \
     "$sysroot/usr/lib/crtn.o" -o "$out/askpass"
+clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+    -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector -std=gnu11 -O1 \
+    -c tests/fixtures/sshd-trace/accept-probe.c -o "$out/accept-probe.o"
+clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+    -nostdlib -nostartfiles -static -Ttests/libc/target/x86_64.ld \
+    -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+    "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/accept-probe.o" \
+    -L"$sysroot/usr/lib" -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack \
+    -Wl,-z,retpolineplt -pie -lc -lclang_rt.builtins \
+    "$sysroot/usr/lib/crtn.o" -o "$out/accept-probe"
 
 cargo build -q -p raven-b70-overlay
 overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
 "$overlay" build/x86_64/initfs.img "$out/initfs.img" \
     "/etc/ssh/sshd_config=$root/tests/fixtures/sshd-trace/sshd_config:0644" \
     "/etc/services.d/sshd.toml=$root/tests/fixtures/sshd-trace/sshd.service.toml:0644" \
+    "/etc/services.d/sshd-trace-accept.toml=$root/tests/fixtures/sshd-trace/sshd-trace-accept.service.toml:0644" \
     "/etc/raven/conf.d/network.toml=$root/tests/fixtures/sshd-trace/network-static.toml:0644" \
     "/bin/sshd-trace-askpass=$out/askpass:0755" \
+    "/bin/sshd-trace-accept=$out/accept-probe:0755" \
     "/etc/ssh/trace-client.sh=$root/tests/fixtures/sshd-trace/trace-client.sh:0644"
 
 image=$out/sshd-trace.img
