@@ -3,11 +3,12 @@
 
 # MPTCP two-tap failover fixture (MPTCP2c)
 
-Status: **fixture and negative control complete; positive failover acceptance BLOCKED on MPTCP2b.**
-The two-tap helper, host peer, QMP unplug and both cases exist. The single-path negative control
-passes and a mutation that skips the unplug makes it fail. The positive `mptcp-failover` case is
-wired with the final assertions and fails closed: the current guest cannot open `IPPROTO_MPTCP`,
-and the two-interface topology cannot claim two legacy IRQs. No fake result is recorded.
+Status: **fixture and negative control complete; positive failover acceptance BLOCKED on the
+userland `IPPROTO_MPTCP` path and a second usable interface.** The two-tap helper, host peer, QMP
+unplug and both cases exist. The single-path negative control passes and a mutation that skips the
+unplug makes it fail. The positive `mptcp-failover` case is wired with the final assertions and
+fails closed: the merged MPTCP2a/2b Rust core is not exposed through `raven-libc-net`/`netd`, and
+the two-interface topology cannot claim two legacy IRQs. No fake result is recorded.
 
 ## Topology
 
@@ -56,8 +57,8 @@ mptcp: negative connected
 mptcp: negative go
 mptcp: negative sent=65536
 mptcp: negative unplug requested
-mptcp: negative tick_bytes=7
-mptcp: negative died_ms=4034
+mptcp: negative tick_bytes=6
+mptcp: negative died_ms=4014
 mptcp: negative ok=1
 mptcp: negative bound_ms=6000
 mptcp: probe IPPROTO_MPTCP errno=93
@@ -66,23 +67,25 @@ mptcp: negative done
 init exited (0)
 ```
 
-Host artifact `build/fixtures/mptcp/host.result`:
-`ok=1 protocol=mptcp bytes=65536 peer=10.77.1.15 unplug=1 unplug_ms=0 client_closed=0`.
-`died_ms` is the bounded silence window; the host peer verified all 65,536 pattern bytes and
-issued the unplug on the second QMP monitor.
+Host artifact `build/fixtures/mptcp/host.log`:
+`host: stream ok bytes=65536 t=0.832`, `host: unplug netdev=n0 ok=1 unplug_ms=0 t=1.834`,
+`host: ticks sent=15`. `died_ms` is the bounded silence window; the host peer verified all 65,536
+pattern bytes and issued the unplug on the second QMP monitor.
 
 Mutation: replacing the `set_link` call with a no-op gives
-`tick_bytes=7`, `negative unexpected-data`, `negative ok=0`; the case fails on the forbidden line.
+`tick_bytes=9`, `negative unexpected-data`, `negative ok=0`; the case fails on the forbidden line.
 The unplug is load-bearing.
 
 ## Blocked positive acceptance
 
-`cargo xtask qtest --case mptcp-failover --arch x86_64` fails closed (263 s, unmatched final
-assertions, forbidden `mptcp: blocked`). The serial names both missing pieces:
+`cargo xtask qtest --case mptcp-failover --arch x86_64` fails closed on the current base
+(`origin/master` `e313c1df`, which merges the MPTCP2a/2b Rust core). The serial names both missing
+pieces:
 
 ```text
+devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+devd: driver virtio-net irq line=11
 devd: driver virtio-net launch failed: irq: resource busy
-devd: virtio-net: irq: resource busy
 netd: nic: open nic:info: no such file or directory; waiting for the driver
 mptcp: socket(IPPROTO_MPTCP) errno=93
 mptcp: blocked mptcp2b-socket-api
@@ -92,13 +95,15 @@ init exited (1)
 * **Two interfaces**: `netd` attaches one `nic:` and `devd` gives both virtio functions the same
   legacy line when MSI-X is unavailable, so the second function cannot launch.
 * **Socket API**: `raven-libc-net` `validate_proto` accepts only protocol 0/6 for `SOCK_STREAM`;
-  `IPPROTO_MPTCP` (262) returns `EPROTONOSUPPORT` before any wire traffic. The path manager
-  (add/remove/backup) is MPTCP2b's remaining surface.
+  `IPPROTO_MPTCP` (262) returns `EPROTONOSUPPORT` before any wire traffic. The merged
+  `raven-tcpip::MptcpSocket` is a host-testable Rust API; `raven-libc-net`/`netd` do not expose it
+  as a guest socket or a path-manager request.
 
 The positive case is not weakened: it still expects the two subflows, backup idle before failure,
 byte-exact streaming, `switch_bound_ms=1500`, and `init exited (0)`, and it forbids
-`mptcp: blocked`. When MPTCP2b and a second usable interface land, the guest program implements the
-same protocol against the host peer and the case can go green without changing the fixture.
+`mptcp: blocked`. When the libc/netd `IPPROTO_MPTCP` path and a second usable interface land, the
+guest program implements the same protocol against the host peer and the case can go green without
+changing the fixture.
 
 ## Donor reconciliation
 

@@ -10,8 +10,9 @@
 // single-path control: a non-MPTCP connection dies when its only path is removed.
 //
 // Positive mode: create the MPTCP socket with IPPROTO_MPTCP and then the path manager. Both are
-// MPTCP2b's API; until it is merged the program prints the exact blocker and exits nonzero, so
-// the failover case fails closed instead of reporting a fake pass.
+// the merged MPTCP2a/2b Rust API, but the current libc rejects the protocol and netd does not
+// expose the path manager to a guest. Until that userland path lands the program prints the exact
+// blocker and exits nonzero, so the failover case fails closed instead of reporting a fake pass.
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -283,9 +284,10 @@ static int run_positive(void) {
     }
     say_value("mptcp: socket fd=", (long)fd, "\n");
     (void)close(fd);
-    // The path manager (add the backup path, mark it backup, query subflows) is the rest of
-    // MPTCP2b. Without it the fixture cannot open the second path, so it fails closed rather
-    // than pretending a one-path connection is the failover acceptance.
+    // The path manager (add the backup path, mark it backup, query subflows) is part of the
+    // merged MPTCP2a/2b core but has no guest socket surface yet. Without it the fixture cannot
+    // open the second path, so it fails closed rather than pretending a one-path connection is
+    // the failover acceptance.
     say("mptcp: blocked mptcp2b-path-manager\n");
     return 1;
 }

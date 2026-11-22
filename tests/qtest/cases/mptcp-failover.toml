@@ -7,10 +7,11 @@
 # through QMP mid-stream, and requires: no reset, no lost or duplicated bytes, the backup path
 # used only after the failure, and a measured switch under the fixture bound.
 #
-# This case is wired but cannot pass until MPTCP2b lands: the current libc rejects
-# IPPROTO_MPTCP (validate_proto accepts only 0/6 today), and netd attaches one nic:, so a second
-# virtio-net function fails devd's driver registration. The case fails closed on the first
-# missing line; the serial names the exact blocker. Do not weaken these expectations.
+# This case is wired but cannot pass until the libc/netd IPPROTO_MPTCP path lands: the current
+# libc rejects IPPROTO_MPTCP (validate_proto accepts only 0/6 today), the merged MPTCP2a/2b Rust
+# core is not exposed to a guest socket, and netd attaches one nic:, so a second virtio-net
+# function fails devd's driver registration. The case fails closed on the first missing line; the
+# serial names the exact blocker. Do not weaken these expectations.
 
 name = "mptcp-failover"
 arch = "x86_64"
