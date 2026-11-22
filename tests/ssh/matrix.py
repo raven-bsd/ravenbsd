@@ -784,13 +784,35 @@ def row_s5_s6() -> None:
     attempt("S6", 1, "reuse", "receive packet type 91 + channel 0",
             type91_line or f"exit {result['returncode']}",
             float(result["elapsed_ms"]), "PASS" if auth and type91_line and open_confirm else "FAIL")
-    attempt("S5-identity", 1, "fresh", "host peer exact N bytes on the same file/sid",
-            "not observable", 0, "BLOCKED",
-            "K431 tests/fixtures/socket-write-identity is not on origin/master")
-    if auth and open_confirm and confirm_line:
+    identity_exit_path = OUT / "socket-write-identity.exit"
+    identity_log = OUT / "socket-write-identity.log"
+    identity_ok = False
+    identity_detail = "artifact missing; run tests/fixtures/socket-write-identity/run-tap.sh"
+    if identity_exit_path.is_file():
+        try:
+            identity_exit = int(identity_exit_path.read_text(encoding="utf-8").strip())
+        except ValueError:
+            identity_exit = -1
+        identity_text = identity_log.read_text(errors="replace") if identity_log.is_file() else ""
+        identity_ok = identity_exit == 0 and "socket-write-identity: ok" in identity_text
+        witness = next((line.strip() for line in identity_text.splitlines()
+                        if "rsh:" in line or "FAIL" in line or "unmatched expectations" in line),
+                       "socket-write-identity: ok")
+        identity_detail = f"exit {identity_exit}; {witness}"
+        attempt("S5-identity", 1, "fresh",
+                "host peer exact N bytes on the same connection; console none",
+                identity_detail, 0, "PASS" if identity_ok else "FAIL")
+    else:
+        attempt("S5-identity", 1, "fresh",
+                "host peer exact N bytes on the same connection; console none",
+                identity_detail, 0, "BLOCKED", identity_detail)
+    if auth and open_confirm and confirm_line and identity_ok:
         record("S5", "PASS",
-               f"client received `{confirm_line.strip()}` on the authenticated connection "
-               f"(sosend; C5/C6/C8); file/sid identity is S5-identity BLOCKED (K431)")
+               f"client received `{confirm_line.strip()}`; identity qtest PASS "
+               f"(sosend; C5/C6/C8)")
+    elif auth and open_confirm and confirm_line:
+        record("S5", "FAIL" if identity_exit_path.is_file() else "BLOCKED",
+               f"confirmation delivery PASS; identity {identity_detail} (sosend; C5/C6/C8)")
     else:
         record("S5", "FAIL",
                f"no channel-open confirmation (exit {result['returncode']}); (sosend; C5/C6/C8)")
