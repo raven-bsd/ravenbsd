@@ -991,14 +991,6 @@ def console_marker_count(console: SerialConsole) -> int:
     return bytes(console.buffer).count(MARKER)
 
 
-def console_scalar(console: SerialConsole, command: str, log_name: str,
-                   timeout: float = 10.0) -> int:
-    """Run one guest command and return its last standalone integer (or -1)."""
-    clean = console_capture(console, command, log_name, timeout=timeout)
-    values = re.findall(r"(?m)^\s*(-?\d+)\s*$", clean)
-    return int(values[-1]) if values else -1
-
-
 def classify_s7(result: dict[str, object], probe_banner: bytes,
                 server_lines: str) -> tuple[str, str]:
     """Classify one failed S7 attempt from the client text, a fresh probe and server lines."""
@@ -1058,14 +1050,10 @@ def row_s7(console: SerialConsole) -> None:
     max_console_new = console_new
     for number in range(1, 11):
         before = console_marker_count(console)
-        log_before = console_scalar(console, "wc -l < /tmp/sshd.log",
-                                    f"s7-log-before-{number}.log")
         session = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-run-{number}.log",
                           timeout=S7_TIMEOUT_S, console=console)
         time.sleep(0.5)
         after = console_marker_count(console)
-        log_after = console_scalar(console, "wc -l < /tmp/sshd.log",
-                                   f"s7-log-after-{number}.log")
         new_markers = after - before
         max_console_new = max(max_console_new, new_markers)
         ok = session["stdout"] == MARKER and new_markers == 0
@@ -1086,34 +1074,19 @@ def row_s7(console: SerialConsole) -> None:
         if ok:
             continue
         probe = banner_probe(f"s7-probe-{number}", send_client=False)
-        server_lines = ""
-        delta = log_after - log_before if log_before >= 0 and log_after >= 0 else -1
-        if log_before >= 0 and log_after > log_before:
-            server_lines = console_capture(
-                console, f"tail -n +{log_before + 1} /tmp/sshd.log | head -n "
-                         f"{log_after - log_before}",
-                f"s7-server-{number}.log")
-        classification, witness = classify_s7(session, probe["bytes"], server_lines)
+        classification, witness = classify_s7(session, probe["bytes"], "")
         attempt("S7-class", number, "fresh",
-                "guest-listening / auth-rejected / connection-reset from the client, a fresh "
-                "banner probe and the server log",
+                "guest-not-listening / auth-rejected / connection-reset from the client and a "
+                "fresh banner probe; QEMU serial in serial.log",
                 f"class={classification}; probe_banner={literal(probe['bytes'])}; "
-                f"server_delta={delta}; witness={witness!r}",
+                f"witness={witness!r}",
                 0, "OBSERVED")
     total_after = console_marker_count(console)
     total_delta = total_after - total_before
-    server_log = console_capture(console, "cat /tmp/sshd.log", "s7-server-console.log",
-                                 timeout=20)
-    server_source = "console"
-    if "Accepted password for raven " not in server_log \
-            and "Connection reset" not in server_log \
-            and "Server listening" not in server_log:
-        server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s7-server.log",
-                                 user=ROOT_USER, timeout=15)
-        server_log = server_capture["stdout"].decode("utf-8", "replace")
-        server_source = f"ssh exit {server_capture['returncode']}"
-    else:
-        server_capture = {"returncode": 0}
+    server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s7-server.log",
+                             user=ROOT_USER, timeout=15)
+    server_log = server_capture["stdout"].decode("utf-8", "replace")
+    server_source = f"ssh exit {server_capture['returncode']}"
     (OUT / "s7-server.raw.log").write_text(server_log, encoding="utf-8")
     ps_capture = ssh_run(["ps", "-e"], "s7-ps.log", user=ROOT_USER, timeout=15)
     ps_log = ps_capture["stdout"].decode("utf-8", "replace")
