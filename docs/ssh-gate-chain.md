@@ -238,6 +238,20 @@ this deviation is recorded in the K434 report.
    (`socket-write-identity-tap: pass`), so S5 is PASS.
 4. **S5-session** remains: no EPIPE, exit -9 at 15 s, fd4 socket/pipe, TCP peer `ESTAB`.
 
+## Rev 23 observations (S1-repeat)
+
+1. **A separate boot is required for S1-repeat.** The ten repeat sessions on the main boot
+   destabilized the guest before S3 (`init exited (134)`). S1-repeat now runs on its own boot after
+   one TCP readiness probe; the main matrix then reboots clean.
+2. **S1-repeat is 10/10.** Every fresh client connection logs
+   `Remote protocol version 2.0, remote software version OpenSSH_10.6` and
+   `Authenticated to ... using "password"`, with walls 8014-8027 ms and exit -9 after auth (the
+   session-completion failure, not the banner/auth step). No zero-byte failures occurred in this
+   run; the per-attempt `step` field would record connect/banner/auth if they did.
+3. **S7 is 10/10 exact** with console delta 0, but all ten attempts exit -9 at ~30 s; S7's exit/wall
+   gate is red.
+4. **S8** still returns `PTY allocation request failed` after K438; K442 is next.
+
 ## Gaps (not evidence)
 
 - FreeBSD `soo_poll` is read (`sys_socket.c:282`); the protocol-specific `pr_sopoll` for TCP was not
