@@ -1901,6 +1901,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-ipc-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-ipc",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-irq-dist"
 version = "0.1.0"
 dependencies = [
