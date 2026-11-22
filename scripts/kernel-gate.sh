@@ -18,8 +18,9 @@
 #   --list   print the case table and exit (no QEMU run)
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
-# The exclusive-host preflight refuses other QEMU/xtask/cargo/rustc or load > 2.0. Set
-# S107_WAIT_FOR_IDLE=<seconds> to wait for an idle host, or S107_MAX_LOAD to change the bound.
+# These are functional rows, not latency rows: the management qemu-hygiene script allows the
+# functional budget (up to nproc/2 QEMU boots, load <= 2*nproc). The exclusive latency window is
+# not required here; the hygiene script's refusal is the stop condition.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -28,15 +29,6 @@ cd "$root" || exit 2
 
 doc=
 log_dir=target/kernel-gate
-wait_idle=${S107_WAIT_FOR_IDLE:-0}
-default_max_load() {
-    n=$(nproc 2>/dev/null || echo 4)
-    case "$n" in ''|*[!0-9]*) n=4 ;; esac
-    m=$((n / 4))
-    [ "$m" -lt 2 ] && m=2
-    echo "$m"
-}
-max_load=${S107_MAX_LOAD:-$(default_max_load)}
 
 # case | arch | owner | subsystem note | optional explicit case path
 # The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
@@ -84,11 +76,12 @@ fi
 doc=$(mgmt_path architecture/product-data/kernel-gate.md) || exit 2
 
 mkdir -p "$log_dir" || exit 2
-sh tests/smp/boot/host-idle.sh \
-    --context "kernel-gate" \
-    --wait "$wait_idle" \
-    --max-load "$max_load" \
-    --state-file "$log_dir/host-state.txt" || exit 2
+hygiene=$(mgmt_path scripts/qemu-hygiene.sh) || exit 2
+if ! sh "$hygiene" > "$log_dir/host-state.txt" 2>&1; then
+    cat "$log_dir/host-state.txt" >&2
+    exit 2
+fi
+cat "$log_dir/host-state.txt"
 
 commit=$(git rev-parse HEAD 2>/dev/null) || { echo "kernel-gate: not a git checkout" >&2; exit 2; }
 short=$(git rev-parse --short=12 HEAD 2>/dev/null) || short=$commit
