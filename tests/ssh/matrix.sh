@@ -48,6 +48,8 @@ stale_qemu() {
         >/dev/null 2>&1 || true
     timeout 5 pkill -TERM -f "qemu-system-x86_64.*$root_real/build/fixtures/ssh-echo/echo.img" \
         >/dev/null 2>&1 || true
+    # A stale serial socket is a FIFO-like file that blocks a full-tree provenance walk.
+    find "$root/build/ssh" -name '*.sock' -delete 2>/dev/null || true
     sleep 1
 }
 down() {
