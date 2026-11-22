@@ -204,6 +204,13 @@ def cache_lookup(cache_root: Path, key: str) -> tuple[Path, dict] | None:
     return image, meta
 
 
+def cache_decision(cache_root: Path, key: str, refresh: bool) -> tuple[Path, dict] | None:
+    """A warm entry is used unless --refresh asks for a measured rebuild."""
+    if refresh:
+        return None
+    return cache_lookup(cache_root, key)
+
+
 def write_cache(cache_root: Path, key: str, image: Path, build_seconds: float) -> dict:
     directory, meta_path, cached = cache_paths(cache_root, key)
     directory.mkdir(parents=True, exist_ok=True)
@@ -254,11 +261,10 @@ def build_image(key: str) -> tuple[Path, float]:
 
 
 def preflight(key: str, refresh: bool) -> tuple[Path, float, bool]:
-    """Return (image, build_seconds, cached). Builds only on a cold cache."""
-    if not refresh:
-        hit = cache_lookup(CACHE_ROOT, key)
-        if hit is not None:
-            return hit[0], 0.0, True
+    """Return (image, build_seconds, cached). Builds only on a cold cache or --refresh."""
+    hit = cache_decision(CACHE_ROOT, key, refresh)
+    if hit is not None:
+        return hit[0], 0.0, True
     image, elapsed = build_image(key)
     write_cache(CACHE_ROOT, key, image, elapsed)
     return image, elapsed, False
@@ -310,13 +316,13 @@ def link_image(image: Path, case: str) -> Path:
     return target
 
 
-def run_case(mode: str, cycles: int, timeout: int) -> int:
+def run_case(mode: str, cycles: int, timeout: int, refresh: bool = False) -> int:
     check_inputs(mode)
     require_clean_tree()
     key = cache_key()
     print(f"stress-preflight: mode={mode} case={MODES[mode]} cycles={cycles}")
     print(f"stress-preflight: key={key} cache={CACHE_ROOT / key}")
-    image, build_seconds, cached = preflight(key, refresh=False)
+    image, build_seconds, cached = preflight(key, refresh=refresh)
     if cached:
         print(f"stress-preflight: build={build_seconds:.2f}s cached=yes image={image}")
     else:
@@ -426,6 +432,9 @@ def selftest() -> int:
         if hit is None or hit[0].read_bytes() != b"k525":
             print("selftest: warm cache is not a hit", file=sys.stderr)
             return 1
+        if cache_decision(base / "cache", key, True) is not None:
+            print("selftest: --refresh still used the cache", file=sys.stderr)
+            return 1
 
     print("stress-preflight: selftest PASS")
     return 0
@@ -500,7 +509,7 @@ def main(argv: list[str]) -> int:
     cycles = 1 if args.cycles is None else args.cycles
     timeout = args.timeout or 1200
     try:
-        return run_case(args.mode, cycles, timeout)
+        return run_case(args.mode, cycles, timeout, refresh=args.refresh)
     except PreflightError as error:
         print(f"stress-preflight: {error}", file=sys.stderr)
         return 2
