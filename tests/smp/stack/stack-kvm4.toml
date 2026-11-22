@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K530 kernel stack lifetime: 80 threads x 10 cycles on 4 CPUs. The guest's exit `s69` line
+# records stack_fresh/stack_cached/heap; the host runner asserts the bounded steady state and the
+# kernel reuse-zero probe.
+
+name = "smp-stack-kvm4"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 360
+pre = ["sh tests/smp/stack/build.sh"]
+initfs = "build/smp/stack/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s69-cleanupcheck s69-stackcheck"
+qemu_extra = ["-accel", "kvm", "-cpu", "host", "-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^stack-selftest: guard-unmapped ok$'
+
+[[expect]]
+regex = '^stack-selftest: reuse-zero ok$'
+
+[[expect]]
+regex = '^stack: start threads=80 cycles=10$'
+
+[[expect]]
+regex = '^stack: cycle=10 done$'
+
+[[expect]]
+regex = '^stack: done$'
+
+[[expect]]
+regex = '^s69: exit s69-stack .*stack_fresh=[0-9]+ stack_cached=[0-9]+ heap=[0-9]+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|stack: fail'
+
+[[forbid]]
+regex = '^stack-cache: DROPPED '
