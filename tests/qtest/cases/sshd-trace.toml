@@ -1,0 +1,121 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K498: boot the release image with an overlay that runs the unmodified upstream
+# sshd with -ddd and DEBUG3. One password login and one command run over guest
+# loopback; the sshd log is printed between the log-begin/log-end markers.
+# This is a trace, not a fix and not a monitor/session result claim.
+
+name = "sshd-trace"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 600
+pre = ["sh tests/fixtures/sshd-trace/build.sh"]
+initfs = "build/fixtures/sshd-trace/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: sshd up$'
+
+[[expect]]
+regex = '^sshd-trace: start$'
+
+[[expect]]
+regex = '^sshd-trace: log-begin$'
+
+[[expect]]
+regex = '^sshd-trace-command-ok$'
+
+[[expect]]
+regex = '^sshd-trace: log-end$'
+
+[[expect]]
+regex = '^sshd-trace: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|sshd-trace: FAIL'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "echo sshd-trace: start\n"
+delay_ms = 100
+
+[[step]]
+wait = '^sshd-trace: start$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=password -o PubkeyAuthentication=no raven@127.0.0.1 'echo sshd-trace-command-ok'\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^.*password: ?$'
+timeout_secs = 60
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^sshd-trace-command-ok$'
+timeout_secs = 60
+
+[[step]]
+send = "~.\n"
+delay_ms = 1000
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "echo sshd-trace: log-begin; cat /tmp/sshd-trace.log; echo sshd-trace: log-end\n"
+delay_ms = 100
+
+[[step]]
+wait = '^sshd-trace: log-end$'
+timeout_secs = 180
+
+[[step]]
+send = "echo sshd-trace: done\n"
+delay_ms = 100
+
+[[step]]
+wait = '^sshd-trace: done$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K498 trace overlay: the release sshd configuration with DEBUG3 logging.
+# This is a test-only copy; the product configuration is unchanged.
+
+Port 22
+ListenAddress 0.0.0.0
+PidFile /tmp/sshd.pid
+HostKey /tmp/ssh/ssh_host_ed25519_key
+PermitRootLogin yes
+AllowUsers root raven
+PasswordAuthentication yes
+PermitEmptyPasswords no
+KbdInteractiveAuthentication no
+AuthorizedKeysFile none
+StrictModes no
+PrintMotd no
+UseDNS no
+LogLevel DEBUG3
