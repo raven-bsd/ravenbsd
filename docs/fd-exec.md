@@ -16,8 +16,8 @@ timeout 300 cargo xtask qtest --case tests/smp/fd-exec/fd-exec.toml --arch x86_6
 The case file lives in the suite (the `xtask` resolver also accepts a path) and uses the
 `libc-test` profile so `raven-init` supplies stdio; a bare `/init` would not have fd 1.
 
-Measured on `c765b13d` (K486 base): **pass**, `duration_ms=169712`, exit status 33, `svcd: settled`,
-`init exited (0)`.
+Measured on the merged K486 branch: **pass**, `duration_ms=98772` (first uncached pass
+169712 ms), exit status 33, `svcd: settled`, `init exited (0)`.
 
 ## CLOEXEC matrix
 
@@ -107,7 +107,7 @@ Donor revisions: freebsd `133344405f532bd54ff3629a77d4c4e062f01fdb`, netbsd
 
 | Command | Cap | Exit | Result |
 |---|---:|---:|---|
-| `cargo xtask qtest --case tests/smp/fd-exec/fd-exec.toml --arch x86_64` | 300 | 0 | pass, 169.7 s |
-| `make check-fast` | 900 | see report | see report |
+| `cargo xtask qtest --case tests/smp/fd-exec/fd-exec.toml --arch x86_64` | 300 | 0 | pass, 98.8 s (first uncached 169.7 s) |
+| `make check-fast` | 900 | 0 | **check-fast: PASSED** (97.39 s) |
 
 No kernel, libc or userland behaviour was changed by K486.
