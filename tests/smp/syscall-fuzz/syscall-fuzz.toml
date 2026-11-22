@@ -8,7 +8,7 @@ timeout_secs = 120
 pre = ["sh tests/smp/syscall-fuzz/build.sh"]
 initfs = "build/syscall-fuzz/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
-qemu_extra = []
+qemu_extra = ["-cpu", "qemu64,+rdrand"]
 expect_exit = "success"
 
 # The fixture walks every ABI syscall with deterministic garbage vectors, then prints the table

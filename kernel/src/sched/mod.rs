@@ -384,7 +384,7 @@ pub fn new_user_thread(
         .ok_or(Errno::EINVAL)?;
     let name = format!("{}-thread", process.id);
     let priority = crate::process::priority::nice_to_priority(process.nice());
-    Thread::new_user(
+    let thread = Thread::new_user(
         name,
         Arc::clone(process),
         entry,
@@ -392,7 +392,9 @@ pub fn new_user_thread(
         arg,
         cr3,
         priority,
-    )
+    )?;
+    process.register_thread(&thread);
+    Ok(thread)
 }
 
 /// Start the scheduler with `thread` as the first runnable user thread.
@@ -453,10 +455,18 @@ fn schedule_locked() {
         };
 
         if !current.idle && current.state() == ThreadState::Running {
-            current.set_state(ThreadState::Ready);
-            let _ = state
+            // K527: enqueue before publishing `Ready`. A runnable thread must own a queue slot;
+            // under the MAX_THREADS bound this cannot fail. If it ever does, stay on the thread
+            // in `Running` rather than dropping a runnable thread.
+            if state
                 .runqueue
-                .push_back(current.effective_priority(), Arc::clone(&current));
+                .push_back(current.effective_priority(), Arc::clone(&current))
+                .is_err()
+            {
+                state.need_resched = false;
+                return;
+            }
+            current.set_state(ThreadState::Ready);
         }
         state.need_resched = false;
         // A terminal process must never run user code again: drop every runnable thread that
@@ -958,18 +968,21 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
                 note_wake_fail(&thread, 2, cpu);
                 return false;
             }
-            thread.set_state(ThreadState::Ready);
+            // K527: enqueue first and only then publish `Ready`. When the queue refuses (it
+            // cannot under the MAX_THREADS bound), leave the thread Blocked with the wake
+            // recorded and let the caller retry; queue pressure is never a thread exit.
             thread.wake_status.store(status as i64, Ordering::SeqCst);
-            thread.pending_wake.store(false, Ordering::SeqCst);
             if state
                 .runqueue
                 .push_back(thread.effective_priority(), Arc::clone(&thread))
                 .is_err()
             {
                 note_wake_fail(&thread, 3, cpu);
-                thread.set_state(ThreadState::Dead);
+                thread.pending_wake.store(true, Ordering::SeqCst);
                 return false;
             }
+            thread.set_state(ThreadState::Ready);
+            thread.pending_wake.store(false, Ordering::SeqCst);
             thread
                 .last_cpu
                 .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
@@ -1041,23 +1054,41 @@ fn try_steal(cpu: usize) -> bool {
             }
         };
         if let Some(thread) = stolen {
-            let mut slot = lock_cpu(cpu);
-            let Some(state) = slot.as_mut() else {
-                return false;
+            // K527: queue membership is the only thing that makes the thread Ready. The victim
+            // pop left it Ready but unqueued; only a successful destination push completes the
+            // handoff.
+            let pushed = {
+                let mut slot = lock_cpu(cpu);
+                match slot.as_mut() {
+                    Some(state) => {
+                        if state
+                            .runqueue
+                            .push_back(thread.effective_priority(), Arc::clone(&thread))
+                            .is_ok()
+                        {
+                            state.need_resched = true;
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    None => false,
+                }
             };
-            thread.set_state(ThreadState::Ready);
+            if !pushed {
+                // Destination full (impossible under the MAX_THREADS bound): restore the
+                // thread to its victim queue; never mark a stolen thread Dead for pressure.
+                let mut slot = lock_cpu(victim);
+                if let Some(state) = slot.as_mut() {
+                    let _ = state
+                        .runqueue
+                        .push_back(thread.effective_priority(), Arc::clone(&thread));
+                }
+                return false;
+            }
             thread
                 .last_cpu
                 .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
-            if state
-                .runqueue
-                .push_back(thread.effective_priority(), Arc::clone(&thread))
-                .is_err()
-            {
-                thread.set_state(ThreadState::Dead);
-                return false;
-            }
-            state.need_resched = true;
             return true;
         }
         offset = offset.saturating_add(1);

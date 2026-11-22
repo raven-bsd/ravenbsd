@@ -6,6 +6,12 @@ use raven_libc_signal::kernel::SysKernel;
 use raven_libc_signal::{SigSet, maskops};
 #[unsafe(no_mangle)]
 pub extern "C" fn pthread_sigmask(how: c_int, set: *const SigSet, old: *mut SigSet) -> c_int {
+    // SIG_SETUP is per thread: the first signal operation on a secondary thread registers that
+    // thread (and its own context area) before an unblock can kick it.
+    if let Err(error) = crate::signal::ensure_entry() {
+        crate::ffi::errno::set(error);
+        return -1;
+    }
     let s = if set.is_null() {
         None
     } else {

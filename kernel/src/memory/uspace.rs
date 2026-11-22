@@ -23,6 +23,7 @@ use raven_rmm::page::{NO_EXECUTE, PRESENT};
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
 use raven_vma::{Backing, PAGE_SIZE, Vma, VmaError, Vmas};
 
+use crate::memory::aslr;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::frame;
 use crate::memory::paging;
@@ -161,6 +162,10 @@ pub struct UserAddressSpace {
     /// Bumped on every mapping change. A capture records it at create and only copies back when
     /// the client's mapping has not been replaced meanwhile.
     mapping_generation: u64,
+    /// Randomized first anonymous mmap hint for this process image.
+    mmap_base: u64,
+    /// Randomized initial stack VMA base for this process image.
+    stack_base: u64,
 }
 
 /// Deferred TLB shootdown and frame recycling after an `unmap`.
@@ -236,7 +241,21 @@ impl UserAddressSpace {
             dma: Vec::new(),
             inherit: Vec::new(),
             mapping_generation: 0,
+            mmap_base: aslr::mmap_base(),
+            stack_base: aslr::stack_base(),
         }
+    }
+
+    /// Randomized anonymous-mmap hint for this process image.
+    #[must_use]
+    pub const fn mmap_base(&self) -> u64 {
+        self.mmap_base
+    }
+
+    /// Randomized initial stack VMA base for this process image.
+    #[must_use]
+    pub const fn stack_base(&self) -> u64 {
+        self.stack_base
     }
 
     /// Monotonic mapping generation, bumped by every map/unmap/protect.
@@ -554,6 +573,9 @@ impl UserAddressSpace {
         if self.vmas.len() != 1 || !self.objects.is_empty() {
             return Err(Errno::EINVAL);
         }
+        // fork inherits the parent layout exactly; only exec draws a new one.
+        self.mmap_base = source.mmap_base;
+        self.stack_base = source.stack_base;
         let vmas: Vec<Vma> = source.vmas.iter().copied().collect();
         let objects = source.objects.clone();
         let inherit = source.inherit.clone();
