@@ -467,6 +467,15 @@ pub fn on_process_exit(process: &Arc<Process>) {
         .any(|token| token == "s32-capturecheck")
     {
         let stats = crate::memory::frame::stats();
+        // The init is the last process to exit; its line is the end-of-test baseline even when
+        // an intermediate cancelled capture is deliberately still mapped for an in-flight reply.
+        if process.path == "/init" {
+            crate::kprintln!(
+                "s32: final frames={} free_bytes={}",
+                capture::frames_in_use(),
+                stats.free_bytes
+            );
+        }
         crate::kprintln!(
             "s32: capture frames={} free_bytes={}",
             capture::frames_in_use(),

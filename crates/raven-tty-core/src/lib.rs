@@ -10,7 +10,8 @@
 //!
 //! Canonical mode implements the line editing a serial console needs: `\r` and `\n` end a line
 //! (the completed line is delivered with a `\n` terminator), backspace erases, `^U` kills,
-//! `^C` discards the line and raises [`Event::Interrupt`], `^D` on an empty line raises
+//! `^C` discards the line and raises [`Event::Interrupt`], `^\` discards it and sets
+//! [`Output::quit`] for the server's `SIGQUIT`, `^D` on an empty line raises
 //! [`Event::EndOfFile`] and `^L` is inserted verbatim. Raw mode passes bytes through without echo
 //! or editing.
 //!
@@ -278,6 +279,8 @@ pub struct Output {
     pub data: Vec<u8>,
     /// Events in the order they happened.
     pub events: Vec<Event>,
+    /// True when `^\` discarded the line and the server must deliver `SIGQUIT`.
+    pub quit: bool,
 }
 
 /// The terminal window size (`struct winsize`).
@@ -429,6 +432,10 @@ impl Discipline {
                 self.interrupt(out);
                 continue;
             }
+            if self.termios.lflag & ISIG != 0 && self.special(VQUIT, byte) {
+                self.quit(out);
+                continue;
+            }
             if byte == NEWLINE || (self.special(VEOL, byte) && self.termios.lflag & IEXTEN != 0) {
                 self.complete_line(out);
                 continue;
@@ -520,6 +527,15 @@ impl Discipline {
             out.echo.extend_from_slice(b"\r\n");
         }
         out.events.push(Event::Interrupt);
+    }
+
+    fn quit(&mut self, out: &mut Output) {
+        self.len = 0;
+        if self.termios.lflag & ECHO != 0 {
+            out.echo.extend_from_slice(b"^\\");
+            out.echo.extend_from_slice(b"\r\n");
+        }
+        out.quit = true;
     }
 
     fn eof_or_complete(&mut self, out: &mut Output) {

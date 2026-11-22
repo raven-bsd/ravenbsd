@@ -47,8 +47,10 @@ const DUPLEX_COLLECT: u32 = 0x4000_0000;
 const DUPLEX_DATAGRAM: u32 = 1;
 /// `MSG_NOSIGNAL` (suppress the SIGPIPE queue on `EPIPE`).
 const DUPLEX_MSG_NOSIGNAL: u32 = 0x4000;
-/// `MSG_WAITALL` (not supported by the Raven raw recv path).
-const MSG_WAITALL: u32 = 0x100;
+/// `MSG_WAITALL` (FreeBSD/NetBSD 0x40): refused explicitly by the raw recv path.
+const MSG_WAITALL: u32 = 0x40;
+/// `MSG_CTRUNC` (FreeBSD/NetBSD 0x20): set on receive when ancillary data did not fit.
+const MSG_CTRUNC: u32 = 0x20;
 /// `SOL_SOCKET`.
 const SOL_SOCKET: u32 = 1;
 /// `SCM_RIGHTS`.
@@ -351,6 +353,31 @@ fn first_record_count(control: &[u8], control_len: usize) -> Result<(u32, u32), 
         return Err(Errno::EINVAL);
     }
     Ok((count, get_u32(control, CMSG_BYTES)?))
+}
+
+/// Parse exactly two 20-byte `SCM_RIGHTS` records, one handle each (K521 donor shape).
+fn two_single_records(control: &[u8], control_len: usize) -> Option<[Handle; 2]> {
+    if control_len != 40 {
+        return None;
+    }
+    let len1 = get_u32(control, 0).ok()?;
+    let count1 = get_u32(control, 12).ok()?;
+    let raw1 = get_u32(control, CMSG_BYTES).ok()?;
+    let len2 = get_u32(control, 20).ok()?;
+    let level2 = get_u32(control, 24).ok()?;
+    let kind2 = get_u32(control, 28).ok()?;
+    let count2 = get_u32(control, 32).ok()?;
+    let raw2 = get_u32(control, 36).ok()?;
+    if len1 != 20
+        || count1 != 1
+        || len2 != 20
+        || level2 != SOL_SOCKET
+        || kind2 != SCM_RIGHTS
+        || count2 != 1
+    {
+        return None;
+    }
+    Some([Handle(raw1), Handle(raw2)])
 }
 
 fn observed(value: Stats) -> u64 {
@@ -742,28 +769,27 @@ fn truncation(table: &mut Table) {
     baseline(table, "truncation");
     let base = stats().unwrap_or_default();
 
-    // A too-small control buffer returns EMSGSIZE and leaves the message queued.
-    if let (Ok((left, right)), Ok((read_end, write_end))) = (pair(0), pipe()) {
+    // A too-small control buffer is not an error: the data is delivered, the whole SCM_RIGHTS
+    // record is dropped and MSG_CTRUNC reports the loss (NetBSD uipc_syscalls.c:867,
+    // FreeBSD uipc_syscalls.c:1020). The message is consumed exactly once.
+    if let (Ok((left, right)), Ok((read_end, write_end))) = (pair(O_NONBLOCK), pipe()) {
         let before = base;
         let mut control = [0u8; 64];
         let control_len = control_one(write_end, &mut control);
         let sent = sendmsg(left, b"t", &control[..control_len], DUPLEX_MSG_NOSIGNAL) == Ok(1);
         let mut data = [0u8; 8];
         let mut small = [0u8; 8];
-        let rejected = matches!(recvmsg(right, &mut data, &mut small), Err(Errno::EMSGSIZE));
-        let mut enough = [0u8; 64];
-        let (retried, handle) = match recvmsg(right, &mut data, &mut enough) {
-            Ok((1, message)) if message.handle_count == 1 => {
-                match first_record_count(&enough, message.control_len as usize) {
-                    Ok((_, raw)) => (true, Some(Handle(raw))),
-                    Err(_) => (false, None),
-                }
+        let delivered = match recvmsg(right, &mut data, &mut small) {
+            Ok((1, message)) => {
+                data[0] == b't'
+                    && message.flags & MSG_CTRUNC != 0
+                    && message.handle_count == 0
+                    && message.control_len == 0
             }
-            _ => (false, None),
+            _ => false,
         };
-        if let Some(handle) = handle {
-            close(handle);
-        }
+        let mut again = [0u8; 8];
+        let consumed = matches!(recvmsg(right, &mut data, &mut again), Err(Errno::EAGAIN));
         close(left);
         close(write_end);
         close(right);
@@ -771,12 +797,12 @@ fn truncation(table: &mut Table) {
         let after = stats().unwrap_or_default().delta(before);
         table.row(
             "truncation",
-            "control-small-emsgsize",
-            sent && rejected && retried && after.zero(),
+            "control-small-ctrunc",
+            sent && delivered && consumed && after.zero(),
             observed(after),
         );
     } else {
-        table.row("truncation", "control-small-emsgsize", false, u64::MAX);
+        table.row("truncation", "control-small-ctrunc", false, u64::MAX);
     }
 
     // A datagram shorter than the user buffer is truncated and the whole message is consumed.
@@ -835,8 +861,7 @@ fn truncation(table: &mut Table) {
         table.row("truncation", "control-exact-offset", false, u64::MAX);
     }
 
-    // Two SCM_RIGHTS records in one datagram: both handles are delivered. Raven flattens them
-    // into one record, a recorded donor divergence.
+    // Two SCM_RIGHTS records in one datagram stay two records with their own headers (K521).
     if let (Ok((left, right)), Ok((read_end, write_end)), Ok((read_end2, write_end2))) =
         (pair(DUPLEX_DATAGRAM | O_NONBLOCK), pipe(), pipe())
     {
@@ -850,18 +875,28 @@ fn truncation(table: &mut Table) {
         let mut received_control = [0u8; 128];
         let delivered = match recvmsg(right, &mut data, &mut received_control) {
             Ok((1, message)) if message.handle_count == 2 => {
-                match first_record_count(&received_control, message.control_len as usize) {
-                    Ok((2, raw)) => {
-                        close(Handle(raw));
-                        match get_u32(&received_control, 20) {
-                            Ok(second_raw) => {
-                                close(Handle(second_raw));
-                                true
-                            }
-                            Err(_) => false,
-                        }
+                match two_single_records(&received_control, message.control_len as usize) {
+                    Some([one, two]) => {
+                        close(one);
+                        close(two);
+                        true
                     }
-                    _ => false,
+                    // A flattened count=2 record: consume both handles and report the divergence.
+                    None => {
+                        if message.control_len >= 20
+                            && let Ok((count, _)) =
+                                first_record_count(&received_control, message.control_len as usize)
+                        {
+                            for index in 0..count.min(2) {
+                                if let Ok(raw) =
+                                    get_u32(&received_control, CMSG_BYTES + index as usize * 4)
+                                {
+                                    close(Handle(raw));
+                                }
+                            }
+                        }
+                        false
+                    }
                 }
             }
             _ => false,
@@ -881,6 +916,61 @@ fn truncation(table: &mut Table) {
         );
     } else {
         table.row("truncation", "two-records-one-datagram", false, u64::MAX);
+    }
+
+    // The same two records on a stream send: the data byte and both headers arrive together.
+    if let (Ok((left, right)), Ok((read_end, write_end)), Ok((read_end2, write_end2))) =
+        (pair(0), pipe(), pipe())
+    {
+        let before = base;
+        let mut control = [0u8; 128];
+        let first = control_record(&[write_end], &mut control, 0);
+        let second = control_record(&[write_end2], &mut control, first);
+        let total = first.saturating_add(second);
+        let sent = sendmsg(left, b"s", &control[..total], DUPLEX_MSG_NOSIGNAL) == Ok(1);
+        let mut data = [0u8; 8];
+        let mut received_control = [0u8; 128];
+        let delivered = match recvmsg(right, &mut data, &mut received_control) {
+            Ok((1, message)) if message.handle_count == 2 && data[0] == b's' => {
+                match two_single_records(&received_control, message.control_len as usize) {
+                    Some([one, two]) => {
+                        close(one);
+                        close(two);
+                        true
+                    }
+                    None => {
+                        if let Ok((count, _)) =
+                            first_record_count(&received_control, message.control_len as usize)
+                        {
+                            for index in 0..count.min(2) {
+                                if let Ok(raw) =
+                                    get_u32(&received_control, CMSG_BYTES + index as usize * 4)
+                                {
+                                    close(Handle(raw));
+                                }
+                            }
+                        }
+                        false
+                    }
+                }
+            }
+            _ => false,
+        };
+        close(left);
+        close(write_end);
+        close(write_end2);
+        close(right);
+        close(read_end);
+        close(read_end2);
+        let after = stats().unwrap_or_default().delta(before);
+        table.row(
+            "truncation",
+            "two-records-one-stream",
+            sent && delivered && after.zero(),
+            observed(after),
+        );
+    } else {
+        table.row("truncation", "two-records-one-stream", false, u64::MAX);
     }
 
     // A control capacity exactly equal to the record length succeeds.
@@ -1279,18 +1369,18 @@ fn waitall(table: &mut Table) {
             flags: MSG_WAITALL,
             handle_count: 0,
         };
-        let unsupported = recvmsg_at(right, &mut message) == Err(Errno::EINVAL);
+        let unsupported = recvmsg_at(right, &mut message) == Err(Errno::EOPNOTSUPP);
         close(left);
         close(right);
         let after = stats().unwrap_or_default().delta(before);
         table.row(
             "waitall",
-            "msg-waitall-einval",
+            "msg-waitall-eopnotsupp",
             sent && unsupported && after.zero(),
             observed(after),
         );
     } else {
-        table.row("waitall", "msg-waitall-einval", false, u64::MAX);
+        table.row("waitall", "msg-waitall-eopnotsupp", false, u64::MAX);
     }
 }
 
@@ -1422,9 +1512,6 @@ impl Fuzz {
         let handle = self.pairs[pair].handle(side);
         let incoming = FuzzPair::peer(side);
         let queue = self.pairs[pair].queue(incoming);
-        let front_has_handle = self.pairs[pair].queues[queue]
-            .first()
-            .is_some_and(|entry| entry.has_handle);
         let mut data = [0u8; 8];
         let mut control = [0u8; 64];
         let mut message = Message {
@@ -1447,8 +1534,20 @@ impl Fuzz {
             let _ = self.pairs[pair].queues[queue].remove(0);
             if had_handle {
                 self.pending = self.pending.saturating_sub(1);
-                // The delivered carrier endpoint is closed immediately; its root stays open.
-                if message.handle_count != 1 || message.control_len < 20 {
+                if small {
+                    // A control buffer too small for the record delivers the data, drops the
+                    // whole SCM_RIGHTS record and reports MSG_CTRUNC (K521 donor rule).
+                    if message.flags & MSG_CTRUNC == 0
+                        || message.handle_count != 0
+                        || message.control_len != 0
+                    {
+                        println!(
+                            "duplex-matrix: fuzz-detail step={step} kind=truncated-control flags=0x{:x} handles={} control-len={}",
+                            message.flags, message.handle_count, message.control_len
+                        );
+                        self.break_invariant(step, 4, side as u8);
+                    }
+                } else if message.handle_count != 1 || message.control_len < 20 {
                     println!(
                         "duplex-matrix: fuzz-detail step={step} kind=delivered-count handles={} control-len={}",
                         message.handle_count, message.control_len
@@ -1472,11 +1571,17 @@ impl Fuzz {
                     }
                     close(delivered);
                 }
-            }
-        } else if result == Err(Errno::EMSGSIZE) {
-            if !front_has_handle || !small {
+            } else if message.flags & MSG_CTRUNC != 0 {
+                // No ancillary data was queued, so there is nothing to truncate.
+                println!(
+                    "duplex-matrix: fuzz-detail step={step} kind=spurious-ctrunc flags=0x{:x}",
+                    message.flags
+                );
                 self.break_invariant(step, 5, side as u8);
             }
+        } else if result == Err(Errno::EMSGSIZE) {
+            // The donor delivers the data and sets MSG_CTRUNC; EMSGSIZE must not come back.
+            self.break_invariant(step, 5, side as u8);
         } else if result != Err(Errno::EAGAIN) && result != Err(Errno::EPIPE) {
             self.break_invariant(step, 6, side as u8);
         }

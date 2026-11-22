@@ -1968,26 +1968,17 @@ fn align_down(value: u64, align: u64) -> u64 {
 }
 
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
-/// Fill 16 bytes for `AT_RANDOM`.
+/// Fill 16 bytes for `AT_RANDOM` from the kernel's boot-seeded pool.
 ///
-/// The value mixes the monotonic clock with a parent address. It is deliberately not
-/// cryptographic yet; the S24/M2 integration only needs distinct bytes per spawned child.
-fn random_bytes(parent_address: usize) -> [u8; RANDOM_LEN] {
+/// A platform with no hardware seed leaves the bytes zero and the child's `AT_RANDOM` auxv
+/// value is not usable; the pool, not a parent address or a clock, is the only source.
+fn random_bytes(_parent_address: usize) -> [u8; RANDOM_LEN] {
     #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-    let now = crate::sys::clock_get(raven_abi::types::clock::MONOTONIC).unwrap_or_default();
-    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
-    let now = raven_abi::types::Timespec::default();
-    let mut state = (now.tv_sec as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
-        ^ (now.tv_nsec as u64)
-        ^ (parent_address as u64);
     let mut bytes = [0u8; RANDOM_LEN];
-    for chunk in bytes.chunks_mut(8) {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        let word = state.to_le_bytes();
-        chunk.copy_from_slice(&word[..chunk.len()]);
-    }
+    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
+    let bytes = [0u8; RANDOM_LEN];
+    #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    let _ = crate::sys::getrandom(&mut bytes);
     bytes
 }
 

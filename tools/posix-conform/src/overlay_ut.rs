@@ -9,20 +9,30 @@ use crate::model::{HeaderRow, Meta, PlatformStatus, Profile, STANDARD, Status};
 use crate::overlay::{Claim, Overlay};
 
 fn root(label: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("posix-overlay-{label}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&path);
-    std::fs::create_dir_all(path.join("docs/posix/evidence")).unwrap();
+    let base = std::env::temp_dir().join(format!("posix-overlay-{label}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    let path = base.join("root");
+    std::fs::create_dir_all(base.join("ravenbsd-prjmgmt/architecture/product-data/posix/evidence"))
+        .unwrap();
+    std::fs::create_dir_all(&path).unwrap();
     path
 }
 
+fn posix(root: &Path) -> PathBuf {
+    root.parent()
+        .unwrap()
+        .join("ravenbsd-prjmgmt/architecture/product-data/posix")
+}
+
 fn cleanup(path: &Path) {
-    let _ = std::fs::remove_dir_all(path);
+    if let Some(base) = path.parent() {
+        let _ = std::fs::remove_dir_all(base);
+    }
 }
 
 fn write_owner(root: &Path, owner: &str, body: &str) {
     std::fs::write(
-        root.join("docs/posix/evidence")
-            .join(format!("{owner}.toml")),
+        posix(root).join("evidence").join(format!("{owner}.toml")),
         format!("schema = 1\nstandard = \"posix-2024\"\n\n{body}"),
     )
     .unwrap();
@@ -75,7 +85,7 @@ fn merge_precedence_overrides_the_derived_status() {
          evidence = \"test:tests/posix/check-headers.sh\"\n\
          notes = \"assert.h compiles under the POSIX feature macros\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.unsupported.is_empty(), "{outcome:?}");
@@ -110,7 +120,7 @@ fn qtest_evidence_resolves_to_a_case() {
         "[[row]]\nid = \"header.assert.h\"\nstatus = \"present\"\n\
          evidence = \"qtest:overlay-pass\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.unsupported.is_empty(), "{outcome:?}");
@@ -130,7 +140,7 @@ fn present_without_executable_evidence_is_unsupported() {
         "P1",
         "[[row]]\nid = \"header.assert.h\"\nstatus = \"present\"\nevidence = \"none\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.claims.is_empty());
@@ -156,7 +166,7 @@ fn fake_test_path_is_unsupported() {
         "[[row]]\nid = \"header.assert.h\"\nstatus = \"present\"\n\
          evidence = \"test:tests/posix/does-not-exist.sh\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.claims.is_empty());
@@ -181,7 +191,7 @@ fn missing_qtest_case_is_unsupported() {
         "[[row]]\nid = \"header.assert.h\"\nstatus = \"present\"\n\
          evidence = \"qtest:no-such-case\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.claims.is_empty());
@@ -201,7 +211,7 @@ fn duplicate_ids_across_owner_files_are_rejected() {
     write_test(&path, "tests/posix/check-headers.sh", "#!/bin/sh\nexit 0\n");
     write_owner(&path, "P1", row);
     write_owner(&path, "P2", row);
-    let error = Overlay::load(&path).unwrap_err().to_string();
+    let error = Overlay::load_at(&posix(&path)).unwrap_err().to_string();
     assert!(
         error.contains("duplicate overlay id `header.assert.h`"),
         "{error}"
@@ -218,7 +228,7 @@ fn waived_row_keeps_the_written_waiver() {
         "[[row]]\nid = \"header.assert.h\"\nstatus = \"waived\"\n\
          evidence = \"none\"\nnotes = \"OWNER WAIVER: P1 omits assert.h for 0.1.0\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.unsupported.is_empty(), "{outcome:?}");
@@ -243,7 +253,7 @@ fn waived_without_a_waiver_is_unsupported() {
         "P1",
         "[[row]]\nid = \"header.assert.h\"\nstatus = \"waived\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.claims.is_empty());
@@ -266,7 +276,7 @@ fn unknown_id_is_unsupported() {
         "[[row]]\nid = \"header.not-real.h\"\nstatus = \"present\"\n\
          evidence = \"test:tests/posix/check-headers.sh\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.claims.is_empty());
@@ -285,7 +295,7 @@ fn overlay_file_must_match_the_row_owner() {
         "[[row]]\nid = \"header.assert.h\"\nstatus = \"present\"\n\
          evidence = \"test:tests/posix/check-headers.sh\"\n",
     );
-    let overlay = Overlay::load(&path).unwrap();
+    let overlay = Overlay::load_at(&posix(&path)).unwrap();
     let mut profile = profile_with_assert_header();
     let outcome = overlay.apply(&path, &mut profile);
     assert!(outcome.claims.is_empty());
@@ -320,8 +330,8 @@ fn seed_includes_supported_overlay_rows() {
          evidence = \"test:tests/posix/check-headers.sh\"\n\
          notes = \"foo export is covered by the header probe\"\n",
     );
-    crate::seed::seed(&path).unwrap();
-    let mut profile = crate::model::load_profile(&path.join("docs/posix/profile.toml")).unwrap();
+    crate::seed::seed_at(&path, &posix(&path)).unwrap();
+    let mut profile = crate::model::load_profile(&posix(&path).join("profile.toml")).unwrap();
     let meta = profile
         .meta_mut("interface.foo")
         .expect("interface.foo row");
@@ -335,11 +345,11 @@ fn seed_includes_supported_overlay_rows() {
 fn owner_batch_files_are_accepted() {
     let path = root("batch");
     std::fs::write(
-        path.join("docs/posix/evidence/P4-text.toml"),
+        posix(&path).join("evidence/P4-text.toml"),
         "schema = 1\nstandard = \"posix-2024\"\n\n[[row]]\nid = \"util.sort\"\n\
          status = \"waived\"\nnotes = \"batch file smoke test\"\n",
     )
     .unwrap();
-    assert!(Overlay::load(&path).is_ok());
+    assert!(Overlay::load_at(&posix(&path)).is_ok());
     cleanup(&path);
 }

@@ -179,6 +179,9 @@ struct Row {
     vector: &'static str,
     ret: isize,
     expect: Expect,
+    /// True for a success row whose value is an ASLR-randomized address. The verdict still
+    /// asserts success, but the address is not part of the deterministic table hash (K502).
+    normalized: bool,
 }
 
 /// Runtime resources used by the valid baseline of each call.
@@ -382,6 +385,7 @@ impl Runner {
             vector,
             ret,
             expect,
+            normalized: false,
         });
     }
 
@@ -402,6 +406,7 @@ impl Runner {
             vector,
             ret,
             expect,
+            normalized: false,
         });
     }
 
@@ -426,6 +431,20 @@ impl Runner {
 
     fn any(&mut self, call: Syscall, vector: &'static str, args: [usize; 6]) {
         self.case(call, vector, args, Expect::Any);
+    }
+
+    /// A success row whose return is an ASLR-randomized address: assert success, but normalize
+    /// the address out of the deterministic table hash (K502).
+    fn address(&mut self, call: Syscall, vector: &'static str, args: [usize; 6]) {
+        let ret = raw(call as usize, args);
+        self.push(Row {
+            nr: call as usize,
+            name: format!("{call:?}"),
+            vector,
+            ret,
+            expect: Expect::Success,
+            normalized: true,
+        });
     }
 
     fn gap(&mut self, text: &'static str) {
@@ -475,7 +494,15 @@ impl Runner {
         for row in &self.rows {
             hash = fnv(hash, &(row.nr as u64).to_le_bytes());
             hash = fnv(hash, row.vector.as_bytes());
-            hash = fnv(hash, &(row.ret as i64).to_le_bytes());
+            // `Expect::Any` rows deliberately do not assert a value; K502 ASLR makes the MAP
+            // baseline address differ per boot. Hash a fixed sentinel for those rows so the
+            // determinism check still covers every asserted row without hashing an address.
+            let ret = if row.normalized || matches!(row.expect, Expect::Any) {
+                0
+            } else {
+                row.ret as i64
+            };
+            hash = fnv(hash, &ret.to_le_bytes());
         }
         println!(
             "syscall-fuzz: summary rows={} deviations={} seed=0x{SEED:016x} table-hash=0x{hash:016x}",
@@ -1320,7 +1347,7 @@ fn memory_calls(runner: &mut Runner, ctx: Ctx) {
         runner.gap("MAP baseline failed; PROTECT/UNMAP baseline rows are not measured");
     }
 
-    runner.ok(
+    runner.address(
         Syscall::MAP,
         "baseline",
         [
@@ -2064,6 +2091,7 @@ fn driver_calls(runner: &mut Runner, ctx: Ctx) {
         vector: "baseline",
         ret: irq,
         expect: Expect::Any,
+        normalized: false,
     });
     if irq >= 0 {
         let irq = irq as usize;
@@ -3013,6 +3041,7 @@ fn raw_plan(r: &mut Runner) {
         vector: "baseline",
         ret: pair,
         expect: Expect::Success,
+        normalized: false,
     });
     r.raw(
         RAW_DUPLEX_PAIR,
@@ -3061,6 +3090,7 @@ fn raw_plan(r: &mut Runner) {
             vector: "baseline",
             ret: sent,
             expect: Expect::Success,
+            normalized: false,
         });
         if sent >= 0 {
             r.raw(
@@ -3503,6 +3533,7 @@ fn raw_plan(r: &mut Runner) {
         vector: "child",
         ret: code,
         expect: Expect::ChildCode(0),
+        normalized: false,
     });
     let code = child_code(r, child_exit_ex, 0);
     r.push(Row {
@@ -3511,6 +3542,7 @@ fn raw_plan(r: &mut Runner) {
         vector: "child7",
         ret: code,
         expect: Expect::ChildCode(7),
+        normalized: false,
     });
     let code = child_code(r, child_exit_ex_garbage, 0);
     r.push(Row {
@@ -3519,6 +3551,7 @@ fn raw_plan(r: &mut Runner) {
         vector: "garbage",
         ret: code,
         expect: Expect::Any,
+        normalized: false,
     });
     r.raw(
         RAW_PROC_WAIT_EX,
@@ -3572,6 +3605,7 @@ fn raw_plan(r: &mut Runner) {
             vector,
             ret: code,
             expect: Expect::ChildCode(-5),
+            normalized: false,
         });
     }
 }
@@ -3610,6 +3644,7 @@ fn terminating_calls(runner: &mut Runner) {
                 vector: "child-code",
                 ret: code,
                 expect: Expect::ChildCode(5),
+                normalized: false,
             });
         }
         Err(_) => runner.gap("PROC_WAIT child setup failed; pointer/code rows are not measured"),
@@ -3622,6 +3657,7 @@ fn terminating_calls(runner: &mut Runner) {
         vector: "child7",
         ret: code,
         expect: Expect::ChildCode(7),
+        normalized: false,
     });
     let code = child_code(runner, child_exit, 0x7fff_ffff);
     runner.push(Row {
@@ -3630,6 +3666,7 @@ fn terminating_calls(runner: &mut Runner) {
         vector: "childmax",
         ret: code,
         expect: Expect::Any,
+        normalized: false,
     });
     let code = child_code(runner, child_thread_exit, 7);
     runner.push(Row {
@@ -3638,6 +3675,7 @@ fn terminating_calls(runner: &mut Runner) {
         vector: "child7",
         ret: code,
         expect: Expect::ChildCode(7),
+        normalized: false,
     });
     let code = child_code(runner, child_self_terminate, 9);
     runner.push(Row {
@@ -3646,6 +3684,7 @@ fn terminating_calls(runner: &mut Runner) {
         vector: "childself9",
         ret: code,
         expect: Expect::ChildCode(9),
+        normalized: false,
     });
 }
 

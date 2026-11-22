@@ -179,6 +179,18 @@ fn scan_handles(
     }
 }
 
+fn scan_records(
+    records: &ControlRecords,
+    owner: usize,
+    info: &[EndInfo],
+    pending: &mut [usize],
+    edges: &mut Vec<(usize, usize)>,
+) {
+    for record in records {
+        scan_handles(record, owner, info, pending, edges);
+    }
+}
+
 fn scan_controls(
     controls: &VecDeque<ControlMessage>,
     owner: usize,
@@ -187,7 +199,7 @@ fn scan_controls(
     edges: &mut Vec<(usize, usize)>,
 ) {
     for control in controls {
-        scan_handles(&control.handles, owner, info, pending, edges);
+        scan_records(&control.records, owner, info, pending, edges);
     }
 }
 
@@ -199,7 +211,7 @@ fn scan_datagrams(
     edges: &mut Vec<(usize, usize)>,
 ) {
     for message in messages {
-        scan_handles(&message.handles, owner, info, pending, edges);
+        scan_records(&message.records, owner, info, pending, edges);
     }
 }
 
@@ -443,20 +455,30 @@ impl Drop for PendingHandle {
     }
 }
 
+/// All control records carried by one send, keeping the sender's cmsg boundaries (K521).
+pub(crate) type ControlRecords = Vec<Vec<PendingHandle>>;
+
+/// Total handles carried across every record.
+fn record_handles(records: &ControlRecords) -> usize {
+    records
+        .iter()
+        .fold(0usize, |total, record| total.saturating_add(record.len()))
+}
+
 struct ControlMessage {
     /// Stream byte offset this ancillary record is attached to.
     offset: u64,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
 }
 
 impl ControlMessage {
-    fn new(offset: u64, handles: Vec<PendingHandle>) -> Self {
+    fn new(offset: u64, records: ControlRecords) -> Self {
         LIVE_CONTROLS.fetch_add(1, Ordering::AcqRel);
-        Self { offset, handles }
+        Self { offset, records }
     }
 
-    fn into_handles(mut self) -> Vec<PendingHandle> {
-        core::mem::take(&mut self.handles)
+    fn into_records(mut self) -> ControlRecords {
+        core::mem::take(&mut self.records)
     }
 }
 
@@ -512,7 +534,7 @@ impl StreamBuffer {
 
 struct DatagramMessage {
     data: Vec<u8>,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
 }
 
 /// One handle to a duplex endpoint.
@@ -979,16 +1001,18 @@ fn read_datagram(
     Ok(copied)
 }
 
-/// Receive one chunk or datagram plus any attached `SCM_RIGHTS` handles.
+/// Receive one chunk or datagram plus the `SCM_RIGHTS` records attached to it.
 ///
-/// The control capacity is checked before consuming data or handles. A too-small buffer
-/// returns `EMSGSIZE` and leaves the message queued. The returned handles are installed by the
-/// caller after this function returns.
+/// The control capacity is checked before consuming data or handles; a too-small buffer returns
+/// `EMSGSIZE` and leaves the message queued. The caller either passes a capacity large enough for
+/// every record and truncates whole records itself (the syscall layer, K521), or gets the old
+/// all-or-nothing rejection. Records keep the sender's cmsg boundaries. The returned handles are
+/// installed by the caller after this function returns.
 pub fn recv(
     end: &Arc<DuplexEnd>,
     destination: UserSlice,
     control_capacity: usize,
-) -> Result<(usize, Vec<PendingHandle>), Errno> {
+) -> Result<(usize, ControlRecords), Errno> {
     let limit = usize::try_from(destination.length()).map_err(|_| Errno::EINVAL)?;
     loop {
         let mut state = end.pair.state.lock();
@@ -1019,19 +1043,19 @@ pub fn recv(
             })?;
             continue;
         }
-        let (copied, handles) = match state.incoming_mut(end.side) {
+        let (copied, records) = match state.incoming_mut(end.side) {
             Buffer::Stream(buffer) => {
                 if buffer.control_ready() {
                     let needed = buffer
                         .controls
                         .front()
-                        .map_or(0, |control| control_size(control.handles.len()));
+                        .map_or(0, |control| control_size(record_handles(&control.records)));
                     if control_capacity < needed {
                         return Err(Errno::EMSGSIZE);
                     }
                     let copied = read_stream(buffer, destination, limit)?;
                     let control = buffer.controls.pop_front().ok_or(Errno::EINVAL)?;
-                    (copied, control.into_handles())
+                    (copied, control.into_records())
                 } else {
                     (read_stream(buffer, destination, limit)?, Vec::new())
                 }
@@ -1040,7 +1064,7 @@ pub fn recv(
                 let Some(message) = buffer.queue.front() else {
                     return Err(Errno::EINVAL);
                 };
-                let needed = control_size(message.handles.len());
+                let needed = control_size(record_handles(&message.records));
                 if control_capacity < needed {
                     return Err(Errno::EMSGSIZE);
                 }
@@ -1053,13 +1077,13 @@ pub fn recv(
                     return Err(Errno::EINVAL);
                 };
                 buffer.bytes = buffer.bytes.saturating_sub(length);
-                (copied, message.handles)
+                (copied, message.records)
             }
         };
         drop(state);
         end.pair.wake_writers(peer);
         event::notify_all();
-        return Ok((copied, handles));
+        return Ok((copied, records));
     }
 }
 
@@ -1080,39 +1104,40 @@ pub fn write(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno> {
     send(end, source, Vec::new(), 0)
 }
 
-/// Write `source` with an optional set of `SCM_RIGHTS` handles.
+/// Write `source` with optional `SCM_RIGHTS` records.
 ///
 /// `flags` currently accepts [`DUPLEX_MSG_NOSIGNAL`]; unknown flags are rejected by the syscall
-/// layer. Stream mode attaches the handles to the first byte of this send; a zero-length send is
-/// a control-only record. Datagram mode stores the handles with the one message.
+/// layer. Stream mode attaches the records to the first byte of this send; a zero-length send is
+/// a control-only record. Datagram mode stores the records with the one message. The sender's
+/// cmsg boundaries are preserved through the queue and on receive (K521).
 pub fn send(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
     flags: u32,
 ) -> Result<usize, Errno> {
-    if source.is_empty() && handles.is_empty() {
+    if source.is_empty() && records.is_empty() {
         return Ok(0);
     }
     let signal = flags & DUPLEX_MSG_NOSIGNAL == 0;
     if end.datagram {
-        write_datagram(end, source, handles, signal)
+        write_datagram(end, source, records, signal)
     } else {
-        write_stream(end, source, handles, signal)
+        write_stream(end, source, records, signal)
     }
 }
 
 fn write_stream(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
     signal: bool,
 ) -> Result<usize, Errno> {
     let total = usize::try_from(source.length()).map_err(|_| Errno::EINVAL)?;
-    let mut pending = if handles.is_empty() {
+    let mut pending = if records.is_empty() {
         None
     } else {
-        Some(handles)
+        Some(records)
     };
     let mut done = 0usize;
     loop {
@@ -1170,10 +1195,10 @@ fn write_stream(
         } else {
             write_stream_ring(buffer, source, done, chunk)?
         };
-        if let Some(handles) = pending.take() {
+        if let Some(records) = pending.take() {
             buffer
                 .controls
-                .push_back(ControlMessage::new(offset, handles));
+                .push_back(ControlMessage::new(offset, records));
         }
         drop(state);
         end.pair.wake_readers(peer);
@@ -1219,18 +1244,18 @@ fn write_stream_ring(
 fn write_datagram(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: ControlRecords,
     signal: bool,
 ) -> Result<usize, Errno> {
     let total = usize::try_from(source.length()).map_err(|_| Errno::EINVAL)?;
-    if total > DUPLEX_DATAGRAM_MAX || handles.len() > DUPLEX_MAX_HANDLES {
+    if total > DUPLEX_DATAGRAM_MAX || record_handles(&records) > DUPLEX_MAX_HANDLES {
         return Err(Errno::EMSGSIZE);
     }
     let mut data = Vec::new();
     data.try_reserve_exact(total).map_err(|_| Errno::ENOMEM)?;
     data.resize(total, 0);
     copy_from_user(&mut data, source)?;
-    let mut pending = Some(DatagramMessage { data, handles });
+    let mut pending = Some(DatagramMessage { data, records });
     loop {
         let mut state = end.pair.state.lock();
         let peer = end.side.peer();

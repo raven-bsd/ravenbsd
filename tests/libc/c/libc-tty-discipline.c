@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,52 @@ static long now_ms(void) {
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
         return -1;
     return (long)ts.tv_sec * 1000L + (long)(ts.tv_nsec / 1000000L);
+}
+
+/* Wake from pause when a queued signal arrives; alarm(1) bounds the no-signal case. The libc
+ * process-signal queue is the observable side of the kernel delivery; the ptyd serial records
+ * the signal number and target. Returns 1 for a prompt signal, 0 for the alarm timeout, -1 for
+ * an unexpected pause result. */
+static int observe_signal(void) {
+    long start = now_ms();
+    (void)alarm(1);
+    errno = 0;
+    int result = pause();
+    long elapsed = now_ms() - start;
+    (void)alarm(0);
+    if (result != -1 || errno != EINTR)
+        return -1;
+    printf("tty-discipline: signal-observe elapsed_ms=%ld\n", elapsed);
+    fflush(stdout);
+    return elapsed < 500 ? 1 : 0;
+}
+
+static int write_all(int fd, const void *data, size_t length) {
+    const unsigned char *bytes = data;
+    size_t offset = 0;
+    while (offset < length) {
+        ssize_t count = write(fd, bytes + offset, length - offset);
+        if (count < 0) {
+            if (errno == EINTR)
+                continue;
+            return -1;
+        }
+        if (count == 0)
+            return -1;
+        offset += (size_t)count;
+    }
+    return 0;
+}
+
+static int set_foreground(int master) {
+    if (setpgid(0, 0) != 0 && errno != EPERM)
+        return -1;
+    int own = getpgrp();
+    if (own <= 0)
+        return -1;
+    if (tcsetpgrp(master, own) != 0)
+        return -1;
+    return own;
 }
 
 static int open_pair(int *master, int *slave, char *name, size_t capacity) {
@@ -204,15 +251,190 @@ static int row_isig(void) {
     term.c_lflag |= ISIG;
     if (tcsetattr(slave, TCSANOW, &term) != 0)
         return fail_row("isig-intr", "tcsetattr", -1);
-    if (write(master, "\x03", 1) != 1)
+    int initial = tcgetpgrp(master);
+    if (initial != 0)
+        return fail_row("isig-intr", "initial-pgrp", initial);
+    if (write_all(master, "\x03", 1) != 0)
         return fail_row("isig-intr", "write-intr", -1);
-    if (write(master, "abc\n", 4) != 4)
+    if (write_all(master, "abc\n", 4) != 0)
         return fail_row("isig-intr", "write-line", -1);
     if (expect_bytes("isig-intr-data", slave, (const unsigned char *)"abc\n", 4, 500) != 0)
         return 1;
     if (expect_bytes("isig-intr-echo", master, (const unsigned char *)"^C\r\n", 4, 500) != 0)
         return 1;
-    printf("tty-discipline: row=isig-intr sigint=pgrp-unset not-measured\n");
+    if (observe_signal() != 0)
+        return fail_row("isig-intr", "pgrp-unset-signal", -1);
+    printf("tty-discipline: row=isig-intr sigint=0 pgrp-unset ok\n");
+    fflush(stdout);
+    close(slave);
+    close(master);
+    return 0;
+}
+
+static int row_isig_foreground(void) {
+    int master = -1;
+    int slave = -1;
+    char path[64];
+    if (open_pair(&master, &slave, path, sizeof(path)) != 0)
+        return fail_row("isig-foreground", "open", -1);
+    struct termios term;
+    canonical_termios(&term, 1);
+    term.c_lflag |= ISIG;
+    if (tcsetattr(slave, TCSANOW, &term) != 0)
+        return fail_row("isig-foreground", "tcsetattr", -1);
+    int own = set_foreground(master);
+    if (own <= 0)
+        return fail_row("isig-foreground", "tcsetpgrp", -1);
+    int read_back = tcgetpgrp(master);
+    if (read_back != own)
+        return fail_row("isig-foreground", "get-after-set", read_back);
+    if (write_all(master, "\x03", 1) != 0)
+        return fail_row("isig-foreground", "write-intr", -1);
+    if (write_all(master, "abc\n", 4) != 0)
+        return fail_row("isig-foreground", "write-line", -1);
+    if (expect_bytes("isig-foreground-data", slave, (const unsigned char *)"abc\n", 4, 1000) !=
+        0)
+        return 1;
+    if (expect_bytes("isig-foreground-echo", master, (const unsigned char *)"^C\r\n", 4, 1000) !=
+        0)
+        return 1;
+    if (observe_signal() != 1)
+        return fail_row("isig-foreground", "sigint-count", -1);
+    printf("tty-discipline: row=isig-foreground sigint=1 ok\n");
+    fflush(stdout);
+    close(slave);
+    close(master);
+    return 0;
+}
+
+static int row_isig_background(void) {
+    int master = -1;
+    int slave = -1;
+    char path[64];
+    if (open_pair(&master, &slave, path, sizeof(path)) != 0)
+        return fail_row("isig-background", "open", -1);
+    struct termios term;
+    canonical_termios(&term, 1);
+    term.c_lflag |= ISIG;
+    if (tcsetattr(slave, TCSANOW, &term) != 0)
+        return fail_row("isig-background", "tcsetattr", -1);
+    if (set_foreground(master) <= 0)
+        return fail_row("isig-background", "tcsetpgrp", -1);
+
+    int pipefd[2];
+    if (pipe(pipefd) != 0)
+        return fail_row("isig-background", "pipe", -1);
+    fflush(stdout);
+    pid_t child = fork();
+    if (child == 0) {
+        close(pipefd[0]);
+        if (setpgid(0, 0) != 0)
+            _exit(2);
+        close(master);
+        close(slave);
+        unsigned char ready = 'R';
+        if (write(pipefd[1], &ready, 1) != 1)
+            _exit(3);
+        /* A background group must never be woken by the ptyd VINTR. pause() consumes a queued
+         * signal through the working libc PROC_SIGRECV path; a silent child at the parent's
+         * 300 ms poll is the negative result. The test process exits at the end, so the child
+         * does not need a kill path (the libc kill wrapper is outside this ticket). */
+        errno = 0;
+        int result = pause();
+        unsigned char signal = result == -1 && errno == EINTR ? 'S' : 'N';
+        ssize_t ignored = write(pipefd[1], &signal, 1);
+        (void)ignored;
+        _exit(signal == 'S' ? 1 : 0);
+    }
+    close(pipefd[1]);
+    if (child < 0)
+        return fail_row("isig-background", "fork", -1);
+    unsigned char ready = 0;
+    if (read_timeout(pipefd[0], &ready, 1, 1000) != 1 || ready != 'R') {
+        close(pipefd[0]);
+        return fail_row("isig-background", "child-ready", -1);
+    }
+    if (write_all(master, "\x03", 1) != 0)
+        return fail_row("isig-background", "write-intr", -1);
+    if (write_all(master, "abc\n", 4) != 0)
+        return fail_row("isig-background", "write-line", -1);
+    if (expect_bytes("isig-background-data", slave, (const unsigned char *)"abc\n", 4, 1000) !=
+        0)
+        return 1;
+    if (observe_signal() != 1) {
+        close(pipefd[0]);
+        return fail_row("isig-background", "foreground-count", -1);
+    }
+    struct pollfd waiting;
+    waiting.fd = pipefd[0];
+    waiting.events = POLLIN;
+    waiting.revents = 0;
+    int background = poll(&waiting, 1, 300) > 0 ? 1 : 0;
+    close(pipefd[0]);
+    if (background != 0)
+        return fail_row("isig-background", "background-signal", background);
+    printf("tty-discipline: row=isig-background foreground=1 background=0 ok\n");
+    fflush(stdout);
+    close(slave);
+    close(master);
+    return 0;
+}
+
+static int row_isig_off(void) {
+    int master = -1;
+    int slave = -1;
+    char path[64];
+    if (open_pair(&master, &slave, path, sizeof(path)) != 0)
+        return fail_row("isig-off", "open", -1);
+    struct termios term;
+    canonical_termios(&term, 1);
+    term.c_lflag &= ~ISIG;
+    if (tcsetattr(slave, TCSANOW, &term) != 0)
+        return fail_row("isig-off", "tcsetattr", -1);
+    if (set_foreground(master) <= 0)
+        return fail_row("isig-off", "tcsetpgrp", -1);
+    if (write_all(master, "\x03", 1) != 0)
+        return fail_row("isig-off", "write-intr", -1);
+    if (write_all(master, "abc\n", 4) != 0)
+        return fail_row("isig-off", "write-line", -1);
+    const unsigned char want[] = {0x03, 'a', 'b', 'c', '\n'};
+    if (expect_bytes("isig-off-data", slave, want, sizeof(want), 1000) != 0)
+        return 1;
+    if (observe_signal() != 0)
+        return fail_row("isig-off", "signal-with-isig-off", -1);
+    printf("tty-discipline: row=isig-off data=1 sigint=0 ok\n");
+    fflush(stdout);
+    close(slave);
+    close(master);
+    return 0;
+}
+
+static int row_vquit_foreground(void) {
+    int master = -1;
+    int slave = -1;
+    char path[64];
+    if (open_pair(&master, &slave, path, sizeof(path)) != 0)
+        return fail_row("isig-quit", "open", -1);
+    struct termios term;
+    canonical_termios(&term, 1);
+    term.c_lflag |= ISIG;
+    term.c_cc[VQUIT] = 0x1c;
+    if (tcsetattr(slave, TCSANOW, &term) != 0)
+        return fail_row("isig-quit", "tcsetattr", -1);
+    if (set_foreground(master) <= 0)
+        return fail_row("isig-quit", "tcsetpgrp", -1);
+    if (write_all(master, "\x1c", 1) != 0)
+        return fail_row("isig-quit", "write-quit", -1);
+    if (write_all(master, "abc\n", 4) != 0)
+        return fail_row("isig-quit", "write-line", -1);
+    if (expect_bytes("isig-quit-data", slave, (const unsigned char *)"abc\n", 4, 1000) != 0)
+        return 1;
+    if (expect_bytes("isig-quit-echo", master, (const unsigned char *)"^\\\r\n", 4, 1000) != 0)
+        return 1;
+    if (observe_signal() != 1)
+        return fail_row("isig-quit", "sigquit-count", -1);
+    printf("tty-discipline: row=isig-quit sigquit=1 ok\n");
+    fflush(stdout);
     close(slave);
     close(master);
     return 0;
@@ -348,6 +570,10 @@ int main(void) {
                         (const unsigned char *)"one X\n", 6);
     (void)row_eof();
     (void)row_isig();
+    (void)row_isig_foreground();
+    (void)row_isig_background();
+    (void)row_isig_off();
+    (void)row_vquit_foreground();
     (void)row_output("opost-onlcr", OPOST | ONLCR, (const unsigned char *)"A\r\n", 3);
     (void)row_output("opost-off", 0, (const unsigned char *)"A\n", 2);
     (void)row_input("icrnl", ICRNL, '\r', '\n', 0);

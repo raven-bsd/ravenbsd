@@ -1,8 +1,0 @@
-tcp-evidence: pass
-commit: 3cda29230c862a21d15bb33fedb391ed963034b0
-dirty: no
-audit: pass
-unit: pass 710/710 passed, 0 failed
-checker: pass
-packet: /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T004851Z
-exit: 0

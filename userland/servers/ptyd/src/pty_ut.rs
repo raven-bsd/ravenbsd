@@ -68,6 +68,16 @@ fn ctrl_c_signals_the_foreground_group_and_echoes() {
 }
 
 #[test]
+fn ctrl_backslash_signals_sigquit_to_the_foreground_group() {
+    let mut pty = pty();
+    pty.set_fg(42);
+    pty.write_master(b"\x1c");
+    assert_eq!(pty.sys().signals, vec![(-42, SIGQUIT)]);
+    assert_eq!(read_master(&mut pty), b"^\\\r\n");
+    assert_eq!(pty.read_slave(&mut [0u8; 4]), Err(Errno::EAGAIN));
+}
+
+#[test]
 fn echo_off_and_flush_drop_the_expected_bytes() {
     let mut pty = pty();
     pty.set_settings(Settings {

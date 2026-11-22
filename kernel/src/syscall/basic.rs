@@ -5,6 +5,7 @@
 
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
@@ -130,12 +131,13 @@ pub fn clock_set(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
-/// `GETRANDOM`: fill a user buffer from the kernel entropy pool.
+/// `GETRANDOM`: fill a user buffer from the boot-seeded ChaCha20 pool.
 ///
-/// Never blocks. The pool is seeded on first use from a hardware source or timer jitter; when
-/// neither can be sampled the call returns `EAGAIN`. `flags` is accepted and ignored (the kernel
-/// does not block on entropy, so `GRND_NONBLOCK` is a no-op). The length is capped at
-/// `0x1FFF_FFFF` like Linux.
+/// The pool is seeded once at boot from RDRAND/RNDR; timer jitter is never cryptographic input.
+/// If the platform has no hardware source (or `entropy=none` disabled it) the pool stays unseeded
+/// and the call returns `EAGAIN`; it never serves a predictable fallback. `flags` is accepted and
+/// ignored (the kernel does not block on entropy, so `GRND_NONBLOCK` is a no-op). The length is
+/// capped at `0x1FFF_FFFF` like Linux.
 pub fn getrandom(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let flags = frame.rdx as u32;
@@ -198,10 +200,10 @@ fn uname(pointer: u64) -> Result<usize, Errno> {
 
 fn handle_close(raw: u32) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
-    process.handles.lock().close(Handle(raw))?;
-    // Deregistration is observable only after the close commits: a failed close (stale
-    // generation, empty slot) must leave every event-queue registration untouched.
-    crate::event::on_handle_close(&process, Handle(raw));
+    // The single close primitive: it commits the table close, cancels an IRQ waiter, removes
+    // event registrations, and fails/releases a server-side `SchemeRequest` that can no longer
+    // receive its reply.
+    crate::event::close_handle(&process, Handle(raw))?;
     Ok(0)
 }
 
@@ -232,5 +234,25 @@ fn handle_revoke(raw: u32, mask: u32) -> Result<usize, Errno> {
         handles.revoke_target(Handle(raw), raven_abi::types::Rights(mask))?
     };
     crate::process::handle::revoke_descendants(&node, applied);
+    let request = {
+        let handles = process.handles.lock();
+        match handles.get(Handle(raw), raven_abi::types::Rights::NONE) {
+            Ok(crate::process::handle::Object::SchemeRequest(request)) => Some(Arc::clone(request)),
+            _ => None,
+        }
+    };
+    if let Some(request) = request
+        && applied.contains(raven_abi::types::Rights::WRITE)
+    {
+        // The server can no longer send the reply. Fail the client and release the capture now;
+        // the handle may stay open, so a later close must not be the only release path.
+        request.fail(Errno::EIO);
+        request
+            .server
+            .active_requests
+            .lock()
+            .retain(|item| !Arc::ptr_eq(item, &request));
+        request.release_captures();
+    }
     Ok(0)
 }

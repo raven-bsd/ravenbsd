@@ -48,6 +48,10 @@ pub const DUPLEX_PEERCRED: usize = 0x114;
 const SOL_SOCKET: u32 = 1;
 /// `SCM_RIGHTS` control type.
 const SCM_RIGHTS: u32 = 1;
+/// Returned in `msg_flags` when ancillary data did not fit (FreeBSD/NetBSD `MSG_CTRUNC`).
+const MSG_CTRUNC: u32 = 0x20;
+/// Requested full-length receive (FreeBSD/NetBSD `MSG_WAITALL`); refused, see [`recvmsg`].
+const MSG_WAITALL: u32 = 0x40;
 /// Bytes in one `DuplexMessage`.
 const MESSAGE_BYTES: usize = 40;
 /// Bytes in one control header.
@@ -200,30 +204,49 @@ pub fn sendmsg(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EINVAL);
     }
     let data = user_slice(message.data, message.data_len)?;
-    let handles = parse_control(&caller, message.control, message.control_len)?;
-    duplex::send(&end, data, handles, message.flags)
+    let records = parse_control(&caller, message.control, message.control_len)?;
+    duplex::send(&end, data, records, message.flags)
 }
 
 /// `duplex_recvmsg(handle, msg)`.
+///
+/// A control buffer too small for the whole `SCM_RIGHTS` record is not an error: the data is
+/// delivered, the record is dropped and `MSG_CTRUNC` is returned, matching the donor copyout rule
+/// (NetBSD `sys/kern/uipc_syscalls.c:867`, FreeBSD `sys/kern/uipc_syscalls.c:1020`). `MSG_WAITALL`
+/// is refused with `EOPNOTSUPP`: the raw receive path returns the queued chunk and cannot hold a
+/// partial message open, and FreeBSD's 2026 `MSG_WAITALL`-with-ancillary behaviour is a known
+/// disagreement, so refusing is the documented rule (no partial-ancillary delivery).
 pub fn recvmsg(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let end = endpoint(&caller, handle, Rights::READ)?;
     let mut message = read_message(frame.rsi)?;
+    if message.flags & MSG_WAITALL != 0 {
+        return Err(Errno::EOPNOTSUPP);
+    }
     if message.flags != 0 {
         return Err(Errno::EINVAL);
     }
     let control_capacity = usize::try_from(message.control_len).map_err(|_| Errno::EMSGSIZE)?;
     let data = user_slice(message.data, message.data_len)?;
-    let (copied, handles) = duplex::recv(&end, data, control_capacity)?;
-    let installed = install_handles(&caller, handles)?;
+    // Let the queue hand over every record even when the caller's buffer is smaller; the donor
+    // consumes the data and only then truncates the ancillary copy. The queue's own limit is the
+    // largest legal send control buffer, so a legal record is never rejected there.
+    let (copied, records) = duplex::recv(&end, data, duplex::DUPLEX_CONTROL_MAX)?;
+    let (installed, truncated) = install_records(&caller, records, control_capacity)?;
     if let Err(error) = write_control(&message, &installed) {
         close_installed(&caller, &installed);
         return Err(error);
     }
-    message.control_len =
-        u64::try_from(control_bytes(installed.len())).map_err(|_| Errno::EINVAL)?;
-    message.handle_count = u32::try_from(installed.len()).map_err(|_| Errno::EMSGSIZE)?;
+    let control_len = installed.iter().fold(0usize, |total, record| {
+        total.saturating_add(control_bytes(record.len()))
+    });
+    let handle_count = installed
+        .iter()
+        .fold(0usize, |total, record| total.saturating_add(record.len()));
+    message.control_len = u64::try_from(control_len).map_err(|_| Errno::EINVAL)?;
+    message.handle_count = u32::try_from(handle_count).map_err(|_| Errno::EMSGSIZE)?;
+    message.flags = if truncated { MSG_CTRUNC } else { 0 };
     if let Err(error) = write_message(frame.rsi, &message) {
         // The caller cannot learn the installed handle values, so leaving them open would make
         // them unreachable. Close them exactly like the control write-back failure path.
@@ -323,7 +346,7 @@ fn parse_control(
     caller: &Arc<process::Process>,
     pointer: u64,
     length: u64,
-) -> Result<Vec<PendingHandle>, Errno> {
+) -> Result<Vec<Vec<PendingHandle>>, Errno> {
     let length = usize::try_from(length).map_err(|_| Errno::EMSGSIZE)?;
     if length == 0 {
         return Ok(Vec::new());
@@ -336,7 +359,8 @@ fn parse_control(
     bytes.resize(length, 0);
     copy_from_user(&mut bytes, UserSlice::new(pointer, length as u64)?)?;
 
-    let mut handles = Vec::new();
+    let mut records = Vec::new();
+    let mut total = 0usize;
     let mut offset = 0usize;
     while offset < length {
         let remaining = length.saturating_sub(offset);
@@ -359,9 +383,13 @@ fn parse_control(
         if level != SOL_SOCKET || kind != SCM_RIGHTS {
             return Err(Errno::EINVAL);
         }
-        if count > duplex::DUPLEX_MAX_HANDLES.saturating_sub(handles.len()) {
+        if count > duplex::DUPLEX_MAX_HANDLES.saturating_sub(total) {
             return Err(Errno::EMSGSIZE);
         }
+        // One vector per cmsg header keeps the sender's record boundaries (K521); an empty
+        // header carries no rights and is not queued.
+        let mut record = Vec::new();
+        record.try_reserve_exact(count).map_err(|_| Errno::ENOMEM)?;
         let ids = offset.saturating_add(CMSG_BYTES);
         let mut index = 0usize;
         while index < count {
@@ -369,15 +397,56 @@ fn parse_control(
             let handle = Handle(raw);
             let (object, rights, lineage) =
                 crate::syscall::handle_xfer::clone_transferable(caller, handle)?;
-            handles.push(PendingHandle::new(object, rights, lineage));
+            record.push(PendingHandle::new(object, rights, lineage));
             index = index.saturating_add(1);
         }
+        if !record.is_empty() {
+            records.push(record);
+        }
+        total = total.saturating_add(count);
         offset = offset.saturating_add(record_len);
     }
     if offset != length {
         return Err(Errno::EINVAL);
     }
-    Ok(handles)
+    Ok(records)
+}
+
+/// Install every record that fits in `capacity`, in order, and report whether a record was lost.
+///
+/// Donor rule (NetBSD `copyout_msg_control`, FreeBSD `uipc_syscalls.c`): whole records only, the
+/// first one that does not fit stops the copy and sets `MSG_CTRUNC`; the data was already
+/// delivered by the queue. Dropping the remaining records releases their pending handles.
+fn install_records(
+    caller: &Arc<process::Process>,
+    records: Vec<Vec<PendingHandle>>,
+    capacity: usize,
+) -> Result<(Vec<Vec<u32>>, bool), Errno> {
+    let mut installed = Vec::new();
+    let mut used = 0usize;
+    let mut truncated = false;
+    for record in records {
+        let needed = control_bytes(record.len());
+        let Some(next) = used.checked_add(needed) else {
+            truncated = true;
+            break;
+        };
+        if next > capacity {
+            truncated = true;
+            break;
+        }
+        match install_handles(caller, record) {
+            Ok(handles) => {
+                used = next;
+                installed.push(handles);
+            }
+            Err(error) => {
+                close_installed(caller, &installed);
+                return Err(error);
+            }
+        }
+    }
+    Ok((installed, truncated))
 }
 
 fn install_handles(
@@ -409,7 +478,7 @@ fn install_handles(
                 installed.push(handle.0);
             }
             Err(error) => {
-                close_installed(caller, &installed);
+                close_handles(caller, &installed);
                 return Err(error);
             }
         }
@@ -417,55 +486,72 @@ fn install_handles(
     Ok(installed)
 }
 
-fn close_installed(caller: &Arc<process::Process>, installed: &[u32]) {
-    for raw in installed {
-        let _ = caller.handles.lock().close(Handle(*raw));
+fn close_handles(caller: &Arc<process::Process>, handles: &[u32]) {
+    let mut table = caller.handles.lock();
+    for raw in handles {
+        let _ = table.close(Handle(*raw));
     }
 }
 
-fn write_control(message: &DuplexMessage, installed: &[u32]) -> Result<(), Errno> {
-    if installed.is_empty() {
+fn close_installed(caller: &Arc<process::Process>, installed: &[Vec<u32>]) {
+    for record in installed {
+        close_handles(caller, record);
+    }
+}
+
+fn write_control(message: &DuplexMessage, installed: &[Vec<u32>]) -> Result<(), Errno> {
+    let total = installed.iter().fold(0usize, |bytes, record| {
+        bytes.saturating_add(control_bytes(record.len()))
+    });
+    if total == 0 {
         return Ok(());
     }
-    let bytes = control_bytes(installed.len());
-    if bytes > usize::try_from(message.control_len).map_err(|_| Errno::EMSGSIZE)? {
+    if total > usize::try_from(message.control_len).map_err(|_| Errno::EMSGSIZE)? {
         return Err(Errno::EMSGSIZE);
     }
     let mut buffer = Vec::new();
-    buffer.try_reserve_exact(bytes).map_err(|_| Errno::ENOMEM)?;
-    buffer.resize(bytes, 0);
-    let header = ControlHeader {
-        len: u32::try_from(bytes).map_err(|_| Errno::EMSGSIZE)?,
-        level: SOL_SOCKET,
-        kind: SCM_RIGHTS,
-        count: u32::try_from(installed.len()).map_err(|_| Errno::EMSGSIZE)?,
-    };
-    buffer
-        .get_mut(0..4)
-        .ok_or(Errno::EINVAL)?
-        .copy_from_slice(&header.len.to_le_bytes());
-    buffer
-        .get_mut(4..8)
-        .ok_or(Errno::EINVAL)?
-        .copy_from_slice(&header.level.to_le_bytes());
-    buffer
-        .get_mut(8..12)
-        .ok_or(Errno::EINVAL)?
-        .copy_from_slice(&header.kind.to_le_bytes());
-    buffer
-        .get_mut(12..16)
-        .ok_or(Errno::EINVAL)?
-        .copy_from_slice(&header.count.to_le_bytes());
-    let mut index = 0usize;
-    for handle in installed {
-        let offset = CMSG_BYTES.saturating_add(index.saturating_mul(4));
+    buffer.try_reserve_exact(total).map_err(|_| Errno::ENOMEM)?;
+    buffer.resize(total, 0);
+    let mut base = 0usize;
+    for record in installed {
+        let bytes = control_bytes(record.len());
+        if bytes == 0 {
+            continue;
+        }
+        let header = ControlHeader {
+            len: u32::try_from(bytes).map_err(|_| Errno::EMSGSIZE)?,
+            level: SOL_SOCKET,
+            kind: SCM_RIGHTS,
+            count: u32::try_from(record.len()).map_err(|_| Errno::EMSGSIZE)?,
+        };
         buffer
-            .get_mut(offset..offset.saturating_add(4))
+            .get_mut(base..base.saturating_add(4))
             .ok_or(Errno::EINVAL)?
-            .copy_from_slice(&handle.to_le_bytes());
-        index = index.saturating_add(1);
+            .copy_from_slice(&header.len.to_le_bytes());
+        buffer
+            .get_mut(base.saturating_add(4)..base.saturating_add(8))
+            .ok_or(Errno::EINVAL)?
+            .copy_from_slice(&header.level.to_le_bytes());
+        buffer
+            .get_mut(base.saturating_add(8)..base.saturating_add(12))
+            .ok_or(Errno::EINVAL)?
+            .copy_from_slice(&header.kind.to_le_bytes());
+        buffer
+            .get_mut(base.saturating_add(12)..base.saturating_add(16))
+            .ok_or(Errno::EINVAL)?
+            .copy_from_slice(&header.count.to_le_bytes());
+        for (index, handle) in record.iter().enumerate() {
+            let offset = base
+                .saturating_add(CMSG_BYTES)
+                .saturating_add(index.saturating_mul(4));
+            buffer
+                .get_mut(offset..offset.saturating_add(4))
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&handle.to_le_bytes());
+        }
+        base = base.saturating_add(bytes);
     }
-    copy_to_user(UserSlice::new(message.control, bytes as u64)?, &buffer)
+    copy_to_user(UserSlice::new(message.control, total as u64)?, &buffer)
 }
 
 fn control_bytes(handles: usize) -> usize {

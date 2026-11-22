@@ -1,782 +1,0 @@
-[2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
-BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
-BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
-loader: RavenBSD loader 0.1 (x86_64)
-loader: RavenBSD loader 0.1 (x86_64)
-loader: memory map: 26 regions
-frames: base=256 count=131072 free=103668 reserved=27404
-paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
-heap: 4096 KiB
-vtd: disabled (iommu=on not set); DMA unprotected
-fpu: xsave 576 bytes
-acpi: mcfg base=0xb0000000 buses=0-255
-acpi: 4 cpus, 1 ioapics, 5 overrides
-apic: id 0 (x2apic)
-keyboard: i8042 irq 1 gsi 1 vector 0x23
-console: rx irq 4 gsi 4 vector 0x22 (active-high)
-cyclic: ok fired=3 order=5ms,10ms,15ms
-time: tsc 2700 MHz (pit)
-time: tsc not invariant
-timer: 1000 Hz
-fpu: xsave 576 bytes
-fpu: xsave 576 bytes
-fpu: xsave 576 bytes
-smp: 4 cpus online
-RavenBSD kernel 0.1 (x86_64) 879d3d39 2026-11-21
-mem: 404 MiB usable in 7 regions
-cmdline: console=ttyS0 loglevel=info
-process: starting /init
-process: /init entry=0x41a890 sp=0x7fffffffde60
-sched: running (4 cpus, slice 10 ms)
-svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
-svcd: logd up
-pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
-pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
-pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
-pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
-pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
-pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
-pcid: devices=6
-svcd: pcid up
-rtc: 2026-11-21 18:11:56 (epoch 1795284716s)
-1795284716.196 nulld: started
-1795284716.216 ramfsd: started
-svcd: nulld up
-svcd: ramfsd up
-1795284716.216 randd: started
-1795284716.217 initfsd: started
-1795284716.217 zerod: started
-svcd: randd up
-svcd: initfsd up
-svcd: zerod up
-devd: devices=6
-devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
-devd: driver virtio-net bar=4 size=16384
-devd: driver virtio-net dma bus=0x100000 len=65536
-devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
-devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
-devd: driver virtio-net irq line=11
-virtio-net: id=1af4:1041
-virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
-virtio-net: dma len=65536 bus=0x100000 irq=11
-virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
-virtio-net: queue0 rx size=8
-virtio-net: queue1 tx size=8
-virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
-virtio-net: serving nic:
-svcd: devd up
-vfsd: mounted / on initfs:
-vfsd: mounted /tmp on ramfs:
-vfsd: mounted /dev/null on null:
-vfsd: mounted /dev/zero on zero:
-vfsd: mounted /dev/random on rand:
-vfsd: mounted /dev/urandom on rand:
-svcd: vfsd up
-svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
-svcd: consd up
-1795284716.259 sysd: started
-svcd: sysd up
-netd: pf absent
-netd: network config mode=dhcp hostname=raven
-netd: hostname raven
-netd: interface eth0 10.0.2.15/24
-netd: interface lo 127.0.0.1/8
-netd: ready
-svcd: netd up
-resolvd: write file:/etc/resolv.conf: read-only file system
-resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43200000ms rebind=75600000ms expires=86400000ms
-resolvd: resolv.conf=nameserver 10.0.2.3
-1795284716.288 resolvd: started
-svcd: resolvd up
-svcd: all services up
-svcd: getty up
-RavenBSD 0.1 (x86_64) (tty:console)
-login: root
-Password: 
-RavenBSD 0.1.0
-
-Welcome to the RavenBSD console.
-This is a root-only login for the 0.1.0 release image.
-
-Type `exit` to close the session.
-                                                                                [38;5;183m/[0m
-[J[38;5;183mraven# [0m[7C[J[38;5;183mraven# [0m[1;39m/[0m[8C[J[38;5;183mraven# [0m[1;39m/b[0m[9C[J[38;5;183mraven# [0m[1;39m/bi[0m[10C[J[38;5;183mraven# [0m[1;39m/bin[0m[11C[J[38;5;183mraven# [0m[1;39m/bin/[0m[12C[J[38;5;183mraven# [0m[1;39m/bin/b[0m[13C[J[38;5;183mraven# [0m[1;39m/bin/br[0m[14C[J[38;5;183mraven# [0m[1;39m/bin/bru[0m[15C[J[38;5;183mraven# [0m[1;39m/bin/brus[0m[16C[J[38;5;183mraven# [0m[1;39m/bin/brush[0m[17C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[18C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/[0m[19C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/e[0m[20C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/et[0m[21C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc[0m[22C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/[0m[23C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/s[0m[24C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/so[0m[25C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soa[0m[26C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak[0m[27C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-[0m[28C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-w[0m[29C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-wo[0m[30C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-wor[0m[31C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-work[0m[32C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workl[0m[33C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-worklo[0m[34C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workloa[0m[35C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload[0m[36C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.[0m[37C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.s[0m[38C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[39C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[40C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m2[0m[41C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m24[0m[42C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m24[0m[90m [0m[43C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m24[0m[90m [0m[39m5[0m[44C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m24[0m[90m [0m[39m5[0m[44C
-soak-ready
-soak-cycle: 1
-ping: 10.0.2.2 seq=1 rtt=14ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 14/14/14 ms
-soak-ping: 0
-soak-write: 1
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 1
-soak-cycle: 2
-ping: 10.0.2.2 seq=1 rtt=10ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 10/10/10 ms
-soak-ping: 0
-soak-write: 2
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 2
-soak-cycle: 3
-ping: 10.0.2.2 seq=1 rtt=6ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 6/6/6 ms
-soak-ping: 0
-soak-write: 3
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 3
-soak-cycle: 4
-ping: 10.0.2.2 seq=1 rtt=6ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 6/6/6 ms
-soak-ping: 0
-soak-write: 4
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 4
-soak-cycle: 5
-ping: 10.0.2.2 seq=1 rtt=12ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 12/12/12 ms
-soak-ping: 0
-soak-write: 5
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 5
-soak-cycle: 6
-ping: 10.0.2.2 seq=1 rtt=2ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 2/2/2 ms
-soak-ping: 0
-soak-write: 6
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 6
-soak-cycle: 7
-ping: 10.0.2.2 seq=1 rtt=8ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 8/8/8 ms
-soak-ping: 0
-soak-write: 7
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 7
-soak-cycle: 8
-ping: 10.0.2.2 seq=1 rtt=4ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 4/4/4 ms
-soak-ping: 0
-soak-write: 8
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 8
-soak-cycle: 9
-ping: 10.0.2.2 seq=1 rtt=6ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 6/6/6 ms
-soak-ping: 0
-soak-write: 9
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 9
-soak-cycle: 10
-ping: 10.0.2.2 seq=1 rtt=6ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 6/6/6 ms
-soak-ping: 0
-soak-write: 10
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 10
-soak-cycle: 11
-ping: 10.0.2.2 seq=1 rtt=3ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 3/3/3 ms
-soak-ping: 0
-soak-write: 11
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 11
-soak-cycle: 12
-ping: 10.0.2.2 seq=1 rtt=9ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 9/9/9 ms
-soak-ping: 0
-soak-write: 12
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 12
-soak-cycle: 13
-ping: 10.0.2.2 seq=1 rtt=23ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 23/23/23 ms
-soak-ping: 0
-soak-write: 13
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 13
-soak-cycle: 14
-ping: 10.0.2.2 seq=1 rtt=4ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 4/4/4 ms
-soak-ping: 0
-soak-write: 14
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 14
-soak-cycle: 15
-ping: 10.0.2.2 seq=1 rtt=6ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 6/6/6 ms
-soak-ping: 0
-soak-write: 15
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 15
-soak-cycle: 16
-ping: 10.0.2.2 seq=1 rtt=7ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 7/7/7 ms
-soak-ping: 0
-soak-write: 16
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 16
-soak-cycle: 17
-ping: 10.0.2.2 seq=1 rtt=8ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 8/8/8 ms
-soak-ping: 0
-soak-write: 17
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 17
-soak-cycle: 18
-ping: 10.0.2.2 seq=1 rtt=10ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 10/10/10 ms
-soak-ping: 0
-soak-write: 18
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 18
-soak-cycle: 19
-ping: 10.0.2.2 seq=1 rtt=3ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 3/3/3 ms
-soak-ping: 0
-soak-write: 19
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 19
-soak-cycle: 20
-ping: 10.0.2.2 seq=1 rtt=4ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 4/4/4 ms
-soak-ping: 0
-soak-write: 20
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 20
-soak-cycle: 21
-ping: 10.0.2.2 seq=1 rtt=3ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 3/3/3 ms
-soak-ping: 0
-soak-write: 21
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 21
-soak-cycle: 22
-ping: 10.0.2.2 seq=1 rtt=6ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 6/6/6 ms
-soak-ping: 0
-soak-write: 22
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 22
-soak-cycle: 23
-ping: 10.0.2.2 seq=1 rtt=6ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 6/6/6 ms
-soak-ping: 0
-soak-write: 23
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 23
-soak-cycle: 24
-ping: 10.0.2.2 seq=1 rtt=4ms
-ping: 1 packets transmitted, 1 received, 0% packet loss
-ping: rtt min/avg/max = 4/4/4 ms
-soak-ping: 0
-soak-write: 24
-RavenBSD
-soak-fork: 0
-soak-sync: 0
-blockd stopped 0
-consd running 0
-devd running 0
-fsd-ufs stopped 0
-getty running 0
-initfsd running 0
-logd running 0
-netd running 0
-nulld running 0
-pcid running 0
-ramfsd running 0
-randd running 0
-resolvd running 0
-rsh stopped 0
-sysd running 0
-vfsd running 0
-zerod running 0
-soak-services: 0
-soak-cycle-done: 24
-soak-done
-                                                                                [38;5;183m/[0m
-[J[38;5;183mraven# [0m[7C[J[38;5;183mraven# [0m[1;39me[0m[8C[J[38;5;183mraven# [0m[1;39mex[0m[9C[J[38;5;183mraven# [0m[1;39mexi[0m[10C[J[38;5;183mraven# [0m[1;32mexit[0m[11C[J[38;5;183mraven# [0m[1;32mexit[0m[90m [0m[12C[J[38;5;183mraven# [0m[1;32mexit[0m[90m [0m[39m0[0m[13C[J[38;5;183mraven# [0m[1;32mexit[0m[90m [0m[39m0[0m[13C
-exit
-init exited (0)
-qemu-system-x86_64: terminating on signal 15 from pid 2574504 (python3)

@@ -1,6 +1,0 @@
-tcp-evidence: pass
-commit: c3a2d95121253912f600442baaae3aa703c763cb
-dirty: yes
-matrix: pass (ran 10, 9 pass, 1 fail)
-packet: /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261121T003615Z
-exit: 0
