@@ -762,12 +762,15 @@ def console_capture(console: SerialConsole, command: str, log_name: str,
     """Run one console command and return the cleaned text up to a post-exec nonce."""
     mark = len(console.buffer)
     nonce = f"K434-{log_name}-{os.getpid()}"
+    started = time.monotonic()
     console.send(f"{command}; echo {nonce}\n".encode())
     end = console.wait_for(b"\n" + nonce.encode(), timeout, start=mark)
+    elapsed = (time.monotonic() - started) * 1000
     segment = bytes(console.buffer[mark:end if end > 0 else len(console.buffer)])
     segment = segment.decode("utf-8", "replace").replace("\r", "")
     clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", segment)
     (OUT / log_name).write_text(clean, encoding="utf-8")
+    print(f"matrix: console {log_name} {elapsed:.0f}ms nonce={end >= 0}", flush=True)
     return clean
 
 
@@ -981,14 +984,6 @@ def console_marker_count(console: SerialConsole) -> int:
     return bytes(console.buffer).count(MARKER)
 
 
-def console_scalar(console: SerialConsole, command: str, log_name: str,
-                   timeout: float = 15.0) -> int:
-    """Run one guest command and return its last standalone integer (or -1)."""
-    clean = console_capture(console, command, log_name, timeout=timeout)
-    values = re.findall(r"(?m)^\s*(-?\d+)\s*$", clean)
-    return int(values[-1]) if values else -1
-
-
 def classify_s7(result: dict[str, object], probe_banner: bytes,
                 server_lines: str) -> tuple[str, str]:
     """Classify one failed S7 attempt from the client text, a fresh probe and server lines."""
@@ -1048,14 +1043,10 @@ def row_s7(console: SerialConsole) -> None:
     max_console_new = console_new
     for number in range(1, 11):
         before = console_marker_count(console)
-        log_before = console_scalar(console, "awk 'END{print NR}' /tmp/sshd.log",
-                                    f"s7-log-before-{number}.log")
         session = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-run-{number}.log",
                           timeout=S7_TIMEOUT_S)
         time.sleep(0.5)
         after = console_marker_count(console)
-        log_after = console_scalar(console, "awk 'END{print NR}' /tmp/sshd.log",
-                                   f"s7-log-after-{number}.log")
         new_markers = after - before
         max_console_new = max(max_console_new, new_markers)
         ok = session["stdout"] == MARKER and new_markers == 0
@@ -1076,23 +1067,25 @@ def row_s7(console: SerialConsole) -> None:
         if ok:
             continue
         probe = banner_probe(f"s7-probe-{number}", send_client=False)
-        server_lines = ""
-        delta = log_after - log_before if log_before >= 0 and log_after >= 0 else -1
-        if log_before >= 0 and log_after > log_before:
-            server_lines = console_capture(
-                console, f"sed -n '{log_before + 1},{log_after}p' /tmp/sshd.log",
-                f"s7-server-{number}.log")
-        classification, witness = classify_s7(session, probe["bytes"], server_lines)
+        classification, witness = classify_s7(session, probe["bytes"], "")
         attempt("S7-class", number, "fresh",
-                "guest-listening / auth-rejected / connection-reset from serial and server log",
+                "guest-listening / auth-rejected / connection-reset from the client and a fresh "
+                "banner probe; full guest serial in serial-only.log",
                 f"class={classification}; probe_banner={literal(probe['bytes'])}; "
-                f"server_delta={delta}; witness={witness!r}",
+                f"witness={witness!r}",
                 0, "OBSERVED")
     total_after = console_marker_count(console)
     total_delta = total_after - total_before
-    server_log = console_capture(console, "cat /tmp/sshd.log", "s7-server.log")
+    server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s7-server.log",
+                             user=ROOT_USER, timeout=15)
+    server_log = server_capture["stdout"].decode("utf-8", "replace")
+    (OUT / "s7-server.raw.log").write_text(server_log, encoding="utf-8")
+    ps_capture = ssh_run(["ps", "-e"], "s7-ps.log", user=ROOT_USER, timeout=15)
+    ps_log = ps_capture["stdout"].decode("utf-8", "replace")
+    (OUT / "s7-ps.raw.log").write_text(ps_log, encoding="utf-8")
     accepted = server_log.count("Accepted password for raven ")
     closed = server_log.count("Connection closed")
+    reset = server_log.count("Connection reset")
     routing_ok = marker_ok and total_delta == 0
     attempt("S7-routing", 1, "fresh", "client exact marker; console receives none",
             f"client={literal(marker_run['stdout'])}; max_console_new={max_console_new}; "
@@ -1119,11 +1112,14 @@ def row_s7(console: SerialConsole) -> None:
                f"({literal(marker_run['stdout'])}); {passed}/10 exact; "
                f"console_total_delta={total_delta}; all_exit_ok={all_exit_ok}; "
                f"walls_ms={[round(value) for value in wall_ms]}; "
-               f"server Accepted={accepted} Connection-closed={closed} (gate; C1-C10)")
+               f"server capture exit={server_capture['returncode']} "
+               f"Accepted={accepted} Connection-closed={closed} reset={reset}; "
+               f"ps capture exit={ps_capture['returncode']} (gate; C1-C10)")
 
 
-def ssh_pty_probe(console: SerialConsole | None, log_name: str) -> dict[str, object]:
-    """Run `ssh -tt tty` and sample the guest process table/monitor log while it is live."""
+def ssh_pty_probe(console: SerialConsole | None, log_name: str,
+                  sample_ps=None) -> dict[str, object]:
+    """Run `ssh -tt tty` and sample the guest process table while it is live."""
     argv = [
         "ssh",
         "-o", "StrictHostKeyChecking=no",
@@ -1159,14 +1155,9 @@ def ssh_pty_probe(console: SerialConsole | None, log_name: str) -> dict[str, obj
                     text = b""
                 if b"Authenticated to " in text:
                     auth_seen = True
-                    if console is not None:
-                        during_ps = console_capture(console, "ps -e", "s8-ps-during.log",
-                                                    timeout=10)
+                    if sample_ps is not None:
+                        during_ps = sample_ps()
             time.sleep(0.02)
-        during_log = ""
-        if console is not None:
-            during_log = console_capture(console, "cat /tmp/sshd.log",
-                                         "s8-server-during.log", timeout=10)
         while process.poll() is None and time.monotonic() < deadline:
             time.sleep(0.02)
         timed_out = process.poll() is None
@@ -1196,10 +1187,10 @@ def ssh_pty_probe(console: SerialConsole | None, log_name: str) -> dict[str, obj
         encoding="utf-8")
     return {"returncode": returncode, "stdout": stdout, "stderr": stderr,
             "elapsed_ms": elapsed, "timed_out": timed_out, "argv": argv,
-            "auth_seen": auth_seen, "during_ps": during_ps, "during_log": during_log}
+            "auth_seen": auth_seen, "during_ps": during_ps}
 
 
-def row_s8(console: SerialConsole | None = None) -> None:
+def row_s8() -> None:
     exit_path = OUT / "pty-alloc.exit"
     log_path = OUT / "pty-alloc.log"
     pty_alloc_ok = False
@@ -1240,20 +1231,27 @@ def row_s8(console: SerialConsole | None = None) -> None:
                 "run `timeout 150 cargo xtask qtest --case termios --arch x86_64`")
 
     fixture_ok = False
-    fixture_detail = "console unavailable; fixture not run"
-    if console is not None:
-        clean = console_capture(console, "/bin/openpty-null; echo K434-openpty-exit=$?",
-                                "s8-openpty-null.log", timeout=30).replace("\r", "")
-        exit_match = re.search(r"K434-openpty-exit=(\d+)", clean)
-        fixture_exit = int(exit_match.group(1)) if exit_match else -1
-        null_line = next((line.strip() for line in clean.splitlines()
-                          if "call=null " in line), "")
-        epipe_line = next((line.strip() for line in clean.splitlines()
-                           if "call=epipe-sentinel" in line), "")
-        name_line = next((line.strip() for line in clean.splitlines()
-                          if "call=name " in line), "")
-        fixture_ok = fixture_exit == 0 and "call=null rc=0" in clean
-        fixture_detail = (f"exit={fixture_exit}; {null_line}; {epipe_line}; {name_line}")
+    fixture_detail = "fixture capture unavailable"
+    fixture_run = ssh_run(["/bin/openpty-null"], "s8-openpty-null.log",
+                          user=ROOT_USER, timeout=30)
+    clean = fixture_run["stdout"].decode("utf-8", "replace")
+    (OUT / "s8-openpty-null.raw.log").write_text(clean, encoding="utf-8")
+    fixture_exit = int(fixture_run["returncode"])
+    null_line = next((line.strip() for line in clean.splitlines()
+                      if "call=null " in line), "")
+    epipe_line = next((line.strip() for line in clean.splitlines()
+                       if "call=epipe-sentinel" in line), "")
+    name_line = next((line.strip() for line in clean.splitlines()
+                      if "call=name " in line), "")
+    fixture_ok = fixture_exit == 0 and "call=null rc=0" in clean
+    fixture_detail = f"exit={fixture_exit}; {null_line}; {epipe_line}; {name_line}"
+    if fixture_exit == 255:
+        attempt("S8-openpty-null", 1, "fresh",
+                "openpty(..., NULL, ...) returns 0; control with a name returns 0",
+                f"fixture SSH capture failed: exit 255; {fixture_detail}", 0, "BLOCKED")
+        record("S8-openpty-null", "BLOCKED",
+               f"fixture SSH capture failed before the test ran: {fixture_detail}")
+    else:
         attempt("S8-openpty-null", 1, "fresh",
                 "openpty(..., NULL, ...) returns 0; control with a name returns 0",
                 fixture_detail, 0, "PASS" if fixture_ok else "FAIL")
@@ -1265,40 +1263,44 @@ def row_s8(console: SerialConsole | None = None) -> None:
                    f"OpenSSH sshpty.c:63 calls openpty(..., NULL, ...); Raven's C wrapper "
                    f"rejects a null name at compat/openpty.rs:23 before any pty call and "
                    f"leaves errno stale: {fixture_detail} (donor FreeBSD pty.c:74 `if (name)`)")
-    else:
-        attempt("S8-openpty-null", 1, "fresh",
-                "openpty(..., NULL, ...) returns 0", fixture_detail, 0, "BLOCKED")
-        record("S8-openpty-null", "BLOCKED", fixture_detail)
 
-    result = ssh_pty_probe(console, "s8-tt.log")
+    def sample_ps() -> str:
+        capture = ssh_run(["ps", "-e"], "s8-ps-during.log", user=ROOT_USER, timeout=10)
+        return capture["stdout"].decode("utf-8", "replace")
+
+    result = ssh_pty_probe(None, "s8-tt.log", sample_ps)
     output = result["stdout"]  # type: ignore[assignment]
     error = result["stderr"]  # type: ignore[assignment]
     match = re.search(rb"/dev/pts/[0-9]+", output)  # type: ignore[arg-type]
-    server_log = ""
-    ps_after = ""
-    if console is not None:
-        console_capture(console, "cat /tmp/sshd.pid", "s8-pid.log", timeout=10)
-        ps_after = console_capture(console, "ps -e", "s8-ps.log", timeout=15).replace("\r", "")
-        console_capture(console, "ps", "s8-services.log", timeout=15)
-        server_log = console_capture(console, "cat /tmp/sshd.log", "s8-server.log",
-                                     timeout=15).replace("\r", "")
-    ps_during = str(result["during_ps"]).replace("\r", "")
+    pid_capture = ssh_run(["cat", "/tmp/sshd.pid"], "s8-pid.log",
+                          user=ROOT_USER, timeout=15)
+    ps_capture = ssh_run(["ps", "-e"], "s8-ps.log", user=ROOT_USER, timeout=15)
+    ps_after = ps_capture["stdout"].decode("utf-8", "replace")
+    (OUT / "s8-ps.raw.log").write_text(ps_after, encoding="utf-8")
+    server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s8-server.log",
+                             user=ROOT_USER, timeout=15)
+    server_log = server_capture["stdout"].decode("utf-8", "replace")
+    (OUT / "s8-server.raw.log").write_text(server_log, encoding="utf-8")
+    ps_during = str(result["during_ps"])
     monitor_lines = [line.strip() for line in (ps_during + "\n" + ps_after).splitlines()
                      if "sshd-session" in line or "sshd-auth" in line]
     monitor_alive = any("sshd-session" in line for line in ps_after.splitlines())
     attempt("S8-monitor", 1, "fresh", "sshd-session row in the guest ps -e table",
-            f"alive_after={monitor_alive}; during={monitor_lines[:4]}; "
-            f"after_rows={len(ps_after.splitlines())}",
+            f"alive_after={monitor_alive}; ps_capture_exit={ps_capture['returncode']}; "
+            f"during={monitor_lines[:4]}; after_rows={len(ps_after.splitlines())}",
             0, "OBSERVED")
     record("S8-monitor", "OBSERVED",
-           f"monitor alive after failure={monitor_alive}; rows={monitor_lines[:4] or 'none'}; "
-           f"ps artifacts s8-ps-during.log/s8-ps.log")
-    fd_lines = [line.strip() for line in (str(result["during_log"]) + "\n" + server_log).splitlines()
+           f"monitor alive after failure={monitor_alive}; "
+           f"ps capture exit={ps_capture['returncode']}; "
+           f"rows={monitor_lines[:4] or 'none'}; artifacts s8-ps-during.log/s8-ps.raw.log")
+    fd_lines = [line.strip() for line in (ps_during + "\n" + server_log).splitlines()
                 if re.search(r"\b(fd|fd=)\b", line) or re.search(r"\bfd[= ]", line)]
     fd_note = ("no /proc and no fd-enumeration syscall exist in this guest "
                "(ps -e exposes PID PPID UID GID CMD only); captured OpenSSH fd lines")
     attempt("S8-fds", 1, "fresh", "monitor fd table", fd_note, 0, "BLOCKED")
-    record("S8-fds", "BLOCKED", f"{fd_note}: {fd_lines[:8] or 'none in the sshd log'}")
+    record("S8-fds", "BLOCKED",
+           f"{fd_note}: {fd_lines[:8] or 'none in ps/sshd log'}; "
+           f"sshd-log capture exit={server_capture['returncode']}")
     if match and pty_alloc_ok and termios_ok:
         record("S8", "PASS",
                f"`ssh -tt tty` returned {match.group(0).decode()}; `pty-alloc` and `termios` "
@@ -1395,7 +1397,7 @@ def main() -> int:
         child = None
         console: SerialConsole | None = None
         try:
-            socket_only = only == "s8"
+            socket_only = only in ("s8", "s7")
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
                                  "vars-only.fd", ready_timeout=180,
                                  socket_serial=socket_only)
@@ -1410,9 +1412,14 @@ def main() -> int:
                     row_s1_repeat()
                 elif only == "s7-exit":
                     row_s7_gate()
-                elif only == "s8":
+                elif only == "s7":
                     login_ok = console is not None and console_login(console)
-                    row_s8(console if login_ok else None)
+                    if login_ok:
+                        row_s7(console)
+                    else:
+                        record("S7", "BLOCKED", "console login failed before S7")
+                elif only == "s8":
+                    row_s8()
                 else:
                     record(only, "BLOCKED", f"unknown RAVEN_MATRIX_ONLY={only}")
         except Exception as error:  # noqa: BLE001 - isolate the only-mode boot
@@ -1462,11 +1469,7 @@ def main() -> int:
                    "guest listener did not accept a TCP connection after svcd: sshd up")
         else:
             time.sleep(0.5)
-            login_ok = s8_console is not None and console_login(s8_console)
-            if s8_console is not None and not login_ok:
-                (OUT / "s8-console.log").write_text("console login failed\n",
-                                                    encoding="utf-8")
-            row_s8(s8_console if login_ok else None)
+            row_s8()
     except Exception as error:  # noqa: BLE001 - isolate the S8 boot
         record("S8", "BLOCKED", f"S8 boot failed: {error}")
     finally:
