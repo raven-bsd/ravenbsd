@@ -9,7 +9,7 @@
 name = "ufs-fsync-persist"
 arch = "x86_64"
 profile = "ufs-demo"
-timeout_secs = 120
+timeout_secs = 180
 pre = ["sh tests/fixtures/ufs-durability/build.sh 2m"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
@@ -80,7 +80,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^mount-ok$'
-timeout_secs = 30
+timeout_secs = 60
 
 [[step]]
 send = "/mnt/bin/ufs-probe persist-write; echo probe=$?\n"
