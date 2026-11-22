@@ -1,0 +1,13 @@
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/tests/smp/readiness/target/x86_64-unknown-none/debug/deps/raven_scheme-3e4e0619cdf6f25b.d: /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/lib.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/client.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/kernel.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/namespace.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/ofd.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/server.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/service.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/sync.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/sys.rs
+
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/tests/smp/readiness/target/x86_64-unknown-none/debug/deps/libraven_scheme-3e4e0619cdf6f25b.rmeta: /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/lib.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/client.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/kernel.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/namespace.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/ofd.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/server.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/service.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/sync.rs /media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/sys.rs
+
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/lib.rs:
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/client.rs:
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/kernel.rs:
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/namespace.rs:
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/ofd.rs:
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/server.rs:
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/service.rs:
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/sync.rs:
+/media/bo/Rustworx/work/ravenbsd-minions/stuart/ravenbsd/crates/raven-scheme/src/sys.rs:
