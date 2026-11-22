@@ -62,4 +62,4 @@ regex = '^smp-aarch64-memory: ok$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|smp-aarch64-memory: fail|smp-aarch64-copy: fail|smp-aarch64-oom: fail'
+regex = '(?i)panic|EXCEPTION|smp-aarch64-memory: fail|smp-aarch64-copy: fail|smp-aarch64-oom: fail|aarch64-smp: tlb .*(timeout|failed)'
