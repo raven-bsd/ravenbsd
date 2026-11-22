@@ -35,20 +35,94 @@ entry!(main);
 const SEED: u64 = 0x5A17_C0DE_1234_9876;
 /// Page size used by every mapping vector.
 const PAGE: usize = 4096;
-/// Raw `pipe(fds)` number (kernel-owned, not a `Syscall` variant).
-const PIPE: usize = 0x6e;
-/// Raw `proc_fork(src, flags)` number (kernel-owned, not a `Syscall` variant).
-const PROC_FORK: usize = 0x39;
 /// `EVQ_CTL` readiness bit for a signalled user event.
 const SIGNALED: usize = 8;
 /// A valid rights mask for the handle vectors.
 const RIGHTS_ALL: usize = u32::MAX as usize;
+/// The rights a freshly created memory object carries (`READ|WRITE|MAP|DUP|TRANSFER`).
+const MEMOBJ_RIGHTS: usize = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 4) | (1 << 5);
 
 const PTR0: usize = 0;
 const PTR1: usize = 1;
 const PTRMAX: usize = usize::MAX;
 const LENMAX: usize = usize::MAX;
 const LENMAX7: usize = usize::MAX - 7;
+
+// Raw pre-enum dispatch numbers: `kernel/src/syscall/mod.rs` tests these before
+// `match Syscall::from_usize(number)`. The checked list `raw-dispatch.list` is compared with the
+// kernel source by `raw-check.sh`; a drift fails the fixture before boot.
+const RAW_GETRANDOM: usize = 0x08;
+const RAW_CLOCK_SET: usize = 0x09;
+const RAW_TRACE_SET: usize = 0x0b;
+const RAW_RECORD_LOCK: usize = 0x0c;
+const RAW_PROC_CHROOT: usize = 0x0d;
+const RAW_THREAD_SET_TLS: usize = 0x23;
+const RAW_THREAD_SELF: usize = 0x24;
+const RAW_THREAD_EXIT_EX: usize = 0x25;
+const RAW_ROBUST_LIST_SET: usize = 0x26;
+const RAW_PROC_SET_PERSONALITY: usize = 0x34;
+const RAW_PROC_SELF_INFO: usize = 0x35;
+const RAW_PROC_SETPGID: usize = 0x36;
+const RAW_PROC_SETSID: usize = 0x37;
+const RAW_PROC_SETCRED: usize = 0x38;
+const RAW_PROC_FORK: usize = 0x39;
+const RAW_PROC_PID_INFO: usize = 0x3a;
+const RAW_PROC_SETCRED_EX: usize = 0x3b;
+const RAW_PROC_CRED_INFO: usize = 0x3c;
+const RAW_PROC_GETGROUPS: usize = 0x3d;
+const RAW_PROC_HANDLE_INFO: usize = 0x3e;
+const RAW_PROC_EXEC_CRED: usize = 0x3f;
+const RAW_MSYNC: usize = 0x44;
+const RAW_PROC_SET_COMMAND: usize = 0x45;
+const RAW_PROC_WAIT_EX: usize = 0x48;
+const RAW_PROC_GETPGID: usize = 0x49;
+const RAW_PROC_SIGNAL: usize = 0x4a;
+const RAW_PROC_SIGRECV: usize = 0x4b;
+const RAW_PROC_TIMES: usize = 0x4c;
+const RAW_PROC_GETRUSAGE: usize = 0x4d;
+const RAW_PROC_GETRLIMIT: usize = 0x4e;
+const RAW_PROC_SETRLIMIT: usize = 0x4f;
+const RAW_HANDLE_COPY: usize = 0x54;
+const RAW_HANDLE_TRANSFER_FILE: usize = 0x55;
+const RAW_PROC_EXEC: usize = 0x6a;
+const RAW_PREAD: usize = 0x6b;
+const RAW_PWRITE: usize = 0x6c;
+const RAW_SEEK: usize = 0x6d;
+const RAW_PIPE: usize = 0x6e;
+const RAW_PIPE2: usize = 0x6f;
+const RAW_GETPRIORITY: usize = 0x78;
+const RAW_SETPRIORITY: usize = 0x79;
+const RAW_NICE: usize = 0x7a;
+const RAW_SCHED_GET_PRIORITY_MAX: usize = 0x7b;
+const RAW_SCHED_GET_PRIORITY_MIN: usize = 0x7c;
+const RAW_SCHED_SETSCHEDULER: usize = 0x7d;
+const RAW_SCHED_GETSCHEDULER: usize = 0x7e;
+const RAW_SIG_SETUP: usize = 0x80;
+const RAW_THREAD_KICK: usize = 0x81;
+const RAW_SIGRESEND: usize = 0x84;
+const RAW_DTRACE_PROBE_LIST: usize = 0x90;
+const RAW_DTRACE_ENABLE: usize = 0x91;
+const RAW_DTRACE_DISABLE: usize = 0x92;
+const RAW_DTRACE_READ: usize = 0x93;
+const RAW_DTRACE_STATS: usize = 0x94;
+const RAW_DTRACE_CLEAR: usize = 0x95;
+const RAW_DUPLEX_PAIR: usize = 0x110;
+const RAW_DUPLEX_SHUTDOWN: usize = 0x111;
+const RAW_DUPLEX_SENDMSG: usize = 0x112;
+const RAW_DUPLEX_RECVMSG: usize = 0x113;
+const RAW_DUPLEX_PEERCRED: usize = 0x114;
+const RAW_PROC_CTTY_SET: usize = 0x1e0;
+const RAW_PROC_CTTY_GET: usize = 0x1e1;
+const RAW_PROC_CTTY_SET_FG: usize = 0x1e2;
+/// Marker for the Linux-personality branch; it has no single syscall number.
+const RAW_LINUX_TRAP: usize = 0;
+
+/// Entries before the enum that are deliberately not called. The reason is part of the audit and
+/// `raw-check.sh` asserts that no `RAW_<name>` call appears in this source.
+const RAW_EXCLUDED: &[(&str, &str)] = &[(
+    "PROC_REBOOT",
+    "exits the machine (poweroff/halt/reset); no bounded non-destructive variant",
+)];
 
 const EFAULT: &[Errno] = &[Errno::EFAULT];
 const EBADF: &[Errno] = &[Errno::EBADF];
@@ -58,6 +132,9 @@ const EACCES: &[Errno] = &[Errno::EACCES];
 const EAGAIN: &[Errno] = &[Errno::EAGAIN];
 const EPERM: &[Errno] = &[Errno::EPERM];
 const ESRCH: &[Errno] = &[Errno::ESRCH];
+const ENOTSUP: &[Errno] = &[Errno::ENOTSUP];
+const EFBIG: &[Errno] = &[Errno::EFBIG];
+const ENOTTY: &[Errno] = &[Errno::ENOTTY];
 
 #[repr(align(4096))]
 struct Page(#[allow(dead_code)] [u8; PAGE]);
@@ -87,9 +164,11 @@ enum Expect {
     ChildCode(i32),
 }
 
-/// One measured syscall call.
+/// One measured syscall call. `nr` is the enum value or the raw pre-enum number; `name` is its
+/// stable label (enum name or the raw constant name).
 struct Row {
-    call: Syscall,
+    nr: usize,
+    name: alloc::string::String,
     vector: &'static str,
     ret: isize,
     expect: Expect,
@@ -170,7 +249,7 @@ fn setup() -> Result<Ctx, Errno> {
         ],
     )?;
     let mut fds = [0u32; 2];
-    checked(PIPE, [fds.as_mut_ptr() as usize, 0, 0, 0, 0, 0])?;
+    checked(RAW_PIPE, [fds.as_mut_ptr() as usize, 0, 0, 0, 0, 0])?;
     let (pipe_r, pipe_w) = (fds[0] as usize, fds[1] as usize);
     let memobj = checked(Syscall::MEMOBJ_CREATE as usize, [PAGE, 0, 0, 0, 0, 0])?;
     let paged = checked(
@@ -216,6 +295,7 @@ struct Runner {
     ctx: Ctx,
     rows: Vec<Row>,
     gaps: Vec<&'static str>,
+    raw_calls: usize,
 }
 
 impl Runner {
@@ -224,13 +304,35 @@ impl Runner {
             ctx,
             rows: Vec::new(),
             gaps: Vec::new(),
+            raw_calls: 0,
         }
     }
 
     fn case(&mut self, call: Syscall, vector: &'static str, args: [usize; 6], expect: Expect) {
         let ret = raw(call as usize, args);
         self.push(Row {
-            call,
+            nr: call as usize,
+            name: format!("{call:?}"),
+            vector,
+            ret,
+            expect,
+        });
+    }
+
+    /// Record one raw pre-enum dispatch call by number and stable name.
+    fn raw(
+        &mut self,
+        number: usize,
+        name: &'static str,
+        vector: &'static str,
+        args: [usize; 6],
+        expect: Expect,
+    ) {
+        let ret = raw(number, args);
+        self.raw_calls = self.raw_calls.saturating_add(1);
+        self.push(Row {
+            nr: number,
+            name: alloc::string::String::from(name),
             vector,
             ret,
             expect,
@@ -279,6 +381,14 @@ impl Runner {
         for gap in &self.gaps {
             println!("syscall-fuzz: coverage-gap {gap}");
         }
+        for (name, reason) in RAW_EXCLUDED {
+            println!("syscall-fuzz: raw-excluded name={name} reason={reason}");
+        }
+        println!(
+            "syscall-fuzz: raw-audit fuzzed={} excluded={}",
+            self.raw_calls,
+            RAW_EXCLUDED.len()
+        );
         for row in &self.rows {
             if Self::verdict(row) {
                 continue;
@@ -290,14 +400,14 @@ impl Runner {
                 Expect::ChildCode(code) => format!("child-code={code}"),
             };
             println!(
-                "syscall-fuzz: deviation nr=0x{:02x} name={:?} vector={} expected={} actual={}",
-                row.call as usize, row.call, row.vector, expected, row.ret
+                "syscall-fuzz: deviation nr=0x{:02x} name={} vector={} expected={} actual={}",
+                row.nr, row.name, row.vector, expected, row.ret
             );
         }
         let deviations = self.rows.iter().filter(|row| !Self::verdict(row)).count();
         let mut hash = 0xcbf2_9ce4_8422_2325u64;
         for row in &self.rows {
-            hash = fnv(hash, &(row.call as usize as u64).to_le_bytes());
+            hash = fnv(hash, &(row.nr as u64).to_le_bytes());
             hash = fnv(hash, row.vector.as_bytes());
             hash = fnv(hash, &(row.ret as i64).to_le_bytes());
         }
@@ -315,6 +425,10 @@ fn errno_name(error: Errno) -> &'static str {
         Errno::ENOENT => "ENOENT",
         Errno::ESRCH => "ESRCH",
         Errno::EINTR => "EINTR",
+        Errno::EIO => "EIO",
+        Errno::E2BIG => "E2BIG",
+        Errno::ENOEXEC => "ENOEXEC",
+        Errno::ECHILD => "ECHILD",
         Errno::EBADF => "EBADF",
         Errno::EAGAIN => "EAGAIN",
         Errno::ENOMEM => "ENOMEM",
@@ -323,11 +437,15 @@ fn errno_name(error: Errno) -> &'static str {
         Errno::EBUSY => "EBUSY",
         Errno::EEXIST => "EEXIST",
         Errno::ENODEV => "ENODEV",
+        Errno::ENOTTY => "ENOTTY",
         Errno::EINVAL => "EINVAL",
+        Errno::EFBIG => "EFBIG",
         Errno::ENOSPC => "ENOSPC",
         Errno::ENAMETOOLONG => "ENAMETOOLONG",
         Errno::ENOSYS => "ENOSYS",
+        Errno::EILSEQ => "EILSEQ",
         Errno::EOVERFLOW => "EOVERFLOW",
+        Errno::EOPNOTSUPP => "EOPNOTSUPP",
         _ => "other",
     }
 }
@@ -342,15 +460,15 @@ fn fnv(mut hash: u64, bytes: &[u8]) -> u64 {
 
 fn emit(row: &Row) {
     let ok = Runner::verdict(row);
-    let errno = if row.ret < 0 {
-        errno_name(Errno(u16::try_from(-row.ret).unwrap_or(u16::MAX)))
-    } else {
-        "none"
+    let errno = match row.expect {
+        Expect::ChildCode(_) => "exit-code",
+        _ if row.ret < 0 => errno_name(Errno(u16::try_from(-row.ret).unwrap_or(u16::MAX))),
+        _ => "none",
     };
     println!(
-        "syscall-fuzz: case nr=0x{:02x} name={:?} vector={} ret={} errno={} ok={}",
-        row.call as usize,
-        row.call,
+        "syscall-fuzz: case nr=0x{:02x} name={} vector={} ret={} errno={} ok={}",
+        row.nr,
+        row.name,
         row.vector,
         row.ret,
         errno,
@@ -400,13 +518,89 @@ extern "C" fn child_self_terminate(code: usize) -> ! {
     }
 }
 
+/// `PROC_SETSID` in a forked child (the parent may already be a group leader).
+extern "C" fn child_setsid(_arg: usize) -> ! {
+    let result = raw(RAW_PROC_SETSID, [0; 6]);
+    // SAFETY: `EXIT` terminates only this child; 0 means the syscall returned a session id.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, usize::from(result < 0)) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+/// `THREAD_EXIT_EX` in a child, bounded to a clean clear word and no unmap.
+extern "C" fn child_exit_ex(_arg: usize) -> ! {
+    let _ = raw(RAW_THREAD_EXIT_EX, [7, 0, 0, 0, 0, 0]);
+    // SAFETY: fallback exit if the terminating call returns.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, 1) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+/// `THREAD_EXIT_EX` with a garbage clear address; the child terminates either way.
+extern "C" fn child_exit_ex_garbage(_arg: usize) -> ! {
+    let _ = raw(RAW_THREAD_EXIT_EX, [9, 1, 0, 0, 0, 0]);
+    // SAFETY: fallback exit if the terminating call returns.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, 2) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+/// Linux-personality `write(1, 0x1, 1)`: no handler is installed, so the trap ends the child.
+extern "C" fn child_linux_write(_arg: usize) -> ! {
+    let _ = raw(1, [1, 1, 1, 0, 0, 0]);
+    // SAFETY: fallback exit if the trap returns.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, 0) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+/// Linux-personality `read(-1, 0x1, 1)`.
+extern "C" fn child_linux_read(_arg: usize) -> ! {
+    let _ = raw(0, [usize::MAX, 1, 1, 0, 0, 0]);
+    // SAFETY: fallback exit if the trap returns.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, 0) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+/// Linux-personality `exit(1)`.
+extern "C" fn child_linux_exit(_arg: usize) -> ! {
+    let _ = raw(60, [1, 0, 0, 0, 0, 0]);
+    // SAFETY: fallback exit if the trap returns.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, 0) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
 /// Fork a child and start `entry` in it; the parent keeps the child handle.
 fn spawn_child(entry: extern "C" fn(usize) -> !, arg: usize) -> Result<usize, Errno> {
-    let child = checked(PROC_FORK, [Handle::SELF_PROC.0 as usize, 0, 0, 0, 0, 0])?;
+    let child = checked(RAW_PROC_FORK, [Handle::SELF_PROC.0 as usize, 0, 0, 0, 0, 0])?;
     let stack = core::ptr::addr_of_mut!(CHILD_STACK);
     checked(
         Syscall::THREAD_CREATE as usize,
         [child, entry as usize, stack_top(stack), arg, 0, 0],
+    )?;
+    Ok(child)
+}
+
+/// Create a Linux-personality fork child and start `entry` in it (no handler installed).
+fn spawn_linux_child(entry: extern "C" fn(usize) -> !) -> Result<usize, Errno> {
+    let child = checked(RAW_PROC_FORK, [Handle::SELF_PROC.0 as usize, 0, 0, 0, 0, 0])?;
+    // `Personality::Linux` is 1. The child has no threads yet, so the change is allowed.
+    checked(
+        RAW_PROC_SET_PERSONALITY,
+        [child, 1, Handle::NONE.0 as usize, 0, 0, 0],
+    )?;
+    let stack = core::ptr::addr_of_mut!(CHILD_STACK);
+    checked(
+        Syscall::THREAD_CREATE as usize,
+        [child, entry as usize, stack_top(stack), 0, 0, 0],
     )?;
     Ok(child)
 }
@@ -461,6 +655,7 @@ fn plan(runner: &mut Runner) {
     event_calls(runner, ctx);
     ipc_calls(runner, ctx);
     driver_calls(runner, ctx);
+    raw_plan(runner);
     terminating_calls(runner);
 }
 
@@ -1798,7 +1993,8 @@ fn driver_calls(runner: &mut Runner, ctx: Ctx) {
         [Handle::ROOT_DEVICE.0 as usize, 1, 9, 0, 0, 0],
     );
     runner.push(Row {
-        call: Syscall::IRQ_CREATE,
+        nr: Syscall::IRQ_CREATE as usize,
+        name: alloc::string::String::from("IRQ_CREATE"),
         vector: "baseline",
         ret: irq,
         expect: Expect::Any,
@@ -1855,6 +2051,1446 @@ fn driver_calls(runner: &mut Runner, ctx: Ctx) {
     );
 }
 
+/// Raw pre-enum dispatch coverage. Mirrors `raw-dispatch.list`; `raw-check.sh` fails if the kernel
+/// source and the list disagree, or if a fuzzed entry loses its `RAW_*` reference in this file.
+fn raw_plan(r: &mut Runner) {
+    let ctx = r.ctx;
+    let selfp = Handle::SELF_PROC.0 as usize;
+    let none = Handle::NONE.0 as usize;
+    let path = core::ptr::addr_of!(PATH) as usize;
+    let name = core::ptr::addr_of!(NAME) as usize;
+    let probe_entry = probe_thread as *const () as usize;
+
+    // GETRANDOM / CLOCK_SET / TRACE_SET / RECORD_LOCK / PROC_CHROOT.
+    r.raw(
+        RAW_GETRANDOM,
+        "GETRANDOM",
+        "baseline",
+        [ctx.out, 16, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_GETRANDOM,
+        "GETRANDOM",
+        "len0",
+        [ctx.out, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_GETRANDOM,
+        "GETRANDOM",
+        "ptr0",
+        [PTR0, 16, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_GETRANDOM,
+        "GETRANDOM",
+        "protnone",
+        [ctx.guard, 16, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_GETRANDOM,
+        "GETRANDOM",
+        "flagsneg",
+        [ctx.out, 16, usize::MAX, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_GETRANDOM,
+        "GETRANDOM",
+        "lenmax",
+        [ctx.out, LENMAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+
+    let mut timespec = [0u8; 16];
+    timespec[..8].copy_from_slice(&(-1i64).to_le_bytes());
+    let ts = timespec.as_ptr() as usize;
+    r.raw(
+        RAW_CLOCK_SET,
+        "CLOCK_SET",
+        "clockbad",
+        [2, ts, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_CLOCK_SET,
+        "CLOCK_SET",
+        "ptr0",
+        [clock::REALTIME as usize, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_CLOCK_SET,
+        "CLOCK_SET",
+        "negts",
+        [clock::REALTIME as usize, ts, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+
+    r.raw(RAW_TRACE_SET, "TRACE_SET", "zero", [0; 6], Expect::Success);
+    r.raw(
+        RAW_TRACE_SET,
+        "TRACE_SET",
+        "max",
+        [PTRMAX, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+
+    let mut lock = [0u8; 32];
+    lock[..2].copy_from_slice(&2i16.to_le_bytes());
+    let lockp = lock.as_ptr() as usize;
+    r.raw(
+        RAW_RECORD_LOCK,
+        "RECORD_LOCK",
+        "cmdneg",
+        [ctx.pipe_r, usize::MAX, lockp, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_RECORD_LOCK,
+        "RECORD_LOCK",
+        "cmd0",
+        [ctx.pipe_r, 0, lockp, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_RECORD_LOCK,
+        "RECORD_LOCK",
+        "ptr0",
+        [ctx.pipe_r, 5, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_RECORD_LOCK,
+        "RECORD_LOCK",
+        "handlebad",
+        [usize::MAX, 6, lockp, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_RECORD_LOCK,
+        "RECORD_LOCK",
+        "pipe",
+        [ctx.pipe_r, 6, lockp, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+
+    r.raw(
+        RAW_PROC_CHROOT,
+        "PROC_CHROOT",
+        "ptr0",
+        [0, 7, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_CHROOT,
+        "PROC_CHROOT",
+        "ptr1",
+        [1, 7, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_CHROOT,
+        "PROC_CHROOT",
+        "len0",
+        [path, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_CHROOT,
+        "PROC_CHROOT",
+        "lenmax",
+        [path, LENMAX, 0, 0, 0, 0],
+        Expect::Err(ENAMETOOLONG),
+    );
+
+    // Thread and process identity/control.
+    r.raw(
+        RAW_THREAD_SET_TLS,
+        "THREAD_SET_TLS",
+        "fdneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_THREAD_SET_TLS,
+        "THREAD_SET_TLS",
+        "zero",
+        [none, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_THREAD_SET_TLS,
+        "THREAD_SET_TLS",
+        "tp1",
+        [none, 1, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_THREAD_SET_TLS,
+        "THREAD_SET_TLS",
+        "tpmax",
+        [none, PTRMAX, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_THREAD_SELF,
+        "THREAD_SELF",
+        "noargs",
+        [0; 6],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_ROBUST_LIST_SET,
+        "ROBUST_LIST_SET",
+        "clear",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_ROBUST_LIST_SET,
+        "ROBUST_LIST_SET",
+        "head1",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_ROBUST_LIST_SET,
+        "ROBUST_LIST_SET",
+        "lenmax",
+        [0, LENMAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+
+    r.raw(
+        RAW_PROC_SET_PERSONALITY,
+        "PROC_SET_PERSONALITY",
+        "persbad",
+        [selfp, 2, none, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SET_PERSONALITY,
+        "PROC_SET_PERSONALITY",
+        "handlerbad",
+        [selfp, 0, usize::MAX, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PROC_SET_PERSONALITY,
+        "PROC_SET_PERSONALITY",
+        "baseline",
+        [selfp, 0, none, 0, 0, 0],
+        Expect::Success,
+    );
+
+    r.raw(
+        RAW_PROC_SELF_INFO,
+        "PROC_SELF_INFO",
+        "baseline",
+        [ctx.out, 8, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_SELF_INFO,
+        "PROC_SELF_INFO",
+        "ptr0",
+        [0, 8, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_SELF_INFO,
+        "PROC_SELF_INFO",
+        "count0",
+        [ctx.out, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SETPGID,
+        "PROC_SETPGID",
+        "pidneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(ESRCH),
+    );
+    r.raw(
+        RAW_PROC_SETPGID,
+        "PROC_SETPGID",
+        "pgidneg",
+        [0, usize::MAX, 0, 0, 0, 0],
+        Expect::Err(EPERM),
+    );
+    r.raw(
+        RAW_PROC_SETPGID,
+        "PROC_SETPGID",
+        "baseline",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Any,
+    );
+    r.raw(
+        RAW_PROC_SETCRED,
+        "PROC_SETCRED",
+        "whichneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SETCRED,
+        "PROC_SETCRED",
+        "valuechange",
+        [0, 1, 0, 0, 0, 0],
+        Expect::Err(EPERM),
+    );
+    r.raw(
+        RAW_PROC_SETCRED,
+        "PROC_SETCRED",
+        "baseline",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_FORK,
+        "PROC_FORK",
+        "fdneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PROC_FORK,
+        "PROC_FORK",
+        "flags1",
+        [selfp, 1, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+
+    r.raw(
+        RAW_PROC_PID_INFO,
+        "PROC_PID_INFO",
+        "baseline",
+        [0, ctx.out, 8, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_PID_INFO,
+        "PROC_PID_INFO",
+        "ptr0",
+        [0, 0, 8, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_PID_INFO,
+        "PROC_PID_INFO",
+        "count0",
+        [0, ctx.out, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_PID_INFO,
+        "PROC_PID_INFO",
+        "pidneg",
+        [usize::MAX, ctx.out, 8, 0, 0, 0],
+        Expect::Err(ESRCH),
+    );
+
+    r.raw(
+        RAW_PROC_SETCRED_EX,
+        "PROC_SETCRED_EX",
+        "which0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SETCRED_EX,
+        "PROC_SETCRED_EX",
+        "groupsptr0",
+        [9, 0, 0, 0, 0, 1],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_SETCRED_EX,
+        "PROC_SETCRED_EX",
+        "baseline",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_CRED_INFO,
+        "PROC_CRED_INFO",
+        "baseline",
+        [ctx.out, 6, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_CRED_INFO,
+        "PROC_CRED_INFO",
+        "ptr0",
+        [0, 6, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_CRED_INFO,
+        "PROC_CRED_INFO",
+        "count5",
+        [ctx.out, 5, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_GETGROUPS,
+        "PROC_GETGROUPS",
+        "size0",
+        [ctx.out, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_GETGROUPS,
+        "PROC_GETGROUPS",
+        "ptr0",
+        [0, 64, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_GETGROUPS,
+        "PROC_GETGROUPS",
+        "size1",
+        [ctx.out, 1, 0, 0, 0, 0],
+        Expect::Any,
+    );
+    r.raw(
+        RAW_PROC_HANDLE_INFO,
+        "PROC_HANDLE_INFO",
+        "baseline",
+        [selfp, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_HANDLE_INFO,
+        "PROC_HANDLE_INFO",
+        "fdneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PROC_EXEC_CRED,
+        "PROC_EXEC_CRED",
+        "flags2",
+        [selfp, 0, 2, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_EXEC_CRED,
+        "PROC_EXEC_CRED",
+        "self",
+        [selfp, 0, 0, 0, 0, 0],
+        Expect::Err(EPERM),
+    );
+    r.raw(
+        RAW_PROC_EXEC_CRED,
+        "PROC_EXEC_CRED",
+        "filebad",
+        [ctx.proc_created, usize::MAX, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+
+    r.raw(
+        RAW_MSYNC,
+        "MSYNC",
+        "fdneg",
+        [usize::MAX, 0, PAGE, 1, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_MSYNC,
+        "MSYNC",
+        "flags0",
+        [selfp, 0, PAGE, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_MSYNC,
+        "MSYNC",
+        "flagsneg",
+        [selfp, 0, PAGE, usize::MAX, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_MSYNC,
+        "MSYNC",
+        "addr1",
+        [selfp, 1, PAGE, 1, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_MSYNC,
+        "MSYNC",
+        "len0",
+        [selfp, 0, 0, 1, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_MSYNC,
+        "MSYNC",
+        "lenmax",
+        [selfp, 0, LENMAX, 1, 0, 0],
+        Expect::Err(EINVAL),
+    );
+
+    r.raw(
+        RAW_PROC_SET_COMMAND,
+        "PROC_SET_COMMAND",
+        "baseline",
+        [selfp, name, 4, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_SET_COMMAND,
+        "PROC_SET_COMMAND",
+        "ptr0",
+        [selfp, 0, 4, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_SET_COMMAND,
+        "PROC_SET_COMMAND",
+        "len0",
+        [selfp, name, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_SET_COMMAND,
+        "PROC_SET_COMMAND",
+        "lenmax",
+        [selfp, name, LENMAX, 0, 0, 0],
+        Expect::Err(ENAMETOOLONG),
+    );
+    r.raw(
+        RAW_PROC_SET_COMMAND,
+        "PROC_SET_COMMAND",
+        "fdneg",
+        [usize::MAX, name, 4, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+
+    r.raw(
+        RAW_PROC_GETPGID,
+        "PROC_GETPGID",
+        "self",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_GETPGID,
+        "PROC_GETPGID",
+        "pidneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(ESRCH),
+    );
+    r.raw(
+        RAW_PROC_SIGNAL,
+        "PROC_SIGNAL",
+        "signo0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SIGNAL,
+        "PROC_SIGNAL",
+        "targethuge",
+        [0x7fff_ffff, 9, 0, 0, 0, 0],
+        Expect::Err(ESRCH),
+    );
+    // Drain any pending SIGCHLD left by the earlier process tests so the no-pending WNOHANG
+    // vector is deterministic; the returned signal number itself is not a table row.
+    while raw(RAW_PROC_SIGRECV, [ctx.out, 1, 0, 0, 0, 0]) >= 0 {}
+    r.raw(
+        RAW_PROC_SIGRECV,
+        "PROC_SIGRECV",
+        "ptr0",
+        [0, 1, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_SIGRECV,
+        "PROC_SIGRECV",
+        "flagsneg",
+        [ctx.out, usize::MAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SIGRECV,
+        "PROC_SIGRECV",
+        "nohang",
+        [ctx.out, 1, 0, 0, 0, 0],
+        Expect::Err(EAGAIN),
+    );
+
+    r.raw(
+        RAW_PROC_TIMES,
+        "PROC_TIMES",
+        "baseline",
+        [ctx.out, 4, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_TIMES,
+        "PROC_TIMES",
+        "ptr0",
+        [0, 4, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_TIMES,
+        "PROC_TIMES",
+        "count3",
+        [ctx.out, 3, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_GETRUSAGE,
+        "PROC_GETRUSAGE",
+        "baseline",
+        [0, ctx.out, 8, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_GETRUSAGE,
+        "PROC_GETRUSAGE",
+        "who1",
+        [1, ctx.out, 8, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_GETRUSAGE,
+        "PROC_GETRUSAGE",
+        "ptr0",
+        [0, 0, 8, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_GETRUSAGE,
+        "PROC_GETRUSAGE",
+        "count7",
+        [0, ctx.out, 7, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_GETRLIMIT,
+        "PROC_GETRLIMIT",
+        "baseline",
+        [0, ctx.out, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_GETRLIMIT,
+        "PROC_GETRLIMIT",
+        "res16",
+        [16, ctx.out, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_GETRLIMIT,
+        "PROC_GETRLIMIT",
+        "ptr0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_SETRLIMIT,
+        "PROC_SETRLIMIT",
+        "res16",
+        [16, 1, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SETRLIMIT,
+        "PROC_SETRLIMIT",
+        "invert",
+        [0, 5, 1, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+
+    r.raw(
+        RAW_HANDLE_COPY,
+        "HANDLE_COPY",
+        "baseline",
+        [selfp, ctx.memobj, MEMOBJ_RIGHTS, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_HANDLE_COPY,
+        "HANDLE_COPY",
+        "fdneg",
+        [usize::MAX, ctx.memobj, RIGHTS_ALL, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_HANDLE_COPY,
+        "HANDLE_COPY",
+        "mask0",
+        [selfp, ctx.memobj, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_HANDLE_TRANSFER_FILE,
+        "HANDLE_TRANSFER_FILE",
+        "mask0",
+        [ctx.pipe_r, ctx.memobj, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_HANDLE_TRANSFER_FILE,
+        "HANDLE_TRANSFER_FILE",
+        "filebad",
+        [usize::MAX, ctx.memobj, RIGHTS_ALL, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_HANDLE_TRANSFER_FILE,
+        "HANDLE_TRANSFER_FILE",
+        "pipe",
+        [ctx.pipe_r, ctx.memobj, RIGHTS_ALL, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+
+    // PROC_EXEC: invalid requests only; a successful exec replaces the image, so no baseline.
+    let exec_zero = [0u64; 11];
+    let mut exec_flags = [0u64; 11];
+    exec_flags[10] = 1;
+    let mut exec_path = [0u64; 11];
+    exec_path[1] = 1;
+    exec_path[3] = usize::MAX as u64;
+    let mut exec_image = [0u64; 11];
+    exec_image[1] = usize::MAX as u64;
+    r.raw(
+        RAW_PROC_EXEC,
+        "PROC_EXEC",
+        "ptr0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_EXEC,
+        "PROC_EXEC",
+        "ptr1",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_EXEC,
+        "PROC_EXEC",
+        "ptrneg",
+        [PTRMAX, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_EXEC,
+        "PROC_EXEC",
+        "protnone",
+        [ctx.guard, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_EXEC,
+        "PROC_EXEC",
+        "image0",
+        [exec_zero.as_ptr() as usize, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_EXEC,
+        "PROC_EXEC",
+        "flags1",
+        [exec_flags.as_ptr() as usize, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_EXEC,
+        "PROC_EXEC",
+        "pathmax",
+        [exec_path.as_ptr() as usize, 0, 0, 0, 0, 0],
+        Expect::Err(ENAMETOOLONG),
+    );
+    r.raw(
+        RAW_PROC_EXEC,
+        "PROC_EXEC",
+        "imagmax",
+        [exec_image.as_ptr() as usize, 0, 0, 0, 0, 0],
+        Expect::Err(EFBIG),
+    );
+
+    // PREAD/PWRITE/SEEK need a scheme file; the pipe is not one.
+    r.raw(
+        RAW_PREAD,
+        "PREAD",
+        "fdneg",
+        [usize::MAX, ctx.out, 1, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PREAD,
+        "PREAD",
+        "pipe",
+        [ctx.pipe_r, ctx.out, 1, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PWRITE,
+        "PWRITE",
+        "fdneg",
+        [usize::MAX, ctx.buf, 1, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PWRITE,
+        "PWRITE",
+        "pipe",
+        [ctx.pipe_w, ctx.buf, 1, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_SEEK,
+        "SEEK",
+        "fdneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_SEEK,
+        "SEEK",
+        "pipe",
+        [ctx.pipe_r, 0, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+
+    // PIPE / PIPE2.
+    let mut pipe_fds = [0u32; 2];
+    r.raw(
+        RAW_PIPE,
+        "PIPE",
+        "baseline",
+        [pipe_fds.as_mut_ptr() as usize, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PIPE,
+        "PIPE",
+        "ptr0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PIPE,
+        "PIPE",
+        "ptr1",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PIPE,
+        "PIPE",
+        "protnone",
+        [ctx.guard, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    let mut pipe2_fds = [0u32; 2];
+    r.raw(
+        RAW_PIPE2,
+        "PIPE2",
+        "baseline",
+        [pipe2_fds.as_mut_ptr() as usize, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PIPE2,
+        "PIPE2",
+        "ptr0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PIPE2,
+        "PIPE2",
+        "flagsneg",
+        [pipe2_fds.as_mut_ptr() as usize, usize::MAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+
+    // Duplex endpoints: pair, send/recv, credentials, shutdown.
+    let mut pair_fds = [0u32; 2];
+    let pair = raw(
+        RAW_DUPLEX_PAIR,
+        [pair_fds.as_mut_ptr() as usize, 0, 0, 0, 0, 0],
+    );
+    r.push(Row {
+        nr: RAW_DUPLEX_PAIR,
+        name: alloc::string::String::from("DUPLEX_PAIR"),
+        vector: "baseline",
+        ret: pair,
+        expect: Expect::Success,
+    });
+    r.raw(
+        RAW_DUPLEX_PAIR,
+        "DUPLEX_PAIR",
+        "ptr0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_DUPLEX_PAIR,
+        "DUPLEX_PAIR",
+        "ptr1",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_DUPLEX_PAIR,
+        "DUPLEX_PAIR",
+        "protnone",
+        [ctx.guard, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_DUPLEX_PAIR,
+        "DUPLEX_PAIR",
+        "flagsneg",
+        [pair_fds.as_mut_ptr() as usize, usize::MAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    if pair >= 0 {
+        let left = pair_fds[0] as usize;
+        let right = pair_fds[1] as usize;
+        let mut send = [0u64; 5];
+        send[0] = ctx.buf as u64;
+        send[1] = 1;
+        let mut recv = [0u64; 5];
+        recv[0] = ctx.out as u64;
+        recv[1] = 8;
+        let sent = raw(
+            RAW_DUPLEX_SENDMSG,
+            [left, send.as_ptr() as usize, 0, 0, 0, 0],
+        );
+        r.push(Row {
+            nr: RAW_DUPLEX_SENDMSG,
+            name: alloc::string::String::from("DUPLEX_SENDMSG"),
+            vector: "baseline",
+            ret: sent,
+            expect: Expect::Success,
+        });
+        if sent >= 0 {
+            r.raw(
+                RAW_DUPLEX_RECVMSG,
+                "DUPLEX_RECVMSG",
+                "baseline",
+                [right, recv.as_ptr() as usize, 0, 0, 0, 0],
+                Expect::Success,
+            );
+        } else {
+            r.gap("DUPLEX_SENDMSG baseline failed; the recvmsg baseline is not measured");
+        }
+        r.raw(
+            RAW_DUPLEX_PEERCRED,
+            "DUPLEX_PEERCRED",
+            "baseline",
+            [left, ctx.out, 0, 0, 0, 0],
+            Expect::Success,
+        );
+        r.raw(
+            RAW_DUPLEX_PEERCRED,
+            "DUPLEX_PEERCRED",
+            "ptr0",
+            [left, 0, 0, 0, 0, 0],
+            Expect::Err(EFAULT),
+        );
+        r.raw(
+            RAW_DUPLEX_SENDMSG,
+            "DUPLEX_SENDMSG",
+            "fdneg",
+            [usize::MAX, send.as_ptr() as usize, 0, 0, 0, 0],
+            Expect::Err(EBADF),
+        );
+        r.raw(
+            RAW_DUPLEX_SENDMSG,
+            "DUPLEX_SENDMSG",
+            "msgptr0",
+            [left, 0, 0, 0, 0, 0],
+            Expect::Err(EFAULT),
+        );
+        let mut flagsbad = send;
+        flagsbad[4] = 0x8000_0000;
+        r.raw(
+            RAW_DUPLEX_SENDMSG,
+            "DUPLEX_SENDMSG",
+            "flagsbad",
+            [left, flagsbad.as_ptr() as usize, 0, 0, 0, 0],
+            Expect::Err(EINVAL),
+        );
+        let mut databad = send;
+        databad[0] = 0;
+        r.raw(
+            RAW_DUPLEX_SENDMSG,
+            "DUPLEX_SENDMSG",
+            "databad",
+            [left, databad.as_ptr() as usize, 0, 0, 0, 0],
+            Expect::Err(EFAULT),
+        );
+        r.raw(
+            RAW_DUPLEX_RECVMSG,
+            "DUPLEX_RECVMSG",
+            "fdneg",
+            [usize::MAX, recv.as_ptr() as usize, 0, 0, 0, 0],
+            Expect::Err(EBADF),
+        );
+        r.raw(
+            RAW_DUPLEX_RECVMSG,
+            "DUPLEX_RECVMSG",
+            "msgptr0",
+            [right, 0, 0, 0, 0, 0],
+            Expect::Err(EFAULT),
+        );
+        r.raw(
+            RAW_DUPLEX_SHUTDOWN,
+            "DUPLEX_SHUTDOWN",
+            "baseline",
+            [left, 1, 0, 0, 0, 0],
+            Expect::Success,
+        );
+        r.raw(
+            RAW_DUPLEX_SHUTDOWN,
+            "DUPLEX_SHUTDOWN",
+            "howbad",
+            [left, 5, 0, 0, 0, 0],
+            Expect::Err(EINVAL),
+        );
+        r.raw(
+            RAW_DUPLEX_SHUTDOWN,
+            "DUPLEX_SHUTDOWN",
+            "fdneg",
+            [usize::MAX, 1, 0, 0, 0, 0],
+            Expect::Err(EBADF),
+        );
+    } else {
+        r.gap("DUPLEX_PAIR baseline failed; the duplex endpoint rows are not measured");
+    }
+
+    // Priority and scheduler.
+    r.raw(
+        RAW_GETPRIORITY,
+        "GETPRIORITY",
+        "baseline",
+        [0, 0, ctx.out, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_GETPRIORITY,
+        "GETPRIORITY",
+        "ptr0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_GETPRIORITY,
+        "GETPRIORITY",
+        "whichneg",
+        [usize::MAX, 0, ctx.out, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_GETPRIORITY,
+        "GETPRIORITY",
+        "whohuge",
+        [0, 0x7fff_ffff, ctx.out, 0, 0, 0],
+        Expect::Err(ESRCH),
+    );
+    r.raw(
+        RAW_SETPRIORITY,
+        "SETPRIORITY",
+        "baseline",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_SETPRIORITY,
+        "SETPRIORITY",
+        "whichneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_SETPRIORITY,
+        "SETPRIORITY",
+        "whohuge",
+        [0, 0x7fff_ffff, 0, 0, 0, 0],
+        Expect::Err(ESRCH),
+    );
+    r.raw(
+        RAW_NICE,
+        "NICE",
+        "baseline",
+        [0, ctx.out, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_NICE,
+        "NICE",
+        "ptr0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_SCHED_GET_PRIORITY_MAX,
+        "SCHED_GET_PRIORITY_MAX",
+        "other",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_SCHED_GET_PRIORITY_MAX,
+        "SCHED_GET_PRIORITY_MAX",
+        "fifo",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Err(ENOTSUP),
+    );
+    r.raw(
+        RAW_SCHED_GET_PRIORITY_MAX,
+        "SCHED_GET_PRIORITY_MAX",
+        "policyneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_SCHED_GET_PRIORITY_MIN,
+        "SCHED_GET_PRIORITY_MIN",
+        "other",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_SCHED_GET_PRIORITY_MIN,
+        "SCHED_GET_PRIORITY_MIN",
+        "fifo",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Err(ENOTSUP),
+    );
+    r.raw(
+        RAW_SCHED_SETSCHEDULER,
+        "SCHED_SETSCHEDULER",
+        "baseline",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_SCHED_SETSCHEDULER,
+        "SCHED_SETSCHEDULER",
+        "policyfifo",
+        [0, 1, 0, 0, 0, 0],
+        Expect::Err(ENOTSUP),
+    );
+    r.raw(
+        RAW_SCHED_SETSCHEDULER,
+        "SCHED_SETSCHEDULER",
+        "policyneg",
+        [0, usize::MAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_SCHED_SETSCHEDULER,
+        "SCHED_SETSCHEDULER",
+        "priobad",
+        [0, 0, 1, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_SCHED_SETSCHEDULER,
+        "SCHED_SETSCHEDULER",
+        "pidhuge",
+        [0x7fff_ffff, 0, 0, 0, 0, 0],
+        Expect::Err(ESRCH),
+    );
+    r.raw(
+        RAW_SCHED_GETSCHEDULER,
+        "SCHED_GETSCHEDULER",
+        "self",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_SCHED_GETSCHEDULER,
+        "SCHED_GETSCHEDULER",
+        "pidneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(ESRCH),
+    );
+
+    // TTY controls need a tty handle; a pipe is ENOTTY.
+    r.raw(
+        RAW_PROC_CTTY_SET,
+        "PROC_CTTY_SET",
+        "fdneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PROC_CTTY_SET,
+        "PROC_CTTY_SET",
+        "pipe",
+        [ctx.pipe_r, 0, 0, 0, 0, 0],
+        Expect::Err(ENOTTY),
+    );
+    r.raw(
+        RAW_PROC_CTTY_GET,
+        "PROC_CTTY_GET",
+        "fdneg",
+        [usize::MAX, ctx.out, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PROC_CTTY_GET,
+        "PROC_CTTY_GET",
+        "pipe",
+        [ctx.pipe_r, ctx.out, 0, 0, 0, 0],
+        Expect::Err(ENOTTY),
+    );
+    r.raw(
+        RAW_PROC_CTTY_SET_FG,
+        "PROC_CTTY_SET_FG",
+        "fdneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_PROC_CTTY_SET_FG,
+        "PROC_CTTY_SET_FG",
+        "pipe",
+        [ctx.pipe_r, 0, 0, 0, 0, 0],
+        Expect::Err(ENOTTY),
+    );
+
+    // Signals: SIGRESEND without a registration is the safe path; SIG_SETUP is installed last.
+    r.raw(
+        RAW_SIGRESEND,
+        "SIGRESEND",
+        "noregistration",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_SIG_SETUP,
+        "SIG_SETUP",
+        "ptr0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_SIG_SETUP,
+        "SIG_SETUP",
+        "offset1",
+        [probe_entry, 1, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_SIG_SETUP,
+        "SIG_SETUP",
+        "flagsneg",
+        [probe_entry, 0, usize::MAX, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_SIG_SETUP,
+        "SIG_SETUP",
+        "baseline",
+        [probe_entry, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_THREAD_KICK,
+        "THREAD_KICK",
+        "fdneg",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_THREAD_KICK,
+        "THREAD_KICK",
+        "selfzero",
+        [none, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+
+    // DTrace control calls.
+    r.raw(
+        RAW_DTRACE_PROBE_LIST,
+        "DTRACE_PROBE_LIST",
+        "count",
+        [ctx.out, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_DTRACE_PROBE_LIST,
+        "DTRACE_PROBE_LIST",
+        "ptr0",
+        [0, 1, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_DTRACE_PROBE_LIST,
+        "DTRACE_PROBE_LIST",
+        "maxmax",
+        [ctx.out, LENMAX, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_DTRACE_ENABLE,
+        "DTRACE_ENABLE",
+        "flags1",
+        [0, 1, none, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_DTRACE_ENABLE,
+        "DTRACE_ENABLE",
+        "handlebad",
+        [0, 0, usize::MAX, 0, 0, 0],
+        Expect::Err(EBADF),
+    );
+    r.raw(
+        RAW_DTRACE_DISABLE,
+        "DTRACE_DISABLE",
+        "probe0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Any,
+    );
+    r.raw(
+        RAW_DTRACE_DISABLE,
+        "DTRACE_DISABLE",
+        "probemax",
+        [usize::MAX, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_DTRACE_READ,
+        "DTRACE_READ",
+        "empty",
+        [ctx.out, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_DTRACE_READ,
+        "DTRACE_READ",
+        "ptr0",
+        [0, 1, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_DTRACE_READ,
+        "DTRACE_READ",
+        "maxmax",
+        [ctx.out, LENMAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_DTRACE_STATS,
+        "DTRACE_STATS",
+        "count",
+        [ctx.out, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_DTRACE_STATS,
+        "DTRACE_STATS",
+        "ptr0",
+        [0, 1, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_DTRACE_CLEAR,
+        "DTRACE_CLEAR",
+        "noargs",
+        [0; 6],
+        Expect::Success,
+    );
+
+    // Children: setsid, THREAD_EXIT_EX, PROC_WAIT_EX, and the Linux personality trap.
+    let code = child_code(r, child_setsid, 0);
+    r.push(Row {
+        nr: RAW_PROC_SETSID,
+        name: alloc::string::String::from("PROC_SETSID"),
+        vector: "child",
+        ret: code,
+        expect: Expect::ChildCode(0),
+    });
+    let code = child_code(r, child_exit_ex, 0);
+    r.push(Row {
+        nr: RAW_THREAD_EXIT_EX,
+        name: alloc::string::String::from("THREAD_EXIT_EX"),
+        vector: "child7",
+        ret: code,
+        expect: Expect::ChildCode(7),
+    });
+    let code = child_code(r, child_exit_ex_garbage, 0);
+    r.push(Row {
+        nr: RAW_THREAD_EXIT_EX,
+        name: alloc::string::String::from("THREAD_EXIT_EX"),
+        vector: "garbage",
+        ret: code,
+        expect: Expect::Any,
+    });
+    r.raw(
+        RAW_PROC_WAIT_EX,
+        "PROC_WAIT_EX",
+        "optneg",
+        [3, 0, usize::MAX, ctx.out, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_WAIT_EX,
+        "PROC_WAIT_EX",
+        "ptr0",
+        [3, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_WAIT_EX,
+        "PROC_WAIT_EX",
+        "idtypebad",
+        [99, 0, 0, ctx.out, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    if let Ok(child) = spawn_child(child_exit, 6) {
+        let _ = child;
+        r.raw(
+            RAW_PROC_WAIT_EX,
+            "PROC_WAIT_EX",
+            "baseline",
+            [3, 0, 0, ctx.out, 0, 0],
+            Expect::Success,
+        );
+    } else {
+        r.gap("PROC_WAIT_EX child setup failed; the baseline is not measured");
+    }
+
+    for (vector, entry) in [
+        ("write", child_linux_write as extern "C" fn(usize) -> !),
+        ("read", child_linux_read),
+        ("exit", child_linux_exit),
+    ] {
+        let code = match spawn_linux_child(entry) {
+            Ok(child) => match wait_child(child) {
+                Ok(code) => code as isize,
+                Err(error) => -(error.0 as isize),
+            },
+            Err(error) => -(error.0 as isize),
+        };
+        r.push(Row {
+            nr: RAW_LINUX_TRAP,
+            name: alloc::string::String::from("LINUX_TRAP"),
+            vector,
+            ret: code,
+            expect: Expect::ChildCode(-5),
+        });
+    }
+}
+
 fn terminating_calls(runner: &mut Runner) {
     let ctx = runner.ctx;
     runner.err(
@@ -1884,7 +3520,8 @@ fn terminating_calls(runner: &mut Runner) {
                 Err(error) => -(error.0 as isize),
             };
             runner.push(Row {
-                call: Syscall::PROC_WAIT,
+                nr: Syscall::PROC_WAIT as usize,
+                name: alloc::string::String::from("PROC_WAIT"),
                 vector: "child-code",
                 ret: code,
                 expect: Expect::ChildCode(5),
@@ -1895,28 +3532,32 @@ fn terminating_calls(runner: &mut Runner) {
 
     let code = child_code(runner, child_exit, 7);
     runner.push(Row {
-        call: Syscall::EXIT,
+        nr: Syscall::EXIT as usize,
+        name: alloc::string::String::from("EXIT"),
         vector: "child7",
         ret: code,
         expect: Expect::ChildCode(7),
     });
     let code = child_code(runner, child_exit, 0x7fff_ffff);
     runner.push(Row {
-        call: Syscall::EXIT,
+        nr: Syscall::EXIT as usize,
+        name: alloc::string::String::from("EXIT"),
         vector: "childmax",
         ret: code,
         expect: Expect::Any,
     });
     let code = child_code(runner, child_thread_exit, 7);
     runner.push(Row {
-        call: Syscall::THREAD_EXIT,
+        nr: Syscall::THREAD_EXIT as usize,
+        name: alloc::string::String::from("THREAD_EXIT"),
         vector: "child7",
         ret: code,
         expect: Expect::ChildCode(7),
     });
     let code = child_code(runner, child_self_terminate, 9);
     runner.push(Row {
-        call: Syscall::PROC_TERMINATE,
+        nr: Syscall::PROC_TERMINATE as usize,
+        name: alloc::string::String::from("PROC_TERMINATE"),
         vector: "childself9",
         ret: code,
         expect: Expect::ChildCode(9),

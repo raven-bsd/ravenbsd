@@ -2167,6 +2167,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-direct"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-compat",
+ "raven-libc-signal",
+ "raven-libc-stdio",
+ "raven-libc-str",
+]
+
+[[package]]
 name = "raven-libc-dtoa"
 version = "0.1.0"
 dependencies = [
@@ -2429,6 +2440,19 @@ dependencies = [
  "raven-libc-abi",
  "raven-libc-ctype",
  "raven-libc-nss",
+]
+
+[[package]]
+name = "raven-libc-robust"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-fmt",
+ "raven-libc-net",
+ "raven-libc-platform",
+ "raven-libc-proc",
+ "raven-libc-signal",
+ "raven-libc-stdlib",
 ]
 
 [[package]]
