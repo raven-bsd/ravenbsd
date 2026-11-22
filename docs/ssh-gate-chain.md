@@ -122,11 +122,10 @@ this deviation is recorded in the K434 report.
   termios defaults and returns `EBUSY` when the slave is already open. `openpty` (`lib/libutil/pty.c:63`)
   and `forkpty` (`:139`) are the libutil convenience over that path.
 - Raven: ptyd supplies the `pty:` scheme pair; libc `openpty`/`grantpt`/`unlockpt`/`ptsname_r` must
-  match the libutil sequence. K430 is merged and its `pty-alloc` qtest passes as root and uid 1000.
-  K436 (`origin/dave/K436` `9d1a30cb`) is not on `origin/master`; verified on scratch, its
-  `pty-alloc`/`pty-calls` pass but `ssh -tt` still answers `PTY allocation request failed on channel
-  0`, and the release image also has no `tty` executable (`rsh: tty: command not found`), so S8 is
-  not green.
+  match the libutil sequence. K430 and K436 are merged; the `pty-alloc` and `pty-calls` qtests pass,
+  including `ptsname`/`ttyname` `/dev/pts/N`. The SSH path still answers
+  `PTY allocation request failed on channel 0`; a test-only `/bin/tty` is staged from
+  `tests/fixtures/ssh-tty` but the allocation fails before it runs, so S8 is not green.
 
 ### C10 exec
 
@@ -198,6 +197,22 @@ this deviation is recorded in the K434 report.
 3. **S8 remains red with K436.** The K436 libc qtests pass, but the SSH PTY request still fails and
    the image has no `tty` utility. Rebuilding the static `sshd-session` against K436 and reimaging
    did not change the client result.
+
+## Rev 20 observations (K431/K436/K439 merged)
+
+1. **S7 routing is fixed.** On master `1f2c0e64` the client receives the exact marker
+   `K434-SSH-MARKER-2026-11-22\n` on the single attempt and all ten 10/10 attempts; the guest
+   console marker delta is 0 (`max_console_new=0`, `console_total_delta=0`). The client still exits
+   -9 after delivering, which remains S5-session's completion failure.
+2. **S5 identity fixture fails before identity.** K431's `socket-write-identity` tap test runs, but
+   the fixture shell fails with `rsh: tty:console: no such file or directory` and
+   `socket-write-identity: shell status=1`; the `server` profile has no consd. S5-identity is FAIL.
+3. **S8 still fails.** K436's `pty-alloc`/`pty-calls` pass, but `ssh -tt ... tty` still returns
+   `PTY allocation request failed on channel 0`. A test-only `/bin/tty` is staged
+   (`tests/fixtures/ssh-tty` via `profiles/release.d/89-ssh-tty.toml`), but the allocation fails
+   before the command runs.
+4. **S5-session** remains: no EPIPE, exit -9 at 15 s, fd4 socket/pipe, TCP peer `ESTAB`; the
+   server-side handle is not exposed.
 
 ## Gaps (not evidence)
 
