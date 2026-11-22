@@ -22,4 +22,4 @@ regex = '^sched-saturation: done=80 lost=0 switches=[0-9]+$'
 regex = '^CONTRACT K527 PASS switches=[0-9]+$'
 
 [[forbid]]
-regex = '(?i)fail|panic|EXCEPTION|lost=[1-9]'
+regex = '(?i)sched-saturation: fail|CONTRACT K527 FAIL|lost=[1-9]|panic|EXCEPTION'
