@@ -191,11 +191,13 @@ pub fn live_queues() -> u64 {
 /// event-signal notification path), not from the timer interrupt.
 pub(crate) fn readiness(process: &Arc<Process>, handle: Handle) -> u32 {
     let table = process.handles.lock();
-    // Both pipe ends are observable even though only the read end carries READ.
+    // Poll observes a source, it does not read or write it. Every end is therefore pollable
+    // with the handle alone: a pipe write end carries WRITE, a write-only pty/duplex carries
+    // WRITE, and a READ-gated lookup would return EACCES before the readiness arm (K548).
     if let Ok(Object::Pipe(end)) = table.get(handle, Rights::NONE) {
         return end.readiness();
     }
-    match table.get(handle, Rights::READ) {
+    match table.get(handle, Rights::NONE) {
         Ok(Object::Timer(timer)) if timer.peek(time::now_ns()) => SIGNALED,
         Ok(Object::UserEvent(event)) if event.ready() => SIGNALED,
         Ok(Object::Irq(irq)) if irq.pending() != 0 => SIGNALED,
@@ -266,15 +268,16 @@ pub(crate) fn duplex_key(id: u64) -> u64 {
 
 /// Resolve a handle to the source key used by the watcher table and by the transition call sites.
 ///
-/// This is `selrecord`'s source lookup: the handle is validated with the same rights as the old
-/// `source_from_handle`, and the returned key is what `notify_source` matches.
+/// This is `selrecord`'s source lookup: the handle is the capability, so poll observes any live
+/// source without a read/write data right (K548: a write-only pty/duplex must not be EACCES), and
+/// the returned key is what `notify_source` matches.
 pub fn source_spec(process: &Arc<Process>, handle: Handle) -> Result<SourceSpec, Errno> {
     let table = process.handles.lock();
     // Both pipe ends are observable even though only the read end carries READ.
     if let Ok(Object::Pipe(end)) = table.get(handle, Rights::NONE) {
         return Ok(SourceSpec::key(end.event_key()));
     }
-    match table.get(handle, Rights::READ) {
+    match table.get(handle, Rights::NONE) {
         Ok(Object::Timer(timer)) => Ok(SourceSpec::timer(timer)),
         Ok(Object::UserEvent(event)) => Ok(SourceSpec::key(arc_key(event))),
         Ok(Object::Irq(irq)) => Ok(SourceSpec::key(irq.event_key())),
