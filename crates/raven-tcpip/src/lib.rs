@@ -55,6 +55,8 @@ mod listen;
 #[cfg(feature = "mptcp")]
 pub mod mptcp_bridge;
 mod mptcp_hooks;
+#[cfg(feature = "mptcp")]
+pub mod mptcp_socket;
 mod neighbor;
 mod observability;
 mod plpmtud_live;
@@ -121,6 +123,8 @@ pub use listen::{AcceptQueue, HalfOpen, HalfOpenQueue, IsnGenerator, ListenStats
 #[cfg(feature = "mptcp")]
 pub use mptcp_bridge::StackSubflow;
 pub use mptcp_hooks::{SubflowId, SubflowOps};
+#[cfg(feature = "mptcp")]
+pub use mptcp_socket::{AF_INET, AF_INET6, IPPROTO_MPTCP, MptcpSocket, SubflowInfo};
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use observability::{
     Counters, HostcacheInfo, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,

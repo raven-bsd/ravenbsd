@@ -92,6 +92,8 @@ pub struct MetaSocket {
     send_closed: bool,
     closed: bool,
     fail_at: Option<u64>,
+    aggregation: bool,
+    scheduler_cursor: usize,
 }
 
 impl MetaSocket {
@@ -115,6 +117,8 @@ impl MetaSocket {
             send_closed: false,
             closed: false,
             fail_at: None,
+            aggregation: false,
+            scheduler_cursor: 0,
         }
     }
 
@@ -183,6 +187,70 @@ impl MetaSocket {
             .map(|entry| entry.id)
     }
 
+    /// Enable or disable aggregation across every regular path.
+    ///
+    /// Off is the default: one active path plus idle backups. On distributes new ranges across
+    /// all alive regular paths; backups still wait until no regular path is alive.
+    pub fn set_aggregation(&mut self, enabled: bool) {
+        self.aggregation = enabled;
+        self.scheduler_cursor = 0;
+        self.pump();
+    }
+
+    /// Whether aggregation is enabled.
+    #[must_use]
+    pub fn aggregation(&self) -> bool {
+        self.aggregation
+    }
+
+    /// Remove one subflow, requeue its unacked ranges and close its transport.
+    pub fn remove_subflow(&mut self, id: u32) -> Result<(), Error> {
+        let index = self
+            .subflows
+            .iter()
+            .position(|entry| entry.id == id)
+            .ok_or(Error::NotFound)?;
+        let mut entry = self.subflows.remove(index);
+        entry.transport.close();
+        for range in &mut self.send {
+            if range.sent_on == Some(id) {
+                range.sent_on = None;
+            }
+        }
+        self.pump();
+        Ok(())
+    }
+
+    /// Unacknowledged bytes last sent on `id`.
+    #[must_use]
+    pub fn bytes_in_flight(&self, id: u32) -> usize {
+        self.send
+            .iter()
+            .filter(|range| range.sent_on == Some(id))
+            .map(|range| range.data.len())
+            .sum()
+    }
+
+    /// Delivered bytes or a peer DATA_FIN are readable.
+    #[must_use]
+    pub fn readable(&self) -> bool {
+        !self.delivered.is_empty() || self.peer_fin
+    }
+
+    /// The connection can accept new application bytes.
+    #[must_use]
+    pub fn writable(&self) -> bool {
+        !self.closed && !self.send_closed && self.send_queue() < self.send_cap
+    }
+
+    /// Close every transport. Used by the socket wrapper after the DATA_FIN path.
+    pub fn close_paths(&mut self) {
+        for entry in &mut self.subflows {
+            entry.transport.close();
+            entry.alive = false;
+        }
+    }
+
     /// Accept application bytes into the connection send buffer and pump them.
     ///
     /// Returns the accepted prefix (which may be short when the send cap is reached); an empty
@@ -228,21 +296,47 @@ impl MetaSocket {
     }
 
     fn pump_ranges(&mut self) -> usize {
-        let Some(active) = self.active() else {
-            return 0;
+        let active_only = self.active();
+        let candidates: Vec<usize> = if self.aggregation {
+            let mut regular: Vec<usize> = self
+                .subflows
+                .iter()
+                .enumerate()
+                .filter(|(_, entry)| entry.alive && !entry.backup)
+                .map(|(index, _)| index)
+                .collect();
+            if regular.is_empty() {
+                regular = self
+                    .subflows
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, entry)| entry.alive)
+                    .map(|(index, _)| index)
+                    .collect();
+            }
+            regular
+        } else {
+            let Some(active) = active_only else {
+                return 0;
+            };
+            self.subflows
+                .iter()
+                .enumerate()
+                .filter(|(_, entry)| entry.id == active && entry.alive)
+                .map(|(index, _)| index)
+                .collect()
         };
-        let Some(index) = self
-            .subflows
-            .iter()
-            .position(|entry| entry.id == active && entry.alive)
-        else {
+        if candidates.is_empty() {
             return 0;
-        };
+        }
+
         let mut sent = 0;
+        let mut cursor = self.scheduler_cursor;
         for range in &mut self.send {
             if range.sent_on.is_some() {
                 continue;
             }
+            let index = candidates[cursor % candidates.len()];
             let length = u16::try_from(range.data.len()).unwrap_or(u16::MAX);
             let ssn = self.subflows[index].ssn;
             let mapping = Mapping {
@@ -263,9 +357,13 @@ impl MetaSocket {
             self.subflows[index].ssn = ssn
                 .wrapping_add(consumed)
                 .wrapping_add(u32::from(range.fin));
-            range.sent_on = Some(active);
+            range.sent_on = Some(self.subflows[index].id);
             sent += 1;
+            if self.aggregation {
+                cursor = cursor.wrapping_add(1);
+            }
         }
+        self.scheduler_cursor = cursor;
         sent
     }
 

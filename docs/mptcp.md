@@ -145,6 +145,38 @@ The transport carries the bytes; the host test passes the DSS mapping metadata t
 out-of-band. Putting MP_CAPABLE/DSS on the real wire and the `IPPROTO_MPTCP` socket API is
 MPTCP2b/2c.
 
+## Socket API (MPTCP2b)
+
+`MptcpSocket` is the host-testable Linux-shaped socket surface (`crates/raven-tcpip/src/
+mptcp_socket.rs`, feature `mptcp`):
+
+| Item | API |
+|---|---|
+| protocol | `IPPROTO_MPTCP = 262` over `AF_INET` / `AF_INET6` |
+| open | `MptcpSocket::open(stack, family, protocol, remote, local_if, peer_capable)` |
+| stream | `send`, `recv`, `readiness`, `close` (same non-blocking/TCP shape) |
+| fallback | `peer_capable = false` opens one plain TCP connection; `is_fallback()` |
+| path add | `add_path(remote, local_if, backup) -> subflow_id` |
+| path remove | `remove_path(subflow_id)` (requeues its unacked ranges) |
+| priority | `set_backup(subflow_id, backup)` (unbackup is `false`) |
+| query | `subflows() -> Vec<SubflowInfo>`: id, local/remote address/port, backup, bytes in flight |
+| policy | failover default; `set_aggregation(true)` opt-in distributes across regular paths |
+| readiness | live `SubflowOps::readiness` on the active path; no cached mask |
+
+The names mirror the Linux path-manager `ADD_ADDR` / `REMOVE_ADDR` / `SET_FLAGS` / `GET_ADDR`
+operations and the `MPTCP_PM_ATTR_SUBFLOWS` shape. The libc/netlink binding and the real-wire
+MP_CAPABLE negotiation are MPTCP2c; this slice is in-process API and lifecycle.
+
+Host tests (`crates/raven-tcpip/tests/mptcp_socket.rs`) cover creation, two paths, send/recv,
+backup promotion, path removal, plain-peer fallback, live readiness and opt-in aggregation.
+
+```sh
+timeout 300 cargo nextest run -p raven-tcpip --features mptcp,testutil --test mptcp_socket
+```
+
+Receive reassembly across subflows is still the MPTCP2a MetaSocket path (DSS metadata out of
+band); the API `recv` reads the active real subflow until the wire DSS mapping lands in 2c.
+
 ## Phase 2 boundary
 
 Phase 2 owns the `raven-tcpip` subflow integration: hooking MP_CAPABLE/MP_JOIN into the TCP
