@@ -52,6 +52,7 @@ mod ipv4_stack;
 mod ipv6_stack;
 mod isn;
 mod listen;
+mod mptcp_hooks;
 mod neighbor;
 mod observability;
 mod plpmtud_live;
@@ -115,6 +116,7 @@ pub use ipv6_stack::{
 };
 pub use isn::{IsnConn, IsnEntropy, IsnState};
 pub use listen::{AcceptQueue, HalfOpen, HalfOpenQueue, IsnGenerator, ListenStats, SynCookie};
+pub use mptcp_hooks::{SubflowId, SubflowOps};
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use observability::{
     Counters, HostcacheInfo, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,
