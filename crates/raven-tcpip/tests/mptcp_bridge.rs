@@ -103,7 +103,14 @@ impl Rig {
     fn read(&mut self, socket: SocketId, length: usize) -> Vec<u8> {
         let mut out = Vec::new();
         let mut buffer = [0u8; 2048];
+        let mut attempts = 0;
         while out.len() < length {
+            attempts += 1;
+            assert!(
+                attempts <= 4,
+                "timed out waiting for {length} bytes (got {})",
+                out.len()
+            );
             let result = {
                 let mut stack = self.b.borrow_mut();
                 stack.recv(socket, &mut buffer)
