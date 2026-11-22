@@ -112,6 +112,7 @@ def main() -> int:
     with open(SERIAL, "w", encoding="utf-8") as serial:
         child.logfile = serial
         try:
+            child.expect("svcd: getty up", timeout=240)
             if not wait_tcp(GUEST, 22, 120):
                 log("error", f"guest sshd did not accept on {GUEST}:22")
                 return 2
