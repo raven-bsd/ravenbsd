@@ -12,7 +12,8 @@
 #
 # The case list is fixed on purpose. Extend it in a ticket that owns the new case; do not add
 # ad-hoc cases at run time. Owners are the lanes that own the subsystem, so a failing row can be
-# routed without re-reading the log.
+# routed without re-reading the log. A row may name a qtest case file in an optional fifth field;
+# without it the case name resolves under tests/qtest/cases/ as before.
 #
 # usage: sh scripts/kernel-gate.sh [--list]
 #   --list   print the case table and exit (no QEMU run)
@@ -38,7 +39,7 @@ default_max_load() {
 }
 max_load=${S107_MAX_LOAD:-$(default_max_load)}
 
-# case | arch | owner | subsystem note
+# case | arch | owner | subsystem note [| qtest case path]
 cases='boot-uname|x86_64|stuart|boot/uname
 kernel-early-boot|x86_64|stuart|boot
 exc-int3|x86_64|stuart|exceptions
@@ -47,6 +48,7 @@ exc-pagefault|x86_64|stuart|exceptions
 exc-doublefault|x86_64|stuart|exceptions
 kernel-paging|x86_64|stuart|paging
 kernel-timer|x86_64|stuart|timer
+readiness-kvm4|x86_64|stuart|readiness|tests/smp/readiness/readiness-kvm4.toml
 time-entropy|x86_64|lance|time-entropy
 time-entropy-cyclic|x86_64|lance|time-entropy
 smp-user|x86_64|stuart|smp
@@ -68,7 +70,7 @@ kernel-paging-aarch64|aarch64|dave|paging
 kernel-timer-aarch64|aarch64|dave|timer'
 
 if [ "${1:-}" = "--list" ]; then
-    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note; do
+    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note case_path; do
         printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
     done
     exit 0
@@ -97,12 +99,13 @@ printf '%s\n' "$cases" > "$cases_file" || exit 2
 results=$log_dir/results.txt
 : > "$results" || exit 2
 
-while IFS='|' read -r name arch owner note; do
+while IFS='|' read -r name arch owner note case_path; do
     [ -n "$name" ] || continue
+    case_spec=${case_path:-$name}
     log="$log_dir/$name.$arch.log"
     printf 'kernel-gate: %-28s %-8s ' "$name" "$arch"
     # stdin is /dev/null: neither cargo nor QEMU may consume the remaining case lines.
-    if cargo xtask qtest --case "$name" --arch "$arch" </dev/null >"$log" 2>&1; then
+    if cargo xtask qtest --case "$case_spec" --arch "$arch" </dev/null >"$log" 2>&1; then
         status=pass
         detail=ok
         printf 'pass\n'

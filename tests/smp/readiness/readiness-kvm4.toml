@@ -4,7 +4,9 @@
 name = "smp-readiness-kvm4"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 120
+# K556 measured budget: three warm runs 5804/4749/4503 ms. ceil(5.804 * 1.25) = 8 s,
+# + 5 s margin = 13 s; rounded to 15 s. The gate preflight holds load <= 5 and no competing QEMU.
+timeout_secs = 15
 pre = ["sh tests/smp/readiness/build.sh"]
 initfs = "build/smp/readiness/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
