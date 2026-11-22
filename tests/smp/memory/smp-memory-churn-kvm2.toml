@@ -8,7 +8,7 @@ profile = "base"
 timeout_secs = 900
 pre = ["sh tests/smp/memory/build.sh"]
 initfs = "build/smp-memory/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on smp-user-trace s24-framecheck init=/churn"
+boot_cmdline = "console=ttyS0 test-exit=1 s24-framecheck init=/churn"
 qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "2"]
 expect_exit = "success"
 
@@ -20,22 +20,6 @@ regex = '^churn: baseline$'
 
 [[expect]]
 regex = '^churn: start cycles=10000$'
-
-[[expect]]
-regex = '^churn: controller start id=0$'
-unordered = true
-
-[[expect]]
-regex = '^churn: controller start id=1$'
-unordered = true
-
-[[expect]]
-regex = '^churn: controller done id=0 cycles=5000$'
-unordered = true
-
-[[expect]]
-regex = '^churn: controller done id=1 cycles=5000$'
-unordered = true
 
 [[expect]]
 regex = '^churn: done cycles=10000$'

@@ -1140,9 +1140,13 @@ fn churn_cycle(mode: usize) -> Result<(), Errno> {
         child_stack_top(),
         mode,
     )?;
-    let _ = sys::handle_close(thread);
+    if let Err(error) = sys::handle_close(thread) {
+        println!("churn: FAIL close-thread errno={}", error.0);
+    }
     let code = proc_wait(child)?;
-    let _ = sys::handle_close(child);
+    if let Err(error) = sys::handle_close(child) {
+        println!("churn: FAIL close-child errno={}", error.0);
+    }
     if code == 0 {
         Ok(())
     } else {

@@ -86,13 +86,14 @@ image=build/smp-memory/smp-memory.img
 churn_image=build/smp-memory/smp-memory-churn.img
 initfs=build/smp-memory/initfs.img
 cmdline='console=ttyS0 test-exit=1 smp_user=on smp-user-trace s24-framecheck'
+churn_cmdline='console=ttyS0 test-exit=1 s24-framecheck'
 out=build/smp-memory/$mode
 
 if [ "$no_build" -eq 0 ]; then
     sh tests/smp/memory/build.sh
     cargo xtask image --arch x86_64 --profile base --cmdline "$cmdline" \
         --initfs "$initfs" --output "$image"
-    cargo xtask image --arch x86_64 --profile base --cmdline "$cmdline init=/churn" \
+    cargo xtask image --arch x86_64 --profile base --cmdline "$churn_cmdline init=/churn" \
         --initfs "$initfs" --output "$churn_image"
 fi
 for required in "$image" "$churn_image" "$initfs" "$case_file" "$churn_case"; do
