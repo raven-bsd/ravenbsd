@@ -172,6 +172,56 @@ fn the_window_size_is_shared_by_master_and_slave() {
 }
 
 #[test]
+fn a_winsize_change_signals_the_foreground_group_once() {
+    let mut pty = pty();
+    pty.set_fg(42);
+    let first = raven_tty_core::Winsize {
+        row: 43,
+        col: 120,
+        xpixel: 0,
+        ypixel: 0,
+    };
+    pty.set_winsize(first);
+    assert_eq!(pty.sys().signals, vec![(-42, SIGWINCH)]);
+    pty.set_winsize(first);
+    assert_eq!(pty.sys().signals, vec![(-42, SIGWINCH)]);
+    let second = raven_tty_core::Winsize {
+        row: 24,
+        col: 80,
+        xpixel: 640,
+        ypixel: 480,
+    };
+    pty.set_winsize(second);
+    assert_eq!(pty.sys().signals, vec![(-42, SIGWINCH), (-42, SIGWINCH)]);
+}
+
+#[test]
+fn a_winsize_change_without_a_foreground_group_signals_nothing() {
+    let mut pty = pty();
+    pty.set_winsize(raven_tty_core::Winsize {
+        row: 43,
+        col: 120,
+        xpixel: 0,
+        ypixel: 0,
+    });
+    assert!(pty.sys().signals.is_empty());
+}
+
+#[test]
+fn a_winsize_change_after_hangup_signals_nothing() {
+    let mut pty = pty();
+    pty.set_fg(42);
+    pty.hangup();
+    pty.set_winsize(raven_tty_core::Winsize {
+        row: 43,
+        col: 120,
+        xpixel: 0,
+        ypixel: 0,
+    });
+    assert!(pty.sys().signals.is_empty());
+}
+
+#[test]
 fn a_custom_verase_byte_edits_the_line() {
     let mut pty = pty();
     let mut want = raven_tty_core::Termios::sane();
