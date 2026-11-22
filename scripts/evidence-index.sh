@@ -89,10 +89,13 @@ size_of() {
     wc -c <"$1" | tr -d ' '
 }
 
-# Print the resolved path for a referenced artifact, or nothing when it does not exist.
-# A report path may be stale: K544's first pass only knew the flat evidence directory, while
-# most moved logs live under tickets/evidence/artifacts/<ticket>/. The lookup tries the direct
-# path, the ticket directory, the flat evidence directories, then a unique basename match.
+# Print "OK<TAB>path" when the referenced path exists as written, "MOVED<TAB>path" when it exists
+# under tickets/evidence/ after a relocation, or nothing when it does not exist.
+#
+# K558: K551 named reports that still point at the legacy product tests tree whose "evidence"
+# component moved to tickets/evidence/ in management. Such a path is rewritten to
+# tickets/evidence/<rest> and reported as MOVED. The lookup also tries the direct path, the ticket
+# directory, the flat evidence directories, then a unique basename match (also MOVED).
 resolve_path() {
     ticket=$1
     token=$2
@@ -100,15 +103,35 @@ resolve_path() {
     case $token in
         tickets/evidence/*)
             if [ -f "$MGMT/$token" ]; then
-                printf '%s' "$MGMT/$token"
+                printf 'OK\t%s' "$MGMT/$token"
                 return 0
             fi
+            ;;
+        tests/*)
+            rest=${token#tests/}
+            if [ "${rest%%/*}" = "evidence" ]; then
+                legacy=${rest#evidence/}
+                if [ -f "$ROOT/$token" ]; then
+                    printf 'OK\t%s' "$ROOT/$token"
+                    return 0
+                fi
+                if [ -f "$MGMT/tickets/evidence/$legacy" ]; then
+                    printf 'MOVED\t%s' "$MGMT/tickets/evidence/$legacy"
+                    return 0
+                fi
+            fi
+            for candidate in "$MGMT/$token" "$ROOT/$token"; do
+                if [ -f "$candidate" ]; then
+                    printf 'OK\t%s' "$candidate"
+                    return 0
+                fi
+            done
             ;;
         /*) ;;
         *)
             for candidate in "$MGMT/$token" "$ROOT/$token"; do
                 if [ -f "$candidate" ]; then
-                    printf '%s' "$candidate"
+                    printf 'OK\t%s' "$candidate"
                     return 0
                 fi
             done
@@ -116,14 +139,14 @@ resolve_path() {
     esac
     for candidate in "$EVIDENCE/artifacts/$ticket/$base" "$EVIDENCE/artifacts/$base" "$EVIDENCE/$base"; do
         if [ -f "$candidate" ]; then
-            printf '%s' "$candidate"
+            printf 'MOVED\t%s' "$candidate"
             return 0
         fi
     done
     matches=$(find "$EVIDENCE" -type f -name "$base" 2>/dev/null || true)
     count=$(printf '%s\n' "$matches" | grep -c . || true)
     if [ "$count" -eq 1 ]; then
-        printf '%s' "$matches"
+        printf 'MOVED\t%s' "$matches"
     fi
     return 0
 }
@@ -132,6 +155,7 @@ resolve_path() {
 path_like() {
     printf '%s' "$1" | awk '
         length($0) == 0 { exit 1 }
+        /\/$/ { exit 1 }
         /[ \t<>|$(),;*[]/ { exit 1 }
         /:[0-9]+(-[0-9]+)?$/ { exit 1 }
         /^(~|\/proc|\/sys|\/dev\/)/ { exit 1 }
@@ -272,9 +296,11 @@ audit_root() {
         missing_here=0
         while IFS= read -r token; do
             [ -n "$token" ] || continue
-            resolved=$(resolve_path "$ticket" "$token")
-            if [ -n "$resolved" ]; then
-                printf '%s\t%s\tOK\n' "$token" "$resolved" >>"$resolved_list"
+            resolution=$(resolve_path "$ticket" "$token")
+            if [ -n "$resolution" ]; then
+                state=$(printf '%s' "$resolution" | cut -f1)
+                resolved=$(printf '%s' "$resolution" | cut -f2)
+                printf '%s\t%s\t%s\n' "$token" "$resolved" "$state" >>"$resolved_list"
             else
                 missing_here=$((missing_here + 1))
                 printf '%s\t-\tMISSING\n' "$token" >>"$resolved_list"
@@ -300,7 +326,7 @@ audit_root() {
         emitted=0
         while IFS='	' read -r token resolved state; do
             [ -n "$token" ] || continue
-            if [ "$state" = "OK" ]; then
+            if [ "$state" = "OK" ] || [ "$state" = "MOVED" ]; then
                 bytes=$(size_of "$resolved")
                 mtime=$(stat -c %Y "$resolved")
                 sum=$(cache_lookup "$resolved" "$bytes" "$mtime")
@@ -319,7 +345,7 @@ audit_root() {
                 printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                     "$ticket" "$lane" "$result" "$evidence_state" "$completeness" \
                     "$trace_rows" "$partial_rows" "$report" "$report_sha" "$report_bytes" \
-                    "$token" "$sum" "$bytes" OK >>"$rows"
+                    "$token" "$sum" "$bytes" "$state" >>"$rows"
             else
                 printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                     "$ticket" "$lane" "$result" "$evidence_state" "$completeness" \
@@ -373,13 +399,14 @@ audit_root() {
     complete=$(awk -F'\t' '$5 == "COMPLETE" { print $1 }' "$rows" | sort -u | wc -l | tr -d ' ')
     done_missing=$(awk -F'\t' '$5 == "MISSING" { print $1 }' "$rows" | sort -u | wc -l | tr -d ' ')
     missing_artifacts=$(awk -F'\t' '$NF == "MISSING" && $11 != "-" { count++ } END { print count + 0 }' "$rows")
+    moved_artifacts=$(awk -F'\t' '$NF == "MOVED" && $11 != "-" { count++ } END { print count + 0 }' "$rows")
     partial_claims=$(grep -c 'claims COMPLETE but row' "$failures_sorted" || true)
     warning_count=$(wc -l <"$warnings_sorted" | tr -d ' ')
     failure_count=$(wc -l <"$failures_sorted" | tr -d ' ')
 
-    printf 'evidence-index: tickets=%s reports=%s done=%s complete=%s done-missing-evidence=%s missing-artifacts=%s partial-claims=%s warnings=%s failures=%s\n' \
+    printf 'evidence-index: tickets=%s reports=%s done=%s complete=%s done-missing-evidence=%s missing-artifacts=%s moved-artifacts=%s partial-claims=%s warnings=%s failures=%s\n' \
         "$indexed" "$reports" "$done_reports" "$complete" "$done_missing" \
-        "$missing_artifacts" "$partial_claims" "$warning_count" "$failure_count"
+        "$missing_artifacts" "$moved_artifacts" "$partial_claims" "$warning_count" "$failure_count"
 
     if [ "$mode" = "collect" ]; then
         mkdir -p "$EVIDENCE"
@@ -481,6 +508,24 @@ Result: BLOCKED
 EOF
     }
 
+    write_moved() {
+        legacy="tests/$(printf 'evidence')/group-a/dup.log"
+        cat >"$tmp/moved/tickets/steve/reports/K905.md" <<EOF
+# K905 report
+Directive rev: 1
+Result: DONE
+
+## Evidence (ASPICE/ASIL)
+
+| ID | Requirement | Test | Result |
+|---|---|---|---|
+| K905-R01 | old product evidence path | \`$legacy\` | PASS |
+EOF
+        mkdir -p "$tmp/moved/tickets/evidence/group-a" "$tmp/moved/tickets/evidence/group-b"
+        printf 'moved\n' >"$tmp/moved/tickets/evidence/group-a/dup.log"
+        printf 'decoy\n' >"$tmp/moved/tickets/evidence/group-b/dup.log"
+    }
+
     expect_fail() {
         name=$1
         root=$2
@@ -499,7 +544,7 @@ EOF
         printf 'ok self-test %s: %s\n' "$name" "$pattern"
     }
 
-    for name in good noev noart partial warn; do
+    for name in good noev noart partial warn moved; do
         make_root "$tmp/$name"
     done
     write_good
@@ -507,6 +552,7 @@ EOF
     write_missing_artifact
     write_complete_partial
     write_warning
+    write_moved
 
     output=$WORK/self-good
     if ! RAVEN_MGMT_ROOT=$tmp/good sh "$0" >"$output" 2>&1; then
@@ -544,6 +590,20 @@ EOF
         status=1
     else
         printf 'ok self-test warn: non-DONE warns and exits zero\n'
+    fi
+
+    output=$WORK/self-moved
+    if ! RAVEN_MGMT_ROOT=$tmp/moved sh "$0" >"$output" 2>&1; then
+        printf 'FAIL self-test moved: a relocated artifact must resolve\n'
+        status=1
+    elif ! grep -q 'moved-artifacts=1' "$output"; then
+        printf 'FAIL self-test moved: expected one MOVED artifact\n'
+        status=1
+    elif ! grep -q 'MOVED' "$tmp/moved/tickets/evidence/INDEX.tsv"; then
+        printf 'FAIL self-test moved: INDEX.tsv does not say MOVED\n'
+        status=1
+    else
+        printf 'ok self-test moved: old product evidence path resolves as MOVED\n'
     fi
 
     return "$status"
