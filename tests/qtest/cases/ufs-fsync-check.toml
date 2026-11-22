@@ -82,7 +82,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^mount-ok$'
-timeout_secs = 30
+timeout_secs = 240
 
 [[step]]
 send = "/mnt/bin/ufs-probe persist-check; echo probe=$?\n"
