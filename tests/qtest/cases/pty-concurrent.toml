@@ -33,35 +33,35 @@ regex = '^pty-concurrent: pair A/B done$'
 regex = '^pty-concurrent: idle_ms=5000 blocked=8$'
 
 [[expect]]
-regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$'
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
-regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$'
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
-regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$'
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
-regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$'
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
-regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$'
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
-regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$'
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
-regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$'
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
 unordered = true
 
 [[expect]]
-regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$'
+regex = '^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
 unordered = true
 
 [[expect]]

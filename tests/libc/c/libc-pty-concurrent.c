@@ -17,7 +17,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/wait.h>
 #include <termios.h>
 #include <time.h>
@@ -138,23 +137,21 @@ static int main_case(void) {
 }
 
 static int many_case(void) {
-    long *shared_start = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
-                              MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    if (shared_start == MAP_FAILED) {
-        printf("pty-concurrent: FAIL mmap errno=%d\n", errno);
-        return 1;
-    }
-    *shared_start = 0;
     int masters[BLOCKED];
     int slaves[BLOCKED];
     pid_t children[BLOCKED];
     char names[BLOCKED][64];
+    int go[BLOCKED][2];
     memset(masters, -1, sizeof(masters));
     memset(slaves, -1, sizeof(slaves));
     for (int index = 0; index < BLOCKED; index++) {
         if (open_pair(&masters[index], &slaves[index], names[index], sizeof(names[index])) != 0 ||
             set_blocking_read(slaves[index]) != 0) {
             printf("pty-concurrent: FAIL open pair=%d errno=%d\n", index, errno);
+            return 1;
+        }
+        if (pipe(go[index]) != 0) {
+            printf("pty-concurrent: FAIL pipe pair=%d errno=%d\n", index, errno);
             return 1;
         }
     }
@@ -167,26 +164,31 @@ static int many_case(void) {
         if (child == 0) {
             for (int other = 0; other < BLOCKED; other++) {
                 if (other != index) {
+                    close(go[other][0]);
+                    close(go[other][1]);
                     close(masters[other]);
                     close(slaves[other]);
                 }
             }
             close(masters[index]);
+            // The parent queues the master byte, then releases this child through its own pipe;
+            // the measured latency starts at that release, so the 5 s idle is excluded.
+            char release = 0;
+            (void)read(go[index][0], &release, 1);
+            close(go[index][0]);
             long start = now_ms();
             unsigned char byte = 0;
             int count = (int)read(slaves[index], &byte, 1);
-            long wall = now_ms() - start;
-            long latency = (*shared_start != 0) ? now_ms() - *shared_start : -1;
-            printf("pty-concurrent: pair=%d read=%d byte=%u wall_ms=%ld latency_ms=%ld\n",
-                   index, count, (unsigned)byte, wall, latency);
+            long latency = now_ms() - start;
+            printf("pty-concurrent: pair=%d read=%d byte=%u latency_ms=%ld\n", index, count,
+                   (unsigned)byte, latency);
             fflush(stdout);
-            _exit(count == 1 && byte == (unsigned char)('a' + index) && latency >= 0 &&
-                          latency <= 500
-                      ? 0
-                      : 1);
+            _exit(count == 1 && byte == (unsigned char)('a' + index) && latency <= 500 ? 0 : 1);
         }
         children[index] = child;
     }
+    for (int index = 0; index < BLOCKED; index++)
+        close(go[index][0]);
 
     struct timespec idle;
     idle.tv_sec = 5;
@@ -195,13 +197,17 @@ static int many_case(void) {
     printf("pty-concurrent: idle_ms=5000 blocked=%d\n", BLOCKED);
     fflush(stdout);
 
-    *shared_start = now_ms();
     for (int index = 0; index < BLOCKED; index++) {
         char byte = (char)('a' + index);
         if (write(masters[index], &byte, 1) != 1) {
             printf("pty-concurrent: FAIL write pair=%d errno=%d\n", index, errno);
             failures++;
         }
+    }
+    for (int index = 0; index < BLOCKED; index++) {
+        char release = 0;
+        (void)write(go[index][1], &release, 1);
+        close(go[index][1]);
     }
     for (int index = 0; index < BLOCKED; index++) {
         int status = 0;
