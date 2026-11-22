@@ -25,7 +25,6 @@ OUT = ROOT / "build" / "fixtures" / "sshd-trace"
 IMAGE = OUT / "sshd-trace.img"
 SERIAL = OUT / "host-serial.log"
 CLIENT = OUT / "host-client.log"
-LOOP_LOG = OUT / "guest-loop.log"
 SUMMARY = OUT / "host-summary.txt"
 TAP = os.environ.get("RAVEN_TRACE_TAP", "ravetrace0")
 GUEST = os.environ.get("RAVEN_TRACE_GUEST", "10.0.2.15")
@@ -111,7 +110,7 @@ def main() -> int:
     if not IMAGE.is_file():
         log("error", f"missing {IMAGE}; run tests/fixtures/sshd-trace/build.sh")
         return 2
-    for path in (SERIAL, CLIENT, LOOP_LOG, SUMMARY):
+    for path in (SERIAL, CLIENT, SUMMARY):
         path.unlink(missing_ok=True)
     vars_path = OUT / "vars-host.fd"
     vars_path.write_bytes(OVMF_VARS.read_bytes())
@@ -166,15 +165,18 @@ def main() -> int:
         finally:
             child.close(force=True)
     text = SERIAL.read_text(encoding="utf-8", errors="replace")
-    connected = "Connection from" in text
+    tap_connected = "Connection from 10.0.2.2" in text
+    loop_connected = "Connection from 127.0.0.1" in text
     loop_ok = "sshd-trace-loop-ok" in text
     loop = "ok" if loop_ok else "missing"
     SUMMARY.write_text(
-        f"host_tap={tap}\ntap_tail={tap_tail}\nconnection_from={connected}\n"
-        f"guest_loop={loop}\naccept_probe={probe}\n",
+        f"host_tap={tap}\ntap_tail={tap_tail}\ntap_connection_from={tap_connected}\n"
+        f"loop_connection_from={loop_connected}\nguest_loop={loop}\n"
+        f"accept_probe={probe}\n",
         encoding="utf-8",
     )
-    log("summary", f"host_tap={tap} connection_from={connected} guest_loop={loop} "
+    log("summary", f"host_tap={tap} tap_connection_from={tap_connected} "
+                   f"loop_connection_from={loop_connected} guest_loop={loop} "
                    f"accept_probe={probe}")
     if not loop_ok:
         return 2
