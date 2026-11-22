@@ -534,14 +534,17 @@ def row_s3_finish(console: SerialConsole, state: dict[str, object]) -> None:
                f"(console root login failed); wrong exit {state['bad_exit']} (auth-passwd; C5/C9)")
         return
     mark = len(console.buffer)
-    console.send(b"cat /tmp/sshd.log\n")
-    console.wait_for(b"raven# ", 30, start=mark)
+    nonce = f"K434-DONE-{os.getpid()}"
+    console.send(f"cat /tmp/sshd.log; echo {nonce}\n".encode())
+    end = console.wait_for(b"\n" + nonce.encode(), 30, start=mark)
     wait_ms = (time.monotonic() - started) * 1000
-    segment = bytes(console.buffer[mark:]).decode("utf-8", "replace").replace("\r", "")
+    segment = bytes(console.buffer[mark:end if end > 0 else len(console.buffer)])
+    segment = segment.decode("utf-8", "replace").replace("\r", "")
     clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", segment)
     lines = [line.strip() for line in clean.splitlines() if line.strip()]
     log_lines = [line for line in lines
-                 if "cat /tmp/sshd.log" not in line and not line.startswith("raven#")]
+                 if "cat /tmp/sshd.log" not in line and nonce not in line
+                 and not line.startswith("raven#")]
     accepted = [line for line in log_lines if "Accepted password for raven " in line]
     observed = accepted[0] if accepted else (" | ".join(log_lines[-4:]) or "no log lines")
     attempt("S3-server-line", 1, "fresh",
