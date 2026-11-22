@@ -542,6 +542,34 @@ static int accept_one(int listener, const char *payload, const char *ack) {
     return 0;
 }
 
+static int check_listen_only(void) {
+    int listener;
+    struct sockaddr_in address;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        return fail("listen-only socket");
+    }
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(23099);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0) {
+        (void)close(listener);
+        return fail("listen-only bind");
+    }
+    errno = 0;
+    if (listen(listener, 2) != 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "bind ok, listen errno=%d", errno);
+        (void)close(listener);
+        return fail(detail);
+    }
+    (void)close(listener);
+    pass("bind ok listen ok");
+    return 0;
+}
+
 static int check_accept(void) {
     int listener;
     struct sockaddr_in address;
@@ -831,6 +859,10 @@ int main(int argc, char **argv) {
     }
     row = "K5";
     if (check_pty() != 0) {
+        return 1;
+    }
+    row = "K6-listen";
+    if (check_listen_only() != 0) {
         return 1;
     }
     row = "K6";
