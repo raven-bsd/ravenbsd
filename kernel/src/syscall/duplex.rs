@@ -48,6 +48,10 @@ pub const DUPLEX_PEERCRED: usize = 0x114;
 const SOL_SOCKET: u32 = 1;
 /// `SCM_RIGHTS` control type.
 const SCM_RIGHTS: u32 = 1;
+/// Returned in `msg_flags` when ancillary data did not fit (FreeBSD/NetBSD `MSG_CTRUNC`).
+const MSG_CTRUNC: u32 = 0x20;
+/// Requested full-length receive (FreeBSD/NetBSD `MSG_WAITALL`); refused, see [`recvmsg`].
+const MSG_WAITALL: u32 = 0x40;
 /// Bytes in one `DuplexMessage`.
 const MESSAGE_BYTES: usize = 40;
 /// Bytes in one control header.
@@ -205,18 +209,38 @@ pub fn sendmsg(frame: &SyscallFrame) -> Result<usize, Errno> {
 }
 
 /// `duplex_recvmsg(handle, msg)`.
+///
+/// A control buffer too small for the whole `SCM_RIGHTS` record is not an error: the data is
+/// delivered, the record is dropped and `MSG_CTRUNC` is returned, matching the donor copyout rule
+/// (NetBSD `sys/kern/uipc_syscalls.c:867`, FreeBSD `sys/kern/uipc_syscalls.c:1020`). `MSG_WAITALL`
+/// is refused with `EOPNOTSUPP`: the raw receive path returns the queued chunk and cannot hold a
+/// partial message open, and FreeBSD's 2026 `MSG_WAITALL`-with-ancillary behaviour is a known
+/// disagreement, so refusing is the documented rule (no partial-ancillary delivery).
 pub fn recvmsg(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let end = endpoint(&caller, handle, Rights::READ)?;
     let mut message = read_message(frame.rsi)?;
+    if message.flags & MSG_WAITALL != 0 {
+        return Err(Errno::EOPNOTSUPP);
+    }
     if message.flags != 0 {
         return Err(Errno::EINVAL);
     }
     let control_capacity = usize::try_from(message.control_len).map_err(|_| Errno::EMSGSIZE)?;
     let data = user_slice(message.data, message.data_len)?;
-    let (copied, handles) = duplex::recv(&end, data, control_capacity)?;
-    let installed = install_handles(&caller, handles)?;
+    // Let the queue hand over the whole record even when the caller's buffer is smaller; the
+    // donor consumes the data and only then truncates the ancillary copy. The queue's own limit
+    // is the largest legal send control buffer, so a legal record is never rejected there.
+    let (copied, handles) = duplex::recv(&end, data, duplex::DUPLEX_CONTROL_MAX)?;
+    let (installed, truncated) = if control_bytes(handles.len()) > control_capacity {
+        // Whole records only: a partial SCM_RIGHTS record would name an installed handle the
+        // caller cannot see. Dropping the pending handles releases their endpoint references.
+        drop(handles);
+        (Vec::new(), true)
+    } else {
+        (install_handles(&caller, handles)?, false)
+    };
     if let Err(error) = write_control(&message, &installed) {
         close_installed(&caller, &installed);
         return Err(error);
@@ -224,6 +248,7 @@ pub fn recvmsg(frame: &SyscallFrame) -> Result<usize, Errno> {
     message.control_len =
         u64::try_from(control_bytes(installed.len())).map_err(|_| Errno::EINVAL)?;
     message.handle_count = u32::try_from(installed.len()).map_err(|_| Errno::EMSGSIZE)?;
+    message.flags = if truncated { MSG_CTRUNC } else { 0 };
     if let Err(error) = write_message(frame.rsi, &message) {
         // The caller cannot learn the installed handle values, so leaving them open would make
         // them unreachable. Close them exactly like the control write-back failure path.
