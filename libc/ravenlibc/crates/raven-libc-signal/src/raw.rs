@@ -27,6 +27,47 @@ const SIG_SETUP: usize = 0x80;
 /// `THREAD_KICK(thread, bits) -> 0` (committed raw 0x81).
 #[cfg(target_os = "none")]
 const THREAD_KICK: usize = 0x81;
+/// `PROC_SIGRECV_EX(out, flags, deliverable) -> signo` (six-word output).
+#[cfg(target_os = "none")]
+const PROC_SIGRECV_EX: usize = 0x85;
+/// `PROC_SIGQUEUE(target, signo, value) -> 0`.
+#[cfg(target_os = "none")]
+const PROC_SIGQUEUE: usize = 0x86;
+/// `PROC_SIGRECV_EX` flag: select only signals whose bit is in the deliverable mask.
+#[cfg(target_os = "none")]
+const SIGRECV_DELIVERABLE: u32 = 2;
+
+/// Receive one queued process signal, selecting only a deliverable one.
+///
+/// The kernel leaves every signal outside `deliverable` queued, so a masked signal is never
+/// consumed by this thread (K443). The six words are
+/// `[signo, sender_pid, si_code, si_uid, si_value, 0]`.
+#[cfg(target_os = "none")]
+pub fn proc_sigrecv_ex(words: &mut [u64; 6], deliverable: u64) -> Result<i32, Errno> {
+    // SAFETY: the kernel writes exactly six u64 words into `words`; the other arguments are
+    // scalars.
+    let result = unsafe {
+        raven_libc_sys::arch::syscall3(
+            PROC_SIGRECV_EX,
+            words.as_mut_ptr() as usize,
+            (raven_libc_sys::signal::WNOHANG | SIGRECV_DELIVERABLE) as usize,
+            deliverable as usize,
+        )
+    };
+    raven_libc_sys::errno::ret_i32(result).map_err(|error| Errno(error.0))
+}
+
+/// Queue `value` with `sig` for `pid` through the kernel's `SI_QUEUE` record.
+#[cfg(target_os = "none")]
+pub fn proc_sigqueue(pid: i32, sig: i32, value: u64) -> Result<(), Errno> {
+    // SAFETY: PROC_SIGQUEUE takes three scalar arguments and the kernel validates the target.
+    let result = unsafe {
+        raven_libc_sys::arch::syscall3(PROC_SIGQUEUE, pid as usize, sig as usize, value as usize)
+    };
+    raven_libc_sys::errno::ret(result)
+        .map(|_| ())
+        .map_err(|error| Errno(error.0))
+}
 
 #[cfg(target_arch = "aarch64")]
 mod context_aarch64;
@@ -74,25 +115,88 @@ pub const JMP_SS_MASK_PTR: usize = 280;
 /// The shell registers the offset returned by [`signal_context_area`] at run time; this
 /// constant is the host/fixture default.
 pub const SIG_CTX_AREA_OFFSET: usize = 4096;
+/// `SIG_SETUP` flag: the second argument is an absolute address (K443).
+pub const SIG_SETUP_ABS: u32 = 2;
+/// The ABI page size used for a dedicated context window.
+const CONTEXT_PAGE: usize = 4096;
 
-/// Locate the kernel context window for a main thread whose TLS image is `tp`.
+/// Where one thread's kernel signal context window lives.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ContextArea {
+    /// The unused tail of the builtin TLS page (TLS-relative).
+    Relative {
+        /// The context address inside the builtin buffer.
+        context: usize,
+        /// `context - tp`.
+        offset: usize,
+    },
+    /// A dedicated page, registered by absolute address.
+    Absolute {
+        /// The page address.
+        context: usize,
+    },
+}
+
+impl ContextArea {
+    /// The address of the `mcontext_t` window.
+    #[must_use]
+    pub const fn context(self) -> usize {
+        match self {
+            Self::Relative { context, .. } | Self::Absolute { context } => context,
+        }
+    }
+
+    /// The second `SIG_SETUP` argument (offset or absolute address).
+    #[must_use]
+    pub const fn argument(self) -> usize {
+        match self {
+            Self::Relative { offset, .. } => offset,
+            Self::Absolute { context } => context,
+        }
+    }
+
+    /// The `SIG_SETUP` flags.
+    #[must_use]
+    pub const fn flags(self) -> u32 {
+        match self {
+            Self::Relative { .. } => 0,
+            Self::Absolute { .. } => SIG_SETUP_ABS,
+        }
+    }
+}
+
+/// Locate the kernel context window for a thread whose TLS pointer is `tp`.
 ///
 /// The builtin TLS buffer is one page and the TCB is placed inside it. The bytes after the TCB
 /// are unused padding, so the `mcontext_t` + `FaultRecord` window can live there without
-/// overwriting `SigThreadState` (which occupies `Pthread.sig_private`). A program whose TLS
-/// layout fills the page has no such tail; it gets `None` and the shell reports `ENOMEM` instead
-/// of registering an area that would fault.
+/// overwriting `SigThreadState` (which occupies `Pthread.sig_private`).
+///
+/// A thread with its own TLS mapping (a `pthread_create` stack, or a main thread whose static
+/// layout exceeds the builtin page) has no such tail: its TLS block ends at the TCB and the TSD
+/// array follows. For that case the function maps a dedicated read-write page and returns it as
+/// an absolute area. The kernel validates and registers the address; the page is per registered
+/// thread (K443).
 #[must_use]
-pub fn signal_context_area(tp: usize) -> Option<(usize, usize)> {
+pub fn signal_context_area(tp: usize) -> Option<ContextArea> {
+    let needed = core::mem::size_of::<McontextT>()
+        .checked_add(core::mem::size_of::<crate::kernel::FaultRecord>())?;
     let base = raven_libc_tls::raw::BUILTIN_TLS.as_ptr() as usize;
     let end = base.checked_add(raven_libc_tls::raw::BUILTIN_TLS.capacity())?;
+    if let Some((context, offset)) = builtin_context(tp, base, end, needed) {
+        return Some(ContextArea::Relative { context, offset });
+    }
+    let len = needed.checked_add(CONTEXT_PAGE - 1)? & !(CONTEXT_PAGE - 1);
+    let page = raven_libc_sys::pages::SysPageProvider::new().map_pages(len, 16, 3)?;
+    Some(ContextArea::Absolute { context: page })
+}
+
+/// The builtin-page plan for `tp`, or `None` when `tp` is not inside the builtin buffer.
+fn builtin_context(tp: usize, base: usize, end: usize, needed: usize) -> Option<(usize, usize)> {
     let context = tp
         .checked_add(core::mem::size_of::<tcb::Pthread>())?
         .checked_add(15)?
         & !15;
-    let needed = core::mem::size_of::<McontextT>()
-        .checked_add(core::mem::size_of::<crate::kernel::FaultRecord>())?;
-    if context < tp || context.checked_add(needed)? > end {
+    if tp < base || context.checked_add(needed)? > end {
         return None;
     }
     Some((context, context.checked_sub(tp)?))

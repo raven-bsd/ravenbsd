@@ -7,15 +7,11 @@
 //! `__rl_entry_fn`. The shell owns the disposition table, so this wrapper is the function that
 //! binds the stub to `signal_entry` and the process table.
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
 use raven_libc_abi::errno::Errno;
 use raven_libc_signal::kernel::FaultRecord;
 use raven_libc_signal::{ENOMEM_ERR, SigKernel, SysKernel, raw, signal_entry};
 
 use super::DISP;
-
-static INSTALLED: AtomicBool = AtomicBool::new(false);
 
 /// The C-ABI body called by `__raven_sigentry` with `(bits, fault_record)`.
 unsafe extern "C" fn shell_signal_entry(bits: usize, fault: *const FaultRecord) -> ! {
@@ -29,22 +25,24 @@ unsafe extern "C" fn shell_signal_entry(bits: usize, fault: *const FaultRecord) 
     signal_entry(&SysKernel::new(), &DISP, bits as u32, fault)
 }
 
-/// Register the entry with the kernel on the first handler installation.
+/// Register the entry with the kernel for the calling thread.
 ///
-/// The disposition table itself is always usable; only asynchronous delivery needs PG-7.
+/// `SIG_SETUP` is per thread, so this runs once per thread that can receive a signal. The
+/// disposition table itself is always usable; only asynchronous delivery needs PG-7. A thread
+/// with a mapped TLS block gets a dedicated absolute context page (K443); the builtin main-thread
+/// TLS keeps the tail of its page.
 pub(crate) fn ensure_entry() -> Result<(), Errno> {
-    if INSTALLED.load(Ordering::Acquire) {
-        return Ok(());
-    }
     #[cfg(target_os = "none")]
     {
         let kernel = SysKernel::new();
         let tp = kernel.thread_pointer();
-        let (context, offset) = raw::signal_context_area(tp).ok_or(ENOMEM_ERR)?;
-        raw::set_ctx_area(tp, context);
+        if raw::with_state(tp, |state| state.ctx_area()) != 0 {
+            return Ok(());
+        }
+        let area = raw::signal_context_area(tp).ok_or(ENOMEM_ERR)?;
+        raw::set_ctx_area(tp, area.context());
         raw::set_entry_function(shell_signal_entry as *const () as usize);
-        kernel.sig_setup(raw::sigentry_address(), offset, 0)?;
+        kernel.sig_setup(raw::sigentry_address(), area.argument(), area.flags())?;
     }
-    INSTALLED.store(true, Ordering::Release);
     Ok(())
 }

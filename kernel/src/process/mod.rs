@@ -128,6 +128,13 @@ pub struct ProcessIds {
 /// Maximum supplementary groups stored by this slice.
 pub const MAX_GROUPS: usize = 16;
 
+/// `si_code` of a child status change (`CLD_EXITED`).
+pub const CLD_EXITED_CODE: u32 = 1;
+/// `si_code` of a plain user signal (`SI_USER`).
+pub const SI_USER_CODE: u32 = 0;
+/// `si_code` of a queued signal (`SI_QUEUE`; the C value is `-1`).
+pub const SI_QUEUE_CODE: u32 = u32::MAX;
+
 /// One queued process signal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PendingSignal {
@@ -135,6 +142,12 @@ pub struct PendingSignal {
     pub signo: u32,
     /// Sender pid.
     pub sender: u64,
+    /// `si_code` (`SI_USER`, `SI_QUEUE` or `CLD_EXITED`).
+    pub code: u32,
+    /// Sender real uid (`si_uid`).
+    pub uid: u32,
+    /// Queued `sigval` payload (`si_value`).
+    pub value: u64,
 }
 
 impl ProcessIds {
@@ -701,6 +714,21 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
 
 /// Deliver one signal with POSIX job-control semantics.
 pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<(), Errno> {
+    deliver_signal_info(target, signo, sender, SI_USER_CODE, 0, 0)
+}
+
+/// Deliver one signal with an explicit `siginfo_t` payload.
+///
+/// The stop/continue bookkeeping is identical to [`deliver_signal`]; only the queued record
+/// differs. `PROC_SIGQUEUE` uses `SI_QUEUE` plus the sender uid and the `sigval` payload.
+pub fn deliver_signal_info(
+    target: &Arc<Process>,
+    signo: u32,
+    sender: u64,
+    code: u32,
+    uid: u32,
+    value: u64,
+) -> Result<(), Errno> {
     if status::is_stop_signal(signo) {
         if target.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
             target.stop_reported.store(false, Ordering::Release);
@@ -713,11 +741,11 @@ pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<
             target.continued.store(true, Ordering::Release);
             target.stop_reported.store(false, Ordering::Release);
         }
-        target.queue_signal(status::SIGCONT, sender);
+        target.queue_signal_info(status::SIGCONT, sender, code, uid, value);
         notify_parent(target, false);
         return Ok(());
     }
-    target.queue_signal(signo, sender);
+    target.queue_signal_info(signo, sender, code, uid, value);
     Ok(())
 }
 
@@ -793,9 +821,22 @@ impl Process {
     /// `THREAD_KICK` bit 0 makes the return-to-user path resume at the registered entry, and an
     /// interruptible wait (`ppoll`, `read`, `waitpid`) returns `EINTR` so the handler can run.
     pub fn queue_signal(&self, signo: u32, sender: u64) {
-        self.pending_signals
-            .lock()
-            .push_back(PendingSignal { signo, sender });
+        self.queue_signal_info(signo, sender, SI_USER_CODE, 0, 0);
+    }
+
+    /// Queue a signal carrying the `siginfo_t` fields the kernel owns.
+    ///
+    /// The kernel stores the sender pid, `si_code`, sender uid and the queued `sigval`; it never
+    /// interprets the signal disposition. `PROC_SIGRECV` hands the fields back to libc, which
+    /// owns the user pending set and constructs the public `siginfo_t`.
+    pub fn queue_signal_info(&self, signo: u32, sender: u64, code: u32, uid: u32, value: u64) {
+        self.pending_signals.lock().push_back(PendingSignal {
+            signo,
+            sender,
+            code,
+            uid,
+            value,
+        });
         self.signal_waiters.wake_all();
         self.kick_threads();
     }
@@ -828,9 +869,35 @@ impl Process {
         self.pending_signals.lock().pop_front()
     }
 
+    /// Remove and return the oldest queued signal matching `predicate`, leaving the rest in
+    /// order.
+    ///
+    /// This is the masked-signal contract: a signal the calling thread blocks is not selected,
+    /// so it stays queued for a thread (or a later unmask) that accepts it (Illumos `fsig`,
+    /// FreeBSD `sigtd`, NetBSD `sigismasked`). No pop/requeue window exists.
+    pub fn pop_signal_where(
+        &self,
+        mut predicate: impl FnMut(&PendingSignal) -> bool,
+    ) -> Option<PendingSignal> {
+        let mut pending = self.pending_signals.lock();
+        let index = pending.iter().position(|signal| predicate(signal))?;
+        pending.remove(index)
+    }
+
     /// True when at least one signal is queued.
     pub fn has_pending_signal(&self) -> bool {
         !self.pending_signals.lock().is_empty()
+    }
+
+    /// True when at least one queued signal matches `predicate`.
+    pub fn has_pending_signal_where(
+        &self,
+        mut predicate: impl FnMut(&PendingSignal) -> bool,
+    ) -> bool {
+        self.pending_signals
+            .lock()
+            .iter()
+            .any(|signal| predicate(signal))
     }
 }
 
@@ -873,7 +940,8 @@ pub fn notify_parent(process: &Process, sigchld: bool) {
         parent
             .child_user_ns
             .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
-        parent.queue_signal(SIGCHLD, process.id);
+        let uid = process.ids.lock().uid;
+        parent.queue_signal_info(SIGCHLD, process.id, CLD_EXITED_CODE, uid, 0);
     }
     parent.child_waiters.wake_all();
 }

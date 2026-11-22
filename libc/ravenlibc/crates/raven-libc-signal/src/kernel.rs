@@ -9,9 +9,7 @@
 //! invented here: `SIGRETURN` 0x82 and the kick bits are the labelled PROPOSED PG-7 values.
 
 use raven_libc_abi::errno::Errno;
-#[cfg(target_os = "none")]
-use raven_libc_abi::generated::signal;
-use raven_libc_abi::structs::SiginfoT;
+use raven_libc_abi::structs::{SiginfoT, Sigval};
 
 use crate::errors::{EINVAL_ERR, ENOSYS_ERR, ETIMEDOUT_ERR};
 use crate::raw;
@@ -160,6 +158,20 @@ pub trait SigKernel: Sync {
     fn terminate(&self, sig: i32, core: bool) -> !;
 }
 
+/// Build the libc `siginfo_t` from the six-word `PROC_SIGRECV_EX` record.
+///
+/// The record is `[signo, sender_pid, si_code, si_uid, si_value, 0]`; the kernel owns those
+/// fields and libc owns the public layout.
+#[must_use]
+pub fn process_siginfo(words: &[u64; 6]) -> (i32, SiginfoT) {
+    let signo = words[0] as i32;
+    let mut info = crate::frame::make_siginfo(signo, words[2] as i32);
+    crate::frame::set_si_pid(&mut info, words[1] as i32);
+    crate::frame::set_si_uid(&mut info, words[3] as u32);
+    crate::frame::set_si_value(&mut info, Sigval { bytes: [words[4]] });
+    (signo, info)
+}
+
 /// The production implementation over `raven-libc-sys`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SysKernel;
@@ -209,6 +221,10 @@ impl SigKernel for SysKernel {
     }
 
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno> {
+        // `Pthread.handle == 0` means the calling thread (the main thread never takes a kernel
+        // object handle). THREAD_KICK spells that `Handle::NONE` (`u32::MAX`); passing 0 would
+        // ask for the process handle and fail with `EBADF` (K443).
+        let handle = if handle == 0 { u32::MAX } else { handle };
         raw::kick(handle, bits)
     }
 
@@ -224,11 +240,15 @@ impl SigKernel for SysKernel {
     fn proc_kill(&self, pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
         #[cfg(target_os = "none")]
         {
-            // The commit queue carries no siginfo payload; `kill`/`killpg` use the plain call.
-            if info.is_some() {
-                return Err(ENOSYS_ERR);
+            match info {
+                // `kill`/`killpg` carry no payload: the plain queue entry (`SI_USER`) is enough.
+                None => {
+                    raven_libc_sys::signal::proc_signal(pid, sig).map_err(|error| Errno(error.0))
+                }
+                // `sigqueue` carries `si_value`; the kernel stamps `SI_QUEUE`, the sender pid and
+                // the sender uid, and `PROC_SIGRECV_EX` returns them to the handler.
+                Some(info) => raw::proc_sigqueue(pid, sig, crate::frame::si_value(info).bytes[0]),
             }
-            raven_libc_sys::signal::proc_signal(pid, sig).map_err(|error| Errno(error.0))
         }
         #[cfg(not(target_os = "none"))]
         {
@@ -239,27 +259,14 @@ impl SigKernel for SysKernel {
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)> {
         #[cfg(target_os = "none")]
         {
-            let mut words = [0u64; 3];
-            let result =
-                raven_libc_sys::signal::proc_sigrecv(&mut words, raven_libc_sys::signal::WNOHANG);
-            let signo = result.ok()?;
-            if signo <= 0 {
+            // The kernel selects only a signal whose bit is in `deliverable` and leaves every
+            // masked signal queued (no pop/requeue window). The six-word record carries the
+            // kernel-owned `siginfo_t` fields, including a `sigqueue` payload.
+            let mut words = [0u64; 6];
+            if raw::proc_sigrecv_ex(&mut words, deliverable).ok()? <= 0 {
                 return None;
             }
-            let bit = 1u64.wrapping_shl((signo as u32).wrapping_sub(1) & 63);
-            if deliverable & bit == 0 {
-                // The kernel queue has no peek/requeue operation. A masked signal stays out of
-                // this entry; `sigprocmask` re-raises the thread pending set when it unmask.
-                return None;
-            }
-            let code = if signo == signal::SIGCHLD as i32 {
-                signal::CLD_EXITED
-            } else {
-                signal::SI_USER
-            };
-            let mut info = crate::frame::make_siginfo(signo, code);
-            crate::frame::set_si_pid(&mut info, words[1] as i32);
-            Some((signo, info))
+            Some(process_siginfo(&words))
         }
         #[cfg(not(target_os = "none"))]
         {

@@ -12,6 +12,10 @@ use raven_libc_signal::{SigSet, maskops};
 /// `set`/`old` are NULL or point to `sigset_t`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigprocmask(how: c_int, set: *const SigSet, old: *mut SigSet) -> c_int {
+    if let Err(error) = super::ensure_entry() {
+        crate::ffi::errno::set(error);
+        return -1;
+    }
     let s = if set.is_null() {
         None
     } else {
