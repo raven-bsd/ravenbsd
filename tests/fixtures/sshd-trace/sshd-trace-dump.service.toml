@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K498 trace-only service: after the host client has had time to connect, copy
+# the sshd DEBUG3 log to the serial console. This avoids the slow brush line
+# editor and keeps the guest log extraction independent of the SSH path under
+# test. The service is test-only and never installed in the product profile.
+
+name = "sshd-trace-dump"
+exec = "/bin/brush"
+args = ["/bin/brush", "-c", "sleep 40; echo sshd-trace-dump: begin > /dev/console; cat /tmp/sshd-trace.log > /dev/console; echo sshd-trace-dump: end > /dev/console"]
+needs = ["sshd"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

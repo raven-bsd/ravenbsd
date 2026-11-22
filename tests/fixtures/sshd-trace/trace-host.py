@@ -3,11 +3,11 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 """K498 host-client sshd session-close trace over the isolated tap.
 
-Boots the K498 DEBUG3 image with a private tap and a pty serial, logs in to the
-root console, makes one password login and one command from the host (the K194
-tap path; slirp hostfwd is the known FIN/RST failure), then reads the sshd debug
-log from the console. The first session's close state is recorded: a command
-that prints and then never closes is the S7/S5 symptom.
+Boots the K498 DEBUG3 image with a private tap, makes one password login and
+one command from the host (the K194 tap path; slirp hostfwd is the known
+FIN/RST failure), and lets the trace-only `sshd-trace-dump` service copy the
+full sshd debug log to the serial. The first session's close state is recorded:
+a command that prints and then never closes is the S7/S5 symptom.
 """
 
 from __future__ import annotations
@@ -108,44 +108,35 @@ def main() -> int:
     ]
     child = pexpect.spawn("qemu-system-x86_64", argv, cwd=str(ROOT),
                           encoding="utf-8", codec_errors="replace", timeout=240)
-    first = "none"
-    second = "none"
-    console = "none"
+    first = "not-run"
+    dumped = "timeout"
     with open(SERIAL, "w", encoding="utf-8") as serial:
         child.logfile = serial
         try:
-            child.expect("svcd: getty up", timeout=240)
-            child.expect(r"login: ?", timeout=120)
-            child.sendline("root")
-            child.expect(r"(?i)password: ?", timeout=30)
-            child.sendline("raven")
-            child.expect("raven# ", timeout=120)
-            log("console", "root login")
-            if not wait_tcp(GUEST, 22, 90):
+            if not wait_tcp(GUEST, 22, 120):
                 log("error", f"guest sshd did not accept on {GUEST}:22")
                 return 2
             log("ready", f"{GUEST}:22")
             first = ssh(GUEST, "echo sshd-trace-command-ok", CLIENT1, 20,
                         "sshd-trace-command-ok")
             log("client1", first)
-            second = ssh(GUEST, "cat /tmp/sshd-trace.log", SERVER_LOG, 20,
-                         "Server listening")
-            log("client2", second)
-            child.sendline("cat /tmp/sshd-trace.log; M=Q; echo ${M}L")
             try:
-                child.expect("QL", timeout=120)
-                console = "log-read"
+                child.expect("sshd-trace-dump: end", timeout=120)
+                dumped = "collected"
             except pexpect.TIMEOUT:
-                console = "log-timeout"
-            log("console", console)
-            SUMMARY.write_text(
-                f"client1={first}\nclient2={second}\nconsole={console}\n",
-                encoding="utf-8",
-            )
+                dumped = "timeout"
+            log("dump", dumped)
         finally:
             child.close(force=True)
-    if "command-ok" not in first:
-        log("error", f"client1 state {first}")
+    text = SERIAL.read_text(encoding="utf-8", errors="replace")
+    begin = "sshd-trace-dump: begin"
+    end = "sshd-trace-dump: end"
+    if begin in text and end in text:
+        body = text.split(begin, 1)[1].split(end, 1)[0]
+        SERVER_LOG.write_text(body.lstrip("\r\n"), encoding="utf-8")
+    SUMMARY.write_text(f"client1={first}\ndump={dumped}\n", encoding="utf-8")
+    log("summary", f"client1={first} dump={dumped}")
+    if dumped != "collected":
         return 2
     log("logs", f"client1={CLIENT1} sshd={SERVER_LOG} serial={SERIAL} summary={SUMMARY}")
     return 0

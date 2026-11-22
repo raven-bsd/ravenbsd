@@ -31,7 +31,8 @@ cargo build -q -p raven-b70-overlay
 overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
 "$overlay" build/x86_64/initfs.img "$out/initfs.img" \
     "/etc/ssh/sshd_config=$root/tests/fixtures/sshd-trace/sshd_config:0644" \
-    "/etc/services.d/sshd.toml=$root/tests/fixtures/sshd-trace/sshd.service.toml:0644"
+    "/etc/services.d/sshd.toml=$root/tests/fixtures/sshd-trace/sshd.service.toml:0644" \
+    "/etc/services.d/sshd-trace-dump.toml=$root/tests/fixtures/sshd-trace/sshd-trace-dump.service.toml:0644"
 
 image=$out/sshd-trace.img
 if [ ! -f "$image" ] || [ "$out/initfs.img" -nt "$image" ]; then
