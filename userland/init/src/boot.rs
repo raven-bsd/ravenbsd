@@ -379,7 +379,27 @@ fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) ->
             .services()
             .iter()
             .position(|service| service.name == "getty" && service.enable);
-        let critical = getty.map(|index| guard.supervisor.dependency_closure(index));
+        let mut critical = getty.map(|index| guard.supervisor.dependency_closure(index));
+        // sshd has no readiness poll of its own, so the full plan must also wait for the
+        // one-shot host-key service before it spawns sshd. Without this barrier sshd races the
+        // key write and exits with "no hostkeys available". The netd prerequisite is handled by
+        // the bootstrap plan (bootstrap_selection), not by this login barrier.
+        if let Some(hostkeys) = guard
+            .supervisor
+            .services()
+            .iter()
+            .position(|service| service.name == "ssh-hostkeys" && service.enable)
+        {
+            let closure = guard.supervisor.dependency_closure(hostkeys);
+            match &mut critical {
+                Some(mask) => {
+                    for (slot, bit) in mask.iter_mut().zip(closure) {
+                        *slot |= bit;
+                    }
+                }
+                None => critical = Some(closure),
+            }
+        }
         (getty, critical)
     };
     let selected = getty.map(|index| {
@@ -518,9 +538,8 @@ fn boot_color() -> bool {
 
 /// Select the bootstrap services and every dependency they need by service name or scheme.
 fn bootstrap_selection(services: &[Manifest]) -> Vec<bool> {
-    // `netd` must register `net:` before the full plan starts sshd; `ssh-hostkeys` must
-    // finish writing `/tmp/ssh/ssh_host_ed25519_key` before sshd loads it. Both are
-    // prerequisites of the SSH service and are cheap when the service is absent.
+    // `netd` must register `net:` before the full plan starts sshd. It is cheap when the
+    // service is absent and it registers the loopback `net:` scheme even without a NIC.
     const SEEDS: &[&str] = &[
         "logd",
         "initfsd",
@@ -533,7 +552,6 @@ fn bootstrap_selection(services: &[Manifest]) -> Vec<bool> {
         "vfsd",
         "devd",
         "netd",
-        "ssh-hostkeys",
     ];
     let mut selected = alloc::vec![false; services.len()];
     for seed in SEEDS {
