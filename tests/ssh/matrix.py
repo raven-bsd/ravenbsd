@@ -520,7 +520,8 @@ def row_s2() -> None:
 
 def ssh_run(command: list[str], log_name: str, user: str = USER,
             password: str = PASSWORD, extra: list[str] | None = None,
-            timeout: int = REQUEST_TIMEOUT_S) -> dict[str, object]:
+            timeout: int = REQUEST_TIMEOUT_S,
+            console: SerialConsole | None = None) -> dict[str, object]:
     argv = [
         "ssh",
         "-o", "StrictHostKeyChecking=no",
@@ -549,6 +550,8 @@ def ssh_run(command: list[str], log_name: str, user: str = USER,
                                    start_new_session=True)
         deadline = started + timeout
         while process.poll() is None and time.monotonic() < deadline:
+            if console is not None:
+                console.pump()
             time.sleep(0.05)
         timed_out = process.poll() is None
         if timed_out:
@@ -984,6 +987,14 @@ def console_marker_count(console: SerialConsole) -> int:
     return bytes(console.buffer).count(MARKER)
 
 
+def console_scalar(console: SerialConsole, command: str, log_name: str,
+                   timeout: float = 10.0) -> int:
+    """Run one guest command and return its last standalone integer (or -1)."""
+    clean = console_capture(console, command, log_name, timeout=timeout)
+    values = re.findall(r"(?m)^\s*(-?\d+)\s*$", clean)
+    return int(values[-1]) if values else -1
+
+
 def classify_s7(result: dict[str, object], probe_banner: bytes,
                 server_lines: str) -> tuple[str, str]:
     """Classify one failed S7 attempt from the client text, a fresh probe and server lines."""
@@ -1028,7 +1039,7 @@ def classify_s7(result: dict[str, object], probe_banner: bytes,
 def row_s7(console: SerialConsole) -> None:
     total_before = console_marker_count(console)
     marker_run = ssh_run(["cat", "/tmp/ssh-marker"], "s7-marker.log",
-                         timeout=S7_TIMEOUT_S)
+                         timeout=S7_TIMEOUT_S, console=console)
     time.sleep(0.5)
     console_new = console_marker_count(console) - total_before
     marker_ok = marker_run["stdout"] == MARKER
@@ -1043,10 +1054,14 @@ def row_s7(console: SerialConsole) -> None:
     max_console_new = console_new
     for number in range(1, 11):
         before = console_marker_count(console)
+        log_before = console_scalar(console, "wc -l < /tmp/sshd.log",
+                                    f"s7-log-before-{number}.log")
         session = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-run-{number}.log",
-                          timeout=S7_TIMEOUT_S)
+                          timeout=S7_TIMEOUT_S, console=console)
         time.sleep(0.5)
         after = console_marker_count(console)
+        log_after = console_scalar(console, "wc -l < /tmp/sshd.log",
+                                   f"s7-log-after-{number}.log")
         new_markers = after - before
         max_console_new = max(max_console_new, new_markers)
         ok = session["stdout"] == MARKER and new_markers == 0
@@ -1067,18 +1082,34 @@ def row_s7(console: SerialConsole) -> None:
         if ok:
             continue
         probe = banner_probe(f"s7-probe-{number}", send_client=False)
-        classification, witness = classify_s7(session, probe["bytes"], "")
+        server_lines = ""
+        delta = log_after - log_before if log_before >= 0 and log_after >= 0 else -1
+        if log_before >= 0 and log_after > log_before:
+            server_lines = console_capture(
+                console, f"tail -n +{log_before + 1} /tmp/sshd.log | head -n "
+                         f"{log_after - log_before}",
+                f"s7-server-{number}.log")
+        classification, witness = classify_s7(session, probe["bytes"], server_lines)
         attempt("S7-class", number, "fresh",
-                "guest-listening / auth-rejected / connection-reset from the client and a fresh "
-                "banner probe; full guest serial in serial-only.log",
+                "guest-listening / auth-rejected / connection-reset from the client, a fresh "
+                "banner probe and the server log",
                 f"class={classification}; probe_banner={literal(probe['bytes'])}; "
-                f"witness={witness!r}",
+                f"server_delta={delta}; witness={witness!r}",
                 0, "OBSERVED")
     total_after = console_marker_count(console)
     total_delta = total_after - total_before
-    server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s7-server.log",
-                             user=ROOT_USER, timeout=15)
-    server_log = server_capture["stdout"].decode("utf-8", "replace")
+    server_log = console_capture(console, "cat /tmp/sshd.log", "s7-server-console.log",
+                                 timeout=20)
+    server_source = "console"
+    if "Accepted password for raven " not in server_log \
+            and "Connection reset" not in server_log \
+            and "Server listening" not in server_log:
+        server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s7-server.log",
+                                 user=ROOT_USER, timeout=15)
+        server_log = server_capture["stdout"].decode("utf-8", "replace")
+        server_source = f"ssh exit {server_capture['returncode']}"
+    else:
+        server_capture = {"returncode": 0}
     (OUT / "s7-server.raw.log").write_text(server_log, encoding="utf-8")
     ps_capture = ssh_run(["ps", "-e"], "s7-ps.log", user=ROOT_USER, timeout=15)
     ps_log = ps_capture["stdout"].decode("utf-8", "replace")
@@ -1112,7 +1143,7 @@ def row_s7(console: SerialConsole) -> None:
                f"({literal(marker_run['stdout'])}); {passed}/10 exact; "
                f"console_total_delta={total_delta}; all_exit_ok={all_exit_ok}; "
                f"walls_ms={[round(value) for value in wall_ms]}; "
-               f"server capture exit={server_capture['returncode']} "
+               f"server capture={server_source} "
                f"Accepted={accepted} Connection-closed={closed} reset={reset}; "
                f"ps capture exit={ps_capture['returncode']} (gate; C1-C10)")
 
