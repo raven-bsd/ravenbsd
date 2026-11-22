@@ -22,6 +22,8 @@ from pathlib import Path
 
 import pexpect
 
+sys.dont_write_bytecode = True
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
