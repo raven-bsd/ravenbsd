@@ -1,3 +1,0 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.36s
-     Running `target/debug/xtask qtest --case cap-revoke --arch x86_64`
-cap-revoke: pass

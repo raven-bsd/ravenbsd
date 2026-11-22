@@ -131,12 +131,13 @@ pub fn clock_set(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
-/// `GETRANDOM`: fill a user buffer from the kernel entropy pool.
+/// `GETRANDOM`: fill a user buffer from the boot-seeded ChaCha20 pool.
 ///
-/// Never blocks. The pool is seeded on first use from a hardware source or timer jitter; when
-/// neither can be sampled the call returns `EAGAIN`. `flags` is accepted and ignored (the kernel
-/// does not block on entropy, so `GRND_NONBLOCK` is a no-op). The length is capped at
-/// `0x1FFF_FFFF` like Linux.
+/// The pool is seeded once at boot from RDRAND/RNDR; timer jitter is never cryptographic input.
+/// If the platform has no hardware source (or `entropy=none` disabled it) the pool stays unseeded
+/// and the call returns `EAGAIN`; it never serves a predictable fallback. `flags` is accepted and
+/// ignored (the kernel does not block on entropy, so `GRND_NONBLOCK` is a no-op). The length is
+/// capped at `0x1FFF_FFFF` like Linux.
 pub fn getrandom(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let flags = frame.rdx as u32;
