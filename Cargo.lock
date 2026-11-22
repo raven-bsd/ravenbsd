@@ -2167,6 +2167,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-direct"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-compat",
+ "raven-libc-signal",
+ "raven-libc-stdio",
+ "raven-libc-str",
+]
+
+[[package]]
 name = "raven-libc-dtoa"
 version = "0.1.0"
 dependencies = [
