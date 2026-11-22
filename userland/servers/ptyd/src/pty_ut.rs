@@ -145,6 +145,33 @@ fn a_drain_set_does_not_discard_queued_output() {
 }
 
 #[test]
+fn a_fresh_pty_starts_at_zero_winsize() {
+    let pty = pty();
+    assert_eq!(pty.winsize(), raven_tty_core::Winsize::default());
+}
+
+#[test]
+fn the_window_size_is_shared_by_master_and_slave() {
+    let mut pty = pty();
+    let first = raven_tty_core::Winsize {
+        row: 43,
+        col: 120,
+        xpixel: 0,
+        ypixel: 0,
+    };
+    pty.set_winsize(first);
+    assert_eq!(pty.winsize(), first);
+    let second = raven_tty_core::Winsize {
+        row: 24,
+        col: 80,
+        xpixel: 640,
+        ypixel: 480,
+    };
+    pty.set_winsize(second);
+    assert_eq!(pty.winsize(), second);
+}
+
+#[test]
 fn a_custom_verase_byte_edits_the_line() {
     let mut pty = pty();
     let mut want = raven_tty_core::Termios::sane();
