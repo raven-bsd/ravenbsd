@@ -1071,13 +1071,24 @@ def main() -> int:
 
     row_s0()
 
+    repeat_child = None
+    try:
+        repeat_child, _ = boot(IMAGE, b"svcd: sshd up", "serial-repeat.log",
+                               "vars-repeat.fd", ready_timeout=180)
+        row_s1_repeat()
+    except Exception as error:  # noqa: BLE001 - isolate a repeat-boot failure
+        record("S1-repeat", "BLOCKED", f"S1-repeat boot failed: {error}")
+    finally:
+        if repeat_child is not None:
+            kill(repeat_child)
+        time.sleep(0.5)
+
     child = None
     console: SerialConsole | None = None
     try:
         child, console = boot(IMAGE, b"svcd: sshd up", "serial.log", "vars.fd",
                               ready_timeout=180, socket_serial=True)
         row_s1()
-        row_s1_repeat()
         row_s2()
         s3_state = row_s3_start()
         row_s4()
