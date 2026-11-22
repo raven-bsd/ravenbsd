@@ -10,7 +10,7 @@ src = "etc/services.d/vfsd.toml"
 path = "/etc/services.d/vfsd.toml"
 
 [[initfs.files]]
-src = "etc/mounts"
+src = "profiles/shell.d/mounts"
 path = "/etc/mounts"
 
 # K175: /etc/mounts mounts /dev/null, /dev/zero, /dev/random and /dev/urandom, so every profile
@@ -18,17 +18,17 @@ path = "/etc/mounts"
 # The initfs builder creates parent directories for staged files; the bytes of these placeholders
 # are never visible after vfsd mounts the device over the path.
 [[initfs.files]]
-src = "etc/mounts"
+src = "profiles/shell.d/mounts"
 path = "/dev/null"
 
 [[initfs.files]]
-src = "etc/mounts"
+src = "profiles/shell.d/mounts"
 path = "/dev/zero"
 
 [[initfs.files]]
-src = "etc/mounts"
+src = "profiles/shell.d/mounts"
 path = "/dev/random"
 
 [[initfs.files]]
-src = "etc/mounts"
+src = "profiles/shell.d/mounts"
 path = "/dev/urandom"

@@ -1,6 +1,0 @@
-tcp-evidence packet: run-20261120T233816Z
-generated: 2026-11-20T23:38:24Z
-phase audit: pass
-phase unit: pass command='cargo nextest run -p raven-tcpip'
-phase checker: pass command='/usr/bin/python3 scripts/tcp-evidence_ut.py'
-phase matrix: blocked reason='scripts/net-conformance.sh is absent (K253 harness not merged)'

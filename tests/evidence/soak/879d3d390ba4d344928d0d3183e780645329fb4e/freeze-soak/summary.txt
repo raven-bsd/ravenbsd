@@ -1,8 +1,0 @@
-soak: pass
-error: -
-cycles: 24/24
-elapsed_s: 138.067
-stall_seconds: 30.0
-serial: build/soak/run-20261121T181153Z/serial.log
-events: build/soak/run-20261121T181153Z/soak.jsonl
-summary: build/soak/run-20261121T181153Z/summary.json
