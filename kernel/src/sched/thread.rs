@@ -62,8 +62,8 @@ static NEXT_TID: AtomicU32 = AtomicU32::new(1);
 /// [`MAX_THREADS`] and sizing every level to the same bound means the queue can never refuse a
 /// runnable thread. Idle threads are never enqueued and are excluded.
 static LIVE_THREADS: AtomicUsize = AtomicUsize::new(0);
-/// One-shot diagnostic when the admission bound rejects a thread (K530 churn).
-static SLOT_DENY_LOGGED: AtomicBool = AtomicBool::new(false);
+/// Admission denials since boot (K530 churn diagnostic).
+static SLOT_DENIES: AtomicUsize = AtomicUsize::new(0);
 /// Slots released since boot (K530 churn diagnostic).
 static SLOTS_DROPPED: AtomicUsize = AtomicUsize::new(0);
 
@@ -78,9 +78,10 @@ impl ThreadSlot {
         let live = LIVE_THREADS.fetch_add(1, Ordering::AcqRel);
         if live >= MAX_THREADS {
             LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
-            if !SLOT_DENY_LOGGED.swap(true, Ordering::AcqRel) {
+            let denied = SLOT_DENIES.fetch_add(1, Ordering::AcqRel).saturating_add(1);
+            if denied == 1 || denied % 1_000 == 0 {
                 crate::kprintln!(
-                    "slot: deny live={live} max={MAX_THREADS} dropped={}",
+                    "slot: deny n={denied} live={live} max={MAX_THREADS} dropped={}",
                     SLOTS_DROPPED.load(Ordering::Acquire)
                 );
             }

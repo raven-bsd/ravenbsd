@@ -18,6 +18,10 @@ target = "none"
 name = "smp-stack-init"
 path = "src/main.rs"
 
+[[bin]]
+name = "smp-stack-join"
+path = "src/join.rs"
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }

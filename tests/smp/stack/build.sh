@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# Build the K530 stack-lifetime fixture and pack build/smp/stack/initfs.img.
+# Build the K530 stack-lifetime and join-lifetime fixtures and pack build/smp/stack/initfs.img
+# and build/smp/stack/join-initfs.img.
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
@@ -23,3 +24,6 @@ RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=
 target="$out/target/x86_64-unknown-none/release/smp-stack-init"
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" /init="$target"
+join_target="$out/target/x86_64-unknown-none/release/smp-stack-join"
+cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+    "$out/join-initfs.img" /init="$join_target"
