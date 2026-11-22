@@ -22,6 +22,13 @@ use crate::usercopy::{copy_from_user, copy_to_user};
 
 /// Raw `duplex_pair(out: *mut [u32; 2], flags: u32) -> 0`.
 pub const DUPLEX_PAIR: usize = 0x110;
+/// Diagnostic flag for `duplex_pair`: write [`DuplexStats`] instead of creating a pair.
+///
+/// The raw duplex numbers are kernel-owned and not yet in `raven-abi`; this evidence flag lets the
+/// K496 ownership matrix observe live pairs/endpoints, queued handles and queued control records
+/// from the guest. It creates no object and is rejected by [`duplex::create`] when it reaches the
+/// normal path.
+pub const DUPLEX_DIAGNOSTIC: u32 = 0x8000_0000;
 /// Raw `duplex_shutdown(handle: u32, how: u32) -> 0`.
 pub const DUPLEX_SHUTDOWN: usize = 0x111;
 /// Raw `duplex_sendmsg(handle: u32, msg: *mut DuplexMessage) -> bytes`.
@@ -65,6 +72,24 @@ struct DuplexMessage {
 
 const _: () = assert!(core::mem::size_of::<DuplexMessage>() == MESSAGE_BYTES);
 
+/// Ownership counters written by the `DUPLEX_DIAGNOSTIC` query.
+#[repr(C)]
+struct DuplexStats {
+    /// Live pair objects.
+    pairs: u64,
+    /// Live endpoint objects.
+    ends: u64,
+    /// Handles waiting in a control record or datagram message.
+    pending: u64,
+    /// Queued stream control records.
+    controls: u64,
+}
+
+/// Bytes in `DuplexStats`.
+const STATS_BYTES: usize = 32;
+
+const _: () = assert!(core::mem::size_of::<DuplexStats>() == STATS_BYTES);
+
 /// User-visible peer credentials.
 #[repr(C)]
 struct DuplexCred {
@@ -91,9 +116,12 @@ const _: () = assert!(core::mem::size_of::<ControlHeader>() == CMSG_BYTES);
 
 /// `duplex_pair(out, flags)`.
 pub fn pair(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let flags = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    if flags & DUPLEX_DIAGNOSTIC != 0 {
+        return stats(frame);
+    }
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let destination = UserSlice::new(frame.rdi, 8)?;
-    let flags = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let (left, right) = duplex::create(flags)?;
     let (left_handle, right_handle) = {
         let mut handles = caller.handles.lock();
@@ -117,6 +145,23 @@ pub fn pair(frame: &SyscallFrame) -> Result<usize, Errno> {
         let _ = handles.close(left_handle);
         return Err(error);
     }
+    Ok(0)
+}
+
+/// `duplex_pair(out, DUPLEX_DIAGNOSTIC)` evidence query.
+fn stats(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let snapshot = duplex::stats();
+    let values = [
+        snapshot.pairs,
+        snapshot.ends,
+        snapshot.pending,
+        snapshot.controls,
+    ];
+    let mut bytes = [0u8; STATS_BYTES];
+    for (chunk, value) in bytes.chunks_exact_mut(8).zip(values) {
+        chunk.copy_from_slice(&value.to_le_bytes());
+    }
+    copy_to_user(UserSlice::new(frame.rdi, STATS_BYTES as u64)?, &bytes)?;
     Ok(0)
 }
 
@@ -170,7 +215,12 @@ pub fn recvmsg(frame: &SyscallFrame) -> Result<usize, Errno> {
     message.control_len =
         u64::try_from(control_bytes(installed.len())).map_err(|_| Errno::EINVAL)?;
     message.handle_count = u32::try_from(installed.len()).map_err(|_| Errno::EMSGSIZE)?;
-    write_message(frame.rsi, &message)?;
+    if let Err(error) = write_message(frame.rsi, &message) {
+        // The caller cannot learn the installed handle values, so leaving them open would make
+        // them unreachable. Close them exactly like the control write-back failure path.
+        close_installed(&caller, &installed);
+        return Err(error);
+    }
     Ok(copied)
 }
 
@@ -327,15 +377,25 @@ fn install_handles(
 ) -> Result<Vec<u32>, Errno> {
     let mut installed = Vec::new();
     for pending in handles {
+        let (object, rights, lineage) = pending.into_parts();
         let inserted = {
             let mut table = caller.handles.lock();
-            table.insert_derived(pending.object, pending.rights, &pending.lineage)
+            table.insert_derived(object, rights, &lineage)
         };
         match inserted {
             Ok(handle) => {
                 let node = caller.handles.lock().lineage_node(handle).ok();
                 if let Some(node) = node {
-                    crate::process::handle::register_lineage(node);
+                    // `insert_derived` stores the parent's *effective* rights, so a bit revoked
+                    // between the send and this install is otherwise indistinguishable from a bit
+                    // that was never granted (C17 wants EPERM, not EACCES). Register first, then
+                    // copy the parent's revoked mask onto the child; a revoke after this point
+                    // reaches the registered child through the normal descendant walk.
+                    crate::process::handle::register_lineage(Arc::clone(&node));
+                    let revoked = lineage.revoked();
+                    if revoked != Rights::NONE {
+                        node.revoke(revoked);
+                    }
                 }
                 installed.push(handle.0);
             }

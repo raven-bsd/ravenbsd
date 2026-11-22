@@ -1622,6 +1622,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-duplex-matrix"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-dynamic-exec"
 version = "0.1.0"
 dependencies = [

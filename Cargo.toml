@@ -78,6 +78,7 @@ members = [
     "tests/smp/memory",
     "tests/smp/syscall-fuzz",
     "tests/smp/ipc-fuzz",
+    "tests/smp/duplex-matrix",
     "tests/smp/aarch64",
     "tests/smp/x86_64",
     "tests/fixtures/s16-rights",

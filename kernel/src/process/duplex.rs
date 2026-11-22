@@ -77,6 +77,39 @@ const WAIT_WRITE: u64 = 2;
 /// Next pair id (the wait-queue key space).
 static NEXT_DUPLEX_ID: AtomicU64 = AtomicU64::new(1);
 
+/// Live duplex pair objects. The K496 matrix compares this with the reachable graph after every
+/// operation; a pair that outlives every external handle is a retained cycle.
+static LIVE_PAIRS: AtomicU64 = AtomicU64::new(0);
+/// Live endpoint objects (two per pair while any handle or queued record holds one).
+static LIVE_ENDS: AtomicU64 = AtomicU64::new(0);
+/// Handles owned by a queued `SCM_RIGHTS` record or datagram message.
+static LIVE_PENDING: AtomicU64 = AtomicU64::new(0);
+/// Queued stream control records (one per `sendmsg` that carried handles).
+static LIVE_CONTROLS: AtomicU64 = AtomicU64::new(0);
+
+/// Observable duplex ownership counters for the K496 evidence suite.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Stats {
+    /// Live pair objects.
+    pub pairs: u64,
+    /// Live endpoint objects.
+    pub ends: u64,
+    /// Handles waiting in a control record or datagram message.
+    pub pending: u64,
+    /// Queued stream control records.
+    pub controls: u64,
+}
+
+/// Snapshot the ownership counters.
+pub fn stats() -> Stats {
+    Stats {
+        pairs: LIVE_PAIRS.load(Ordering::Acquire),
+        ends: LIVE_ENDS.load(Ordering::Acquire),
+        pending: LIVE_PENDING.load(Ordering::Acquire),
+        controls: LIVE_CONTROLS.load(Ordering::Acquire),
+    }
+}
+
 /// One side of a duplex pair.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
@@ -116,6 +149,7 @@ pub(crate) struct PendingHandle {
 
 impl PendingHandle {
     pub(crate) fn new(object: Object, rights: Rights, lineage: Arc<LineageNode>) -> Self {
+        LIVE_PENDING.fetch_add(1, Ordering::AcqRel);
         Self {
             object,
             rights,
@@ -124,10 +158,49 @@ impl PendingHandle {
     }
 }
 
+impl PendingHandle {
+    /// Take the owned object/rights/lineage without running the counter drop.
+    ///
+    /// The caller installs the object in a handle table, so the in-flight reference ends here and
+    /// the live counter is decremented exactly once.
+    pub(crate) fn into_parts(self) -> (Object, Rights, Arc<LineageNode>) {
+        let this = core::mem::ManuallyDrop::new(self);
+        // SAFETY: `this` is consumed here, every field is read exactly once and the original
+        // `PendingHandle` is never dropped, so no field is dropped twice.
+        let object = unsafe { core::ptr::read(&this.object) };
+        let lineage = unsafe { core::ptr::read(&this.lineage) };
+        LIVE_PENDING.fetch_sub(1, Ordering::AcqRel);
+        (object, this.rights, lineage)
+    }
+}
+
+impl Drop for PendingHandle {
+    fn drop(&mut self) {
+        LIVE_PENDING.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 struct ControlMessage {
     /// Stream byte offset this ancillary record is attached to.
     offset: u64,
     handles: Vec<PendingHandle>,
+}
+
+impl ControlMessage {
+    fn new(offset: u64, handles: Vec<PendingHandle>) -> Self {
+        LIVE_CONTROLS.fetch_add(1, Ordering::AcqRel);
+        Self { offset, handles }
+    }
+
+    fn into_handles(mut self) -> Vec<PendingHandle> {
+        core::mem::take(&mut self.handles)
+    }
+}
+
+impl Drop for ControlMessage {
+    fn drop(&mut self) {
+        LIVE_CONTROLS.fetch_sub(1, Ordering::AcqRel);
+    }
 }
 
 struct StreamBuffer {
@@ -263,6 +336,7 @@ impl DuplexEnd {
 
 impl Drop for DuplexEnd {
     fn drop(&mut self) {
+        LIVE_ENDS.fetch_sub(1, Ordering::AcqRel);
         let (left, right) = {
             let mut state = self.pair.state.lock();
             match self.side {
@@ -322,6 +396,12 @@ impl Duplex {
         self.left_writers.wake_all();
         self.right_readers.wake_all();
         self.right_writers.wake_all();
+    }
+}
+
+impl Drop for Duplex {
+    fn drop(&mut self) {
+        LIVE_PAIRS.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
@@ -499,6 +579,7 @@ pub fn create(flags: u32) -> Result<(Arc<DuplexEnd>, Arc<DuplexEnd>), Errno> {
             gid: ids.gid,
         }
     });
+    LIVE_PAIRS.fetch_add(1, Ordering::AcqRel);
     let pair = Arc::new(Duplex {
         id,
         peer,
@@ -519,6 +600,7 @@ pub fn create(flags: u32) -> Result<(Arc<DuplexEnd>, Arc<DuplexEnd>), Errno> {
     });
     let nonblock = flags & O_NONBLOCK != 0;
     let cloexec = flags & O_CLOEXEC != 0;
+    LIVE_ENDS.fetch_add(2, Ordering::AcqRel);
     let left = Arc::new(DuplexEnd {
         pair: Arc::clone(&pair),
         side: Side::Left,
@@ -681,7 +763,7 @@ pub fn recv(
                     }
                     let copied = read_stream(buffer, destination, limit)?;
                     let control = buffer.controls.pop_front().ok_or(Errno::EINVAL)?;
-                    (copied, control.handles)
+                    (copied, control.into_handles())
                 } else {
                     (read_stream(buffer, destination, limit)?, Vec::new())
                 }
@@ -823,7 +905,7 @@ fn write_stream(
         if let Some(handles) = pending.take() {
             buffer
                 .controls
-                .push_back(ControlMessage { offset, handles });
+                .push_back(ControlMessage::new(offset, handles));
         }
         drop(state);
         end.pair.wake_readers(peer);
