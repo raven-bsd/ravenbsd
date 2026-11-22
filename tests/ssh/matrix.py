@@ -1094,6 +1094,63 @@ def row_mutation() -> None:
                f"mutation not observed: {observed}")
 
 
+def row_s8_proof(console: SerialConsole | None) -> None:
+    """K548 proof: correlate one client banner timeout with the guest sshd log."""
+    result = ssh_run(["tty"], "s8-proof-tt.log", extra=["-tt"], timeout=15)
+    text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace").strip()
+    attempt("S8-proof-tt", 1, "fresh", "client banner/accept result",
+            f"exit {result['returncode']}; {text[:240]}",
+            float(result["elapsed_ms"]), "OBSERVED")
+    if console is None:
+        record("S8-proof", "BLOCKED", "no serial console for the sshd log")
+        return
+    if console.wait_for(b"login:", 5) < 0:
+        console.send(b"\n")
+        if console.wait_for(b"login:", 30) < 0:
+            record("S8-proof", "BLOCKED", "no console login prompt")
+            return
+    console.send(b"root\n")
+    if console.wait_for(b"Password:", 10) < 0:
+        record("S8-proof", "BLOCKED", "no console password prompt")
+        return
+    console.send(b"raven\n")
+    if console.wait_for(b"Welcome to the RavenBSD console", 15) < 0:
+        record("S8-proof", "BLOCKED", "console login did not reach the shell banner")
+        return
+    console.send(b"\n")
+    time.sleep(0.5)
+    start_mark = len(console.buffer)
+    console.send(b"echo K434-$((7*11))")
+    time.sleep(0.3)
+    console.send(b"\r")
+    started = console.wait_for(b"K434-77", 8, start=start_mark) >= 0
+    mark = len(console.buffer)
+    console.send(b"ls -l /tmp/sshd.log; cat /tmp/sshd.log; echo K434-$((13*13))")
+    time.sleep(0.3)
+    console.send(b"\r")
+    end = console.wait_for(b"K434-169", 15, start=mark)
+    if end < 0:
+        console.send(b"\n")
+        end = console.wait_for(b"K434END", 15, start=mark)
+    segment = bytes(console.buffer[mark:len(console.buffer)])
+    log = segment.decode("utf-8", "replace").replace("\r", "")
+    log = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", log)
+    (OUT / "s8-proof-sshd.log").write_text(log, encoding="utf-8")
+    print(f"matrix: console s8-proof-sshd.log shell={started} end_marker={end >= 0}", flush=True)
+    print("matrix: --- /tmp/sshd.log ---", flush=True)
+    for line in log.splitlines():
+        print(f"matrix: sshd| {line}", flush=True)
+    lines = log.splitlines()
+    listening = [line for line in lines if "Server listening" in line]
+    connections = [line for line in lines if "Connection from" in line]
+    record("S8-proof", "OBSERVED",
+           f"client_exit={result['returncode']}; Server listening={len(listening)}; "
+           f"Connection from={len(connections)}; artifact=s8-proof-sshd.log")
+    attempt("S8-proof-accept", 1, "fresh",
+            "Server listening line and whether a Connection from line follows",
+            f"listening={listening[:2]}; connections={connections[:2]}", 0, "OBSERVED")
+
+
 def row_s5_s6() -> None:
     result = ssh_probe(["true"], "s5-vvv.log", extra=["-vvv"])
     text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
@@ -1621,7 +1678,7 @@ def main() -> int:
         row_label = ("K562-mutation" if only == "mutation"
                      else "S4" if only == "s4" else only)
         try:
-            socket_only = only in ("s8", "s7")
+            socket_only = only in ("s8", "s7", "s8-proof")
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
                                  "vars-only.fd", ready_timeout=180,
                                  socket_serial=socket_only)
@@ -1654,6 +1711,8 @@ def main() -> int:
                         record("S7", "BLOCKED", "console login failed before S7")
                 elif only == "s8":
                     row_s8()
+                elif only == "s8-proof":
+                    row_s8_proof(console)
                 elif only == "s5":
                     row_s5_s6()
                 else:
