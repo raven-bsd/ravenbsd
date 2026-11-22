@@ -105,6 +105,23 @@ The four worker exits print increasing free-frame counts because each exit relea
 worker while the other three are still alive; the count never falls, and the final post-churn
 value is the baseline. Evidence: `tests/evidence/k458/<sha>/`.
 
+## SSH-shape integration (K473)
+
+`pty-ssh-shape` runs the exact server-side pty sequence without sshd or the network: the libutil
+`openpty` call order (`posix_openpt`, `grantpt`, `unlockpt`, `ptsname`, `open` slave), the K444
+pty-req termios record, the K455 43x120 window size, a fork+`execve` session child on the slave
+that prints `ttyname(0)` and `tcgetwinsize(0)`, an ECHO/input round-trip, then close-all. Each call
+logs `pty-ssh-shape: step=N call=... rv=...`, so a failure names the syscall.
+
+```sh
+timeout 300 cargo xtask qtest --case pty-ssh-shape --arch x86_64
+# pty-ssh-shape: pass
+```
+
+The child is a true `fork` + `execve` of the test binary. `posix_spawn` of the same dynamic
+`/bin/libc-test` returned `ENOENT` (2) in the libc-test profile; `execve` works and is the path
+OpenSSH uses. The case is the reference the S8 `openpty: Broken pipe` owner should cite.
+
 ## Privsep wire shape
 
 The `pty-monitor` guest test implements the monitor side over `socketpair(AF_UNIX)`:
