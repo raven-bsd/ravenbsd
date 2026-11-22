@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K438: SCM_RIGHTS fd passing over AF_UNIX, the OpenSSH monitor_fdpass shape.
+# The parent sends one/two fds over a socketpair and the forked child receives them.
+# Asserts the exact cmsg fields and count, the returned descriptor numbers, and byte
+# identity through the received fd: a regular file (read back through the original) and a
+# pty master (bytes on the slave). A malformed cmsg is EINVAL and an absent cmsg leaves
+# msg_controllen at 0.
+
+name = "fdpass"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh fdpass"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^fdpass: start$'
+
+# The child prints when it receives; the parent prints after sendmsg. They run concurrently,
+# so the child lines are matched without ordering.
+[[expect]]
+regex = '^fdpass: file-child cmsg_len=20 level=1 type=1 count=1 controllen=20$'
+unordered = true
+
+[[expect]]
+regex = '^fdpass: file-child fd0=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^fdpass: file sent=1 sent_cmsg_len=20$'
+
+[[expect]]
+regex = '^fdpass: file parent-read=child$'
+
+[[expect]]
+regex = '^fdpass: pty master=[0-9]+ slave=[0-9]+ name=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^fdpass: pty-child cmsg_len=20 level=1 type=1 count=1 controllen=20$'
+unordered = true
+
+[[expect]]
+regex = '^fdpass: pty-child fd0=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^fdpass: pty sent=1 sent_cmsg_len=20$'
+
+[[expect]]
+regex = '^fdpass: pty parent-read=pty-child'
+
+[[expect]]
+regex = '^fdpass: two-child cmsg_len=24 level=1 type=1 count=2 controllen=24$'
+unordered = true
+
+[[expect]]
+regex = '^fdpass: two-child fd0=[0-9]+ fd1=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^fdpass: two sent=2 sent_cmsg_len=24$'
+
+[[expect]]
+regex = '^fdpass: two file=child pty=pty-child$'
+
+[[expect]]
+regex = '^fdpass: truncated recv=-1 errno=90$'
+
+# The too-small control buffer must leave the message queued: the full-buffer retry gets the
+# same one byte and descriptor.
+[[expect]]
+regex = '^fdpass: truncated-retry cmsg_len=20 level=1 type=1 count=1 controllen=20$'
+
+[[expect]]
+regex = '^fdpass: truncated-retry fd0=[0-9]+$'
+
+[[expect]]
+regex = '^fdpass: malformed sent=-1 errno=22$'
+
+[[expect]]
+regex = '^fdpass: absent control=0$'
+
+[[expect]]
+regex = '^fdpass: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fdpass: fail'

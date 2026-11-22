@@ -38,7 +38,7 @@ pub struct PlatformBackend<'a, B: SysBackend, L: Lock> {
 ///
 /// The attached `CALL` reply carries the 6-byte [`Response::Ok`] inline and then one
 /// `(handle, rights_mask)` pair; the kernel installs that handle in the caller's table.
-pub(crate) fn event_handle<B: SysBackend>(backend: &B, sock: Sock) -> Result<Handle, Errno> {
+pub fn event_handle<B: SysBackend>(backend: &B, sock: Sock) -> Result<Handle, Errno> {
     let request = SocketRequest::Call(Call::Event);
     let mut encoded = [0u8; 64];
     let used = request.encode(&mut encoded).map_err(|_| Errno::EINVAL)?;
