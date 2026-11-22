@@ -7909,6 +7909,17 @@ modified = true
 notes = "lock, mmap/minherit and _rs_forkdetect removed; state is caller-owned; getentropy replaced by Entropy; fork wipe of rs and rsx added (doc 15 3.A.1.1)"
 
 [[import]]
+path = "crates/raven-entropy/src/lib.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/crypt/arc4random.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-22"
+modified = true
+notes = "pure raven-entropy port of _rs_init/_rs_stir/_rs_rekey/_rs_random_buf and the 8-byte-IV ChaCha from chacha_private.h (public domain, same revision); getentropy, mmap/minherit and the libc lock replaced by SeedSource, the caller lock and Pool::fork_child"
+
+[[import]]
 path = "libc/ravenlibc/crates/raven-libc-rand/src/platform.rs"
 upstream = "openbsd"
 upstream_path = "lib/libc/crypt/arc4random.h"
