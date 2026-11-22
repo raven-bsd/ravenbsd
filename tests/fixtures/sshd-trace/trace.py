@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pexpect
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "build" / "fixtures" / "sshd-trace"
 IMAGE = OUT / "sshd-trace.img"
 SERIAL = OUT / "serial.log"

@@ -14,7 +14,7 @@ sh tests/fixtures/sshd-trace/build.sh
 
 out=build/fixtures/sshd-trace
 image=$out/sshd-trace.img
-if [ ! -f "$image" ]; then
+if [ ! -f "$image" ] || [ "$out/initfs.img" -nt "$image" ]; then
     cargo xtask image --arch x86_64 --profile release \
         --initfs "$out/initfs.img" --output "$image"
 fi
