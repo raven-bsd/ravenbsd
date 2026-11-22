@@ -24,7 +24,9 @@ use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, clock, map, prot};
+use raven_initfs::Initfs;
 use raven_rt::entry;
+use raven_rt::exec::{exec_image, execve};
 use raven_rt::println;
 use raven_rt::sys;
 
@@ -42,6 +44,15 @@ const POLL_LIMIT: u32 = 50_000_000;
 const PROC_FORK: usize = 0x39;
 /// Raw kernel `pipe(fds)` number (kernel-owned, not a `Syscall` variant).
 const PIPE: usize = 0x6e;
+
+/// K540: total fork+exec+exit cycles.
+const CHURN_CYCLES: usize = 10_000;
+/// Each of the two controller processes runs half the cycles.
+const CHURN_PER_CONTROLLER: usize = CHURN_CYCLES / 2;
+/// Pages the map/unmap child touches before exiting.
+const CHURN_MAP_PAGES: usize = 16;
+/// The four interleaved child variants: plain exit, page fault, map/unmap, exec failure.
+const CHURN_VARIANTS: usize = 4;
 
 /// End of the canonical user window (the same value as `raven-abi` layout).
 const USER_END: usize = 0x0000_7FFF_FFFF_F000;
@@ -1119,7 +1130,261 @@ fn fork_exit_rounds() -> Result<(), Errno> {
     Ok(())
 }
 
-fn main(_args: raven_rt::Args) -> i32 {
+/// K540: one fork+exec+exit cycle. The child entry either execs `/churn` or, for the failure
+/// variant, records an ENOENT and exits so the parent waits on the failure-path teardown.
+fn churn_cycle(mode: usize) -> Result<(), Errno> {
+    let child = proc_fork()?;
+    let thread = sys::thread_create(
+        child,
+        churn_child_entry as *const () as usize,
+        child_stack_top(),
+        mode,
+    )?;
+    let _ = sys::handle_close(thread);
+    let code = proc_wait(child)?;
+    let _ = sys::handle_close(child);
+    if code == 0 {
+        Ok(())
+    } else {
+        println!("churn: FAIL child mode={mode} code={code}");
+        Err(Errno::EIO)
+    }
+}
+
+/// The forked child entry: exec the same `/churn` image with the variant in argv[1], or make the
+/// failed exec explicit for the failure-path variant.
+extern "C" fn churn_child_entry(mode: usize) -> ! {
+    if mode == CHURN_VARIANTS.saturating_sub(1) {
+        let path: &[u8] = b"/no-such-churn-entry";
+        match execve(path, &[path], &[], &[]) {
+            Err(Errno::ENOENT) => sys::exit(0),
+            Err(error) => {
+                println!("churn: FAIL exec-fail errno={}", error.0);
+                sys::exit(2)
+            }
+            Ok(()) => sys::exit(1),
+        }
+    }
+    let image = match sys::map_initfs() {
+        Ok(image) => image,
+        Err(error) => {
+            println!("churn: FAIL initfs errno={}", error.0);
+            sys::exit(3);
+        }
+    };
+    let initfs = match Initfs::parse(image) {
+        Ok(initfs) => initfs,
+        Err(_) => {
+            println!("churn: FAIL initfs parse");
+            sys::exit(4);
+        }
+    };
+    let program = match initfs.get("/churn") {
+        Some(program) => program,
+        None => {
+            println!("churn: FAIL /churn missing");
+            sys::exit(5);
+        }
+    };
+    let text: &[u8] = match mode {
+        0 => b"exit",
+        1 => b"fault",
+        2 => b"map",
+        _ => {
+            println!("churn: FAIL mode={mode}");
+            sys::exit(6);
+        }
+    };
+    let argv = [b"/churn".as_slice(), text];
+    match exec_image(program.data, b"/churn", &argv, &[], &[]) {
+        Ok(()) => sys::exit(7),
+        Err(error) => {
+            println!("churn: FAIL exec mode={mode} errno={}", error.0);
+            sys::exit(8);
+        }
+    }
+}
+
+/// The exec'd child variant. It exits after one fault or one map/unmap round; the parent's
+/// `PROC_WAIT` then drives teardown.
+fn churn_child_mode(mode: &str) -> i32 {
+    match mode {
+        "exit" => 0,
+        "fault" => {
+            let page = match sys::map_anonymous(PAGE) {
+                Ok(page) => page,
+                Err(error) => {
+                    println!("churn: FAIL fault-map errno={}", error.0);
+                    return 1;
+                }
+            };
+            // SAFETY: the kernel mapped one writable page at `page`; the write forces the
+            // anonymous fault this variant measures.
+            unsafe {
+                (page as *mut u8).write_volatile(0x5A);
+            }
+            0
+        }
+        "map" => {
+            let len = CHURN_MAP_PAGES.saturating_mul(PAGE);
+            let base = match sys::map_anonymous(len) {
+                Ok(base) => base,
+                Err(error) => {
+                    println!("churn: FAIL map errno={}", error.0);
+                    return 1;
+                }
+            };
+            let mut page = 0usize;
+            while page < CHURN_MAP_PAGES {
+                let address = base.saturating_add(page.saturating_mul(PAGE));
+                // SAFETY: the page is inside the writable mapping just created.
+                unsafe {
+                    (address as *mut u8).write_volatile(page as u8);
+                }
+                page = page.saturating_add(1);
+            }
+            page = 0;
+            while page < CHURN_MAP_PAGES {
+                let address = base.saturating_add(page.saturating_mul(PAGE));
+                // SAFETY: the page is inside the mapping and was just written.
+                let observed = unsafe { (address as *const u8).read_volatile() };
+                if observed != page as u8 {
+                    println!("churn: FAIL map-pattern page={page}");
+                    return 1;
+                }
+                page = page.saturating_add(1);
+            }
+            if let Err(error) = sys::unmap(Handle::SELF_PROC, base, len) {
+                println!("churn: FAIL unmap errno={}", error.0);
+                return 1;
+            }
+            0
+        }
+        _ => {
+            println!("churn: FAIL unknown child mode");
+            1
+        }
+    }
+}
+
+/// The controller child entry: exec `/churn` again with the controller role and an id.
+extern "C" fn churn_controller_entry(id: usize) -> ! {
+    let image = match sys::map_initfs() {
+        Ok(image) => image,
+        Err(error) => {
+            println!("churn: FAIL controller initfs errno={}", error.0);
+            sys::exit(1);
+        }
+    };
+    let initfs = match Initfs::parse(image) {
+        Ok(initfs) => initfs,
+        Err(_) => {
+            println!("churn: FAIL controller initfs parse");
+            sys::exit(2);
+        }
+    };
+    let program = match initfs.get("/churn") {
+        Some(program) => program,
+        None => {
+            println!("churn: FAIL controller /churn missing");
+            sys::exit(3);
+        }
+    };
+    let id_text: &[u8] = if id == 0 { b"0" } else { b"1" };
+    let argv = [b"/churn".as_slice(), b"controller".as_slice(), id_text];
+    match exec_image(program.data, b"/churn", &argv, &[], &[]) {
+        Ok(()) => sys::exit(4),
+        Err(error) => {
+            println!("churn: FAIL controller exec errno={}", error.0);
+            sys::exit(5);
+        }
+    }
+}
+
+fn start_churn_controller(id: usize) -> Result<Handle, Errno> {
+    let child = proc_fork()?;
+    let thread = sys::thread_create(
+        child,
+        churn_controller_entry as *const () as usize,
+        child_stack_top(),
+        id,
+    )?;
+    let _ = sys::handle_close(thread);
+    Ok(child)
+}
+
+fn churn_controller_process(id: &str) -> i32 {
+    let id_number = id.parse::<usize>().unwrap_or(0);
+    println!("churn: controller start id={id_number}");
+    let mut cycle = 0usize;
+    while cycle < CHURN_PER_CONTROLLER {
+        let mode = cycle % CHURN_VARIANTS;
+        if let Err(error) = churn_cycle(mode) {
+            println!(
+                "churn: FAIL controller={id_number} cycle={cycle} mode={mode} errno={}",
+                error.0
+            );
+            return 1;
+        }
+        cycle = cycle.saturating_add(1);
+    }
+    println!("churn: controller done id={id_number} cycles={CHURN_PER_CONTROLLER}");
+    0
+}
+
+/// PID 1 in `/churn` mode: one warm-up child sets the cycle-0 frame baseline, then two
+/// controller processes run 5,000 fork+exec+exit cycles each.
+fn churn_parent() -> i32 {
+    println!("churn: warmup");
+    if let Err(error) = churn_cycle(0) {
+        println!("churn: FAIL warmup errno={}", error.0);
+        return 1;
+    }
+    let _ = sys::nanosleep(50_000_000);
+    println!("churn: baseline");
+    println!("churn: start cycles={CHURN_CYCLES}");
+
+    let first = match start_churn_controller(0) {
+        Ok(child) => child,
+        Err(error) => {
+            println!("churn: FAIL controller0 start errno={}", error.0);
+            return 1;
+        }
+    };
+    let second = match start_churn_controller(1) {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = sys::handle_close(first);
+            println!("churn: FAIL controller1 start errno={}", error.0);
+            return 1;
+        }
+    };
+    let first_code = proc_wait(first).unwrap_or(-1);
+    let _ = sys::handle_close(first);
+    let second_code = proc_wait(second).unwrap_or(-1);
+    let _ = sys::handle_close(second);
+    // The last child s24 lines are printed by the dying CPUs; let the console drain before the
+    // final markers.
+    let _ = sys::nanosleep(200_000_000);
+    println!("churn: done cycles={CHURN_CYCLES}");
+    if first_code != 0 || second_code != 0 {
+        println!("churn: FAIL controllers first={first_code} second={second_code}");
+        return 1;
+    }
+    println!("smp-memory: churn ok");
+    0
+}
+
+fn main(args: raven_rt::Args) -> i32 {
+    if args.get(0) == Some("/churn") {
+        if args.get(1) == Some("controller") {
+            return churn_controller_process(args.get(2).unwrap_or("0"));
+        }
+        if let Some(mode) = args.get(1) {
+            return churn_child_mode(mode);
+        }
+        return churn_parent();
+    }
     println!("smp-memory: start workers={WORKERS}");
 
     let (object, sampled, keep) = match tlb_setup() {

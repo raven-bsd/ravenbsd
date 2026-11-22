@@ -28,4 +28,5 @@ RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=
 
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
-    /init="$binary"
+    /init="$binary" \
+    /churn="$binary"

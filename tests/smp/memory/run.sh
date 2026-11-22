@@ -51,12 +51,16 @@ case "$mode" in
     tcg)
         case_file=tests/smp/memory/smp-memory.toml
         case_name=smp-memory
+        churn_case=tests/smp/memory/smp-memory-churn.toml
+        churn_name=smp-memory-churn
         kvm_state=disabled
         smp=4
         ;;
     kvm2)
         case_file=tests/smp/memory/smp-memory-kvm2.toml
         case_name=smp-memory-kvm2
+        churn_case=tests/smp/memory/smp-memory-churn-kvm2.toml
+        churn_name=smp-memory-churn-kvm2
         smp=2
         if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
             echo "smp-memory: BLOCKED /dev/kvm is not readable and writable" >&2
@@ -67,6 +71,8 @@ case "$mode" in
     kvm4)
         case_file=tests/smp/memory/smp-memory-kvm4.toml
         case_name=smp-memory-kvm4
+        churn_case=tests/smp/memory/smp-memory-churn-kvm4.toml
+        churn_name=smp-memory-churn-kvm4
         smp=4
         if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
             echo "smp-memory: BLOCKED /dev/kvm is not readable and writable" >&2
@@ -77,6 +83,7 @@ case "$mode" in
 esac
 
 image=build/smp-memory/smp-memory.img
+churn_image=build/smp-memory/smp-memory-churn.img
 initfs=build/smp-memory/initfs.img
 cmdline='console=ttyS0 test-exit=1 smp_user=on smp-user-trace s24-framecheck'
 out=build/smp-memory/$mode
@@ -85,8 +92,10 @@ if [ "$no_build" -eq 0 ]; then
     sh tests/smp/memory/build.sh
     cargo xtask image --arch x86_64 --profile base --cmdline "$cmdline" \
         --initfs "$initfs" --output "$image"
+    cargo xtask image --arch x86_64 --profile base --cmdline "$cmdline init=/churn" \
+        --initfs "$initfs" --output "$churn_image"
 fi
-for required in "$image" "$initfs" "$case_file"; do
+for required in "$image" "$churn_image" "$initfs" "$case_file" "$churn_case"; do
     if [ ! -f "$required" ]; then
         echo "smp-memory: missing $required (run without --no-build first)" >&2
         exit 2
@@ -177,6 +186,91 @@ if [ "$count" -eq 0 ]; then
     echo "smp-memory: no iterations completed" >&2
     exit 1
 fi
+
+churn_dir=$out/churn
+mkdir -p "$churn_dir"
+if ! RAVEN_SMP_MEMORY_NO_BUILD=1 \
+    cargo run -q -p raven-qtest -- run \
+        --case "$churn_case" \
+        --arch x86_64 \
+        --image "$churn_image" \
+        --no-build \
+        --out "$churn_dir" \
+        > "$churn_dir/stdout.txt" 2>&1; then
+    {
+        echo "smp-memory: FAIL churn mode=$mode iteration=1 commit=$(git rev-parse HEAD)"
+        echo "smp-memory: case=$churn_case image=$churn_image"
+        echo "smp-memory: log=$churn_dir/$churn_name.log"
+        echo "smp-memory: stdout=$churn_dir/stdout.txt"
+        tail -n 30 "$churn_dir/stdout.txt"
+    } | tee "$out/failure.txt" >&2
+    exit 1
+fi
+churn_log=$churn_dir/$churn_name.log
+churn_baseline=$(awk -F= '/^s24: frames free=/ { value=$2 } /^churn: baseline$/ { print value; exit }' "$churn_log")
+awk -F= '/^churn: start cycles=10000$/ { started=1; next } started && /^s24: frames free=/ { print $2 }' "$churn_log" > "$churn_dir/frames.txt"
+churn_count=$(wc -l < "$churn_dir/frames.txt" | tr -d ' ')
+if [ -z "$churn_baseline" ] || [ "$churn_count" -lt 10000 ]; then
+    {
+        echo "smp-memory: FAIL churn-frames mode=$mode log=$churn_log"
+        echo "smp-memory: baseline=${churn_baseline:-missing} frames=$churn_count want-at-least=10000"
+    } | tee "$out/failure.txt" >&2
+    exit 1
+fi
+churn_c1000=$(sed -n '1000p' "$churn_dir/frames.txt")
+churn_c5000=$(sed -n '5000p' "$churn_dir/frames.txt")
+churn_c10000=$(sed -n '10000p' "$churn_dir/frames.txt")
+churn_allowed=$((1052672 + 32768))
+for pair in "1000:$churn_c1000" "5000:$churn_c5000" "10000:$churn_c10000"; do
+    checkpoint=${pair%%:*}
+    value=${pair#*:}
+    case $value in
+        ''|*[!0-9]*)
+            {
+                echo "smp-memory: FAIL churn-checkpoint mode=$mode cycle=$checkpoint value=${value:-missing}"
+            } | tee "$out/failure.txt" >&2
+            exit 1
+            ;;
+    esac
+    if [ "$value" -lt $((churn_baseline - churn_allowed)) ]; then
+        {
+            echo "smp-memory: FAIL churn-reserve mode=$mode cycle=$checkpoint"
+            echo "smp-memory: baseline=$churn_baseline value=$value delta=$((churn_baseline - value)) allowed=$churn_allowed"
+        } | tee "$out/failure.txt" >&2
+        exit 1
+    fi
+done
+churn_delta1000=$((churn_baseline - churn_c1000))
+churn_delta5000=$((churn_baseline - churn_c5000))
+churn_delta10000=$((churn_baseline - churn_c10000))
+churn_final=$(tail -n 1 "$churn_dir/frames.txt")
+case $churn_final in
+    ''|*[!0-9]*)
+        {
+            echo "smp-memory: FAIL churn-final mode=$mode value=${churn_final:-missing}"
+        } | tee "$out/failure.txt" >&2
+        exit 1
+        ;;
+esac
+churn_delta_final=$((churn_baseline - churn_final))
+if [ "$churn_final" -lt $((churn_baseline - churn_allowed)) ]; then
+    {
+        echo "smp-memory: FAIL churn-final-reserve mode=$mode"
+        echo "smp-memory: baseline=$churn_baseline final=$churn_final delta=$churn_delta_final allowed=$churn_allowed"
+    } | tee "$out/failure.txt" >&2
+    exit 1
+fi
+if [ "$churn_delta5000" -gt $((churn_delta1000 + 32768)) ] || \
+    [ "$churn_delta10000" -gt $((churn_delta1000 + 32768)) ]; then
+    {
+        echo "smp-memory: FAIL churn-growth mode=$mode"
+        echo "smp-memory: delta1k=$churn_delta1000 delta5k=$churn_delta5000 delta10k=$churn_delta10000 allowed-growth=32768"
+    } | tee "$out/failure.txt" >&2
+    exit 1
+fi
+churn_line="smp-memory: churn checkpoints baseline=$churn_baseline c1000=$churn_c1000 c5000=$churn_c5000 c10000=$churn_c10000 final=$churn_final delta1k=$churn_delta1000 delta5k=$churn_delta5000 delta10k=$churn_delta10000 deltaFinal=$churn_delta_final allowed=$churn_allowed"
+printf '%s\n' "$churn_line" | tee "$out/churn.txt"
+
 sort -n "$durations" > "$out/durations-ms.sorted"
 worst=$(tail -n 1 "$out/durations-ms.sorted")
 rank=$(awk -v n="$count" 'BEGIN { print int((n * 90 + 99) / 100) }')
@@ -194,4 +288,5 @@ last=$(grep -h '^smp-memory: summary ' "$out"/run-*.log | tail -n 1)
     echo "iterations=$count planned=$iterations timeboxed=$timeboxed timebox_secs=$timebox"
     echo "duration_ms worst=$worst p90=$p90 average=$average"
     echo "last_sample=$last"
+    echo "$churn_line"
 } | tee "$out/summary.txt"
