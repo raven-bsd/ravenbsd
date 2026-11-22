@@ -831,6 +831,18 @@ fn oom_pattern(chunk: usize, page: usize, seed: usize) -> u64 {
     0xA5A5_0000_0000_0000u64 ^ ((seed as u64) << 48) ^ ((chunk as u64) << 20) ^ (page as u64)
 }
 
+/// Serialize a child's console line through the shared page. `println!` may issue more than one
+/// write, so two children printing a failure at the same time can interleave the bytes.
+macro_rules! oom_print {
+    ($lock:expr, $($arg:tt)*) => {{
+        while $lock.swap(1, Ordering::Acquire) != 0 {
+            core::hint::spin_loop();
+        }
+        println!($($arg)*);
+        $lock.store(0, Ordering::Release);
+    }};
+}
+
 /// In-guest frame-exhaustion child: map 1 MiB chunks until the frame allocator refuses, verify
 /// every page carries a distinct pattern, then release everything.
 extern "C" fn oom_inject_child_entry(packed: usize) -> ! {
@@ -841,15 +853,29 @@ extern "C" fn oom_inject_child_entry(packed: usize) -> ! {
     let ready = unsafe { &*(shared as *const AtomicU32) };
     // SAFETY: same shared page; `go` is the second u32.
     let go = unsafe { &*((shared.saturating_add(4)) as *const AtomicU32) };
-    // SAFETY: same shared page; `verified` is the third u32. Both children hold every frame
-    // until both have checked their patterns, so neither frees frames into the other's
-    // allocation loop.
-    let verified = unsafe { &*((shared.saturating_add(8)) as *const AtomicU32) };
+    // SAFETY: same shared page; `written` is the third u32 and `verified` the fourth. Both
+    // children must finish writing every pattern before either reads one back, otherwise a
+    // frame shared across the two processes could be overwritten and verified in an order that
+    // hides the duplicate.
+    let written = unsafe { &*((shared.saturating_add(8)) as *const AtomicU32) };
+    // SAFETY: same shared page; `verified` is the fourth u32.
+    let verified = unsafe { &*((shared.saturating_add(12)) as *const AtomicU32) };
+    // The odd seed owns slot A, the even seed slot B. The parent prints both result lines after
+    // reaping, so the two children never interleave console writes on the success path.
+    let odd = seed % 2 == 1;
+    let refusals_offset = if odd { 16 } else { 20 };
+    let frames_offset = if odd { 24 } else { 32 };
+    // SAFETY: same shared page; the refusal slots are the u32s at +16/+20.
+    let refusals_slot = unsafe { &*((shared.saturating_add(refusals_offset)) as *const AtomicU32) };
+    // SAFETY: same shared page; the frame slots are the u64s at +24/+32.
+    let frames_slot = unsafe { &*((shared.saturating_add(frames_offset)) as *const AtomicU64) };
+    // SAFETY: same shared page; the console lock is the u32 at +40.
+    let console = unsafe { &*((shared.saturating_add(40)) as *const AtomicU32) };
 
     let small = match sys::map_anonymous(OOM_SMALL_PAGES * PAGE) {
         Ok(address) => address,
         Err(error) => {
-            println!("oom: fail small-map errno={}", error.0);
+            oom_print!(console, "oom: fail small-map errno={}", error.0);
             sys::exit(3);
         }
     };
@@ -861,7 +887,7 @@ extern "C" fn oom_inject_child_entry(packed: usize) -> ! {
         core::hint::spin_loop();
         spins = spins.saturating_add(1);
         if spins > POLL_LIMIT {
-            println!("oom: fail barrier timeout");
+            oom_print!(console, "oom: fail barrier timeout");
             sys::exit(9);
         }
     }
@@ -880,13 +906,13 @@ extern "C" fn oom_inject_child_entry(packed: usize) -> ! {
                 refusals = refusals.saturating_add(1);
             }
             Err(error) => {
-                println!("oom: fail map errno={}", error.0);
+                oom_print!(console, "oom: fail map errno={}", error.0);
                 sys::exit(4);
             }
         }
     }
     if refusals == 0 {
-        println!("oom: fail no-refusal chunks={chunks}");
+        oom_print!(console, "oom: fail no-refusal chunks={chunks}");
         sys::exit(7);
     }
 
@@ -904,6 +930,18 @@ extern "C" fn oom_inject_child_entry(packed: usize) -> ! {
         }
         chunk = chunk.saturating_add(1);
     }
+    // Every page has been written. Wait for the other child before reading any page back, so a
+    // frame handed to both processes is overwritten by at least one pattern before verification.
+    written.fetch_add(1, Ordering::AcqRel);
+    let mut spins = 0u32;
+    while written.load(Ordering::Acquire) < 2 {
+        core::hint::spin_loop();
+        spins = spins.saturating_add(1);
+        if spins > POLL_LIMIT {
+            oom_print!(console, "oom: fail written barrier timeout");
+            sys::exit(11);
+        }
+    }
     chunk = 0;
     while chunk < chunks {
         let base = OOM_CHUNK_ADDR[chunk].load(Ordering::Acquire);
@@ -913,7 +951,8 @@ extern "C" fn oom_inject_child_entry(packed: usize) -> ! {
             let address = base.saturating_add(page.saturating_mul(PAGE));
             let observed = read_word(address);
             if observed != oom_pattern(chunk, page, seed) {
-                println!(
+                oom_print!(
+                    console,
                     "oom: fail double-handout chunk={chunk} page={page} seen={observed:#x} want={:#x}",
                     oom_pattern(chunk, page, seed)
                 );
@@ -934,7 +973,7 @@ extern "C" fn oom_inject_child_entry(packed: usize) -> ! {
         core::hint::spin_loop();
         spins = spins.saturating_add(1);
         if spins > POLL_LIMIT {
-            println!("oom: fail verified barrier timeout");
+            oom_print!(console, "oom: fail verified barrier timeout");
             sys::exit(10);
         }
     }
@@ -943,13 +982,14 @@ extern "C" fn oom_inject_child_entry(packed: usize) -> ! {
         let base = OOM_CHUNK_ADDR[chunk].load(Ordering::Acquire);
         let pages = OOM_CHUNK_PAGES_USED[chunk].load(Ordering::Acquire);
         if let Err(error) = sys::unmap(Handle::SELF_PROC, base, pages.saturating_mul(PAGE)) {
-            println!("oom: fail unmap errno={}", error.0);
+            oom_print!(console, "oom: fail unmap errno={}", error.0);
             sys::exit(8);
         }
         frames_back = frames_back.saturating_add(pages.saturating_mul(PAGE));
         chunk = chunk.saturating_add(1);
     }
-    println!("oom: pass refusals={refusals} frames_back={frames_back}");
+    refusals_slot.store(refusals, Ordering::Release);
+    frames_slot.store(frames_back as u64, Ordering::Release);
     sys::exit(0)
 }
 
@@ -958,11 +998,28 @@ fn oom_round(
     round: usize,
     ready: &AtomicU32,
     go: &AtomicU32,
+    written: &AtomicU32,
     verified: &AtomicU32,
 ) -> Result<(), Errno> {
     ready.store(0, Ordering::Release);
     go.store(0, Ordering::Release);
+    written.store(0, Ordering::Release);
     verified.store(0, Ordering::Release);
+    // SAFETY: the shared page is mapped writable; the refusal slots are the u32s at +16/+20.
+    let refusals_a = unsafe { &*((shared.saturating_add(16)) as *const AtomicU32) };
+    // SAFETY: same shared page; slot B is the u32 at +20.
+    let refusals_b = unsafe { &*((shared.saturating_add(20)) as *const AtomicU32) };
+    // SAFETY: same shared page; the frame slots are the u64s at +24/+32.
+    let frames_a = unsafe { &*((shared.saturating_add(24)) as *const AtomicU64) };
+    // SAFETY: same shared page; slot B is the u64 at +32.
+    let frames_b = unsafe { &*((shared.saturating_add(32)) as *const AtomicU64) };
+    // SAFETY: same shared page; the console lock is the u32 at +40.
+    let console = unsafe { &*((shared.saturating_add(40)) as *const AtomicU32) };
+    refusals_a.store(0, Ordering::Release);
+    refusals_b.store(0, Ordering::Release);
+    frames_a.store(0, Ordering::Release);
+    frames_b.store(0, Ordering::Release);
+    console.store(0, Ordering::Release);
     println!("oom: round={round} children=2");
 
     let first_seed = round.saturating_mul(2).saturating_sub(1);
@@ -997,6 +1054,16 @@ fn oom_round(
     // Drain the children's `s24: frames free=` lines before the round marker; the dying CPU
     // prints them on its own context and `PROC_WAIT` can wake the parent first.
     let _ = sys::nanosleep(200_000_000);
+    println!(
+        "oom: pass refusals={} frames_back={}",
+        refusals_a.load(Ordering::Acquire),
+        frames_a.load(Ordering::Acquire)
+    );
+    println!(
+        "oom: pass refusals={} frames_back={}",
+        refusals_b.load(Ordering::Acquire),
+        frames_b.load(Ordering::Acquire)
+    );
     println!("oom: round={round} done");
 
     let next = sys::map_anonymous(PAGE)?;
@@ -1026,16 +1093,12 @@ fn oom_injection() -> Result<(), Errno> {
     let ready = unsafe { &*(shared as *const AtomicU32) };
     // SAFETY: same shared page; `go` is the second u32.
     let go = unsafe { &*((shared.saturating_add(4)) as *const AtomicU32) };
-    // SAFETY: same shared page; `verified` is the third u32.
-    let verified = unsafe { &*((shared.saturating_add(8)) as *const AtomicU32) };
+    // SAFETY: same shared page; `written` is the third u32 and `verified` the fourth.
+    let written = unsafe { &*((shared.saturating_add(8)) as *const AtomicU32) };
+    // SAFETY: same shared page; `verified` is the fourth u32.
+    let verified = unsafe { &*((shared.saturating_add(12)) as *const AtomicU32) };
 
-    let mut result = Ok(());
-    for round in 1..=2usize {
-        if let Err(error) = oom_round(shared, round, ready, go, verified) {
-            result = Err(error);
-            break;
-        }
-    }
+    let result = oom_round(shared, 1, ready, go, written, verified);
     let _ = sys::unmap(Handle::SELF_PROC, shared, PAGE);
     let _ = sys::handle_close(object);
     result

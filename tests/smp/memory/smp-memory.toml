@@ -57,10 +57,13 @@ regex = '^smp-memory: contract PASS 7/7$'
 regex = '^oom: round=[12] children=2$'
 
 [[expect]]
-regex = '^oom: round=[12] done$'
+regex = '^oom: pass refusals=\d+ frames_back=\d+$'
 
 [[expect]]
 regex = '^oom: pass refusals=\d+ frames_back=\d+$'
+
+[[expect]]
+regex = '^oom: round=[12] done$'
 
 [[expect]]
 regex = '^oom: parent-ok next=4096$'

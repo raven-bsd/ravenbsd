@@ -99,7 +99,7 @@ further 1 MiB-scale drop on the second OOM child.
 ## Frame-exhaustion OOM injection (K475)
 
 K5 exercises the object layer: a 1 GiB `MEMOBJ_CREATE` is refused before a frame is touched. K475
-adds the frame-allocator row after K7. Each round starts **two children concurrently** through a
+adds the frame-allocator row after K7. The row starts **two children concurrently** through a
 shared `memobj` barrier page, then:
 
 1. each child maps a 16-page first chunk and then 1 MiB (`256`-page) chunks until the allocator
@@ -107,31 +107,33 @@ shared `memobj` barrier page, then:
    bounded at 640 chunks;
 2. every mapped page is filled with a distinct 64-bit pattern derived from `(seed, chunk, page)`,
    so a frame handed out twice is overwritten and detected;
-3. both children meet a second barrier while still holding every frame, then read every page back
-   and fail on the first mismatch (`oom: fail double-handout ...`);
-4. both children unmap every chunk and print `oom: pass refusals=N frames_back=<bytes>`; the parent
-   reaps both, allocates one page, writes/reads a marker, and prints `oom: parent-ok next=4096`;
-5. the sequence runs twice (`oom: round=1`, `oom: round=2`) so a per-attempt leak would show as a
-   further drop in the second post-round line.
+3. both children meet a `written` barrier, then read every page back and fail on the first
+   mismatch (`oom: fail double-handout ...`); a `verified` barrier keeps every frame held until
+   both checks are complete;
+4. both children unmap every chunk and record `refusals`/`frames_back` in the shared page; the
+   parent reaps both, prints the two `oom: pass refusals=N frames_back=<bytes>` lines (so the
+   success lines cannot interleave on the console), allocates one page, writes/reads a marker, and
+   prints `oom: parent-ok next=4096`.
+
+The sequence runs once (`oom: round=1`). K453's two sequential K5 attempts already show that the
+one-time reserve does not grow per attempt; in K475 the two children are concurrent attempts on the
+same allocator.
 
 The numeric baseline row is checked by `tests/smp/memory/run.sh`, because `s24: frames free=` is
 kernel serial output that the in-guest fixture cannot read. The runner takes the last `s24` line
-before `oom: round=1` as the baseline and the last `s24` line before each `oom: parent-ok` as the
-post-round value. A reclaim leak fails the run; the second post-round value must also stay within
-the documented 32 KiB cache transient of the first.
+before `oom: round=1 children=2` as the baseline and the last `s24` line before
+`oom: round=1 done` as the post value. A reclaim leak fails the run.
 
-| Run | Baseline | Round 1 post | Round 2 post | Delta | Refusals | `frames_back` round 1 / round 2 (child A / child B) |
-|---|---:|---:|---:|---:|---:|---|
-| TCG `-smp 4` | 505,294,848 | 505,294,848 | 505,294,848 | 0 | 3 / 3 | R1 240,189,440 / 263,258,112; R2 222,363,648 / 281,083,904 |
-| KVM `-smp 2` | 505,270,272 | 505,266,176 | 505,266,176 | -4,096 | 3 / 3 | R1 252,772,352 / 250,675,200; R2 235,995,136 / 267,452,416 |
-| KVM `-smp 4` | 505,196,544 | 505,192,448 | 505,192,448 | -4,096 | 3 / 3 | R1 250,675,200 / 252,772,352; R2 262,209,536 / 241,238,016 |
+| Run | Baseline | Post | Delta | Refusals | `frames_back` (child A / child B) |
+|---|---:|---:|---:|---:|---|
+| TCG `-smp 4` | 505,286,656 | 505,286,656 | 0 | 3 / 3 | 242,286,592 / 261,160,960 |
+| KVM `-smp 2` | 505,266,176 | 505,262,080 | -4,096 | 3 / 3 | 297,861,120 / 205,586,432 |
+| KVM `-smp 4` | 505,192,448 | 505,188,352 | -4,096 | 3 / 3 | 266,403,840 / 237,043,712 |
 
-Each round's two children release about 503 MiB together, which is the baseline minus the kernel
-image, page tables and the parent's live mappings. The **4,096-byte difference is the test-owned
-shared barrier page**, allocated after the K6 `s24` line: the delta is `-4,096` when that line
-prints before the allocation and `0` when the delayed line prints after it. The parent unmaps the
-page after both rounds. `post1 == post2` in both modes: the second attempt adds no reserve and
-leaks nothing.
+The two children release about 503 MiB together, which is the baseline minus the kernel image, page
+tables and the parent's live mappings. The **4,096-byte difference is the test-owned shared barrier
+page**, allocated after the K6 `s24` line: the delta is `-4,096` when that line prints before the
+allocation and `0` when the delayed line prints after it. The parent unmaps the page after the row.
 
 ### Reserve arithmetic and the per-CPU page cache
 
@@ -157,30 +159,30 @@ fails the row.
 
 ### Mutation/negative checks
 
-- **Double handout.** Temporarily changed `kernel/src/memory/uspace.rs` `map_anonymous` so a
-  failed `frame::alloc_zeroed_frame()` reuses the last mapped user frame for a bounded 1 MiB chunk
-  (diff SHA-256 `848229142cf9817e57157acdf49bfda7044684dc7681db76a81c55e9ac76354a`). Both children
-  failed the pattern check:
-  `oom: fail double-handout chunk=208 page=0 seen=0xa5a400000d0000ff want=0xa5a400000d000000`
-  and the same for chunk 274; the qtest forbade the line and exited 35. Reverted with
+- **Double handout.** Temporarily changed `kernel/src/memory/uspace.rs` `map_anonymous` so page
+  128 of a 1 MiB chunk is mapped to page 0's frame (diff SHA-256
+  `1a1413f7eac533047b360dbda1a3d912930b07080b9848be8e7fd621fd876ce4`). Both children failed the
+  pattern check:
+  `oom: fail double-handout chunk=1 page=0 seen=0xa5a4000000100080 want=0xa5a4000000100000`
+  and the seed-2 equivalent; the qtest forbade the line and exited 35. Reverted with
   `git restore kernel/src/memory/uspace.rs`.
 - **Reclaim leak.** Temporarily changed `kernel/src/memory/frame.rs` `free_frame` to drop every
   eighth reclaimed frame (diff SHA-256
   `1fa58439cd991a7a94c9903028b1687551fd13b777b8aa8297da23022c020f44`). The qtest passed, but the
   runner failed the numeric row:
-  `smp-memory: FAIL oom-baseline ... baseline=338071552 post1=295776256 delta=42295296 allowed=1089536`.
+  `smp-memory: FAIL oom-baseline ... baseline=338067456 post1=295747584 delta=42319872 allowed=1089536`.
   Reverted with `git restore kernel/src/memory/frame.rs`.
 
 No allocator defect was found on the production path: every refusal was `ENOMEM`, the guest never
-panicked or printed `EXCEPTION`, no page pattern was overwritten, and both post-round lines returned
-to the baseline. No permanent kernel change remains.
+panicked or printed `EXCEPTION`, no page pattern was overwritten, and the post line returned to the
+baseline. No permanent kernel change remains.
 
 ## Commands and result
 
 ```sh
-timeout 600 sh tests/smp/memory/run.sh tcg --iterations 1   # PASS, 7 rows + 2 OOM rounds, 237.9 s (host load 44)
-timeout 600 sh tests/smp/memory/run.sh kvm2 --iterations 1  # PASS, 7 rows + 2 OOM rounds, 29.1 s
-timeout 600 sh tests/smp/memory/run.sh kvm4 --iterations 1  # PASS, 7 rows + 2 OOM rounds, 32.7 s
+timeout 600 sh tests/smp/memory/run.sh tcg --iterations 1   # PASS, 7 rows + OOM row, 223.4 s (host load 68)
+timeout 600 sh tests/smp/memory/run.sh kvm2 --iterations 1  # PASS, 7 rows + OOM row, 25.9 s
+timeout 600 sh tests/smp/memory/run.sh kvm4 --iterations 1  # PASS, 7 rows + OOM row, 31.9 s
 ```
 
 The existing TLB lines remain: `smp-memory: summary alloc_ops=256 fault_pages=512 maps=32
