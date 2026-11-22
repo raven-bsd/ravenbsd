@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K492 boot-loop matrix entry point. The Python runner owns the matrix and
+# K492/K546 boot-loop matrix entry point. The Python runner owns the matrix and
 # reuses the existing `tests/smp/boot/soak_boot.py` foreground QEMU supervisor.
 # Usage: sh tests/soak/run.sh --mode tcg --boots 20
+#        sh tests/soak/run.sh --mode tcg --boots 10 --arch aarch64
 
 set -eu
 

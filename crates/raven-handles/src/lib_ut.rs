@@ -514,8 +514,9 @@ fn queued_derivation_after_revoke_cannot_regain_a_revoked_right() {
         .revoke_target(parent, Rights::WRITE)
         .expect("revoke parent");
 
-    // The receive installs a grandchild from the queued intermediate after the revoke. The
-    // grandchild never had WRITE, so the split is EACCES, not EPERM.
+    // The queued intermediate held WRITE at send time; the receive child is granted that
+    // send-time mask and the completed ancestor revoke binds it. C17: granted-then-revoked is
+    // EPERM, not EACCES. The right is still not regained: the effective mask is READ.
     let installed = queue_table
         .insert_derived(
             TestObject(3),
@@ -524,10 +525,7 @@ fn queued_derivation_after_revoke_cannot_regain_a_revoked_right() {
         )
         .expect("install after revoke");
     assert_eq!(queue_table.rights(installed), Ok(Rights::READ));
-    assert_eq!(
-        queue_table.get(installed, Rights::WRITE),
-        Err(Errno::EACCES)
-    );
+    assert_eq!(queue_table.get(installed, Rights::WRITE), Err(Errno::EPERM));
     assert_eq!(queue_table.get(installed, Rights::READ), Ok(&TestObject(3)));
 }
 

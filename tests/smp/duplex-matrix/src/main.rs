@@ -1416,6 +1416,10 @@ enum Side {
 /// One datagram queue entry in the fuzz model: whether it carries a handle.
 struct Queued {
     has_handle: bool,
+    /// The carrier's WRITE was still effective when this message was sent. A handle queued
+    /// after the carrier revoke never held WRITE, so its use is EACCES; one queued before the
+    /// revoke is granted-then-revoked at install time and its use is EPERM.
+    write_at_send: bool,
 }
 
 struct FuzzPair {
@@ -1483,7 +1487,10 @@ impl Fuzz {
         let queue = self.pairs[pair].queue(side);
         let result = sendmsg(handle, b"d", &[], DUPLEX_MSG_NOSIGNAL);
         if result == Ok(1) {
-            self.pairs[pair].queues[queue].push(Queued { has_handle: false });
+            self.pairs[pair].queues[queue].push(Queued {
+                has_handle: false,
+                write_at_send: false,
+            });
         }
         self.record(1, side as u8 + pair as u8 * 2, ret_of(result));
         if !self.stats_ok() {
@@ -1499,7 +1506,10 @@ impl Fuzz {
         let queue = self.pairs[pair].queue(side);
         let result = sendmsg(handle, b"h", &control[..control_len], DUPLEX_MSG_NOSIGNAL);
         if result == Ok(1) {
-            self.pairs[pair].queues[queue].push(Queued { has_handle: true });
+            self.pairs[pair].queues[queue].push(Queued {
+                has_handle: true,
+                write_at_send: !self.carrier_revoked,
+            });
             self.pending = self.pending.saturating_add(1);
         }
         self.record(2, side as u8 + pair as u8 * 2, ret_of(result));
@@ -1531,6 +1541,7 @@ impl Fuzz {
                 return;
             };
             let had_handle = entry.has_handle;
+            let write_at_send = entry.write_at_send;
             let _ = self.pairs[pair].queues[queue].remove(0);
             if had_handle {
                 self.pending = self.pending.saturating_sub(1);
@@ -1557,15 +1568,21 @@ impl Fuzz {
                     let raw = get_u32(&control, CMSG_BYTES).unwrap_or(u32::MAX);
                     let delivered = Handle(raw);
                     let write = sendmsg(delivered, b"z", &[], DUPLEX_MSG_NOSIGNAL);
-                    let rights_ok = if self.carrier_revoked {
-                        write == Err(Errno::EPERM)
+                    let rights_ok = if write_at_send {
+                        if self.carrier_revoked {
+                            // Granted at send, revoked by the ancestor before the use.
+                            write == Err(Errno::EPERM)
+                        } else {
+                            matches!(write, Ok(_) | Err(Errno::EAGAIN) | Err(Errno::EPIPE))
+                        }
                     } else {
-                        matches!(write, Ok(_) | Err(Errno::EAGAIN) | Err(Errno::EPIPE))
+                        // Queued after the revoke: this handle never held WRITE.
+                        write == Err(Errno::EACCES)
                     };
                     if !rights_ok {
                         println!(
-                            "duplex-matrix: fuzz-detail step={step} kind=delivered-rights revoked={} write={write:?}",
-                            self.carrier_revoked
+                            "duplex-matrix: fuzz-detail step={step} kind=delivered-rights revoked={} send-write={} write={write:?}",
+                            self.carrier_revoked, write_at_send
                         );
                         self.break_invariant(step, 4, side as u8);
                     }
@@ -1721,6 +1738,11 @@ fn fuzz(table: &mut Table) {
     }
 
     let before = stats().unwrap_or_default();
+    // Deterministic C17 seed: queue the carrier before the revoke, install it after. With the
+    // granted-snapshot fix the use is EPERM; dropping the snapshot makes it EACCES.
+    fuzz.send_handle(0, Side::Left, 0);
+    fuzz.revoke_carrier(0);
+    fuzz.recv(0, Side::Right, false, 0);
     let mut step = 0;
     while step < FUZZ_OPS {
         let pair = rng.below(3) as usize;
