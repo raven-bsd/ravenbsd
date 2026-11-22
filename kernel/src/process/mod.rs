@@ -285,6 +285,8 @@ pub struct Process {
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
+    /// True once an exec has replaced this process image; a child then refuses `setpgid`.
+    pub exec_done: AtomicBool,
     /// Threads blocked in `PROC_SIGRECV`.
     pub signal_waiters: WaitQueue,
     /// Parents blocked in `PROC_WAIT_EX` on this process's children.
@@ -469,6 +471,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -545,6 +548,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -614,6 +618,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -917,6 +922,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
