@@ -13,6 +13,12 @@
 //! `^C` discards the line and raises [`Event::Interrupt`], `^D` on an empty line raises
 //! [`Event::EndOfFile`] and `^L` is inserted verbatim. Raw mode passes bytes through without echo
 //! or editing.
+//!
+//! [`Termios`] is the complete terminal attribute record: the pty stores it, the protocol carries
+//! it field by field and `tcgetattr` returns it unchanged (K444). The bit rules are the NetBSD
+//! `ttyinput_wlock`/`ttyoutput` ones for the flags a scheme pty can honour (`ICRNL`, `INLCR`,
+//! `IGNCR`, `ISTRIP`, `IXON`, `ISIG`, `ICANON`, `ECHO`, `OPOST`, `ONLCR`, `OCRNL`); bits with no
+//! hardware behind them are preserved so the round-trip is exact.
 
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
@@ -36,10 +42,190 @@ const ERASE: &[u8] = b"\x08 \x08";
 
 const CTRL_C: u8 = 0x03;
 const CTRL_D: u8 = 0x04;
-const CTRL_L: u8 = 0x0c;
 const CTRL_U: u8 = 0x15;
 const DEL: u8 = 0x7f;
 const BACKSPACE: u8 = 0x08;
+
+/// `IGNBRK`: ignore break.
+pub const IGNBRK: u32 = 0o0000001;
+/// `BRKINT`: break raises `SIGINT`.
+pub const BRKINT: u32 = 0o0000002;
+/// `IGNPAR`: ignore parity errors.
+pub const IGNPAR: u32 = 0o0000004;
+/// `PARMRK`: mark parity errors.
+pub const PARMRK: u32 = 0o0000010;
+/// `INPCK`: enable input parity checking.
+pub const INPCK: u32 = 0o0000020;
+/// `ISTRIP`: strip the eighth input bit.
+pub const ISTRIP: u32 = 0o0000040;
+/// `INLCR`: translate input `\n` to `\r`.
+pub const INLCR: u32 = 0o0000100;
+/// `IGNCR`: ignore input `\r`.
+pub const IGNCR: u32 = 0o0000200;
+/// `ICRNL`: translate input `\r` to `\n`.
+pub const ICRNL: u32 = 0o0000400;
+/// `IXON`: enable start/stop output flow control.
+pub const IXON: u32 = 0o0002000;
+/// `IXANY`: any character restarts output.
+pub const IXANY: u32 = 0o0004000;
+/// `IXOFF`: enable start/stop input flow control.
+pub const IXOFF: u32 = 0o0010000;
+/// `IMAXBEL`: ring the bell on input overflow.
+pub const IMAXBEL: u32 = 0o0020000;
+/// `IUTF8`: input is UTF-8.
+pub const IUTF8: u32 = 0o0040000;
+
+/// `OPOST`: enable output processing.
+pub const OPOST: u32 = 0o0000001;
+/// `ONLCR`: map output `\n` to `\r\n`.
+pub const ONLCR: u32 = 0o0000004;
+/// `OCRNL`: map output `\r` to `\n`.
+pub const OCRNL: u32 = 0o0000010;
+/// `ONOCR`: do not output `\r` at column zero.
+pub const ONOCR: u32 = 0o0000020;
+/// `ONLRET`: output `\n` also returns the carriage.
+pub const ONLRET: u32 = 0o0000040;
+
+/// `CS8`: eight-bit characters.
+pub const CS8: u32 = 0o0000060;
+/// `CREAD`: enable the receiver.
+pub const CREAD: u32 = 0o0000200;
+/// `B38400`, the pty default line speed.
+pub const B38400: u32 = 0o0000017;
+
+/// `ISIG`: enable `VINTR`/`VQUIT`/`VSUSP` signals.
+pub const ISIG: u32 = 0o0000001;
+/// `ICANON`: enable canonical input processing.
+pub const ICANON: u32 = 0o0000002;
+/// `ECHO`: echo input characters.
+pub const ECHO: u32 = 0o0000010;
+/// `ECHOE`: echo erase as `"\b \b"`.
+pub const ECHOE: u32 = 0o0000020;
+/// `ECHOK`: echo `VKILL` as a newline.
+pub const ECHOK: u32 = 0o0000040;
+/// `ECHONL`: echo `\n` even when `ECHO` is off.
+pub const ECHONL: u32 = 0o0000100;
+/// `IEXTEN`: enable implementation-defined input processing.
+pub const IEXTEN: u32 = 0o100000;
+
+/// Index of `VINTR` in `c_cc`.
+pub const VINTR: usize = 0;
+/// Index of `VQUIT` in `c_cc`.
+pub const VQUIT: usize = 1;
+/// Index of `VERASE` in `c_cc`.
+pub const VERASE: usize = 2;
+/// Index of `VKILL` in `c_cc`.
+pub const VKILL: usize = 3;
+/// Index of `VEOF` in `c_cc`.
+pub const VEOF: usize = 4;
+/// Index of `VTIME` in `c_cc`.
+pub const VTIME: usize = 5;
+/// Index of `VMIN` in `c_cc`.
+pub const VMIN: usize = 6;
+/// Index of `VSTART` in `c_cc`.
+pub const VSTART: usize = 8;
+/// Index of `VSTOP` in `c_cc`.
+pub const VSTOP: usize = 9;
+/// Index of `VSUSP` in `c_cc`.
+pub const VSUSP: usize = 10;
+/// Index of `VEOL` in `c_cc`.
+pub const VEOL: usize = 11;
+
+/// The disabled special-character value (`_POSIX_VDISABLE` in Raven libc is 0).
+pub const VDISABLE: u8 = 0;
+
+/// The complete `struct termios` attribute record.
+///
+/// The field layout and bit values are the Raven ABI (`libc/ravenlibc/abi/structs.toml`), which
+/// follows the BSD termios layout. The wire protocol encodes every field explicitly; this type is
+/// never sent as raw memory.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Termios {
+    /// Input flags (`c_iflag`).
+    pub iflag: u32,
+    /// Output flags (`c_oflag`).
+    pub oflag: u32,
+    /// Control flags (`c_cflag`).
+    pub cflag: u32,
+    /// Local flags (`c_lflag`).
+    pub lflag: u32,
+    /// Line discipline (`c_line`).
+    pub line: u8,
+    /// Special characters (`c_cc`).
+    pub cc: [u8; 32],
+    /// Input speed (`__c_ispeed`).
+    pub ispeed: u32,
+    /// Output speed (`__c_ospeed`).
+    pub ospeed: u32,
+}
+
+impl Termios {
+    /// The sane pty default: an 8-bit, 38400-baud, canonical, echoing RFC 4254 terminal with
+    /// `ICRNL`, `IXON`, `ISIG`, `IEXTEN`, `OPOST` and `ONLCR`.
+    #[must_use]
+    pub const fn sane() -> Self {
+        let mut cc = [0u8; 32];
+        cc[VINTR] = CTRL_C;
+        cc[VQUIT] = 0x1c;
+        cc[VERASE] = DEL;
+        cc[VKILL] = CTRL_U;
+        cc[VEOF] = CTRL_D;
+        cc[VSTART] = 0x11;
+        cc[VSTOP] = 0x13;
+        cc[VSUSP] = 0x1a;
+        cc[VMIN] = 1;
+        cc[VTIME] = 0;
+        Self {
+            iflag: ICRNL | IXON,
+            oflag: OPOST | ONLCR,
+            cflag: CS8 | CREAD | B38400,
+            lflag: ISIG | ICANON | ECHO | IEXTEN,
+            line: 0,
+            cc,
+            ispeed: B38400,
+            ospeed: B38400,
+        }
+    }
+
+    /// Canonical/raw view of the record.
+    #[must_use]
+    pub const fn settings(&self) -> Settings {
+        Settings {
+            mode: if self.lflag & ICANON != 0 {
+                Mode::Canonical
+            } else {
+                Mode::Raw
+            },
+            echo: self.lflag & ECHO != 0,
+        }
+    }
+
+    /// Apply a canonical/raw view without touching the other fields.
+    pub fn set_settings(&mut self, settings: Settings) {
+        if settings.mode == Mode::Canonical {
+            self.lflag |= ICANON;
+        } else {
+            self.lflag &= !ICANON;
+        }
+        if settings.echo {
+            self.lflag |= ECHO;
+        } else {
+            self.lflag &= !ECHO;
+        }
+    }
+
+    /// `c_cc[index]`, or [`VDISABLE`] when the index is outside the record.
+    #[must_use]
+    pub fn cc(&self, index: usize) -> u8 {
+        self.cc.get(index).copied().unwrap_or(VDISABLE)
+    }
+}
+
+impl Default for Termios {
+    fn default() -> Self {
+        Self::sane()
+    }
+}
 
 /// Input mode of the discipline.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -94,7 +280,7 @@ pub struct Output {
 /// The line discipline state.
 #[derive(Clone, Debug)]
 pub struct Discipline {
-    settings: Settings,
+    termios: Termios,
     line: [u8; MAX_LINE],
     len: usize,
 }
@@ -109,10 +295,7 @@ impl Discipline {
     /// A canonical, echoing discipline with an empty line.
     pub const fn new() -> Self {
         Self {
-            settings: Settings {
-                mode: Mode::Canonical,
-                echo: true,
-            },
+            termios: Termios::sane(),
             line: [0u8; MAX_LINE],
             len: 0,
         }
@@ -120,23 +303,38 @@ impl Discipline {
 
     /// Current mode and echo switch.
     pub fn settings(&self) -> Settings {
-        self.settings
+        self.termios.settings()
     }
 
-    /// Apply new settings, returning the number of pending input bytes discarded.
+    /// The complete terminal attribute record.
+    #[must_use]
+    pub const fn termios(&self) -> Termios {
+        self.termios
+    }
+
+    /// Replace the complete terminal attribute record, returning the number of pending input
+    /// bytes discarded.
     ///
-    /// A partially edited line cannot be carried across a mode switch (in raw mode it would be
-    /// delivered as a line the reader never saw), so a mode change drops it.
-    pub fn set_settings(&mut self, settings: Settings) -> usize {
-        let discarded = if settings.mode == self.settings.mode {
+    /// A partially edited line cannot be carried across a canonical/raw switch (in raw mode it
+    /// would be delivered as a line the reader never saw), so a mode change drops it. Every other
+    /// field is stored verbatim, including bits this pty has no hardware to act on.
+    pub fn set_termios(&mut self, termios: Termios) -> usize {
+        let discarded = if termios.settings().mode == self.settings().mode {
             0
         } else {
             let pending = self.len;
             self.len = 0;
             pending
         };
-        self.settings = settings;
+        self.termios = termios;
         discarded
+    }
+
+    /// Apply new mode/echo settings, returning the number of pending input bytes discarded.
+    pub fn set_settings(&mut self, settings: Settings) -> usize {
+        let mut termios = self.termios;
+        termios.set_settings(settings);
+        self.set_termios(termios)
     }
 
     /// Number of bytes in the line being edited.
@@ -151,23 +349,95 @@ impl Discipline {
         pending
     }
 
-    /// Feed console input through the discipline.
-    pub fn feed(&mut self, input: &[u8], out: &mut Output) {
-        for &byte in input {
-            if self.settings.mode == Mode::Raw {
-                out.data.push(byte);
-                continue;
-            }
-            match byte {
-                b'\r' | NEWLINE => self.complete_line(out),
-                BACKSPACE | DEL => self.erase(out),
-                CTRL_U => self.kill_line(out),
-                CTRL_C => self.interrupt(out),
-                CTRL_D => self.eof_or_complete(out),
-                CTRL_L => self.insert(byte, out),
-                _ => self.insert(byte, out),
+    /// Translate slave output through `OPOST`/`ONLCR`/`OCRNL`.
+    ///
+    /// This is the NetBSD `ttyoutput` rule set for the flags a scheme pty can honour. With
+    /// `OPOST` clear the bytes are passed through unchanged.
+    pub fn process_output(&self, data: &[u8], out: &mut Vec<u8>) {
+        if self.termios.oflag & OPOST == 0 {
+            out.extend_from_slice(data);
+            return;
+        }
+        for &byte in data {
+            if byte == b'\n' && self.termios.oflag & ONLCR != 0 {
+                out.extend_from_slice(b"\r\n");
+            } else if byte == b'\r' && self.termios.oflag & OCRNL != 0 {
+                out.push(b'\n');
+            } else {
+                out.push(byte);
             }
         }
+    }
+
+    /// Feed console input through the discipline.
+    pub fn feed(&mut self, input: &[u8], out: &mut Output) {
+        for &raw in input {
+            if self.termios.cflag & CREAD == 0 {
+                continue;
+            }
+            // Raw mode is a byte pipe in this pty: the console's raw-mode clients never expect
+            // editing, echo or translation (they clear the termios bits themselves when they use
+            // cfmakeraw). This preserves the pre-K444 scheme contract.
+            if self.termios.settings().mode == Mode::Raw {
+                out.data.push(raw);
+                continue;
+            }
+            let mut byte = raw;
+            if self.termios.iflag & ISTRIP != 0 {
+                byte &= 0x7f;
+            }
+            if self.termios.iflag & IXON != 0 {
+                if self.special(VSTOP, byte) {
+                    continue;
+                }
+                if self.special(VSTART, byte) {
+                    continue;
+                }
+            }
+            if byte == b'\r' {
+                if self.termios.iflag & IGNCR != 0 {
+                    continue;
+                }
+                if self.termios.iflag & ICRNL != 0 {
+                    byte = NEWLINE;
+                }
+            } else if byte == NEWLINE && self.termios.iflag & INLCR != 0 {
+                byte = b'\r';
+            }
+
+            if self.termios.lflag & ISIG != 0 && self.special(VINTR, byte) {
+                self.interrupt(out);
+                continue;
+            }
+            if byte == NEWLINE || (self.special(VEOL, byte) && self.termios.lflag & IEXTEN != 0) {
+                self.complete_line(out);
+                continue;
+            }
+            if self.special(VERASE, byte) || byte == BACKSPACE || byte == DEL {
+                self.erase(out);
+                continue;
+            }
+            if self.special(VKILL, byte) {
+                self.kill_line(out);
+                continue;
+            }
+            if self.special(VEOF, byte) {
+                self.eof_or_complete(out);
+                continue;
+            }
+            if self.termios.iflag & IMAXBEL != 0 && self.len == MAX_LINE {
+                if self.termios.lflag & ECHO != 0 {
+                    out.echo.push(BELL);
+                }
+                continue;
+            }
+            self.insert(byte, out);
+        }
+    }
+
+    fn special(&self, index: usize, byte: u8) -> bool {
+        let value = self.termios.cc(index);
+        value != VDISABLE && value == byte
     }
 
     fn complete_line(&mut self, out: &mut Output) {
@@ -184,7 +454,7 @@ impl Discipline {
             return;
         }
         self.len -= 1;
-        if self.settings.echo {
+        if self.termios.lflag & ECHO != 0 {
             out.echo.extend_from_slice(ERASE);
         }
     }
@@ -195,7 +465,7 @@ impl Discipline {
         }
         let erased = self.len;
         self.len = 0;
-        if self.settings.echo {
+        if self.termios.lflag & ECHO != 0 {
             for _ in 0..erased {
                 out.echo.extend_from_slice(ERASE);
             }
@@ -204,7 +474,7 @@ impl Discipline {
 
     fn interrupt(&mut self, out: &mut Output) {
         self.len = 0;
-        if self.settings.echo {
+        if self.termios.lflag & ECHO != 0 {
             out.echo.extend_from_slice(b"^C");
             out.echo.extend_from_slice(b"\r\n");
         }
@@ -221,20 +491,20 @@ impl Discipline {
 
     fn insert(&mut self, byte: u8, out: &mut Output) {
         if self.len == MAX_LINE {
-            if self.settings.echo {
+            if self.termios.lflag & ECHO != 0 {
                 out.echo.push(BELL);
             }
             return;
         }
         self.line[self.len] = byte;
         self.len += 1;
-        if self.settings.echo {
+        if self.termios.lflag & ECHO != 0 {
             out.echo.push(byte);
         }
     }
 
     fn echo_terminator(&mut self, out: &mut Output) {
-        if self.settings.echo {
+        if self.termios.lflag & ECHO != 0 {
             out.echo.extend_from_slice(b"\r\n");
         }
     }

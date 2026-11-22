@@ -97,3 +97,47 @@ fn default_termios_has_cread_and_cs8() {
     assert_ne!(termios.c_cflag & CS8, 0);
     assert_ne!(termios.c_cflag & CREAD, 0);
 }
+
+/// The exact OpenSSH `pty_req` mode word shape: ICRNL, IXON, ISIG, ICANON, ECHO, IEXTEN,
+/// OPOST/ONLCR, CS8, VMIN/VTIME and both speeds. `tcsetattr`/`tcgetattr` must preserve every
+/// field; K444 is red when any one of them is dropped.
+#[test]
+fn tcsetattr_round_trips_every_termios_field() {
+    const IGNBRK: u32 = 0o0000001;
+    const ICRNL: u32 = 0o0000400;
+    const IXON: u32 = 0o0002000;
+    const OPOST: u32 = 0o0000001;
+    const ONLCR: u32 = 0o0000004;
+    const ISIG: u32 = 0o0000001;
+    const IEXTEN: u32 = 0o100000;
+    const VINTR: usize = 0;
+    const VERASE: usize = 2;
+    const VKILL: usize = 3;
+    const VEOF: usize = 4;
+    const VSTART: usize = 8;
+    const VSTOP: usize = 9;
+    const B9600: u32 = 0o15;
+    const B19200: u32 = 0o16;
+
+    let (platform, fd) = tty_platform();
+    let mut want = default_termios();
+    want.c_iflag = IGNBRK | ICRNL | IXON;
+    want.c_oflag = OPOST | ONLCR;
+    want.c_cflag = crate::ioctl::tty::CS8 | crate::ioctl::tty::CREAD | B38400;
+    want.c_lflag = ISIG | ICANON | ECHO | IEXTEN;
+    want.c_line = 0;
+    want.c_cc[VINTR] = 3;
+    want.c_cc[VERASE] = 0x7f;
+    want.c_cc[VKILL] = 0x15;
+    want.c_cc[VEOF] = 0x04;
+    want.c_cc[VSTART] = 0x11;
+    want.c_cc[VSTOP] = 0x13;
+    want.c_cc[VMIN] = 7;
+    want.c_cc[VTIME] = 3;
+    want.__c_ispeed = B9600;
+    want.__c_ospeed = B19200;
+
+    tcsetattr(&platform, fd, &want).expect("tcsetattr");
+    let got = tcgetattr(&platform, fd).expect("tcgetattr");
+    assert_eq!(got, want);
+}
