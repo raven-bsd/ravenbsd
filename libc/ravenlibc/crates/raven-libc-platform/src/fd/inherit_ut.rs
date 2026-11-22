@@ -198,6 +198,27 @@ fn restored_socket_exposes_its_identity() {
 }
 
 #[test]
+fn restored_cloexec_socket_is_closed_before_main() {
+    let platform = Platform::new(FakeSys::new());
+    let mut entry = FdMapEntry::new(3, 0x52, OfdKind::Socket, 1, 2);
+    entry.socket = Some(SocketMeta {
+        domain: 1,
+        ty: 1,
+        proto: 0,
+        state: 5,
+    });
+    platform
+        .restore_fdmap(&FdMap {
+            entries: vec![entry],
+        })
+        .expect("restore");
+    assert!(platform.get(3).is_ok());
+    platform.close_cloexec_fds().expect("close cloexec");
+    assert!(platform.get(3).is_err());
+    assert!(platform.inherited_sockets().is_empty());
+}
+
+#[test]
 fn version_one_block_decodes_without_readiness() {
     let mut bytes = alloc::vec::Vec::new();
     bytes.extend_from_slice(&FDMAP_MAGIC);
