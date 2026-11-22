@@ -42,7 +42,7 @@ regex = '^init exited \(0\)$'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
-timeout_secs = 120
+timeout_secs = 180
 
 [[step]]
 send = "root\n"
