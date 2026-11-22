@@ -1,17 +1,18 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K498: boot the release image with an overlay that runs the unmodified upstream
-# sshd with -ddd and DEBUG3. One password login and one command run over guest
-# loopback; the sshd log is printed between the log-begin/log-end markers.
-# This is a trace, not a fix and not a monitor/session result claim.
+# K498: the pre-step boots the release image with the DEBUG3 sshd overlay, makes
+# one password login and one command over a private hostfwd port, and keeps the
+# QEMU serial log (the sshd -ddd trace) in build/fixtures/sshd-trace/serial.log.
+# The case then boots the same image as a console smoke. This is a trace, not a
+# fix and not a monitor/session result claim.
 
 name = "sshd-trace"
 arch = "x86_64"
 profile = "release"
-timeout_secs = 600
-pre = ["sh tests/fixtures/sshd-trace/build.sh"]
-initfs = "build/fixtures/sshd-trace/initfs.img"
+timeout_secs = 300
+pre = ["sh tests/fixtures/sshd-trace/run.sh"]
+image = "build/fixtures/sshd-trace/sshd-trace.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
@@ -24,25 +25,19 @@ expect_exit = "success"
 regex = '^svcd: sshd up$'
 
 [[expect]]
-regex = '^sshd-trace: start$'
+regex = '(?i)^.*login: ?root'
 
 [[expect]]
-regex = '^sshd-trace: log-begin$'
+regex = '(?i)^password: ?$'
 
 [[expect]]
-regex = '^sshd-trace-command-ok$'
-
-[[expect]]
-regex = '^sshd-trace: log-end$'
-
-[[expect]]
-regex = '^sshd-trace: done$'
+regex = '^raven# $'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|sshd-trace: FAIL'
+regex = '(?i)panic|EXCEPTION'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
@@ -63,54 +58,6 @@ delay_ms = 100
 [[step]]
 wait = '^raven# $'
 timeout_secs = 120
-
-[[step]]
-send = "echo sshd-trace: start\n"
-delay_ms = 100
-
-[[step]]
-wait = '^sshd-trace: start$'
-timeout_secs = 30
-
-[[step]]
-send = "/bin/ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=password -o PubkeyAuthentication=no raven@127.0.0.1 'echo sshd-trace-command-ok'\n"
-delay_ms = 100
-
-[[step]]
-wait = '(?i)^.*password: ?$'
-timeout_secs = 60
-
-[[step]]
-send = "raven\n"
-delay_ms = 100
-
-[[step]]
-wait = '^sshd-trace-command-ok$'
-timeout_secs = 60
-
-[[step]]
-send = "~.\n"
-delay_ms = 1000
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 60
-
-[[step]]
-send = "echo sshd-trace: log-begin; cat /tmp/sshd-trace.log; echo sshd-trace: log-end\n"
-delay_ms = 100
-
-[[step]]
-wait = '^sshd-trace: log-end$'
-timeout_secs = 180
-
-[[step]]
-send = "echo sshd-trace: done\n"
-delay_ms = 100
-
-[[step]]
-wait = '^sshd-trace: done$'
-timeout_secs = 30
 
 [[step]]
 send = "exit 0\n"
