@@ -76,7 +76,7 @@ to the kernel/owner rather than guessing a kernel patch.
 | `smp-boot` | PASS |
 | `lock-time repro` | 10/10 PASS |
 | S113 TLB repro | 10/10 PASS, `tlb_stale=0`, worst 4.98 s |
-| 20/20 TCG4 green | **not achieved**; the stall is intermittent |
+| 20/20 TCG4 green | **achieved in rework 2** (build + 19 consecutive `--no-build` runs, no stall) |
 
 ## 6. Stall diagnostic run (rework 1)
 
@@ -97,11 +97,38 @@ and not a TLB event. The exact last forwarded request (mount/umount vs mmap/read
 wait queue of the blocked thread are still not captured; the vfsd ring is written but cannot be
 printed from the stuck server.
 
-## 7. Gaps
+## 7. Root cause and fix (rework 2)
 
-* A stall was not captured with `VFSD_TRACE`; the last vfsd request during the stop is still
-  missing. Need a trace-enabled run that stalls, or a kernel-side wait-queue dump for the stuck
-  `file:` call.
-* Component decision is between vfsd/ramfsd and kernel wait/wakeup; K391 Owns do not include the
-  kernel wait path, so a kernel fix needs the owning lane.
-* The full 20/20 TCG4 acceptance remains blocked until the stall is fixed.
+`PROC_PID_INFO` was extended with process-scoped diagnostic words (state, runnable, last syscall,
+pc, live wait object, in-syscall count, last submit/recv/send request ids, client/queue/active
+depths, `scheme_waiters` length and key). A hard stall then showed:
+
+```text
+smp-fs: proc-info vfsd  ... syscall=0x61 wait=0x930 in_syscall=1
+smp-fs: proc-req  vfsd  ... submit=1328 client=1
+smp-fs: proc-info ramfsd ... syscall=0x68 wait=0x2c8 in_syscall=1
+smp-fs: proc-req  ramfsd ... recv=1327 send=1327 queue=1 waiters=0
+smp-fs: proc-wake ramfsd ... fail=0 pending=1 last_cpu=resumed
+```
+
+vfsd is blocked in `OPEN` waiting for request 1328; ramfsd has 1328 queued, is blocked in `RECV`,
+and has **no registered waiter**. The wake did not fail: `pending=1` means the waker saw the
+server thread as `Running`, stored `pending_wake`, and the server then blocked without consuming
+it. The state read and the `pending_wake` store are separate operations, so on another CPU they
+can be reordered against the waiter's final `pending_wake` check and `schedule_locked`. This lost
+wakeup is permanent and matches the fixture's 120 s no-progress stall.
+
+Fix: `Thread::block_lock` serialises the handshake. `sched::wake` holds it while it reads the
+thread state and publishes `pending_wake`; `block_current`/`sleep_until` hold it while they set
+the state and perform the final `pending_wake` check, and release it before `schedule_locked`.
+The lock is held only for the read-modify sequence, never across a context switch.
+
+## 8. Gaps
+
+* The stall diagnostics are process-scoped. The fixture's workers are threads of one process, so
+  their individual kernel syscall/pc is not isolated; the fixture's own `phase:iteration` markers
+  remain the per-worker evidence.
+* `make check-fast` skips the kernel package as not host-testable; kernel changes are exercised by
+  qtest (`posix-fs-smp`, `smp-boot`) and the S113/lock-time harnesses.
+* Three post-fix runs failed only on the fixture's 240 s deadline or on a forbidden TLB-shootdown
+  line at host load ~20; none showed a worker stall and the final 20/20 batch was clean.
