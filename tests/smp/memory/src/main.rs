@@ -23,7 +23,7 @@ use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
-use raven_abi::types::{Handle, map, prot};
+use raven_abi::types::{Handle, clock, map, prot};
 use raven_rt::entry;
 use raven_rt::println;
 use raven_rt::sys;
@@ -40,6 +40,15 @@ const TLB_ROUNDS: u32 = 64;
 const FORK_ROUNDS: usize = 2;
 const POLL_LIMIT: u32 = 50_000_000;
 const PROC_FORK: usize = 0x39;
+
+/// End of the canonical user window (the same value as `raven-abi` layout).
+const USER_END: usize = 0x0000_7FFF_FFFF_F000;
+/// Largest eager object `MEMOBJ_CREATE` accepts; a request this size exceeds the guest's frames.
+const OOM_OBJECT_BYTES: usize = 1 << 30;
+/// Stack growth within the kernel's 256 KiB user stack.
+const STACK_WITHIN: usize = 200 * 1024;
+/// A depth below the 256 KiB user stack, past its guard.
+const STACK_BEYOND: usize = 300 * 1024;
 
 const VALUE_LOW: u64 = 0x1111_1111_1111_1111;
 const VALUE_HIGH: u64 = 0x2222_2222_2222_2222;
@@ -353,6 +362,418 @@ fn proc_wait(child: Handle) -> Result<i32, Errno> {
     Ok(code)
 }
 
+// ---------------------------------------------------------------------------
+// Memory contract rows (K453). Each row prints CONTRACT Kx PASS|FAIL and the
+// contract suite fails the fixture if any row is red.
+// ---------------------------------------------------------------------------
+
+fn protect(process: Handle, address: usize, len: usize, protection: usize) -> Result<(), Errno> {
+    // SAFETY: PROTECT takes scalar arguments; the kernel validates the range and protection.
+    Errno::from_ret(unsafe {
+        sys::syscall4(
+            Syscall::PROTECT as usize,
+            process.0 as usize,
+            address,
+            len,
+            protection,
+        )
+    })
+    .map(|_| ())
+}
+
+fn debug_write_raw(pointer: usize, length: usize) -> Result<usize, Errno> {
+    // SAFETY: DEBUG_WRITE takes a user pointer and length; the kernel validates the pointer.
+    Errno::from_ret(unsafe { sys::syscall2(Syscall::DEBUG_WRITE as usize, pointer, length) })
+}
+
+fn uname_raw(pointer: usize) -> Result<usize, Errno> {
+    // SAFETY: UNAME writes a fixed utsname record to the user pointer; the kernel validates it.
+    Errno::from_ret(unsafe { sys::syscall1(Syscall::UNAME as usize, pointer) })
+}
+
+fn clock_get_raw(clock_id: usize, pointer: usize) -> Result<usize, Errno> {
+    // SAFETY: CLOCK_GET writes a timespec to the user pointer; the kernel validates it.
+    Errno::from_ret(unsafe { sys::syscall2(Syscall::CLOCK_GET as usize, clock_id, pointer) })
+}
+
+fn memobj_create_raw(len: usize) -> Result<Handle, Errno> {
+    // SAFETY: MEMOBJ_CREATE takes scalar arguments; zero selects an eager anonymous object.
+    Errno::from_ret(unsafe { sys::syscall2(Syscall::MEMOBJ_CREATE as usize, len, 0) })
+        .map(|value| Handle(value as u32))
+}
+
+fn current_sp() -> usize {
+    let sp: usize;
+    // SAFETY: reading RSP does not dereference memory and does not modify the stack.
+    unsafe {
+        core::arch::asm!("mov {}, rsp", out(reg) sp, options(nomem, nostack, preserves_flags));
+    }
+    sp
+}
+
+fn start_child_with(entry: usize, stack_top: usize, arg: usize) -> Result<Handle, Errno> {
+    let child = proc_fork()?;
+    sys::thread_create(child, entry, stack_top, arg)?;
+    Ok(child)
+}
+
+fn wait_child(child: Handle) -> Result<i32, Errno> {
+    let code = proc_wait(child)?;
+    // The child's `s24-framecheck` line is printed after `PROC_WAIT` can observe Exited; let the
+    // dying CPU finish the evidence line before the parent prints its contract line.
+    let _ = sys::nanosleep(20_000_000);
+    Ok(code)
+}
+
+extern "C" fn cow_child_entry(value: usize) -> ! {
+    // SAFETY: this is the child's private COW copy of the static page.
+    unsafe {
+        core::ptr::addr_of_mut!(CHILD_COW)
+            .cast::<u8>()
+            .write_volatile((value & 0xFF) as u8);
+    }
+    sys::exit(0)
+}
+
+extern "C" fn fault_write_entry(address: usize) -> ! {
+    // SAFETY: the parent passes an address that is unmapped or not writable in this child.
+    unsafe {
+        (address as *mut u8).write_volatile(0x5A);
+    }
+    // If the access succeeded, the contract failed; exit with a non-signal code.
+    sys::exit(1)
+}
+
+extern "C" fn fault_read_entry(address: usize) -> ! {
+    // SAFETY: the parent passes an address that is unmapped or not readable in this child.
+    unsafe {
+        let _ = (address as *const u8).read_volatile();
+    }
+    sys::exit(1)
+}
+
+extern "C" fn stack_beyond_entry(stack_top: usize) -> ! {
+    let address = stack_top.saturating_sub(STACK_BEYOND);
+    // SAFETY: the parent requests an access below the user stack guard; it must fault.
+    unsafe {
+        (address as *mut u8).write_volatile(0x5A);
+    }
+    sys::exit(1)
+}
+
+extern "C" fn oom_child_entry(_arg: usize) -> ! {
+    let large = match memobj_create_raw(OOM_OBJECT_BYTES) {
+        Ok(handle) => {
+            let _ = sys::handle_close(handle);
+            sys::exit(2)
+        }
+        Err(error) if error == Errno::ENOMEM => error,
+        Err(_) => sys::exit(4),
+    };
+    let _ = large;
+    // The pressure must be released: a normal object after the failed one must succeed.
+    match memobj_create_raw(PAGE) {
+        Ok(handle) => {
+            let _ = sys::handle_close(handle);
+            sys::exit(0)
+        }
+        Err(_) => sys::exit(3),
+    }
+}
+
+fn contract_fault_unmapped() -> Result<(), Errno> {
+    let address = 0x0000_5000_0000_0000usize;
+    let child = match start_child_with(
+        fault_write_entry as *const () as usize,
+        child_stack_top(),
+        address,
+    ) {
+        Ok(child) => child,
+        Err(error) => {
+            println!("CONTRACT K1 FAIL setup errno={}", error.0);
+            return Err(error);
+        }
+    };
+    let code = wait_child(child)?;
+    if code == -11 {
+        println!("CONTRACT K1 PASS unmapped=0x{address:x} status={code}");
+        Ok(())
+    } else {
+        println!("CONTRACT K1 FAIL unmapped=0x{address:x} status={code} want=-11");
+        Err(Errno::EIO)
+    }
+}
+
+fn contract_protection() -> Result<(), Errno> {
+    let page = sys::map_anonymous(PAGE)?;
+    if let Err(error) = protect(Handle::SELF_PROC, page, PAGE, prot::READ) {
+        println!("CONTRACT K2 FAIL protect-read errno={}", error.0);
+        return Err(error);
+    }
+    let child = start_child_with(
+        fault_write_entry as *const () as usize,
+        child_stack_top(),
+        page,
+    )?;
+    let code = wait_child(child)?;
+    let _ = sys::unmap(Handle::SELF_PROC, page, PAGE);
+    if code != -11 {
+        println!("CONTRACT K2 FAIL ro-write status={code} want=-11");
+        return Err(Errno::EIO);
+    }
+
+    let none = sys::map_anonymous(PAGE)?;
+    if let Err(error) = protect(Handle::SELF_PROC, none, PAGE, 0) {
+        println!("CONTRACT K2 FAIL protect-none errno={}", error.0);
+        return Err(error);
+    }
+    let child = start_child_with(
+        fault_read_entry as *const () as usize,
+        child_stack_top(),
+        none,
+    )?;
+    let code = wait_child(child)?;
+    let _ = sys::unmap(Handle::SELF_PROC, none, PAGE);
+    if code == -11 {
+        println!("CONTRACT K2 PASS ro-write={code} none-read={code}");
+        Ok(())
+    } else {
+        println!("CONTRACT K2 FAIL none-read status={code} want=-11");
+        Err(Errno::EIO)
+    }
+}
+
+fn contract_cow() -> Result<(), Errno> {
+    // Fill the parent's COW page with a known pattern.
+    // SAFETY: the static page is writable in the fixture's data VMA.
+    unsafe {
+        let base = core::ptr::addr_of_mut!(CHILD_COW).cast::<u8>();
+        let mut index = 0usize;
+        while index < PAGE {
+            base.add(index).write_volatile(0x11);
+            index = index.saturating_add(1);
+        }
+    }
+    let child = start_child_with(
+        cow_child_entry as *const () as usize,
+        child_stack_top(),
+        0x22,
+    )?;
+    let code = wait_child(child)?;
+    // SAFETY: the static page is readable in the fixture's data VMA.
+    let first = unsafe { core::ptr::addr_of!(CHILD_COW).cast::<u8>().read_volatile() };
+    let last = unsafe {
+        core::ptr::addr_of!(CHILD_COW)
+            .cast::<u8>()
+            .add(PAGE - 1)
+            .read_volatile()
+    };
+    if code == 0 && first == 0x11 && last == 0x11 {
+        println!("CONTRACT K3 PASS parent=0x11 child=0x22 status={code}");
+        Ok(())
+    } else {
+        println!("CONTRACT K3 FAIL status={code} parent0={first:#x} parentN={last:#x} want=0x11");
+        Err(Errno::EIO)
+    }
+}
+
+fn contract_mmap_errno() -> Result<(), Errno> {
+    let page = sys::map_anonymous(PAGE)?;
+    let collision = sys::map_object_in(
+        Handle::SELF_PROC,
+        Handle::NONE,
+        0,
+        page,
+        PAGE,
+        prot::READ | prot::WRITE,
+        map::FIXED,
+    );
+    let collision_errno = match collision {
+        Ok(_) => {
+            println!("CONTRACT K4 FAIL fixed-collision mapped");
+            return Err(Errno::EIO);
+        }
+        Err(error) => error,
+    };
+    let unmapped_errno = match sys::unmap(Handle::SELF_PROC, page.saturating_add(PAGE), PAGE) {
+        Ok(()) => {
+            println!("CONTRACT K4 FAIL munmap-unmapped ok");
+            return Err(Errno::EIO);
+        }
+        Err(error) => error,
+    };
+    let huge_errno = match sys::map_anonymous(1usize << 40) {
+        Ok(_) => {
+            println!("CONTRACT K4 FAIL huge-map ok");
+            return Err(Errno::EIO);
+        }
+        Err(error) => error,
+    };
+    let protect_errno = match protect(Handle::SELF_PROC, page.saturating_add(PAGE), PAGE, 0) {
+        Ok(()) => {
+            println!("CONTRACT K4 FAIL mprotect-unmapped ok");
+            return Err(Errno::EIO);
+        }
+        Err(error) => error,
+    };
+    let _ = sys::unmap(Handle::SELF_PROC, page, PAGE);
+
+    // Access after munmap must fault in a child.
+    let child = start_child_with(
+        fault_write_entry as *const () as usize,
+        child_stack_top(),
+        page,
+    )?;
+    let code = wait_child(child)?;
+    let _ = sys::unmap(Handle::SELF_PROC, page, PAGE);
+    let ok = collision_errno == Errno::EEXIST
+        && unmapped_errno == Errno::EINVAL
+        && huge_errno == Errno::ENOMEM
+        && protect_errno == Errno::ENOMEM
+        && code == -11;
+    if ok {
+        println!(
+            "CONTRACT K4 PASS fixed={} munmap={} huge={} prot={} after-unmap={code}",
+            collision_errno.0, unmapped_errno.0, huge_errno.0, protect_errno.0
+        );
+        Ok(())
+    } else {
+        println!(
+            "CONTRACT K4 FAIL fixed={} want=17 munmap={} want=22 huge={} want=12 prot={} want=12 after-unmap={code} want=-11",
+            collision_errno.0, unmapped_errno.0, huge_errno.0, protect_errno.0
+        );
+        Err(Errno::EIO)
+    }
+}
+
+fn contract_oom() -> Result<(), Errno> {
+    let first = start_child_with(
+        oom_child_entry as *const () as usize,
+        child_stack_top(),
+        OOM_OBJECT_BYTES,
+    )?;
+    let first_code = wait_child(first)?;
+    let second = start_child_with(
+        oom_child_entry as *const () as usize,
+        child_stack_top(),
+        OOM_OBJECT_BYTES,
+    )?;
+    let second_code = wait_child(second)?;
+    let recovery = sys::map_anonymous(PAGE);
+    let recovery_ok = match recovery {
+        Ok(address) => {
+            write_word(address, 0xA5A5_5A5A_1234_5678);
+            let value = read_word(address);
+            let _ = sys::unmap(Handle::SELF_PROC, address, PAGE);
+            value == 0xA5A5_5A5A_1234_5678
+        }
+        Err(_) => false,
+    };
+    if first_code == 0 && second_code == 0 && recovery_ok {
+        println!("CONTRACT K5 PASS first={first_code} second={second_code} recovery=1");
+        Ok(())
+    } else {
+        println!(
+            "CONTRACT K5 FAIL first={first_code} second={second_code} want=0 recovery={recovery_ok}"
+        );
+        Err(Errno::EIO)
+    }
+}
+
+fn contract_stack() -> Result<(), Errno> {
+    let sp = current_sp();
+    let within = sp.saturating_sub(STACK_WITHIN);
+    // SAFETY: the user stack VMA is 256 KiB and this access is 200 KiB below the current SP.
+    let within_ok = unsafe {
+        (within as *mut u8).write_volatile(0x5A);
+        (within as *const u8).read_volatile() == 0x5A
+    };
+    if !within_ok {
+        println!("CONTRACT K6 FAIL within-stack sp=0x{sp:x} address=0x{within:x}");
+        return Err(Errno::EIO);
+    }
+    let child = start_child_with(stack_beyond_entry as *const () as usize, sp, sp)?;
+    let code = wait_child(child)?;
+    if code == -11 {
+        println!("CONTRACT K6 PASS within=1 beyond-status={code}");
+        Ok(())
+    } else {
+        println!("CONTRACT K6 FAIL beyond-status={code} want=-11");
+        Err(Errno::EIO)
+    }
+}
+
+fn contract_efault() -> Result<(), Errno> {
+    let low = debug_write_raw(1, 1);
+    let past = debug_write_raw(USER_END.saturating_add(1), 1);
+    let wrap = debug_write_raw(USER_END.saturating_sub(1), 2);
+    let uname = uname_raw(1);
+    let clock = clock_get_raw(clock::MONOTONIC as usize, 1);
+    let low_err = low.as_ref().err().copied();
+    let past_err = past.as_ref().err().copied();
+    let wrap_err = wrap.as_ref().err().copied();
+    let uname_err = uname.as_ref().err().copied();
+    let clock_err = clock.as_ref().err().copied();
+    let low_ok = matches!(low_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
+    let past_ok = matches!(past_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
+    let wrap_ok = matches!(wrap_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
+    let uname_ok = matches!(uname_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
+    let clock_ok = matches!(clock_err, Some(Errno::EFAULT) | Some(Errno::EINVAL));
+    if low_ok && past_ok && wrap_ok && uname_ok && clock_ok {
+        println!(
+            "CONTRACT K7 PASS low={:?} past={:?} wrap={:?} uname={:?} clock={:?}",
+            low_err.map(|error| error.0),
+            past_err.map(|error| error.0),
+            wrap_err.map(|error| error.0),
+            uname_err.map(|error| error.0),
+            clock_err.map(|error| error.0)
+        );
+        Ok(())
+    } else {
+        println!(
+            "CONTRACT K7 FAIL low={:?} past={:?} wrap={:?} uname={:?} clock={:?}",
+            low_err.map(|error| error.0),
+            past_err.map(|error| error.0),
+            wrap_err.map(|error| error.0),
+            uname_err.map(|error| error.0),
+            clock_err.map(|error| error.0)
+        );
+        Err(Errno::EIO)
+    }
+}
+
+fn contract_suite() -> Result<(), Errno> {
+    let mut failed = 0usize;
+    if contract_fault_unmapped().is_err() {
+        failed = failed.saturating_add(1);
+    }
+    if contract_protection().is_err() {
+        failed = failed.saturating_add(1);
+    }
+    if contract_cow().is_err() {
+        failed = failed.saturating_add(1);
+    }
+    if contract_mmap_errno().is_err() {
+        failed = failed.saturating_add(1);
+    }
+    if contract_oom().is_err() {
+        failed = failed.saturating_add(1);
+    }
+    if contract_stack().is_err() {
+        failed = failed.saturating_add(1);
+    }
+    if contract_efault().is_err() {
+        failed = failed.saturating_add(1);
+    }
+    if failed == 0 {
+        println!("smp-memory: contract PASS 7/7");
+        Ok(())
+    } else {
+        println!("smp-memory: contract FAIL {failed}/7");
+        Err(Errno::EIO)
+    }
+}
+
 extern "C" fn child_entry(seed: usize) -> ! {
     // Touch a COW page before allocating, so the child exercises both the static-data COW path
     // and the allocator's anonymous-map path.
@@ -476,6 +897,12 @@ fn main(_args: raven_rt::Args) -> i32 {
 
     if let Err(error) = fork_exit_rounds() {
         println!("smp-memory: fork/exit failed errno={}", error.0);
+        return 1;
+    }
+
+    if let Err(error) = contract_suite() {
+        println!("smp-memory: contract suite failed errno={}", error.0);
+        fail("contract");
         return 1;
     }
 
