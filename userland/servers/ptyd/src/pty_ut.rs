@@ -104,3 +104,80 @@ impl Pty<Sink> {
         &self.sink
     }
 }
+
+#[test]
+fn the_complete_termios_round_trips() {
+    let mut pty = pty();
+    let mut want = raven_tty_core::Termios::sane();
+    want.iflag = raven_tty_core::ICRNL | raven_tty_core::IXON;
+    want.oflag = raven_tty_core::OPOST | raven_tty_core::ONLCR;
+    want.cc[raven_tty_core::VMIN] = 7;
+    want.cc[raven_tty_core::VTIME] = 3;
+    want.ispeed = 0o15;
+    want.ospeed = 0o16;
+    assert_eq!(pty.set_termios(want), 0);
+    assert_eq!(pty.termios(), want);
+    assert_eq!(pty.settings(), want.settings());
+}
+
+#[test]
+fn output_processing_obeys_onlcr() {
+    let mut pty = pty();
+    pty.write_slave(b"line\n");
+    assert_eq!(read_master(&mut pty), b"line\r\n");
+
+    let mut raw = raven_tty_core::Termios::sane();
+    raw.oflag &= !raven_tty_core::OPOST;
+    pty.set_termios(raw);
+    pty.write_slave(b"line\n");
+    assert_eq!(read_master(&mut pty), b"line\n");
+}
+
+#[test]
+fn a_drain_set_does_not_discard_queued_output() {
+    let mut pty = pty();
+    pty.write_slave(b"pending\n");
+    let mut next = raven_tty_core::Termios::sane();
+    next.cc[raven_tty_core::VMIN] = 9;
+    next.lflag &= !raven_tty_core::ECHO;
+    pty.set_termios(next);
+    assert_eq!(read_master(&mut pty), b"pending\r\n");
+}
+
+#[test]
+fn a_fresh_pty_starts_at_zero_winsize() {
+    let pty = pty();
+    assert_eq!(pty.winsize(), raven_tty_core::Winsize::default());
+}
+
+#[test]
+fn the_window_size_is_shared_by_master_and_slave() {
+    let mut pty = pty();
+    let first = raven_tty_core::Winsize {
+        row: 43,
+        col: 120,
+        xpixel: 0,
+        ypixel: 0,
+    };
+    pty.set_winsize(first);
+    assert_eq!(pty.winsize(), first);
+    let second = raven_tty_core::Winsize {
+        row: 24,
+        col: 80,
+        xpixel: 640,
+        ypixel: 480,
+    };
+    pty.set_winsize(second);
+    assert_eq!(pty.winsize(), second);
+}
+
+#[test]
+fn a_custom_verase_byte_edits_the_line() {
+    let mut pty = pty();
+    let mut want = raven_tty_core::Termios::sane();
+    want.cc[raven_tty_core::VERASE] = 0x18;
+    want.lflag &= !raven_tty_core::ECHO;
+    pty.set_termios(want);
+    pty.write_master(b"ab\x18c\n");
+    assert_eq!(read_slave(&mut pty), b"ac\n");
+}

@@ -92,6 +92,9 @@ mod program {
                 // `svcd` probes a resident scheme with the bare `pty:` path; pair 0 is the
                 // historical named pair and is safe to create for the probe.
                 "" | "master" => (0u64, Role::Master),
+                // `posix_openpt` opens the clone device; the server allocates the unit, then
+                // `fstat` gives the caller the pair id through the endpoint inode.
+                "ptmx" => (self.pairs.alloc(), Role::Master),
                 "slave" => (0u64, Role::Slave),
                 _ => {
                     let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
@@ -150,14 +153,28 @@ mod program {
                 return Err(Errno::EINVAL.into());
             }
             let op = u16::from_le_bytes([request[2], request[3]]);
+            if matches!(
+                op,
+                raven_proto_tty::OP_GET_TERMIOS | raven_proto_tty::OP_SET_TERMIOS
+            ) && response.len() < raven_proto_tty::TERMIOS_LEN
+            {
+                return Err(Errno::EINVAL.into());
+            }
+            if matches!(
+                op,
+                raven_proto_tty::OP_GET_WINSIZE | raven_proto_tty::OP_SET_WINSIZE
+            ) && response.len() < raven_proto_tty::WINSIZE_LEN
+            {
+                return Err(Errno::EINVAL.into());
+            }
             let arg0 = u32::from_le_bytes([request[4], request[5], request[6], request[7]]);
             let arg1 = u32::from_le_bytes([request[8], request[9], request[10], request[11]]);
             match op {
                 raven_proto_tty::OP_SET_MODE
                 | raven_proto_tty::OP_GET_MODE
                 | raven_proto_tty::OP_FLUSH => {
-                    let request = decode_request(&request[..raven_proto_tty::CALL_LEN])
-                        .map_err(|_| Errno::EINVAL)?;
+                    let request = decode_request(request).map_err(|_| Errno::EINVAL)?;
+                    let mut body = [0u8; raven_proto_tty::CALL_LEN];
                     let reply = match request {
                         Request::SetMode { settings } => {
                             pty.set_settings(settings);
@@ -166,8 +183,35 @@ mod program {
                         Request::GetMode => Response::Mode(pty.settings()),
                         Request::Flush => Response::Flushed { bytes: pty.flush() },
                     };
-                    let mut body = [0u8; raven_proto_tty::CALL_LEN];
                     encode_response(reply, &mut body);
+                    response[..body.len()].copy_from_slice(&body);
+                    Ok(body.len())
+                }
+                raven_proto_tty::OP_GET_TERMIOS | raven_proto_tty::OP_SET_TERMIOS => {
+                    match raven_proto_tty::decode_termios_request(request)
+                        .map_err(|_| Errno::EINVAL)?
+                    {
+                        raven_proto_tty::TermiosRequest::Set { termios } => {
+                            pty.set_termios(termios);
+                        }
+                        raven_proto_tty::TermiosRequest::Get => {}
+                    }
+                    let mut body = [0u8; raven_proto_tty::TERMIOS_LEN];
+                    raven_proto_tty::encode_termios_response(&pty.termios(), &mut body);
+                    response[..body.len()].copy_from_slice(&body);
+                    Ok(body.len())
+                }
+                raven_proto_tty::OP_GET_WINSIZE | raven_proto_tty::OP_SET_WINSIZE => {
+                    match raven_proto_tty::decode_winsize_request(request)
+                        .map_err(|_| Errno::EINVAL)?
+                    {
+                        raven_proto_tty::WinsizeRequest::Set { winsize } => {
+                            pty.set_winsize(winsize);
+                        }
+                        raven_proto_tty::WinsizeRequest::Get => {}
+                    }
+                    let mut body = [0u8; raven_proto_tty::WINSIZE_LEN];
+                    raven_proto_tty::encode_winsize_response(&pty.winsize(), &mut body);
                     response[..body.len()].copy_from_slice(&body);
                     Ok(body.len())
                 }
@@ -214,6 +258,14 @@ mod program {
             {
                 pty.hangup();
             }
+            // The donor releases the pty unit when its last endpoint closes; a pair that
+            // survives every close is a leak that only shows up after many SSH sessions.
+            if !self.files.values().any(|other| other.pair == entry.pair) {
+                self.pairs.remove(entry.pair);
+                if self.files.is_empty() {
+                    raven_rt::eprintln!("ptyd: files=0 pairs={}", self.pairs.len());
+                }
+            }
             Ok(())
         }
     }
@@ -235,6 +287,7 @@ mod program {
             }
         };
         let mut handler = HandlerImpl::new();
+        raven_rt::eprintln!("ptyd: files=0 pairs=0");
         loop {
             if let Some(packet) = server.poll(None) {
                 let _ = server.dispatch(packet, &mut handler);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
-//! `tcgetwinsize`: the tty protocol has no window-size operation yet, so the answer is `ENOSYS`.
+//! `tcgetwinsize`: the pty stores the window size; a non-tty fd answers `ENOTTY`.
 
 use core::ffi::c_int;
 
@@ -20,9 +20,19 @@ pub unsafe extern "C" fn tcgetwinsize(fd: c_int, winsize: *mut Winsize) -> c_int
         return fail(raven_libc_ipc::EFAULT);
     }
     match raven_libc_platform::ioctl::tty::tcgetwinsize(crate::ffi::platform::global(), fd) {
-        Ok(()) => {
+        Ok(size) => {
             // SAFETY: the caller contract above grants a writable `struct winsize`.
-            unsafe { core::ptr::write(winsize, Winsize::default()) };
+            unsafe {
+                core::ptr::write(
+                    winsize,
+                    Winsize {
+                        ws_row: size.row,
+                        ws_col: size.col,
+                        ws_xpixel: size.xpixel,
+                        ws_ypixel: size.ypixel,
+                    },
+                );
+            }
             0
         }
         Err(error) => map(error),

@@ -361,15 +361,14 @@ pub fn ppoll<B: SysBackend, L: Lock>(
     let timeout_ms = match timeout {
         None => -1,
         Some(value) => {
-            if value.tv_sec < 0 || value.tv_nsec < 0 {
-                0
-            } else {
-                let nanos = i128::from(value.tv_sec)
-                    .saturating_mul(1_000_000_000)
-                    .saturating_add(i128::from(value.tv_nsec));
-                let millis = nanos.saturating_add(999_999) / 1_000_000;
-                i32::try_from(millis).unwrap_or(i32::MAX)
+            if value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1_000_000_000 {
+                return Err(Errno::EINVAL);
             }
+            let nanos = i128::from(value.tv_sec)
+                .saturating_mul(1_000_000_000)
+                .saturating_add(i128::from(value.tv_nsec));
+            let millis = nanos.saturating_add(999_999) / 1_000_000;
+            i32::try_from(millis).unwrap_or(i32::MAX)
         }
     };
     poll(platform, fds, timeout_ms)

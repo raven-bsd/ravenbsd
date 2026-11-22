@@ -4,10 +4,10 @@
 name = "smp-memory-kvm2"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 180
+timeout_secs = 300
 pre = ["sh tests/smp/memory/build.sh"]
 initfs = "build/smp-memory/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on smp-user-trace"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on smp-user-trace s24-framecheck"
 qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "2"]
 expect_exit = "success"
 
@@ -26,6 +26,30 @@ regex = '^smp-memory: concurrent-shootdown waiters=4$'
 
 [[expect]]
 regex = '^smp-memory: workers ready$'
+
+[[expect]]
+regex = '^CONTRACT K1 PASS .*$'
+
+[[expect]]
+regex = '^CONTRACT K2 PASS .*$'
+
+[[expect]]
+regex = '^CONTRACT K3 PASS .*$'
+
+[[expect]]
+regex = '^CONTRACT K4 PASS .*$'
+
+[[expect]]
+regex = '^CONTRACT K5 PASS .*$'
+
+[[expect]]
+regex = '^CONTRACT K6 PASS .*$'
+
+[[expect]]
+regex = '^CONTRACT K7 PASS .*$'
+
+[[expect]]
+regex = '^smp-memory: contract PASS 7/7$'
 
 [[expect]]
 regex = '^smp-memory: summary alloc_ops=\d+ fault_pages=\d+ maps=\d+ forks=4 tlb_rounds=64 tlb_stale=0$'

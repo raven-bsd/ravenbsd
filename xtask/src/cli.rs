@@ -47,7 +47,7 @@ cargo xtask commands:
   image   --arch <a> [--platform <generic|pi4>] [--profile <p>] [--cmdline <s>] [--initfs <p>] [--kernel <p>] [--output <path>]
   initfs  --arch <a> [--profile <p>]
   run     --arch <a> [--profile <p>] [--no-build] [-- <qemu args>]
-  qtest   [--case <name> | --all] [--arch <a>] [--no-build]
+  qtest   [--case <name> | --all] [--arch <a>] [--no-build] [--no-pre]
   provenance
   posix-gaps [--check]
   posix-check [--profile posix] [--arch A] [--json] [--host-only]

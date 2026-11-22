@@ -19,6 +19,13 @@ if [ "$arch" != x86_64 ]; then
 fi
 
 sysroot=$root/build/$arch/sysroot
+# K441: refuse an artifact older than the sources before the mtime-based refresh can hide it.
+if [ -f "$root/build/$arch/libc.stamp" ]; then
+    cargo xtask libc-pack --arch "$arch" --verify || exit 1
+fi
+if [ -f "$root/build/$arch/libc-dso.stamp" ]; then
+    cargo xtask libc-link --arch "$arch" --verify || exit 1
+fi
 libc_archive=$sysroot/usr/lib/libc.a
 if [ ! -f "$libc_archive" ] ||
     [ -n "$(find "$root/libc/ravenlibc/crates" "$root/libc/ravenlibc/abi" \

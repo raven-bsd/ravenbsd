@@ -1,0 +1,680 @@
+   Compiling raven-libc-platform v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-platform)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.10s
+────────────
+ Nextest run ID 713a6e1d-e241-425c-b242-2fa6d07d0bd9 with nextest profile: default
+    Starting 673 tests across 6 binaries
+        PASS [   0.007s] (  1/673) raven-libc-platform backend::tests::fake_open_missing_is_enoent
+        PASS [   0.003s] (  2/673) raven-libc-platform backend::tests::platform_fchmod_changes_the_open_handle_mode
+        PASS [   0.011s] (  3/673) raven-libc-platform backend::tests::platform_close_from_and_range
+        PASS [   0.011s] (  4/673) raven-libc-platform backend::tests::fake_map_is_zero_filled
+        PASS [   0.011s] (  5/673) raven-libc-platform backend::tests::adopt_probes_a_tty_handle
+        PASS [   0.011s] (  6/673) raven-libc-platform backend::tests::fake_fstat_decodes
+        PASS [   0.011s] (  7/673) raven-libc-platform backend::tests::fake_file_round_trip
+        PASS [   0.011s] (  8/673) raven-libc-platform backend::tests::fake_faults_are_one_shot
+        PASS [   0.011s] (  9/673) raven-libc-platform backend::tests::fake_statfs_call
+        PASS [   0.011s] ( 10/673) raven-libc-platform backend::tests::platform_blocked_reader_keeps_the_ofd_alive
+        PASS [   0.008s] ( 11/673) raven-libc-platform backend::tests::platform_dup2_replaces_and_drops_only_at_zero
+        PASS [   0.011s] ( 12/673) raven-libc-platform backend::tests::fake_uname_and_clock
+        PASS [   0.004s] ( 13/673) raven-libc-platform backend::tests::platform_fchmod_without_a_remembered_path_is_eopnotsupp
+        PASS [   0.012s] ( 14/673) raven-libc-platform backend::tests::init_fdsan_reads_the_level
+        PASS [   0.004s] ( 15/673) raven-libc-platform backend::tests::platform_open_creat_with_trailing_slash_is_eisdir
+        PASS [   0.004s] ( 16/673) raven-libc-platform backend::tests::platform_mkdir_with_trailing_slash_succeeds
+        PASS [   0.016s] ( 17/673) raven-libc-platform backend::tests::fake_dup_shares_the_cursor
+        PASS [   0.005s] ( 18/673) raven-libc-platform backend::tests::platform_mkdir_rmdir_unlink_rename
+        PASS [   0.005s] ( 19/673) raven-libc-platform backend::tests::platform_open_create_applies_mode_and_umask
+        PASS [   0.006s] ( 20/673) raven-libc-platform backend::tests::platform_ftruncate_needs_write_access
+        PASS [   0.005s] ( 21/673) raven-libc-platform backend::tests::platform_init_cwd_uses_an_absolute_pwd
+        PASS [   0.007s] ( 22/673) raven-libc-platform backend::tests::platform_fcntl_dupfd_limits
+        PASS [   0.004s] ( 23/673) raven-libc-platform backend::tests::platform_open_trailing_slash_on_a_file_is_enotdir
+        PASS [   0.005s] ( 24/673) raven-libc-platform backend::tests::platform_open_excl_on_existing_is_eexist
+        PASS [   0.004s] ( 25/673) raven-libc-platform backend::tests::platform_pipe_and_pipe2_return_usable_descriptors
+        PASS [   0.005s] ( 26/673) raven-libc-platform backend::tests::platform_open_write_only_read_is_ebadf
+        PASS [   0.005s] ( 27/673) raven-libc-platform backend::tests::platform_open_trunc_clears_the_file
+        PASS [   0.007s] ( 28/673) raven-libc-platform backend::tests::platform_open_read_close
+        PASS [   0.005s] ( 29/673) raven-libc-platform backend::tests::platform_pread_is_enosys_and_pipe_is_espipe
+        PASS [   0.006s] ( 30/673) raven-libc-platform backend::tests::platform_read_short_count
+        PASS [   0.014s] ( 31/673) raven-libc-platform backend::tests::platform_getcwd_argument_cases
+        PASS [   0.009s] ( 32/673) raven-libc-platform backend::tests::platform_read_only_write_is_ebadf
+        PASS [   0.016s] ( 33/673) raven-libc-platform backend::tests::platform_fcntl_round_trips_flags
+        PASS [   0.008s] ( 34/673) raven-libc-platform backend::tests::platform_readv_coalesces
+        PASS [   0.008s] ( 35/673) raven-libc-platform backend::tests::platform_readv_empty_is_zero
+        PASS [   0.006s] ( 36/673) raven-libc-platform backend::tests::platform_stat_missing_is_enoent
+        PASS [   0.006s] ( 37/673) raven-libc-platform backend::tests::platform_stat_converts_the_record
+        PASS [   0.007s] ( 38/673) raven-libc-platform backend::tests::platform_stat_trailing_slash_on_a_file_is_enotdir
+        PASS [   0.008s] ( 39/673) raven-libc-platform backend::tests::platform_statvfs_round_trip
+        PASS [   0.006s] ( 40/673) raven-libc-platform backend::tests::platform_unlink_trailing_slash_is_eisdir
+        PASS [   0.006s] ( 41/673) raven-libc-platform backend::tests::platform_writev_preserves_order
+        PASS [   0.006s] ( 42/673) raven-libc-platform backend::tests::platform_umask_masks_mkdir_and_create
+        PASS [   0.005s] ( 43/673) raven-libc-platform compat::tests::invalid_rlimit_is_einval
+        PASS [   0.015s] ( 44/673) raven-libc-platform backend::tests::platform_pathconf_needs_the_path
+        PASS [   0.006s] ( 45/673) raven-libc-platform compat::tests::close_range_and_closefrom
+        PASS [   0.013s] ( 46/673) raven-libc-platform backend::tests::platform_rename_file_with_trailing_slash_is_enotdir
+        PASS [   0.006s] ( 47/673) raven-libc-platform compat::tests::posix_close_matches_close
+        PASS [   0.007s] ( 48/673) raven-libc-platform compat::tests::open64_matches_open
+        PASS [   0.008s] ( 49/673) raven-libc-platform backend::tests::statvfs_works_on_a_regular_file
+        PASS [   0.004s] ( 50/673) raven-libc-platform conf::confstr::tests::cs_gnu_libpthread_version
+        PASS [   0.008s] ( 51/673) raven-libc-platform compat::tests::rlimits_round_trip
+        PASS [   0.006s] ( 52/673) raven-libc-platform compat::tests::setrlimit64_matches_setrlimit
+        PASS [   0.005s] ( 53/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_ilp32_off32_cflags
+        PASS [   0.006s] ( 54/673) raven-libc-platform conf::confstr::tests::cs_path_is_the_raven_single_root
+        PASS [   0.007s] ( 55/673) raven-libc-platform conf::confstr::tests::cs_path
+        PASS [   0.008s] ( 56/673) raven-libc-platform conf::confstr::tests::cs_gnu_libc_version
+        PASS [   0.010s] ( 57/673) raven-libc-platform compat::tests::ttyname_rejects_a_file
+        PASS [   0.005s] ( 58/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_ilp32_off32_lintflags
+        PASS [   0.004s] ( 59/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_ilp32_offbig_ldflags
+        PASS [   0.011s] ( 60/673) raven-libc-platform compat::tests::umask_returns_the_previous_value
+        PASS [   0.005s] ( 61/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_ilp32_offbig_cflags
+        PASS [   0.005s] ( 62/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_ilp32_offbig_lintflags
+        PASS [   0.005s] ( 63/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_lp64_off64_cflags
+        PASS [   0.008s] ( 64/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_ilp32_off32_libs
+        PASS [   0.010s] ( 65/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_ilp32_off32_ldflags
+        PASS [   0.005s] ( 66/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_lp64_off64_ldflags
+        PASS [   0.006s] ( 67/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_ilp32_offbig_libs
+        PASS [   0.006s] ( 68/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_lp64_off64_libs
+        PASS [   0.013s] ( 69/673) raven-libc-platform conf::confstr::tests::cs_posix_v5_width_restricted_envs
+        PASS [   0.005s] ( 70/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_lpbig_offbig_libs
+        PASS [   0.006s] ( 71/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_lpbig_offbig_ldflags
+        PASS [   0.006s] ( 72/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_lpbig_offbig_cflags
+        PASS [   0.005s] ( 73/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_width_restricted_envs
+        PASS [   0.004s] ( 74/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_ilp32_off32_libs
+        PASS [   0.004s] ( 75/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_ilp32_off32_ldflags
+        PASS [   0.008s] ( 76/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_lp64_off64_lintflags
+        PASS [   0.006s] ( 77/673) raven-libc-platform conf::confstr::tests::cs_posix_v6_lpbig_offbig_lintflags
+        PASS [   0.006s] ( 78/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_ilp32_off32_lintflags
+        PASS [   0.008s] ( 79/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_ilp32_off32_cflags
+        PASS [   0.004s] ( 80/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_lp64_off64_cflags
+        PASS [   0.005s] ( 81/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_ilp32_offbig_cflags
+        PASS [   0.006s] ( 82/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_ilp32_offbig_libs
+        PASS [   0.007s] ( 83/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_ilp32_offbig_ldflags
+        PASS [   0.006s] ( 84/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_ilp32_offbig_lintflags
+        PASS [   0.005s] ( 85/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_lpbig_offbig_ldflags
+        PASS [   0.006s] ( 86/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_lp64_off64_libs
+        PASS [   0.006s] ( 87/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_lp64_off64_lintflags
+        PASS [   0.007s] ( 88/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_lp64_off64_ldflags
+        PASS [   0.005s] ( 89/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_lpbig_offbig_libs
+        PASS [   0.005s] ( 90/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_lpbig_offbig_lintflags
+        PASS [   0.005s] ( 91/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_threads_cflags
+        PASS [   0.006s] ( 92/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_threads_ldflags
+        PASS [   0.005s] ( 93/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_width_restricted_envs
+        PASS [   0.010s] ( 94/673) raven-libc-platform conf::confstr::tests::cs_posix_v7_lpbig_offbig_cflags
+        PASS [   0.005s] ( 95/673) raven-libc-platform conf::confstr::tests::cs_v6_env
+        PASS [   0.005s] ( 96/673) raven-libc-platform conf::confstr::tests::cs_v7_env
+        PASS [   0.004s] ( 97/673) raven-libc-platform conf::confstr::tests::width_restricted_envs_are_lp64
+        PASS [   0.005s] ( 98/673) raven-libc-platform conf::confstr::tests::short_buffer_truncates_and_reports_the_size
+        PASS [   0.005s] ( 99/673) raven-libc-platform conf::confstr::tests::threads_ldflags_is_empty
+        PASS [   0.005s] (100/673) raven-libc-platform conf::pathconf::tests::pc_2_symlinks
+        PASS [   0.005s] (101/673) raven-libc-platform conf::pathconf::tests::pc_alloc_size_min
+        PASS [   0.009s] (102/673) raven-libc-platform conf::confstr::tests::no_value_returns_zero
+        PASS [   0.005s] (103/673) raven-libc-platform conf::pathconf::tests::pc_chown_restricted
+        PASS [   0.006s] (104/673) raven-libc-platform conf::pathconf::tests::pc_async_io
+        PASS [   0.005s] (105/673) raven-libc-platform conf::pathconf::tests::pc_max_canon
+        PASS [   0.006s] (106/673) raven-libc-platform conf::pathconf::tests::pc_filesizebits
+        PASS [   0.005s] (107/673) raven-libc-platform conf::pathconf::tests::pc_name_max
+        PASS [   0.005s] (108/673) raven-libc-platform conf::pathconf::tests::pc_no_trunc
+        PASS [   0.012s] (109/673) raven-libc-platform conf::confstr::tests::unknown_is_einval
+        PASS [   0.005s] (110/673) raven-libc-platform conf::pathconf::tests::pc_path_max
+        PASS [   0.005s] (111/673) raven-libc-platform conf::pathconf::tests::pc_pipe_buf
+        PASS [   0.005s] (112/673) raven-libc-platform conf::pathconf::tests::pc_rec_max_xfer_size
+        PASS [   0.009s] (113/673) raven-libc-platform conf::pathconf::tests::pc_max_input
+        PASS [   0.005s] (114/673) raven-libc-platform conf::pathconf::tests::pc_symlink_max
+        PASS [   0.011s] (115/673) raven-libc-platform conf::pathconf::tests::pc_link_max
+        PASS [   0.069s] (116/673) raven-libc-platform backend::tests::platform_dup_shares_the_ofd
+        PASS [   0.069s] (117/673) raven-libc-platform backend::tests::fake_write_and_contents
+        PASS [   0.069s] (118/673) raven-libc-platform backend::tests::inheritance_block_round_trip_from_a_platform
+        PASS [   0.061s] (119/673) raven-libc-platform backend::tests::platform_mkdir_applies_umask
+        PASS [   0.009s] (120/673) raven-libc-platform conf::pathconf::tests::pc_prio_io
+        PASS [   0.005s] (121/673) raven-libc-platform conf::pathconf::tests::pc_vdisable
+        PASS [   0.010s] (122/673) raven-libc-platform conf::pathconf::tests::pc_rec_incr_xfer_size
+        PASS [   0.071s] (123/673) raven-libc-platform backend::tests::platform_chdir_into_a_file_is_enotdir
+        PASS [   0.009s] (124/673) raven-libc-platform conf::pathconf::tests::pc_rec_min_xfer_size
+        PASS [   0.005s] (125/673) raven-libc-platform conf::pathconf::tests::unknown_pc_is_einval
+        PASS [   0.010s] (126/673) raven-libc-platform conf::pathconf::tests::pc_sock_maxbuf
+        PASS [   0.006s] (127/673) raven-libc-platform conf::sysconf::tests::named_rows_are_all_handled
+        PASS [   0.005s] (128/673) raven-libc-platform conf::sysconf::tests::sc_2_fort_run
+        PASS [   0.005s] (129/673) raven-libc-platform conf::sysconf::tests::sc_2_localedef
+        PASS [   0.013s] (130/673) raven-libc-platform conf::pathconf::tests::pc_rec_xfer_align
+        PASS [   0.010s] (131/673) raven-libc-platform conf::pathconf::tests::ufs_constants_match_the_specification
+        PASS [   0.007s] (132/673) raven-libc-platform conf::sysconf::tests::sc_2_char_term
+        PASS [   0.007s] (133/673) raven-libc-platform conf::sysconf::tests::sc_2_c_bind
+        PASS [   0.011s] (134/673) raven-libc-platform conf::pathconf::tests::pc_sync_io
+        PASS [   0.005s] (135/673) raven-libc-platform conf::sysconf::tests::sc_2_pbs_checkpoint
+        PASS [   0.010s] (136/673) raven-libc-platform conf::sysconf::tests::fixed_values_match_the_specification
+        PASS [   0.008s] (137/673) raven-libc-platform conf::sysconf::tests::sc_2_fort_dev
+        PASS [   0.077s] (138/673) raven-libc-platform backend::tests::platform_chdir_into_a_directory_works
+        PASS [   0.006s] (139/673) raven-libc-platform conf::sysconf::tests::sc_2_pbs
+        PASS [   0.005s] (140/673) raven-libc-platform conf::sysconf::tests::sc_2_pbs_track
+        PASS [   0.006s] (141/673) raven-libc-platform conf::sysconf::tests::sc_aio_max
+        PASS [   0.005s] (142/673) raven-libc-platform conf::sysconf::tests::sc_barriers
+        PASS [   0.011s] (143/673) raven-libc-platform conf::sysconf::tests::sc_2_pbs_locate
+        PASS [   0.009s] (144/673) raven-libc-platform conf::sysconf::tests::sc_2_upe
+        PASS [   0.009s] (145/673) raven-libc-platform conf::sysconf::tests::sc_2_sw_dev
+        PASS [   0.012s] (146/673) raven-libc-platform conf::sysconf::tests::sc_2_pbs_accounting
+        PASS [   0.006s] (147/673) raven-libc-platform conf::sysconf::tests::sc_atexit_max
+        PASS [   0.011s] (148/673) raven-libc-platform conf::sysconf::tests::sc_advisory_info
+        PASS [   0.017s] (149/673) raven-libc-platform conf::sysconf::tests::sc_2_c_dev
+        PASS [   0.010s] (150/673) raven-libc-platform conf::sysconf::tests::sc_asynchronous_io
+        PASS [   0.019s] (151/673) raven-libc-platform conf::sysconf::tests::open_max_follows_the_rlimit_cell
+        PASS [   0.010s] (152/673) raven-libc-platform conf::sysconf::tests::sc_avphys_pages
+        PASS [   0.012s] (153/673) raven-libc-platform conf::sysconf::tests::sc_2_version
+        PASS [   0.015s] (154/673) raven-libc-platform conf::sysconf::tests::sc_2_pbs_message
+        PASS [   0.012s] (155/673) raven-libc-platform conf::sysconf::tests::sc_arg_max
+        PASS [   0.013s] (156/673) raven-libc-platform conf::sysconf::tests::sc_aio_listio_max
+        PASS [   0.006s] (157/673) raven-libc-platform conf::sysconf::tests::sc_clk_tck
+        PASS [   0.014s] (158/673) raven-libc-platform conf::sysconf::tests::sc_aio_prio_delta_max
+        PASS [   0.006s] (159/673) raven-libc-platform conf::sysconf::tests::sc_expr_nest_max
+        PASS [   0.010s] (160/673) raven-libc-platform conf::sysconf::tests::sc_bc_string_max
+        PASS [   0.010s] (161/673) raven-libc-platform conf::sysconf::tests::sc_bc_scale_max
+        PASS [   0.005s] (162/673) raven-libc-platform conf::sysconf::tests::sc_job_control
+        PASS [   0.009s] (163/673) raven-libc-platform conf::sysconf::tests::sc_delaytimer_max
+        PASS [   0.008s] (164/673) raven-libc-platform conf::sysconf::tests::sc_iov_max
+        PASS [   0.006s] (165/673) raven-libc-platform conf::sysconf::tests::sc_login_name_max
+        PASS [   0.005s] (166/673) raven-libc-platform conf::sysconf::tests::sc_memlock
+        PASS [   0.017s] (167/673) raven-libc-platform conf::sysconf::tests::sc_clock_selection
+        PASS [   0.010s] (168/673) raven-libc-platform conf::sysconf::tests::sc_line_max
+        PASS [   0.018s] (169/673) raven-libc-platform conf::sysconf::tests::sc_bc_dim_max
+        PASS [   0.007s] (170/673) raven-libc-platform conf::sysconf::tests::sc_memlock_range
+        PASS [   0.015s] (171/673) raven-libc-platform conf::sysconf::tests::sc_getgr_r_size_max
+        PASS [   0.019s] (172/673) raven-libc-platform conf::sysconf::tests::sc_child_max
+        PASS [   0.008s] (173/673) raven-libc-platform conf::sysconf::tests::sc_memory_protection
+        PASS [   0.016s] (174/673) raven-libc-platform conf::sysconf::tests::sc_cputime
+        PASS [   0.020s] (175/673) raven-libc-platform conf::sysconf::tests::sc_coll_weights_max
+        PASS [   0.016s] (176/673) raven-libc-platform conf::sysconf::tests::sc_getpw_r_size_max
+        PASS [   0.011s] (177/673) raven-libc-platform conf::sysconf::tests::sc_mapped_files
+        PASS [   0.009s] (178/673) raven-libc-platform conf::sysconf::tests::sc_message_passing
+        PASS [   0.006s] (179/673) raven-libc-platform conf::sysconf::tests::sc_nprocessors_conf
+        PASS [   0.020s] (180/673) raven-libc-platform conf::sysconf::tests::sc_host_name_max
+        PASS [   0.007s] (181/673) raven-libc-platform conf::sysconf::tests::sc_nzero
+        PASS [   0.006s] (182/673) raven-libc-platform conf::sysconf::tests::sc_page_size
+        PASS [   0.020s] (183/673) raven-libc-platform conf::sysconf::tests::sc_ipv6
+        PASS [   0.023s] (184/673) raven-libc-platform conf::sysconf::tests::sc_fsync
+        PASS [   0.010s] (185/673) raven-libc-platform conf::sysconf::tests::sc_ngroups_max
+        PASS [   0.008s] (186/673) raven-libc-platform conf::sysconf::tests::sc_pagesize
+        PASS [   0.011s] (187/673) raven-libc-platform conf::sysconf::tests::sc_mq_prio_max
+        PASS [   0.009s] (188/673) raven-libc-platform conf::sysconf::tests::sc_nprocessors_onln
+        PASS [   0.008s] (189/673) raven-libc-platform conf::sysconf::tests::sc_open_max
+        PASS [   0.015s] (190/673) raven-libc-platform conf::sysconf::tests::sc_minsigstksz
+        PASS [   0.035s] (191/673) raven-libc-platform conf::sysconf::tests::sc_bc_base_max
+        PASS [   0.010s] (192/673) raven-libc-platform conf::sysconf::tests::sc_phys_pages
+        PASS [   0.016s] (193/673) raven-libc-platform conf::sysconf::tests::sc_monotonic_clock
+        PASS [   0.006s] (194/673) raven-libc-platform conf::sysconf::tests::sc_reader_writer_locks
+        PASS [   0.015s] (195/673) raven-libc-platform conf::sysconf::tests::sc_mq_open_max
+        PASS [   0.010s] (196/673) raven-libc-platform conf::sysconf::tests::sc_raw_sockets
+        PASS [   0.008s] (197/673) raven-libc-platform conf::sysconf::tests::sc_realtime_signals
+        PASS [   0.016s] (198/673) raven-libc-platform conf::sysconf::tests::sc_pass_max
+        PASS [   0.009s] (199/673) raven-libc-platform conf::sysconf::tests::sc_sem_nsems_max
+        PASS [   0.009s] (200/673) raven-libc-platform conf::sysconf::tests::sc_saved_ids
+        PASS [   0.015s] (201/673) raven-libc-platform conf::sysconf::tests::sc_prioritized_io
+        PASS [   0.011s] (202/673) raven-libc-platform conf::sysconf::tests::sc_semaphores
+        PASS [   0.017s] (203/673) raven-libc-platform conf::sysconf::tests::sc_priority_scheduling
+        PASS [   0.009s] (204/673) raven-libc-platform conf::sysconf::tests::sc_sigstksz
+        PASS [   0.013s] (205/673) raven-libc-platform conf::sysconf::tests::sc_sem_value_max
+        PASS [   0.015s] (206/673) raven-libc-platform conf::sysconf::tests::sc_re_dup_max
+        PASS [   0.010s] (207/673) raven-libc-platform conf::sysconf::tests::sc_sigqueue_max
+        PASS [   0.128s] (208/673) raven-libc-platform backend::tests::platform_dup2_close_stress_is_leak_free
+        PASS [   0.011s] (209/673) raven-libc-platform conf::sysconf::tests::sc_shared_memory_objects
+        PASS [   0.008s] (210/673) raven-libc-platform conf::sysconf::tests::sc_sporadic_server
+        PASS [   0.004s] (211/673) raven-libc-platform conf::sysconf::tests::sc_synchronized_io
+        PASS [   0.006s] (212/673) raven-libc-platform conf::sysconf::tests::sc_stream_max
+        PASS [   0.009s] (213/673) raven-libc-platform conf::sysconf::tests::sc_ss_repl_max
+        PASS [   0.011s] (214/673) raven-libc-platform conf::sysconf::tests::sc_spin_locks
+        PASS [   0.017s] (215/673) raven-libc-platform conf::sysconf::tests::sc_regexp
+        PASS [   0.007s] (216/673) raven-libc-platform conf::sysconf::tests::sc_symloop_max
+        PASS [   0.017s] (217/673) raven-libc-platform conf::sysconf::tests::sc_rtsig_max
+        PASS [   0.015s] (218/673) raven-libc-platform conf::sysconf::tests::sc_shell
+        PASS [   0.010s] (219/673) raven-libc-platform conf::sysconf::tests::sc_streams
+        PASS [   0.014s] (220/673) raven-libc-platform conf::sysconf::tests::sc_spawn
+        PASS [   0.006s] (221/673) raven-libc-platform conf::sysconf::tests::sc_thread_prio_inherit
+        PASS [   0.007s] (222/673) raven-libc-platform conf::sysconf::tests::sc_thread_keys_max
+        PASS [   0.006s] (223/673) raven-libc-platform conf::sysconf::tests::sc_thread_sporadic_server
+        PASS [   0.007s] (224/673) raven-libc-platform conf::sysconf::tests::sc_thread_threads_max
+        PASS [   0.005s] (225/673) raven-libc-platform conf::sysconf::tests::sc_timers
+        PASS [   0.009s] (226/673) raven-libc-platform conf::sysconf::tests::sc_thread_robust_prio_protect
+        PASS [   0.012s] (227/673) raven-libc-platform conf::sysconf::tests::sc_thread_attr_stackaddr
+        PASS [   0.009s] (228/673) raven-libc-platform conf::sysconf::tests::sc_thread_safe_functions
+        PASS [   0.010s] (229/673) raven-libc-platform conf::sysconf::tests::sc_thread_robust_prio_inherit
+        PASS [   0.012s] (230/673) raven-libc-platform conf::sysconf::tests::sc_thread_cputime
+        PASS [   0.011s] (231/673) raven-libc-platform conf::sysconf::tests::sc_thread_destructor_iterations
+        PASS [   0.007s] (232/673) raven-libc-platform conf::sysconf::tests::sc_timeouts
+        PASS [   0.012s] (233/673) raven-libc-platform conf::sysconf::tests::sc_thread_prio_protect
+        PASS [   0.012s] (234/673) raven-libc-platform conf::sysconf::tests::sc_thread_process_shared
+        PASS [   0.014s] (235/673) raven-libc-platform conf::sysconf::tests::sc_thread_attr_stacksize
+        PASS [   0.011s] (236/673) raven-libc-platform conf::sysconf::tests::sc_thread_stack_min
+        PASS [   0.009s] (237/673) raven-libc-platform conf::sysconf::tests::sc_timer_max
+        PASS [   0.008s] (238/673) raven-libc-platform conf::sysconf::tests::sc_trace_event_filter
+        PASS [   0.012s] (239/673) raven-libc-platform conf::sysconf::tests::sc_threads
+        PASS [   0.014s] (240/673) raven-libc-platform conf::sysconf::tests::sc_thread_priority_scheduling
+        PASS [   0.005s] (241/673) raven-libc-platform conf::sysconf::tests::sc_trace_name_max
+        PASS [   0.012s] (242/673) raven-libc-platform conf::sysconf::tests::sc_trace
+        PASS [   0.008s] (243/673) raven-libc-platform conf::sysconf::tests::sc_tty_name_max
+        PASS [   0.012s] (244/673) raven-libc-platform conf::sysconf::tests::sc_trace_event_name_max
+        PASS [   0.012s] (245/673) raven-libc-platform conf::sysconf::tests::sc_trace_inherit
+        PASS [   0.007s] (246/673) raven-libc-platform conf::sysconf::tests::sc_version
+        PASS [   0.009s] (247/673) raven-libc-platform conf::sysconf::tests::sc_v7_ilp32_offbig
+        PASS [   0.010s] (248/673) raven-libc-platform conf::sysconf::tests::sc_v6_lpbig_offbig
+        PASS [   0.012s] (249/673) raven-libc-platform conf::sysconf::tests::sc_typed_memory_objects
+        PASS [   0.011s] (250/673) raven-libc-platform conf::sysconf::tests::sc_v6_ilp32_off32
+        PASS [   0.012s] (251/673) raven-libc-platform conf::sysconf::tests::sc_uio_maxiov
+        PASS [   0.013s] (252/673) raven-libc-platform conf::sysconf::tests::sc_trace_log
+        PASS [   0.010s] (253/673) raven-libc-platform conf::sysconf::tests::sc_v6_lp64_off64
+        PASS [   0.010s] (254/673) raven-libc-platform conf::sysconf::tests::sc_v7_ilp32_off32
+        PASS [   0.013s] (255/673) raven-libc-platform conf::sysconf::tests::sc_trace_user_event_max
+        PASS [   0.006s] (256/673) raven-libc-platform conf::sysconf::tests::sc_xbs5_ilp32_off32
+        PASS [   0.011s] (257/673) raven-libc-platform conf::sysconf::tests::sc_v7_lp64_off64
+        PASS [   0.015s] (258/673) raven-libc-platform conf::sysconf::tests::sc_tzname_max
+        PASS [   0.006s] (259/673) raven-libc-platform conf::sysconf::tests::sc_xbs5_lpbig_offbig
+        PASS [   0.013s] (260/673) raven-libc-platform conf::sysconf::tests::sc_v7_lpbig_offbig
+        PASS [   0.008s] (261/673) raven-libc-platform conf::sysconf::tests::sc_xbs5_ilp32_offbig
+        PASS [   0.008s] (262/673) raven-libc-platform conf::sysconf::tests::sc_xbs5_lp64_off64
+        PASS [   0.005s] (263/673) raven-libc-platform conf::sysconf::tests::sc_xopen_enh_i18n
+        PASS [   0.007s] (264/673) raven-libc-platform conf::sysconf::tests::sc_xopen_crypt
+        PASS [   0.006s] (265/673) raven-libc-platform conf::sysconf::tests::sc_xopen_xpg2
+        PASS [   0.006s] (266/673) raven-libc-platform conf::sysconf::tests::sc_xopen_unix
+        PASS [   0.007s] (267/673) raven-libc-platform conf::sysconf::tests::sc_xopen_streams
+        PASS [   0.018s] (268/673) raven-libc-platform conf::sysconf::tests::sc_v6_ilp32_offbig
+        PASS [   0.021s] (269/673) raven-libc-platform conf::sysconf::tests::sc_trace_sys_max
+        PASS [   0.008s] (270/673) raven-libc-platform conf::sysconf::tests::sc_xopen_legacy
+        PASS [   0.008s] (271/673) raven-libc-platform conf::sysconf::tests::sc_xopen_realtime_threads
+        PASS [   0.005s] (272/673) raven-libc-platform conf::sysconf::tests::unknown_name_is_einval
+        PASS [   0.005s] (273/673) raven-libc-platform conf::tests::sysconf_defaults_are_the_documented_ones
+        PASS [   0.009s] (274/673) raven-libc-platform conf::sysconf::tests::sc_xopen_shm
+        PASS [   0.009s] (275/673) raven-libc-platform conf::sysconf::tests::sc_xopen_realtime
+        PASS [   0.007s] (276/673) raven-libc-platform conf::sysconf::tests::sc_xopen_xpg4
+        PASS [   0.162s] (277/673) raven-libc-platform backend::tests::fd_table_stress_keeps_refcounts_consistent
+        PASS [   0.011s] (278/673) raven-libc-platform conf::sysconf::tests::sc_xopen_xcu_version
+        PASS [   0.008s] (279/673) raven-libc-platform conf::tests::pathconf_and_fpathconf_agree_on_constants
+        PASS [   0.005s] (280/673) raven-libc-platform dir::getcwd::tests::buf_null_with_large_size_allocates_that_size
+        PASS [   0.008s] (281/673) raven-libc-platform conf::tests::confstr_path_is_stable
+        PASS [   0.006s] (282/673) raven-libc-platform dir::getcwd::tests::exact_buffer_is_filled
+        PASS [   0.013s] (283/673) raven-libc-platform conf::sysconf::tests::sc_xopen_version
+        PASS [   0.009s] (284/673) raven-libc-platform dir::getcwd::tests::buf_null_size_zero_allocates_as_needed
+        PASS [   0.008s] (285/673) raven-libc-platform dir::getcwd::tests::too_small_buffer_is_erange
+        PASS [   0.010s] (286/673) raven-libc-platform dir::getcwd::tests::larger_buffer_is_zero_terminated
+        PASS [   0.015s] (287/673) raven-libc-platform conf::sysconf::tests::sc_xopen_xpg3
+        PASS [   0.009s] (288/673) raven-libc-platform fcntl::tests::conflict_and_interrupt_errno_propagate
+        PASS [   0.010s] (289/673) raven-libc-platform dir::getcwd::tests::root_is_one_slash
+        PASS [   0.005s] (290/673) raven-libc-platform fd::fdsan::tests::level_can_be_changed
+        PASS [   0.005s] (291/673) raven-libc-platform fd::fdsan::tests::tag_round_trip
+        PASS [   0.006s] (292/673) raven-libc-platform fd::fdsan::tests::level_from_env
+        PASS [   0.010s] (293/673) raven-libc-platform dir::tests::getcwd_reexport_matches_the_implementation
+        PASS [   0.006s] (294/673) raven-libc-platform fd::fdsan::tests::tag_value_is_sign_extended
+        PASS [   0.009s] (295/673) raven-libc-platform fd::fdsan::tests::disabled_reports_nothing
+        PASS [   0.013s] (296/673) raven-libc-platform dir::getcwd::tests::buf_with_size_zero_is_einval
+        PASS [   0.010s] (297/673) raven-libc-platform fcntl::tests::unknown_commands_and_types_are_einval
+        PASS [   0.011s] (298/673) raven-libc-platform fcntl::tests::bad_fd_is_ebadf
+        PASS [   0.011s] (299/673) raven-libc-platform fcntl::tests::setlk_forwards_the_handle_and_wire_fields
+        PASS [   0.011s] (300/673) raven-libc-platform fcntl::tests::getlk_copies_the_first_conflict_back
+        PASS [   0.009s] (301/673) raven-libc-platform fd::fdsan::tests::expected_owned_and_unowned_messages
+        PASS [   0.009s] (302/673) raven-libc-platform fd::fdsan::tests::double_close_message
+        PASS [   0.009s] (303/673) raven-libc-platform fd::fdsan::tests::tag_type_keeps_every_owner
+        PASS [   0.007s] (304/673) raven-libc-platform fd::fdsan::tests::warn_once_reports_once
+        PASS [   0.006s] (305/673) raven-libc-platform fd::inherit::tests::empty_block_round_trip
+        PASS [   0.005s] (306/673) raven-libc-platform fd::inherit::tests::nulted_path_is_einval
+        PASS [   0.006s] (307/673) raven-libc-platform fd::inherit::tests::env_round_trip_is_lowercase_hex
+        PASS [   0.008s] (308/673) raven-libc-platform fd::inherit::tests::bad_version_is_eproto
+        PASS [   0.014s] (309/673) raven-libc-platform fd::fdsan::tests::fatal_is_an_abort
+        PASS [   0.009s] (310/673) raven-libc-platform fd::fdsan::tests::wrong_owner_message_names_both
+        PASS [   0.007s] (311/673) raven-libc-platform fd::inherit::tests::string_table_is_shared
+        PASS [   0.005s] (312/673) raven-libc-platform fd::inherit::tests::version_one_block_decodes_without_readiness
+        PASS [   0.010s] (313/673) raven-libc-platform fd::fdsan::tests::warn_reports_every_time
+        PASS [   0.009s] (314/673) raven-libc-platform fd::inherit::tests::env_rejects_odd_length_and_bad_digits
+        PASS [   0.012s] (315/673) raven-libc-platform fd::inherit::tests::bad_magic_is_eproto
+        PASS [   0.010s] (316/673) raven-libc-platform fd::inherit::tests::no_path_is_marked
+        PASS [   0.012s] (317/673) raven-libc-platform fd::fdsan::tests::zero_value_is_unowned
+        PASS [   0.006s] (318/673) raven-libc-platform fd::ofd::tests::add_and_drop_refs
+        PASS [   0.010s] (319/673) raven-libc-platform fd::inherit::tests::round_trip_keeps_every_field
+        PASS [   0.010s] (320/673) raven-libc-platform fd::inherit::tests::restore_fdmap_shares_one_ofd_per_handle
+        PASS [   0.011s] (321/673) raven-libc-platform fd::inherit::tests::too_many_entries_is_e2big
+        PASS [   0.014s] (322/673) raven-libc-platform fd::inherit::tests::entry_handle_wraps_the_number
+        PASS [   0.012s] (323/673) raven-libc-platform fd::inherit::tests::truncation_is_eproto
+        PASS [   0.009s] (324/673) raven-libc-platform fd::ofd::tests::adding_ref_to_a_dead_ofd_fails
+        PASS [   0.007s] (325/673) raven-libc-platform fd::ofd::tests::epochs_increase
+        PASS [   0.009s] (326/673) raven-libc-platform fd::ofd::tests::access_mode_helpers
+        PASS [   0.013s] (327/673) raven-libc-platform fd::inherit::tests::transferable_kinds
+        PASS [   0.008s] (328/673) raven-libc-platform fd::ofd::tests::an_event_handle_becomes_the_poll_source
+        PASS [   0.008s] (329/673) raven-libc-platform fd::ofd::tests::insert_and_get
+        PASS [   0.006s] (330/673) raven-libc-platform intr::tests::cancellation_points_include_the_posix_set
+        PASS [   0.005s] (331/673) raven-libc-platform intr::tests::close_treats_eintr_as_success
+        PASS [   0.009s] (332/673) raven-libc-platform fd::ofd::tests::pending_ofd_attaches_once
+        PASS [   0.009s] (333/673) raven-libc-platform fd::ofd::tests::release_reuses_the_slot
+        PASS [   0.006s] (334/673) raven-libc-platform intr::tests::class_n_never_restarts
+        PASS [   0.009s] (335/673) raven-libc-platform fd::ofd::tests::totals_and_entries
+        PASS [   0.008s] (336/673) raven-libc-platform intr::tests::non_eintr_errors_pass_through
+        PASS [   0.009s] (337/673) raven-libc-platform intr::tests::class_lists_are_disjoint
+        PASS [   0.006s] (338/673) raven-libc-platform intr::tests::restartable_retries_with_permission
+        PASS [   0.006s] (339/673) raven-libc-platform ioctl::tests::fioclex_and_fionclex
+        PASS [   0.010s] (340/673) raven-libc-platform intr::tests::deadline_math
+        PASS [   0.013s] (341/673) raven-libc-platform fd::ofd::tests::zero_is_reserved
+        PASS [   0.010s] (342/673) raven-libc-platform intr::tests::restart_classes
+        PASS [   0.010s] (343/673) raven-libc-platform intr::tests::restart_wanted_is_false_without_hooks
+        PASS [   0.008s] (344/673) raven-libc-platform ioctl::tests::tcgets_needs_a_tty
+        PASS [   0.008s] (345/673) raven-libc-platform ioctl::tty::tests::a_legacy_console_falls_back_to_get_mode_and_set_mode
+        PASS [   0.007s] (346/673) raven-libc-platform ioctl::tty::tests::default_termios_has_cread_and_cs8
+        PASS [   0.011s] (347/673) raven-libc-platform intr::tests::restartable_stops_without_permission
+        PASS [   0.009s] (348/673) raven-libc-platform ioctl::tty::tests::cfmakeraw_clears_the_input_flags
+        PASS [   0.008s] (349/673) raven-libc-platform ioctl::tty::tests::speed_accessors_round_trip
+        PASS [   0.006s] (350/673) raven-libc-platform ioctl::tty::tests::tcsetattr_round_trips_every_termios_field
+        PASS [   0.012s] (351/673) raven-libc-platform ioctl::tests::tcsets_needs_a_tty
+        PASS [   0.007s] (352/673) raven-libc-platform lock::lockf::tests::f_test_reports_a_foreign_lock_as_eacces
+        PASS [   0.013s] (353/673) raven-libc-platform ioctl::tests::unknown_request_is_enotty
+        PASS [   0.014s] (354/673) raven-libc-platform ioctl::tests::fionbio_sets_and_clears_nonblock
+        PASS [   0.008s] (355/673) raven-libc-platform ioctl::tty::tests::tcsetattr_switches_to_raw
+        PASS [   0.015s] (356/673) raven-libc-platform ioctl::tests::net_ioctl_classification
+        PASS [   0.013s] (357/673) raven-libc-platform ioctl::tty::tests::tcflush_succeeds_on_a_tty
+        PASS [   0.010s] (358/673) raven-libc-platform ioctl::tty::tests::tcsetattr_clears_echo_only
+        PASS [   0.004s] (359/673) raven-libc-platform mem::mmap::tests::anonymous_shared_goes_through_memobj_create
+        PASS [   0.010s] (360/673) raven-libc-platform lock::lockf::tests::f_lock_is_a_blocking_write_lock
+        PASS [   0.007s] (361/673) raven-libc-platform lock::tests::no_lock_is_transparent
+        PASS [   0.015s] (362/673) raven-libc-platform ioctl::tty::tests::tcdrain_is_enosys_until_pg_54
+        PASS [   0.008s] (363/673) raven-libc-platform mem::mmap::tests::file_mapping_attaches_a_pager_object
+        PASS [   0.013s] (364/673) raven-libc-platform lock::lockf::tests::f_test_uses_a_write_lock_probe
+        PASS [   0.012s] (365/673) raven-libc-platform lock::lockf::tests::unknown_function_is_einval
+        PASS [   0.007s] (366/673) raven-libc-platform mem::mmap::tests::misaligned_offset_is_einval
+        PASS [   0.010s] (367/673) raven-libc-platform mem::mmap::tests::anonymous_private_is_zero_filled
+        PASS [   0.016s] (368/673) raven-libc-platform ioctl::tty::tests::tcgetattr_returns_canonical_echo
+        PASS [   0.014s] (369/673) raven-libc-platform lock::lockf::tests::f_tlock_is_a_non_blocking_write_lock
+        PASS [   0.006s] (370/673) raven-libc-platform mem::mmap::tests::msync_validates_flags_and_flushes
+        PASS [   0.013s] (371/673) raven-libc-platform lock::lockf::tests::f_ulock_unlocks
+        PASS [   0.011s] (372/673) raven-libc-platform lock::tests::guard_releases_on_drop
+        PASS [   0.015s] (373/673) raven-libc-platform lock::lockf::tests::f_test_ignores_our_own_lock
+        PASS [   0.010s] (374/673) raven-libc-platform mem::mmap::tests::fixed_mapping_replaces_the_range
+        PASS [   0.010s] (375/673) raven-libc-platform mem::mmap::tests::madvise_normal_succeeds_and_dontneed_is_tbd
+        PASS [   0.010s] (376/673) raven-libc-platform mem::mmap::tests::mprotect_changes_the_bits
+        PASS [   0.008s] (377/673) raven-libc-platform mem::shm::tests::bad_names_are_einval
+        PASS [   0.011s] (378/673) raven-libc-platform mem::mmap::tests::write_exec_is_eacces
+        PASS [   0.011s] (379/673) raven-libc-platform mem::mmap::tests::munmap_removes_the_mapping
+        PASS [   0.006s] (380/673) raven-libc-platform mem::tests::page_size_matches_the_abi
+        PASS [   0.007s] (381/673) raven-libc-platform mem::shm::tests::names_map_into_the_tmp_prefix
+        PASS [   0.010s] (382/673) raven-libc-platform mem::mmap::tests::zero_length_is_einval
+        PASS [   0.007s] (383/673) raven-libc-platform mem::shm::tests::create_reopen_and_unlink_round_trip
+        PASS [   0.007s] (384/673) raven-libc-platform mem::shm::tests::write_only_and_bad_names_are_rejected_before_open
+        PASS [   0.014s] (385/673) raven-libc-platform mem::mmap::tests::mlock_is_an_accepted_no_op
+        PASS [   0.012s] (386/673) raven-libc-platform mem::mmap::tests::page_size_is_4096
+        PASS [   0.007s] (387/673) raven-libc-platform path::cwd_tests::pwd_relative_is_ignored
+        PASS [   0.009s] (388/673) raven-libc-platform path::cwd_tests::set_replaces_the_path
+        PASS [   0.009s] (389/673) raven-libc-platform path::cwd_tests::starts_at_root
+        PASS [   0.008s] (390/673) raven-libc-platform path::resolve_tests::component_255_is_accepted
+        PASS [   0.010s] (391/673) raven-libc-platform path::cwd_tests::pwd_absolute_is_used
+        PASS [   0.008s] (392/673) raven-libc-platform path::resolve_tests::dot_dot_past_root_is_clamped
+        PASS [   0.010s] (393/673) raven-libc-platform path::resolve_tests::component_256_is_enametoolong
+        PASS [   0.013s] (394/673) raven-libc-platform mem::tests::bounce_limit_is_64_kib
+        PASS [   0.008s] (395/673) raven-libc-platform path::resolve_tests::empty_path_is_enoent
+        PASS [   0.011s] (396/673) raven-libc-platform path::resolve_tests::dev_fd_names
+        PASS [   0.014s] (397/673) raven-libc-platform path::cwd_tests::pwd_is_normalised
+        PASS [   0.008s] (398/673) raven-libc-platform path::resolve_tests::total_4095_is_rejected_by_the_transport_limit
+        PASS [   0.008s] (399/673) raven-libc-platform path::resolve_tests::empty_path_with_at_empty_path_returns_base
+        PASS [   0.009s] (400/673) raven-libc-platform path::resolve_tests::file_prefix_is_added_once
+        PASS [   0.008s] (401/673) raven-libc-platform path::resolve_tests::total_4096_is_enametoolong
+        PASS [   0.009s] (402/673) raven-libc-platform path::resolve_tests::nul_is_einval
+        PASS [   0.009s] (403/673) raven-libc-platform path::resolve_tests::resolver_table_has_at_least_eighty_cases
+        PASS [   0.005s] (404/673) raven-libc-platform platform::p1c_tests::a_blocking_socket_read_waits_and_retries_after_eagain
+        PASS [   0.011s] (405/673) raven-libc-platform path::resolve_tests::wide_limits_accept_4095
+        PASS [   0.008s] (406/673) raven-libc-platform path::special_tests::std_names
+        PASS [   0.005s] (407/673) raven-libc-platform platform::p1c_tests::lseek_moves_the_fake_cursor
+        PASS [   0.006s] (408/673) raven-libc-platform platform::p1c_tests::utime_sends_the_explicit_times
+        PASS [   0.006s] (409/673) raven-libc-platform platform::p1c_tests::stdio_env_publishes_the_standard_fd_handles
+        PASS [   0.012s] (410/673) raven-libc-platform path::special_tests::proc_self_fd_numbers
+        PASS [   0.009s] (411/673) raven-libc-platform platform::p1c_tests::hostid_and_domainname_round_trip
+        PASS [   0.009s] (412/673) raven-libc-platform platform::p1c_tests::exec_fdmap_env_carries_the_table_and_closes_cloexec
+        PASS [   0.013s] (413/673) raven-libc-platform path::special_tests::other_dev_paths_are_not_special
+        PASS [   0.017s] (414/673) raven-libc-platform path::resolve_tests::relative_base_is_einval
+        PASS [   0.016s] (415/673) raven-libc-platform path::special_tests::dev_fd_numbers
+        PASS [   0.012s] (416/673) raven-libc-platform platform::p1c_tests::a_nonblocking_socket_read_returns_eagain
+        PASS [   0.010s] (417/673) raven-libc-platform platform::p1c_tests::fork_child_duplicates_an_inherited_socket_handle
+        PASS [   0.024s] (418/673) raven-libc-platform path::cwd_tests::resolve_uses_the_cwd
+        PASS [   0.012s] (419/673) raven-libc-platform platform::p1c_tests::chown_family_uses_the_root_handle
+        PASS [   0.009s] (420/673) raven-libc-platform platform::p1c_tests::mkfifoat_and_mknodat_resolve_through_the_cwd
+        PASS [   0.012s] (421/673) raven-libc-platform platform::p1c_tests::exec_fdmap_duplicates_the_event_handle
+        PASS [   0.008s] (422/673) raven-libc-platform poll::epoll_tests::ctl_add_and_wait_delivers
+        PASS [   0.013s] (423/673) raven-libc-platform poll::epoll_tests::create_rejects_unknown_flags
+        PASS [   0.015s] (424/673) raven-libc-platform platform::p1c_tests::getdtablesize_tracks_the_nofile_limit
+        PASS [   0.011s] (425/673) raven-libc-platform poll::epoll_tests::create_returns_an_epoll_fd
+        PASS [   0.008s] (426/673) raven-libc-platform poll::epoll_tests::empty_events_is_einval
+        PASS [   0.005s] (427/673) raven-libc-platform poll::tests::a_failed_poll_leaves_the_cached_queue_usable
+        PASS [   0.009s] (428/673) raven-libc-platform poll::epoll_tests::event_encoding_round_trips
+        PASS [   0.006s] (429/673) raven-libc-platform poll::select_tests::writable_file_sets_the_bit
+        PASS [   0.007s] (430/673) raven-libc-platform poll::epoll_tests::pwait_is_enosys_until_pg_26
+        PASS [   0.009s] (431/673) raven-libc-platform poll::epoll_tests::oneshot_stops_delivery_after_the_first_event
+        PASS [   0.007s] (432/673) raven-libc-platform poll::epoll_tests::stale_cookie_is_dropped
+        PASS [   0.011s] (433/673) raven-libc-platform poll::epoll_tests::ctl_del_removes_the_registration
+        PASS [   0.019s] (434/673) raven-libc-platform platform::p1c_tests::closing_an_fd_releases_its_doorbell_with_handle_close
+        PASS [   0.005s] (435/673) raven-libc-platform poll::tests::every_entry_for_a_shared_descriptor_gets_its_own_revents
+        PASS [   0.008s] (436/673) raven-libc-platform poll::select_tests::readable_file_sets_the_bit
+        PASS [   0.008s] (437/673) raven-libc-platform poll::tests::a_stored_readiness_mask_is_not_a_poll_verdict
+        PASS [   0.008s] (438/673) raven-libc-platform poll::tests::an_entry_with_no_events_is_not_ready
+        PASS [   0.010s] (439/673) raven-libc-platform poll::select_tests::negative_nfds_is_einval
+        PASS [   0.010s] (440/673) raven-libc-platform poll::select_tests::invalid_timeout_is_einval
+        PASS [   0.005s] (441/673) raven-libc-platform poll::tests::negative_fd_is_ignored
+        PASS [   0.006s] (442/673) raven-libc-platform poll::tests::invalid_fd_is_pollnval
+        PASS [   0.005s] (443/673) raven-libc-platform poll::tests::tty_timeout_returns_zero
+        PASS [   0.006s] (444/673) raven-libc-platform poll::tests::too_many_fds_is_einval
+        PASS [   0.007s] (445/673) raven-libc-platform poll::tests::poll_recovers_from_a_foreign_waiting_event_queue
+        PASS [   0.012s] (446/673) raven-libc-platform poll::select_tests::nfds_above_fd_setsize_is_einval
+        PASS [   0.012s] (447/673) raven-libc-platform poll::select_tests::pselect_is_enosys_until_pg_26
+        PASS [   0.006s] (448/673) raven-libc-platform random::getentropy::tests::read_rand_returns_the_bytes
+        PASS [   0.009s] (449/673) raven-libc-platform poll::tests::regular_file_is_immediately_readable
+        PASS [   0.007s] (450/673) raven-libc-platform random::getentropy::tests::getrandom_uses_the_weak_rand_source_until_pg_52
+        PASS [   0.007s] (451/673) raven-libc-platform random::getentropy::tests::platform_wrapper_matches_the_free_function
+        PASS [   0.006s] (452/673) raven-libc-platform random::getentropy::tests::zero_length_is_a_success
+        PASS [   0.012s] (453/673) raven-libc-platform poll::tests::regular_file_is_immediately_writable
+        PASS [   0.007s] (454/673) raven-libc-platform random::tests::getentropy_max_is_256
+        PASS [   0.009s] (455/673) raven-libc-platform random::getentropy::tests::two_hundred_fifty_seven_is_eio
+        PASS [   0.012s] (456/673) raven-libc-platform poll::tests::two_entries_for_one_descriptor_register_it_once
+        PASS [   0.010s] (457/673) raven-libc-platform random::getentropy::tests::short_source_is_eio
+        PASS [   0.013s] (458/673) raven-libc-platform random::getentropy::tests::entropy_is_weak_until_pg_52
+        PASS [   0.008s] (459/673) raven-libc-platform registry_tests::every_registered_stub_is_a_tbd_row
+        PASS [   0.011s] (460/673) raven-libc-platform random::getentropy::tests::seed_is_32_bytes_and_clock_mixed
+        PASS [   0.015s] (461/673) raven-libc-platform poll::tests::tty_hup_is_reported
+        PASS [   0.006s] (462/673) raven-libc-platform registry_tests::external_rows_name_a_ticket_owner
+        PASS [   0.006s] (463/673) raven-libc-platform registry_tests::skip_rows_are_class_b
+        PASS [   0.015s] (464/673) raven-libc-platform random::getentropy::tests::missing_rand_scheme_is_enoent
+        PASS [   0.013s] (465/673) raven-libc-platform random::getentropy::tests::two_hundred_fifty_six_is_accepted
+        PASS [   0.009s] (466/673) raven-libc-platform registry_tests::exists_rows_name_only_defined_syscalls
+        PASS [   0.009s] (467/673) raven-libc-platform registry_tests::every_tbd_row_is_a_registered_stub
+        PASS [   0.006s] (468/673) raven-libc-platform sched::nice::tests::boundaries_are_inclusive
+        PASS [   0.006s] (469/673) raven-libc-platform sched::nice::tests::set_errors_propagate
+        PASS [   0.008s] (470/673) raven-libc-platform registry_tests::status_counts_are_reported_by_the_document
+        PASS [   0.020s] (471/673) raven-libc-platform poll::tests::ppoll_reports_the_poll_result
+        PASS [   0.006s] (472/673) raven-libc-platform scheme::rootcall::tests::a_call_succeeds
+        PASS [   0.009s] (473/673) raven-libc-platform sched::nice::tests::clamp_is_the_linux_range
+        PASS [   0.008s] (474/673) raven-libc-platform sched::nice::tests::without_procd_negative_is_eperm
+        PASS [   0.007s] (475/673) raven-libc-platform sched::tests::clamp_uses_nzero
+        PASS [   0.007s] (476/673) raven-libc-platform sched::nice::tests::without_procd_non_negative_is_a_no_op_success
+        PASS [   0.005s] (477/673) raven-libc-platform scheme::tests::decode_a_status_response
+        PASS [   0.005s] (478/673) raven-libc-platform scheme::tests::call_status_helper_is_used
+        PASS [   0.006s] (479/673) raven-libc-platform scheme::tests::encode_a_mkdir_call
+        PASS [   0.010s] (480/673) raven-libc-platform scheme::rootcall::tests::invalidate_closes_the_handle
+        PASS [   0.005s] (481/673) raven-libc-platform stat::tests::fields_copy_one_to_one
+        PASS [   0.014s] (482/673) raven-libc-platform sched::nice::tests::clamp_happens_before_setpriority
+        PASS [   0.009s] (483/673) raven-libc-platform scheme::rootcall::tests::root_is_opened_once
+        PASS [   0.013s] (484/673) raven-libc-platform scheme::rootcall::tests::eio_reopens_the_root_once
+        PASS [   0.005s] (485/673) raven-libc-platform stat::tests::statvfs_maps_the_wire_record
+        PASS [   0.010s] (486/673) raven-libc-platform scheme::tests::fstat_record_decodes
+        PASS [   0.013s] (487/673) raven-libc-platform scheme::rootcall::tests::open_error_propagates
+        PASS [   0.008s] (488/673) raven-libc-platform scheme::tests::probe_leaves_files_unknown
+        PASS [   0.008s] (489/673) raven-libc-platform scheme::tests::undecodable_response_is_eproto
+        PASS [   0.010s] (490/673) raven-libc-platform scheme::tests::open_scheme_path_does_not_add_file
+        PASS [   0.009s] (491/673) raven-libc-platform stat::tests::dev_rdev_and_blksize_are_the_documented_defaults
+        PASS [   0.010s] (492/673) raven-libc-platform scheme::tests::probe_detects_a_tty
+        PASS [   0.009s] (493/673) raven-libc-platform stat::tests::blocks_are_in_512_byte_units
+        PASS [   0.006s] (494/673) raven-libc-platform stat::tests::times_are_whole_seconds
+        PASS [   0.010s] (495/673) raven-libc-platform stat::tests::missing_type_bits_are_filled_from_the_source
+        PASS [   0.007s] (496/673) raven-libc-platform stubs_tests::lookup_finds_a_known_stub
+        PASS [   0.005s] (497/673) raven-libc-platform stubs_tests::stub_errno_matches_the_record
+        PASS [   0.008s] (498/673) raven-libc-platform stubs_tests::every_stub_has_a_gap_and_a_nonzero_errno
+        PASS [   0.008s] (499/673) raven-libc-platform stubs_tests::lookup_returns_none_for_an_implemented_name
+        PASS [   0.005s] (500/673) raven-libc-platform sysinfo::hostname::tests::hostname_prefers_sys_over_uname
+        PASS [   0.006s] (501/673) raven-libc-platform stubs_tests::no_stub_is_also_a_supported_primitive_name
+        PASS [   0.011s] (502/673) raven-libc-platform stat::tests::statx_never_claims_btime
+        PASS [   0.006s] (503/673) raven-libc-platform stubs_tests::stub_names_are_unique
+        PASS [   0.006s] (504/673) raven-libc-platform sysinfo::hostname::tests::hostname_max_is_64
+        PASS [   0.007s] (505/673) raven-libc-platform sysinfo::hostname::tests::gethostname_falls_back_to_uname
+        PASS [   0.007s] (506/673) raven-libc-platform sysinfo::hostname::tests::hostname_64_is_accepted
+        PASS [   0.008s] (507/673) raven-libc-platform sysinfo::hostname::tests::gethostname_reads_sys_hostname
+        PASS [   0.006s] (508/673) raven-libc-platform sysinfo::hostname::tests::hostname_with_nul_is_einval
+        PASS [   0.009s] (509/673) raven-libc-platform sysinfo::hostname::tests::gethostname_short_buffer_is_enametoolong
+        PASS [   0.006s] (510/673) raven-libc-platform sysinfo::hostname::tests::sethostname_writes_through_sys
+        PASS [   0.005s] (511/673) raven-libc-platform sysinfo::sysctl::tests::mib_to_name
+        PASS [   0.025s] (512/673) raven-libc-platform sched::tests::nzero_is_20
+        PASS [   0.005s] (513/673) raven-libc-platform sysinfo::sysctl::tests::numeric_sysctl_matches_the_name_form
+        PASS [   0.006s] (514/673) raven-libc-platform sysinfo::sysctl::tests::empty_buffer_is_a_size_query
+        PASS [   0.007s] (515/673) raven-libc-platform sysinfo::sysctl::tests::read_integer_64
+        PASS [   0.036s] (516/673) raven-libc-platform registry_tests::every_row_has_a_known_status_and_gap
+        PASS [   0.037s] (517/673) raven-libc-platform registry_tests::document_and_registry_have_the_same_rows
+        PASS [   0.006s] (518/673) raven-libc-platform sysinfo::sysctl::tests::short_value_buffer_is_enomem
+        PASS [   0.013s] (519/673) raven-libc-platform sysinfo::hostname::tests::hostname_65_is_einval
+        PASS [   0.007s] (520/673) raven-libc-platform sysinfo::sysctl::tests::short_mib_output_is_enomem
+        PASS [   0.006s] (521/673) raven-libc-platform sysinfo::sysctl::tests::unknown_mib_is_enoent
+        PASS [   0.004s] (522/673) raven-libc-platform sysinfo::tests::get_nprocs_defaults_to_one
+        PASS [   0.005s] (523/673) raven-libc-platform sysinfo::sysctl::tests::write_text_value
+        PASS [   0.011s] (524/673) raven-libc-platform sysinfo::sysctl::tests::name_to_mib
+        PASS [   0.006s] (525/673) raven-libc-platform sysinfo::tests::get_phys_pages_defaults_to_16384
+        PASS [   0.005s] (526/673) raven-libc-platform sysinfo::uname::tests::uname_fills_every_field_from_the_syscall
+        PASS [   0.010s] (527/673) raven-libc-platform sysinfo::sysctl::tests::unknown_name_is_enoent
+        PASS [   0.005s] (528/673) raven-libc-platform time::sleep::tests::interrupted_sleep_returns_the_full_request_until_pg_17
+        PASS [   0.006s] (529/673) raven-libc-platform sysinfo::uname::tests::field_bytes_without_nul_is_the_whole_field
+        PASS [   0.009s] (530/673) raven-libc-platform sysinfo::tests::getloadavg_is_tbd
+        PASS [   0.014s] (531/673) raven-libc-platform sysinfo::sysctl::tests::read_integer_32
+        PASS [   0.010s] (532/673) raven-libc-platform sysinfo::tests::fallback_is_one_cpu_and_64_mib
+        PASS [   0.014s] (533/673) raven-libc-platform sysinfo::sysctl::tests::read_text_value
+        PASS [   0.010s] (534/673) raven-libc-platform sysinfo::tests::sysinfo_is_copy_and_comparable
+        PASS [   0.006s] (535/673) raven-libc-platform time::sleep::tests::large_requests_do_not_overflow
+        PASS [   0.012s] (536/673) raven-libc-platform sysinfo::sysctl::tests::write_integer_value
+        PASS [   0.005s] (537/673) raven-libc-platform time::sleep::tests::one_second_is_one_billion_nanoseconds
+        PASS [   0.010s] (538/673) raven-libc-platform sysinfo::uname::tests::field_bytes_stops_at_nul
+        PASS [   0.010s] (539/673) raven-libc-platform sysinfo::uname::tests::libc_record_has_the_domainname_field
+        PASS [   0.017s] (540/673) raven-libc-platform sysinfo::sysctl::tests::sysctlnametomib_copies_the_path
+        PASS [   0.006s] (541/673) raven-libc-platform time::usleep::tests::zero_microseconds
+        PASS [   0.016s] (542/673) raven-libc-platform sysinfo::tests::sysinfo_without_arguments_returns_the_fallback
+        PASS [   0.009s] (543/673) raven-libc-platform time::tests::unknown_clock_is_einval
+        PASS [   0.016s] (544/673) raven-libc-platform sysinfo::tests::sysinfo_uses_the_counters_when_present
+        PASS [   0.009s] (545/673) raven-libc-platform time::tests::realtime_and_monotonic_are_available
+        PASS [   0.010s] (546/673) raven-libc-platform time::tests::clock_getres_is_one_nanosecond
+        PASS [   0.013s] (547/673) raven-libc-platform time::sleep::tests::zero_seconds_does_not_call_the_kernel
+        PASS [   0.010s] (548/673) raven-libc-platform time::tests::nanosleep_advances_the_clock
+        PASS [   0.016s] (549/673) raven-libc-platform sysinfo::uname::tests::raw_uname_exposes_the_model
+        PASS [   0.010s] (550/673) raven-libc-platform time::usleep::tests::one_microsecond
+        PASS [   0.007s] (551/673) raven-libc-platform tty::isatty::tests::regular_file_is_not_a_tty
+        PASS [   0.011s] (552/673) raven-libc-platform time::tests::relative_clock_nanosleep_sleeps
+        PASS [   0.013s] (553/673) raven-libc-platform time::tests::interrupted_nanosleep_returns_the_full_request_until_pg_17
+        PASS [   0.013s] (554/673) raven-libc-platform time::usleep::tests::nine_hundred_ninety_nine_microseconds
+        PASS [   0.007s] (555/673) raven-libc-platform tty::tests::tty_name_max_is_32
+        PASS [   0.011s] (556/673) raven-libc-platform tty::isatty::tests::bad_fd_is_not_a_tty
+        PASS [   0.006s] (557/673) raven-libc-platform tty::tests::tty_name_max_matches_the_abi
+        PASS [   0.011s] (558/673) raven-libc-platform tty::isatty::tests::tty_is_a_tty
+        PASS [   0.016s] (559/673) raven-libc-platform time::tests::invalid_timespec_is_einval
+        PASS [   0.008s] (560/673) raven-libc-platform xlat::tests::fcntl_actions
+        PASS [   0.018s] (561/673) raven-libc-platform time::tests::gettimeofday_matches_realtime
+        PASS [   0.007s] (562/673) raven-libc-platform xlat::tests::open_directory
+        PASS [   0.010s] (563/673) raven-libc-platform xlat::tests::call_status_decoding
+        PASS [   0.010s] (564/673) raven-libc-platform xlat::tests::fixture_matches_the_stat_defaults
+        PASS [   0.010s] (565/673) raven-libc-platform xlat::tests::fixture_matches_the_open_table
+        PASS [   0.022s] (566/673) raven-libc-platform time::tests::absolute_clock_nanosleep_is_enosys
+        PASS [   0.006s] (567/673) raven-libc-platform xlat::tests::open_read_only
+        PASS [   0.010s] (568/673) raven-libc-platform xlat::tests::open_append_and_flags
+        PASS [   0.012s] (569/673) raven-libc-platform xlat::tests::every_fixture_row_is_in_a_table
+        PASS [   0.012s] (570/673) raven-libc-platform xlat::tests::fixture_matches_the_fcntl_table
+        PASS [   0.012s] (571/673) raven-libc-platform xlat::tests::fixture_matches_the_ioctl_table
+        PASS [   0.011s] (572/673) raven-libc-platform xlat::tests::open_create_and_excl
+        PASS [   0.009s] (573/673) raven-libc-platform xlat::tests::open_read_write
+        PASS [   0.012s] (574/673) raven-libc-platform xlat::tests::open_path_is_eopnotsupp
+        PASS [   0.009s] (575/673) raven-libc-platform xlat::tests::open_trunc_on_write_is_kept
+        PASS [   0.012s] (576/673) raven-libc-platform xlat::tests::open_excl_without_create_is_ignored
+        PASS [   0.007s] (577/673) raven-libc-platform xlat::tests::open_write_only
+        PASS [   0.009s] (578/673) raven-libc-platform xlat::tests::open_unknown_bit_is_einval
+        PASS [   0.011s] (579/673) raven-libc-platform xlat::tests::open_trunc_on_read_only_is_dropped
+        PASS [   0.011s] (580/673) raven-libc-platform xlat::tests::open_tmpfile_is_eopnotsupp
+        PASS [   0.017s] (581/673) raven-libc-platform xlat::tests::ioctl_actions
+        PASS [   0.008s] (582/673) raven-libc-platform::process_lifetime tty_kind_is_recorded_at_open
+        PASS [   0.008s] (583/673) raven-libc-platform::process_lifetime mmap_and_nanosleep_cross_the_seam
+        PASS [   0.008s] (584/673) raven-proto-tty tests::a_foreign_version_is_rejected
+        PASS [   0.010s] (585/673) raven-libc-platform::process_lifetime open_dup_read_close
+        PASS [   0.010s] (586/673) raven-proto-tty tests::a_short_termios_body_is_truncated
+        PASS [   0.006s] (587/673) raven-proto-tty tests::responses_round_trip
+        PASS [   0.009s] (588/673) raven-proto-tty tests::get_mode_request_golden_bytes
+        PASS [   0.011s] (589/673) raven-proto-tty tests::flush_request_golden_bytes
+        PASS [   0.005s] (590/673) raven-proto-tty tests::short_messages_are_rejected
+        PASS [   0.006s] (591/673) raven-proto-tty tests::set_termios_round_trips_every_field
+        PASS [   0.008s] (592/673) raven-proto-tty tests::get_termios_golden_bytes
+        PASS [   0.007s] (593/673) raven-proto-tty tests::requests_round_trip
+        PASS [   0.012s] (594/673) raven-proto-tty tests::errors_have_descriptions
+        PASS [   0.005s] (595/673) raven-proto-tty tests::trailing_bytes_are_ignored
+        PASS [   0.013s] (596/673) raven-libc-platform::process_lifetime working_directory_survives_the_process
+        PASS [   0.015s] (597/673) raven-libc-platform xlat::tests::packet_status_decoding
+        PASS [   0.007s] (598/673) raven-proto-tty tests::the_termios_body_is_69_bytes
+        PASS [   0.010s] (599/673) raven-proto-tty tests::mode_response_golden_bytes
+        PASS [   0.011s] (600/673) raven-proto-tty tests::invalid_mode_and_echo_are_rejected
+        PASS [   0.016s] (601/673) raven-proto-tty tests::flushed_response_golden_bytes
+        PASS [   0.008s] (602/673) raven-proto-tty tests::write_permission_helpers_round_trip_and_have_stable_bytes
+        PASS [   0.010s] (603/673) raven-proto-tty tests::unknown_operations_are_rejected
+        PASS [   0.012s] (604/673) raven-proto-tty tests::set_mode_request_golden_bytes
+        PASS [   0.009s] (605/673) raven-ptyd pairs::tests::pairs_have_independent_queues_and_settings
+        PASS [   0.007s] (606/673) raven-ptyd pty::tests::canonical_input_is_line_buffered_and_echoed
+        PASS [   0.008s] (607/673) raven-ptyd pairs::tests::pty_inode_is_nonzero_and_role_distinct
+        PASS [   0.009s] (608/673) raven-ptyd pty::tests::a_custom_verase_byte_edits_the_line
+        PASS [   0.009s] (609/673) raven-ptyd pty::tests::echo_off_and_flush_drop_the_expected_bytes
+        PASS [   0.011s] (610/673) raven-ptyd pty::tests::hangup_makes_empty_reads_return_eof
+        PASS [   0.011s] (611/673) raven-ptyd pty::tests::raw_mode_passes_bytes_without_echo
+        PASS [   0.012s] (612/673) raven-ptyd pty::tests::ctrl_c_signals_the_foreground_group_and_echoes
+        PASS [   0.010s] (613/673) raven-tty-core tests::a_cleared_icrnl_keeps_carriage_return_as_data
+        PASS [   0.011s] (614/673) raven-ptyd pty::tests::the_complete_termios_round_trips
+        PASS [   0.007s] (615/673) raven-tty-core tests::a_partial_line_survives_between_chunks
+        PASS [   0.005s] (616/673) raven-tty-core tests::backspace_on_an_empty_line_does_nothing
+        PASS [   0.006s] (617/673) raven-tty-core tests::backspace_accepts_both_erase_bytes
+        PASS [   0.014s] (618/673) raven-ptyd pty::tests::a_drain_set_does_not_discard_queued_output
+        PASS [   0.015s] (619/673) raven-ptyd pty::tests::slave_output_is_readable_on_the_master
+        PASS [   0.015s] (620/673) raven-ptyd pty::tests::output_processing_obeys_onlcr
+        PASS [   0.013s] (621/673) raven-tty-core tests::a_custom_verase_byte_erases
+        PASS [   0.005s] (622/673) raven-tty-core tests::ctrl_l_is_passed_through
+        PASS [   0.005s] (623/673) raven-tty-core tests::echo_can_be_disabled
+        PASS [   0.011s] (624/673) raven-tty-core tests::a_line_edited_with_backspace_is_delivered_edited
+        PASS [   0.012s] (625/673) raven-tty-core tests::a_tab_is_inserted_verbatim
+        PASS [   0.015s] (626/673) raven-tty-core tests::a_disabled_veol_does_not_complete_the_line
+        PASS [   0.012s] (627/673) raven-tty-core tests::backspace_erases_and_echoes
+        PASS [   0.005s] (628/673) raven-tty-core tests::icrnl_translates_carriage_return
+        PASS [   0.010s] (629/673) raven-tty-core tests::carriage_return_newline_completes_two_lines
+        PASS [   0.009s] (630/673) raven-tty-core tests::eof_echoes_nothing
+        PASS [   0.007s] (631/673) raven-tty-core tests::eof_on_an_empty_line_raises_end_of_file
+        PASS [   0.006s] (632/673) raven-tty-core tests::flush_reports_the_discarded_bytes
+        PASS [   0.006s] (633/673) raven-tty-core tests::high_bytes_are_inserted_verbatim
+        PASS [   0.008s] (634/673) raven-tty-core tests::eof_then_more_input_still_completes_lines
+        PASS [   0.008s] (635/673) raven-tty-core tests::flush_on_an_empty_line_reports_zero
+        PASS [   0.015s] (636/673) raven-tty-core tests::an_empty_line_is_delivered_as_a_newline
+        PASS [   0.017s] (637/673) raven-tty-core tests::an_empty_chunk_produces_nothing
+        PASS [   0.008s] (638/673) raven-tty-core tests::interrupt_after_a_partial_line_raises_one_event
+        PASS [   0.013s] (639/673) raven-tty-core tests::eof_on_a_non_empty_line_completes_it
+        PASS [   0.009s] (640/673) raven-tty-core tests::interrupt_does_not_echo_when_echo_is_off
+        PASS [   0.015s] (641/673) raven-tty-core tests::carriage_return_completes_a_line
+        PASS [   0.021s] (642/673) raven-tty-core tests::a_mode_switch_discards_the_pending_line
+        PASS [   0.010s] (643/673) raven-tty-core tests::input_is_echoed_in_order
+        PASS [   0.008s] (644/673) raven-tty-core tests::interrupt_echoes_caret_c_and_a_newline
+        PASS [   0.006s] (645/673) raven-tty-core tests::many_lines_in_one_chunk_all_arrive
+        PASS [   0.006s] (646/673) raven-tty-core tests::newline_completes_a_line
+        PASS [   0.007s] (647/673) raven-tty-core tests::output_starts_empty
+        PASS [   0.006s] (648/673) raven-tty-core tests::raw_mode_does_not_edit
+        PASS [   0.011s] (649/673) raven-tty-core tests::kill_line_erases_the_whole_line
+        PASS [   0.014s] (650/673) raven-tty-core tests::interrupt_discards_the_line
+        PASS [   0.011s] (651/673) raven-tty-core tests::kill_then_backspace_does_nothing
+        PASS [   0.011s] (652/673) raven-tty-core tests::raw_mode_does_not_echo
+        PASS [   0.012s] (653/673) raven-tty-core tests::output_is_raw_without_opost
+        PASS [   0.012s] (654/673) raven-tty-core tests::new_discipline_is_canonical_and_echoes
+        PASS [   0.013s] (655/673) raven-tty-core tests::kill_line_then_input_starts_a_new_line
+        PASS [   0.010s] (656/673) raven-tty-core tests::raw_mode_has_no_events
+        PASS [   0.010s] (657/673) raven-tty-core tests::settings_round_trip
+        PASS [   0.010s] (658/673) raven-tty-core tests::raw_mode_passes_bytes_through
+        PASS [   0.010s] (659/673) raven-tty-core tests::several_lines_in_one_chunk_are_delivered_in_order
+        PASS [   0.017s] (660/673) raven-tty-core tests::opost_onlcr_translates_output
+        PASS [   0.013s] (661/673) raven-tty-core tests::raw_then_canonical_round_trip
+        PASS [   0.013s] (662/673) raven-tty-core tests::set_termios_round_trips_every_field
+        PASS [   0.012s] (663/673) raven-tty-core tests::termios_default_is_the_ssh_terminal_shape
+        PASS [   0.009s] (664/673) raven-tty-core tests::the_line_limit_accepts_exactly_max_bytes
+        PASS [   0.009s] (665/673) raven-tty-core tests::the_same_mode_switch_does_not_discard
+        PASS [   0.020s] (666/673) raven-tty-core tests::kill_line_on_an_empty_line_does_nothing
+        PASS [   0.007s] (667/673) raven-tty-core tests::the_terminator_is_normalised_to_newline
+        PASS [   0.010s] (668/673) raven-tty-core tests::the_line_limit_rings_the_bell_and_ignores_input
+        PASS [   0.008s] (669/673) raven-tty-core tests::without_echo_editing_still_happens
+        PASS [   0.015s] (670/673) raven-tty-core tests::the_bell_byte_is_inserted_like_any_other
+        PASS [   0.013s] (671/673) raven-tty-core tests::the_default_impl_matches_new
+        PASS [   0.011s] (672/673) raven-tty-core tests::the_settings_view_changes_only_icanon_and_echo
+        PASS [   0.315s] (673/673) raven-libc-platform registry_tests::every_implemented_row_has_a_function
+────────────
+     Summary [   0.558s] 673 tests run: 673 passed, 0 skipped

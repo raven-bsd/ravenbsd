@@ -1,0 +1,62 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.07s
+     Running `target/debug/xtask qtest --case pty-churn --arch x86_64`
+pty-churn: fail
+--- serial (last 40 lines) ---
+ptyd: files=0 pairs=0
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=17938 spawn=32636 first_poll=32737 deadline=62636 stalled=0 ready_at=33066
+ptyd: files=0 pairs=0
+1795346649.112 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=17769 spawn=27725 first_poll=27932 deadline=147773 stalled=48 ready_at=48206
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=48255 spawn=50001 first_poll=50065 deadline=110001 stalled=0 ready_at=51218
+pty-churn: start uid=0 workers=4 cycles=50 concurrent=32
+pty-churn: handshake index=0 path=/dev/pts/1
+pty-churn: handshake index=1 path=/dev/pts/2
+pty-churn: handshake index=2 path=/dev/pts/3
+pty-churn: handshake index=3 path=/dev/pts/4
+pty-churn: handshake distinct=4
+pty-churn: FAIL worker=3 cycle=26 slave-fd-reuse got=5 errno=0
+s24: frames free=465620992
+s25: exit handles=0
+pty-churn: FAIL worker=1 cycle=26 slave-fd-reuse got=5 errno=0
+s24: frames free=465780736
+s25: exit handles=0
+pty-churn: FAIL worker=0 cycle=26 slave-fd-reuse got=5 errno=0
+s24: frames free=465965056
+s25: exit handles=0
+pty-churn: FAIL worker=2 cycle=26 slave-fd-reuse got=5 errno=0
+s24: frames free=466116608
+s25: exit handles=0
+pty-churn: FAIL worker-status index=0 status=256
+ptyd: files=0 pairs=0
+s24: frames free=467996672
+s25: exit handles=0
+svcd: libc-test crash loop, giving up
+svcd: settled
+init exited (1)
+--- unmatched expectations ---
+^pty-churn: worker=[0-3] cycles=50 first-master=[0-9]+ first-slave=[0-9]+ ok$
+^pty-churn: worker=[0-3] cycles=50 first-master=[0-9]+ first-slave=[0-9]+ ok$
+^pty-churn: worker=[0-3] cycles=50 first-master=[0-9]+ first-slave=[0-9]+ ok$
+^pty-churn: worker=[0-3] cycles=50 first-master=[0-9]+ first-slave=[0-9]+ ok$
+^pty-churn: workers=4 status=ok$
+^pty-churn: concurrent=32 distinct=ok$
+^pty-churn: fd-reuse master=[0-9]+ slave=[0-9]+ ok$
+^pty-churn: pass cycles=200 concurrent=32$
+^init exited \(0\)$
+--- forbidden hits ---
+pty-churn: FAIL worker=3 cycle=26 slave-fd-reuse got=5 errno=0
+pty-churn: FAIL worker=1 cycle=26 slave-fd-reuse got=5 errno=0
+pty-churn: FAIL worker=0 cycle=26 slave-fd-reuse got=5 errno=0
+pty-churn: FAIL worker=2 cycle=26 slave-fd-reuse got=5 errno=0
+pty-churn: FAIL worker-status index=0 status=256
+--- result ---
+exit status 35; expected success; unmatched expectations: ^pty-churn: worker=[0-3] cycles=50 first-master=[0-9]+ first-slave=[0-9]+ ok$, ^pty-churn: worker=[0-3] cycles=50 first-master=[0-9]+ first-slave=[0-9]+ ok$, ^pty-churn: worker=[0-3] cycles=50 first-master=[0-9]+ first-slave=[0-9]+ ok$, ^pty-churn: worker=[0-3] cycles=50 first-master=[0-9]+ first-slave=[0-9]+ ok$, ^pty-churn: workers=4 status=ok$, ^pty-churn: concurrent=32 distinct=ok$, ^pty-churn: fd-reuse master=[0-9]+ slave=[0-9]+ ok$, ^pty-churn: pass cycles=200 concurrent=32$, ^init exited \(0\)$; 5 forbidden line(s) matched
