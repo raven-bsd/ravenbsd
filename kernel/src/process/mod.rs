@@ -548,7 +548,9 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
-        exec_done: AtomicBool::new(false),
+        // A PROC_CREATE child receives its image from the spawn loader; it counts as exec'd for
+        // the setpgid EACCES rule.
+        exec_done: AtomicBool::new(true),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -618,6 +620,8 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
         pending_exec: Mutex::new(None),
+        // A fork child is pre-exec even if its parent had exec'd; setpgid remains allowed until
+        // the child's own exec.
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
