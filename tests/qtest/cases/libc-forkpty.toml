@@ -17,7 +17,7 @@ expect_exit = "success"
 regex = '^libc-forkpty: start$'
 
 [[expect]]
-regex = '^libc-forkpty: parent pid=[0-9]+ name=pty:slave/[0-9]+$'
+regex = '^libc-forkpty: parent pid=[0-9]+ name=/dev/pts/[0-9]+$'
 
 [[expect]]
 regex = '^libc-forkpty: master=pty-child$'

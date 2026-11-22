@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K436: the OpenSSH sshpty.c pty_allocate sequence, one assertion per call:
+# posix_openpt -> grantpt -> unlockpt -> ptsname -> open(ptsname) -> tcgetattr,
+# then a master/slave byte round-trip and the composed sequence.
+
+name = "pty-calls"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-calls"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^pty-calls: start uid=0$'
+
+[[expect]]
+regex = '^pty-calls: posix-openpt fd=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^pty-calls: grantpt=0$'
+
+[[expect]]
+regex = '^pty-calls: unlockpt=0$'
+
+[[expect]]
+regex = '^pty-calls: ptsname=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-calls: slave-open fd=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^pty-calls: tcgetattr=ok$'
+
+[[expect]]
+regex = '^pty-calls: ttyname=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-calls: roundtrip=ok$'
+
+[[expect]]
+regex = '^pty-calls: composed=ok$'
+
+[[expect]]
+regex = '^pty-calls: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-calls: fail'
