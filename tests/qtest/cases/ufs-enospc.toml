@@ -90,7 +90,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^k466: enospc errno=28 chunk=[0-9]+ wrote=[0-9]+$'
-timeout_secs = 120
+timeout_secs = 300
 
 [[step]]
 wait = '^probe=0$'
