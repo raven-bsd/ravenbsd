@@ -219,9 +219,14 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
         }
         addr
     } else {
+        let hint = if addr == 0 {
+            address_space.mmap_base()
+        } else {
+            addr
+        };
         address_space
             .vmas()
-            .find_free(len, addr, PAGE_SIZE)
+            .find_free(len, hint, PAGE_SIZE)
             .ok_or(Errno::ENOMEM)?
     };
 
