@@ -21,19 +21,22 @@ regex = '^duplex-matrix: row group=fuzz name=stateful-10k ok=yes value=[0-9]+$'
 regex = '^duplex-matrix: row group=abandoned name=recv-bad-message-close-installed ok=yes value=[0-9]+$'
 
 [[expect]]
-regex = '^duplex-matrix: row group=cycles name=self-send-closed ok=no value=[0-9]+$'
+regex = '^duplex-matrix: row group=cycles name=self-send-closed ok=yes value=[0-9]+$'
 
 [[expect]]
-regex = '^duplex-matrix: row group=cycles name=self-send-delivered ok=yes value=0$'
+regex = '^duplex-matrix: row group=cycles name=self-send-reachable-retained ok=yes value=[0-9]+$'
 
 [[expect]]
-regex = '^duplex-matrix: row group=cycles name=two-object-ring-closed ok=no value=[0-9]+$'
+regex = '^duplex-matrix: row group=cycles name=self-send-delivered ok=yes value=[0-9]+$'
 
 [[expect]]
-regex = '^duplex-matrix: row group=cycles name=three-object-ring-closed ok=no value=[0-9]+$'
+regex = '^duplex-matrix: row group=cycles name=two-object-ring-closed ok=yes value=[0-9]+$'
 
 [[expect]]
-regex = '^duplex-matrix: summary rows=[0-9]+ deviations=[0-9]+ seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
+regex = '^duplex-matrix: row group=cycles name=three-object-ring-closed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: summary rows=[0-9]+ deviations=0 seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
 
 [[expect]]
 regex = '^duplex-matrix: alive$'

@@ -1566,6 +1566,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-devfs-nodes"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-df"
 version = "0.1.0"
 dependencies = [
@@ -2213,8 +2224,14 @@ version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
  "raven-libc-compat",
+ "raven-libc-dtoa",
+ "raven-libc-elf",
+ "raven-libc-fts",
  "raven-libc-iconv-cjk",
+ "raven-libc-locale",
  "raven-libc-m",
+ "raven-libc-malloc",
+ "raven-libc-rtld",
  "raven-libc-signal",
  "raven-libc-stdio",
  "raven-libc-str",
@@ -4139,6 +4156,16 @@ dependencies = [
 [[package]]
 name = "raven-turnstile"
 version = "0.1.0"
+
+[[package]]
+name = "raven-ufs-durability-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-umount"
