@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# K435: guest SSH kernel-contract conformance suite (K1-K6). The fixture runs on the
-# network-config-test profile with netd and ptyd; the host peer opens two TCP connections for K6.
+# K440: guest SSH kernel-contract conformance suite (K1-K10). The fixture runs on the
+# network-config-test profile with netd and ptyd; the host peer opens two TCP connections for K6
+# and two EOF/half-close connections on 23098.
 name = "ssh-contract"
 arch = "x86_64"
 profile = "network-config-test"
@@ -15,7 +16,7 @@ initfs = "build/fixtures/ssh-contract/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
-    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23097-:23097",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23097-:23097,hostfwd=tcp:127.0.0.1:23098-:23098",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
 expect_exit = "success"
@@ -39,10 +40,22 @@ regex = '^.*CONTRACT K5 PASS .*$'
 regex = '^.*CONTRACT K6 PASS .*$'
 
 [[expect]]
-regex = '^.*CONTRACT SUMMARY PASS 6/6$'
+regex = '^.*CONTRACT K7 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K8 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K9 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K10 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 10/10$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)CONTRACT K[1-6] FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'
+regex = '(?i)CONTRACT K([1-9]|10) FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'

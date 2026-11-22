@@ -1,0 +1,32 @@
+   Compiling raven-libc-proc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-proc)
+   Compiling raven-libc-platform v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/libc/ravenlibc/crates/raven-libc-platform)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.73s
+────────────
+ Nextest run ID 95527a39-0fd9-4c78-bca2-2dcd977bc6b0 with nextest profile: default
+    Starting 1 test across 2 binaries (585 tests skipped)
+        FAIL [   0.004s] (1/1) raven-libc-platform ioctl::tty::tests::tcsetattr_round_trips_every_termios_field
+  stdout ───
+
+    running 1 test
+    test ioctl::tty::tests::tcsetattr_round_trips_every_termios_field ... FAILED
+
+    failures:
+
+    failures:
+        ioctl::tty::tests::tcsetattr_round_trips_every_termios_field
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 581 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'ioctl::tty::tests::tcsetattr_round_trips_every_termios_field' (572507) panicked at libc/ravenlibc/crates/raven-libc-platform/src/ioctl/termios_ut.rs:142:5:
+    assertion `left == right` failed
+      left: Termios { c_iflag: 0, c_oflag: 0, c_cflag: 176, c_lflag: 10, c_line: 0, c_cc: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], __c_ispeed: 15, __c_ospeed: 15 }
+     right: Termios { c_iflag: 1281, c_oflag: 5, c_cflag: 191, c_lflag: 32779, c_line: 0, c_cc: [3, 0, 127, 21, 4, 3, 7, 0, 17, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], __c_ispeed: 13, __c_ospeed: 14 }
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+  Cancelling due to test failure: 
+────────────
+     Summary [   0.016s] 1 test run: 0 passed, 1 failed, 585 skipped
+        FAIL [   0.004s] (1/1) raven-libc-platform ioctl::tty::tests::tcsetattr_round_trips_every_termios_field
+error: test run failed

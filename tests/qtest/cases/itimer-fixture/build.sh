@@ -34,6 +34,13 @@ out=build/fixtures/itimer
 mkdir -p "$out"
 
 sysroot=${RAVENLIBC_SYSROOT:-$root/build/$arch/sysroot}
+# K441: a present stamp must match the tree; a stale artifact fails closed here too.
+if [ -f "$root/build/$arch/libc.stamp" ]; then
+    cargo xtask libc-pack --arch "$arch" --verify || exit 1
+fi
+if [ -f "$root/build/$arch/libc-dso.stamp" ]; then
+    cargo xtask libc-link --arch "$arch" --verify || exit 1
+fi
 for file in \
     "$sysroot/usr/lib/crt1.o" \
     "$sysroot/usr/lib/crti.o" \

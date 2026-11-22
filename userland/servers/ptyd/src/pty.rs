@@ -4,9 +4,10 @@
 //! The pty queues and the foreground process group.
 
 use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
-use raven_tty_core::{Discipline, Event, Output, Settings};
+use raven_tty_core::{Discipline, Event, Output, Settings, Termios};
 
 /// POSIX SIGINT.
 pub const SIGINT: u32 = 2;
@@ -52,6 +53,17 @@ impl<S: SignalSink> Pty<S> {
         self.discipline.set_settings(settings)
     }
 
+    /// The complete terminal attribute record shared by the master and the slave.
+    #[must_use]
+    pub fn termios(&self) -> Termios {
+        self.discipline.termios()
+    }
+
+    /// Set the complete terminal attribute record and return the discarded pending input count.
+    pub fn set_termios(&mut self, termios: Termios) -> usize {
+        self.discipline.set_termios(termios)
+    }
+
     /// Drive input from the master side through the discipline.
     pub fn write_master(&mut self, data: &[u8]) {
         let mut output = Output::default();
@@ -73,9 +85,11 @@ impl<S: SignalSink> Pty<S> {
         }
     }
 
-    /// Write output from the slave side; it becomes readable on the master.
+    /// Write output from the slave side; it becomes readable on the master after `OPOST`.
     pub fn write_slave(&mut self, data: &[u8]) {
-        self.to_master.extend(data.iter().copied());
+        let mut output = Vec::with_capacity(data.len());
+        self.discipline.process_output(data, &mut output);
+        self.to_master.extend(output);
     }
 
     /// Read bytes for the master side, or `EAGAIN` when no data is queued.
