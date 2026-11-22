@@ -8,9 +8,9 @@ use raven_libc_abi::fcntl;
 
 use crate::backend::FakeSys;
 use crate::ioctl::tty::{
-    B38400, ECHO, ICANON, VMIN, VTIME, Winsize, cfgetispeed, cfgetospeed, cfmakeraw, cfsetispeed,
-    cfsetospeed, default_termios, tcdrain, tcflush, tcgetattr, tcgetwinsize, tcsetattr,
-    tcsetwinsize,
+    B38400, ECHO, ICANON, OP_GET_FG, OP_SET_FG, VMIN, VTIME, Winsize, cfgetispeed, cfgetospeed,
+    cfmakeraw, cfsetispeed, cfsetospeed, custom_arg0, custom_body, default_termios, tcdrain,
+    tcflush, tcgetattr, tcgetwinsize, tcsetattr, tcsetwinsize,
 };
 use crate::platform::Platform;
 
@@ -73,6 +73,37 @@ fn a_legacy_console_falls_back_to_get_mode_and_set_mode() {
     let after = tcgetattr(&platform, fd).expect("tcgetattr");
     assert_eq!(after.c_lflag & ICANON, 0);
     assert_eq!(after.c_lflag & ECHO, 0);
+}
+
+#[test]
+fn custom_fg_body_round_trips_the_pgrp() {
+    let body = custom_body(OP_GET_FG, 0);
+    assert_eq!(
+        u16::from_le_bytes(body[0..2].try_into().unwrap()),
+        raven_proto_tty::VERSION
+    );
+    assert_eq!(
+        u16::from_le_bytes(body[2..4].try_into().unwrap()),
+        OP_GET_FG
+    );
+    let mut response = [0u8; raven_proto_tty::CALL_LEN];
+    response[0..2].copy_from_slice(&raven_proto_tty::VERSION.to_le_bytes());
+    response[2..4].copy_from_slice(&OP_GET_FG.to_le_bytes());
+    response[4..8].copy_from_slice(&4242u32.to_le_bytes());
+    assert_eq!(custom_arg0(&response, OP_GET_FG), Ok(4242));
+}
+
+#[test]
+fn custom_fg_rejects_the_wrong_op() {
+    let mut response = [0u8; raven_proto_tty::CALL_LEN];
+    response[0..2].copy_from_slice(&raven_proto_tty::VERSION.to_le_bytes());
+    response[2..4].copy_from_slice(&OP_SET_FG.to_le_bytes());
+    assert_eq!(custom_arg0(&response, OP_GET_FG), Err(Errno::EPROTO));
+}
+
+#[test]
+fn custom_fg_rejects_a_short_response() {
+    assert_eq!(custom_arg0(&[], OP_GET_FG), Err(Errno::EPROTO));
 }
 
 #[test]
