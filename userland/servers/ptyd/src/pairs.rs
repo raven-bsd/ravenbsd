@@ -11,6 +11,16 @@ use alloc::collections::BTreeMap;
 
 use crate::{Pty, SignalSink};
 
+/// The stable inode of one pty endpoint: pair `N` master is `2N + 1`, slave is `2N + 2`.
+///
+/// The donor devfs pty nodes carry a device inode; Raven's scheme `Stat` record has `ino` only,
+/// so the pair and role provide the identity that `fstat` reports. Both values are non-zero and
+/// a master never shares an inode with a slave.
+#[must_use]
+pub const fn inode(pair: u64, slave: bool) -> u64 {
+    pair.wrapping_mul(2).wrapping_add(if slave { 2 } else { 1 })
+}
+
 /// The pty pair table.
 pub struct Pairs<S: SignalSink + Default> {
     entries: BTreeMap<u64, Pty<S>>,
