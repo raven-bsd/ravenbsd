@@ -21,7 +21,10 @@ path = "src/main.rs"
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-elf = { path = "../../../crates/raven-elf" }
 raven-initfs = { path = "../../../crates/raven-initfs" }
-raven-rt = { path = "../../../userland/rt", default-features = false }
+# `raven-scheme` links `alloc` unconditionally, so the fixture needs the runtime allocator even
+# though it never allocates.  The no-alloc `raven-spawn` path is proven separately by building
+# that crate without features (K463).
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
 
 [lints]
 workspace = true
