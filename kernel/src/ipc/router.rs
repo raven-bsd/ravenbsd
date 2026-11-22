@@ -698,6 +698,7 @@ pub fn send(
     if !Arc::ptr_eq(&request.server, caller) {
         return Err(Errno::EACCES);
     }
+    caller.last_send_id.store(request.id, Ordering::Relaxed);
     if request.done.load(Ordering::Acquire) {
         if crate::memory::paging::cmdline()
             .split_ascii_whitespace()
@@ -987,6 +988,7 @@ fn deliver(
 ) -> Result<Handle, Errno> {
     let trace = super::trace_k147() && K147_DELIVER.fetch_add(1, Ordering::Relaxed) < 64;
     let trace_start = if trace { crate::time::now_ns() } else { 0 };
+    caller.last_recv_id.store(request.id, Ordering::Relaxed);
     let packet = request.deliverable_packet();
     // Adopt the caller's trace id for the duration of this call: a nested call the server makes
     // while serving it inherits the caller's trace. Cleared when SEND finishes.
@@ -1068,6 +1070,10 @@ fn submit_checked(request: &Arc<PendingRequest>, bounded: bool) -> Result<(), Er
         .scheme_queue
         .lock()
         .push_back(Arc::clone(request));
+    request
+        .client
+        .last_submit_id
+        .store(request.id, Ordering::Relaxed);
     drop(state);
     request
         .server

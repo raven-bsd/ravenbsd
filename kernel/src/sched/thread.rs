@@ -167,6 +167,12 @@ pub struct Thread {
     pub slice_ticks: AtomicU32,
     /// Token identifying the current blocking operation.
     pub block_token: AtomicU64,
+    /// Serialises the state/`pending_wake` handshake between the waiter and a waker.
+    ///
+    /// The pair is not atomic on its own: a waker that reads `Running` may store
+    /// `pending_wake` after the waiter has passed its final check. Holding this lock across
+    /// both sides' read-modify sequences closes that window (K391).
+    pub block_lock: AtomicBool,
     /// Status delivered by the wakeup (0 or `-errno`).
     pub wake_status: AtomicI64,
     /// A wakeup arrived before the thread reached `block_current`.
@@ -343,6 +349,7 @@ impl Thread {
             preempt_count: AtomicU32::new(0),
             slice_ticks: AtomicU32::new(crate::sched::SLICE_TICKS),
             block_token: AtomicU64::new(0),
+            block_lock: AtomicBool::new(false),
             wake_status: AtomicI64::new(0),
             pending_wake: AtomicBool::new(false),
             idle,
@@ -440,6 +447,7 @@ impl Thread {
             preempt_count: AtomicU32::new(0),
             slice_ticks: AtomicU32::new(crate::sched::SLICE_TICKS),
             block_token: AtomicU64::new(0),
+            block_lock: AtomicBool::new(false),
             wake_status: AtomicI64::new(0),
             pending_wake: AtomicBool::new(false),
             idle: true,
@@ -492,6 +500,7 @@ impl Thread {
             preempt_count: AtomicU32::new(0),
             slice_ticks: AtomicU32::new(crate::sched::SLICE_TICKS),
             block_token: AtomicU64::new(0),
+            block_lock: AtomicBool::new(false),
             wake_status: AtomicI64::new(0),
             pending_wake: AtomicBool::new(false),
             idle: true,

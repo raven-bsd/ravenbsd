@@ -619,6 +619,14 @@ pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapfra
     if !thread.user {
         return;
     }
+    if !frame.is_null() {
+        // SAFETY: the syscall stub passes its live trap frame in `rdi`; this call owns it.
+        let number = unsafe { (*frame).rax };
+        let pc = unsafe { (*frame).rip };
+        thread.process.last_syscall.store(number, Ordering::Relaxed);
+        thread.process.last_pc.store(pc, Ordering::Relaxed);
+        thread.process.in_syscall.fetch_add(1, Ordering::Relaxed);
+    }
     if !thread.fpu_saved.swap(true, Ordering::AcqRel) {
         // SAFETY: the syscall entry path owns the CPU and the thread is current.
         unsafe {
@@ -678,6 +686,12 @@ pub extern "C" fn sched_syscall_exit() {
     if !thread.user {
         return;
     }
+    let _ = thread
+        .process
+        .in_syscall
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            Some(value.saturating_sub(1))
+        });
     if thread.fpu_saved.swap(false, Ordering::AcqRel) {
         // SAFETY: the syscall return path owns the CPU and the thread is current.
         unsafe {
