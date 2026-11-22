@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-proc-rlimit"
+version = "0.1.0"
+description = "K491 rlimit privilege, infinity and inheritance fixture."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_proc_rlimit"
+path = "src/lib.rs"
+
+[[bin]]
+name = "proc-rlimit-init"
+path = "src/bin/init.rs"
+test = false
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-rt = { path = "../../../userland/rt", features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true

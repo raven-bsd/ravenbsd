@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K531: /tmp is the dedicated ramfs instance with an explicit POSIX 1777+sticky root. The `ramfs:`
+# instance stays at the default 0755 for `/etc` ramfs mounts in the test profiles.
+
+name = "tmpfs"
+exec = "/sbin/ramfsd"
+args = ["/sbin/ramfsd", "--scheme", "tmpfs", "--root-mode", "1777"]
+needs = ["logd"]
+provides = ["scheme:tmpfs"]
+readiness = "scheme"
+restart = "never"

@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K506: the same syscall vector table on aarch64 (the K456 432 rows plus the K500
+# PROC_SIGNAL/signo0pgrp row). The fixture and expectations are shared with the x86-64 case;
+# only the architecture, console and image path differ.
+
+name = "syscall-fuzz-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/smp/syscall-fuzz/build.sh"]
+initfs = "build/syscall-fuzz/aarch64/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1 smp_user=on"
+qemu_extra = ["-smp", "4", "-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^syscall-fuzz: start seed=0x[0-9a-f]+ syscalls=47$'
+
+[[expect]]
+regex = '^syscall-fuzz: summary rows=[0-9]+ deviations=[0-9]+ seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^syscall-fuzz: alive$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|setup-failed|syscall-fuzz: failed'

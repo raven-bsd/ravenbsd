@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K494: orphan reparent and reap. The fixture is PID 1; the parent exits first, the orphan is
+# reparented to PID 1, exactly one reaper collects it, and non-child waits are ECHILD.
+
+name = "proc-orphan"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc-orphan/build.sh"]
+initfs = "build/fixtures/proc-orphan/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s24-framecheck s69-cleanupcheck"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-orphan: reparent=1 parent-exit=5$'
+
+[[expect]]
+regex = '^proc-orphan: nonchild=echild$'
+
+[[expect]]
+regex = '^proc-orphan: orphan-exit=7 reaped=1$'
+
+[[expect]]
+regex = '^proc-orphan: grandchild-exit=3 reparent=1$'
+
+[[expect]]
+regex = '^proc-orphan: batch=10 reaped=10$'
+
+[[expect]]
+regex = '^proc-orphan: ok$'
+
+[[expect]]
+regex = '^s24: frames free=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^s69: exit s69-orphan .*$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-orphan: fail'

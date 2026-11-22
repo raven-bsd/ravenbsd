@@ -4,7 +4,7 @@
 #
 # Run the K456 syscall robustness measurement.
 #
-# usage: sh tests/smp/syscall-fuzz/run.sh [tcg|kvm2] [--iterations N] [--no-build]
+# usage: sh tests/smp/syscall-fuzz/run.sh [tcg|kvm2] [--iterations N] [--arch x86_64|aarch64] [--no-build]
 #
 # One iteration is a determinism pair: the same image is booted twice with the same seed and the
 # two table hashes must match. The first failure stops the campaign and is preserved; no retry
@@ -17,17 +17,23 @@ cd "$root"
 mode=${1:-tcg}
 case "$mode" in
     tcg|kvm2) ;;
-    *) printf 'usage: %s [tcg|kvm2] [--iterations N] [--no-build]\n' "$0" >&2; exit 2 ;;
+    *) printf 'usage: %s [tcg|kvm2] [--iterations N] [--arch x86_64|aarch64] [--no-build]\n' "$0" >&2; exit 2 ;;
 esac
 shift || true
 
 iterations=1
 no_build=0
+arch=x86_64
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --iterations)
             [ "$#" -ge 2 ] || { echo "--iterations needs a value" >&2; exit 2; }
             iterations=$2
+            shift 2
+            ;;
+        --arch)
+            [ "$#" -ge 2 ] || { echo "--arch needs a value" >&2; exit 2; }
+            arch=$2
             shift 2
             ;;
         --no-build)
@@ -41,14 +47,36 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+case "$arch" in
+    x86_64|aarch64) ;;
+    *) echo "syscall-fuzz: unsupported arch $arch (x86_64 or aarch64)" >&2; exit 2 ;;
+esac
+
 case "$mode" in
     tcg)
-        case_file=tests/smp/syscall-fuzz/syscall-fuzz.toml
-        case_name=syscall-fuzz
         smp=4
         kvm_state=disabled
+        if [ "$arch" = aarch64 ]; then
+            case_file=tests/smp/syscall-fuzz/syscall-fuzz-aarch64.toml
+            case_name=syscall-fuzz-aarch64
+            image=build/syscall-fuzz/aarch64/syscall-fuzz.img
+            initfs=build/syscall-fuzz/aarch64/initfs.img
+            cmdline='console=ttyAMA0 test-exit=1 smp_user=on'
+            out=build/syscall-fuzz/aarch64/$mode
+        else
+            case_file=tests/smp/syscall-fuzz/syscall-fuzz.toml
+            case_name=syscall-fuzz
+            image=build/syscall-fuzz/syscall-fuzz.img
+            initfs=build/syscall-fuzz/initfs.img
+            cmdline='console=ttyS0 test-exit=1 smp_user=on'
+            out=build/syscall-fuzz/$mode
+        fi
         ;;
     kvm2)
+        [ "$arch" = x86_64 ] || {
+            echo "syscall-fuzz: kvm2 is x86_64 only (use tcg --arch aarch64)" >&2
+            exit 2
+        }
         case_file=tests/smp/syscall-fuzz/syscall-fuzz-kvm2.toml
         case_name=syscall-fuzz-kvm2
         smp=2
@@ -57,18 +85,17 @@ case "$mode" in
             exit 2
         fi
         kvm_state="enabled $(ls -l /dev/kvm)"
+        image=build/syscall-fuzz/syscall-fuzz.img
+        initfs=build/syscall-fuzz/initfs.img
+        cmdline='console=ttyS0 test-exit=1 smp_user=on'
+        out=build/syscall-fuzz/$mode
         ;;
 esac
 
-image=build/syscall-fuzz/syscall-fuzz.img
-initfs=build/syscall-fuzz/initfs.img
-cmdline='console=ttyS0 test-exit=1 smp_user=on'
-out=build/syscall-fuzz/$mode
-
 if [ "$no_build" -eq 0 ]; then
     sh tests/smp/syscall-fuzz/raw-check.sh
-    sh tests/smp/syscall-fuzz/build.sh
-    cargo xtask image --arch x86_64 --profile base --cmdline "$cmdline" \
+    sh tests/smp/syscall-fuzz/build.sh "$arch"
+    cargo xtask image --arch "$arch" --profile base --cmdline "$cmdline" \
         --initfs "$initfs" --output "$image"
 fi
 for required in "$image" "$initfs" "$case_file"; do
@@ -84,7 +111,7 @@ boot() {
     if ! RAVEN_SYSCALL_FUZZ_NO_BUILD=1 timeout 150 \
         cargo run -q -p raven-qtest -- run \
             --case "$case_file" \
-            --arch x86_64 \
+            --arch "$arch" \
             --image "$image" \
             --no-build \
             --out "$directory" \
@@ -128,11 +155,11 @@ deviations=$(sed -n 's/.*deviations=\([0-9][0-9]*\).*/\1/p' "$last_log" | tail -
 
 {
     echo "K456/K462 syscall robustness measurement"
-    echo "mode=$mode smp=$smp kvm=$kvm_state"
+    echo "arch=$arch mode=$mode smp=$smp kvm=$kvm_state"
     echo "commit=$(git rev-parse HEAD)"
-    echo "qemu=$(qemu-system-x86_64 --version | head -n 1)"
+    echo "qemu=$(qemu-system-$arch --version | head -n 1)"
     echo "case=$case_file image=$image seed=0x5a17c0de12349876"
-    echo "command=sh tests/smp/syscall-fuzz/run.sh $mode --iterations $iterations"
+    echo "command=sh tests/smp/syscall-fuzz/run.sh $mode --iterations $iterations --arch $arch"
     echo "iterations=$iterations boots=$((iterations * 2)) determinism=identical-hash"
     echo "table-hash=$(cat "$out"/run-*/hash.txt | tail -n 1)"
     echo "rows=$rows deviations=$deviations"

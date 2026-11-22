@@ -14,14 +14,23 @@ use std::process::Command;
 use serde_json::Value;
 
 fn root(label: &str) -> PathBuf {
-    let path =
+    let base =
         std::env::temp_dir().join(format!("posix-overlay-gate-{label}-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(path.join("docs/posix/evidence")).unwrap();
+    let _ = fs::remove_dir_all(&base);
+    let path = base.join("root");
+    fs::create_dir_all(base.join("ravenbsd-prjmgmt/architecture/product-data/posix/evidence"))
+        .unwrap();
+    fs::create_dir_all(&path).unwrap();
     fs::create_dir_all(path.join("tests/qtest/cases")).unwrap();
     fs::create_dir_all(path.join("tests/posix")).unwrap();
     fs::create_dir_all(path.join("bin")).unwrap();
     path
+}
+
+fn posix(root: &Path) -> PathBuf {
+    root.parent()
+        .unwrap()
+        .join("ravenbsd-prjmgmt/architecture/product-data/posix")
 }
 
 fn chmod_exec(path: &Path) {
@@ -32,7 +41,7 @@ fn chmod_exec(path: &Path) {
 
 fn write_min_profile(root: &Path) {
     fs::write(
-        root.join("docs/posix/profile.toml"),
+        posix(root).join("profile.toml"),
         "schema = 1\nstandard = \"posix-2024\"\n\n\
          [[process]]\n\
          id = \"process.fork\"\n\
@@ -48,7 +57,7 @@ fn write_min_profile(root: &Path) {
     )
     .unwrap();
     fs::write(
-        root.join("docs/posix/traceability.toml"),
+        posix(root).join("traceability.toml"),
         "schema = 1\nstandard = \"posix-2024\"\n\n\
          [[trace]]\n\
          id = \"process.fork\"\n\
@@ -61,8 +70,7 @@ fn write_min_profile(root: &Path) {
 
 fn write_overlay(root: &Path, owner: &str, row: &str) {
     fs::write(
-        root.join("docs/posix/evidence")
-            .join(format!("{owner}.toml")),
+        posix(root).join("evidence").join(format!("{owner}.toml")),
         format!("schema = 1\nstandard = \"posix-2024\"\n\n{row}"),
     )
     .unwrap();
@@ -97,6 +105,7 @@ fn run_gate(root: &Path) -> Value {
             "PATH",
             format!("{}:/usr/bin:/bin", root.join("bin").display()),
         )
+        .env_remove("RAVEN_MGMT_ROOT")
         .output()
         .unwrap();
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
@@ -118,7 +127,9 @@ fn row<'a>(report: &'a Value, id: &str) -> &'a Value {
 }
 
 fn cleanup(path: &Path) {
-    let _ = fs::remove_dir_all(path);
+    if let Some(base) = path.parent() {
+        let _ = fs::remove_dir_all(base);
+    }
 }
 
 #[test]
