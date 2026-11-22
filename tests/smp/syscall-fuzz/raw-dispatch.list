@@ -16,10 +16,10 @@ ipc::SEEK	0x6d	kernel/src/syscall/ipc.rs:28	fuzz	direct	SEEK
 raven_abi::syscall::MSYNC	0x44	crates/raven-abi/src/syscall.rs:231	fuzz	direct	MSYNC
 exec::PROC_EXEC	0x6a	kernel/src/syscall/exec.rs:22	fuzz	direct	PROC_EXEC
 duplex::DUPLEX_PAIR	0x110	kernel/src/syscall/duplex.rs:24	fuzz	direct	DUPLEX_PAIR
-duplex::DUPLEX_SHUTDOWN	0x111	kernel/src/syscall/duplex.rs:26	fuzz	direct	DUPLEX_SHUTDOWN
-duplex::DUPLEX_SENDMSG	0x112	kernel/src/syscall/duplex.rs:28	fuzz	direct	DUPLEX_SENDMSG
-duplex::DUPLEX_RECVMSG	0x113	kernel/src/syscall/duplex.rs:30	fuzz	direct	DUPLEX_RECVMSG
-duplex::DUPLEX_PEERCRED	0x114	kernel/src/syscall/duplex.rs:32	fuzz	direct	DUPLEX_PEERCRED
+duplex::DUPLEX_SHUTDOWN	0x111	kernel/src/syscall/duplex.rs:33	fuzz	direct	DUPLEX_SHUTDOWN
+duplex::DUPLEX_SENDMSG	0x112	kernel/src/syscall/duplex.rs:35	fuzz	direct	DUPLEX_SENDMSG
+duplex::DUPLEX_RECVMSG	0x113	kernel/src/syscall/duplex.rs:37	fuzz	direct	DUPLEX_RECVMSG
+duplex::DUPLEX_PEERCRED	0x114	kernel/src/syscall/duplex.rs:39	fuzz	direct	DUPLEX_PEERCRED
 pipe::PIPE	0x6e	kernel/src/syscall/pipe.rs:19	fuzz	direct	PIPE
 pipe::PIPE2	0x6f	kernel/src/syscall/pipe.rs:21	fuzz	direct	PIPE2
 priority::GETPRIORITY	0x78	kernel/src/syscall/priority.rs:23	fuzz	direct	GETPRIORITY
