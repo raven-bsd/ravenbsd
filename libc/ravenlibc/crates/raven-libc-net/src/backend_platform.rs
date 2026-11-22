@@ -143,6 +143,13 @@ impl<B: SysBackend, L: Lock> NetBackend for PlatformBackend<'_, B, L> {
         }
     }
 
+    fn mptcp_control(&self, s: Sock, request: &[u8], reply: &mut [u8]) -> Result<usize, Errno> {
+        self.platform
+            .backend()
+            .call(raven_libc_platform::Handle(s.0), request, reply)
+            .map_err(|error| Errno(error.0))
+    }
+
     fn close(&self, s: Sock) {
         let _ = self
             .platform

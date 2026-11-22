@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# MPTCP2c1: the guest userland IPPROTO_MPTCP API contract. The probe creates a loopback
+# MPTCP listener/client pair, adds a backup path, marks it backup, queries state, sends and
+# receives, closes and checks the exact errno for a wrong socket type. Until MPTCP2c2 lands
+# the `net:mptcp` open is rejected by netd; the case stays red and the serial names the errno.
+
+name = "mptcp-api"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 240
+initfs = "build/mptcp-api/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+pre = ["sh tests/mptcp/api/build.sh"]
+
+[[expect]]
+regex = '^mptcp-api: start$'
+
+[[expect]]
+regex = '^mptcp-api: listener fd=[0-9]+ port=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: socket fd=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: connect=ok$'
+
+[[expect]]
+regex = '^mptcp-api: accept fd=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: add-path id=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: backup id=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: info state=[0-9]+ subflows=[0-9]+ active=[0-9]+$'
+
+[[expect]]
+regex = '^mptcp-api: roundtrip=5$'
+
+[[expect]]
+regex = '^mptcp-api: close=ok$'
+
+[[expect]]
+regex = '^mptcp-api: wrong-type errno=(93|95)$'
+
+[[expect]]
+regex = '^mptcp-api: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)mptcp-api: fail|listener errno|socket errno|add-path errno|backup errno|info errno|connect errno|panic|EXCEPTION'

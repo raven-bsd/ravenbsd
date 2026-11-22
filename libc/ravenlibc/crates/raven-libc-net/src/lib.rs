@@ -55,6 +55,7 @@ pub mod flags;
 pub mod iface;
 pub mod ifnames;
 pub mod itoa;
+pub mod mptcp;
 pub mod msg;
 pub mod netdb;
 pub mod opts;
@@ -176,6 +177,13 @@ pub trait NetBackend {
     fn iface_list(&self) -> Result<Vec<IfaceResponse>, Errno> {
         let first = self.iface(IfaceRequest::List)?;
         Ok(alloc::vec![first])
+    }
+
+    /// Send one encoded `SOL_MPTCP` control request and receive the raw reply.
+    ///
+    /// The default rejects the request; a backend that speaks the MPTCP opcode overrides it.
+    fn mptcp_control(&self, _s: Sock, _request: &[u8], _reply: &mut [u8]) -> Result<usize, Errno> {
+        Err(Errno::ENOPROTOOPT)
     }
 }
 
