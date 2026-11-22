@@ -18,7 +18,16 @@ regex = '^duplex-matrix: start seed=0x[0-9a-f]+ fuzz-ops=10000 groups=7$'
 regex = '^duplex-matrix: row group=fuzz name=stateful-10k ok=yes value=[0-9]+$'
 
 [[expect]]
+regex = '^duplex-matrix: row group=truncation name=control-small-ctrunc ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=truncation name=two-records-one-datagram ok=yes value=[0-9]+$'
+
+[[expect]]
 regex = '^duplex-matrix: row group=abandoned name=recv-bad-message-close-installed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=waitall name=msg-waitall-refused ok=yes value=[0-9]+$'
 
 [[expect]]
 regex = '^duplex-matrix: row group=cycles name=self-send-closed ok=no value=[0-9]+$'

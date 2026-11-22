@@ -53,6 +53,15 @@ pub const O_NONBLOCK: u32 = 0o4000;
 pub const O_CLOEXEC: u32 = 0o2000000;
 /// `MSG_NOSIGNAL`: suppress the `SIGPIPE` queue on `EPIPE` for one send.
 pub const DUPLEX_MSG_NOSIGNAL: u32 = 0x4000;
+/// `MSG_CTRUNC`: the receive control buffer was too small for every record.
+///
+/// NetBSD and FreeBSD `sys/sys/socket.h` both use `0x0020`; the value is the BSD one, not the
+/// Linux `0x08`.
+pub const MSG_CTRUNC: u32 = 0x20;
+/// `MSG_WAITALL`: wait for the full receive length, or EOF/error.
+///
+/// NetBSD and FreeBSD `sys/sys/socket.h` both use `0x0040`; Linux's `0x0100` is not this ABI.
+pub const MSG_WAITALL: u32 = 0x40;
 /// Maximum handles in one control message.
 pub const DUPLEX_MAX_HANDLES: usize = 16;
 /// Maximum pending control messages per direction.
@@ -180,26 +189,56 @@ impl Drop for PendingHandle {
     }
 }
 
-struct ControlMessage {
-    /// Stream byte offset this ancillary record is attached to.
-    offset: u64,
+/// One wire control record and the handles it carries.
+///
+/// A `sendmsg` may carry several `SCM_RIGHTS` records; each keeps its own header and handle list,
+/// as NetBSD `unp_externalize` and FreeBSD `unp_externalize` preserve one record per mbuf.
+pub(crate) struct ControlRecord {
     handles: Vec<PendingHandle>,
 }
 
-impl ControlMessage {
-    fn new(offset: u64, handles: Vec<PendingHandle>) -> Self {
-        LIVE_CONTROLS.fetch_add(1, Ordering::AcqRel);
-        Self { offset, handles }
+impl ControlRecord {
+    pub(crate) fn new(handles: Vec<PendingHandle>) -> Self {
+        Self { handles }
     }
 
-    fn into_handles(mut self) -> Vec<PendingHandle> {
-        core::mem::take(&mut self.handles)
+    pub(crate) fn len(&self) -> usize {
+        self.handles.len()
+    }
+
+    /// Bytes this record occupies on the Raven wire: a 16-byte header plus one `u32` per handle.
+    pub(crate) fn wire_len(&self) -> usize {
+        16usize.saturating_add(self.handles.len().saturating_mul(4))
+    }
+
+    pub(crate) fn into_handles(self) -> Vec<PendingHandle> {
+        self.handles
+    }
+}
+
+struct ControlMessage {
+    /// Stream byte offset this ancillary record is attached to.
+    offset: u64,
+    /// Records in one `sendmsg`, in wire order.
+    records: Vec<ControlRecord>,
+}
+
+impl ControlMessage {
+    fn new(offset: u64, records: Vec<ControlRecord>) -> Self {
+        LIVE_CONTROLS.fetch_add(records.len() as u64, Ordering::AcqRel);
+        Self { offset, records }
+    }
+
+    fn into_records(mut self) -> Vec<ControlRecord> {
+        let records = core::mem::take(&mut self.records);
+        LIVE_CONTROLS.fetch_sub(records.len() as u64, Ordering::AcqRel);
+        records
     }
 }
 
 impl Drop for ControlMessage {
     fn drop(&mut self) {
-        LIVE_CONTROLS.fetch_sub(1, Ordering::AcqRel);
+        LIVE_CONTROLS.fetch_sub(self.records.len() as u64, Ordering::AcqRel);
     }
 }
 
@@ -249,7 +288,7 @@ impl StreamBuffer {
 
 struct DatagramMessage {
     data: Vec<u8>,
-    handles: Vec<PendingHandle>,
+    records: Vec<ControlRecord>,
 }
 
 /// One handle to a duplex endpoint.
@@ -711,16 +750,16 @@ fn read_datagram(
     Ok(copied)
 }
 
-/// Receive one chunk or datagram plus any attached `SCM_RIGHTS` handles.
+/// Receive one chunk or datagram plus every attached `SCM_RIGHTS` record.
 ///
-/// The control capacity is checked before consuming data or handles. A too-small buffer
-/// returns `EMSGSIZE` and leaves the message queued. The returned handles are installed by the
-/// caller after this function returns.
+/// The caller decides how much of the record list fits the user buffer: the wire contract
+/// delivers the data even when the control buffer is short and reports `MSG_CTRUNC` (NetBSD
+/// `copyout_msg_control` 846-895; FreeBSD `sys/kern/uipc_syscalls.c` 996-1028), so this function
+/// never fails on control capacity. The returned records are installed by the caller.
 pub fn recv(
     end: &Arc<DuplexEnd>,
     destination: UserSlice,
-    control_capacity: usize,
-) -> Result<(usize, Vec<PendingHandle>), Errno> {
+) -> Result<(usize, Vec<ControlRecord>), Errno> {
     let limit = usize::try_from(destination.length()).map_err(|_| Errno::EINVAL)?;
     loop {
         let mut state = end.pair.state.lock();
@@ -751,19 +790,12 @@ pub fn recv(
             })?;
             continue;
         }
-        let (copied, handles) = match state.incoming_mut(end.side) {
+        let (copied, records) = match state.incoming_mut(end.side) {
             Buffer::Stream(buffer) => {
                 if buffer.control_ready() {
-                    let needed = buffer
-                        .controls
-                        .front()
-                        .map_or(0, |control| control_size(control.handles.len()));
-                    if control_capacity < needed {
-                        return Err(Errno::EMSGSIZE);
-                    }
                     let copied = read_stream(buffer, destination, limit)?;
                     let control = buffer.controls.pop_front().ok_or(Errno::EINVAL)?;
-                    (copied, control.into_handles())
+                    (copied, control.into_records())
                 } else {
                     (read_stream(buffer, destination, limit)?, Vec::new())
                 }
@@ -772,10 +804,6 @@ pub fn recv(
                 let Some(message) = buffer.queue.front() else {
                     return Err(Errno::EINVAL);
                 };
-                let needed = control_size(message.handles.len());
-                if control_capacity < needed {
-                    return Err(Errno::EMSGSIZE);
-                }
                 let copied = message.data.len().min(limit);
                 if let Some(bytes) = message.data.get(..copied) {
                     copy_out(destination.address(), bytes)?;
@@ -785,21 +813,13 @@ pub fn recv(
                     return Err(Errno::EINVAL);
                 };
                 buffer.bytes = buffer.bytes.saturating_sub(length);
-                (copied, message.handles)
+                (copied, message.records)
             }
         };
         drop(state);
         end.pair.wake_writers(peer);
         event::notify_all();
-        return Ok((copied, handles));
-    }
-}
-
-fn control_size(handles: usize) -> usize {
-    if handles == 0 {
-        0
-    } else {
-        16usize.saturating_add(handles.saturating_mul(4))
+        return Ok((copied, records));
     }
 }
 
@@ -820,31 +840,31 @@ pub fn write(end: &Arc<DuplexEnd>, source: UserSlice) -> Result<usize, Errno> {
 pub fn send(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: Vec<ControlRecord>,
     flags: u32,
 ) -> Result<usize, Errno> {
-    if source.is_empty() && handles.is_empty() {
+    if source.is_empty() && records.is_empty() {
         return Ok(0);
     }
     let signal = flags & DUPLEX_MSG_NOSIGNAL == 0;
     if end.datagram {
-        write_datagram(end, source, handles, signal)
+        write_datagram(end, source, records, signal)
     } else {
-        write_stream(end, source, handles, signal)
+        write_stream(end, source, records, signal)
     }
 }
 
 fn write_stream(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: Vec<ControlRecord>,
     signal: bool,
 ) -> Result<usize, Errno> {
     let total = usize::try_from(source.length()).map_err(|_| Errno::EINVAL)?;
-    let mut pending = if handles.is_empty() {
+    let mut pending = if records.is_empty() {
         None
     } else {
-        Some(handles)
+        Some(records)
     };
     let mut done = 0usize;
     loop {
@@ -902,10 +922,10 @@ fn write_stream(
         } else {
             write_stream_ring(buffer, source, done, chunk)?
         };
-        if let Some(handles) = pending.take() {
+        if let Some(records) = pending.take() {
             buffer
                 .controls
-                .push_back(ControlMessage::new(offset, handles));
+                .push_back(ControlMessage::new(offset, records));
         }
         drop(state);
         end.pair.wake_readers(peer);
@@ -951,18 +971,19 @@ fn write_stream_ring(
 fn write_datagram(
     end: &Arc<DuplexEnd>,
     source: UserSlice,
-    handles: Vec<PendingHandle>,
+    records: Vec<ControlRecord>,
     signal: bool,
 ) -> Result<usize, Errno> {
     let total = usize::try_from(source.length()).map_err(|_| Errno::EINVAL)?;
-    if total > DUPLEX_DATAGRAM_MAX || handles.len() > DUPLEX_MAX_HANDLES {
+    let handle_count = records.iter().map(ControlRecord::len).sum::<usize>();
+    if total > DUPLEX_DATAGRAM_MAX || handle_count > DUPLEX_MAX_HANDLES {
         return Err(Errno::EMSGSIZE);
     }
     let mut data = Vec::new();
     data.try_reserve_exact(total).map_err(|_| Errno::ENOMEM)?;
     data.resize(total, 0);
     copy_from_user(&mut data, source)?;
-    let mut pending = Some(DatagramMessage { data, handles });
+    let mut pending = Some(DatagramMessage { data, records });
     loop {
         let mut state = end.pair.state.lock();
         let peer = end.side.peer();

@@ -15,7 +15,7 @@ use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
 use raven_usercopy::UserSlice;
 
-use crate::process::duplex::{self, PendingHandle};
+use crate::process::duplex::{self, ControlRecord, PendingHandle};
 use crate::process::{self, handle::Object};
 use crate::syscall::SyscallFrame;
 use crate::usercopy::{copy_from_user, copy_to_user};
@@ -191,8 +191,8 @@ pub fn sendmsg(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EINVAL);
     }
     let data = user_slice(message.data, message.data_len)?;
-    let handles = parse_control(&caller, message.control, message.control_len)?;
-    duplex::send(&end, data, handles, message.flags)
+    let records = parse_control(&caller, message.control, message.control_len)?;
+    duplex::send(&end, data, records, message.flags)
 }
 
 /// `duplex_recvmsg(handle, msg)`.
@@ -201,24 +201,37 @@ pub fn recvmsg(frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let end = endpoint(&caller, handle, Rights::READ)?;
     let mut message = read_message(frame.rsi)?;
+    // The donor flag is refused explicitly (FreeBSD unix-stream restarts on MSG_WAITALL while
+    // externalizing ancillary data, `uipc_usrreq.c:1445,1739`); unknown bits stay EINVAL.
+    if message.flags & duplex::MSG_WAITALL != 0 {
+        return Err(Errno::EOPNOTSUPP);
+    }
     if message.flags != 0 {
         return Err(Errno::EINVAL);
     }
     let control_capacity = usize::try_from(message.control_len).map_err(|_| Errno::EMSGSIZE)?;
     let data = user_slice(message.data, message.data_len)?;
-    let (copied, handles) = duplex::recv(&end, data, control_capacity)?;
-    let installed = install_handles(&caller, handles)?;
-    if let Err(error) = write_control(&message, &installed) {
-        close_installed(&caller, &installed);
-        return Err(error);
-    }
-    message.control_len =
-        u64::try_from(control_bytes(installed.len())).map_err(|_| Errno::EINVAL)?;
-    message.handle_count = u32::try_from(installed.len()).map_err(|_| Errno::EMSGSIZE)?;
+    let (copied, records) = duplex::recv(&end, data)?;
+    // NetBSD/FreeBSD deliver the data and the largest prefix of complete records that fits, set
+    // MSG_CTRUNC, and release the records that did not fit. A SCM_RIGHTS record is never
+    // partially copied (NetBSD copyout_msg_control 867-872).
+    let (records, truncated) = fit_control(records, control_capacity);
+    let installed = install_handles(&caller, records)?;
+    let control_len = match write_control(&message, &installed) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            close_records(&caller, &installed);
+            return Err(error);
+        }
+    };
+    message.control_len = u64::try_from(control_len).map_err(|_| Errno::EINVAL)?;
+    message.handle_count = u32::try_from(installed.iter().map(Vec::len).sum::<usize>())
+        .map_err(|_| Errno::EMSGSIZE)?;
+    message.flags = if truncated { duplex::MSG_CTRUNC } else { 0 };
     if let Err(error) = write_message(frame.rsi, &message) {
         // The caller cannot learn the installed handle values, so leaving them open would make
         // them unreachable. Close them exactly like the control write-back failure path.
-        close_installed(&caller, &installed);
+        close_records(&caller, &installed);
         return Err(error);
     }
     Ok(copied)
@@ -314,7 +327,7 @@ fn parse_control(
     caller: &Arc<process::Process>,
     pointer: u64,
     length: u64,
-) -> Result<Vec<PendingHandle>, Errno> {
+) -> Result<Vec<ControlRecord>, Errno> {
     let length = usize::try_from(length).map_err(|_| Errno::EMSGSIZE)?;
     if length == 0 {
         return Ok(Vec::new());
@@ -327,7 +340,8 @@ fn parse_control(
     bytes.resize(length, 0);
     copy_from_user(&mut bytes, UserSlice::new(pointer, length as u64)?)?;
 
-    let mut handles = Vec::new();
+    let mut records = Vec::new();
+    let mut total_handles = 0usize;
     let mut offset = 0usize;
     while offset < length {
         let remaining = length.saturating_sub(offset);
@@ -350,10 +364,11 @@ fn parse_control(
         if level != SOL_SOCKET || kind != SCM_RIGHTS {
             return Err(Errno::EINVAL);
         }
-        if count > duplex::DUPLEX_MAX_HANDLES.saturating_sub(handles.len()) {
+        if count > duplex::DUPLEX_MAX_HANDLES.saturating_sub(total_handles) {
             return Err(Errno::EMSGSIZE);
         }
         let ids = offset.saturating_add(CMSG_BYTES);
+        let mut handles = Vec::new();
         let mut index = 0usize;
         while index < count {
             let raw = u32_at(&bytes, ids.saturating_add(index.saturating_mul(4)))?;
@@ -363,47 +378,77 @@ fn parse_control(
             handles.push(PendingHandle::new(object, rights, lineage));
             index = index.saturating_add(1);
         }
+        total_handles = total_handles.saturating_add(count);
+        records.push(ControlRecord::new(handles));
         offset = offset.saturating_add(record_len);
     }
     if offset != length {
         return Err(Errno::EINVAL);
     }
-    Ok(handles)
+    Ok(records)
+}
+
+/// Keep the largest prefix of complete records that fits `capacity`.
+///
+/// A record is never split: NetBSD `copyout_msg_control` breaks before a `SCM_RIGHTS` record
+/// that does not fit (`MSG_CTRUNC` 867-872), and FreeBSD disposes the whole excess external
+/// control chain. Records after the first that does not fit are released too.
+fn fit_control(records: Vec<ControlRecord>, capacity: usize) -> (Vec<ControlRecord>, bool) {
+    let mut kept = Vec::new();
+    let mut used = 0usize;
+    let mut truncated = false;
+    for record in records {
+        let size = record.wire_len();
+        if !truncated && used.saturating_add(size) <= capacity {
+            used = used.saturating_add(size);
+            kept.push(record);
+        } else {
+            truncated = true;
+        }
+    }
+    (kept, truncated)
 }
 
 fn install_handles(
     caller: &Arc<process::Process>,
-    handles: Vec<PendingHandle>,
-) -> Result<Vec<u32>, Errno> {
-    let mut installed = Vec::new();
-    for pending in handles {
-        let (object, rights, lineage) = pending.into_parts();
-        let inserted = {
-            let mut table = caller.handles.lock();
-            table.insert_derived(object, rights, &lineage)
-        };
-        match inserted {
-            Ok(handle) => {
-                let node = caller.handles.lock().lineage_node(handle).ok();
-                if let Some(node) = node {
-                    // `insert_derived` stores the parent's *effective* rights, so a bit revoked
-                    // between the send and this install is otherwise indistinguishable from a bit
-                    // that was never granted (C17 wants EPERM, not EACCES). Register first, then
-                    // copy the parent's revoked mask onto the child; a revoke after this point
-                    // reaches the registered child through the normal descendant walk.
-                    crate::process::handle::register_lineage(Arc::clone(&node));
-                    let revoked = lineage.revoked();
-                    if revoked != Rights::NONE {
-                        node.revoke(revoked);
+    records: Vec<ControlRecord>,
+) -> Result<Vec<Vec<u32>>, Errno> {
+    let mut installed: Vec<Vec<u32>> = Vec::new();
+    let mut flat: Vec<u32> = Vec::new();
+    for record in records {
+        let mut handles = Vec::new();
+        for pending in record.into_handles() {
+            let (object, rights, lineage) = pending.into_parts();
+            let inserted = {
+                let mut table = caller.handles.lock();
+                table.insert_derived(object, rights, &lineage)
+            };
+            match inserted {
+                Ok(handle) => {
+                    let node = caller.handles.lock().lineage_node(handle).ok();
+                    if let Some(node) = node {
+                        // `insert_derived` stores the parent's *effective* rights, so a bit
+                        // revoked between the send and this install is otherwise
+                        // indistinguishable from a bit that was never granted (C17 wants EPERM,
+                        // not EACCES). Register first, then copy the parent's revoked mask onto
+                        // the child; a revoke after this point reaches the registered child
+                        // through the normal descendant walk.
+                        crate::process::handle::register_lineage(Arc::clone(&node));
+                        let revoked = lineage.revoked();
+                        if revoked != Rights::NONE {
+                            node.revoke(revoked);
+                        }
                     }
+                    flat.push(handle.0);
+                    handles.push(handle.0);
                 }
-                installed.push(handle.0);
-            }
-            Err(error) => {
-                close_installed(caller, &installed);
-                return Err(error);
+                Err(error) => {
+                    close_installed(caller, &flat);
+                    return Err(error);
+                }
             }
         }
+        installed.push(handles);
     }
     Ok(installed)
 }
@@ -414,57 +459,78 @@ fn close_installed(caller: &Arc<process::Process>, installed: &[u32]) {
     }
 }
 
-fn write_control(message: &DuplexMessage, installed: &[u32]) -> Result<(), Errno> {
-    if installed.is_empty() {
-        return Ok(());
+fn close_records(caller: &Arc<process::Process>, installed: &[Vec<u32>]) {
+    for handles in installed {
+        close_installed(caller, handles);
     }
-    let bytes = control_bytes(installed.len());
+}
+
+/// Write one control header per record and return the bytes written.
+///
+/// Keeping the headers separate is the donor behaviour (NetBSD `unp_externalize`; FreeBSD
+/// `unp_externalize` 3778-3925 and `recvmsg` 996-1028); the K496 flattening is gone.
+fn write_control(message: &DuplexMessage, installed: &[Vec<u32>]) -> Result<usize, Errno> {
+    let bytes = records_bytes(installed);
+    if bytes == 0 {
+        return Ok(0);
+    }
     if bytes > usize::try_from(message.control_len).map_err(|_| Errno::EMSGSIZE)? {
         return Err(Errno::EMSGSIZE);
     }
     let mut buffer = Vec::new();
     buffer.try_reserve_exact(bytes).map_err(|_| Errno::ENOMEM)?;
     buffer.resize(bytes, 0);
-    let header = ControlHeader {
-        len: u32::try_from(bytes).map_err(|_| Errno::EMSGSIZE)?,
-        level: SOL_SOCKET,
-        kind: SCM_RIGHTS,
-        count: u32::try_from(installed.len()).map_err(|_| Errno::EMSGSIZE)?,
-    };
-    buffer
-        .get_mut(0..4)
-        .ok_or(Errno::EINVAL)?
-        .copy_from_slice(&header.len.to_le_bytes());
-    buffer
-        .get_mut(4..8)
-        .ok_or(Errno::EINVAL)?
-        .copy_from_slice(&header.level.to_le_bytes());
-    buffer
-        .get_mut(8..12)
-        .ok_or(Errno::EINVAL)?
-        .copy_from_slice(&header.kind.to_le_bytes());
-    buffer
-        .get_mut(12..16)
-        .ok_or(Errno::EINVAL)?
-        .copy_from_slice(&header.count.to_le_bytes());
-    let mut index = 0usize;
-    for handle in installed {
-        let offset = CMSG_BYTES.saturating_add(index.saturating_mul(4));
+    let mut offset = 0usize;
+    for handles in installed {
+        let record_len = record_bytes(handles.len());
+        let header = ControlHeader {
+            len: u32::try_from(record_len).map_err(|_| Errno::EMSGSIZE)?,
+            level: SOL_SOCKET,
+            kind: SCM_RIGHTS,
+            count: u32::try_from(handles.len()).map_err(|_| Errno::EMSGSIZE)?,
+        };
         buffer
             .get_mut(offset..offset.saturating_add(4))
             .ok_or(Errno::EINVAL)?
-            .copy_from_slice(&handle.to_le_bytes());
-        index = index.saturating_add(1);
+            .copy_from_slice(&header.len.to_le_bytes());
+        buffer
+            .get_mut(offset.saturating_add(4)..offset.saturating_add(8))
+            .ok_or(Errno::EINVAL)?
+            .copy_from_slice(&header.level.to_le_bytes());
+        buffer
+            .get_mut(offset.saturating_add(8)..offset.saturating_add(12))
+            .ok_or(Errno::EINVAL)?
+            .copy_from_slice(&header.kind.to_le_bytes());
+        buffer
+            .get_mut(offset.saturating_add(12)..offset.saturating_add(16))
+            .ok_or(Errno::EINVAL)?
+            .copy_from_slice(&header.count.to_le_bytes());
+        let mut index = 0usize;
+        for handle in handles {
+            let id_offset = offset
+                .saturating_add(CMSG_BYTES)
+                .saturating_add(index.saturating_mul(4));
+            buffer
+                .get_mut(id_offset..id_offset.saturating_add(4))
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&handle.to_le_bytes());
+            index = index.saturating_add(1);
+        }
+        offset = offset.saturating_add(record_len);
     }
-    copy_to_user(UserSlice::new(message.control, bytes as u64)?, &buffer)
+    copy_to_user(UserSlice::new(message.control, bytes as u64)?, &buffer)?;
+    Ok(bytes)
 }
 
-fn control_bytes(handles: usize) -> usize {
-    if handles == 0 {
-        0
-    } else {
-        CMSG_BYTES.saturating_add(handles.saturating_mul(4))
-    }
+fn record_bytes(handles: usize) -> usize {
+    CMSG_BYTES.saturating_add(handles.saturating_mul(4))
+}
+
+fn records_bytes(installed: &[Vec<u32>]) -> usize {
+    installed
+        .iter()
+        .map(|handles| record_bytes(handles.len()))
+        .sum()
 }
 
 fn u32_at(bytes: &[u8], offset: usize) -> Result<u32, Errno> {

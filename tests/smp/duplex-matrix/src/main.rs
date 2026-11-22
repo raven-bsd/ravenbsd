@@ -45,8 +45,12 @@ const DUPLEX_DIAGNOSTIC: u32 = 0x8000_0000;
 const DUPLEX_DATAGRAM: u32 = 1;
 /// `MSG_NOSIGNAL` (suppress the SIGPIPE queue on `EPIPE`).
 const DUPLEX_MSG_NOSIGNAL: u32 = 0x4000;
-/// `MSG_WAITALL` (not supported by the Raven raw recv path).
-const MSG_WAITALL: u32 = 0x100;
+/// `MSG_CTRUNC` as defined by NetBSD and FreeBSD `sys/sys/socket.h`.
+const MSG_CTRUNC: u32 = 0x20;
+/// `MSG_WAITALL` as defined by NetBSD and FreeBSD `sys/sys/socket.h` (not Linux's `0x100`).
+const MSG_WAITALL: u32 = 0x40;
+/// A bit no donor defines for this ABI (Linux's `MSG_WAITALL` value).
+const MSG_UNKNOWN: u32 = 0x100;
 /// `SOL_SOCKET`.
 const SOL_SOCKET: u32 = 1;
 /// `SCM_RIGHTS`.
@@ -251,6 +255,23 @@ fn recvmsg_at(handle: Handle, message: *mut Message) -> Result<usize, Errno> {
     ))
 }
 
+fn recvmsg_flags(
+    handle: Handle,
+    data: &mut [u8],
+    control: &mut [u8],
+    flags: u32,
+) -> Result<usize, Errno> {
+    let mut message = Message {
+        data: data.as_mut_ptr() as u64,
+        data_len: data.len() as u64,
+        control: control.as_mut_ptr() as u64,
+        control_len: control.len() as u64,
+        flags,
+        handle_count: 0,
+    };
+    recvmsg_at(handle, &mut message)
+}
+
 fn shutdown(handle: Handle, how: u8) -> Result<(), Errno> {
     checked(raw(
         DUPLEX_SHUTDOWN,
@@ -321,18 +342,28 @@ fn control_one(handle: Handle, buffer: &mut [u8]) -> usize {
     control_record(&[handle], buffer, 0)
 }
 
+fn record_at(control: &[u8], control_len: usize, offset: usize) -> Result<(u32, u32), Errno> {
+    if control_len < offset.saturating_add(CMSG_BYTES) {
+        return Err(Errno::EINVAL);
+    }
+    let length = get_u32(control, offset)?;
+    let level = get_u32(control, offset.saturating_add(4))?;
+    let kind = get_u32(control, offset.saturating_add(8))?;
+    let count = get_u32(control, offset.saturating_add(12))?;
+    let record_len = length as usize;
+    if record_len < CMSG_BYTES
+        || offset.saturating_add(record_len) > control_len
+        || level != SOL_SOCKET
+        || kind != SCM_RIGHTS
+        || record_len != CMSG_BYTES.saturating_add((count as usize).saturating_mul(4))
+    {
+        return Err(Errno::EINVAL);
+    }
+    Ok((count, get_u32(control, offset.saturating_add(CMSG_BYTES))?))
+}
+
 fn first_record_count(control: &[u8], control_len: usize) -> Result<(u32, u32), Errno> {
-    if control_len < CMSG_BYTES {
-        return Err(Errno::EINVAL);
-    }
-    let length = get_u32(control, 0)?;
-    let level = get_u32(control, 4)?;
-    let kind = get_u32(control, 8)?;
-    let count = get_u32(control, 12)?;
-    if length as usize != control_len || level != SOL_SOCKET || kind != SCM_RIGHTS {
-        return Err(Errno::EINVAL);
-    }
-    Ok((count, get_u32(control, CMSG_BYTES)?))
+    record_at(control, control_len, 0)
 }
 
 fn observed(value: Stats) -> u64 {
@@ -662,28 +693,26 @@ fn truncation(table: &mut Table) {
     baseline(table, "truncation");
     let base = stats().unwrap_or_default();
 
-    // A too-small control buffer returns EMSGSIZE and leaves the message queued.
-    if let (Ok((left, right)), Ok((read_end, write_end))) = (pair(0), pipe()) {
+    // A too-small control buffer delivers the data, copies no partial SCM_RIGHTS record, sets
+    // MSG_CTRUNC and consumes the message (NetBSD copyout_msg_control 867-872; FreeBSD
+    // uipc_syscalls.c 1020). K496 recorded the old EMSGSIZE divergence.
+    if let (Ok((left, right)), Ok((read_end, write_end))) = (pair(O_NONBLOCK), pipe()) {
         let before = base;
         let mut control = [0u8; 64];
         let control_len = control_one(write_end, &mut control);
         let sent = sendmsg(left, b"t", &control[..control_len], DUPLEX_MSG_NOSIGNAL) == Ok(1);
         let mut data = [0u8; 8];
         let mut small = [0u8; 8];
-        let rejected = matches!(recvmsg(right, &mut data, &mut small), Err(Errno::EMSGSIZE));
-        let mut enough = [0u8; 64];
-        let (retried, handle) = match recvmsg(right, &mut data, &mut enough) {
-            Ok((1, message)) if message.handle_count == 1 => {
-                match first_record_count(&enough, message.control_len as usize) {
-                    Ok((_, raw)) => (true, Some(Handle(raw))),
-                    Err(_) => (false, None),
-                }
+        let truncated = match recvmsg(right, &mut data, &mut small) {
+            Ok((1, message)) => {
+                message.flags == MSG_CTRUNC
+                    && message.handle_count == 0
+                    && message.control_len == 0
+                    && data[0] == b't'
             }
-            _ => (false, None),
+            _ => false,
         };
-        if let Some(handle) = handle {
-            close(handle);
-        }
+        let consumed = matches!(recvmsg(right, &mut data, &mut small), Err(Errno::EAGAIN));
         close(left);
         close(write_end);
         close(right);
@@ -691,12 +720,12 @@ fn truncation(table: &mut Table) {
         let after = stats().unwrap_or_default().delta(before);
         table.row(
             "truncation",
-            "control-small-emsgsize",
-            sent && rejected && retried && after.zero(),
+            "control-small-ctrunc",
+            sent && truncated && consumed && after.zero(),
             observed(after),
         );
     } else {
-        table.row("truncation", "control-small-emsgsize", false, u64::MAX);
+        table.row("truncation", "control-small-ctrunc", false, u64::MAX);
     }
 
     // A datagram shorter than the user buffer is truncated and the whole message is consumed.
@@ -755,8 +784,9 @@ fn truncation(table: &mut Table) {
         table.row("truncation", "control-exact-offset", false, u64::MAX);
     }
 
-    // Two SCM_RIGHTS records in one datagram: both handles are delivered. Raven flattens them
-    // into one record, a recorded donor divergence.
+    // Two SCM_RIGHTS records in one datagram stay two records (NetBSD unp_externalize 1428;
+    // FreeBSD unp_externalize 3778 and soreceive_generic 2932-3010). K496 recorded the
+    // flattening divergence; both headers and both handles are checked here.
     if let (Ok((left, right)), Ok((read_end, write_end)), Ok((read_end2, write_end2))) =
         (pair(DUPLEX_DATAGRAM | O_NONBLOCK), pipe(), pipe())
     {
@@ -769,17 +799,20 @@ fn truncation(table: &mut Table) {
         let mut data = [0u8; 8];
         let mut received_control = [0u8; 128];
         let delivered = match recvmsg(right, &mut data, &mut received_control) {
-            Ok((1, message)) if message.handle_count == 2 => {
-                match first_record_count(&received_control, message.control_len as usize) {
-                    Ok((2, raw)) => {
-                        close(Handle(raw));
-                        match get_u32(&received_control, 20) {
-                            Ok(second_raw) => {
-                                close(Handle(second_raw));
-                                true
-                            }
-                            Err(_) => false,
-                        }
+            Ok((1, message))
+                if message.handle_count == 2
+                    && message.control_len == total as u64
+                    && message.flags == 0 =>
+            {
+                let control_len = message.control_len as usize;
+                match (
+                    record_at(&received_control, control_len, 0),
+                    record_at(&received_control, control_len, first),
+                ) {
+                    (Ok((1, raw_first)), Ok((1, raw_second))) => {
+                        close(Handle(raw_first));
+                        close(Handle(raw_second));
+                        true
                     }
                     _ => false,
                 }
@@ -1191,26 +1224,27 @@ fn waitall(table: &mut Table) {
         let sent = sendmsg(left, b"w", &[], DUPLEX_MSG_NOSIGNAL) == Ok(1);
         let mut data = [0u8; 8];
         let mut control = [0u8; 64];
-        let mut message = Message {
-            data: data.as_mut_ptr() as u64,
-            data_len: 4,
-            control: control.as_mut_ptr() as u64,
-            control_len: control.len() as u64,
-            flags: MSG_WAITALL,
-            handle_count: 0,
-        };
-        let unsupported = recvmsg_at(right, &mut message) == Err(Errno::EINVAL);
+        // Donor MSG_WAITALL is 0x40 (NetBSD/FreeBSD sys/socket.h). FreeBSD's unix-stream
+        // restart with ancillary data is `uipc_usrreq.c:1445,1739`; Raven refuses it explicitly
+        // instead of implementing that restart path.
+        let refused =
+            recvmsg_flags(right, &mut data, &mut control, MSG_WAITALL) == Err(Errno::EOPNOTSUPP);
+        // Linux's 0x100 is not a donor flag for this ABI and stays an unknown-bit EINVAL.
+        let unknown =
+            recvmsg_flags(right, &mut data, &mut control, MSG_UNKNOWN) == Err(Errno::EINVAL);
+        // Neither refusal may consume the queued datagram.
+        let still_queued = matches!(recvmsg(right, &mut data, &mut control), Ok((1, _)));
         close(left);
         close(right);
         let after = stats().unwrap_or_default().delta(before);
         table.row(
             "waitall",
-            "msg-waitall-einval",
-            sent && unsupported && after.zero(),
+            "msg-waitall-refused",
+            sent && refused && unknown && still_queued && after.zero(),
             observed(after),
         );
     } else {
-        table.row("waitall", "msg-waitall-einval", false, u64::MAX);
+        table.row("waitall", "msg-waitall-refused", false, u64::MAX);
     }
 }
 
@@ -1342,9 +1376,6 @@ impl Fuzz {
         let handle = self.pairs[pair].handle(side);
         let incoming = FuzzPair::peer(side);
         let queue = self.pairs[pair].queue(incoming);
-        let front_has_handle = self.pairs[pair].queues[queue]
-            .first()
-            .is_some_and(|entry| entry.has_handle);
         let mut data = [0u8; 8];
         let mut control = [0u8; 64];
         let mut message = Message {
@@ -1367,8 +1398,22 @@ impl Fuzz {
             let _ = self.pairs[pair].queues[queue].remove(0);
             if had_handle {
                 self.pending = self.pending.saturating_sub(1);
-                // The delivered carrier endpoint is closed immediately; its root stays open.
-                if message.handle_count != 1 || message.control_len < 20 {
+                // A short control buffer delivers the data and sets MSG_CTRUNC; the kernel
+                // releases the transferred record instead of leaving the message queued.
+                if message.flags == MSG_CTRUNC {
+                    if small {
+                        if message.handle_count != 0 || message.control_len != 0 {
+                            println!(
+                                "duplex-matrix: fuzz-detail step={step} kind=truncated-count handles={} control-len={}",
+                                message.handle_count, message.control_len
+                            );
+                            self.break_invariant(step, 4, side as u8);
+                        }
+                    } else {
+                        self.break_invariant(step, 4, side as u8);
+                    }
+                } else if message.handle_count != 1 || message.control_len < 20 {
+                    // The delivered carrier endpoint is closed immediately; its root stays open.
                     println!(
                         "duplex-matrix: fuzz-detail step={step} kind=delivered-count handles={} control-len={}",
                         message.handle_count, message.control_len
@@ -1392,10 +1437,8 @@ impl Fuzz {
                     }
                     close(delivered);
                 }
-            }
-        } else if result == Err(Errno::EMSGSIZE) {
-            if !front_has_handle || !small {
-                self.break_invariant(step, 5, side as u8);
+            } else if message.handle_count != 0 || message.flags != 0 {
+                self.break_invariant(step, 4, side as u8);
             }
         } else if result != Err(Errno::EAGAIN) && result != Err(Errno::EPIPE) {
             self.break_invariant(step, 6, side as u8);
