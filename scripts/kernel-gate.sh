@@ -19,9 +19,10 @@
 #   --list   print the case table and exit (no QEMU run)
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
-# These are functional rows, not latency rows: the preflight refuses another QEMU but tolerates
-# co-tenant cargo/rustc builds and allows load <= 2*nproc. S107_LATENCY=1 switches to the strict
-# no-job, max(2, nproc/4) contract for wall-clock rows.
+# These are functional rows, not latency rows: the preflight tolerates up to nproc/2 co-tenant
+# QEMUs (the same budget as scripts/qemu-hygiene.sh), tolerates co-tenant cargo/rustc builds and
+# allows load <= 2*nproc. S107_LATENCY=1 switches to the strict no-job, max(2, nproc/4) contract
+# for wall-clock rows.
 # A clean clone runs without RAVEN_MGMT_ROOT: the table is then kept under target/kernel-gate/
 # instead of the management tree, and the rows still run.
 set -u
@@ -46,8 +47,9 @@ default_max_load() {
     fi
 }
 max_load=${S107_MAX_LOAD:-$(default_max_load)}
+qemu_budget=$(( $(nproc 2>/dev/null || echo 4) / 2 ))
 preflight_args=
-[ "$latency" = 1 ] || preflight_args=--allow-jobs
+[ "$latency" = 1 ] || preflight_args="--allow-jobs --max-qemu $qemu_budget"
 
 # case | arch | owner | subsystem note | optional explicit case path
 # The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
@@ -69,6 +71,7 @@ locking|x86_64|lance|locking
 lockstat|x86_64|lance|locking
 ipc-donation|x86_64|lance|ipc
 ipc-fuzz|x86_64|bob|ipc fuzz|tests/smp/ipc-fuzz/ipc-fuzz.toml
+duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator
 proc-death-cleanup|x86_64|stuart|process

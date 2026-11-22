@@ -58,8 +58,12 @@ use crate::kprintln;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::uspace::UserAddressSpace;
 use crate::memory::{frame, paging};
+use crate::sched::thread::Thread;
 use crate::sched::wait::WaitQueue;
 use crate::usercopy::copy_from_user;
+
+/// `THREAD_KICK` bit 0: inspect the pending signal state (PG-7).
+const KICK_CHECK: u32 = 1;
 
 use self::handle::Object;
 use self::status::{RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
@@ -124,6 +128,13 @@ pub struct ProcessIds {
 /// Maximum supplementary groups stored by this slice.
 pub const MAX_GROUPS: usize = 16;
 
+/// `si_code` of a child status change (`CLD_EXITED`).
+pub const CLD_EXITED_CODE: u32 = 1;
+/// `si_code` of a plain user signal (`SI_USER`).
+pub const SI_USER_CODE: u32 = 0;
+/// `si_code` of a queued signal (`SI_QUEUE`; the C value is `-1`).
+pub const SI_QUEUE_CODE: u32 = u32::MAX;
+
 /// One queued process signal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PendingSignal {
@@ -131,6 +142,12 @@ pub struct PendingSignal {
     pub signo: u32,
     /// Sender pid.
     pub sender: u64,
+    /// `si_code` (`SI_USER`, `SI_QUEUE` or `CLD_EXITED`).
+    pub code: u32,
+    /// Sender real uid (`si_uid`).
+    pub uid: u32,
+    /// Queued `sigval` payload (`si_value`).
+    pub value: u64,
 }
 
 impl ProcessIds {
@@ -248,6 +265,8 @@ pub struct Process {
     pub exit_code: AtomicI32,
     /// Live thread count.
     pub threads: AtomicU32,
+    /// Live threads created for this process (weak; the scheduler owns the strong reference).
+    pub threads_live: Mutex<Vec<Weak<Thread>>>,
     /// True once the process is terminal: none of its threads may run user code again.
     pub exiting: AtomicBool,
     /// True once the one-shot teardown has released the address space and handle table.
@@ -452,6 +471,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -529,6 +549,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -599,6 +620,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -692,6 +714,21 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
 
 /// Deliver one signal with POSIX job-control semantics.
 pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<(), Errno> {
+    deliver_signal_info(target, signo, sender, SI_USER_CODE, 0, 0)
+}
+
+/// Deliver one signal with an explicit `siginfo_t` payload.
+///
+/// The stop/continue bookkeeping is identical to [`deliver_signal`]; only the queued record
+/// differs. `PROC_SIGQUEUE` uses `SI_QUEUE` plus the sender uid and the `sigval` payload.
+pub fn deliver_signal_info(
+    target: &Arc<Process>,
+    signo: u32,
+    sender: u64,
+    code: u32,
+    uid: u32,
+    value: u64,
+) -> Result<(), Errno> {
     if status::is_stop_signal(signo) {
         if target.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
             target.stop_reported.store(false, Ordering::Release);
@@ -704,11 +741,11 @@ pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<
             target.continued.store(true, Ordering::Release);
             target.stop_reported.store(false, Ordering::Release);
         }
-        target.queue_signal(status::SIGCONT, sender);
+        target.queue_signal_info(status::SIGCONT, sender, code, uid, value);
         notify_parent(target, false);
         return Ok(());
     }
-    target.queue_signal(signo, sender);
+    target.queue_signal_info(signo, sender, code, uid, value);
     Ok(())
 }
 
@@ -773,12 +810,58 @@ impl Process {
         self.threads.fetch_sub(1, Ordering::AcqRel) <= 1
     }
 
-    /// Queue a signal and wake a `PROC_SIGRECV` waiter.
+    /// Publish a live thread so a process-directed signal can kick it.
+    pub fn register_thread(&self, thread: &Arc<Thread>) {
+        self.threads_live.lock().push(Arc::downgrade(thread));
+    }
+
+    /// Queue a signal, wake a `PROC_SIGRECV` waiter and kick every live thread.
+    ///
+    /// The kick is the PG-7 bridge from the kernel's per-process queue to libc's signal entry:
+    /// `THREAD_KICK` bit 0 makes the return-to-user path resume at the registered entry, and an
+    /// interruptible wait (`ppoll`, `read`, `waitpid`) returns `EINTR` so the handler can run.
     pub fn queue_signal(&self, signo: u32, sender: u64) {
-        self.pending_signals
-            .lock()
-            .push_back(PendingSignal { signo, sender });
+        self.queue_signal_info(signo, sender, SI_USER_CODE, 0, 0);
+    }
+
+    /// Queue a signal carrying the `siginfo_t` fields the kernel owns.
+    ///
+    /// The kernel stores the sender pid, `si_code`, sender uid and the queued `sigval`; it never
+    /// interprets the signal disposition. `PROC_SIGRECV` hands the fields back to libc, which
+    /// owns the user pending set and constructs the public `siginfo_t`.
+    pub fn queue_signal_info(&self, signo: u32, sender: u64, code: u32, uid: u32, value: u64) {
+        self.pending_signals.lock().push_back(PendingSignal {
+            signo,
+            sender,
+            code,
+            uid,
+            value,
+        });
         self.signal_waiters.wake_all();
+        self.kick_threads();
+    }
+
+    /// Kick every live thread of this process with the signal-check bit.
+    fn kick_threads(&self) {
+        let mut threads = self.threads_live.lock();
+        threads.retain(|weak| {
+            let Some(thread) = weak.upgrade() else {
+                return false;
+            };
+            // A kick is only meaningful after libc has registered the PG-7 entry. Without one
+            // the word would be consumed as a bare `EINTR` with no handler, so leave the signal
+            // in the process queue for `PROC_SIGRECV` and do not disturb an unrelated wait.
+            if thread.signal_entry.load(Ordering::Acquire) == 0 {
+                return true;
+            }
+            thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+            if thread.interruptible.load(Ordering::Acquire) {
+                let token = thread.block_token.load(Ordering::SeqCst);
+                let token = (token != 0).then_some(token);
+                let _ = crate::sched::wake(thread, token, Errno::EINTR.to_ret());
+            }
+            true
+        });
     }
 
     /// Pop the oldest queued signal.
@@ -786,9 +869,35 @@ impl Process {
         self.pending_signals.lock().pop_front()
     }
 
+    /// Remove and return the oldest queued signal matching `predicate`, leaving the rest in
+    /// order.
+    ///
+    /// This is the masked-signal contract: a signal the calling thread blocks is not selected,
+    /// so it stays queued for a thread (or a later unmask) that accepts it (Illumos `fsig`,
+    /// FreeBSD `sigtd`, NetBSD `sigismasked`). No pop/requeue window exists.
+    pub fn pop_signal_where(
+        &self,
+        mut predicate: impl FnMut(&PendingSignal) -> bool,
+    ) -> Option<PendingSignal> {
+        let mut pending = self.pending_signals.lock();
+        let index = pending.iter().position(|signal| predicate(signal))?;
+        pending.remove(index)
+    }
+
     /// True when at least one signal is queued.
     pub fn has_pending_signal(&self) -> bool {
         !self.pending_signals.lock().is_empty()
+    }
+
+    /// True when at least one queued signal matches `predicate`.
+    pub fn has_pending_signal_where(
+        &self,
+        mut predicate: impl FnMut(&PendingSignal) -> bool,
+    ) -> bool {
+        self.pending_signals
+            .lock()
+            .iter()
+            .any(|signal| predicate(signal))
     }
 }
 
@@ -831,7 +940,8 @@ pub fn notify_parent(process: &Process, sigchld: bool) {
         parent
             .child_user_ns
             .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
-        parent.queue_signal(SIGCHLD, process.id);
+        let uid = process.ids.lock().uid;
+        parent.queue_signal_info(SIGCHLD, process.id, CLD_EXITED_CODE, uid, 0);
     }
     parent.child_waiters.wake_all();
 }
@@ -903,6 +1013,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),

@@ -6,7 +6,9 @@
 #
 # Refuse to start when another QEMU, xtask/cargo/rustc job or a high load average is present.
 # --allow-jobs ignores co-tenant cargo/rustc/xtask builds: a functional boot row is not
-# invalidated by another lane compiling, only by another QEMU or a load above the budget.
+# invalidated by another lane compiling, only by too many other QEMUs or a load above the budget.
+# --max-qemu N tolerates up to N co-tenant QEMUs (the functional budget is nproc/2, the same as
+# scripts/qemu-hygiene.sh; the default 0 keeps the strict check).
 # Latency and stress rows keep the strict check (no other job at all).
 # --wait keeps polling the same checks in the foreground for the requested number of seconds.
 # Host state is always written before the decision (including the refusal).
@@ -15,6 +17,7 @@ set -u
 
 wait_secs=0
 allow_jobs=0
+max_qemu=0
 default_max_load() {
     n=$(nproc 2>/dev/null || echo 4)
     case "$n" in ''|*[!0-9]*) n=4 ;; esac
@@ -32,8 +35,9 @@ usage: sh tests/smp/boot/host-idle.sh [options]
 
   --wait SECONDS      wait up to SECONDS for an idle host (default 0: refuse)
   --max-load LOAD     maximum 1-minute load average (default max(2, nproc/4))
-  --allow-jobs        ignore co-tenant cargo/rustc/xtask builds (functional rows); another
-                      QEMU and the load budget still refuse
+  --allow-jobs        ignore co-tenant cargo/rustc/xtask builds (functional rows); the QEMU
+                      and load budgets still apply
+  --max-qemu N        tolerate up to N other QEMUs (functional budget nproc/2; default 0)
   --state-file PATH   host-state record path (default build/host-idle-state.txt)
   --context NAME      label for the record/log (default host)
   -h, --help          show this help
@@ -45,6 +49,7 @@ while [ "$#" -gt 0 ]; do
         --wait) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; wait_secs=$2; shift 2 ;;
         --max-load) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; max_load=$2; shift 2 ;;
         --allow-jobs) allow_jobs=1; shift ;;
+        --max-qemu) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; max_qemu=$2; shift 2 ;;
         --state-file) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; state_file=$2; shift 2 ;;
         --context) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; context=$2; shift 2 ;;
         -h|--help) usage; exit 0 ;;
@@ -80,6 +85,7 @@ write_state() {
         printf 'max_load=%s\n' "$max_load"
         printf 'wait_secs=%s\n' "$wait_secs"
         printf 'allow_jobs=%s\n' "$allow_jobs"
+        printf 'max_qemu=%s\n' "$max_qemu"
         printf 'qemu:\n%s\n' "${qemu:-none}"
         printf 'jobs:\n%s\n' "${jobs:-none}"
         printf 'kvm='; ls -l /dev/kvm 2>&1 || true
@@ -92,6 +98,7 @@ check_idle() {
     loadavg=$(cat /proc/loadavg 2>/dev/null || echo '0')
     load1=${loadavg%% *}
     qemu=$(list_qemu || true)
+    qemu_count=$(printf '%s\n' "$qemu" | awk 'NF { n++ } END { print n + 0 }')
     jobs=$(list_jobs || true)
     idle=1
     busy=    # colon-delimited reasons
@@ -99,7 +106,10 @@ check_idle() {
         idle=0
         busy="${busy}load($load1>$max_load) "
     }
-    [ -n "$qemu" ] && { idle=0; busy="${busy}qemu "; }
+    [ "$qemu_count" -gt "$max_qemu" ] && {
+        idle=0
+        busy="${busy}qemu($qemu_count>$max_qemu) "
+    }
     if [ "$allow_jobs" -eq 1 ]; then
         [ -n "$jobs" ] && busy="${busy}jobs-ignored "
     else
