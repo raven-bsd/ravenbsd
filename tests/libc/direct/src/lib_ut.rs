@@ -11,6 +11,7 @@
     clippy::arithmetic_side_effects,
     clippy::undocumented_unsafe_blocks,
     clippy::missing_safety_doc,
+    unexpected_cfgs,
     unsafe_code
 )]
 
@@ -1079,4 +1080,467 @@ fn math_fp_nan() {
         raven_libc_m::nan(b"1234").to_bits(),
         raven_libc_m::nan(b"").to_bits()
     );
+}
+
+// --- K519: the last 19 INDIRECT libc rows ------------------------------------------
+
+/// Source-inclusion test of the unreferenced `support/env.rs` (the file has no public path).
+/// Items the libm crate uses elsewhere are dead in this isolated copy.
+#[allow(dead_code)]
+#[path = "../../../../libc/ravenlibc/crates/raven-libc-m/src/support/env.rs"]
+mod k519_support_env;
+
+/// The generic block bodies are not compiled on x86_64 without the `size` feature; include the
+/// exact source so the host test can exercise it without changing the product build.
+#[path = "../../../../libc/ravenlibc/crates/raven-libc-str/src/raw/mem/impls.rs"]
+mod k519_mem_impls;
+
+/// The included `raw/strcoll.rs` resolves `super::{strcmp,strlen,common}` here.
+mod strcmp {
+    pub use raven_libc_str::raw::strcmp::strcmp;
+}
+mod strlen {
+    pub use raven_libc_str::raw::strlen::strlen;
+}
+mod common {
+    /// # Safety
+    /// `p..p+len` is readable for the returned lifetime.
+    pub unsafe fn bytes<'a>(p: *const u8, len: usize) -> &'a [u8] {
+        unsafe { core::slice::from_raw_parts(p, len) }
+    }
+    /// # Safety
+    /// `p..p+len` is writable for the returned lifetime.
+    pub unsafe fn bytes_mut<'a>(p: *mut u8, len: usize) -> &'a mut [u8] {
+        unsafe { core::slice::from_raw_parts_mut(p, len) }
+    }
+}
+/// The exact source of the unreferenced `raw/strcoll.rs`; `crate::cstr` comes from `lib.rs`.
+#[path = "../../../../libc/ravenlibc/crates/raven-libc-str/src/raw/strcoll.rs"]
+mod k519_strcoll;
+
+#[test]
+fn util_dtoa_bigint_misc() {
+    // source: libc/ravenlibc/crates/raven-libc-dtoa/src/bigint/misc.rs
+    let mut ctx = raven_libc_dtoa::DtoaCtx::new();
+    let mut out = [0u8; 800];
+    let d = raven_libc_dtoa::dtoa(
+        &mut ctx,
+        f64::MAX,
+        raven_libc_dtoa::DigitMode::Shortest,
+        0,
+        raven_libc_dtoa::Rounding::Nearest,
+        &mut out,
+    )
+    .unwrap();
+    assert_eq!(&out[..d.len], b"17976931348623157");
+    assert_eq!(d.decpt, 309);
+}
+
+#[test]
+fn util_fts_dirent_dirstream() {
+    // source: libc/ravenlibc/crates/raven-libc-fts/src/dirent/dirstream.rs
+    use raven_libc_fts::DirStream;
+    use raven_libc_fts::fake::FakeFs;
+    let mut fs = FakeFs::new();
+    fs.mkdir("d", 0o755);
+    fs.file("d/a", 1);
+    let mut dir = DirStream::opendir(&mut fs, b"d").unwrap();
+    assert_eq!(dir.telldir(), 0);
+    let first = dir.readdir(&mut fs).unwrap().unwrap();
+    assert_eq!(first.name, b".");
+    assert_eq!(dir.telldir(), first.off);
+    assert!(dir.telldir() > 0);
+    dir.closedir(&mut fs).unwrap();
+}
+
+#[test]
+fn util_fts_ftw() {
+    // source: libc/ravenlibc/crates/raven-libc-fts/src/ftw.rs
+    use raven_libc_abi::generated::structs::Stat;
+    use raven_libc_fts::fake::FakeFs;
+    use raven_libc_fts::{FTW_D, FTW_F, ftw};
+    let mut fs = FakeFs::new();
+    fs.mkdir("r", 0o755);
+    fs.file("r/a", 1);
+    fs.mkdir("r/sub", 0o755);
+    fs.file("r/sub/x", 2);
+    let mut seen: Vec<(Vec<u8>, i32)> = Vec::new();
+    let mut callback = |path: &[u8], _stat: &Stat, flag: i32| {
+        seen.push((path.to_vec(), flag));
+        0
+    };
+    assert_eq!(ftw(&mut fs, b"r", &mut callback, 1).unwrap(), 0);
+    assert!(seen.contains(&(b"r".to_vec(), FTW_D)));
+    assert!(seen.contains(&(b"r/a".to_vec(), FTW_F)));
+    assert!(seen.contains(&(b"r/sub/x".to_vec(), FTW_F)));
+}
+
+#[test]
+fn util_fts_nftw() {
+    // source: libc/ravenlibc/crates/raven-libc-fts/src/nftw.rs
+    use raven_libc_abi::generated::structs::Stat;
+    use raven_libc_fts::fake::FakeFs;
+    use raven_libc_fts::{FTW_D, FTW_F, Ftw, nftw};
+    let mut fs = FakeFs::new();
+    fs.mkdir("r", 0o755);
+    fs.file("r/a", 1);
+    fs.mkdir("r/sub", 0o755);
+    fs.file("r/sub/x", 2);
+    let mut seen: Vec<(Vec<u8>, i32, i64)> = Vec::new();
+    let mut callback = |path: &[u8], _stat: &Stat, flag: i32, ftw: &Ftw| {
+        seen.push((path.to_vec(), flag, ftw.level));
+        0
+    };
+    assert_eq!(nftw(&mut fs, b"r", &mut callback, 1, 0).unwrap(), 0);
+    assert!(seen.contains(&(b"r".to_vec(), FTW_D, 0)));
+    assert!(seen.contains(&(b"r/a".to_vec(), FTW_F, 1)));
+    assert!(seen.contains(&(b"r/sub/x".to_vec(), FTW_F, 2)));
+}
+
+#[test]
+fn util_locale_gettext() {
+    // source: libc/ravenlibc/crates/raven-libc-locale/src/gettext/mod.rs
+    use std::collections::BTreeMap;
+
+    use raven_libc_locale::gettext::{FileSource, Gettext};
+    use raven_libc_locale::locale::{EnvSource, LC_MESSAGES, LocaleState};
+
+    struct Fs(BTreeMap<Vec<u8>, Vec<u8>>);
+    impl FileSource for Fs {
+        fn read_all(&self, path: &[u8], max: usize) -> Option<Vec<u8>> {
+            self.0.get(path).filter(|data| data.len() <= max).cloned()
+        }
+    }
+    struct Env(&'static [(&'static [u8], &'static [u8])]);
+    impl EnvSource for Env {
+        fn get(&self, name: &[u8]) -> Option<&[u8]> {
+            self.0
+                .iter()
+                .find(|(key, _)| *key == name)
+                .map(|(_, value)| *value)
+        }
+    }
+    fn mo(entries: &[(&[u8], &[u8])]) -> Vec<u8> {
+        let n = entries.len();
+        let orig = 20usize;
+        let trans = orig + 8 * n;
+        let strings = trans + 8 * n;
+        let mut data = vec![0u8; strings];
+        let put = |data: &mut Vec<u8>, at: usize, value: u32| {
+            if let Some(slot) = data.get_mut(at..at + 4) {
+                slot.copy_from_slice(&value.to_le_bytes());
+            }
+        };
+        put(&mut data, 0, 0x9504_12de);
+        put(&mut data, 8, n as u32);
+        put(&mut data, 12, orig as u32);
+        put(&mut data, 16, trans as u32);
+        for (index, (key, value)) in entries.iter().enumerate() {
+            let key_at = data.len();
+            data.extend_from_slice(key);
+            data.push(0);
+            let value_at = data.len();
+            data.extend_from_slice(value);
+            data.push(0);
+            put(&mut data, orig + index * 8, key.len() as u32);
+            put(&mut data, orig + index * 8 + 4, key_at as u32);
+            put(&mut data, trans + index * 8, value.len() as u32);
+            put(&mut data, trans + index * 8 + 4, value_at as u32);
+        }
+        data
+    }
+
+    let data = mo(&[(b"file", b"fichier\0fichiers")]);
+    let mut files = BTreeMap::new();
+    files.insert(
+        b"/usr/share/locale/en_US.UTF-8/LC_MESSAGES/messages.mo".to_vec(),
+        data,
+    );
+    let fs = Fs(files);
+    let env = Env(&[]);
+    let mut state = LocaleState::new();
+    let _ = state.setlocale(LC_MESSAGES, Some(b"en_US.UTF-8"), &env);
+    let mut gettext = Gettext::new();
+    let singular = gettext.dcngettext(
+        &fs,
+        &env,
+        None,
+        b"file",
+        b"files",
+        1,
+        LC_MESSAGES,
+        &state.global(),
+        state.table(),
+    );
+    assert_eq!(singular, b"fichier");
+    let plural = gettext.dcngettext(
+        &fs,
+        &env,
+        None,
+        b"file",
+        b"files",
+        2,
+        LC_MESSAGES,
+        &state.global(),
+        state.table(),
+    );
+    assert_eq!(plural, b"fichiers");
+}
+
+#[test]
+fn math_support_env_status() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/support/env.rs
+    let mut status = k519_support_env::Status::OK;
+    assert!(!status.inexact());
+    status.set_inexact(true);
+    assert!(status.inexact());
+    status.set_inexact(false);
+    assert!(!status.inexact());
+    let mut under = k519_support_env::Status::OK;
+    under.set_underflow(true);
+    assert!(under.underflow());
+    let result = k519_support_env::FpResult::ok(2.5);
+    assert_eq!(result.val, 2.5);
+    assert!(!result.status.inexact());
+}
+
+#[test]
+fn math_support_narrowing_div_fmod() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/support/int_traits/narrowing_div.rs
+    // The large-remainder path uses `checked_narrowing_div_rem` on the u128 double-wide type.
+    assert_eq!(raven_libc_m::fmod(1.0e300, 7.0), 1.0);
+}
+
+#[test]
+fn math_support_macros_hf64() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/support/macros.rs
+    // `cbrt` evaluates `hf64!` constants; a broken `hf64!` changes the result.
+    assert_eq!(raven_libc_m::cbrt(27.0), 3.0);
+}
+
+struct K519Arena {
+    base: usize,
+    len: usize,
+    used: core::cell::Cell<usize>,
+}
+
+impl K519Arena {
+    fn new(len: usize) -> Self {
+        let layout = Layout::from_size_align(len, 4096).unwrap();
+        let base = unsafe { std::alloc::alloc_zeroed(layout) };
+        assert!(!base.is_null());
+        Self {
+            base: base as usize,
+            len,
+            used: core::cell::Cell::new(0),
+        }
+    }
+}
+
+impl raven_libc_malloc::PageProvider for K519Arena {
+    fn page_size(&self) -> usize {
+        4096
+    }
+    fn map_pages(&self, len: usize, align: usize, _prot: u8) -> Option<usize> {
+        let used = self.used.get();
+        let aligned = (self.base + used + align - 1) & !(align - 1);
+        let start = aligned - self.base;
+        if start + len > self.len {
+            return None;
+        }
+        self.used.set(start + len);
+        Some(aligned)
+    }
+    fn map_exact(&self, hint: usize, len: usize) -> Option<usize> {
+        if hint == self.base + self.used.get() && self.used.get() + len <= self.len {
+            self.used.set(self.used.get() + len);
+            return Some(hint);
+        }
+        None
+    }
+    fn unmap(&self, _addr: usize, _len: usize) -> bool {
+        true
+    }
+    fn protect(&self, _addr: usize, _len: usize, _prot: u8) -> bool {
+        true
+    }
+}
+
+struct K519Locks;
+impl raven_libc_malloc::Lock for K519Locks {
+    fn lock(&self, _index: usize) {}
+    fn unlock(&self, _index: usize) {}
+    fn reset(&self, _index: usize) {}
+}
+
+struct K519Entropy;
+impl raven_libc_malloc::Entropy for K519Entropy {
+    fn fill(&self, buf: &mut [u8]) -> bool {
+        for (index, byte) in buf.iter_mut().enumerate() {
+            *byte = (index as u8) | 1;
+        }
+        true
+    }
+}
+
+struct K519Platform;
+impl raven_libc_malloc::Platform for K519Platform {
+    fn thread_id(&self) -> usize {
+        0
+    }
+    fn set_errno(&self, _errno: i32) {}
+    fn write_stderr(&self, _bytes: &[u8]) {}
+    fn abort(&self) -> ! {
+        panic!("abort")
+    }
+    fn progname(&self) -> &[u8] {
+        b"k519"
+    }
+    fn process_id(&self) -> u32 {
+        1
+    }
+}
+
+#[test]
+fn util_malloc_hardened() {
+    // source: libc/ravenlibc/crates/raven-libc-malloc/src/hardened/mod.rs
+    use raven_libc_malloc::{Hardened, Heap};
+    let heap = Hardened::new(
+        K519Arena::new(1 << 20),
+        K519Locks,
+        K519Entropy,
+        K519Platform,
+        b"",
+    );
+    let first = heap.malloc(16);
+    assert_ne!(first, 0);
+    let second = heap.malloc(32);
+    assert_ne!(second, 0);
+    assert_ne!(first, second);
+    heap.free(second);
+    heap.free(first);
+}
+
+#[test]
+fn signal_raw_setjmp_aarch64_abi() {
+    // source: libc/ravenlibc/crates/raven-libc-signal/src/raw/setjmp_aarch64.rs
+    // AArch64-only assembly: the host test checks the musl slot contract (H-20).
+    let source = include_str!(
+        "../../../../libc/ravenlibc/crates/raven-libc-signal/src/raw/setjmp_aarch64.rs"
+    );
+    assert!(source.contains("stp x19, x20, [x0,#0]"));
+    assert!(source.contains("stp x29, x30, [x0,#80]"));
+    assert!(source.contains("str x2, [x0,#104]"));
+    assert!(source.contains("stp d8, d9, [x0,#112]"));
+    assert!(source.contains("ldp x19, x20, [x0,#0]"));
+    assert!(source.contains("ldr x2, [x0,#104]"));
+}
+
+#[test]
+fn signal_raw_setjmp_riscv64_abi() {
+    // source: libc/ravenlibc/crates/raven-libc-signal/src/raw/setjmp_riscv64.rs
+    let source = include_str!(
+        "../../../../libc/ravenlibc/crates/raven-libc-signal/src/raw/setjmp_riscv64.rs"
+    );
+    assert!(source.contains("sd s0, 0(a0)"));
+    assert!(source.contains("sd s11, 88(a0)"));
+    assert!(source.contains("sd sp, 96(a0)"));
+    assert!(source.contains("sd ra, 104(a0)"));
+    assert!(source.contains("fsd fs0, 112(a0)"));
+    assert!(source.contains("ld s0, 0(a0)"));
+    assert!(source.contains("ld ra, 104(a0)"));
+}
+
+#[test]
+fn signal_raw_sigsetjmp_aarch64_abi() {
+    // source: libc/ravenlibc/crates/raven-libc-signal/src/raw/sigsetjmp_aarch64.rs
+    let source = include_str!(
+        "../../../../libc/ravenlibc/crates/raven-libc-signal/src/raw/sigsetjmp_aarch64.rs"
+    );
+    assert!(source.contains("str x30, [x0,#256]"));
+    assert!(source.contains("str x19, [x0,#272]"));
+    assert!(source.contains("str x2, [x0,#280]"));
+    assert!(source.contains("ldr x3, [x0,#264]"));
+}
+
+#[test]
+fn signal_raw_sigsetjmp_riscv64_abi() {
+    // source: libc/ravenlibc/crates/raven-libc-signal/src/raw/sigsetjmp_riscv64.rs
+    let source = include_str!(
+        "../../../../libc/ravenlibc/crates/raven-libc-signal/src/raw/sigsetjmp_riscv64.rs"
+    );
+    assert!(source.contains("sd ra, 256(a0)"));
+    assert!(source.contains("sd s0, 272(a0)"));
+    assert!(source.contains("sd a2, 280(a0)"));
+    assert!(source.contains("ld a3, 264(a0)"));
+}
+
+#[test]
+fn util_str_mem_impls() {
+    // source: libc/ravenlibc/crates/raven-libc-str/src/raw/mem/impls.rs
+    // The x86_64 build uses the arch block; this exercises the generic donor bodies directly.
+    let mut dst = [0u8; 5];
+    unsafe {
+        k519_mem_impls::copy_forward(dst.as_mut_ptr(), b"hello".as_ptr(), 5);
+    }
+    assert_eq!(&dst, b"hello");
+    let mut overlap = *b"abcdef";
+    unsafe {
+        k519_mem_impls::copy_backward(overlap.as_mut_ptr().add(1), overlap.as_ptr(), 5);
+    }
+    assert_eq!(&overlap, b"aabcde");
+    let mut set = [0u8; 4];
+    unsafe {
+        k519_mem_impls::set_bytes(set.as_mut_ptr(), b'x', set.len());
+    }
+    assert_eq!(&set, b"xxxx");
+    assert!(unsafe { k519_mem_impls::compare_bytes(b"abc".as_ptr(), b"abd".as_ptr(), 3) } < 0);
+    assert_eq!(
+        unsafe { k519_mem_impls::c_string_length(c"abc".as_ptr()) },
+        3
+    );
+}
+
+#[test]
+fn util_str_raw_strcoll() {
+    // source: libc/ravenlibc/crates/raven-libc-str/src/raw/strcoll.rs
+    // The file is unreferenced; this includes its exact source with the same helper contracts.
+    assert!(unsafe { k519_strcoll::strcoll(c"abc".as_ptr().cast(), c"abd".as_ptr().cast()) } < 0);
+    let mut dst = [0u8; 8];
+    let copied =
+        unsafe { k519_strcoll::strxfrm(dst.as_mut_ptr(), c"abc".as_ptr().cast(), dst.len()) };
+    assert_eq!(copied, 3);
+    assert_eq!(&dst[..4], b"abc\0");
+}
+
+#[test]
+fn util_ld_self_object() {
+    // source: libc/ravenlibc/ld/src/self_object.rs
+    use raven_libc_elf::{DigestError, SliceMem};
+    let mem = SliceMem::new(0, &[]);
+    assert_eq!(
+        raven_libc_rtld::self_object::digest_self(&mem, 0, 65, 0).unwrap_err(),
+        DigestError::BadDynamic
+    );
+    assert_eq!(
+        raven_libc_rtld::self_object::digest_self(&mem, 0, 0, 0).unwrap_err(),
+        DigestError::NotDynamic
+    );
+}
+
+/// The unreferenced `fdlibm/modf.rs` duplicate; the exact source is tested directly.
+/// The file is written for the libm crate's lint set, so these two style lints are local noise.
+#[allow(clippy::needless_return, clippy::needless_late_init)]
+#[path = "../../../../libc/ravenlibc/crates/raven-libc-m/src/fdlibm/modf.rs"]
+mod k519_fdlibm_modf;
+
+#[test]
+fn math_fdlibm_modf_duplicate() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/modf.rs
+    let (fraction, integral) = k519_fdlibm_modf::modf(3.5);
+    assert_eq!(fraction, 0.5);
+    assert_eq!(integral, 3.0);
+    let (negative_fraction, negative_integral) = k519_fdlibm_modf::modf(-0.75);
+    assert_eq!(negative_fraction, -0.75);
+    assert!(negative_integral == 0.0 && negative_integral.is_sign_negative());
 }
