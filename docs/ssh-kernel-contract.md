@@ -88,10 +88,11 @@ The qtest expects `CONTRACT K11..K14 PASS`, `CONTRACT SUMMARY PASS 4/4` and
 
 ## Integration status
 
-The K434 gate matrix was run against a release image at commit `a8059977`
-(before the registered-entry kick refinement). S0 passed; the SSH rows were
-blocked because `netd` reached `netd: ready` and then restarted into
-`netd: net: already exists` / `svcd: netd crash loop, giving up`. The matrix
-image was not rebuilt after the refinement because the pack step exceeded its
-360 s cap (`/tmp/opencode/k443-image-build3.log`). The matrix therefore remains
-an open integration item for K434 after K440/K441/K444 are merged.
+The K434 gate matrix first ran against a release image at commit `a8059977`.
+`netd` reached `netd: ready` and then restarted into `netd: net: already
+exists` / `svcd: netd crash loop, giving up`. The registered-entry gate
+(`096f97e0`) removed that restart; a second run with the `096f97e0` release
+kernel copied into the same image reached sshd and passed S1/S2/S3/S4/S6.
+S5-session still exits -9 and S7 still returns 0 command bytes (the
+`/tmp/ssh-marker` fixture is not staged on this branch). The matrix therefore
+remains an open K434 integration item after K440/K441/K444 are merged.
