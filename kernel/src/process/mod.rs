@@ -804,6 +804,12 @@ impl Process {
             let Some(thread) = weak.upgrade() else {
                 return false;
             };
+            // A kick is only meaningful after libc has registered the PG-7 entry. Without one
+            // the word would be consumed as a bare `EINTR` with no handler, so leave the signal
+            // in the process queue for `PROC_SIGRECV` and do not disturb an unrelated wait.
+            if thread.signal_entry.load(Ordering::Acquire) == 0 {
+                return true;
+            }
             thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
             if thread.interruptible.load(Ordering::Acquire) {
                 let token = thread.block_token.load(Ordering::SeqCst);
