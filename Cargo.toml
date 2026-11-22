@@ -50,6 +50,8 @@ members = [
     "tests/fixtures/s35-handles",
     "tests/fixtures/k68-svc",
     "tests/fixtures/service-restart",
+    "tests/fixtures/proc-pgrp",
+    "tests/fixtures/proc-orphan",
     "tests/fixtures/fault",
     "tests/fixtures/s21-edu",
     "tests/fixtures/s21d-aarch64",

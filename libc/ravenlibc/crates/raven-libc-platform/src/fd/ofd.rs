@@ -42,6 +42,20 @@ pub enum OfdKind {
     Unknown,
 }
 
+/// The socket identity carried across `execve` with an inherited socket OFD.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SocketMeta {
+    /// `AF_INET`, `AF_INET6` or `AF_UNIX`.
+    pub domain: i32,
+    /// `SOCK_STREAM` or `SOCK_DGRAM`.
+    pub ty: i32,
+    /// The protocol number.
+    pub proto: i32,
+    /// Encoded `raven_libc_net::SocketState` (0 pending, 1 open, 2 bound, 3 listening,
+    /// 4 connecting, 5 connected, 6 shutdown).
+    pub state: u8,
+}
+
 /// One open-file description.
 #[derive(Debug)]
 pub struct Ofd {
@@ -63,6 +77,8 @@ pub struct Ofd {
     pub dir_cursor_ok: bool,
     /// Table epoch; a reused fd cannot deliver a stale epoll event.
     pub epoch: u32,
+    /// Socket metadata for an inherited socket; `None` for every other kind.
+    pub socket: Cell<Option<SocketMeta>>,
 }
 
 impl Ofd {
@@ -84,7 +100,19 @@ impl Ofd {
             path,
             dir_cursor_ok: false,
             epoch,
+            socket: Cell::new(None),
         }
+    }
+
+    /// The inherited socket metadata, when this OFD is a socket.
+    #[must_use]
+    pub fn socket_meta(&self) -> Option<SocketMeta> {
+        self.socket.get()
+    }
+
+    /// Record the socket metadata used to re-register the OFD after `execve`.
+    pub fn set_socket_meta(&self, meta: SocketMeta) {
+        self.socket.set(Some(meta));
     }
 
     /// Set the kernel handle of a pending OFD.
@@ -301,6 +329,16 @@ impl<'a, B: SysBackend, L: Lock> OfdRef<'a, B, L> {
         self.snapshot().map_or(OfdKind::Unknown, |ofd| ofd.kind)
     }
 
+    /// The inherited socket metadata, when this OFD is a socket.
+    pub fn socket_meta(&self) -> Option<SocketMeta> {
+        self.snapshot().and_then(|ofd| ofd.socket.get())
+    }
+
+    /// Record the socket metadata used to re-register the OFD after `execve`.
+    pub fn set_socket_meta(&self, meta: SocketMeta) {
+        self.platform.set_ofd_socket_meta(self.index, meta);
+    }
+
     /// The OFD status (`F_GETFL`).
     pub fn status(&self) -> u32 {
         self.snapshot().map_or(0, |ofd| {
@@ -378,6 +416,7 @@ impl Clone for Ofd {
             path: self.path.clone(),
             dir_cursor_ok: self.dir_cursor_ok,
             epoch: self.epoch,
+            socket: Cell::new(self.socket.get()),
         }
     }
 }
