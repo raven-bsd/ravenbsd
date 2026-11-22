@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K408 accepted-socket over the K194 tap. The guest owns the listener; the host peer connects to
+# 10.0.2.15:23096 and verifies the five write markers. The pre builds the `accept` variant of the
+# fixture; the tap must already be up (run this case through tests/fixtures/socket-write-exec/
+# run-tap.sh, which owns the tap lifecycle). The guest is a long-running network profile, so the
+# case expects the harness timeout.
+
+name = "socket-write-exec-tap"
+arch = "x86_64"
+profile = "server"
+timeout_secs = 180
+initfs = "build/fixtures/socket-write-exec/initfs-tap.img"
+boot_cmdline = "console=ttyS0 loglevel=info"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "tap,id=n0,ifname=ravendemo0,script=no,downscript=no",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-write-exec/tap.pcap",
+]
+expect_exit = "timeout"
+pre = [
+    "SOCKET_WRITE_EXEC_MODE=accept sh tests/fixtures/socket-write-exec/build.sh",
+    "SOCKET_WRITE_EXEC_MODE=accept sh tests/fixtures/socket-write-exec/start-host.sh > build/fixtures/socket-write-exec/host.stdout 2>&1 &",
+]
+
+[[expect]]
+regex = '^socket-write-exec: listening port=23096$'
+
+[[expect]]
+regex = '^socket-write-exec: accepted fd=[0-9]+$'
+
+[[expect]]
+regex = '^socket-write-exec: same sent$'
+
+[[expect]]
+regex = '^socket-write-exec: fork sent$'
+
+[[expect]]
+regex = '^socket-write-exec-child: pollout ready$'
+
+[[expect]]
+regex = '^socket-write-exec: exec sent$'
+
+[[expect]]
+regex = '^socket-write-exec: read request$'
+
+[[expect]]
+regex = '^socket-write-exec: read sent$'
+
+[[expect]]
+regex = '^socket-write-exec: second sent$'
+
+[[expect]]
+regex = '^socket-write-exec: host done$'
+
+[[expect]]
+regex = '^socket-write-exec: done$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|socket-write-exec: write failed|socket-write-exec: .*trigger missing|socket-write-exec: .*child status=|socket-write-exec-child: pollout (timeout|failed)'

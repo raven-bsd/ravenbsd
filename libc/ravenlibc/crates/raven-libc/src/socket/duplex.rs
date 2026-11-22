@@ -219,7 +219,42 @@ impl UnixBackend for ShellUnix {
                 None,
                 (flags & (MSG_CMSG_CLOEXEC as i32)) != 0,
             ) {
-                Ok(fd) => fds.push(fd),
+                Ok(fd) => {
+                    // A net scheme socket is one data handle plus one readiness doorbell. The
+                    // sender's fd table owned both, but `SCM_RIGHTS` carries only the data
+                    // handle, so a blocking read on the received TCP fd would see the scheme's
+                    // `EAGAIN` and never wait. Re-attach the receiver's own event, exactly as
+                    // `socket`/`accept` do. A kernel duplex handle rejects the scheme CALL; the
+                    // error is harmless there because its own handle is pollable.
+                    //
+                    // Donor divergence (recorded for review): NetBSD
+                    // `sys/kern/uipc_usrreq.c:unp_internalize` installs the existing socket
+                    // object, whose receive queue is directly waitable (`sbwait`). Raven's
+                    // scheme ABI splits that object from the client data handle, so the event
+                    // handle must be re-created on adoption.
+                    // `probe_kind` recognises a tty and otherwise reports `Unknown`; a net
+                    // socket is not distinguishable from another scheme handle there. The
+                    // `Call::Event` probe is the discriminator: a net socket returns a valid
+                    // event, a plain file/duplex handle returns an error that is ignored.
+                    if let Ok(reference) = platform.get(fd)
+                        && matches!(
+                            reference.kind(),
+                            raven_libc_platform::OfdKind::Socket
+                                | raven_libc_platform::OfdKind::Unknown
+                        )
+                    {
+                        let index = reference.index();
+                        let data = reference.handle();
+                        drop(reference);
+                        if let Ok(event) = raven_libc_net::backend_platform::event_handle(
+                            platform.backend(),
+                            Sock(data.0),
+                        ) {
+                            let _ = platform.set_ofd_event(index, event);
+                        }
+                    }
+                    fds.push(fd);
+                }
                 Err(error) => {
                     close_raw(*handle);
                     for rest in raw.get(index.saturating_add(1)..).unwrap_or(&[]) {

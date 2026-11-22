@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K382 virtio-net TX completion stress. The guest connects to the host at 10.0.2.2:23095 and
+# sends 32 KiB in 32 writes; the host verifies and echoes it. The guest logs `done` only after
+# every TX frame crossed the NIC and the echo returned. This is more than two TX ring capacities
+# (8 entries). The guest is a long-running network profile, so the case expects the harness
+# timeout. The 180 s budget covers the measured >90 s guest boot under host load; the functional
+# assertions are unchanged.
+#
+# K433 adds the SSH confirmation shape on the same established connection: a 4-byte request, four
+# 44-byte replies, and a host ack. Four replies exceed the three spare TX buffers, so the last one
+# requires a reclaimed completion slot.
+
+name = "virtio-tx"
+arch = "x86_64"
+profile = "server"
+timeout_secs = 180
+initfs = "build/fixtures/virtio-tx/initfs.img"
+boot_cmdline = "console=ttyS0 loglevel=info"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/virtio-tx/qemu.pcap",
+]
+expect_exit = "timeout"
+pre = [
+    "sh tests/fixtures/virtio-tx/build.sh",
+    "sh tests/fixtures/virtio-tx/start-host.sh",
+]
+
+[[expect]]
+regex = '^virtio-tx: connected$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-tx: sent=32768 elapsed_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-tx: echo received=32768$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-tx: read request=4$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-tx: confirmation frames=4 bytes=176$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-tx: confirmation ack$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-tx: done$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: irq tx fired=[1-9]'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: irq progress fired=([2-9][0-9]|[1-9][0-9]{2,}) '
+unordered = true
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|virtio-tx: write failed|virtio-tx: echo mismatch|virtio-tx: confirmation .* failed|virtio-net: pump'

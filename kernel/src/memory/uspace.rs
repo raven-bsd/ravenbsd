@@ -17,10 +17,13 @@ use raven_abi::layout::aarch64::{USER_END, USER_MIN};
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::prot;
 use raven_pager::PageState;
+#[cfg(target_arch = "x86_64")]
+use raven_rmm::Mapper;
 use raven_rmm::page::{NO_EXECUTE, PRESENT};
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
 use raven_vma::{Backing, PAGE_SIZE, Vma, VmaError, Vmas};
 
+use crate::memory::aslr;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::frame;
 use crate::memory::paging;
@@ -159,6 +162,10 @@ pub struct UserAddressSpace {
     /// Bumped on every mapping change. A capture records it at create and only copies back when
     /// the client's mapping has not been replaced meanwhile.
     mapping_generation: u64,
+    /// Randomized first anonymous mmap hint for this process image.
+    mmap_base: u64,
+    /// Randomized initial stack VMA base for this process image.
+    stack_base: u64,
 }
 
 /// Deferred TLB shootdown and frame recycling after an `unmap`.
@@ -234,7 +241,21 @@ impl UserAddressSpace {
             dma: Vec::new(),
             inherit: Vec::new(),
             mapping_generation: 0,
+            mmap_base: aslr::mmap_base(),
+            stack_base: aslr::stack_base(),
         }
+    }
+
+    /// Randomized anonymous-mmap hint for this process image.
+    #[must_use]
+    pub const fn mmap_base(&self) -> u64 {
+        self.mmap_base
+    }
+
+    /// Randomized initial stack VMA base for this process image.
+    #[must_use]
+    pub const fn stack_base(&self) -> u64 {
+        self.stack_base
     }
 
     /// Monotonic mapping generation, bumped by every map/unmap/protect.
@@ -552,6 +573,9 @@ impl UserAddressSpace {
         if self.vmas.len() != 1 || !self.objects.is_empty() {
             return Err(Errno::EINVAL);
         }
+        // fork inherits the parent layout exactly; only exec draws a new one.
+        self.mmap_base = source.mmap_base;
+        self.stack_base = source.stack_base;
         let vmas: Vec<Vma> = source.vmas.iter().copied().collect();
         let objects = source.objects.clone();
         let inherit = source.inherit.clone();
@@ -1508,6 +1532,42 @@ fn leaf_flags(prot: u8, writable: bool) -> PageFlags {
 /// ring-3 access fault. The frame stays present so `UNMAP` and `PROTECT` can find and re-use it.
 fn none_leaf_flags() -> PageFlags {
     PageFlags::from_bits(PRESENT | NO_EXECUTE)
+}
+
+/// True when every present leaf in `[address, address + length)` is user-accessible.
+///
+/// x86-64 `rep movsb` at CPL0 ignores the U/S bit on reads, so `PROT_NONE`'s present
+/// supervisor-only leaf is readable by `copy_from_user` unless the kernel checks it in software.
+/// A not-present page is allowed through: the copy's fault fixup/VM fault path is responsible for
+/// resolving it or returning EFAULT. A present supervisor leaf is rejected with EFAULT here.
+///
+/// The walk is one page-table traversal per 4 KiB page in the range; `copy_to_user` does not need
+/// it because a user write to the supervisor leaf faults in hardware.
+#[cfg(target_arch = "x86_64")]
+pub fn user_range_user_accessible(root: u64, address: u64, length: u64) -> bool {
+    let Some(end) = address.checked_add(length) else {
+        return false;
+    };
+    let mut allocator = paging::KernelFrameAllocator;
+    let memory = paging::KernelPhysMemory;
+    let mut tlb = paging::KernelTlb;
+    let Ok(mut mapper) = Mapper::new(PhysAddr(root), &mut allocator, &memory, &mut tlb) else {
+        return false;
+    };
+    let mut page = address & !(PAGE_SIZE - 1);
+    while page < end {
+        let Some(virt) = VirtAddr::new(page) else {
+            return false;
+        };
+        if let Some((_, flags, _)) = mapper.translate(virt)
+            && flags.is_present()
+            && !flags.is_user()
+        {
+            return false;
+        }
+        page = page.saturating_add(PAGE_SIZE);
+    }
+    true
 }
 
 /// Map one 4 KiB user leaf, seeding the intermediate tables as user-owned for `PROT_NONE`.

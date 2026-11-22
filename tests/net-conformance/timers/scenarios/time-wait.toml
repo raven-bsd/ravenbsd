@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "timer-time-wait"
+port = 24102
+baseline = "host-side: timeout 120 cargo nextest run -p tcp-timer-conformance two_msl_closes_time_wait_at_the_armed_deadline"
+donor = [
+  "FreeBSD sys/netinet/tcp_timer.c:tcp_timer_2msl (TIME-WAIT and FIN_WAIT_2)",
+  "FreeBSD sys/netinet/tcp_timewait.c:tcp_twstart (2 * MSL)",
+]
+rfcs = ["RFC 9293 section 3.10.2 (TIME-WAIT and 2MSL)"]
+
+[[expect]]
+step = "active close completes the FIN handshake"
+packet = "FIN/ACK"
+assert = "the final ACK leaves and the connection enters TIME-WAIT"
+
+[[expect]]
+step = "peer sends a SYN on the same 4-tuple inside 2*MSL"
+packet = "SYN"
+assert = "the SYN is dropped (timewait_syn_drops) and no SYN-ACK is sent"
+
+[[expect]]
+step = "time advances past 2*MSL (2000 ms in the host scenario)"
+packet = "none"
+assert = "the TIME-WAIT entry expires and the connection closes"
+
+[[expect]]
+step = "FIN_WAIT_2 without a fast recycle and an idle peer"
+packet = "none"
+assert = "TT_2MSL rearms at TP_KEEPINTVL until TP_MAXIDLE, then closes"
+
+# The K253 guest holds a connection for 12 s; the default 2*MSL is 60 s, so the wire variant is
+# narrowed. The host timer state machine arms 2*MSL explicitly and asserts the exact deadline.
+narrowed = "wire 2*MSL needs a longer-lived fixture or a configurable time-wait; the host timer scenario is deterministic"

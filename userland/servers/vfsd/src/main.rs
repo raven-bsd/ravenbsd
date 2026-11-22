@@ -87,9 +87,21 @@ mod program {
     struct Proxy {
         target: Handle,
         path: String,
+        /// The caller's process root captured at open time; path CALLs must stay under it.
+        root: String,
         root_listing: bool,
         merged: Option<Vec<u8>>,
         mount_generation: u32,
+    }
+
+    #[derive(Clone, Copy)]
+    struct DiagEntry {
+        op: u8,
+        file: u64,
+        offset: u64,
+        len: u64,
+        request: u32,
+        accepted: bool,
     }
 
     struct VfsHandler {
@@ -99,6 +111,8 @@ mod program {
         mount_generation: u32,
         probe: crate::trace::Probe,
         trace: bool,
+        diag: [Option<DiagEntry>; 16],
+        diag_len: usize,
     }
 
     impl VfsHandler {
@@ -110,7 +124,51 @@ mod program {
                 mount_generation: 1,
                 probe: crate::trace::Probe::server(),
                 trace,
+                diag: [None; 16],
+                diag_len: 0,
             }
+        }
+
+        fn note_diag(
+            &mut self,
+            op: u8,
+            file: u64,
+            offset: u64,
+            len: u64,
+            request: u32,
+            accepted: bool,
+        ) {
+            let index = self.diag_len % 16;
+            if let Some(slot) = self.diag.get_mut(index) {
+                *slot = Some(DiagEntry {
+                    op,
+                    file,
+                    offset,
+                    len,
+                    request,
+                    accepted,
+                });
+                self.diag_len = self.diag_len.saturating_add(1);
+            }
+        }
+
+        fn dump_diag(&self) {
+            println!("vfsd-diag: begin entries={}", self.diag_len.min(16));
+            let start = self.diag_len.saturating_sub(16);
+            for index in start..self.diag_len {
+                if let Some(entry) = self.diag.get(index % 16).copied().flatten() {
+                    println!(
+                        "vfsd-diag: op={} file={} off={} len={} req={} accepted={}",
+                        entry.op,
+                        entry.file,
+                        entry.offset,
+                        entry.len,
+                        entry.request,
+                        entry.accepted
+                    );
+                }
+            }
+            println!("vfsd-diag: end");
         }
 
         fn bump_mounts(&mut self) {
@@ -283,7 +341,7 @@ mod program {
                     .ok_or(Errno::ENOENT)?
                     .scheme
                     .clone();
-                match self.target_lstat(&scheme, &suffix) {
+                match self.target_lstat(&scheme, suffix) {
                     Ok(stat) if stat.mode & S_IFMT == S_IFLNK => {
                         if !follow_final && index + 1 == components.len() {
                             return Err(Errno::ELOOP);
@@ -292,7 +350,7 @@ mod program {
                         if links > 40 {
                             return Err(Errno::ELOOP);
                         }
-                        let target = self.target_readlink(&scheme, &suffix)?;
+                        let target = self.target_readlink(&scheme, suffix)?;
                         if target.is_empty() {
                             return Err(Errno::ENOENT);
                         }
@@ -339,6 +397,7 @@ mod program {
             len: u64,
             shared: bool,
         ) -> HandlerResult<CallReply> {
+            self.note_diag(4, file, offset, len, 0, true);
             if self.trace {
                 println!(
                     "vfsd-trace: mmap file={file} offset={offset} len={len} shared={shared} open={}",
@@ -646,15 +705,28 @@ mod program {
             Ok(written)
         }
 
+        /// Resolve a path CALL against the caller's root captured at open time.
+        ///
+        /// Absolute payload paths must not be resolved against the global mount table: a process
+        /// that chrooted keeps its root on every path CALL through the already-open description.
+        fn call_path(&self, root: &str, base: &str, path: &str) -> Result<String, Errno> {
+            if root == "/" {
+                self.absolute(base, path)
+            } else {
+                self.normalize_under_root(root, base, path)
+            }
+        }
+
         fn forward_one(
             &self,
             call: Call<'_>,
             base: &str,
+            root: &str,
             response: &mut [u8],
             creds: &Credentials,
         ) -> Result<usize, Errno> {
             let raw = single_path(&call).ok_or(Errno::EINVAL)?;
-            let path = self.absolute(base, &bytes_to_string(raw)?)?;
+            let path = self.call_path(root, base, &bytes_to_string(raw)?)?;
             let (mount_id, suffix) = self.table.resolve(&path)?;
             let scheme = self
                 .table
@@ -972,19 +1044,25 @@ mod program {
             _mode: u32,
             ctx: &Ctx,
         ) -> HandlerResult<Opened> {
+            if path == "__diag__" || path == "/__diag__" {
+                self.dump_diag();
+                return Err(Errno::EINVAL.into());
+            }
             self.probe.record(ctx.trace_id, OPEN_OPCODE);
             let (path, requires_dir) = self.normalize_request_path(path)?;
             let directory = requires_dir || flags.directory();
             let target_flags = OpenFlags::from_wire(flags.to_wire() & !WIRE_OPEN_DIRECTORY)
                 .map_err(|_| Errno::EINVAL)?;
             let mut path = path;
+            let mut root = String::from("/");
             if let Ok(root_len) = usize::try_from(ctx.root_len)
                 && root_len > 0
             {
-                let root = path.get(..root_len).ok_or(Errno::EINVAL)?.to_string();
-                if root != "/" {
-                    path = self.resolve_rooted(&path, &root, !target_flags.nofollow())?;
+                let open_root = path.get(..root_len).ok_or(Errno::EINVAL)?.to_string();
+                if open_root != "/" {
+                    path = self.resolve_rooted(&path, &open_root, !target_flags.nofollow())?;
                 }
+                root = open_root;
             }
             let (mount_id, suffix) = self.table.resolve(&path)?;
             let scheme = self
@@ -1025,6 +1103,7 @@ mod program {
                     target,
                     root_listing: path == "/",
                     path,
+                    root,
                     merged: None,
                     mount_generation: self.mount_generation,
                 },
@@ -1036,6 +1115,7 @@ mod program {
                     path_for_trace, target_handle, ctx.trace_id, ctx.request.0
                 );
             }
+            self.note_diag(1, u64::from(target_handle), 0, 0, ctx.request.0, true);
             Ok(Opened::File(id))
         }
 
@@ -1061,6 +1141,14 @@ mod program {
             buffer: &mut [u8],
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
+            self.note_diag(
+                2,
+                file,
+                offset,
+                u64::try_from(buffer.len()).unwrap_or(0),
+                ctx.request.0,
+                true,
+            );
             self.probe.record(ctx.trace_id, READ_OPCODE);
             if !self.trace {
                 return self.read(file, offset, buffer);
@@ -1106,6 +1194,14 @@ mod program {
             buffer: &[u8],
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
+            self.note_diag(
+                3,
+                file,
+                offset,
+                u64::try_from(buffer.len()).unwrap_or(0),
+                ctx.request.0,
+                true,
+            );
             if !self.trace {
                 return self.write(file, offset, buffer);
             }
@@ -1261,9 +1357,13 @@ mod program {
             response: &mut [u8],
             creds: &Credentials,
         ) -> HandlerResult<usize> {
-            let (target, base) = {
+            let (target, base, root) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
-                (entry.file.target, entry.file.path.clone())
+                (
+                    entry.file.target,
+                    entry.file.path.clone(),
+                    entry.file.root.clone(),
+                )
             };
             let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
             match decoded.call {
@@ -1361,17 +1461,17 @@ mod program {
                 }
                 Call::Statvfs => Ok(proxy_call(&Client::new(), target, &decoded, response)?),
                 Call::Link { path, target } => {
-                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
-                    let target = self.absolute(&base, &bytes_to_string(target)?)?;
+                    let path = self.call_path(&root, &base, &bytes_to_string(path)?)?;
+                    let target = self.call_path(&root, &base, &bytes_to_string(target)?)?;
                     Ok(self.forward_link(&path, &target, response, creds)?)
                 }
                 Call::Rename { from, to } => {
-                    let from = self.absolute(&base, &bytes_to_string(from)?)?;
-                    let to = self.absolute(&base, &bytes_to_string(to)?)?;
+                    let from = self.call_path(&root, &base, &bytes_to_string(from)?)?;
+                    let to = self.call_path(&root, &base, &bytes_to_string(to)?)?;
                     Ok(self.forward_rename(&from, &to, response, creds)?)
                 }
                 Call::Access { mode, path } => {
-                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
+                    let path = self.call_path(&root, &base, &bytes_to_string(path)?)?;
                     let (mount_id, suffix) = self.table.resolve(&path)?;
                     let scheme = self
                         .table
@@ -1401,7 +1501,7 @@ mod program {
                 | Call::Mknod { .. }
                 | Call::Utimens { .. }
                 | Call::Lstat { .. } => {
-                    Ok(self.forward_one(decoded.call, &base, response, creds)?)
+                    Ok(self.forward_one(decoded.call, &base, &root, response, creds)?)
                 }
                 Call::Mmap { .. } => status(response, Err(Errno::EINVAL)),
             }

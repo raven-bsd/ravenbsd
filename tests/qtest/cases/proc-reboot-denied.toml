@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K517: PROC_REBOOT denied rows. A root caller passing unknown flag bits gets
+# EINVAL; after setresuid(1000) the same poweroff request gets EPERM. The
+# fixture never acts successfully, so PID 1 exits 0 and the guest exits via C5.
+
+name = "proc-reboot-denied"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/proc-reboot/build.sh denied"]
+initfs = "build/fixtures/proc-reboot/denied.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^invalid=EINVAL$'
+
+[[expect]]
+regex = '^denied=EPERM$'
+
+[[expect]]
+regex = '^denied-done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|RETURNED|setuid='

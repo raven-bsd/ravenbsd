@@ -394,6 +394,141 @@ fn cross_table_child_sees_the_parent_revoke() {
     assert_eq!(child_table.get(child, Rights::READ), Ok(&TestObject(2)));
 }
 
+// K528: the ancestor revoke must bind a child even when the child was installed before the
+// revoke but registered in the kernel's weak lineage registry after the revoke snapshot. The
+// threshold below is the exact interleaving: T1 insert (child node created), T2 revoke complete
+// (no propagation because the registry does not contain the child yet), T1 register (no state
+// change), then a use of the child.
+
+#[test]
+fn install_before_register_race_binds_the_child_to_the_ancestor_revoke() {
+    let mut parent_table = table();
+    let parent = parent_table
+        .insert(
+            TestObject(1),
+            Rights::READ.union(Rights::WRITE).union(Rights::DUP),
+        )
+        .expect("insert parent");
+    let parent_node = parent_table.lineage_node(parent).expect("parent node");
+
+    let mut child_table = table();
+    let child = child_table
+        .insert_derived(
+            TestObject(2),
+            Rights::READ.union(Rights::WRITE),
+            &parent_node,
+        )
+        .expect("T1 install before register");
+    let child_node = child_table.lineage_node(child).expect("child node");
+    assert!(child_node.is_descendant_of(&parent_node));
+
+    // T2: the revoke completes while the child is absent from the registry. `revoke_descendants`
+    // would iterate no matching node, so the child's own `revoked` mask stays zero.
+    let (_node, applied) = parent_table
+        .revoke_target(parent, Rights::WRITE)
+        .expect("T2 revoke");
+    assert_eq!(applied, Rights::WRITE);
+
+    // T1: register after the revoke. Registration adds no state to the node, and the eager
+    // propagation never reached it, so its own granted mask still contains WRITE. The use check
+    // below is what must see the ancestor: this is not a metadata-only assertion.
+    assert!(child_node.granted().contains(Rights::WRITE));
+
+    // A use (not a metadata query) must observe the completed ancestor revoke.
+    assert_eq!(child_table.get(child, Rights::WRITE), Err(Errno::EPERM));
+    assert_eq!(child_table.get(child, Rights::READ), Ok(&TestObject(2)));
+}
+
+#[test]
+fn closed_intermediate_keeps_the_ancestor_rule() {
+    let mut parent_table = table();
+    let parent = parent_table
+        .insert(
+            TestObject(1),
+            Rights::READ.union(Rights::WRITE).union(Rights::DUP),
+        )
+        .expect("insert parent");
+    let parent_node = parent_table.lineage_node(parent).expect("parent node");
+
+    let mut child_table = table();
+    let intermediate = child_table
+        .insert_derived(
+            TestObject(2),
+            Rights::READ.union(Rights::WRITE),
+            &parent_node,
+        )
+        .expect("insert intermediate");
+    let intermediate_node = child_table
+        .lineage_node(intermediate)
+        .expect("intermediate node");
+    let grandchild = child_table
+        .insert_derived(
+            TestObject(3),
+            Rights::READ.union(Rights::WRITE),
+            &intermediate_node,
+        )
+        .expect("insert grandchild");
+    let grandchild_node = child_table
+        .lineage_node(grandchild)
+        .expect("grandchild node");
+    child_table.close(intermediate).expect("close intermediate");
+
+    parent_table
+        .revoke_target(parent, Rights::WRITE)
+        .expect("revoke parent");
+    assert!(grandchild_node.is_descendant_of(&parent_node));
+    assert_eq!(
+        child_table.get(grandchild, Rights::WRITE),
+        Err(Errno::EPERM)
+    );
+    assert_eq!(
+        child_table.get(grandchild, Rights::READ),
+        Ok(&TestObject(3))
+    );
+}
+
+#[test]
+fn queued_derivation_after_revoke_cannot_regain_a_revoked_right() {
+    let mut parent_table = table();
+    let parent = parent_table
+        .insert(
+            TestObject(1),
+            Rights::READ.union(Rights::WRITE).union(Rights::DUP),
+        )
+        .expect("insert parent");
+    let parent_node = parent_table.lineage_node(parent).expect("parent node");
+
+    // The queued intermediate (an SCM_RIGHTS sender's handle) was derived before the revoke.
+    let mut queue_table = table();
+    let queued = queue_table
+        .insert_derived(
+            TestObject(2),
+            Rights::READ.union(Rights::WRITE).union(Rights::TRANSFER),
+            &parent_node,
+        )
+        .expect("queue intermediate");
+    let queued_node = queue_table.lineage_node(queued).expect("queued node");
+
+    // Revoke completes without a registry walk reaching the queued node.
+    parent_table
+        .revoke_target(parent, Rights::WRITE)
+        .expect("revoke parent");
+
+    // The queued intermediate held WRITE at send time; the receive child is granted that
+    // send-time mask and the completed ancestor revoke binds it. C17: granted-then-revoked is
+    // EPERM, not EACCES. The right is still not regained: the effective mask is READ.
+    let installed = queue_table
+        .insert_derived(
+            TestObject(3),
+            Rights::READ.union(Rights::WRITE),
+            &queued_node,
+        )
+        .expect("install after revoke");
+    assert_eq!(queue_table.rights(installed), Ok(Rights::READ));
+    assert_eq!(queue_table.get(installed, Rights::WRITE), Err(Errno::EPERM));
+    assert_eq!(queue_table.get(installed, Rights::READ), Ok(&TestObject(3)));
+}
+
 #[test]
 fn for_each_live_skips_holes_and_retired_slots() {
     let mut table = table();

@@ -8,6 +8,7 @@
 
 use raven_abi::errno::Errno;
 
+use crate::hostcache::{HostKey, HostMetrics, Hostcache};
 use crate::socket::Kind;
 use crate::{Ipv4Addr, SocketId, Stack};
 
@@ -1458,5 +1459,43 @@ impl<D: crate::Device> Stack<D> {
             .iter()
             .filter(|(_, record)| !record.closed)
             .map(|(id, _)| SocketId(*id))
+    }
+}
+
+/// Hostcache counters and occupancy for the observability API.
+///
+/// `hits`/`misses` are the FreeBSD `tcp_hc_lookup` counters; `entries` and `histogram` are the
+/// current table occupancy. Per-host RTT/MSS/MTU values are read with
+/// [`Hostcache::observability_metrics`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct HostcacheInfo {
+    /// Lookup hits.
+    pub hits: u64,
+    /// Lookup misses, including expired entries.
+    pub misses: u64,
+    /// Live entries.
+    pub entries: usize,
+    /// Bucket-length histogram (`bucket_limit + 1` bins).
+    pub histogram: alloc::vec::Vec<usize>,
+}
+
+impl Hostcache {
+    /// Snapshot the hit/miss counters and table occupancy.
+    #[must_use]
+    pub fn observability_info(&self) -> HostcacheInfo {
+        HostcacheInfo {
+            hits: self.hits(),
+            misses: self.misses(),
+            entries: self.len(),
+            histogram: self.histogram(),
+        }
+    }
+
+    /// Read the per-host RTT/MSS/MTU metrics for `key` through the observability surface.
+    ///
+    /// This is the same lookup as [`Hostcache::get`]: it counts a hit or miss and treats an
+    /// expired entry as a miss, so the observation does not change the cache's accounting rules.
+    pub fn observability_metrics(&mut self, key: &HostKey, now_ms: u64) -> Option<HostMetrics> {
+        self.get(key, now_ms)
     }
 }

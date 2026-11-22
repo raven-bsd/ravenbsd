@@ -1,11 +1,45 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# aarch64 release login (K153)
+# aarch64 release login (K153/K410)
 
-Status: **aarch64 login 5/5 PASS (K173, 2026-11-19).** The K166 PL011/DEBUG_READ path now reaches
-`Password:` and `raven#`; K169 fixed the brush link layout. The K153/K139 history below is
-retained as history. No Pi 4 board result is claimed.
+Status: **aarch64 login 5/5 PASS (K173, 2026-11-19); styled-banner expectation fixed (K410,
+2026-11-21).** The K166 PL011/DEBUG_READ path now reaches `Password:` and `raven#`; K169 fixed the
+brush link layout. The K153/K139 history below is retained as history. No Pi 4 board result is
+claimed.
+
+## K410 styled-banner update (2026-11-21)
+
+`tests/qtest/cases/login-aarch64.toml` still expected the pre-K374 single-line banner
+`RavenBSD 0.1 (aarch64) (tty:console)` and timed out even though the guest booted, logged in and
+exited cleanly. The case now asserts the K374 styled screen and keeps the authentication checks:
+
+```diff
+-[[expect]]
+-regex = '^RavenBSD 0\.1 \(aarch64\) \(tty:console\)$'
++[[expect]]
++regex = '^R A V E N   B S D$'
++
++[[expect]]
++regex = '^-{10,}$'
++
++[[expect]]
++regex = '^Welcome to RavenBSD 0\.1 aarch64$'
+```
+
+The login/password/`raven#`/`init exited (0)` expectations are unchanged. This is not a weaker
+"any output" check; it requires the styled screen (three markers), login, password, root prompt and
+clean exit.
+
+```sh
+timeout 600 cargo xtask qtest --case login-aarch64 --arch aarch64 --no-build
+# login-aarch64: pass, 34.6 s, all expectations matched, no forbidden lines
+```
+
+Serial: `R A V E N   B S D`, `Welcome to RavenBSD 0.1 aarch64`, `login: root`, `Password:`,
+`raven#`, `init exited (0)`. The fixed/stale serial, JSON, case diff and `SHA256SUMS` are under
+`tests/evidence/pi4/0b3bb7d1…/`. The guest image is the K096b release image
+(`sha256 c6c2527f…83b2a2`); no guest code changed.
 
 ## K173 update (2026-11-19)
 

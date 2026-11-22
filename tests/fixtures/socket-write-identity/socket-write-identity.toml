@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K431 pipe non-blocking service: the fixture needs no scheme; it exercises pipe(fcntl(O_NONBLOCK))
+# and the blocking round-trip directly. The test-only svcd.conf exits init with this service status.
+
+name = "socket-write-identity"
+exec = "/bin/socket-write-identity"
+needs = []
+readiness = "none"
+restart = "never"
+max_restarts = 0

@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K524: AT_RANDOM and GETRANDOM use the boot-seeded pool; two execs differ; no xorshift.
+
+name = "random-at-random"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/random/build.sh"]
+initfs = "build/fixtures/random/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^entropy: source=(rdrand|rndr)$'
+unordered = true
+
+[[expect]]
+regex = '^random: exec differ=1$'
+
+[[expect]]
+regex = '^random: fork-next=1$'
+
+[[expect]]
+regex = '^random: getrandom ok=1$'
+
+[[expect]]
+regex = '^random: full=1$'
+
+[[expect]]
+regex = '^random: burst=1000 collision=0$'
+
+[[expect]]
+regex = '^random: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|random: fail|exec differ=0'

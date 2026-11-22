@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# id|kind|rules|packets|support|expect
+#   kind=scenario: rules+packets drive the engine
+#   kind=parse-error: rules must be rejected at expect=<line>,<substring>
+#   support=raven-pf: executed by the fixture harness
+#   support=raven-pf-parse-error: executed by the fixture harness
+#   support=donor-only: validated structurally, skipped with the stated reason
+stateful-tcp|scenario|rules/stateful-tcp.conf|packets/stateful-tcp.tsv|raven-pf|-
+stateful-udp|scenario|rules/stateful-udp.conf|packets/stateful-udp.tsv|raven-pf|-
+stateful-icmp|scenario|rules/stateful-icmp.conf|packets/stateful-icmp.tsv|raven-pf|-
+default-deny|scenario|rules/default-deny.conf|packets/default-deny.tsv|raven-pf|-
+quick-last-match|scenario|rules/quick-last-match.conf|packets/quick-last-match.tsv|raven-pf|-
+nat|scenario|rules/nat.conf|packets/nat.tsv|raven-pf|-
+rdr|scenario|rules/rdr.conf|packets/rdr.tsv|raven-pf|-
+ipv6|scenario|rules/ipv6.conf|packets/ipv6.tsv|raven-pf|-
+fragment|scenario|rules/fragment.conf|packets/fragment.tsv|donor-only|reassembly queue (pf_reassemble) is outside raven-pf 0.1.0 (D-pf-frag-state, docs/pf.md); structural validation only
+fragment-no-scrub|scenario|rules/fragment-no-scrub.conf|packets/fragment-no-scrub.tsv|raven-pf|-
+malformed-unknown-keyword|parse-error|rules/malformed-unknown-keyword.conf|-|raven-pf-parse-error|4,unknown protocol
+malformed-bad-address|parse-error|rules/malformed-bad-address.conf|-|raven-pf-parse-error|4,invalid IP address
+malformed-bad-port|parse-error|rules/malformed-bad-port.conf|-|raven-pf-parse-error|4,invalid port
+malformed-duplicate-direction|parse-error|rules/malformed-duplicate-direction.conf|-|raven-pf-parse-error|3,duplicate direction
+malformed-duplicate-from|parse-error|rules/malformed-duplicate-from.conf|-|raven-pf-parse-error|3,duplicate `from` clause
+malformed-missing-port|parse-error|rules/malformed-missing-port.conf|-|raven-pf-parse-error|3,`port` needs a value

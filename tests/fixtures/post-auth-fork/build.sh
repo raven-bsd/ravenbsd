@@ -75,7 +75,7 @@ else
         "$sysroot/usr/lib/crtn.o" -o "$out/post-auth-fork"
 fi
 
-cargo xtask initfs --arch "$arch" --profile network-config-test > /dev/null
+cargo xtask initfs --arch "$arch" --profile server > /dev/null
 cp build/"$arch"/initfs.img "$out/base.img"
 
 cargo build -q -p raven-b70-overlay

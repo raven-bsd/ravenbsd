@@ -7,5 +7,5 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../../../.." && pwd)
 cd "$root"
-cargo nextest run -p tar
+cargo nextest run -p raven-tar
 printf 'ok: tar host tests\n'

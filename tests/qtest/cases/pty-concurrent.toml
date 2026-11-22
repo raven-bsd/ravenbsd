@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K513: a blocked slave read on one pair must not stall another pair or the pty server.
+# Pair A blocks in read(VMIN=1); pair B writes and reads one byte within 500 ms.
+# Eight pairs block for a 5 s idle window; each then receives its byte within 500 ms.
+# Sixteen pairs repeat with a stated 1000 ms bound and a 1 s idle.
+# Per-pair latencies are printed by the guest; ptyd also prints idle-wakes and cpu-ns.
+# KVM removes the TCG guest-scheduler tail that dominated the K489/K513 measurements; the
+# remaining bound is the server completion shape this ticket changes.
+
+name = "pty-concurrent"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/libc/target/build.sh pty-concurrent"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^ptyd: timer-wakes=0$'
+unordered = true
+
+[[expect]]
+regex = '^ptyd: user-ns=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^ptyd: system-ns=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: start uid=0 blocked=8$'
+
+[[expect]]
+regex = '^pty-concurrent: B write=1 read=1 byte=66 wall_ms=[0-9]+$'
+
+[[expect]]
+regex = '^pty-concurrent: A read=1 byte=65 wall_ms=[0-9]+$'
+
+[[expect]]
+regex = '^pty-concurrent: pair A/B done$'
+
+[[expect]]
+regex = '^pty-concurrent: idle_ms=5000 pairs=8$'
+
+[[expect]]
+regex = '^pty-concurrent: pairs=8 pair=[0-7] read=1 byte=[0-9]+ latency_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pairs=8 bound_ms=500 status=ok$'
+
+[[expect]]
+regex = '^pty-concurrent: idle_ms=1000 pairs=16$'
+
+[[expect]]
+regex = '^pty-concurrent: pairs=16 pair=[0-9]+ read=1 byte=[0-9]+ latency_ms=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: pairs=16 bound_ms=1000 status=ok$'
+
+[[expect]]
+regex = '^pty-concurrent: ninth pair ok$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^pty-concurrent: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-concurrent: FAIL|pty-concurrent: timeout'

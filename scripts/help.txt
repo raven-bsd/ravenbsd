@@ -13,6 +13,7 @@ run|Boot the selected profile in QEMU
 group:Test
 check|Full gate: stable guard, fmt, clippy, tests, provenance
 check-fast|Fast changed-package gate for everyday edits
+check-build|Compile all workspace tests; fail on unowned failure (pre-tag: check-fast, check-build, qtests)
 check-full|Full allocator stress gate
 guard|Stable-Rust guard only
 test|Full check plus every QEMU integration test
@@ -28,6 +29,7 @@ posix-check|Run the POSIX conformance profile
 toolchain|Rebuild the pinned Rust toolchain
 group:Maintenance
 provenance|SPDX, donor and dependency provenance check
+info|Code statistics: Rust code lines, files and the language mix
 clean|Remove build output
 distclean|Remove build output, vendor and local caches
 help-xtask|Raw xtask command list

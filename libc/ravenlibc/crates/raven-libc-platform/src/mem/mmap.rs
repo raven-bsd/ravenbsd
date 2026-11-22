@@ -45,6 +45,10 @@ fn validate(len: usize, offset: i64, protection: i32, flags: i32) -> Result<(), 
     if flags & mman::MAP_SHARED != 0 && flags & mman::MAP_PRIVATE != 0 {
         return Err(Errno::EINVAL);
     }
+    let map_type = flags & (mman::MAP_SHARED | mman::MAP_PRIVATE);
+    if map_type != mman::MAP_SHARED && map_type != mman::MAP_PRIVATE {
+        return Err(Errno::EINVAL);
+    }
     Ok(())
 }
 

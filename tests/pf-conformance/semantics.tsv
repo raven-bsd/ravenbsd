@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Every manifest id must have one row here. `donor` names the exact
+# OpenBSD/FreeBSD/NetBSD function that fixes the expected rule/packet result.
+# id|donor|assertion
+stateful-tcp|OpenBSD sys/net/pf.c:pf_match_rule,pf_test_state; sys/net/pfvar.h PFTM_TCP_*|last match wins unless quick; state hit precedes rules; TCP first/opening/established expiry
+stateful-udp|OpenBSD sys/net/pf.c:pf_test_state UDP arm; sys/net/pfvar.h PFTM_UDP_*|forward/reverse orientation; udp.first -> udp.multiple; timeout re-creation
+stateful-icmp|OpenBSD sys/net/pf.c:pf_test_state_icmp,pf_icmp_mapping; sys/net/pfvar.h PFTM_ICMP_*|echo request/reply state; icmp.first and icmp.error expiry
+default-deny|OpenBSD sys/net/pf.c:pf_match_rule,pf_test; FreeBSD sys/netpfil/pf/pf.c:pf_test|default block; quick stops the walk; CIDR and port matching; reverse state
+quick-last-match|OpenBSD sys/net/pf.c:pf_match_rule|a matching quick rule returns PF_TEST_QUICK; otherwise the last pass/block rule is used
+nat|FreeBSD sys/netpfil/pf/pf_lb.c:pf_get_transaddr,pf_map_addr; sys/netpfil/pf/pf.c:pf_test_state|source translation before filtering; state keeps the original tuple for the reply (K273 executed)
+rdr|FreeBSD sys/netpfil/pf/pf_lb.c:pf_get_transaddr,pf_map_addr; sys/netpfil/pf/pf.c:pf_test_state|destination translation before filtering; reply restores the wire destination (K273 executed)
+ipv6|FreeBSD sys/netpfil/pf/pf.c:pf_test,pf_setup_pdesc (AF_INET6),pf_test_state|inet6 rule match and state key for TCP/UDP (K273 executed)
+fragment|OpenBSD sys/net/pf_norm.c:pf_reassemble,pf_normalize_ip; FreeBSD sys/netpfil/pf/pf_norm.c|incomplete fragments are queued (PF_PASS, *m0=NULL) and the datagram is filtered once; the reassembly queue is not in raven-pf 0.1.0, so this scenario is donor-only
+fragment-no-scrub|FreeBSD sys/netpfil/pf/pf.c:5997-6002 pf_match_rule PF_VPROTO_FRAGMENT|a rule with src/dst `port_op` fails for a fragment, so the default block is correct; K380 fixed `Rule::matches` to reject the port rule (the KNOWN entry is gone)
+malformed-unknown-keyword|OpenBSD sys/net/pf.c default-block path; NetBSD dist/pf/sbin/pfctl/parse.y|unknown protocol rejects the ruleset; no partial load
+malformed-bad-address|NetBSD dist/pf/sbin/pfctl/parse.y|bad IP address rejects the ruleset; no partial load
+malformed-bad-port|NetBSD dist/pf/sbin/pfctl/parse.y|out-of-range port rejects the ruleset; no partial load
+malformed-duplicate-direction|NetBSD dist/pf/sbin/pfctl/parse.y|duplicate in/out rejects the ruleset; no partial load
+malformed-duplicate-from|NetBSD dist/pf/sbin/pfctl/parse.y|duplicate from rejects the ruleset; no partial load
+malformed-missing-port|NetBSD dist/pf/sbin/pfctl/parse.y|missing port value rejects the ruleset; no partial load

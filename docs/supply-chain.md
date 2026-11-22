@@ -170,9 +170,10 @@ cargo workspaces — the root product, `userland/brush` and `userland/uutils` �
 ```text
 vendor/                 771 crates, 1.2 GiB, cargo checksums per crate (not tracked source)
 vendor/manifest.toml    root/brush/uutils lock sha256, 771 crates, SBOM sha256 80c2994a…
-vendor/sbom.cdx.json    CycloneDX 1.5, 771 components with SHA-256 hashes and licences
+vendor/sbom.cdx.json    CycloneDX 1.5, 771 components with SHA-256 hashes and licences,
+                        sha256 1f89f0edbddf41aa67bbab1cde24ee92a0a90b2a48954c48d5120d4e22662c47
 build/release/vendor-full.tar.zst  full snapshot artifact, 131 MiB,
-                                   sha256 16a94b19c3d7ee28091f14482cc3ffea35cc3d674d56bfe0a9c167c3b2acc26d
+                                   sha256 ae2a44825d6d25e594501931cdd12b031b52e95d2579ff76ad89bc7b3f92bac8
 .cargo/vendor.toml      opt-in source.crates-io.replace-with = "vendored-sources"
 .cargo/config.toml      aliases and target cfgs only (normal builds use crates.io)
 ```
@@ -180,10 +181,36 @@ build/release/vendor-full.tar.zst  full snapshot artifact, 131 MiB,
 The 1.2 GiB snapshot is too large to track and must not receive the project SPDX headers: only
 `vendor/manifest.toml` and `vendor/sbom.cdx.json` are committed. The snapshot is a checksummed
 release artifact (`vendor-full.tar.zst`); upload it to the release evidence store and record the
-URL with the manifest checksum. Materialize it on a fresh checkout before an offline build:
+URL with the manifest checksum. Materialize and verify it locally on a fresh checkout (no publish URL required):
 
 ```sh
-timeout 360 sh scripts/release-vendor.sh
+timeout 900 sh scripts/release-vendor.sh   # builds; exits 1 with artifact_url = "UNPUBLISHED"
+timeout 60  sh scripts/release-vendor.sh --local   # checks the tarball SHA-256 against the manifest
+```
+
+### Publish and local verification (K390)
+
+`vendor/manifest.toml` records `artifact_url = "UNPUBLISHED"` until the owner publishes the
+artifact. A release build without a URL fails closed; there is no placeholder store URL.
+
+```sh
+# owner: upload build/release/vendor-full.tar.zst, then record the URL
+timeout 900 sh scripts/release-vendor.sh --url 'https://<release-store>/vendor-full.tar.zst'
+# or: RELEASE_VENDOR_URL='https://...' timeout 900 sh scripts/release-vendor.sh
+
+# offline/CI: verify the local tarball without any URL
+timeout 60 sh scripts/release-vendor.sh --local
+```
+
+The local verification prints the SHA-256 and fails if it differs from the manifest. The tarball is
+not committed and is not uploaded by the script.
+
+`cargo deny check` is the enforcement command (cargo-deny 0.22.0; the tool is pinned by the
+release host, not by Cargo). `deny.toml` keeps the advisory list empty, denies unknown
+registries/git, and allows only the reviewed `ucs2` MPL-2.0 exception; wildcard internal path
+dependencies are a warning with the owner/reason/expiry recorded in `audit.toml`.
+
+```sh
 CARGO_NET_OFFLINE=true \
 CARGO_SOURCE_CRATES_IO_REPLACE_WITH=vendored-sources \
 CARGO_SOURCE_VENDORED_SOURCES_DIRECTORY="$PWD/vendor" \
@@ -198,20 +225,23 @@ inherit `--config`; the `CARGO_SOURCE_*` environment carries the same vendored s
 `.cargo/audit.toml` is a symlink to the reviewed root `audit.toml`; `cargo audit` reads that path.
 `deny.toml` carries the same advisory exceptions plus the bans/licences/sources policy.
 
-### Audit exceptions
+### Audit and licence exceptions
 
-All five current advisories are name/version collisions with the first-party workspace utilities
-`userland/bin/tar` and `userland/bin/time` (both `0.1.0`, `publish = false`). No upstream
-`tar-rs`/`time` crate is linked or shipped. SC2 renames the utilities to `raven-tar`/`raven-time`;
-these exceptions expire 2027-02-28. No blanket ignore.
+The advisory exception list is **empty**: SC2 renamed the first-party utilities to
+`raven-tar`/`raven-time` (`publish = false`), so the former name-collision advisories do not
+match and `audit.toml`/`deny.toml` carry `ignore = []`. No upstream `tar-rs`/`time` crate is
+linked or shipped.
 
-| ID | Owner | Reachability | Expiry |
-|---|---|---|---|
-| RUSTSEC-2018-0002 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
-| RUSTSEC-2021-0080 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
-| RUSTSEC-2026-0067 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
-| RUSTSEC-2026-0068 | kevin | first-party `tar` utility; no tar-rs code | 2027-02-28 |
-| RUSTSEC-2020-0071 | kevin | first-party `time` utility; no time crate code | 2027-02-28 |
+One reviewed licence exception remains:
+
+| Crate | Licence | Owner | Reason / reachability | Expiry |
+|---|---|---|---|---|
+| `ucs2` 0.3.3 | MPL-2.0 | kevin | unmodified crates.io helper via `uefi` -> `raven-loader`; file-level copyleft, no Raven code derived | 2027-02-28 |
+
+`cargo deny check` (0.22.0) is the enforcement command. Internal wildcard path dependencies are a
+warning, not a release-blocking deny, because 321 workspace members are not marked
+`publish = false`; registry/git unknown sources remain denied and the weekly audit tracks any
+registry wildcard. The owner/reason/expiry is also in `audit.toml`. No blanket ignore.
 
 ## 11. Metrics
 

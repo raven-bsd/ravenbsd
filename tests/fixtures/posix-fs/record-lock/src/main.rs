@@ -20,7 +20,7 @@ use core::ffi::{c_char, c_int};
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
-use raven_abi::types::fcntl::{GETLK, RecordLock, SETLK, UNLCK, WRLCK};
+use raven_abi::types::fcntl::{GETLK, RDLCK, RecordLock, SETLK, UNLCK, WRLCK};
 use raven_initfs::Initfs;
 use raven_libc_abi::fcntl::{F_GETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, O_RDWR};
 use raven_libc_abi::structs::Flock;
@@ -41,6 +41,9 @@ const READ_WRITE: u32 = 3;
 const LIBC_PATH: &[u8] = b"/tmp/record-lock/lockfile\0";
 const LIBC_START: i64 = 20;
 const LIBC_LEN: i64 = 10;
+const PROC_HANDLE_INFO: usize = 0x3E;
+const PROC_SIGNAL: usize = 0x4A;
+const SIGKILL: usize = 9;
 
 unsafe extern "C" {
     fn open(path: *const c_char, flags: c_int, mode: c_int) -> c_int;
@@ -75,6 +78,7 @@ fn run() -> Result<(), String> {
     conflict(&initfs, &handle)?;
     getlk_conflict(&initfs)?;
     blocking(&initfs, &handle)?;
+    close_any(&initfs, &client, &handle)?;
     close_release(&initfs, &client, &handle)?;
 
     // The close-release phase closed the original descriptor.
@@ -82,6 +86,10 @@ fn run() -> Result<(), String> {
         .open("file:/tmp/record-lock/lockfile", READ_WRITE)
         .map_err(|error| format!("reopen lockfile: {}", error.description()))?;
     exit_release(&initfs, &handle)?;
+    read_read(&initfs, &handle)?;
+    disjoint(&initfs, &handle)?;
+    getlk_pid(&initfs, &handle)?;
+    kill_release(&initfs, &handle)?;
     libc_getlk_free()?;
     libc_getlk_conflict(&initfs)?;
     libc_setlk_conflict(&initfs)?;
@@ -233,6 +241,112 @@ fn exit_release(initfs: &Initfs<'_>, handle: &Handle) -> Result<(), String> {
     set(handle, WRLCK, 0, 10)?;
     unlock(handle, 0, 10)?;
     println!("record-lock: exit ok");
+    Ok(())
+}
+
+/// Close a second descriptor for the same file; POSIX releases the process's locks on it.
+fn close_any(initfs: &Initfs<'_>, client: &Client, handle: &Handle) -> Result<(), String> {
+    set(handle, WRLCK, 0, 10)?;
+    let second = client
+        .open("file:/tmp/record-lock/lockfile", READ_WRITE)
+        .map_err(|error| format!("open second descriptor: {}", error.description()))?;
+    if *handle == second {
+        return Err("second descriptor reused the locked handle".to_string());
+    }
+    clear(RESULT);
+    clear(PHASE);
+    let child = spawn_child(initfs, "try 0 10")?;
+    client
+        .close(second)
+        .map_err(|error| format!("close second descriptor: {}", error.description()))?;
+    write_text(PHASE, "go")?;
+    let text = wait_for(RESULT, "granted")?;
+    wait_child(child)?;
+    if text.trim() != "granted" {
+        return Err(format!("close-any child reported {text}"));
+    }
+    println!("record-lock: close-any ok");
+    Ok(())
+}
+
+/// SIGKILL is an owner death with no `EXIT` syscall: the lock must not survive it.
+fn kill_release(initfs: &Initfs<'_>, handle: &Handle) -> Result<(), String> {
+    clear(RESULT);
+    let child = spawn_child(initfs, "hold 0 10")?;
+    let pid = handle_pid(child)?;
+    wait_for(RESULT, "locked")?;
+    signal(pid, SIGKILL)?;
+    let code = wait_child_code(child)?;
+    if code != 128 + SIGKILL as i32 {
+        return Err(format!("SIGKILL child exited {code}"));
+    }
+    let after = get(handle, WRLCK, 0, 10)?;
+    if after.l_type != UNLCK {
+        return Err(format!(
+            "stale lock after SIGKILL: type={} pid={}",
+            after.l_type, after.l_pid
+        ));
+    }
+    println!("record-lock: kill ok");
+    Ok(())
+}
+
+fn read_read(initfs: &Initfs<'_>, handle: &Handle) -> Result<(), String> {
+    set(handle, RDLCK, 0, 10)?;
+    clear(RESULT);
+    let child = spawn_child(initfs, "readpair 0 10")?;
+    let text = wait_for(RESULT, "readpair ")?;
+    wait_child(child)?;
+    unlock(handle, 0, 10)?;
+    if text.trim() != "readpair granted conflict" {
+        return Err(format!("read/read child reported `{text}`"));
+    }
+    println!("record-lock: read-read ok");
+    Ok(())
+}
+
+fn disjoint(initfs: &Initfs<'_>, handle: &Handle) -> Result<(), String> {
+    set(handle, WRLCK, 0, 10)?;
+    clear(RESULT);
+    let disjoint_child = spawn_child(initfs, "conflict 20 10")?;
+    let disjoint_text = wait_for(RESULT, "granted")?;
+    wait_child(disjoint_child)?;
+    clear(RESULT);
+    let overlap_child = spawn_child(initfs, "conflict 5 10")?;
+    let overlap_text = wait_for(RESULT, "conflict")?;
+    wait_child(overlap_child)?;
+    unlock(handle, 0, 10)?;
+    if disjoint_text.trim() != "granted" || overlap_text.trim() != "conflict" {
+        return Err(format!(
+            "disjoint child reported `{}` / `{}`",
+            disjoint_text, overlap_text
+        ));
+    }
+    println!("record-lock: disjoint ok");
+    Ok(())
+}
+
+fn getlk_pid(initfs: &Initfs<'_>, handle: &Handle) -> Result<(), String> {
+    clear(RESULT);
+    let child = spawn_child(initfs, "hold 0 10")?;
+    let pid = handle_pid(child)?;
+    wait_for(RESULT, "locked")?;
+    let held = get(handle, WRLCK, 0, 10)?;
+    if held.l_type != WRLCK || held.l_pid != pid as i32 {
+        return Err(format!(
+            "getlk pid mismatch: type={} pid={} expected={pid}",
+            held.l_type, held.l_pid
+        ));
+    }
+    wait_child(child)?;
+    let after = get(handle, WRLCK, 0, 10)?;
+    if after.l_type != UNLCK {
+        return Err(format!(
+            "stale lock after exit: type={} pid={}",
+            after.l_type, after.l_pid
+        ));
+    }
+    println!("record-lock: getlk-pid ok");
     Ok(())
 }
 
@@ -409,14 +523,19 @@ fn spawn_child(initfs: &Initfs<'_>, mode: &str) -> Result<Handle, String> {
 }
 
 fn wait_child(handle: Handle) -> Result<(), String> {
-    let mut code = 0i32;
-    RtSys
-        .proc_wait(handle, &mut code)
-        .map_err(|error| format!("wait child: {}", error.description()))?;
+    let code = wait_child_code(handle)?;
     if code != 0 {
         return Err(format!("child exited {code}"));
     }
     Ok(())
+}
+
+fn wait_child_code(handle: Handle) -> Result<i32, String> {
+    let mut code = 0i32;
+    RtSys
+        .proc_wait(handle, &mut code)
+        .map_err(|error| format!("wait child: {}", error.description()))?;
+    Ok(code)
 }
 
 fn lock(kind: i16, start: i64, len: i64) -> RecordLock {
@@ -450,6 +569,29 @@ fn set(handle: &Handle, kind: i16, start: i64, len: i64) -> Result<(), String> {
 
 fn unlock(handle: &Handle, start: i64, len: i64) -> Result<(), String> {
     set(handle, UNLCK, start, len)
+}
+
+fn get(handle: &Handle, kind: i16, start: i64, len: i64) -> Result<RecordLock, String> {
+    let mut value = lock(kind, start, len);
+    record_lock(handle, GETLK, &mut value)
+        .map_err(|error| format!("get lock: {}", error.description()))?;
+    Ok(value)
+}
+
+fn handle_pid(handle: Handle) -> Result<u32, String> {
+    // SAFETY: PROC_HANDLE_INFO takes a process handle and returns its pid.
+    let result = unsafe { raven_rt::sys::syscall2(PROC_HANDLE_INFO, handle.0 as usize, 0) };
+    let pid =
+        Errno::from_ret(result).map_err(|error| format!("handle info: {}", error.description()))?;
+    u32::try_from(pid).map_err(|_| "handle pid too large".to_string())
+}
+
+fn signal(pid: u32, signo: usize) -> Result<(), String> {
+    // SAFETY: PROC_SIGNAL takes the target pid and a signal number.
+    let result = unsafe { raven_rt::sys::syscall2(PROC_SIGNAL, pid as usize, signo) };
+    Errno::from_ret(result)
+        .map(|_| ())
+        .map_err(|error| format!("signal {pid}: {}", error.description()))
 }
 
 fn wait_for(path: &str, prefix: &str) -> Result<String, String> {

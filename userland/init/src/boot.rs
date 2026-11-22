@@ -190,7 +190,7 @@ pub fn run() -> i32 {
                 plan_text(&guard.supervisor, Some(&selected))
             );
         }
-        if let Some(code) = run_waves(&core, Some(&selected), false, false) {
+        if let Some(code) = run_waves(&core, Some(&selected), false, false, None) {
             return code;
         }
         if pivot_requested() {
@@ -276,6 +276,7 @@ fn run_waves(
     selected: Option<&[bool]>,
     only_unstarted: bool,
     serial: bool,
+    critical: Option<&[bool]>,
 ) -> Option<i32> {
     let waves = { core.lock().supervisor.plan().waves.clone() };
     for wave in waves {
@@ -299,19 +300,27 @@ fn run_waves(
         }
         if serial {
             for index in members {
-                if let Some(code) = start_and_wait(core, &[index]) {
+                if let Some(code) = start_and_wait(core, &[index], critical) {
                     return Some(code);
                 }
             }
-        } else if let Some(code) = start_and_wait(core, &members) {
+        } else if let Some(code) = start_and_wait(core, &members, critical) {
             return Some(code);
         }
     }
     None
 }
 
-/// Start `members` and wait until each has been ready or reached a terminal state.
-fn start_and_wait(core: &Arc<Mutex<Core>>, members: &[usize]) -> Option<i32> {
+/// Start `members` and wait for the boot-critical ones to become ready or terminal.
+///
+/// Services outside the getty dependency closure keep running on their own workers: the login
+/// must not wait for a network service that cannot start on a board without a NIC. The boot
+/// report later marks a still-starting non-critical service unavailable.
+fn start_and_wait(
+    core: &Arc<Mutex<Core>>,
+    members: &[usize],
+    critical: Option<&[bool]>,
+) -> Option<i32> {
     for &index in members {
         let generation = { core.lock().supervisor.start(index, now_ms()) };
         if let Some(generation) = generation {
@@ -326,6 +335,9 @@ fn start_and_wait(core: &Arc<Mutex<Core>>, members: &[usize]) -> Option<i32> {
         let done = {
             let guard = core.lock();
             members.iter().all(|&index| {
+                if critical.is_some_and(|mask| !mask.get(index).copied().unwrap_or(false)) {
+                    return true;
+                }
                 guard.supervisor.runtime().get(index).is_none_or(|runtime| {
                     runtime.ever_ready
                         || matches!(
@@ -360,13 +372,15 @@ fn boot_timing_enabled(initfs: &Initfs<'_>) -> bool {
 /// it keeps later service lines from scrolling the prompt away. A getty failure still prints and
 /// still fails the boot.
 fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) -> Option<i32> {
-    let getty = {
+    let (getty, critical) = {
         let guard = core.lock();
-        guard
+        let getty = guard
             .supervisor
             .services()
             .iter()
-            .position(|service| service.name == "getty" && service.enable)
+            .position(|service| service.name == "getty" && service.enable);
+        let critical = getty.map(|index| guard.supervisor.dependency_closure(index));
+        (getty, critical)
     };
     let selected = getty.map(|index| {
         let mut mask = alloc::vec![true; core.lock().supervisor.len()];
@@ -375,7 +389,13 @@ fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) ->
         }
         mask
     });
-    if let Some(code) = run_waves(core, selected.as_deref(), only_unstarted, serial) {
+    if let Some(code) = run_waves(
+        core,
+        selected.as_deref(),
+        only_unstarted,
+        serial,
+        critical.as_deref(),
+    ) {
         return Some(code);
     }
     if let Some(index) = getty {
@@ -394,33 +414,67 @@ fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) ->
 
 /// Print the concise boot report and the health marker before the login starts.
 fn print_boot_report(core: &Arc<Mutex<Core>>, skip: usize) {
-    let (up, failed) = {
+    let (up, unavailable, failed, rows) = {
         let guard = core.lock();
         let mut up = 0usize;
+        let mut unavailable = 0usize;
         let mut failed = 0usize;
+        let mut rows = Vec::new();
+        let now = now_ms();
         for (index, service) in guard.supervisor.services().iter().enumerate() {
             if !service.enable || index == skip {
                 continue;
             }
-            let ready = guard
-                .supervisor
-                .runtime()
-                .get(index)
-                .is_some_and(|runtime| {
-                    runtime.state == State::Running
-                        || (service.restart == Restart::Never && !service.required)
-                });
+            let runtime = guard.supervisor.runtime().get(index);
+            let state = runtime.map(|runtime| runtime.state);
+            let ready = state == Some(State::Running)
+                || (service.restart == Restart::Never && !service.required);
+            let hard_failed = !ready && state == Some(State::Failed);
             if ready {
                 up = up.saturating_add(1);
-            } else {
+            } else if hard_failed {
                 failed = failed.saturating_add(1);
+            } else {
+                unavailable = unavailable.saturating_add(1);
             }
+            let elapsed_ms = runtime
+                .map(|runtime| {
+                    let started = runtime.ready_timing.start_ms.unwrap_or(now);
+                    runtime
+                        .ready_timing
+                        .finished_ms
+                        .unwrap_or(now)
+                        .saturating_sub(started)
+                })
+                .unwrap_or(0);
+            let status = if ready {
+                crate::bootscreen::Status::Ok
+            } else if hard_failed {
+                crate::bootscreen::Status::Fail
+            } else {
+                crate::bootscreen::Status::Warn
+            };
+            rows.push(crate::bootscreen::Row {
+                elapsed_ms,
+                name: service.name.clone(),
+                status,
+            });
         }
-        (up, failed)
+        (up, unavailable, failed, rows)
     };
-    if failed == 0 {
-        raven_rt::println!("svcd: all services up");
-    } else {
+    raven_rt::print!(
+        "{}",
+        crate::bootscreen::render(boot_arch(), &rows, boot_color())
+    );
+    if unavailable > 0 {
+        if failed > 0 {
+            raven_rt::println!(
+                "svcd: boot report: {up} up, {unavailable} unavailable, {failed} failed"
+            );
+        } else {
+            raven_rt::println!("svcd: boot report: {up} up, {unavailable} unavailable");
+        }
+    } else if failed > 0 {
         raven_rt::println!("svcd: boot report: {up} up, {failed} failed");
     }
     let (health_due, health) = {
@@ -441,6 +495,25 @@ fn print_boot_report(core: &Arc<Mutex<Core>>, skip: usize) {
             }
         }
     }
+}
+
+fn boot_arch() -> &'static str {
+    #[cfg(target_arch = "x86_64")]
+    {
+        "x86_64"
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        "aarch64"
+    }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        "unknown"
+    }
+}
+
+fn boot_color() -> bool {
+    !crate::bootscreen::plain_requested()
 }
 
 /// Select the bootstrap services and every dependency they need by service name or scheme.
@@ -778,6 +851,12 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
             Notice::CrashLoop(index) => {
                 if let Some(service) = guard.supervisor.services().get(*index) {
                     raven_rt::println!("svcd: {} crash loop, giving up", service.name);
+                }
+            }
+            Notice::Unavailable(index, reason) => {
+                if let Some(service) = guard.supervisor.services().get(*index) {
+                    raven_rt::println!("svcd: {} unavailable: {}", service.name, reason);
+                    emit_ready_timing(&guard, *index, "finished_at");
                 }
             }
         }

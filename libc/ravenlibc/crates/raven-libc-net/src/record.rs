@@ -41,6 +41,41 @@ pub enum SocketState {
     Closed,
 }
 
+impl SocketState {
+    /// Encode the state in the `FdMap` inheritance block.
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        match self {
+            Self::Pending => 0,
+            Self::Open => 1,
+            Self::Bound => 2,
+            Self::Listening => 3,
+            Self::Connecting => 4,
+            Self::Connected => 5,
+            Self::Shutdown { .. } => 6,
+            Self::Closed => 7,
+        }
+    }
+
+    /// Decode the `FdMap` state code.
+    #[must_use]
+    pub const fn from_code(code: u8) -> Self {
+        match code {
+            0 => Self::Pending,
+            1 => Self::Open,
+            2 => Self::Bound,
+            3 => Self::Listening,
+            4 => Self::Connecting,
+            5 => Self::Connected,
+            6 => Self::Shutdown {
+                read: true,
+                write: true,
+            },
+            _ => Self::Closed,
+        }
+    }
+}
+
 /// One socket record.
 #[derive(Clone, Debug)]
 pub struct SocketRec {
@@ -162,9 +197,19 @@ impl SocketTable {
         self.records.get_mut(&ofd)
     }
 
+    /// Iterate every record.
+    pub fn iter(&self) -> impl Iterator<Item = (&u32, &SocketRec)> {
+        self.records.iter()
+    }
+
     /// Remove a record.
     pub fn remove(&mut self, ofd: u32) -> Option<SocketRec> {
         self.records.remove(&ofd)
+    }
+
+    /// Every record, keyed by OFD token, for the post-fork handle refresh.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&u32, &mut SocketRec)> {
+        self.records.iter_mut()
     }
 }
 

@@ -737,7 +737,7 @@ fn write_cr3(value: u64) {
     }
 }
 
-fn rdmsr(msr: u32) -> u64 {
+pub(crate) fn rdmsr(msr: u32) -> u64 {
     let low: u32;
     let high: u32;
     // SAFETY: ring-0 MSR read of an architectural address.
@@ -753,7 +753,7 @@ fn rdmsr(msr: u32) -> u64 {
     (u64::from(high) << 32) | u64::from(low)
 }
 
-fn wrmsr(msr: u32, value: u64) {
+pub(crate) fn wrmsr(msr: u32, value: u64) {
     // SAFETY: ring-0 MSR write of an architectural address.
     unsafe {
         asm!(
