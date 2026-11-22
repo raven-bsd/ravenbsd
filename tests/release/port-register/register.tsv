@@ -709,7 +709,7 @@ libc/ravenlibc/include/bits/abi_time.h	libc	COVERED	path	tests/libc/headers/test
 libc/ravenlibc/include/bits/dirent.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/bits/errno.h	libc	COVERED	path	tests/libc/headers/src/consts.rs	kevin	-	header	-	-
 libc/ravenlibc/include/bits/fcntl.h	libc	COVERED	basename	libc/ravenlibc/tools/hdrgen/src/validate_ut.rs	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/include/bits/ioctl.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/include/bits/ioctl.h	libc	COVERED	basename	tests/libc/c/libc-pty-winsize.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/bits/ipc.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/bits/ipcstat.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/bits/link.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
@@ -811,7 +811,7 @@ libc/ravenlibc/include/sys/eventfd.h	libc	COVERED	basename	tests/libc/headers/he
 libc/ravenlibc/include/sys/fcntl.h	libc	COVERED	basename	libc/ravenlibc/tools/hdrgen/src/validate_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/file.h	libc	COVERED	basename	libc/ravenlibc/tools/hdrgen/src/probe_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/inotify.h	libc	COVERED	suffix	libc/ravenlibc/crates/raven-libc-personality-linux/src/inotify_ut.rs	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/include/sys/ioctl.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/include/sys/ioctl.h	libc	COVERED	basename	tests/libc/c/libc-pty-winsize.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/ipc.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/klog.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/mman.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
