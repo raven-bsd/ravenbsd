@@ -46,7 +46,11 @@ default_max_load() {
 }
 max_load=${S107_MAX_LOAD:-$(default_max_load)}
 preflight_args=
-[ "$latency" = 1 ] || preflight_args=--allow-jobs
+if [ "$latency" = 1 ]; then
+    preflight_args=
+else
+    preflight_args="--allow-jobs --allow-qemu $(( $(nproc) / 2 ))"
+fi
 
 # case | arch | owner | subsystem note | optional explicit case path
 # The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.

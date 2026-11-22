@@ -32,6 +32,14 @@ pub unsafe extern "C" fn sigaction(
     } else {
         // SAFETY: the caller supplies a readable sigaction.
         let action = unsafe { &*new };
+        // A function handler needs the kernel's PG-7 entry before the first asynchronous
+        // signal can be delivered. SIG_DFL/SIG_IGN stay entirely in the libc table.
+        if action.handler > 1
+            && let Err(error) = super::ensure_entry()
+        {
+            crate::ffi::errno::set(error);
+            return -1;
+        }
         Some(Disposition {
             handler: action.handler,
             mask: action.mask[0],
