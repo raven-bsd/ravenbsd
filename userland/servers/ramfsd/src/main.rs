@@ -67,9 +67,7 @@ mod program {
         let config = match parse_config(&args) {
             Ok(config) => config,
             Err(()) => {
-                raven_rt::eprintln!(
-                    "ramfsd: usage: ramfsd [--scheme NAME] [--root-mode OCTAL]"
-                );
+                raven_rt::eprintln!("ramfsd: usage: ramfsd [--scheme NAME] [--root-mode OCTAL]");
                 return 2;
             }
         };

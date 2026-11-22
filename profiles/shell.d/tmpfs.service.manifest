@@ -10,4 +10,4 @@ args = ["/sbin/ramfsd", "--scheme", "tmpfs", "--root-mode", "1777"]
 needs = ["logd"]
 provides = ["scheme:tmpfs"]
 readiness = "scheme"
-restart = "on-failure"
+restart = "never"
