@@ -71,20 +71,20 @@ int main(void) {
             printf("dir-create-denied errno=%d (%s)\n", errno, strerror(errno));
             _exit(3);
         }
-        int mode_fd = open("/tmp/k531-dir/mode600", O_CREAT | O_WRONLY | O_TRUNC, 0600);
+        int mode_fd = open("/tmp/k531-file", O_CREAT | O_WRONLY | O_TRUNC, 0600);
         if (mode_fd < 0) {
             printf("file-create-denied errno=%d (%s)\n", errno, strerror(errno));
             _exit(4);
         }
         close(mode_fd);
-        if (chmod("/tmp/k531-dir/mode600", 0600) != 0) {
+        if (chmod("/tmp/k531-file", 0600) != 0) {
             printf("file-chmod-denied errno=%d (%s)\n", errno, strerror(errno));
             _exit(5);
         }
 
         struct stat dir_st;
         struct stat file_st;
-        if (stat("/tmp/k531-dir", &dir_st) != 0 || stat("/tmp/k531-dir/mode600", &file_st) != 0) {
+        if (stat("/tmp/k531-dir", &dir_st) != 0 || stat("/tmp/k531-file", &file_st) != 0) {
             printf("user-stat-denied errno=%d\n", errno);
             _exit(6);
         }
@@ -103,7 +103,7 @@ int main(void) {
     }
 
     if (unlink("/tmp/k531-root") != 0 || unlink("/tmp/k531-user") != 0 ||
-        unlink("/tmp/k531-dir/mode600") != 0 || rmdir("/tmp/k531-dir") != 0) {
+        unlink("/tmp/k531-file") != 0 || rmdir("/tmp/k531-dir") != 0) {
         return fail("root-remove");
     }
     printf("root-remove-ok\n");
