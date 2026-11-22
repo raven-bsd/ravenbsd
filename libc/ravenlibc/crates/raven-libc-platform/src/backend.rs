@@ -304,6 +304,7 @@ struct FakeNode {
     mode: u32,
     kind: OfdKind,
     target: Option<Vec<u8>>,
+    legacy_tty: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -423,6 +424,7 @@ impl FakeSys {
                 mode,
                 kind,
                 target: None,
+                legacy_tty: false,
             },
         );
     }
@@ -437,6 +439,20 @@ impl FakeSys {
         self
     }
 
+    /// Create a tty node that only understands the legacy `GET_MODE`/`SET_MODE` calls.
+    ///
+    /// The real console scheme is such a server: `GET_TERMIOS`/`SET_TERMIOS` answer `ENOSYS`
+    /// and libc falls back to the canonical/echo view.
+    pub fn tty_legacy(&self, path: &[u8]) -> &Self {
+        self.tty(path);
+        let mut world = self.world.borrow_mut();
+        if let Some(node) = world.nodes.get_mut(&key(path)) {
+            node.legacy_tty = true;
+        }
+        drop(world);
+        self
+    }
+
     /// Create a `sys:` value addressed as `sys:a/b`.
     pub fn sys(&self, path: &[u8], value: &[u8]) -> &Self {
         let mut full = b"sys:".to_vec();
@@ -448,6 +464,7 @@ impl FakeSys {
                 mode: 0o100_644,
                 kind: OfdKind::File,
                 target: None,
+                legacy_tty: false,
             },
         );
         self
@@ -462,6 +479,7 @@ impl FakeSys {
                 mode: 0o100_644,
                 kind: OfdKind::File,
                 target: None,
+                legacy_tty: false,
             },
         );
         self
@@ -637,6 +655,7 @@ impl SysBackend for FakeSys {
                     mode: 0o100_666,
                     kind: OfdKind::File,
                     target: None,
+                    legacy_tty: false,
                 };
                 world.nodes.insert(path.to_vec(), node.clone());
                 node
@@ -820,6 +839,18 @@ impl SysBackend for FakeSys {
         let open = world.open_files.get(&file).cloned().ok_or(Errno::EBADF)?;
         if open.kind == OfdKind::Tty && req.len() >= raven_proto_tty::CALL_LEN {
             let op = u16::from_le_bytes([req[2], req[3]]);
+            let legacy = world
+                .nodes
+                .get(&open.path)
+                .is_some_and(|node| node.legacy_tty);
+            if legacy
+                && matches!(
+                    op,
+                    raven_proto_tty::OP_GET_TERMIOS | raven_proto_tty::OP_SET_TERMIOS
+                )
+            {
+                return Err(Errno::ENOSYS);
+            }
             if matches!(
                 op,
                 raven_proto_tty::OP_GET_TERMIOS | raven_proto_tty::OP_SET_TERMIOS
@@ -910,6 +941,7 @@ impl SysBackend for FakeSys {
                         mode: raven_libc_abi::stat::S_IFDIR | (mode & 0o7777),
                         kind: OfdKind::Dir,
                         target: None,
+                        legacy_tty: false,
                     },
                 );
                 raven_proto_fs::CallResponse::Status(0)
@@ -944,6 +976,7 @@ impl SysBackend for FakeSys {
                         mode: raven_libc_abi::stat::S_IFLNK | 0o777,
                         kind: OfdKind::File,
                         target: Some(target.to_vec()),
+                        legacy_tty: false,
                     },
                 );
                 raven_proto_fs::CallResponse::Status(0)

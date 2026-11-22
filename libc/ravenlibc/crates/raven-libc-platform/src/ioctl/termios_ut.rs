@@ -55,6 +55,26 @@ fn tcsetattr_clears_echo_only() {
 }
 
 #[test]
+fn a_legacy_console_falls_back_to_get_mode_and_set_mode() {
+    let fake = FakeSys::new();
+    fake.tty_legacy(b"/dev/tty");
+    let platform = Platform::new(fake);
+    let fd = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("open");
+    let before = tcgetattr(&platform, fd).expect("tcgetattr");
+    assert_ne!(before.c_lflag & ICANON, 0);
+    assert_ne!(before.c_lflag & ECHO, 0);
+
+    let mut raw = default_termios();
+    cfmakeraw(&mut raw);
+    tcsetattr(&platform, fd, &raw).expect("tcsetattr");
+    let after = tcgetattr(&platform, fd).expect("tcgetattr");
+    assert_eq!(after.c_lflag & ICANON, 0);
+    assert_eq!(after.c_lflag & ECHO, 0);
+}
+
+#[test]
 fn tcflush_succeeds_on_a_tty() {
     let (platform, fd) = tty_platform();
     assert_eq!(tcflush(&platform, fd, 0), Ok(()));

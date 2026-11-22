@@ -1,0 +1,57 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running `target/debug/xtask qtest --case termios --arch x86_64`
+termios: fail
+--- serial (last 40 lines) ---
+svcd: zerod up
+svcd: zerod timing: generation=1 start=3913 spawn=6085 first_poll=6119 deadline=11085 stalled=0 ready_at=6152
+1795343194.310 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=3782 spawn=5939 first_poll=5959 deadline=125939 stalled=0 ready_at=12363
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=12374 spawn=13055 first_poll=13074 deadline=73055 stalled=0 ready_at=13399
+termios: start uid=0
+termios: slave-open fd=4
+termios: tcsetattr=0
+termios: slave iflag=02401 ok
+termios: slave oflag=05 ok
+termios: slave cflag=0275 ok
+termios: slave lflag=0100013 ok
+termios: slave line=0 ok
+termios: slave ispeed=016 ok
+termios: slave ospeed FAIL want=017 got=0
+termios: slave c_cc=ok
+termios: master ospeed FAIL want=017 got=0
+termios: master=FAIL
+termios: tcsadrain=0
+termios: drain=ok
+termios: drain iflag=02401 ok
+termios: drain oflag=05 ok
+termios: drain cflag=0275 ok
+termios: drain lflag=0100003 ok
+termios: drain line=0 ok
+termios: drain ispeed=016 ok
+termios: drain ospeed FAIL want=017 got=0
+termios: drain c_cc=ok
+termios: FAIL fields=3
+svcd: libc-test crash loop, giving up
+svcd: settled
+init exited (1)
+--- unmatched expectations ---
+^termios: slave ospeed=0?[0-7]+ ok$
+^termios: master=ok$
+^termios: ok$
+^init exited \(0\)$
+--- forbidden hits ---
+termios: slave ospeed FAIL want=017 got=0
+termios: master ospeed FAIL want=017 got=0
+termios: master=FAIL
+termios: drain ospeed FAIL want=017 got=0
+termios: FAIL fields=3
+--- result ---
+exit status 35; expected success; unmatched expectations: ^termios: slave ospeed=0?[0-7]+ ok$, ^termios: master=ok$, ^termios: ok$, ^init exited \(0\)$; 5 forbidden line(s) matched
