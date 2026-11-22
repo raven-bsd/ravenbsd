@@ -701,7 +701,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             wire |= raven_proto_fs::WIRE_OPEN_DIRECTORY;
         }
-        let wire_path = file_path(&resolved.abs);
+        // `/dev/pts/<N>` is the public pty slave name; the pty server is the `pty:` scheme. Keep
+        // the public path on the OFD (ttyname) and send the scheme path to the backend.
+        let pty_wire = pty_slave_wire(&resolved.abs);
+        let wire_path = match &pty_wire {
+            Some(wire) => wire.clone(),
+            None => file_path(&resolved.abs),
+        };
         let handle = crate::intr::cancellable(|| {
             crate::intr::run(
                 crate::intr::CallClass::Restartable,
@@ -709,7 +715,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 || self.backend.open(&wire_path, u32::from(wire)),
             )
         })?;
-        let kind = if is_tty_path(&resolved.abs) {
+        let kind = if pty_wire.is_some() || is_tty_path(&resolved.abs) {
             OfdKind::Tty
         } else if wire & raven_proto_fs::WIRE_OPEN_DIRECTORY != 0 {
             OfdKind::Dir
@@ -2096,6 +2102,17 @@ fn event_number(event: Handle) -> u32 {
 
 fn is_tty_path(path: &[u8]) -> bool {
     matches!(path, b"/dev/tty" | b"/dev/console" | b"/dev/ptmx")
+}
+
+/// Map the public `/dev/pts/<N>` slave path to the pty server's `pty:slave/<N>` scheme path.
+fn pty_slave_wire(path: &[u8]) -> Option<Vec<u8>> {
+    let id = path.strip_prefix(b"/dev/pts/")?;
+    if id.is_empty() {
+        return None;
+    }
+    let mut wire = Vec::from(b"pty:slave/" as &[u8]);
+    wire.extend_from_slice(id);
+    Some(wire)
 }
 
 impl<B: SysBackend, L: Lock> OfdRef<'_, B, L> {
