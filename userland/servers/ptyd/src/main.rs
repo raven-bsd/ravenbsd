@@ -95,6 +95,12 @@ mod program {
                 index = index.saturating_add(1);
                 continue;
             }
+            // The timer worker only owns VTIME jobs; VMIN-only jobs are completed by the write
+            // drain and must not contend with the server loop every millisecond.
+            if only.is_none() && pending[index].vtime == 0 {
+                index = index.saturating_add(1);
+                continue;
+            }
             let (pair, capture, length, vtime, start, token, completer) = {
                 let job = &pending[index];
                 (

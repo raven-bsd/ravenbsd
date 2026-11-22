@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/wait.h>
 #include <termios.h>
 #include <time.h>
@@ -137,6 +138,13 @@ static int main_case(void) {
 }
 
 static int many_case(void) {
+    long *shared_start = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+                              MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (shared_start == MAP_FAILED) {
+        printf("pty-concurrent: FAIL mmap errno=%d\n", errno);
+        return 1;
+    }
+    *shared_start = 0;
     int masters[BLOCKED];
     int slaves[BLOCKED];
     pid_t children[BLOCKED];
@@ -167,10 +175,15 @@ static int many_case(void) {
             long start = now_ms();
             unsigned char byte = 0;
             int count = (int)read(slaves[index], &byte, 1);
-            printf("pty-concurrent: pair=%d read=%d byte=%u wall_ms=%ld\n", index, count,
-                   (unsigned)byte, now_ms() - start);
+            long wall = now_ms() - start;
+            long latency = (*shared_start != 0) ? now_ms() - *shared_start : -1;
+            printf("pty-concurrent: pair=%d read=%d byte=%u wall_ms=%ld latency_ms=%ld\n",
+                   index, count, (unsigned)byte, wall, latency);
             fflush(stdout);
-            _exit(count == 1 && byte == (unsigned char)('a' + index) ? 0 : 1);
+            _exit(count == 1 && byte == (unsigned char)('a' + index) && latency >= 0 &&
+                          latency <= 500
+                      ? 0
+                      : 1);
         }
         children[index] = child;
     }
@@ -182,6 +195,7 @@ static int many_case(void) {
     printf("pty-concurrent: idle_ms=5000 blocked=%d\n", BLOCKED);
     fflush(stdout);
 
+    *shared_start = now_ms();
     for (int index = 0; index < BLOCKED; index++) {
         char byte = (char)('a' + index);
         if (write(masters[index], &byte, 1) != 1) {
