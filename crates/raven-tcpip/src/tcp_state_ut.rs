@@ -73,3 +73,18 @@ fn apply_syn_options_with_ws_negotiates_the_peer_scale() {
     assert_eq!(c.snd_wscale, 7);
     assert_eq!(c.negotiated_wscale, Some(7));
 }
+
+#[test]
+fn a_zero_window_with_equal_seq_ack_closes_the_window() {
+    // Approved donor divergence from NetBSD tcp_input.c:2666: the donor only takes a window
+    // when `tiwin > snd_wnd` for equal seq/ack, so a zero shrink is ignored. Raven honours it
+    // so the sender stops probing a closed window; `zero_window_probe_counter_moves` is the
+    // end-to-end observability test.
+    let mut c = connection();
+    c.snd_wnd = 5_000;
+    c.max_snd_wnd = 5_000;
+    c.snd_wl1 = 2_000;
+    c.snd_wl2 = 4_000;
+    update_snd_wnd(&mut c, 2_000, 4_000, 0);
+    assert_eq!(c.snd_wnd, 0);
+}
