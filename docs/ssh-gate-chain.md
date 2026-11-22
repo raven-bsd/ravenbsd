@@ -122,9 +122,11 @@ this deviation is recorded in the K434 report.
   termios defaults and returns `EBUSY` when the slave is already open. `openpty` (`lib/libutil/pty.c:63`)
   and `forkpty` (`:139`) are the libutil convenience over that path.
 - Raven: ptyd supplies the `pty:` scheme pair; libc `openpty`/`grantpt`/`unlockpt`/`ptsname_r` must
-  match the libutil sequence. K430 is merged and its `pty-alloc` qtest passes as root and uid 1000,
-  but `ssh -tt` still answers `PTY allocation request failed on channel 0`; the release image also
-  has no `tty` executable (`rsh: tty: command not found`), so S8 is not green.
+  match the libutil sequence. K430 is merged and its `pty-alloc` qtest passes as root and uid 1000.
+  K436 (`origin/dave/K436` `9d1a30cb`) is not on `origin/master`; verified on scratch, its
+  `pty-alloc`/`pty-calls` pass but `ssh -tt` still answers `PTY allocation request failed on channel
+  0`, and the release image also has no `tty` executable (`rsh: tty: command not found`), so S8 is
+  not green.
 
 ### C10 exec
 
@@ -181,6 +183,21 @@ this deviation is recorded in the K434 report.
 3. **S8 has two independent gaps.** The K430 `pty-alloc` qtest passes, but `ssh -tt ... tty` still
    fails the PTY request and the release image has no `tty` executable (`rsh: tty: command not
    found`). Rebuilding the static `sshd-session` against the merged libc did not change the result.
+
+## Rev 19 observations (K436 scratch, S7 routing)
+
+1. **K436 is not on `origin/master`.** Master is still `d50c35bb`; K436 is only
+   `origin/dave/K436` `9d1a30cb`. It was verified on the local scratch branch
+   `ken/K434-k436verify` `b86cc544` (not pushed). Its `pty-alloc`/`pty-calls` pass, but
+   `ssh -tt ... tty` still returns `PTY allocation request failed on channel 0`.
+2. **S7 routing is checked at both ends.** The master run has client stdout 0 bytes and
+   `console_total_delta=0` (the output is on neither endpoint in that run). The K436 scratch run has
+   client 0 bytes and the delayed console capture shows the exact marker 11 times. The S7-routing
+   row records the client bytes, the per-attempt console max and the total console delta; it is red
+   in both runs because the client never receives the marker.
+3. **S8 remains red with K436.** The K436 libc qtests pass, but the SSH PTY request still fails and
+   the image has no `tty` utility. Rebuilding the static `sshd-session` against K436 and reimaging
+   did not change the client result.
 
 ## Gaps (not evidence)
 

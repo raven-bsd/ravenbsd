@@ -3,91 +3,91 @@
 
 # SSH gate matrix (S0-S8)
 
-Status: OBSERVED, 2026-11-22, rev 18. Base `origin/master` `d50c35bb` (K430 merged) merged into
-`ken/K434` at `b5150cfc`; matrix code `7da596b1`. K431 is still absent. One throw-away S0 boot,
-one `pty-alloc` qtest, and one release-image SSH boot on the K194 tap. The chain each row asserts is
-in [`docs/ssh-gate-chain.md`](ssh-gate-chain.md); the lead's mapping is `tickets/ssh/SSH-CHAIN.md`.
-**A row is pass or fail with exact bytes.** No class labels, no retries to green.
+Status: OBSERVED, 2026-11-22, rev 19. Base `origin/master` `d50c35bb`; **K436 is not on master**
+(it exists only at `origin/dave/K436` `9d1a30cb`). The master run used `ken/K434` at `5eb93bb0`
+with a dedicated bridge/tap (`kenbr0`/`kentap0`); K436 was verified separately on the local scratch
+branch `ken/K434-k436verify` (`b86cc544`, not pushed). K431 is still absent.
 
-Run: `timeout 900 sh tests/ssh/matrix.sh` (exit 1; 3 red summary rows, 3 blocked sub-rows) and
-`timeout 900 make check-fast` (exit 0; `check-fast: PASSED`).
+Run: `timeout 900 env RAVEN_QEMU_BRIDGE=kenbr0 RAVEN_QEMU_TAP=kentap0 sh tests/ssh/matrix.sh`
+(exit 1; 4 red summary rows) and `timeout 900 make check-fast` (exit 0; `check-fast: PASSED`).
 
-## Matrix
+## Master matrix (d50c35bb)
 
 | Step | Test | Expectation (source) | Result | Exact assertion / artifact |
 |---|---|---|---|---|
-| S0 | guest TCP accept/echo over the tap | BSD `accept`/`read`/`write` (C1) | PASS | 30/30 bytes `K434-S0-ECHO-0123456789abcdef\n`, 301 ms, `serial-echo.log` |
-| S1 | sshd banner, fresh + control | OpenSSH `kex.c:1297` builds from `SSH_VERSION`; `version.h:3` is `OpenSSH_10.6` | PASS | attempt 1 `SSH-2.0-OpenSSH_10.6\r\n` (1879 ms); control 1546 ms; client-first probe 1541 ms |
-| S2 | KEXINIT | RFC 4251 section 6 (C2/C3) | PASS | `total=960 packet_length=956 padding=9 payload=946 type=20` |
-| S3 | auth | OpenSSH `auth.c:264` `auth_log`, `auth-passwd.c:79` | PASS | wrong password exit 255 + `Permission denied`; correct client `Authenticated to ... using "password".`; serial server line `Accepted password for raven from UNKNOWN port 65535 ssh2` |
-| S4 | post-auth read | POSIX `read(2)`; FreeBSD `soreceive` (C2/C7) | PASS | `debug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0`; no `EFAULT`; the command output did not arrive (S5-session) |
-| S5 | confirmation delivery | POSIX `write(2)`; FreeBSD `sosend` (C5/C6/C8) | PASS | `debug2: channel_input_open_confirmation: channel 0`; `channel 0: open confirm rwindow 0 rmax 32768` |
-| S5-identity | exact N bytes on the same file/sid | K431 fixture | BLOCKED | `tests/fixtures/socket-write-identity` is not on `origin/master` |
-| S5-session | post-exec session path | POSIX `read`/`write`; OpenSSH `serverloop.c`/`session.c` (C10) | **FAIL** | no EPIPE with live stdin; client killed at 15 s (`exit -9`, `timed_out=True`); sampled fd4 `socket:[268524506]`, `pipe:[268515101]`; TCP peer `ESTAB 10.0.2.2:49332 -> 10.0.2.15:22`; server-side handle not exposed |
-| S6 | channel confirmation | RFC 4254 section 5.1; OpenSSH `channels.c` (C5) | PASS | `debug3: receive packet: type 91` + `channel 0: open confirm rwindow 0 rmax 32768` |
-| S6-length | 44-byte plaintext packet | OpenSSH `channels.c:2198`/`:5085` | BLOCKED | client log exposes type and recipient channel, not the packet length |
-| S7 | marker + 10/10 | gate (C1-C10) | **FAIL** | client stdout 0 bytes on the single marker attempt and 10/10; the guest serial log shows the exact marker **11 times**, so the command ran and its stdout went to the guest console, not the SSH channel |
-| S8 | PTY | POSIX `openpty`; OpenSSH `pty.c` (C9) | **FAIL** | `PTY allocation request failed on channel 0`; the guest console also reports `rsh: tty: command not found`; the pty-alloc qtest PASSes |
-| S8-pty-alloc | dynamic pty case | K430 `tests/libc/c/libc-pty-alloc.c` | PASS | `timeout 45 cargo xtask qtest --case pty-alloc --arch x86_64` exit 0, `pty-alloc: pass` (17.3 s measured) |
+| S0 | guest TCP accept/echo over tap | BSD `accept`/`read`/`write` (C1) | PASS | 30/30 bytes `K434-S0-ECHO-0123456789abcdef\n`, 297 ms |
+| S1 | banner, fresh + control | OpenSSH `kex.c:1297`; `version.h:3` | PASS | `SSH-2.0-OpenSSH_10.6\r\n` attempt 1 (1861 ms), control 1478 ms, client-first 1497 ms |
+| S2 | KEXINIT | RFC 4251 section 6 | PASS | `total=960 packet_length=956 padding=9 payload=946 type=20` |
+| S3 | auth | OpenSSH `auth.c:264`, `auth-passwd.c:79` | PASS | wrong exit 255 + `Permission denied`; client `Authenticated to ...`; server `Accepted password for raven from UNKNOWN port 65535 ssh2` |
+| S4 | post-auth read | POSIX `read`; FreeBSD `soreceive` | PASS | `hostkeys-00@openssh.com`, no `EFAULT` |
+| S5 | confirmation delivery | POSIX `write`; FreeBSD `sosend` | PASS | `channel 0: open confirm rwindow 0 rmax 32768` |
+| S5-identity | same file/sid | K431 fixture | BLOCKED | not on `origin/master` |
+| S5-session | post-exec session | POSIX `read`/`write`; C10 | **FAIL** | no EPIPE; exit -9 at the 15 s cap; fd4 `socket:[269251562]`, `pipe:[269259340]`; TCP peer `ESTAB 10.0.2.2:55512 -> 10.0.2.15:22` |
+| S6 | confirmation | RFC 4254 section 5.1 | PASS | `receive packet: type 91` + channel 0 |
+| S6-length | 44-byte plaintext | `channels.c:2198`/`:5085` | BLOCKED | not in the client log |
+| S7 | marker + 10/10 | gate C1-C10 | **FAIL** | client 0 bytes on the single attempt and 10/10 |
+| S7-routing | client receives, console does not | C5/C9/C10 fd routing | **FAIL** | client 0 bytes; `max_console_new=0`; `console_total_delta=0` |
+| S8-pty-alloc | dynamic pty case | K430/K436 libc test | PASS | `pty-alloc: pass` (17 s class) |
+| S8 | PTY | POSIX `openpty`; OpenSSH `pty.c` | **FAIL** | `PTY allocation request failed on channel 0`; the guest also has no `tty` (`rsh: tty: command not found`) |
 
-The per-attempt table is `build/ssh/matrix/attempts.tsv`: attempt number, fresh/reused connection,
-expected and received bytes, elapsed milliseconds, result and detail.
+## K436 scratch verification (not on master)
 
-## Rev 18 corrections (facts, not labels)
+`origin/dave/K436` = `9d1a30cb`; merged locally into `ken/K434-k436verify` = `b86cc544`. The static
+`sshd-session` was rebuilt against the K436 libc (57 s) and the release image rebuilt (4m56).
+Result:
 
-1. **The old S5-session EPIPE was the test harness.** The previous run used
-   `stdin=/dev/null`; strace showed `read(4</dev/null<char 1:3>>, "", 32768) = 0`.
-   `sshbuf_read` (`addons/ssh/openssh/sshbuf-misc.c:340-353`) maps a zero-length read to
-   `SSH_ERR_SYSTEM_ERROR` with `errno = EPIPE`, so OpenSSH logged `Broken pipe`. It was not a
-   network-socket EPIPE. With a live stdin pipe the row has no EPIPE; the client still does not
-   complete and is killed at the 15 s cap. The row now fails on completion, and records the sampled
-   fd4 socket/pipe and the `ESTAB` TCP peer.
-2. **S7 command execution is real; the output path is not.** The guest serial log contains
-   `K434-SSH-MARKER-2026-11-22` 11 times (one single attempt + ten 10/10 attempts), while every SSH
-   client received 0 bytes. The session stdout is on the guest console, not the SSH channel.
-3. **S8 pty-alloc passes but `ssh -tt` fails.** K430's dynamic qtest passes as root and uid 1000.
-   The SSH PTY request still answers `PTY allocation request failed on channel 0`; the guest also
-   lacks a `tty` executable (`rsh: tty: command not found`), so the exact `/dev/pts/N` assertion
-   cannot pass even if the allocation is fixed. The rebuilt static `sshd-session` (51 s build) did
-   not change this.
-4. **S3 server line.** The exact line is `Accepted password for raven from UNKNOWN port 65535 ssh2`;
-   `getpeername`/`ssh_remote_ipaddr` does not return `10.0.2.2`. The auth line itself is present.
-5. **S1 banner.** The wire bytes are `SSH-2.0-OpenSSH_10.6\r\n`: `version.h:3` is
-   `SSH_VERSION "OpenSSH_10.6"`, `:6` is `SSH_RELEASE SSH_VERSION SSH_PORTABLE`, and `kex.c:1297`
-   uses `SSH_VERSION`. The ticket's `10.6p2` is the command-line release, not the banner.
+- `pty-alloc` qtest: PASS.
+- `ssh -tt raven@... tty`: **FAIL**, `PTY allocation request failed on channel 0`.
+- S7: client 0 bytes; the delayed guest-console capture showed the exact marker 11 times, so the
+  command ran and its stdout was not on the client channel.
+- S5-session: no EPIPE; exit -9 at the 15 s cap; fd4 socket/pipe; TCP peer `ESTAB`.
+
+K436 does not make S8 green in this tree. The remaining S8 failures are the PTY allocation request
+and the absent `tty` utility; the S7 output path is separate.
+
+## S7 fd-routing detail
+
+The rev 19 master row asserts both ends:
+
+- client stdout: 0 bytes on the single attempt and all ten 10/10 attempts;
+- guest console marker count: `max_console_new=0`, `console_total_delta=0` in that run.
+
+The K436 scratch run showed the opposite console side: 11 exact markers in the delayed console
+capture. Neither run has the marker on the client channel. The row is red; the routing evidence is
+recorded per run (master delta 0; K436 delayed total 11).
+
+## S5-session detail
+
+The previous rev 18 EPIPE was the test harness (`stdin=/dev/null`; `read(4)=0` mapped by
+`sshbuf_read` to `EPIPE`). With a live stdin pipe there is no EPIPE. The client still does not
+complete: `exit -9`, `timed_out=True`; fd4 `socket:[269251562]`, `pipe:[269259340]`; the TCP socket
+fd 3 is `ESTAB 10.0.2.2:55512 -> 10.0.2.15:22`; the server-side handle is not exposed. S5-session
+fails on completion, not on a fabricated socket errno.
 
 ## Artifacts (SHA-256)
 
 ```text
-matrix.tsv, attempts.tsv, serial.log, serial-echo.log, s3-server.log,
-s7-marker.log, s7-run-1..10.log, s8-tt.log, s8-server.log, pty-alloc.log,
-s5-vvv.log, s5-vvv.log-probe.log, s5-vvv.log-strace.log
+62ea7c9b8c698ced05c4da40190994d08c95069983e5d28a1aaf20100174b958  build/ssh/matrix/matrix.tsv
+5c28923dcc6beae3138ea892ea2c9a9e7eba747eaaf5fbc0c2b05b82b53da616  build/ssh/matrix/attempts.tsv
+5a44d948421318798852b28a85cd0cfc5ef7b959c18a9b562aef7e5c1237cd64  build/ssh/matrix/serial.log
+7c3c1acb436695de78b3c9b1aa2d1b4ef8e9fdedb906711f970065f78c4c3410  build/ssh/matrix/serial-echo.log
+96f5d40687dc506eaa3ef09166ebb146d77862b26dbe42612ff03be47c6da7d9  build/ssh/matrix/s7-marker.log
+4cbcca582962953592e38a5f02afa41bd507e6db2f1c3d4ee356059bb0a8c326  build/ssh/matrix/s8-tt.log
+6c7dac5049f925d37920908e41c28c144faf07146526b92ddc86cc2e3d6da4e9  build/ssh/matrix/pty-alloc.log
+ec4e237b5cfa6bae3fdef0ecabdb839f506874555b1153d3cacf7dee353f6f13  build/ssh/matrix/s5-vvv.log-probe.log
+9d185dd9b118e77e33dee988e92a5d17c4fecd2f2c95e98762e0421355379c43  build/ssh/matrix/s5-vvv.log-strace.log
+51fae215ac760e4d5e93382c5a30d547147eb7462c46e3136d8ff9b3362d7c82  build/ssh/matrix/s8-server.log
+ec3839e756500557b35dced1d5d6c5bcdbc771c32506c16a7b2222505bd6b405  master run log
+bea7bca038cfb65c151a57c9687f6fa85ec223c579ae35693435b4c920dac9ab  K436 scratch run log
 ```
 
-The exact hashes are in the K434 report, which is the acceptance record. The large artifacts stay in
-`build/ssh/matrix/`; they are reproducible with `sh tests/ssh/matrix.sh`.
-
-## Test-first and negative evidence
-
-- The rows were written as exact assertions before this run. The failed values are preserved in
-  earlier runs: the first S1 probe was 0 bytes on the rev-16 harness, S2 produced `total_read=0` in
-  one run, S3's wrong-password attempt timed out during banner exchange in one run, and S5-session
-  produced the `/dev/null` read/EPIPE shape before the stdin fix.
-- The wrong-password row is the negative auth check: exit 255 + `Permission denied`; the correct
-  row must show `Authenticated to` and the server `Accepted` line.
-- S2 rejects a 0-byte/0-record probe and accepts only the exact framed KEXINIT.
-- S8's pty-alloc qtest passes on the same base while `ssh -tt` fails, so the two assertions are
-  independent and neither is vacuous.
+The K434 report carries the full acceptance record, gates and open gaps.
 
 ## Open gaps
 
-- S5's same-file/sid identity assertion needs K431's `socket-write-identity` fixture (not on this
-  base). S5 records client-side delivery only.
-- S6's 44-byte plaintext length is not in the client debug log; the type-91/recipient-channel parse
-  is. A server-side instrumented build would be needed for the length.
-- S3's server line reports `from UNKNOWN port 65535`; the peer address is not observable from
-  `getpeername`.
-- S7's stdout is on the guest console; the server-side session fd mapping to the SSH channel is the
-  open defect.
-- S8's `ssh -tt` allocation still fails after K430 and the static `sshd-session` rebuild; the guest
-  `tty` utility is also missing. Both are separate fixes.
+- S5 identity needs K431's `socket-write-identity` fixture.
+- S6 length is not observable from the client log.
+- S3 peer address is `UNKNOWN` (`getpeername` gap).
+- S7 stdout is not on the client channel; the master run also has console delta 0.
+- S8 still fails PTY allocation; K436's scratch verification did not change it; `tty` is missing.
+- K436 is not on `origin/master`; the scratch verification is not part of `ken/K434`.
