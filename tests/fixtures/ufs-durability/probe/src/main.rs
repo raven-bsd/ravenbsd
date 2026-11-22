@@ -148,6 +148,33 @@ mod program {
         Ok(hash)
     }
 
+    /// Rename one entry directly on the `ufs:` server root.
+    ///
+    /// `raven_rt::fs::rename` addresses the root `file:` server, which does not cross
+    /// into the mounted UFS; the S11 rename on the mounted scheme is the product path.
+    fn rename_ufs(from: &str, to: &str) -> Result<(), String> {
+        let flags = fs::s11_flags(O_RDONLY).map_err(|error| error.description().to_string())?;
+        let root = Client::new()
+            .open("ufs:/", flags)
+            .map_err(|error| format!("open ufs:/ for rename: {}", error.description()))?;
+        let request = CallRequest::new(Call::Rename {
+            from: from.as_bytes(),
+            to: to.as_bytes(),
+        });
+        let mut response = [0u8; 64];
+        let length = Client::new()
+            .call_typed(root, &request, &mut response)
+            .map_err(|error| format!("rename call: {}", error.description()))?;
+        let _ = Client::new().close(root);
+        match CallResponse::decode(request.op(), &response[..length])
+            .map_err(|_| "rename decode".to_string())?
+        {
+            CallResponse::Status(0) => Ok(()),
+            CallResponse::Status(status) => Err(format!("rename status {status}")),
+            _ => Err("rename response".into()),
+        }
+    }
+
     fn statfs() -> Result<raven_proto_fs::StatFs, String> {
         let flags = fs::s11_flags(O_RDONLY).map_err(|error| error.description().to_string())?;
         let handle = Client::new()
@@ -271,8 +298,7 @@ mod program {
         fs::sync().map_err(|error| format!("sync dir: {}", error.description()))?;
         raven_rt::println!("k466: persist dir=ok");
 
-        fs::rename(ENTRY_PATH, RENAMED_PATH)
-            .map_err(|error| format!("rename: {}", error.description()))?;
+        rename_ufs("/k466-entry.txt", "/k466-renamed.txt")?;
         fs::sync().map_err(|error| format!("sync rename: {}", error.description()))?;
         raven_rt::println!("k466: persist rename=ok");
         Ok(())
