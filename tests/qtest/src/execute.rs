@@ -34,6 +34,8 @@ pub struct ExecuteOptions {
     pub runner: Option<Vec<String>>,
     /// Do not invoke `cargo xtask image`; require the image to exist already.
     pub no_build: bool,
+    /// Do not run the case's `pre` commands; the image/fixture must already exist.
+    pub no_pre: bool,
 }
 
 impl ExecuteOptions {
@@ -47,6 +49,7 @@ impl ExecuteOptions {
             ovmf_vars: None,
             runner: None,
             no_build: false,
+            no_pre: false,
         }
     }
 }
@@ -149,11 +152,21 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
             Some(reason.clone()),
             ResultKind::Skipped,
             started,
+            false,
         );
     }
 
-    if let Err(reason) = run_pre_commands(case, &arch) {
-        return finish(report, Vec::new(), Some(reason), ResultKind::Error, started);
+    if !options.no_pre
+        && let Err(reason) = run_pre_commands(case, &arch)
+    {
+        return finish(
+            report,
+            Vec::new(),
+            Some(reason),
+            ResultKind::Error,
+            started,
+            false,
+        );
     }
 
     let mut cleanup = Vec::new();
@@ -165,6 +178,7 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
                 Some("--runner needs a command".to_string()),
                 ResultKind::Error,
                 started,
+                options.no_pre,
             );
         }
         Some(runner) => (runner[0].clone(), runner[1..].to_vec()),
@@ -180,10 +194,18 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
                     Some(reason),
                     ResultKind::Skipped,
                     started,
+                    options.no_pre,
                 );
             }
             Err(PrepareError::Error(reason)) => {
-                return finish(report, Vec::new(), Some(reason), ResultKind::Error, started);
+                return finish(
+                    report,
+                    Vec::new(),
+                    Some(reason),
+                    ResultKind::Error,
+                    started,
+                    options.no_pre,
+                );
             }
         },
     };
@@ -216,6 +238,7 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
                 Some(format!("could not start case: {error:#}")),
                 ResultKind::Error,
                 started,
+                options.no_pre,
             );
         }
     };
@@ -257,7 +280,7 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
         None if passed => None,
         None => Some(describe_failure(case, &report, run.timed_out, exit)),
     };
-    finish(report, run.lines, detail, result, started)
+    finish(report, run.lines, detail, result, started, options.no_pre)
 }
 
 fn prepare_external(
@@ -476,7 +499,16 @@ fn finish(
     detail: Option<String>,
     result: ResultKind,
     started: Instant,
+    pre_skipped: bool,
 ) -> CaseOutcome {
+    let detail = if pre_skipped {
+        Some(match detail {
+            Some(existing) => format!("{existing}; pre skipped: --no-pre"),
+            None => "pre skipped: --no-pre".to_string(),
+        })
+    } else {
+        detail
+    };
     report.result = result;
     report.duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     CaseOutcome {

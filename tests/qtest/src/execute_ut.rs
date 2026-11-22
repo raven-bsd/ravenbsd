@@ -306,6 +306,35 @@ fn a_complete_log_with_a_live_runner_is_reaped_and_passes() {
 }
 
 #[test]
+fn run_with_no_pre_does_not_execute_pre() {
+    let temp = TempDir::new("execute-no-pre");
+    let marker = temp.path().join("pre-ran.txt");
+    let text = format!(
+        "name = \"no-pre\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
+         expect_exit = \"success\"\n\
+         pre = [\"echo ran > {}\"]\n",
+        marker.display()
+    );
+    let case = Case::parse(&text).unwrap();
+    let mut options = runner("exit 33");
+    options.no_pre = true;
+    let outcome = execute(&case, &options);
+    assert_eq!(
+        outcome.report.result,
+        ResultKind::Pass,
+        "{:?}",
+        outcome.detail
+    );
+    assert!(
+        !marker.exists(),
+        "--no-pre executed the pre command and created {}",
+        marker.display()
+    );
+    let detail = outcome.detail.expect("pre-skip detail");
+    assert!(detail.contains("pre skipped: --no-pre"), "{detail}");
+}
+
+#[test]
 fn run_artifacts_are_removed() {
     let temp = TempDir::new("execute-cleanup");
     let vars = temp.path().join("case.vars.fd");
