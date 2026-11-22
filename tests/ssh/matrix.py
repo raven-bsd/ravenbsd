@@ -861,10 +861,11 @@ def row_s7(console: SerialConsole) -> None:
     marker_run = ssh_run(["cat", "/tmp/ssh-marker"], "s7-marker.log")
     time.sleep(0.5)
     console_new = console_marker_count(console) - total_before
-    marker_ok = marker_run["returncode"] == 0 and marker_run["stdout"] == MARKER
+    marker_ok = marker_run["stdout"] == MARKER
     attempt("S7-marker", 1, "fresh", f"{literal(MARKER)}; console delta 0",
             f"{literal(marker_run['stdout'])}; console_new={console_new}",
-            float(marker_run["elapsed_ms"]), "PASS" if marker_ok else "FAIL",
+            float(marker_run["elapsed_ms"]),
+            "PASS" if marker_ok and console_new == 0 else "FAIL",
             f"exit {marker_run['returncode']}")
     passed = 0
     max_console_new = console_new
@@ -875,7 +876,7 @@ def row_s7(console: SerialConsole) -> None:
         after = console_marker_count(console)
         new_markers = after - before
         max_console_new = max(max_console_new, new_markers)
-        ok = session["returncode"] == 0 and session["stdout"] == MARKER
+        ok = session["stdout"] == MARKER and new_markers == 0
         passed += 1 if ok else 0
         attempt("S7-10/10", number, "fresh", f"{literal(MARKER)}; console delta 0",
                 f"{literal(session['stdout'])}; console_new={new_markers}",
@@ -890,17 +891,19 @@ def row_s7(console: SerialConsole) -> None:
             float(marker_run["elapsed_ms"]), "PASS" if routing_ok else "FAIL")
     if routing_ok:
         record("S7-routing", "PASS",
-               "client received the exact marker and the guest console marker count did not "
-               "increase over the single attempt plus 10/10")
+               f"client received the exact marker; console total delta 0 "
+               f"(exit {marker_run['returncode']} after delivery is S5-session)")
     else:
-        record("S7-routing", "FAIL",
-               f"client={literal(marker_run['stdout'])}; max_console_new={max_console_new}; "
-               f"console_total_delta={total_delta} (the command output is not on the client "
-               f"channel)")
+        if marker_run["stdout"] != MARKER:
+            reason = f"client={literal(marker_run['stdout'])} (not the marker)"
+        else:
+            reason = f"console_total_delta={total_delta} (console also received the marker)"
+        record("S7-routing", "FAIL", reason)
     if marker_ok and passed == 10 and total_delta == 0:
         record("S7", "PASS",
                f"`cat /tmp/ssh-marker` returned exactly {literal(MARKER)} on the single attempt "
-               f"and on 10/10 command sessions; console_total_delta=0 (gate; C1-C10)")
+               f"and on 10/10; console_total_delta=0; exit codes "
+               f"{marker_run['returncode']}/10 sessions are the S5-session completion fact")
     else:
         record("S7", "FAIL",
                f"marker {'exact' if marker_ok else 'mismatch/error'} "
