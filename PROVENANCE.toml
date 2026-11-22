@@ -7917,7 +7917,7 @@ license = "ISC"
 tier = "A"
 copied = "2026-11-22"
 modified = true
-notes = "pure raven-entropy port of _rs_init/_rs_stir/_rs_rekey/_rs_random_buf and the 8-byte-IV ChaCha from chacha_private.h (public domain, same revision); getentropy, mmap/minherit and the libc lock replaced by SeedSource, the caller lock and Pool::fork_child"
+notes = "pure raven-entropy port of _rs_init/_rs_stir/_rs_rekey/_rs_random_buf, plus arc4random.h's _rs_allocate/_rs_forkdetect shape and the 8-byte-IV ChaCha from chacha_private.h (public domain, same revision); getentropy, mmap/minherit and the libc lock replaced by SeedSource, the caller lock and Pool::fork_child"
 
 [[import]]
 path = "libc/ravenlibc/crates/raven-libc-rand/src/platform.rs"
