@@ -299,6 +299,19 @@ def banner_probe(label: str, send_client: bool) -> dict[str, object]:
             "connect_ms": connected_ms}
 
 
+def wait_tcp(port: int, timeout_s: float) -> bool:
+    """Wait until the guest listener accepts a TCP connection (repeat-boot readiness)."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            connection = socket.create_connection((HOST, port), timeout=1)
+            connection.close()
+            return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
 def row_s0() -> None:
     if not ECHO_IMAGE.is_file():
         record("S0", "BLOCKED",
@@ -1075,7 +1088,12 @@ def main() -> int:
     try:
         repeat_child, _ = boot(IMAGE, b"svcd: sshd up", "serial-repeat.log",
                                "vars-repeat.fd", ready_timeout=180)
-        row_s1_repeat()
+        if not wait_tcp(22, 30):
+            record("S1-repeat", "BLOCKED",
+                   "guest listener did not accept a TCP connection after svcd: sshd up")
+        else:
+            time.sleep(0.5)
+            row_s1_repeat()
     except Exception as error:  # noqa: BLE001 - isolate a repeat-boot failure
         record("S1-repeat", "BLOCKED", f"S1-repeat boot failed: {error}")
     finally:
