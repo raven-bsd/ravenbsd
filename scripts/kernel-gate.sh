@@ -14,8 +14,12 @@
 # ad-hoc cases at run time. Owners are the lanes that own the subsystem, so a failing row can be
 # routed without re-reading the log.
 #
-# usage: sh scripts/kernel-gate.sh [--list]
-#   --list   print the case table and exit (no QEMU run)
+# usage: sh scripts/kernel-gate.sh [--list | --durability | --functional]
+#   --list         print the case table and exit (no QEMU run)
+#   --durability   run only the three UFS durability rows (ENOSPC, fsync write/kill,
+#                  remount check) and write target/kernel-gate/durability.md
+#   --functional   use the functional hygiene budget (qemu <= 2 and load1 <= 2 x nproc)
+#                  instead of the exclusive host-idle preflight; a REFUSE stops the gate
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
 # The exclusive-host preflight refuses other QEMU/xtask/cargo/rustc or load > 2.0. Set
@@ -61,32 +65,68 @@ kmem-frames-nopcpu|x86_64|mark|allocator
 proc-death-cleanup|x86_64|stuart|process
 trace-context|x86_64|tim|trace
 release-login|x86_64|kevin|release
+ufs-enospc|x86_64|mel|ufs/durability
+ufs-fsync-persist|x86_64|mel|ufs/durability
+ufs-fsync-check|x86_64|mel|ufs/durability
 boot-uname-aarch64|aarch64|dave|boot/uname
 kernel-early-boot-aarch64|aarch64|dave|boot
 kernel-exc-aarch64|aarch64|dave|exceptions
 kernel-paging-aarch64|aarch64|dave|paging
 kernel-timer-aarch64|aarch64|dave|timer'
 
-if [ "${1:-}" = "--list" ]; then
-    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note; do
-        printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
-    done
-    exit 0
-fi
+durability=0
+functional=0
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --list)
+            printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note; do
+                printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
+            done
+            exit 0
+            ;;
+        --durability) durability=1 ;;
+        --functional) functional=1 ;;
+        -h|--help)
+            sed -n '6,26p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "kernel-gate: unknown option: $1" >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    sed -n '6,19p' "$0" | sed 's/^# \{0,1\}//'
-    exit 0
+if [ "$durability" -eq 1 ]; then
+    cases=$(printf '%s\n' "$cases" | awk -F'|' '$4 == "ufs/durability"')
+    doc=target/kernel-gate/durability.md
+else
+    doc=$(mgmt_path architecture/product-data/kernel-gate.md) || exit 2
 fi
-
-doc=$(mgmt_path architecture/product-data/kernel-gate.md) || exit 2
 
 mkdir -p "$log_dir" || exit 2
-sh tests/smp/boot/host-idle.sh \
-    --context "kernel-gate" \
-    --wait "$wait_idle" \
-    --max-load "$max_load" \
-    --state-file "$log_dir/host-state.txt" || exit 2
+if [ "$functional" -eq 1 ]; then
+    # Functional rows use the functional hygiene budget, not the exclusive window: up to two
+    # other boots and load1 <= 2 x nproc. A REFUSE stops the gate; do not override it.
+    load1=$(cut -d' ' -f1 /proc/loadavg)
+    nproc=$(nproc 2>/dev/null || echo 4)
+    max_load=$((nproc * 2))
+    qemu=$(ps -eo stat=,comm= 2>/dev/null \
+        | awk '$1 !~ /^[ZX]/ && $2 ~ /^qemu-system-/ { n++ } END { print n + 0 }')
+    if [ "$qemu" -gt 2 ] ||
+        awk -v l="$load1" -v m="$max_load" 'BEGIN { exit !(l > m) }'; then
+        echo "kernel-gate: hygiene REFUSE functional qemu=$qemu load1=$load1 max_load=$max_load" >&2
+        exit 2
+    fi
+    echo "kernel-gate: hygiene functional qemu=$qemu load1=$load1 max_load=$max_load"
+else
+    sh tests/smp/boot/host-idle.sh \
+        --context "kernel-gate" \
+        --wait "$wait_idle" \
+        --max-load "$max_load" \
+        --state-file "$log_dir/host-state.txt" || exit 2
+fi
 
 commit=$(git rev-parse HEAD 2>/dev/null) || { echo "kernel-gate: not a git checkout" >&2; exit 2; }
 short=$(git rev-parse --short=12 HEAD 2>/dev/null) || short=$commit
