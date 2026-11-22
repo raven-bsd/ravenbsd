@@ -46,6 +46,7 @@ case "$mode" in
         case_name=duplex-matrix
         smp=4
         kvm_state=disabled
+        boot_cap=75
         ;;
     kvm2)
         case_file=tests/smp/duplex-matrix/duplex-matrix-kvm2.toml
@@ -56,6 +57,7 @@ case "$mode" in
             exit 2
         fi
         kvm_state="enabled $(ls -l /dev/kvm)"
+        boot_cap=75
         ;;
 esac
 
@@ -79,7 +81,7 @@ done
 boot() {
     directory=$1
     mkdir -p "$directory"
-    if ! RAVEN_DUPLEX_MATRIX_NO_BUILD=1 timeout 180 \
+    if ! RAVEN_DUPLEX_MATRIX_NO_BUILD=1 timeout "$boot_cap" \
         cargo run -q -p raven-qtest -- run \
             --case "$case_file" \
             --arch x86_64 \
