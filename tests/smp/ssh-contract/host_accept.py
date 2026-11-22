@@ -89,8 +89,8 @@ def half_close(host, port, deadline):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=23097)
-    parser.add_argument("--eof-port", type=int, default=23098)
+    parser.add_argument("--port", type=int, default=23197)
+    parser.add_argument("--eof-port", type=int, default=23198)
     parser.add_argument("--result", required=True)
     parser.add_argument("--log", default="")
     parser.add_argument("--timeout", type=float, default=120.0)

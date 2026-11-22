@@ -11,7 +11,7 @@
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::SiginfoT;
 
-use crate::errors::{EINVAL_ERR, ENOSYS_ERR, ETIMEDOUT_ERR};
+use crate::errors::{EINVAL_ERR, ETIMEDOUT_ERR};
 use crate::raw;
 
 /// Kick bit 0: look at the pending sets.
@@ -93,14 +93,15 @@ pub struct SigCaps {
 }
 
 impl SigCaps {
-    /// The production capability set: no PG-7, PG-8, PG-10, PG-12 or PG-44 primitive exists.
+    /// The production capability set: PG-7 entry/kick/sigreturn, PG-8 EINTR and PG-44 signals
+    /// are available; stop/continue and FP-in-frame remain future work.
     pub const PRODUCTION: Self = Self {
-        entry: false,
-        kick: false,
-        sigreturn: false,
-        resend: false,
-        eintr: false,
-        proc_kill: false,
+        entry: true,
+        kick: true,
+        sigreturn: true,
+        resend: true,
+        eintr: true,
+        proc_kill: true,
         stop: false,
         fp_in_frame: false,
     };
@@ -164,11 +165,6 @@ impl SysKernel {
     pub const fn new() -> Self {
         Self
     }
-
-    fn notify(pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
-        let _ = (pid, sig, info);
-        Err(ENOSYS_ERR)
-    }
 }
 
 impl SigKernel for SysKernel {
@@ -198,16 +194,11 @@ impl SigKernel for SysKernel {
     }
 
     fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
-        // PG-7 is absent: remember the address for the shell and report the gap. No number is
-        // fabricated; the shell checks `caps().entry` before calling this.
-        let _ = (ctx_area_offset, flags);
-        raw::set_entry_function(entry);
-        Err(ENOSYS_ERR)
+        raw::sig_setup(entry, ctx_area_offset, flags)
     }
 
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno> {
-        let _ = (handle, bits);
-        Err(ENOSYS_ERR)
+        raw::thread_kick(handle, bits)
     }
 
     fn sigreturn(&self) -> ! {
@@ -215,17 +206,26 @@ impl SigKernel for SysKernel {
     }
 
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno> {
-        let _ = (sig, info, mask);
-        Err(ENOSYS_ERR)
+        raw::sigresend(sig, info as *const SiginfoT as usize, mask)
     }
 
     fn proc_kill(&self, pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
-        Self::notify(pid, sig, info)
+        let _ = info;
+        raven_libc_sys::signal::proc_signal(pid, sig).map_err(|error| Errno(error.0))
     }
 
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)> {
         let _ = deliverable;
-        None
+        let mut raw = [0u64; 3];
+        let signo =
+            raven_libc_sys::signal::proc_sigrecv(&mut raw, raven_libc_sys::signal::WNOHANG).ok()?;
+        if signo <= 0 {
+            return None;
+        }
+        let mut info =
+            crate::frame::user_siginfo(signo, raven_libc_abi::generated::signal::SI_USER);
+        crate::frame::set_si_pid(&mut info, raw[1] as i32);
+        Some((signo, info))
     }
 
     fn wait_for_kick(&self, deadline_ns: Option<u64>) -> Result<(), Errno> {

@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K443: SIGCHLD delivery and reaping while blocked in ppoll. The guest runs the OpenSSH
+# self-pipe handler, one child (no SA_RESTART and SA_RESTART), an already-written blocking
+# self-pipe read, and two children exiting while the parent sleeps. It is a static libc-test
+# image with no network or pty dependency.
+
+name = "sigchld-ppoll"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 120
+initfs = "build/fixtures/sigchld-ppoll/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+pre = ["sh tests/smp/ssh-contract/sigchld-build.sh"]
+
+[[expect]]
+regex = '^sigchld-ppoll: start sig=17$'
+
+[[expect]]
+regex = '^sigchld-ppoll: no-SA_RESTART PASS handler=1 read=1 wait=7$'
+
+[[expect]]
+regex = '^sigchld-ppoll: SA_RESTART PASS handler=1 read=1 wait=7$'
+
+[[expect]]
+regex = '^sigchld-ppoll: BLOCKING PASS read=1$'
+
+[[expect]]
+regex = '^sigchld-ppoll: TWO PASS handler=2 statuses=3,4$'
+
+[[expect]]
+regex = '^sigchld-ppoll: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)sigchld-ppoll: FAIL|panic|EXCEPTION'

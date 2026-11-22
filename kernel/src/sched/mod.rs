@@ -384,7 +384,7 @@ pub fn new_user_thread(
         .ok_or(Errno::EINVAL)?;
     let name = format!("{}-thread", process.id);
     let priority = crate::process::priority::nice_to_priority(process.nice());
-    Thread::new_user(
+    let thread = Thread::new_user(
         name,
         Arc::clone(process),
         entry,
@@ -392,7 +392,9 @@ pub fn new_user_thread(
         arg,
         cr3,
         priority,
-    )
+    )?;
+    process.thread_list.lock().push(Arc::clone(&thread));
+    Ok(thread)
 }
 
 /// Start the scheduler with `thread` as the first runnable user thread.
@@ -1073,6 +1075,11 @@ pub fn exit_thread(code: i32) -> ! {
     };
     thread.exit_code.store(code, Ordering::SeqCst);
     crate::syscall::futex::remove_thread(thread.id);
+    thread
+        .process
+        .thread_list
+        .lock()
+        .retain(|entry| !Arc::ptr_eq(entry, &thread));
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }

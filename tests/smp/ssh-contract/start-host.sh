@@ -16,7 +16,7 @@ rm -f "$out/host.result" "$out/host.log" "$out/host.stdout"
 pkill -f "ssh-contract/host_accept.py" 2>/dev/null || true
 python3 tests/smp/ssh-contract/host_accept.py \
     --host 127.0.0.1 \
-    --port 23097 \
+    --port 23197 \
     --result "$out/host.result" \
     --log "$out/host.log" \
     --timeout 120 \

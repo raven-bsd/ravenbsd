@@ -12,6 +12,7 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::{JmpBuf, McontextT, SiginfoT, UcontextT};
 use raven_libc_tls::raw as tls_raw;
 use raven_libc_tls::tcb;
@@ -500,6 +501,55 @@ pub fn call_handler(stack: usize, handler: usize, arg1: usize, arg2: usize, arg3
     // SAFETY: `stack` is either the application's alternate stack (with room) or the interrupted
     // stack below its live frame; `handler` is the application function address.
     unsafe { __rl_call_handler(stack, handler, arg1, arg2, arg3) }
+}
+
+/// `SIG_SETUP` (syscall 0x80): register the per-thread entry and context area.
+pub fn sig_setup(entry: usize, ctx_offset: usize, flags: u32) -> Result<(), Errno> {
+    // SAFETY: SIG_SETUP takes scalar arguments only; the kernel validates the entry address
+    // against the caller's executable mappings and the context area against the user range.
+    let result = unsafe {
+        raven_libc_sys::arch::syscall3(
+            raven_abi::signal::SIG_SETUP,
+            entry,
+            ctx_offset,
+            flags as usize,
+        )
+    };
+    raven_libc_sys::errno::ret(result)
+        .map(|_| ())
+        .map_err(|error| Errno(error.0))
+}
+
+/// `THREAD_KICK` (0x81): set sticky signal bits on one thread.
+pub fn thread_kick(handle: u32, bits: u32) -> Result<(), Errno> {
+    // SAFETY: THREAD_KICK takes two scalar arguments; the kernel validates the handle rights.
+    let result = unsafe {
+        raven_libc_sys::arch::syscall2(
+            raven_abi::syscall::THREAD_KICK,
+            handle as usize,
+            bits as usize,
+        )
+    };
+    raven_libc_sys::errno::ret(result)
+        .map(|_| ())
+        .map_err(|error| Errno(error.0))
+}
+
+/// `SIGRESEND` (0x84): restore the user mask and request a nested entry.
+pub fn sigresend(sig: i32, info: usize, mask: u64) -> Result<(), Errno> {
+    // SAFETY: SIGRESEND takes scalar arguments; `info` is opaque to the kernel and `mask` is
+    // stored as the thread's user signal mask.
+    let result = unsafe {
+        raven_libc_sys::arch::syscall3(
+            raven_abi::signal::SIGRESEND,
+            sig as usize,
+            info,
+            mask as usize,
+        )
+    };
+    raven_libc_sys::errno::ret(result)
+        .map(|_| ())
+        .map_err(|error| Errno(error.0))
 }
 
 /// `SIGRETURN` (syscall 0x82, PROPOSED PG-7).

@@ -2484,6 +2484,7 @@ dependencies = [
 name = "raven-libc-signal"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-libc-abi",
  "raven-libc-sys",
  "raven-libc-tls",

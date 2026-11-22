@@ -50,6 +50,9 @@ pub unsafe extern "C" fn sigaction(
         },
     ) {
         Ok(()) => {
+            if request.as_ref().is_some_and(|action| action.handler > 1) {
+                super::entry::ensure_signal_entry();
+            }
             if !old.is_null() {
                 // SAFETY: the caller supplies a writable sigaction.
                 unsafe {

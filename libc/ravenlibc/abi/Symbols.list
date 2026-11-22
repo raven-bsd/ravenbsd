@@ -1735,6 +1735,9 @@ ynf
 __raven_init_main_thread
 __raven_libc_init
 __raven_libc_start
+__raven_sigentry_body
+__raven_sigentry_body_asm
+__raven_sigentry_stack
 __raven_va_error
 __raven_va_error_at_line
 __raven_va_execl

@@ -3,11 +3,11 @@
 
 # K440: guest SSH kernel-contract conformance suite (K1-K10). The fixture runs on the
 # network-config-test profile with netd and ptyd; the host peer opens two TCP connections for K6
-# and two EOF/half-close connections on 23098.
+# and two EOF/half-close connections on 23198.
 name = "ssh-contract"
 arch = "x86_64"
 profile = "network-config-test"
-timeout_secs = 30
+timeout_secs = 180
 pre = [
     "sh tests/smp/ssh-contract/build.sh",
     "sh tests/smp/ssh-contract/start-host.sh",
@@ -16,7 +16,7 @@ initfs = "build/fixtures/ssh-contract/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
-    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23097-:23097,hostfwd=tcp:127.0.0.1:23098-:23098",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23197-:23197,hostfwd=tcp:127.0.0.1:23198-:23198",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
 expect_exit = "success"

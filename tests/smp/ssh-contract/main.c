@@ -42,8 +42,8 @@ extern int grantpt(int fd);
 extern int unlockpt(int fd);
 extern char *ptsname(int fd);
 
-#define K6_PORT 23097
-#define KEOF_PORT 23098
+#define K6_PORT 23197
+#define KEOF_PORT 23198
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
 static long raven_debug_write(const char *bytes, size_t len) {

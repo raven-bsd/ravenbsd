@@ -11,7 +11,12 @@ use super::DISP;
 #[unsafe(no_mangle)]
 pub extern "C" fn signal(sig: c_int, handler: usize) -> usize {
     match legacy::signal(&DISP, sig, handler) {
-        Ok(old) => old,
+        Ok(old) => {
+            if handler > 1 {
+                super::entry::ensure_signal_entry();
+            }
+            old
+        }
         Err(error) => {
             crate::ffi::errno::set(error);
             usize::MAX

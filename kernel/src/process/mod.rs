@@ -250,6 +250,8 @@ pub struct Process {
     pub exit_code: AtomicI32,
     /// Live thread count.
     pub threads: AtomicU32,
+    /// Live thread objects, used to deliver a process-directed signal to every thread.
+    pub thread_list: Mutex<Vec<Arc<crate::sched::thread::Thread>>>,
     /// True once the process is terminal: none of its threads may run user code again.
     pub exiting: AtomicBool,
     /// True once the one-shot teardown has released the address space and handle table.
@@ -452,6 +454,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        thread_list: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -528,6 +531,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        thread_list: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -597,6 +601,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        thread_list: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -776,6 +781,23 @@ impl Process {
             .lock()
             .push_back(PendingSignal { signo, sender });
         self.signal_waiters.wake_all();
+        // Process-directed signals must interrupt a thread blocked in an interruptible syscall
+        // (ppoll/read/wait). The thread objects are the authority: the initial thread has no
+        // user handle, and THREAD_CREATE handles may already be closed. Clone the list, drop the
+        // lock, then kick: waking a waiter takes the scheduler lock.
+        let threads: Vec<Arc<crate::sched::thread::Thread>> = self.thread_list.lock().clone();
+        for thread in threads {
+            // Only a thread with a registered PG-7 entry can consume the kick; a process that
+            // uses PROC_SIGRECV is already woken above, and an ordinary waiter (svcd) must not
+            // be disturbed by a SIGCHLD it does not handle.
+            if thread
+                .signal_entry
+                .load(core::sync::atomic::Ordering::Acquire)
+                != 0
+            {
+                crate::syscall::thread::kick_thread(&thread, crate::syscall::thread::KICK_CHECK);
+            }
+        }
     }
 
     /// Pop the oldest queued signal.
@@ -900,6 +922,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        thread_list: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),

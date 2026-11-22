@@ -26,11 +26,13 @@ fi
 
 sysroot=$root/build/$arch/sysroot
 libc_archive=$sysroot/usr/lib/libc.a
+rebuilt=0
 if [ ! -f "$libc_archive" ] ||
     [ -n "$(find "$root/libc/ravenlibc/crates" "$root/libc/ravenlibc/abi" \
         "$root/libc/ravenlibc/crt" "$root/libc/ravenlibc/Cargo.toml" \
         -newer "$libc_archive" -print -quit 2>/dev/null)" ]; then
     cargo xtask libc-pack --arch "$arch"
+    rebuilt=1
 fi
 for file in crt1.o crti.o crtn.o libc.a; do
     [ -f "$sysroot/usr/lib/$file" ] || {
@@ -38,6 +40,14 @@ for file in crt1.o crti.o crtn.o libc.a; do
         exit 1
     }
 done
+
+stamp=$out/.stamp
+if [ "$rebuilt" -eq 0 ] && [ -f "$stamp" ] && [ "$stamp" -nt "$root/tests/smp/ssh-contract/main.c" ] &&
+    [ "$stamp" -nt "$root/tests/smp/ssh-contract/child.c" ] &&
+    [ -f "$out/initfs.img" ]; then
+    echo "ssh-contract fixture: up to date"
+    exit 0
+fi
 
 CC=${CC:-clang}
 command -v "$CC" >/dev/null 2>&1 || {
@@ -96,9 +106,7 @@ link_one "$out/main.o" "$out/ssh-contract"
 link_one "$out/child.o" "$out/ssh-contract-child"
 
 for tool in raven-init raven-ptyd; do
-    if [ ! -x "$root/build/$arch/user/$tool" ]; then
-        cargo xtask build user --arch "$arch" -p "$tool"
-    fi
+    cargo xtask build user --arch "$arch" --release -p "$tool" >/dev/null
 done
 init=$root/build/$arch/user/raven-init
 ptyd=$root/build/$arch/user/raven-ptyd
@@ -117,4 +125,5 @@ overlay=$root/target/debug/raven-b70-overlay
     "/etc/services.d/ptyd.toml=$root/tests/smp/ssh-contract/ptyd.service.toml" \
     "/etc/svcd.conf=$root/tests/smp/ssh-contract/ssh-contract.svcd.conf"
 
+touch "$stamp"
 echo "ssh-contract fixture: $out/initfs.img"

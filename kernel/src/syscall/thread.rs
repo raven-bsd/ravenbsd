@@ -264,6 +264,29 @@ pub fn kick(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// Set the sticky kick bits on one thread and wake it when it is interruptible.
+///
+/// Used by process-directed signal delivery: `queue_signal` cannot hold the target's handle
+/// table while waking a waiter, so it collects the thread handles and calls this helper after
+/// dropping the lock.
+pub(crate) fn kick_thread(thread: &Arc<crate::sched::thread::Thread>, bits: u32) {
+    if bits == 0 || thread.state() == ThreadState::Dead {
+        return;
+    }
+    thread
+        .kick_bits
+        .fetch_or(bits, core::sync::atomic::Ordering::AcqRel);
+    if thread
+        .interruptible
+        .load(core::sync::atomic::Ordering::Acquire)
+    {
+        let token = thread
+            .block_token
+            .load(core::sync::atomic::Ordering::SeqCst);
+        let token = (token != 0).then_some(token);
+        let _ = sched::wake(Arc::clone(thread), token, Errno::EINTR.to_ret());
+    }
+}
 /// `thread_set_tls(thread, tp) -> 0`.
 ///
 /// `Handle::NONE` targets the calling thread. A non-zero base must be a
@@ -319,7 +342,7 @@ pub struct SignalEntry {
 }
 
 /// `THREAD_KICK` bit 0: inspect pending signal state.
-const KICK_CHECK: u32 = 1;
+pub(crate) const KICK_CHECK: u32 = 1;
 
 /// `sig_setup(entry: usize, ctx_offset: usize, flags: u32) -> 0` (raw 0x80).
 ///

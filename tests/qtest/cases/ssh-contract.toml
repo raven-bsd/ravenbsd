@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Alias for the K443 acceptance command `cargo xtask qtest --case ssh-contract`; the fixture
+# lives under tests/smp/ssh-contract/ and the qtest resolver only scans tests/qtest/cases.
+
+name = "ssh-contract"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 180
+pre = [
+    "sh tests/smp/ssh-contract/build.sh",
+    "sh tests/smp/ssh-contract/start-host.sh",
+]
+initfs = "build/fixtures/ssh-contract/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23197-:23197,hostfwd=tcp:127.0.0.1:23198-:23198",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONTRACT K1 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K2 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K3 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K4 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K5 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K6 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K7 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K8 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K9 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K10 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 10/10$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)CONTRACT K([1-9]|10) FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'
