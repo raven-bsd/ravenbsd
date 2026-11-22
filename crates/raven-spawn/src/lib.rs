@@ -1618,7 +1618,7 @@ fn plan_image<'a>(
 /// The wire block is built in a heap `Vec`; a no-alloc image cannot publish it.  Empty is the
 /// common case and stays supported (K463).
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
-#[allow(dead_code)] // host tests exercise it; only the no-alloc target cfg calls it
+#[allow(dead_code)] // ravenbsd target builds compile this for the no-alloc path; the alloc build uses encode_fdmap
 fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
     if fdmap.is_empty() {
         Ok(())
@@ -1627,8 +1627,10 @@ fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
     }
 }
 
-#[cfg(any(feature = "alloc", test))]
-#[allow(dead_code)] // the caller is target-only; host tests exercise it
+#[cfg(any(
+    test,
+    all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
+))]
 fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
     let mut out = alloc_crate::vec::Vec::with_capacity(8usize.saturating_add(18 * entries.len()));
