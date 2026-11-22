@@ -1,15 +1,14 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors */
 
-/* K489: a slave read blocked with VMIN=1 must not stall the pty server for another pair.
+/* K513: a blocked slave read on one pair must not delay another pair or the pty server.
  *
- * Pair A: a child blocks in read(slave A) with no data.
- * Pair B: the parent writes one byte to master B and reads it from slave B; the wall time is
- * measured. On the single-threaded ptyd this stalls until the alarm fires.
- * Eight pairs: eight children block, the parent idles 5 s, then writes one byte to every master;
- * each child reports its read wall time.
- * A ninth pair is allocated and closed after the blocked set; ptyd must return to files=0 pairs=0.
- * A 3 s SIGALRM bounds the first red measurement so the case reports a wall instead of hanging. */
+ * Pair A blocks in read(VMIN=1); pair B writes and reads one byte with a wall bound.
+ * Eight pairs block for a 5 s idle window; each then receives its byte. The 16-pair phase uses a
+ * 1 s idle and a stated 1000 ms bound. The per-pair latencies are printed; each child enforces
+ * its phase bound. A ninth pair allocates and closes; ptyd returns to files=0 pairs=0.
+ * The case runs under KVM because a bound over eight guest processes measures the TCG scheduler
+ * as much as ptyd (K489); the server completion is what this ticket bounds. */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -22,7 +21,11 @@
 #include <time.h>
 #include <unistd.h>
 
-#define BLOCKED 8
+#define MAX_PAIRS 16
+#define PAIRS8 8
+#define PAIRS16 16
+#define BOUND8_MS 500
+#define BOUND16_MS 1000
 
 static int failures;
 
@@ -119,7 +122,7 @@ static int main_case(void) {
     printf("pty-concurrent: B write=%d read=%d byte=%u wall_ms=%ld\n", wrote, read_back,
            (unsigned)byte, wall);
     fflush(stdout);
-    if (wrote != 1 || read_back != 1 || byte != 'B' || wall > 500) {
+    if (wrote != 1 || read_back != 1 || byte != 'B' || wall > BOUND8_MS) {
         printf("pty-concurrent: FAIL B wall_ms=%ld\n", wall);
         failures++;
     }
@@ -136,109 +139,147 @@ static int main_case(void) {
     return 0;
 }
 
-static int many_case(void) {
-    int masters[BLOCKED];
-    int slaves[BLOCKED];
-    pid_t children[BLOCKED];
-    char names[BLOCKED][64];
-    int go[BLOCKED][2];
+/* Open `pairs` blocked reads, idle, write one byte to every master, release every reader and
+ * enforce `bound_ms` from release to read completion. The per-pair lines are the evidence. */
+static int run_phase(int pairs, int bound_ms, int idle_secs) {
+    int masters[MAX_PAIRS];
+    int slaves[MAX_PAIRS];
+    int go[MAX_PAIRS][2];
+    int ready[MAX_PAIRS][2];
+    pid_t children[MAX_PAIRS];
+    char names[MAX_PAIRS][64];
+    int phase_failures = 0;
+
+    if (pairs < 1 || pairs > MAX_PAIRS)
+        return 1;
     memset(masters, -1, sizeof(masters));
     memset(slaves, -1, sizeof(slaves));
-    for (int index = 0; index < BLOCKED; index++) {
+    memset(go, -1, sizeof(go));
+    memset(ready, -1, sizeof(ready));
+    memset(children, 0, sizeof(children));
+
+    for (int index = 0; index < pairs; index++) {
         if (open_pair(&masters[index], &slaves[index], names[index], sizeof(names[index])) != 0 ||
             set_blocking_read(slaves[index]) != 0) {
             printf("pty-concurrent: FAIL open pair=%d errno=%d\n", index, errno);
+            failures++;
             return 1;
         }
-        if (pipe(go[index]) != 0) {
+        if (pipe(go[index]) != 0 || pipe(ready[index]) != 0) {
             printf("pty-concurrent: FAIL pipe pair=%d errno=%d\n", index, errno);
+            failures++;
             return 1;
         }
     }
-    for (int index = 0; index < BLOCKED; index++) {
+
+    for (int index = 0; index < pairs; index++) {
         pid_t child = fork();
         if (child < 0) {
             printf("pty-concurrent: FAIL fork pair=%d errno=%d\n", index, errno);
+            failures++;
             return 1;
         }
         if (child == 0) {
-            for (int other = 0; other < BLOCKED; other++) {
+            for (int other = 0; other < pairs; other++) {
                 if (other != index) {
                     close(go[other][0]);
                     close(go[other][1]);
+                    close(ready[other][0]);
+                    close(ready[other][1]);
                     close(masters[other]);
                     close(slaves[other]);
                 }
             }
             close(masters[index]);
-            // The parent queues the master byte, then releases this child through its own pipe;
-            // the measured latency starts at that release, so the 5 s idle is excluded.
-            char release = 0;
-            (void)read(go[index][0], &release, 1);
+            close(go[index][1]);
+            close(ready[index][0]);
+            char ready_byte = 1;
+            (void)write(ready[index][1], &ready_byte, 1);
+            close(ready[index][1]);
+            // The parent sends the phase start timestamp just before it writes the masters;
+            // the measured latency therefore covers the server write/completion path, not the
+            // idle and not only the child's post-release scheduling.
+            long start = 0;
+            (void)read(go[index][0], &start, sizeof(start));
             close(go[index][0]);
-            long start = now_ms();
             unsigned char byte = 0;
             int count = (int)read(slaves[index], &byte, 1);
             long latency = now_ms() - start;
-            printf("pty-concurrent: pair=%d read=%d byte=%u latency_ms=%ld\n", index, count,
-                   (unsigned)byte, latency);
+            printf("pty-concurrent: pairs=%d pair=%d read=%d byte=%u latency_ms=%ld\n", pairs,
+                   index, count, (unsigned)byte, latency);
             fflush(stdout);
-            _exit(count == 1 && byte == (unsigned char)('a' + index) && latency <= 500 ? 0 : 1);
+            _exit(count == 1 && byte == (unsigned char)('a' + index) && latency <= bound_ms ? 0
+                                                                                        : 1);
         }
         children[index] = child;
     }
-    for (int index = 0; index < BLOCKED; index++)
+
+    for (int index = 0; index < pairs; index++)
         close(go[index][0]);
+    for (int index = 0; index < pairs; index++) {
+        char ready_byte = 0;
+        (void)read(ready[index][0], &ready_byte, 1);
+        close(ready[index][0]);
+        close(ready[index][1]);
+    }
 
     struct timespec idle;
-    idle.tv_sec = 5;
+    idle.tv_sec = idle_secs;
     idle.tv_nsec = 0;
     (void)nanosleep(&idle, NULL);
-    printf("pty-concurrent: idle_ms=5000 blocked=%d\n", BLOCKED);
+    printf("pty-concurrent: idle_ms=%d pairs=%d\n", idle_secs * 1000, pairs);
     fflush(stdout);
 
-    for (int index = 0; index < BLOCKED; index++) {
+    long start_ms = now_ms();
+    for (int index = 0; index < pairs; index++) {
+        (void)write(go[index][1], &start_ms, sizeof(start_ms));
+        close(go[index][1]);
+    }
+    for (int index = 0; index < pairs; index++) {
         char byte = (char)('a' + index);
         if (write(masters[index], &byte, 1) != 1) {
             printf("pty-concurrent: FAIL write pair=%d errno=%d\n", index, errno);
-            failures++;
+            phase_failures++;
         }
     }
-    for (int index = 0; index < BLOCKED; index++) {
-        char release = 0;
-        (void)write(go[index][1], &release, 1);
-        close(go[index][1]);
-    }
-    for (int index = 0; index < BLOCKED; index++) {
+    for (int index = 0; index < pairs; index++) {
         int status = 0;
         if (waitpid(children[index], &status, 0) != children[index] || !WIFEXITED(status) ||
             WEXITSTATUS(status) != 0) {
             printf("pty-concurrent: FAIL pair=%d status=%d\n", index, status);
-            failures++;
+            phase_failures++;
         }
         close(slaves[index]);
         close(masters[index]);
     }
 
-    int ninth_master = -1;
-    int ninth_slave = -1;
-    char ninth_name[64];
-    if (open_pair(&ninth_master, &ninth_slave, ninth_name, sizeof(ninth_name)) != 0) {
+    failures += phase_failures;
+    printf("pty-concurrent: pairs=%d bound_ms=%d status=%s\n", pairs, bound_ms,
+           phase_failures == 0 ? "ok" : "fail");
+    return phase_failures == 0 ? 0 : 1;
+}
+
+static void ninth_pair(void) {
+    int master = -1;
+    int slave = -1;
+    char name[64];
+    if (open_pair(&master, &slave, name, sizeof(name)) != 0) {
         printf("pty-concurrent: FAIL ninth errno=%d\n", errno);
         failures++;
-    } else {
-        close(ninth_slave);
-        close(ninth_master);
-        printf("pty-concurrent: ninth pair ok\n");
+        return;
     }
-    return 0;
+    close(slave);
+    close(master);
+    printf("pty-concurrent: ninth pair ok\n");
 }
 
 int main(void) {
-    printf("pty-concurrent: start uid=%d blocked=%d\n", (int)getuid(), BLOCKED);
+    printf("pty-concurrent: start uid=%d blocked=%d\n", (int)getuid(), PAIRS8);
     fflush(stdout);
     (void)main_case();
-    (void)many_case();
+    (void)run_phase(PAIRS8, BOUND8_MS, 5);
+    (void)run_phase(PAIRS16, BOUND16_MS, 1);
+    ninth_pair();
     if (failures != 0) {
         printf("pty-concurrent: FAIL rows=%d\n", failures);
         return 1;

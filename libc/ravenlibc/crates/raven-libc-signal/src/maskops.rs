@@ -89,7 +89,11 @@ pub fn pthread_sigmask<K: SigKernel>(
     };
     next &= APP_MASK;
     raw::mask_store(tp, next);
-    if mask::deliverable(raw::pending_load(tp), next) != 0 {
+    // An unblock must re-check the *process* queue too: a signal that arrived while blocked is
+    // owned by the kernel, so thread-pending bits alone cannot prove there is nothing to run.
+    // The fresh kick is cheap and the entry path treats an empty check as spurious.
+    let unblocked = previous & !next & APP_MASK;
+    if unblocked != 0 || mask::deliverable(raw::pending_load(tp), next) != 0 {
         kernel.kick(kernel.thread_handle(), KICK_CHECK).ok();
     }
     0

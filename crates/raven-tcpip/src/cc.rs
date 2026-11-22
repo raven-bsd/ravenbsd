@@ -9,6 +9,11 @@
 //! CUBIC is adapted from FreeBSD `sys/netinet/cc/cc_cubic.c` and `cc_cubic.h` (BSD-2-Clause;
 //! Copyright (c) 2008-2010 Lawrence Stewart, Copyright (c) 2010 The FreeBSD Foundation).
 //! The Rust expression is first-party.
+//!
+//! K258 also read NetBSD `sys/netinet/tcp_congctl.c` (4-clause NRL: read-only, no code copied).
+//! Its two-MSS partial-ACK floor and outstanding-data recovery exit are retained where they are
+//! compatible with the FreeBSD/K269 controller; the FreeBSD ABC congestion-avoidance boundary and
+//! first-RTO cut are authoritative and unchanged. CUBIC and RACK remain first-party extensions.
 
 use crate::Duration;
 
@@ -119,7 +124,9 @@ pub trait CongestionControl {
 /// The loss/recovery arithmetic follows the FreeBSD `newreno_cc_cong_signal`,
 /// `newreno_cc_cwnd_in_cong_avoid`, `newreno_cc_cwnd_in_slow_start`,
 /// `newreno_cc_after_idle`, `newreno_cc_post_recovery` and `tcp_newreno_partial_ack` behaviour.
-/// CUBIC and RACK remain first-party extensions.
+/// The two-MSS partial-ACK floor and the outstanding-data recovery exit follow the NetBSD
+/// `tcp_congctl.c` reading where they do not change a K269 vector row. CUBIC and RACK remain
+/// first-party extensions.
 #[derive(Clone, Debug)]
 pub struct NewReno {
     cwnd: u32,
@@ -159,11 +166,12 @@ impl NewReno {
 
     /// Apply a fast-retransmit loss event with the flight size at the event.
     pub fn loss_fast_retransmit(&mut self, flight: u32, snd_nxt: u32) {
-        // FreeBSD newreno_cc_cwnd_on_multiplicative_decrease: beta=50%, at least two MSS.
+        // NetBSD uses min(snd_wnd, snd_cwnd) in tcp_common_congestion_exp. The CcContext has no
+        // snd_wnd field, and `flight` is bounded by the receiver window and cwnd at the loss
+        // point, so it is the closest available proxy.
         let win = flight
             .min(self.cwnd)
-            .saturating_mul(50)
-            .checked_div(100)
+            .checked_div(2)
             .unwrap_or(0)
             .checked_div(self.mss)
             .unwrap_or(0)
@@ -183,21 +191,21 @@ impl NewReno {
         if !self.in_recovery {
             return;
         }
-        // FreeBSD tcp_newreno_partial_ack: subtract acked, then add one MSS.
+        // NetBSD tcp_newreno_fast_retransmit_newack: deflate by (acked - MSS).
         self.cwnd = self
             .cwnd
             .saturating_add(self.mss)
             .saturating_sub(acked)
-            .max(self.mss);
+            .max(2 * self.mss);
     }
 
     /// Apply a full ACK at or above `recover`.
     pub fn full_ack(&mut self) {
         if self.in_recovery {
             if let Some(ack) = self.last_ack {
-                let pipe = self.recover.saturating_sub(ack);
-                self.cwnd = if pipe < self.ssthresh {
-                    pipe.max(self.mss).saturating_add(self.mss)
+                let outstanding = self.recover.saturating_sub(ack);
+                self.cwnd = if outstanding < self.ssthresh {
+                    outstanding.saturating_add(self.mss)
                 } else {
                     self.ssthresh
                 };
@@ -285,6 +293,7 @@ impl CongestionControl for NewReno {
         self.bytes_acked = 0;
         self.last_ack = None;
         self.in_recovery = false;
+        self.in_rto = true;
     }
 
     fn cwnd(&self) -> u32 {
