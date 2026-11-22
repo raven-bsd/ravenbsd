@@ -52,6 +52,7 @@ members = [
     "tests/fixtures/service-restart",
     "tests/fixtures/proc-pgrp",
     "tests/fixtures/proc-orphan",
+    "tests/fixtures/proc-times",
     "tests/fixtures/fault",
     "tests/fixtures/s21-edu",
     "tests/fixtures/s21d-aarch64",

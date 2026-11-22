@@ -7,9 +7,12 @@ Reducers for the tree-wide donor-file test mapping:
 
 | File | Purpose |
 |---|---|
-| `run.py` | Enumerates donor-marked files, maps each to a test, regenerates the register and doc, and gates staleness |
+| `run.py` | Enumerates donor-marked files, maps each to a test, regenerates the TSV register, and gates staleness |
 | `register.tsv` | Generated register: one row per donor file with status, basis, test evidence, owner and proposed ticket |
-| `../../../docs/releases/0.1.0-port-register.md` | Generated summary, counts per area and every NONE row |
+
+The rendered summary is lead-maintained in `ravenbsd-prjmgmt/architecture/product-data/port-register.md`.
+The product repository no longer writes it: `docs/` is frozen (AGENTS.md rule 31), so this tool writes
+only the machine-readable TSV.
 
 ## Commands
 
@@ -18,8 +21,8 @@ timeout 120 python3 tests/release/port-register/run.py --write   # regenerate
 timeout 120 python3 tests/release/port-register/run.py --check   # reducer gate
 ```
 
-`--check` exits non-zero when a donor-marked file has no register row, when a row is stale, or
-when the recorded status/evidence or the generated doc differs from a fresh regeneration.
+`--check` exits non-zero when a donor-marked file has no register row, or when a row's recorded
+status/evidence differs from a fresh regeneration.
 
 ## Method
 
