@@ -58,6 +58,24 @@ K7 now also covers a valid `PROT_NONE` page directly:
 - `DEBUG_WRITE(prot_none, 1)` and `WRITE(pipe, prot_none, 1)` return `EFAULT` (14);
 - `UNAME`/`CLOCK_GET` into the same page return `EFAULT`, confirming `copy_to_user` is unchanged.
 
+### aarch64 measurement (K467)
+
+The aarch64 guest suite (`tests/smp/aarch64`, case `smp-tlb-aarch64-concurrent`) is the aarch64
+measurement; the `tests/smp/memory` case is x86_64-only (`build.sh` exits 77 for aarch64), so it
+cannot be the aarch64 run. The aarch64 fixture now runs the same class:
+
+- `DEBUG_WRITE` and pipe `WRITE` from a full `PROT_NONE` page and from a page straddling a valid
+  page and a `PROT_NONE` page return 14;
+- `UNAME`/`CLOCK_GET` into the `PROT_NONE` page return 14 (`copy_to_user`);
+- the next valid `DEBUG_WRITE`/`UNAME`/`WRITE` succeeds and the process stays alive.
+
+Measured on `smp-tlb-aarch64-concurrent`: all six values `Some(14)`, `next-debug/uname/write=true`,
+`smp-aarch64-copy: ok`, `smp-aarch64-tlb: ok`, `tlb_stale=0`. The x86-64 equivalent is the K456
+fuzz (432 rows, `deviations=0`, identical determinism pair) plus K7 7/7. The aarch64 path is
+`ldtrb`/`sttrb`; the mutation `ldtrb` -> `ldrb`, `sttrb` -> `strb` makes the aarch64 row read the
+supervisor leaf (`protnone-debug=None straddle-debug=None ...`) and fail, proving the measurement
+is not tautological. The check is restored; no kernel change remains.
+
 ## Frame accounting
 
 `s24: frames free=` is printed by the kernel after every child exit (the existing
