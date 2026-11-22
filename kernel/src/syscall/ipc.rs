@@ -58,6 +58,7 @@ fn register(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno>
             _ => return Err(Errno::EACCES),
         }
     }
+    registry::authorize(caller, &name)?;
     let server = registry::register(caller, &name)?;
     let rights = Rights::READ
         .union(Rights::WRITE)
