@@ -1112,9 +1112,9 @@ def main() -> int:
         row_s4()
         row_s5_s6()
         row_s3_finish(console, s3_state)
-        row_s7(console)
         row_s8()
         console_capture(console, "cat /tmp/sshd.log", "s8-server.log")
+        row_s7(console)
     except Exception as error:  # noqa: BLE001 - a boot failure is a BLOCKED row, not a crash
         record("S1", "BLOCKED", f"SSH boot/run failed: {error}")
         for row in ("S2", "S3", "S4", "S5", "S6", "S7", "S8"):

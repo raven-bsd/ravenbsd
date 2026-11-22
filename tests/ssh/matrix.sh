@@ -39,11 +39,12 @@ down() {
 }
 trap down EXIT HUP INT TERM
 
-# S8's dynamic pty case comes from merged K430. Its measured run is ~17 s; 45 s is a small margin.
+# S8's dynamic pty case comes from merged K430. Its measured run after K442 is ~39 s; 75 s is a
+# small margin.
 mkdir -p build/ssh/matrix
 echo "matrix: running the K430 pty-alloc qtest" >&2
 pty_exit=0
-timeout 45 cargo xtask qtest --case pty-alloc --arch x86_64 \
+timeout 75 cargo xtask qtest --case pty-alloc --arch x86_64 \
     > build/ssh/matrix/pty-alloc.log 2>&1 || pty_exit=$?
 echo "$pty_exit" > build/ssh/matrix/pty-alloc.exit
 
