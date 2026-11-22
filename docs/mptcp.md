@@ -115,6 +115,36 @@ Scenario matrix (`crates/raven-mptcp/src/meta_ut.rs`, 11 tests):
 The mock subflows live only in `meta_ut.rs`; `raven-tcpip` and the kernel are untouched. MPTCP2
 adapts the real TCP subflow to the same `Subflow` trait.
 
+## Transport bridge (MPTCP2a)
+
+`raven-tcpip` now has an opt-in `mptcp` feature (`crates/raven-tcpip/src/mptcp_bridge.rs`). It
+implements `raven_mptcp::Subflow` over the real plain-TCP `SubflowOps`:
+
+* `StackSubflow<D>` wraps a shared `Rc<RefCell<Stack<D>>>` and a `SubflowId`; `send` queues on the
+  real TCP socket, `readiness` calls the same live `SubflowOps::readiness` used by the TCP stack,
+  and `close` closes the real subflow.
+* `MetaSocket::pump` now re-reads each transport's live `closed` level before scheduling, so a real
+  TCP subflow that died is requeued onto the backup without an explicit notification.
+* The feature is off by default; without `--features mptcp` the plain TCP crate and its tests are
+  unchanged.
+
+Host proof (`crates/raven-tcpip/tests/mptcp_bridge.rs`, enabled with `--features mptcp,testutil`)
+runs two real `raven-tcpip` TCP connections over the simulator:
+
+| Test | Assertion |
+|---|---|
+| handshake + DSS + reorder | MP_CAPABLE keys exchange, 3000 bytes over the primary, mappings delivered in reverse order to a peer MetaSocket, byte-exact |
+| failover | primary real TCP closed mid-stream; backup idle until then; only unacked DSN 1000/2000 re-injected, byte-exact, no duplicate |
+| live readiness | writable before/after a peer write; readable without a cached mask |
+
+```sh
+timeout 300 cargo nextest run -p raven-tcpip --features mptcp,testutil --test mptcp_bridge
+```
+
+The transport carries the bytes; the host test passes the DSS mapping metadata to the peer
+out-of-band. Putting MP_CAPABLE/DSS on the real wire and the `IPPROTO_MPTCP` socket API is
+MPTCP2b/2c.
+
 ## Phase 2 boundary
 
 Phase 2 owns the `raven-tcpip` subflow integration: hooking MP_CAPABLE/MP_JOIN into the TCP

@@ -97,6 +97,8 @@ pub(crate) struct SocketTable {
     reported_chains: usize,
     released_ports: Vec<u16>,
     detached: Vec<(ConnectionKey, TimeWaitInfo, i64)>,
+    /// MPTCP subflow handles over plain-TCP sockets (MPTCP1b).
+    pub(crate) subflows: crate::mptcp_hooks::SubflowTable,
     next_id: u32,
     max: usize,
 }
@@ -121,6 +123,7 @@ impl SocketTable {
             reported_chains: 0,
             released_ports: Vec::new(),
             detached: Vec::new(),
+            subflows: crate::mptcp_hooks::SubflowTable::new(),
             next_id: 1,
             max,
         }
