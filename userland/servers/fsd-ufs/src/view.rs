@@ -513,10 +513,9 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
     }
 
     fn sync(&mut self) -> Result<(), Errno> {
-        if self.read_only {
-            return Ok(());
-        }
-        self.ufs.sync().map_err(|error| self.note_error(error))
+        // K542 mutation: sync is a no-op for this run; reverted after the gate
+        // proves it catches a dirty remount.
+        Ok(())
     }
 }
 
