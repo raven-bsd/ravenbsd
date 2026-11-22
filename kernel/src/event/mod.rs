@@ -343,21 +343,11 @@ fn deregister(process: &Arc<crate::process::Process>, handle: raven_abi::types::
     REMOVED_REGISTRATIONS.fetch_add(removed as u64, core::sync::atomic::Ordering::Relaxed);
 }
 
-/// The post-commit event close hook.
-///
-/// [`close_handle`] below is the preferred entry point because it can also cancel an IRQ waiter
-/// while the slot is still live.  This entry point survives for the user `HANDLE_CLOSE` path,
-/// which closes the table first; it removes the handle's registrations and does not touch the
-/// (already invalidated) slot.
-pub fn on_handle_close(process: &Arc<crate::process::Process>, handle: raven_abi::types::Handle) {
-    deregister(process, handle);
-}
-
 /// Close `handle` in `process` and run the close hook exactly once.
 ///
 /// This is the single kernel-side close primitive: scheme-file and request-handle close,
 /// thread-creation rollback and the process-exit sweep all use it, and the user `HANDLE_CLOSE`
-/// path calls [`on_handle_close`] so every close shares the same event hook.  The IRQ object is
+/// path does too, so every close shares the same event hook.  The IRQ object is
 /// captured before the close so a blocked `IRQ_WAIT` can be cancelled when the caller has the
 /// process context; the event registrations are removed only after the close commits, so a stale
 /// handle fails with `EBADF` and leaves every registration intact.
