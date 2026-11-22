@@ -46,6 +46,7 @@ echo "$pty_exit" > build/ssh/matrix/pty-alloc.exit
 echo "matrix: building the S0 echo fixture" >&2
 timeout 120 sh tests/fixtures/ssh-echo/build.sh || echo "matrix: S0 fixture build failed" >&2
 
+$SUDO sh scripts/qemu-net.sh down >/dev/null 2>&1 || true
 $SUDO sh scripts/qemu-net.sh up
 up=1
 timeout 600 python3 tests/ssh/matrix.py
