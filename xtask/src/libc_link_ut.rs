@@ -20,6 +20,7 @@ fn parse_accepts_arch_set_and_check() {
         "--set".into(),
         "tiny".into(),
         "--check".into(),
+        "--verify".into(),
         "--json".into(),
         "--out".into(),
         "build/alt".into(),
@@ -28,6 +29,7 @@ fn parse_accepts_arch_set_and_check() {
     assert_eq!(options.arch, Arch::Aarch64);
     assert_eq!(options.set, "tiny");
     assert!(options.check);
+    assert!(options.verify);
     assert!(options.json);
     assert_eq!(options.out, PathBuf::from("build/alt"));
 }
