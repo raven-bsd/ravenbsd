@@ -355,6 +355,31 @@ fn first_record_count(control: &[u8], control_len: usize) -> Result<(u32, u32), 
     Ok((count, get_u32(control, CMSG_BYTES)?))
 }
 
+/// Parse exactly two 20-byte `SCM_RIGHTS` records, one handle each (K521 donor shape).
+fn two_single_records(control: &[u8], control_len: usize) -> Option<[Handle; 2]> {
+    if control_len != 40 {
+        return None;
+    }
+    let len1 = get_u32(control, 0).ok()?;
+    let count1 = get_u32(control, 12).ok()?;
+    let raw1 = get_u32(control, CMSG_BYTES).ok()?;
+    let len2 = get_u32(control, 20).ok()?;
+    let level2 = get_u32(control, 24).ok()?;
+    let kind2 = get_u32(control, 28).ok()?;
+    let count2 = get_u32(control, 32).ok()?;
+    let raw2 = get_u32(control, 36).ok()?;
+    if len1 != 20
+        || count1 != 1
+        || len2 != 20
+        || level2 != SOL_SOCKET
+        || kind2 != SCM_RIGHTS
+        || count2 != 1
+    {
+        return None;
+    }
+    Some([Handle(raw1), Handle(raw2)])
+}
+
 fn observed(value: Stats) -> u64 {
     value
         .pairs
@@ -837,7 +862,6 @@ fn truncation(table: &mut Table) {
     }
 
     // Two SCM_RIGHTS records in one datagram stay two records with their own headers (K521).
-    // The current queue flattens them, so this row is the red proof of the remaining gap.
     if let (Ok((left, right)), Ok((read_end, write_end)), Ok((read_end2, write_end2))) =
         (pair(DUPLEX_DATAGRAM | O_NONBLOCK), pipe(), pipe())
     {
@@ -850,36 +874,30 @@ fn truncation(table: &mut Table) {
         let mut data = [0u8; 8];
         let mut received_control = [0u8; 128];
         let delivered = match recvmsg(right, &mut data, &mut received_control) {
-            Ok((1, message)) if message.handle_count == 2 && message.control_len == 40 => {
-                let first_ok = first_record_count(&received_control, 20).is_ok();
-                let len2 = get_u32(&received_control, 20).unwrap_or(0);
-                let level2 = get_u32(&received_control, 24).unwrap_or(0);
-                let kind2 = get_u32(&received_control, 28).unwrap_or(0);
-                let count2 = get_u32(&received_control, 32).unwrap_or(0);
-                let raw2 = get_u32(&received_control, 36).unwrap_or(u32::MAX);
-                if let Ok((_, raw1)) = first_record_count(&received_control, 20) {
-                    close(Handle(raw1));
-                }
-                if raw2 != u32::MAX {
-                    close(Handle(raw2));
-                }
-                first_ok && len2 == 20 && level2 == SOL_SOCKET && kind2 == SCM_RIGHTS && count2 == 1
-            }
-            Ok((1, message)) => {
-                // Flattened (count=2 in one record): consume the two handles so the row leaks
-                // nothing while it reports the divergence.
-                if message.control_len >= 20
-                    && let Ok((count, _)) =
-                        first_record_count(&received_control, message.control_len as usize)
-                {
-                    for index in 0..count.min(2) {
-                        if let Ok(raw) = get_u32(&received_control, CMSG_BYTES + index as usize * 4)
+            Ok((1, message)) if message.handle_count == 2 => {
+                match two_single_records(&received_control, message.control_len as usize) {
+                    Some([one, two]) => {
+                        close(one);
+                        close(two);
+                        true
+                    }
+                    // A flattened count=2 record: consume both handles and report the divergence.
+                    None => {
+                        if message.control_len >= 20
+                            && let Ok((count, _)) =
+                                first_record_count(&received_control, message.control_len as usize)
                         {
-                            close(Handle(raw));
+                            for index in 0..count.min(2) {
+                                if let Ok(raw) =
+                                    get_u32(&received_control, CMSG_BYTES + index as usize * 4)
+                                {
+                                    close(Handle(raw));
+                                }
+                            }
                         }
+                        false
                     }
                 }
-                false
             }
             _ => false,
         };
@@ -898,6 +916,61 @@ fn truncation(table: &mut Table) {
         );
     } else {
         table.row("truncation", "two-records-one-datagram", false, u64::MAX);
+    }
+
+    // The same two records on a stream send: the data byte and both headers arrive together.
+    if let (Ok((left, right)), Ok((read_end, write_end)), Ok((read_end2, write_end2))) =
+        (pair(0), pipe(), pipe())
+    {
+        let before = base;
+        let mut control = [0u8; 128];
+        let first = control_record(&[write_end], &mut control, 0);
+        let second = control_record(&[write_end2], &mut control, first);
+        let total = first.saturating_add(second);
+        let sent = sendmsg(left, b"s", &control[..total], DUPLEX_MSG_NOSIGNAL) == Ok(1);
+        let mut data = [0u8; 8];
+        let mut received_control = [0u8; 128];
+        let delivered = match recvmsg(right, &mut data, &mut received_control) {
+            Ok((1, message)) if message.handle_count == 2 && data[0] == b's' => {
+                match two_single_records(&received_control, message.control_len as usize) {
+                    Some([one, two]) => {
+                        close(one);
+                        close(two);
+                        true
+                    }
+                    None => {
+                        if let Ok((count, _)) =
+                            first_record_count(&received_control, message.control_len as usize)
+                        {
+                            for index in 0..count.min(2) {
+                                if let Ok(raw) =
+                                    get_u32(&received_control, CMSG_BYTES + index as usize * 4)
+                                {
+                                    close(Handle(raw));
+                                }
+                            }
+                        }
+                        false
+                    }
+                }
+            }
+            _ => false,
+        };
+        close(left);
+        close(write_end);
+        close(write_end2);
+        close(right);
+        close(read_end);
+        close(read_end2);
+        let after = stats().unwrap_or_default().delta(before);
+        table.row(
+            "truncation",
+            "two-records-one-stream",
+            sent && delivered && after.zero(),
+            observed(after),
+        );
+    } else {
+        table.row("truncation", "two-records-one-stream", false, u64::MAX);
     }
 
     // A control capacity exactly equal to the record length succeeds.
