@@ -21,6 +21,10 @@ TCP_SOAK_INTERVAL ?= 10
 BASE ?= origin/master
 HELP_SCRIPT ?= scripts/make-help.sh
 HELP_MANIFEST ?= scripts/help.txt
+SPACE_MIN_GB ?= 20
+PRUNE_APPLY ?= 0
+PRUNE_DAYS ?= 14
+PRUNE_DEPS ?= 0
 
 export VERBOSE
 
@@ -33,7 +37,7 @@ XTASK = cargo run -q -p xtask --
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
 	posix-gaps posix-check toolchain clean distclean check-fast check-build ufs-selftest qemu-ufs soak-smoke soak-24h \
-	tcp-soak-smoke tcp-soak-24h
+	tcp-soak-smoke tcp-soak-24h info space prune
 
 help:
 	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
@@ -111,7 +115,12 @@ dev:
 release:
 	@sh scripts/build.sh release $(ARCH)
 
+# Release, image and CI-style builds do not use incremental state; leaving it on only grows
+# target/ by tens of gigabytes. Developer builds keep incremental enabled.
+image release world release-gate check-build: export CARGO_INCREMENTAL=0
+
 image:
+	@sh scripts/space-guard.sh $(SPACE_MIN_GB)
 	@$(XTASK) image --arch $(ARCH) --platform $(PLATFORM) --profile $(PROFILE)
 
 # K176: QEMU UFS-root preflight (ESP bootstrap + a real UFS2 root disk).
@@ -141,6 +150,18 @@ world:
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .
+
+# Code statistics: Rust code lines first, then the full tokei language table. The scan excludes
+# build output, Git, and vendor trees; the summary separates vendored uutils/brush from our code.
+info:
+	@sh scripts/info.sh
+
+# Disk use and safe build-cache pruning. `prune` is dry-run until PRUNE_APPLY=1.
+space:
+	@sh scripts/space.sh
+
+prune:
+	@sh scripts/prune.sh $(if $(filter 1,$(PRUNE_APPLY)),--apply,) --days $(PRUNE_DAYS) $(if $(filter 1,$(PRUNE_DEPS)),--deps,)
 
 posix-gaps:
 	@$(XTASK) posix-gaps

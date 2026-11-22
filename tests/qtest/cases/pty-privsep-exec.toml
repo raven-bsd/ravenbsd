@@ -37,6 +37,10 @@ regex = '^pty-privsep-exec: child round=0 request=ok$'
 
 [[expect]]
 regex = '^pty-privsep-exec: monitor round=0 master=[0-9]+ name=/dev/pts/[0-9]+$'
+# The monitor and the child print to the same serial line discipline; the monitor can print its
+# round line before the child prints its request line. The line is required exactly once, but its
+# position relative to the child's line is not deterministic.
+unordered = true
 
 [[expect]]
 regex = '^pty-privsep-exec: child round=0 name=/dev/pts/[0-9]+$'

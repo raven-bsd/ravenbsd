@@ -58,8 +58,12 @@ use crate::kprintln;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::uspace::UserAddressSpace;
 use crate::memory::{frame, paging};
+use crate::sched::thread::Thread;
 use crate::sched::wait::WaitQueue;
 use crate::usercopy::copy_from_user;
+
+/// `THREAD_KICK` bit 0: inspect the pending signal state (PG-7).
+const KICK_CHECK: u32 = 1;
 
 use self::handle::Object;
 use self::status::{RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
@@ -124,6 +128,13 @@ pub struct ProcessIds {
 /// Maximum supplementary groups stored by this slice.
 pub const MAX_GROUPS: usize = 16;
 
+/// `si_code` of a child status change (`CLD_EXITED`).
+pub const CLD_EXITED_CODE: u32 = 1;
+/// `si_code` of a plain user signal (`SI_USER`).
+pub const SI_USER_CODE: u32 = 0;
+/// `si_code` of a queued signal (`SI_QUEUE`; the C value is `-1`).
+pub const SI_QUEUE_CODE: u32 = u32::MAX;
+
 /// One queued process signal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PendingSignal {
@@ -131,6 +142,12 @@ pub struct PendingSignal {
     pub signo: u32,
     /// Sender pid.
     pub sender: u64,
+    /// `si_code` (`SI_USER`, `SI_QUEUE` or `CLD_EXITED`).
+    pub code: u32,
+    /// Sender real uid (`si_uid`).
+    pub uid: u32,
+    /// Queued `sigval` payload (`si_value`).
+    pub value: u64,
 }
 
 impl ProcessIds {
@@ -248,6 +265,8 @@ pub struct Process {
     pub exit_code: AtomicI32,
     /// Live thread count.
     pub threads: AtomicU32,
+    /// Live threads created for this process (weak; the scheduler owns the strong reference).
+    pub threads_live: Mutex<Vec<Weak<Thread>>>,
     /// True once the process is terminal: none of its threads may run user code again.
     pub exiting: AtomicBool,
     /// True once the one-shot teardown has released the address space and handle table.
@@ -452,6 +471,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -529,6 +549,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -599,6 +620,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -692,6 +714,21 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
 
 /// Deliver one signal with POSIX job-control semantics.
 pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<(), Errno> {
+    deliver_signal_info(target, signo, sender, SI_USER_CODE, 0, 0)
+}
+
+/// Deliver one signal with an explicit `siginfo_t` payload.
+///
+/// The stop/continue bookkeeping is identical to [`deliver_signal`]; only the queued record
+/// differs. `PROC_SIGQUEUE` uses `SI_QUEUE` plus the sender uid and the `sigval` payload.
+pub fn deliver_signal_info(
+    target: &Arc<Process>,
+    signo: u32,
+    sender: u64,
+    code: u32,
+    uid: u32,
+    value: u64,
+) -> Result<(), Errno> {
     if status::is_stop_signal(signo) {
         if target.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
             target.stop_reported.store(false, Ordering::Release);
@@ -704,11 +741,11 @@ pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<
             target.continued.store(true, Ordering::Release);
             target.stop_reported.store(false, Ordering::Release);
         }
-        target.queue_signal(status::SIGCONT, sender);
+        target.queue_signal_info(status::SIGCONT, sender, code, uid, value);
         notify_parent(target, false);
         return Ok(());
     }
-    target.queue_signal(signo, sender);
+    target.queue_signal_info(signo, sender, code, uid, value);
     Ok(())
 }
 
@@ -773,12 +810,58 @@ impl Process {
         self.threads.fetch_sub(1, Ordering::AcqRel) <= 1
     }
 
-    /// Queue a signal and wake a `PROC_SIGRECV` waiter.
+    /// Publish a live thread so a process-directed signal can kick it.
+    pub fn register_thread(&self, thread: &Arc<Thread>) {
+        self.threads_live.lock().push(Arc::downgrade(thread));
+    }
+
+    /// Queue a signal, wake a `PROC_SIGRECV` waiter and kick every live thread.
+    ///
+    /// The kick is the PG-7 bridge from the kernel's per-process queue to libc's signal entry:
+    /// `THREAD_KICK` bit 0 makes the return-to-user path resume at the registered entry, and an
+    /// interruptible wait (`ppoll`, `read`, `waitpid`) returns `EINTR` so the handler can run.
     pub fn queue_signal(&self, signo: u32, sender: u64) {
-        self.pending_signals
-            .lock()
-            .push_back(PendingSignal { signo, sender });
+        self.queue_signal_info(signo, sender, SI_USER_CODE, 0, 0);
+    }
+
+    /// Queue a signal carrying the `siginfo_t` fields the kernel owns.
+    ///
+    /// The kernel stores the sender pid, `si_code`, sender uid and the queued `sigval`; it never
+    /// interprets the signal disposition. `PROC_SIGRECV` hands the fields back to libc, which
+    /// owns the user pending set and constructs the public `siginfo_t`.
+    pub fn queue_signal_info(&self, signo: u32, sender: u64, code: u32, uid: u32, value: u64) {
+        self.pending_signals.lock().push_back(PendingSignal {
+            signo,
+            sender,
+            code,
+            uid,
+            value,
+        });
         self.signal_waiters.wake_all();
+        self.kick_threads();
+    }
+
+    /// Kick every live thread of this process with the signal-check bit.
+    fn kick_threads(&self) {
+        let mut threads = self.threads_live.lock();
+        threads.retain(|weak| {
+            let Some(thread) = weak.upgrade() else {
+                return false;
+            };
+            // A kick is only meaningful after libc has registered the PG-7 entry. Without one
+            // the word would be consumed as a bare `EINTR` with no handler, so leave the signal
+            // in the process queue for `PROC_SIGRECV` and do not disturb an unrelated wait.
+            if thread.signal_entry.load(Ordering::Acquire) == 0 {
+                return true;
+            }
+            thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+            if thread.interruptible.load(Ordering::Acquire) {
+                let token = thread.block_token.load(Ordering::SeqCst);
+                let token = (token != 0).then_some(token);
+                let _ = crate::sched::wake(thread, token, Errno::EINTR.to_ret());
+            }
+            true
+        });
     }
 
     /// Pop the oldest queued signal.
@@ -786,9 +869,35 @@ impl Process {
         self.pending_signals.lock().pop_front()
     }
 
+    /// Remove and return the oldest queued signal matching `predicate`, leaving the rest in
+    /// order.
+    ///
+    /// This is the masked-signal contract: a signal the calling thread blocks is not selected,
+    /// so it stays queued for a thread (or a later unmask) that accepts it (Illumos `fsig`,
+    /// FreeBSD `sigtd`, NetBSD `sigismasked`). No pop/requeue window exists.
+    pub fn pop_signal_where(
+        &self,
+        mut predicate: impl FnMut(&PendingSignal) -> bool,
+    ) -> Option<PendingSignal> {
+        let mut pending = self.pending_signals.lock();
+        let index = pending.iter().position(|signal| predicate(signal))?;
+        pending.remove(index)
+    }
+
     /// True when at least one signal is queued.
     pub fn has_pending_signal(&self) -> bool {
         !self.pending_signals.lock().is_empty()
+    }
+
+    /// True when at least one queued signal matches `predicate`.
+    pub fn has_pending_signal_where(
+        &self,
+        mut predicate: impl FnMut(&PendingSignal) -> bool,
+    ) -> bool {
+        self.pending_signals
+            .lock()
+            .iter()
+            .any(|signal| predicate(signal))
     }
 }
 
@@ -831,7 +940,8 @@ pub fn notify_parent(process: &Process, sigchld: bool) {
         parent
             .child_user_ns
             .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
-        parent.queue_signal(SIGCHLD, process.id);
+        let uid = process.ids.lock().uid;
+        parent.queue_signal_info(SIGCHLD, process.id, CLD_EXITED_CODE, uid, 0);
     }
     parent.child_waiters.wake_all();
 }
@@ -903,6 +1013,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -1236,18 +1347,25 @@ fn build_stack(
     let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
     let mut cursor = buffer.len();
 
-    let random = random16();
-    let random_start = cursor
-        .checked_sub(random.len())
-        .ok_or(ProcessError::ArgTooLong)?;
-    let random_slot = buffer
-        .get_mut(random_start..cursor)
-        .ok_or(ProcessError::BadAddress)?;
-    random_slot.copy_from_slice(&random);
-    cursor = random_start;
-    let random_address = stack_base
-        .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
-        .ok_or(ProcessError::BadAddress)?;
+    // AT_RANDOM comes from the same boot-seeded pool as GETRANDOM. On a platform with no
+    // hardware source the pool is unseeded and the pair is published as zero rather than a
+    // predictable fallback; GETRANDOM reports the documented EAGAIN.
+    let random_address = match random16() {
+        Some(random) => {
+            let random_start = cursor
+                .checked_sub(random.len())
+                .ok_or(ProcessError::ArgTooLong)?;
+            let random_slot = buffer
+                .get_mut(random_start..cursor)
+                .ok_or(ProcessError::BadAddress)?;
+            random_slot.copy_from_slice(&random);
+            cursor = random_start;
+            stack_base
+                .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
+                .ok_or(ProcessError::BadAddress)?
+        }
+        None => 0,
+    };
 
     let platform_address = place_bytes(&mut buffer, &mut cursor, stack_base, platform.as_bytes())?;
     let path_address = place_bytes(&mut buffer, &mut cursor, stack_base, path)?;
@@ -1435,80 +1553,14 @@ fn write_word(buffer: &mut [u8], cursor: &mut usize, value: u64) -> Result<(), P
     Ok(())
 }
 
-fn random16() -> [u8; 16] {
+/// 16 bytes for `AT_RANDOM` from the boot-seeded ChaCha20 pool.
+///
+/// `None` means the platform has no hardware entropy source; the auxv pair is then zero and
+/// `GETRANDOM` returns the documented `EAGAIN` instead of serving a predictable fallback.
+fn random16() -> Option<[u8; 16]> {
     let mut bytes = [0u8; 16];
-    #[cfg(target_arch = "x86_64")]
-    {
-        let features = core::arch::x86_64::__cpuid(1);
-        if features.ecx & (1 << 30) != 0 {
-            let mut chunk_index = 0usize;
-            while chunk_index < 2 {
-                let mut attempt: u32 = 0;
-                let mut filled = false;
-                while attempt < 10 {
-                    let value: u64;
-                    let ok: u8;
-                    // SAFETY: `rdrand` is available per CPUID.1:ECX[30] and has no memory side
-                    // effects. `setc` records the success flag.
-                    unsafe {
-                        core::arch::asm!(
-                            "rdrand {value}",
-                            "setc {ok}",
-                            value = out(reg) value,
-                            ok = out(reg_byte) ok,
-                            options(nomem, nostack),
-                        );
-                    }
-                    if ok != 0 {
-                        let start = chunk_index.saturating_mul(8);
-                        if let Some(slot) = bytes.get_mut(start..start.saturating_add(8)) {
-                            slot.copy_from_slice(&value.to_le_bytes());
-                        }
-                        filled = true;
-                        break;
-                    }
-                    attempt = attempt.saturating_add(1);
-                }
-                if !filled {
-                    break;
-                }
-                chunk_index = chunk_index.saturating_add(1);
-            }
-            if chunk_index == 2 {
-                return bytes;
-            }
-        }
-    }
-
-    let mut state = entropy_seed() ^ 0x9E37_79B9_7F4A_7C15;
-    let mut index = 0usize;
-    while index < bytes.len() {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        let word = state.to_le_bytes();
-        let end = index.saturating_add(8).min(bytes.len());
-        if let Some(slot) = bytes.get_mut(index..end) {
-            let copy = end.saturating_sub(index);
-            if let Some(source) = word.get(..copy) {
-                slot.copy_from_slice(source);
-            }
-        }
-        index = end;
-    }
-    bytes
-}
-
-/// Non-cryptographic fallback entropy: the architecture's free-running counter.
-#[cfg(target_arch = "x86_64")]
-fn entropy_seed() -> u64 {
-    tsc::read()
-}
-
-/// Non-cryptographic fallback entropy: the generic-timer physical counter.
-#[cfg(target_arch = "aarch64")]
-fn entropy_seed() -> u64 {
-    timer::read_counter()
+    crate::time::entropy_fill(&mut bytes).ok()?;
+    Some(bytes)
 }
 
 /// The ELF machine of the running kernel.
@@ -1909,7 +1961,7 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     drop(state);
     crate::process::tty::hangup_session_leader(process);
     notify_parent(process, true);
-    crate::event::notify_all();
+    crate::event::notify_source(Arc::as_ptr(process) as usize as u64);
     drop(irq);
     teardown(process, code, own_context);
     true

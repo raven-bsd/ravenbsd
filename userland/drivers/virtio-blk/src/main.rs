@@ -229,7 +229,21 @@ mod program {
         // MSI-X setup fails, so its exclusive `irq_create` for line 11 would return EBUSY and devd
         // would exit before serving `disk:0`. The block queue is poll-driven: release the line
         // here, before devd launches the network, and bound the completion poll below.
-        let _ = raven_rt::handle_close(IRQ_HANDLE);
+        //
+        // K466/K522: that release is only valid for the shared legacy line. With `msix=1` the
+        // handle is this device's own MSI-X vector; closing it frees the vector while the
+        // programmed table entry still raises it on every completion, which floods the kernel
+        // with `unclaimed vector` and can hand the vector to another device.
+        //
+        // Vector lifecycle rule: devd creates and claims the vector, the device raises one
+        // message per completion, this queue acknowledges by draining the used ring while it
+        // polls, and the handle is closed only when the MSI-X table itself is released. No
+        // acknowledgement may follow the close; the MSI-X vector therefore stays owned for the
+        // driver's lifetime and the kernel EOIs any in-flight completion. Close only the legacy
+        // line.
+        if msix.is_none() {
+            let _ = raven_rt::handle_close(IRQ_HANDLE);
+        }
         let msix_bar = match &msix {
             Some(info) => {
                 let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)

@@ -1,42 +1,40 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
-// The backoff table, `TCP_REXMTVAL` and `TCPT_RANGESET` derivations are ported from FreeBSD
-// `sys/netinet/tcp_timer.c`/`tcp_var.h`, Copyright (c) 1982, 1986, 1993
-// The Regents of the University of California. BSD-3-Clause.
+// The backoff table, `TCP_REXMTVAL` and `TCPT_RANGESET` derivations are ported from NetBSD
+// `sys/netinet/tcp_timer.c`/`tcp_timer.h`/`tcp_var.h` at donor revision
+// `36eddebcc36cb0775aa2962005b9c05419a6ff01`:
+// Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+// Copyright (c) 1997, 1998, 2001, 2005 The NetBSD Foundation, Inc.
+// Copyright (c) 1982, 1986, 1988, 1990, 1993, 1995 The Regents of the University of California.
+// All rights reserved. BSD-3-Clause; the full notice is in `tcp_timer.rs` and the provenance
+// entry is in the K256 report (sent to K264, not edited in `PROVENANCE.toml` here).
 
 //! RFC 6298 RTT estimator in integer q8 arithmetic.
 //!
 //! The retransmission backoff table, the `TCP_REXMTVAL` base and the range clamp are ported
-//! from FreeBSD `sys/netinet/tcp_timer.c` (`tcp_backoff`, `tcp_rexmit_*`), `sys/netinet/tcp_timer.h`
-//! (`TCP_MAXRXTSHIFT`, `TCP_RTT_INVALIDATE`, `TCPTV_MIN`, `TCPTV_CPU_VAR`, `TCPTV_REXMTMAX`,
-//! `TCPT_RANGESET`) and `sys/netinet/tcp_var.h` (`TCP_REXMTVAL`), at donor revision
-//! `133344405f532bd54ff3629a77d4c4e062f01fdb`.
+//! from NetBSD `sys/netinet/tcp_timer.c` (`tcp_backoff`, `tcp_totbackoff`), `tcp_timer.h`
+//! (`TCP_MAXRXTSHIFT`, `TCPTV_MIN`, `TCPTV_REXMTMAX`, `TCPT_RANGESET`) and `tcp_var.h`
+//! (`TCP_REXMTVAL`, `TCP_RTT_SHIFT`, `TCP_RTTVAR_SHIFT`).
 
-/// FreeBSD `tcp_backoff[]`: RTO multiplier indexed by `t_rxtshift`.
-pub const TCP_BACKOFF: [u32; 13] = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 512, 512, 512];
+/// NetBSD `tcp_backoff[]`: RTO multiplier indexed by `t_rxtshift`.
+pub const TCP_BACKOFF: [u32; 13] = [1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64, 64];
 
-/// FreeBSD `tcp_totbackoff`: the sum of [`TCP_BACKOFF`].
-// The persist timer itself is K265/Jerry.
+/// NetBSD `tcp_totbackoff`: the sum of [`TCP_BACKOFF`].
+// The persist timer itself is K254/Jerry.
 #[allow(dead_code)]
-pub const TCP_TOTBACKOFF: u32 = 2_559;
+pub const TCP_TOTBACKOFF: u32 = 511;
 
-/// FreeBSD `TCP_MAXRXTSHIFT`: the last retransmit shift before a drop.
+/// NetBSD `TCP_MAXRXTSHIFT`: the last retransmit shift before a drop.
 pub const TCP_MAXRXTSHIFT: u8 = 12;
 
-/// FreeBSD `TCP_RTT_INVALIDATE`: after this shift the next sample starts a new estimate.
-pub const TCP_RTT_INVALIDATE: u8 = TCP_MAXRXTSHIFT / 4;
-
-/// FreeBSD `TCPTV_REXMTMAX` in milliseconds (64 s).
+/// NetBSD `TCPTV_REXMTMAX` in milliseconds (64 s).
 pub const TCPTV_REXMTMAX_MS: u64 = 64_000;
 
-/// FreeBSD `TCPTV_MIN` in milliseconds (30 ms).
-pub const TCPTV_MIN_MS: u64 = 30;
+/// NetBSD `TCPTV_MIN` in milliseconds (500 ms, one slow tick).
+pub const TCPTV_MIN_MS: u64 = 500;
 
-/// FreeBSD `TCPTV_CPU_VAR` in milliseconds: the `TCPT_RANGESET` processing slop (200 ms).
-pub const TCPTV_CPU_VAR_MS: u64 = 200;
-
-/// FreeBSD `TCPTV_RTOBASE` in milliseconds: the initial RTO (1 s).
+/// NetBSD `TCPTV_SRTTDFLT` in milliseconds: the initial RTO (1 s).
 pub const TCPTV_RTOBASE_MS: u64 = 1_000;
 
 /// Fixed-point RTO estimator.
@@ -159,37 +157,33 @@ impl RtoEstimator {
         if value > max { max } else { value }
     }
 
-    /// FreeBSD `tcp_timer_rexmt` RTO arm:
-    /// `RANGESET(base * tcp_backoff[shift] + tcp_rexmit_slop, t_rttmin, tcp_rexmit_max)`.
+    /// NetBSD `tcp_timer_rexmt` RTO arm:
+    /// `RANGESET((TCP_REXMTVAL < t_rttmin ? t_rttmin : TCP_REXMTVAL) * tcp_backoff[shift],
+    /// t_rttmin, TCPTV_REXMTMAX)`.
+    ///
+    /// NetBSD `TCPT_RANGESET` has no CPU-slop term; the backoff table itself supplies the
+    /// multiplier and the two bounds supply the clamp.
     #[must_use]
-    pub fn backoff_from_ms(
-        base_ms: u64,
-        shift: u8,
-        rttmin_ms: u64,
-        slop_ms: u64,
-        max_ms: u64,
-    ) -> u64 {
+    pub fn backoff_from_ms(base_ms: u64, shift: u8, rttmin_ms: u64, max_ms: u64) -> u64 {
         let base = base_ms.max(rttmin_ms);
         let factor = u64::from(TCP_BACKOFF[usize::from(shift.min(TCP_MAXRXTSHIFT))]);
-        Self::rangeset(
-            base.saturating_mul(factor).saturating_add(slop_ms),
-            rttmin_ms,
-            max_ms,
-        )
+        Self::rangeset(base.saturating_mul(factor), rttmin_ms, max_ms)
     }
 
     /// Arm from [`Self::rexmtval_ms`]; see [`Self::backoff_from_ms`].
     #[must_use]
-    pub fn backoff_ms(&self, shift: u8, rttmin_ms: u64, slop_ms: u64, max_ms: u64) -> u64 {
-        Self::backoff_from_ms(self.rexmtval_ms(), shift, rttmin_ms, slop_ms, max_ms)
+    pub fn backoff_ms(&self, shift: u8, rttmin_ms: u64, max_ms: u64) -> u64 {
+        Self::backoff_from_ms(self.rexmtval_ms(), shift, rttmin_ms, max_ms)
     }
 
-    /// FreeBSD `TCP_RTT_INVALIDATE`: make the next sample start a new estimate.
+    /// NetBSD losing path in `tcp_timer_rexmt`: fold `srtt` into `rttvar` and zero `srtt`.
     ///
-    /// FreeBSD does not fold srtt into rttvar in `tcp_timer_rexmt`; it calls `in_losing()` and
-    /// `tcp_xmit_timer` takes its first-measurement branch while `t_rxtshift` is still above
-    /// `TCP_RTT_INVALIDATE`.
-    pub fn invalidate_srtt(&mut self) {
+    /// NetBSD does `t_rttvar += t_srtt >> TCP_RTT_SHIFT; t_srtt = 0;` so the next sample takes
+    /// the first-measurement branch while `srtt + 4*rttvar` stays constant until then. In the
+    /// q8 millisecond representation this is `rttvar += srtt / 4`, then `srtt = 0`.
+    pub fn losing(&mut self) {
+        self.rttvar_q8 = self.rttvar_q8.saturating_add(self.srtt_q8 / 4);
+        self.srtt_q8 = 0;
         self.srtt_invalid = true;
     }
 

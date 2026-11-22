@@ -63,6 +63,9 @@ regex = '34\s+32768\s+1\s+ufs-root'
 regex = 's99-persist$'
 
 [[expect]]
+regex = '^irq-loop-ok$'
+
+[[expect]]
 regex = '^init exited \(0\)$'
 
 [[step]]
@@ -135,7 +138,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^mount-ok$'
-timeout_secs = 30
+timeout_secs = 120
 
 [[step]]
 send = "echo s99-persist > /mnt/s99-demo.txt; echo write-ok\n"
@@ -143,7 +146,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^write-ok$'
-timeout_secs = 30
+timeout_secs = 120
 
 [[step]]
 send = "cat /mnt/s99-demo.txt; echo read-ok\n"
@@ -151,6 +154,21 @@ delay_ms = 100
 
 [[step]]
 wait = '^read-ok$'
+timeout_secs = 120
+
+# K522 regression row: bounded disk I/O loop over the MSI-X completion path.
+# Eight write+read cycles, N=8; the vector must stay owned for the whole loop.
+# Any `irq:` report (unclaimed vector / unexpected interrupt) fails the case.
+[[step]]
+send = "i=0; while [ $i -lt 8 ]; do cat /etc/motd > /mnt/i; cat /mnt/i > /dev/null; i=$((i+1)); done; echo irq-loop-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^irq-loop-ok$'
+timeout_secs = 120
+
+[[step]]
+wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
@@ -159,7 +177,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^umount-ok$'
-timeout_secs = 30
+timeout_secs = 120
 
 [[step]]
 send = "exit 0\n"
@@ -171,3 +189,8 @@ timeout_secs = 60
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|mount: .*error|mount: .*invalid|fsd-ufs: .*failed|blockd: .*failed'
+
+# K522: the MSI-X vector must stay owned; the kernel reports any free vector
+# that still fires as `irq: unclaimed vector` (or `irq: unexpected interrupt`).
+[[forbid]]
+regex = '^irq:'

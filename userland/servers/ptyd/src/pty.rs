@@ -11,6 +11,8 @@ use raven_tty_core::{Discipline, Event, Output, Settings, Termios, Winsize};
 
 /// POSIX SIGINT.
 pub const SIGINT: u32 = 2;
+/// POSIX SIGQUIT.
+pub const SIGQUIT: u32 = 3;
 /// POSIX SIGWINCH.
 pub const SIGWINCH: u32 = 28;
 
@@ -109,6 +111,9 @@ impl<S: SignalSink> Pty<S> {
                 }
                 Event::EndOfFile => self.eof = true,
             }
+        }
+        if output.quit && self.fg_pgrp > 0 {
+            let _ = self.sink.signal(-self.fg_pgrp, SIGQUIT);
         }
     }
 

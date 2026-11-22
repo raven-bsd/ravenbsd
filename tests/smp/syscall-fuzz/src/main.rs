@@ -127,6 +127,8 @@ const RAW_EXCLUDED: &[(&str, &str)] = &[(
 const EFAULT: &[Errno] = &[Errno::EFAULT];
 const EBADF: &[Errno] = &[Errno::EBADF];
 const EINVAL: &[Errno] = &[Errno::EINVAL];
+const EPIPE: &[Errno] = &[Errno::EPIPE];
+const EOPNOTSUPP: &[Errno] = &[Errno::EOPNOTSUPP];
 const ENAMETOOLONG: &[Errno] = &[Errno::ENAMETOOLONG];
 const EACCES: &[Errno] = &[Errno::EACCES];
 const EAGAIN: &[Errno] = &[Errno::EAGAIN];
@@ -167,6 +169,8 @@ enum Expect {
     Any,
     /// The result must be an error in this set.
     Err(&'static [Errno]),
+    /// The result must be this exact non-negative value (a full getrandom length).
+    Exact(usize),
     /// A forked child must exit with this code while the parent survives.
     ChildCode(i32),
 }
@@ -179,6 +183,9 @@ struct Row {
     vector: &'static str,
     ret: isize,
     expect: Expect,
+    /// True for a success row whose value is an ASLR-randomized address. The verdict still
+    /// asserts success, but the address is not part of the deterministic table hash (K502).
+    normalized: bool,
 }
 
 /// Runtime resources used by the valid baseline of each call.
@@ -382,6 +389,7 @@ impl Runner {
             vector,
             ret,
             expect,
+            normalized: false,
         });
     }
 
@@ -402,6 +410,7 @@ impl Runner {
             vector,
             ret,
             expect,
+            normalized: false,
         });
     }
 
@@ -428,6 +437,20 @@ impl Runner {
         self.case(call, vector, args, Expect::Any);
     }
 
+    /// A success row whose return is an ASLR-randomized address: assert success, but normalize
+    /// the address out of the deterministic table hash (K502).
+    fn address(&mut self, call: Syscall, vector: &'static str, args: [usize; 6]) {
+        let ret = raw(call as usize, args);
+        self.push(Row {
+            nr: call as usize,
+            name: format!("{call:?}"),
+            vector,
+            ret,
+            expect: Expect::Success,
+            normalized: true,
+        });
+    }
+
     fn gap(&mut self, text: &'static str) {
         self.gaps.push(text);
     }
@@ -439,6 +462,7 @@ impl Runner {
             Expect::Err(set) => {
                 row.ret < 0 && set.contains(&Errno(u16::try_from(-row.ret).unwrap_or(u16::MAX)))
             }
+            Expect::Exact(value) => row.ret == value as isize,
             Expect::ChildCode(code) => row.ret == code as isize,
         }
     }
@@ -463,6 +487,7 @@ impl Runner {
                 Expect::Success => alloc::string::String::from("success"),
                 Expect::Any => alloc::string::String::from("any"),
                 Expect::Err(set) => format!("{set:?}"),
+                Expect::Exact(value) => format!("exact={value}"),
                 Expect::ChildCode(code) => format!("child-code={code}"),
             };
             println!(
@@ -475,7 +500,15 @@ impl Runner {
         for row in &self.rows {
             hash = fnv(hash, &(row.nr as u64).to_le_bytes());
             hash = fnv(hash, row.vector.as_bytes());
-            hash = fnv(hash, &(row.ret as i64).to_le_bytes());
+            // `Expect::Any` rows deliberately do not assert a value; K502 ASLR makes the MAP
+            // baseline address differ per boot. Hash a fixed sentinel for those rows so the
+            // determinism check still covers every asserted row without hashing an address.
+            let ret = if row.normalized || matches!(row.expect, Expect::Any) {
+                0
+            } else {
+                row.ret as i64
+            };
+            hash = fnv(hash, &ret.to_le_bytes());
         }
         println!(
             "syscall-fuzz: summary rows={} deviations={} seed=0x{SEED:016x} table-hash=0x{hash:016x}",
@@ -579,6 +612,41 @@ extern "C" fn child_self_terminate(code: usize) -> ! {
             code,
         )
     };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+/// A child that waits to be signalled; used by the setpgid/signal coverage rows.
+extern "C" fn child_sleep(_arg: usize) -> ! {
+    loop {
+        let _ = raw(Syscall::NANOSLEEP as usize, [10_000_000, 0, 0, 0, 0, 0]);
+    }
+}
+
+/// A child that drops to uid 1000 and checks one authority rule. `arg` selects the rule:
+/// 0 CLOCK_SET, 1 DTrace ENABLE, 2 SETRLIMIT hard raise. Exit 0 means the call was denied.
+extern "C" fn child_nonroot(arg: usize) -> ! {
+    let _ = raw(0x3b, [4, 1000, 1000, 1000, 0, 0]); // PROC_SETCRED_EX setresuid
+    let _ = raw(0x3b, [8, 1000, 1000, 1000, 0, 0]); // PROC_SETCRED_EX setresgid
+    let mut ts = [0u8; 16];
+    ts[..8].copy_from_slice(&1_600_000_000i64.to_le_bytes());
+    let denied = match arg {
+        0 => {
+            raw(
+                RAW_CLOCK_SET,
+                [clock::REALTIME as usize, ts.as_ptr() as usize, 0, 0, 0, 0],
+            ) == -(Errno::EPERM.0 as isize)
+        }
+        1 => {
+            raw(RAW_DTRACE_ENABLE, [1, 0, Handle::NONE.0 as usize, 0, 0, 0])
+                == -(Errno::EPERM.0 as isize)
+        }
+        2 => raw(RAW_PROC_SETRLIMIT, [7, 10, 300, 0, 0, 0]) == -(Errno::EPERM.0 as isize),
+        _ => false,
+    };
+    // SAFETY: `EXIT` terminates only this child; the parent reaps it.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, usize::from(!denied)) };
     loop {
         core::hint::spin_loop();
     }
@@ -1320,7 +1388,7 @@ fn memory_calls(runner: &mut Runner, ctx: Ctx) {
         runner.gap("MAP baseline failed; PROTECT/UNMAP baseline rows are not measured");
     }
 
-    runner.ok(
+    runner.address(
         Syscall::MAP,
         "baseline",
         [
@@ -2064,6 +2132,7 @@ fn driver_calls(runner: &mut Runner, ctx: Ctx) {
         vector: "baseline",
         ret: irq,
         expect: Expect::Any,
+        normalized: false,
     });
     if irq >= 0 {
         let irq = irq as usize;
@@ -2135,7 +2204,23 @@ fn raw_plan(r: &mut Runner) {
         "GETRANDOM",
         "baseline",
         [ctx.out, 16, 0, 0, 0, 0],
-        Expect::Success,
+        Expect::Exact(16),
+    );
+    // K545: a request the pool can fill returns the full length, not a short read.
+    r.raw(
+        RAW_GETRANDOM,
+        "GETRANDOM",
+        "len4096",
+        [ctx.out, PAGE, 0, 0, 0, 0],
+        Expect::Exact(PAGE),
+    );
+    // GRND_NONBLOCK is accepted and ignored by this pool (the boot seed is synchronous).
+    r.raw(
+        RAW_GETRANDOM,
+        "GETRANDOM",
+        "nonblock",
+        [ctx.out, 16, 1, 0, 0, 0],
+        Expect::Exact(16),
     );
     r.raw(
         RAW_GETRANDOM,
@@ -2196,6 +2281,23 @@ fn raw_plan(r: &mut Runner) {
         "negts",
         [clock::REALTIME as usize, ts, 0, 0, 0, 0],
         Expect::Err(EINVAL),
+    );
+    // K529: root succeeds; a uid-1000 child is denied before the RTC write.
+    let mut clock_ok = [0u8; 16];
+    clock_ok[..8].copy_from_slice(&1_600_000_000i64.to_le_bytes());
+    r.raw(
+        RAW_CLOCK_SET,
+        "CLOCK_SET",
+        "baseline",
+        [
+            clock::REALTIME as usize,
+            clock_ok.as_ptr() as usize,
+            0,
+            0,
+            0,
+            0,
+        ],
+        Expect::Success,
     );
 
     r.raw(RAW_TRACE_SET, "TRACE_SET", "zero", [0; 6], Expect::Success);
@@ -2399,6 +2501,36 @@ fn raw_plan(r: &mut Runner) {
         [0, 0, 0, 0, 0, 0],
         Expect::Any,
     );
+    // K488: a direct child can be moved to its own group and signalled; the pid comes from the
+    // process handle. The child sleeps until killed.
+    if let Ok(child) = spawn_child(child_sleep, 0) {
+        let pid = raw(RAW_PROC_HANDLE_INFO, [child, 0, 0, 0, 0, 0]);
+        if pid > 0 {
+            let pid = pid as usize;
+            r.raw(
+                RAW_PROC_SETPGID,
+                "PROC_SETPGID",
+                "child",
+                [pid, pid, 0, 0, 0, 0],
+                Expect::Success,
+            );
+            r.raw(
+                RAW_PROC_GETPGID,
+                "PROC_GETPGID",
+                "child",
+                [pid, 0, 0, 0, 0, 0],
+                Expect::Success,
+            );
+            r.raw(
+                RAW_PROC_SIGNAL,
+                "PROC_SIGNAL",
+                "killchild",
+                [pid, 9, 0, 0, 0, 0],
+                Expect::Success,
+            );
+            let _ = wait_child(child);
+        }
+    }
     r.raw(
         RAW_PROC_SETCRED,
         "PROC_SETCRED",
@@ -2780,6 +2912,30 @@ fn raw_plan(r: &mut Runner) {
         [0, 0, 0, 0, 0, 0],
         Expect::Err(EFAULT),
     );
+    // K491: an unprivileged hard-limit raise is EPERM; root can set a finite pair and infinity.
+    let rlimit_nonroot = child_code(r, child_nonroot, 2);
+    r.push(Row {
+        nr: RAW_PROC_SETRLIMIT,
+        name: alloc::string::String::from("PROC_SETRLIMIT"),
+        vector: "nonroot",
+        ret: rlimit_nonroot,
+        expect: Expect::ChildCode(0),
+        normalized: false,
+    });
+    r.raw(
+        RAW_PROC_SETRLIMIT,
+        "PROC_SETRLIMIT",
+        "baseline",
+        [0, 1, 2, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_PROC_SETRLIMIT,
+        "PROC_SETRLIMIT",
+        "infinity",
+        [7, LENMAX, LENMAX, 0, 0, 0],
+        Expect::Success,
+    );
     r.raw(
         RAW_PROC_SETRLIMIT,
         "PROC_SETRLIMIT",
@@ -3013,6 +3169,7 @@ fn raw_plan(r: &mut Runner) {
         vector: "baseline",
         ret: pair,
         expect: Expect::Success,
+        normalized: false,
     });
     r.raw(
         RAW_DUPLEX_PAIR,
@@ -3061,6 +3218,7 @@ fn raw_plan(r: &mut Runner) {
             vector: "baseline",
             ret: sent,
             expect: Expect::Success,
+            normalized: false,
         });
         if sent >= 0 {
             r.raw(
@@ -3139,6 +3297,30 @@ fn raw_plan(r: &mut Runner) {
             "baseline",
             [left, 1, 0, 0, 0, 0],
             Expect::Success,
+        );
+        // K520/K521: after SHUT_WR the local send is EPIPE and the peer reads EOF.
+        r.raw(
+            RAW_DUPLEX_SENDMSG,
+            "DUPLEX_SENDMSG",
+            "after-shut-wr",
+            [left, send.as_ptr() as usize, 0, 0, 0, 0],
+            Expect::Err(EPIPE),
+        );
+        r.raw(
+            RAW_DUPLEX_RECVMSG,
+            "DUPLEX_RECVMSG",
+            "after-shut-wr",
+            [right, recv.as_ptr() as usize, 0, 0, 0, 0],
+            Expect::Exact(0),
+        );
+        let mut waitall = recv;
+        waitall[4] = 0x40; // MSG_WAITALL is refused: EOPNOTSUPP.
+        r.raw(
+            RAW_DUPLEX_RECVMSG,
+            "DUPLEX_RECVMSG",
+            "waitall",
+            [right, waitall.as_ptr() as usize, 0, 0, 0, 0],
+            Expect::Err(EOPNOTSUPP),
         );
         r.raw(
             RAW_DUPLEX_SHUTDOWN,
@@ -3424,6 +3606,22 @@ fn raw_plan(r: &mut Runner) {
         [ctx.out, LENMAX, 0, 0, 0, 0],
         Expect::Success,
     );
+    // K529: root can enable/disable; a uid-1000 child is denied before provider state.
+    r.raw(
+        RAW_DTRACE_ENABLE,
+        "DTRACE_ENABLE",
+        "baseline",
+        [1, 0, none, 0, 0, 0],
+        Expect::Success,
+    );
+    r.raw(
+        RAW_DTRACE_DISABLE,
+        "DTRACE_DISABLE",
+        "baseline",
+        [1, 0, 0, 0, 0, 0],
+        Expect::Success,
+    );
+
     r.raw(
         RAW_DTRACE_ENABLE,
         "DTRACE_ENABLE",
@@ -3503,6 +3701,7 @@ fn raw_plan(r: &mut Runner) {
         vector: "child",
         ret: code,
         expect: Expect::ChildCode(0),
+        normalized: false,
     });
     let code = child_code(r, child_exit_ex, 0);
     r.push(Row {
@@ -3511,6 +3710,7 @@ fn raw_plan(r: &mut Runner) {
         vector: "child7",
         ret: code,
         expect: Expect::ChildCode(7),
+        normalized: false,
     });
     let code = child_code(r, child_exit_ex_garbage, 0);
     r.push(Row {
@@ -3519,6 +3719,7 @@ fn raw_plan(r: &mut Runner) {
         vector: "garbage",
         ret: code,
         expect: Expect::Any,
+        normalized: false,
     });
     r.raw(
         RAW_PROC_WAIT_EX,
@@ -3572,6 +3773,7 @@ fn raw_plan(r: &mut Runner) {
             vector,
             ret: code,
             expect: Expect::ChildCode(-5),
+            normalized: false,
         });
     }
 }
@@ -3610,6 +3812,7 @@ fn terminating_calls(runner: &mut Runner) {
                 vector: "child-code",
                 ret: code,
                 expect: Expect::ChildCode(5),
+                normalized: false,
             });
         }
         Err(_) => runner.gap("PROC_WAIT child setup failed; pointer/code rows are not measured"),
@@ -3622,6 +3825,7 @@ fn terminating_calls(runner: &mut Runner) {
         vector: "child7",
         ret: code,
         expect: Expect::ChildCode(7),
+        normalized: false,
     });
     let code = child_code(runner, child_exit, 0x7fff_ffff);
     runner.push(Row {
@@ -3630,6 +3834,7 @@ fn terminating_calls(runner: &mut Runner) {
         vector: "childmax",
         ret: code,
         expect: Expect::Any,
+        normalized: false,
     });
     let code = child_code(runner, child_thread_exit, 7);
     runner.push(Row {
@@ -3638,6 +3843,7 @@ fn terminating_calls(runner: &mut Runner) {
         vector: "child7",
         ret: code,
         expect: Expect::ChildCode(7),
+        normalized: false,
     });
     let code = child_code(runner, child_self_terminate, 9);
     runner.push(Row {
@@ -3646,6 +3852,7 @@ fn terminating_calls(runner: &mut Runner) {
         vector: "childself9",
         ret: code,
         expect: Expect::ChildCode(9),
+        normalized: false,
     });
 }
 

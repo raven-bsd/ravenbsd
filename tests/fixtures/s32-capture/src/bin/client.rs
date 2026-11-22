@@ -14,8 +14,8 @@ use raven_abi::types::Handle;
 use raven_rt::entry;
 use raven_rt::println;
 use raven_s32_capture::{
-    O_RDWR, PAGE, all_equal, fill, handle_close, map_anonymous, map_fixed, map_hint, nanosleep,
-    open, protect, read, thread_create, thread_exit, unmap, write,
+    O_RDWR, PAGE, all_equal, call, fill, handle_close, handle_revoke, map_anonymous, map_fixed,
+    map_hint, nanosleep, open, protect, read, thread_create, thread_exit, unmap, write,
 };
 
 entry!(main);
@@ -35,6 +35,13 @@ static WORK_ADDR: AtomicUsize = AtomicUsize::new(0);
 static WORK_RESULT: AtomicU32 = AtomicU32::new(0);
 /// Set when the worker finished its check.
 static WORK_DONE: AtomicU32 = AtomicU32::new(0);
+/// Handle the revoke worker reads through.
+static REVOKE_HANDLE: AtomicUsize = AtomicUsize::new(0);
+/// Revoke worker result: 0 pending, 1 read ok, 2 read failed.
+static REVOKE_RESULT: AtomicU32 = AtomicU32::new(0);
+
+const CYCLE_BYTES: usize = 4096;
+const CYCLES: usize = 10_000;
 
 extern "C" fn worker(_arg: usize) -> ! {
     let _ = nanosleep(30_000_000);
@@ -225,12 +232,196 @@ fn window_test() -> bool {
     unmap(mapped, PAGE).is_ok()
 }
 
+extern "C" fn revoke_worker(_arg: usize) -> ! {
+    let handle = Handle(REVOKE_HANDLE.load(Ordering::Acquire) as u32);
+    let buffer = match map_anonymous(LEN) {
+        Ok(buffer) => buffer,
+        Err(_) => {
+            REVOKE_RESULT.store(2, Ordering::Release);
+            thread_exit(0);
+        }
+    };
+    // SAFETY: `buffer` is a private writable 1 MiB mapping.
+    let slice = unsafe { core::slice::from_raw_parts_mut(buffer, LEN) };
+    let result = read(handle, slice);
+    REVOKE_RESULT.store(
+        if result.ok() == Some(LEN) { 1 } else { 2 },
+        Ordering::Release,
+    );
+    thread_exit(0)
+}
+
+/// 10k capture acquire/release cycles on a small buffer.
+fn cycle() -> i32 {
+    let echo = match open("s32:echo", O_RDWR) {
+        Ok(handle) => handle,
+        Err(_) => return fail("cycle open failed"),
+    };
+    let input = match map_anonymous(CYCLE_BYTES) {
+        Ok(buffer) => buffer,
+        Err(_) => return fail("cycle input failed"),
+    };
+    let output = match map_anonymous(CYCLE_BYTES) {
+        Ok(buffer) => buffer,
+        Err(_) => return fail("cycle output failed"),
+    };
+    let mut round = 0usize;
+    while round < CYCLES {
+        // SAFETY: both pointers are private CYCLE_BYTES mappings of this process.
+        unsafe {
+            let source = core::slice::from_raw_parts_mut(input, CYCLE_BYTES);
+            let mut index = 0usize;
+            while index < CYCLE_BYTES {
+                source[index] = (index as u8) ^ (round as u8);
+                index = index.saturating_add(1);
+            }
+        }
+        // SAFETY: both buffers are live CYCLE_BYTES mappings.
+        let source = unsafe { core::slice::from_raw_parts(input, CYCLE_BYTES) };
+        // SAFETY: `output` is a private writable CYCLE_BYTES mapping.
+        let destination = unsafe { core::slice::from_raw_parts_mut(output, CYCLE_BYTES) };
+        if call(echo, source, Some(destination)).ok() != Some(CYCLE_BYTES) {
+            return fail("cycle call failed");
+        }
+        if destination != source {
+            return fail("cycle data mismatch");
+        }
+        round = round.saturating_add(1);
+    }
+    let _ = handle_close(echo);
+    println!("s32: cycle ok");
+    0
+}
+
+/// One 1 MiB capture against the delaying server: 0 success, 3 slot exhaustion.
+fn burst() -> i32 {
+    let delay = match open("s32:hold", O_RDWR) {
+        Ok(handle) => handle,
+        Err(_) => return 1,
+    };
+    let buffer = match map_anonymous(LEN) {
+        Ok(buffer) => buffer,
+        Err(_) => return 1,
+    };
+    // SAFETY: `buffer` is a private writable 1 MiB mapping.
+    let slice = unsafe { core::slice::from_raw_parts_mut(buffer, LEN) };
+    match read(delay, slice) {
+        Ok(LEN) => 0,
+        Err(Errno::ENOMEM) => 3,
+        _ => 1,
+    }
+}
+
+/// One 1 MiB capture the controller cancels while the server still holds the reply.
+fn victim() -> i32 {
+    let delay = match open("s32:delay-read", O_RDWR) {
+        Ok(handle) => handle,
+        Err(_) => return 1,
+    };
+    let buffer = match map_anonymous(LEN) {
+        Ok(buffer) => buffer,
+        Err(_) => return 1,
+    };
+    // SAFETY: `buffer` is a private writable 1 MiB mapping.
+    let slice = unsafe { core::slice::from_raw_parts_mut(buffer, LEN) };
+    let _ = read(delay, slice);
+    0
+}
+
+/// The server drops the request handle; the client must wake with EIO, not hang.
+fn close_request() -> i32 {
+    let file = match open("s32:close-request", O_RDWR) {
+        Ok(handle) => handle,
+        Err(_) => return fail("close-request open failed"),
+    };
+    let buffer = match map_anonymous(LEN) {
+        Ok(buffer) => buffer,
+        Err(_) => return fail("close-request buffer failed"),
+    };
+    // SAFETY: `buffer` is a private writable 1 MiB mapping.
+    let slice = unsafe { core::slice::from_raw_parts_mut(buffer, LEN) };
+    match read(file, slice) {
+        Err(Errno::EIO) => {
+            let _ = handle_close(file);
+            println!("s32: close-request ok");
+            0
+        }
+        Err(_) => fail("close-request wrong error"),
+        Ok(_) => fail("close-request unexpectedly succeeded"),
+    }
+}
+
+/// The server revokes the request handle (leaving it open); the client must wake with EIO.
+fn revoke_request() -> i32 {
+    let file = match open("s32:revoke-request", O_RDWR) {
+        Ok(handle) => handle,
+        Err(_) => return fail("revoke-request open failed"),
+    };
+    let buffer = match map_anonymous(LEN) {
+        Ok(buffer) => buffer,
+        Err(_) => return fail("revoke-request buffer failed"),
+    };
+    // SAFETY: `buffer` is a private writable 1 MiB mapping.
+    let slice = unsafe { core::slice::from_raw_parts_mut(buffer, LEN) };
+    match read(file, slice) {
+        Err(Errno::EIO) => {
+            let _ = handle_close(file);
+            println!("s32: revoke-request ok");
+            0
+        }
+        Err(_) => fail("revoke-request wrong error"),
+        Ok(_) => fail("revoke-request unexpectedly succeeded"),
+    }
+}
+
+/// Revoke the file handle while a capture is in flight; the request must still complete.
+fn revoke() -> i32 {
+    let delay = match open("s32:slow-read", O_RDWR) {
+        Ok(handle) => handle,
+        Err(_) => return fail("revoke open failed"),
+    };
+    let stack = match map_anonymous(STACK) {
+        Ok(stack) => stack,
+        Err(_) => return fail("revoke stack failed"),
+    };
+    REVOKE_HANDLE.store(delay.0 as usize, Ordering::Release);
+    REVOKE_RESULT.store(0, Ordering::Release);
+    let entry: extern "C" fn(usize) -> ! = revoke_worker;
+    if thread_create(entry as usize, stack as usize + STACK, 0).is_err() {
+        return fail("revoke thread failed");
+    }
+    let _ = nanosleep(20_000_000);
+    if handle_revoke(delay, 0).is_err() {
+        return fail("revoke failed");
+    }
+    let mut tries = 0usize;
+    while REVOKE_RESULT.load(Ordering::Acquire) == 0 && tries < 4000 {
+        let _ = nanosleep(1_000_000);
+        tries = tries.saturating_add(1);
+    }
+    if REVOKE_RESULT.load(Ordering::Acquire) != 1 {
+        return fail("revoke read failed");
+    }
+    let _ = handle_close(delay);
+    println!("s32: revoke ok");
+    0
+}
+
 fn fail(line: &str) -> i32 {
     println!("s32: {}", line);
     1
 }
 
-fn main(_args: raven_rt::Args) -> i32 {
+fn main(args: raven_rt::Args) -> i32 {
+    match args.get(1).unwrap_or("matrix") {
+        "cycle" => return cycle(),
+        "burst" => return burst(),
+        "victim" => return victim(),
+        "revoke" => return revoke(),
+        "close-request" => return close_request(),
+        "revoke-request" => return revoke_request(),
+        _ => {}
+    }
     let echo = match open("s32:echo", O_RDWR) {
         Ok(handle) => handle,
         Err(_) => return fail("client open failed"),

@@ -1,3 +1,0 @@
-$ timeout 60 sh -n docs/releases/0.1.0-freeze-checklist.md
-docs/releases/0.1.0-freeze-checklist.md: 2: Syntax error: newline unexpected
-exit=2

@@ -29,6 +29,9 @@ posix-check|Run the POSIX conformance profile
 toolchain|Rebuild the pinned Rust toolchain
 group:Maintenance
 provenance|SPDX, donor and dependency provenance check
+info|Code statistics: Rust code lines, files and the language mix
+space|Show target/build disk use and free space
+prune|Remove safe build caches (dry-run; PRUNE_APPLY=1 deletes)
 clean|Remove build output
 distclean|Remove build output, vendor and local caches
 help-xtask|Raw xtask command list
@@ -42,3 +45,7 @@ VERBOSE|Set to 1 to print the commands xtask runs
 SOAK_SECONDS|Smoke workload seconds (default 120)
 SOAK_INTERVAL|Smoke workload cycle seconds (default 5)
 SOAK_PROFILE|Soak image profile (default release)
+SPACE_MIN_GB|Minimum free GiB required before an image build (default 20)
+PRUNE_APPLY|Set to 1 to delete pruned files instead of dry-run
+PRUNE_DAYS|Age in days for old build images and logs (default 14)
+PRUNE_DEPS|Set to 1 to run cargo-sweep on old dependency artifacts

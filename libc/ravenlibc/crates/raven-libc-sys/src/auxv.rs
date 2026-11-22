@@ -207,9 +207,9 @@ impl AuxVec {
         self.get(AT_RANDOM)
     }
 
-    /// `AT_SECURE`; always 0 in ABI v1 (H-7), even when a spawner writes the key.
+    /// `AT_SECURE`; the value the exec transition published in the vector.
     pub fn secure(&self) -> usize {
-        0
+        self.get(AT_SECURE).unwrap_or(0)
     }
 
     /// `AT_HWCAP`.

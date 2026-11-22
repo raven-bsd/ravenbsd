@@ -422,6 +422,34 @@ fn newreno_full_ack_uses_outstanding_data() {
     assert_eq!(newreno.cwnd(), 11_460);
 }
 
+// K258 rev 37 retains the NetBSD `tcp_congctl.c` partial-ACK floor where it does not change a
+// K269 row: `tcp_newreno_fast_retransmit_newack` deflates by `acked - MSS` and floors at two MSS.
+// NetBSD file is 4-clause NRL (read-only); K269's FreeBSD rows are unchanged.
+#[test]
+fn netbsd_partial_ack_floors_at_two_mss() {
+    let mut newreno = NewReno::new(1460, 2_920, 1_000_000, 1_000_000);
+    newreno.loss_fast_retransmit(2_920, 100_000);
+    newreno.partial_ack(100_000);
+    assert_eq!(newreno.cwnd(), 2 * 1460);
+}
+
+// K258 rev 37 also retains the NetBSD outstanding-data recovery exit: when `recover - ack` is
+// below one MSS the window is that outstanding data plus one MSS (never an extra MSS floor).
+#[test]
+fn netbsd_full_ack_keeps_the_outstanding_data_floor() {
+    let mut newreno = NewReno::new(1460, 2_920, 1_000_000, 1_000_000);
+    newreno.loss_fast_retransmit(2_920, 1_000);
+    let mut ctx = CcContext {
+        mss: 1460,
+        snd_una: 900,
+        ..CcContext::default()
+    };
+    newreno.on_ack(&mut ctx, 100, None);
+    newreno.full_ack();
+    assert!(!newreno.in_recovery());
+    assert_eq!(newreno.cwnd(), 1_460);
+}
+
 #[test]
 fn newreno_ecn_shortens_without_dup_ack_inflation() {
     let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
