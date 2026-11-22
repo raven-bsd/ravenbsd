@@ -51,6 +51,13 @@ pub fn syscall_probe(frame: &SyscallFrame) {
 
 /// Dispatch one `DTRACE_*` control syscall.
 pub fn dispatch(number: usize, frame: &SyscallFrame) -> Result<usize, Errno> {
+    // Probe configuration, record drains and global stats are root authority in 0.1.0.
+    // `PROBE_LIST` exposes only static probe metadata, but it is root-only too so no unprivileged
+    // caller can enumerate the tracing surface. Reject before touching provider state.
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    if caller.ids.lock().euid != 0 {
+        return Err(Errno::EPERM);
+    }
     match number {
         PROBE_LIST => probe_list(frame),
         ENABLE => enable(frame),

@@ -109,6 +109,12 @@ pub fn clock_set(frame: &SyscallFrame) -> Result<usize, Errno> {
     if clock_id != clock::REALTIME {
         return Err(Errno::EINVAL);
     }
+    // The wall clock is global system state. 0.1.0 uses effective uid 0 as the authority; a
+    // delegable CAP_TIME is post-0.1.0. Reject before reading the user pointer or the RTC.
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    if caller.ids.lock().euid != 0 {
+        return Err(Errno::EPERM);
+    }
     let mut timespec = Timespec::default();
     let source = UserSlice::new(
         frame.rsi,

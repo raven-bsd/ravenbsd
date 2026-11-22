@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K529: CLOCK_SET and DTrace control are root-only; a uid-1000 process is denied and the clock
+# and probe state are unchanged.
+
+name = "capability"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/capability/build.sh"]
+initfs = "build/fixtures/capability/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^capability: root clock=1 dtrace=1$'
+
+[[expect]]
+regex = '^capability: nonroot clock=1 unchanged=1 dtrace=1$'
+
+[[expect]]
+regex = '^capability: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|capability: fail'

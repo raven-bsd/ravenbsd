@@ -116,6 +116,7 @@ members = [
     "tests/fixtures/proc",
     "tests/fixtures/proc-rlimit",
     "tests/fixtures/devfs",
+    "tests/fixtures/capability",
     "tests/fixtures/http-fetch/patch-initfs",
     "tests/fixtures/pipe",
     "profiles/iommu-fixture",

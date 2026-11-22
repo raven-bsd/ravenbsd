@@ -1418,6 +1418,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-capability-authority"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-cat"
 version = "0.1.0"
 dependencies = [
