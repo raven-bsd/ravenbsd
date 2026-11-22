@@ -29,6 +29,12 @@ pub const DUPLEX_PAIR: usize = 0x110;
 /// from the guest. It creates no object and is rejected by [`duplex::create`] when it reaches the
 /// normal path.
 pub const DUPLEX_DIAGNOSTIC: u32 = 0x8000_0000;
+/// Diagnostic flag for `duplex_pair`: run one cycle-collection pass, then write [`DuplexStats`].
+///
+/// The collector is explicit, never a read/write/send/recv hook. It costs one registry snapshot
+/// and a scan of every live pair's queued handles; a pair with a live external endpoint is a root
+/// and its receive queues are never cleared.
+pub const DUPLEX_COLLECT: u32 = 0x4000_0000;
 /// Raw `duplex_shutdown(handle: u32, how: u32) -> 0`.
 pub const DUPLEX_SHUTDOWN: usize = 0x111;
 /// Raw `duplex_sendmsg(handle: u32, msg: *mut DuplexMessage) -> bytes`.
@@ -117,7 +123,10 @@ const _: () = assert!(core::mem::size_of::<ControlHeader>() == CMSG_BYTES);
 /// `duplex_pair(out, flags)`.
 pub fn pair(frame: &SyscallFrame) -> Result<usize, Errno> {
     let flags = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
-    if flags & DUPLEX_DIAGNOSTIC != 0 {
+    if flags & DUPLEX_COLLECT != 0 {
+        duplex::collect_cycles();
+    }
+    if flags & (DUPLEX_COLLECT | DUPLEX_DIAGNOSTIC) != 0 {
         return stats(frame);
     }
     let caller = process::current().ok_or(Errno::ESRCH)?;
