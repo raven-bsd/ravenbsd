@@ -29,6 +29,10 @@ regex = '^pty-concurrent: pair-b wall-ms=\d+ bound=500 byte=66$'
 regex = '^pty-concurrent: pairs=8 worst-ms=\d+ bound=500$'
 
 [[expect]]
+regex = '^pty-concurrent: pair index=\d+ wall-ms=\d+$'
+unordered = true
+
+[[expect]]
 regex = '^pty-concurrent: ninth alloc-close ok$'
 
 [[expect]]

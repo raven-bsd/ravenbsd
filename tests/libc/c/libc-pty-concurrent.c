@@ -273,6 +273,7 @@ static int pairs_eight(void) {
                    i, r.index, r.count, (unsigned)r.byte, wall, BOUND_MS);
             return 1;
         }
+        printf("pty-concurrent: pair index=%d wall-ms=%ld\n", i, wall);
     }
     for (int i = 0; i < PAIRS; i++) {
         int status = 0;
