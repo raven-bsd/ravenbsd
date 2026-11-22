@@ -130,6 +130,54 @@ fn focus_rows_are_regenerated_with_real_numbers() {
 }
 
 #[test]
+fn wave_syscalls_are_in_the_served_table() {
+    let root = root();
+    let doc = std::fs::read_to_string(mgmt_file(&root, "architecture/product-data/syscall-abi.md"))
+        .expect("doc");
+    let model = model(&root);
+    for (number, name, reason) in [
+        (0x08_u64, "GETRANDOM", "public: libc getrandom/getentropy"),
+        (0x110, "DUPLEX_PAIR", "public: libc socketpair"),
+        (0x111, "DUPLEX_SHUTDOWN", "public: libc shutdown"),
+        (0x112, "DUPLEX_SENDMSG", "public: libc sendmsg"),
+        (0x113, "DUPLEX_RECVMSG", "public: libc recvmsg"),
+        (
+            0x114,
+            "DUPLEX_PEERCRED",
+            "public: libc getpeereid/getpeercred",
+        ),
+        (0x1E1, "PROC_CTTY_GET", "public: libc tcgetpgrp"),
+        (0x1E2, "PROC_CTTY_SET_FG", "public: libc tcsetpgrp"),
+    ] {
+        let hex = format!("0x{number:02X}");
+        let key = (number, name.to_string());
+        assert_eq!(
+            model.known.get(&key).map(String::as_str),
+            Some(reason),
+            "served known-omission reason for {hex} {name}"
+        );
+        let comment = format!("<!-- abi-completeness: known-omission {hex} {name} {reason} -->");
+        assert!(doc.contains(&comment), "served table missing: {comment}");
+        assert!(
+            doc.contains(&format!("| `{hex}` | `{name}` |")),
+            "served table row missing: {hex} {name}"
+        );
+        assert!(
+            model
+                .dispatch
+                .iter()
+                .any(|entry| entry.number == number && entry.name == name),
+            "dispatch surface missing: {hex} {name}"
+        );
+    }
+    assert!(doc.contains("`AT_RANDOM`"), "AT_RANDOM note missing");
+    assert!(
+        doc.contains("not a syscall number"),
+        "AT_RANDOM must be documented as an auxv entry, not a syscall"
+    );
+}
+
+#[test]
 fn dispatch_and_documented_table_are_complete() {
     let root = root();
     let model = model(&root);

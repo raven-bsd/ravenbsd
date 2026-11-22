@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K548: poll(2) on the fd kinds the guest ssh client uses. The C fixture polls a
+# socketpair end, a pipe write/read end and a write-only pty slave; a write-only
+# source must return its readiness, never EACCES. It runs as /bin/libc-test under
+# the libc-test profile so the pty server is available.
+
+name = "posix-poll"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 180
+pre = ["sh tests/fixtures/posix-poll/build.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^posix-poll: socket ok$'
+
+[[expect]]
+regex = '^posix-poll: pipe ok$'
+
+[[expect]]
+regex = '^posix-poll: pty ok$'
+
+[[expect]]
+regex = '^posix-poll: ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|posix-poll: fail'
