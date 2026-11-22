@@ -40,9 +40,11 @@ mod program {
     const ENTRY_PATH: &str = "file:/mnt/k466-entry.txt";
     const RENAMED_PATH: &str = "file:/mnt/k466-renamed.txt";
 
-    const CHUNK: usize = 4096;
-    const PERSIST_CHUNKS: usize = 16;
-    const MAX_FILL_CHUNKS: usize = 4096;
+    /// One S11 write/read payload. The block path costs a few synchronous requests per
+    /// call, so 16 KiB keeps the fill and the byte check inside the case timeout.
+    const CHUNK: usize = 16 * 1024;
+    const PERSIST_CHUNKS: usize = 4;
+    const MAX_FILL_CHUNKS: usize = 256;
 
     fn main(args: raven_rt::Args) -> i32 {
         let mut mode = "";

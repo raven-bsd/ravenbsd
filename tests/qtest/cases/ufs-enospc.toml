@@ -3,13 +3,13 @@
 
 # K466 row 8: a write that must fail returns ENOSPC, the acknowledged bytes stay
 # readable and the free-block count reaches the documented floor instead of
-# wrapping. The 4 MiB disk is filled from the guest through the mounted UFS.
+# wrapping. The 1 MiB disk is filled from the guest through the mounted UFS.
 
 name = "ufs-enospc"
 arch = "x86_64"
 profile = "ufs-demo"
 timeout_secs = 240
-pre = ["sh tests/fixtures/ufs-durability/build.sh 4m"]
+pre = ["sh tests/fixtures/ufs-durability/build.sh 1m"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
