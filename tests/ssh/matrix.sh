@@ -5,8 +5,12 @@
 # K434 per-step SSH gate matrix (S0-S8). Runs the pty-alloc qtest, builds the throw-away S0 echo
 # initfs, then runs matrix.py. RAVEN_NET_MODE=netns (default) uses a private ken434 namespace with
 # its own ravenbr0/ravendemo0; RAVEN_NET_MODE=shared uses scripts/qemu-net.sh for the rev-24 A/B.
-# RAVEN_MATRIX_ONLY=s4|mutation|s1-repeat|s7|s7-exit|s8 runs one boot-only row set. The s4 mode
-# boots once and runs three single-attempt auth-then-read proofs; mutation boots the 0755 image and
+# RAVEN_MATRIX_ONLY=s4|mutation|s1-repeat|s7|s7-exit|s8|s5|s8-proof|full runs one boot-only row set.
+# `full` is the single-shot K434 gate: S1, S2, S3, S4, S5/S6 (including S5-session), S7 and S8 in
+# order on one image, writing serial-<row>.log deltas. The wrapper tests/ssh/run-k434-matrix.sh pins
+# one tree/image hash and runs it:
+#   sh tests/ssh/run-k434-matrix.sh
+# The s4 mode boots once and runs three single-attempt auth-then-read proofs; mutation boots the 0755 image and
 # asserts the non-root /tmp create fails:
 #   timeout 600 env RAVEN_MATRIX_ONLY=s4 sh tests/ssh/matrix.sh
 #   timeout 300 env RAVEN_MATRIX_ONLY=mutation RAVEN_SSH_IMAGE=build/qtest/ssh-login.img \

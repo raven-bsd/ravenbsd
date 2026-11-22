@@ -1661,6 +1661,35 @@ def write_tables() -> None:
     print(f"matrix: table {rows_path}")
 
 
+def serial_row_capture(console: SerialConsole, name: str, mark: int) -> int:
+    """Write the serial bytes produced by one row and return the new offset."""
+    console.pump()
+    chunk = bytes(console.buffer[mark:])
+    (OUT / f"serial-{name}.log").write_bytes(chunk)
+    print(f"matrix: serial-{name}.log {len(chunk)} bytes", flush=True)
+    return len(console.buffer)
+
+
+def row_full(console: SerialConsole) -> None:
+    """S1-S8 plus S5-session in order on one boot, with per-row serial capture."""
+    mark = len(console.buffer)
+    row_s1()
+    mark = serial_row_capture(console, "S1", mark)
+    row_s2()
+    mark = serial_row_capture(console, "S2", mark)
+    s3_state = row_s3_start()
+    row_s3_finish(console, s3_state)
+    mark = serial_row_capture(console, "S3", mark)
+    row_s4()
+    mark = serial_row_capture(console, "S4", mark)
+    row_s5_s6()
+    mark = serial_row_capture(console, "S5-S6", mark)
+    row_s7(console)
+    mark = serial_row_capture(console, "S7", mark)
+    row_s8()
+    serial_row_capture(console, "S8", mark)
+
+
 def main() -> int:
     if not IMAGE.is_file():
         print(f"matrix: missing image {IMAGE}", file=sys.stderr)
@@ -1678,7 +1707,7 @@ def main() -> int:
         row_label = ("K562-mutation" if only == "mutation"
                      else "S4" if only == "s4" else only)
         try:
-            socket_only = only in ("s8", "s7", "s8-proof")
+            socket_only = only in ("s8", "s7", "s8-proof", "full")
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
                                  "vars-only.fd", ready_timeout=180,
                                  socket_serial=socket_only)
@@ -1713,6 +1742,8 @@ def main() -> int:
                     row_s8()
                 elif only == "s8-proof":
                     row_s8_proof(console)
+                elif only == "full":
+                    row_full(console)
                 elif only == "s5":
                     row_s5_s6()
                 else:
