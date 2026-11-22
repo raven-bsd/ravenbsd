@@ -121,6 +121,7 @@ def qemu_argv(image: Path, serial_arg: str, vars_path: Path) -> list[str]:
     return [
         "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
         "-serial", serial_arg, "-display", "none", "-monitor", "none", "-no-reboot",
+        "-snapshot",
         "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE}",
         "-drive", f"if=pflash,format=raw,file={vars_path}",
         "-drive", f"format=raw,file={image}",
@@ -218,19 +219,23 @@ def boot(image: Path, ready: bytes, serial_name: str, vars_name: str,
             pass
         serial_arg = f"unix:{socket_path},server=on,wait=off"
         console = SerialConsole(socket_path, serial)
-        child = subprocess.Popen(qemu_argv(image, serial_arg, vars_path), cwd=ROOT,
-                                 start_new_session=True,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        qemu_log = OUT / f"{serial_name}.qemu.log"
+        with open(qemu_log, "wb") as qemu_err:
+            child = subprocess.Popen(qemu_argv(image, serial_arg, vars_path), cwd=ROOT,
+                                     start_new_session=True,
+                                     stdout=subprocess.DEVNULL, stderr=qemu_err)
         console.connect(10)
         if console.wait_for(ready, ready_timeout) < 0:
             kill(child)
             console.close()
-            raise RuntimeError(f"guest never reached {ready!r}; serial {serial}")
+            raise RuntimeError(f"guest never reached {ready!r}; serial {serial}; qemu {qemu_log}")
         return child, console
     serial.write_bytes(b"")
-    child = subprocess.Popen(qemu_argv(image, f"file:{serial}", vars_path), cwd=ROOT,
-                             start_new_session=True,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    qemu_log = OUT / f"{serial_name}.qemu.log"
+    with open(qemu_log, "wb") as qemu_err:
+        child = subprocess.Popen(qemu_argv(image, f"file:{serial}", vars_path), cwd=ROOT,
+                                 start_new_session=True,
+                                 stdout=subprocess.DEVNULL, stderr=qemu_err)
     deadline = time.monotonic() + ready_timeout
     while time.monotonic() < deadline:
         try:
@@ -240,7 +245,7 @@ def boot(image: Path, ready: bytes, serial_name: str, vars_name: str,
             pass
         time.sleep(0.1)
     kill(child)
-    raise RuntimeError(f"guest never reached {ready!r}; serial {serial}")
+    raise RuntimeError(f"guest never reached {ready!r}; serial {serial}; qemu {qemu_log}")
 
 
 def banner_probe(label: str, send_client: bool) -> dict[str, object]:
@@ -1099,7 +1104,7 @@ def main() -> int:
     finally:
         if repeat_child is not None:
             kill(repeat_child)
-        time.sleep(0.5)
+        time.sleep(2.0)
 
     s8_child = None
     try:
@@ -1116,7 +1121,7 @@ def main() -> int:
     finally:
         if s8_child is not None:
             kill(s8_child)
-        time.sleep(0.5)
+        time.sleep(2.0)
 
     child = None
     console: SerialConsole | None = None
