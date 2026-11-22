@@ -17,10 +17,10 @@ use raven_qtest::{
 
 const USAGE: &str = "\
 usage:
-  raven-qtest run --case <file.toml> [--no-build] [--image <img>] [--arch <a>] [--out <dir>]
+  raven-qtest run --case <file.toml> [--no-build] [--no-pre] [--image <img>] [--arch <a>] [--out <dir>]
                   [--ovmf-code <p>] [--ovmf-vars <p>] [--runner <command...>]
   raven-qtest list [--cases <dir>]
-  raven-qtest all [--arch <a>] [--no-build]";
+  raven-qtest all [--arch <a>] [--no-build] [--no-pre]";
 
 fn main() -> ExitCode {
     match run() {
@@ -89,6 +89,7 @@ fn parse_run_args(args: &[String]) -> Result<RunArgs> {
                 continue;
             }
             "--no-build" => options.no_build = true,
+            "--no-pre" => options.no_pre = true,
             other => bail!("unexpected argument `{other}`\n{USAGE}"),
         }
         index += 1;
@@ -150,6 +151,7 @@ fn list(args: &[String]) -> Result<u8> {
 fn run_all(args: &[String]) -> Result<u8> {
     let mut arch = "x86_64".to_string();
     let mut no_build = false;
+    let mut no_pre = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -158,6 +160,7 @@ fn run_all(args: &[String]) -> Result<u8> {
                 arch = value(args, index, "--arch")?.to_string();
             }
             "--no-build" => no_build = true,
+            "--no-pre" => no_pre = true,
             other => bail!("unexpected argument `{other}`\n{USAGE}"),
         }
         index += 1;
@@ -175,6 +178,7 @@ fn run_all(args: &[String]) -> Result<u8> {
         }
         let mut options = ExecuteOptions::new();
         options.no_build = no_build;
+        options.no_pre = no_pre;
         let result = execute_with_oracles(&case, &options);
         write_outcome(&result.outcome, &options.out_dir)?;
         write_reports(&options.out_dir, &case.spec.name, &result.oracles)?;
@@ -218,7 +222,7 @@ fn print_outcome(outcome: &CaseOutcome, oracles: &[OracleReport], print_detail: 
         && let Some(detail) = &outcome.detail
         && matches!(
             outcome.report.result,
-            ResultKind::Skipped | ResultKind::Error
+            ResultKind::Pass | ResultKind::Skipped | ResultKind::Error
         )
     {
         println!("  {detail}");
@@ -270,6 +274,14 @@ mod tests {
         let parsed = parse_run_args(&args(&["--case", "case.toml", "--no-build"])).unwrap();
         assert_eq!(parsed.case_path, PathBuf::from("case.toml"));
         assert!(parsed.execute.no_build);
+    }
+
+    #[test]
+    fn run_accepts_no_pre() {
+        let parsed = parse_run_args(&args(&["--case", "case.toml", "--no-pre"])).unwrap();
+        assert_eq!(parsed.case_path, PathBuf::from("case.toml"));
+        assert!(parsed.execute.no_pre);
+        assert!(!parsed.execute.no_build);
     }
 
     #[test]
