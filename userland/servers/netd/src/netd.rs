@@ -7,6 +7,7 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::filter::{FilterDevice, FilterLog, FilterPolicy, new_log};
@@ -371,6 +372,9 @@ struct SocketFile {
     transport: Transport,
     interface: Interface,
     socket: Option<SocketId>,
+    /// Every core listener for this file. A wildcard (`0.0.0.0`) bind creates one entry per
+    /// available core; every other socket keeps this empty and uses `interface`/`socket`.
+    listeners: Vec<(Interface, SocketId)>,
     listener: bool,
     path_endpoint: Endpoint,
     local: Endpoint,
@@ -393,6 +397,7 @@ impl SocketFile {
             transport,
             interface,
             socket: None,
+            listeners: Vec::new(),
             listener: false,
             path_endpoint,
             local: if icmp {
@@ -421,6 +426,7 @@ impl SocketFile {
             transport: accepted.transport,
             interface: accepted.interface,
             socket: Some(accepted.socket),
+            listeners: Vec::new(),
             listener: false,
             path_endpoint: accepted.local,
             local: accepted.local,
@@ -442,6 +448,20 @@ impl SocketFile {
             self.local.port
         } else {
             self.path_endpoint.port
+        }
+    }
+
+    /// Every core listener this file owns: the wildcard set when present, otherwise the single
+    /// legacy `(interface, socket)` pair.
+    fn listener_entries(&self) -> Vec<(Interface, SocketId)> {
+        if !self.listeners.is_empty() {
+            self.listeners.clone()
+        } else if self.listener {
+            self.socket
+                .map(|id| vec![(self.interface, id)])
+                .unwrap_or_default()
+        } else {
+            Vec::new()
         }
     }
 }
@@ -797,7 +817,10 @@ impl<D: Device> Netd<D> {
             .iter()
             .filter_map(|(file, state)| match state {
                 File::Socket(state)
-                    if state.socket == Some(socket) && state.interface == interface =>
+                    if (state.socket == Some(socket) && state.interface == interface)
+                        || state.listeners.iter().any(|(core_interface, id)| {
+                            *core_interface == interface && *id == socket
+                        }) =>
                 {
                     Some(*file)
                 }
@@ -939,10 +962,16 @@ impl<D: Device> Netd<D> {
         }
         self.file_refs.remove(&file);
         let file = self.files.remove(&file).ok_or(Errno::EBADF)?;
-        if let File::Socket(socket) = file
-            && let Some(id) = socket.socket
-        {
-            let _ = self.core_mut(socket.interface).close(id);
+        if let File::Socket(socket) = file {
+            if socket.listeners.is_empty() {
+                if let Some(id) = socket.socket {
+                    let _ = self.core_mut(socket.interface).close(id);
+                }
+            } else {
+                for (interface, id) in socket.listeners {
+                    let _ = self.core_mut(interface).close(id);
+                }
+            }
         }
         Ok(true)
     }
@@ -1292,7 +1321,7 @@ impl<D: Device> Netd<D> {
     }
 
     fn listen(&mut self, file: u64, backlog: u16) -> Result<Response, Errno> {
-        let (interface, transport, port, has_socket) =
+        let (interface, transport, port, has_socket, wildcard) =
             match self.files.get(&file).ok_or(Errno::EBADF)? {
                 File::Control => return Err(Errno::EINVAL),
                 File::Socket(socket) => (
@@ -1300,6 +1329,7 @@ impl<D: Device> Netd<D> {
                     socket.transport,
                     socket.port_for_listen(),
                     socket.socket.is_some(),
+                    socket.local.ip == [0, 0, 0, 0],
                 ),
             };
         if has_socket {
@@ -1308,14 +1338,48 @@ impl<D: Device> Netd<D> {
         if transport != Transport::Tcp {
             return Err(Errno::EOPNOTSUPP);
         }
-        let id = self
-            .core_mut(interface)
-            .tcp_listen(port, backlog as usize)?;
+        // A wildcard bind is one POSIX socket visible on every interface. Raven keeps one
+        // `Stack` per interface, so register the same port on every available core and aggregate
+        // accept/readiness over them. This is the per-interface divergence recorded in the
+        // report: NetBSD `solisten`/`soreceive` demultiplex one socket by local port.
+        let mut interfaces = Vec::with_capacity(2);
+        if wildcard {
+            interfaces.push(Interface::Loopback);
+            if self.nic.is_some() {
+                interfaces.push(Interface::Nic);
+            }
+        } else {
+            interfaces.push(interface);
+        }
+        let mut created: Vec<(Interface, SocketId)> = Vec::with_capacity(interfaces.len());
+        for core_interface in interfaces {
+            match self
+                .core_mut(core_interface)
+                .tcp_listen(port, backlog as usize)
+            {
+                Ok(id) => created.push((core_interface, id)),
+                Err(error) => {
+                    for (created_interface, id) in created {
+                        let _ = self.core_mut(created_interface).close(id);
+                    }
+                    return Err(error);
+                }
+            }
+        }
+        // Keep the file's original interface as the primary so per-file callers (doorbell
+        // identity and the getsockname fallback) stay stable.
+        let primary = created
+            .iter()
+            .position(|(core_interface, _)| *core_interface == interface)
+            .unwrap_or(0);
+        let (primary_interface, primary_id) = created[primary];
         let socket = match self.files.get_mut(&file).ok_or(Errno::EBADF)? {
             File::Socket(socket) => socket,
             File::Control => return Err(Errno::EINVAL),
         };
-        socket.socket = Some(id);
+        socket.socket = Some(primary_id);
+        socket.interface = primary_interface;
+        socket.listeners = created;
         socket.listener = true;
         socket.local.port = port;
         socket.bound = true;
@@ -1324,20 +1388,26 @@ impl<D: Device> Netd<D> {
     }
 
     fn accept(&mut self, file: u64) -> Result<Response, Errno> {
-        let (interface, listener, local) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+        let (listeners, local) = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
             File::Socket(socket) => {
                 if !socket.listener {
                     return Err(Errno::EINVAL);
                 }
-                (
-                    socket.interface,
-                    socket.socket.ok_or(Errno::EBADF)?,
-                    socket.local,
-                )
+                (socket.listener_entries(), socket.local)
             }
         };
-        let Some(socket) = self.core_mut(interface).tcp_accept(listener)? else {
+        if listeners.is_empty() {
+            return Err(Errno::EBADF);
+        }
+        let mut accepted = None;
+        for (interface, listener) in listeners {
+            if let Some(socket) = self.core_mut(interface).tcp_accept(listener)? {
+                accepted = Some((interface, socket));
+                break;
+            }
+        }
+        let Some((interface, socket)) = accepted else {
             return Err(Errno::EAGAIN);
         };
         if self.accepted.len() >= MAX_PENDING_ACCEPTS {
@@ -1504,20 +1574,29 @@ impl<D: Device> Netd<D> {
 
     /// Live readiness of the socket behind an open file.
     ///
-    /// The file must already name a live socket on the same interface; the core predicate runs
-    /// on that interface and socket id. A control file and a file without a socket have a defined
-    /// error instead of a made-up "ready" bit.
+    /// A wildcard listener aggregates the level of every core listener; every other file runs the
+    /// core predicate on its one interface and socket id. A control file and a file without a
+    /// socket have a defined error instead of a made-up "ready" bit.
     pub fn socket_readiness(&self, file: u64) -> Result<Readiness, Errno> {
-        let (interface, socket, write_shutdown) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+        let (interface, socket, listeners) = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
-            File::Socket(socket) => (socket.interface, socket.socket, socket.write_shutdown),
+            File::Socket(socket) => (socket.interface, socket.socket, socket.listeners.clone()),
         };
-        let id = socket.ok_or(Errno::ENOTCONN)?;
-        let mut ready = self.core_ref(interface).readiness(id)?;
-        // A local SHUT_WR rejects every later write with EPIPE; the readiness query must report
-        // the same level, not the core's pre-shutdown send space.
-        if write_shutdown {
-            ready.writable = false;
+        if listeners.is_empty() {
+            let id = socket.ok_or(Errno::ENOTCONN)?;
+            return self.core_ref(interface).readiness(id);
+        }
+        // A wildcard listener is one POSIX socket over several cores: the level is the OR of
+        // every core's listener (pending connections on any interface). The core predicate is the
+        // sole level source for every socket: FreeBSD `SBS_CANTSENDMORE` keeps POLLOUT after
+        // SHUT_WR (K279).
+        let mut ready = Readiness::NONE;
+        for (core_interface, id) in listeners {
+            let level = self.core_ref(core_interface).readiness(id)?;
+            ready.readable |= level.readable;
+            ready.writable |= level.writable;
+            ready.hup |= level.hup;
+            ready.error |= level.error;
         }
         Ok(ready)
     }
@@ -1568,20 +1647,24 @@ impl<D: Device> Netd<D> {
         let Some(File::Socket(socket)) = self.files.get(&file) else {
             return;
         };
-        let Some(id) = socket.socket else {
-            return;
-        };
-        let interface = socket.interface;
         let values = [
             (SockOpt::ReuseAddr, i32::from(socket.reuse_addr)),
             (SockOpt::RcvBuf, socket.rcvbuf),
             (SockOpt::SndBuf, socket.sndbuf),
             (SockOpt::TcpNoDelay, i32::from(socket.nodelay)),
         ];
-        for (option, value) in values {
-            let _ = self
-                .core_mut(interface)
-                .set_socket_option(id, u32::from(option.code()), value);
+        let mut targets = socket.listener_entries();
+        if targets.is_empty()
+            && let Some(id) = socket.socket
+        {
+            targets.push((socket.interface, id));
+        }
+        for (interface, id) in targets {
+            for &(option, value) in &values {
+                let _ =
+                    self.core_mut(interface)
+                        .set_socket_option(id, u32::from(option.code()), value);
+            }
         }
     }
 

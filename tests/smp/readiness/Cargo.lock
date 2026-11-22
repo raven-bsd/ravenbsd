@@ -29,6 +29,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proto-net"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
 name = "raven-rt"
 version = "0.1.0"
 dependencies = [
@@ -55,7 +62,11 @@ name = "raven-smp-readiness"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-net",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
