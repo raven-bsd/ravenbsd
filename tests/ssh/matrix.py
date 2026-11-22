@@ -50,6 +50,7 @@ ASKPASS = ROOT / "tests" / "ssh" / "askpass.sh"
 EXPECTED_BANNER = b"SSH-2.0-OpenSSH_10.6\r\n"
 BANNER_BOUND_S = 10.0
 REQUEST_TIMEOUT_S = 15
+S1_REPEAT_TIMEOUT_S = 8
 S7_TIMEOUT_S = 30
 S7_WALL_BOUND_MS = 5000
 ECHO_PORT = 23097
@@ -57,7 +58,7 @@ ECHO_PAYLOAD = b"K434-S0-ECHO-0123456789abcdef\n"
 MARKER = b"K434-SSH-MARKER-2026-11-22\n"
 
 ROW_ORDER = [
-    "S0", "S1", "S1-client-first", "S2", "S3", "S4", "S5", "S5-identity",
+    "S0", "S1", "S1-client-first", "S1-repeat", "S2", "S3", "S4", "S5", "S5-identity",
     "S5-session", "S6", "S6-length", "S7", "S7-routing", "S7-exit", "S8", "S8-pty-alloc",
 ]
 
@@ -397,6 +398,56 @@ def row_s1() -> None:
         record("S1-client-first", "FAIL",
                f"client-first probe got {literal(third['bytes'])} "
                f"(characterisation only)")
+
+
+def row_s1_repeat() -> None:
+    counts = {"connect": 0, "banner": 0, "auth": 0, "ok": 0}
+    walls: list[float] = []
+    exits: list[int] = []
+    for number in range(1, 11):
+        result = ssh_run(["true"], f"s1-repeat-{number}.log", extra=["-vvv"],
+                         timeout=S1_REPEAT_TIMEOUT_S)
+        text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
+        elapsed = float(result["elapsed_ms"])
+        walls.append(elapsed)
+        exits.append(int(result["returncode"]))
+        connected = "Connection established." in text
+        banner_line = next((line.strip() for line in text.splitlines()
+                            if "Remote protocol version" in line), "")
+        banner_ok = ("Remote protocol version 2.0, remote software version OpenSSH_10.6"
+                     in text)
+        auth_line = next((line.strip() for line in text.splitlines()
+                          if line.startswith("Authenticated to ")
+                          and 'using "password"' in line), "")
+        auth_ok = bool(auth_line)
+        if not connected:
+            step = "connect"
+        elif not banner_ok:
+            step = "banner"
+        elif not auth_ok:
+            step = "auth"
+        else:
+            step = "ok"
+        counts[step] += 1
+        witness = next((line.strip() for line in text.splitlines()
+                        if any(marker in line for marker in (
+                            "Connection timed out", "Connection refused",
+                            "Connection closed", "ssh_exchange_identification",
+                            "Permission denied"))), "-")
+        attempt("S1-repeat", number, "fresh",
+                "Remote protocol version 2.0 ... OpenSSH_10.6 + Authenticated",
+                f"step={step}; banner={banner_line or '-'}; auth={auth_line or '-'}; "
+                f"exit={result['returncode']}; wall={elapsed:.0f} ms; witness={witness}",
+                elapsed, "PASS" if banner_ok and auth_ok else "FAIL")
+    if counts["ok"] == 10:
+        record("S1-repeat", "PASS",
+               f"10/10 fresh connections: banner OpenSSH_10.6 and Authenticated; "
+               f"walls_ms={[round(value) for value in walls]}; exits={exits}")
+    else:
+        record("S1-repeat", "FAIL",
+               f"connect_fail={counts['connect']} banner_fail={counts['banner']} "
+               f"auth_fail={counts['auth']} ok={counts['ok']}; "
+               f"walls_ms={[round(value) for value in walls]}; exits={exits}")
 
 
 def row_s2() -> None:
@@ -1026,6 +1077,7 @@ def main() -> int:
         child, console = boot(IMAGE, b"svcd: sshd up", "serial.log", "vars.fd",
                               ready_timeout=180, socket_serial=True)
         row_s1()
+        row_s1_repeat()
         row_s2()
         s3_state = row_s3_start()
         row_s4()
