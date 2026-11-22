@@ -323,7 +323,8 @@ int main(void) {
     change2.ws_col = 80;
     change2.ws_xpixel = 640;
     change2.ws_ypixel = 480;
-    if (ioctl(master, TIOCSWINSZ, &change2) != 0) {
+    /* The slave path must signal too; change-1 and change-3 use the master. */
+    if (tcsetwinsize(slave, &change2) != 0) {
         printf("pty-winsize: sigwinch change-2-set FAIL errno=%d\n", errno);
         return 1;
     }
