@@ -1,0 +1,4 @@
+package	step	error	file_line	owner
+raven-kernel	clippy kernel x86_64	clippy::too_many_arguments (8/7)	kernel/src/process/exec.rs:63:1	K418 (proposed)
+raven-kernel	clippy kernel aarch64	clippy::too_many_arguments (8/7)	kernel/src/process/exec.rs:63:1	K418 (proposed)
+raven-devd	clippy user programs x86_64	clippy::unnecessary_sort_by	userland/servers/devd/src/pci.rs:46:5	K419 (proposed)

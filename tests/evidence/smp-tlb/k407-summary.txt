@@ -1,0 +1,14 @@
+K407 posix-fs-smp-kvm4 10x
+sha=b04e71ad87d0273ab9d86367b912a30c300c69ac
+start=2026-11-21T21:59:48Z
+run=1 rc=0 start=2026-11-21T21:59:55Z end=2026-11-21T22:01:19Z load_start=9.80 10.26 8.32 load_end=40.09 19.51 11.72
+run=2 rc=1 start=2026-11-21T22:01:19Z end=2026-11-21T22:04:49Z load_start=40.09 19.51 11.72 load_end=32.20 24.49 15.19
+run=3 rc=0 start=2026-11-21T22:04:49Z end=2026-11-21T22:06:36Z load_start=32.20 24.49 15.19 load_end=59.36 38.06 21.14
+run=4 rc=0 start=2026-11-21T22:06:36Z end=2026-11-21T22:07:17Z load_start=59.36 38.06 21.14 load_end=42.26 36.34 21.28
+run=5 rc=0 start=2026-11-21T22:07:17Z end=2026-11-21T22:07:47Z load_start=42.26 36.34 21.28 load_end=29.55 33.82 20.92
+run=6 rc=0 start=2026-11-21T22:07:47Z end=2026-11-21T22:08:22Z load_start=29.55 33.82 20.92 load_end=22.57 31.55 20.63
+run=7 rc=0 start=2026-11-21T22:08:22Z end=2026-11-21T22:09:23Z load_start=22.57 31.55 20.63 load_end=27.25 31.07 21.14
+run=8 rc=1 start=2026-11-21T22:09:23Z end=2026-11-21T22:10:23Z load_start=27.25 31.07 21.14 load_end=26.37 29.96 21.37
+run=9 rc=0 start=2026-11-21T22:10:23Z end=2026-11-21T22:11:00Z load_start=26.37 29.96 21.37 load_end=20.55 28.16 21.13
+run=10 rc=0 start=2026-11-21T22:11:00Z end=2026-11-21T22:11:30Z load_start=20.55 28.16 21.13 load_end=14.97 26.08 20.66
+summary pass=8 fail=2 tlb_timeout_runs=2 fixture_fail_runs=1 stale_nmi_runs=2

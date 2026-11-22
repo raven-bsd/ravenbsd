@@ -21,6 +21,8 @@ grep -Fq '| tcp-soak |' "$packet"
 grep -Fq '| rack-audit |' "$packet"
 grep -Fq '| pf-conformance |' "$packet"
 grep -Fq '| pipe-poll |' "$packet"
+grep -Fq 'tests/evidence/release-host/cold-start-boot/README.md' "$packet"
+grep -Fq 'tests/evidence/release-host/image-pins.txt' "$packet"
 grep -Fq 'HARDWARE/UNVERIFIED' "$packet"
 
 readme=$(sha256sum tests/evidence/release-host/README.md | cut -d ' ' -f 1)

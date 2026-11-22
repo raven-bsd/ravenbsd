@@ -116,6 +116,24 @@ test with `duplicate NMI acknowledged a stale shootdown`. The merged entry itsel
 the tests are the K393 deliverable. The pinned targets are settled briefly before the next
 target is queued on the same CPU; that is test sequencing, not product behaviour.
 
+## KVM4 10x sample (K407)
+
+`posix-fs-smp-kvm4` was run ten times on `origin/master` `b04e71ad` (NMI fix + K393 tests) at
+host load 9.8-59: **8 pass, 2 fail**. The serials and per-run summary are in
+`tests/evidence/smp-tlb/`.
+
+| Run | Result | Failure |
+|---:|---|---|
+| 2 | FAIL | six `smp: tlb shootdown timeout` lines on CPU 0; the fixture worker deadline follows the stall; two stale-NMI diagnostics |
+| 8 | FAIL | six `smp: tlb shootdown timeout` lines on CPU 0; fixture green |
+
+Both failures show the same CPU 0 pattern: `irq_age_ms` 100, 203, 307, 410, 514, 617, 720 with
+`ack_after_ms=MAX` and `last` stuck at the previous sequence. The target vCPU was not scheduled
+for up to 720 ms; this is a host KVM stall, not a guest IF=0/TLB delivery defect. The 100 ms
+deadline is unchanged. The KVM4 10x sample is therefore **8/10, with two TLB-stall failures**;
+it is not a clean TLB gate. K391 owns the fixture stall and a quiet-host rerun is required before
+the release gate.
+
 ## Donor reconciliation
 
 The TLB completion protocol is from NetBSD `sys/arch/x86/x86/x86_tlb.c`

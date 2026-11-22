@@ -1,0 +1,5 @@
+package	step	lint	file_line	owner
+virtio-net	clippy user programs x86_64	clippy::manual_is_multiple_of	userland/drivers/virtio-net/src/main.rs:772:24	Bob/K424
+virtio-net	clippy user programs x86_64	clippy::manual_is_multiple_of	userland/drivers/virtio-net/src/main.rs:810:24	Bob/K424
+vfsd	clippy user programs x86_64	clippy::needless_borrow	userland/servers/vfsd/src/main.rs:286:50	Mel/K425
+vfsd	clippy user programs x86_64	clippy::needless_borrow	userland/servers/vfsd/src/main.rs:295:68	Mel/K425

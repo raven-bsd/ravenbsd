@@ -1,0 +1,299 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K414: the 0.1.0-ufs server gate. Boots the product profile on its writable UFS2
+# root, asserts the styled login, the release service/network/pf state, the disk
+# tools, every staged uutils binary, and a file surviving a guest reboot.
+
+name = "ufs-server"
+arch = "x86_64"
+profile = "0.1.0-ufs"
+timeout_secs = 420
+boot_cmdline = "console=ttyS0 loglevel=info"
+qemu_extra = [
+    "-action", "reboot=reset",
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/x86_64/0.1.0-ufs-root.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "any"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^-{10,}$'
+unordered = true
+
+[[expect]]
+regex = '^[0-9]{3}\.[0-9]{2}  \S+ +[a-z]+$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 x86_64$'
+
+[[expect]]
+regex = '^netd: pf loaded rules=[0-9]+ nat=[0-9]+$'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '(?i)^.*login:'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|no UFS root device|uutils: .* MISSING|uutils: inventory FAILED'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/sbin/mount\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/df -h / && echo df-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^df-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "test -x /bin/lsblk && echo d1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^d1$'
+timeout_secs = 60
+
+[[step]]
+send = "test -x /sbin/newfs && echo d2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^d2$'
+timeout_secs = 60
+
+[[step]]
+send = "test -x /sbin/gpart && echo d3\n"
+delay_ms = 100
+
+[[step]]
+wait = '^d3$'
+timeout_secs = 60
+
+[[step]]
+send = "test -x /bin/df && test -x /bin/stat && echo d4\n"
+delay_ms = 100
+
+[[step]]
+wait = '^d4$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/lsblk && echo lsblk-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^lsblk-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/stat -f / >/dev/null && echo stat-f-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^stat-f-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/pfctl -n -f /etc/pf.conf && echo pfctl-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^pfctl-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/ifconfig eth0 && echo ifconfig-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ifconfig: eth0 .*inet 10\.0\.2\.15 '
+timeout_secs = 30
+
+[[step]]
+wait = '^ifconfig-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/ping 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+timeout_secs = 60
+
+[[step]]
+send = ". /bin/uutils-inventory\n"
+delay_ms = 100
+
+[[step]]
+wait = '^uutils: total=108 staged=32 gaps=76$'
+timeout_secs = 60
+
+[[step]]
+wait = '^uutils: inventory ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo colour:$TERM:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^colour:xterm-256color:1$'
+timeout_secs = 60
+
+[[step]]
+send = "NO_COLOR=1; . /etc/profile; echo plain:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^plain:0$'
+timeout_secs = 60
+
+[[step]]
+send = "NO_COLOR=; . /etc/profile; echo restored:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^restored:1$'
+timeout_secs = 60
+
+[[step]]
+send = "TERM=dumb; . /etc/profile; echo dumb:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^dumb:0$'
+timeout_secs = 60
+
+[[step]]
+send = "TERM=xterm-256color; . /etc/profile; echo termrestored:$CLICOLOR\n"
+delay_ms = 100
+
+[[step]]
+wait = '^termrestored:1$'
+timeout_secs = 60
+
+[[step]]
+send = "echo ufs-server-persist > /persist.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "echo write-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^write-ok$'
+timeout_secs = 60
+
+[[step]]
+send = "/sbin/reboot\n"
+delay_ms = 100
+
+[[step]]
+wait = '^power: reboot$'
+timeout_secs = 60
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 180
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/cat /persist.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs-server-persist$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/poweroff\n"
+delay_ms = 100
+
+[[step]]
+wait = '^power: poweroff$'
+timeout_secs = 60

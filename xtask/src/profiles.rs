@@ -334,9 +334,9 @@ fn relative(path: &Path, root: &Path) -> String {
 
 fn valid_name(name: &str) -> bool {
     !name.is_empty()
-        && name
-            .chars()
-            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' || ch == '_')
+        && name.chars().all(|ch| {
+            ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' || ch == '_' || ch == '.'
+        })
 }
 
 /// Repository-relative allowlist of services that may keep a restartable policy in a one-shot

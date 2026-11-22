@@ -24,6 +24,10 @@ addons/tls/openssl/
 addons/ssh/openssh/
 
 tests/libc/fuzz/corpus/
+
+# MPTCP1: the MPTCP option fuzz corpus is binary fuzz input, not source; no SPDX header
+# applies. The readable crate, tests and docs stay under the provenance check.
+tests/mptcp/fuzz/corpus/
 # B54: binary Pi 5 DTB fixtures; tests/fixtures/pi5/generate.py regenerates them from the
 # documented trees, and the readable .dts/README stay under the SPDX check.
 tests/fixtures/pi5/*.dtb
