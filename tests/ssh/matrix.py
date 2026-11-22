@@ -635,6 +635,18 @@ def ssh_probe(command: list[str], log_name: str, user: str = USER,
 
 
 def row_s3_start() -> dict[str, object]:
+    bad = ssh_run(["true"], "s3-wrong.log", password="wrong-password",
+                  extra=["-v"])
+    bad_text = (bad["stderr"] + bad["stdout"]).decode("utf-8", "replace")
+    refused = bad["returncode"] == 255 and "Permission denied" in bad_text
+    if not refused:
+        banner_timeout = "timed out during banner exchange" in bad_text
+        bad_detail = ("banner timeout before auth" if banner_timeout else
+                      f"exit {bad['returncode']} + no refusal line")
+    else:
+        bad_detail = f"exit {bad['returncode']} + Permission denied"
+    attempt("S3-wrong", 1, "fresh", "exit 255 + Permission denied",
+            bad_detail, float(bad["elapsed_ms"]), "PASS" if refused else "FAIL")
     good = ssh_run(["true"], "s3-raven.log", extra=["-v"])
     good_text = (good["stderr"] + good["stdout"]).decode("utf-8", "replace")
     auth_line = next((line for line in good_text.splitlines()
@@ -643,15 +655,22 @@ def row_s3_start() -> dict[str, object]:
     attempt("S3-auth-raven", 1, "fresh", 'Authenticated to ... using "password"',
             auth_line or f"exit {good['returncode']}",
             float(good["elapsed_ms"]), "PASS" if client_auth else "FAIL")
-    bad = ssh_run(["true"], "s3-wrong.log", password="wrong-password",
-                  extra=["-v"])
-    bad_text = (bad["stderr"] + bad["stdout"]).decode("utf-8", "replace")
-    refused = bad["returncode"] == 255 and "Permission denied" in bad_text
-    attempt("S3-wrong", 1, "fresh", "exit 255 + Permission denied",
-            f"exit {bad['returncode']} + {'Permission denied' if 'Permission denied' in bad_text else 'no refusal line'}",
-            float(bad["elapsed_ms"]), "PASS" if refused else "FAIL")
     return {"client_auth": client_auth, "auth_line": auth_line,
             "refused": refused, "bad_exit": bad["returncode"]}
+
+
+def console_capture(console: SerialConsole, command: str, log_name: str,
+                    timeout: float = 30) -> str:
+    """Run one console command and return the cleaned text up to a post-exec nonce."""
+    mark = len(console.buffer)
+    nonce = f"K434-{log_name}-{os.getpid()}"
+    console.send(f"{command}; echo {nonce}\n".encode())
+    end = console.wait_for(b"\n" + nonce.encode(), timeout, start=mark)
+    segment = bytes(console.buffer[mark:end if end > 0 else len(console.buffer)])
+    segment = segment.decode("utf-8", "replace").replace("\r", "")
+    clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", segment)
+    (OUT / log_name).write_text(clean, encoding="utf-8")
+    return clean
 
 
 def row_s3_finish(console: SerialConsole, state: dict[str, object]) -> None:
@@ -687,17 +706,12 @@ def row_s3_finish(console: SerialConsole, state: dict[str, object]) -> None:
                f"client auth {'yes' if state['client_auth'] else 'no'}; server line unreadable "
                f"(console root login failed); wrong exit {state['bad_exit']} (auth-passwd; C5/C9)")
         return
-    mark = len(console.buffer)
-    nonce = f"K434-DONE-{os.getpid()}"
-    console.send(f"cat /tmp/sshd.log; echo {nonce}\n".encode())
-    end = console.wait_for(b"\n" + nonce.encode(), 30, start=mark)
-    wait_ms = (time.monotonic() - started) * 1000
-    segment = bytes(console.buffer[mark:end if end > 0 else len(console.buffer)])
-    segment = segment.decode("utf-8", "replace").replace("\r", "")
-    clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", segment)
+    capture_started = time.monotonic()
+    clean = console_capture(console, "cat /tmp/sshd.log", "s3-server.log")
+    wait_ms = (time.monotonic() - capture_started) * 1000
     lines = [line.strip() for line in clean.splitlines() if line.strip()]
     log_lines = [line for line in lines
-                 if "cat /tmp/sshd.log" not in line and nonce not in line
+                 if "cat /tmp/sshd.log" not in line and "K434-" not in line
                  and not line.startswith("raven#")]
     accepted = [line for line in log_lines if "Accepted password for raven " in line]
     observed = accepted[0] if accepted else (" | ".join(log_lines[-4:]) or "no log lines")
@@ -937,6 +951,7 @@ def main() -> int:
         row_s3_finish(console, s3_state)
         row_s7()
         row_s8()
+        console_capture(console, "cat /tmp/sshd.log", "s8-server.log")
     except Exception as error:  # noqa: BLE001 - a boot failure is a BLOCKED row, not a crash
         record("S1", "BLOCKED", f"SSH boot/run failed: {error}")
         for row in ("S2", "S3", "S4", "S5", "S6", "S7", "S8"):
