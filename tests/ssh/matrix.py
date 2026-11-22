@@ -1101,6 +1101,23 @@ def main() -> int:
             kill(repeat_child)
         time.sleep(0.5)
 
+    s8_child = None
+    try:
+        s8_child, _ = boot(IMAGE, b"svcd: sshd up", "serial-s8.log",
+                           "vars-s8.fd", ready_timeout=180)
+        if not wait_tcp(22, 30):
+            record("S8", "BLOCKED",
+                   "guest listener did not accept a TCP connection after svcd: sshd up")
+        else:
+            time.sleep(0.5)
+            row_s8()
+    except Exception as error:  # noqa: BLE001 - isolate the S8 boot
+        record("S8", "BLOCKED", f"S8 boot failed: {error}")
+    finally:
+        if s8_child is not None:
+            kill(s8_child)
+        time.sleep(0.5)
+
     child = None
     console: SerialConsole | None = None
     try:
@@ -1112,8 +1129,6 @@ def main() -> int:
         row_s4()
         row_s5_s6()
         row_s3_finish(console, s3_state)
-        row_s8()
-        console_capture(console, "cat /tmp/sshd.log", "s8-server.log")
         row_s7(console)
     except Exception as error:  # noqa: BLE001 - a boot failure is a BLOCKED row, not a crash
         record("S1", "BLOCKED", f"SSH boot/run failed: {error}")
