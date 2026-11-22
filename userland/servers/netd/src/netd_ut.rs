@@ -907,6 +907,60 @@ fn listener_readiness_follows_the_accept_backlog() {
 }
 
 #[test]
+fn wildcard_listener_serves_loopback_and_nic() {
+    let mut netd = new_netd_with_nic();
+    let mut now = 0i64;
+    // A 0.0.0.0 bind selects the NIC interface at open time. The listener must still serve the
+    // loopback core: a client to 127.0.0.1 has to become readable and accept.
+    let listener = netd.open("net:tcp/0.0.0.0:7010").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+
+    let loopback = Endpoint {
+        ip: [127, 0, 0, 1],
+        port: 7010,
+    };
+    let loop_client = netd.open("net:tcp/127.0.0.1:7010").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, loop_client, Call::Connect(loopback)),
+        Response::Ok
+    );
+    let bits = readiness_retry(&mut netd, listener, READY_READABLE, &mut now);
+    assert_eq!(bits & READY_WRITABLE, 0);
+    let id = accept(&mut netd, listener, &mut now);
+    let loop_accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    assert_eq!(netd.write(loop_client, 0, b"loop").unwrap(), 4);
+    let mut buffer = [0u8; 8];
+    let read = read_retry(&mut netd, loop_accepted, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"loop");
+
+    // The same wildcard listener keeps serving the NIC path.
+    let nic = Endpoint {
+        ip: [10, 0, 2, 15],
+        port: 7010,
+    };
+    let nic_client = netd.open("net:tcp/10.0.2.15:7010").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, nic_client, Call::Connect(nic)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let nic_accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    assert_eq!(netd.write(nic_client, 0, b"nic").unwrap(), 3);
+    let read = read_retry(&mut netd, nic_accepted, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"nic");
+
+    netd.close(nic_accepted).unwrap();
+    netd.close(loop_accepted).unwrap();
+    netd.close(nic_client).unwrap();
+    netd.close(loop_client).unwrap();
+    netd.close(listener).unwrap();
+    assert_eq!(netd.socket_files(), 0);
+}
+
+#[test]
 fn readiness_reports_a_peer_half_close_as_readable_not_hup() {
     let mut netd = new_netd();
     let mut now = 0i64;
