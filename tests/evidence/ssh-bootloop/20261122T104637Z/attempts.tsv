@@ -1,0 +1,26 @@
+boot	attempt	banner_bytes	banner_exact	banner_wall_ms	auth_exit	auth_wall_ms	auth_line	auth_ok	serial_sha256	result	note
+1	1	22	False	4417.6	None	18873.9	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	5f405a777bc61f3ac0a0fa883511ca383ab8990fe1994dc6fd3cdcf73a90b4e0	FAIL	banner mismatch
+1	2	22	False	1967.1	None	18028.5	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	5f405a777bc61f3ac0a0fa883511ca383ab8990fe1994dc6fd3cdcf73a90b4e0	FAIL	banner mismatch
+1	3	22	False	2808.8	None	17943.1	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	5f405a777bc61f3ac0a0fa883511ca383ab8990fe1994dc6fd3cdcf73a90b4e0	FAIL	banner mismatch
+1	4	0	False	8007.5	255	8114.3		False	5f405a777bc61f3ac0a0fa883511ca383ab8990fe1994dc6fd3cdcf73a90b4e0	FAIL	zero-byte banner
+1	5	0	False	8005.4	None	8145.2		False	5f405a777bc61f3ac0a0fa883511ca383ab8990fe1994dc6fd3cdcf73a90b4e0	FAIL	zero-byte banner
+2	1	0	False	8036.0	255	8135.7		False	b225f9be99e36e62bb3123b3961eab7cdc1264e8ff4ef3319cb85f815ee8dc5b	FAIL	zero-byte banner
+2	2	0	False	8071.7	None	8172.8		False	b225f9be99e36e62bb3123b3961eab7cdc1264e8ff4ef3319cb85f815ee8dc5b	FAIL	zero-byte banner
+2	3	22	False	6664.7	None	17751.7	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	b225f9be99e36e62bb3123b3961eab7cdc1264e8ff4ef3319cb85f815ee8dc5b	FAIL	banner mismatch
+2	4	22	False	6053.3	None	23933.5	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	b225f9be99e36e62bb3123b3961eab7cdc1264e8ff4ef3319cb85f815ee8dc5b	FAIL	banner mismatch
+2	5	22	False	4996.8	None	21901.3	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	b225f9be99e36e62bb3123b3961eab7cdc1264e8ff4ef3319cb85f815ee8dc5b	FAIL	banner mismatch
+3	1	22	False	3717.2	None	18011.0	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	f4135d107e4a9be61091008df6afc6c51a7e878d312089c97d3e80d7fc32a673	FAIL	banner mismatch
+3	2	22	False	7288.0	None	22255.7	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	f4135d107e4a9be61091008df6afc6c51a7e878d312089c97d3e80d7fc32a673	FAIL	banner mismatch
+3	3	22	False	6155.6	None	22748.3	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	f4135d107e4a9be61091008df6afc6c51a7e878d312089c97d3e80d7fc32a673	FAIL	banner mismatch
+3	4	22	False	4087.5	None	18368.2	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	f4135d107e4a9be61091008df6afc6c51a7e878d312089c97d3e80d7fc32a673	FAIL	banner mismatch
+3	5	22	False	2024.0	None	17828.1	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	f4135d107e4a9be61091008df6afc6c51a7e878d312089c97d3e80d7fc32a673	FAIL	banner mismatch
+4	1	22	False	2787.2	None	18098.5	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	5efd399a54d233e774c204e153ae79afe7f204421d09e4c218e2531597f089e6	FAIL	banner mismatch
+4	2	22	False	5274.6	None	22214.6	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	5efd399a54d233e774c204e153ae79afe7f204421d09e4c218e2531597f089e6	FAIL	banner mismatch
+4	3	22	False	6778.4	None	22427.8	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	5efd399a54d233e774c204e153ae79afe7f204421d09e4c218e2531597f089e6	FAIL	banner mismatch
+4	4	22	False	6159.3	None	18952.5	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	5efd399a54d233e774c204e153ae79afe7f204421d09e4c218e2531597f089e6	FAIL	banner mismatch
+4	5	22	False	2293.1	None	17094.8	Authenticated to 10.0.2.15 ([10.0.2.15]:22) using "password"	False	5efd399a54d233e774c204e153ae79afe7f204421d09e4c218e2531597f089e6	FAIL	banner mismatch
+5	1	0	False	8062.6	None	8125.0		False	fc4cf9a03959e618529f939571db33771379fffe36075ed0ca08bfda100ae2be	FAIL	zero-byte banner
+5	2	0	False	8146.8	None	8150.1		False	fc4cf9a03959e618529f939571db33771379fffe36075ed0ca08bfda100ae2be	FAIL	zero-byte banner
+5	3	0	False	8292.9	None	8144.9		False	fc4cf9a03959e618529f939571db33771379fffe36075ed0ca08bfda100ae2be	FAIL	zero-byte banner
+5	4	0	False	8054.9	255	8129.0		False	fc4cf9a03959e618529f939571db33771379fffe36075ed0ca08bfda100ae2be	FAIL	zero-byte banner
+5	5	0	False	8137.2	255	8158.1		False	fc4cf9a03959e618529f939571db33771379fffe36075ed0ca08bfda100ae2be	FAIL	zero-byte banner

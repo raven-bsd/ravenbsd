@@ -1,0 +1,11 @@
+{
+  "attempts": 25,
+  "attempts_per_boot": 5,
+  "boots": 5,
+  "failed": 25,
+  "image": "build/qtest/ssh-login.img",
+  "image_sha256": "6713edd3b505aedf1e3f8fb77898f393a70a221d6c6528d674d910896952adbe",
+  "passed": 0,
+  "result": "FAIL",
+  "zero_byte_attempts": 9
+}

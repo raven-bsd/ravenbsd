@@ -1,0 +1,8 @@
+OpenSSH_8.9p1 Ubuntu-3ubuntu0.18, OpenSSL 3.0.2 15 Mar 2022
+debug1: Reading configuration data /home/bo/.ssh/config
+debug1: Reading configuration data /etc/ssh/ssh_config
+debug1: /etc/ssh/ssh_config line 19: include /etc/ssh/ssh_config.d/*.conf matched no files
+debug1: /etc/ssh/ssh_config line 21: Applying options for *
+debug1: Connecting to 10.0.2.15 [10.0.2.15] port 22.
+debug1: connect to address 10.0.2.15 port 22: Connection timed out
+ssh: connect to host 10.0.2.15 port 22: Connection timed out

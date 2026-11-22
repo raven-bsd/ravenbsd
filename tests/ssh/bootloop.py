@@ -242,8 +242,12 @@ def main() -> int:
                     note = "zero-byte banner"
                 elif not banner["banner_exact"]:
                     note = "banner mismatch"
-                elif not auth["auth_ok"]:
-                    note = "auth/session failure"
+                elif not auth["auth_line"]:
+                    note = "no Authenticated line"
+                elif auth["auth_exit"] != 0:
+                    note = f"session exit {auth['auth_exit']}"
+                if auth["auth_line"]:
+                    note = (note + "; authenticated").lstrip("; ")
                 row = {
                     "boot": boot_index,
                     "attempt": attempt,
