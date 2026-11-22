@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# C74hq: the libc alarm/pause/ualarm seam on aarch64. This is the aarch64 twin of
+# cases/posix-alarm.toml: the same fixture installs a SIGALRM handler, proves the stored
+# disposition, then proves timer delivery through bounded pause() returns for alarm(1), a
+# one-shot ualarm and a repeating ualarm. No host result is substituted.
+
+name = "posix-alarm-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/posix-alarm/build.sh"]
+initfs = "build/fixtures/posix-alarm/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^posix-alarm: start$'
+
+[[expect]]
+regex = '^posix-alarm: handler-installed ok$'
+
+[[expect]]
+regex = '^posix-alarm: handler-stored ok$'
+
+[[expect]]
+regex = '^posix-alarm: alarm-eintr ok$'
+
+[[expect]]
+regex = '^posix-alarm: alarm-bounded ok$'
+
+[[expect]]
+regex = '^posix-alarm: alarm-ms=[0-9]+$'
+
+[[expect]]
+regex = '^posix-alarm: ualarm-eintr ok$'
+
+[[expect]]
+regex = '^posix-alarm: ualarm-bounded ok$'
+
+[[expect]]
+regex = '^posix-alarm: ualarm-ms=[0-9]+$'
+
+[[expect]]
+regex = '^posix-alarm: interval-first ok$'
+
+[[expect]]
+regex = '^posix-alarm: interval-second ok$'
+
+[[expect]]
+regex = '^posix-alarm: interval-bounded ok$'
+
+[[expect]]
+regex = '^posix-alarm: interval-ms=[0-9]+$'
+
+[[expect]]
+regex = '^posix-alarm: cancel-return ok$'
+
+[[expect]]
+regex = '^posix-alarm: cancel-clear ok$'
+
+[[expect]]
+regex = '^posix-alarm: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|posix-alarm: FAIL'
