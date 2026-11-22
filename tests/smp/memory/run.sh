@@ -78,7 +78,7 @@ esac
 
 image=build/smp-memory/smp-memory.img
 initfs=build/smp-memory/initfs.img
-cmdline='console=ttyS0 test-exit=1 smp_user=on smp-user-trace'
+cmdline='console=ttyS0 test-exit=1 smp_user=on smp-user-trace s24-framecheck'
 out=build/smp-memory/$mode
 
 if [ "$no_build" -eq 0 ]; then

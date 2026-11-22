@@ -1,0 +1,19 @@
+==> guard
+==> fmt
+==> clippy (changed)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s
+==> tests (changed, parallel)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+────────────
+ Nextest run ID bdb925a1-2ad2-4b90-a32f-2c191cf99014 with nextest profile: default
+    Starting 886 tests across 6 binaries
+────────────
+     Summary [  66.752s] 886 tests run: 886 passed (1 slow), 0 skipped
+==> profiles
+check-fast summary:
+  ok       guard (exit 0, 14.98s)
+  ok       fmt (exit 0, 12.95s)
+  ok       clippy (changed) (exit 0, 0.35s)
+  ok       tests (changed, parallel) (exit 0, 67.46s)
+  ok       profiles (exit 0, 0.48s)
+check-fast: PASSED

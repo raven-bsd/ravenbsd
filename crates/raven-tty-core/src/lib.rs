@@ -277,6 +277,23 @@ pub struct Output {
     pub events: Vec<Event>,
 }
 
+/// The terminal window size (`struct winsize`).
+///
+/// The four fields are the BSD layout: `ws_row`, `ws_col`, `ws_xpixel`, `ws_ypixel`, all
+/// `unsigned short`. A new pty starts at `0x0`, as in NetBSD; the pty stores one record per pair
+/// and returns it unchanged on both the master and the slave.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Winsize {
+    /// Rows, in characters.
+    pub row: u16,
+    /// Columns, in characters.
+    pub col: u16,
+    /// Horizontal size, in pixels.
+    pub xpixel: u16,
+    /// Vertical size, in pixels.
+    pub ypixel: u16,
+}
+
 /// The line discipline state.
 #[derive(Clone, Debug)]
 pub struct Discipline {

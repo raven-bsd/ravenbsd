@@ -1197,6 +1197,13 @@ name = "raven-abi"
 version = "0.1.0"
 
 [[package]]
+name = "raven-abi-coverage"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-at-fixture"
 version = "0.1.0"
 dependencies = [
@@ -3749,6 +3756,14 @@ dependencies = [
  "raven-proto-svc",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-syscall-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]

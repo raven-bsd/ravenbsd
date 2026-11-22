@@ -1,0 +1,100 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=107379 reserved=23693
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2704 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 78db8e563 2026-11-22
+mem: 419 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x466d14 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=2751 spawn=3174 first_poll=3188 deadline=8174 stalled=0 ready_at=3256
+rtc: 2026-11-22 11:02:10 (epoch 1795345330s)
+1795345334.535 randd: started
+1795345334.716 ramfsd: started
+svcd: randd up
+svcd: randd timing: generation=1 start=3379 spawn=4347 first_poll=4353 deadline=9347 stalled=0 ready_at=4732
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=3345 spawn=4617 first_poll=4630 deadline=9617 stalled=0 ready_at=5062
+svcd: consd up
+svcd: consd timing: generation=1 start=3263 spawn=4357 first_poll=4415 deadline=64357 stalled=0 ready_at=5080
+1795345335.436 nulld: started
+1795345335.596 sysd: started
+1795345335.659 zerod: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=3296 spawn=5431 first_poll=5440 deadline=10431 stalled=0 ready_at=5664
+svcd: sysd up
+svcd: sysd timing: generation=1 start=3413 spawn=5561 first_poll=5571 deadline=10561 stalled=0 ready_at=5681
+svcd: zerod up
+svcd: zerod timing: generation=1 start=3427 spawn=5567 first_poll=5592 deadline=10567 stalled=0 ready_at=5766
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=3331 spawn=5588 first_poll=5632 deadline=35588 stalled=0 ready_at=5770
+1795345338.668 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=3282 spawn=4555 first_poll=4568 deadline=124555 stalled=0 ready_at=8694
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=8700 spawn=9074 first_poll=9086 deadline=69074 stalled=0 ready_at=9249
+pty-winsize: start uid=0
+pty-winsize: slave-open fd=4
+pty-winsize: set1=0
+pty-winsize: get slave=0
+pty-winsize: slave row=43 ok
+pty-winsize: slave col=120 ok
+pty-winsize: slave xpixel=0 ok
+pty-winsize: slave ypixel=0 ok
+pty-winsize: get master=0
+pty-winsize: master row=43 ok
+pty-winsize: master col=120 ok
+pty-winsize: master xpixel=0 ok
+pty-winsize: master ypixel=0 ok
+pty-winsize: ioctl-get=0
+pty-winsize: ioctl-slave row=43 ok
+pty-winsize: ioctl-slave col=120 ok
+pty-winsize: ioctl-slave xpixel=0 ok
+pty-winsize: ioctl-slave ypixel=0 ok
+pty-winsize: set2-ioctl=0
+pty-winsize: get second-slave=0
+pty-winsize: second-slave row=24 ok
+pty-winsize: second-slave col=80 ok
+pty-winsize: second-slave xpixel=640 ok
+pty-winsize: second-slave ypixel=480 ok
+pty-winsize: set3=0
+pty-winsize: get zeros-master=0
+pty-winsize: zeros-master row=0 ok
+pty-winsize: zeros-master col=0 ok
+pty-winsize: zeros-master xpixel=0 ok
+pty-winsize: zeros-master ypixel=0 ok
+pty-winsize: non-tty-get=-1 errno=25
+pty-winsize: non-tty-set=-1 errno=25
+pty-winsize: ok
+svcd: libc-test up
+svcd: libc-test timing: generation=1 start=9254 spawn=9841 first_poll=none deadline=69841 stalled=0 ready_at=10364
+svcd: settled
+init exited (0)

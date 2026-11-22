@@ -24,6 +24,7 @@ struct QtestOptions {
     selection: Selection,
     arch: Option<String>,
     no_build: bool,
+    no_pre: bool,
 }
 
 impl QtestOptions {
@@ -31,6 +32,7 @@ impl QtestOptions {
         let mut selection = None;
         let mut arch = None;
         let mut no_build = false;
+        let mut no_pre = false;
         let mut index = 0;
         while index < args.len() {
             match args[index].as_str() {
@@ -51,6 +53,7 @@ impl QtestOptions {
                     );
                 }
                 "--no-build" => no_build = true,
+                "--no-pre" => no_pre = true,
                 other => bail!("qtest: unexpected argument `{other}`"),
             }
             index += 1;
@@ -61,6 +64,7 @@ impl QtestOptions {
             selection,
             arch,
             no_build,
+            no_pre,
         })
     }
 
@@ -79,6 +83,9 @@ impl QtestOptions {
         }
         if self.no_build {
             args.push("--no-build".to_string());
+        }
+        if self.no_pre {
+            args.push("--no-pre".to_string());
         }
         Ok(args)
     }
@@ -247,5 +254,30 @@ mod tests {
             .unwrap();
         let expected = cases.join("one.toml").display().to_string();
         assert_eq!(args, vec!["run", "--case", expected.as_str(), "--no-build"]);
+    }
+
+    #[test]
+    fn no_pre_is_forwarded_for_a_single_case() {
+        let cases = temp_cases("case-no-pre");
+        fs::write(cases.join("one.toml"), "").unwrap();
+        let args = options(&["--case", "one", "--no-pre"])
+            .harness_args(&cases)
+            .unwrap();
+        let expected = cases.join("one.toml").display().to_string();
+        assert_eq!(args, vec!["run", "--case", expected.as_str(), "--no-pre"]);
+    }
+
+    #[test]
+    fn no_build_and_no_pre_keep_the_forwarded_order() {
+        let cases = temp_cases("case-no-build-no-pre");
+        fs::write(cases.join("one.toml"), "").unwrap();
+        let args = options(&["--case", "one", "--no-build", "--no-pre"])
+            .harness_args(&cases)
+            .unwrap();
+        let expected = cases.join("one.toml").display().to_string();
+        assert_eq!(
+            args,
+            vec!["run", "--case", expected.as_str(), "--no-build", "--no-pre"]
+        );
     }
 }

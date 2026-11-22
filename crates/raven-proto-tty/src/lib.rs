@@ -21,13 +21,14 @@
 //!
 //! `GET_TERMIOS`/`SET_TERMIOS` carry the complete 60-byte ABI record field by field in a
 //! [`TERMIOS_LEN`]-byte body (K444). Every field is little-endian with a fixed offset; no struct
-//! memory is sent, so the ABI padding bytes never travel.
+//! memory is sent, so the ABI padding bytes never travel. `GET_WINSIZE`/`SET_WINSIZE` carry the
+//! four `struct winsize` fields in a [`WINSIZE_LEN`]-byte body (K455).
 
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-pub use raven_tty_core::{Mode, Settings, Termios};
+pub use raven_tty_core::{Mode, Settings, Termios, Winsize};
 
 /// Protocol version carried in every request and response.
 pub const VERSION: u16 = 1;
@@ -38,6 +39,10 @@ pub const CALL_LEN: usize = 12;
 /// Encoded length of a `GET_TERMIOS`/`SET_TERMIOS` body: the 12-byte header followed by the
 /// four flag words, `c_line`, `c_cc[32]` and the two speeds.
 pub const TERMIOS_LEN: usize = CALL_LEN + 4 * 4 + 1 + 32 + 4 + 4;
+
+/// Encoded length of a `GET_WINSIZE`/`SET_WINSIZE` body: the 12-byte header and four little-endian
+/// `u16` fields.
+pub const WINSIZE_LEN: usize = CALL_LEN + 4 * 2;
 
 /// `SET_MODE(mode, echo)`.
 pub const OP_SET_MODE: u16 = 1;
@@ -53,6 +58,10 @@ pub const OP_SET_WRITE: u16 = 5;
 pub const OP_GET_TERMIOS: u16 = 6;
 /// `SET_TERMIOS`.
 pub const OP_SET_TERMIOS: u16 = 7;
+/// `GET_WINSIZE`.
+pub const OP_GET_WINSIZE: u16 = 8;
+/// `SET_WINSIZE`.
+pub const OP_SET_WINSIZE: u16 = 9;
 
 const CANONICAL: u32 = 0;
 const RAW: u32 = 1;
@@ -83,6 +92,18 @@ pub enum TermiosRequest {
     Set {
         /// Requested attributes.
         termios: Termios,
+    },
+}
+
+/// A window-size request (`GET_WINSIZE`/`SET_WINSIZE`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WinsizeRequest {
+    /// Ask for the current window size.
+    Get,
+    /// Install the requested window size.
+    Set {
+        /// Requested geometry.
+        winsize: Winsize,
     },
 }
 
@@ -250,6 +271,69 @@ fn termios_from(input: &[u8]) -> Result<Termios, TtyError> {
         cc,
         ispeed: u32::from_le_bytes([input[61], input[62], input[63], input[64]]),
         ospeed: u32::from_le_bytes([input[65], input[66], input[67], input[68]]),
+    })
+}
+
+/// Encode `GET_WINSIZE` into a [`WINSIZE_LEN`] body.
+pub fn encode_get_winsize_request(out: &mut [u8; WINSIZE_LEN]) {
+    put_header(OP_GET_WINSIZE, out);
+    out[CALL_LEN..].fill(0);
+}
+
+/// Encode `SET_WINSIZE` into a [`WINSIZE_LEN`] body.
+pub fn encode_set_winsize_request(winsize: &Winsize, out: &mut [u8; WINSIZE_LEN]) {
+    put_header(OP_SET_WINSIZE, out);
+    put_winsize(winsize, out);
+}
+
+/// Encode a `GET_WINSIZE`/`SET_WINSIZE` answer into a [`WINSIZE_LEN`] body.
+pub fn encode_winsize_response(winsize: &Winsize, out: &mut [u8; WINSIZE_LEN]) {
+    put_header(OP_GET_WINSIZE, out);
+    put_winsize(winsize, out);
+}
+
+fn put_winsize(winsize: &Winsize, out: &mut [u8; WINSIZE_LEN]) {
+    out[12..14].copy_from_slice(&winsize.row.to_le_bytes());
+    out[14..16].copy_from_slice(&winsize.col.to_le_bytes());
+    out[16..18].copy_from_slice(&winsize.xpixel.to_le_bytes());
+    out[18..20].copy_from_slice(&winsize.ypixel.to_le_bytes());
+}
+
+/// Decode a `GET_WINSIZE`/`SET_WINSIZE` body.
+pub fn decode_winsize_request(input: &[u8]) -> Result<WinsizeRequest, TtyError> {
+    let (op, _, _) = header(input)?;
+    match op {
+        OP_GET_WINSIZE => {
+            if input.len() < WINSIZE_LEN {
+                return Err(TtyError::Truncated);
+            }
+            Ok(WinsizeRequest::Get)
+        }
+        OP_SET_WINSIZE => Ok(WinsizeRequest::Set {
+            winsize: winsize_from(input)?,
+        }),
+        other => Err(TtyError::UnknownOp(other)),
+    }
+}
+
+/// Decode a `GET_WINSIZE`/`SET_WINSIZE` answer body.
+pub fn decode_winsize_response(input: &[u8]) -> Result<Winsize, TtyError> {
+    let (op, _, _) = header(input)?;
+    match op {
+        OP_GET_WINSIZE | OP_SET_WINSIZE => winsize_from(input),
+        other => Err(TtyError::UnknownOp(other)),
+    }
+}
+
+fn winsize_from(input: &[u8]) -> Result<Winsize, TtyError> {
+    if input.len() < WINSIZE_LEN {
+        return Err(TtyError::Truncated);
+    }
+    Ok(Winsize {
+        row: u16::from_le_bytes([input[12], input[13]]),
+        col: u16::from_le_bytes([input[14], input[15]]),
+        xpixel: u16::from_le_bytes([input[16], input[17]]),
+        ypixel: u16::from_le_bytes([input[18], input[19]]),
     })
 }
 
