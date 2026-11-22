@@ -159,6 +159,14 @@ impl WaitQueue {
         count
     }
 
+    /// Key of the oldest registered waiter (K391 diagnostic).
+    pub fn first_key(&self) -> Option<(u64, u64)> {
+        self.waiters
+            .lock()
+            .first()
+            .map(|waiter| (waiter.space, waiter.addr))
+    }
+
     /// Remove a stale waiter after its timeout won the race.
     pub fn remove(&self, space: u64, addr: u64, thread_id: u64) {
         let mut waiters = self.waiters.lock();
