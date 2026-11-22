@@ -62,7 +62,7 @@ wait = '^raven# $'
 timeout_secs = 120
 
 [[step]]
-send = "/etc/ssh/trace-client.sh > /tmp/client.log 2>&1 & echo sshd-trace: client-started\n"
+send = "/bin/brush /etc/ssh/trace-client.sh > /tmp/client.log 2>&1 & echo sshd-trace: client-started\n"
 delay_ms = 100
 
 [[step]]

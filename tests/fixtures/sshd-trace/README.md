@@ -6,13 +6,14 @@
 This fixture boots the release image with the unmodified upstream OpenSSH 10.6p2 `sshd` built
 from the current tree. The overlay changes only test inputs: `/etc/ssh/sshd_config` gets
 `LogLevel DEBUG3`, the `sshd` service runs `-D -ddd -E /tmp/sshd-trace.log`, and
-`/etc/ssh/askpass.sh` is installed 0755 for the guest client.
+`/bin/sshd-trace-askpass` is installed 0755 for the guest client.
 
 The qtest drives one password login and one command over guest loopback:
 
-1. the root console starts `/etc/ssh/trace-client.sh` in the background; the script waits 2 s,
+1. the root console starts `/bin/brush /etc/ssh/trace-client.sh` in the background; the kernel
+   executes ELF only, so the script is passed to brush rather than exec'd. The script waits 2 s,
    then runs `/bin/ssh ... raven@127.0.0.1 'echo sshd-trace-command-ok'` with
-   `SSH_ASKPASS_REQUIRE=force` so the image password comes from the askpass helper and no
+   `SSH_ASKPASS_REQUIRE=force`; the ELF askpass helper supplies the image password and no
    `/dev/tty` prompt is needed. The long command lives in the script, so the brush line editor
    only redraws the short launcher line;
 2. the console sleeps 12 s, then prints `/tmp/client.log` and the full
