@@ -25,6 +25,9 @@ regex = '^random: at-random absent$'
 regex = '^random: getrandom eagain$'
 
 [[expect]]
+regex = '^random: unseeded no-write=1$'
+
+[[expect]]
 regex = '^random: ok$'
 
 [[expect]]
