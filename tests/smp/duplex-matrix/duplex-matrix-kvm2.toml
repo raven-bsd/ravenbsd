@@ -4,7 +4,7 @@
 name = "duplex-matrix-kvm2"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 180
+timeout_secs = 60
 pre = ["sh tests/smp/duplex-matrix/build.sh"]
 initfs = "build/duplex-matrix/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
