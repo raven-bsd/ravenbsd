@@ -66,6 +66,7 @@ cmdline='console=ttyS0 test-exit=1 smp_user=on'
 out=build/syscall-fuzz/$mode
 
 if [ "$no_build" -eq 0 ]; then
+    sh tests/smp/syscall-fuzz/raw-check.sh
     sh tests/smp/syscall-fuzz/build.sh
     cargo xtask image --arch x86_64 --profile base --cmdline "$cmdline" \
         --initfs "$initfs" --output "$image"
@@ -126,7 +127,7 @@ rows=$(sed -n 's/.*summary rows=\([0-9][0-9]*\).*/\1/p' "$last_log" | tail -n 1)
 deviations=$(sed -n 's/.*deviations=\([0-9][0-9]*\).*/\1/p' "$last_log" | tail -n 1)
 
 {
-    echo "K456 syscall robustness measurement"
+    echo "K456/K462 syscall robustness measurement"
     echo "mode=$mode smp=$smp kvm=$kvm_state"
     echo "commit=$(git rev-parse HEAD)"
     echo "qemu=$(qemu-system-x86_64 --version | head -n 1)"

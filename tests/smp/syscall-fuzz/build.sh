@@ -19,6 +19,8 @@ target=${CARGO_TARGET_DIR:-target}/x86_64-unknown-none/release
 binary=$target/raven-syscall-fuzz-init
 mkdir -p "$out"
 
+sh tests/smp/syscall-fuzz/raw-check.sh
+
 if [ "${RAVEN_SYSCALL_FUZZ_NO_BUILD:-0}" = 1 ] && [ -f "$out/initfs.img" ] && [ -f "$binary" ]; then
     exit 0
 fi
