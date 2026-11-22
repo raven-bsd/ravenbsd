@@ -152,6 +152,31 @@ fn interrupt_echoes_caret_c_and_a_newline() {
 }
 
 #[test]
+fn quit_discards_the_line_and_echoes_caret_backslash() {
+    let mut discipline = Discipline::new();
+    feed(&mut discipline, b"half");
+    let output = feed(&mut discipline, b"\x1c");
+    assert_eq!(discipline.pending(), 0);
+    assert!(output.quit);
+    assert!(output.events.is_empty());
+    assert_eq!(output.echo, b"^\\\r\n");
+    assert!(output.lines.is_empty());
+}
+
+#[test]
+fn quit_does_not_echo_when_echo_is_off() {
+    let mut discipline = Discipline::new();
+    discipline.set_settings(Settings {
+        mode: Mode::Canonical,
+        echo: false,
+    });
+    let output = feed(&mut discipline, b"\x1c");
+    assert!(output.echo.is_empty());
+    assert!(output.quit);
+    assert!(output.events.is_empty());
+}
+
+#[test]
 fn interrupt_after_a_partial_line_raises_one_event() {
     let mut discipline = Discipline::new();
     feed(&mut discipline, b"ab");

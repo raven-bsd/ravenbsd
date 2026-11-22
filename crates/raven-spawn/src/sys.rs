@@ -405,6 +405,19 @@ pub unsafe fn syscall6(
     }
 }
 
+/// Raw `GETRANDOM` (the kernel's boot-seeded pool).
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+const GETRANDOM: usize = 0x08;
+
+/// Fill `buffer` from the kernel entropy pool.
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+pub fn getrandom(buffer: &mut [u8]) -> Result<(), Errno> {
+    // SAFETY: GETRANDOM writes at most `buffer.len()` bytes to the caller's live slice.
+    let raw = unsafe { syscall3(GETRANDOM, buffer.as_mut_ptr() as usize, buffer.len(), 0) };
+    Errno::from_ret(raw)?;
+    Ok(())
+}
+
 /// Read a clock (`clock::REALTIME` or `clock::MONOTONIC`).
 #[cfg(target_os = "none")]
 pub fn clock_get(clock_id: u32) -> Result<Timespec, Errno> {

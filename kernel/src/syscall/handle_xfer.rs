@@ -102,7 +102,9 @@ pub fn copy(frame: &SyscallFrame) -> Result<usize, Errno> {
         let lineage = handles.lineage_node(src_handle)?;
         (clone_for_copy(object)?, rights, lineage)
     };
-    let revoked = lineage.revoked();
+    // The split is C17: a right this handle held and an ancestor revoked is EPERM; a right it
+    // never held is EACCES even when the same bit was revoked on an ancestor.
+    let revoked = lineage.revoked_effective();
     if mask.0 & revoked.0 != 0 {
         return Err(Errno::EPERM);
     }

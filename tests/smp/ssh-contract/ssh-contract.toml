@@ -7,7 +7,11 @@
 name = "ssh-contract"
 arch = "x86_64"
 profile = "network-config-test"
-timeout_secs = 30
+# K495 cap arithmetic from the measured run: 691096 ms measured, ceil(691.096 * 1.25) = 864,
+# +30 s margin = 894 s. The measured run started at load1=24.18 (functional budget <=40) and
+# ended at load1=49.58; the wall time is host-load dominated, so this is a measured cap, not a
+# preference. No assertion or row changed.
+timeout_secs = 894
 pre = [
     "sh tests/smp/ssh-contract/build.sh",
     "sh tests/smp/ssh-contract/start-host.sh",

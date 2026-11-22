@@ -24,8 +24,9 @@ set -u
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root" || exit 2
+. "$root/scripts/lib/mgmt.sh"
 
-doc=docs/kernel-gate.md
+doc=
 log_dir=target/kernel-gate
 wait_idle=${S107_WAIT_FOR_IDLE:-0}
 default_max_load() {
@@ -77,6 +78,8 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     sed -n '6,19p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
 fi
+
+doc=$(mgmt_path architecture/product-data/kernel-gate.md) || exit 2
 
 mkdir -p "$log_dir" || exit 2
 sh tests/smp/boot/host-idle.sh \

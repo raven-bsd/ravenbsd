@@ -1,9 +1,0 @@
-tcp-evidence: partial
-commit: 8a7e6477a400408b7d85652c5330774488d32de3
-dirty: no
-audit: pass
-unit: pass 647/647 passed, 0 failed
-checker: pass
-matrix: blocked (scripts/net-conformance.sh is absent (K253 harness not merged))
-packet: /media/bo/Rustworx/work/ravenbsd-minions/otto/ravenbsd/tests/evidence/tcp/run-20261120T233816Z
-exit: 2

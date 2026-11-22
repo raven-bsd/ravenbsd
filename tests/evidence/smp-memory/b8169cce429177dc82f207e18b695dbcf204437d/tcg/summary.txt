@@ -1,9 +1,0 @@
-S85b SMP memory/paging/TLB stress
-mode=tcg smp=4 kvm=disabled
-commit=b8169cce429177dc82f207e18b695dbcf204437d
-qemu=QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)
-case=tests/smp/memory/smp-memory.toml image=build/smp-memory/smp-memory.img
-command=sh tests/smp/memory/run.sh tcg --iterations 10 --timebox 2700
-iterations=10 planned=10 timeboxed=no timebox_secs=2700
-duration_ms worst=41485 p90=38267 average=29772
-last_sample=smp-memory: summary alloc_ops=256 fault_pages=512 maps=32 forks=4 tlb_rounds=64 tlb_stale=0
