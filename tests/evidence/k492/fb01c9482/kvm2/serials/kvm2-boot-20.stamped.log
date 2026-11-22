@@ -1,0 +1,117 @@
+12.327376 [2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+12.355022 BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+12.357439 BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+12.357727 loader: RavenBSD loader 0.1 (x86_64)
+12.358132 loader: RavenBSD loader 0.1 (x86_64)
+14.101507 loader: memory map: 28 regions
+14.116420 frames: base=256 count=131072 free=93657 reserved=37415
+14.122136 paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+14.130123 heap: 4096 KiB
+14.333733 vtd: disabled (iommu=on not set); DMA unprotected
+14.340975 fpu: xsave 576 bytes
+14.342696 acpi: mcfg base=0xb0000000 buses=0-255
+14.344862 acpi: 2 cpus, 1 ioapics, 5 overrides
+14.345753 apic: id 0 (x2apic)
+14.348099 keyboard: i8042 irq 1 gsi 1 vector 0x23
+14.350919 console: rx irq 4 gsi 4 vector 0x22 (active-high)
+14.402144 cyclic: ok fired=3 order=5ms,10ms,15ms
+14.406016 time: tsc 4799 MHz (pit)
+14.406913 time: tsc not invariant
+14.407485 timer: 1000 Hz
+14.438818 fpu: xsave 576 bytes
+14.452942 smp: 2 cpus online
+14.456394 RavenBSD kernel 0.1 (x86_64) 240d92d70 2026-11-22
+14.459110 mem: 365 MiB usable in 8 regions
+14.463225 cmdline: console=ttyS0 loglevel=info
+14.465978 process: starting /init
+14.469597 process: /init entry=0x41c100 sp=0x7fffffffde60
+14.471956 sched: running (2 cpus, slice 10 ms)
+14.642405 svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
+14.685780 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+14.685940 svcd: logd up
+14.693384 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+14.694130 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+14.699526 pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+14.701594 pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+14.702698 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+14.702804 pcid: devices=6
+14.712271 svcd: pcid up
+14.996617 rtc: 2026-11-22 14:23:02 (epoch 1795357382s)
+14.998566 1795357382.351 nulld: started
+15.011419 1795357382.359 ramfsd: started
+15.027401 1795357382.368 randd: started
+15.027781 svcd: nulld up
+15.047873 svcd: ramfsd up
+15.099824 svcd: randd up
+15.124150 1795357382.422 zerod: started
+15.319618 svcd: zerod up
+15.390936 1795357382.570 initfsd: started
+15.392337 devd: devices=6
+15.395977 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+15.396499 devd: driver virtio-net bar=4 size=16384
+15.399145 devd: driver virtio-net dma bus=0x100000 len=65536
+15.403038 devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+15.407167 devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+15.409183 svcd: initfsd up
+15.409458 devd: driver virtio-net irq line=11
+15.415493 virtio-net: id=1af4:1041
+15.421197 virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+15.421197 virtio-net: dma len=65536 bus=0x100000 irq=11
+15.422620 virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+15.422931 virtio-net: queue0 rx size=8
+15.426420 virtio-net: queue1 tx size=8
+15.429291 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+15.431549 virtio-net: serving nic:
+15.440370 svcd: devd up
+15.453233 vfsd: mounted / on initfs:
+15.453510 vfsd: mounted /tmp on ramfs:
+15.453811 vfsd: mounted /dev/null on null:
+15.454120 vfsd: mounted /dev/zero on zero:
+15.454551 vfsd: mounted /dev/random on rand:
+15.454996 vfsd: mounted /dev/urandom on rand:
+15.471741 svcd: vfsd up
+15.482078 svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
+15.483497 svcd: consd up
+15.494219 ptyd: files=0 pairs=0
+15.494925 svcd: ptyd up
+15.494925 ptyd: files=0 pairs=0
+15.503977 1795357382.635 sysd: started
+15.506121 svcd: sysd up
+15.514683 netd: pf absent
+15.518578 netd: network config mode=dhcp hostname=raven
+15.519986 netd: hostname raven
+15.520561 netd: interface eth0 10.0.2.15/24
+15.521551 netd: interface lo 127.0.0.1/8
+15.522046 netd: ready
+15.533230 svcd: netd up
+15.547129 virtio-net: irq tx fired=1 isr=0x1 tx=1 rx=1
+15.555244 resolvd: write file:/etc/resolv.conf: read-only file system
+15.559528 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43200000ms rebind=75600000ms expires=86400000ms
+15.559617 resolvd: resolv.conf=nameserver 10.0.2.3
+15.561717 1795357382.667 resolvd: started
+15.569735 svcd: resolvd up
+15.697774 svcd: ssh-hostkeys up
+15.769076 svcd: sshd up
+15.778314 [1;36mR A V E N   B S D[0m
+15.791250 [2m--------------------------------------------------------------------------------[0m
+15.794000 000.00  consd               [32mok[0m
+15.795388 000.00  ptyd                [32mok[0m
+15.797053 000.00  sysd                [32mok[0m
+15.797644 000.01  netd                [32mok[0m
+15.800457 000.01  resolvd             [32mok[0m
+15.805436 000.02  vfsd                [32mok[0m
+15.806159 000.02  logd                [32mok[0m
+15.808471 000.03  sshd                [32mok[0m
+15.811490 000.04  pcid                [32mok[0m
+15.813420 000.07  ssh-hostkeys        [32mok[0m
+15.814498 000.13  ramfsd              [32mok[0m
+15.816552 000.14  randd               [32mok[0m
+15.818644 000.16  nulld               [32mok[0m
+15.832676 000.22  zerod               [32mok[0m
+15.833169 000.38  initfsd             [32mok[0m
+15.833759 000.40  devd                [32mok[0m
+15.834823 [2m--------------------------------------------------------------------------------[0m
+15.834911 
+15.835454 Welcome to RavenBSD 0.1 x86_64
+15.836488 svcd: getty up
+16.222168 login: 

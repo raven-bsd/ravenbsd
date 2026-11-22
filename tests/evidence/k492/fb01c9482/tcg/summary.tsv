@@ -1,0 +1,21 @@
+mode	boot	status	login_line	login_s	wall_s	load1_before	load1_after	qemu_before	jobs_before	heavy	forbidden	serial
+tcg	1	pass	login:	41.277	41.463	72.67	81.0	4	22	no		serials/tcg-boot-01.log
+tcg	2	pass	login:	53.449	53.688	81.0	95.37	5	38	no		serials/tcg-boot-02.log
+tcg	3	pass	login:	44.464	44.763	95.37	89.77	4	55	no		serials/tcg-boot-03.log
+tcg	4	pass	login:	34.857	35.039	89.77	83.87	5	26	no		serials/tcg-boot-04.log
+tcg	5	pass	login:	21.041	21.254	83.87	75.57	5	17	no		serials/tcg-boot-05.log
+tcg	6	pass	login:	21.826	22.048	75.57	67.25	7	18	no		serials/tcg-boot-06.log
+tcg	7	pass	login:	10.427	11.506	67.25	59.41	6	20	no		serials/tcg-boot-07.log
+tcg	8	pass	login:	9.04	9.139	59.41	52.43	5	16	no		serials/tcg-boot-08.log
+tcg	9	pass	login:	9.331	9.436	52.43	49.43	5	13	no		serials/tcg-boot-09.log
+tcg	10	pass	login:	8.785	12.743	49.43	41.63	6	14	no		serials/tcg-boot-10.log
+tcg	11	pass	login:	9.128	9.23	41.63	38.48	6	14	no		serials/tcg-boot-11.log
+tcg	12	pass	login:	9.168	10.427	38.48	34.93	6	15	no		serials/tcg-boot-12.log
+tcg	13	pass	login:	11.358	11.478	34.93	32.39	7	13	no		serials/tcg-boot-13.log
+tcg	14	pass	login:	30.625	30.785	32.39	45.01	7	50	no		serials/tcg-boot-14.log
+tcg	15	pass	login:	24.869	25.039	45.01	52.45	7	22	no		serials/tcg-boot-15.log
+tcg	16	pass	login:	43.093	43.392	52.45	73.79	6	30	yes		serials/tcg-boot-16.log
+tcg	17	pass	login:	34.225	34.462	73.79	72.71	6	36	yes		serials/tcg-boot-17.log
+tcg	18	pass	login:	32.825	33.294	72.71	67.38	7	30	yes		serials/tcg-boot-18.log
+tcg	19	pass	login:	20.261	20.546	67.38	60.18	6	24	yes		serials/tcg-boot-19.log
+tcg	20	pass	login:	21.204	21.415	60.18	56.66	5	20	yes		serials/tcg-boot-20.log

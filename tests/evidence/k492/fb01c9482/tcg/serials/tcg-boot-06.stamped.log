@@ -1,0 +1,119 @@
+10.265569 [2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+10.358954 BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+10.364368 BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+10.365330 loader: RavenBSD loader 0.1 (x86_64)
+10.366335 loader: RavenBSD loader 0.1 (x86_64)
+15.698196 loader: memory map: 26 regions
+15.743627 frames: base=256 count=131072 free=93683 reserved=37389
+15.783129 paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+15.869470 heap: 4096 KiB
+16.343627 vtd: disabled (iommu=on not set); DMA unprotected
+16.345253 fpu: fxsave 512 bytes
+16.354478 acpi: mcfg base=0xb0000000 buses=0-255
+16.357212 acpi: 4 cpus, 1 ioapics, 5 overrides
+16.358464 apic: id 0 (xapic)
+16.362329 keyboard: i8042 irq 1 gsi 1 vector 0x23
+16.364454 console: rx irq 4 gsi 4 vector 0x22 (active-high)
+16.393660 cyclic: ok fired=3 order=5ms,10ms,15ms
+16.394993 time: tsc 2720 MHz (pit)
+16.396068 time: tsc not invariant
+16.397108 timer: 1000 Hz
+16.443237 fpu: fxsave 512 bytes
+16.478367 fpu: fxsave 512 bytes
+16.504305 fpu: fxsave 512 bytes
+16.504907 smp: 4 cpus online
+16.510510 RavenBSD kernel 0.1 (x86_64) 240d92d70 2026-11-22
+16.510645 mem: 365 MiB usable in 7 regions
+16.510645 cmdline: console=ttyS0 loglevel=info
+16.613498 process: starting /init
+16.625385 process: /init entry=0x41c100 sp=0x7fffffffde60
+16.626532 sched: running (4 cpus, slice 10 ms)
+17.558476 svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
+17.822194 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+17.825093 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+17.825093 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+17.825565 pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+17.825596 pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+17.826141 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+17.829367 pcid: devices=6
+17.830516 svcd: logd up
+17.847366 svcd: pcid up
+18.151172 rtc: unavailable
+18.153132 1.753 nulld: started
+18.300561 1.900 ramfsd: started
+18.403532 2.002 randd: started
+18.421356 2.020 zerod: started
+18.433409 svcd: ramfsd up
+18.436619 svcd: nulld up
+18.441728 svcd: zerod up
+18.455037 svcd: randd up
+18.813780 2.408 initfsd: started
+18.830463 svcd: initfsd up
+18.842296 devd: devices=6
+18.843975 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+18.896747 devd: driver virtio-net bar=4 size=16384
+18.900432 devd: driver virtio-net dma bus=0x100000 len=65536
+18.901006 devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+18.903305 devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+18.905717 devd: driver virtio-net irq line=11
+18.954600 virtio-net: id=1af4:1041
+18.955968 virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+18.956321 virtio-net: dma len=65536 bus=0x100000 irq=11
+18.959938 virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+18.961431 virtio-net: queue0 rx size=8
+18.961501 virtio-net: queue1 tx size=8
+18.961698 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+18.967097 virtio-net: serving nic:
+18.981886 svcd: devd up
+19.059254 vfsd: mounted / on initfs:
+19.065899 vfsd: mounted /tmp on ramfs:
+19.069041 vfsd: mounted /dev/null on null:
+19.074292 vfsd: mounted /dev/zero on zero:
+19.075888 vfsd: mounted /dev/random on rand:
+19.078588 vfsd: mounted /dev/urandom on rand:
+19.107792 svcd: vfsd up
+19.122464 svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
+19.172384 svcd: consd up
+19.188798 ptyd: files=0 pairs=0
+19.207079 svcd: ptyd up
+19.220976 ptyd: files=0 pairs=0
+19.242541 2.831 sysd: started
+19.252057 svcd: sysd up
+19.294674 netd: pf absent
+19.354099 netd: network config mode=dhcp hostname=raven
+19.376330 netd: hostname raven
+19.376917 netd: interface eth0 10.0.2.15/24
+19.378576 netd: interface lo 127.0.0.1/8
+19.378611 netd: ready
+19.404788 svcd: netd up
+19.481416 virtio-net: irq tx fired=1 isr=0x1 tx=1 rx=1
+19.527560 resolvd: write file:/etc/resolv.conf: read-only file system
+19.529601 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199975ms rebind=75599975ms expires=86399975ms
+19.539456 resolvd: resolv.conf=nameserver 10.0.2.3
+19.546948 3.132 resolvd: started
+19.553807 svcd: resolvd up
+20.764649 svcd: ssh-hostkeys up
+20.862848 svcd: sshd up
+20.873219 [1;36mR A V E N   B S D[0m
+20.873323 [2m--------------------------------------------------------------------------------[0m
+20.873379 000.03  ptyd                [32mok[0m
+20.873431 000.04  sysd                [32mok[0m
+20.873491 000.05  consd               [32mok[0m
+20.873569 000.09  sshd                [32mok[0m
+20.873656 000.12  vfsd                [32mok[0m
+20.873984 000.14  resolvd             [32mok[0m
+20.873984 000.15  netd                [32mok[0m
+20.873984 000.26  pcid                [32mok[0m
+20.874198 000.27  logd                [32mok[0m
+20.874198 000.32  zerod               [32mok[0m
+20.874269 000.39  randd               [32mok[0m
+20.874344 000.48  ramfsd              [32mok[0m
+20.874434 000.53  nulld               [32mok[0m
+20.874587 000.96  initfsd             [32mok[0m
+20.874723 001.12  devd                [32mok[0m
+20.874806 001.19  ssh-hostkeys        [32mok[0m
+20.875014 [2m--------------------------------------------------------------------------------[0m
+20.875041 
+20.875102 Welcome to RavenBSD 0.1 x86_64
+20.875264 svcd: getty up
+21.825766 login: 

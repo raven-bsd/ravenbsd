@@ -1,0 +1,23 @@
+k492: start utc=2026-11-22T14:23:10Z commit=fb01c9482e7dd24184ecd5daa208f6fc2fb0134f image=/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/ravenbsd-x86_64.img sha256=0fa5f6554d5fdd88f81f27de41bedb69fae148d9f91d59ba3148640e592e4806 load1=63.21 nproc=20 boots=20 heavy=5
+k492: PASS mode=kvm4 boot=1/20 login_s=10.579 wall_s=10.971 heavy=no load1=63.21->62.8
+k492: PASS mode=kvm4 boot=2/20 login_s=14.868 wall_s=16.791 heavy=no load1=62.8->62.14
+k492: PASS mode=kvm4 boot=3/20 login_s=7.335 wall_s=10.787 heavy=no load1=62.14->60.04
+k492: PASS mode=kvm4 boot=4/20 login_s=13.308 wall_s=13.631 heavy=no load1=60.04->62.25
+k492: PASS mode=kvm4 boot=5/20 login_s=16.511 wall_s=17.241 heavy=no load1=62.25->64.88
+k492: PASS mode=kvm4 boot=6/20 login_s=16.843 wall_s=17.182 heavy=no load1=64.88->70.88
+k492: PASS mode=kvm4 boot=7/20 login_s=18.233 wall_s=18.599 heavy=no load1=70.88->74.28
+k492: PASS mode=kvm4 boot=8/20 login_s=17.397 wall_s=17.764 heavy=no load1=74.28->76.72
+k492: PASS mode=kvm4 boot=9/20 login_s=14.73 wall_s=15.177 heavy=no load1=76.72->74.27
+k492: PASS mode=kvm4 boot=10/20 login_s=17.124 wall_s=17.551 heavy=no load1=74.27->74.64
+k492: PASS mode=kvm4 boot=11/20 login_s=13.394 wall_s=13.71 heavy=no load1=74.64->73.66
+k492: PASS mode=kvm4 boot=12/20 login_s=10.493 wall_s=10.86 heavy=no load1=73.66->69.44
+k492: PASS mode=kvm4 boot=13/20 login_s=9.884 wall_s=10.206 heavy=no load1=69.44->66.78
+k492: PASS mode=kvm4 boot=14/20 login_s=11.075 wall_s=11.358 heavy=no load1=66.78->64.12
+k492: PASS mode=kvm4 boot=15/20 login_s=7.148 wall_s=7.408 heavy=no load1=64.12->59.54
+k492: PASS mode=kvm4 boot=16/20 login_s=9.14 wall_s=9.503 heavy=yes load1=59.54->59.02
+k492: PASS mode=kvm4 boot=17/20 login_s=11.444 wall_s=11.791 heavy=yes load1=59.02->64.73
+k492: PASS mode=kvm4 boot=18/20 login_s=17.406 wall_s=17.751 heavy=yes load1=64.73->68.6
+k492: PASS mode=kvm4 boot=19/20 login_s=20.12 wall_s=20.539 heavy=yes load1=68.6->71.78
+k492: PASS mode=kvm4 boot=20/20 login_s=19.125 wall_s=19.79 heavy=yes load1=71.78->81.19
+k492: PASS all runs requested=20 modes=kvm4
+k492: summary=/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/k492/run-20261122T142309Z/summary.tsv

@@ -1,0 +1,21 @@
+mode	boot	status	login_line	login_s	wall_s	load1_before	load1_after	qemu_before	jobs_before	heavy	forbidden	serial
+kvm4	1	pass	login:	10.579	10.971	63.21	62.8	5	7	no		serials/kvm4-boot-01.log
+kvm4	2	pass	login:	14.868	16.791	62.8	62.14	5	24	no		serials/kvm4-boot-02.log
+kvm4	3	pass	login:	7.335	10.787	62.14	60.04	5	27	no		serials/kvm4-boot-03.log
+kvm4	4	pass	login:	13.308	13.631	60.04	62.25	6	10	no		serials/kvm4-boot-04.log
+kvm4	5	pass	login:	16.511	17.241	62.25	64.88	6	25	no		serials/kvm4-boot-05.log
+kvm4	6	pass	login:	16.843	17.182	64.88	70.88	6	26	no		serials/kvm4-boot-06.log
+kvm4	7	pass	login:	18.233	18.599	70.88	74.28	6	15	no		serials/kvm4-boot-07.log
+kvm4	8	pass	login:	17.397	17.764	74.28	76.72	6	10	no		serials/kvm4-boot-08.log
+kvm4	9	pass	login:	14.73	15.177	76.72	74.27	6	15	no		serials/kvm4-boot-09.log
+kvm4	10	pass	login:	17.124	17.551	74.27	74.64	4	14	no		serials/kvm4-boot-10.log
+kvm4	11	pass	login:	13.394	13.71	74.64	73.66	3	9	no		serials/kvm4-boot-11.log
+kvm4	12	pass	login:	10.493	10.86	73.66	69.44	4	8	no		serials/kvm4-boot-12.log
+kvm4	13	pass	login:	9.884	10.206	69.44	66.78	4	18	no		serials/kvm4-boot-13.log
+kvm4	14	pass	login:	11.075	11.358	66.78	64.12	4	20	no		serials/kvm4-boot-14.log
+kvm4	15	pass	login:	7.148	7.408	64.12	59.54	5	12	no		serials/kvm4-boot-15.log
+kvm4	16	pass	login:	9.14	9.503	59.54	59.02	5	13	yes		serials/kvm4-boot-16.log
+kvm4	17	pass	login:	11.444	11.791	59.02	64.73	5	28	yes		serials/kvm4-boot-17.log
+kvm4	18	pass	login:	17.406	17.751	64.73	68.6	5	28	yes		serials/kvm4-boot-18.log
+kvm4	19	pass	login:	20.12	20.539	68.6	71.78	5	30	yes		serials/kvm4-boot-19.log
+kvm4	20	pass	login:	19.125	19.79	71.78	81.19	6	29	yes		serials/kvm4-boot-20.log

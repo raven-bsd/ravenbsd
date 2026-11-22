@@ -1,0 +1,119 @@
+5.086247 [2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+5.119025 BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+5.124302 BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+5.124951 loader: RavenBSD loader 0.1 (x86_64)
+5.126273 loader: RavenBSD loader 0.1 (x86_64)
+7.021355 loader: memory map: 26 regions
+7.054558 frames: base=256 count=131072 free=93682 reserved=37390
+7.068400 paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+7.180363 heap: 4096 KiB
+7.454171 vtd: disabled (iommu=on not set); DMA unprotected
+7.454891 fpu: fxsave 512 bytes
+7.457712 acpi: mcfg base=0xb0000000 buses=0-255
+7.457883 acpi: 4 cpus, 1 ioapics, 5 overrides
+7.459945 apic: id 0 (xapic)
+7.460934 keyboard: i8042 irq 1 gsi 1 vector 0x23
+7.461109 console: rx irq 4 gsi 4 vector 0x22 (active-high)
+7.489668 cyclic: ok fired=3 order=5ms,10ms,15ms
+7.489754 time: tsc 2721 MHz (pit)
+7.489840 time: tsc not invariant
+7.490532 timer: 1000 Hz
+7.513407 fpu: fxsave 512 bytes
+7.525683 fpu: fxsave 512 bytes
+7.542458 fpu: fxsave 512 bytes
+7.542953 smp: 4 cpus online
+7.545305 RavenBSD kernel 0.1 (x86_64) 240d92d70 2026-11-22
+7.545404 mem: 365 MiB usable in 7 regions
+7.545479 cmdline: console=ttyS0 loglevel=info
+7.558713 process: starting /init
+7.558827 process: /init entry=0x41c100 sp=0x7fffffffde60
+7.560094 sched: running (4 cpus, slice 10 ms)
+7.866061 svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
+8.194800 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+8.196332 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+8.197593 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+8.198143 pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+8.198422 pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+8.198736 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+8.199281 pcid: devices=6
+8.216482 svcd: pcid up
+8.219696 svcd: logd up
+8.398604 rtc: 2026-11-22 14:14:12 (epoch 1795356852s)
+8.400257 1795356852.915 zerod: started
+8.418508 svcd: zerod up
+8.425663 1795356852.941 nulld: started
+8.432685 svcd: nulld up
+8.440600 1795356852.956 ramfsd: started
+8.443582 1795356852.959 randd: started
+8.455012 svcd: ramfsd up
+8.462813 svcd: randd up
+8.810492 1795356853.322 initfsd: started
+8.817051 svcd: initfsd up
+8.826351 devd: devices=6
+8.827758 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+8.834156 devd: driver virtio-net bar=4 size=16384
+8.836427 devd: driver virtio-net dma bus=0x100000 len=65536
+8.836851 devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+8.838473 devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+8.840029 devd: driver virtio-net irq line=11
+8.851236 virtio-net: id=1af4:1041
+8.852722 virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+8.853232 virtio-net: dma len=65536 bus=0x100000 irq=11
+8.854070 virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+8.855037 virtio-net: queue0 rx size=8
+8.855078 virtio-net: queue1 tx size=8
+8.855235 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+8.859388 virtio-net: serving nic:
+8.863655 svcd: devd up
+8.891692 vfsd: mounted / on initfs:
+8.894369 vfsd: mounted /tmp on ramfs:
+8.895666 vfsd: mounted /dev/null on null:
+8.897855 vfsd: mounted /dev/zero on zero:
+8.898734 vfsd: mounted /dev/random on rand:
+8.899976 vfsd: mounted /dev/urandom on rand:
+8.921486 svcd: vfsd up
+8.932577 svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
+8.949107 svcd: consd up
+8.956851 ptyd: files=0 pairs=0
+8.960102 svcd: ptyd up
+8.962068 ptyd: files=0 pairs=0
+8.968347 1795356853.477 sysd: started
+8.972452 svcd: sysd up
+8.990596 netd: pf absent
+9.005664 netd: network config mode=dhcp hostname=raven
+9.016000 netd: hostname raven
+9.016534 netd: interface eth0 10.0.2.15/24
+9.019029 netd: interface lo 127.0.0.1/8
+9.019277 netd: ready
+9.031258 svcd: netd up
+9.057986 virtio-net: irq tx fired=1 isr=0x1 tx=1 rx=1
+9.173898 resolvd: write file:/etc/resolv.conf: read-only file system
+9.177234 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199896ms rebind=75599896ms expires=86399896ms
+9.177601 resolvd: resolv.conf=nameserver 10.0.2.3
+9.185238 1795356853.692 resolvd: started
+9.190576 svcd: resolvd up
+9.834742 svcd: ssh-hostkeys up
+9.882507 svcd: sshd up
+9.893085 [1;36mR A V E N   B S D[0m
+9.893143 [2m--------------------------------------------------------------------------------[0m
+9.893199 000.01  ptyd                [32mok[0m
+9.893337 000.01  sysd                [32mok[0m
+9.893482 000.01  consd               [32mok[0m
+9.893583 000.05  sshd                [32mok[0m
+9.893676 000.06  vfsd                [32mok[0m
+9.893772 000.06  netd                [32mok[0m
+9.893849 000.09  pcid                [32mok[0m
+9.893931 000.10  zerod               [32mok[0m
+9.894008 000.15  randd               [32mok[0m
+9.894081 000.16  resolvd             [32mok[0m
+9.894165 000.18  ramfsd              [32mok[0m
+9.894241 000.18  nulld               [32mok[0m
+9.894342 000.35  logd                [32mok[0m
+9.894461 000.58  initfsd             [32mok[0m
+9.894589 000.63  devd                [32mok[0m
+9.894673 000.64  ssh-hostkeys        [32mok[0m
+9.894822 [2m--------------------------------------------------------------------------------[0m
+9.894860 
+9.894919 Welcome to RavenBSD 0.1 x86_64
+9.895152 svcd: getty up
+10.427139 login: 

@@ -1,0 +1,5 @@
+mode	boot	status	login_line	login_s	wall_s	load1_before	load1_after	qemu_before	jobs_before	heavy	forbidden	serial
+tcg	1	pass	login:	6.801	24.648	50.26	46.76	2	41	no		serials/tcg-boot-01.log
+tcg	2	pass	login:	22.538	28.749	46.76	50.76	4	12	no		serials/tcg-boot-02.log
+tcg	3	pass	login:	33.564	65.481	50.76	67.14	5	16	no		serials/tcg-boot-03.log
+tcg	4	fail		None	45.613	67.14	76.57	6	42	no		serials/tcg-boot-04.log

@@ -1,0 +1,119 @@
+7.451770 [2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+7.458956 BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+7.460766 BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+7.461134 loader: RavenBSD loader 0.1 (x86_64)
+7.462566 loader: RavenBSD loader 0.1 (x86_64)
+8.727907 loader: memory map: 26 regions
+8.732812 frames: base=256 count=131072 free=93610 reserved=37462
+8.735661 paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+8.739120 heap: 4096 KiB
+8.798899 vtd: disabled (iommu=on not set); DMA unprotected
+8.799094 fpu: xsave 576 bytes
+8.799439 acpi: mcfg base=0xb0000000 buses=0-255
+8.799791 acpi: 4 cpus, 1 ioapics, 5 overrides
+8.800057 apic: id 0 (x2apic)
+8.801167 keyboard: i8042 irq 1 gsi 1 vector 0x23
+8.801508 console: rx irq 4 gsi 4 vector 0x22 (active-high)
+8.827105 cyclic: ok fired=3 order=5ms,10ms,15ms
+8.827369 time: tsc 2696 MHz (pit)
+8.827622 time: tsc not invariant
+8.827787 timer: 1000 Hz
+8.849600 fpu: xsave 576 bytes
+8.860101 fpu: xsave 576 bytes
+8.870765 fpu: xsave 576 bytes
+8.871013 smp: 4 cpus online
+8.871742 RavenBSD kernel 0.1 (x86_64) 240d92d70 2026-11-22
+8.872081 mem: 365 MiB usable in 7 regions
+8.873198 cmdline: console=ttyS0 loglevel=info
+8.873453 process: starting /init
+8.874156 process: /init entry=0x41c100 sp=0x7fffffffde60
+8.874468 sched: running (4 cpus, slice 10 ms)
+8.943493 svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
+8.977806 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+8.978016 svcd: logd up
+8.979058 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+8.981047 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+8.983065 pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+8.985066 pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+8.987072 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+8.988314 pcid: devices=6
+8.993575 svcd: pcid up
+9.097649 rtc: 2026-11-22 14:26:22 (epoch 1795357582s)
+9.097996 1795357582.285 nulld: started
+9.218570 svcd: nulld up
+9.233809 1795357582.420 randd: started
+9.239878 1795357582.426 ramfsd: started
+9.249876 1795357582.436 zerod: started
+9.271615 svcd: randd up
+9.271813 svcd: ramfsd up
+9.272015 svcd: zerod up
+9.273515 1795357582.459 initfsd: started
+9.275927 svcd: initfsd up
+9.276528 devd: devices=6
+9.277328 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+9.280012 devd: driver virtio-net bar=4 size=16384
+9.282094 devd: driver virtio-net dma bus=0x100000 len=65536
+9.284145 devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+9.285711 devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+9.286206 devd: driver virtio-net irq line=11
+9.298635 virtio-net: id=1af4:1041
+9.300704 virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+9.301256 virtio-net: dma len=65536 bus=0x100000 irq=11
+9.303753 virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+9.304213 virtio-net: queue0 rx size=8
+9.305583 virtio-net: queue1 tx size=8
+9.306365 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+9.308228 virtio-net: serving nic:
+9.318029 svcd: devd up
+9.329923 vfsd: mounted / on initfs:
+9.330262 vfsd: mounted /tmp on ramfs:
+9.330633 vfsd: mounted /dev/null on null:
+9.330992 vfsd: mounted /dev/zero on zero:
+9.331514 vfsd: mounted /dev/random on rand:
+9.331715 vfsd: mounted /dev/urandom on rand:
+9.340451 svcd: vfsd up
+9.342457 svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
+9.344781 svcd: consd up
+9.352531 ptyd: files=0 pairs=0
+9.352986 svcd: ptyd up
+9.353223 ptyd: files=0 pairs=0
+9.366503 1795357582.552 sysd: started
+9.366802 svcd: sysd up
+9.375999 netd: pf absent
+9.385872 netd: network config mode=dhcp hostname=raven
+9.390480 netd: hostname raven
+9.390877 netd: interface eth0 10.0.2.15/24
+9.391232 netd: interface lo 127.0.0.1/8
+9.391403 netd: ready
+9.400437 svcd: netd up
+9.411815 virtio-net: irq tx fired=1 isr=0x1 tx=1 rx=1
+9.510371 resolvd: write file:/etc/resolv.conf: read-only file system
+9.514390 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199911ms rebind=75599911ms expires=86399911ms
+9.514734 resolvd: resolv.conf=nameserver 10.0.2.3
+9.515568 1795357582.701 resolvd: started
+9.526077 svcd: resolvd up
+9.630323 svcd: ssh-hostkeys up
+9.653043 svcd: sshd up
+9.658306 [1;36mR A V E N   B S D[0m
+9.661984 [2m--------------------------------------------------------------------------------[0m
+9.662554 000.00  consd               [32mok[0m
+9.664003 000.00  ptyd                [32mok[0m
+9.664589 000.01  sysd                [32mok[0m
+9.666035 000.02  vfsd                [32mok[0m
+9.666561 000.02  sshd                [32mok[0m
+9.667997 000.03  netd                [32mok[0m
+9.668463 000.03  logd                [32mok[0m
+9.672163 000.05  pcid                [32mok[0m
+9.672717 000.10  ssh-hostkeys        [32mok[0m
+9.674217 000.12  resolvd             [32mok[0m
+9.674784 000.15  zerod               [32mok[0m
+9.676524 000.21  nulld               [32mok[0m
+9.676908 000.24  randd               [32mok[0m
+9.685470 000.25  ramfsd              [32mok[0m
+9.685995 000.28  initfsd             [32mok[0m
+9.686404 000.32  devd                [32mok[0m
+9.687370 [2m--------------------------------------------------------------------------------[0m
+9.687444 
+9.697292 Welcome to RavenBSD 0.1 x86_64
+9.697610 svcd: getty up
+9.884474 login: 

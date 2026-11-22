@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/tests/soak/run.py", line 451, in <module>
+    raise SystemExit(main(sys.argv[1:]))
+  File "/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/tests/soak/run.py", line 342, in main
+    return selftest()
+  File "/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/tests/soak/run.py", line 308, in selftest
+    assert bad.forbidden, token
+AssertionError: kern: restart requested

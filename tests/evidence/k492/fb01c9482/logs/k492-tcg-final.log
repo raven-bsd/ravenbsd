@@ -1,0 +1,23 @@
+k492: start utc=2026-11-22T14:10:26Z commit=fb01c9482e7dd24184ecd5daa208f6fc2fb0134f image=/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/x86_64/ravenbsd-x86_64.img sha256=0fa5f6554d5fdd88f81f27de41bedb69fae148d9f91d59ba3148640e592e4806 load1=72.67 nproc=20 boots=20 heavy=5
+k492: PASS mode=tcg boot=1/20 login_s=41.277 wall_s=41.463 heavy=no load1=72.67->81.0
+k492: PASS mode=tcg boot=2/20 login_s=53.449 wall_s=53.688 heavy=no load1=81.0->95.37
+k492: PASS mode=tcg boot=3/20 login_s=44.464 wall_s=44.763 heavy=no load1=95.37->89.77
+k492: PASS mode=tcg boot=4/20 login_s=34.857 wall_s=35.039 heavy=no load1=89.77->83.87
+k492: PASS mode=tcg boot=5/20 login_s=21.041 wall_s=21.254 heavy=no load1=83.87->75.57
+k492: PASS mode=tcg boot=6/20 login_s=21.826 wall_s=22.048 heavy=no load1=75.57->67.25
+k492: PASS mode=tcg boot=7/20 login_s=10.427 wall_s=11.506 heavy=no load1=67.25->59.41
+k492: PASS mode=tcg boot=8/20 login_s=9.04 wall_s=9.139 heavy=no load1=59.41->52.43
+k492: PASS mode=tcg boot=9/20 login_s=9.331 wall_s=9.436 heavy=no load1=52.43->49.43
+k492: PASS mode=tcg boot=10/20 login_s=8.785 wall_s=12.743 heavy=no load1=49.43->41.63
+k492: PASS mode=tcg boot=11/20 login_s=9.128 wall_s=9.23 heavy=no load1=41.63->38.48
+k492: PASS mode=tcg boot=12/20 login_s=9.168 wall_s=10.427 heavy=no load1=38.48->34.93
+k492: PASS mode=tcg boot=13/20 login_s=11.358 wall_s=11.478 heavy=no load1=34.93->32.39
+k492: PASS mode=tcg boot=14/20 login_s=30.625 wall_s=30.785 heavy=no load1=32.39->45.01
+k492: PASS mode=tcg boot=15/20 login_s=24.869 wall_s=25.039 heavy=no load1=45.01->52.45
+k492: PASS mode=tcg boot=16/20 login_s=43.093 wall_s=43.392 heavy=yes load1=52.45->73.79
+k492: PASS mode=tcg boot=17/20 login_s=34.225 wall_s=34.462 heavy=yes load1=73.79->72.71
+k492: PASS mode=tcg boot=18/20 login_s=32.825 wall_s=33.294 heavy=yes load1=72.71->67.38
+k492: PASS mode=tcg boot=19/20 login_s=20.261 wall_s=20.546 heavy=yes load1=67.38->60.18
+k492: PASS mode=tcg boot=20/20 login_s=21.204 wall_s=21.415 heavy=yes load1=60.18->56.66
+k492: PASS all runs requested=20 modes=tcg
+k492: summary=/media/bo/Rustworx/work/ravenbsd-minions/jorge/ravenbsd/build/k492/run-20261122T141022Z/summary.tsv

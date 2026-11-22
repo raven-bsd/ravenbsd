@@ -1,0 +1,119 @@
+4.331999 [2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+4.354484 BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+4.358143 BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+4.358601 loader: RavenBSD loader 0.1 (x86_64)
+4.359954 loader: RavenBSD loader 0.1 (x86_64)
+6.168167 loader: memory map: 27 regions
+6.199304 frames: base=256 count=131072 free=93680 reserved=37392
+6.218375 paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+6.307565 heap: 4096 KiB
+6.525756 vtd: disabled (iommu=on not set); DMA unprotected
+6.526069 fpu: fxsave 512 bytes
+6.529258 acpi: mcfg base=0xb0000000 buses=0-255
+6.529412 acpi: 4 cpus, 1 ioapics, 5 overrides
+6.531335 apic: id 0 (xapic)
+6.532267 keyboard: i8042 irq 1 gsi 1 vector 0x23
+6.532428 console: rx irq 4 gsi 4 vector 0x22 (active-high)
+6.558496 cyclic: ok fired=3 order=5ms,10ms,15ms
+6.558588 time: tsc 2713 MHz (pit)
+6.558651 time: tsc not invariant
+6.558753 timer: 1000 Hz
+6.596278 fpu: fxsave 512 bytes
+6.617476 fpu: fxsave 512 bytes
+6.633661 fpu: fxsave 512 bytes
+6.633769 smp: 4 cpus online
+6.636237 RavenBSD kernel 0.1 (x86_64) 240d92d70 2026-11-22
+6.636314 mem: 365 MiB usable in 7 regions
+6.636406 cmdline: console=ttyS0 loglevel=info
+6.651721 process: starting /init
+6.652335 process: /init entry=0x41c100 sp=0x7fffffffde60
+6.655110 sched: running (4 cpus, slice 10 ms)
+6.975822 svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
+7.025616 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+7.028700 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+7.028949 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+7.029139 pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+7.029309 pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+7.029511 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+7.029650 pcid: devices=6
+7.045810 svcd: pcid up
+7.048794 svcd: logd up
+7.190153 rtc: 2026-11-22 14:14:55 (epoch 1795356895s)
+7.191534 1795356895.641 nulld: started
+7.237824 svcd: nulld up
+7.269064 1795356895.719 randd: started
+7.286130 1795356895.736 ramfsd: started
+7.307188 1795356895.756 zerod: started
+7.309947 svcd: randd up
+7.340449 svcd: zerod up
+7.417384 svcd: ramfsd up
+7.565725 1795356896.012 initfsd: started
+7.573259 svcd: initfsd up
+7.580746 devd: devices=6
+7.582903 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+7.592661 devd: driver virtio-net bar=4 size=16384
+7.596360 devd: driver virtio-net dma bus=0x100000 len=65536
+7.596969 devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+7.598668 devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+7.600838 devd: driver virtio-net irq line=11
+7.617221 virtio-net: id=1af4:1041
+7.620716 virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+7.621088 virtio-net: dma len=65536 bus=0x100000 irq=11
+7.622531 virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+7.624246 virtio-net: queue0 rx size=8
+7.624335 virtio-net: queue1 tx size=8
+7.624514 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+7.630317 virtio-net: serving nic:
+7.645672 svcd: devd up
+7.683539 vfsd: mounted / on initfs:
+7.688094 vfsd: mounted /tmp on ramfs:
+7.688094 vfsd: mounted /dev/null on null:
+7.690407 vfsd: mounted /dev/zero on zero:
+7.691583 vfsd: mounted /dev/random on rand:
+7.693365 vfsd: mounted /dev/urandom on rand:
+7.719010 svcd: vfsd up
+7.735435 svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
+7.760030 svcd: consd up
+7.779977 ptyd: files=0 pairs=0
+7.784936 svcd: ptyd up
+7.787850 ptyd: files=0 pairs=0
+7.797565 1795356896.242 sysd: started
+7.802981 svcd: sysd up
+7.830370 netd: pf absent
+7.853352 netd: network config mode=dhcp hostname=raven
+7.871101 netd: hostname raven
+7.871568 netd: interface eth0 10.0.2.15/24
+7.873540 netd: interface lo 127.0.0.1/8
+7.873606 netd: ready
+7.889501 svcd: netd up
+7.920094 virtio-net: irq tx fired=1 isr=0x1 tx=1 rx=1
+7.948011 resolvd: write file:/etc/resolv.conf: read-only file system
+7.950000 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43199986ms rebind=75599986ms expires=86399986ms
+7.950271 resolvd: resolv.conf=nameserver 10.0.2.3
+7.954761 1795356896.398 resolvd: started
+7.967296 svcd: resolvd up
+8.575024 svcd: ssh-hostkeys up
+8.662769 svcd: sshd up
+8.672975 [1;36mR A V E N   B S D[0m
+8.673085 [2m--------------------------------------------------------------------------------[0m
+8.673173 000.02  sysd                [32mok[0m
+8.673306 000.02  consd               [32mok[0m
+8.673403 000.02  ptyd                [32mok[0m
+8.673507 000.06  pcid                [32mok[0m
+8.673604 000.07  vfsd                [32mok[0m
+8.673682 000.07  logd                [32mok[0m
+8.673750 000.07  resolvd             [32mok[0m
+8.673818 000.08  netd                [32mok[0m
+8.673887 000.08  sshd                [32mok[0m
+8.673959 000.16  nulld               [32mok[0m
+8.674037 000.16  randd               [32mok[0m
+8.674107 000.18  zerod               [32mok[0m
+8.674170 000.28  ramfsd              [32mok[0m
+8.674296 000.51  initfsd             [32mok[0m
+8.674398 000.59  devd                [32mok[0m
+8.674472 000.60  ssh-hostkeys        [32mok[0m
+8.674673 [2m--------------------------------------------------------------------------------[0m
+8.674692 
+8.674753 Welcome to RavenBSD 0.1 x86_64
+8.674923 svcd: getty up
+9.128234 login: 
