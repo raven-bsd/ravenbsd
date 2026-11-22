@@ -64,7 +64,7 @@ case "$mode:$arch" in
         initfs=build/duplex-matrix/initfs.img
         cmdline='console=ttyS0 test-exit=1 smp_user=on'
         out=build/duplex-matrix/$mode
-        boot_cap=180
+        boot_cap=75
         kvm_state=disabled
         ;;
     kvm2:x86_64)
@@ -75,7 +75,7 @@ case "$mode:$arch" in
         initfs=build/duplex-matrix/initfs.img
         cmdline='console=ttyS0 test-exit=1 smp_user=on'
         out=build/duplex-matrix/$mode
-        boot_cap=180
+        boot_cap=75
         if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
             echo "duplex-matrix: BLOCKED /dev/kvm is not readable and writable" >&2
             exit 2
