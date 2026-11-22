@@ -5,6 +5,11 @@
 // in 32 writes without any intervening receive traffic; the host verifies it and echoes the same
 // 32 KiB back. The guest logs `done` only after every TX frame crossed the NIC and the echo
 // returned, so a TX used-ring wedge is visible on the serial line.
+//
+// K433 extends the same connection with the SSH confirmation shape: the host sends a 4-byte
+// request after the echo, the guest reads it and writes four 44-byte confirmation frames (more
+// than the three spare TX buffers, so the last one needs a reclaimed slot), and the host verifies
+// all 176 bytes before acknowledging.
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -23,6 +28,10 @@
 #define FRAMES 32
 #define FRAME_BYTES 1024
 #define TOTAL_BYTES (FRAMES * FRAME_BYTES)
+#define REQUEST_BYTES 4
+#define CONFIRM_FRAMES 4
+#define CONFIRM_BYTES 44
+#define CONFIRM_BASE 0x40
 
 static unsigned char buffer[TOTAL_BYTES];
 
@@ -155,6 +164,40 @@ int main(void) {
             return 1;
         }
     }
+
+    // K433: the SSH confirmation shape. The host has sent a small request; the guest reads it and
+    // then writes four 44-byte confirmation frames (more than the three spare TX buffers), so the
+    // last frame requires the driver to reclaim completed TX slots. The host verifies every byte
+    // and acknowledges only then.
+    unsigned char request[REQUEST_BYTES];
+    if (read_full(connection, request, REQUEST_BYTES) != REQUEST_BYTES) {
+        say_value("virtio-tx: confirmation request failed errno=", errno, "\n");
+        return 1;
+    }
+    say_value("virtio-tx: read request=", REQUEST_BYTES, "\n");
+
+    for (int frame = 0; frame < CONFIRM_FRAMES; frame++) {
+        for (size_t index = 0; index < CONFIRM_BYTES; index++) {
+            buffer[index] =
+                (unsigned char)(CONFIRM_BASE + (long)frame * CONFIRM_BYTES + (long)index);
+        }
+        if (write_all(connection, buffer, CONFIRM_BYTES) != CONFIRM_BYTES) {
+            say_value("virtio-tx: confirmation write failed frame=", frame, "");
+            say_value(" errno=", errno, "\n");
+            return 1;
+        }
+    }
+    say_value("virtio-tx: confirmation frames=", CONFIRM_FRAMES, "");
+    say_value(" bytes=", (long)(CONFIRM_FRAMES * CONFIRM_BYTES), "\n");
+
+    unsigned char ack[REQUEST_BYTES];
+    if (read_full(connection, ack, REQUEST_BYTES) != REQUEST_BYTES ||
+        memcmp(ack, "ACK\n", REQUEST_BYTES) != 0) {
+        say_value("virtio-tx: confirmation ack failed errno=", errno, "\n");
+        return 1;
+    }
+    say("virtio-tx: confirmation ack\n");
+
     say("virtio-tx: done\n");
     return 0;
 }
