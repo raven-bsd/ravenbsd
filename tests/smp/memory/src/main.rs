@@ -53,6 +53,9 @@ const CHURN_PER_CONTROLLER: usize = CHURN_CYCLES / 2;
 const CHURN_MAP_PAGES: usize = 16;
 /// The four interleaved child variants: plain exit, page fault, map/unmap, exec failure.
 const CHURN_VARIANTS: usize = 4;
+/// Pipe handles inherited by the two controllers for the pre-churn barrier.
+static CONTROLLER_READY_FD: AtomicUsize = AtomicUsize::new(0);
+static CONTROLLER_GO_FD: AtomicUsize = AtomicUsize::new(0);
 
 /// End of the canonical user window (the same value as `raven-abi` layout).
 const USER_END: usize = 0x0000_7FFF_FFFF_F000;
@@ -435,6 +438,35 @@ fn pipe_create() -> Result<(Handle, Handle), Errno> {
     // SAFETY: PIPE writes two u32 handles into the live array.
     Errno::from_ret(unsafe { sys::syscall1(PIPE, fds.as_mut_ptr() as usize) })?;
     Ok((Handle(fds[0]), Handle(fds[1])))
+}
+
+/// Render `value` in decimal into the tail of `buffer`; the slice is not NUL-terminated.
+fn decimal(value: usize, buffer: &mut [u8; 20]) -> &[u8] {
+    let mut index = buffer.len();
+    let mut remaining = value;
+    loop {
+        index = index.saturating_sub(1);
+        buffer[index] = b'0' + (remaining % 10) as u8;
+        remaining /= 10;
+        if remaining == 0 {
+            break;
+        }
+    }
+    &buffer[index..]
+}
+
+/// Read exactly `count` bytes from a pipe handle.
+fn read_exact(handle: Handle, count: usize) -> Result<(), Errno> {
+    let mut buffer = [0u8; 4];
+    let mut got = 0usize;
+    while got < count {
+        let bytes = sys::read(handle, &mut buffer[got..count])?;
+        if bytes == 0 {
+            return Err(Errno::EIO);
+        }
+        got = got.saturating_add(bytes);
+    }
+    Ok(())
 }
 
 fn current_sp() -> usize {
@@ -1295,7 +1327,23 @@ extern "C" fn churn_controller_entry(id: usize) -> ! {
         }
     };
     let id_text: &[u8] = if id == 0 { b"0" } else { b"1" };
-    let argv = [b"/churn".as_slice(), b"controller".as_slice(), id_text];
+    let mut ready_text_buffer = [0u8; 20];
+    let mut go_text_buffer = [0u8; 20];
+    let ready_text = decimal(
+        CONTROLLER_READY_FD.load(Ordering::Relaxed),
+        &mut ready_text_buffer,
+    );
+    let go_text = decimal(
+        CONTROLLER_GO_FD.load(Ordering::Relaxed),
+        &mut go_text_buffer,
+    );
+    let argv = [
+        b"/churn".as_slice(),
+        b"controller".as_slice(),
+        id_text,
+        ready_text,
+        go_text,
+    ];
     match exec_image(program.data, b"/churn", &argv, &[], &[]) {
         Ok(()) => sys::exit(4),
         Err(error) => {
@@ -1317,8 +1365,22 @@ fn start_churn_controller(id: usize) -> Result<Handle, Errno> {
     Ok(child)
 }
 
-fn churn_controller_process(id: &str) -> i32 {
+fn churn_controller_process(id: &str, ready: &str, go: &str) -> i32 {
     let id_number = id.parse::<usize>().unwrap_or(0);
+    let ready = ready.parse::<u32>().map(Handle).unwrap_or(Handle::NONE);
+    let go = go.parse::<u32>().map(Handle).unwrap_or(Handle::NONE);
+    if let Err(error) = sys::write(ready, &[1]) {
+        println!(
+            "churn: FAIL controller ready id={id_number} errno={}",
+            error.0
+        );
+        return 1;
+    }
+    let mut byte = [0u8; 1];
+    if let Err(error) = sys::read(go, &mut byte) {
+        println!("churn: FAIL controller go id={id_number} errno={}", error.0);
+        return 1;
+    }
     println!("churn: controller start id={id_number}");
     let mut cycle = 0usize;
     while cycle < CHURN_PER_CONTROLLER {
@@ -1333,20 +1395,74 @@ fn churn_controller_process(id: &str) -> i32 {
         cycle = cycle.saturating_add(1);
     }
     println!("churn: controller done id={id_number} cycles={CHURN_PER_CONTROLLER}");
+    // Park after the last cycle until both controllers have finished: the 10,000th child-exit
+    // checkpoint must still include both controller address spaces.
+    if let Err(error) = sys::write(ready, &[1]) {
+        println!(
+            "churn: FAIL controller finish id={id_number} errno={}",
+            error.0
+        );
+        return 1;
+    }
+    if let Err(error) = sys::read(go, &mut byte) {
+        println!(
+            "churn: FAIL controller release id={id_number} errno={}",
+            error.0
+        );
+        return 1;
+    }
     0
 }
 
-/// PID 1 in `/churn` mode: one warm-up child sets the cycle-0 frame baseline, then two
-/// controller processes run 5,000 fork+exec+exit cycles each.
+/// A probe child that only exits: its teardown prints the `s24` baseline after the two
+/// controllers are established and parked at the start barrier.
+extern "C" fn churn_probe_entry(_arg: usize) -> ! {
+    sys::exit(0);
+}
+
+fn churn_probe() -> Result<(), Errno> {
+    let child = proc_fork()?;
+    let thread = sys::thread_create(
+        child,
+        churn_probe_entry as *const () as usize,
+        child_stack_top(),
+        0,
+    )?;
+    let _ = sys::handle_close(thread);
+    let code = proc_wait(child)?;
+    let _ = sys::handle_close(child);
+    if code == 0 { Ok(()) } else { Err(Errno::EIO) }
+}
+
+/// PID 1 in `/churn` mode: one warm-up child, then two controller processes run 5,000
+/// fork+exec+exit cycles each. The controllers park on a pipe barrier until the probe child has
+/// printed the cycle-0 frame baseline, so the baseline includes both controller address spaces
+/// and excludes any in-flight churn child.
 fn churn_parent() -> i32 {
     println!("churn: warmup");
     if let Err(error) = churn_cycle(0) {
         println!("churn: FAIL warmup errno={}", error.0);
         return 1;
     }
-    let _ = sys::nanosleep(50_000_000);
-    println!("churn: baseline");
-    println!("churn: start cycles={CHURN_CYCLES}");
+
+    let (ready_r, ready_w) = match pipe_create() {
+        Ok(pipe) => pipe,
+        Err(error) => {
+            println!("churn: FAIL ready pipe errno={}", error.0);
+            return 1;
+        }
+    };
+    let (go_r, go_w) = match pipe_create() {
+        Ok(pipe) => pipe,
+        Err(error) => {
+            let _ = sys::handle_close(ready_r);
+            let _ = sys::handle_close(ready_w);
+            println!("churn: FAIL go pipe errno={}", error.0);
+            return 1;
+        }
+    };
+    CONTROLLER_READY_FD.store(ready_w.0 as usize, Ordering::Relaxed);
+    CONTROLLER_GO_FD.store(go_r.0 as usize, Ordering::Relaxed);
 
     let first = match start_churn_controller(0) {
         Ok(child) => child,
@@ -1363,14 +1479,42 @@ fn churn_parent() -> i32 {
             return 1;
         }
     };
+    // The children hold their inherited copies; PID 1 now keeps only the read/go ends it uses.
+    let _ = sys::handle_close(ready_w);
+    let _ = sys::handle_close(go_r);
+    if let Err(error) = read_exact(ready_r, 2) {
+        println!("churn: FAIL controller ready read errno={}", error.0);
+        return 1;
+    }
+    if let Err(error) = churn_probe() {
+        println!("churn: FAIL baseline probe errno={}", error.0);
+        return 1;
+    }
+    println!("churn: baseline");
+    println!("churn: start cycles={CHURN_CYCLES}");
+    if let Err(error) = sys::write(go_w, &[1, 1]) {
+        println!("churn: FAIL controller go write errno={}", error.0);
+        return 1;
+    }
+    if let Err(error) = read_exact(ready_r, 2) {
+        println!("churn: FAIL controller finish read errno={}", error.0);
+        return 1;
+    }
+    println!("churn: done cycles={CHURN_CYCLES}");
+    if let Err(error) = sys::write(go_w, &[1, 1]) {
+        println!("churn: FAIL controller release errno={}", error.0);
+        return 1;
+    }
+
     let first_code = proc_wait(first).unwrap_or(-1);
     let _ = sys::handle_close(first);
     let second_code = proc_wait(second).unwrap_or(-1);
     let _ = sys::handle_close(second);
+    let _ = sys::handle_close(ready_r);
+    let _ = sys::handle_close(go_w);
     // The last child s24 lines are printed by the dying CPUs; let the console drain before the
     // final markers.
     let _ = sys::nanosleep(200_000_000);
-    println!("churn: done cycles={CHURN_CYCLES}");
     if first_code != 0 || second_code != 0 {
         println!("churn: FAIL controllers first={first_code} second={second_code}");
         return 1;
@@ -1382,7 +1526,11 @@ fn churn_parent() -> i32 {
 fn main(args: raven_rt::Args) -> i32 {
     if args.get(0) == Some("/churn") {
         if args.get(1) == Some("controller") {
-            return churn_controller_process(args.get(2).unwrap_or("0"));
+            return churn_controller_process(
+                args.get(2).unwrap_or("0"),
+                args.get(3).unwrap_or("0"),
+                args.get(4).unwrap_or("0"),
+            );
         }
         if let Some(mode) = args.get(1) {
             return churn_child_mode(mode);
