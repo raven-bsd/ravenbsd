@@ -100,9 +100,14 @@ static int poll_one(int fd, short events, int timeout_ms) {
     pfd.fd = fd;
     pfd.events = events;
     pfd.revents = 0;
+    errno = 0;
     do {
         ready = poll(&pfd, 1, timeout_ms);
     } while (ready < 0 && errno == EINTR);
+    if (ready >= 0) {
+        // Do not leak a stale errno from the scheme Call::Poll readiness query inside the shim.
+        errno = 0;
+    }
     return ready < 0 ? -1 : pfd.revents;
 }
 
@@ -558,7 +563,10 @@ static int check_accept(void) {
     }
     revents = poll_one(listener, POLLIN, 5000);
     if (revents < 0 || (revents & POLLIN) == 0) {
-        return fail("listener poll");
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "listener poll revents=%d errno=%d",
+                       revents, errno);
+        return fail(detail);
     }
     if (accept_one(listener, "ACCEPT1", "K6ACK1") != 0) {
         return fail("accept first");
