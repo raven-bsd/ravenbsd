@@ -309,6 +309,20 @@ pub struct Process {
     pub wait_object: AtomicU64,
     /// Number of threads of this process currently inside a syscall (K391 diagnostic).
     pub in_syscall: AtomicU32,
+    /// Last scheme request id this process submitted as a client (K391 diagnostic).
+    pub last_submit_id: AtomicU64,
+    /// Last scheme request id this process received as a server (K391 diagnostic).
+    pub last_recv_id: AtomicU64,
+    /// Last scheme request id this process replied to as a server (K391 diagnostic).
+    pub last_send_id: AtomicU64,
+    /// Wakeups that removed a waiter without enqueueing the thread (K391 diagnostic).
+    pub wake_fail: AtomicU32,
+    /// Packed `(reason, cpu, thread_state)` of the last failed wake (K391 diagnostic).
+    pub wake_fail_detail: AtomicU64,
+    /// Wakeups that found the thread still running and set `pending_wake` (K391 diagnostic).
+    pub wake_pending: AtomicU32,
+    /// CPU that received the last successful wakeup, or `u32::MAX` once it resumed (K391).
+    pub wake_last_cpu: AtomicU32,
     /// Accumulated kernel/syscall time.
     pub system_ns: AtomicU64,
     /// Accumulated user time (not sampled yet; zero).
@@ -467,6 +481,13 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         last_pc: AtomicU64::new(0),
         wait_object: AtomicU64::new(0),
         in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -536,6 +557,13 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         last_pc: AtomicU64::new(0),
         wait_object: AtomicU64::new(0),
         in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -598,6 +626,13 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         last_pc: AtomicU64::new(0),
         wait_object: AtomicU64::new(0),
         in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
@@ -894,6 +929,13 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         last_pc: AtomicU64::new(0),
         wait_object: AtomicU64::new(0),
         in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),

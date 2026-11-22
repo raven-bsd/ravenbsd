@@ -85,12 +85,13 @@ static LAT: [[[AtomicU64; ITERATIONS]; OP_COUNT]; FILE_WORKERS] =
     [const { [const { [const { AtomicU64::new(0) }; ITERATIONS] }; OP_COUNT] }; FILE_WORKERS];
 static MOUNT_LAT: [[AtomicU64; ITERATIONS]; MOUNT_WORKERS] =
     [const { [const { AtomicU64::new(0) }; ITERATIONS] }; MOUNT_WORKERS];
+static INITFSD_PID: AtomicU64 = AtomicU64::new(0);
 static VFSD_PID: AtomicU64 = AtomicU64::new(0);
 static RAMFSD_PID: AtomicU64 = AtomicU64::new(0);
 
 const PROC_PID_INFO: usize = 0x3A;
 const PROC_HANDLE_INFO: usize = 0x3E;
-const PROC_INFO_WORDS: usize = 47;
+const PROC_INFO_WORDS: usize = 61;
 
 fn handle_pid(handle: Handle) -> Option<u64> {
     // SAFETY: PROC_HANDLE_INFO reads one scalar from the live handle value.
@@ -116,6 +117,23 @@ fn dump_proc_info(label: &str, pid: u64) {
     println!(
         "smp-fs: proc-info {label} pid={pid} state={} runnable={} syscall={:#x} pc={:#x} wait={:#x} in_syscall={}",
         words[41], words[42], words[43], words[44], words[45], words[46]
+    );
+    println!(
+        "smp-fs: proc-req {label} submit={} recv={} send={} client={} queue={} active={} waiters={} key={:#x}",
+        words[47], words[48], words[49], words[50], words[51], words[52], words[53], words[54]
+    );
+    println!(
+        "smp-fs: proc-wake {label} fail={} detail={:#x} pending={} last_cpu={} rq_need={} rq_len={}",
+        words[55],
+        words[56],
+        words[57],
+        if words[58] == u64::from(u32::MAX) {
+            "resumed".to_string()
+        } else {
+            words[58].to_string()
+        },
+        words[59],
+        words[60]
     );
 }
 
@@ -603,6 +621,7 @@ fn start_services() -> Result<(), String> {
             .map_err(|_| format!("spawn {path}"))?;
         if let Some(pid) = handle_pid(handle) {
             match path {
+                "/sbin/initfsd" => INITFSD_PID.store(pid, Ordering::Release),
                 "/sbin/ramfsd" => RAMFSD_PID.store(pid, Ordering::Release),
                 "/sbin/vfsd" => VFSD_PID.store(pid, Ordering::Release),
                 _ => {}
@@ -718,6 +737,7 @@ fn start_workers() -> Result<(), String> {
 fn dump_vfs_diagnostics() {
     dump_proc_info("vfsd", VFSD_PID.load(Ordering::Acquire));
     dump_proc_info("ramfsd", RAMFSD_PID.load(Ordering::Acquire));
+    dump_proc_info("initfsd", INITFSD_PID.load(Ordering::Acquire));
     dump_proc_info("self", 0);
     println!("smp-fs: diag request start");
     let _ = fs::open(&file_path("__diag__"), O_RDONLY);

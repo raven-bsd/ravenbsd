@@ -166,8 +166,8 @@ pub const PROC_SETCRED: usize = 0x38;
 pub const PROC_PID_INFO: usize = 0x3A;
 /// Raw `proc_set_command(proc, name, len) -> 0` number (P2o).
 pub const PROC_SET_COMMAND: usize = 0x45;
-/// Maximum `PROC_PID_INFO` words: eight identity words, a 256-byte name, and six K391 words.
-pub const PROC_INFO_MAX_WORDS: usize = 47;
+/// Maximum `PROC_PID_INFO` words: eight identity words, a 256-byte name, and twenty K391 words.
+pub const PROC_INFO_MAX_WORDS: usize = 61;
 /// Raw `proc_setcred_ex(which, a, b, c, groups, count) -> 0` number.
 pub const PROC_SETCRED_EX: usize = 0x3B;
 /// Raw `proc_cred_info(out, count) -> 0` number.
@@ -260,9 +260,26 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
             ProcessState::Exited => 2u64,
         };
         let runnable = u64::from(
-            target.threads.load(Ordering::Acquire) > 0
-                && !target.exiting.load(Ordering::Acquire),
+            target.threads.load(Ordering::Acquire) > 0 && !target.exiting.load(Ordering::Acquire),
         );
+        // Take one queue lock at a time: the diagnostic must not create a lock-order edge
+        // between the client, delivery and server queues of a live process.
+        let client_len = u64::try_from(target.client_requests.lock().len()).unwrap_or(u64::MAX);
+        let queue_len = u64::try_from(target.scheme_queue.lock().len()).unwrap_or(u64::MAX);
+        let active_len = u64::try_from(target.active_requests.lock().len()).unwrap_or(u64::MAX);
+        let last_wake_cpu = target.wake_last_cpu.load(Ordering::Relaxed);
+        let (cpu_need_resched, cpu_runqueue) = if last_wake_cpu == u32::MAX {
+            (0u64, 0u64)
+        } else {
+            let cpu = usize::try_from(last_wake_cpu).unwrap_or(0);
+            let (need, len) = crate::sched::cpu_status(cpu);
+            (u64::from(need), len as u64)
+        };
+        let waiter_len = u64::try_from(target.scheme_waiters.len()).unwrap_or(u64::MAX);
+        let waiter_key = target
+            .scheme_waiters
+            .first_key()
+            .map_or(0, |(space, addr)| (space << 32) | (addr & 0xffff_ffff));
         let diagnostics = [
             state,
             runnable,
@@ -270,9 +287,23 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
             target.last_pc.load(Ordering::Relaxed),
             target.wait_object.load(Ordering::Relaxed),
             u64::from(target.in_syscall.load(Ordering::Relaxed)),
+            target.last_submit_id.load(Ordering::Relaxed),
+            target.last_recv_id.load(Ordering::Relaxed),
+            target.last_send_id.load(Ordering::Relaxed),
+            client_len,
+            queue_len,
+            active_len,
+            waiter_len,
+            waiter_key,
+            u64::from(target.wake_fail.load(Ordering::Relaxed)),
+            target.wake_fail_detail.load(Ordering::Relaxed),
+            u64::from(target.wake_pending.load(Ordering::Relaxed)),
+            u64::from(target.wake_last_cpu.load(Ordering::Relaxed)),
+            cpu_need_resched,
+            cpu_runqueue as u64,
         ];
         for (chunk, value) in bytes
-            .get_mut(328..376)
+            .get_mut(328..488)
             .ok_or(Errno::EINVAL)?
             .chunks_exact_mut(8)
             .zip(diagnostics)

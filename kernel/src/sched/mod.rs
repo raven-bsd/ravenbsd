@@ -633,6 +633,10 @@ pub fn yield_now() {
 /// thread's more recent token intact. Single-threaded servers then read `wait_object != 0` as
 /// "currently blocked" (K391 diagnostic).
 fn note_unblock(current: &Thread) {
+    current
+        .process
+        .wake_last_cpu
+        .store(u32::MAX, Ordering::Relaxed);
     let token = current.block_token.load(Ordering::SeqCst);
     let _ = current.process.wait_object.compare_exchange(
         token,
@@ -640,6 +644,24 @@ fn note_unblock(current: &Thread) {
         Ordering::Relaxed,
         Ordering::Relaxed,
     );
+}
+
+/// Serialise the `(state, pending_wake)` handshake against a concurrent wake.
+///
+/// Held only for the read-modify sequence, never across `schedule_locked`.
+fn lock_block(thread: &Thread) -> BlockLockGuard<'_> {
+    while thread.block_lock.swap(true, Ordering::Acquire) {
+        core::hint::spin_loop();
+    }
+    BlockLockGuard(&thread.block_lock)
+}
+
+struct BlockLockGuard<'a>(&'a core::sync::atomic::AtomicBool);
+
+impl Drop for BlockLockGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
 }
 
 pub fn sleep_until(deadline: u64) -> isize {
@@ -669,6 +691,7 @@ pub fn sleep_until(deadline: u64) -> isize {
             .insert(deadline, (Arc::clone(&current), token, 0));
         (current, token)
     };
+    let block = lock_block(&current);
     current.block_token.store(token, Ordering::SeqCst);
     current.pending_wake.store(false, Ordering::SeqCst);
     current.wake_status.store(0, Ordering::SeqCst);
@@ -679,10 +702,10 @@ pub fn sleep_until(deadline: u64) -> isize {
     }
     current.interruptible.store(true, Ordering::SeqCst);
     current.set_state(ThreadState::Blocked);
-    current
-        .process
-        .wait_object
-        .store(current.block_token.load(Ordering::SeqCst), Ordering::Relaxed);
+    current.process.wait_object.store(
+        current.block_token.load(Ordering::SeqCst),
+        Ordering::Relaxed,
+    );
     if current.pending_wake.swap(false, Ordering::SeqCst) {
         cancel_sleep(token);
         current.set_state(ThreadState::Running);
@@ -697,6 +720,7 @@ pub fn sleep_until(deadline: u64) -> isize {
         current.interruptible.store(false, Ordering::SeqCst);
         return Errno::EINTR.to_ret();
     }
+    drop(block);
     schedule_locked();
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
@@ -818,6 +842,7 @@ pub fn block_current() -> isize {
             None => return 0,
         }
     };
+    let block = lock_block(&current);
     if current.pending_wake.swap(false, Ordering::SeqCst) {
         current.set_state(ThreadState::Running);
         current.interruptible.store(false, Ordering::SeqCst);
@@ -829,10 +854,10 @@ pub fn block_current() -> isize {
         return Errno::EINTR.to_ret();
     }
     current.set_state(ThreadState::Blocked);
-    current
-        .process
-        .wait_object
-        .store(current.block_token.load(Ordering::SeqCst), Ordering::Relaxed);
+    current.process.wait_object.store(
+        current.block_token.load(Ordering::SeqCst),
+        Ordering::Relaxed,
+    );
     if current.pending_wake.swap(false, Ordering::SeqCst) {
         current.set_state(ThreadState::Running);
         note_unblock(&current);
@@ -845,6 +870,7 @@ pub fn block_current() -> isize {
         current.interruptible.store(false, Ordering::SeqCst);
         return Errno::EINTR.to_ret();
     }
+    drop(block);
     schedule_locked();
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
@@ -882,12 +908,27 @@ pub fn end_block(token: u64) {
         .remove_where(|(_, entry_token, _)| *entry_token == token);
 }
 
+/// Record why a wakeup could not enqueue its thread (K391 diagnostic).
+fn note_wake_fail(thread: &Thread, reason: u64, cpu: usize) {
+    let detail =
+        (reason << 56) | ((cpu as u64 & 0x00ff_ffff) << 32) | (thread.state() as u64 & 0xff);
+    thread
+        .process
+        .wake_fail_detail
+        .store(detail, Ordering::Relaxed);
+    thread.process.wake_fail.fetch_add(1, Ordering::Relaxed);
+}
+
 /// Wake `thread`; `token` restricts the wakeup to the thread's current blocking operation.
 pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
     if !INITIALIZED.load(Ordering::Acquire) {
         return false;
     }
     let _guard = sync::critical();
+    // Close the waiter/waker race: the target may be between its final `pending_wake` check
+    // and `schedule_locked`. Holding the thread's block lock makes "read state" and "publish
+    // the wake" atomic with the waiter's "set Blocked, re-check pending" sequence.
+    let _block = lock_block(&thread);
     if let Some(token) = token
         && thread.block_token.load(Ordering::SeqCst) != token
     {
@@ -900,18 +941,21 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
             if !thread.pending_wake.swap(true, Ordering::SeqCst) {
                 thread.wake_status.store(status as i64, Ordering::SeqCst);
             }
+            thread.process.wake_pending.fetch_add(1, Ordering::Relaxed);
             true
         }
         ThreadState::Blocked => {
             let cpu = target_cpu(&thread);
             let mut slot = lock_cpu(cpu);
             let Some(state) = slot.as_mut() else {
+                note_wake_fail(&thread, 1, cpu);
                 return false;
             };
             // Re-check under the owning CPU's lock; the thread may have been woken meanwhile.
             if thread.state() != ThreadState::Blocked
                 || token.is_some_and(|token| thread.block_token.load(Ordering::SeqCst) != token)
             {
+                note_wake_fail(&thread, 2, cpu);
                 return false;
             }
             thread.set_state(ThreadState::Ready);
@@ -922,12 +966,17 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
                 .push_back(thread.effective_priority(), Arc::clone(&thread))
                 .is_err()
             {
+                note_wake_fail(&thread, 3, cpu);
                 thread.set_state(ThreadState::Dead);
                 return false;
             }
             thread
                 .last_cpu
                 .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
+            thread
+                .process
+                .wake_last_cpu
+                .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Relaxed);
             state.need_resched = true;
             drop(slot);
             if cpu != this_cpu() {
@@ -940,6 +989,14 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
         }
         ThreadState::Ready | ThreadState::Dead => false,
     }
+}
+
+/// Snapshot `(need_resched, runqueue_len)` for `cpu` (K391 diagnostic).
+pub fn cpu_status(cpu: usize) -> (bool, usize) {
+    let slot = lock_cpu(cpu);
+    slot.as_ref().map_or((false, 0), |state| {
+        (state.need_resched, state.runqueue.len())
+    })
 }
 
 /// CPU a blocked thread should resume on.
