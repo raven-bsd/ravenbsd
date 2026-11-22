@@ -551,7 +551,6 @@ fn bootstrap_selection(services: &[Manifest]) -> Vec<bool> {
         "fsd-ufs",
         "vfsd",
         "devd",
-        "netd",
     ];
     let mut selected = alloc::vec![false; services.len()];
     for seed in SEEDS {
