@@ -10,6 +10,7 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)
 cd "$root"
+export PYTHONDONTWRITEBYTECODE=1
 for arg in "$@"; do
     case "$arg" in
         --hours|--hours=*|--resume|--resume=*|--prove-hung-boot|--prove-stall)
