@@ -28,6 +28,7 @@ extern crate alloc;
 pub mod abi;
 pub mod address;
 pub mod ast;
+pub mod conf;
 pub mod engine;
 pub mod log;
 pub mod nat;
@@ -39,6 +40,7 @@ pub use address::{AddrSpec, IpAddr, Ipv4Addr, Ipv6Addr, PortSpec};
 pub use ast::{
     Action, AddrPort, Direction, Family, IfaceSpec, Packet, Protocol, Rule, Ruleset, StatePolicy,
 };
+pub use conf::{Conf, ConfError};
 pub use engine::{CounterSnapshot, Decision, Engine, MAX_RULES, RuleStatSnapshot, Verdict};
 pub use log::{LogEntry, MAX_LOG_ENTRIES, PacketLog};
 pub use nat::{MAX_NAT_RULES, NatAction, NatError, NatRule, NatTable, Pool, PoolKind, Translation};

@@ -40,6 +40,7 @@ fn rule(action: NatAction, kind: PoolKind, addresses: Vec<IpAddr>) -> NatRule {
             addresses,
             proxy_port: Some((50001, 50003)),
             static_port: false,
+            sticky: false,
         },
         log: false,
     }
@@ -216,6 +217,71 @@ fn source_hash_and_random_selection_are_deterministic() {
         let right = second.translate(0, &out_tcp(), |_, _| false).unwrap();
         assert_eq!(left, right, "{kind:?}");
     }
+}
+
+#[test]
+fn a_sticky_pool_keeps_the_same_address_for_a_source() {
+    let mut table = NatTable::new();
+    let mut nat = rule(
+        NatAction::Nat,
+        PoolKind::RoundRobin,
+        alloc::vec![
+            IpAddr::V4(Ipv4Addr::new(203, 0, 113, 1)),
+            IpAddr::V4(Ipv4Addr::new(203, 0, 113, 2)),
+        ],
+    );
+    nat.pool.sticky = true;
+    table.push(nat);
+    let first = table
+        .translate(0, &out_tcp(), |_, _| false)
+        .unwrap()
+        .unwrap();
+    let second = table
+        .translate(0, &out_tcp(), |_, _| false)
+        .unwrap()
+        .unwrap();
+    assert_eq!(first.source, second.source);
+}
+
+#[test]
+fn a_full_sticky_table_fails_closed() {
+    let mut table = NatTable::new();
+    let mut nat = rule(
+        NatAction::Nat,
+        PoolKind::RoundRobin,
+        alloc::vec![IpAddr::V4(NATIP)],
+    );
+    nat.pool.sticky = true;
+    nat.pool.static_port = true;
+    table.push(nat);
+    for index in 0..MAX_STICKY_ENTRIES {
+        let source = Ipv4Addr::new(10, (index >> 8) as u8, index as u8, 1);
+        let packet = Packet::tcp(
+            Direction::Out,
+            "eth0",
+            source,
+            1234,
+            SERVER,
+            80,
+            tcp_flag::SYN,
+            60,
+        );
+        assert!(table.translate(0, &packet, |_, _| false).unwrap().is_some());
+    }
+    let extra = Packet::tcp(
+        Direction::Out,
+        "eth0",
+        Ipv4Addr::new(10, 16, 0, 1),
+        1234,
+        SERVER,
+        80,
+        tcp_flag::SYN,
+        60,
+    );
+    assert_eq!(
+        table.translate(0, &extra, |_, _| false),
+        Err(NatError::StickyFull)
+    );
 }
 
 #[test]

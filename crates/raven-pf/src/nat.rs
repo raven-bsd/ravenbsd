@@ -20,6 +20,7 @@
 //! `docs/pf.md`; `bitmask` over a multi-address pool is approximated by the first address
 //! (deviation D-pf-pool-bitmask) because the 0.1.0 parser has no pool-mask option.
 
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::address::IpAddr;
@@ -33,6 +34,8 @@ pub const MAX_POOL_ADDRESSES: usize = 16;
 pub const NAT_PROXY_PORT_LOW: u16 = 50001;
 /// Donor `PF_NAT_PROXY_PORT_HIGH`: last port of the default NAT port range.
 pub const NAT_PROXY_PORT_HIGH: u16 = 65535;
+/// Largest number of sticky source mappings held by one ruleset.
+pub const MAX_STICKY_ENTRIES: usize = 4096;
 
 /// Donor `PF_POOL_*` selection strategy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,6 +63,9 @@ pub struct Pool {
     pub proxy_port: Option<(u16, u16)>,
     /// `static-port`: never rewrite the source port (NAT only).
     pub static_port: bool,
+    /// `sticky-address`: reuse the pool address selected for a source (donor
+    /// `PF_POOL_STICKYADDR`).
+    pub sticky: bool,
 }
 
 impl Pool {
@@ -71,6 +77,7 @@ impl Pool {
             addresses: Vec::new(),
             proxy_port: None,
             static_port: false,
+            sticky: false,
         }
     }
 }
@@ -133,6 +140,8 @@ pub enum NatError {
     NoAddress,
     /// No free port in the configured range.
     PoolExhausted,
+    /// The sticky source mapping table is full (donor `PF_SRC_NODES` bound).
+    StickyFull,
 }
 
 /// The NAT/RDR rule table.
@@ -141,6 +150,8 @@ pub struct NatTable {
     rules: Vec<NatRule>,
     cursor: u64,
     address_cursor: u64,
+    /// Sticky source-to-pool-address mappings, keyed by `(rule, source)`.
+    sticky: BTreeMap<(usize, IpAddr), IpAddr>,
 }
 
 impl NatTable {
@@ -151,6 +162,7 @@ impl NatTable {
             rules: Vec::new(),
             cursor: 0,
             address_cursor: 0,
+            sticky: BTreeMap::new(),
         }
     }
 
@@ -217,8 +229,24 @@ impl NatTable {
         if rule.pool.addresses.is_empty() {
             return Err(NatError::NoAddress);
         }
-        let Some(address) = select_address(&mut self.address_cursor, &rule.pool, packet) else {
-            return Err(NatError::NoAddress);
+        let sticky = rule.pool.sticky && rule.pool.kind != PoolKind::None;
+        let key = (index, packet.source);
+        let (address, remember) = if sticky {
+            if let Some(existing) = self.sticky.get(&key).copied() {
+                (existing, false)
+            } else {
+                let Some(selected) = select_address(&mut self.address_cursor, &rule.pool, packet)
+                else {
+                    return Err(NatError::NoAddress);
+                };
+                (selected, true)
+            }
+        } else {
+            let Some(selected) = select_address(&mut self.address_cursor, &rule.pool, packet)
+            else {
+                return Err(NatError::NoAddress);
+            };
+            (selected, false)
         };
         let family_ok = match rule.action {
             NatAction::Nat => address.is_v4() == packet.source.is_v4(),
@@ -226,6 +254,12 @@ impl NatTable {
         };
         if !family_ok {
             return Err(NatError::NoAddress);
+        }
+        if remember {
+            if self.sticky.len() >= MAX_STICKY_ENTRIES {
+                return Err(NatError::StickyFull);
+            }
+            self.sticky.insert(key, address);
         }
         match rule.action {
             NatAction::Nat => {

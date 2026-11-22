@@ -544,6 +544,9 @@ fn parse_nat_rule(tokens: &[&str], line: usize, tables: &[Table]) -> Result<NatR
         } else if token.eq_ignore_ascii_case("static-port") {
             rule.pool.static_port = true;
             index += 1;
+        } else if token.eq_ignore_ascii_case("sticky-address") {
+            rule.pool.sticky = true;
+            index += 1;
         } else if token.eq_ignore_ascii_case("log") {
             rule.log = true;
             index += 1;

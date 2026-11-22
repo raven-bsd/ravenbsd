@@ -65,6 +65,17 @@ fn replace_validates_the_whole_new_list() {
 }
 
 #[test]
+fn remove_deletes_every_matching_entry() {
+    let mut table = Table::new("web");
+    let one = AddrSpec::parse("192.0.2.1").unwrap();
+    table.add(one).unwrap();
+    table.add(AddrSpec::parse("192.0.2.2").unwrap()).unwrap();
+    assert!(table.remove(&one));
+    assert!(!table.remove(&one));
+    assert_eq!(table.entries.len(), 1);
+}
+
+#[test]
 fn the_table_count_is_bounded() {
     let tables: alloc::vec::Vec<Table> = (0..MAX_TABLES)
         .map(|index| Table::new(alloc::format!("t{index}")))

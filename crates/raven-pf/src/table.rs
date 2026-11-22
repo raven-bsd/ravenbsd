@@ -90,6 +90,16 @@ impl Table {
         Ok(())
     }
 
+    /// Delete every entry equal to `spec`, returning whether anything matched.
+    ///
+    /// Donor `pfr_table_del` removes the address key; the Raven table is a bounded ordered
+    /// value list, so a repeated entry is removed with the first one.
+    pub fn remove(&mut self, spec: &AddrSpec) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|entry| entry != spec);
+        self.entries.len() != before
+    }
+
     /// True when `address` is in the table. Table entries never nest, but the lookup keeps a
     /// depth guard so a corrupted ruleset cannot recurse without bound.
     #[must_use]
