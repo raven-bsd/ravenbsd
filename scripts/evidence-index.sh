@@ -5,11 +5,13 @@
 # Evidence index (K544): walk every ticket report, parse the Evidence (ASPICE/ASIL) block, and
 # write one newline-stable TSV register with the report hash and every referenced artifact.
 #
-# usage: sh scripts/evidence-index.sh [--root DIR] [--check | --self-test]
+# usage: sh scripts/evidence-index.sh [--root DIR] [--check | --refresh | --self-test]
 #
 #   (default)     index the management root and write tickets/evidence/INDEX.tsv;
 #                 exits non-zero on a DONE report without an Evidence block, a missing
 #                 artifact, or a COMPLETE claim with a PARTIAL row.
+#   --refresh     the same as the default, but regenerate every artifact hash from scratch
+#                 (ignore the persistent cache); writes only into $RAVEN_MGMT_ROOT.
 #   --check       the same audit without writing; prints the counts and the gap list and
 #                 exits 0 so a backlog can be measured before it is fixed.
 #   --self-test   prove the three failure paths with temporary reports under /tmp and
@@ -58,6 +60,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --self-test)
             MODE=self-test
+            shift
+            ;;
+        --refresh)
+            MODE=refresh
             shift
             ;;
         -h | --help)
@@ -172,9 +178,14 @@ path_like() {
 }
 
 # audit_root MODE
-# MODE=collect writes INDEX.tsv and enforces; MODE=check only reports.
+# MODE=collect|refresh writes INDEX.tsv and enforces; refresh rehashes every artifact and
+# rebuilds the cache. MODE=check only reports.
 audit_root() {
     mode=$1
+    use_cache=1
+    if [ "$mode" = "refresh" ]; then
+        use_cache=0
+    fi
     rows=$WORK/rows
     failures=$WORK/failures
     warnings=$WORK/warnings
@@ -194,8 +205,11 @@ audit_root() {
     cache_store() {
         printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >>"$cache"
     }
-    if [ "$mode" = "collect" ]; then
+    if [ "$mode" = "collect" ] || [ "$mode" = "refresh" ]; then
         mkdir -p "$EVIDENCE"
+    fi
+    if [ "$mode" = "refresh" ]; then
+        : >"$cache"
     fi
 
     reports=0
@@ -329,7 +343,10 @@ audit_root() {
             if [ "$state" = "OK" ] || [ "$state" = "MOVED" ]; then
                 bytes=$(size_of "$resolved")
                 mtime=$(stat -c %Y "$resolved")
-                sum=$(cache_lookup "$resolved" "$bytes" "$mtime")
+                sum=
+                if [ "$use_cache" -eq 1 ]; then
+                    sum=$(cache_lookup "$resolved" "$bytes" "$mtime")
+                fi
                 if [ -z "$sum" ]; then
                     meta=$(awk -F'\t' -v path="$resolved" '$1 == path { print $2 "\t" $3; exit }' "$WORK/hash-cache")
                     if [ -n "$meta" ]; then
@@ -337,7 +354,7 @@ audit_root() {
                     else
                         sum=$(sha256_of "$resolved")
                         printf '%s\t%s\t%s\n' "$resolved" "$sum" "$bytes" >>"$WORK/hash-cache"
-                        if [ "$mode" = "collect" ]; then
+                        if [ "$mode" = "collect" ] || [ "$mode" = "refresh" ]; then
                             cache_store "$resolved" "$bytes" "$mtime" "$sum"
                         fi
                     fi
@@ -408,7 +425,7 @@ audit_root() {
         "$indexed" "$reports" "$done_reports" "$complete" "$done_missing" \
         "$missing_artifacts" "$moved_artifacts" "$partial_claims" "$warning_count" "$failure_count"
 
-    if [ "$mode" = "collect" ]; then
+    if [ "$mode" = "collect" ] || [ "$mode" = "refresh" ]; then
         mkdir -p "$EVIDENCE"
         index=$EVIDENCE/INDEX.tsv
         out=$WORK/INDEX.tsv
@@ -432,7 +449,7 @@ audit_root() {
         [ -n "$line" ] && printf 'evidence-index: %s\n' "$line"
     done <"$warnings_sorted"
 
-    if [ "$mode" = "collect" ] && [ "$failure_count" -ne 0 ]; then
+    if { [ "$mode" = "collect" ] || [ "$mode" = "refresh" ]; } && [ "$failure_count" -ne 0 ]; then
         return 1
     fi
     return 0
@@ -615,6 +632,9 @@ case $MODE in
         ;;
     collect)
         audit_root collect
+        ;;
+    refresh)
+        audit_root refresh
         ;;
     check)
         audit_root check
