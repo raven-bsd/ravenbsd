@@ -242,10 +242,11 @@ fn without_echo_editing_still_happens() {
 #[test]
 fn raw_mode_passes_bytes_through() {
     let mut discipline = Discipline::new();
-    discipline.set_settings(Settings {
-        mode: Mode::Raw,
-        echo: true,
-    });
+    let mut termios = Termios::sane();
+    termios.iflag = 0;
+    termios.oflag = 0;
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
     let output = feed(&mut discipline, b"ab\r\n");
     assert_eq!(output.data, b"ab\r\n");
     assert!(output.lines.is_empty());
@@ -548,6 +549,34 @@ fn output_is_raw_without_opost() {
     let mut out = Vec::new();
     discipline.process_output(b"line\n", &mut out);
     assert_eq!(out, b"line\n");
+}
+
+#[test]
+fn vwerase_removes_the_previous_word() {
+    let mut discipline = Discipline::new();
+    let output = feed(&mut discipline, b"one two\x17X\n");
+    assert_eq!(lines(&output), vec![&b"one X\n"[..]]);
+}
+
+#[test]
+fn raw_input_still_honours_translation_and_istrip() {
+    let mut crlf = Termios::sane();
+    crlf.iflag = ICRNL;
+    crlf.oflag = 0;
+    crlf.lflag = 0;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(crlf);
+    let output = feed(&mut discipline, b"\r");
+    assert_eq!(output.data, b"\n");
+
+    let mut strip = Termios::sane();
+    strip.iflag = ISTRIP;
+    strip.oflag = 0;
+    strip.lflag = 0;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(strip);
+    let output = feed(&mut discipline, &[0xff]);
+    assert_eq!(output.data, &[0x7f]);
 }
 
 #[test]

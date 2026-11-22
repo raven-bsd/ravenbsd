@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K485: the stored termios bits change pty behaviour. Rows cover canonical VERASE/VKILL/VEOF/
+# VWERASE, ISIG VINTR consumption/echo (SIGINT delivery is reported as pgrp-unset), OPOST/ONLCR,
+# ICRNL/INLCR/IGNCR/ISTRIP, and VMIN/VTIME with a measured range.
+
+name = "tty-discipline"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh tty-discipline"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+
+[[expect]]
+regex = '^tty-discipline: start uid=0$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-erase ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-kill ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-werase ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-eof ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-eof-empty ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-intr-data ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-intr-echo ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-intr sigint=pgrp-unset not-measured$'
+
+[[expect]]
+regex = '^tty-discipline: row=opost-onlcr ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=opost-off ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=icrnl ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=inlcr ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=igncr silent ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=istrip ok$'
+
+[[expect]]
+regex = '^tty-discipline: vmin1 read=1 byte=88 elapsed_ms=[0-9]+$'
+
+[[expect]]
+regex = '^tty-discipline: row=vmin1 ok$'
+
+[[expect]]
+regex = '^tty-discipline: vtime child count=0 elapsed_ms=[1-9][0-9]+$'
+
+[[expect]]
+regex = '^tty-discipline: row=vtime ok$'
+
+[[expect]]
+regex = '^tty-discipline: ok$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|tty-discipline: .*FAIL'

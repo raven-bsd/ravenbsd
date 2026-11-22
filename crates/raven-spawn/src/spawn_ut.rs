@@ -928,6 +928,15 @@ fn auxv_has_the_pg50_keys_and_at_base() {
 }
 
 #[test]
+fn no_alloc_fdmap_rejects_inherited_descriptors() {
+    assert_eq!(no_alloc_fdmap(&[]), Ok(()));
+    assert_eq!(
+        no_alloc_fdmap(&[(1, 7)]),
+        Err(SpawnError::Sys(Errno::ENOTSUP))
+    );
+}
+
+#[test]
 fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     let main = child_elf(false, false);
     let elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
