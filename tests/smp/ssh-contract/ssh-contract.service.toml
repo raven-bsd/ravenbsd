@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K435: one one-shot SSH kernel-contract probe.
+name = "ssh-contract"
+exec = "/bin/ssh-contract"
+args = []
+readiness = "exit"
+restart = "never"
+max_restarts = 0
