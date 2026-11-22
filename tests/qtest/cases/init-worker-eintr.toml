@@ -33,6 +33,9 @@ regex = '^init-worker-eintr: killed=137$'
 regex = '^init-worker-eintr: killed-restart=yes$'
 
 [[expect]]
+regex = '^init-worker-eintr: wait-error=-1$'
+
+[[expect]]
 regex = '^init-worker-eintr: ok$'
 
 [[expect]]

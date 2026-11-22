@@ -322,6 +322,13 @@ mod program {
             return 1;
         }
         raven_rt::println!("init-worker-eintr: killed-restart=yes");
+        match wait_child_status(Handle::new(0xFFFF, 0)) {
+            Err(_) => raven_rt::println!("init-worker-eintr: wait-error=-1"),
+            Ok(code) => {
+                raven_rt::println!("init-worker-eintr: wait-error={code} expected=-1");
+                return 1;
+            }
+        }
         raven_rt::println!("init-worker-eintr: ok");
         0
     }
