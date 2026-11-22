@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K488: process-group and session contract. No tty wiring (PG-54 follow-up).
+
+name = "proc-pgrp"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc-pgrp/build.sh"]
+initfs = "build/fixtures/proc-pgrp/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-pgrp: getpgrp=1 inherit=1$'
+
+[[expect]]
+regex = '^proc-pgrp: setpgid-self=1 setpgid-child=1 negative-pgid=1$'
+
+[[expect]]
+regex = '^proc-pgrp: after-exec=eacces$'
+
+[[expect]]
+regex = '^proc-pgrp: cross-session=eperm group-eperm=1$'
+
+[[expect]]
+regex = '^proc-pgrp: getsid=1 setsid-again=eperm$'
+
+[[expect]]
+regex = '^proc-pgrp: group-kill=1 group-wait=1$'
+
+[[expect]]
+regex = '^proc-pgrp: leader-lifetime=1 group-reuse=1$'
+
+[[expect]]
+regex = '^proc-pgrp: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-pgrp: fail'
