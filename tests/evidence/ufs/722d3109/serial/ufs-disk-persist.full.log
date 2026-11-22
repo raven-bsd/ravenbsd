@@ -1,0 +1,166 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: failed to load Boot0002 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0): Not Found
+BdsDxe: loading Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=103956 reserved=27116
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2700 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 1a854c0e 2026-11-21
+mem: 406 MiB usable in 8 regions
+cmdline: console=ttyS0 loglevel=info
+process: starting /init
+process: /init entry=0x41c134 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod blockd fsd-ufs
+svcd: logd up
+svcd: logd timing: generation=1 start=375 spawn=443 first_poll=459 deadline=5443 stalled=0 ready_at=706
+pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:03.0 vendor=0x1af4 device=0x1042 class=0x01 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+pcid: devices=7
+svcd: pcid up
+svcd: pcid timing: generation=1 start=396 spawn=669 first_poll=674 deadline=60669 stalled=0 ready_at=780
+rtc: 2026-11-21 23:13:07 (epoch 1795302787s)
+1795302788.276 ramfsd: started
+1795302788.309 nulld: started
+1795302788.315 zerod: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=811 spawn=1290 first_poll=1314 deadline=6290 stalled=0 ready_at=1358
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=958 spawn=1127 first_poll=1251 deadline=6127 stalled=0 ready_at=1481
+svcd: zerod up
+svcd: zerod timing: generation=1 start=1143 spawn=1293 first_poll=1477 deadline=6293 stalled=0 ready_at=1497
+1795302788.503 randd: started
+svcd: randd up
+svcd: randd timing: generation=1 start=1003 spawn=1411 first_poll=1436 deadline=6411 stalled=0 ready_at=1587
+1795302788.597 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=799 spawn=1407 first_poll=1412 deadline=121407 stalled=0 ready_at=1614
+devd: devices=7
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: matched 00:03.0 vendor=0x1af4 device=0x1042 irq_line=11 irq_pin=1
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix vector=64 table=0x0 bar=1
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=0
+virtio-net: msix table=0x0 bar=1 vector=1
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+devd: driver virtio-blk bar=4 size=16384
+devd: driver virtio-blk dma bus=0x180000 len=65536
+devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=5
+devd: driver virtio-blk msix vector=65 table=0x0 bar=1
+virtio-blk: id=1af4:1042
+virtio-blk: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-blk: msix table=0x0 bar=1 vector=1
+virtio-blk: capacity=32835 sector_size=512 ro=0
+virtio-blk: features=0x00000200 version1=1
+virtio-blk: queue0 size=8 notify=0x0
+virtio-blk: dma bus=0x180000 len=65536 irq=0
+virtio-blk: registered disk
+svcd: devd up
+svcd: devd timing: generation=1 start=784 spawn=994 first_poll=1130 deadline=60994 stalled=0 ready_at=1894
+blockd: remote disk=disk:0 sectors=32835 ro=0
+blockd: gpt ok partitions=1
+blockd: part 1 ufs-root 34..32801
+1795302789.236 blockd: started
+svcd: blockd up
+svcd: blockd timing: generation=1 start=1898 spawn=1935 first_poll=1944 deadline=61935 stalled=0 ready_at=2252
+fsd-ufs: mounted block:0 partition 1 as ufs: (16777216 bytes)
+fsd-ufs: repaired 1 findings on block:0
+fsd-ufs: mode=rw journal=none
+1795302812.275 fsd-ufs: started
+svcd: fsd-ufs up
+svcd: fsd-ufs timing: generation=1 start=2256 spawn=2294 first_poll=2306 deadline=62294 stalled=0 ready_at=25316
+svcd: root: /root mount failed: no such file or directory; starting the initfs plan
+svcd: consd up
+svcd: consd timing: generation=1 start=25370 spawn=25402 first_poll=25416 deadline=85402 stalled=0 ready_at=25434
+1795302812.475 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=25437 spawn=25462 first_poll=25478 deadline=30462 stalled=0 ready_at=25487
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd-ufs up
+svcd: vfsd-ufs timing: generation=1 start=25492 spawn=25527 first_poll=25535 deadline=85527 stalled=0 ready_at=25633
+R A V E N   B S D
+--------------------------------------------------------------------------------
+000.05  sysd                ok
+000.06  consd               ok
+000.14  vfsd-ufs            ok
+000.33  logd                ok
+000.35  blockd              ok
+000.35  zerod               ok
+000.38  pcid                ok
+000.52  ramfsd              ok
+000.55  nulld               ok
+000.58  randd               ok
+000.81  initfsd             ok
+001.11  devd                ok
+023.06  fsd-ufs             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# lraven# lsraven# lsbraven# lsblraven# lsblkraven# lsblk
+NAME SIZE SECTORS TYPE
+block0 16811520 32835 disk
+block0p1 16777216 32768 part ufs-root
+mount ufs: /mnt && echo mount-ok
+                                                                                /
+raven# raven# mraven# moraven# mouraven# mounraven# mountraven# mount raven# mount uraven# mount ufraven# mount ufsraven# mount ufs:raven# mount ufs: raven# mount ufs: /raven# mount ufs: /mraven# mount ufs: /mnraven# mount ufs: /mntraven# mount ufs: /mnt raven# mount ufs: /mnt &raven# mount ufs: /mnt &&raven# mount ufs: /mnt && raven# mount ufs: /mnt && eraven# mount ufs: /mnt && ecraven# mount ufs: /mnt && echraven# mount ufs: /mnt && echoraven# mount ufs: /mnt && echo raven# mount ufs: /mnt && echo mraven# mount ufs: /mnt && echo moraven# mount ufs: /mnt && echo mouraven# mount ufs: /mnt && echo mounraven# mount ufs: /mnt && echo mountraven# mount ufs: /mnt && echo mount-raven# mount ufs: /mnt && echo mount-oraven# mount ufs: /mnt && echo mount-okraven# mount ufs: /mnt && echo mount-ok
+mount-ok
+cat /mnt/s99-demo.txt; echo read-ok
+                                                                                /
+raven# raven# craven# caraven# catraven# cat raven# cat /raven# cat /mraven# cat /mnraven# cat /mntraven# cat /mnt/raven# cat /mnt/sraven# cat /mnt/s9raven# cat /mnt/s99raven# cat /mnt/s99-raven# cat /mnt/s99-draven# cat /mnt/s99-deraven# cat /mnt/s99-demraven# cat /mnt/s99-demoraven# cat /mnt/s99-demo.raven# cat /mnt/s99-demo.traven# cat /mnt/s99-demo.txraven# cat /mnt/s99-demo.txtraven# cat /mnt/s99-demo.txt;raven# cat /mnt/s99-demo.txt; raven# cat /mnt/s99-demo.txt; eraven# cat /mnt/s99-demo.txt; ecraven# cat /mnt/s99-demo.txt; echraven# cat /mnt/s99-demo.txt; echoraven# cat /mnt/s99-demo.txt; echo raven# cat /mnt/s99-demo.txt; echo rraven# cat /mnt/s99-demo.txt; echo reraven# cat /mnt/s99-demo.txt; echo rearaven# cat /mnt/s99-demo.txt; echo readraven# cat /mnt/s99-demo.txt; echo read-raven# cat /mnt/s99-demo.txt; echo read-oraven# cat /mnt/s99-demo.txt; echo read-okraven# cat /mnt/s99-demo.txt; echo read-ok
+s99-persist
+read-ok
+umount /mnt && echo umount-ok
+                                                                                /
+raven# raven# uraven# umraven# umoraven# umouraven# umounraven# umountraven# umount raven# umount /raven# umount /mraven# umount /mnraven# umount /mntraven# umount /mnt raven# umount /mnt &raven# umount /mnt &&raven# umount /mnt && raven# umount /mnt && eraven# umount /mnt && ecraven# umount /mnt && echraven# umount /mnt && echoraven# umount /mnt && echo raven# umount /mnt && echo uraven# umount /mnt && echo umraven# umount /mnt && echo umoraven# umount /mnt && echo umouraven# umount /mnt && echo umounraven# umount /mnt && echo umountraven# umount /mnt && echo umount-raven# umount /mnt && echo umount-oraven# umount /mnt && echo umount-okraven# umount /mnt && echo umount-ok
+umount-ok
+exit 0
+                                                                                /
+raven# raven# eraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+init exited (0)

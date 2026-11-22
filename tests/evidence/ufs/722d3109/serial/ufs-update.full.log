@@ -1,0 +1,191 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: failed to load Boot0002 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0): Not Found
+BdsDxe: loading Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 24 regions
+frames: base=256 count=131072 free=114747 reserved=16325
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 3846 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 1a854c0e 2026-11-21
+mem: 448 MiB usable in 6 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x41c134 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod blockd fsd-ufs vfsd
+svcd: logd up
+svcd: logd timing: generation=1 start=163 spawn=180 first_poll=207 deadline=5180 stalled=0 ready_at=234
+pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:03.0 vendor=0x1af4 device=0x1042 class=0x01 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+pcid: devices=7
+svcd: pcid up
+svcd: pcid timing: generation=1 start=179 spawn=205 first_poll=217 deadline=60205 stalled=0 ready_at=345
+rtc: 2026-11-21 23:26:45 (epoch 1795303605s)
+1795303605.490 nulld: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=383 spawn=408 first_poll=441 deadline=5408 stalled=0 ready_at=521
+1795303605.539 initfsd: started
+1795303605.564 ramfsd: started
+1795303605.581 randd: started
+1795303605.585 zerod: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=365 spawn=415 first_poll=441 deadline=120415 stalled=0 ready_at=599
+svcd: randd up
+svcd: randd timing: generation=1 start=398 spawn=455 first_poll=457 deadline=5455 stalled=0 ready_at=601
+svcd: zerod up
+svcd: zerod timing: generation=1 start=453 spawn=516 first_poll=520 deadline=5516 stalled=0 ready_at=617
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=388 spawn=439 first_poll=456 deadline=5439 stalled=0 ready_at=620
+devd: devices=7
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: matched 00:03.0 vendor=0x1af4 device=0x1042 irq_line=11 irq_pin=1
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix vector=64 table=0x0 bar=1
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=0
+virtio-net: msix table=0x0 bar=1 vector=1
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+virtio-net: serving nic:
+devd: driver virtio-blk bar=4 size=16384
+devd: driver virtio-blk dma bus=0x181000 len=65536
+devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=5
+devd: driver virtio-blk msix vector=65 table=0x0 bar=1
+virtio-blk: id=1af4:1042
+virtio-blk: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-blk: msix table=0x0 bar=1 vector=1
+virtio-blk: capacity=524355 sector_size=512 ro=0
+virtio-blk: features=0x00000200 version1=1
+virtio-blk: queue0 size=8 notify=0x0
+virtio-blk: dma bus=0x181000 len=65536 irq=0
+virtio-blk: registered disk
+svcd: devd up
+svcd: devd timing: generation=1 start=348 spawn=378 first_poll=384 deadline=60378 stalled=0 ready_at=930
+blockd: remote disk=disk:0 sectors=524355 ro=0
+blockd: gpt ok partitions=1
+blockd: part 1 ufs-root 34..524321
+1795303606.213 blockd: started
+svcd: blockd up
+svcd: blockd timing: generation=1 start=936 spawn=1001 first_poll=1003 deadline=61001 stalled=0 ready_at=1218
+fsd-ufs: mounted block:0 partition 1 as ufs: (268435456 bytes)
+fsd-ufs: mode=rw journal=none
+1795303622.571 fsd-ufs: started
+svcd: fsd-ufs up
+svcd: fsd-ufs timing: generation=1 start=1242 spawn=1269 first_poll=1277 deadline=61269 stalled=0 ready_at=17605
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=17609 spawn=17620 first_poll=17623 deadline=77620 stalled=0 ready_at=17695
+svcd: root pivoted to UFS at /
+svcd: root services=13 added=4
+svcd: service plan: logd pcid consd devd initfsd netd nulld ramfsd randd sysd zerod blockd vfsd fsd-ufs getty resolvd
+svcd: consd up
+svcd: consd timing: generation=1 start=18334 spawn=18623 first_poll=18626 deadline=78623 stalled=0 ready_at=18637
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: interface eth0 10.0.2.15/24
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+svcd: netd timing: generation=1 start=18664 spawn=20307 first_poll=20308 deadline=80307 stalled=0 ready_at=20522
+virtio-net: irq tx fired=1 isr=0x1 tx=1 rx=1
+1795303625.960 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=20574 spawn=20930 first_poll=20959 deadline=25930 stalled=0 ready_at=20993
+resolvd: wrote file:/etc/resolv.conf
+resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43198812ms rebind=75598812ms expires=86398812ms
+resolvd: resolv.conf=nameserver 10.0.2.3
+1795303627.226 resolvd: started
+svcd: resolvd up
+svcd: resolvd timing: generation=1 start=20997 spawn=21606 first_poll=21607 deadline=81606 stalled=0 ready_at=22268
+R A V E N   B S D
+--------------------------------------------------------------------------------
+000.07  logd                ok
+000.09  vfsd                ok
+000.14  nulld               ok
+000.16  zerod               ok
+000.17  pcid                ok
+000.20  randd               ok
+000.23  ramfsd              ok
+000.23  initfsd             ok
+000.28  blockd              ok
+000.30  consd               ok
+000.42  sysd                ok
+000.58  devd                ok
+001.27  resolvd             ok
+001.86  netd                ok
+016.36  fsd-ufs             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# /raven# /braven# /biraven# /binraven# /bin/raven# /bin/craven# /bin/caraven# /bin/catraven# /bin/cat raven# /bin/cat /raven# /bin/cat /eraven# /bin/cat /etraven# /bin/cat /etcraven# /bin/cat /etc/raven# /bin/cat /etc/uraven# /bin/cat /etc/ufraven# /bin/cat /etc/ufsraven# /bin/cat /etc/ufs-raven# /bin/cat /etc/ufs-uraven# /bin/cat /etc/ufs-upraven# /bin/cat /etc/ufs-updraven# /bin/cat /etc/ufs-updaraven# /bin/cat /etc/ufs-updatraven# /bin/cat /etc/ufs-updateraven# /bin/cat /etc/ufs-update.raven# /bin/cat /etc/ufs-update.traven# /bin/cat /etc/ufs-update.txraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txt
+k185-first
+                                                                                /
+raven# raven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/draven# /bin/dfraven# /bin/df raven# /bin/df -raven# /bin/df -hraven# /bin/df -h raven# /bin/df -h /raven# /bin/df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+ufs:            240M   41M  199M  17% /
+                                                                                /
+raven# raven# /bin/df -h /raven# /sraven# /sbraven# /sbiraven# /sbinraven# /sbin/raven# /sbin/mraven# /sbin/moraven# /sbin/mouraven# /sbin/mounraven# /sbin/mountraven# /sbin/mount
+ufs: on /
+ramfs: on /tmp
+null: on /dev/null
+zero: on /dev/zero
+rand: on /dev/random
+rand: on /dev/urandom
+                                                                                /
+raven# raven# eraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# /sbin/mountraven# /bin/df -h /raven# /bin/df -h /raven# /bin/df -h /raven# /bin/df -h /raven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txtraven# /bin/cat /etc/ufs-update.txt
+k185-first
+                                                                                /
+raven# 

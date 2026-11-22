@@ -1,0 +1,70 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running `target/debug/xtask qtest --case ufs-disk-ufs1 --arch x86_64 --no-build`
+ufs-disk-ufs1: fail
+--- serial (last 40 lines) ---
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd-ufs up
+svcd: vfsd-ufs timing: generation=1 start=6905 spawn=7014 first_poll=7017 deadline=67014 stalled=0 ready_at=7066
+R A V E N   B S D
+--------------------------------------------------------------------------------
+000.04  sysd                ok
+000.04  consd               ok
+000.16  vfsd-ufs            ok
+000.23  blockd              ok
+000.23  logd                ok
+000.26  pcid                ok
+000.56  randd               ok
+000.65  zerod               ok
+000.93  ramfsd              ok
+000.93  nulld               ok
+001.69  initfsd             ok
+001.89  devd                ok
+003.85  fsd-ufs             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# lraven# lsraven# lsbraven# lsblraven# lsblkraven# lsblk
+NAME SIZE SECTORS TYPE
+block0 16811520 32835 disk
+block0p1 16777216 32768 part ufs-root
+mount ufs: /mnt && echo mount-ok
+                                                                                /
+raven# raven# mraven# moraven# mouraven# mounraven# mountraven# mount raven# mount uraven# mount ufraven# mount ufsraven# mount ufs:raven# mount ufs: raven# mount ufs: /raven# mount ufs: /mraven# mount ufs: /mnraven# mount ufs: /mntraven# mount ufs: /mnt raven# mount ufs: /mnt &raven# mount ufs: /mnt &&raven# mount ufs: /mnt && raven# mount ufs: /mnt && eraven# mount ufs: /mnt && ecraven# mount ufs: /mnt && echraven# mount ufs: /mnt && echoraven# mount ufs: /mnt && echo raven# mount ufs: /mnt && echo mraven# mount ufs: /mnt && echo moraven# mount ufs: /mnt && echo mouraven# mount ufs: /mnt && echo mounraven# mount ufs: /mnt && echo mount
+--- unmatched expectations ---
+s99-persist$
+^init exited \(0\)$
+--- result ---
+step 9 (^mount-ok$) failed: no matching serial line within 30 s
+last 20 serial line(s):
+003.85  fsd-ufs             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# lraven# lsraven# lsbraven# lsblraven# lsblkraven# lsblk
+NAME SIZE SECTORS TYPE
+block0 16811520 32835 disk
+block0p1 16777216 32768 part ufs-root
+mount ufs: /mnt && echo mount-ok
+                                                                                /

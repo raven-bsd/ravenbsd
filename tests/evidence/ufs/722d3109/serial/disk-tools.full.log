@@ -1,0 +1,143 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: failed to load Boot0002 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x2,0x0): Not Found
+BdsDxe: loading Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 26 regions
+frames: base=256 count=131072 free=103726 reserved=27346
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2706 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 1a854c0e 2026-11-21
+mem: 405 MiB usable in 7 regions
+cmdline: console=ttyS0 loglevel=info
+process: starting /init
+process: /init entry=0x41c134 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
+svcd: logd up
+pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:02.0 vendor=0x1af4 device=0x1042 class=0x01 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:03.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+pcid: devices=7
+svcd: pcid up
+rtc: 2026-11-21 23:21:50 (epoch 1795303310s)
+1795303310.439 nulld: started
+1795303310.468 ramfsd: started
+svcd: nulld up
+1795303310.499 randd: started
+1795303310.512 zerod: started
+svcd: randd up
+svcd: ramfsd up
+svcd: zerod up
+1795303310.609 initfsd: started
+svcd: initfsd up
+devd: devices=7
+devd: matched 00:02.0 vendor=0x1af4 device=0x1042 irq_line=11 irq_pin=1
+devd: matched 00:03.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: driver virtio-blk bar=4 size=16384
+devd: driver virtio-blk dma bus=0x100000 len=65536
+devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=5
+devd: driver virtio-blk msix unavailable: bad handle or file descriptor; using legacy irq
+devd: driver virtio-blk irq line=11
+virtio-blk: id=1af4:1042
+virtio-blk: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-blk: capacity=32835 sector_size=512 ro=0
+virtio-blk: features=0x00000200 version1=1
+virtio-blk: queue0 size=8 notify=0x0
+virtio-blk: dma bus=0x100000 len=65536 irq=11
+virtio-blk: registered disk
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x180000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
+devd: driver virtio-net launch failed: irq: resource busy
+devd: virtio-net: irq: resource busy
+svcd: devd failed: exited before it became ready
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
+svcd: consd up
+1795303310.813 sysd: started
+svcd: sysd up
+netd: pf absent
+netd: network config mode=dhcp hostname=raven
+netd: nic: open nic:info: no such file or directory; waiting for the driver
+netd: hostname raven
+netd: interface lo 127.0.0.1/8
+netd: ready
+svcd: netd up
+resolvd: lease eth0: no such device
+resolvd: lease not ready; retrying in the background
+1795303315.992 resolvd: started
+resolvd: lease eth0: no such device
+svcd: resolvd up
+R A V E N   B S D
+--------------------------------------------------------------------------------
+000.01  consd               ok
+000.01  sysd                ok
+000.02  logd                ok
+000.04  netd                ok
+000.04  vfsd                ok
+000.06  pcid                ok
+000.12  nulld               ok
+000.18  randd               ok
+000.18  zerod               ok
+000.20  ramfsd              ok
+000.28  initfsd             ok
+000.41  devd                fail
+005.14  resolvd             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: boot report: 12 up, 1 failed
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# /raven# /sraven# /sbraven# /sbiraven# /sbinraven# /sbin/raven# /sbin/draven# /sbin/diraven# /sbin/disraven# /sbin/diskraven# /sbin/disk-raven# /sbin/disk-traven# /sbin/disk-toraven# /sbin/disk-tooraven# /sbin/disk-toolraven# /sbin/disk-tool-raven# /sbin/disk-tool-sraven# /sbin/disk-tool-svraven# /sbin/disk-tool-svcraven# /sbin/disk-tool-svccraven# /sbin/disk-tool-svcctraven# /sbin/disk-tool-svcctlraven# /sbin/disk-tool-svcctl raven# /sbin/disk-tool-svcctl sraven# /sbin/disk-tool-svcctl straven# /sbin/disk-tool-svcctl staraven# /sbin/disk-tool-svcctl starraven# /sbin/disk-tool-svcctl startraven# /sbin/disk-tool-svcctl start raven# /sbin/disk-tool-svcctl start braven# /sbin/disk-tool-svcctl start blraven# /sbin/disk-tool-svcctl start bloraven# /sbin/disk-tool-svcctl start blocraven# /sbin/disk-tool-svcctl start blockraven# /sbin/disk-tool-svcctl start blockdraven# /sbin/disk-tool-svcctl start blockd
+blockd: waiting for disk:0: no such file or directory
+svcctl: blockd: timed out waiting for the operation
+                                                                                1 /
+raven# blockd: still waiting for disk:0 after 50: no such file or directory
+blockd: still waiting for disk:0 after 100: no such file or directory
+blockd: still waiting for disk:0 after 150: no such file or directory
+blockd: still waiting for disk:0 after 200: no such file or directory
+blockd: still waiting for disk:0 after 250: no such file or directory
+blockd: still waiting for disk:0 after 300: no such file or directory
+blockd: still waiting for disk:0 after 350: no such file or directory
+blockd: still waiting for disk:0 after 400: no such file or directory
+blockd: still waiting for disk:0 after 450: no such file or directory
+blockd: still waiting for disk:0 after 500: no such file or directory
+blockd: still waiting for disk:0 after 550: no such file or directory
+svcd: blockd failed: readiness timeout

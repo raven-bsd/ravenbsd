@@ -1,0 +1,19 @@
+{
+  "case": "ufs-root-persist",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 120013,
+  "exit_status": null,
+  "matched": [
+    "^loader: RavenBSD loader 0\\.1 \\(x86_64\\)$",
+    "^RavenBSD kernel 0\\.1 \\(x86_64\\)",
+    "^svcd: root pivoted to UFS at /$",
+    "^R A V E N   B S D$",
+    "^-{80}$",
+    "^Welcome to RavenBSD 0\\.1 x86_64$",
+    "(?i)^password: ?$",
+    "^k176-persist$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}

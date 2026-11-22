@@ -1,0 +1,33 @@
+/tmp/raven-ufs-selftest.iSikwz/pi4.img: clean
+ufs-inject: mkdir /opt/update ino=5 fsck=clean
+ufs-inject: mkdir /opt/update/etc ino=6 fsck=clean
+ufs-inject: mkdir /opt/update/opt ino=7 fsck=clean
+ufs-inject: mkdir /opt/update/opt/app ino=8 fsck=clean
+ufs-inject: mkdir /opt/update/opt/app/bin ino=9 fsck=clean
+ufs-inject: put /opt/update/etc/motd ino=10 replaced=false bytes=14 fsck=clean
+ufs-inject: put /opt/update/opt/app/bin/tool ino=11 replaced=false bytes=15 fsck=clean
+ufs-inject: symlink /opt/update/opt/app/bin/motd -> /opt/update/etc/motd ino=12 fsck=clean
+raven-ufs: sync /tmp/raven-ufs-selftest.iSikwz/tree -> /opt/update fsck=clean
+ufs-inject: put /opt/update/put.txt ino=13 replaced=false bytes=12 fsck=clean
+raven-ufs: put /opt/update/put.txt fsck=clean
+ufs-inject: rm /opt/update/put.txt fsck=clean
+raven-ufs: rm /opt/update/put.txt fsck=clean
+ufs-inject: mkdir /opt/update/empty ino=13 fsck=clean
+raven-ufs: mkdir /opt/update/empty fsck=clean
+ufs-inject: mkdir /opt/update ino=5 fsck=clean
+ufs-inject: mkdir /opt/update/etc ino=6 fsck=clean
+ufs-inject: mkdir /opt/update/opt ino=7 fsck=clean
+ufs-inject: mkdir /opt/update/opt/app ino=8 fsck=clean
+ufs-inject: mkdir /opt/update/opt/app/bin ino=9 fsck=clean
+ufs-inject: put /opt/update/etc/motd ino=10 replaced=true bytes=14 fsck=clean
+ufs-inject: symlink /opt/update/opt/app/bin/motd -> /opt/update/etc/motd ino=12 fsck=clean
+ufs-inject: rm /opt/update/opt/app/bin/tool fsck=clean
+ufs-inject: rm /opt/update/empty fsck=clean
+raven-ufs: sync /tmp/raven-ufs-selftest.iSikwz/tree -> /opt/update fsck=clean
+/tmp/raven-ufs-selftest.iSikwz/pi4.img: clean
+raven-ufs-selftest: corrupt-GPT refusal PASS
+raven-ufs-selftest: unconfirmed block-device refusal PASS
+raven-ufs-selftest: mounted block-device refusal PASS
+raven-ufs-selftest: ESP sha256 16c7f1d8a38b4b84560e558ab03b13c82e2ff374d87eaacb4df22f03604e7a4f (unchanged)
+raven-ufs-selftest: inode 142736377 size 10502656 (unchanged)
+raven-ufs-selftest: PASS

@@ -1,0 +1,19 @@
+{
+  "case": "ufs-statfs",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 180015,
+  "exit_status": null,
+  "matched": [
+    "^svcd: root pivoted to UFS at /$",
+    "^R A V E N   B S D$",
+    "^-{80}$",
+    "^Welcome to RavenBSD 0\\.1 x86_64$",
+    "^ufs: +2[0-4][0-9]M +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$",
+    "^ufs: +[0-9]+ +[0-9]+ +[0-9]+ +[0-9]+% /$",
+    "^fill=[0-9]+$",
+    "^ufs: on /$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}

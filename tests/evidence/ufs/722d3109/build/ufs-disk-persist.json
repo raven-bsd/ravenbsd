@@ -1,0 +1,17 @@
+{
+  "case": "ufs-disk-persist",
+  "arch": "x86_64",
+  "result": "pass",
+  "duration_ms": 58007,
+  "exit_status": null,
+  "matched": [
+    "^loader: RavenBSD loader 0\\.1 \\(x86_64\\)$",
+    "^RavenBSD kernel 0\\.1 \\(x86_64\\)",
+    "(?i)^password: ?$",
+    "block0p1 16777216 32768 part ufs-root",
+    "s99-persist$",
+    "^init exited \\(0\\)$"
+  ],
+  "unmatched": [],
+  "forbidden_hits": []
+}

@@ -1,0 +1,240 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: failed to load Boot0002 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0): Not Found
+BdsDxe: loading Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0003 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=103957 reserved=27115
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2720 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 1a854c0e 2026-11-21
+mem: 406 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x41c134 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod blockd fsd-ufs
+svcd: logd up
+svcd: logd timing: generation=1 start=1440 spawn=1981 first_poll=2093 deadline=6981 stalled=0 ready_at=2347
+pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
+pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:03.0 vendor=0x1af4 device=0x1042 class=0x01 subclass=0x00 irq_line=11 irq_pin=1
+pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
+pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
+pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
+pcid: devices=7
+svcd: pcid up
+svcd: pcid timing: generation=1 start=1481 spawn=2160 first_poll=2196 deadline=62160 stalled=0 ready_at=2640
+rtc: 2026-11-21 23:10:47 (epoch 1795302647s)
+1795302651.618 nulld: started
+1795302651.791 randd: started
+svcd: randd up
+svcd: randd timing: generation=1 start=2892 spawn=3870 first_poll=4030 deadline=8870 stalled=0 ready_at=4941
+1795302652.027 ramfsd: started
+1795302652.100 zerod: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=2816 spawn=4089 first_poll=4180 deadline=9089 stalled=0 ready_at=5194
+svcd: zerod up
+svcd: zerod timing: generation=1 start=3231 spawn=4402 first_poll=4441 deadline=9402 stalled=0 ready_at=5486
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=2859 spawn=4069 first_poll=4147 deadline=9069 stalled=0 ready_at=5525
+1795302653.494 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=2665 spawn=3848 first_poll=4170 deadline=123848 stalled=0 ready_at=6869
+devd: devices=7
+devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
+devd: matched 00:03.0 vendor=0x1af4 device=0x1042 irq_line=11 irq_pin=1
+devd: driver virtio-net bar=4 size=16384
+devd: driver virtio-net dma bus=0x100000 len=65536
+devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
+devd: driver virtio-net msix vector=64 table=0x0 bar=1
+virtio-net: id=1af4:1041
+virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-net: dma len=65536 bus=0x100000 irq=0
+virtio-net: msix table=0x0 bar=1 vector=1
+virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
+virtio-net: queue0 rx size=8
+virtio-net: queue1 tx size=8
+virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
+devd: driver virtio-blk bar=4 size=16384
+virtio-net: serving nic:
+devd: driver virtio-blk dma bus=0x1bd000 len=65536
+devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=5
+devd: driver virtio-blk msix vector=65 table=0x0 bar=1
+virtio-blk: id=1af4:1042
+virtio-blk: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
+virtio-blk: msix table=0x0 bar=1 vector=1
+virtio-blk: capacity=32835 sector_size=512 ro=0
+virtio-blk: features=0x00000200 version1=1
+virtio-blk: queue0 size=8 notify=0x0
+virtio-blk: dma bus=0x1bd000 len=65536 irq=0
+virtio-blk: registered disk
+svcd: devd up
+svcd: devd timing: generation=1 start=2644 spawn=2976 first_poll=3179 deadline=65662 stalled=2686 ready_at=12722
+blockd: remote disk=disk:0 sectors=32835 ro=0
+blockd: gpt ok partitions=1
+blockd: part 1 ufs-root 34..32801
+1795302664.899 blockd: started
+svcd: blockd up
+svcd: blockd timing: generation=1 start=12724 spawn=13165 first_poll=13250 deadline=73165 stalled=0 ready_at=18105
+fsd-ufs: mounted block:0 partition 1 as ufs: (16777216 bytes)
+fsd-ufs: mode=rw journal=none
+1795302725.813 fsd-ufs: started
+svcd: fsd-ufs up
+svcd: fsd-ufs timing: generation=1 start=18155 spawn=18821 first_poll=18874 deadline=78821 stalled=0 ready_at=78921
+svcd: root: /root mount failed: no such file or directory; starting the initfs plan
+svcd: consd up
+svcd: consd timing: generation=1 start=79093 spawn=79182 first_poll=79209 deadline=139182 stalled=0 ready_at=79255
+1795302726.337 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=79276 spawn=79317 first_poll=79326 deadline=84317 stalled=0 ready_at=79384
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd-ufs up
+svcd: vfsd-ufs timing: generation=1 start=79397 spawn=79458 first_poll=79481 deadline=139458 stalled=0 ready_at=79606
+R A V E N   B S D
+--------------------------------------------------------------------------------
+000.11  sysd                ok
+000.16  consd               ok
+000.21  vfsd-ufs            ok
+000.91  logd                ok
+001.16  pcid                ok
+002.05  randd               ok
+002.25  zerod               ok
+002.38  nulld               ok
+002.67  ramfsd              ok
+004.20  initfsd             ok
+005.38  blockd              ok
+010.08  devd                ok
+060.77  fsd-ufs             ok
+--------------------------------------------------------------------------------
+
+Welcome to RavenBSD 0.1 x86_64
+svcd: getty up
+login: root
+Password: 
+RavenBSD 0.1.0
+
+Welcome to the RavenBSD console.
+This is a root-only login for the 0.1.0 release image.
+
+Type `exit` to close the session.
+                                                                                /
+raven# raven# lraven# lsraven# ls raven# ls /raven# ls /braven# ls /biraven# ls /binraven# ls /bin
+brush
+cat
+cp
+curl
+date
+df
+du
+echo
+ed
+false
+getty
+head
+hostname
+id
+login
+ls
+lsblk
+man
+mkdir
+mv
+ps
+rm
+rmdir
+rsh
+sleep
+sort
+stat
+svcctl
+tail
+touch
+true
+uname
+wc
+wget
+                                                                                /
+raven# raven# ls /binraven# ls /binraven# ls /binraven# ls /binraven# ls /sraven# ls /sbraven# ls /sbiraven# ls /sbinraven# ls /sbin
+blockd
+consd
+devd
+dmesg
+fsd-ufs
+gpart
+ifconfig
+initfsd
+logd
+mount
+netd
+netstat
+newfs
+nulld
+pcid
+ping
+ramfsd
+randd
+resolvd
+route
+sysd
+umount
+vfsd
+virtio-blk
+virtio-net
+zerod
+                                                                                /
+raven# raven# ls /sbinraven# ls /sbinraven# lsbraven# lsblraven# lsblkraven# lsblk
+NAME SIZE SECTORS TYPE
+block0 16811520 32835 disk
+block0p1 16777216 32768 part ufs-root
+gpart show block:0
+                                                                                /
+raven# raven# graven# gpraven# gparaven# gparraven# gpartraven# gpart raven# gpart sraven# gpart shraven# gpart shoraven# gpart showraven# gpart show raven# gpart show braven# gpart show blraven# gpart show bloraven# gpart show blocraven# gpart show blockraven# gpart show block:raven# gpart show block:0raven# gpart show block:0
+Geom name: block0
+Mediasize: 16811520
+Sectorsize: 512
+Scheme: GPT
+  start  size  index  name
+     34 32768       1  ufs-root
+                                                                                /
+raven# raven# mraven# moraven# mouraven# mounraven# mountraven# mount raven# mount uraven# mount ufraven# mount ufsraven# mount ufs:raven# mount ufs: raven# mount ufs: /raven# mount ufs: /mraven# mount ufs: /mnraven# mount ufs: /mntraven# mount ufs: /mnt raven# mount ufs: /mnt &raven# mount ufs: /mnt &&raven# mount ufs: /mnt && raven# mount ufs: /mnt && eraven# mount ufs: /mnt && ecraven# mount ufs: /mnt && echraven# mount ufs: /mnt && echoraven# mount ufs: /mnt && echo raven# mount ufs: /mnt && echo mraven# mount ufs: /mnt && echo moraven# mount ufs: /mnt && echo mouraven# mount ufs: /mnt && echo mounraven# mount ufs: /mnt && echo mountraven# mount ufs: /mnt && echo mount-raven# mount ufs: /mnt && echo mount-oraven# mount ufs: /mnt && echo mount-okraven# mount ufs: /mnt && echo mount-ok
+mount-ok
+echo s99-persist > /mnt/s99-demo.txt; echo write-ok
+                                                                                /
+raven# raven# eraven# ecraven# echraven# echoraven# echo raven# echo sraven# echo s9raven# echo s99raven# echo s99-raven# echo s99-praven# echo s99-peraven# echo s99-perraven# echo s99-persraven# echo s99-persiraven# echo s99-persisraven# echo s99-persistraven# echo s99-persist raven# echo s99-persist >raven# echo s99-persist > raven# echo s99-persist > /raven# echo s99-persist > /mraven# echo s99-persist > /mnraven# echo s99-persist > /mntraven# echo s99-persist > /mnt/raven# echo s99-persist > /mnt/sraven# echo s99-persist > /mnt/s9raven# echo s99-persist > /mnt/s99raven# echo s99-persist > /mnt/s99-raven# echo s99-persist > /mnt/s99-draven# echo s99-persist > /mnt/s99-deraven# echo s99-persist > /mnt/s99-demraven# echo s99-persist > /mnt/s99-demoraven# echo s99-persist > /mnt/s99-demo.raven# echo s99-persist > /mnt/s99-demo.traven# echo s99-persist > /mnt/s99-demo.txraven# echo s99-persist > /mnt/s99-demo.txtraven# echo s99-persist > /mnt/s99-demo.txt;raven# echo s99-persist > /mnt/s99-demo.txt; raven# echo s99-persist > /mnt/s99-demo.txt; eraven# echo s99-persist > /mnt/s99-demo.txt; ecraven# echo s99-persist > /mnt/s99-demo.txt; echraven# echo s99-persist > /mnt/s99-demo.txt; echoraven# echo s99-persist > /mnt/s99-demo.txt; echo raven# echo s99-persist > /mnt/s99-demo.txt; echo wraven# echo s99-persist > /mnt/s99-demo.txt; echo wrraven# echo s99-persist > /mnt/s99-demo.txt; echo wriraven# echo s99-persist > /mnt/s99-demo.txt; echo writraven# echo s99-persist > /mnt/s99-demo.txt; echo writeraven# echo s99-persist > /mnt/s99-demo.txt; echo write-raven# echo s99-persist > /mnt/s99-demo.txt; echo write-oraven# echo s99-persist > /mnt/s99-demo.txt; echo write-okraven# echo s99-persist > /mnt/s99-demo.txt; echo write-ok
+write-ok
+                                                                                /
+raven# raven# craven# caraven# catraven# cat raven# cat /raven# cat /mraven# cat /mnraven# cat /mntraven# cat /mnt/raven# cat /mnt/sraven# cat /mnt/s9raven# cat /mnt/s99raven# cat /mnt/s99-raven# cat /mnt/s99-draven# cat /mnt/s99-deraven# cat /mnt/s99-demraven# cat /mnt/s99-demoraven# cat /mnt/s99-demo.raven# cat /mnt/s99-demo.traven# cat /mnt/s99-demo.txraven# cat /mnt/s99-demo.txtraven# cat /mnt/s99-demo.txt;raven# cat /mnt/s99-demo.txt; raven# cat /mnt/s99-demo.txt; eraven# cat /mnt/s99-demo.txt; ecraven# cat /mnt/s99-demo.txt; echraven# cat /mnt/s99-demo.txt; echoraven# cat /mnt/s99-demo.txt; echo raven# cat /mnt/s99-demo.txt; echo rraven# cat /mnt/s99-demo.txt; echo reraven# cat /mnt/s99-demo.txt; echo rearaven# cat /mnt/s99-demo.txt; echo readraven# cat /mnt/s99-demo.txt; echo read-raven# cat /mnt/s99-demo.txt; echo read-oraven# cat /mnt/s99-demo.txt; echo read-okraven# cat /mnt/s99-demo.txt; echo read-ok
+s99-persist
+read-ok
+umount /mnt && echo umount-ok
+                                                                                /
+raven# raven# uraven# umraven# umoraven# umouraven# umounraven# umountraven# umount raven# umount /raven# umount /mraven# umount /mnraven# umount /mntraven# umount /mnt raven# umount /mnt &raven# umount /mnt &&raven# umount /mnt && raven# umount /mnt && eraven# umount /mnt && ecraven# umount /mnt && echraven# umount /mnt && echoraven# umount /mnt && echo raven# umount /mnt && echo uraven# umount /mnt && echo umraven# umount /mnt && echo umoraven# umount /mnt && echo umouraven# umount /mnt && echo umounraven# umount /mnt && echo umountraven# umount /mnt && echo umount-raven# umount /mnt && echo umount-oraven# umount /mnt && echo umount-okraven# umount /mnt && echo umount-ok
+umount-ok
+exit 0
+                                                                                /
+raven# raven# echo s99-persist > /mnt/s99-demo.txt; echo write-okraven# exraven# exiraven# exitraven# exit raven# exit 0raven# exit 0
+exit
+init exited (0)

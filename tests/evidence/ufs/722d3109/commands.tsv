@@ -1,0 +1,14 @@
+gate	command	cap_s	exit	duration_ms	result	artifact
+ufs-disk	cargo xtask qtest --case ufs-disk --arch x86_64	480	0	327149	PASS	serial/ufs-disk.log
+ufs-disk-persist	cargo xtask qtest --case ufs-disk-persist --arch x86_64 --no-build	300	0	58007	PASS	serial/ufs-disk-persist.log
+ufs-disk-ufs1	cargo xtask qtest --case ufs-disk-ufs1 --arch x86_64 --no-build	300	0	80527	PASS	serial/ufs-disk-ufs1.log
+ufs-root	cargo xtask qtest --case ufs-root --arch x86_64 --no-build	300	0	180051	PASS	serial/ufs-root.log
+ufs-root-persist	cargo xtask qtest --case ufs-root-persist --arch x86_64 --no-build	300	0	120013	PASS	serial/ufs-root-persist.log
+ufs-logout	cargo xtask qtest --case ufs-logout --arch x86_64 --no-build	150	0	90203	PASS	serial/ufs-logout.log
+disk-tools	cargo xtask qtest --case disk-tools --arch x86_64 --no-build	300	1	132496	FAIL	serial/disk-tools.log
+ufs-update	cargo xtask qtest --case ufs-update --arch x86_64 --no-build	300	0	189145	PASS	serial/ufs-update.log
+ufs-update-persist	cargo xtask qtest --case ufs-update-persist --arch x86_64 --no-build	200	0	127471	PASS	serial/ufs-update-persist.log
+ufs-full	cargo xtask qtest --case ufs-full --arch x86_64	600	0	180066	PASS	serial/ufs-full.log
+ufs-statfs	cargo xtask qtest --case ufs-statfs --arch x86_64 --no-build	300	0	180015	PASS	serial/ufs-statfs.log
+ufs-selftest	make ufs-selftest	180	0	1000	PASS	serial/ufs-selftest.log
+check-fast	make check-fast	300	0	22000	PASS	serial/check-fast.log
