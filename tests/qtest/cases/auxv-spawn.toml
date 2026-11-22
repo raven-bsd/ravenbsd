@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K526: two execs get distinct, nonzero AT_RANDOM values. The init spawns the child once; the
+# child carries the first vector bytes into a same-pid PROC_EXEC and compares them in the
+# replacement image. The same fixture also prints the final IDs and AT_SECURE in the setuid case.
+
+name = "auxv-spawn"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/setuid/build.sh auxv"]
+initfs = "build/fixtures/setuid/auxv-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^auxv-spawn: nonzero=1 distinct=1 prev=[0-9a-f]+ now=[0-9a-f]+$'
+
+[[expect]]
+regex = '^auxv-init: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|auxv-spawn: fail|auxv-init: fail'

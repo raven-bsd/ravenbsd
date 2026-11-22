@@ -17,10 +17,11 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
+    use alloc::boxed::Box;
     use alloc::collections::BTreeMap;
     use alloc::sync::Arc;
     use alloc::vec::Vec;
-    use core::sync::atomic::{AtomicU64, Ordering};
+    use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
     use raven_abi::errno::Errno;
     use raven_abi::types::clock;
@@ -29,7 +30,7 @@ mod program {
     use raven_ptyd::{Pairs, SignalSink};
     use raven_rt::entry;
     use raven_rt::sync::Mutex;
-    use raven_rt::sys::{clock_get, nanosleep};
+    use raven_rt::sys::{clock_get, futex_wait, futex_wake};
     use raven_rt::thread;
     use raven_scheme::{Completer, Ctx, Handler, HandlerError, HandlerResult, Opened, Server};
     use raven_tty_core::{VMIN, VTIME};
@@ -37,12 +38,10 @@ mod program {
     entry!(main);
 
     const PROC_SIGNAL: usize = 0x4A;
+    const PROC_TIMES: usize = 0x4C;
     const OP_SET_FG: u16 = 0x10;
     const OP_GET_FG: u16 = 0x11;
     const OP_HANGUP: u16 = 0x12;
-
-    /// Total deferred-reader poll iterations (1 ms apart), the idle-cost signal.
-    static READER_WAKES: AtomicU64 = AtomicU64::new(0);
 
     #[derive(Default)]
     struct TargetSignal;
@@ -74,104 +73,34 @@ mod program {
         })
     }
 
-    /// A deferred slave read: the server loop registers the capture buffer and returns. The write
-    /// path drains matching jobs immediately; the pending worker is only the timer/drain fallback.
-    struct ReadJob {
+    /// This process's `(user_ns, system_ns)`.
+    ///
+    /// `system_ns` is wall-inclusive for a blocking syscall (K508 accounts the whole syscall),
+    /// so only `user_ns` is used as an idle-CPU bound; the timer and server wait in the kernel.
+    fn cpu_times() -> (u64, u64) {
+        let mut values = [0u64; 4];
+        // SAFETY: PROC_TIMES writes four u64 words to this live array; the syscall reads only
+        // scalar arguments and never retains the pointer.
+        let raw = unsafe {
+            raven_rt::sys::syscall2(PROC_TIMES, values.as_mut_ptr() as usize, values.len())
+        };
+        if raw < 0 {
+            return (0, 0);
+        }
+        (values[0], values[1])
+    }
+
+    /// One slave read waiting for its own pair. The writer completes it; no worker polls.
+    struct DeferredRead {
         token: u64,
-        pair: u64,
+        /// Capture buffer mapped by the kernel for this deferred request.
         capture: usize,
         length: usize,
-        vtime: u64,
-        start: u64,
+        /// `VTIME` deadline in nanoseconds; zero means wait for data only.
+        vtime_ns: u64,
+        start_ns: u64,
         completer: Completer,
     }
-
-    /// Capture reads waiting for data or their VTIME deadline.
-    static PENDING: Mutex<Vec<ReadJob>> = Mutex::new(Vec::new());
-
-    /// Complete one pending job if its pair has data or its deadline elapsed.
-    ///
-    /// `Some(pair)` restricts the scan to the pair whose write just queued data; `None` is the
-    /// worker fallback for `VTIME`. The capture buffer is the kernel-owned deferred capture and
-    /// remains mapped until `Completer::complete`.
-    fn drain_pending(pairs: &Arc<Mutex<Pairs<TargetSignal>>>, only: Option<u64>) {
-        let mut pending = PENDING.lock();
-        let mut index = 0usize;
-        while index < pending.len() {
-            if only.is_some_and(|pair| pending[index].pair != pair) {
-                index = index.saturating_add(1);
-                continue;
-            }
-            // The timer worker only owns VTIME jobs; VMIN-only jobs are completed by the write
-            // drain and must not contend with the server loop every millisecond.
-            if only.is_none() && pending[index].vtime == 0 {
-                index = index.saturating_add(1);
-                continue;
-            }
-            let (pair, capture, length, vtime, start, token, completer) = {
-                let job = &pending[index];
-                (
-                    job.pair,
-                    job.capture,
-                    job.length,
-                    job.vtime,
-                    job.start,
-                    job.token,
-                    job.completer.clone(),
-                )
-            };
-            let result = {
-                let mut pty_pairs = pairs.lock();
-                match pty_pairs.get_mut(pair) {
-                    Some(pty) => {
-                        // SAFETY: the deferred capture stays mapped until `complete`; the slice
-                        // length is the caller's captured buffer length.
-                        let buffer =
-                            unsafe { core::slice::from_raw_parts_mut(capture as *mut u8, length) };
-                        Some(pty.read_slave(buffer))
-                    }
-                    None => None,
-                }
-            };
-            let completion = match result {
-                Some(Ok(count)) => Some(Ok(count)),
-                Some(Err(Errno::EAGAIN)) => {
-                    let limit =
-                        (vtime != 0).then_some(u64::from(vtime).saturating_mul(100_000_000));
-                    if let Some(limit) = limit
-                        && now_ns().saturating_sub(start) >= limit
-                    {
-                        Some(Ok(0))
-                    } else {
-                        None
-                    }
-                }
-                Some(Err(error)) => Some(Err(error)),
-                None => Some(Err(Errno::EBADF)),
-            };
-            if let Some(completion) = completion {
-                let _ = pending.remove(index);
-                let _ = completer.complete(token, completion);
-            } else {
-                index = index.saturating_add(1);
-            }
-        }
-    }
-
-    /// Timer/drain fallback for deferred reads.
-    fn pending_worker(_arg: usize) {
-        loop {
-            READER_WAKES.fetch_add(1, Ordering::Relaxed);
-            let pairs = HANDLER_PAIRS.lock().as_ref().cloned();
-            if let Some(pairs) = pairs {
-                drain_pending(&pairs, None);
-            }
-            let _ = nanosleep(1_000_000);
-        }
-    }
-
-    /// Pairs handle for the pending worker, set once at startup.
-    static HANDLER_PAIRS: Mutex<Option<Arc<Mutex<Pairs<TargetSignal>>>>> = Mutex::new(None);
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum Role {
@@ -186,24 +115,214 @@ mod program {
     }
 
     struct HandlerImpl {
-        pairs: Arc<Mutex<Pairs<TargetSignal>>>,
+        pairs: Pairs<TargetSignal>,
         files: BTreeMap<u64, FileEntry>,
         next: u64,
         completer: Option<Completer>,
+        /// One queue per pair: a writer completes only its own pair's blocked reads, while the
+        /// VTIME timer scans the same map from its own thread.
+        deferred: Arc<Mutex<BTreeMap<u64, Vec<DeferredRead>>>>,
+        /// Futex generation; the timer sleeps until the earliest VTIME deadline.
+        timer_wake: Arc<AtomicU32>,
+        timer_wakes: Arc<AtomicU64>,
+        /// `(user_ns, wall_ns, timer_wakes)` sampled when the 8th read blocks with VTIME=0.
+        idle_start: Option<(u64, u64, u64)>,
     }
 
     impl HandlerImpl {
         fn new() -> Self {
             Self {
-                pairs: Arc::new(Mutex::new(Pairs::new())),
+                pairs: Pairs::new(),
                 files: BTreeMap::new(),
                 next: 1,
                 completer: None,
+                deferred: Arc::new(Mutex::new(BTreeMap::new())),
+                timer_wake: Arc::new(AtomicU32::new(0)),
+                timer_wakes: Arc::new(AtomicU64::new(0)),
+                idle_start: None,
             }
         }
 
         fn file(&self, file: u64) -> Result<FileEntry, Errno> {
             self.files.get(&file).copied().ok_or(Errno::EBADF)
+        }
+
+        fn wake_timer(&self) {
+            self.timer_wake.fetch_add(1, Ordering::AcqRel);
+            let _ = futex_wake(self.timer_wake.as_ref(), 1);
+        }
+
+        fn defer_read(
+            &mut self,
+            pair: u64,
+            token: u64,
+            capture: usize,
+            length: usize,
+            vtime: u64,
+        ) -> Result<(), Errno> {
+            let Some(completer) = self.completer.clone() else {
+                return Err(Errno::EAGAIN);
+            };
+            let vtime_ns = vtime.saturating_mul(100_000_000);
+            let (total, all_data_only) = {
+                let mut map = self.deferred.lock();
+                map.entry(pair).or_default().push(DeferredRead {
+                    token,
+                    capture,
+                    length,
+                    vtime_ns,
+                    start_ns: now_ns(),
+                    completer,
+                });
+                let total: usize = map.values().map(Vec::len).sum();
+                let all_data_only = map.values().flatten().all(|job| job.vtime_ns == 0);
+                (total, all_data_only)
+            };
+            if vtime_ns != 0 {
+                self.wake_timer();
+            }
+            if total >= 8 && all_data_only {
+                self.idle_start = Some((
+                    cpu_times().0,
+                    now_ns(),
+                    self.timer_wakes.load(Ordering::Acquire),
+                ));
+            }
+            Ok(())
+        }
+
+        /// Complete this pair's blocked reads from data the writer just queued.
+        fn complete_pair(&mut self, pair: u64) {
+            let jobs = {
+                let mut map = self.deferred.lock();
+                map.remove(&pair)
+            };
+            let Some(jobs) = jobs else {
+                return;
+            };
+            let mut keep = Vec::new();
+            let mut completed = Vec::new();
+            let mut has_vtime = false;
+            for job in jobs {
+                if job.vtime_ns != 0 {
+                    has_vtime = true;
+                }
+                let Some(pty) = self.pairs.get_mut(pair) else {
+                    completed.push((job, Err(Errno::EBADF)));
+                    continue;
+                };
+                // SAFETY: the capture buffer stays mapped until this deferred token is
+                // completed; the job was removed from the shared queue under its lock, and
+                // the timer cannot see it until a non-empty keep vector is reinserted.
+                let buffer =
+                    unsafe { core::slice::from_raw_parts_mut(job.capture as *mut u8, job.length) };
+                match pty.read_slave(buffer) {
+                    Ok(count) => completed.push((job, Ok(count))),
+                    Err(Errno::EAGAIN) => keep.push(job),
+                    Err(error) => completed.push((job, Err(error))),
+                }
+            }
+            if !keep.is_empty() {
+                self.deferred.lock().insert(pair, keep);
+            }
+            if has_vtime {
+                self.wake_timer();
+            }
+            for (job, result) in completed {
+                let _ = job.completer.complete(job.token, result);
+            }
+            self.finish_idle();
+        }
+
+        /// Complete every blocked read for a pair (hangup/close), leaving no capture dangling.
+        fn complete_all(&mut self, pair: u64, result: Result<usize, Errno>) {
+            let jobs = {
+                let mut map = self.deferred.lock();
+                map.remove(&pair)
+            };
+            let Some(jobs) = jobs else {
+                return;
+            };
+            let has_vtime = jobs.iter().any(|job| job.vtime_ns != 0);
+            for job in jobs {
+                let _ = job.completer.complete(job.token, result);
+            }
+            if has_vtime {
+                self.wake_timer();
+            }
+            self.finish_idle();
+        }
+
+        /// Print the measured 8/16-pair idle window once the table has no deferred read.
+        fn finish_idle(&mut self) {
+            let empty = self.deferred.lock().is_empty();
+            if !empty {
+                return;
+            }
+            let Some((user0, wall0, wakes0)) = self.idle_start.take() else {
+                return;
+            };
+            let (user1, _) = cpu_times();
+            let wall1 = now_ns();
+            let wakes1 = self.timer_wakes.load(Ordering::Acquire);
+            raven_rt::eprintln!(
+                "ptyd: idle-window wall-ns={} user-ns={} timer-wakes={}",
+                wall1.saturating_sub(wall0),
+                user1.saturating_sub(user0),
+                wakes1.saturating_sub(wakes0)
+            );
+        }
+    }
+
+    struct TimerArgs {
+        jobs: Arc<Mutex<BTreeMap<u64, Vec<DeferredRead>>>>,
+        wake: Arc<AtomicU32>,
+        wakes: Arc<AtomicU64>,
+    }
+
+    fn timer_entry(raw: usize) {
+        // SAFETY: `raw` is the `Box::into_raw` from `main`; this thread owns it exactly once.
+        let args = unsafe { Box::from_raw(raw as *mut TimerArgs) };
+        timer_worker(args.jobs, args.wake, args.wakes)
+    }
+
+    /// VTIME timer: sleep on the futex until the earliest deadline; no polling loop.
+    fn timer_worker(
+        jobs: Arc<Mutex<BTreeMap<u64, Vec<DeferredRead>>>>,
+        wake: Arc<AtomicU32>,
+        wakes: Arc<AtomicU64>,
+    ) -> ! {
+        loop {
+            let expected = wake.load(Ordering::Acquire);
+            let now = now_ns();
+            let mut expired = Vec::new();
+            let mut next = None;
+            {
+                let mut map = jobs.lock();
+                for (_, list) in map.iter_mut() {
+                    let mut keep = Vec::new();
+                    for job in list.drain(..) {
+                        if job.vtime_ns != 0 && now.saturating_sub(job.start_ns) >= job.vtime_ns {
+                            expired.push(job);
+                        } else {
+                            if job.vtime_ns != 0 {
+                                let deadline = job.start_ns.saturating_add(job.vtime_ns);
+                                next =
+                                    Some(next.map_or(deadline, |value: u64| value.min(deadline)));
+                            }
+                            keep.push(job);
+                        }
+                    }
+                    *list = keep;
+                }
+                map.retain(|_, list| !list.is_empty());
+            }
+            for job in expired {
+                let _ = job.completer.complete(job.token, Ok(0));
+            }
+            let timeout = next.map(|deadline| deadline.saturating_sub(now_ns()).max(1));
+            let _ = futex_wait(wake.as_ref(), expected, timeout);
+            wakes.fetch_add(1, Ordering::Relaxed);
         }
     }
 
@@ -222,7 +341,7 @@ mod program {
                 "" | "master" => (0u64, Role::Master),
                 // `posix_openpt` opens the clone device; the server allocates the unit, then
                 // `fstat` gives the caller the pair id through the endpoint inode.
-                "ptmx" => (self.pairs.lock().alloc(), Role::Master),
+                "ptmx" => (self.pairs.alloc(), Role::Master),
                 "slave" => (0u64, Role::Slave),
                 _ => {
                     let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
@@ -240,7 +359,7 @@ mod program {
             if !readable && !writable {
                 return Err(Errno::EACCES.into());
             }
-            self.pairs.lock().open(pair);
+            self.pairs.open(pair);
             let id = self.next;
             self.next = self.next.wrapping_add(1);
             self.files.insert(id, FileEntry { pair, role });
@@ -249,16 +368,13 @@ mod program {
 
         fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
             let entry = self.file(file)?;
-            let mut pairs = self.pairs.lock();
-            let pty = pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
-            match entry.role {
-                Role::Master => pty
-                    .read_master(buffer)
-                    .map_err(raven_scheme::HandlerError::Errno),
-                Role::Slave => pty
-                    .read_slave(buffer)
-                    .map_err(raven_scheme::HandlerError::Errno),
+            let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+            let count = match entry.role {
+                Role::Master => pty.read_master(buffer),
+                Role::Slave => pty.read_slave(buffer),
             }
+            .map_err(HandlerError::Errno)?;
+            Ok(count)
         }
 
         fn read_with(
@@ -272,53 +388,48 @@ mod program {
             if entry.role == Role::Master || buffer.is_empty() {
                 return self.read(file, 0, buffer);
             }
-            let (vtime, vmin) = {
-                let mut pairs = self.pairs.lock();
-                let pty = pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+            let (vmin, vtime) = {
+                let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
                 match pty.read_slave(buffer) {
                     Ok(count) => return Ok(count),
                     Err(Errno::EAGAIN) => {}
                     Err(error) => return Err(HandlerError::Errno(error)),
                 }
                 let termios = pty.termios();
-                (u64::from(termios.cc(VTIME)), usize::from(termios.cc(VMIN)))
+                (usize::from(termios.cc(VMIN)), u64::from(termios.cc(VTIME)))
             };
             if vmin == 0 && vtime == 0 {
                 return Err(HandlerError::Errno(Errno::EAGAIN));
             }
-            let Some(completer) = self.completer.clone() else {
-                return Err(HandlerError::Errno(Errno::EAGAIN));
-            };
-            PENDING.lock().push(ReadJob {
-                token: ctx.token,
-                pair: entry.pair,
-                capture: buffer.as_mut_ptr() as usize,
-                length: buffer.len(),
+            self.defer_read(
+                entry.pair,
+                ctx.token,
+                buffer.as_mut_ptr() as usize,
+                buffer.len(),
                 vtime,
-                start: now_ns(),
-                completer,
-            });
+            )
+            .map_err(HandlerError::Errno)?;
             Err(HandlerError::Defer(ctx.token))
         }
 
         fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
             let entry = self.file(file)?;
             {
-                let mut pairs = self.pairs.lock();
-                let pty = pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+                let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
                 match entry.role {
                     Role::Master => pty.write_master(buffer),
                     Role::Slave => pty.write_slave(buffer),
                 }
             }
-            drain_pending(&self.pairs, Some(entry.pair));
+            if entry.role == Role::Master {
+                self.complete_pair(entry.pair);
+            }
             Ok(buffer.len())
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
             let entry = self.file(file)?;
-            let mut pairs = self.pairs.lock();
-            let pty = pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+            let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
             if request.len() < raven_proto_tty::CALL_LEN
                 || response.len() < raven_proto_tty::CALL_LEN
             {
@@ -345,7 +456,8 @@ mod program {
             }
             let arg0 = u32::from_le_bytes([request[4], request[5], request[6], request[7]]);
             let arg1 = u32::from_le_bytes([request[8], request[9], request[10], request[11]]);
-            match op {
+            let mut hangup = false;
+            let result = match op {
                 raven_proto_tty::OP_SET_MODE
                 | raven_proto_tty::OP_GET_MODE
                 | raven_proto_tty::OP_FLUSH => {
@@ -398,13 +510,18 @@ mod program {
                 OP_GET_FG => write_custom(response, OP_GET_FG, pty.fg() as u32, 0),
                 OP_HANGUP => {
                     pty.hangup();
+                    hangup = true;
                     write_custom(response, OP_HANGUP, 0, 0)
                 }
                 _ => {
                     let _ = arg1;
                     Err(Errno::ENOSYS.into())
                 }
+            };
+            if hangup {
+                self.complete_all(entry.pair, Ok(0));
             }
+            result
         }
 
         fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
@@ -423,28 +540,34 @@ mod program {
             let Some(entry) = self.files.remove(&file) else {
                 return Err(Errno::EBADF.into());
             };
-            let mut pairs = self.pairs.lock();
             // The kernel delivers CLOSE once the last duplicate of the slave is gone; from
-            // then on the master sees EOF instead of an empty read.
-            if entry.role == Role::Slave
+            // then on the master sees EOF instead of an empty read. Any deferred slave read
+            // is completed with 0 as well, so a hanging reader cannot outlive its pair.
+            let last_slave = entry.role == Role::Slave
                 && !self
                     .files
                     .values()
-                    .any(|other| other.pair == entry.pair && other.role == Role::Slave)
-                && let Some(pty) = pairs.get_mut(entry.pair)
-            {
-                pty.hangup();
+                    .any(|other| other.pair == entry.pair && other.role == Role::Slave);
+            if last_slave {
+                if let Some(pty) = self.pairs.get_mut(entry.pair) {
+                    pty.hangup();
+                }
+                self.complete_all(entry.pair, Ok(0));
             }
             // The donor releases the pty unit when its last endpoint closes; a pair that
             // survives every close is a leak that only shows up after many SSH sessions.
             if !self.files.values().any(|other| other.pair == entry.pair) {
-                pairs.remove(entry.pair);
+                self.complete_all(entry.pair, Ok(0));
+                self.pairs.remove(entry.pair);
                 if self.files.is_empty() {
-                    raven_rt::eprintln!("ptyd: files=0 pairs={}", pairs.len());
+                    let (user, system) = cpu_times();
+                    raven_rt::eprintln!("ptyd: files=0 pairs={}", self.pairs.len());
                     raven_rt::eprintln!(
-                        "ptyd: reader-wakes={}",
-                        READER_WAKES.load(Ordering::Relaxed)
+                        "ptyd: timer-wakes={}",
+                        self.timer_wakes.load(Ordering::Acquire)
                     );
+                    raven_rt::eprintln!("ptyd: user-ns={user}");
+                    raven_rt::eprintln!("ptyd: system-ns={system}");
                 }
             }
             Ok(())
@@ -469,9 +592,23 @@ mod program {
         };
         let mut handler = HandlerImpl::new();
         handler.completer = Some(server.completer());
-        *HANDLER_PAIRS.lock() = Some(Arc::clone(&handler.pairs));
-        let _ = thread::spawn(pending_worker, 0, 32 * 1024);
+        let timer_args = Box::new(TimerArgs {
+            jobs: Arc::clone(&handler.deferred),
+            wake: Arc::clone(&handler.timer_wake),
+            wakes: Arc::clone(&handler.timer_wakes),
+        });
+        let raw = Box::into_raw(timer_args) as usize;
+        if thread::spawn(timer_entry, raw, 32 * 1024).is_err() {
+            // SAFETY: the spawn failed, so no thread owns `raw`.
+            drop(unsafe { Box::from_raw(raw as *mut TimerArgs) });
+            raven_rt::eprintln!("ptyd: timer spawn failed");
+            return 1;
+        }
+        let (user, system) = cpu_times();
         raven_rt::eprintln!("ptyd: files=0 pairs=0");
+        raven_rt::eprintln!("ptyd: timer-wakes=0");
+        raven_rt::eprintln!("ptyd: user-ns={user}");
+        raven_rt::eprintln!("ptyd: system-ns={system}");
         loop {
             if let Some(packet) = server.poll(None) {
                 let _ = server.dispatch(packet, &mut handler);

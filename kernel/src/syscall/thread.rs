@@ -9,7 +9,7 @@ use core::sync::atomic::Ordering;
 use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
-use raven_abi::signal::{CONTEXT_AREA_LIMIT, ENTRY_SP, FaultRecord, MContext};
+use raven_abi::signal::{CONTEXT_AREA_LIMIT, ENTRY_SP, FaultRecord, MContext, SIG_SETUP_ABS};
 use raven_abi::syscall::{THREAD_CREATE_EX, ThreadCreateEx};
 use raven_abi::types::{Handle, Rights, prot};
 use raven_usercopy::{UserSlice, is_user_address};
@@ -337,17 +337,30 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
     let entry = frame.rdi;
     let offset = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
-    if flags & !ENTRY_SP != 0 {
+    if flags & !(ENTRY_SP | SIG_SETUP_ABS) != 0 {
         return Err(Errno::EINVAL);
     }
     let context_size = size_of::<MContext>().saturating_add(size_of::<FaultRecord>());
-    match offset.checked_add(context_size) {
-        Some(end) if end <= CONTEXT_AREA_LIMIT => {}
-        _ => return Err(Errno::EINVAL),
-    }
-    if offset & 0xf != 0 {
-        return Err(Errno::EINVAL);
-    }
+    // An absolute area is a dedicated user page for a thread whose TLS mapping has no tail
+    // (K443). The legacy relative form stays bound to the 64 KiB TLS window.
+    let (context_offset, context_absolute) = if flags & SIG_SETUP_ABS != 0 {
+        if offset == 0 || offset & 0xf != 0 || !is_user_address(offset as u64) {
+            return Err(Errno::EFAULT);
+        }
+        if UserSlice::new(offset as u64, context_size as u64).is_err() {
+            return Err(Errno::EFAULT);
+        }
+        (0, offset as u64)
+    } else {
+        match offset.checked_add(context_size) {
+            Some(end) if end <= CONTEXT_AREA_LIMIT => {}
+            _ => return Err(Errno::EINVAL),
+        }
+        if offset & 0xf != 0 {
+            return Err(Errno::EINVAL);
+        }
+        (offset, 0)
+    };
     if !is_user_address(entry) {
         return Err(Errno::EFAULT);
     }
@@ -361,7 +374,10 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     thread
         .signal_ctx_offset
-        .store(offset as u64, Ordering::Release);
+        .store(context_offset as u64, Ordering::Release);
+    thread
+        .signal_ctx_abs
+        .store(context_absolute, Ordering::Release);
     thread.signal_flags.store(flags, Ordering::Release);
     thread.signal_entry.store(entry, Ordering::Release);
     Ok(0)
@@ -404,9 +420,15 @@ fn signal_target(
     if entry == 0 {
         return None;
     }
+    let absolute = thread.signal_ctx_abs.load(Ordering::Acquire);
     let offset = thread.signal_ctx_offset.load(Ordering::Acquire);
-    let Some(ctx) = thread.tls_base().checked_add(offset) else {
-        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    let ctx = if absolute != 0 {
+        absolute
+    } else {
+        let Some(ctx) = thread.tls_base().checked_add(offset) else {
+            process::exit_process(Errno::EFAULT.to_ret() as i32);
+        };
+        ctx
     };
     let size = size_of::<MContext>().saturating_add(size_of::<FaultRecord>());
     if UserSlice::new(ctx, size as u64).is_err() {
