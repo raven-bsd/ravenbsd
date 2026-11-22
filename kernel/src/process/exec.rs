@@ -240,6 +240,7 @@ fn process_errno(error: ProcessError) -> Errno {
         | ProcessError::Handle(_)
         | ProcessError::Sched(_) => Errno::ENOMEM,
         ProcessError::ArgTooLong => Errno::E2BIG,
+        ProcessError::NoEntropy => Errno::EAGAIN,
         ProcessError::BadAddress => Errno::EINVAL,
         ProcessError::NoInit => Errno::ENOENT,
     }

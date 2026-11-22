@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K524 negative: `entropy=off` leaves the pool unseeded even though RDRAND exists. The pre-seed
+# self-test proves GETRANDOM is a defined failure, and start_init must fail AT_RANDOM with the
+# same no-source error instead of falling back to the old RDRAND/xorshift path.
+name = "random-getrandom"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1 entropy=off random-selftest=pre-seed"
+qemu_extra = []
+expect_exit = "failure"
+
+[[expect]]
+regex = '^entropy-selftest: pre-seed=Unseeded$'
+
+[[expect]]
+regex = '^entropy: source=none$'
+
+[[expect]]
+regex = '^kernel: error: no hardware entropy source$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

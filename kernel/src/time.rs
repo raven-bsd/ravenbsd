@@ -6,8 +6,8 @@
 //! The monotonic clock counts from the architecture counter and the timer tick counter; the wall
 //! clock (`CLOCK_REALTIME`) is the platform RTC read lazily on first use plus the monotonic
 //! elapsed time, and the entropy pool feeds `GETRANDOM`/`AT_RANDOM`. The RTC and the pool are
-//! wired here because the platform RTC lives in [`rtc`] and the pool needs the monotonic counter
-//! for its jitter fallback.
+//! wired here because the platform RTC lives in [`rtc`] and the pool is seeded from the platform
+//! DRNG during timer initialisation, before userspace starts.
 //!
 //! x86-64 uses the TSC with a calibrated scale; aarch64 uses `CNTPCT_EL0` with the frequency from
 //! `CNTFRQ_EL0` (or `BootInfo.counter_freq`). Both expose the same interface to the scheduler and
@@ -24,6 +24,7 @@ use raven_timemath::{self, Scale};
 use crate::arch::aarch64::timer as arch_timer;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::{apic, tsc};
+use crate::cmdline::CmdLine;
 use crate::sync::IrqSpinLock;
 use crate::{boot, kprintln};
 
@@ -90,6 +91,7 @@ pub fn init(counter_hz: u64, boot_counter: u64) {
         BOOT_COUNTER.store(boot_counter, Ordering::Release);
     }
     cyclic_selftest();
+    entropy_init();
 }
 
 /// Nanoseconds since [`init`].
@@ -434,18 +436,19 @@ pub fn tsc_hz() -> u64 {
 // Entropy
 // ---------------------------------------------------------------------------
 
-/// The global pool, seeded lazily on the first `GETRANDOM`.
-static ENTROPY_POOL: IrqSpinLock<Option<raven_entropy::Pool>> = IrqSpinLock::new(None);
-/// Whether the pool has been seeded (a benign fast path; double-init is harmless).
-static ENTROPY_READY: AtomicBool = AtomicBool::new(false);
+/// The one boot-seeded pool. Every `GETRANDOM` and every `AT_RANDOM` draws from it.
+static ENTROPY_POOL: IrqSpinLock<raven_entropy::Pool> =
+    IrqSpinLock::new(raven_entropy::Pool::new());
+/// Set once by [`entropy_init`]; prevents a second lazy seed race.
+static ENTROPY_INIT: AtomicBool = AtomicBool::new(false);
 
-/// The entropy source the pool was seeded from.
+/// The hardware source that seeded the pool at boot.
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)] // Variants are arch-gated, so one is always unused on a given architecture.
 enum EntropySource {
     Rdrand,
     Rndr,
-    Jitter,
+    None,
 }
 
 impl EntropySource {
@@ -453,76 +456,104 @@ impl EntropySource {
         match self {
             EntropySource::Rdrand => "rdrand",
             EntropySource::Rndr => "rndr",
-            EntropySource::Jitter => "jitter",
+            EntropySource::None => "none",
         }
     }
 }
 
-/// Fill `out` with pool bytes, seeding the pool on first use.
+/// Sample the platform DRNG once, before userspace exists, and report the source once.
 ///
-/// Never blocks: the pool is seeded from a hardware source when present (RDRAND/RNDR) and from
-/// timer jitter otherwise, and a reseed from jitter covers a pool that has exhausted its budget.
-/// Returns the pool error mapped by the caller to a defined errno when no source can be sampled.
+/// There is no timer-jitter fallback and no second lazy seed race. If the platform has no
+/// hardware source the pool stays unseeded: `GETRANDOM` returns `EAGAIN`, and exec fails with
+/// the same defined error because `AT_RANDOM` uses the same pool.
+pub fn entropy_init() {
+    if ENTROPY_INIT.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let cmdline = CmdLine::parse(crate::memory::paging::cmdline());
+    if cmdline.get("random-selftest") == Some("pre-seed") {
+        let mut probe = [0u8; 4];
+        match entropy_fill(&mut probe) {
+            Ok(_) => kprintln!("entropy-selftest: pre-seed=seeded"),
+            Err(raven_entropy::Error::Unseeded) => {
+                kprintln!("entropy-selftest: pre-seed=Unseeded")
+            }
+            Err(_) => kprintln!("entropy-selftest: pre-seed=error"),
+        }
+    }
+    if cmdline.get("entropy") == Some("off") {
+        kprintln!("entropy: source=none");
+        return;
+    }
+    match hardware_seed() {
+        Some((source, mut seed)) => {
+            let result = ENTROPY_POOL
+                .lock()
+                .stir(raven_entropy::SeedSource::Hardware, &seed);
+            wipe(&mut seed);
+            match result {
+                Ok(()) => kprintln!("entropy: source={}", source.name()),
+                Err(_) => kprintln!("entropy: source=none"),
+            }
+        }
+        None => kprintln!("entropy: source=none"),
+    }
+}
+
+/// Fill `out` from the boot-seeded pool.
+///
+/// A drained randomized re-key interval samples the hardware source again and stirs it; no jitter
+/// is ever used. An unseeded pool or the absence of a hardware source is a defined error for the
+/// caller (`EAGAIN` for `GETRANDOM`, exec failure for `AT_RANDOM`).
 pub fn entropy_fill(out: &mut [u8]) -> Result<usize, raven_entropy::Error> {
-    ensure_entropy();
-    let mut guard = ENTROPY_POOL.lock();
-    let pool = match guard.as_mut() {
-        Some(pool) => pool,
-        None => return Err(raven_entropy::Error::Unseeded),
-    };
+    let mut pool = ENTROPY_POOL.lock();
     match pool.fill(out) {
         Ok(written) => Ok(written),
         Err(raven_entropy::Error::NeedsReseed) => {
-            jitter_entropy(pool);
+            let Some((_, mut seed)) = hardware_seed() else {
+                return Err(raven_entropy::Error::NeedsReseed);
+            };
+            let result = pool.stir(raven_entropy::SeedSource::Hardware, &seed);
+            wipe(&mut seed);
+            result?;
             pool.fill(out)
         }
         Err(error) => Err(error),
     }
 }
 
-/// Seed the pool once; the race between two first-time callers is benign (both produce a valid
-/// seeded pool and one wins).
-fn ensure_entropy() {
-    if ENTROPY_READY.load(Ordering::Acquire) {
-        return;
-    }
-    let mut pool = raven_entropy::Pool::new();
-    let source = sample_entropy(&mut pool);
-    *ENTROPY_POOL.lock() = Some(pool);
-    ENTROPY_READY.store(true, Ordering::Release);
-    kprintln!("entropy: source={}", source.name());
-}
-
-/// Sample a hardware entropy source, falling back to timer jitter.
-fn sample_entropy(pool: &mut raven_entropy::Pool) -> EntropySource {
+/// Sample the platform DRNG once. No timer jitter and no software fallback.
+fn hardware_seed() -> Option<(EntropySource, [u8; raven_entropy::SEED_SIZE])> {
     #[cfg(target_arch = "x86_64")]
-    if let Some(bytes) = rdrand_entropy() {
-        pool.add_entropy(&bytes);
-        return EntropySource::Rdrand;
+    if let Some(seed) = rdrand_seed() {
+        return Some((EntropySource::Rdrand, seed));
     }
     #[cfg(target_arch = "aarch64")]
-    if let Some(bytes) = rndr_entropy() {
-        pool.add_entropy(&bytes);
-        return EntropySource::Rndr;
+    if let Some(seed) = rndr_seed() {
+        return Some((EntropySource::Rndr, seed));
     }
-    jitter_entropy(pool);
-    EntropySource::Jitter
+    None
 }
 
-/// Read 64 bytes from RDRAND when the CPUID feature bit is present.
+/// Clear seed material in a way the optimizer does not discard.
+fn wipe(bytes: &mut [u8]) {
+    bytes.fill(0);
+    core::hint::black_box(bytes);
+}
+
+/// Read one 40-byte seed from RDRAND when CPUID.1:ECX[30] is set.
 #[cfg(target_arch = "x86_64")]
-fn rdrand_entropy() -> Option<[u8; 64]> {
+fn rdrand_seed() -> Option<[u8; raven_entropy::SEED_SIZE]> {
     // RDRAND is present when CPUID.1:ECX[30] is set.
     let features = core::arch::x86_64::__cpuid(1);
     if features.ecx & (1 << 30) == 0 {
         return None;
     }
-    let mut bytes = [0u8; 64];
-    for chunk in bytes.chunks_exact_mut(8) {
-        let value = rdrand64()?;
-        chunk.copy_from_slice(&value.to_le_bytes());
+    let mut seed = [0u8; raven_entropy::SEED_SIZE];
+    for chunk in seed.chunks_exact_mut(8) {
+        chunk.copy_from_slice(&rdrand64()?.to_le_bytes());
     }
-    Some(bytes)
+    Some(seed)
 }
 
 /// One RDRAND word with a short retry loop (RDRAND may set CF=0 under contention).
@@ -549,14 +580,14 @@ fn rdrand64() -> Option<u64> {
     None
 }
 
-/// Read 64 bytes from RNDR when the architecture feature is present.
+/// Read one 40-byte seed from RNDR when the architecture feature is present.
 #[cfg(target_arch = "aarch64")]
-fn rndr_entropy() -> Option<[u8; 64]> {
+fn rndr_seed() -> Option<[u8; raven_entropy::SEED_SIZE]> {
     if !rndr_available() {
         return None;
     }
-    let mut bytes = [0u8; 64];
-    for chunk in bytes.chunks_exact_mut(8) {
+    let mut seed = [0u8; raven_entropy::SEED_SIZE];
+    for chunk in seed.chunks_exact_mut(8) {
         let mut value: u64;
         // SAFETY: RNDR is a read-only system register enabled by the `ID_AA64ISAR0_EL1` check in
         // `rndr_available`; it has no memory side effects.
@@ -569,7 +600,7 @@ fn rndr_entropy() -> Option<[u8; 64]> {
         }
         chunk.copy_from_slice(&value.to_le_bytes());
     }
-    Some(bytes)
+    Some(seed)
 }
 
 /// Whether the CPU implements RNDR (`ID_AA64ISAR0_EL1[63:60] == 1`).
@@ -585,24 +616,4 @@ fn rndr_available() -> bool {
         );
     }
     (isar >> 60) & 0xf == 1
-}
-
-/// Fallback entropy from timer jitter.
-///
-/// Samples the low bits of the monotonic clock delta between tightly spaced reads. This is a
-/// weak, possibly observable source: it keeps boot and early userspace from blocking but is
-/// **not** cryptographically strong, exactly as documented in `raven-entropy`.
-fn jitter_entropy(pool: &mut raven_entropy::Pool) {
-    let mut bytes = [0u8; 64];
-    let mut previous = now_ns();
-    for chunk in bytes.chunks_exact_mut(2) {
-        for _ in 0..16 {
-            core::hint::spin_loop();
-        }
-        let current = now_ns();
-        let delta = current.saturating_sub(previous);
-        previous = current;
-        chunk.copy_from_slice(&(delta as u16).to_le_bytes());
-    }
-    pool.add_entropy(&bytes);
 }

@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K524: AT_RANDOM and GETRANDOM come from the same boot-seeded K523 pool. The probe runs the
+# pre-seed self-test before the hardware source is stirred, then eight self-execs: each exec must
+# get a fresh AT_RANDOM and a fresh GETRANDOM stream. A PROC_FORK child inherits the AT_RANDOM
+# bytes but draws different GETRANDOM bytes from the shared pool.
+name = "random-at-random"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/random/build.sh"]
+initfs = "build/fixtures/random/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 random-selftest=pre-seed"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^entropy-selftest: pre-seed=Unseeded$'
+
+[[expect]]
+regex = '^entropy: source=rdrand$'
+
+[[expect]]
+regex = '^random: at-random nonzero=1$'
+
+[[expect]]
+regex = '^random: getrandom nonzero=1 at-random-differs=1$'
+
+[[expect]]
+regex = '^random: getrandom zero-len=0 invalid-flags=1$'
+
+[[expect]]
+regex = '^random: fork at-random-inherited=1 getrandom-differs=1$'
+
+[[expect]]
+regex = '^random: exec-start$'
+
+[[expect]]
+regex = '^random: exec at-random-distinct=8 getrandom-distinct=8$'
+
+[[expect]]
+regex = '^random: pass$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|random: FAIL'

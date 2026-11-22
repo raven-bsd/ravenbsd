@@ -44,12 +44,8 @@ use crate::arch::aarch64::ipc::{
 };
 #[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::syscall as arch_syscall;
-#[cfg(target_arch = "aarch64")]
-use crate::arch::aarch64::timer;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::syscall as arch_syscall;
-#[cfg(target_arch = "x86_64")]
-use crate::arch::x86_64::tsc;
 use crate::cmdline::CmdLine;
 use crate::initfs;
 #[cfg(target_arch = "x86_64")]
@@ -367,6 +363,8 @@ pub enum ProcessError {
     Handle(Errno),
     /// The argv/envp strings exceed `ARG_MAX` or the stack block.
     ArgTooLong,
+    /// The pool has no hardware seed; the same failure as an unseeded `GETRANDOM`.
+    NoEntropy,
     /// A virtual address was not canonical or an arithmetic operation overflowed.
     BadAddress,
     /// The ELF declared an interpreter.
@@ -384,6 +382,7 @@ impl fmt::Display for ProcessError {
             ProcessError::OutOfFrames => f.write_str("out of frames for the init process"),
             ProcessError::Handle(error) => write!(f, "handle setup failed: {error:?}"),
             ProcessError::ArgTooLong => f.write_str("argument list too long"),
+            ProcessError::NoEntropy => f.write_str("no hardware entropy source"),
             ProcessError::BadAddress => f.write_str("invalid user address"),
             ProcessError::Interpreter => f.write_str("init ELF has a PT_INTERP"),
             ProcessError::Sched(error) => write!(f, "scheduler setup failed: {error:?}"),
@@ -1236,7 +1235,7 @@ fn build_stack(
     let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
     let mut cursor = buffer.len();
 
-    let random = random16();
+    let random = random16()?;
     let random_start = cursor
         .checked_sub(random.len())
         .ok_or(ProcessError::ArgTooLong)?;
@@ -1435,80 +1434,10 @@ fn write_word(buffer: &mut [u8], cursor: &mut usize, value: u64) -> Result<(), P
     Ok(())
 }
 
-fn random16() -> [u8; 16] {
+fn random16() -> Result<[u8; 16], ProcessError> {
     let mut bytes = [0u8; 16];
-    #[cfg(target_arch = "x86_64")]
-    {
-        let features = core::arch::x86_64::__cpuid(1);
-        if features.ecx & (1 << 30) != 0 {
-            let mut chunk_index = 0usize;
-            while chunk_index < 2 {
-                let mut attempt: u32 = 0;
-                let mut filled = false;
-                while attempt < 10 {
-                    let value: u64;
-                    let ok: u8;
-                    // SAFETY: `rdrand` is available per CPUID.1:ECX[30] and has no memory side
-                    // effects. `setc` records the success flag.
-                    unsafe {
-                        core::arch::asm!(
-                            "rdrand {value}",
-                            "setc {ok}",
-                            value = out(reg) value,
-                            ok = out(reg_byte) ok,
-                            options(nomem, nostack),
-                        );
-                    }
-                    if ok != 0 {
-                        let start = chunk_index.saturating_mul(8);
-                        if let Some(slot) = bytes.get_mut(start..start.saturating_add(8)) {
-                            slot.copy_from_slice(&value.to_le_bytes());
-                        }
-                        filled = true;
-                        break;
-                    }
-                    attempt = attempt.saturating_add(1);
-                }
-                if !filled {
-                    break;
-                }
-                chunk_index = chunk_index.saturating_add(1);
-            }
-            if chunk_index == 2 {
-                return bytes;
-            }
-        }
-    }
-
-    let mut state = entropy_seed() ^ 0x9E37_79B9_7F4A_7C15;
-    let mut index = 0usize;
-    while index < bytes.len() {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        let word = state.to_le_bytes();
-        let end = index.saturating_add(8).min(bytes.len());
-        if let Some(slot) = bytes.get_mut(index..end) {
-            let copy = end.saturating_sub(index);
-            if let Some(source) = word.get(..copy) {
-                slot.copy_from_slice(source);
-            }
-        }
-        index = end;
-    }
-    bytes
-}
-
-/// Non-cryptographic fallback entropy: the architecture's free-running counter.
-#[cfg(target_arch = "x86_64")]
-fn entropy_seed() -> u64 {
-    tsc::read()
-}
-
-/// Non-cryptographic fallback entropy: the generic-timer physical counter.
-#[cfg(target_arch = "aarch64")]
-fn entropy_seed() -> u64 {
-    timer::read_counter()
+    crate::time::entropy_fill(&mut bytes).map_err(|_| ProcessError::NoEntropy)?;
+    Ok(bytes)
 }
 
 /// The ELF machine of the running kernel.

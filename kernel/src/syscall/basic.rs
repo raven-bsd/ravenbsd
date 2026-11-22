@@ -27,9 +27,10 @@ use crate::usercopy::{copy_from_user, copy_to_user};
 pub const GETRANDOM: usize = 0x08;
 /// `clock_set(clock_id: u32, ts: *const Timespec) -> 0` syscall number (reviewer-assigned, S72).
 pub const CLOCK_SET: usize = 0x09;
-/// `getrandom` flag: the kernel never blocks on entropy, so this is accepted and ignored.
+/// `getrandom` flag: accepted; boot seeding already completed before userspace, so the thread
+/// does not sleep. A platform without a hardware source still returns `EAGAIN`.
 pub const GRND_NONBLOCK: u32 = 1;
-/// `getrandom` flag: the single pool serves both requests, so this is accepted and ignored.
+/// `getrandom` flag: accepted; the boot-seeded pool serves both requests.
 pub const GRND_RANDOM: u32 = 2;
 
 /// Dispatch one decoded syscall.
@@ -131,12 +132,15 @@ pub fn clock_set(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
-/// `GETRANDOM`: fill a user buffer from the kernel entropy pool.
+/// `GETRANDOM`: fill a user buffer from the boot-seeded kernel entropy pool.
 ///
-/// Never blocks. The pool is seeded on first use from a hardware source or timer jitter; when
-/// neither can be sampled the call returns `EAGAIN`. `flags` is accepted and ignored (the kernel
-/// does not block on entropy, so `GRND_NONBLOCK` is a no-op). The length is capped at
-/// `0x1FFF_FFFF` like Linux.
+/// The pool is seeded once during timer initialisation from RDRAND/RNDR, before any userspace
+/// exists. There is no timer-jitter fallback and no lazy seed race. If the platform has no
+/// hardware source the pool stays unseeded and the call returns `EAGAIN`; the same error is
+/// returned when the randomized re-key interval is exhausted and no hardware source is available
+/// to stir a fresh seed. `GRND_NONBLOCK` and `GRND_RANDOM` are accepted (the syscall does not
+/// sleep because boot sampling precedes userspace); both draw from the same pool. The length is
+/// capped at `0x1FFF_FFFF` like Linux.
 pub fn getrandom(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let flags = frame.rdx as u32;

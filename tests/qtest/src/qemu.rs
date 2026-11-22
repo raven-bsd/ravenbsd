@@ -116,6 +116,8 @@ pub(crate) fn qemu_command(
             for argument in [
                 "-machine",
                 "q35",
+                "-cpu",
+                "qemu64,+rdrand",
                 "-m",
                 "512M",
                 "-smp",
@@ -147,12 +149,13 @@ pub(crate) fn qemu_command(
         }
         "aarch64" => {
             // GICv2 matches the Pi 4 GIC-400 this driver targets; the default `virt` GICv3
-            // would exercise a different device.
+            // would exercise a different device. `max` exposes RNDR so the boot entropy source
+            // is real hardware; the Pi 4 RNG200 is a platform-server source, not kernel boot.
             for argument in [
                 "-M",
                 "virt,gic-version=2",
                 "-cpu",
-                "cortex-a72",
+                "max",
                 "-m",
                 "512M",
                 "-nographic",
@@ -254,6 +257,8 @@ mod tests {
             vec![
                 "-machine",
                 "q35",
+                "-cpu",
+                "qemu64,+rdrand",
                 "-m",
                 "512M",
                 "-smp",
@@ -325,7 +330,7 @@ mod tests {
                 "-M",
                 "virt,gic-version=2",
                 "-cpu",
-                "cortex-a72",
+                "max",
                 "-m",
                 "512M",
                 "-nographic",
