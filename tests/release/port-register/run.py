@@ -77,7 +77,13 @@ PROPOSED_TITLE = {
     "K451": "libc ABI descriptor behaviour tests (misc/poll/stat/time)",
     "K452": "kernel donor-file behaviour tests",
     "K453": "crate donor-file behaviour tests",
-    "K454": "userland donor-file behaviour tests",
+    "K454": "libc ABI group coverage: misc/poll/stat/time descriptors",
+}
+CLOSED_BY = {
+    "libc/ravenlibc/abi/misc.toml": "K454",
+    "libc/ravenlibc/abi/poll.toml": "K454",
+    "libc/ravenlibc/abi/stat.toml": "K454",
+    "libc/ravenlibc/abi/time.toml": "K454",
 }
 
 
@@ -348,7 +354,7 @@ def build_rows() -> List[Dict[str, str]]:
         status, evidence, basis = classify(path, index)
         meta = donors[path]
         owner = owner_for(path)
-        proposed = PROPOSED[area] if status == "NONE" else "-"
+        proposed = CLOSED_BY.get(path) or (PROPOSED[area] if status == "NONE" else "-")
         rows.append(
             {
                 "file": path,
@@ -405,8 +411,12 @@ def render_doc(rows: List[Dict[str, str]]) -> str:
     total_indirect = sum(row[3] for row in table)
     total_none = sum(row[4] for row in table)
     none_rows = [row for row in rows if row["status"] == "NONE"]
+    closed_rows = [
+        row for row in rows
+        if row["status"] != "NONE" and row["proposed_ticket"] in CLOSED_BY.values()
+    ]
     proposed: Dict[str, List[str]] = {}
-    for row in none_rows:
+    for row in none_rows + closed_rows:
         proposed.setdefault(row["proposed_ticket"], []).append(row["file"])
 
     lines = [
@@ -465,6 +475,22 @@ def render_doc(rows: List[Dict[str, str]]) -> str:
             lines.append(
                 f"| `{row['file']}` | {row['owner']} | {row['proposed_ticket']} |"
             )
+    else:
+        lines.append("| - | - | - |")
+    lines.extend(
+        [
+            "",
+            "## Closed by K454",
+            "",
+            "The four libc ABI descriptors that were NONE in the K450 register now have a named test:",
+            "",
+            "| File | Status | Test |",
+            "|---|---|---|",
+        ]
+    )
+    if closed_rows:
+        for row in closed_rows:
+            lines.append(f"| `{row['file']}` | {row['status']} | `{row['evidence']}` |")
     else:
         lines.append("| - | - | - |")
     lines.extend(["", "## Proposed tickets", ""])
