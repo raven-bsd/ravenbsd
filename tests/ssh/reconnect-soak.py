@@ -20,6 +20,7 @@ run; the frozen product evidence tree is never touched). No QEMU-free shortcut, 
 
 Usage: python3 tests/ssh/reconnect-soak.py [--sessions N] [--batch N] [--session-timeout S]
                                            [--tty-sessions N] [--keep-going] [--image PATH]
+                                           [--net tap|user]
 Exit: 0 when every session passes, 1 when a session fails, 2 for setup problems.
 """
 
@@ -64,6 +65,7 @@ def parse_args(argv: list[str]) -> dict:
         "tty_sessions": 0,
         "keep_going": False,
         "image": IMAGE,
+        "net": "tap",
     }
     index = 0
     while index < len(argv):
@@ -85,6 +87,9 @@ def parse_args(argv: list[str]) -> dict:
             index += 1
         elif arg == "--image" and index + 1 < len(argv):
             options["image"] = Path(argv[index + 1])
+            index += 2
+        elif arg == "--net" and index + 1 < len(argv):
+            options["net"] = argv[index + 1]
             index += 2
         elif arg in ("-h", "--help"):
             print(__doc__)
@@ -141,8 +146,19 @@ def kill(child: subprocess.Popen) -> None:
     child.wait()
 
 
-def boot(run: Path, image: Path) -> tuple[subprocess.Popen, Path]:
-    ensure_tap()
+def boot(run: Path, image: Path, net: str) -> tuple[subprocess.Popen, Path, str, int]:
+    host, port = HOST, 22
+    if net == "tap":
+        ensure_tap()
+        netdev = f"tap,id=n0,ifname={TAP},script=no,downscript=no"
+    elif net == "user":
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        host = "127.0.0.1"
+        netdev = f"user,id=n0,hostfwd=tcp:127.0.0.1:{port}-:22"
+    else:
+        raise RuntimeError(f"unknown --net {net} (tap or user)")
     boot_dir = run / "boot"
     boot_dir.mkdir(parents=True, exist_ok=True)
     vars_path = boot_dir / "vars.fd"
@@ -158,7 +174,7 @@ def boot(run: Path, image: Path) -> tuple[subprocess.Popen, Path]:
         "-drive", f"format=raw,file={image}",
         "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
         "-nic", "none",
-        "-netdev", f"tap,id=n0,ifname={TAP},script=no,downscript=no",
+        "-netdev", netdev,
         "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     ]
     qemu_err = boot_dir / "qemu.err"
@@ -176,21 +192,22 @@ def boot(run: Path, image: Path) -> tuple[subprocess.Popen, Path]:
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((HOST, 22), timeout=1):
-                return child, serial
+            with socket.create_connection((host, port), timeout=1):
+                return child, serial, host, port
         except OSError:
             time.sleep(0.5)
     kill(child)
     raise RuntimeError("guest TCP 22 never listened")
 
 
-def ssh_argv(marker: str, tty: bool) -> list[str]:
+def ssh_argv(marker: str, tty: bool, host: str, port: int) -> list[str]:
     command = "tty" if tty else f"echo {marker}"
     argv = ["ssh"]
     if tty:
         argv.append("-tt")
     argv += [
         "-v",
+        "-p", str(port),
         "-o", "StrictHostKeyChecking=no",
         "-o", "UserKnownHostsFile=/dev/null",
         "-o", "PreferredAuthentications=password",
@@ -198,13 +215,14 @@ def ssh_argv(marker: str, tty: bool) -> list[str]:
         "-o", "KbdInteractiveAuthentication=no",
         "-o", "NumberOfPasswordPrompts=1",
         "-o", "ConnectTimeout=8",
-        f"{USER}@{HOST}",
+        f"{USER}@{host}",
         command,
     ]
     return argv
 
 
-def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool) -> dict:
+def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool,
+                host: str, port: int) -> dict:
     log = run / f"session-{number}.ssh.log"
     out_path = run / f"session-{number}.stdout"
     env = dict(os.environ)
@@ -214,7 +232,7 @@ def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool) 
     started = time.monotonic()
     with open(log, "wb") as log_file, open(out_path, "wb") as out_file:
         child = subprocess.Popen(
-            ssh_argv(marker, tty), cwd=ROOT, stdin=subprocess.DEVNULL,
+            ssh_argv(marker, tty, host, port), cwd=ROOT, stdin=subprocess.DEVNULL,
             stdout=out_file, stderr=log_file, env=env, start_new_session=True,
         )
         timed_out = False
@@ -276,12 +294,17 @@ def main(argv: list[str]) -> int:
     failures = 0
     child = None
     try:
-        child, serial = boot(run, image)
-        print(f"reconnect-soak: booted; hygiene after boot: {hygiene()}")
+        child, serial, host, port = boot(run, image, options["net"])
+        print(
+            f"reconnect-soak: booted net={options['net']} target={host}:{port}; "
+            f"hygiene after boot: {hygiene()}"
+        )
         total = options["sessions"]
         for number in range(1, total + 1):
             marker = f"K449-OK-{number}"
-            row = run_session(run, number, marker, options["session_timeout"], tty=False)
+            row = run_session(
+                run, number, marker, options["session_timeout"], tty=False, host=host, port=port
+            )
             rows.append(row)
             print(
                 f"session {number}/{total}: exit={row['exit']} timed_out={row['timed_out']} "
@@ -297,7 +320,7 @@ def main(argv: list[str]) -> int:
             for number in range(1, options["tty_sessions"] + 1):
                 row = run_session(
                     run, 1000 + number, f"K449-TTY-{number}",
-                    options["session_timeout"], tty=True,
+                    options["session_timeout"], tty=True, host=host, port=port,
                 )
                 rows.append(row)
                 print(
@@ -312,10 +335,11 @@ def main(argv: list[str]) -> int:
     finally:
         if child is not None:
             kill(child)
-        subprocess.run(
-            ["sudo", "-n", "sh", "scripts/qemu-net.sh", "down"],
-            cwd=ROOT, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
+        if options["net"] == "tap":
+            subprocess.run(
+                ["sudo", "-n", "sh", "scripts/qemu-net.sh", "down"],
+                cwd=ROOT, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
     columns = [
         "session", "batch", "exit", "timed_out", "wall_ms", "marker_expected",
         "marker_ok", "stdout_hex", "auth_line", "exit_status_line", "free_line",
@@ -336,6 +360,7 @@ def main(argv: list[str]) -> int:
         "hygiene_before": hygiene_before,
         "hygiene_after": hygiene(),
         "session_timeout_s": options["session_timeout"],
+        "net": options["net"],
         "keep_going": options["keep_going"],
     }
     (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
