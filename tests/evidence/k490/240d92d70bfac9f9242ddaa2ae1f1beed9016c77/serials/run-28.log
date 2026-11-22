@@ -1,0 +1,57 @@
+[2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=107327 reserved=23745
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2722 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 240d92d70 2026-11-22
+mem: 419 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x466d64 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=22691 spawn=25209 first_poll=25255 deadline=30209 stalled=0 ready_at=25664
+svcd: consd up
+svcd: consd timing: generation=1 start=25712 spawn=36411 first_poll=37372 deadline=96411 stalled=0 ready_at=40871
+rtc: 2026-11-22 14:11:35 (epoch 1795356695s)
+1795356735.888 nulld: started
+1795356736.210 zerod: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=25817 spawn=38735 first_poll=39198 deadline=43735 stalled=0 ready_at=41686
+1795356737.492 randd: started
+svcd: zerod up
+svcd: zerod timing: generation=1 start=27096 spawn=39999 first_poll=40709 deadline=44999 stalled=0 ready_at=42730
+svcd: randd up
+svcd: randd timing: generation=1 start=26549 spawn=41467 first_poll=41764 deadline=46467 stalled=0 ready_at=43775
+1795356739.087 sysd: started
+svcd: sysd up
+svcd: sysd timing: generation=1 start=26671 spawn=42016 first_poll=42117 deadline=47016 stalled=0 ready_at=45806
+1795356740.685 ramfsd: started
+svcd: ramfsd up
+ptyd: files=0 pairs=0
+svcd: ramfsd timing: generation=1 start=26473 spawn=45322 first_poll=45725 deadline=50322 stalled=0 ready_at=47730
+ptyd: files=0 pairs=0
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=26313 spawn=47714 first_poll=47747 deadline=77714 stalled=0 ready_at=48531
+1795356770.584 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=25759 spawn=40641 first_poll=40939 deadline=161270 stalled=629 ready_at=75791

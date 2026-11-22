@@ -1,0 +1,36 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.23s
+     Running `target/debug/xtask qtest --case pty-privsep-exec --arch x86_64`
+pty-privsep-exec: crash
+--- serial (last 40 lines) ---
+--- unmatched expectations ---
+^ptyd: files=0 pairs=0$
+^pty-privsep-exec: start uid=0$
+^pty-privsep-exec: child start fd=[0-9]+ negative=0$
+^pty-privsep-exec: child state tag=exec1 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$
+^pty-privsep-exec: child reexec fd=[0-9]+$
+^pty-privsep-exec: child state tag=exec2 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$
+^pty-privsep-exec: child round=0 request=ok$
+^pty-privsep-exec: monitor round=0 master=[0-9]+ name=/dev/pts/[0-9]+$
+^pty-privsep-exec: child round=0 name=/dev/pts/[0-9]+$
+^pty-privsep-exec: child round=0 master=[0-9]+$
+^pty-privsep-exec: child round=0 roundtrip=MS$
+^pty-privsep-exec: child round=1 request=ok$
+^pty-privsep-exec: child round=1 name=/dev/pts/[0-9]+$
+^pty-privsep-exec: child round=1 master=[0-9]+$
+^pty-privsep-exec: child round=1 roundtrip=MS$
+^pty-privsep-exec: child allocations=2 ok$
+^pty-privsep-exec: positive child status=0$
+^pty-privsep-exec: positive monitor status=0$
+^pty-privsep-exec: positive ok$
+^pty-privsep-exec: child start fd=[0-9]+ negative=1$
+^pty-privsep-exec: child state tag=exec1 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$
+^pty-privsep-exec: negative send errno=(9|32)$
+^pty-privsep-exec: negative channel-closed ok$
+^pty-privsep-exec: negative child status=0$
+^pty-privsep-exec: negative monitor status=0$
+^pty-privsep-exec: negative ok$
+^pty-privsep-exec: ok$
+^ptyd: files=0 pairs=0$
+^init exited \(0\)$
+--- result ---
+exit status 1; expected success; unmatched expectations: ^ptyd: files=0 pairs=0$, ^pty-privsep-exec: start uid=0$, ^pty-privsep-exec: child start fd=[0-9]+ negative=0$, ^pty-privsep-exec: child state tag=exec1 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$, ^pty-privsep-exec: child reexec fd=[0-9]+$, ^pty-privsep-exec: child state tag=exec2 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$, ^pty-privsep-exec: child round=0 request=ok$, ^pty-privsep-exec: monitor round=0 master=[0-9]+ name=/dev/pts/[0-9]+$, ^pty-privsep-exec: child round=0 name=/dev/pts/[0-9]+$, ^pty-privsep-exec: child round=0 master=[0-9]+$, ^pty-privsep-exec: child round=0 roundtrip=MS$, ^pty-privsep-exec: child round=1 request=ok$, ^pty-privsep-exec: child round=1 name=/dev/pts/[0-9]+$, ^pty-privsep-exec: child round=1 master=[0-9]+$, ^pty-privsep-exec: child round=1 roundtrip=MS$, ^pty-privsep-exec: child allocations=2 ok$, ^pty-privsep-exec: positive child status=0$, ^pty-privsep-exec: positive monitor status=0$, ^pty-privsep-exec: positive ok$, ^pty-privsep-exec: child start fd=[0-9]+ negative=1$, ^pty-privsep-exec: child state tag=exec1 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$, ^pty-privsep-exec: negative send errno=(9|32)$, ^pty-privsep-exec: negative channel-closed ok$, ^pty-privsep-exec: negative child status=0$, ^pty-privsep-exec: negative monitor status=0$, ^pty-privsep-exec: negative ok$, ^pty-privsep-exec: ok$, ^ptyd: files=0 pairs=0$, ^init exited \(0\)$

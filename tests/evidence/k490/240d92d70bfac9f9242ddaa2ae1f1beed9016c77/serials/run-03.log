@@ -1,0 +1,66 @@
+[2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=107327 reserved=23745
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2719 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 240d92d70 2026-11-22
+mem: 419 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x466d64 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=15987 spawn=18313 first_poll=18445 deadline=23313 stalled=0 ready_at=19381
+rtc: 2026-11-22 13:43:13 (epoch 1795354993s)
+1795355023.994 randd: started
+svcd: consd up
+svcd: consd timing: generation=1 start=19411 spawn=30817 first_poll=31003 deadline=90817 stalled=0 ready_at=31694
+1795355024.749 zerod: started
+svcd: randd up
+svcd: randd timing: generation=1 start=19816 spawn=30371 first_poll=30711 deadline=35371 stalled=0 ready_at=32175
+svcd: zerod up
+svcd: zerod timing: generation=1 start=20008 spawn=30052 first_poll=30143 deadline=35052 stalled=0 ready_at=32241
+1795355025.254 nulld: started
+1795355025.529 ramfsd: started
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=19621 spawn=31911 first_poll=31968 deadline=36911 stalled=0 ready_at=32813
+svcd: nulld up
+svcd: nulld timing: generation=1 start=19498 spawn=29850 first_poll=30713 deadline=35214 stalled=364 ready_at=32828
+1795355025.864 sysd: started
+ptyd: files=0 pairs=0
+svcd: sysd up
+svcd: sysd timing: generation=1 start=19913 spawn=32583 first_poll=32841 deadline=37583 stalled=0 ready_at=33561
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=19544 spawn=33139 first_poll=33157 deadline=63139 stalled=0 ready_at=33624
+ptyd: files=0 pairs=0
+1795355040.641 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=19431 spawn=30620 first_poll=31300 deadline=150926 stalled=306 ready_at=47913
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=47924 spawn=50536 first_poll=50617 deadline=110536 stalled=0 ready_at=52021
+pty-privsep-exec: start uid=0

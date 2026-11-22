@@ -1,0 +1,98 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=107327 reserved=23745
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2721 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 240d92d70 2026-11-22
+mem: 419 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x466d64 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=14389 spawn=16476 first_poll=16523 deadline=21476 stalled=0 ready_at=16736
+svcd: consd up
+svcd: consd timing: generation=1 start=16757 spawn=20120 first_poll=20182 deadline=80120 stalled=0 ready_at=20699
+rtc: 2026-11-22 13:48:29 (epoch 1795355309s)
+1795355330.039 nulld: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=16852 spawn=20889 first_poll=20959 deadline=25889 stalled=0 ready_at=21419
+1795355330.711 randd: started
+svcd: randd up
+svcd: randd timing: generation=1 start=17060 spawn=20435 first_poll=20728 deadline=25435 stalled=0 ready_at=22332
+1795355331.822 zerod: started
+1795355331.894 ramfsd: started
+ptyd: files=0 pairs=0
+svcd: zerod up
+svcd: zerod timing: generation=1 start=17400 spawn=22563 first_poll=22681 deadline=27563 stalled=0 ready_at=22994
+1795355332.053 sysd: started
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=17039 spawn=22550 first_poll=22569 deadline=27550 stalled=0 ready_at=23390
+svcd: sysd up
+svcd: sysd timing: generation=1 start=17259 spawn=22741 first_poll=22755 deadline=27741 stalled=0 ready_at=23545
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=16968 spawn=23091 first_poll=23277 deadline=53091 stalled=0 ready_at=23702
+ptyd: files=0 pairs=0
+1795355349.995 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=16820 spawn=21549 first_poll=21603 deadline=141549 stalled=0 ready_at=41167
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=41176 spawn=43482 first_poll=43532 deadline=103563 stalled=81 ready_at=45213
+pty-privsep-exec: start uid=0
+pty-privsep-exec: child start fd=3 negative=0
+pty-privsep-exec: child state tag=exec1 fstat=-1/9 dup=4/9 getsockopt=0/0 type=1 fcntl=0
+pty-privsep-exec: child reexec fd=3
+pty-privsep-exec: child state tag=exec2 fstat=-1/9 dup=4/9 getsockopt=0/0 type=1 fcntl=0
+pty-privsep-exec: child round=0 request=ok
+pty-privsep-exec: monitor round=0 master=3 name=/dev/pts/1
+pty-privsep-exec: child round=0 name=/dev/pts/1
+pty-privsep-exec: child round=0 master=4
+pty-privsep-exec: child round=0 roundtrip=MS
+ptyd: files=0 pairs=0
+pty-privsep-exec: child round=1 request=ok
+pty-privsep-exec: monitor round=1 master=3 name=/dev/pts/1
+pty-privsep-exec: child round=1 name=/dev/pts/1
+pty-privsep-exec: child round=1 master=4
+pty-privsep-exec: child round=1 roundtrip=MS
+ptyd: files=0 pairs=0
+pty-privsep-exec: child allocations=2 ok
+pty-privsep-exec: positive child status=0
+pty-privsep-exec: positive monitor status=0
+pty-privsep-exec: positive ok
+pty-privsep-exec: child start fd=3 negative=1
+pty-privsep-exec: child state tag=exec1 fstat=-1/9 dup=4/9 getsockopt=0/0 type=1 fcntl=0
+pty-privsep-exec: negative send errno=9
+pty-privsep-exec: negative channel-closed ok
+pty-privsep-exec: negative child status=0
+pty-privsep-exec: negative monitor status=0
+pty-privsep-exec: negative ok
+pty-privsep-exec: ok
+svcd: libc-test up
+svcd: libc-test timing: generation=1 start=45255 spawn=47840 first_poll=none deadline=107840 stalled=0 ready_at=54710
+svcd: settled
+init exited (0)
