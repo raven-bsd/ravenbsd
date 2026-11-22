@@ -133,6 +133,7 @@ members = [
     "tests/libc/gate",
     "tests/libc/spawn",
     "tests/libc/toolchain-abi",
+    "tests/libc/robust",
     "tests/user",
     "tests/user/image",
     "tests/ufs-powercut",

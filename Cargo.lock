@@ -2432,6 +2432,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-robust"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-fmt",
+ "raven-libc-net",
+ "raven-libc-platform",
+ "raven-libc-proc",
+ "raven-libc-signal",
+ "raven-libc-stdlib",
+]
+
+[[package]]
 name = "raven-libc-rtld"
 version = "0.1.0"
 dependencies = [
