@@ -2645,6 +2645,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-mptcp"
+version = "0.1.0"
+
+[[package]]
+name = "raven-mptcp-vectors"
+version = "0.1.0"
+dependencies = [
+ "raven-mptcp",
+]
+
+[[package]]
 name = "raven-msi"
 version = "0.1.0"
 

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-mptcp-fuzz"
+version = "0.1.0"
+description = "cargo-fuzz targets for raven-mptcp; nightly tool only, outside the workspace."
+edition = "2024"
+license = "BSD-3-Clause"
+publish = false
+
+# Its own workspace: a stable `cargo build` or `make check` never needs nightly.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+raven-mptcp = { path = "../../../crates/raven-mptcp" }
+
+[[bin]]
+name = "mptcp_options"
+path = "fuzz_targets/mptcp_options.rs"
+test = false
+doc = false
