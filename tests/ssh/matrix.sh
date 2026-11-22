@@ -67,6 +67,11 @@ if [ -z "$only" ]; then
     # S0 is a separate throw-away `server` initfs. A build failure is reported by the S0 row.
     echo "matrix: building the S0 echo fixture" >&2
     timeout 120 sh tests/fixtures/ssh-echo/build.sh || echo "matrix: S0 fixture build failed" >&2
+
+    # S8's NULL-name fixture is staged in the release image by profiles/release.d/90-ssh-openpty.toml.
+    echo "matrix: building the S8 openpty fixture" >&2
+    timeout 120 sh tests/fixtures/ssh-openpty/build.sh \
+        || echo "matrix: S8 openpty fixture build failed" >&2
 fi
 
 if [ "$mode" = shared ]; then

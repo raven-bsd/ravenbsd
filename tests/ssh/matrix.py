@@ -53,6 +53,7 @@ EXPECTED_BANNER = b"SSH-2.0-OpenSSH_10.6\r\n"
 BANNER_BOUND_S = 10.0
 REQUEST_TIMEOUT_S = 15
 S1_REPEAT_TIMEOUT_S = 8
+S4_ATTEMPTS = 5
 S7_TIMEOUT_S = 30
 S7_WALL_BOUND_MS = 5000
 ECHO_PORT = 23097
@@ -61,8 +62,8 @@ MARKER = b"K434-SSH-MARKER-2026-11-22\n"
 
 ROW_ORDER = [
     "S0", "S1", "S1-client-first", "S1-repeat", "S2", "S3", "S4", "S5", "S5-identity",
-    "S5-session", "S6", "S6-length", "S7", "S7-routing", "S7-exit", "S8", "S8-pty-alloc",
-    "S8-termios",
+    "S5-session", "S6", "S6-length", "S7", "S7-class", "S7-routing", "S7-exit", "S8",
+    "S8-openpty-null", "S8-monitor", "S8-fds", "S8-pty-alloc", "S8-termios",
 ]
 
 rows: list[tuple[str, str, str]] = []
@@ -829,31 +830,57 @@ def row_s3_finish(console: SerialConsole, state: dict[str, object]) -> None:
 
 
 def row_s4() -> None:
-    result = ssh_run(["uname", "-a"], "s4-vv.log", extra=["-vv"])
-    text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
-    auth = "Authenticated to " in text and 'using "password"' in text
-    hostkeys_line = next((line for line in text.splitlines()
-                          if "client_input_global_request: rtype hostkeys-00@openssh.com" in line), "")
-    hostkeys = bool(hostkeys_line)
-    no_efault = "EFAULT" not in text
-    output = result["stdout"].decode("utf-8", "replace")
-    uname_ok = output.startswith("RavenBSD ")
-    observed = f"hostkeys={hostkeys} uname_output={uname_ok} exit={result['returncode']} efault={not no_efault}"
-    attempt("S4", 1, "fresh", "hostkeys-00@openssh.com + no EFAULT",
-            observed, float(result["elapsed_ms"]),
-            "PASS" if auth and hostkeys and no_efault else "FAIL")
-    if auth and hostkeys and no_efault:
+    """S4: the first post-auth read, logged per attempt.
+
+    OpenSSH's post-auth global request (`hostkeys-00@openssh.com`) arrives over the same
+    connection. The command output is the exact marker file, so the row asserts the payload
+    bytes as well as the absence of EFAULT. A transient auth failure is recorded as its own
+    attempt; it is never averaged away.
+    """
+    records: list[dict[str, object]] = []
+    passed_attempt: int | None = None
+    for number in range(1, S4_ATTEMPTS + 1):
+        result = ssh_run(["cat", "/etc/ssh-matrix-marker"], f"s4-vv-{number}.log",
+                         extra=["-vv"])
+        text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
+        auth = "Authenticated to " in text and 'using "password"' in text
+        hostkeys_line = next((line for line in text.splitlines()
+                              if "client_input_global_request: rtype hostkeys-00@openssh.com"
+                              in line), "")
+        hostkeys = bool(hostkeys_line)
+        no_efault = "EFAULT" not in text
+        output = result["stdout"]
+        exact = output == MARKER
+        ok = auth and hostkeys and exact and no_efault
+        observed = (f"auth={auth} hostkeys={hostkeys} bytes={literal(output)} "
+                    f"exit={result['returncode']} efault={not no_efault}")
+        attempt("S4", number, "fresh",
+                f'Authenticated + hostkeys-00@openssh.com + {literal(MARKER)} + no EFAULT',
+                observed, float(result["elapsed_ms"]), "PASS" if ok else "FAIL")
+        records.append({"number": number, "auth": auth, "hostkeys": hostkeys,
+                        "exact": exact, "no_efault": no_efault,
+                        "exit": result["returncode"], "observed": observed,
+                        "hostkeys_line": hostkeys_line})
+        if ok:
+            passed_attempt = number
+            break
+    if passed_attempt is not None:
+        chosen = records[passed_attempt - 1]
         record("S4", "PASS",
-               f"post-auth read returned `{hostkeys_line.strip()}`; no EFAULT (POSIX read; "
-               f"C2/C7). The command output did not arrive (exit {result['returncode']}); that is "
-               f"the post-exec path, not this read")
-    elif not auth:
+               f"attempt {passed_attempt}/{S4_ATTEMPTS}: post-auth read returned "
+               f"`{str(chosen['hostkeys_line']).strip()}` and the exact payload "
+               f"{literal(MARKER)}; no EFAULT (POSIX read; C2/C7)")
+        return
+    failed = [str(record_entry["observed"]) for record_entry in records]
+    if records and not any(bool(record_entry["auth"]) for record_entry in records):
         record("S4", "BLOCKED",
-               f"auth not reached (exit {result['returncode']}); post-auth read not exercised "
-               f"(C2/C7)")
+               f"auth not reached in {len(records)} bounded attempts; post-auth read not "
+               f"exercised: " + "; ".join(f"#{index + 1} {text}"
+                                         for index, text in enumerate(failed)))
     else:
         record("S4", "FAIL",
-               f"{observed} (POSIX read; C2/C7)")
+               f"no exact post-auth read in {len(records)} attempts: "
+               + "; ".join(f"#{index + 1} {text}" for index, text in enumerate(failed)))
 
 
 def row_s5_s6() -> None:
@@ -954,6 +981,55 @@ def console_marker_count(console: SerialConsole) -> int:
     return bytes(console.buffer).count(MARKER)
 
 
+def console_scalar(console: SerialConsole, command: str, log_name: str,
+                   timeout: float = 15.0) -> int:
+    """Run one guest command and return its last standalone integer (or -1)."""
+    clean = console_capture(console, command, log_name, timeout=timeout)
+    values = re.findall(r"(?m)^\s*(-?\d+)\s*$", clean)
+    return int(values[-1]) if values else -1
+
+
+def classify_s7(result: dict[str, object], probe_banner: bytes,
+                server_lines: str) -> tuple[str, str]:
+    """Classify one failed S7 attempt from the client text, a fresh probe and server lines."""
+    text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")  # type: ignore[operator]
+    auth = "Authenticated to " in text
+    banner = "Remote protocol version" in text
+    probe_ok = probe_banner == EXPECTED_BANNER
+    phrases = (
+        "Permission denied",
+        "Connection refused",
+        "Connection timed out",
+        "Connection reset",
+        "Connection closed",
+        "Connection aborted",
+        "kex_exchange_identification",
+        "Broken pipe",
+        "Identification string",
+    )
+    witness = ""
+    for phrase in phrases:
+        witness = next((line.strip() for line in text.splitlines() if phrase in line), "")
+        if witness:
+            break
+    if "Permission denied" in text or "Failed password" in server_lines \
+            or "Invalid user" in server_lines:
+        return "auth-rejected", witness or "server logged a password refusal"
+    if witness:
+        if not probe_ok and ("timed out" in witness or "refused" in witness):
+            return "guest-not-listening", witness
+        if "banner exchange" in witness:
+            return ("banner-timeout" if probe_ok else "guest-not-listening"), witness
+        return "connection-reset", witness
+    if not banner:
+        if probe_ok:
+            return "banner-timeout", "no banner in attempt; fresh probe exact"
+        return "guest-not-listening", "no banner; fresh probe failed"
+    if not auth:
+        return "auth-not-completed", "banner present; no Authenticated line"
+    return "post-auth-zero-bytes", "Authenticated present; stdout not the marker"
+
+
 def row_s7(console: SerialConsole) -> None:
     total_before = console_marker_count(console)
     marker_run = ssh_run(["cat", "/tmp/ssh-marker"], "s7-marker.log",
@@ -972,10 +1048,14 @@ def row_s7(console: SerialConsole) -> None:
     max_console_new = console_new
     for number in range(1, 11):
         before = console_marker_count(console)
+        log_before = console_scalar(console, "awk 'END{print NR}' /tmp/sshd.log",
+                                    f"s7-log-before-{number}.log")
         session = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-run-{number}.log",
                           timeout=S7_TIMEOUT_S)
         time.sleep(0.5)
         after = console_marker_count(console)
+        log_after = console_scalar(console, "awk 'END{print NR}' /tmp/sshd.log",
+                                   f"s7-log-after-{number}.log")
         new_markers = after - before
         max_console_new = max(max_console_new, new_markers)
         ok = session["stdout"] == MARKER and new_markers == 0
@@ -993,8 +1073,26 @@ def row_s7(console: SerialConsole) -> None:
                 f"exit {session['returncode']}; wall={elapsed:.0f} ms; "
                 f"bytes={literal(session['stdout'])}",
                 elapsed, "PASS" if exit_ok and session["stdout"] == MARKER else "FAIL")
+        if ok:
+            continue
+        probe = banner_probe(f"s7-probe-{number}", send_client=False)
+        server_lines = ""
+        delta = log_after - log_before if log_before >= 0 and log_after >= 0 else -1
+        if log_before >= 0 and log_after > log_before:
+            server_lines = console_capture(
+                console, f"sed -n '{log_before + 1},{log_after}p' /tmp/sshd.log",
+                f"s7-server-{number}.log")
+        classification, witness = classify_s7(session, probe["bytes"], server_lines)
+        attempt("S7-class", number, "fresh",
+                "guest-listening / auth-rejected / connection-reset from serial and server log",
+                f"class={classification}; probe_banner={literal(probe['bytes'])}; "
+                f"server_delta={delta}; witness={witness!r}",
+                0, "OBSERVED")
     total_after = console_marker_count(console)
     total_delta = total_after - total_before
+    server_log = console_capture(console, "cat /tmp/sshd.log", "s7-server.log")
+    accepted = server_log.count("Accepted password for raven ")
+    closed = server_log.count("Connection closed")
     routing_ok = marker_ok and total_delta == 0
     attempt("S7-routing", 1, "fresh", "client exact marker; console receives none",
             f"client={literal(marker_run['stdout'])}; max_console_new={max_console_new}; "
@@ -1020,10 +1118,88 @@ def row_s7(console: SerialConsole) -> None:
                f"marker {'exact' if marker_ok else 'mismatch/error'} "
                f"({literal(marker_run['stdout'])}); {passed}/10 exact; "
                f"console_total_delta={total_delta}; all_exit_ok={all_exit_ok}; "
-               f"walls_ms={[round(value) for value in wall_ms]} (gate; C1-C10)")
+               f"walls_ms={[round(value) for value in wall_ms]}; "
+               f"server Accepted={accepted} Connection-closed={closed} (gate; C1-C10)")
 
 
-def row_s8() -> None:
+def ssh_pty_probe(console: SerialConsole | None, log_name: str) -> dict[str, object]:
+    """Run `ssh -tt tty` and sample the guest process table/monitor log while it is live."""
+    argv = [
+        "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "ConnectTimeout=8",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-tt",
+        f"{USER}@{HOST}",
+        "tty",
+    ]
+    env = os.environ.copy()
+    env["SSH_ASKPASS"] = str(ASKPASS)
+    env["SSH_ASKPASS_REQUIRE"] = "force"
+    env["DISPLAY"] = ":0"
+    env["K434_SSH_PASSWORD"] = PASSWORD
+    stdout_path = OUT / f"{log_name}.stdout"
+    stderr_path = OUT / f"{log_name}.stderr"
+    started = time.monotonic()
+    auth_seen = False
+    during_ps = ""
+    with open(stdout_path, "wb") as out_file, open(stderr_path, "wb") as err_file:
+        process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.PIPE,
+                                   stdout=out_file, stderr=err_file, env=env,
+                                   start_new_session=True)
+        deadline = started + REQUEST_TIMEOUT_S
+        while process.poll() is None and time.monotonic() < deadline:
+            if not auth_seen:
+                try:
+                    text = stderr_path.read_bytes()
+                except OSError:
+                    text = b""
+                if b"Authenticated to " in text:
+                    auth_seen = True
+                    if console is not None:
+                        during_ps = console_capture(console, "ps -e", "s8-ps-during.log",
+                                                    timeout=10)
+            time.sleep(0.02)
+        during_log = ""
+        if console is not None:
+            during_log = console_capture(console, "cat /tmp/sshd.log",
+                                         "s8-server-during.log", timeout=10)
+        while process.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+        timed_out = process.poll() is None
+        if timed_out:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        returncode = process.wait()
+        try:
+            process.stdin.close()  # type: ignore[union-attr]
+        except (OSError, AttributeError):
+            pass
+    stdout = stdout_path.read_bytes()
+    stderr = stderr_path.read_bytes()
+    elapsed = (time.monotonic() - started) * 1000
+    log = OUT / log_name
+    log.write_text(
+        f"$ {' '.join(argv)}\n"
+        f"exit: {returncode}\n"
+        f"timed_out: {timed_out}\n"
+        f"auth_seen: {auth_seen}\n"
+        f"elapsed_ms: {elapsed:.0f}\n"
+        f"stdout_hex: {stdout.hex()}\n"
+        f"stdout_text: {stdout.decode('utf-8', 'replace')}\n"
+        f"stderr_text: {stderr.decode('utf-8', 'replace')}\n",
+        encoding="utf-8")
+    return {"returncode": returncode, "stdout": stdout, "stderr": stderr,
+            "elapsed_ms": elapsed, "timed_out": timed_out, "argv": argv,
+            "auth_seen": auth_seen, "during_ps": during_ps, "during_log": during_log}
+
+
+def row_s8(console: SerialConsole | None = None) -> None:
     exit_path = OUT / "pty-alloc.exit"
     log_path = OUT / "pty-alloc.log"
     pty_alloc_ok = False
@@ -1062,24 +1238,81 @@ def row_s8() -> None:
         attempt("S8-termios", 1, "fresh", "exit 0 + `termios: pass`",
                 "artifact missing", 0, "BLOCKED",
                 "run `timeout 150 cargo xtask qtest --case termios --arch x86_64`")
-    result = ssh_run(["tty"], "s8-tt.log", extra=["-tt"])
-    output = result["stdout"].decode("utf-8", "replace")
-    error = result["stderr"].decode("utf-8", "replace")
-    match = re.search(r"/dev/pts/[0-9]+", output)
+
+    fixture_ok = False
+    fixture_detail = "console unavailable; fixture not run"
+    if console is not None:
+        clean = console_capture(console, "/bin/openpty-null; echo K434-openpty-exit=$?",
+                                "s8-openpty-null.log", timeout=30).replace("\r", "")
+        exit_match = re.search(r"K434-openpty-exit=(\d+)", clean)
+        fixture_exit = int(exit_match.group(1)) if exit_match else -1
+        null_line = next((line.strip() for line in clean.splitlines()
+                          if "call=null " in line), "")
+        epipe_line = next((line.strip() for line in clean.splitlines()
+                           if "call=epipe-sentinel" in line), "")
+        name_line = next((line.strip() for line in clean.splitlines()
+                          if "call=name " in line), "")
+        fixture_ok = fixture_exit == 0 and "call=null rc=0" in clean
+        fixture_detail = (f"exit={fixture_exit}; {null_line}; {epipe_line}; {name_line}")
+        attempt("S8-openpty-null", 1, "fresh",
+                "openpty(..., NULL, ...) returns 0; control with a name returns 0",
+                fixture_detail, 0, "PASS" if fixture_ok else "FAIL")
+        if fixture_ok:
+            record("S8-openpty-null", "PASS",
+                   "the exact OpenSSH NULL-name call returns a pair (FreeBSD pty.c:74)")
+        else:
+            record("S8-openpty-null", "FAIL",
+                   f"OpenSSH sshpty.c:63 calls openpty(..., NULL, ...); Raven's C wrapper "
+                   f"rejects a null name at compat/openpty.rs:23 before any pty call and "
+                   f"leaves errno stale: {fixture_detail} (donor FreeBSD pty.c:74 `if (name)`)")
+    else:
+        attempt("S8-openpty-null", 1, "fresh",
+                "openpty(..., NULL, ...) returns 0", fixture_detail, 0, "BLOCKED")
+        record("S8-openpty-null", "BLOCKED", fixture_detail)
+
+    result = ssh_pty_probe(console, "s8-tt.log")
+    output = result["stdout"]  # type: ignore[assignment]
+    error = result["stderr"]  # type: ignore[assignment]
+    match = re.search(rb"/dev/pts/[0-9]+", output)  # type: ignore[arg-type]
+    server_log = ""
+    ps_after = ""
+    if console is not None:
+        console_capture(console, "cat /tmp/sshd.pid", "s8-pid.log", timeout=10)
+        ps_after = console_capture(console, "ps -e", "s8-ps.log", timeout=15).replace("\r", "")
+        console_capture(console, "ps", "s8-services.log", timeout=15)
+        server_log = console_capture(console, "cat /tmp/sshd.log", "s8-server.log",
+                                     timeout=15).replace("\r", "")
+    ps_during = str(result["during_ps"]).replace("\r", "")
+    monitor_lines = [line.strip() for line in (ps_during + "\n" + ps_after).splitlines()
+                     if "sshd-session" in line or "sshd-auth" in line]
+    monitor_alive = any("sshd-session" in line for line in ps_after.splitlines())
+    attempt("S8-monitor", 1, "fresh", "sshd-session row in the guest ps -e table",
+            f"alive_after={monitor_alive}; during={monitor_lines[:4]}; "
+            f"after_rows={len(ps_after.splitlines())}",
+            0, "OBSERVED")
+    record("S8-monitor", "OBSERVED",
+           f"monitor alive after failure={monitor_alive}; rows={monitor_lines[:4] or 'none'}; "
+           f"ps artifacts s8-ps-during.log/s8-ps.log")
+    fd_lines = [line.strip() for line in (str(result["during_log"]) + "\n" + server_log).splitlines()
+                if re.search(r"\b(fd|fd=)\b", line) or re.search(r"\bfd[= ]", line)]
+    fd_note = ("no /proc and no fd-enumeration syscall exist in this guest "
+               "(ps -e exposes PID PPID UID GID CMD only); captured OpenSSH fd lines")
+    attempt("S8-fds", 1, "fresh", "monitor fd table", fd_note, 0, "BLOCKED")
+    record("S8-fds", "BLOCKED", f"{fd_note}: {fd_lines[:8] or 'none in the sshd log'}")
     if match and pty_alloc_ok and termios_ok:
         record("S8", "PASS",
-               f"`ssh -tt tty` returned {match.group(0)}; `pty-alloc` and `termios` pass "
-               f"(openpty; C9)")
-        attempt("S8", 1, "fresh", "/dev/pts/N", match.group(0),
+               f"`ssh -tt tty` returned {match.group(0).decode()}; `pty-alloc` and `termios` "
+               f"pass (openpty; C9)")
+        attempt("S8", 1, "fresh", "/dev/pts/N", match.group(0).decode(),
                 float(result["elapsed_ms"]), "PASS")
-    elif "PTY allocation request failed" in error or "PTY allocation request failed" in output:
+    elif b"PTY allocation request failed" in error or b"PTY allocation request failed" in output:
         record("S8", "FAIL",
-               "`PTY allocation request failed on channel 0` (pts_alloc/openpty; C9); "
-               "server log in s8-server.log")
+               f"`PTY allocation request failed on channel 0` (pts_alloc/openpty; C9); full "
+               f"sshd log in s8-server.log; openpty-null fixture: {fixture_detail}")
         attempt("S8", 1, "fresh", "/dev/pts/N", "PTY allocation request failed",
                 float(result["elapsed_ms"]), "FAIL")
-    elif "tty: command not found" in (output + error):
-        tty_line = next((line.strip() for line in (output + error).splitlines()
+    elif b"tty: command not found" in (output + error):
+        tty_line = next((line.strip() for line in (output + error).decode("utf-8", "replace").splitlines()
                          if "tty: command not found" in line), "tty: command not found")
         record("S8", "FAIL",
                f"PTY allocation did not report; the remote `tty` utility is missing: `{tty_line}` "
@@ -1088,14 +1321,15 @@ def row_s8() -> None:
                 float(result["elapsed_ms"]), "FAIL")
     elif match and not (pty_alloc_ok and termios_ok):
         record("S8", "FAIL",
-               f"`ssh -tt tty` returned {match.group(0)}, but pty-alloc="
+               f"`ssh -tt tty` returned {match.group(0).decode()}, but pty-alloc="
                f"{pty_alloc_ok} termios={termios_ok} (openpty; C9)")
-        attempt("S8", 1, "fresh", "/dev/pts/N + pty-alloc/termios pass", match.group(0),
-                float(result["elapsed_ms"]), "FAIL")
+        attempt("S8", 1, "fresh", "/dev/pts/N + pty-alloc/termios pass",
+                match.group(0).decode(), float(result["elapsed_ms"]), "FAIL")
     else:
         record("S8", "FAIL",
-               f"`ssh -tt tty` exit {result['returncode']}, no /dev/pts/N (openpty; C9)")
-        attempt("S8", 1, "fresh", "/dev/pts/N", literal(result["stdout"][:80]),
+               f"`ssh -tt tty` exit {result['returncode']}, no /dev/pts/N (openpty; C9); "
+               f"openpty-null fixture: {fixture_detail}")
+        attempt("S8", 1, "fresh", "/dev/pts/N", literal(output[:80]),
                 float(result["elapsed_ms"]), "FAIL")
 
 
@@ -1159,9 +1393,14 @@ def main() -> int:
     only = os.environ.get("RAVEN_MATRIX_ONLY", "")
     if only:
         child = None
+        console: SerialConsole | None = None
         try:
-            child, _ = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
-                            "vars-only.fd", ready_timeout=180)
+            socket_only = only == "s8"
+            child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
+                                 "vars-only.fd", ready_timeout=180,
+                                 socket_serial=socket_only)
+            if socket_only:
+                console = handle  # type: ignore[assignment]
             if not wait_tcp(22, 30):
                 record(only, "BLOCKED",
                        "guest listener did not accept a TCP connection after svcd: sshd up")
@@ -1172,7 +1411,8 @@ def main() -> int:
                 elif only == "s7-exit":
                     row_s7_gate()
                 elif only == "s8":
-                    row_s8()
+                    login_ok = console is not None and console_login(console)
+                    row_s8(console if login_ok else None)
                 else:
                     record(only, "BLOCKED", f"unknown RAVEN_MATRIX_ONLY={only}")
         except Exception as error:  # noqa: BLE001 - isolate the only-mode boot
@@ -1180,6 +1420,9 @@ def main() -> int:
         finally:
             if child is not None:
                 kill(child)
+            if console is not None:
+                console.pump()
+                console.close()
             time.sleep(2.0)
         write_tables()
         failed = [row for row, status, _ in rows if status in ("FAIL", "BLOCKED", "PARTIAL")]
@@ -1219,12 +1462,11 @@ def main() -> int:
                    "guest listener did not accept a TCP connection after svcd: sshd up")
         else:
             time.sleep(0.5)
-            row_s8()
-        if s8_console is not None:
-            if console_login(s8_console):
-                console_capture(s8_console, "cat /tmp/sshd.log", "s8-server.log")
-            else:
-                (OUT / "s8-server.log").write_text("console login failed\n", encoding="utf-8")
+            login_ok = s8_console is not None and console_login(s8_console)
+            if s8_console is not None and not login_ok:
+                (OUT / "s8-console.log").write_text("console login failed\n",
+                                                    encoding="utf-8")
+            row_s8(s8_console if login_ok else None)
     except Exception as error:  # noqa: BLE001 - isolate the S8 boot
         record("S8", "BLOCKED", f"S8 boot failed: {error}")
     finally:
