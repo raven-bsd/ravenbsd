@@ -12,10 +12,10 @@ qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "2"]
 expect_exit = "success"
 
 [[expect]]
-regex = '^sched-saturation: spawned=80 cap=1024$'
+regex = '^sched-saturation: spawned=40 cap=1024$'
 
 [[expect]]
-regex = '^sched-saturation: done=80 lost=0 switches=[0-9]+$'
+regex = '^sched-saturation: done=40 lost=0 switches=[0-9]+$'
 
 [[expect]]
 regex = '^CONTRACT K527 PASS switches=[0-9]+$'

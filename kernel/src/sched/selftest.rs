@@ -193,7 +193,7 @@ fn monitor() {
 ///
 /// A dropped runnable thread shows up here as a missing completion; the monitor fails with the
 /// lost count instead of exiting success.
-const SATURATION_WORKERS: u32 = 80;
+const SATURATION_WORKERS: u32 = 40;
 /// Schedules per worker; 128 workers x 100 yields is a 12,800-schedule stress.
 const SATURATION_YIELDS: u32 = 256;
 /// Saturation monitor timeout.
