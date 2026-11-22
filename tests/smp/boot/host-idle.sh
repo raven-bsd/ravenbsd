@@ -5,12 +5,16 @@
 # Exclusive-host preflight for the S107 boot-loop soak and kernel gate.
 #
 # Refuse to start when another QEMU, xtask/cargo/rustc job or a high load average is present.
+# --allow-jobs ignores co-tenant cargo/rustc/xtask builds: a functional boot row is not
+# invalidated by another lane compiling, only by another QEMU or a load above the budget.
+# Latency and stress rows keep the strict check (no other job at all).
 # --wait keeps polling the same checks in the foreground for the requested number of seconds.
 # Host state is always written before the decision (including the refusal).
 
 set -u
 
 wait_secs=0
+allow_jobs=0
 default_max_load() {
     n=$(nproc 2>/dev/null || echo 4)
     case "$n" in ''|*[!0-9]*) n=4 ;; esac
@@ -28,6 +32,8 @@ usage: sh tests/smp/boot/host-idle.sh [options]
 
   --wait SECONDS      wait up to SECONDS for an idle host (default 0: refuse)
   --max-load LOAD     maximum 1-minute load average (default max(2, nproc/4))
+  --allow-jobs        ignore co-tenant cargo/rustc/xtask builds (functional rows); another
+                      QEMU and the load budget still refuse
   --state-file PATH   host-state record path (default build/host-idle-state.txt)
   --context NAME      label for the record/log (default host)
   -h, --help          show this help
@@ -38,6 +44,7 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --wait) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; wait_secs=$2; shift 2 ;;
         --max-load) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; max_load=$2; shift 2 ;;
+        --allow-jobs) allow_jobs=1; shift ;;
         --state-file) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; state_file=$2; shift 2 ;;
         --context) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; context=$2; shift 2 ;;
         -h|--help) usage; exit 0 ;;
@@ -72,6 +79,7 @@ write_state() {
         printf 'nproc=%s\n' "$nproc"
         printf 'max_load=%s\n' "$max_load"
         printf 'wait_secs=%s\n' "$wait_secs"
+        printf 'allow_jobs=%s\n' "$allow_jobs"
         printf 'qemu:\n%s\n' "${qemu:-none}"
         printf 'jobs:\n%s\n' "${jobs:-none}"
         printf 'kvm='; ls -l /dev/kvm 2>&1 || true
@@ -92,7 +100,11 @@ check_idle() {
         busy="${busy}load($load1>$max_load) "
     }
     [ -n "$qemu" ] && { idle=0; busy="${busy}qemu "; }
-    [ -n "$jobs" ] && { idle=0; busy="${busy}xtask/cargo/rustc "; }
+    if [ "$allow_jobs" -eq 1 ]; then
+        [ -n "$jobs" ] && busy="${busy}jobs-ignored "
+    else
+        [ -n "$jobs" ] && { idle=0; busy="${busy}xtask/cargo/rustc "; }
+    fi
     write_state
 }
 

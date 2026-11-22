@@ -334,6 +334,30 @@ fn r06_timer_jitter_cannot_seed_or_rekey() {
     assert_ne!(second, first);
 }
 
+// K565: the explicit weak software seed uses the same `_rs_stir` construction, while the strict
+// `stir(TimerJitter)` path remains rejected above.
+#[test]
+fn weak_software_stir_uses_the_same_construction() {
+    let seed = seed_bytes(0x7e);
+    let mut weak = Pool::new();
+    assert_eq!(weak.stir_weak(&seed), Ok(()));
+    let mut strict = Pool::new();
+    assert_eq!(strict.stir(SeedSource::Hardware, &seed), Ok(()));
+
+    let mut weak_stream = [0u8; 128];
+    let mut strict_stream = [0u8; 128];
+    assert_eq!(weak.fill(&mut weak_stream), Ok(weak_stream.len()));
+    assert_eq!(strict.fill(&mut strict_stream), Ok(strict_stream.len()));
+    assert_eq!(weak_stream, strict_stream);
+
+    let mut before = [0u8; 64];
+    weak.fill(&mut before).unwrap();
+    assert_eq!(weak.stir_weak(&seed_bytes(0x7f)), Ok(()));
+    let mut after = [0u8; 64];
+    weak.fill(&mut after).unwrap();
+    assert_ne!(before, after);
+}
+
 // The kernel's legacy `add_entropy` shim must be byte-for-byte the explicit `stir` path.
 #[test]
 fn legacy_add_entropy_matches_stir() {

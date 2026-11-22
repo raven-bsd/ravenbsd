@@ -33,7 +33,7 @@ XTASK = cargo run -q -p xtask --
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
 	posix-gaps posix-check toolchain clean distclean check-fast check-build ufs-selftest qemu-ufs soak-smoke soak-24h \
-	tcp-soak-smoke tcp-soak-24h
+	tcp-soak-smoke tcp-soak-24h info
 
 help:
 	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
@@ -141,6 +141,11 @@ world:
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .
+
+# Code statistics: Rust code lines first, then the full tokei language table. The scan excludes
+# build output, Git, and vendor trees; the summary separates vendored uutils/brush from our code.
+info:
+	@sh scripts/info.sh
 
 posix-gaps:
 	@$(XTASK) posix-gaps
