@@ -9,7 +9,7 @@ pub mod tty;
 pub use net::{NetIoctl, net_ioctl};
 pub use tty::{
     Winsize, cfgetispeed, cfgetospeed, cfmakeraw, cfsetispeed, cfsetospeed, tcflush, tcgetattr,
-    tcgetwinsize, tcsetattr, tcsetwinsize,
+    tcgetpgrp, tcgetwinsize, tcsetattr, tcsetpgrp, tcsetwinsize,
 };
 
 use raven_abi::errno::Errno;

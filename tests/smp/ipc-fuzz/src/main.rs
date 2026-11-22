@@ -106,7 +106,7 @@ static mut CALL_RESP: [u8; RESPONSE_CAP] = [0; RESPONSE_CAP];
 
 static CLIENT_DONE: AtomicBool = AtomicBool::new(false);
 static CALL_RESULTS: [AtomicI64; MAX_GROUPS] = [const { AtomicI64::new(i64::MIN) }; MAX_GROUPS];
-static CLIENT_ROWS: [AtomicI64; 7] = [const { AtomicI64::new(i64::MIN) }; 7];
+static CLIENT_ROWS: [AtomicI64; 10] = [const { AtomicI64::new(i64::MIN) }; 10];
 
 /// The server-side attachment handles, published before the client thread starts.
 static MEMOBJ: AtomicI64 = AtomicI64::new(-1);
@@ -432,13 +432,16 @@ fn main(_args: raven_rt::Args) -> i32 {
         table.row("client", group_name(group), vector, call_ret, expect);
     }
     let standalone = [
-        ("call-reqmax", HUGE_LENGTH),
-        ("call-respmax", HUGE_LENGTH),
-        ("read-lenmax", HUGE_LENGTH),
-        ("pread-wrap", WRAP_OFFSET),
-        ("seek-whence", EINVAL),
-        ("send-file", EBADF_EACCES),
-        ("send-forged", EBADF),
+        ("call-reqmax", Expect::Err(HUGE_LENGTH)),
+        ("call-respmax", Expect::Err(HUGE_LENGTH)),
+        ("read-lenmax", Expect::Err(HUGE_LENGTH)),
+        ("pread-0", Expect::Success),
+        ("pread-1", Expect::Success),
+        ("pread-last", Expect::Success),
+        ("pread-wrap", Expect::Err(WRAP_OFFSET)),
+        ("seek-whence", Expect::Err(EINVAL)),
+        ("send-file", Expect::Err(EBADF_EACCES)),
+        ("send-forged", Expect::Err(EBADF)),
     ];
     for (index, (vector, expect)) in standalone.iter().enumerate() {
         let value = CLIENT_ROWS[index].load(Ordering::Acquire);
@@ -447,13 +450,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         } else {
             value as isize
         };
-        table.row(
-            "client",
-            "standalone",
-            vector,
-            call_ret,
-            Expect::Err(expect),
-        );
+        table.row("client", "standalone", vector, call_ret, *expect);
     }
 
     table.summary();
@@ -609,6 +606,12 @@ extern "C" fn client_main(_arg: usize) -> ! {
         raw(
             raven_abi::syscall::Syscall::READ as usize,
             [file.0 as usize, response, usize::MAX, 0, 0, 0],
+        ),
+        raw(PREAD, [file.0 as usize, response, 16, 0, 0, 0]),
+        raw(PREAD, [file.0 as usize, response, 16, 1, 0, 0]),
+        raw(
+            PREAD,
+            [file.0 as usize, response, 16, usize::MAX - 16, 0, 0],
         ),
         raw(PREAD, [file.0 as usize, response, 16, usize::MAX - 7, 0, 0]),
         raw(SEEK, [file.0 as usize, 0, usize::MAX, 0, 0, 0]),

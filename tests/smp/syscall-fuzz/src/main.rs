@@ -2315,12 +2315,14 @@ fn raw_plan(r: &mut Runner) {
         [usize::MAX, 0, 0, 0, 0, 0],
         Expect::Err(ESRCH),
     );
+    // POSIX.1-2017 setpgid(): a negative pgid is EINVAL. K488 (d88879078) implements it; the
+    // fuzz table carried the pre-K488 EPERM expectation (K500).
     r.raw(
         RAW_PROC_SETPGID,
         "PROC_SETPGID",
         "pgidneg",
         [0, usize::MAX, 0, 0, 0, 0],
-        Expect::Err(EPERM),
+        Expect::Err(EINVAL),
     );
     r.raw(
         RAW_PROC_SETPGID,
@@ -2586,13 +2588,28 @@ fn raw_plan(r: &mut Runner) {
         [usize::MAX, 0, 0, 0, 0, 0],
         Expect::Err(ESRCH),
     );
+    // POSIX.1-2017 kill(): signal 0 is an existence/permission check and returns 0. K488
+    // (d88879078) implements it; the fuzz table carried the pre-K488 EINVAL expectation (K500).
     r.raw(
         RAW_PROC_SIGNAL,
         "PROC_SIGNAL",
         "signo0",
         [0, 0, 0, 0, 0, 0],
-        Expect::Err(EINVAL),
+        Expect::Success,
     );
+    // The negative-pid group form is the same existence check on `-pgrp`; use the caller's own
+    // group so the check is deterministic. NetBSD kill1() dispatches pid < 0 to killpg1().
+    let pgrp = raw(RAW_PROC_GETPGID, [0, 0, 0, 0, 0, 0]);
+    if pgrp > 0 {
+        let group = 0usize.wrapping_sub(usize::try_from(pgrp).unwrap_or(0));
+        r.raw(
+            RAW_PROC_SIGNAL,
+            "PROC_SIGNAL",
+            "signo0pgrp",
+            [group, 0, 0, 0, 0, 0],
+            Expect::Success,
+        );
+    }
     r.raw(
         RAW_PROC_SIGNAL,
         "PROC_SIGNAL",
