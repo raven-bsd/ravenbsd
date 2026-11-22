@@ -49,9 +49,13 @@ dies with `poll: Permission denied` and `exit=255` before step 3. The script rep
 Commands after K548 and the measurement window:
 
 ```
+timeout 20 python3 tests/fixtures/sshd-trace/assert-loopback.py --selftest
 timeout 300 sh tests/fixtures/sshd-trace/build.sh
 timeout 600 python3 tests/fixtures/sshd-trace/assert-loopback.py
 ```
 
-The script writes `loopback-serial.log` and `loopback-summary.txt` and exits 0 only when all eight
+`--selftest` exercises the matcher without a boot: the full nine-line sequence passes, a missing
+`send eof` step reports `eof`, and a `send close`/`send eof` swap reports `close`.
+
+The script writes `loopback-serial.log` and `loopback-summary.txt` and exits 0 only when all nine
 ordered steps are present, 2 for the K548/client block, 1 for a missing step.

@@ -60,6 +60,53 @@ def console(child: pexpect.spawn, command: str, marker: str, timeout: int) -> bo
         return False
 
 
+def sequence_failure(lines: list[str]) -> str | None:
+    position = 0
+    for name, pattern in SEQUENCE:
+        found = -1
+        for index in range(position, len(lines)):
+            if re.search(pattern, lines[index]):
+                found = index
+                break
+        if found < 0:
+            return name
+        position = found + 1
+    return None
+
+
+def selftest() -> int:
+    good = [
+        "debug1: Starting session: command for raven from UNKNOWN port 65535 id 0",
+        "debug2: channel 0: read 293 from efd 15",
+        "debug2: channel 0: sent ext data 293",
+        "debug1: Received SIGCHLD.",
+        "debug1: session_by_pid: pid 42",
+        "debug1: session_exit_message: session 0 channel 0 pid 42 exit 0",
+        "debug2: channel 0: send eof",
+        "debug2: channel 0: send close for remote id 0",
+        "verbose: Close session: user raven from UNKNOWN port 65535 id 0",
+    ]
+    failure = sequence_failure(good)
+    if failure is not None:
+        log("selftest", f"full sequence rejected at {failure}")
+        return 1
+    missing = [line for line in good if "send eof" not in line]
+    failure = sequence_failure(missing)
+    if failure != "eof":
+        log("selftest", f"missing eof reported {failure}")
+        return 1
+    reordered = good.copy()
+    eof_index = next(index for index, line in enumerate(reordered) if "send eof" in line)
+    close_index = next(index for index, line in enumerate(reordered) if "send close" in line)
+    reordered[eof_index], reordered[close_index] = reordered[close_index], reordered[eof_index]
+    failure = sequence_failure(reordered)
+    if failure != "close":
+        log("selftest", f"reordered close/eof reported {failure}")
+        return 1
+    log("selftest", "PASS (full, missing eof, reordered close)")
+    return 0
+
+
 def main() -> int:
     if not IMAGE.is_file():
         log("error", f"missing {IMAGE}; run tests/fixtures/sshd-trace/build.sh")
@@ -116,22 +163,17 @@ def main() -> int:
         log("blocked", "guest loopback client did not print the command marker")
         return 2
     lines = [line[len("LOGLINE "):] for line in text.splitlines() if line.startswith("LOGLINE ")]
-    position = 0
-    for name, pattern in SEQUENCE:
-        found = -1
-        for index in range(position, len(lines)):
-            if re.search(pattern, lines[index]):
-                found = index
-                break
-        if found < 0:
-            SUMMARY.write_text("\n".join(summary) + f"\nmissing={name}\n", encoding="utf-8")
-            log("fail", f"missing ordered step {name}")
-            return 1
-        position = found + 1
+    failure = sequence_failure(lines)
+    if failure is not None:
+        SUMMARY.write_text("\n".join(summary) + f"\nmissing={failure}\n", encoding="utf-8")
+        log("fail", f"missing ordered step {failure}")
+        return 1
     SUMMARY.write_text("\n".join(summary) + "\nresult=PASS\n", encoding="utf-8")
     log("pass", f"ordered sequence {len(SEQUENCE)}/{len(SEQUENCE)}; serial {SERIAL}")
     return 0
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--selftest":
+        sys.exit(selftest())
     sys.exit(main())
