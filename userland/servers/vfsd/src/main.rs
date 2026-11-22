@@ -87,6 +87,8 @@ mod program {
     struct Proxy {
         target: Handle,
         path: String,
+        /// The caller's process root captured at open time; path CALLs must stay under it.
+        root: String,
         root_listing: bool,
         merged: Option<Vec<u8>>,
         mount_generation: u32,
@@ -703,15 +705,28 @@ mod program {
             Ok(written)
         }
 
+        /// Resolve a path CALL against the caller's root captured at open time.
+        ///
+        /// Absolute payload paths must not be resolved against the global mount table: a process
+        /// that chrooted keeps its root on every path CALL through the already-open description.
+        fn call_path(&self, root: &str, base: &str, path: &str) -> Result<String, Errno> {
+            if root == "/" {
+                self.absolute(base, path)
+            } else {
+                self.normalize_under_root(root, base, path)
+            }
+        }
+
         fn forward_one(
             &self,
             call: Call<'_>,
             base: &str,
+            root: &str,
             response: &mut [u8],
             creds: &Credentials,
         ) -> Result<usize, Errno> {
             let raw = single_path(&call).ok_or(Errno::EINVAL)?;
-            let path = self.absolute(base, &bytes_to_string(raw)?)?;
+            let path = self.call_path(root, base, &bytes_to_string(raw)?)?;
             let (mount_id, suffix) = self.table.resolve(&path)?;
             let scheme = self
                 .table
@@ -1039,13 +1054,15 @@ mod program {
             let target_flags = OpenFlags::from_wire(flags.to_wire() & !WIRE_OPEN_DIRECTORY)
                 .map_err(|_| Errno::EINVAL)?;
             let mut path = path;
+            let mut root = String::from("/");
             if let Ok(root_len) = usize::try_from(ctx.root_len)
                 && root_len > 0
             {
-                let root = path.get(..root_len).ok_or(Errno::EINVAL)?.to_string();
-                if root != "/" {
-                    path = self.resolve_rooted(&path, &root, !target_flags.nofollow())?;
+                let open_root = path.get(..root_len).ok_or(Errno::EINVAL)?.to_string();
+                if open_root != "/" {
+                    path = self.resolve_rooted(&path, &open_root, !target_flags.nofollow())?;
                 }
+                root = open_root;
             }
             let (mount_id, suffix) = self.table.resolve(&path)?;
             let scheme = self
@@ -1086,6 +1103,7 @@ mod program {
                     target,
                     root_listing: path == "/",
                     path,
+                    root,
                     merged: None,
                     mount_generation: self.mount_generation,
                 },
@@ -1339,9 +1357,13 @@ mod program {
             response: &mut [u8],
             creds: &Credentials,
         ) -> HandlerResult<usize> {
-            let (target, base) = {
+            let (target, base, root) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
-                (entry.file.target, entry.file.path.clone())
+                (
+                    entry.file.target,
+                    entry.file.path.clone(),
+                    entry.file.root.clone(),
+                )
             };
             let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
             match decoded.call {
@@ -1439,17 +1461,17 @@ mod program {
                 }
                 Call::Statvfs => Ok(proxy_call(&Client::new(), target, &decoded, response)?),
                 Call::Link { path, target } => {
-                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
-                    let target = self.absolute(&base, &bytes_to_string(target)?)?;
+                    let path = self.call_path(&root, &base, &bytes_to_string(path)?)?;
+                    let target = self.call_path(&root, &base, &bytes_to_string(target)?)?;
                     Ok(self.forward_link(&path, &target, response, creds)?)
                 }
                 Call::Rename { from, to } => {
-                    let from = self.absolute(&base, &bytes_to_string(from)?)?;
-                    let to = self.absolute(&base, &bytes_to_string(to)?)?;
+                    let from = self.call_path(&root, &base, &bytes_to_string(from)?)?;
+                    let to = self.call_path(&root, &base, &bytes_to_string(to)?)?;
                     Ok(self.forward_rename(&from, &to, response, creds)?)
                 }
                 Call::Access { mode, path } => {
-                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
+                    let path = self.call_path(&root, &base, &bytes_to_string(path)?)?;
                     let (mount_id, suffix) = self.table.resolve(&path)?;
                     let scheme = self
                         .table
@@ -1479,7 +1501,7 @@ mod program {
                 | Call::Mknod { .. }
                 | Call::Utimens { .. }
                 | Call::Lstat { .. } => {
-                    Ok(self.forward_one(decoded.call, &base, response, creds)?)
+                    Ok(self.forward_one(decoded.call, &base, &root, response, creds)?)
                 }
                 Call::Mmap { .. } => status(response, Err(Errno::EINVAL)),
             }

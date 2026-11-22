@@ -300,7 +300,7 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
             u64::from(target.wake_pending.load(Ordering::Relaxed)),
             u64::from(target.wake_last_cpu.load(Ordering::Relaxed)),
             cpu_need_resched,
-            cpu_runqueue as u64,
+            cpu_runqueue,
         ];
         for (chunk, value) in bytes
             .get_mut(328..488)
@@ -402,6 +402,10 @@ pub fn set_command(frame: &SyscallFrame) -> Result<usize, Errno> {
 pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let pid = frame.rdi as u32 as i32;
+    let pgid = frame.rsi as u32 as i32;
+    if pgid < 0 {
+        return Err(Errno::EINVAL);
+    }
     let target = if pid == 0 || u64::try_from(pid).ok() == Some(caller.id) {
         Arc::clone(&caller)
     } else {
@@ -420,14 +424,23 @@ pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
         let ids = target.ids.lock();
         (ids.sid, ids.pgid)
     };
+    if target_id != caller.id {
+        // A child must still be in the caller's session and must not have exec'd. The donor
+        // order is same-session EPERM before the exec EACCES.
+        if target_sid != caller.ids.lock().sid {
+            return Err(Errno::EPERM);
+        }
+        if target.exec_done.load(Ordering::Acquire) {
+            return Err(Errno::EACCES);
+        }
+    }
     if target_sid == target_id {
         return Err(Errno::EPERM);
     }
-    let pgid = frame.rsi as u32 as i32;
     let group = if pgid == 0 {
         target_id
     } else {
-        u64::try_from(pgid).map_err(|_| Errno::EPERM)?
+        u64::try_from(pgid).map_err(|_| Errno::EINVAL)?
     };
     let valid = group == target_id
         || group == current_group
@@ -1226,7 +1239,7 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let target = frame.rdi as u32 as i32;
     let signo = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
-    if !signal_valid(signo) {
+    if signo != 0 && !signal_valid(signo) {
         return Err(Errno::EINVAL);
     }
     let targets: Vec<Arc<Process>> = if target > 0 {
@@ -1256,6 +1269,10 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
         if !signal_allowed(&caller, target) {
             return Err(Errno::EPERM);
         }
+    }
+    if signo == 0 {
+        // POSIX `kill(pid, 0)` is an existence/permission check; it never queues a signal.
+        return Ok(0);
     }
     for target in targets {
         signal_one(&caller, &target, signo)?;
