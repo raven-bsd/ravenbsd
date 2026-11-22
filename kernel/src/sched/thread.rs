@@ -62,6 +62,10 @@ static NEXT_TID: AtomicU32 = AtomicU32::new(1);
 /// [`MAX_THREADS`] and sizing every level to the same bound means the queue can never refuse a
 /// runnable thread. Idle threads are never enqueued and are excluded.
 static LIVE_THREADS: AtomicUsize = AtomicUsize::new(0);
+/// One-shot diagnostic when the admission bound rejects a thread (K530 churn).
+static SLOT_DENY_LOGGED: AtomicBool = AtomicBool::new(false);
+/// Slots released since boot (K530 churn diagnostic).
+static SLOTS_DROPPED: AtomicUsize = AtomicUsize::new(0);
 
 /// RAII reservation for the kernel-wide thread bound.
 struct ThreadSlot {
@@ -71,8 +75,15 @@ struct ThreadSlot {
 impl ThreadSlot {
     /// Reserve one non-idle thread slot, or fail the thread creation with `EAGAIN`.
     fn reserve() -> Result<Self, Errno> {
-        if LIVE_THREADS.fetch_add(1, Ordering::AcqRel) >= MAX_THREADS {
+        let live = LIVE_THREADS.fetch_add(1, Ordering::AcqRel);
+        if live >= MAX_THREADS {
             LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
+            if !SLOT_DENY_LOGGED.swap(true, Ordering::AcqRel) {
+                crate::kprintln!(
+                    "slot: deny live={live} max={MAX_THREADS} dropped={}",
+                    SLOTS_DROPPED.load(Ordering::Acquire)
+                );
+            }
             return Err(Errno::EAGAIN);
         }
         Ok(Self { counted: true })
@@ -88,6 +99,7 @@ impl Drop for ThreadSlot {
     fn drop(&mut self) {
         if self.counted {
             LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
+            SLOTS_DROPPED.fetch_add(1, Ordering::AcqRel);
         }
     }
 }
@@ -591,6 +603,8 @@ static STACK_CACHE: Mutex<Vec<(u64, u64)>> = Mutex::new(Vec::new());
 const STACK_CACHE_MAX: usize = MAX_THREADS;
 /// Stacks freshly carved from the heap since boot (diagnostic counter).
 static STACK_FRESH: AtomicU64 = AtomicU64::new(0);
+/// Freed stack pairs the cache refused (the K530 defect); should stay zero.
+static STACK_DROPS: AtomicU64 = AtomicU64::new(0);
 /// One-shot `s69-stackcheck` reuse probe.
 static STACK_SELFTEST_DONE: AtomicBool = AtomicBool::new(false);
 
@@ -702,6 +716,13 @@ pub fn free_kernel_stack(base: u64, top: u64) {
     let mut cache = STACK_CACHE.lock();
     if cache.len() < STACK_CACHE_MAX {
         cache.push((base, top));
+    } else {
+        let dropped = STACK_DROPS
+            .fetch_add(1, Ordering::Relaxed)
+            .saturating_add(1);
+        if dropped == 1 {
+            crate::kprintln!("stack-cache: DROPPED base={base:#x} top={top:#x}");
+        }
     }
 }
 

@@ -6,10 +6,11 @@
 #
 # usage: sh tests/smp/stack/run.sh kvm1|kvm2|kvm4 [--iterations N]
 #
-# The guest creates 1000 threads, joins them, and repeats for 100 cycles. The kernel `s69` line
-# at exit carries `stack_fresh`, `stack_cached` and `heap`; this script asserts that the fresh
-# stack count stays at the sched-core admission bound (1024) and the shipped fixture's reuse probe
-# printed `reuse-zero ok`. A red tree fails the fresh-stack bound or the guest at OOM.
+# The guest creates 80 threads, releases them, and repeats for 10 cycles (800 admissions, below
+# the 1024 live-thread bound). The kernel `s69` line at exit carries `stack_fresh`,
+# `stack_cached` and `heap`; this script asserts that the fresh stack count stays near the first
+# cycle, every freed stack is cached, no pair was dropped, and the shipped fixture's reuse probe
+# printed `reuse-zero ok`.
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
@@ -81,11 +82,16 @@ while [ "$iteration" -le "$iterations" ]; do
         grep -E '^stack-selftest:|^stack: fail' "$serial" | tail -n 10 >&2 || true
         exit 1
     fi
-    # MAX_THREADS is 1024; 1100 is the small scheduling/init margin. The leaky 64-entry mutation
-    # carves 64 new stacks every cycle (5 + 128 + 99 * 64 = 6,469) and still stays under this
-    # guest's memory, so the bound is the reuse property, not an OOM side effect.
-    if [ "$fresh" -gt 1100 ] || [ "$cached" -gt 1100 ]; then
-        echo "smp-stack: FAIL mode=$mode stack_fresh=$fresh stack_cached=$cached (bound 1100)" >&2
+    # Green fresh is 5 init/kernel + 1 selftest + 80 churn = 81; the 64-entry mutation carves 16
+    # new stacks every cycle (81 + 9 * 16 = 225), so 100 is a clean discriminator that is also
+    # below the 1024 admission bound. The cache must hold all 80 churn stacks, and the one-shot
+    # `stack-cache: DROPPED` line is the direct leak evidence.
+    if [ "$fresh" -gt 100 ] || [ "$cached" -lt 80 ]; then
+        echo "smp-stack: FAIL mode=$mode stack_fresh=$fresh stack_cached=$cached" >&2
+        exit 1
+    fi
+    if grep -q '^stack-cache: DROPPED ' "$serial"; then
+        echo "smp-stack: FAIL mode=$mode a freed stack pair was dropped" >&2
         exit 1
     fi
     printf 'smp-stack: PASSED mode=%s iteration=%s stack_fresh=%s stack_cached=%s heap=%s\n' \
