@@ -4,14 +4,14 @@
 //! Guest probe for the K466 ENOSPC and sync/persistence qtests.
 //!
 //! It is a static no_std program injected into the external UFS2 disk by the case
-//! `pre` script and run from the mounted filesystem. Modes:
+//! `pre` script and run from the mounted filesystem.
 //!
-//! * `enospc`         fill `/mnt/k466-fill` until a write fails; require `ENOSPC`,
-//!                    verify the written prefix/suffix, and print the free-block floor.
-//! * `persist-write`  write a deterministic file, a directory entry and a rename,
-//!                    sync twice after each step, and print checksums.
-//! * `persist-check`  verify every byte, the directory entry and the rename after a
-//!                    power-cut boot of the same image.
+//! `enospc` fills `/mnt/k466-fill` until a write fails, requires `ENOSPC`, verifies
+//! the written prefix/suffix and prints the free-block floor.
+//!
+//! `persist-write` writes a deterministic file, a directory entry and a rename,
+//! syncs twice after each step, and prints checksums. `persist-check` verifies every
+//! byte, the directory entry and the rename after a power-cut boot of the same image.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -28,9 +28,7 @@ mod program {
     use alloc::vec::Vec;
 
     use raven_abi::errno::Errno;
-    use raven_proto_fs::{
-        Call, CallRequest, CallResponse, O_CREAT, O_RDONLY, O_RDWR, O_TRUNC,
-    };
+    use raven_proto_fs::{Call, CallRequest, CallResponse, O_CREAT, O_RDONLY, O_RDWR, O_TRUNC};
     use raven_rt::entry;
     use raven_rt::fs;
     use raven_scheme::Client;
@@ -112,8 +110,8 @@ mod program {
     }
 
     fn read_verified(path: &str, chunks: usize) -> Result<u64, String> {
-        let mut file =
-            fs::open(path, O_RDONLY).map_err(|error| format!("open {path}: {}", error.description()))?;
+        let mut file = fs::open(path, O_RDONLY)
+            .map_err(|error| format!("open {path}: {}", error.description()))?;
         let mut hash = 0xcbf2_9ce4_8422_2325u64;
         let mut buffer = vec![0u8; CHUNK];
         for index in 0..chunks {
@@ -207,31 +205,37 @@ mod program {
             match file.write(&data) {
                 Ok(count) if count == CHUNK => written += CHUNK as u64,
                 Ok(count) => {
-                    return Err(format!("short write {count} at chunk {index} without ENOSPC"))
+                    return Err(format!(
+                        "short write {count} at chunk {index} without ENOSPC"
+                    ));
                 }
                 Err(error) if error == Errno::ENOSPC => {
                     failed_chunk = Some(index);
                     break;
                 }
                 Err(error) => {
-                    return Err(format!("unexpected errno at chunk {index}: {}", error.description()))
+                    return Err(format!(
+                        "unexpected errno at chunk {index}: {}",
+                        error.description()
+                    ));
                 }
             }
         }
         let Some(failed_chunk) = failed_chunk else {
-            return Err(format!("filesystem not full after {} chunks", MAX_FILL_CHUNKS));
+            return Err(format!(
+                "filesystem not full after {} chunks",
+                MAX_FILL_CHUNKS
+            ));
         };
         drop(file);
         if written == 0 {
             return Err("first write failed".into());
         }
-        raven_rt::println!(
-            "k466: enospc errno=28 chunk={failed_chunk} wrote={written}"
-        );
+        raven_rt::println!("k466: enospc errno=28 chunk={failed_chunk} wrote={written}");
 
         // Every previously acknowledged chunk must still read back.
-        let mut reader =
-            fs::open(FILL_PATH, O_RDONLY).map_err(|error| format!("reopen: {}", error.description()))?;
+        let mut reader = fs::open(FILL_PATH, O_RDONLY)
+            .map_err(|error| format!("reopen: {}", error.description()))?;
         let mut buffer = vec![0u8; CHUNK];
         let mut hash = 0xcbf2_9ce4_8422_2325u64;
         for index in 0..(written / CHUNK as u64) {
@@ -315,3 +319,6 @@ mod program {
         Ok(())
     }
 }
+
+#[cfg(not(target_os = "none"))]
+fn main() {}
