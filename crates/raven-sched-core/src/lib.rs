@@ -28,7 +28,7 @@ pub const MAX_THREADS: usize = 1024;
 ///
 /// Deliberately equal to [`MAX_THREADS`]: the queue is the fixed-capacity, allocation-free
 /// admission gate, and its bound must cover every thread that can target one level.
-pub const CAPACITY: usize = 64;
+pub const CAPACITY: usize = MAX_THREADS;
 
 /// A 32-priority FIFO run queue.
 ///
