@@ -307,6 +307,16 @@ fn a_three_byte_dss_header_is_rejected_not_indexed() {
 }
 
 #[test]
+fn a_three_byte_add_addr_header_is_rejected_not_indexed() {
+    // cargo-fuzz found [01 1e 03 30]: NOP then ADD_ADDR with no Address ID byte.
+    assert_eq!(MptcpOption::parse(&[30, 3, 0x30]), Err(Error::BadLength));
+    assert_eq!(
+        parse_options(&[0x01, 0x1e, 0x03, 0x30]),
+        Err(Error::BadLength)
+    );
+}
+
+#[test]
 fn remove_ids_rejects_empty_and_oversized_lists() {
     assert_eq!(RemoveIds::new(vec![]), Err(Error::BadLength));
     assert_eq!(

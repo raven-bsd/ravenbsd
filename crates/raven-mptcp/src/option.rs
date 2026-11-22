@@ -508,6 +508,9 @@ fn parse_dss(body: &[u8], nibble: u8, length: usize) -> Result<MptcpOption, Erro
 }
 
 fn parse_add_addr(body: &[u8], nibble: u8, length: usize) -> Result<MptcpOption, Error> {
+    if length < 8 {
+        return Err(Error::BadLength);
+    }
     if nibble & !1 != 0 {
         return Err(Error::ReservedNonZero);
     }
