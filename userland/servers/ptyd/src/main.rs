@@ -17,9 +17,9 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
+    use alloc::boxed::Box;
     use alloc::collections::BTreeMap;
     use alloc::sync::Arc;
-    use alloc::vec::Vec;
     use core::sync::atomic::{AtomicU64, Ordering};
 
     use raven_abi::errno::Errno;
@@ -67,10 +67,11 @@ mod program {
         })
     }
 
-    /// A deferred slave read: the server loop registers the capture buffer and returns. The write
-    /// path drains matching jobs immediately; the pending worker is only the timer/drain fallback.
+    /// One deferred slave read with its own worker: a blocked read on one pair cannot delay the
+    /// completion of another pair.
     struct ReadJob {
         token: u64,
+        pairs: Arc<Mutex<Pairs<TargetSignal>>>,
         pair: u64,
         capture: usize,
         length: usize,
@@ -79,92 +80,51 @@ mod program {
         completer: Completer,
     }
 
-    /// Capture reads waiting for data or their VTIME deadline.
-    static PENDING: Mutex<Vec<ReadJob>> = Mutex::new(Vec::new());
-
-    /// Complete one pending job if its pair has data or its deadline elapsed.
-    ///
-    /// `Some(pair)` restricts the scan to the pair whose write just queued data; `None` is the
-    /// worker fallback for `VTIME`. The capture buffer is the kernel-owned deferred capture and
-    /// remains mapped until `Completer::complete`.
-    fn drain_pending(pairs: &Arc<Mutex<Pairs<TargetSignal>>>, only: Option<u64>) {
-        let mut pending = PENDING.lock();
-        let mut index = 0usize;
-        while index < pending.len() {
-            if only.is_some_and(|pair| pending[index].pair != pair) {
-                index = index.saturating_add(1);
-                continue;
-            }
-            // The timer worker only owns VTIME jobs; VMIN-only jobs are completed by the write
-            // drain and must not contend with the server loop every millisecond.
-            if only.is_none() && pending[index].vtime == 0 {
-                index = index.saturating_add(1);
-                continue;
-            }
-            let (pair, capture, length, vtime, start, token, completer) = {
-                let job = &pending[index];
-                (
-                    job.pair,
-                    job.capture,
-                    job.length,
-                    job.vtime,
-                    job.start,
-                    job.token,
-                    job.completer.clone(),
-                )
-            };
+    /// Per-read worker: poll its own pair, write the captured buffer, complete exactly once.
+    fn read_job(raw: usize) {
+        // SAFETY: `raw` is the `Box::into_raw` from `read_with`; this worker reclaims it once.
+        let job = unsafe { Box::from_raw(raw as *mut ReadJob) };
+        let limit = (job.vtime != 0).then_some(job.vtime.saturating_mul(100_000_000));
+        loop {
             let result = {
-                let mut pty_pairs = pairs.lock();
-                match pty_pairs.get_mut(pair) {
+                let mut pairs = job.pairs.lock();
+                match pairs.get_mut(job.pair) {
                     Some(pty) => {
                         // SAFETY: the deferred capture stays mapped until `complete`; the slice
                         // length is the caller's captured buffer length.
-                        let buffer =
-                            unsafe { core::slice::from_raw_parts_mut(capture as *mut u8, length) };
+                        let buffer = unsafe {
+                            core::slice::from_raw_parts_mut(job.capture as *mut u8, job.length)
+                        };
                         Some(pty.read_slave(buffer))
                     }
                     None => None,
                 }
             };
-            let completion = match result {
-                Some(Ok(count)) => Some(Ok(count)),
-                Some(Err(Errno::EAGAIN)) => {
-                    let limit =
-                        (vtime != 0).then_some(u64::from(vtime).saturating_mul(100_000_000));
-                    if let Some(limit) = limit
-                        && now_ns().saturating_sub(start) >= limit
-                    {
-                        Some(Ok(0))
-                    } else {
-                        None
-                    }
+            match result {
+                Some(Ok(count)) => {
+                    let _ = job.completer.complete(job.token, Ok(count));
+                    return;
                 }
-                Some(Err(error)) => Some(Err(error)),
-                None => Some(Err(Errno::EBADF)),
-            };
-            if let Some(completion) = completion {
-                let _ = pending.remove(index);
-                let _ = completer.complete(token, completion);
-            } else {
-                index = index.saturating_add(1);
+                Some(Err(Errno::EAGAIN)) => {}
+                Some(Err(error)) => {
+                    let _ = job.completer.complete(job.token, Err(error));
+                    return;
+                }
+                None => {
+                    let _ = job.completer.complete(job.token, Err(Errno::EBADF));
+                    return;
+                }
             }
-        }
-    }
-
-    /// Timer/drain fallback for deferred reads.
-    fn pending_worker(_arg: usize) {
-        loop {
+            if let Some(limit) = limit
+                && now_ns().saturating_sub(job.start) >= limit
+            {
+                let _ = job.completer.complete(job.token, Ok(0));
+                return;
+            }
             READER_WAKES.fetch_add(1, Ordering::Relaxed);
-            let pairs = HANDLER_PAIRS.lock().as_ref().cloned();
-            if let Some(pairs) = pairs {
-                drain_pending(&pairs, None);
-            }
             let _ = nanosleep(1_000_000);
         }
     }
-
-    /// Pairs handle for the pending worker, set once at startup.
-    static HANDLER_PAIRS: Mutex<Option<Arc<Mutex<Pairs<TargetSignal>>>>> = Mutex::new(None);
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum Role {
@@ -282,8 +242,9 @@ mod program {
             let Some(completer) = self.completer.clone() else {
                 return Err(HandlerError::Errno(Errno::EAGAIN));
             };
-            PENDING.lock().push(ReadJob {
+            let job = Box::new(ReadJob {
                 token: ctx.token,
+                pairs: Arc::clone(&self.pairs),
                 pair: entry.pair,
                 capture: buffer.as_mut_ptr() as usize,
                 length: buffer.len(),
@@ -291,6 +252,12 @@ mod program {
                 start: now_ns(),
                 completer,
             });
+            let raw = Box::into_raw(job) as usize;
+            if thread::spawn(read_job, raw, 32 * 1024).is_err() {
+                // SAFETY: the spawn failed, so no worker owns `raw`.
+                drop(unsafe { Box::from_raw(raw as *mut ReadJob) });
+                return Err(HandlerError::Errno(Errno::EAGAIN));
+            }
             Err(HandlerError::Defer(ctx.token))
         }
 
@@ -304,7 +271,6 @@ mod program {
                     Role::Slave => pty.write_slave(buffer),
                 }
             }
-            drain_pending(&self.pairs, Some(entry.pair));
             Ok(buffer.len())
         }
 
@@ -462,8 +428,6 @@ mod program {
         };
         let mut handler = HandlerImpl::new();
         handler.completer = Some(server.completer());
-        *HANDLER_PAIRS.lock() = Some(Arc::clone(&handler.pairs));
-        let _ = thread::spawn(pending_worker, 0, 32 * 1024);
         raven_rt::eprintln!("ptyd: files=0 pairs=0");
         loop {
             if let Some(packet) = server.poll(None) {
