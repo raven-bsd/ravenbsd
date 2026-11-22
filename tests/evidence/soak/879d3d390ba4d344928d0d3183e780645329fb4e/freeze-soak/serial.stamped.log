@@ -1,782 +1,0 @@
-2.970947 [2J[01;01H[=3h[2J[01;01HBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
-2.978869 BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
-2.980586 BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
-2.980975 loader: RavenBSD loader 0.1 (x86_64)
-2.981444 loader: RavenBSD loader 0.1 (x86_64)
-3.445021 loader: memory map: 26 regions
-3.448262 frames: base=256 count=131072 free=103668 reserved=27404
-3.450083 paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
-3.452763 heap: 4096 KiB
-3.480303 vtd: disabled (iommu=on not set); DMA unprotected
-3.480542 fpu: xsave 576 bytes
-3.480954 acpi: mcfg base=0xb0000000 buses=0-255
-3.481334 acpi: 4 cpus, 1 ioapics, 5 overrides
-3.481622 apic: id 0 (x2apic)
-3.482643 keyboard: i8042 irq 1 gsi 1 vector 0x23
-3.483192 console: rx irq 4 gsi 4 vector 0x22 (active-high)
-3.508775 cyclic: ok fired=3 order=5ms,10ms,15ms
-3.509035 time: tsc 2700 MHz (pit)
-3.509278 time: tsc not invariant
-3.509443 timer: 1000 Hz
-3.530223 fpu: xsave 576 bytes
-3.540633 fpu: xsave 576 bytes
-3.551333 fpu: xsave 576 bytes
-3.551538 smp: 4 cpus online
-3.552118 RavenBSD kernel 0.1 (x86_64) 879d3d39 2026-11-21
-3.552481 mem: 404 MiB usable in 7 regions
-3.552888 cmdline: console=ttyS0 loglevel=info
-3.553735 process: starting /init
-3.554268 process: /init entry=0x41a890 sp=0x7fffffffde60
-3.554693 sched: running (4 cpus, slice 10 ms)
-3.587131 svcd: bootstrap plan: logd pcid devd initfsd nulld ramfsd randd zerod vfsd
-3.604208 svcd: logd up
-3.608907 pcid: device 00:00.0 vendor=0x8086 device=0x29c0 class=0x06 subclass=0x00 irq_line=255 irq_pin=0
-3.609977 pcid: device 00:01.0 vendor=0x1234 device=0x1111 class=0x03 subclass=0x00 irq_line=255 irq_pin=0
-3.611028 pcid: device 00:02.0 vendor=0x1af4 device=0x1041 class=0x02 subclass=0x00 irq_line=11 irq_pin=1
-3.612085 pcid: device 00:1f.0 vendor=0x8086 device=0x2918 class=0x06 subclass=0x01 irq_line=255 irq_pin=0
-3.613163 pcid: device 00:1f.2 vendor=0x8086 device=0x2922 class=0x01 subclass=0x06 irq_line=10 irq_pin=1
-3.614228 pcid: device 00:1f.3 vendor=0x8086 device=0x2930 class=0x0c subclass=0x05 irq_line=10 irq_pin=1
-3.614423 pcid: devices=6
-3.615165 svcd: pcid up
-3.690846 rtc: 2026-11-21 18:11:56 (epoch 1795284716s)
-3.691148 1795284716.196 nulld: started
-3.710658 1795284716.216 ramfsd: started
-3.710888 svcd: nulld up
-3.711202 svcd: ramfsd up
-3.711570 1795284716.216 randd: started
-3.712042 1795284716.217 initfsd: started
-3.712485 1795284716.217 zerod: started
-3.712754 svcd: randd up
-3.712965 svcd: initfsd up
-3.713271 svcd: zerod up
-3.713708 devd: devices=6
-3.714475 devd: matched 00:02.0 vendor=0x1af4 device=0x1041 irq_line=11 irq_pin=1
-3.715136 devd: driver virtio-net bar=4 size=16384
-3.715808 devd: driver virtio-net dma bus=0x100000 len=65536
-3.716627 devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4
-3.717625 devd: driver virtio-net msix unavailable: bad handle or file descriptor; using legacy irq
-3.718078 devd: driver virtio-net irq line=11
-3.719283 virtio-net: id=1af4:1041
-3.720124 virtio-net: common=0x0 notify=0x3000 isr=0x1000 device=0x2000
-3.720627 virtio-net: dma len=65536 bus=0x100000 irq=11
-3.721371 virtio-net: mac=52:54:00:12:34:56 mtu=1500 link=up
-3.721822 virtio-net: queue0 rx size=8
-3.722141 virtio-net: queue1 tx size=8
-3.722919 virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536
-3.723589 virtio-net: serving nic:
-3.729641 svcd: devd up
-3.733241 vfsd: mounted / on initfs:
-3.733635 vfsd: mounted /tmp on ramfs:
-3.734062 vfsd: mounted /dev/null on null:
-3.734465 vfsd: mounted /dev/zero on zero:
-3.734892 vfsd: mounted /dev/random on rand:
-3.735335 vfsd: mounted /dev/urandom on rand:
-3.743831 svcd: vfsd up
-3.745691 svcd: root: /root: no UFS root device (no such file or directory); starting the initfs plan
-3.748052 svcd: consd up
-3.754699 1795284716.259 sysd: started
-3.754991 svcd: sysd up
-3.761804 netd: pf absent
-3.762986 netd: network config mode=dhcp hostname=raven
-3.763555 netd: hostname raven
-3.763943 netd: interface eth0 10.0.2.15/24
-3.764316 netd: interface lo 127.0.0.1/8
-3.764455 netd: ready
-3.771883 svcd: netd up
-3.781162 resolvd: write file:/etc/resolv.conf: read-only file system
-3.782445 resolvd: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3 renew=43200000ms rebind=75600000ms expires=86400000ms
-3.782915 resolvd: resolv.conf=nameserver 10.0.2.3
-3.783603 1795284716.288 resolvd: started
-3.791007 svcd: resolvd up
-3.797000 svcd: all services up
-3.797168 svcd: getty up
-3.839538 RavenBSD 0.1 (x86_64) (tty:console)
-3.857908 login: root
-3.908165 Password: 
-3.913639 RavenBSD 0.1.0
-3.913639 
-3.913916 Welcome to the RavenBSD console.
-3.914524 This is a root-only login for the 0.1.0 release image.
-3.914548 
-3.914927 Type `exit` to close the session.
-3.962732                                                                                 [38;5;183m/[0m
-4.066717 [J[38;5;183mraven# [0m[7C[J[38;5;183mraven# [0m[1;39m/[0m[8C[J[38;5;183mraven# [0m[1;39m/b[0m[9C[J[38;5;183mraven# [0m[1;39m/bi[0m[10C[J[38;5;183mraven# [0m[1;39m/bin[0m[11C[J[38;5;183mraven# [0m[1;39m/bin/[0m[12C[J[38;5;183mraven# [0m[1;39m/bin/b[0m[13C[J[38;5;183mraven# [0m[1;39m/bin/br[0m[14C[J[38;5;183mraven# [0m[1;39m/bin/bru[0m[15C[J[38;5;183mraven# [0m[1;39m/bin/brus[0m[16C[J[38;5;183mraven# [0m[1;39m/bin/brush[0m[17C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[18C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/[0m[19C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/e[0m[20C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/et[0m[21C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc[0m[22C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/[0m[23C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/s[0m[24C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/so[0m[25C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soa[0m[26C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak[0m[27C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-[0m[28C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-w[0m[29C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-wo[0m[30C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-wor[0m[31C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-work[0m[32C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workl[0m[33C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-worklo[0m[34C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workloa[0m[35C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload[0m[36C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.[0m[37C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.s[0m[38C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[39C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[40C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m2[0m[41C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m24[0m[42C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m24[0m[90m [0m[43C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m24[0m[90m [0m[39m5[0m[44C[J[38;5;183mraven# [0m[1;32m/bin/brush[0m[90m [0m[39m/etc/soak-workload.sh[0m[90m [0m[39m24[0m[90m [0m[39m5[0m[44C
-4.147129 soak-ready
-4.147467 soak-cycle: 1
-4.165805 ping: 10.0.2.2 seq=1 rtt=14ms
-4.166425 ping: 1 packets transmitted, 1 received, 0% packet loss
-4.166859 ping: rtt min/avg/max = 14/14/14 ms
-4.173650 soak-ping: 0
-4.189553 soak-write: 1
-4.223669 RavenBSD
-4.235971 soak-fork: 0
-4.273075 soak-sync: 0
-4.275334 blockd stopped 0
-4.275614 consd running 0
-4.275878 devd running 0
-4.276183 fsd-ufs stopped 0
-4.276459 getty running 0
-4.276800 initfsd running 0
-4.277026 logd running 0
-4.277281 netd running 0
-4.277554 nulld running 0
-4.277868 pcid running 0
-4.278144 ramfsd running 0
-4.278489 randd running 0
-4.278732 resolvd running 0
-4.278966 rsh stopped 0
-4.279226 sysd running 0
-4.279484 vfsd running 0
-4.279764 zerod running 0
-4.287192 soak-services: 0
-4.287600 soak-cycle-done: 1
-9.323978 soak-cycle: 2
-9.338055 ping: 10.0.2.2 seq=1 rtt=10ms
-9.338678 ping: 1 packets transmitted, 1 received, 0% packet loss
-9.339125 ping: rtt min/avg/max = 10/10/10 ms
-9.349963 soak-ping: 0
-9.362726 soak-write: 2
-9.397042 RavenBSD
-9.397483 soak-fork: 0
-9.433202 soak-sync: 0
-9.434497 blockd stopped 0
-9.434663 consd running 0
-9.434806 devd running 0
-9.434974 fsd-ufs stopped 0
-9.435177 getty running 0
-9.435345 initfsd running 0
-9.435489 logd running 0
-9.435633 netd running 0
-9.435788 nulld running 0
-9.435934 pcid running 0
-9.436109 ramfsd running 0
-9.436274 randd running 0
-9.436436 resolvd running 0
-9.436578 rsh stopped 0
-9.436731 sysd running 0
-9.436875 vfsd running 0
-9.437033 zerod running 0
-9.446294 soak-services: 0
-9.446510 soak-cycle-done: 2
-14.471194 soak-cycle: 3
-14.481091 ping: 10.0.2.2 seq=1 rtt=6ms
-14.481707 ping: 1 packets transmitted, 1 received, 0% packet loss
-14.482113 ping: rtt min/avg/max = 6/6/6 ms
-14.485018 soak-ping: 0
-14.496770 soak-write: 3
-14.529059 RavenBSD
-14.541284 soak-fork: 0
-14.577375 soak-sync: 0
-14.579374 blockd stopped 0
-14.579651 consd running 0
-14.579919 devd running 0
-14.580264 fsd-ufs stopped 0
-14.580549 getty running 0
-14.580907 initfsd running 0
-14.581125 logd running 0
-14.581413 netd running 0
-14.581689 nulld running 0
-14.581952 pcid running 0
-14.582236 ramfsd running 0
-14.582544 randd running 0
-14.582846 resolvd running 0
-14.583091 rsh stopped 0
-14.583377 sysd running 0
-14.583646 vfsd running 0
-14.583921 zerod running 0
-14.590470 soak-services: 0
-14.590839 soak-cycle-done: 3
-19.622239 soak-cycle: 4
-19.632367 ping: 10.0.2.2 seq=1 rtt=6ms
-19.633040 ping: 1 packets transmitted, 1 received, 0% packet loss
-19.633513 ping: rtt min/avg/max = 6/6/6 ms
-19.636200 soak-ping: 0
-19.648054 soak-write: 4
-19.680536 RavenBSD
-19.680936 soak-fork: 0
-19.713517 soak-sync: 0
-19.715577 blockd stopped 0
-19.715857 consd running 0
-19.716122 devd running 0
-19.716442 fsd-ufs stopped 0
-19.716755 getty running 0
-19.717058 initfsd running 0
-19.717336 logd running 0
-19.717664 netd running 0
-19.717963 nulld running 0
-19.718243 pcid running 0
-19.718558 ramfsd running 0
-19.718852 randd running 0
-19.719167 resolvd running 0
-19.719464 rsh stopped 0
-19.719799 sysd running 0
-19.720118 vfsd running 0
-19.720462 zerod running 0
-19.726705 soak-services: 0
-19.727055 soak-cycle-done: 4
-24.754195 soak-cycle: 5
-24.769212 ping: 10.0.2.2 seq=1 rtt=12ms
-24.769571 ping: 1 packets transmitted, 1 received, 0% packet loss
-24.769806 ping: rtt min/avg/max = 12/12/12 ms
-24.779327 soak-ping: 0
-24.791361 soak-write: 5
-24.824625 RavenBSD
-24.825087 soak-fork: 0
-24.862631 soak-sync: 0
-24.864934 blockd stopped 0
-24.865221 consd running 0
-24.865495 devd running 0
-24.865856 fsd-ufs stopped 0
-24.866151 getty running 0
-24.866488 initfsd running 0
-24.866818 logd running 0
-24.867139 netd running 0
-24.867406 nulld running 0
-24.867694 pcid running 0
-24.868006 ramfsd running 0
-24.868351 randd running 0
-24.868701 resolvd running 0
-24.868982 rsh stopped 0
-24.869274 sysd running 0
-24.869579 vfsd running 0
-24.869886 zerod running 0
-24.876771 soak-services: 0
-24.877125 soak-cycle-done: 5
-29.911357 soak-cycle: 6
-29.916400 ping: 10.0.2.2 seq=1 rtt=2ms
-29.916772 ping: 1 packets transmitted, 1 received, 0% packet loss
-29.916985 ping: rtt min/avg/max = 2/2/2 ms
-29.924384 soak-ping: 0
-29.933589 soak-write: 6
-29.966171 RavenBSD
-29.966589 soak-fork: 0
-30.000722 soak-sync: 0
-30.002732 blockd stopped 0
-30.002962 consd running 0
-30.003179 devd running 0
-30.003428 fsd-ufs stopped 0
-30.003664 getty running 0
-30.003917 initfsd running 0
-30.004138 logd running 0
-30.004362 netd running 0
-30.004595 nulld running 0
-30.004831 pcid running 0
-30.005072 ramfsd running 0
-30.005304 randd running 0
-30.005556 resolvd running 0
-30.005778 rsh stopped 0
-30.006000 sysd running 0
-30.006224 vfsd running 0
-30.006457 zerod running 0
-30.013767 soak-services: 0
-30.014031 soak-cycle-done: 6
-35.047398 soak-cycle: 7
-35.058516 ping: 10.0.2.2 seq=1 rtt=8ms
-35.058849 ping: 1 packets transmitted, 1 received, 0% packet loss
-35.059042 ping: rtt min/avg/max = 8/8/8 ms
-35.060360 soak-ping: 0
-35.067463 soak-write: 7
-35.100528 RavenBSD
-35.100948 soak-fork: 0
-35.136813 soak-sync: 0
-35.138872 blockd stopped 0
-35.139134 consd running 0
-35.139369 devd running 0
-35.139659 fsd-ufs stopped 0
-35.139948 getty running 0
-35.140234 initfsd running 0
-35.140484 logd running 0
-35.140743 netd running 0
-35.141002 nulld running 0
-35.141264 pcid running 0
-35.141536 ramfsd running 0
-35.141805 randd running 0
-35.142096 resolvd running 0
-35.142338 rsh stopped 0
-35.142590 sysd running 0
-35.142876 vfsd running 0
-35.143151 zerod running 0
-35.149928 soak-services: 0
-35.150255 soak-cycle-done: 7
-40.176146 soak-cycle: 8
-40.184879 ping: 10.0.2.2 seq=1 rtt=4ms
-40.185586 ping: 1 packets transmitted, 1 received, 0% packet loss
-40.186225 ping: rtt min/avg/max = 4/4/4 ms
-40.191001 soak-ping: 0
-40.205452 soak-write: 8
-40.237320 RavenBSD
-40.237829 soak-fork: 0
-40.273988 soak-sync: 0
-40.277175 blockd stopped 0
-40.277813 consd running 0
-40.278208 devd running 0
-40.278581 fsd-ufs stopped 0
-40.278928 getty running 0
-40.279778 initfsd running 0
-40.279778 logd running 0
-40.280073 netd running 0
-40.280383 nulld running 0
-40.280735 pcid running 0
-40.281074 ramfsd running 0
-40.281380 randd running 0
-40.281733 resolvd running 0
-40.282007 rsh stopped 0
-40.282298 sysd running 0
-40.282603 vfsd running 0
-40.282919 zerod running 0
-40.287977 soak-services: 0
-40.288214 soak-cycle-done: 8
-45.315731 soak-cycle: 9
-45.325690 ping: 10.0.2.2 seq=1 rtt=6ms
-45.326007 ping: 1 packets transmitted, 1 received, 0% packet loss
-45.326221 ping: rtt min/avg/max = 6/6/6 ms
-45.329571 soak-ping: 0
-45.338748 soak-write: 9
-45.371909 RavenBSD
-45.372379 soak-fork: 0
-45.409051 soak-sync: 0
-45.411467 blockd stopped 0
-45.411791 consd running 0
-45.412133 devd running 0
-45.412466 fsd-ufs stopped 0
-45.412790 getty running 0
-45.413140 initfsd running 0
-45.413442 logd running 0
-45.413743 netd running 0
-45.414062 nulld running 0
-45.414365 pcid running 0
-45.414686 ramfsd running 0
-45.415012 randd running 0
-45.415364 resolvd running 0
-45.415659 rsh stopped 0
-45.415962 sysd running 0
-45.416288 vfsd running 0
-45.416595 zerod running 0
-45.423150 soak-services: 0
-45.423499 soak-cycle-done: 9
-50.453685 soak-cycle: 10
-50.462699 ping: 10.0.2.2 seq=1 rtt=6ms
-50.463124 ping: 1 packets transmitted, 1 received, 0% packet loss
-50.463273 ping: rtt min/avg/max = 6/6/6 ms
-50.466622 soak-ping: 0
-50.474882 soak-write: 10
-50.508206 RavenBSD
-50.508478 soak-fork: 0
-50.540034 soak-sync: 0
-50.541488 blockd stopped 0
-50.541673 consd running 0
-50.541837 devd running 0
-50.542054 fsd-ufs stopped 0
-50.542217 getty running 0
-50.542399 initfsd running 0
-50.542561 logd running 0
-50.542746 netd running 0
-50.542922 nulld running 0
-50.543114 pcid running 0
-50.543317 ramfsd running 0
-50.543490 randd running 0
-50.543690 resolvd running 0
-50.543841 rsh stopped 0
-50.544020 sysd running 0
-50.544198 vfsd running 0
-50.544394 zerod running 0
-50.553022 soak-services: 0
-50.553205 soak-cycle-done: 10
-55.580824 soak-cycle: 11
-55.587846 ping: 10.0.2.2 seq=1 rtt=3ms
-55.588295 ping: 1 packets transmitted, 1 received, 0% packet loss
-55.588576 ping: rtt min/avg/max = 3/3/3 ms
-55.593756 soak-ping: 0
-55.603173 soak-write: 11
-55.634375 RavenBSD
-55.634688 soak-fork: 0
-55.668067 soak-sync: 0
-55.669758 blockd stopped 0
-55.669977 consd running 0
-55.670223 devd running 0
-55.670520 fsd-ufs stopped 0
-55.670704 getty running 0
-55.670893 initfsd running 0
-55.671113 logd running 0
-55.671354 netd running 0
-55.671576 nulld running 0
-55.671783 pcid running 0
-55.672018 ramfsd running 0
-55.672238 randd running 0
-55.672475 resolvd running 0
-55.672680 rsh stopped 0
-55.672899 sysd running 0
-55.673156 vfsd running 0
-55.673390 zerod running 0
-55.681160 soak-services: 0
-55.681492 soak-cycle-done: 11
-60.717042 soak-cycle: 12
-60.732241 ping: 10.0.2.2 seq=1 rtt=9ms
-60.734970 ping: 1 packets transmitted, 1 received, 0% packet loss
-60.736539 ping: rtt min/avg/max = 9/9/9 ms
-60.744570 soak-ping: 0
-60.784553 soak-write: 12
-60.843559 RavenBSD
-60.844040 soak-fork: 0
-60.884621 soak-sync: 0
-60.886921 blockd stopped 0
-60.887168 consd running 0
-60.887522 devd running 0
-60.887706 fsd-ufs stopped 0
-60.887973 getty running 0
-60.888269 initfsd running 0
-60.888538 logd running 0
-60.888805 netd running 0
-60.889097 nulld running 0
-60.889373 pcid running 0
-60.889698 ramfsd running 0
-60.890004 randd running 0
-60.890301 resolvd running 0
-60.890574 rsh stopped 0
-60.890840 sysd running 0
-60.891128 vfsd running 0
-60.891406 zerod running 0
-60.898788 soak-services: 0
-60.899126 soak-cycle-done: 12
-65.935578 soak-cycle: 13
-65.962874 ping: 10.0.2.2 seq=1 rtt=23ms
-65.963806 ping: 1 packets transmitted, 1 received, 0% packet loss
-65.964515 ping: rtt min/avg/max = 23/23/23 ms
-65.972611 soak-ping: 0
-66.008145 soak-write: 13
-66.077400 RavenBSD
-66.078790 soak-fork: 0
-66.137542 soak-sync: 0
-66.141437 blockd stopped 0
-66.141942 consd running 0
-66.142374 devd running 0
-66.142882 fsd-ufs stopped 0
-66.143340 getty running 0
-66.143847 initfsd running 0
-66.144334 logd running 0
-66.144806 netd running 0
-66.145237 nulld running 0
-66.145702 pcid running 0
-66.146142 ramfsd running 0
-66.146670 randd running 0
-66.147127 resolvd running 0
-66.147681 rsh stopped 0
-66.148112 sysd running 0
-66.149945 vfsd running 0
-66.150404 zerod running 0
-66.153053 soak-services: 0
-66.153644 soak-cycle-done: 13
-71.191968 soak-cycle: 14
-71.200180 ping: 10.0.2.2 seq=1 rtt=4ms
-71.200803 ping: 1 packets transmitted, 1 received, 0% packet loss
-71.201200 ping: rtt min/avg/max = 4/4/4 ms
-71.206034 soak-ping: 0
-71.220199 soak-write: 14
-71.261310 RavenBSD
-71.261762 soak-fork: 0
-71.319482 soak-sync: 0
-71.322006 blockd stopped 0
-71.322342 consd running 0
-71.322611 devd running 0
-71.322908 fsd-ufs stopped 0
-71.323192 getty running 0
-71.323503 initfsd running 0
-71.323765 logd running 0
-71.324025 netd running 0
-71.324292 nulld running 0
-71.324554 pcid running 0
-71.324861 ramfsd running 0
-71.325142 randd running 0
-71.325446 resolvd running 0
-71.325781 rsh stopped 0
-71.325985 sysd running 0
-71.326272 vfsd running 0
-71.326551 zerod running 0
-71.333597 soak-services: 0
-71.333913 soak-cycle-done: 14
-76.362236 soak-cycle: 15
-76.372371 ping: 10.0.2.2 seq=1 rtt=6ms
-76.373014 ping: 1 packets transmitted, 1 received, 0% packet loss
-76.373715 ping: rtt min/avg/max = 6/6/6 ms
-76.376252 soak-ping: 0
-76.388542 soak-write: 15
-76.421577 RavenBSD
-76.422056 soak-fork: 0
-76.458478 soak-sync: 0
-76.459989 blockd stopped 0
-76.460168 consd running 0
-76.460343 devd running 0
-76.460525 fsd-ufs stopped 0
-76.460721 getty running 0
-76.460866 initfsd running 0
-76.461031 logd running 0
-76.461200 netd running 0
-76.461361 nulld running 0
-76.461526 pcid running 0
-76.461696 ramfsd running 0
-76.461869 randd running 0
-76.462062 resolvd running 0
-76.462209 rsh stopped 0
-76.462450 sysd running 0
-76.462586 vfsd running 0
-76.462761 zerod running 0
-76.470604 soak-services: 0
-76.470804 soak-cycle-done: 15
-81.501368 soak-cycle: 16
-81.513430 ping: 10.0.2.2 seq=1 rtt=7ms
-81.514049 ping: 1 packets transmitted, 1 received, 0% packet loss
-81.514450 ping: rtt min/avg/max = 7/7/7 ms
-81.526347 soak-ping: 0
-81.537374 soak-write: 16
-81.567460 RavenBSD
-81.567931 soak-fork: 0
-81.603711 soak-sync: 0
-81.605926 blockd stopped 0
-81.606155 consd running 0
-81.606439 devd running 0
-81.606768 fsd-ufs stopped 0
-81.607050 getty running 0
-81.607354 initfsd running 0
-81.607646 logd running 0
-81.607921 netd running 0
-81.608194 nulld running 0
-81.608468 pcid running 0
-81.608832 ramfsd running 0
-81.609115 randd running 0
-81.609406 resolvd running 0
-81.609714 rsh stopped 0
-81.609977 sysd running 0
-81.610246 vfsd running 0
-81.610532 zerod running 0
-81.617836 soak-services: 0
-81.618154 soak-cycle-done: 16
-86.646596 soak-cycle: 17
-86.658685 ping: 10.0.2.2 seq=1 rtt=8ms
-86.659310 ping: 1 packets transmitted, 1 received, 0% packet loss
-86.659721 ping: rtt min/avg/max = 8/8/8 ms
-86.660169 soak-ping: 0
-86.672616 soak-write: 17
-86.704606 RavenBSD
-86.705077 soak-fork: 0
-86.740813 soak-sync: 0
-86.742999 blockd stopped 0
-86.743264 consd running 0
-86.743551 devd running 0
-86.743894 fsd-ufs stopped 0
-86.744209 getty running 0
-86.744557 initfsd running 0
-86.744983 logd running 0
-86.745337 netd running 0
-86.745692 nulld running 0
-86.746057 pcid running 0
-86.746409 ramfsd running 0
-86.746724 randd running 0
-86.747088 resolvd running 0
-86.747397 rsh stopped 0
-86.747750 sysd running 0
-86.748085 vfsd running 0
-86.748424 zerod running 0
-86.754015 soak-services: 0
-86.754367 soak-cycle-done: 17
-91.779735 soak-cycle: 18
-91.793790 ping: 10.0.2.2 seq=1 rtt=10ms
-91.794415 ping: 1 packets transmitted, 1 received, 0% packet loss
-91.794861 ping: rtt min/avg/max = 10/10/10 ms
-91.805656 soak-ping: 0
-91.817629 soak-write: 18
-91.850795 RavenBSD
-91.851210 soak-fork: 0
-91.886974 soak-sync: 0
-91.889235 blockd stopped 0
-91.889500 consd running 0
-91.889787 devd running 0
-91.890235 fsd-ufs stopped 0
-91.890534 getty running 0
-91.890865 initfsd running 0
-91.891153 logd running 0
-91.891453 netd running 0
-91.891740 nulld running 0
-91.892035 pcid running 0
-91.892352 ramfsd running 0
-91.892658 randd running 0
-91.892985 resolvd running 0
-91.893251 rsh stopped 0
-91.893551 sysd running 0
-91.893849 vfsd running 0
-91.894151 zerod running 0
-91.900066 soak-services: 0
-91.900447 soak-cycle-done: 18
-96.925929 soak-cycle: 19
-96.933867 ping: 10.0.2.2 seq=1 rtt=3ms
-96.934493 ping: 1 packets transmitted, 1 received, 0% packet loss
-96.934928 ping: rtt min/avg/max = 3/3/3 ms
-96.939726 soak-ping: 0
-96.951856 soak-write: 19
-96.986084 RavenBSD
-96.986542 soak-fork: 0
-97.023128 soak-sync: 0
-97.025470 blockd stopped 0
-97.025761 consd running 0
-97.026044 devd running 0
-97.026356 fsd-ufs stopped 0
-97.026655 getty running 0
-97.026943 initfsd running 0
-97.027271 logd running 0
-97.027544 netd running 0
-97.027831 nulld running 0
-97.028139 pcid running 0
-97.028436 ramfsd running 0
-97.028735 randd running 0
-97.029061 resolvd running 0
-97.029364 rsh stopped 0
-97.029645 sysd running 0
-97.029968 vfsd running 0
-97.030339 zerod running 0
-97.037133 soak-services: 0
-97.037482 soak-cycle-done: 19
-102.065784 soak-cycle: 20
-102.073891 ping: 10.0.2.2 seq=1 rtt=4ms
-102.074424 ping: 1 packets transmitted, 1 received, 0% packet loss
-102.074766 ping: rtt min/avg/max = 4/4/4 ms
-102.079760 soak-ping: 0
-102.091604 soak-write: 20
-102.123781 RavenBSD
-102.136041 soak-fork: 0
-102.171173 soak-sync: 0
-102.173330 blockd stopped 0
-102.173593 consd running 0
-102.173915 devd running 0
-102.174148 fsd-ufs stopped 0
-102.174424 getty running 0
-102.174707 initfsd running 0
-102.174963 logd running 0
-102.175261 netd running 0
-102.175488 nulld running 0
-102.175739 pcid running 0
-102.176015 ramfsd running 0
-102.176298 randd running 0
-102.176592 resolvd running 0
-102.176840 rsh stopped 0
-102.177170 sysd running 0
-102.177399 vfsd running 0
-102.177650 zerod running 0
-102.184302 soak-services: 0
-102.184657 soak-cycle-done: 20
-107.220001 soak-cycle: 21
-107.225995 ping: 10.0.2.2 seq=1 rtt=3ms
-107.226468 ping: 1 packets transmitted, 1 received, 0% packet loss
-107.226748 ping: rtt min/avg/max = 3/3/3 ms
-107.232915 soak-ping: 0
-107.243673 soak-write: 21
-107.274694 RavenBSD
-107.275045 soak-fork: 0
-107.309286 soak-sync: 0
-107.311230 blockd stopped 0
-107.311480 consd running 0
-107.311704 devd running 0
-107.311954 fsd-ufs stopped 0
-107.312291 getty running 0
-107.312545 initfsd running 0
-107.312791 logd running 0
-107.313026 netd running 0
-107.313277 nulld running 0
-107.313503 pcid running 0
-107.313749 ramfsd running 0
-107.313978 randd running 0
-107.314242 resolvd running 0
-107.314455 rsh stopped 0
-107.314675 sysd running 0
-107.314896 vfsd running 0
-107.315124 zerod running 0
-107.322381 soak-services: 0
-107.322698 soak-cycle-done: 21
-112.354067 soak-cycle: 22
-112.364235 ping: 10.0.2.2 seq=1 rtt=6ms
-112.364842 ping: 1 packets transmitted, 1 received, 0% packet loss
-112.365247 ping: rtt min/avg/max = 6/6/6 ms
-112.368007 soak-ping: 0
-112.380001 soak-write: 22
-112.412528 RavenBSD
-112.413014 soak-fork: 0
-112.449395 soak-sync: 0
-112.451844 blockd stopped 0
-112.452159 consd running 0
-112.452504 devd running 0
-112.452837 fsd-ufs stopped 0
-112.453153 getty running 0
-112.453490 initfsd running 0
-112.453787 logd running 0
-112.454082 netd running 0
-112.454396 nulld running 0
-112.454688 pcid running 0
-112.454997 ramfsd running 0
-112.455306 randd running 0
-112.455622 resolvd running 0
-112.455891 rsh stopped 0
-112.456176 sysd running 0
-112.456503 vfsd running 0
-112.456792 zerod running 0
-112.463545 soak-services: 0
-112.463887 soak-cycle-done: 22
-117.490036 soak-cycle: 23
-117.499087 ping: 10.0.2.2 seq=1 rtt=6ms
-117.499482 ping: 1 packets transmitted, 1 received, 0% packet loss
-117.499619 ping: rtt min/avg/max = 6/6/6 ms
-117.503000 soak-ping: 0
-117.511352 soak-write: 23
-117.540129 RavenBSD
-117.540568 soak-fork: 0
-117.576456 soak-sync: 0
-117.578616 blockd stopped 0
-117.578890 consd running 0
-117.579187 devd running 0
-117.579490 fsd-ufs stopped 0
-117.579779 getty running 0
-117.580120 initfsd running 0
-117.580392 logd running 0
-117.580657 netd running 0
-117.580931 nulld running 0
-117.581233 pcid running 0
-117.581563 ramfsd running 0
-117.581843 randd running 0
-117.582142 resolvd running 0
-117.582444 rsh stopped 0
-117.582735 sysd running 0
-117.583007 vfsd running 0
-117.583285 zerod running 0
-117.589404 soak-services: 0
-117.589627 soak-cycle-done: 23
-122.626140 soak-cycle: 24
-122.633210 ping: 10.0.2.2 seq=1 rtt=4ms
-122.633685 ping: 1 packets transmitted, 1 received, 0% packet loss
-122.633882 ping: rtt min/avg/max = 4/4/4 ms
-122.639204 soak-ping: 0
-122.647611 soak-write: 24
-122.676741 RavenBSD
-122.676959 soak-fork: 0
-122.708559 soak-sync: 0
-122.709869 blockd stopped 0
-122.710025 consd running 0
-122.710175 devd running 0
-122.710349 fsd-ufs stopped 0
-122.710507 getty running 0
-122.710675 initfsd running 0
-122.710825 logd running 0
-122.710978 netd running 0
-122.711133 nulld running 0
-122.711281 pcid running 0
-122.711445 ramfsd running 0
-122.711598 randd running 0
-122.711778 resolvd running 0
-122.711921 rsh stopped 0
-122.712068 sysd running 0
-122.712216 vfsd running 0
-122.712379 zerod running 0
-122.721558 soak-services: 0
-122.721807 soak-cycle-done: 24
-127.751267 soak-done
-127.773437                                                                                 [38;5;183m/[0m
-127.954634 [J[38;5;183mraven# [0m[7C[J[38;5;183mraven# [0m[1;39me[0m[8C[J[38;5;183mraven# [0m[1;39mex[0m[9C[J[38;5;183mraven# [0m[1;39mexi[0m[10C[J[38;5;183mraven# [0m[1;32mexit[0m[11C[J[38;5;183mraven# [0m[1;32mexit[0m[90m [0m[12C[J[38;5;183mraven# [0m[1;32mexit[0m[90m [0m[39m0[0m[13C[J[38;5;183mraven# [0m[1;32mexit[0m[90m [0m[39m0[0m[13C
-127.954832 exit
-127.957255 init exited (0)
-137.952004 qemu-system-x86_64: terminating on signal 15 from pid 2574504 (python3)

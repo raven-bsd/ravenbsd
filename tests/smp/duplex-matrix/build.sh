@@ -9,13 +9,26 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 
 arch=${RAVEN_QT_ARCH:-${1:-x86_64}}
-if [ "$arch" != x86_64 ]; then
-    printf 'skipped: duplex-matrix is x86_64 only\n'
-    exit 77
-fi
+case "$arch" in
+    x86_64)
+        target_triple=x86_64-unknown-none
+        linker=$root/tests/smp/duplex-matrix/linker.ld
+        out=build/duplex-matrix
+        rustflags="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$linker"
+        ;;
+    aarch64)
+        target_triple=aarch64-unknown-none-softfloat
+        linker=$root/tests/smp/duplex-matrix/linker-aarch64.ld
+        out=build/duplex-matrix/aarch64
+        rustflags="-C relocation-model=static -C force-frame-pointers=yes -C link-arg=-T$linker"
+        ;;
+    *)
+        printf 'skipped: duplex-matrix supports x86_64 and aarch64 (got %s)\n' "$arch"
+        exit 77
+        ;;
+esac
 
-out=build/duplex-matrix
-target=${CARGO_TARGET_DIR:-target}/x86_64-unknown-none/release
+target=${CARGO_TARGET_DIR:-target}/$target_triple/release
 binary=$target/raven-duplex-matrix-init
 mkdir -p "$out"
 
@@ -23,8 +36,8 @@ if [ "${RAVEN_DUPLEX_MATRIX_NO_BUILD:-0}" = 1 ] && [ -f "$out/initfs.img" ] && [
     exit 0
 fi
 
-RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/tests/smp/duplex-matrix/linker.ld" \
-    cargo build -p raven-duplex-matrix --target x86_64-unknown-none --release
+RUSTFLAGS="$rustflags" \
+    cargo build -p raven-duplex-matrix --target "$target_triple" --release
 
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \

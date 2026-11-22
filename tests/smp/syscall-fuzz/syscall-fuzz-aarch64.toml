@@ -12,7 +12,7 @@ timeout_secs = 120
 pre = ["sh tests/smp/syscall-fuzz/build.sh"]
 initfs = "build/syscall-fuzz/aarch64/initfs.img"
 boot_cmdline = "console=ttyAMA0 test-exit=1 smp_user=on"
-qemu_extra = ["-smp", "4"]
+qemu_extra = ["-smp", "4", "-cpu", "max"]
 expect_exit = "success"
 
 [[expect]]

@@ -1,9 +1,0 @@
-tcp-soak: pass
-error: -
-cycles: 60/60
-elapsed_s: 715.322
-stall_seconds: 40.0
-serial: build/tcp-soak/run-20261121T175954Z/serial.log
-socket-state: build/tcp-soak/run-20261121T175954Z/socket-state.log
-events: build/tcp-soak/run-20261121T175954Z/tcp-soak.jsonl
-summary: build/tcp-soak/run-20261121T175954Z/summary.json

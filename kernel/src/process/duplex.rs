@@ -547,6 +547,11 @@ pub struct DuplexEnd {
 }
 
 impl DuplexEnd {
+    /// Watcher key shared by both ends of this duplex pair.
+    pub(crate) fn event_key(&self) -> u64 {
+        crate::event::duplex_key(self.pair.id)
+    }
+
     /// True when the endpoint was created with `O_NONBLOCK`.
     #[allow(dead_code)] // F_GETFL reports it when fcntl lands
     pub const fn is_nonblock(&self) -> bool {
@@ -591,7 +596,7 @@ impl DuplexEnd {
             state.right_write_shutdown = true;
         }
         self.pair.wake_all();
-        event::notify_all();
+        event::notify_source(self.event_key());
     }
 
     /// Current EVQ readiness bits for this endpoint.
@@ -639,7 +644,7 @@ impl Drop for DuplexEnd {
             self.pair.left_readers.wake_all();
             self.pair.left_writers.wake_all();
         }
-        event::notify_all();
+        event::notify_source(self.event_key());
     }
 }
 
@@ -951,7 +956,7 @@ pub fn read(end: &Arc<DuplexEnd>, destination: UserSlice) -> Result<usize, Errno
         state.incoming_mut(end.side).discard_controls_at_read();
         drop(state);
         end.pair.wake_writers(peer);
-        event::notify_all();
+        event::notify_source(end.event_key());
         return Ok(copied);
     }
 }
@@ -1082,7 +1087,7 @@ pub fn recv(
         };
         drop(state);
         end.pair.wake_writers(peer);
-        event::notify_all();
+        event::notify_source(end.event_key());
         return Ok((copied, records));
     }
 }
@@ -1202,7 +1207,7 @@ fn write_stream(
         }
         drop(state);
         end.pair.wake_readers(peer);
-        event::notify_all();
+        event::notify_source(end.event_key());
         done = done.saturating_add(copied);
         if done >= total {
             return Ok(done);
@@ -1290,7 +1295,7 @@ fn write_datagram(
         }
         drop(state);
         end.pair.wake_readers(peer);
-        event::notify_all();
+        event::notify_source(end.event_key());
         return Ok(total);
     }
 }
@@ -1324,7 +1329,7 @@ pub fn shutdown(end: &Arc<DuplexEnd>, how: u8) -> Result<(), Errno> {
         end.pair.wake_writers(end.side);
         end.pair.wake_readers(peer);
     }
-    event::notify_all();
+    event::notify_source(end.event_key());
     Ok(())
 }
 
