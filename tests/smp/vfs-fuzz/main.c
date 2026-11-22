@@ -337,6 +337,30 @@ static void chroot_rows(void) {
         int err3 = errno;
         row("CH08", errno_is(err3, open_errors, 6), "cached-root lstat(/../init) refused");
     }
+
+    memset(&status, 0, sizeof(status));
+    errno = 0;
+    if (lstat("/../../init", &status) == 0) {
+        char resolved[80];
+        (void)snprintf(resolved, sizeof(resolved), "lstat mode=0%o size=%ld",
+                       (unsigned)status.st_mode, (long)status.st_size);
+        escape("CH09", "lstat(/../../init)", resolved);
+        row("CH09", 0, "cached-root lstat(/../../init) escaped the chroot");
+    } else {
+        int err4 = errno;
+        row("CH09", errno_is(err4, open_errors, 6), "cached-root lstat(/../../init) refused");
+    }
+
+    memset(&status, 0, sizeof(status));
+    errno = 0;
+    if (lstat("/mounts", &status) == 0) {
+        row("CH10", 1, "in-root lstat(/mounts) after chroot succeeds");
+    } else {
+        int err5 = errno;
+        char detail[80];
+        (void)snprintf(detail, sizeof(detail), "in-root lstat(/mounts) errno=%d", err5);
+        row("CH10", 0, detail);
+    }
 }
 
 int main(void) {
@@ -461,6 +485,10 @@ int main(void) {
 
     sayf("vfs-fuzz: summary rows=%d deviations=%d escapes=%d hash=0x%016lx\n", rows, deviations,
          escapes, table_hash);
+    if (escapes != 0) {
+        say("vfs-fuzz: FAILED: chroot escape\n");
+        return 1;
+    }
     say("vfs-fuzz: alive\n");
-    return 0; /* findings (including the chroot escape) are reported; survival is the pass gate */
+    return 0;
 }

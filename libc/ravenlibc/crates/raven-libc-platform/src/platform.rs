@@ -1637,7 +1637,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok((handle, true))
     }
 
-    fn invalidate_root(&self) {
+    /// Drop the cached `file:/` root; a `chroot` must never reuse the old root.
+    pub fn invalidate_root(&self) {
         if let Some(handle) = self.root.borrow_mut().take() {
             let _ = self.backend.close(handle);
         }
