@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K431 S5 identity fixture network: a private 10.43.0.0/24 bridge/tap so the test does not share
+# the K194 ravendemo0/10.0.2.15 network with another lane.
+
+[network]
+hostname = "raven-identity"
+mode = "static"
+
+[network.static]
+address = "10.43.0.15"
+prefix = 24
+gateway = "10.43.0.2"
+dns = ["10.43.0.2"]
