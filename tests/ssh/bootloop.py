@@ -78,9 +78,14 @@ def kill(child: subprocess.Popen) -> None:
 
 
 def ensure_tap() -> None:
-    """The K194 tap is non-persistent: recreate the bridge before each boot."""
+    """The K194 tap is non-persistent and must belong to this user: recreate it."""
     if os.environ.get("RAVEN_BOOTLOOP_SUDO", "0") != "1":
         return
+    subprocess.run(
+        ["sudo", "-n", "sh", "scripts/qemu-net.sh", "down"],
+        cwd=ROOT, check=False,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
     subprocess.run(
         ["sudo", "-n", "sh", "scripts/qemu-net.sh", "up"],
         cwd=ROOT, check=False,
