@@ -885,3 +885,198 @@ fn math_fdlibm_powf_one() {
     assert_eq!(raven_libc_m::powf(1.0, 3.0), 1.0);
     assert_eq!(raven_libc_m::powf(2.0, 3.0), 8.0);
 }
+
+// --- K507: next 25 INDIRECT rows (transcendental/Bessel/NAN family) -----------------
+
+fn close64(actual: f64, expected: f64) -> bool {
+    (actual - expected).abs() < 1e-9
+}
+
+fn close32(actual: f32, expected: f32) -> bool {
+    (actual - expected).abs() < 1e-5
+}
+
+#[test]
+fn math_coremath_cbrt() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/coremath/cbrt.rs
+    assert_eq!(raven_libc_m::cbrt(27.0), 3.0);
+    assert_eq!(raven_libc_m::cbrt(-8.0), -2.0);
+}
+
+#[test]
+fn math_fdlibm_expo2() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expo2.rs
+    let value = raven_libc_m::sinh(710.0);
+    assert!(value.is_finite());
+    assert!(value > 0.0);
+}
+
+#[test]
+fn math_fdlibm_k_expo2() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_expo2.rs
+    let value = raven_libc_m::cosh(710.0);
+    assert!(value.is_finite());
+    assert!(value > 0.0);
+}
+
+#[test]
+fn math_fdlibm_k_expo2f() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_expo2f.rs
+    let value = raven_libc_m::coshf(89.0);
+    assert!(value.is_finite());
+    assert!(value > 0.0);
+}
+
+#[test]
+fn math_fdlibm_j0() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/j0.rs
+    assert_eq!(raven_libc_m::j0(0.0), 1.0);
+    assert!(close64(raven_libc_m::j0(1.0), 0.765_197_686_557_966_6));
+}
+
+#[test]
+fn math_fdlibm_j0f() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/j0f.rs
+    assert_eq!(raven_libc_m::j0f(0.0), 1.0);
+    assert!(close32(raven_libc_m::j0f(1.0), 0.765_197_7));
+}
+
+#[test]
+fn math_fdlibm_j1() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/j1.rs
+    assert_eq!(raven_libc_m::j1(0.0), 0.0);
+    assert!(close64(raven_libc_m::j1(1.0), 0.440_050_585_744_933_55));
+}
+
+#[test]
+fn math_fdlibm_jn() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/jn.rs
+    assert_eq!(raven_libc_m::jn(0, 0.0), 1.0);
+    assert!(close64(raven_libc_m::jn(1, 1.0), 0.440_050_585_744_933_55));
+    // jn(2, 3) is the first order that runs jn's own forward recurrence.
+    assert!(close64(raven_libc_m::jn(2, 3.0), 0.486_091_260_585_891));
+}
+
+#[test]
+fn math_fdlibm_jnf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/jnf.rs
+    assert_eq!(raven_libc_m::jnf(0, 0.0), 1.0);
+    assert!(close32(raven_libc_m::jnf(1, 1.0), 0.440_050_57));
+    assert!(close32(raven_libc_m::jnf(2, 3.0), 0.486_091_26));
+}
+
+#[test]
+fn math_fdlibm_k_cos() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_cos.rs
+    // cos(0.5) has |x| <= pi/4 and dispatches straight into k_cos.
+    assert!(close64(raven_libc_m::cos(0.5), 0.877_582_561_890_372_8));
+}
+
+#[test]
+fn math_fdlibm_k_cosf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_cosf.rs
+    // cosf(0.5) has |x| <= pi/4 and dispatches straight into k_cosf.
+    assert!(close32(raven_libc_m::cosf(0.5), 0.877_582_55));
+}
+
+#[test]
+fn math_fdlibm_k_sin() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_sin.rs
+    // sin(0.5) has |x| <= pi/4 and dispatches straight into k_sin.
+    assert!(close64(raven_libc_m::sin(0.5), 0.479_425_538_604_203));
+}
+
+#[test]
+fn math_fdlibm_k_sinf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_sinf.rs
+    // sinf(0.5) has |x| <= pi/4 and dispatches straight into k_sinf.
+    assert!(close32(raven_libc_m::sinf(0.5), 0.479_425_55));
+}
+
+#[test]
+fn math_fdlibm_k_tan() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_tan.rs
+    assert!(close64(raven_libc_m::tan(1.0), 1.557_407_724_654_902_3));
+}
+
+#[test]
+fn math_fdlibm_k_tanf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_tanf.rs
+    assert!(close32(raven_libc_m::tanf(1.0), 1.557_407_7));
+}
+
+#[test]
+fn math_portable_modf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/portable/modf.rs
+    // `raven_libc_m::modf` routes to portable::modf; fdlibm/modf.rs is an
+    // unreferenced duplicate of this file.
+    let (fraction, integral) = raven_libc_m::modf(3.5);
+    assert_eq!(fraction, 0.5);
+    assert_eq!(integral, 3.0);
+}
+
+#[test]
+fn math_fdlibm_rem_pio2_large() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/rem_pio2_large.rs
+    // sin(1e20) needs Payne-Hanek reduction through rem_pio2_large.
+    assert!(close64(raven_libc_m::sin(1.0e20), -0.645_251_285_265_780_8));
+}
+
+#[test]
+fn math_fdlibm_rem_pio2f() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/rem_pio2f.rs
+    assert!(close32(raven_libc_m::sinf(1.0e20), 0.656_576_7));
+}
+
+#[test]
+fn math_fdlibm_sinf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/sinf.rs
+    assert_eq!(raven_libc_m::sinf(0.0), 0.0);
+    assert!(close32(raven_libc_m::sinf(1.0), 0.841_470_96));
+}
+
+#[test]
+fn math_fdlibm_sinh() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/sinh.rs
+    assert_eq!(raven_libc_m::sinh(0.0), 0.0);
+    assert!(close64(raven_libc_m::sinh(1.0), 1.175_201_193_643_801_4));
+}
+
+#[test]
+fn math_fdlibm_sinhf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/sinhf.rs
+    assert_eq!(raven_libc_m::sinhf(0.0), 0.0);
+    assert!(close32(raven_libc_m::sinhf(1.0), 1.175_201_2));
+}
+
+#[test]
+fn math_fdlibm_tanf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tanf.rs
+    assert_eq!(raven_libc_m::tanf(0.0), 0.0);
+    assert!(close32(raven_libc_m::tanf(1.0), 1.557_407_7));
+}
+
+#[test]
+fn math_fdlibm_tanh() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tanh.rs
+    assert_eq!(raven_libc_m::tanh(0.0), 0.0);
+    assert!(close64(raven_libc_m::tanh(1.0), 0.761_594_155_955_764_9));
+}
+
+#[test]
+fn math_fdlibm_tanhf() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tanhf.rs
+    assert_eq!(raven_libc_m::tanhf(0.0), 0.0);
+    assert!(close32(raven_libc_m::tanhf(1.0), 0.761_594_2));
+}
+
+#[test]
+fn math_fp_nan() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fp/nan.rs
+    assert!(raven_libc_m::nan(b"0x1234").is_nan());
+    assert!(raven_libc_m::nan(b"").is_nan());
+    assert_ne!(
+        raven_libc_m::nan(b"1234").to_bits(),
+        raven_libc_m::nan(b"").to_bits()
+    );
+}
