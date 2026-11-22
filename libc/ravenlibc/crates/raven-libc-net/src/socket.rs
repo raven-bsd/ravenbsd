@@ -58,9 +58,10 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         }
         validate_proto(base, proto)?;
         let caps = self.backend.caps();
-        let (handle, state) = if caps.bare_open {
+        let mptcp = proto == crate::mptcp::IPPROTO_MPTCP;
+        let (handle, state) = if caps.bare_open || mptcp {
             let mut buffer = [0u8; 16];
-            let path = crate::msg::bare_path(base, &mut buffer)?;
+            let path = crate::msg::bare_path_proto(proto, base, &mut buffer)?;
             (Some(self.backend.open(path)?), SocketState::Open)
         } else {
             (None, SocketState::Pending)
@@ -172,7 +173,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let backlog = clamp_backlog(backlog)?;
         if rec.sock.is_none() {
             let mut buffer = [0u8; 64];
-            let path = crate::msg::socket_path(rec.ty, local, &mut buffer)?;
+            let path = crate::msg::socket_path_proto(rec.proto, rec.ty, local, &mut buffer)?;
             let sock = self.backend.open(path)?;
             self.fds.attach(info.ofd, sock);
             rec.sock = Some(sock);
@@ -280,7 +281,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let was_pending = rec.sock.is_none();
         if was_pending {
             let mut buffer = [0u8; 64];
-            let path = crate::msg::socket_path(rec.ty, endpoint, &mut buffer)?;
+            let path = crate::msg::socket_path_proto(rec.proto, rec.ty, endpoint, &mut buffer)?;
             let sock = self.backend.open(path)?;
             self.fds.attach(info.ofd, sock);
             rec.sock = Some(sock);
@@ -451,7 +452,8 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             }
             let endpoint = destination.unwrap_or_default();
             let mut buffer = [0u8; 64];
-            let path = match crate::msg::socket_path(rec.ty, endpoint, &mut buffer) {
+            let path = match crate::msg::socket_path_proto(rec.proto, rec.ty, endpoint, &mut buffer)
+            {
                 Ok(path) => path,
                 Err(error) => {
                     return Err(SendErr {
@@ -857,6 +859,24 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let mut table = self.table.borrow_mut();
         let rec = table.get_mut(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if level == crate::mptcp::SOL_MPTCP {
+            if rec.proto != crate::mptcp::IPPROTO_MPTCP {
+                return Err(Errno::ENOPROTOOPT);
+            }
+            let control = match name {
+                crate::mptcp::MPTCP_INFO => crate::mptcp::Control::Info,
+                crate::mptcp::MPTCP_SUBFLOW_ADDRS => crate::mptcp::Control::Subflows,
+                _ => return Err(Errno::ENOPROTOOPT),
+            };
+            let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+            let mut request = [0u8; 64];
+            let used = control.encode(&mut request)?;
+            let mut reply = [0u8; 256];
+            let count =
+                self.backend
+                    .mptcp_control(sock, request.get(..used).unwrap_or(&[]), &mut reply)?;
+            return crate::mptcp::decode_reply(reply.get(..count).unwrap_or(&[]), name, out);
+        }
         if level == SOL_SOCKET && name == SO_PEERCRED {
             if rec.domain != AF_UNIX {
                 return Err(Errno::EOPNOTSUPP);
@@ -950,6 +970,37 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let mut table = self.table.borrow_mut();
         let rec = table.get_mut(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if level == crate::mptcp::SOL_MPTCP {
+            if rec.proto != crate::mptcp::IPPROTO_MPTCP {
+                return Err(Errno::ENOPROTOOPT);
+            }
+            let control = match name {
+                crate::mptcp::MPTCP_PM_CMD_ADD_ADDR => {
+                    crate::mptcp::Control::AddAddr(crate::mptcp::PmAddr::decode(value)?)
+                }
+                crate::mptcp::MPTCP_PM_CMD_DEL_ADDR => {
+                    crate::mptcp::Control::DelAddr(*value.first().ok_or(Errno::EINVAL)?)
+                }
+                crate::mptcp::MPTCP_PM_CMD_SET_FLAGS => {
+                    crate::mptcp::Control::SetFlags(crate::mptcp::PmAddr::decode(value)?)
+                }
+                _ => return Err(Errno::ENOPROTOOPT),
+            };
+            let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+            let mut request = [0u8; 64];
+            let used = control.encode(&mut request)?;
+            let mut reply = [0u8; 256];
+            let count =
+                self.backend
+                    .mptcp_control(sock, request.get(..used).unwrap_or(&[]), &mut reply)?;
+            let mut sink = [0u8; 4];
+            return crate::mptcp::decode_reply(
+                reply.get(..count).unwrap_or(&[]),
+                crate::mptcp::MPTCP_INFO,
+                &mut sink,
+            )
+            .map(|_| ());
+        }
         if let Some(is_read) = opts::timeout_slot(name) {
             let (sec, usec) = opts::read_timeval(value)?;
             let millis = opts::timeout_ms(sec, usec);
@@ -1089,7 +1140,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
 
 fn validate_proto(ty: i32, proto: i32) -> Result<(), Errno> {
     let accepted = if ty == SOCK_STREAM {
-        proto == 0 || proto == 6
+        proto == 0 || proto == 6 || proto == crate::mptcp::IPPROTO_MPTCP
     } else {
         proto == 0 || proto == 17
     };

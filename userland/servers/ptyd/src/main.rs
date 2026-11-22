@@ -187,10 +187,14 @@ mod program {
             }
         }
 
-        fn fstat(&mut self, _file: u64) -> HandlerResult<Stat> {
+        fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
+            let entry = self.file(file)?;
             Ok(Stat {
                 mode: S_IFCHR | 0o666,
                 nlink: 1,
+                // The donor devfs pty node has a device inode. The scheme Stat has `ino`, so
+                // report the pair/role identity that the SCM_RIGHTS exchange can compare.
+                ino: raven_ptyd::inode(entry.pair, entry.role == Role::Slave),
                 ..Stat::default()
             })
         }

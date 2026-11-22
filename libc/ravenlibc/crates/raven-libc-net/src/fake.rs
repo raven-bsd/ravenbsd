@@ -134,6 +134,8 @@ struct FakeState {
     fail: Option<(FakeOp, Errno)>,
     max_read: Option<usize>,
     route_fail: bool,
+    mptcp_requests: Vec<Vec<u8>>,
+    mptcp_reply: Vec<u8>,
 }
 
 /// A fake netd plus fd table and environment.
@@ -308,6 +310,17 @@ impl FakeNetd {
         self.state.borrow_mut().log.clear();
     }
 
+    /// Every encoded `SOL_MPTCP` request received by the fake.
+    #[must_use]
+    pub fn mptcp_requests(&self) -> Vec<Vec<u8>> {
+        self.state.borrow().mptcp_requests.clone()
+    }
+
+    /// Set the canned reply for the next `SOL_MPTCP` control request.
+    pub fn set_mptcp_reply(&self, reply: &[u8]) {
+        self.state.borrow_mut().mptcp_reply = reply.to_vec();
+    }
+
     /// The number of live backend sockets.
     #[must_use]
     pub fn socket_count(&self) -> usize {
@@ -392,6 +405,14 @@ impl NetBackend for FakeNetd {
                 Kind::Udp
             };
             return self.open_endpoint(kind, None);
+        }
+        if text == "net:mptcp" {
+            return self.open_endpoint(Kind::Tcp, None);
+        }
+        if let Some(endpoint) = text.strip_prefix("net:mptcp/") {
+            let path = alloc::format!("net:tcp/{endpoint}");
+            let parsed = path::parse(&path).map_err(|_| Errno::EINVAL)?;
+            return self.open_endpoint(Kind::Tcp, parsed.endpoint);
         }
         let parsed = path::parse(text).map_err(|_| Errno::EINVAL)?;
         match parsed.transport {
@@ -720,6 +741,28 @@ impl NetBackend for FakeNetd {
             // answer keeps the fake honest instead of inventing readiness.
             Call::Poll => Err(Errno::EOPNOTSUPP),
         }
+    }
+
+    fn mptcp_control(&self, _s: Sock, request: &[u8], reply: &mut [u8]) -> Result<usize, Errno> {
+        let mut state = self.state.borrow_mut();
+        state.mptcp_requests.push(request.to_vec());
+        let canned = state.mptcp_reply.clone();
+        if canned.is_empty() {
+            // A successful setter by default; a getter test sets a structured reply.
+            let ok = [0u8, 0u8];
+            let count = ok.len().min(reply.len());
+            reply
+                .get_mut(..count)
+                .ok_or(Errno::ENOBUFS)?
+                .copy_from_slice(ok.get(..count).ok_or(Errno::ENOBUFS)?);
+            return Ok(count);
+        }
+        let count = canned.len().min(reply.len());
+        reply
+            .get_mut(..count)
+            .ok_or(Errno::ENOBUFS)?
+            .copy_from_slice(canned.get(..count).unwrap_or(&[]));
+        Ok(count)
     }
 
     fn close(&self, s: Sock) {
