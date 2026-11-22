@@ -25,20 +25,24 @@ use alloc::vec::Vec;
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 
-use crate::fd::ofd::OfdKind;
+use crate::fd::ofd::{OfdKind, SocketMeta};
 
 /// Magic at the start of the block.
 pub const FDMAP_MAGIC: [u8; 4] = *b"RFDM";
 /// Current block version.
-pub const FDMAP_VERSION: u16 = 2;
+pub const FDMAP_VERSION: u16 = 3;
+/// The previous version, without socket identity.
+pub const FDMAP_VERSION_V2: u16 = 2;
 /// The legacy version `raven-spawn` publishes.
 pub const FDMAP_VERSION_V1: u16 = 1;
 /// Fixed header length.
 pub const HEADER_LEN: usize = 8;
 /// Version-1 entry length (also the prefix of a version-2 entry).
 pub const ENTRY_LEN: usize = 18;
-/// Current entry length, with the event handle and readiness mask.
+/// Version-2 entry length, with the event handle and readiness mask.
 pub const ENTRY_LEN_V2: usize = 26;
+/// Current entry length: version 2 plus domain/type/proto/state.
+pub const ENTRY_LEN_V3: usize = 39;
 /// No-path marker in `path_off`.
 pub const NO_PATH: u32 = u32::MAX;
 
@@ -68,6 +72,8 @@ pub struct FdMapEntry {
     pub event: u32,
     /// The K232 one-shot readiness replay mask.
     pub readiness: u32,
+    /// Socket identity for an inherited socket OFD (`FDMAP_VERSION` 3).
+    pub socket: Option<SocketMeta>,
 }
 
 impl FdMapEntry {
@@ -82,6 +88,7 @@ impl FdMapEntry {
             path: None,
             event: 0,
             readiness: 0,
+            socket: None,
         }
     }
 }
@@ -121,7 +128,7 @@ impl FdMap {
             }
         }
         let mut out = Vec::with_capacity(
-            HEADER_LEN + ENTRY_LEN_V2.saturating_mul(self.entries.len()) + strings.len(),
+            HEADER_LEN + ENTRY_LEN_V3.saturating_mul(self.entries.len()) + strings.len(),
         );
         out.extend_from_slice(&FDMAP_MAGIC);
         out.extend_from_slice(&FDMAP_VERSION.to_le_bytes());
@@ -135,6 +142,11 @@ impl FdMap {
             out.extend_from_slice(&offset.to_le_bytes());
             out.extend_from_slice(&entry.event.to_le_bytes());
             out.extend_from_slice(&entry.readiness.to_le_bytes());
+            let socket = entry.socket.unwrap_or_default();
+            out.extend_from_slice(&socket.domain.to_le_bytes());
+            out.extend_from_slice(&socket.ty.to_le_bytes());
+            out.extend_from_slice(&socket.proto.to_le_bytes());
+            out.push(socket.state);
         }
         out.extend_from_slice(&strings);
         Ok(out)
@@ -180,7 +192,8 @@ impl FdMap {
         let version = read_u16(input, 4).ok_or(Errno::EPROTO)?;
         let entry_len = match version {
             FDMAP_VERSION_V1 => ENTRY_LEN,
-            FDMAP_VERSION => ENTRY_LEN_V2,
+            FDMAP_VERSION_V2 => ENTRY_LEN_V2,
+            FDMAP_VERSION => ENTRY_LEN_V3,
             _ => return Err(Errno::EPROTO),
         };
         let count = usize::from(read_u16(input, 6).ok_or(Errno::EPROTO)?);
@@ -198,15 +211,29 @@ impl FdMap {
             let fd_flags = *record.get(9).ok_or(Errno::EPROTO)?;
             let status = read_u32(record, 10).ok_or(Errno::EPROTO)?;
             let offset = read_u32(record, 14).ok_or(Errno::EPROTO)?;
-            let event = if version == FDMAP_VERSION {
+            let event = if version >= FDMAP_VERSION_V2 {
                 read_u32(record, 18).ok_or(Errno::EPROTO)?
             } else {
                 0
             };
-            let readiness = if version == FDMAP_VERSION {
+            let readiness = if version >= FDMAP_VERSION_V2 {
                 read_u32(record, 22).ok_or(Errno::EPROTO)?
             } else {
                 0
+            };
+            let socket = if version >= FDMAP_VERSION {
+                let domain = read_i32(record, 26).ok_or(Errno::EPROTO)?;
+                let ty = read_i32(record, 30).ok_or(Errno::EPROTO)?;
+                let proto = read_i32(record, 34).ok_or(Errno::EPROTO)?;
+                let state = *record.get(38).ok_or(Errno::EPROTO)?;
+                (domain != 0 || ty != 0 || proto != 0 || state != 0).then_some(SocketMeta {
+                    domain,
+                    ty,
+                    proto,
+                    state,
+                })
+            } else {
+                None
             };
             let path = if offset == NO_PATH {
                 None
@@ -227,6 +254,7 @@ impl FdMap {
                 path,
                 event,
                 readiness,
+                socket,
             });
             index = index.saturating_add(1);
         }
@@ -272,6 +300,21 @@ pub const fn transferable(kind: OfdKind) -> bool {
 /// A handle reference used when rebuilding a child table.
 pub fn entry_handle(entry: &FdMapEntry) -> Handle {
     Handle(entry.handle)
+}
+
+/// One inherited socket descriptor, exposed to the libc socket layer after `restore_fdmap`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InheritedSocket {
+    /// The child descriptor number.
+    pub fd: i32,
+    /// The OFD arena token.
+    pub ofd: u32,
+    /// The already-valid kernel handle.
+    pub handle: Handle,
+    /// `F_GETFL` status bits (the caller derives `O_NONBLOCK`).
+    pub status: u32,
+    /// The socket identity.
+    pub socket: SocketMeta,
 }
 
 fn hex_digit(value: u8) -> u8 {

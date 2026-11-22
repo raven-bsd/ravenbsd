@@ -50,6 +50,7 @@ pub(crate) fn run(
             || row.starts_with(b"RSH_FD2="))
     });
     envp.extend(platform.stdio_env());
+    crate::socket::sync_exec_meta();
     if let Ok(Some(fdmap)) = platform.exec_fdmap_env() {
         let prefix = raven_libc_platform::fd::inherit::ENV_NAME;
         envp.retain(|row| !row.starts_with(prefix));
