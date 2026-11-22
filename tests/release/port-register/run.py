@@ -78,12 +78,59 @@ PROPOSED_TITLE = {
     "K452": "kernel donor-file behaviour tests",
     "K453": "crate donor-file behaviour tests",
     "K454": "libc ABI group coverage: misc/poll/stat/time descriptors",
+    "K459": "SSH-critical INDIRECT rows with direct tests",
+    "K465": "next 25 INDIRECT rows with direct tests",
 }
 CLOSED_BY = {
     "libc/ravenlibc/abi/misc.toml": "K454",
     "libc/ravenlibc/abi/poll.toml": "K454",
     "libc/ravenlibc/abi/stat.toml": "K454",
     "libc/ravenlibc/abi/time.toml": "K454",
+    "libc/ravenlibc/crates/raven-libc-abi/src/generated/misc.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-abi/src/generated/mman.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-abi/src/generated/poll.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-abi/src/generated/stat.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-abi/src/generated/sysconf.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-abi/src/generated/time.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-compat/src/pty/shared.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-signal/src/raw/setjmp_x86_64.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-signal/src/raw/sigsetjmp_x86_64.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-stdio/src/backend_fd.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-stdio/src/closeall.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/bsd_compat.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/explicit_bzero.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/mem/mod.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/memccpy.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/memmem.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/mempcpy.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/memset_s.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/strdup.rs": "K459",
+    "libc/ravenlibc/crates/raven-libc-str/src/raw/swab.rs": "K459",
+    "crates/raven-tcpip/src/pmtu.rs": "K465",
+    "crates/raven-tcpip/src/sack.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-compat/src/humanize/expand.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-compat/src/humanize/scaled.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-iconv-cjk/src/big5.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-iconv-cjk/src/gb18030.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-iconv-cjk/src/gb18030utf.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-iconv-cjk/src/hkscs.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-iconv-cjk/src/jis0208.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-iconv-cjk/src/ksc.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-iconv-cjk/src/revjis.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/cos.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/powf.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp2.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tan.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/ceil.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/fabs.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/fdim.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/fmax.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/fmin.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/fmod.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/rint.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/sqrt.rs": "K465",
 }
 
 
@@ -480,19 +527,21 @@ def render_doc(rows: List[Dict[str, str]]) -> str:
     lines.extend(
         [
             "",
-            "## Closed by K454",
+            "## Closed by later tickets",
             "",
-            "The four libc ABI descriptors that were NONE in the K450 register now have a named test:",
+            "Rows that moved from NONE/INDIRECT to COVERED with a named direct test:",
             "",
-            "| File | Status | Test |",
-            "|---|---|---|",
+            "| File | Status | Test | Closed by |",
+            "|---|---|---|---|",
         ]
     )
     if closed_rows:
         for row in closed_rows:
-            lines.append(f"| `{row['file']}` | {row['status']} | `{row['evidence']}` |")
+            lines.append(
+                f"| `{row['file']}` | {row['status']} | `{row['evidence']}` | {row['proposed_ticket']} |"
+            )
     else:
-        lines.append("| - | - | - |")
+        lines.append("| - | - | - | - |")
     lines.extend(["", "## Proposed tickets", ""])
     if proposed:
         for ticket in sorted(proposed):

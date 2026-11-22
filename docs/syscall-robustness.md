@@ -1,20 +1,26 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# Syscall robustness (K456)
+# Syscall robustness (K456, K462 round 2)
 
-Status: **OBSERVED on base `a666aab4`, x86-64, TCG `smp=4` and KVM `smp=2`.** The guest fixture
-`tests/smp/syscall-fuzz` walks every `raven-abi` syscall variant with deterministic garbage vectors
-and prints the raw return, errno and survival for each call. It fixes nothing: the deviations below
-are findings for the owning lane.
+Status: **OBSERVED on base `abd594b8`, x86-64, TCG `smp=4` and KVM `smp=2`.** The guest fixture
+`tests/smp/syscall-fuzz` walks every `raven-abi` syscall variant **and** every raw pre-enum dispatch
+site with deterministic garbage vectors, and prints the raw return, errno and survival for each
+call. It fixes nothing: the deviations below are findings for the owning lane (K461 owns the one
+root cause).
 
 ## Scope and count
 
-`crates/raven-abi/src/syscall.rs` defines **47** `Syscall` variants (`Syscall::ALL.len() == 47`,
-printed by the fixture). The ticket text says 48; the measured table has 47 rows. Raw numbers that
-are dispatched before the enum (`PROC_FORK`, `PIPE`, `TRACE_SET`, `RECV_LOCK`, `MSYNC`,
-`PROC_REBOOT`, the Linux trap, ...) are outside this table; they are exercised only where the
-fixture uses them as setup (`PIPE`, `PROC_FORK`) or where the enum names the same operation.
+* `crates/raven-abi/src/syscall.rs` defines **47** `Syscall` variants (`Syscall::ALL.len() == 47`,
+  printed by the fixture). The ticket text says 48; the measured enum table has 47 rows.
+* Round 2 adds the **65 pre-enum dispatch sites** in `kernel/src/syscall/mod.rs` before
+  `match Syscall::from_usize(number)`: 58 direct `if number == ..` checks, six DTrace control
+  numbers, and the Linux-personality trap. `tests/smp/syscall-fuzz/raw-dispatch.list` is the
+  checked list (expression, number, definition file:line, disposition); `raw-check.sh` parses the
+  kernel source and fails on any drift, missing fixture reference, or a fuzzed excluded path. The
+  current check prints `entries=65 fuzz=63 child=1 excluded=1`.
+* Total measured rows: **432** (240 enum vectors + 192 raw vector rows; `raw-audit fuzzed=184`
+  counts raw calls, including the multi-vector sites).
 
 ## Method
 
@@ -27,26 +33,29 @@ fixture uses them as setup (`PIPE`, `PROC_FORK`) or where the enum names the sam
   attributable.
 * A valid baseline is measured per call. Where the initfs has no server or device, the baseline is
   recorded as context (`any`) and the coverage gap is listed below.
-* `EXIT`, `THREAD_EXIT` and `PROC_TERMINATE(self)` run in forked children; the parent records the
-  exit code and its own survival.
+* `EXIT`, `THREAD_EXIT`, `PROC_TERMINATE(self)`, `PROC_SETSID`, `THREAD_EXIT_EX` and the
+  Linux-personality trap run in forked children; the parent records the exit code and its survival.
 * Every case line is `syscall-fuzz: case nr=.. name=.. vector=.. ret=.. errno=.. ok=..`; the summary
   prints the stable FNV-1a `table-hash` over `(number, vector, return)`.
 
 ## Commands and result (OBSERVED)
 
 ```text
-$ timeout 120 sh tests/smp/syscall-fuzz/run.sh tcg --iterations 1
-rows=240 deviations=9 seed=0x5a17c0de12349876 table-hash=0xb6b4b85a00ea5d77
-real 26.42 s (image rebuild included)
+$ timeout 300 sh tests/smp/syscall-fuzz/run.sh tcg --iterations 1
+rows=432 deviations=10 seed=0x5a17c0de12349876 table-hash=0xef23e662891758f3
+real 13.79 s
 
-$ timeout 120 sh tests/smp/syscall-fuzz/run.sh kvm2 --iterations 1
-rows=240 deviations=9 seed=0x5a17c0de12349876 table-hash=0xb6b4b85a00ea5d77
-real 13.50 s
+$ timeout 300 sh tests/smp/syscall-fuzz/run.sh kvm2 --iterations 1
+rows=432 deviations=10 seed=0x5a17c0de12349876 table-hash=0xd8b6c53a23b7a8db
+real 10.86 s
 ```
 
 One iteration is a determinism pair: two boots of the same image. Both boots in each mode printed the
-same hash, and TCG and KVM produced the same hash. `syscall-fuzz: alive` and `init exited (0)` were
-present in all four boots. Full logs: `build/syscall-fuzz/<mode>/run-1/a/syscall-fuzz*.log`.
+same hash. TCG and KVM now differ at exactly two rows, both mode-dependent by design:
+`THREAD_SELF` returns the current tid (5 vs 3) and `DTRACE_STATS` returns the online CPU count
+(4 vs 2). The K456 hash was `0xb6b4b85a00ea5d77` for the 240 enum rows; the new hash covers the 192
+raw rows as well, so it necessarily changes. `syscall-fuzz: alive` and `init exited (0)` were present
+in all four boots. Full logs: `build/syscall-fuzz/<mode>/run-1/a/syscall-fuzz*.log`.
 
 ## Measured table
 
@@ -102,10 +111,94 @@ present in all four boots. Full logs: `build/syscall-fuzz/<mode>/run-1/a/syscall
 | EXIT | child7=ok childmax=ok |
 | THREAD_EXIT | child7=ok |
 
+## Raw pre-enum table (round 2)
+
+Order and names are the checked list; `ok` is a non-negative return. `exit(-5)` is a child exit
+code, not an errno.
+
+| Site | Vectors -> observed |
+|---|---|
+| GETRANDOM | baseline=ok len0=ok ptr0=EFAULT protnone=EFAULT flagsneg=EINVAL lenmax=EINVAL |
+| CLOCK_SET | clockbad=EINVAL ptr0=EFAULT negts=EINVAL |
+| TRACE_SET | zero=ok max=ok |
+| RECORD_LOCK | cmdneg=EINVAL cmd0=EINVAL ptr0=EFAULT handlebad=EBADF pipe=EBADF |
+| PROC_CHROOT | ptr0=EFAULT ptr1=EFAULT len0=EINVAL lenmax=ENAMETOOLONG |
+| THREAD_SET_TLS | fdneg=EBADF zero=ok tp1=EFAULT tpmax=EFAULT |
+| THREAD_SELF | noargs=ok (mode-dependent tid) |
+| ROBUST_LIST_SET | clear=ok head1=EINVAL lenmax=EINVAL |
+| PROC_SET_PERSONALITY | persbad=EINVAL handlerbad=EBADF baseline=ok |
+| PROC_SELF_INFO | baseline=ok ptr0=EFAULT count0=EINVAL |
+| PROC_SETPGID | pidneg=ESRCH pgidneg=EPERM baseline=EPERM (caller is a session leader) |
+| PROC_SETSID | child=ok (child is not a group leader) |
+| PROC_SETCRED | whichneg=EINVAL valuechange=EPERM baseline=ok |
+| PROC_FORK | fdneg=EBADF flags1=EINVAL |
+| PROC_PID_INFO | baseline=ok ptr0=EFAULT count0=EINVAL pidneg=ESRCH |
+| PROC_SETCRED_EX | which0=EINVAL groupsptr0=EFAULT baseline=ok |
+| PROC_CRED_INFO | baseline=ok ptr0=EFAULT count5=EINVAL |
+| PROC_GETGROUPS | size0=ok ptr0=EFAULT size1=ok |
+| PROC_HANDLE_INFO | baseline=ok fdneg=EBADF |
+| PROC_EXEC_CRED | flags2=EINVAL self=EPERM filebad=EBADF |
+| MSYNC | fdneg=EBADF flags0=EINVAL flagsneg=EINVAL addr1=EINVAL len0=EINVAL lenmax=EINVAL |
+| PROC_SET_COMMAND | baseline=ok ptr0=EFAULT len0=ok lenmax=ENAMETOOLONG fdneg=EBADF |
+| PROC_WAIT_EX | optneg=EINVAL ptr0=EFAULT idtypebad=EINVAL baseline=ok |
+| PROC_GETPGID | self=ok pidneg=ESRCH |
+| PROC_SIGNAL | signo0=EINVAL targethuge=ESRCH |
+| PROC_SIGRECV | ptr0=EFAULT flagsneg=EINVAL nohang=EAGAIN (pending SIGCHLD drained first) |
+| PROC_TIMES | baseline=ok ptr0=EFAULT count3=EINVAL |
+| PROC_GETRUSAGE | baseline=ok who1=EINVAL ptr0=EFAULT count7=EINVAL |
+| PROC_GETRLIMIT | baseline=ok res16=EINVAL ptr0=EFAULT |
+| PROC_SETRLIMIT | res16=EINVAL invert=EINVAL |
+| HANDLE_COPY | baseline=ok fdneg=EBADF mask0=EINVAL |
+| HANDLE_TRANSFER_FILE | mask0=EINVAL filebad=EBADF pipe=EBADF |
+| PROC_EXEC | ptr0=EFAULT ptr1=EFAULT ptrneg=EFAULT **protnone=EINVAL** image0=EINVAL flags1=EINVAL pathmax=ENAMETOOLONG imagmax=EFBIG |
+| PREAD | fdneg=EBADF pipe=EBADF |
+| PWRITE | fdneg=EBADF pipe=EBADF |
+| SEEK | fdneg=EBADF pipe=EBADF |
+| PIPE | baseline=ok ptr0=EFAULT ptr1=EFAULT protnone=EFAULT |
+| PIPE2 | baseline=ok ptr0=EFAULT flagsneg=EINVAL |
+| GETPRIORITY | baseline=ok ptr0=EFAULT whichneg=EINVAL whohuge=ESRCH |
+| SETPRIORITY | baseline=ok whichneg=EINVAL whohuge=ESRCH |
+| NICE | baseline=ok ptr0=EFAULT |
+| SCHED_GET_PRIORITY_MAX | other=ok fifo=EOPNOTSUPP policyneg=EINVAL |
+| SCHED_GET_PRIORITY_MIN | other=ok fifo=EOPNOTSUPP policyneg=EINVAL |
+| SCHED_SETSCHEDULER | baseline=ok policyfifo=EOPNOTSUPP policyneg=EINVAL priobad=EINVAL pidhuge=ESRCH |
+| SCHED_GETSCHEDULER | self=ok pidneg=ESRCH |
+| PROC_CTTY_SET | fdneg=EBADF pipe=ENOTTY |
+| PROC_CTTY_GET | fdneg=EBADF pipe=ENOTTY |
+| PROC_CTTY_SET_FG | fdneg=EBADF pipe=ENOTTY |
+| SIG_SETUP | ptr0=EFAULT offset1=EINVAL flagsneg=EINVAL baseline=ok |
+| THREAD_KICK | fdneg=EBADF selfzero=ok |
+| SIGRESEND | noregistration=EINVAL |
+| DTRACE_PROBE_LIST | count=ok ptr0=EFAULT maxmax=ok (clamped) |
+| DTRACE_ENABLE | flags1=EINVAL handlebad=EBADF |
+| DTRACE_DISABLE | probe0=EINVAL (no probe 0) probemax=EINVAL |
+| DTRACE_READ | empty=ok ptr0=EFAULT maxmax=EINVAL |
+| DTRACE_STATS | count=ok (mode-dependent CPU count) ptr0=EFAULT |
+| DTRACE_CLEAR | noargs=ok |
+| DUPLEX_PAIR | baseline=ok ptr0=EFAULT ptr1=EFAULT protnone=EFAULT flagsneg=EINVAL |
+| DUPLEX_SHUTDOWN | baseline=ok howbad=EINVAL fdneg=EBADF |
+| DUPLEX_SENDMSG | baseline=ok fdneg=EBADF msgptr0=EFAULT flagsbad=EINVAL databad=EFAULT |
+| DUPLEX_RECVMSG | baseline=ok fdneg=EBADF msgptr0=EFAULT |
+| DUPLEX_PEERCRED | baseline=ok ptr0=EFAULT |
+| THREAD_EXIT_EX | child7=ok garbage=ok (child exit 9) |
+| LINUX_TRAP | write=exit(-5) read=exit(-5) exit=exit(-5) (no handler) |
+
+## Excluded paths
+
+| Path | Number | Reason | Proof |
+|---|---|---|---|
+| PROC_REBOOT | 0x46 | Exits the machine (poweroff, halt or reset). A successful call is not survivable, so no bounded non-destructive variant exists. | `process_ctl::reboot` calls `crate::arch::poweroff/halt/reset`; `raw-check.sh` verifies the handler still has a machine-ending path and that the fixture has **no** `RAW_PROC_REBOOT` call and lists the name in `RAW_EXCLUDED`. |
+
+No other whole path is excluded. The baseline of `PROC_EXEC` (a successful image replacement),
+`CLOCK_SET` (a real time change) and `PROC_SETCRED_EX` (a real credential change) are not run; the
+garbage-argument rows for those calls are measured.
+
 ## Deviations
 
-Nine rows returned something other than the contract errno. All nine have one root cause: on
-x86-64, `copy_from_user` reads a `PROT_NONE` leaf instead of faulting.
+Ten rows returned something other than the contract errno. All ten have one root cause: on
+x86-64, `copy_from_user` reads a `PROT_NONE` leaf instead of faulting. Round 2 adds the `PROC_EXEC`
+request path; `PROC_EXEC` with `ptr0`/`ptr1`/`ptrneg` correctly returns EFAULT because the range
+validator rejects those before the copy.
 
 | Syscall | Vector | Expected | Actual | Kernel path (OBSERVED) |
 |---|---|---|---|---|
@@ -118,6 +211,7 @@ x86-64, `copy_from_user` reads a `PROT_NONE` leaf instead of faulting.
 | PROC_NAMESPACE | protnone (4 B prefix) | EFAULT | EINVAL (reads NUL bytes) | `kernel/src/syscall/process_ctl.rs:946` `user_string` -> `router.rs:1230` |
 | PAGER_SUPPLY | protnone (1 B data) | EFAULT | 0 (success; the zero page is supplied as data) | `kernel/src/syscall/memory_ctl.rs:128` `copy_from_user` |
 | FUTEX | wait-protnone | EFAULT | EAGAIN (reads the zero word, values differ) | `kernel/src/syscall/futex.rs:104` `copy_from_user` |
+| PROC_EXEC | protnone (88 B request) | EFAULT | EINVAL (reads a zero request, `image_len=0`) | `kernel/src/syscall/exec.rs:57` `Request::parse` -> `copy_from_user` |
 
 ### Root cause
 
@@ -135,11 +229,11 @@ x86-64, `copy_from_user` reads a `PROT_NONE` leaf instead of faulting.
 
 ### Proposed follow-up (PROPOSED, not fixed here)
 
-One kernel ticket, owner stuart: make x86-64 `copy_from_user` reject a user range whose leaf lacks
+K461 (Mark) owns the root cause: make x86-64 `copy_from_user` reject a user range whose leaf lacks
 the user bit (walk the leaf, or set AC for SMAP only after the leaf check), with a unit test that a
-`PROT_NONE` source returns EFAULT for `DEBUG_WRITE`/pipe `WRITE`/`user_string`/`PAGER_SUPPLY`/
-`FUTEX`; keep the aarch64 `ldtrb` path as the reference. The ticket that fixes it must also keep the
-write-side EFAULT behavior covered.
+`PROT_NONE` source returns EFAULT for `DEBUG_WRITE`, pipe `WRITE`, `user_string`, `PAGER_SUPPLY`,
+`FUTEX` and the `PROC_EXEC` request; keep the aarch64 `ldtrb` path as the reference. The fix must
+also keep the write-side EFAULT behavior covered.
 
 ## Coverage gaps (OBSERVED)
 
@@ -148,15 +242,24 @@ write-side EFAULT behavior covered.
   console.
 * `FSTAT`, `CALL`, `SEND` and `DUP` need a scheme file/server; the initfs has no vfsd, so only the
   invalid-handle rows are measured for `FSTAT`/`CALL`/`SEND`, and `DUP`'s baseline is `EBADF`.
+  `PREAD`/`PWRITE`/`SEEK`/`HANDLE_TRANSFER_FILE` and the TTY controls have the same setup limit.
 * `RECV` with a full packet buffer cannot be measured without a registered server (it would block);
   only the capacity-error and no-server rows are measured.
+* The Linux-personality trap is measured **without a handler**, which is the documented `-EIO`
+  termination path (child exit `-5`); a handler-backed trap needs a userspace Linux server and is
+  not covered.
+* `PROC_EXEC` is measured with invalid requests only; a successful exec replaces the image. The
+  `CLOCK_SET` and `PROC_SETCRED_EX` successful-effect baselines are likewise not run.
+* `PROC_SIGRECV` drains the pending `SIGCHLD` from the earlier child tests before its WNOHANG
+  vector, so that vector deterministically measures the no-pending path; the drained signal number
+  is not a table row.
 * Device baselines (`MMIO_CREATE`, `BOOT_BLOB`, `DMA_ALLOC`, `IRQ_CREATE`) are recorded as context;
   their success depends on the QEMU profile. They are not part of the deviation list.
-* Raw dispatched numbers outside `Syscall::ALL` (fork/exec/pipe/signal/pread/trace/reboot/...) are
-  not in this table; `PROC_FORK` and `PIPE` are used only as setup.
+* Cross-mode hash equality is not claimed: `THREAD_SELF` (tid) and `DTRACE_STATS` (online CPUs)
+  legitimately differ between TCG `smp=4` and KVM `smp=2`. The determinism pair is per mode.
 
 ## K451 cross-reference
 
-`docs/kernel/audit/` is not present on base `a666aab4` (K451 not merged). This file is the measured
+`docs/kernel/audit/` is not present on base `abd594b8` (K451 not merged). This file is the measured
 input that the K451 panic-surface section should cite by row; `docs/kernel/audit/**` was not edited
 here (Stuart owns it).
