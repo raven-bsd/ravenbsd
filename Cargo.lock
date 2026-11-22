@@ -1857,6 +1857,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-init-worker-eintr"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-init",
+ "raven-initfs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-svc-manifest",
+]
+
+[[package]]
 name = "raven-initfs"
 version = "0.1.0"
 
