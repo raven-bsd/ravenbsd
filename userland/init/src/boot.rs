@@ -541,17 +541,8 @@ fn bootstrap_selection(services: &[Manifest]) -> Vec<bool> {
     // `netd` must register `net:` before the full plan starts sshd. It is cheap when the
     // service is absent and it registers the loopback `net:` scheme even without a NIC.
     const SEEDS: &[&str] = &[
-        "logd",
-        "initfsd",
-        "ramfsd",
-        "nulld",
-        "zerod",
-        "randd",
-        "blockd",
-        "fsd-ufs",
-        "vfsd",
-        "devd",
-        "netd",
+        "logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "blockd", "fsd-ufs", "vfsd",
+        "devd", "netd",
     ];
     let mut selected = alloc::vec![false; services.len()];
     for seed in SEEDS {
