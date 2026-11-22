@@ -1,5 +1,5 @@
 # K451 kernel inventory
-# commit: b2b892194a4f722d24f27e1a02d0f11c648a47cf
+# commit: 80cf30b37787b0e0f43479a0a81db4a514b7db45
 # name	value/kind	path:line
 
 [SYSSCALLS]
@@ -165,8 +165,8 @@ live_mmio	fn	kernel/src/process/handle.rs:358
 new	fn	kernel/src/process/handle.rs:364
 register_lineage	fn	kernel/src/process/handle.rs:445
 revoke_descendants	fn	kernel/src/process/handle.rs:455
-lineage_nodes	fn	kernel/src/process/handle.rs:469
-install_initial	fn	kernel/src/process/handle.rs:479
+lineage_nodes	fn	kernel/src/process/handle.rs:475
+install_initial	fn	kernel/src/process/handle.rs:485
 replace_image_from_user	fn	kernel/src/process/exec.rs:68
 take_pending	fn	kernel/src/process/exec.rs:234
 set	fn	kernel/src/process/robust.rs:39
