@@ -11,7 +11,8 @@
 # the accelerator and the probe must boot.
 #
 # Usage: scripts/smp-aarch64.sh [--iterations N] [--timebox SECS] [--soak N] [--max-load N] [--kvm]
-# Outputs: build/qtest/smp-aarch64.tsv (case/arch/iteration/rc/duration_ms)
+# Outputs: build/qtest/smp-aarch64.tsv
+#          (case/arch/iteration/rc/duration_ms/load1_before/load1_after)
 #          build/qtest/smp-aarch64/*.log (one serial transcript per run)
 
 set -u
@@ -74,15 +75,17 @@ run_case() {
         return 0
     fi
     t0=$(date +%s)
+    load_before=$(cut -d ' ' -f1 /proc/loadavg 2>/dev/null || echo 0)
     log="$LOGDIR/${case_name}-${arch}-${iter}.log"
     if cargo xtask qtest --case "$case_name" --arch "$arch" > "$log" 2>&1; then
         rc=0
     else
         rc=$?
     fi
+    load_after=$(cut -d ' ' -f1 /proc/loadavg 2>/dev/null || echo 0)
     duration=$(sed -n 's/.*"duration_ms": \([0-9][0-9]*\).*/\1/p' "$OUT/$case_name.json" 2>/dev/null | head -1)
     [ -n "$duration" ] || duration=$(( ($(date +%s) - t0) * 1000 ))
-    printf '%s\t%s\t%s\t%s\t%s\n' "$case_name" "$arch" "$iter" "$rc" "$duration" >> "$LOG"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$case_name" "$arch" "$iter" "$rc" "$duration" "$load_before" "$load_after" >> "$LOG"
     if [ "$rc" -ne 0 ]; then
         FAILED=1
         echo "FAIL $case_name $arch iter=$iter rc=$rc log=$log" >&2
