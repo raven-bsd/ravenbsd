@@ -14,8 +14,11 @@
 # ad-hoc cases at run time. Owners are the lanes that own the subsystem, so a failing row can be
 # routed without re-reading the log.
 #
-# usage: sh scripts/kernel-gate.sh [--list]
-#   --list   print the case table and exit (no QEMU run)
+# usage: sh scripts/kernel-gate.sh [--list | --durability]
+#   --list         print the case table and exit (no QEMU run)
+#   --durability   run only the three UFS durability rows (ENOSPC, fsync
+#                  write/kill, remount check) and write target/kernel-gate/
+#                  durability.md instead of the standing table
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
 # The exclusive-host preflight refuses other QEMU/xtask/cargo/rustc or load > 2.0. Set
@@ -61,6 +64,9 @@ kmem-frames-nopcpu|x86_64|mark|allocator
 proc-death-cleanup|x86_64|stuart|process
 trace-context|x86_64|tim|trace
 release-login|x86_64|kevin|release
+ufs-enospc|x86_64|mel|ufs/durability
+ufs-fsync-persist|x86_64|mel|ufs/durability
+ufs-fsync-check|x86_64|mel|ufs/durability
 boot-uname-aarch64|aarch64|dave|boot/uname
 kernel-early-boot-aarch64|aarch64|dave|boot
 kernel-exc-aarch64|aarch64|dave|exceptions
@@ -75,11 +81,23 @@ if [ "${1:-}" = "--list" ]; then
 fi
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    sed -n '6,19p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '6,22p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
 fi
 
 doc=$(mgmt_path architecture/product-data/kernel-gate.md) || exit 2
+
+case "${1:-}" in
+    "") ;;
+    --durability)
+        cases=$(printf '%s\n' "$cases" | awk -F'|' '$4 == "ufs/durability"')
+        doc=target/kernel-gate/durability.md
+        ;;
+    *)
+        echo "kernel-gate: unknown option: $1" >&2
+        exit 2
+        ;;
+esac
 
 mkdir -p "$log_dir" || exit 2
 sh tests/smp/boot/host-idle.sh \
