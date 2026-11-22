@@ -1,0 +1,79 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=107329 reserved=23743
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2713 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) c185d5511-dirty 2026-11-22
+mem: 419 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x466d14 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=4494 spawn=4825 first_poll=4853 deadline=9825 stalled=0 ready_at=4898
+rtc: 2026-11-22 12:15:04 (epoch 1795349704s)
+1795349711.327 nulld: started
+1795349711.484 randd: started
+1795349711.626 sysd: started
+svcd: randd up
+svcd: randd timing: generation=1 start=5060 spawn=7351 first_poll=7386 deadline=12351 stalled=0 ready_at=7686
+svcd: consd up
+svcd: consd timing: generation=1 start=4910 spawn=7390 first_poll=7447 deadline=67390 stalled=0 ready_at=7689
+svcd: nulld up
+svcd: nulld timing: generation=1 start=4949 spawn=6681 first_poll=7025 deadline=11681 stalled=0 ready_at=7821
+svcd: sysd up
+svcd: sysd timing: generation=1 start=5124 spawn=7046 first_poll=7071 deadline=12046 stalled=0 ready_at=7850
+1795349711.905 zerod: started
+svcd: zerod up
+svcd: zerod timing: generation=1 start=5199 spawn=7839 first_poll=7921 deadline=12839 stalled=0 ready_at=8009
+ptyd: files=0 pairs=0
+1795349712.075 ramfsd: started
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=5006 spawn=7973 first_poll=8007 deadline=12973 stalled=0 ready_at=8232
+ptyd: files=0 pairs=0
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=4963 spawn=8091 first_poll=8108 deadline=38091 stalled=0 ready_at=8259
+1795349715.861 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=4925 spawn=6930 first_poll=7013 deadline=126930 stalled=0 ready_at=11906
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=11911 spawn=12396 first_poll=12414 deadline=72396 stalled=0 ready_at=12666
+pty-privsep-exec: start uid=0
+pty-privsep-exec: child start fd=3 negative=0
+pty-privsep-exec: child round=0 request=ok
+pty-privsep-exec: monitor round=0 master=3 name=/dev/pts/1
+pty-privsep-exec: child round=0 name=/dev/pts/1
+pty-privsep-exec: child round=0 master=-1
+pty-privsep-exec: FAIL recv-master=0 errno=88
+pty-privsep-exec: positive child status=256
+pty-privsep-exec: monitor request round=1 errno=0
+ptyd: files=0 pairs=0
+pty-privsep-exec: FAIL child-status=256 errno=0
+svcd: libc-test crash loop, giving up
+svcd: settled
+init exited (1)

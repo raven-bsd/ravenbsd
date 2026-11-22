@@ -1,0 +1,40 @@
+{
+  "case": "pty-privsep-exec",
+  "arch": "x86_64",
+  "result": "fail",
+  "duration_ms": 28434,
+  "exit_status": 35,
+  "matched": [
+    "^ptyd: files=0 pairs=0$",
+    "^pty-privsep-exec: start uid=0$",
+    "^pty-privsep-exec: child start fd=[0-9]+ negative=0$",
+    "^pty-privsep-exec: child round=0 request=ok$",
+    "^pty-privsep-exec: monitor round=0 master=[0-9]+ name=/dev/pts/[0-9]+$",
+    "^pty-privsep-exec: child round=0 name=/dev/pts/[0-9]+$",
+    "^ptyd: files=0 pairs=0$"
+  ],
+  "unmatched": [
+    "^pty-privsep-exec: child round=0 master=[0-9]+$",
+    "^pty-privsep-exec: child round=0 roundtrip=MS$",
+    "^pty-privsep-exec: child round=1 request=ok$",
+    "^pty-privsep-exec: child round=1 name=/dev/pts/[0-9]+$",
+    "^pty-privsep-exec: child round=1 master=[0-9]+$",
+    "^pty-privsep-exec: child round=1 roundtrip=MS$",
+    "^pty-privsep-exec: child allocations=2 ok$",
+    "^pty-privsep-exec: positive child status=0$",
+    "^pty-privsep-exec: positive monitor status=0$",
+    "^pty-privsep-exec: positive ok$",
+    "^pty-privsep-exec: child start fd=[0-9]+ negative=1$",
+    "^pty-privsep-exec: negative send errno=(9|32)$",
+    "^pty-privsep-exec: negative channel-closed ok$",
+    "^pty-privsep-exec: negative child status=0$",
+    "^pty-privsep-exec: negative monitor status=0$",
+    "^pty-privsep-exec: negative ok$",
+    "^pty-privsep-exec: ok$",
+    "^init exited \\(0\\)$"
+  ],
+  "forbidden_hits": [
+    "pty-privsep-exec: FAIL recv-master=0 errno=88",
+    "pty-privsep-exec: FAIL child-status=256 errno=0"
+  ]
+}

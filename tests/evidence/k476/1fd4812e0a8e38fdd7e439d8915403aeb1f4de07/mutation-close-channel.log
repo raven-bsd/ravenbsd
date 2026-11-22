@@ -1,0 +1,71 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running `target/debug/xtask qtest --case pty-privsep-exec --arch x86_64`
+pty-privsep-exec: fail
+--- serial (last 40 lines) ---
+1795349909.192 nulld: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=14828 spawn=19704 first_poll=19916 deadline=24704 stalled=0 ready_at=21051
+1795349911.790 randd: started
+1795349912.571 zerod: started
+svcd: zerod up
+svcd: zerod timing: generation=1 start=15290 spawn=21809 first_poll=22107 deadline=26968 stalled=159 ready_at=24116
+svcd: randd up
+svcd: randd timing: generation=1 start=15195 spawn=23253 first_poll=23541 deadline=28253 stalled=0 ready_at=24213
+1795349914.202 sysd: started
+svcd: consd up
+svcd: consd timing: generation=1 start=14717 spawn=23879 first_poll=24411 deadline=83879 stalled=0 ready_at=25352
+svcd: sysd up
+svcd: sysd timing: generation=1 start=15235 spawn=24900 first_poll=25023 deadline=29900 stalled=0 ready_at=25888
+ptyd: files=0 pairs=0
+1795349915.260 ramfsd: started
+ptyd: files=0 pairs=0
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=14868 spawn=26156 first_poll=26233 deadline=56156 stalled=0 ready_at=26560
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=14997 spawn=26267 first_poll=26311 deadline=31267 stalled=0 ready_at=26673
+1795349929.219 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=14800 spawn=21690 first_poll=21726 deadline=141934 stalled=244 ready_at=40334
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=40351 spawn=41662 first_poll=41684 deadline=101662 stalled=0 ready_at=42809
+pty-privsep-exec: start uid=0
+pty-privsep-exec: child start fd=3 negative=0
+pty-privsep-exec: FAIL request=0 errno=9
+pty-privsep-exec: positive child status=256
+pty-privsep-exec: FAIL child-status=256 errno=0
+svcd: libc-test crash loop, giving up
+svcd: settled
+init exited (1)
+--- unmatched expectations ---
+^pty-privsep-exec: child round=0 request=ok$
+^pty-privsep-exec: monitor round=0 master=[0-9]+ name=/dev/pts/[0-9]+$
+^pty-privsep-exec: child round=0 name=/dev/pts/[0-9]+$
+^pty-privsep-exec: child round=0 master=[0-9]+$
+^pty-privsep-exec: child round=0 roundtrip=MS$
+^pty-privsep-exec: child round=1 request=ok$
+^pty-privsep-exec: child round=1 name=/dev/pts/[0-9]+$
+^pty-privsep-exec: child round=1 master=[0-9]+$
+^pty-privsep-exec: child round=1 roundtrip=MS$
+^pty-privsep-exec: child allocations=2 ok$
+^pty-privsep-exec: positive child status=0$
+^pty-privsep-exec: positive monitor status=0$
+^pty-privsep-exec: positive ok$
+^pty-privsep-exec: child start fd=[0-9]+ negative=1$
+^pty-privsep-exec: negative send errno=(9|32)$
+^pty-privsep-exec: negative channel-closed ok$
+^pty-privsep-exec: negative child status=0$
+^pty-privsep-exec: negative monitor status=0$
+^pty-privsep-exec: negative ok$
+^pty-privsep-exec: ok$
+^init exited \(0\)$
+--- forbidden hits ---
+pty-privsep-exec: FAIL request=0 errno=9
+pty-privsep-exec: FAIL child-status=256 errno=0
+--- result ---
+exit status 35; expected success; unmatched expectations: ^pty-privsep-exec: child round=0 request=ok$, ^pty-privsep-exec: monitor round=0 master=[0-9]+ name=/dev/pts/[0-9]+$, ^pty-privsep-exec: child round=0 name=/dev/pts/[0-9]+$, ^pty-privsep-exec: child round=0 master=[0-9]+$, ^pty-privsep-exec: child round=0 roundtrip=MS$, ^pty-privsep-exec: child round=1 request=ok$, ^pty-privsep-exec: child round=1 name=/dev/pts/[0-9]+$, ^pty-privsep-exec: child round=1 master=[0-9]+$, ^pty-privsep-exec: child round=1 roundtrip=MS$, ^pty-privsep-exec: child allocations=2 ok$, ^pty-privsep-exec: positive child status=0$, ^pty-privsep-exec: positive monitor status=0$, ^pty-privsep-exec: positive ok$, ^pty-privsep-exec: child start fd=[0-9]+ negative=1$, ^pty-privsep-exec: negative send errno=(9|32)$, ^pty-privsep-exec: negative channel-closed ok$, ^pty-privsep-exec: negative child status=0$, ^pty-privsep-exec: negative monitor status=0$, ^pty-privsep-exec: negative ok$, ^pty-privsep-exec: ok$, ^init exited \(0\)$; 2 forbidden line(s) matched
