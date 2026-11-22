@@ -7,6 +7,10 @@
 # (8 entries). The guest is a long-running network profile, so the case expects the harness
 # timeout. The 180 s budget covers the measured >90 s guest boot under host load; the functional
 # assertions are unchanged.
+#
+# K433 adds the SSH confirmation shape on the same established connection: a 4-byte request, four
+# 44-byte replies, and a host ack. Four replies exceed the three spare TX buffers, so the last one
+# requires a reclaimed completion slot.
 
 name = "virtio-tx"
 arch = "x86_64"
@@ -39,6 +43,18 @@ regex = '^virtio-tx: echo received=32768$'
 unordered = true
 
 [[expect]]
+regex = '^virtio-tx: read request=4$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-tx: confirmation frames=4 bytes=176$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-tx: confirmation ack$'
+unordered = true
+
+[[expect]]
 regex = '^virtio-tx: done$'
 unordered = true
 
@@ -51,4 +67,4 @@ regex = '^virtio-net: irq progress fired=([2-9][0-9]|[1-9][0-9]{2,}) '
 unordered = true
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|virtio-tx: write failed|virtio-tx: echo mismatch|virtio-net: pump'
+regex = '(?i)panic|EXCEPTION|virtio-tx: write failed|virtio-tx: echo mismatch|virtio-tx: confirmation .* failed|virtio-net: pump'
