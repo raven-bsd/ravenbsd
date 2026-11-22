@@ -143,6 +143,8 @@ def fixture_hash() -> str:
 
 
 def cache_key() -> str:
+    if not SSH_INPUT.is_file():
+        raise PreflightError(f"missing ssh binary: {SSH_INPUT}")
     tree, dirty = git_tree()
     return compose_key(tree, dirty, sha256_file(SSH_INPUT), fixture_hash())
 
@@ -309,9 +311,9 @@ def link_image(image: Path, case: str) -> Path:
 
 
 def run_case(mode: str, cycles: int, timeout: int) -> int:
-    key = cache_key()
     check_inputs(mode)
     require_clean_tree()
+    key = cache_key()
     print(f"stress-preflight: mode={mode} case={MODES[mode]} cycles={cycles}")
     print(f"stress-preflight: key={key} cache={CACHE_ROOT / key}")
     image, build_seconds, cached = preflight(key, refresh=False)
