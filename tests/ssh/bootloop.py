@@ -77,7 +77,19 @@ def kill(child: subprocess.Popen) -> None:
     child.wait()
 
 
+def ensure_tap() -> None:
+    """The K194 tap is non-persistent: recreate the bridge before each boot."""
+    if os.environ.get("RAVEN_BOOTLOOP_SUDO", "0") != "1":
+        return
+    subprocess.run(
+        ["sudo", "-n", "sh", "scripts/qemu-net.sh", "up"],
+        cwd=ROOT, check=False,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+
 def boot(index: int) -> tuple[subprocess.Popen, Path]:
+    ensure_tap()
     boot_dir = RUN / f"boot-{index}"
     boot_dir.mkdir(parents=True, exist_ok=True)
     vars_path = boot_dir / "vars.fd"
@@ -201,7 +213,19 @@ def main() -> int:
     rows: list[dict] = []
     failures = 0
     for boot_index in range(1, BOOTS + 1):
-        child, serial = boot(boot_index)
+        try:
+            child, serial = boot(boot_index)
+        except RuntimeError as exc:
+            print(f"bootloop: boot {boot_index} failed: {exc}", file=sys.stderr)
+            for attempt in range(1, ATTEMPTS + 1):
+                rows.append({
+                    "boot": boot_index, "attempt": attempt, "banner_bytes": 0,
+                    "banner_exact": False, "banner_wall_ms": 0, "banner_error": str(exc),
+                    "auth_exit": None, "auth_wall_ms": 0, "auth_line": "", "auth_ok": False,
+                    "serial_sha256": "", "result": "FAIL", "note": f"boot failed: {exc}",
+                })
+                failures += 1
+            continue
         try:
             for attempt in range(1, ATTEMPTS + 1):
                 banner = banner_attempt(boot_index, attempt)
@@ -259,7 +283,7 @@ def main() -> int:
         "attempts": len(rows),
         "passed": len(rows) - failures,
         "failed": failures,
-        "zero_byte_attempts": sum(1 for r in rows if r["banner_bytes"] == 0),
+        "zero_byte_attempts": sum(1 for r in rows if r["note"] == "zero-byte banner"),
         "result": "pass" if failures == 0 else "FAIL",
     }
     (RUN / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")

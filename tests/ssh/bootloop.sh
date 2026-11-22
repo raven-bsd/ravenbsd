@@ -54,4 +54,5 @@ trap down EXIT HUP INT TERM
 
 $SUDO sh scripts/qemu-net.sh up
 up=1
-RAVEN_SSH_IMAGE="$image" python3 tests/ssh/bootloop.py
+RAVEN_BOOTLOOP_SUDO=$([ -n "$SUDO" ] && echo 1 || echo 0) \
+    RAVEN_SSH_IMAGE="$image" python3 tests/ssh/bootloop.py
