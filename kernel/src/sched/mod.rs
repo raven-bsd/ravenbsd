@@ -1135,10 +1135,16 @@ pub fn exit_thread(code: i32) -> ! {
         state.current = Some(Arc::clone(&next));
         next
     };
+    // `state.current` now owns the incoming thread. This frame never resumes, so a local Arc
+    // carried across the switch would keep the thread and, through `Thread::process`, its
+    // process alive forever.
+    let to_ptr = Arc::as_ptr(&to);
+    drop(to);
     // SAFETY: the critical section stays live on the dead thread's stack forever; the stack is
-    // freed later by `reap_dead` from another thread's context.
+    // freed later by `reap_dead` from another thread's context. `state.current` keeps the
+    // incoming thread alive across the switch.
     unsafe {
-        context::switch(&*raw, &to);
+        context::switch(&*raw, &*to_ptr);
     }
     loop {
         core::hint::spin_loop();
