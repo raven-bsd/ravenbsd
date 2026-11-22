@@ -38,7 +38,7 @@ pub struct PlatformBackend<'a, B: SysBackend, L: Lock> {
 ///
 /// The attached `CALL` reply carries the 6-byte [`Response::Ok`] inline and then one
 /// `(handle, rights_mask)` pair; the kernel installs that handle in the caller's table.
-pub(crate) fn event_handle<B: SysBackend>(backend: &B, sock: Sock) -> Result<Handle, Errno> {
+pub fn event_handle<B: SysBackend>(backend: &B, sock: Sock) -> Result<Handle, Errno> {
     let request = SocketRequest::Call(Call::Event);
     let mut encoded = [0u8; 64];
     let used = request.encode(&mut encoded).map_err(|_| Errno::EINVAL)?;
@@ -141,6 +141,13 @@ impl<B: SysBackend, L: Lock> NetBackend for PlatformBackend<'_, B, L> {
             Response::Err(error) => Err(Errno(error.0)),
             _ => Err(Errno::EPROTO),
         }
+    }
+
+    fn mptcp_control(&self, s: Sock, request: &[u8], reply: &mut [u8]) -> Result<usize, Errno> {
+        self.platform
+            .backend()
+            .call(raven_libc_platform::Handle(s.0), request, reply)
+            .map_err(|error| Errno(error.0))
     }
 
     fn close(&self, s: Sock) {

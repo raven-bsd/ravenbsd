@@ -177,6 +177,49 @@ timeout 300 cargo nextest run -p raven-tcpip --features mptcp,testutil --test mp
 Receive reassembly across subflows is still the MPTCP2a MetaSocket path (DSS metadata out of
 band); the API `recv` reads the active real subflow until the wire DSS mapping lands in 2c.
 
+## Userland socket API (MPTCP2c1)
+
+The libc half of the Linux-shaped `socket(AF_INET/AF_INET6, SOCK_STREAM, IPPROTO_MPTCP)` surface is
+implemented in `raven-libc-net`: protocol validation, the `net:mptcp`/`net:mptcp/<ip>:<port>` scheme
+paths, and the `SOL_MPTCP` control encoding. Plain TCP/UDP keeps its existing `net:tcp`/`net:udp`
+paths byte-for-byte, and `SOCK_DGRAM + IPPROTO_MPTCP` returns `EPROTONOSUPPORT` (93) before any
+request.
+
+The guest probe (`tests/mptcp/api/main.c`, qtest `mptcp-api`) is still red because the server half
+is MPTCP2c2 (`netd`/`raven-netcore`): `netd` does not yet recognize `net:mptcp`, so the first
+listener open returns `EINVAL`:
+
+```text
+mptcp-api: start
+mptcp-api: listener errno=22
+```
+
+The C API surface:
+
+| Operation | Shape |
+|---|---|
+| create | `socket(AF_INET/AF_INET6, SOCK_STREAM, IPPROTO_MPTCP)` |
+| path add | `setsockopt(fd, SOL_MPTCP, MPTCP_PM_CMD_ADD_ADDR, struct mptcp_pm_addr ...)` |
+| path remove | `setsockopt(fd, SOL_MPTCP, MPTCP_PM_CMD_DEL_ADDR, id)` |
+| backup | `setsockopt(fd, SOL_MPTCP, MPTCP_PM_CMD_SET_FLAGS, backup flag)` |
+| state | `getsockopt(fd, SOL_MPTCP, MPTCP_INFO, ...)`; per-subflow ids via `MPTCP_SUBFLOW_ADDRS` |
+| fallback | an MP_CAPABLE negotiation failure keeps the connection on plain TCP |
+
+The libc-to-netd control frames use the existing `KIND_CALL` header (`u16` version 1, `u16` kind 4)
+followed by one of the MPTCP opcodes; the payload follows the opcode:
+
+| Opcode | Request payload | Reply |
+|---|---|---|
+| 12 `OP_MPTCP_ADD_ADDR` | 12-byte `mptcp_pm_addr` (family, id, flags, IPv4, port) | `TAG_OK` |
+| 13 `OP_MPTCP_DEL_ADDR` | 1-byte id | `TAG_OK` |
+| 14 `OP_MPTCP_SET_FLAGS` | 12-byte `mptcp_pm_addr` with the backup flag | `TAG_OK` |
+| 15 `OP_MPTCP_INFO` | none | `TAG_MPTCP_INFO` (8), `u16` length, 12-byte C `mptcp_info` |
+| 16 `OP_MPTCP_SUBFLOWS` | none | `TAG_MPTCP_SUBFLOWS` (9), `u16` length, 16-byte records |
+
+Errors use the existing `TAG_ERR` (6) + `u16` errno. The server side (MPTCP2c2) owns the opcode
+table in `raven-proto-net`/`netd`; libc only encodes and decodes it. The `raven-tcpip::MptcpSocket`
+host API remains the backend the server drives; it is not reachable from libc directly.
+
 ## Phase 2 boundary
 
 Phase 2 owns the `raven-tcpip` subflow integration: hooking MP_CAPABLE/MP_JOIN into the TCP
