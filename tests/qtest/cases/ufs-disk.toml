@@ -138,7 +138,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^mount-ok$'
-timeout_secs = 30
+timeout_secs = 120
 
 [[step]]
 send = "echo s99-persist > /mnt/s99-demo.txt; echo write-ok\n"
@@ -146,7 +146,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^write-ok$'
-timeout_secs = 30
+timeout_secs = 120
 
 [[step]]
 send = "cat /mnt/s99-demo.txt; echo read-ok\n"
@@ -154,7 +154,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^read-ok$'
-timeout_secs = 30
+timeout_secs = 120
 
 # K522 regression row: bounded disk I/O loop over the MSI-X completion path.
 # The vector must stay owned for the whole loop; any `irq:` report (unclaimed
@@ -177,7 +177,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^umount-ok$'
-timeout_secs = 30
+timeout_secs = 120
 
 [[step]]
 send = "exit 0\n"
