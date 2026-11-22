@@ -1778,6 +1778,21 @@ impl<D: Device> Stack<D> {
                     send_challenge = true;
                     break 'transition;
                 }
+                // NetBSD tcp_input.c:2182: PAWS is checked once for every synchronized state,
+                // before the state-specific body, and only RST is exempt.
+                let synchronized = !matches!(
+                    connection.state,
+                    TcpState::SynSent | TcpState::SynReceived | TcpState::Listen | TcpState::Closed
+                );
+                if synchronized {
+                    if paws_stale(connection, segment, now) {
+                        connection.paws_drops = connection.paws_drops.saturating_add(1);
+                        self.counters.paws_drops = self.counters.paws_drops.wrapping_add(1);
+                        send_ack = true;
+                        break 'transition;
+                    }
+                    paws_update(connection, segment, now);
+                }
                 match connection.state {
                     TcpState::SynSent => {
                         if segment.rst() {
@@ -1872,25 +1887,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::Established => {
-                        if connection.timestamps
-                            && let Some(tsval) = segment.tsval
-                            && seq_lt(tsval, connection.ts_recent)
-                            && now.saturating_since(connection.ts_recent_age).as_millis()
-                                < 24 * 60 * 60 * 1000
-                        {
-                            connection.paws_drops = connection.paws_drops.saturating_add(1);
-                            self.counters.paws_drops = self.counters.paws_drops.wrapping_add(1);
-                            send_ack = true;
-                            break 'transition;
-                        }
-                        if connection.timestamps
-                            && let Some(tsval) = segment.tsval
-                            && seq_gt(tsval, connection.ts_recent)
-                            && seq_le(segment.seq, connection.rcv_nxt)
-                        {
-                            connection.ts_recent = tsval;
-                            connection.ts_recent_age = now;
-                        }
                         if !ack_window_ok(connection, segment.ack) {
                             if seq_gt(segment.ack, connection.highest_sent()) {
                                 self.counters.acks_for_unsent =
@@ -2014,25 +2010,6 @@ impl<D: Device> Stack<D> {
                         }
                     }
                     TcpState::FinWait1 => {
-                        if connection.timestamps
-                            && let Some(tsval) = segment.tsval
-                            && seq_lt(tsval, connection.ts_recent)
-                            && now.saturating_since(connection.ts_recent_age).as_millis()
-                                < 24 * 60 * 60 * 1000
-                        {
-                            connection.paws_drops = connection.paws_drops.saturating_add(1);
-                            self.counters.paws_drops = self.counters.paws_drops.wrapping_add(1);
-                            send_ack = true;
-                            break 'transition;
-                        }
-                        if connection.timestamps
-                            && let Some(tsval) = segment.tsval
-                            && seq_gt(tsval, connection.ts_recent)
-                            && seq_le(segment.seq, connection.rcv_nxt)
-                        {
-                            connection.ts_recent = tsval;
-                            connection.ts_recent_age = now;
-                        }
                         if !ack_window_ok(connection, segment.ack) {
                             if seq_gt(segment.ack, connection.snd_nxt) {
                                 self.counters.acks_for_unsent =
@@ -3571,6 +3548,44 @@ impl<D: Device> Stack<D> {
             self.tcp_delayed_ack(socket, now);
             let _ = self.tcp_zero_window_timer(socket, now);
         }
+    }
+}
+
+/// NetBSD `tcp_input.c:241` `TCP_PAWS_IDLE` is 24 days (24 * 24 hours), not 24 hours.
+const TCP_PAWS_IDLE_MS: u64 = 24 * 24 * 60 * 60 * 1000;
+
+/// NetBSD `tcp_input.c:2182` PAWS: a stale non-RST timestamp in a synchronized state is
+/// dropped. A `ts_recent` older than the 24-day idle interval is the exception: it is cleared
+/// instead, so the next in-order segment can install a fresh value.
+fn paws_stale(connection: &mut TcpConnection, segment: &Segment<'_>, now: Instant) -> bool {
+    if !connection.timestamps || segment.rst() || connection.ts_recent == 0 {
+        return false;
+    }
+    let Some(tsval) = segment.tsval else {
+        return false;
+    };
+    if !seq_lt(tsval, connection.ts_recent) {
+        return false;
+    }
+    if now.saturating_since(connection.ts_recent_age).as_millis() > TCP_PAWS_IDLE_MS {
+        connection.ts_recent = 0;
+        return false;
+    }
+    true
+}
+
+/// NetBSD `tcp_input.c:2340`: an in-order segment with a timestamp at least `ts_recent`
+/// advances the PAWS value and its age.
+fn paws_update(connection: &mut TcpConnection, segment: &Segment<'_>, now: Instant) {
+    if !connection.timestamps {
+        return;
+    }
+    let Some(tsval) = segment.tsval else {
+        return;
+    };
+    if seq_ge(tsval, connection.ts_recent) && seq_le(segment.seq, connection.rcv_nxt) {
+        connection.ts_recent = tsval;
+        connection.ts_recent_age = now;
     }
 }
 

@@ -34,6 +34,9 @@ pub const SIGRESEND: usize = 0x84;
 
 /// `SIG_SETUP` flag: enter with the interrupted `sp` instead of a fresh `sp - 128` frame.
 pub const ENTRY_SP: u32 = 1;
+/// `SIG_SETUP` flag: the second argument is an absolute user context address, not a TLS-relative
+/// offset. Used for a thread whose context area is a dedicated page (K443).
+pub const SIG_SETUP_ABS: u32 = 2;
 
 /// Fault kind: page fault with no mapping (`SIGSEGV`/`SEGV_MAPERR`).
 pub const FAULT_PAGE_NOMAP: u32 = 1;

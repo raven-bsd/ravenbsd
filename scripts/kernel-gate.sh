@@ -23,7 +23,7 @@
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
 # These are functional rows, not latency rows: the preflight refuses another QEMU but tolerates
-# co-tenant cargo/rustc builds and allows load <= 2*nproc. S107_LATENCY=1 switches to the strict
+# co-tenant cargo/rustc builds and allows load <= 4*nproc (a scheduling guard, not a pass). S107_LATENCY=1 switches to the strict
 # no-job, max(2, nproc/4) contract for wall-clock rows.
 # A clean clone runs without RAVEN_MGMT_ROOT: the table is then kept under target/kernel-gate/
 # instead of the management tree, and the rows still run.
@@ -45,12 +45,16 @@ default_max_load() {
         [ "$m" -lt 2 ] && m=2
         echo "$m"
     else
-        echo $((n * 2))
+        echo $((n * 4))
     fi
 }
 max_load=${S107_MAX_LOAD:-$(default_max_load)}
 preflight_args=
-[ "$latency" = 1 ] || preflight_args=--allow-jobs
+if [ "$latency" = 1 ]; then
+    preflight_args=
+else
+    preflight_args="--allow-jobs --allow-qemu $(( $(nproc) / 2 ))"
+fi
 
 # case | arch | owner | subsystem note | optional explicit case path
 # The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
