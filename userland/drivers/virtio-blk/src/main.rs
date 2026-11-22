@@ -235,7 +235,9 @@ mod program {
         // table entry still raises it on every completion, which floods the kernel with
         // `unclaimed vector` and can hand the vector to another device. Keep the MSI-X vector
         // owned (the kernel EOIs it) and close only the legacy line.
-        let _ = raven_rt::handle_close(IRQ_HANDLE);
+        if msix.is_none() {
+            let _ = raven_rt::handle_close(IRQ_HANDLE);
+        }
         let msix_bar = match &msix {
             Some(info) => {
                 let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)
