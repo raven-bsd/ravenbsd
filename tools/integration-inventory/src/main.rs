@@ -17,8 +17,6 @@ use raven_integration_inventory::{
     BLOCK_BEGIN, BLOCK_END, check_document, inventory, render_block, write_document,
 };
 
-const DEFAULT_DOC: &str = "docs/design/integration-inventory.md";
-
 const USAGE: &str = "\
 usage:
   raven-integration-inventory [--root <dir>]
@@ -26,7 +24,9 @@ usage:
   raven-integration-inventory --check [--root <dir>] [--doc <path>]
 
 `--write` regenerates the `integration-inventory:begin/end` block in the document.
-`--check` regenerates it in memory and fails (exit 1) when the file differs.";
+`--check` regenerates it in memory and fails (exit 1) when the file differs.
+The default document is RAVEN_MGMT_ROOT/architecture/product-data/integration-inventory.md;
+there is no product docs fallback.";
 
 fn main() -> ExitCode {
     match run() {
@@ -40,7 +40,7 @@ fn main() -> ExitCode {
 
 fn run() -> anyhow::Result<u8> {
     let mut root = PathBuf::from(".");
-    let mut document = PathBuf::from(DEFAULT_DOC);
+    let mut document: Option<PathBuf> = None;
     let mut check = false;
     let mut write = false;
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -53,7 +53,7 @@ fn run() -> anyhow::Result<u8> {
             }
             "--doc" => {
                 index += 1;
-                document = PathBuf::from(value(&args, index, "--doc")?);
+                document = Some(PathBuf::from(value(&args, index, "--doc")?));
             }
             "--check" => check = true,
             "--write" => write = true,
@@ -66,7 +66,10 @@ fn run() -> anyhow::Result<u8> {
         index += 1;
     }
     let root = absolute(&root);
-    let document = absolute(&document);
+    let document = match document {
+        Some(path) => absolute(&path),
+        None => mgmt_doc(&root)?,
+    };
 
     if check {
         return match check_document(&root, &document)? {
@@ -102,6 +105,23 @@ fn absolute(path: &Path) -> PathBuf {
             .map(|current| current.join(path))
             .unwrap_or_else(|_| path.to_path_buf())
     }
+}
+
+fn mgmt_doc(root: &Path) -> anyhow::Result<PathBuf> {
+    let raw = std::env::var("RAVEN_MGMT_ROOT")
+        .ok()
+        .filter(|value| !value.is_empty());
+    let base = raw
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.parent().unwrap_or(root).join("ravenbsd-prjmgmt"));
+    if !base.is_dir() {
+        anyhow::bail!(
+            "RAVEN_MGMT_ROOT: management root {} is not a directory; set RAVEN_MGMT_ROOT to the \
+             ravenbsd-prjmgmt checkout (no product docs fallback)",
+            base.display()
+        );
+    }
+    Ok(base.join("architecture/product-data/integration-inventory.md"))
 }
 
 fn value<'a>(args: &'a [String], index: usize, flag: &str) -> anyhow::Result<&'a str> {

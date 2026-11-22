@@ -1,4 +1,5 @@
 file	area	status	basis	evidence	owner	proposed_ticket	source	upstream	license
+crates/raven-entropy/src/lib.rs	crates	COVERED	sibling	crates/raven-entropy/src/lib_ut.rs	bob	-	provenance+header	openbsd	ISC
 crates/raven-linux-abi/src/sysnums.rs	crates	COVERED	stem	crates/raven-linux-abi/tests/sysnums.rs	bob	-	provenance	linux-raw-sys	MIT
 crates/raven-pf/src/abi.rs	crates	COVERED	sibling	crates/raven-pf/src/abi_ut.rs	bob	-	provenance+header	freebsd	BSD-2-Clause
 crates/raven-pf/src/nat.rs	crates	COVERED	sibling	crates/raven-pf/src/nat_ut.rs	bob	-	provenance+header	freebsd	BSD-2-Clause
@@ -81,7 +82,7 @@ libc/ravenlibc/abi/time.toml	libc	COVERED	path	tests/libc/abi/src/lib_ut.rs	kevi
 libc/ravenlibc/arch/aarch64/include/bits/alltypes.h	libc	COVERED	path	tests/libc/headers/src/lib_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/aarch64/include/bits/fenv.h	libc	COVERED	basename	tests/libc/headers/layouts.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/aarch64/include/bits/hwcap.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/arch/aarch64/include/bits/mman.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/arch/aarch64/include/bits/mman.h	libc	COVERED	basename	tests/fixtures/aslr/aslr.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/aarch64/include/bits/setjmp.h	libc	COVERED	basename	libc/ravenlibc/tools/hdrgen/src/probe_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/aarch64/include/bits/signal.h	libc	COVERED	basename	tests/libc/headers/src/manifest_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/riscv64/include/bits/alltypes.h	libc	COVERED	basename	tests/libc/headers/src/lib_ut.rs	kevin	-	provenance+header	musl	MIT
@@ -91,7 +92,7 @@ libc/ravenlibc/arch/riscv64/include/bits/signal.h	libc	COVERED	basename	tests/li
 libc/ravenlibc/arch/x86_64/include/bits/alltypes.h	libc	COVERED	basename	tests/libc/headers/src/lib_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/x86_64/include/bits/fenv.h	libc	COVERED	basename	tests/libc/headers/layouts.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/x86_64/include/bits/limits.h	libc	COVERED	basename	tests/libc/c/libc-closefrom.c	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/arch/x86_64/include/bits/mman.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/arch/x86_64/include/bits/mman.h	libc	COVERED	basename	tests/fixtures/aslr/aslr.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/x86_64/include/bits/setjmp.h	libc	COVERED	basename	libc/ravenlibc/tools/hdrgen/src/probe_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/arch/x86_64/include/bits/signal.h	libc	COVERED	basename	tests/libc/headers/src/manifest_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/crates/raven-libc-abi/src/generated/errno.rs	libc	COVERED	path	tests/libc/toolchain-abi/src/lib.rs	kevin	-	provenance+header	musl	MIT
@@ -789,8 +790,8 @@ libc/ravenlibc/include/stdbit.h	libc	COVERED	basename	tests/libc/headers/manifes
 libc/ravenlibc/include/stdint.h	libc	COVERED	path	tests/libc/headers/src/lib_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/stdio.h	libc	COVERED	path	tests/libc/headers/src/lib_ut.rs	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/stdio_ext.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/include/stdlib.h	libc	COVERED	basename	tests/fixtures/chroot/chroot.c	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/include/string.h	libc	COVERED	basename	tests/fixtures/chroot/chroot.c	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/include/stdlib.h	libc	COVERED	basename	tests/fixtures/aslr/aslr.c	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/include/string.h	libc	COVERED	basename	tests/fixtures/aslr/aslr.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/stringlist.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	freebsd	BSD-2-Clause
 libc/ravenlibc/include/strings.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/stropts.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
@@ -798,7 +799,7 @@ libc/ravenlibc/include/sys/_decls.h	libc	COVERED	basename	tests/libc/headers/man
 libc/ravenlibc/include/sys/_endian.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	freebsd	BSD-3-Clause
 libc/ravenlibc/include/sys/_visible.h	libc	COVERED	basename	tests/libc/headers/src/clang_ut.rs	kevin	-	provenance+header	freebsd	BSD-3-Clause
 libc/ravenlibc/include/sys/acct.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/include/sys/auxv.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/include/sys/auxv.h	libc	COVERED	basename	tests/fixtures/aslr/aslr.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/caprights.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	freebsd	BSD-2-Clause
 libc/ravenlibc/include/sys/capsicum.h	libc	COVERED	suffix	libc/ravenlibc/crates/raven-libc-pledge/src/cap_rights_ut.rs	kevin	-	provenance+header	freebsd	BSD-2-Clause
 libc/ravenlibc/include/sys/cdefs.h	libc	COVERED	basename	tests/libc/headers/src/lib_ut.rs	kevin	-	provenance+header	freebsd	BSD-3-Clause
@@ -814,7 +815,7 @@ libc/ravenlibc/include/sys/inotify.h	libc	COVERED	suffix	libc/ravenlibc/crates/r
 libc/ravenlibc/include/sys/ioctl.h	libc	COVERED	basename	tests/libc/c/libc-openpty-null.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/ipc.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/klog.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/include/sys/mman.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/include/sys/mman.h	libc	COVERED	basename	tests/fixtures/aslr/aslr.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/mount.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/msg.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/sys/param.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	freebsd	BSD-3-Clause
@@ -867,7 +868,7 @@ libc/ravenlibc/include/ttyent.h	libc	COVERED	basename	tests/libc/headers/manifes
 libc/ravenlibc/include/uchar.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/ucontext.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/ulimit.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
-libc/ravenlibc/include/unistd.h	libc	COVERED	basename	tests/fixtures/b20-linux/hello.c	kevin	-	provenance+header	musl	MIT
+libc/ravenlibc/include/unistd.h	libc	COVERED	basename	tests/fixtures/aslr/aslr.c	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/utime.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/utmpx.h	libc	COVERED	basename	tests/libc/headers/header-only-constants.toml	kevin	-	provenance+header	musl	MIT
 libc/ravenlibc/include/uuid.h	libc	COVERED	basename	tests/libc/headers/manifest.toml	kevin	-	provenance+header	freebsd	BSD-2-Clause
