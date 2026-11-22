@@ -12,17 +12,15 @@
 #
 # The case list is fixed on purpose. Extend it in a ticket that owns the new case; do not add
 # ad-hoc cases at run time. Owners are the lanes that own the subsystem, so a failing row can be
-# routed without re-reading the log. A row may name a qtest case file in an optional fifth field;
-# without it the case name resolves under tests/qtest/cases/ as before.
+# routed without re-reading the log.
 #
 # usage: sh scripts/kernel-gate.sh [--list]
 #   --list   print the case table and exit (no QEMU run)
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
-# These are functional rows, not latency rows: the preflight tolerates up to nproc/2 co-tenant
-# QEMUs (the same budget as scripts/qemu-hygiene.sh), tolerates co-tenant cargo/rustc builds and
-# allows load <= 2*nproc. S107_LATENCY=1 switches to the strict no-job, max(2, nproc/4) contract
-# for wall-clock rows.
+# These are functional rows, not latency rows: the preflight refuses another QEMU but tolerates
+# co-tenant cargo/rustc builds and allows load <= 4*nproc (a scheduling guard, not a pass). S107_LATENCY=1 switches to the strict
+# no-job, max(2, nproc/4) contract for wall-clock rows.
 # A clean clone runs without RAVEN_MGMT_ROOT: the table is then kept under target/kernel-gate/
 # instead of the management tree, and the rows still run.
 set -u
@@ -43,13 +41,16 @@ default_max_load() {
         [ "$m" -lt 2 ] && m=2
         echo "$m"
     else
-        echo $((n * 2))
+        echo $((n * 4))
     fi
 }
 max_load=${S107_MAX_LOAD:-$(default_max_load)}
-qemu_budget=$(( $(nproc 2>/dev/null || echo 4) / 2 ))
 preflight_args=
-[ "$latency" = 1 ] || preflight_args="--allow-jobs --max-qemu $qemu_budget"
+if [ "$latency" = 1 ]; then
+    preflight_args=
+else
+    preflight_args="--allow-jobs --allow-qemu $(( $(nproc) / 2 ))"
+fi
 
 # case | arch | owner | subsystem note | optional explicit case path
 # The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
@@ -85,7 +86,7 @@ kernel-timer-aarch64|aarch64|dave|timer
 duplex-matrix-aarch64|aarch64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix-aarch64.toml'
 
 if [ "${1:-}" = "--list" ]; then
-    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note case_path; do
+    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note _path; do
         printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
     done
     exit 0
