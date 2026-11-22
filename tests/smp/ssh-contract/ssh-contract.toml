@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K435: guest SSH kernel-contract conformance suite (K1-K6). The fixture runs on the
+# network-config-test profile with netd and ptyd; the host peer opens two TCP connections for K6.
+name = "ssh-contract"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 30
+pre = [
+    "sh tests/smp/ssh-contract/build.sh",
+    "sh tests/smp/ssh-contract/start-host.sh",
+]
+initfs = "build/fixtures/ssh-contract/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23097-:23097",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONTRACT K1 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K2 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K3 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K4 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K5 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K6 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 6/6$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)CONTRACT K[1-6] FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'

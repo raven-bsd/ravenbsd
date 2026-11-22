@@ -1,0 +1,605 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+//
+// K435: guest SSH kernel-contract conformance suite. It runs inside the RavenBSD image and
+// prints one `CONTRACT <id> PASS|FAIL <detail>` line per row. The service exits non-zero on the
+// first red row; the qtest fails on any FAIL. Rows:
+//   K1 poll/select current level (no cache/replay)
+//   K2 nonblocking read (EAGAIN/exact bytes/valid buffer)
+//   K3 nonblocking write (EAGAIN/partial/success delivered on the same socket)
+//   K4 dup and fork+exec identity/readiness
+//   K5 PTY open/grant/unlock/ptsname, pair round-trip, termios defaults
+//   K6 accept: accepted fd independent, listener still accepts
+
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <signal.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <termios.h>
+#include <unistd.h>
+
+#ifndef O_NONBLOCK
+#define O_NONBLOCK 0x0004
+#endif
+
+extern int posix_openpt(int flags);
+extern int grantpt(int fd);
+extern int unlockpt(int fd);
+extern char *ptsname(int fd) __attribute__((weak));
+
+#define K6_PORT 23097
+
+// raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
+static long raven_debug_write(const char *bytes, size_t len) {
+    register long number asm("rax") = 3;
+    register const char *pointer asm("rdi") = bytes;
+    register size_t length asm("rsi") = len;
+    __asm__ volatile("syscall"
+                     : "+r"(number)
+                     : "r"(pointer), "r"(length)
+                     : "rcx", "r11", "memory");
+    return number;
+}
+
+static void say(const char *text) {
+    (void)raven_debug_write(text, strlen(text));
+}
+
+static const char *row = "K0";
+
+static void result(int ok, const char *detail) {
+    char line[240];
+    int length = snprintf(line, sizeof(line), "CONTRACT %s %s %s\n", row, ok ? "PASS" : "FAIL",
+                          detail);
+    if (length > 0) {
+        size_t size = (size_t)length;
+        if (size >= sizeof(line)) {
+            size = sizeof(line) - 1;
+        }
+        (void)raven_debug_write(line, size);
+    }
+}
+
+static int fail(const char *what) {
+    char detail[160];
+    (void)snprintf(detail, sizeof(detail), "%s errno=%d", what, errno);
+    result(0, detail);
+    say("CONTRACT SUMMARY FAIL\n");
+    return 1;
+}
+
+static void pass(const char *detail) {
+    result(1, detail);
+}
+
+static int poll_one(int fd, short events, int timeout_ms) {
+    struct pollfd pfd;
+    int ready;
+
+    // The SSH poll path always uses a nonzero timeout. The libc non-scheme zero-timeout query
+    // is a separate libc gap; 1 ms still measures the current level, not a future edge.
+    if (timeout_ms == 0) {
+        timeout_ms = 100;
+    }
+    pfd.fd = fd;
+    pfd.events = events;
+    pfd.revents = 0;
+    do {
+        ready = poll(&pfd, 1, timeout_ms);
+    } while (ready < 0 && errno == EINTR);
+    return ready < 0 ? -1 : pfd.revents;
+}
+
+static int select_read(int fd, int timeout_ms) {
+    fd_set read_set;
+    struct timeval timeout;
+    int ready;
+
+    if (timeout_ms == 0) {
+        timeout_ms = 100;
+    }
+    FD_ZERO(&read_set);
+    FD_SET(fd, &read_set);
+    timeout.tv_sec = timeout_ms / 1000;
+    timeout.tv_usec = (timeout_ms % 1000) * 1000;
+    do {
+        ready = select(fd + 1, &read_set, NULL, NULL, &timeout);
+    } while (ready < 0 && errno == EINTR);
+    return ready;
+}
+
+static int read_exact(int fd, void *buffer, size_t length) {
+    size_t done = 0;
+
+    while (done < length) {
+        ssize_t got = read(fd, (char *)buffer + done, length - done);
+        if (got <= 0) {
+            return -1;
+        }
+        done += (size_t)got;
+    }
+    return 0;
+}
+
+static int check_poll(void) {
+    int sv[2];
+    char byte = 'A';
+    int revents;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("socketpair");
+    }
+    revents = poll_one(sv[1], POLLOUT, 0);
+    if (revents < 0 || (revents & POLLOUT) == 0) {
+        return fail("empty write-ready");
+    }
+    revents = poll_one(sv[0], POLLIN, 0);
+    if (revents != 0) {
+        return fail("empty read-ready");
+    }
+    if (select_read(sv[0], 0) != 0) {
+        return fail("select empty");
+    }
+    if (write(sv[1], &byte, 1) != 1) {
+        return fail("write");
+    }
+    revents = poll_one(sv[0], POLLIN, 0);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("read-ready");
+    }
+    if (select_read(sv[0], 0) != 1) {
+        return fail("select ready");
+    }
+    if (read(sv[0], &byte, 1) != 1) {
+        return fail("drain");
+    }
+    // Level-triggered: the consumed readable edge must not replay and the write level must be
+    // recomputed from the current ring state.
+    revents = poll_one(sv[0], POLLIN, 0);
+    if (revents != 0) {
+        return fail("read replay");
+    }
+    if (select_read(sv[0], 0) != 0) {
+        return fail("select replay");
+    }
+    if (close(sv[1]) != 0) {
+        return fail("close writer");
+    }
+    revents = poll_one(sv[0], POLLIN | POLLHUP, 0);
+    if (revents < 0 || (revents & POLLHUP) == 0) {
+        return fail("hup");
+    }
+    if (close(sv[0]) != 0) {
+        return fail("close reader");
+    }
+    pass("level=current drain=no-replay hup=seen");
+    return 0;
+}
+
+static int check_read(void) {
+    int sv[2];
+    unsigned char payload[100];
+    unsigned char buffer[100];
+    size_t index;
+    ssize_t count;
+
+    for (index = 0; index < sizeof(payload); index++) {
+        payload[index] = (unsigned char)(index + 1);
+    }
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sv) != 0) {
+        return fail("socketpair");
+    }
+    if (write(sv[1], payload, sizeof(payload)) != (ssize_t)sizeof(payload)) {
+        return fail("write");
+    }
+    count = read(sv[0], buffer, 10);
+    if (count != 10 || memcmp(buffer, payload, 10) != 0) {
+        return fail("partial first");
+    }
+    count = read(sv[0], buffer, 10);
+    if (count != 10 || memcmp(buffer, payload + 10, 10) != 0) {
+        return fail("partial second");
+    }
+    if (poll_one(sv[0], POLLIN, 0) == 0) {
+        return fail("remaining poll");
+    }
+    count = read(sv[0], buffer, 80);
+    if (count != 80 || memcmp(buffer, payload + 20, 80) != 0) {
+        return fail("remainder");
+    }
+    if (poll_one(sv[0], POLLIN, 0) != 0) {
+        return fail("drained poll");
+    }
+    errno = 0;
+    count = read(sv[0], buffer, sizeof(buffer));
+    if (count != -1 || errno != EAGAIN) {
+        return fail("empty EAGAIN");
+    }
+    if (close(sv[0]) != 0 || close(sv[1]) != 0) {
+        return fail("close");
+    }
+    pass("partial=10/10/80 eagain=1 eof=0");
+    return 0;
+}
+
+static unsigned char big_write[128 * 1024];
+
+static int check_write(void) {
+    int sv[2];
+    ssize_t first;
+    ssize_t second;
+    ssize_t want;
+    ssize_t got;
+    unsigned char scratch[4096];
+    unsigned char final[4096];
+
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sv) != 0) {
+        return fail("socketpair");
+    }
+    memset(big_write, 0x5a, sizeof(big_write));
+    first = write(sv[1], big_write, sizeof(big_write));
+    if (first <= 0 || first >= (ssize_t)sizeof(big_write)) {
+        return fail("partial");
+    }
+    errno = 0;
+    second = write(sv[1], big_write, 4096);
+    if (second != -1 || errno != EAGAIN) {
+        return fail("full EAGAIN");
+    }
+    want = first;
+    while (want > 0) {
+        got = read(sv[0], scratch,
+                   want < (ssize_t)sizeof(scratch) ? (size_t)want : sizeof(scratch));
+        if (got <= 0) {
+            return fail("drain");
+        }
+        want -= got;
+    }
+    if (write(sv[1], big_write, 4096) != 4096) {
+        return fail("after drain");
+    }
+    if (read_exact(sv[0], final, sizeof(final)) != 0 ||
+        memcmp(final, big_write, sizeof(final)) != 0) {
+        return fail("delivery same socket");
+    }
+    if (close(sv[0]) != 0 || close(sv[1]) != 0) {
+        return fail("close");
+    }
+    pass("partial=positive eagain=1 delivered=4096");
+    return 0;
+}
+
+static void k4_watchdog(void) {
+    sleep(12);
+    say("CONTRACT K4 FAIL child-exit-hang watchdog\n");
+    say("CONTRACT SUMMARY FAIL\n");
+    (void)kill(getppid(), SIGKILL);
+    _exit(0);
+}
+
+static int check_dup_exec(void) {
+    int sv[2];
+    int duplicate;
+    char byte = 'D';
+    pid_t child;
+    pid_t watchdog;
+    int status = 0;
+    char fd_text[16];
+    char *argv[3];
+    char *envp[1] = {NULL};
+
+    say("CONTRACT K4 CHILD stage=start\n");
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        return fail("dup socketpair");
+    }
+    duplicate = dup(sv[0]);
+    if (duplicate < 0) {
+        return fail("dup");
+    }
+    if (poll_one(sv[0], POLLIN, 0) != 0 || poll_one(duplicate, POLLIN, 0) != 0) {
+        return fail("dup empty readiness");
+    }
+    if (write(sv[1], &byte, 1) != 1) {
+        return fail("dup write");
+    }
+    // The duplicate and the original share one open file description, so the readable level is
+    // visible through both and a drain through one clears it for both.
+    if (poll_one(sv[0], POLLIN, 0) == 0 || poll_one(duplicate, POLLIN, 0) == 0) {
+        return fail("dup shared readiness");
+    }
+    if (read(duplicate, &byte, 1) != 1) {
+        return fail("dup read");
+    }
+    if (poll_one(sv[0], POLLIN, 0) != 0 || poll_one(duplicate, POLLIN, 0) != 0) {
+        return fail("dup shared drain");
+    }
+    if (close(duplicate) != 0) {
+        return fail("dup close duplicate");
+    }
+
+    watchdog = fork();
+    if (watchdog == 0) {
+        k4_watchdog();
+    }
+
+    // Use a fresh duplicate for the exec child, matching the rexec fdmap shape: the child gets
+    // one stable descriptor that survives exec even if the original table also has holes.
+    duplicate = dup(sv[0]);
+    if (duplicate < 0) {
+        return fail("exec dup");
+    }
+    say("CONTRACT K4 CHILD stage=fork\n");
+    child = fork();
+    say("CONTRACT K4 CHILD stage=forked\n");
+    if (child < 0) {
+        return fail("fork");
+    }
+    if (child == 0) {
+        say("CONTRACT K4 CHILD stage=child\n");
+        (void)close(sv[0]);
+        (void)close(sv[1]);
+        // Keep only the inherited contract socket; the service's net/pty/event handles are not
+        // part of K4 and would otherwise be torn down by the exec child.
+        for (int fd = 0; fd < 64; fd++) {
+            if (fd != duplicate) {
+                (void)close(fd);
+            }
+        }
+        if (snprintf(fd_text, sizeof(fd_text), "%d", duplicate) <= 0) {
+            _exit(2);
+        }
+        argv[0] = (char *)"ssh-contract-child";
+        argv[1] = fd_text;
+        argv[2] = NULL;
+        execve("/bin/ssh-contract-child", argv, envp);
+        {
+            char line[96];
+            (void)snprintf(line, sizeof(line), "CONTRACT K4 CHILD exec fail errno=%d\n", errno);
+            say(line);
+        }
+        _exit(3);
+    }
+    (void)close(duplicate);
+    if (write(sv[1], "PING", 4) != 4) {
+        return fail("exec parent write");
+    }
+    say("CONTRACT K4 CHILD stage=wait\n");
+    {
+        int exited = 0;
+        int loop;
+        for (loop = 0; loop < 8; loop++) {
+            pid_t waited = waitpid(child, &status, WNOHANG);
+            {
+                char line[96];
+                (void)snprintf(line, sizeof(line),
+                               "CONTRACT K4 CHILD waitpid=%d status=%d errno=%d\n", (int)waited,
+                               status, errno);
+                say(line);
+            }
+            if (waited == child) {
+                exited = 1;
+                break;
+            }
+            if (waited < 0 && errno != EINTR) {
+                break;
+            }
+            say("CONTRACT K4 CHILD stage=sleep\n");
+            sleep(1);
+        }
+        if (!exited) {
+            (void)kill(child, SIGKILL);
+            (void)waitpid(child, &status, 0);
+            result(0, "exec child stuck no PONG");
+            say("CONTRACT SUMMARY FAIL\n");
+            return 1;
+        }
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            char detail[96];
+            (void)snprintf(detail, sizeof(detail), "exec child status=%d", status);
+            result(0, detail);
+            say("CONTRACT SUMMARY FAIL\n");
+            return 1;
+        }
+        {
+            char pong[4];
+            if (read_exact(sv[1], pong, sizeof(pong)) != 0 ||
+                memcmp(pong, "PONG", sizeof(pong)) != 0) {
+                result(0, "exec child PONG missing");
+                say("CONTRACT SUMMARY FAIL\n");
+                return 1;
+            }
+        }
+    }
+    if (close(sv[0]) != 0 || close(sv[1]) != 0) {
+        return fail("exec close");
+    }
+    if (watchdog > 0) {
+        (void)kill(watchdog, SIGKILL);
+    }
+    pass("dup=shared exec=child-same-socket");
+    return 0;
+}
+
+static int check_pty(void) {
+    int master;
+    int slave;
+    struct termios settings;
+    char name[128];
+    char buffer[32];
+    ssize_t count;
+    int revents;
+
+    master = posix_openpt(O_RDWR | O_NOCTTY);
+    if (master < 0) {
+        return fail("posix_openpt");
+    }
+    if (grantpt(master) != 0) {
+        return fail("grantpt");
+    }
+    if (unlockpt(master) != 0) {
+        return fail("unlockpt");
+    }
+    if (ptsname == NULL) {
+        errno = ENOSYS;
+        return fail("ptsname symbol missing");
+    }
+    if (ptsname(master) == NULL) {
+        return fail("ptsname");
+    }
+    (void)snprintf(name, sizeof(name), "%s", ptsname(master));
+    slave = open(name, O_RDWR | O_NOCTTY);
+    if (slave < 0) {
+        return fail("open slave");
+    }
+    if (!isatty(master) || !isatty(slave)) {
+        return fail("isatty");
+    }
+    if (tcgetattr(slave, &settings) != 0) {
+        return fail("tcgetattr");
+    }
+    if ((settings.c_lflag & ICANON) == 0 || (settings.c_lflag & ECHO) == 0) {
+        return fail("termios defaults");
+    }
+    if (write(master, "hello\n", 6) != 6) {
+        return fail("master write");
+    }
+    revents = poll_one(slave, POLLIN, 2000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("slave poll");
+    }
+    count = read(slave, buffer, sizeof(buffer));
+    if (count < 5 || memcmp(buffer, "hello", 5) != 0) {
+        return fail("slave roundtrip");
+    }
+    // Drain the master-side echo queued by the line discipline before the slave output test.
+    if (poll_one(master, POLLIN, 2000) > 0) {
+        (void)read(master, buffer, sizeof(buffer));
+    }
+    if (write(slave, "world\n", 6) != 6) {
+        return fail("slave write");
+    }
+    revents = poll_one(master, POLLIN, 2000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("master poll");
+    }
+    count = read(master, buffer, sizeof(buffer));
+    if (count < 5 || memcmp(buffer, "world", 5) != 0) {
+        return fail("master roundtrip");
+    }
+    if (close(slave) != 0 || close(master) != 0) {
+        return fail("pty close");
+    }
+    pass("pair=open termios=icanon-echo roundtrip=both");
+    return 0;
+}
+
+static int accept_one(int listener, const char *payload, const char *ack) {
+    int fd;
+    char buffer[32];
+    size_t length = strlen(payload);
+
+    fd = accept(listener, NULL, NULL);
+    if (fd < 0) {
+        return -1;
+    }
+    if (read_exact(fd, buffer, length) != 0 || memcmp(buffer, payload, length) != 0) {
+        (void)close(fd);
+        errno = EPROTO;
+        return -1;
+    }
+    if (write(fd, payload, length) != (ssize_t)length) {
+        (void)close(fd);
+        return -1;
+    }
+    if (read_exact(fd, buffer, strlen(ack)) != 0 ||
+        memcmp(buffer, ack, strlen(ack)) != 0) {
+        (void)close(fd);
+        errno = EPROTO;
+        return -1;
+    }
+    (void)close(fd);
+    return 0;
+}
+
+static int check_accept(void) {
+    int listener;
+    struct sockaddr_in address;
+    int revents;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        return fail("socket");
+    }
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(K6_PORT);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0) {
+        return fail("bind");
+    }
+    if (listen(listener, 2) != 0) {
+        return fail("listen");
+    }
+    revents = poll_one(listener, POLLIN, 5000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("listener poll");
+    }
+    if (accept_one(listener, "ACCEPT1", "K6ACK1") != 0) {
+        return fail("accept first");
+    }
+    // The listener must still accept while the first accepted descriptor has been used.
+    revents = poll_one(listener, POLLIN, 5000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        return fail("listener second poll");
+    }
+    if (accept_one(listener, "ACCEPT2", "K6ACK2") != 0) {
+        return fail("accept second");
+    }
+    if (close(listener) != 0) {
+        return fail("listener close");
+    }
+    pass("accepted=independent listener=still-accepts");
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    row = "K1";
+    if (check_poll() != 0) {
+        return 1;
+    }
+    row = "K2";
+    if (check_read() != 0) {
+        return 1;
+    }
+    row = "K3";
+    if (check_write() != 0) {
+        return 1;
+    }
+    row = "K4";
+    if (check_dup_exec() != 0) {
+        return 1;
+    }
+    row = "K5";
+    if (check_pty() != 0) {
+        return 1;
+    }
+    row = "K6";
+    if (check_accept() != 0) {
+        return 1;
+    }
+    say("CONTRACT SUMMARY PASS 6/6\n");
+    return 0;
+}

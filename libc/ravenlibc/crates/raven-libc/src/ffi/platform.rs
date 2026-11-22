@@ -53,6 +53,10 @@ static STARTUP_RECORDED: AtomicBool = AtomicBool::new(false);
 static STARTUP_APPLIED: AtomicBool = AtomicBool::new(false);
 /// Set before the start cwd is applied, so a recursive `global` cannot apply it twice.
 static STARTUP_CWD_APPLIED: AtomicBool = AtomicBool::new(false);
+/// Set when `execve` supplied the `__RAVEN_FDMAP` entry: the exec caller's fd table is
+/// authoritative, including deliberately closed descriptors 0/1/2. A spawned service with no
+/// fdmap still adopts the console.
+static EXEC_INHERITED: AtomicBool = AtomicBool::new(false);
 
 /// Longest accepted child cwd (including the trailing NUL).
 const MAX_CWD: usize = 4096;
@@ -140,7 +144,9 @@ fn apply_startup_cwd(platform: &Platform<RealSys, ShellLock>) {
 /// Install the spawner's descriptors and adopt standard descriptors on the first use.
 fn apply_startup(platform: &Platform<RealSys, ShellLock>) {
     restore_inherited_fds(platform);
-    ensure_standard_fds(platform);
+    if !EXEC_INHERITED.load(Ordering::Acquire) {
+        ensure_standard_fds(platform);
+    }
 }
 
 /// Install the `RFDM` block the spawner mapped into this process.
@@ -181,6 +187,7 @@ fn restore_exec_fdmap(platform: &Platform<RealSys, ShellLock>) {
         let Some(value) = crate::stdlib::env_support::get(name) else {
             return;
         };
+        EXEC_INHERITED.store(true, Ordering::Release);
         if let Ok(block) = FdMap::decode_env(value)
             && platform.restore_fdmap(&block).is_ok()
         {
