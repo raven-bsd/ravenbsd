@@ -56,7 +56,7 @@ MARKER = b"K434-SSH-MARKER-2026-11-22\n"
 
 ROW_ORDER = [
     "S0", "S1", "S1-client-first", "S2", "S3", "S4", "S5", "S5-identity",
-    "S5-session", "S6", "S6-length", "S7", "S8", "S8-pty-alloc",
+    "S5-session", "S6", "S6-length", "S7", "S7-routing", "S8", "S8-pty-alloc",
 ]
 
 rows: list[tuple[str, str, str]] = []
@@ -829,20 +829,51 @@ def row_s5_s6() -> None:
                f"command session completed exit 0; fd4={fd_text}, peer_state={peer_text}")
 
 
-def row_s7() -> None:
+def console_marker_count(console: SerialConsole) -> int:
+    console.pump()
+    return bytes(console.buffer).count(MARKER)
+
+
+def row_s7(console: SerialConsole) -> None:
+    before = console_marker_count(console)
     marker_run = ssh_run(["cat", "/tmp/ssh-marker"], "s7-marker.log")
-    marker_ok = marker_run["returncode"] == 0 and marker_run["stdout"] == MARKER
-    attempt("S7-marker", 1, "fresh", literal(MARKER), literal(marker_run["stdout"]),
+    time.sleep(0.5)
+    after = console_marker_count(console)
+    console_new = after - before
+    marker_ok = (marker_run["returncode"] == 0 and marker_run["stdout"] == MARKER
+                 and console_new == 0)
+    attempt("S7-marker", 1, "fresh", f"{literal(MARKER)}; console delta 0",
+            f"{literal(marker_run['stdout'])}; console_new={console_new}",
             float(marker_run["elapsed_ms"]), "PASS" if marker_ok else "FAIL",
             f"exit {marker_run['returncode']}")
     passed = 0
+    max_console_new = console_new
     for number in range(1, 11):
+        before = console_marker_count(console)
         session = ssh_run(["cat", "/tmp/ssh-marker"], f"s7-run-{number}.log")
-        ok = session["returncode"] == 0 and session["stdout"] == MARKER
+        time.sleep(0.5)
+        after = console_marker_count(console)
+        new_markers = after - before
+        max_console_new = max(max_console_new, new_markers)
+        ok = (session["returncode"] == 0 and session["stdout"] == MARKER
+              and new_markers == 0)
         passed += 1 if ok else 0
-        attempt("S7-10/10", number, "fresh", literal(MARKER),
-                literal(session["stdout"]), float(session["elapsed_ms"]),
-                "PASS" if ok else "FAIL", f"exit {session['returncode']}")
+        attempt("S7-10/10", number, "fresh", f"{literal(MARKER)}; console delta 0",
+                f"{literal(session['stdout'])}; console_new={new_markers}",
+                float(session["elapsed_ms"]), "PASS" if ok else "FAIL",
+                f"exit {session['returncode']}")
+    routing_ok = marker_ok and max_console_new == 0
+    attempt("S7-routing", 1, "fresh", "client exact marker; console receives none",
+            f"client={literal(marker_run['stdout'])}; max_console_new={max_console_new}",
+            float(marker_run["elapsed_ms"]), "PASS" if routing_ok else "FAIL")
+    if routing_ok:
+        record("S7-routing", "PASS",
+               "client received the exact marker and the guest console marker count did not "
+               "increase on the single attempt or 10/10")
+    else:
+        record("S7-routing", "FAIL",
+               f"client={literal(marker_run['stdout'])}; max_console_new={max_console_new} "
+               f"(the command output is not on the client channel)")
     if marker_ok and passed == 10:
         record("S7", "PASS",
                f"`cat /tmp/ssh-marker` returned exactly {literal(MARKER)} on the single attempt "
@@ -851,7 +882,7 @@ def row_s7() -> None:
         record("S7", "FAIL",
                f"marker {'exact' if marker_ok else 'mismatch/error'} "
                f"({literal(marker_run['stdout'])}); {passed}/10 command sessions returned the "
-               f"exact marker (gate; C1-C10)")
+               f"exact marker; max_console_new={max_console_new} (gate; C1-C10)")
 
 
 def row_s8() -> None:
@@ -887,6 +918,14 @@ def row_s8() -> None:
         record("S8", "FAIL",
                "`PTY allocation request failed on channel 0` (pts_alloc/openpty; C9)")
         attempt("S8", 1, "fresh", "/dev/pts/N", "PTY allocation request failed",
+                float(result["elapsed_ms"]), "FAIL")
+    elif "tty: command not found" in (output + error):
+        tty_line = next((line.strip() for line in (output + error).splitlines()
+                         if "tty: command not found" in line), "tty: command not found")
+        record("S8", "FAIL",
+               f"PTY allocation did not report; the remote `tty` utility is missing: `{tty_line}` "
+               f"(C9)")
+        attempt("S8", 1, "fresh", "/dev/pts/N", tty_line,
                 float(result["elapsed_ms"]), "FAIL")
     elif match and not pty_alloc_ok:
         record("S8", "FAIL",
@@ -949,7 +988,7 @@ def main() -> int:
         row_s4()
         row_s5_s6()
         row_s3_finish(console, s3_state)
-        row_s7()
+        row_s7(console)
         row_s8()
         console_capture(console, "cat /tmp/sshd.log", "s8-server.log")
     except Exception as error:  # noqa: BLE001 - a boot failure is a BLOCKED row, not a crash
