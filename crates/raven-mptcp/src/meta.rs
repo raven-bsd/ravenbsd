@@ -19,15 +19,39 @@ use alloc::vec::Vec;
 use crate::Error;
 use crate::dss::Mapping;
 
+/// Live level of one subflow transport.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SubflowReadiness {
+    /// The transport has bytes to read.
+    pub readable: bool,
+    /// The transport can accept a write.
+    pub writable: bool,
+    /// The transport is terminally closed and its outstanding ranges must be re-injected.
+    pub closed: bool,
+}
+
 /// A transport that can carry one MPTCP subflow.
 ///
-/// The trait is deliberately small and object-safe: MPTCP2 adapts the real TCP subflow to it.
+/// The trait is deliberately small and object-safe: MPTCP2b adapts the real TCP stack to it.
 /// `send` returns an error when the transport cannot queue the mapping; the meta-socket leaves
-/// the range unsent and retries on the next pump/failover.
+/// the range unsent and retries on the next pump/failover. `readiness` is a live query; the
+/// default is a writable, open transport for simple mocks.
 pub trait Subflow {
     /// Queue one mapped range on this subflow. `data_fin` is the connection-level DATA_FIN for
     /// this range (the mapping's `data_len` may be zero).
     fn send(&mut self, mapping: Mapping, payload: &[u8], data_fin: bool) -> Result<(), Error>;
+
+    /// Current live level of the transport.
+    fn readiness(&mut self) -> SubflowReadiness {
+        SubflowReadiness {
+            readable: false,
+            writable: true,
+            closed: false,
+        }
+    }
+
+    /// Close the transport. The meta-socket keeps the handle for terminal state.
+    fn close(&mut self) {}
 }
 
 struct SubflowEntry {
@@ -195,8 +219,15 @@ impl MetaSocket {
     /// Send every range that has not been assigned to a live subflow. Returns the number sent.
     ///
     /// Only the active path is used: backup paths stay idle until the primary is dead or their
-    /// priority is changed. A `send` error leaves the range pending for the next pump.
+    /// priority is changed. A `send` error leaves the range pending for the next pump. The
+    /// transport's live `closed` level is re-read first, so a real connection that died is
+    /// requeued without a separate notification.
     pub fn pump(&mut self) -> usize {
+        self.refresh_dead();
+        self.pump_ranges()
+    }
+
+    fn pump_ranges(&mut self) -> usize {
         let Some(active) = self.active() else {
             return 0;
         };
@@ -236,6 +267,40 @@ impl MetaSocket {
             sent += 1;
         }
         sent
+    }
+
+    /// Re-read every transport's live level and requeue outstanding ranges of a closed path.
+    pub fn refresh(&mut self) {
+        let _ = self.pump();
+    }
+
+    /// Live readiness of one transport.
+    pub fn subflow_readiness(&mut self, id: u32) -> Result<SubflowReadiness, Error> {
+        let entry = self
+            .subflows
+            .iter_mut()
+            .find(|entry| entry.id == id)
+            .ok_or(Error::NotFound)?;
+        Ok(entry.transport.readiness())
+    }
+
+    fn refresh_dead(&mut self) {
+        let mut dead = Vec::new();
+        for entry in &mut self.subflows {
+            if entry.alive && entry.transport.readiness().closed {
+                dead.push(entry.id);
+            }
+        }
+        for id in dead {
+            if let Some(entry) = self.subflows.iter_mut().find(|entry| entry.id == id) {
+                entry.alive = false;
+            }
+            for range in &mut self.send {
+                if range.sent_on == Some(id) {
+                    range.sent_on = None;
+                }
+            }
+        }
     }
 
     /// Queue and send a DATA_FIN after all queued data.

@@ -46,7 +46,7 @@ pub use handshake::{
     MpCapableFlags, MpCapableHandshake, MpJoinAck, MpJoinInitiator, MpJoinResponder, MpJoinSyn,
     MpJoinSynAck,
 };
-pub use meta::{MetaSocket, Subflow};
+pub use meta::{MetaSocket, Subflow, SubflowReadiness};
 pub use option::{Address, MptcpOption, RemoveIds, TcpRstReason};
 pub use path::{MAX_PATHS, Path, PathManager};
 
