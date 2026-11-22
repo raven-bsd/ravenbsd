@@ -94,6 +94,27 @@ fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(handle.0 as usize)
 }
 
+/// Break copy-on-write for a scheme read response buffer before the capture copies it.
+///
+/// A buffer written before `fork` is a private COW page whose PTE is read-only until a write.
+/// `capture::create` rejects that PTE with `EFAULT` even though the VMA is writable; a plain
+/// `copy_to_user` would take the COW fault and retry. Resolve the same write fault here, once
+/// per page, so the capture sees a writable private page. Bounded: the transfer limit rejects
+/// oversized reads before this point.
+fn fault_in_read_buffer(address: u64, len: u64) {
+    const PAGE: u64 = 4096;
+    const MAX_FAULT_IN: u64 = 1 << 20;
+    if len == 0 || len > MAX_FAULT_IN {
+        return;
+    }
+    let end = address.saturating_add(len);
+    let mut page = address & !(PAGE - 1);
+    while page < end {
+        let _ = crate::process::handle_page_fault(page);
+        page = page.saturating_add(PAGE);
+    }
+}
+
 fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let object = caller.handles.lock().get(handle, Rights::NONE)?.clone();
@@ -117,6 +138,7 @@ fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
     crate::process::tty::check_access(caller, &file, false)?;
+    fault_in_read_buffer(frame.rsi, frame.rdx);
     router::read(caller, &file, frame.rsi, frame.rdx)
 }
 
@@ -151,6 +173,7 @@ pub fn pread(frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(&caller, handle, Rights::READ)?;
     crate::process::tty::check_access(&caller, &file, false)?;
+    fault_in_read_buffer(frame.rsi, frame.rdx);
     router::pread(&caller, &file, frame.rsi, frame.rdx, frame.r10)
 }
 
