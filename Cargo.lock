@@ -1502,6 +1502,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-console-input"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-coretest"
 version = "0.1.0"
 dependencies = [
@@ -1552,6 +1560,17 @@ dependencies = [
  "raven-fdt-lite",
  "raven-initfs",
  "raven-proto-dev",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-devfs-nodes"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
@@ -1615,6 +1634,14 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-dtrace-user"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-duplex-matrix"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
@@ -2197,8 +2224,14 @@ version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
  "raven-libc-compat",
+ "raven-libc-dtoa",
+ "raven-libc-elf",
+ "raven-libc-fts",
  "raven-libc-iconv-cjk",
+ "raven-libc-locale",
  "raven-libc-m",
+ "raven-libc-malloc",
+ "raven-libc-rtld",
  "raven-libc-signal",
  "raven-libc-stdio",
  "raven-libc-str",
@@ -3023,6 +3056,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-orphan"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-pgrp"
 version = "0.1.0"
 dependencies = [
@@ -3041,10 +3083,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-reboot"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-registry"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-rlimit"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
  "raven-rt",
 ]
 
@@ -3054,6 +3113,14 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-times"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 

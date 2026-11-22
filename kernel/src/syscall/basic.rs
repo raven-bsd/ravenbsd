@@ -5,6 +5,7 @@
 
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
@@ -198,10 +199,10 @@ fn uname(pointer: u64) -> Result<usize, Errno> {
 
 fn handle_close(raw: u32) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
-    process.handles.lock().close(Handle(raw))?;
-    // Deregistration is observable only after the close commits: a failed close (stale
-    // generation, empty slot) must leave every event-queue registration untouched.
-    crate::event::on_handle_close(&process, Handle(raw));
+    // The single close primitive: it commits the table close, cancels an IRQ waiter, removes
+    // event registrations, and fails/releases a server-side `SchemeRequest` that can no longer
+    // receive its reply.
+    crate::event::close_handle(&process, Handle(raw))?;
     Ok(0)
 }
 
@@ -232,5 +233,25 @@ fn handle_revoke(raw: u32, mask: u32) -> Result<usize, Errno> {
         handles.revoke_target(Handle(raw), raven_abi::types::Rights(mask))?
     };
     crate::process::handle::revoke_descendants(&node, applied);
+    let request = {
+        let handles = process.handles.lock();
+        match handles.get(Handle(raw), raven_abi::types::Rights::NONE) {
+            Ok(crate::process::handle::Object::SchemeRequest(request)) => Some(Arc::clone(request)),
+            _ => None,
+        }
+    };
+    if let Some(request) = request
+        && applied.contains(raven_abi::types::Rights::WRITE)
+    {
+        // The server can no longer send the reply. Fail the client and release the capture now;
+        // the handle may stay open, so a later close must not be the only release path.
+        request.fail(Errno::EIO);
+        request
+            .server
+            .active_requests
+            .lock()
+            .retain(|item| !Arc::ptr_eq(item, &request));
+        request.release_captures();
+    }
     Ok(0)
 }

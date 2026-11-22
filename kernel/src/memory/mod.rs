@@ -6,6 +6,7 @@
 //! The frame allocator, page tables, heap, MMIO window and the user address-space code compile
 //! for both architectures; the user mapping layer selects the architecture's page encoding.
 
+pub mod aslr;
 pub mod aspace;
 #[allow(dead_code)] // The alloc/free API is consumed by S05/S06.
 pub mod frame;

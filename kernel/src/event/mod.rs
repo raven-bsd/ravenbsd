@@ -299,7 +299,26 @@ pub fn close_handle(
             _ => None,
         }
     };
+    let request = {
+        let table = process.handles.lock();
+        match table.get(handle, raven_abi::types::Rights::NONE) {
+            Ok(crate::process::handle::Object::SchemeRequest(request)) => Some(Arc::clone(request)),
+            _ => None,
+        }
+    };
     process.handles.lock().close(handle)?;
+    if let Some(request) = request {
+        // A server that closes the request capability cannot send the reply. Fail the client,
+        // release the capture and drop the server's active-request record instead of leaving a
+        // blocked client and a mapped slot until the server exits.
+        request.fail(Errno::EIO);
+        request
+            .server
+            .active_requests
+            .lock()
+            .retain(|item| !Arc::ptr_eq(item, &request));
+        request.release_captures();
+    }
     #[cfg(target_arch = "x86_64")]
     if let Some(irq) = irq {
         irq.cancel_waiters(handle.0);

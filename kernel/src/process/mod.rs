@@ -70,9 +70,7 @@ const PAGE: u64 = 4096;
 ///
 /// PG-49/PG-50: `raven_rt::spawn` sizes a child stack for `ARG_MAX` (128 KiB) plus the C8 arrays
 /// and headroom. The first process gets the same 256 KiB mapping.
-const USER_STACK_SIZE: u64 = 256 * 1024;
-/// Guard page at the top of the user range.
-const USER_GUARD: u64 = 4096;
+const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
@@ -1234,9 +1232,7 @@ fn build_stack(
         return Err(ProcessError::ArgTooLong);
     }
 
-    let stack_base = USER_END
-        .checked_sub(USER_STACK_SIZE + USER_GUARD)
-        .ok_or(ProcessError::BadAddress)?;
+    let stack_base = address_space.stack_base();
     let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
     let mut cursor = buffer.len();
 
@@ -1881,6 +1877,10 @@ fn irq_held_elsewhere(owner: &Arc<Process>, irq: &Arc<crate::driver::irq::Irq>) 
 ///
 /// Returns false when the process was already terminal (no resurrection, no second teardown).
 fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool {
+    // A process can die without the EXIT syscall (SIGKILL, a fault or OOM). POSIX record locks
+    // are owned by the process, so release them on the single teardown path before any waiter
+    // can observe a stale owner.
+    crate::syscall::record_lock::release_process(process.id);
     // The state/wake graph takes the per-CPU scheduler lock through `sched::wake`. The syscall
     // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
     // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space

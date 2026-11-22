@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K502 fixed-layout control: boot with `aslr=off`. The same probe must report identical layouts
+# for all 20 runs and must not print the randomized pass line. This proves the fixed path has no
+# regression when the randomizer is disabled.
+name = "aslr-fixed"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/aslr/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1 aslr=off"
+expect_exit = "success"
+
+[[expect]]
+regex = '^aslr: stable same=1$'
+
+[[expect]]
+regex = '^aslr: fork inherits same=1$'
+
+[[expect]]
+regex = '^aslr: run=\d+ stack=0x[0-9a-f]+ mmap=0x[0-9a-f]+ pie=0x[0-9a-f]+ interp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^aslr: summary distinct-stack=1 distinct-mmap=1 distinct-pie=1 distinct-interp=1$'
+
+[[expect]]
+regex = '^aslr: fixed-layout runs=20$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|aslr: FAIL|aslr: pass'

@@ -1,24 +1,149 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+# K516: SYS_DEBUG_READ contract. The guest fixture drives the syscall directly:
+#   1. zero length returns 0 immediately;
+#   2. a bad user pointer returns EFAULT and leaves the queued bytes for the next read;
+#   3. a 4-byte buffer over a 10-byte line returns 4, 4, 2 with no loss or duplication;
+#   4. a 64-byte burst read in 8-byte chunks neither overruns nor loses the tail;
+#   5. a timed empty read returns 0 within a bounded interval;
+#   6. a cross-process PROC_SIGNAL interrupts a blocked read with EINTR; PROC_SIGRECV still
+#      returns the queued signal and the console bytes remain readable.
+# The K503 line-discipline vehicle is preserved as console-input-shell.toml.
+
 name = "console-input"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 60
-skip = "needs the B65 serial-input harness"
-pre = ["sh tests/fixtures/s27-echo/build.sh"]
-initfs = "build/fixtures/s27-echo/initfs.img"
+timeout_secs = 120
+pre = ["sh tests/fixtures/console-input/build.sh"]
+initfs = "build/fixtures/console-input/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
 
-# The fixture echoes every received byte upper-cased: `hello\nq` prints `HELLO` (with CRLF) and
-# then `Q`, after which it exits 0.
 [[expect]]
-regex = '^HELLO'
+regex = '^console-input: zero=0$'
 
 [[expect]]
-regex = '^Q$'
+regex = '^console-input: bad=EFAULT$'
+
+[[expect]]
+regex = '^console-input: bad-tail=1$'
+
+[[expect]]
+regex = '^console-input: bounds=4,4,2 extra=0$'
+
+[[expect]]
+regex = '^console-input: burst=1 bytes=64$'
+
+[[expect]]
+regex = '^console-input: timeout=0 elapsed-ms=[0-9]+$'
+
+[[expect]]
+regex = '^console-input: signal-eintr=1$'
+
+[[expect]]
+regex = '^console-input: signal-recv=10$'
+
+[[expect]]
+regex = '^console-input: signal-tail=1$'
+
+[[expect]]
+regex = '^console-input: signal-child=0$'
+
+[[expect]]
+regex = '^console-input: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic'
+regex = '(?i)panic|EXCEPTION|fatal runtime error|console-input: fail'
+
+[[step]]
+wait = '^console-input: zero=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^console-input: ready-bad$'
+timeout_secs = 30
+
+[[step]]
+send = "BADPTR"
+delay_ms = 50
+
+[[step]]
+wait = '^console-input: bad=EFAULT$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: bad-tail=1$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: ready-bounds$'
+timeout_secs = 15
+
+[[step]]
+send = "ABCDEFGHIJ"
+delay_ms = 50
+
+[[step]]
+wait = '^console-input: bounds=4,4,2 extra=0$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: ready-burst$'
+timeout_secs = 15
+
+[[step]]
+send = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-"
+delay_ms = 50
+
+[[step]]
+wait = '^console-input: burst=1 bytes=64$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: ready-timeout$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: timeout=0 elapsed-ms=[0-9]+$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: signal-start$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: ready-signal$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: signal-eintr=1$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: signal-recv=10$'
+timeout_secs = 15
+
+[[step]]
+send = "TAIL"
+delay_ms = 50
+
+[[step]]
+wait = '^console-input: signal-tail=1$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: signal-child=0$'
+timeout_secs = 15
+
+[[step]]
+wait = '^console-input: ok$'
+timeout_secs = 15
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
