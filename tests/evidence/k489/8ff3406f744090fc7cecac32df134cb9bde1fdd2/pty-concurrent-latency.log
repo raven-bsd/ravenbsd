@@ -1,0 +1,96 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=107289 reserved=23783
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2709 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 8ff3406f7 2026-11-22
+mem: 419 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x466d64 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=2511 spawn=2701 first_poll=2711 deadline=7701 stalled=0 ready_at=2762
+rtc: 2026-11-22 14:46:32 (epoch 1795358792s)
+1795358796.346 sysd: started
+svcd: consd up
+svcd: consd timing: generation=1 start=2772 spawn=3971 first_poll=3989 deadline=63971 stalled=0 ready_at=4364
+1795358796.603 zerod: started
+1795358796.857 nulld: started
+1795358796.895 randd: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=2798 spawn=4267 first_poll=4355 deadline=9267 stalled=0 ready_at=5086
+svcd: zerod up
+svcd: zerod timing: generation=1 start=2953 spawn=4425 first_poll=4601 deadline=9425 stalled=0 ready_at=5098
+svcd: sysd up
+svcd: sysd timing: generation=1 start=2940 spawn=4263 first_poll=4300 deadline=9263 stalled=0 ready_at=5171
+svcd: randd up
+svcd: randd timing: generation=1 start=2907 spawn=4717 first_poll=4820 deadline=9717 stalled=0 ready_at=5457
+1795358797.593 ramfsd: started
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=2843 spawn=5259 first_poll=5412 deadline=10259 stalled=0 ready_at=6117
+ptyd: files=0 pairs=0
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=2830 spawn=6197 first_poll=6247 deadline=36197 stalled=0 ready_at=6688
+ptyd: files=0 pairs=0
+ptyd: reader-wakes=23
+1795358806.132 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=2785 spawn=4389 first_poll=4407 deadline=124389 stalled=0 ready_at=14150
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=14156 spawn=14474 first_poll=14479 deadline=74474 stalled=0 ready_at=14644
+pty-concurrent: start uid=0 blocked=8
+pty-concurrent: B write=1 read=1 byte=66 wall_ms=27
+pty-concurrent: A read=1 byte=65 wall_ms=125
+pty-concurrent: pair A/B done
+ptyd: files=0 pairs=0
+ptyd: reader-wakes=1505
+pty-concurrent: idle_ms=5000 blocked=8
+pty-concurrent: pair=5 read=1 byte=102 latency_ms=142
+pty-concurrent: pair=1 read=1 byte=98 latency_ms=215
+pty-concurrent: pair=4 read=1 byte=101 latency_ms=2145
+pty-concurrent: pair=0 read=1 byte=97 latency_ms=5166
+pty-concurrent: pair=3 read=1 byte=100 latency_ms=5026
+pty-concurrent: pair=2 read=1 byte=99 latency_ms=6490
+pty-concurrent: pair=7 read=1 byte=104 latency_ms=5211
+pty-concurrent: pair=6 read=1 byte=103 latency_ms=6449
+pty-concurrent: FAIL pair=0 status=256
+pty-concurrent: FAIL pair=2 status=256
+pty-concurrent: FAIL pair=3 status=256
+pty-concurrent: FAIL pair=4 status=256
+pty-concurrent: FAIL pair=6 status=256
+pty-concurrent: FAIL pair=7 status=256
+ptyd: files=0 pairs=0
+ptyd: reader-wakes=1889
+pty-concurrent: ninth pair ok
+ptyd: files=0 pairs=0
+ptyd: reader-wakes=1893
+pty-concurrent: FAIL rows=6
+svcd: libc-test crash loop, giving up
+svcd: settled
+init exited (1)
