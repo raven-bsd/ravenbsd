@@ -49,8 +49,11 @@ in the implementation.
 1. A child exit calls `process::notify_parent`, which queues `SIGCHLD` on the
    parent and calls `Process::queue_signal`.
 2. `queue_signal` keeps the per-process `PROC_SIGRECV` queue, wakes its signal
-   waiter, and sets `THREAD_KICK` bit 0 on every live thread. An interruptible
-   `EVQ_WAIT`, pipe read or `PROC_WAIT_EX` returns `EINTR`.
+   waiter, and sets `THREAD_KICK` bit 0 on every live thread that has a
+   registered `SIG_SETUP` entry. A process that has not installed a handler is
+   left alone: its signal stays in the queue for `PROC_SIGRECV` instead of
+   producing a handlerless `EINTR`. An interruptible `EVQ_WAIT`, pipe read or
+   `PROC_WAIT_EX` returns `EINTR`.
 3. On the syscall return path the kernel resolves the registered `SIG_SETUP`
    entry, saves the interrupted `mcontext_t` and resumes libc's
    `__raven_sigentry`.
@@ -82,3 +85,13 @@ The qtest expects `CONTRACT K11..K14 PASS`, `CONTRACT SUMMARY PASS 4/4` and
 * `PROC_SIGRECV` has no peek operation; a process signal masked while the entry
   pops it is not put back. K443 exercises the unmasked SIGCHLD path used by the
   SSH server loop.
+
+## Integration status
+
+The K434 gate matrix was run against a release image at commit `a8059977`
+(before the registered-entry kick refinement). S0 passed; the SSH rows were
+blocked because `netd` reached `netd: ready` and then restarted into
+`netd: net: already exists` / `svcd: netd crash loop, giving up`. The matrix
+image was not rebuilt after the refinement because the pack step exceeded its
+360 s cap (`/tmp/opencode/k443-image-build3.log`). The matrix therefore remains
+an open integration item for K434 after K440/K441/K444 are merged.
