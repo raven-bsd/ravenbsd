@@ -53,6 +53,24 @@ impl<S: SignalSink + Default> Pairs<S> {
         self.entries.get_mut(&id)
     }
 
+    /// Allocate the lowest free pair id.
+    ///
+    /// This is the clone-device rule the donors use: the pty server owns the unit pool, so two
+    /// processes can never open the same pair by accident. Pair `0` stays reserved for the
+    /// historical named `pty:master`/`pty:slave` paths and is skipped here.
+    pub fn alloc(&mut self) -> u64 {
+        let mut id = 1u64;
+        while self.entries.contains_key(&id) {
+            id = id.wrapping_add(1);
+        }
+        id
+    }
+
+    /// Remove a pair once its last scheme file has closed.
+    pub fn remove(&mut self, id: u64) -> bool {
+        self.entries.remove(&id).is_some()
+    }
+
     /// Number of live pairs.
     #[must_use]
     pub fn len(&self) -> usize {

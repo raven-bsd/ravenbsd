@@ -37,6 +37,31 @@ fn pty_inode_is_nonzero_and_role_distinct() {
 }
 
 #[test]
+fn allocation_uses_the_lowest_free_unit_and_reuses_it() {
+    let mut pairs = Pairs::<Sink>::new();
+    assert_eq!(pairs.alloc(), 1);
+    pairs.open(1);
+    assert_eq!(pairs.alloc(), 2);
+    pairs.open(2);
+    assert_eq!(pairs.alloc(), 3);
+    assert!(pairs.remove(1));
+    assert_eq!(pairs.alloc(), 1);
+}
+
+#[test]
+fn removal_releases_only_the_named_pair() {
+    let mut pairs = Pairs::<Sink>::new();
+    pairs.open(1);
+    pairs.open(2);
+    assert_eq!(pairs.len(), 2);
+    assert!(pairs.remove(1));
+    assert_eq!(pairs.len(), 1);
+    assert!(pairs.get_mut(1).is_none());
+    assert!(pairs.get_mut(2).is_some());
+    assert!(!pairs.remove(1));
+}
+
+#[test]
 fn pairs_have_independent_queues_and_settings() {
     let mut pairs = Pairs::<Sink>::new();
     assert!(pairs.is_empty());

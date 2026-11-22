@@ -92,6 +92,9 @@ mod program {
                 // `svcd` probes a resident scheme with the bare `pty:` path; pair 0 is the
                 // historical named pair and is safe to create for the probe.
                 "" | "master" => (0u64, Role::Master),
+                // `posix_openpt` opens the clone device; the server allocates the unit, then
+                // `fstat` gives the caller the pair id through the endpoint inode.
+                "ptmx" => (self.pairs.alloc(), Role::Master),
                 "slave" => (0u64, Role::Slave),
                 _ => {
                     let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
@@ -255,6 +258,14 @@ mod program {
             {
                 pty.hangup();
             }
+            // The donor releases the pty unit when its last endpoint closes; a pair that
+            // survives every close is a leak that only shows up after many SSH sessions.
+            if !self.files.values().any(|other| other.pair == entry.pair) {
+                self.pairs.remove(entry.pair);
+                if self.files.is_empty() {
+                    raven_rt::eprintln!("ptyd: files=0 pairs={}", self.pairs.len());
+                }
+            }
             Ok(())
         }
     }
@@ -276,6 +287,7 @@ mod program {
             }
         };
         let mut handler = HandlerImpl::new();
+        raven_rt::eprintln!("ptyd: files=0 pairs=0");
         loop {
             if let Some(packet) = server.poll(None) {
                 let _ = server.dispatch(packet, &mut handler);

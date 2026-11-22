@@ -11,7 +11,7 @@ privsep exchange. The SSH server is the unmodified upstream OpenSSH 10.6p2 add-o
 
 | Layer | Location | Contract |
 |---|---|---|
-| pty scheme | `userland/servers/ptyd/` | One line discipline and two byte queues per pair; `pty:master[/N]` and `pty:slave[/N]`; `SET_MODE`/`GET_MODE`/`FLUSH`, the complete `GET_TERMIOS`/`SET_TERMIOS` record, `GET_WINSIZE`/`SET_WINSIZE`, foreground group and hangup |
+| pty scheme | `userland/servers/ptyd/` | One line discipline and two byte queues per pair; `pty:master[/N]` and `pty:slave[/N]`; `pty:ptmx` allocates the lowest free pair, whose last close releases it; `SET_MODE`/`GET_MODE`/`FLUSH`, the complete `GET_TERMIOS`/`SET_TERMIOS` record, `GET_WINSIZE`/`SET_WINSIZE`, foreground group and hangup |
 | libc pty calls | `libc/ravenlibc/crates/raven-libc/src/compat/` | `posix_openpt`, `grantpt`, `unlockpt`, `ptsname`, `ptsname_r`, `openpty` |
 | libc termios | `libc/ravenlibc/crates/raven-libc-platform/src/ioctl/tty.rs` | `tcgetattr`/`tcsetattr` over the full record; older console servers fall back to `GET_MODE`/`SET_MODE` |
 | libc winsize | `libc/ravenlibc/crates/raven-libc-platform/src/ioctl/tty.rs` | `tcgetwinsize`/`tcsetwinsize` and the `TIOCGWINSZ`/`TIOCSWINSZ` ioctl path; non-tty -> `ENOTTY` |
@@ -82,6 +82,28 @@ timeout 600 cargo xtask qtest --case pty-winsize --arch x86_64
 
 Evidence: `tests/evidence/k455/<sha>/` contains the pre-fix `ENOSYS` serial, the pass log and
 JSON, the `ws_col` mutation failure and `SHA256SUMS`.
+
+## Lifetime and churn (K458)
+
+`posix_openpt` opens the clone device `pty:ptmx`; the pty server allocates the lowest free pair
+id, the same unit-pool rule as NetBSD `ptmopen`/`pty_alloc_master` and FreeBSD `pts_alloc`/
+`ptsdrv_free`. The caller reads the pair id back from the endpoint inode (`2N+1` master), so
+`ptsname` names `/dev/pts/<N>` without a process-local counter. Two concurrent processes never
+share a pair. When the last scheme file of a pair closes, the server removes the pair; a test
+hook prints `ptyd: files=0 pairs=0` at startup and on every transition to an empty table.
+
+The `pty-churn` case runs four fork workers through 50 cycles each, holds 32 pairs at once,
+checks the slave paths are distinct, and proves descriptor reuse and a zero handle count at
+worker exit. The kernel's `s24-framecheck` records the free-frame count after each worker exit:
+
+```sh
+timeout 600 cargo xtask qtest --case pty-churn --arch x86_64
+# pty-churn: pass cycles=200 concurrent=32
+```
+
+The four worker exits print increasing free-frame counts because each exit releases that
+worker while the other three are still alive; the count never falls, and the final post-churn
+value is the baseline. Evidence: `tests/evidence/k458/<sha>/`.
 
 ## Privsep wire shape
 

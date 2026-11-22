@@ -35,10 +35,12 @@ interrupted thread context); atfork handlers and multi-thread fork bookkeeping i
 
 ## PTY
 
-`posix_openpt` takes the next process-local pair id and opens `pty:master/<id>` on the real
-`ptyd` server, installing the scheme handle as a descriptor. The descriptor-to-pair binding is
-kept in a small fixed table; `ptsname_r` formats `pty:slave/<id>`. `grantpt` and `unlockpt` are
-successful no-ops because the pty server owns both ends.
+`posix_openpt` opens the clone device `pty:ptmx`; `ptyd` allocates the lowest free pair id and
+installs the scheme handle as a descriptor. The pair id is read back from the endpoint inode
+(`2N+1` master) and kept in a small fixed descriptor table; `ptsname_r` formats `pty:slave/<id>`.
+`grantpt` and `unlockpt` are successful no-ops because the pty server owns both ends. The last
+close of a pair releases the unit, so concurrent processes never share a pty and churn does not
+grow the server table.
 
 `openpty` opens the slave through the same `pty:` client, and `forkpty` runs `login_tty` in the
 child: `setsid`, the native `PROC_CTTY_SET` (`TIOCSCTTY`), and `dup2` of the slave onto stdio.
