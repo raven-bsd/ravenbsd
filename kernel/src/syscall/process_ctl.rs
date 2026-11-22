@@ -300,7 +300,7 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
             u64::from(target.wake_pending.load(Ordering::Relaxed)),
             u64::from(target.wake_last_cpu.load(Ordering::Relaxed)),
             cpu_need_resched,
-            cpu_runqueue as u64,
+            cpu_runqueue,
         ];
         for (chunk, value) in bytes
             .get_mut(328..488)

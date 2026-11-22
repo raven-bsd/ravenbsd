@@ -21,8 +21,8 @@ use raven_proto_fs::{Call, CallRequest, CallResponse, SetTime, Stat as WireStat}
 
 use crate::backend::SysBackend;
 use crate::fd::fdsan::{Action, FdsanState, Mismatch};
-use crate::fd::inherit::{ENV_NAME, FdMap, FdMapEntry, transferable};
-use crate::fd::ofd::{OfdArena, OfdKind, OfdRef};
+use crate::fd::inherit::{ENV_NAME, FdMap, FdMapEntry, InheritedSocket, transferable};
+use crate::fd::ofd::{OfdArena, OfdKind, OfdRef, SocketMeta};
 use crate::fd::table::{FD_CLOEXEC, FdTable};
 use crate::fd::{DEFAULT_HARD_NOFILE, DEFAULT_SOFT_NOFILE};
 use crate::lock::{Lock, NoLock, guard};
@@ -272,6 +272,43 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 .swap(status, core::sync::atomic::Ordering::Relaxed),
             None => 0,
         }
+    }
+
+    /// Record the socket identity that an inherited OFD must restore after `execve`.
+    pub fn set_ofd_socket_meta(&self, index: u32, meta: SocketMeta) {
+        if let Some(ofd) = self.ofd.borrow().get(index) {
+            ofd.set_socket_meta(meta);
+        }
+    }
+
+    /// Every live socket OFD with the identity needed to rebuild the libc socket table.
+    ///
+    /// Called by the socket layer after startup restored the inheritance block. Descriptors
+    /// closed by `close_cloexec_fds` are already absent from the fd table.
+    #[must_use]
+    pub fn inherited_sockets(&self) -> Vec<InheritedSocket> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        let mut out = Vec::new();
+        for (fd, entry) in entries {
+            let Some(ofd) = arena.get(entry.ofd) else {
+                continue;
+            };
+            if ofd.kind != OfdKind::Socket {
+                continue;
+            }
+            let Some(socket) = ofd.socket_meta() else {
+                continue;
+            };
+            out.push(InheritedSocket {
+                fd,
+                ofd: entry.ofd,
+                handle: ofd.handle.get(),
+                status: ofd.status.load(core::sync::atomic::Ordering::Relaxed),
+                socket,
+            });
+        }
+        out
     }
 
     pub(crate) fn set_ofd_kind(&self, index: u32, kind: OfdKind) {
@@ -1637,7 +1674,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok((handle, true))
     }
 
-    fn invalidate_root(&self) {
+    /// Drop the cached `file:/` root; a `chroot` must never reuse the old root.
+    pub fn invalidate_root(&self) {
         if let Some(handle) = self.root.borrow_mut().take() {
             let _ = self.backend.close(handle);
         }
@@ -1724,6 +1762,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             inherited.path = ofd.path.as_ref().map(|path| path.to_vec());
             inherited.event = event_number(ofd.event.get());
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
+            inherited.socket = ofd.socket_meta();
             out.push(inherited);
         }
         Ok(FdMap { entries: out })
@@ -1764,6 +1803,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                     .map_or(event.0, |duplicate| duplicate.0)
             };
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
+            inherited.socket = ofd.socket_meta();
             block.entries.push(inherited);
         }
         if block.entries.is_empty() {
@@ -1853,6 +1893,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                         let _ = inherited.set_event(Handle(entry.event));
                     }
                     inherited.set_poll_rearm(entry.readiness);
+                    if let Some(socket) = entry.socket {
+                        inherited.set_socket_meta(socket);
+                    }
                 }
                 by_handle.insert(entry.handle, index);
                 index

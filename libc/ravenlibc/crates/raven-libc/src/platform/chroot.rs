@@ -20,9 +20,11 @@ pub unsafe extern "C" fn chroot(path: *const c_char) -> c_int {
     }
     // SAFETY: the caller's C string contract.
     let path = unsafe { crate::ffi::cstr::slice(path) };
-    crate::ffi::ret::int(
-        raven_libc_sys::sys::proc_chroot(path)
-            .map(|()| 0)
-            .map_err(|error| Errno(error.0)),
-    )
+    let result = raven_libc_sys::sys::proc_chroot(path);
+    if result.is_ok() {
+        // A cached `file:/` root captured under the old root must not outlive the transition:
+        // the next lstat/readlink/root call reopens it under the new root.
+        crate::ffi::platform::global().invalidate_root();
+    }
+    crate::ffi::ret::int(result.map(|()| 0).map_err(|error| Errno(error.0)))
 }

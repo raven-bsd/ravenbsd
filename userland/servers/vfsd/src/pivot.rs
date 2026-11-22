@@ -12,6 +12,7 @@ use raven_vfs_core::MountTable;
 /// another mount exists, so a live root pivot builds a replacement table from the existing
 /// non-root entries and installs the new root. The old open files keep their targets; new path
 /// resolution uses the replacement.
+#[allow(dead_code)] // the mount handler is target-only; the host build omits it
 pub(crate) fn pivot_root(table: &MountTable, scheme: &str) -> Result<MountTable, Errno> {
     let mut replacement = MountTable::new();
     for mount in table.mounts() {

@@ -42,6 +42,8 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use raven_libc_abi::errno::Errno;
+use raven_libc_platform::Handle;
+use raven_libc_platform::fd::{InheritedSocket, SocketMeta};
 use raven_proto_net::{Call, Endpoint, IfaceRequest, IfaceResponse};
 
 pub mod addr;
@@ -200,6 +202,12 @@ pub trait SocketFds {
     fn resolve(&self, fd: i32) -> Result<FdInfo, Errno>;
     /// The last reference to an OFD went away.
     fn release(&self, ofd: u32);
+    /// Socket identities restored from the `execve` inheritance block.
+    fn inherited(&self) -> Vec<InheritedSocket> {
+        Vec::new()
+    }
+    /// Record the socket identity for the next `execve` inheritance block.
+    fn set_meta(&self, _ofd: u32, _meta: SocketMeta) {}
 }
 
 /// One resolved fd.
@@ -259,13 +267,53 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
     }
     /// Build a net layer with an optional `AF_UNIX` backend.
     pub fn with_unix(backend: B, fds: F, env: E, unix: Option<U>) -> Self {
-        Self {
+        let net = Self {
             backend,
             fds,
             env,
             unix,
             table: RefCell::new(SocketTable::new()),
             dns: RefCell::new(dnsio::DnsState::default()),
+        };
+        net.rehydrate_inherited();
+        net
+    }
+
+    /// Rebuild the socket records for sockets inherited across `execve`.
+    ///
+    /// The generic fd table restored the OFD, handle and event; this adds the metadata the
+    /// socket layer needs (`domain`, `type`, `proto`, state) so `recvmsg`/`sendmsg` and
+    /// `getsockopt(SO_TYPE)` work on the inherited descriptor.
+    fn rehydrate_inherited(&self) {
+        for inherited in self.fds.inherited() {
+            let meta = inherited.socket;
+            let mut rec = SocketRec::new(
+                meta.domain,
+                meta.ty,
+                meta.proto,
+                SocketState::from_code(meta.state),
+                inherited.fd,
+            );
+            rec.sock = (inherited.handle != Handle::NONE).then_some(Sock(inherited.handle.0));
+            rec.nonblock = inherited.status & raven_libc_abi::fcntl::O_NONBLOCK as u32 != 0;
+            let _ = self.table.borrow_mut().insert(inherited.ofd, rec);
+        }
+    }
+
+    /// Publish every live socket's identity to the platform OFD for the next `execve`.
+    pub fn sync_meta(&self) {
+        for (_, rec) in self.table.borrow().iter() {
+            if let Ok(info) = self.fds.resolve(rec.fd) {
+                self.fds.set_meta(
+                    info.ofd,
+                    SocketMeta {
+                        domain: rec.domain,
+                        ty: rec.ty,
+                        proto: rec.proto,
+                        state: rec.state.code(),
+                    },
+                );
+            }
         }
     }
 
