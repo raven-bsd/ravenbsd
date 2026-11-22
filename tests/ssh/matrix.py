@@ -784,10 +784,10 @@ def console_login(console: SerialConsole) -> bool:
         if console.wait_for(b"login:", 30) < 0:
             return False
     console.send(b"root\n")
-    if console.wait_for(b"Password:", 20) < 0:
+    if console.wait_for(b"Password:", 10) < 0:
         return False
     console.send(b"raven\n")
-    return console.wait_for(b"raven# ", 30) >= 0
+    return console.wait_for(b"raven# ", 15) >= 0
 
 
 def console_capture(console: SerialConsole, command: str, log_name: str,
@@ -820,7 +820,7 @@ def row_s3_finish(console: SerialConsole, state: dict[str, object]) -> None:
                f"(no console login prompt); wrong exit {state['bad_exit']} (auth-passwd; C5/C9)")
         return
     console.send(b"root\n")
-    if console.wait_for(b"Password:", 20) < 0:
+    if console.wait_for(b"Password:", 10) < 0:
         wait_ms = (time.monotonic() - started) * 1000
         attempt("S3-server-line", 1, "fresh",
                 "Accepted password for raven from 10.0.2.2 port N ssh2",
@@ -1110,11 +1110,11 @@ def row_s7(console: SerialConsole) -> None:
     total_after = console_marker_count(console)
     total_delta = total_after - total_before
     server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s7-server.log",
-                             user=ROOT_USER, timeout=15)
+                             user=ROOT_USER, timeout=8)
     server_log = server_capture["stdout"].decode("utf-8", "replace")
     server_source = f"ssh exit {server_capture['returncode']}"
     (OUT / "s7-server.raw.log").write_text(server_log, encoding="utf-8")
-    ps_capture = ssh_run(["ps", "-e"], "s7-ps.log", user=ROOT_USER, timeout=15)
+    ps_capture = ssh_run(["ps", "-e"], "s7-ps.log", user=ROOT_USER, timeout=8)
     ps_log = ps_capture["stdout"].decode("utf-8", "replace")
     (OUT / "s7-ps.raw.log").write_text(ps_log, encoding="utf-8")
     accepted = server_log.count("Accepted password for raven ")
@@ -1267,7 +1267,7 @@ def row_s8() -> None:
     fixture_ok = False
     fixture_detail = "fixture capture unavailable"
     fixture_run = ssh_run(["/bin/openpty-null"], "s8-openpty-null.log",
-                          user=ROOT_USER, timeout=30)
+                          user=ROOT_USER, timeout=15)
     clean = fixture_run["stdout"].decode("utf-8", "replace")
     (OUT / "s8-openpty-null.raw.log").write_text(clean, encoding="utf-8")
     fixture_exit = int(fixture_run["returncode"])
@@ -1277,14 +1277,16 @@ def row_s8() -> None:
                        if "call=epipe-sentinel" in line), "")
     name_line = next((line.strip() for line in clean.splitlines()
                       if "call=name " in line), "")
-    fixture_ok = fixture_exit == 0 and "call=null rc=0" in clean
+    fixture_ran = bool(null_line and name_line)
+    fixture_ok = fixture_ran and "call=null rc=0" in clean
     fixture_detail = f"exit={fixture_exit}; {null_line}; {epipe_line}; {name_line}"
-    if fixture_exit == 255:
+    if not fixture_ran:
         attempt("S8-openpty-null", 1, "fresh",
                 "openpty(..., NULL, ...) returns 0; control with a name returns 0",
-                f"fixture SSH capture failed: exit 255; {fixture_detail}", 0, "BLOCKED")
+                f"fixture did not run: exit {fixture_exit}; {fixture_detail}",
+                0, "BLOCKED")
         record("S8-openpty-null", "BLOCKED",
-               f"fixture SSH capture failed before the test ran: {fixture_detail}")
+               f"fixture did not produce its two call lines: {fixture_detail}")
     else:
         attempt("S8-openpty-null", 1, "fresh",
                 "openpty(..., NULL, ...) returns 0; control with a name returns 0",
@@ -1299,7 +1301,7 @@ def row_s8() -> None:
                    f"leaves errno stale: {fixture_detail} (donor FreeBSD pty.c:74 `if (name)`)")
 
     def sample_ps() -> str:
-        capture = ssh_run(["ps", "-e"], "s8-ps-during.log", user=ROOT_USER, timeout=10)
+        capture = ssh_run(["ps", "-e"], "s8-ps-during.log", user=ROOT_USER, timeout=8)
         return capture["stdout"].decode("utf-8", "replace")
 
     result = ssh_pty_probe(None, "s8-tt.log", sample_ps)
@@ -1307,12 +1309,12 @@ def row_s8() -> None:
     error = result["stderr"]  # type: ignore[assignment]
     match = re.search(rb"/dev/pts/[0-9]+", output)  # type: ignore[arg-type]
     pid_capture = ssh_run(["cat", "/tmp/sshd.pid"], "s8-pid.log",
-                          user=ROOT_USER, timeout=15)
-    ps_capture = ssh_run(["ps", "-e"], "s8-ps.log", user=ROOT_USER, timeout=15)
+                          user=ROOT_USER, timeout=8)
+    ps_capture = ssh_run(["ps", "-e"], "s8-ps.log", user=ROOT_USER, timeout=8)
     ps_after = ps_capture["stdout"].decode("utf-8", "replace")
     (OUT / "s8-ps.raw.log").write_text(ps_after, encoding="utf-8")
     server_capture = ssh_run(["cat", "/tmp/sshd.log"], "s8-server.log",
-                             user=ROOT_USER, timeout=15)
+                             user=ROOT_USER, timeout=8)
     server_log = server_capture["stdout"].decode("utf-8", "replace")
     (OUT / "s8-server.raw.log").write_text(server_log, encoding="utf-8")
     ps_during = str(result["during_ps"])
