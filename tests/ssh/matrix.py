@@ -1654,6 +1654,8 @@ def main() -> int:
                         record("S7", "BLOCKED", "console login failed before S7")
                 elif only == "s8":
                     row_s8()
+                elif only == "s5":
+                    row_s5_s6()
                 else:
                     record(only, "BLOCKED", f"unknown RAVEN_MATRIX_ONLY={only}")
         except Exception as error:  # noqa: BLE001 - isolate the only-mode boot
