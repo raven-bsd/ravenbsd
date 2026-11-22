@@ -139,7 +139,7 @@ this deviation is recorded in the K434 report.
 | S0 | C1 | guest accepts a TCP connection over the tap and echoes the exact payload |
 | S1 | C1, C2 | `SSH-2.0-OpenSSH_10.6\r\n` (22 bytes) on a fresh connection within 10 s; a second fresh connection is the control |
 | S2 | C2, C3 | one KEXINIT packet: `uint32 length=956`, `padding_length=9`, total 960, msg id 20, parse succeeds |
-| S3 | C5 precondition, C9 | server log line `Accepted password for raven from 10.0.2.2 port N ssh2`; wrong password exits 255 with `Permission denied` |
+| S3 | C5 precondition, C9 | server log line `Accepted password for raven ... ssh2` (observed `from UNKNOWN port 65535`, a getpeername gap); wrong password exits 255 with `Permission denied` |
 | S4 | C2, C7 | post-auth read returns `hostkeys-00@openssh.com` and the command output; no `EFAULT` |
 | S5 | C5, C6, C8 | the client receives the channel-open confirmation on the authenticated connection (file/sid identity is K431's fixture) |
 | S6 | C5 | the confirmation is message type 91 on the client's channel 0 |
