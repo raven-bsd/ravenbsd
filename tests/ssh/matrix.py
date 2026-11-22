@@ -1463,6 +1463,8 @@ def main() -> int:
                 time.sleep(0.5)
                 if only == "s1-repeat":
                     row_s1_repeat()
+                elif only == "s4":
+                    row_s4()
                 elif only == "s7-exit":
                     row_s7_gate()
                 elif only == "s7":
