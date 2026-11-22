@@ -3066,11 +3066,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-rlimit"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-spawn-attrs"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-times"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 

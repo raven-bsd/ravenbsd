@@ -136,6 +136,13 @@ const ENOTSUP: &[Errno] = &[Errno::ENOTSUP];
 const EFBIG: &[Errno] = &[Errno::EFBIG];
 const ENOTTY: &[Errno] = &[Errno::ENOTTY];
 
+/// The IRQ id namespace is platform-defined: x86-64 numbers ISA lines, aarch64 numbers GIC
+/// interrupt ids (SPI + 32). The vector is the same on both; only the valid baseline id differs.
+#[cfg(target_arch = "aarch64")]
+const IRQ_BASELINE: usize = 64;
+#[cfg(not(target_arch = "aarch64"))]
+const IRQ_BASELINE: usize = 9;
+
 #[repr(align(4096))]
 struct Page(#[allow(dead_code)] [u8; PAGE]);
 
@@ -223,55 +230,114 @@ fn valid_dma() -> Option<usize> {
     (raw >= 0).then_some(raw as usize)
 }
 
+/// Name the setup step that failed. The architecture parity report needs the exact syscall,
+/// not just the errno; this is test instrumentation only.
+fn setup_step(name: &'static str, result: Result<usize, Errno>) -> Result<usize, Errno> {
+    result.map_err(|error| {
+        println!("syscall-fuzz: setup-failed step={name} errno={error:?}");
+        error
+    })
+}
+
+/// A pager-backed object is optional for the non-pager rows. aarch64 currently returns ENOSYS
+/// from the kernel cfg gate; record the gap and use handle 0. The PAGER_SUPPLY rows keep the
+/// contract expectation, so that gap is reported as a deviation with the kernel finding.
+fn optional_pager_step(name: &'static str, result: Result<usize, Errno>) -> Result<usize, Errno> {
+    match result {
+        Ok(handle) => Ok(handle),
+        Err(Errno::ENOSYS) => {
+            println!("syscall-fuzz: pager-gap step={name} errno=ENOSYS");
+            Ok(0)
+        }
+        Err(error) => {
+            println!("syscall-fuzz: setup-failed step={name} errno={error:?}");
+            Err(error)
+        }
+    }
+}
+
 fn setup() -> Result<Ctx, Errno> {
     let buf = core::ptr::addr_of!(BUF) as usize;
     let out = core::ptr::addr_of!(OUT) as usize;
-    let base = checked(
-        Syscall::MAP as usize,
-        [
-            Handle::SELF_PROC.0 as usize,
-            Handle::NONE.0 as usize,
-            0,
-            0,
-            2 * PAGE,
-            prot::READ | prot::WRITE,
-        ],
+    let base = setup_step(
+        "MAP",
+        checked(
+            Syscall::MAP as usize,
+            [
+                Handle::SELF_PROC.0 as usize,
+                Handle::NONE.0 as usize,
+                0,
+                0,
+                2 * PAGE,
+                prot::READ | prot::WRITE,
+            ],
+        ),
     )?;
-    checked(
-        Syscall::PROTECT as usize,
-        [
-            Handle::SELF_PROC.0 as usize,
-            base.saturating_add(PAGE),
-            PAGE,
-            0,
-            0,
-            0,
-        ],
+    setup_step(
+        "PROTECT",
+        checked(
+            Syscall::PROTECT as usize,
+            [
+                Handle::SELF_PROC.0 as usize,
+                base.saturating_add(PAGE),
+                PAGE,
+                0,
+                0,
+                0,
+            ],
+        ),
     )?;
     let mut fds = [0u32; 2];
-    checked(RAW_PIPE, [fds.as_mut_ptr() as usize, 0, 0, 0, 0, 0])?;
+    setup_step(
+        "PIPE",
+        checked(RAW_PIPE, [fds.as_mut_ptr() as usize, 0, 0, 0, 0, 0]),
+    )?;
     let (pipe_r, pipe_w) = (fds[0] as usize, fds[1] as usize);
-    let memobj = checked(Syscall::MEMOBJ_CREATE as usize, [PAGE, 0, 0, 0, 0, 0])?;
-    let paged = checked(
-        Syscall::MEMOBJ_CREATE as usize,
-        [PAGE, memobj::PAGER, 0, 0, 0, 0],
+    let memobj = setup_step(
+        "MEMOBJ_CREATE",
+        checked(Syscall::MEMOBJ_CREATE as usize, [PAGE, 0, 0, 0, 0, 0]),
     )?;
-    let paged2 = checked(
-        Syscall::MEMOBJ_CREATE as usize,
-        [PAGE, memobj::PAGER, 0, 0, 0, 0],
+    let paged = optional_pager_step(
+        "MEMOBJ_CREATE_PAGER1",
+        checked(
+            Syscall::MEMOBJ_CREATE as usize,
+            [PAGE, memobj::PAGER, 0, 0, 0, 0],
+        ),
     )?;
-    let event = checked(Syscall::EVENT_CREATE as usize, [0; 6])?;
-    let timer = checked(
-        Syscall::TIMER_CREATE as usize,
-        [clock::MONOTONIC as usize, 0, 0, 0, 0, 0],
+    let paged2 = optional_pager_step(
+        "MEMOBJ_CREATE_PAGER2",
+        checked(
+            Syscall::MEMOBJ_CREATE as usize,
+            [PAGE, memobj::PAGER, 0, 0, 0, 0],
+        ),
     )?;
-    let evq = checked(Syscall::EVQ_CREATE as usize, [0; 6])?;
-    let proc_created = checked(Syscall::PROC_CREATE as usize, [0; 6])?;
-    let dup = checked(
-        Syscall::HANDLE_DUP as usize,
-        [pipe_r, RIGHTS_ALL, 0, 0, 0, 0],
+    let event = setup_step(
+        "EVENT_CREATE",
+        checked(Syscall::EVENT_CREATE as usize, [0; 6]),
     )?;
-    checked(Syscall::HANDLE_CLOSE as usize, [dup, 0, 0, 0, 0, 0])?;
+    let timer = setup_step(
+        "TIMER_CREATE",
+        checked(
+            Syscall::TIMER_CREATE as usize,
+            [clock::MONOTONIC as usize, 0, 0, 0, 0, 0],
+        ),
+    )?;
+    let evq = setup_step("EVQ_CREATE", checked(Syscall::EVQ_CREATE as usize, [0; 6]))?;
+    let proc_created = setup_step(
+        "PROC_CREATE",
+        checked(Syscall::PROC_CREATE as usize, [0; 6]),
+    )?;
+    let dup = setup_step(
+        "HANDLE_DUP",
+        checked(
+            Syscall::HANDLE_DUP as usize,
+            [pipe_r, RIGHTS_ALL, 0, 0, 0, 0],
+        ),
+    )?;
+    setup_step(
+        "HANDLE_CLOSE",
+        checked(Syscall::HANDLE_CLOSE as usize, [dup, 0, 0, 0, 0, 0]),
+    )?;
     Ok(Ctx {
         buf,
         out,
@@ -1990,7 +2056,7 @@ fn driver_calls(runner: &mut Runner, ctx: Ctx) {
 
     let irq = raw(
         Syscall::IRQ_CREATE as usize,
-        [Handle::ROOT_DEVICE.0 as usize, 1, 9, 0, 0, 0],
+        [Handle::ROOT_DEVICE.0 as usize, 1, IRQ_BASELINE, 0, 0, 0],
     );
     runner.push(Row {
         nr: Syscall::IRQ_CREATE as usize,
@@ -2004,7 +2070,9 @@ fn driver_calls(runner: &mut Runner, ctx: Ctx) {
         runner.ok(Syscall::IRQ_WAIT, "timeout", [irq, 1_000_000, 0, 0, 0, 0]);
         runner.ok(Syscall::IRQ_ACK, "baseline", [irq, 0, 0, 0, 0, 0]);
     } else {
-        runner.gap("IRQ_CREATE returned an error; IRQ_WAIT/ACK baselines are not measured");
+        // The platform did not grant the baseline line. IRQ_WAIT/ACK cannot be attributed to a
+        // valid handle, so record a gap instead of inventing an expectation.
+        runner.gap("IRQ_CREATE baseline did not return a handle; IRQ_WAIT/ACK are not measured");
     }
     runner.err(
         Syscall::IRQ_CREATE,
@@ -2033,7 +2101,7 @@ fn driver_calls(runner: &mut Runner, ctx: Ctx) {
     runner.err(
         Syscall::IRQ_CREATE,
         "flags1",
-        [Handle::ROOT_DEVICE.0 as usize, 1, 9, 1, 0, 0],
+        [Handle::ROOT_DEVICE.0 as usize, 1, IRQ_BASELINE, 1, 0, 0],
         EINVAL,
     );
 
@@ -2315,12 +2383,14 @@ fn raw_plan(r: &mut Runner) {
         [usize::MAX, 0, 0, 0, 0, 0],
         Expect::Err(ESRCH),
     );
+    // POSIX.1-2017 setpgid(): a negative pgid is EINVAL. K488 (d88879078) implements it; the
+    // fuzz table carried the pre-K488 EPERM expectation (K500).
     r.raw(
         RAW_PROC_SETPGID,
         "PROC_SETPGID",
         "pgidneg",
         [0, usize::MAX, 0, 0, 0, 0],
-        Expect::Err(EPERM),
+        Expect::Err(EINVAL),
     );
     r.raw(
         RAW_PROC_SETPGID,
@@ -2586,13 +2656,28 @@ fn raw_plan(r: &mut Runner) {
         [usize::MAX, 0, 0, 0, 0, 0],
         Expect::Err(ESRCH),
     );
+    // POSIX.1-2017 kill(): signal 0 is an existence/permission check and returns 0. K488
+    // (d88879078) implements it; the fuzz table carried the pre-K488 EINVAL expectation (K500).
     r.raw(
         RAW_PROC_SIGNAL,
         "PROC_SIGNAL",
         "signo0",
         [0, 0, 0, 0, 0, 0],
-        Expect::Err(EINVAL),
+        Expect::Success,
     );
+    // The negative-pid group form is the same existence check on `-pgrp`; use the caller's own
+    // group so the check is deterministic. NetBSD kill1() dispatches pid < 0 to killpg1().
+    let pgrp = raw(RAW_PROC_GETPGID, [0, 0, 0, 0, 0, 0]);
+    if pgrp > 0 {
+        let group = 0usize.wrapping_sub(usize::try_from(pgrp).unwrap_or(0));
+        r.raw(
+            RAW_PROC_SIGNAL,
+            "PROC_SIGNAL",
+            "signo0pgrp",
+            [group, 0, 0, 0, 0, 0],
+            Expect::Success,
+        );
+    }
     r.raw(
         RAW_PROC_SIGNAL,
         "PROC_SIGNAL",

@@ -1881,6 +1881,10 @@ fn irq_held_elsewhere(owner: &Arc<Process>, irq: &Arc<crate::driver::irq::Irq>) 
 ///
 /// Returns false when the process was already terminal (no resurrection, no second teardown).
 fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool {
+    // A process can die without the EXIT syscall (SIGKILL, a fault or OOM). POSIX record locks
+    // are owned by the process, so release them on the single teardown path before any waiter
+    // can observe a stale owner.
+    crate::syscall::record_lock::release_process(process.id);
     // The state/wake graph takes the per-CPU scheduler lock through `sched::wake`. The syscall
     // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
     // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space

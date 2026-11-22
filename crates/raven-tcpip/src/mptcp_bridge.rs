@@ -14,6 +14,7 @@
 //! handshake. MPTCP2b owns the wire integration.
 
 use alloc::rc::Rc;
+#[cfg(any(test, feature = "testutil"))]
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
@@ -77,13 +78,13 @@ impl<D: Device + 'static> StackSubflow<D> {
 }
 
 impl<D: Device + 'static> Subflow for StackSubflow<D> {
-    fn send(&mut self, mapping: Mapping, payload: &[u8], _data_fin: bool) -> Result<(), Error> {
+    fn send(&mut self, _mapping: Mapping, payload: &[u8], _data_fin: bool) -> Result<(), Error> {
         let mut stack = self.stack.borrow_mut();
         match stack.send_on(self.id, payload) {
             Ok(count) if count == payload.len() => {
                 #[cfg(any(test, feature = "testutil"))]
                 self.mappings.borrow_mut().push(Mapped {
-                    mapping,
+                    mapping: _mapping,
                     data: payload.to_vec(),
                 });
                 Ok(())
