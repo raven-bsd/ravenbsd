@@ -796,10 +796,11 @@ def row_s5_s6() -> None:
         except ValueError:
             identity_exit = -1
         identity_text = identity_log.read_text(errors="replace") if identity_log.is_file() else ""
-        identity_ok = identity_exit == 0 and "socket-write-identity: ok" in identity_text
+        identity_ok = (identity_exit == 0
+                       and "socket-write-identity-tap: pass" in identity_text)
         witness = next((line.strip() for line in identity_text.splitlines()
                         if "rsh:" in line or "FAIL" in line or "unmatched expectations" in line),
-                       "socket-write-identity: ok")
+                       "socket-write-identity-tap: pass")
         identity_detail = f"exit {identity_exit}; {witness}"
         attempt("S5-identity", 1, "fresh",
                 "host peer exact N bytes on the same connection; console none",
