@@ -32,8 +32,8 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast ufs-selftest qemu-ufs demo demo-build soak-smoke soak-24h \
-	tcp-soak-smoke tcp-soak-24h
+	posix-gaps posix-check toolchain clean distclean check-fast check-build ufs-selftest qemu-ufs soak-smoke soak-24h \
+	tcp-soak-smoke tcp-soak-24h info
 
 help:
 	@sh $(HELP_SCRIPT) "RavenBSD" "$(HELP_MANIFEST)"
@@ -54,6 +54,11 @@ check:
 # or the working tree. Seconds, not minutes. The full `make check` stays the checkpoint gate.
 check-fast:
 	@$(XTASK) check --fast --changed
+
+# Pre-tag gate: compile every host workspace test target, do not run tests. Closes the
+# check-fast changed-package blind spot (K394/K400). Run after check-fast and before the qtests.
+check-build:
+	@sh tests/release/workspace-build/check.sh
 
 # Host-only UFS image/partition updater proof: GPT/ESP+UFS, put/rm/mkdir/sync,
 # fsck and the safety refusals. No board and no whole-image copy.
@@ -113,13 +118,6 @@ image:
 qemu-ufs:
 	@sh scripts/qemu-ufs.sh
 
-# Owner demo: build the one-disk UFS image and boot it interactively on the real K194 tap.
-demo: qemu-ufs
-
-# Rebuild the one-disk UFS demo image from a clean tree without booting it.
-demo-build:
-	@sh scripts/qemu-ufs.sh --build-only
-
 soak-smoke:
 	@sh scripts/soak.sh --duration $(SOAK_SECONDS) --interval $(SOAK_INTERVAL) --profile $(SOAK_PROFILE)
 
@@ -143,6 +141,11 @@ world:
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .
+
+# Code statistics: Rust code lines first, then the full tokei language table. The scan excludes
+# build output, Git, and vendor trees; the summary separates vendored uutils/brush from our code.
+info:
+	@sh scripts/info.sh
 
 posix-gaps:
 	@$(XTASK) posix-gaps

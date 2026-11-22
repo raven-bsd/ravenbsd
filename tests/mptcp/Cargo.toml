@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-mptcp-vectors"
+version = "0.1.0"
+description = "Byte-exact RFC 8684 vectors and decoder fuzz replay for raven-mptcp."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+raven-mptcp = { path = "../../crates/raven-mptcp" }
+
+[lints]
+workspace = true

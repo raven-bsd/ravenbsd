@@ -86,6 +86,29 @@ if [ -z "${RAVENLIBC_SYSROOT:-}" ]; then
             exit 2
         fi
     fi
+    # The dynamic runtime is a separate `libc-link` artifact. `libc-pack` only re-stages the
+    # sysroot copy, so a libc change newer than `libc.so.1` would otherwise run the case against
+    # the previous shared library (K438: a mutated recvmsg still passed). Refresh it here.
+    if [ "$link_kind" = dynamic ]; then
+        # Compare the source-of-truth `libc-link` output, not the sysroot copy: `libc-pack`
+        # re-stages the copy (with a fresh mtime) even when the shared library itself is stale.
+        dynamic_libc=$root/build/$arch/libc.so.1
+        dynamic_stale=0
+        if [ ! -f "$dynamic_libc" ]; then
+            dynamic_stale=1
+        elif [ -n "$(find "$root/libc/ravenlibc/crates" "$root/libc/ravenlibc/abi" \
+            "$root/libc/ravenlibc/crt" "$root/libc/ravenlibc/Cargo.toml" \
+            -newer "$dynamic_libc" -print -quit 2>/dev/null)" ]; then
+            dynamic_stale=1
+        fi
+        if [ "$dynamic_stale" -eq 1 ]; then
+            printf 'refresh: generated %s libc.so.1 is missing or older than libc sources\n' "$arch"
+            if ! cargo xtask libc-link --arch "$arch"; then
+                printf 'error: cargo xtask libc-link --arch %s failed\n' "$arch" >&2
+                exit 2
+            fi
+        fi
+    fi
 else
     sysroot=$RAVENLIBC_SYSROOT
 fi

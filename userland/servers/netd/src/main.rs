@@ -515,7 +515,7 @@ mod program {
                 if self
                     .netd
                     .socket_readiness(file)
-                    .is_ok_and(|ready| ready.readable)
+                    .is_ok_and(|ready| ready.readable || ready.writable)
                 {
                     let _ = event_signal(event, 1);
                 }

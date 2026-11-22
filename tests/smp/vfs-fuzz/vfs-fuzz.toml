@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "vfs-fuzz"
+arch = "x86_64"
+profile = "core-servers-files"
+timeout_secs = 120
+pre = ["sh tests/smp/vfs-fuzz/build.sh"]
+initfs = "build/vfs-fuzz/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^vfs-fuzz: start seed=0x[0-9a-f]+ vfs$'
+
+[[expect]]
+regex = '^vfs-fuzz: summary rows=[0-9]+ deviations=[0-9]+ escapes=[0-9]+ hash=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^vfs-fuzz: alive$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|setup-failed'

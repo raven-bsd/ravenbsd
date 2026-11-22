@@ -166,8 +166,8 @@ pub const PROC_SETCRED: usize = 0x38;
 pub const PROC_PID_INFO: usize = 0x3A;
 /// Raw `proc_set_command(proc, name, len) -> 0` number (P2o).
 pub const PROC_SET_COMMAND: usize = 0x45;
-/// Maximum `PROC_PID_INFO` words: eight identity words plus a 256-byte name and NUL.
-pub const PROC_INFO_MAX_WORDS: usize = 41;
+/// Maximum `PROC_PID_INFO` words: eight identity words, a 256-byte name, and twenty K391 words.
+pub const PROC_INFO_MAX_WORDS: usize = 61;
 /// Raw `proc_setcred_ex(which, a, b, c, groups, count) -> 0` number.
 pub const PROC_SETCRED_EX: usize = 0x3B;
 /// Raw `proc_cred_info(out, count) -> 0` number.
@@ -184,8 +184,14 @@ pub const PROC_WAIT_EX: usize = 0x48;
 pub const PROC_GETPGID: usize = 0x49;
 /// Raw `proc_signal(target, signo) -> 0` number.
 pub const PROC_SIGNAL: usize = 0x4A;
-/// Raw `proc_sigrecv(out, flags) -> signo` number.
+/// Raw `proc_sigrecv(out, flags) -> signo` number (three-word legacy output).
 pub const PROC_SIGRECV: usize = 0x4B;
+/// Raw `proc_sigrecv_ex(out, flags, deliverable) -> signo` number (six-word output).
+pub const PROC_SIGRECV_EX: usize = 0x85;
+/// Raw `proc_sigqueue(target, signo, value) -> 0` number.
+pub const PROC_SIGQUEUE: usize = 0x86;
+/// `PROC_SIGRECV_EX` flag: select only signals whose bit is in the `deliverable` mask.
+const SIGRECV_DELIVERABLE: u32 = 2;
 /// Raw `proc_times(out, count) -> 0` number.
 pub const PROC_TIMES: usize = 0x4C;
 /// Raw `proc_getrusage(who, out, count) -> 0` number.
@@ -236,7 +242,8 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
     }
     if count > 8 {
         let command = target.command.lock();
-        let capacity = length.saturating_sub(64).saturating_sub(1);
+        // The name area stays at byte 64; the K391 diagnostic words start at byte 328.
+        let capacity = length.saturating_sub(64).saturating_sub(1).min(256);
         let mut end = 0usize;
         for (index, character) in command.char_indices() {
             let next = index.saturating_add(character.len_utf8());
@@ -250,6 +257,64 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
             command.as_bytes().get(..end),
         ) {
             slot.copy_from_slice(source);
+        }
+    }
+    if count >= PROC_INFO_MAX_WORDS {
+        let state = match *target.state.lock() {
+            ProcessState::Created => 0u64,
+            ProcessState::Running => 1u64,
+            ProcessState::Exited => 2u64,
+        };
+        let runnable = u64::from(
+            target.threads.load(Ordering::Acquire) > 0 && !target.exiting.load(Ordering::Acquire),
+        );
+        // Take one queue lock at a time: the diagnostic must not create a lock-order edge
+        // between the client, delivery and server queues of a live process.
+        let client_len = u64::try_from(target.client_requests.lock().len()).unwrap_or(u64::MAX);
+        let queue_len = u64::try_from(target.scheme_queue.lock().len()).unwrap_or(u64::MAX);
+        let active_len = u64::try_from(target.active_requests.lock().len()).unwrap_or(u64::MAX);
+        let last_wake_cpu = target.wake_last_cpu.load(Ordering::Relaxed);
+        let (cpu_need_resched, cpu_runqueue) = if last_wake_cpu == u32::MAX {
+            (0u64, 0u64)
+        } else {
+            let cpu = usize::try_from(last_wake_cpu).unwrap_or(0);
+            let (need, len) = crate::sched::cpu_status(cpu);
+            (u64::from(need), len as u64)
+        };
+        let waiter_len = u64::try_from(target.scheme_waiters.len()).unwrap_or(u64::MAX);
+        let waiter_key = target
+            .scheme_waiters
+            .first_key()
+            .map_or(0, |(space, addr)| (space << 32) | (addr & 0xffff_ffff));
+        let diagnostics = [
+            state,
+            runnable,
+            target.last_syscall.load(Ordering::Relaxed),
+            target.last_pc.load(Ordering::Relaxed),
+            target.wait_object.load(Ordering::Relaxed),
+            u64::from(target.in_syscall.load(Ordering::Relaxed)),
+            target.last_submit_id.load(Ordering::Relaxed),
+            target.last_recv_id.load(Ordering::Relaxed),
+            target.last_send_id.load(Ordering::Relaxed),
+            client_len,
+            queue_len,
+            active_len,
+            waiter_len,
+            waiter_key,
+            u64::from(target.wake_fail.load(Ordering::Relaxed)),
+            target.wake_fail_detail.load(Ordering::Relaxed),
+            u64::from(target.wake_pending.load(Ordering::Relaxed)),
+            u64::from(target.wake_last_cpu.load(Ordering::Relaxed)),
+            cpu_need_resched,
+            cpu_runqueue,
+        ];
+        for (chunk, value) in bytes
+            .get_mut(328..488)
+            .ok_or(Errno::EINVAL)?
+            .chunks_exact_mut(8)
+            .zip(diagnostics)
+        {
+            chunk.copy_from_slice(&value.to_le_bytes());
         }
     }
     Ok(bytes)
@@ -343,6 +408,10 @@ pub fn set_command(frame: &SyscallFrame) -> Result<usize, Errno> {
 pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let pid = frame.rdi as u32 as i32;
+    let pgid = frame.rsi as u32 as i32;
+    if pgid < 0 {
+        return Err(Errno::EINVAL);
+    }
     let target = if pid == 0 || u64::try_from(pid).ok() == Some(caller.id) {
         Arc::clone(&caller)
     } else {
@@ -361,14 +430,23 @@ pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
         let ids = target.ids.lock();
         (ids.sid, ids.pgid)
     };
+    if target_id != caller.id {
+        // A child must still be in the caller's session and must not have exec'd. The donor
+        // order is same-session EPERM before the exec EACCES.
+        if target_sid != caller.ids.lock().sid {
+            return Err(Errno::EPERM);
+        }
+        if target.exec_done.load(Ordering::Acquire) {
+            return Err(Errno::EACCES);
+        }
+    }
     if target_sid == target_id {
         return Err(Errno::EPERM);
     }
-    let pgid = frame.rsi as u32 as i32;
     let group = if pgid == 0 {
         target_id
     } else {
-        u64::try_from(pgid).map_err(|_| Errno::EPERM)?
+        u64::try_from(pgid).map_err(|_| Errno::EINVAL)?
     };
     let valid = group == target_id
         || group == current_group
@@ -744,6 +822,11 @@ pub fn exec_cred(frame: &SyscallFrame) -> Result<usize, Errno> {
     let gid = u32::from_le_bytes([bytes[60], bytes[61], bytes[62], bytes[63]]);
     if mode & S_IFMT != S_IFREG {
         return Err(Errno::EACCES);
+    }
+    // A scheme server's `fstat` is not authority for root credentials.  Elevated bits are
+    // accepted only from the kernel-recorded live owner of a boot-trusted executable source.
+    if mode & (S_ISUID | S_ISGID) != 0 && !registry::file_source_trusted(&file.server) {
+        return Err(Errno::EPERM);
     }
 
     let caller_ids = caller.ids.lock();
@@ -1147,29 +1230,32 @@ fn signal_allowed(caller: &Process, target: &Process) -> bool {
 }
 
 fn signal_one(caller: &Arc<Process>, target: &Arc<Process>, signo: u32) -> Result<(), Errno> {
+    signal_one_info(caller, target, signo, process::SI_USER_CODE, 0, 0)
+}
+
+/// Deliver one signal with an explicit queued record (`sigqueue`).
+fn signal_one_info(
+    caller: &Arc<Process>,
+    target: &Arc<Process>,
+    signo: u32,
+    code: u32,
+    uid: u32,
+    value: u64,
+) -> Result<(), Errno> {
     if signo == SIGKILL {
         if Arc::ptr_eq(caller, target) {
             process::exit_process(KILL_EXIT_CODE);
         }
         return process::terminate(target, KILL_EXIT_CODE);
     }
-    process::deliver_signal(target, signo, caller.id)
+    process::deliver_signal_info(target, signo, caller.id, code, uid, value)
 }
 
-/// `proc_signal(target, signo) -> 0`.
+/// Resolve a `PROC_SIGNAL` target into the concrete processes it names.
 ///
-/// Positive `target` is a pid, zero is the caller's process group and a negative
-/// value is `-pgid`. `SIGKILL` terminates, stop signals set the wait-status stop
-/// state, `SIGCONT` clears it and every other signal is queued for
-/// `PROC_SIGRECV`. The permission check uses the caller's effective/real uid and
-/// the target's real/saved uid; effective uid 0 is privileged.
-pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
-    let caller = process::current().ok_or(Errno::ESRCH)?;
-    let target = frame.rdi as u32 as i32;
-    let signo = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
-    if !signal_valid(signo) {
-        return Err(Errno::EINVAL);
-    }
+/// Positive `target` is a pid, zero is the caller's process group and a negative value is
+/// `-pgid`. The caller must be allowed to signal every resolved process.
+fn resolve_targets(caller: &Arc<Process>, target: i32) -> Result<Vec<Arc<Process>>, Errno> {
     let targets: Vec<Arc<Process>> = if target > 0 {
         let pid = u64::try_from(target).map_err(|_| Errno::ESRCH)?;
         let target = process::lookup_pid(pid).ok_or(Errno::ESRCH)?;
@@ -1194,12 +1280,55 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::ESRCH);
     }
     for target in &targets {
-        if !signal_allowed(&caller, target) {
+        if !signal_allowed(caller, target) {
             return Err(Errno::EPERM);
         }
     }
+    Ok(targets)
+}
+
+/// `proc_signal(target, signo) -> 0`.
+///
+/// Positive `target` is a pid, zero is the caller's process group and a negative
+/// value is `-pgid`. `SIGKILL` terminates, stop signals set the wait-status stop
+/// state, `SIGCONT` clears it and every other signal is queued for
+/// `PROC_SIGRECV`. The permission check uses the caller's effective/real uid and
+/// the target's real/saved uid; effective uid 0 is privileged.
+pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let target = frame.rdi as u32 as i32;
+    let signo = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    if signo != 0 && !signal_valid(signo) {
+        return Err(Errno::EINVAL);
+    }
+    let targets = resolve_targets(&caller, target)?;
+    if signo == 0 {
+        // POSIX `kill(pid, 0)` is an existence/permission check; it never queues a signal.
+        return Ok(0);
+    }
     for target in targets {
         signal_one(&caller, &target, signo)?;
+    }
+    Ok(0)
+}
+
+/// `proc_sigqueue(target, signo, value) -> 0`.
+///
+/// Same target and permission contract as `PROC_SIGNAL`, but the queued record carries the
+/// caller's real uid, `SI_QUEUE` and the 64-bit `sigval` payload. The kernel does not interpret
+/// the payload; `PROC_SIGRECV_EX` returns it to libc.
+pub fn sigqueue(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let target = frame.rdi as u32 as i32;
+    let signo = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let value = frame.rdx;
+    if signo == 0 || !signal_valid(signo) {
+        return Err(Errno::EINVAL);
+    }
+    let targets = resolve_targets(&caller, target)?;
+    let uid = caller.ids.lock().uid;
+    for target in targets {
+        signal_one_info(&caller, &target, signo, process::SI_QUEUE_CODE, uid, value)?;
     }
     Ok(0)
 }
@@ -1210,23 +1339,64 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// returns `EAGAIN` instead of blocking. The kernel queue does not interpret
 /// signal dispositions; libc owns the user pending set.
 pub fn sigrecv(frame: &SyscallFrame) -> Result<usize, Errno> {
+    receive(frame, 3, false)
+}
+
+/// `proc_sigrecv_ex(out, flags, deliverable) -> signo`.
+///
+/// Writes six little-endian u64 words `[signo, sender_pid, si_code, si_uid, si_value, 0]`.
+/// `flags` bit 0 is `WNOHANG` and bit 1 (`DELIVERABLE`) makes the kernel select the oldest signal
+/// whose bit is in the `deliverable` mask, leaving every other signal queued. That is the masked
+/// queue contract: a blocked signal is not consumed (Illumos `fsig`, FreeBSD `sigtd`, NetBSD
+/// `sigismasked`).
+pub fn sigrecv_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
+    receive(frame, 6, true)
+}
+
+/// The one-bit mask of a signal number (the libc `APP_MASK` layout).
+fn signal_bit(signo: u32) -> u64 {
+    1u64.wrapping_shl(signo.saturating_sub(1) & 63)
+}
+
+/// Shared receive path for the legacy three-word and the extended six-word call.
+fn receive(frame: &SyscallFrame, words: usize, extended: bool) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
-    let destination = UserSlice::new(frame.rdi, 24)?;
+    let destination = UserSlice::new(frame.rdi, (words * 8) as u64)?;
     let flags = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
-    if flags & !WNOHANG != 0 {
+    let allowed = if extended {
+        WNOHANG | SIGRECV_DELIVERABLE
+    } else {
+        WNOHANG
+    };
+    if flags & !allowed != 0 {
         return Err(Errno::EINVAL);
     }
+    let selects = extended && flags & SIGRECV_DELIVERABLE != 0;
+    let deliverable = if selects { frame.rdx } else { 0 };
     loop {
-        if let Some(signal) = caller.pop_signal() {
-            let mut bytes = [0u8; 24];
-            for (chunk, value) in
-                bytes
-                    .chunks_exact_mut(8)
-                    .zip([u64::from(signal.signo), signal.sender, 0])
-            {
+        let selected = if selects {
+            caller.pop_signal_where(|signal| deliverable & signal_bit(signal.signo) != 0)
+        } else {
+            caller.pop_signal()
+        };
+        if let Some(signal) = selected {
+            let values = if extended {
+                [
+                    u64::from(signal.signo),
+                    signal.sender,
+                    u64::from(signal.code),
+                    u64::from(signal.uid),
+                    signal.value,
+                    0,
+                ]
+            } else {
+                [u64::from(signal.signo), signal.sender, 0, 0, 0, 0]
+            };
+            let mut bytes = [0u8; 48];
+            for (chunk, value) in bytes.chunks_exact_mut(8).zip(values).take(words) {
                 chunk.copy_from_slice(&value.to_le_bytes());
             }
-            copy_to_user(destination, &bytes)?;
+            copy_to_user(destination, &bytes[..words * 8])?;
             return Ok(signal.signo as usize);
         }
         if flags & WNOHANG != 0 {
@@ -1237,9 +1407,15 @@ pub fn sigrecv(frame: &SyscallFrame) -> Result<usize, Errno> {
             sched::end_block(token);
             return Err(Errno::EINTR);
         }
-        let queued = caller
-            .signal_waiters
-            .enqueue_if(caller.id, 0, || Ok(!caller.has_pending_signal()));
+        let queued = caller.signal_waiters.enqueue_if(caller.id, 0, || {
+            let empty = if selects {
+                !caller
+                    .has_pending_signal_where(|signal| deliverable & signal_bit(signal.signo) != 0)
+            } else {
+                !caller.has_pending_signal()
+            };
+            Ok(empty)
+        });
         match queued {
             Ok(true) => {}
             Ok(false) => {
@@ -1335,10 +1511,34 @@ pub fn getrlimit(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// Apply one `setrlimit` request to `old`.
+///
+/// The rules follow NetBSD `dosetrlimit`: an explicit soft limit above the new hard limit is
+/// `EINVAL`, and an unprivileged process may not raise the hard limit (`EPERM`). The one
+/// divergence is the BSD "lower the hard limit" form: when the caller passes the current soft
+/// value unchanged and lowers the hard below it, the soft value is clamped to the new hard
+/// (FreeBSD/OpenBSD clamp; NetBSD rejects). An explicit `cur > max` request remains `EINVAL`.
+fn rlimit_set(old: Rlimit, requested: Rlimit, privileged: bool) -> Result<Rlimit, Errno> {
+    if requested.cur > requested.max {
+        if requested.cur == old.cur {
+            if !privileged && requested.max > old.max {
+                return Err(Errno::EPERM);
+            }
+            return Ok(Rlimit::new(requested.max, requested.max));
+        }
+        return Err(Errno::EINVAL);
+    }
+    if !privileged && requested.max > old.max {
+        return Err(Errno::EPERM);
+    }
+    Ok(requested)
+}
+
 /// `proc_setrlimit(resource, cur, max) -> 0`.
 ///
-/// A soft limit above the existing hard limit needs effective uid 0; every pair
-/// must satisfy `cur <= max`.
+/// An unprivileged process may lower either value and may raise the soft limit up to the
+/// existing hard limit, but it may not raise the hard limit; only effective uid 0 may do that.
+/// `RLIM_INFINITY` is stored verbatim and is subject to the same hard-limit rule.
 pub fn setrlimit(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let resource = usize::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
@@ -1349,15 +1549,9 @@ pub fn setrlimit(frame: &SyscallFrame) -> Result<usize, Errno> {
         cur: frame.rsi,
         max: frame.rdx,
     };
-    if !limit.valid() {
-        return Err(Errno::EINVAL);
-    }
     let privileged = caller.ids.lock().euid == 0;
     let mut limits = caller.limits.lock();
     let slot = limits.get_mut(resource).ok_or(Errno::EINVAL)?;
-    if limit.cur > slot.max && !privileged {
-        return Err(Errno::EPERM);
-    }
-    *slot = limit;
+    *slot = rlimit_set(*slot, limit, privileged)?;
     Ok(0)
 }

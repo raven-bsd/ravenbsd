@@ -109,6 +109,9 @@ extern "C" fn raven_fork_child_reset() {
     platform.reset_event_queue();
     // The child keeps its inherited socket descriptors alive after the parent closes its copies.
     platform.fork_child_inherit();
+    // The socket records cache the kernel handle; point them at the child's fresh handles so a
+    // later `Call::Event`/`CALL` does not use the parent's released handle (K409 EBADF).
+    crate::socket::refresh_after_fork();
 }
 
 /// `fork`.

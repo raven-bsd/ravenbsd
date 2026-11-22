@@ -3,9 +3,43 @@
 
 //! Host tests for image assembly helpers.
 
+use std::fs;
 use std::path::Path;
 
 use super::*;
+
+#[test]
+fn dotted_product_profile_name_loads() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let profile = Profile::load(root, "0.1.0-ufs").expect("0.1.0-ufs profile");
+    assert_eq!(profile.name, "0.1.0-ufs");
+    let boot = Profile::load(root, "0.1.0-ufs-boot").expect("0.1.0-ufs-boot profile");
+    assert_eq!(boot.name, "0.1.0-ufs-boot");
+    assert!(ufs_boot_profile(root, "0.1.0-ufs").is_some());
+}
+
+#[test]
+fn ufs_root_is_selected_by_a_spec_and_a_boot_profile() {
+    let root = std::env::temp_dir().join(format!("raven-image-ufs-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("profiles/demo")).unwrap();
+    fs::write(root.join("profiles/demo/rootfs.toml"), "size = 1048576\n").unwrap();
+    assert_eq!(ufs_boot_profile(&root, "demo"), None);
+
+    fs::write(
+        root.join("profiles/demo-boot.toml"),
+        "name = \"demo-boot\"\n[boot]\ncmdline = \"console=ttyS0\"\nlog_level = \"info\"\n",
+    )
+    .unwrap();
+    assert_eq!(
+        ufs_boot_profile(&root, "demo"),
+        Some("demo-boot".to_string())
+    );
+
+    fs::remove_file(root.join("profiles/demo/rootfs.toml")).unwrap();
+    assert_eq!(ufs_boot_profile(&root, "demo"), None);
+    let _ = fs::remove_dir_all(&root);
+}
 
 #[test]
 fn boot_toml_uses_profile_and_override() {

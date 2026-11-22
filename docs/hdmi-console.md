@@ -3,25 +3,31 @@
 
 # Pi 4 HDMI text console (HDMI1)
 
-Status: **host codec/blitter and firmware configuration OBSERVED; the Pi 4 board output is
-UNVERIFIED and handed to UI1.** This is a firmware linear display buffer rendered as a text
-console. It is not GPU/DRM, has no acceleration and makes no claim about a monitor result.
+Status: **host codec/blitter, firmware configuration and the K386 qtest OBSERVED; the Pi 4
+board output is UNVERIFIED and handed to UI1.** This is a firmware linear display buffer
+rendered as a text console. It is not GPU/DRM, has no acceleration and makes no claim about a
+monitor result.
 
 ## 1. Scope and boundary
 
-The owner requires a monitor plugged into the Pi 4 to show boot/login text. HDMI1 delivers:
+The owner requires a monitor plugged into the Pi 4 to show boot/login text. HDMI1/FB1 deliver:
 
 * a deterministic firmware display buffer in `config.txt`;
 * `crates/raven-fb`, a host-tested mailbox property codec, pixel formats, 8x16 text blitter,
   scrolling and cursor;
 * a Pi 4 kernel early console that asks the firmware for the display buffer, mirrors every kernel
   log line to it and keeps the UART output unconditional;
-* the existing `consd` `fb:console` output sink remains the userspace fan-out point (CON1); the
-  userspace server that owns the live display buffer after boot is a UI1 follow-up.
+* FB1's `DEBUG_WRITE` mirror: the consd UART sink used by getty/login also calls
+  `arch::aarch64::serial::write_bytes`, which mirrors the same bytes to the HDMI text console
+  before the unconditional UART write. This is the login-output path; no second console sink is
+  needed;
+* the existing `consd` `fb:console` output sink remains an optional userspace fan-out point
+  (CON1); a userspace display provider is no longer required for the kernel mirror.
 
-The kernel early console is the boot path. `getty`/`login` output reaches HDMI only when a
-userspace `fb:console` provider exists and consd opens it; until then the login prompt stays on
-UART and the HDMI screen keeps the last kernel text. This ticket does not fake a login transcript.
+The kernel early console is the boot path. The HDMI screen shows the same byte stream as UART:
+kernel banner/log lines and, through FB1, getty/login output. A failed mailbox or display buffer
+leaves UART-only operation and the boot/login gate unchanged. This document does not fake a
+monitor transcript; the physical panel and USB keyboard are UI1 board evidence.
 
 E-Ink keeps its `Canvas` terminology in `raven-eink`. The HDMI path uses **display buffer** /
 **HDMI console** and does not reintroduce a Canvas-style model.
@@ -149,8 +155,8 @@ has no new Cargo dependency and the host tests exercise the same files.
    model, native resolution and cable.
 4. Boot once without a monitor and once with a monitor hot-plugged after power-on; UART must be
    byte-identical in both cases and the boot/login gate must not regress.
-5. A userspace `fb:console` provider is still required for `login:` to appear on HDMI; that
-   provider and the real keyboard/display login are UI1 evidence, not HDMI1.
+5. FB1's kernel `DEBUG_WRITE` mirror carries `login:`/getty output to HDMI; the real
+   panel/keyboard login (and any userspace `fb:console` provider) is UI1 evidence, not HDMI1.
 
 ## 8. DR-57 / DR-52 reconciliation
 
@@ -166,13 +172,54 @@ donors; no CDDL/GPL code was read or copied. Donor revision: NetBSD
 | Bus address translation | No VideoCore bus | FreeBSD `bcm2835_vcbus.c/h` (BSD-2-Clause) | `linux-rpi` legacy master view, read-only | `vcbus - 0xC0000000` for BCM2838 SDRAM, validated against the HHDM window |
 | Text console/blitter | Illumos `wscons`-equivalent terminal is not applicable | NetBSD `bcm2835_genfb.c` (BSD-2-Clause) attaches `genfb`; the 8x16 glyph data is NetBSD `wsfont/bold8x16.h` (public-domain data, BSD-2 file) | fbcon outcome only | First-party blitter/scroll/cursor; glyph table reused from the already-proven E1d font with the same donor notice |
 | Cache ownership | No firmware DMA display buffer | FreeBSD `pmap_mapdev` maps the buffer uncached (BSD-2-Clause) | DMA coherent mapping outcome | CPU HHDM mapping is cacheable, so explicit `dc cvac`/`dc ivac` + `dsb sy` around mailbox and scanout |
-| `consd` sink | SMF/console fan-out outcome | CON1 first-party `ConsoleOutput` in `userland/servers/consd` | systemd-logind/seat outcome only | Reuse the existing `fb:console` sink; provider is UI1 |
+| `consd` sink | SMF/console fan-out outcome | CON1 first-party `ConsoleOutput` in `userland/servers/consd` | systemd-logind/seat outcome only | FB1 kernel `DEBUG_WRITE` mirror is the primary login path; the `fb:console` sink stays optional for a userspace provider |
 
 ## 9. Open inputs
 
-* A userspace `fb:console` provider so `login:`/getty output reaches HDMI after the kernel hands
-  over; UI1 owns that and the USB keyboard path.
+* The live init presentation of the styled screen is K374. The K386 qtest asserts the styled
+  screen through the target probe's serial mirror (marked `hdmi-console: styled screen`) and the
+  host PPM; the live init's concise boot report remains in the same transcript and is not an
+  HDMI-console gap.
 * Real-panel mode/timing evidence if the monitor rejects DMT 1024x768 60 Hz; the fallback is a
   different fixed `hdmi_mode`.
-* `raven-fb` can later grow a no_std display-file buffer for the provider, but HDMI1 keeps the
-  kernel and crate boundary small.
+* A real monitor photo, USB-keyboard login and panel/cable record belong to UI1; the K386 qtest
+  never substitutes for them.
+
+## 10. K386 qtest (`hdmi-console`)
+
+`tests/qtest/cases/hdmi-console.toml` boots a minimal test initfs with the production
+`init`/`getty`/`login` path and a target probe, for both instruction sets:
+
+```sh
+timeout 600 cargo xtask qtest --case hdmi-console --arch aarch64
+timeout 600 cargo xtask qtest --case hdmi-console --arch x86_64
+```
+
+The fixture (`tests/fixtures/hdmi-console/`) is deliberately smaller than the release image: it
+uses the production service binaries, getty/login and the rsh login shell, plus a read-only
+account fixture. That isolates the console/login path from release-image build time; it does not
+disable a service or replace the product getty/login. `getty` resolves the root account to
+`/bin/brush`, so the fixture stages the product `raven-rsh` binary at that path; brush itself,
+completion and the release profile stay covered by `brush-login` and `login-retry`. The
+HDMI-console contract is the console output path, not a second brush test.
+
+What the case proves:
+
+| Claim | Artifact |
+|---|---|
+| Firmware mode is 1024x768x32, from the actual `xtask/src/pi.rs` `CONFIG_TXT` literal | `build/fixtures/hdmi-console/config.txt`, `host.log` |
+| `raven-fb` renders the exact 8x16 glyph, scrolls and keeps the cursor | target `hdmi-console: blit/scroll ok`; host `build/qtest/hdmi-console.ppm` |
+| Malformed/failed mailbox replies return errors; the kernel's `fb.rs` failure paths stay `UART only` and contain no panic/unwrap | target `hdmi-console: mailbox fallback ok`; host `host.log` source checks |
+| The styled screen (title, 80-column rules, timed rows, `Welcome`) is on the serial stream the Pi 4 kernel mirrors | target `hdmi-console: styled screen` block in `build/qtest/hdmi-console.log` |
+| Boot banner and the real `login:` prompt are on the same stream | `build/qtest/hdmi-console.log`, `hdmi-console.json` |
+| Login `root`/`raven`, shell prompt, one command and clean `init exited (0)` | same serial log |
+
+The QEMU `virt` harness has no Pi 4 firmware mailbox and no panel, so there is no hardware
+framebuffer capture. The honest chain is: the serial log is the byte stream that
+`arch::aarch64::serial::{write_str,write_bytes}` mirrors to `fb::write_text` on a Pi 4 build;
+the target probe prints the styled screen and runs the same `raven-fb` blitter in the guest; and
+the host check renders that screen into `build/qtest/hdmi-console.ppm` at 1024x768x32. The
+`hdmi-console: styled screen` marker separates the probe's lines from the init's concise boot
+report; the real getty owns `login:`. The PPM is a synthetic blitter render, not a photo of a
+monitor. A real monitor and USB keyboard login remain UI1 board evidence, and no
+physical-monitor claim is made here.

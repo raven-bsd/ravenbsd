@@ -10,6 +10,7 @@
 extern crate alloc;
 
 use raven_abi::errno::Errno;
+use raven_abi::types::Handle;
 use raven_ipc::protocol::{Opcode, PACKET_SIZE};
 use raven_rt::entry;
 use raven_rt::println;
@@ -25,6 +26,11 @@ const MODE_DELAY_WRITE: u64 = 2;
 const MODE_DELAY_READ: u64 = 3;
 const MODE_DIE: u64 = 4;
 const MODE_PAUSE: u64 = 5;
+const MODE_HOLD: u64 = 6;
+const MODE_RELEASE: u64 = 7;
+const MODE_CLOSE_REQUEST: u64 = 8;
+const MODE_SLOW_READ: u64 = 9;
+const MODE_REVOKE_REQUEST: u64 = 10;
 
 /// Size of the echo buffer and every fixture capture.
 const LEN: usize = 1024 * 1024;
@@ -36,6 +42,11 @@ fn mode_for_path(path: &[u8]) -> u64 {
         b"delay-read" => MODE_DELAY_READ,
         b"die" => MODE_DIE,
         b"pause" => MODE_PAUSE,
+        b"hold" => MODE_HOLD,
+        b"release" => MODE_RELEASE,
+        b"close-request" => MODE_CLOSE_REQUEST,
+        b"slow-read" => MODE_SLOW_READ,
+        b"revoke-request" => MODE_REVOKE_REQUEST,
         _ => MODE_ECHO,
     }
 }
@@ -49,6 +60,8 @@ fn main(_args: raven_rt::Args) -> i32 {
 
     let mut data = alloc::vec![0u8; LEN];
     let mut stored = 0usize;
+    let mut held: alloc::vec::Vec<(Handle, raven_ipc::protocol::SchemePacket)> =
+        alloc::vec::Vec::new();
     let mut packet_bytes = [0u8; PACKET_SIZE];
     loop {
         let request = match recv(&mut packet_bytes) {
@@ -63,9 +76,20 @@ fn main(_args: raven_rt::Args) -> i32 {
         let mode = reply.server_cookie;
         let mut die = false;
         let mut pause_after = false;
+        let mut hold = false;
         match reply.opcode {
             value if value == Opcode::Open.as_u16() => {
-                reply.server_cookie = mode_for_path(reply.path_bytes());
+                let path_mode = mode_for_path(reply.path_bytes());
+                reply.server_cookie = path_mode;
+                if path_mode == MODE_RELEASE {
+                    // An OPEN carries no capture, so it still reaches the server when every
+                    // slot is held; release the held replies from here.
+                    for (handle, held_reply) in held.drain(..) {
+                        if let Ok(bytes) = encode_packet(&held_reply) {
+                            let _ = send(handle, &bytes);
+                        }
+                    }
+                }
             }
             value if value == Opcode::Write.as_u16() => {
                 let length = usize::try_from(reply.buffer_len)
@@ -107,6 +131,16 @@ fn main(_args: raven_rt::Args) -> i32 {
                         // Receive without replying, then die; the kernel must wake the client.
                         die = true;
                     }
+                    MODE_SLOW_READ => {
+                        // A wide in-flight window for the handle-revoke row.
+                        let _ = nanosleep(500_000_000);
+                        // SAFETY: the kernel captured `buffer_len` writable bytes at
+                        // `buffer_addr` in this address space.
+                        unsafe {
+                            fill(reply.buffer_addr as usize, length, 0x55);
+                        }
+                        reply.buffer_len = length as u64;
+                    }
                     MODE_DELAY_READ => {
                         let _ = nanosleep(150_000_000);
                         // The client unmaps its range during the sleep. The kernel maps these
@@ -117,6 +151,31 @@ fn main(_args: raven_rt::Args) -> i32 {
                             fill(reply.buffer_addr as usize, length, 0x55);
                         }
                         reply.buffer_len = length as u64;
+                    }
+                    MODE_REVOKE_REQUEST => {
+                        // Remove WRITE from the request capability but keep it open. The kernel
+                        // must fail the client and release the capture at the revoke, not wait
+                        // for a close that may never come.
+                        let _ = raven_s32_capture::handle_revoke(request, 0);
+                        continue;
+                    }
+                    MODE_CLOSE_REQUEST => {
+                        // Drop the server's request capability without replying. The kernel must
+                        // wake the client with EIO and release the capture; the server stays up.
+                        let _ = raven_s32_capture::handle_close(request);
+                        continue;
+                    }
+                    MODE_HOLD => {
+                        // Keep the capture mapped and the request unanswered. The burst clients
+                        // fill the eight slots; the ninth fails in the allocator. A later CALL
+                        // with "release" sends every held reply.
+                        // SAFETY: the kernel captured `buffer_len` writable bytes at
+                        // `buffer_addr` in this address space.
+                        unsafe {
+                            fill(reply.buffer_addr as usize, length, 0x55);
+                        }
+                        reply.buffer_len = length as u64;
+                        hold = true;
                     }
                     _ => {
                         let length = length.min(stored);
@@ -133,6 +192,25 @@ fn main(_args: raven_rt::Args) -> i32 {
                 }
             }
             value if value == Opcode::Call.as_u16() => {
+                if mode == MODE_HOLD {
+                    let length = usize::try_from(reply.buffer_len)
+                        .unwrap_or(usize::MAX)
+                        .min(data.len());
+                    let source = reply.buffer_addr as *const u8;
+                    // SAFETY: the kernel captured `buffer_len` readable bytes at `buffer_addr`.
+                    let request_bytes = if length > 0 {
+                        unsafe { core::slice::from_raw_parts(source, length) }
+                    } else {
+                        &[]
+                    };
+                    if request_bytes == b"release" {
+                        for (handle, held_reply) in held.drain(..) {
+                            if let Ok(bytes) = encode_packet(&held_reply) {
+                                let _ = send(handle, &bytes);
+                            }
+                        }
+                    }
+                }
                 if mode == MODE_PAUSE {
                     let length = usize::try_from(reply.buffer_len)
                         .unwrap_or(usize::MAX)
@@ -147,8 +225,28 @@ fn main(_args: raven_rt::Args) -> i32 {
                     if request == b"pause" {
                         pause_after = true;
                     }
+                    reply.buffer_len = 0;
+                } else if mode == MODE_ECHO {
+                    // One capture/release round trip for the K511 10k cycle: echo the request
+                    // capture into the response capture.
+                    let request_len = usize::try_from(reply.buffer_len)
+                        .unwrap_or(usize::MAX)
+                        .min(data.len());
+                    let response_len = usize::try_from(reply.response_len).unwrap_or(0);
+                    let length = request_len.min(response_len);
+                    if length > 0 {
+                        let source = reply.buffer_addr as *const u8;
+                        let destination = reply.response_addr as *mut u8;
+                        // SAFETY: both captures are kernel-owned ranges of `length` bytes in this
+                        // address space for the duration of the request.
+                        unsafe {
+                            core::ptr::copy_nonoverlapping(source, destination, length);
+                        }
+                    }
+                    reply.buffer_len = length as u64;
+                } else {
+                    reply.buffer_len = 0;
                 }
-                reply.buffer_len = 0;
             }
             value if value == Opcode::Close.as_u16() || value == Opcode::Dup.as_u16() => {}
             value if value == Opcode::Fstat.as_u16() => {
@@ -157,6 +255,10 @@ fn main(_args: raven_rt::Args) -> i32 {
             _ => {
                 reply.status = i32::from(Errno::EPROTO.0);
             }
+        }
+        if hold {
+            held.push((request, reply));
+            continue;
         }
         if die {
             let _ = nanosleep(100_000_000);

@@ -142,3 +142,43 @@ fn call_handler_runs_on_a_separate_stack() {
     let result = call_handler(top, triple as *const () as usize, 7, 0, 0);
     assert_eq!(result, 21);
 }
+
+// --- K443: the context window is no longer tied to the builtin TLS page ---
+
+#[test]
+fn builtin_tail_is_selected_for_a_builtin_tls_pointer() {
+    let base = raven_libc_tls::raw::BUILTIN_TLS.as_ptr() as usize;
+    let end = base + raven_libc_tls::raw::BUILTIN_TLS.capacity();
+    let needed =
+        core::mem::size_of::<McontextT>() + core::mem::size_of::<crate::kernel::FaultRecord>();
+    let (context, offset) = builtin_context(base, base, end, needed).expect("builtin tail");
+    assert_eq!(offset, context - base);
+    assert!(context >= base);
+    assert!(context + needed <= end);
+}
+
+#[test]
+fn a_foreign_tls_pointer_has_no_builtin_tail() {
+    let base = raven_libc_tls::raw::BUILTIN_TLS.as_ptr() as usize;
+    let end = base + raven_libc_tls::raw::BUILTIN_TLS.capacity();
+    let needed =
+        core::mem::size_of::<McontextT>() + core::mem::size_of::<crate::kernel::FaultRecord>();
+    let local = 0u8;
+    let foreign = (&local as *const u8 as usize) & !15;
+    assert_eq!(builtin_context(foreign, base, end, needed), None);
+}
+
+#[test]
+fn context_area_argument_and_flags_describe_the_registration() {
+    let relative = ContextArea::Relative {
+        context: 0x1000,
+        offset: 0x120,
+    };
+    assert_eq!(relative.context(), 0x1000);
+    assert_eq!(relative.argument(), 0x120);
+    assert_eq!(relative.flags(), 0);
+    let absolute = ContextArea::Absolute { context: 0x9000 };
+    assert_eq!(absolute.context(), 0x9000);
+    assert_eq!(absolute.argument(), 0x9000);
+    assert_eq!(absolute.flags(), SIG_SETUP_ABS);
+}

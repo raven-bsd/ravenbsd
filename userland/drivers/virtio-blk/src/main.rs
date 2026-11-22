@@ -38,9 +38,11 @@ mod program {
     use alloc::string::{String, ToString};
     use alloc::vec;
 
+    use core::sync::atomic::{AtomicBool, Ordering};
+
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
-    use raven_driver::{AccessError, Capability, DmaRegion, Irq, MmioRegion};
+    use raven_driver::{AccessError, Capability, DmaRegion, MmioRegion};
     use raven_proto_block::{
         BlockInfo, INFO_LEN, Op as WireOp, REPLY_HEADER_LEN, Request as WireRequest, SECTOR_SIZE,
         encode_reply, write_reply_header,
@@ -81,8 +83,10 @@ mod program {
     const STATUS_OFFSET: usize = 0x0110;
     const DATA_OFFSET: usize = 0x0200;
     const CHUNK_BYTES: usize = (CHUNK_SECTORS as usize) * (SECTOR_SIZE as usize);
-    /// Legacy INTx wait per completion (one second).
-    const IRQ_WAIT_NS: u64 = 1_000_000_000;
+    /// Completion poll bound: 2000 × 1 ms = 2 s, matching the previous completion budget.
+    const POLL_LIMIT: u32 = 2000;
+    /// One-time completion-poll trace (K427 measurement).
+    static POLL_TRACED: AtomicBool = AtomicBool::new(false);
 
     /// MSI-X queue message and table location supplied by `devd`.
     struct MsixInfo {
@@ -221,7 +225,25 @@ mod program {
         // 64 KiB payload moves with a compiled copy instead of 8,000 volatile accesses.
         let (meta, data) = dma_window.split_at_mut(DATA_OFFSET);
         let dma = DmaRegion::new(meta, dma_info.bus_addr);
-        let irq = Irq::new(IRQ_HANDLE);
+        // K427: devd transfers one shared legacy INTx line to both virtio devices. The network's
+        // MSI-X setup fails, so its exclusive `irq_create` for line 11 would return EBUSY and devd
+        // would exit before serving `disk:0`. The block queue is poll-driven: release the line
+        // here, before devd launches the network, and bound the completion poll below.
+        //
+        // K466/K522: that release is only valid for the shared legacy line. With `msix=1` the
+        // handle is this device's own MSI-X vector; closing it frees the vector while the
+        // programmed table entry still raises it on every completion, which floods the kernel
+        // with `unclaimed vector` and can hand the vector to another device.
+        //
+        // Vector lifecycle rule: devd creates and claims the vector, the device raises one
+        // message per completion, this queue acknowledges by draining the used ring while it
+        // polls, and the handle is closed only when the MSI-X table itself is released. No
+        // acknowledgement may follow the close; the MSI-X vector therefore stays owned for the
+        // driver's lifetime and the kernel EOIs any in-flight completion. Close only the legacy
+        // line.
+        if msix.is_none() {
+            let _ = raven_rt::handle_close(IRQ_HANDLE);
+        }
         let msix_bar = match &msix {
             Some(info) => {
                 let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)
@@ -232,7 +254,7 @@ mod program {
         };
 
         let mut device = VirtioBlk::open(
-            bar, config, dma, data, irq, bar_index, bar_size, irq_line, msix, msix_bar,
+            bar, config, dma, data, bar_index, bar_size, irq_line, msix, msix_bar,
         )?;
         raven_rt::println!(
             "virtio-blk: capacity={} sector_size={} ro={}",
@@ -582,7 +604,6 @@ mod program {
         dma: DmaRegion,
         /// The data window of the DMA buffer (offset [`DATA_OFFSET`] onwards).
         data: &'static mut [u8],
-        irq: Irq,
         caps: Caps,
         layout: RingLayout,
         qsize: u16,
@@ -602,7 +623,6 @@ mod program {
             mut config: MmioRegion,
             mut dma: DmaRegion,
             data: &'static mut [u8],
-            irq: Irq,
             bar_index: usize,
             bar_size: usize,
             _irq_line: u32,
@@ -711,7 +731,6 @@ mod program {
                 bar,
                 dma,
                 data,
-                irq,
                 caps,
                 layout,
                 qsize,
@@ -841,36 +860,27 @@ mod program {
             self.dma.publish();
             self.notify(0)?;
 
-            let mut rounds = 0usize;
+            let mut polls = 0u32;
             loop {
-                rounds += 1;
-                if rounds > 3 {
-                    return self.fail();
-                }
-                let fired = match self.irq.wait(IRQ_WAIT_NS) {
-                    Ok(fired) => fired,
-                    Err(_) => return self.fail(),
-                };
-                if fired == 0 {
-                    return self.fail();
-                }
-                let _isr = self
-                    .bar
-                    .read_u8(self.caps.isr.offset)
-                    .map_err(device_errno)?;
-                let _ = self.irq.ack();
                 self.dma.acquire();
                 let used = self
                     .dma
                     .read_u16(self.layout.used_idx())
                     .map_err(device_errno)?;
-                if used == self.used_seq {
-                    continue;
+                if used != self.used_seq {
+                    if used.wrapping_sub(self.used_seq) != 1 {
+                        return self.fail();
+                    }
+                    break;
                 }
-                if used.wrapping_sub(self.used_seq) != 1 {
+                polls = polls.saturating_add(1);
+                if polls > POLL_LIMIT {
                     return self.fail();
                 }
-                break;
+                let _ = raven_rt::nanosleep(1_000_000);
+            }
+            if !POLL_TRACED.swap(true, Ordering::AcqRel) {
+                raven_rt::println!("virtio-blk: completion polled={polls}");
             }
 
             self.dma.acquire();

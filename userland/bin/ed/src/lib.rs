@@ -216,8 +216,7 @@ impl Editor {
     pub fn execute(&mut self, script: &str, io: &mut dyn Io) -> Result<(), Error> {
         self.quit = false;
         self.pending = None;
-        let mut lines = script.lines();
-        while let Some(line) = lines.next() {
+        for line in script.lines() {
             if self.quit {
                 break;
             }

@@ -266,6 +266,11 @@ pub struct Irq {
 }
 
 impl Irq {
+    /// Stable watcher key shared with the IRQ_CREATE registration.
+    pub(crate) fn event_key(&self) -> u64 {
+        self as *const Irq as usize as u64
+    }
+
     /// Firings accumulated since the last wait/ack.
     pub fn pending(&self) -> u64 {
         self.pending.load(Ordering::Acquire)
@@ -593,6 +598,7 @@ pub fn handle_interrupt(vector: u8) -> bool {
         apic::eoi();
         return true;
     };
+    let irq_key = irq.event_key();
     let irq = &*irq;
     let _ = irq.pending.fetch_add(1, Ordering::AcqRel);
     irq.last_cpu.store(
@@ -609,7 +615,7 @@ pub fn handle_interrupt(vector: u8) -> bool {
         ioapic::mask_gsi_isr(irq.gsi);
     }
     let _ = irq.waiters.wake_one(0, u64::from(irq.vector));
-    event::notify_all();
+    event::notify_source(irq_key);
     apic::eoi();
     true
 }

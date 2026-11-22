@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-robust"
+version = "0.1.0"
+description = "Host adversarial-argument tests for the ravenlibc login/server wrappers."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+raven-libc-abi = { path = "../../../libc/ravenlibc/crates/raven-libc-abi" }
+raven-libc-fmt = { path = "../../../libc/ravenlibc/crates/raven-libc-fmt" }
+raven-libc-net = { path = "../../../libc/ravenlibc/crates/raven-libc-net" }
+raven-libc-platform = { path = "../../../libc/ravenlibc/crates/raven-libc-platform" }
+raven-libc-proc = { path = "../../../libc/ravenlibc/crates/raven-libc-proc" }
+raven-libc-signal = { path = "../../../libc/ravenlibc/crates/raven-libc-signal" }
+raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" }

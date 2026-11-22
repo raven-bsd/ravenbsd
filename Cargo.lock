@@ -1197,6 +1197,17 @@ name = "raven-abi"
 version = "0.1.0"
 
 [[package]]
+name = "raven-abi-completeness"
+version = "0.1.0"
+
+[[package]]
+name = "raven-abi-coverage"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-at-fixture"
 version = "0.1.0"
 dependencies = [
@@ -1491,6 +1502,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-console-input"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-coretest"
 version = "0.1.0"
 dependencies = [
@@ -1541,6 +1560,17 @@ dependencies = [
  "raven-fdt-lite",
  "raven-initfs",
  "raven-proto-dev",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-devfs-nodes"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
@@ -1604,6 +1634,14 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-dtrace-user"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-duplex-matrix"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
@@ -1846,6 +1884,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-init-worker-eintr"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-init",
+ "raven-initfs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-svc-manifest",
+]
+
+[[package]]
 name = "raven-initfs"
 version = "0.1.0"
 
@@ -1887,6 +1937,15 @@ name = "raven-ipc"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+]
+
+[[package]]
+name = "raven-ipc-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-ipc",
+ "raven-rt",
 ]
 
 [[package]]
@@ -2160,6 +2219,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-direct"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-compat",
+ "raven-libc-dtoa",
+ "raven-libc-elf",
+ "raven-libc-fts",
+ "raven-libc-iconv-cjk",
+ "raven-libc-locale",
+ "raven-libc-m",
+ "raven-libc-malloc",
+ "raven-libc-rtld",
+ "raven-libc-signal",
+ "raven-libc-stdio",
+ "raven-libc-str",
+ "raven-tcpip",
+]
+
+[[package]]
 name = "raven-libc-dtoa"
 version = "0.1.0"
 dependencies = [
@@ -2425,6 +2504,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-robust"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-fmt",
+ "raven-libc-net",
+ "raven-libc-platform",
+ "raven-libc-proc",
+ "raven-libc-signal",
+ "raven-libc-stdlib",
+]
+
+[[package]]
 name = "raven-libc-rtld"
 version = "0.1.0"
 dependencies = [
@@ -2642,6 +2734,17 @@ dependencies = [
  "raven-abi",
  "raven-proto-fs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-mptcp"
+version = "0.1.0"
+
+[[package]]
+name = "raven-mptcp-vectors"
+version = "0.1.0"
+dependencies = [
+ "raven-mptcp",
 ]
 
 [[package]]
@@ -2953,11 +3056,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-orphan"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-pgrp"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-primitives"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-reboot"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 
@@ -2970,11 +3099,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-rlimit"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-spawn-attrs"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-times"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 
@@ -3115,6 +3261,16 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-random-pool"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -3741,6 +3897,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-syscall-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-sysd"
 version = "0.1.0"
 dependencies = [
@@ -3776,6 +3940,7 @@ dependencies = [
  "hmac",
  "md-5",
  "raven-abi",
+ "raven-mptcp",
  "raven-prng",
  "raven-tcpip-sim",
  "raven-tcpip-wire",
@@ -4001,6 +4166,16 @@ dependencies = [
 [[package]]
 name = "raven-turnstile"
 version = "0.1.0"
+
+[[package]]
+name = "raven-ufs-durability-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-umount"

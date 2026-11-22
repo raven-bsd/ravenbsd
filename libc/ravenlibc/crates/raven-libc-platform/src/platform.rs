@@ -21,8 +21,8 @@ use raven_proto_fs::{Call, CallRequest, CallResponse, SetTime, Stat as WireStat}
 
 use crate::backend::SysBackend;
 use crate::fd::fdsan::{Action, FdsanState, Mismatch};
-use crate::fd::inherit::{ENV_NAME, FdMap, FdMapEntry, transferable};
-use crate::fd::ofd::{OfdArena, OfdKind, OfdRef};
+use crate::fd::inherit::{ENV_NAME, FdMap, FdMapEntry, InheritedSocket, transferable};
+use crate::fd::ofd::{OfdArena, OfdKind, OfdRef, SocketMeta};
 use crate::fd::table::{FD_CLOEXEC, FdTable};
 use crate::fd::{DEFAULT_HARD_NOFILE, DEFAULT_SOFT_NOFILE};
 use crate::lock::{Lock, NoLock, guard};
@@ -274,6 +274,43 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
     }
 
+    /// Record the socket identity that an inherited OFD must restore after `execve`.
+    pub fn set_ofd_socket_meta(&self, index: u32, meta: SocketMeta) {
+        if let Some(ofd) = self.ofd.borrow().get(index) {
+            ofd.set_socket_meta(meta);
+        }
+    }
+
+    /// Every live socket OFD with the identity needed to rebuild the libc socket table.
+    ///
+    /// Called by the socket layer after startup restored the inheritance block. Descriptors
+    /// closed by `close_cloexec_fds` are already absent from the fd table.
+    #[must_use]
+    pub fn inherited_sockets(&self) -> Vec<InheritedSocket> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        let mut out = Vec::new();
+        for (fd, entry) in entries {
+            let Some(ofd) = arena.get(entry.ofd) else {
+                continue;
+            };
+            if ofd.kind != OfdKind::Socket {
+                continue;
+            }
+            let Some(socket) = ofd.socket_meta() else {
+                continue;
+            };
+            out.push(InheritedSocket {
+                fd,
+                ofd: entry.ofd,
+                handle: ofd.handle.get(),
+                status: ofd.status.load(core::sync::atomic::Ordering::Relaxed),
+                socket,
+            });
+        }
+        out
+    }
+
     pub(crate) fn set_ofd_kind(&self, index: u32, kind: OfdKind) {
         if let Some(ofd) = self.ofd.borrow_mut().get_mut(index) {
             ofd.kind = kind;
@@ -318,6 +355,19 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         cloexec: bool,
     ) -> Result<i32, Errno> {
         self.install_impl(None, Handle::NONE, kind, status, path, cloexec, 0)
+    }
+
+    /// The kernel handle currently cached by an OFD.
+    ///
+    /// `fork_child_inherit` replaces a socket's parent handle with the child's fresh handle; a
+    /// caller holding the old `Sock` value must query the OFD instead of using the stale copy.
+    #[must_use]
+    pub fn ofd_handle(&self, index: u32) -> Option<Handle> {
+        let arena = self.ofd.borrow();
+        arena
+            .get(index)
+            .map(|ofd| ofd.handle.get())
+            .filter(|handle| *handle != Handle::NONE)
     }
 
     /// Attach the kernel handle to an OFD installed with [`Platform::install_pending`].
@@ -688,7 +738,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             wire |= raven_proto_fs::WIRE_OPEN_DIRECTORY;
         }
-        let wire_path = file_path(&resolved.abs);
+        // `/dev/pts/<N>` is the public pty slave name; the pty server is the `pty:` scheme. Keep
+        // the public path on the OFD (ttyname) and send the scheme path to the backend.
+        let pty_wire = pty_slave_wire(&resolved.abs);
+        let wire_path = match &pty_wire {
+            Some(wire) => wire.clone(),
+            None => file_path(&resolved.abs),
+        };
         let handle = crate::intr::cancellable(|| {
             crate::intr::run(
                 crate::intr::CallClass::Restartable,
@@ -696,7 +752,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 || self.backend.open(&wire_path, u32::from(wire)),
             )
         })?;
-        let kind = if is_tty_path(&resolved.abs) {
+        let kind = if pty_wire.is_some() || is_tty_path(&resolved.abs) {
             OfdKind::Tty
         } else if wire & raven_proto_fs::WIRE_OPEN_DIRECTORY != 0 {
             OfdKind::Dir
@@ -761,7 +817,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
         let handle = reference.handle();
         let blocking = reference.status() & fcntl::O_NONBLOCK as u32 == 0;
-        let doorbell = reference.kind() == OfdKind::Socket && reference.poll_signaled();
+        // Any OFD with an attached scheme event is a waitable scheme socket. The kind is not a
+        // sufficient test: `scheme::probe_kind` reports `Unknown` for a net socket adopted from
+        // `SCM_RIGHTS`, even after its readiness event is attached (K438).
+        let doorbell = reference.poll_signaled();
+        let pipe = reference.kind() == OfdKind::Pipe;
         loop {
             let result = crate::intr::cancellable(|| {
                 crate::intr::run(
@@ -771,10 +831,10 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 )
             });
             match result {
-                Err(Errno::EAGAIN) if blocking && doorbell => {
-                    // The doorbell is a hint: netd may have drained the queue before this read.
-                    // POSIX requires a blocking socket read to wait, so wait for the next
-                    // readable event and retry instead of leaking EAGAIN to the caller.
+                Err(Errno::EAGAIN) if blocking && (doorbell || pipe) => {
+                    // The kernel pipe end is created non-blocking (there is no runtime setter);
+                    // POSIX blocking is emulated from the OFD status here. The socket doorbell is
+                    // also a hint: netd may have drained the queue before this read.
                     let ready = crate::poll::wait_readable(self, fd, -1)?;
                     if ready == 0 {
                         continue;
@@ -805,13 +865,54 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             return Err(Errno::EBADF);
         }
         let handle = reference.handle();
-        crate::intr::cancellable(|| {
-            crate::intr::run(
-                crate::intr::CallClass::Restartable,
-                crate::intr::restart_wanted(),
-                || self.backend.write(handle, buf),
-            )
-        })
+        let pipe = reference.kind() == OfdKind::Pipe;
+        let blocking = reference.status() & fcntl::O_NONBLOCK as u32 == 0;
+        if pipe && blocking && !buf.is_empty() {
+            // The kernel pipe end is always non-blocking (see `pipe2`); a blocking descriptor
+            // waits here for ring space and loops until every byte is accepted.
+            self.write_pipe_blocking(fd, handle, buf)
+        } else {
+            crate::intr::cancellable(|| {
+                crate::intr::run(
+                    crate::intr::CallClass::Restartable,
+                    crate::intr::restart_wanted(),
+                    || self.backend.write(handle, buf),
+                )
+            })
+        }
+    }
+
+    /// Emulate a blocking pipe write over the non-blocking kernel endpoint.
+    fn write_pipe_blocking(&self, fd: i32, handle: Handle, buf: &[u8]) -> Result<usize, Errno> {
+        let mut done = 0usize;
+        while done < buf.len() {
+            let remaining = &buf[done..];
+            let result = crate::intr::cancellable(|| {
+                crate::intr::run(
+                    crate::intr::CallClass::Restartable,
+                    crate::intr::restart_wanted(),
+                    || self.backend.write(handle, remaining),
+                )
+            });
+            match result {
+                Ok(0) => break,
+                Ok(count) => done = done.saturating_add(count.min(remaining.len())),
+                Err(Errno::EAGAIN) => {
+                    let ready = crate::poll::wait_writable(self, fd, -1)?;
+                    if ready == 0 {
+                        continue;
+                    }
+                }
+                Err(Errno::EINTR) if done == 0 && crate::intr::restart_wanted() => continue,
+                Err(error) => {
+                    if done == 0 {
+                        return Err(error);
+                    }
+                    break;
+                }
+            }
+        }
+        Ok(done)
     }
 
     /// `readv`: one request up to 64 KiB, then a loop for the rest.
@@ -1573,7 +1674,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok((handle, true))
     }
 
-    fn invalidate_root(&self) {
+    /// Drop the cached `file:/` root; a `chroot` must never reuse the old root.
+    pub fn invalidate_root(&self) {
         if let Some(handle) = self.root.borrow_mut().take() {
             let _ = self.backend.close(handle);
         }
@@ -1660,6 +1762,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             inherited.path = ofd.path.as_ref().map(|path| path.to_vec());
             inherited.event = event_number(ofd.event.get());
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
+            inherited.socket = ofd.socket_meta();
             out.push(inherited);
         }
         Ok(FdMap { entries: out })
@@ -1700,6 +1803,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                     .map_or(event.0, |duplicate| duplicate.0)
             };
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
+            inherited.socket = ofd.socket_meta();
             block.entries.push(inherited);
         }
         if block.entries.is_empty() {
@@ -1712,6 +1816,41 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         out.push(b'=');
         out.extend_from_slice(&value);
         Ok(Some(out))
+    }
+
+    /// `RSH_FD0/1/2` environment entries for the shell's standard descriptors.
+    ///
+    /// The first-party `rsh` takes its standard streams as scheme handles in these variables. A
+    /// host that execs it directly (OpenSSH's command child) has only fd numbers, so publish the
+    /// current fd 0/1/2 handles. The caller's existing `RSH_FD*` values win.
+    pub fn stdio_env(&self) -> Vec<Vec<u8>> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        let mut out = Vec::new();
+        for (fd, entry) in entries {
+            let name = match fd {
+                0 => b"RSH_FD0".as_slice(),
+                1 => b"RSH_FD1".as_slice(),
+                2 => b"RSH_FD2".as_slice(),
+                _ => continue,
+            };
+            let Some(ofd) = arena.get(entry.ofd) else {
+                continue;
+            };
+            if !transferable(ofd.kind) {
+                continue;
+            }
+            let handle = ofd.handle.get();
+            if handle == Handle::NONE {
+                continue;
+            }
+            let mut row = Vec::new();
+            row.extend_from_slice(name);
+            row.push(b'=');
+            row.extend_from_slice(alloc::format!("{}", handle.0).as_bytes());
+            out.push(row);
+        }
+        out
     }
 
     /// Close every descriptor marked `FD_CLOEXEC` after `execve` restored the table.
@@ -1754,6 +1893,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                         let _ = inherited.set_event(Handle(entry.event));
                     }
                     inherited.set_poll_rearm(entry.readiness);
+                    if let Some(socket) = entry.socket {
+                        inherited.set_socket_meta(socket);
+                    }
                 }
                 by_handle.insert(entry.handle, index);
                 index
@@ -1781,13 +1923,19 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     /// The kernel accepts only `O_CLOEXEC` and `O_NONBLOCK`; every other bit is `EINVAL`, not a
     /// silent ignore. `O_NONBLOCK` is recorded in both OFD status words and `O_CLOEXEC` in both
     /// fd-table entries.
+    ///
+    /// The kernel pipe end captures its blocking flag at creation and has no runtime setter, while
+    /// POSIX `fcntl(F_SETFL)` must change the open-file description. Create every kernel end
+    /// non-blocking and emulate blocking in `read`/`write` from the OFD status; a later
+    /// `F_SETFL(O_NONBLOCK)` then takes effect without a second kernel object.
     pub fn pipe2(&self, flags: i32) -> Result<(i32, i32), Errno> {
         let flags = u32::try_from(flags).map_err(|_| Errno::EINVAL)?;
         let known = (fcntl::O_CLOEXEC | fcntl::O_NONBLOCK) as u32;
         if flags & !known != 0 {
             return Err(Errno::EINVAL);
         }
-        let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(flags)?;
+        let kernel_flags = flags | fcntl::O_NONBLOCK as u32;
+        let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(kernel_flags)?;
         let cloexec = flags & fcntl::O_CLOEXEC as u32 != 0;
         let status = if flags & fcntl::O_NONBLOCK as u32 != 0 {
             fcntl::O_NONBLOCK as u32
@@ -2083,6 +2231,17 @@ fn event_number(event: Handle) -> u32 {
 
 fn is_tty_path(path: &[u8]) -> bool {
     matches!(path, b"/dev/tty" | b"/dev/console" | b"/dev/ptmx")
+}
+
+/// Map the public `/dev/pts/<N>` slave path to the pty server's `pty:slave/<N>` scheme path.
+fn pty_slave_wire(path: &[u8]) -> Option<Vec<u8>> {
+    let id = path.strip_prefix(b"/dev/pts/")?;
+    if id.is_empty() {
+        return None;
+    }
+    let mut wire = Vec::from(b"pty:slave/" as &[u8]);
+    wire.extend_from_slice(id);
+    Some(wire)
 }
 
 impl<B: SysBackend, L: Lock> OfdRef<'_, B, L> {

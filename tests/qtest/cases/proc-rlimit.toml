@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K491: rlimit privilege, RLIM_INFINITY, lowering the hard limit, inheritance across
+# fork/exec, and the libc NOFILE consumer returning EMFILE at exactly the soft limit.
+
+name = "proc-rlimit"
+arch = "x86_64"
+profile = "core-servers-files"
+timeout_secs = 240
+pre = ["sh tests/fixtures/proc-rlimit/build.sh"]
+initfs = "build/fixtures/proc-rlimit/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-rlimit: root defaults=1 cpu=1 nofile=1 infinity=1 reset=1 invalid=1$'
+
+[[expect]]
+regex = '^proc-rlimit: user raise-cpu=1 raise-nofile=1 soft=1 clamp=1 invalid=1 infinity=1$'
+
+[[expect]]
+regex = '^proc-rlimit: fork inherit=1$'
+
+[[expect]]
+regex = '^proc-rlimit: ok$'
+
+[[expect]]
+regex = '^proc-rlimit: exec-inherit=1 nofile-emfile=1 open-fds=1024 soft=1024$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-rlimit: fail'

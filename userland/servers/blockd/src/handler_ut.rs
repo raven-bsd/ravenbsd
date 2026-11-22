@@ -25,6 +25,8 @@ fn ctx() -> Ctx {
         buffer_len: 0,
         response_len: 0,
         credentials: Credentials::ROOT,
+        // The test disk has no per-process root prefix (K224): zero is unrooted.
+        root_len: 0,
         trace_id: 0,
     }
 }

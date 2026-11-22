@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-proc-reboot"
+version = "0.1.0"
+description = "K517 PROC_REBOOT fixtures: EPERM/EINVAL rows and the poweroff action."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "proc-reboot-denied"
+path = "src/denied.rs"
+
+[[bin]]
+name = "proc-reboot-poweroff"
+path = "src/poweroff.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../../userland/rt", features = ["alloc"] }
+
+[lints]
+workspace = true

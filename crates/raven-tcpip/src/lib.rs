@@ -52,6 +52,11 @@ mod ipv4_stack;
 mod ipv6_stack;
 mod isn;
 mod listen;
+#[cfg(feature = "mptcp")]
+pub mod mptcp_bridge;
+mod mptcp_hooks;
+#[cfg(feature = "mptcp")]
+pub mod mptcp_socket;
 mod neighbor;
 mod observability;
 mod plpmtud_live;
@@ -115,6 +120,11 @@ pub use ipv6_stack::{
 };
 pub use isn::{IsnConn, IsnEntropy, IsnState};
 pub use listen::{AcceptQueue, HalfOpen, HalfOpenQueue, IsnGenerator, ListenStats, SynCookie};
+#[cfg(feature = "mptcp")]
+pub use mptcp_bridge::StackSubflow;
+pub use mptcp_hooks::{SubflowId, SubflowOps};
+#[cfg(feature = "mptcp")]
+pub use mptcp_socket::{AF_INET, AF_INET6, IPPROTO_MPTCP, MptcpSocket, SubflowInfo};
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use observability::{
     Counters, HostcacheInfo, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,

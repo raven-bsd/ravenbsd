@@ -114,7 +114,10 @@ pub fn poll<B: SysBackend, L: Lock>(
         if !registration.scheme {
             continue;
         }
-        let Some(bits) = live_readiness(backend, registration.reference.poll_handle()) else {
+        // K409: the attached event is only the wake hint. The live level query must go to the
+        // socket's data handle, not `poll_handle()` (which becomes the event once attached), or
+        // a POLLOUT-only request never sees the socket's writable level.
+        let Some(bits) = live_readiness(backend, registration.reference.handle()) else {
             continue;
         };
         ready = ready.saturating_add(apply_bits(registration, fds, bits));
@@ -181,7 +184,7 @@ pub fn poll<B: SysBackend, L: Lock>(
                 continue;
             };
             if registration.scheme
-                && let Some(bits) = live_readiness(backend, registration.reference.poll_handle())
+                && let Some(bits) = live_readiness(backend, registration.reference.handle())
             {
                 // Only the current live directions are a verdict; a delivered event is a
                 // wake hint and may be stale.
@@ -198,7 +201,7 @@ pub fn poll<B: SysBackend, L: Lock>(
             if !registration.scheme {
                 continue;
             }
-            if let Some(bits) = live_readiness(backend, registration.reference.poll_handle()) {
+            if let Some(bits) = live_readiness(backend, registration.reference.handle()) {
                 let fired = apply_bits(registration, fds, bits);
                 if fired > 0 {
                     return Ok(fired);
@@ -305,6 +308,21 @@ pub fn wait_readable<B: SysBackend, L: Lock>(
     poll(platform, &mut fds, timeout_ms)
 }
 
+/// Wait until `fd` is writable. Used to emulate a blocking pipe write over the non-blocking
+/// kernel pipe endpoint created by `Platform::pipe2`.
+pub fn wait_writable<B: SysBackend, L: Lock>(
+    platform: &Platform<B, L>,
+    fd: i32,
+    timeout_ms: i32,
+) -> Result<usize, Errno> {
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLOUT as i16,
+        revents: 0,
+    }];
+    poll(platform, &mut fds, timeout_ms)
+}
+
 /// Translate a kernel readiness mask into the caller's `poll` bits.
 fn delivered_revents(mask: u32, requested: i32) -> i16 {
     let mut revents = 0i16;
@@ -343,15 +361,14 @@ pub fn ppoll<B: SysBackend, L: Lock>(
     let timeout_ms = match timeout {
         None => -1,
         Some(value) => {
-            if value.tv_sec < 0 || value.tv_nsec < 0 {
-                0
-            } else {
-                let nanos = i128::from(value.tv_sec)
-                    .saturating_mul(1_000_000_000)
-                    .saturating_add(i128::from(value.tv_nsec));
-                let millis = nanos.saturating_add(999_999) / 1_000_000;
-                i32::try_from(millis).unwrap_or(i32::MAX)
+            if value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1_000_000_000 {
+                return Err(Errno::EINVAL);
             }
+            let nanos = i128::from(value.tv_sec)
+                .saturating_mul(1_000_000_000)
+                .saturating_add(i128::from(value.tv_nsec));
+            let millis = nanos.saturating_add(999_999) / 1_000_000;
+            i32::try_from(millis).unwrap_or(i32::MAX)
         }
     };
     poll(platform, fds, timeout_ms)

@@ -31,6 +31,8 @@ pub(crate) struct Options {
     pub(crate) set: String,
     /// Run the ELF gate.
     pub(crate) check: bool,
+    /// Verify the DSO stamp instead of building.
+    pub(crate) verify: bool,
     /// Print a JSON summary.
     pub(crate) json: bool,
     /// Output directory.
@@ -41,6 +43,7 @@ fn parse(args: &[String]) -> Result<Options> {
     let mut arch = Arch::X86_64;
     let mut set = "server".to_string();
     let mut check = false;
+    let mut verify = false;
     let mut json = false;
     let mut out = None;
     let mut index = 0usize;
@@ -61,6 +64,7 @@ fn parse(args: &[String]) -> Result<Options> {
                 set = args.get(index).context("--set value")?.clone();
             }
             Some("--check") => check = true,
+            Some("--verify") => verify = true,
             Some("--json") => json = true,
             Some("--out") => {
                 index += 1;
@@ -78,6 +82,7 @@ fn parse(args: &[String]) -> Result<Options> {
         arch,
         set,
         check,
+        verify,
         json,
         out: out.unwrap_or_else(|| PathBuf::from(format!("build/{}", arch.short()))),
     })
@@ -89,6 +94,14 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     if options.set == "tiny" {
         println!("libc-link: skipped(tiny)");
         return Ok(0);
+    }
+    if options.verify {
+        if verify_dso_stamp(root, &options).is_ok() {
+            println!("libc-link: verify: ok");
+            return Ok(0);
+        }
+        eprintln!("artifact stale: run cargo xtask libc-link");
+        return Ok(1);
     }
     let out = root.join(&options.out);
     std::fs::create_dir_all(&out).with_context(|| format!("cannot create {}", out.display()))?;
@@ -164,6 +177,8 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     );
     stage_sysroot(&out, &libc, &loader)?;
     println!("libc-link: sysroot: ok");
+    write_dso_stamp(root, &options, &libc, &loader)?;
+    println!("libc-link: stamp: ok");
 
     if options.check {
         let mut failed = false;
@@ -211,6 +226,65 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     Ok(0)
 }
 
+/// DSO stamp file written after a successful `libc-link` (K441).
+pub(crate) const DSO_STAMP_FILE: &str = "libc-dso.stamp";
+const DSO_STAMP_FORMAT: &str = "k441.1";
+
+fn write_dso_stamp(root: &Path, options: &Options, libc: &Path, loader: &Path) -> Result<()> {
+    let out = root.join(&options.out);
+    let text = format!(
+        "format={DSO_STAMP_FORMAT}\narch={}\nset={}\nsources={:016x}\nlibc_so={:016x}\nsysroot_libc_so={:016x}\nloader={:016x}\nsysroot_loader={:016x}\n",
+        options.arch.short(),
+        options.set,
+        crate::libc_pack::source_hash(root)?,
+        crate::libc_pack::hash_file(libc)?,
+        crate::libc_pack::hash_file(&out.join("sysroot/lib/libc.so.1"))?,
+        crate::libc_pack::hash_file(loader)?,
+        crate::libc_pack::hash_file(&out.join("sysroot/libexec/ld-elf.so.1"))?,
+    );
+    let path = out.join(DSO_STAMP_FILE);
+    let temporary = path.with_extension("tmp");
+    std::fs::write(&temporary, text)
+        .with_context(|| format!("cannot write {}", temporary.display()))?;
+    std::fs::rename(&temporary, &path)
+        .with_context(|| format!("cannot publish {}", path.display()))?;
+    Ok(())
+}
+
+fn verify_dso_stamp(root: &Path, options: &Options) -> Result<()> {
+    let out = root.join(&options.out);
+    let text =
+        std::fs::read_to_string(out.join(DSO_STAMP_FILE)).with_context(|| "no libc-dso stamp")?;
+    if crate::libc_pack::stamp_field(&text, "format") != Some(DSO_STAMP_FORMAT) {
+        bail!("stamp format mismatch");
+    }
+    if crate::libc_pack::stamp_field(&text, "arch") != Some(options.arch.short()) {
+        bail!("stamp arch mismatch");
+    }
+    if crate::libc_pack::stamp_field(&text, "set") != Some(options.set.as_str()) {
+        bail!("stamp set mismatch");
+    }
+    let field = |key: &str| -> Result<u64> {
+        let value = crate::libc_pack::stamp_field(&text, key)
+            .with_context(|| format!("stamp {key} missing"))?;
+        u64::from_str_radix(value, 16).with_context(|| format!("stamp {key} invalid"))
+    };
+    if field("sources")? != crate::libc_pack::source_hash(root)? {
+        bail!("sources changed");
+    }
+    for (key, path) in [
+        ("libc_so", out.join("libc.so.1")),
+        ("sysroot_libc_so", out.join("sysroot/lib/libc.so.1")),
+        ("loader", out.join("ld-elf.so.1")),
+        ("sysroot_loader", out.join("sysroot/libexec/ld-elf.so.1")),
+    ] {
+        if field(key)? != crate::libc_pack::hash_file(&path)? {
+            bail!("{key} changed");
+        }
+    }
+    Ok(())
+}
+
 /// Publish the freshly linked dynamic objects into the arch sysroot.
 ///
 /// `libc-pack` stages the static sysroot; the dynamic `libc.so.1`/`ld-elf.so.1` are only known
@@ -229,10 +303,11 @@ fn stage_sysroot(out: &Path, libc: &Path, loader: &Path) -> Result<()> {
     std::fs::copy(loader, libexec.join("ld-elf.so.1"))
         .with_context(|| format!("cannot copy {} to sysroot/libexec", loader.display()))?;
     let libc_so = usr_lib.join("libc.so");
-    if !libc_so.is_file() {
-        std::fs::write(&libc_so, b"INPUT ( libc.so.1 )\n")
-            .with_context(|| "cannot write sysroot libc.so script")?;
-    }
+    // Always replace a stale sysroot `libc.so`. Older trees carry a real shared object here;
+    // leaving it in place makes `-lc` prefer that stale image over the freshly linked
+    // `lib/libc.so.1`, which is how the dynamic pty exports disappeared from C links.
+    std::fs::write(&libc_so, b"INPUT ( libc.so.1 )\n")
+        .with_context(|| "cannot write sysroot libc.so script")?;
     Ok(())
 }
 

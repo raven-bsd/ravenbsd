@@ -158,6 +158,33 @@ pub fn send_ipi(destination: u32, vector: u8) {
     }
 }
 
+/// Send a non-maskable interrupt to `destination`.
+///
+/// S159: the TLB shootdown uses NMI delivery so a target in a long IF=0 section (EXIT,
+/// usercopy fault, or a scheduler critical section) still takes the invalidation before the
+/// bounded shootdown deadline. The vector field is architecturally ignored for NMI; the CPU
+/// enters vector 2.
+pub fn send_nmi(destination: u32) {
+    const NMI_DELIVERY: u32 = 0b100 << 8;
+    if is_x2apic() {
+        wrmsr(
+            X2_ICR,
+            (u64::from(destination) << 32) | u64::from(NMI_DELIVERY),
+        );
+    } else {
+        let mut spins = 0u32;
+        while xapic_read(XAPIC_ICR_LOW) & (1 << 12) != 0 {
+            spins = spins.saturating_add(1);
+            if spins >= 1_000_000 {
+                break;
+            }
+            core::hint::spin_loop();
+        }
+        xapic_write(XAPIC_ICR_HIGH, (destination & 0xFF) << 24);
+        xapic_write(XAPIC_ICR_LOW, NMI_DELIVERY);
+    }
+}
+
 /// Program the LAPIC timer divide configuration.
 pub fn timer_set_divisor(bits: u8) {
     let bits = u32::from(bits & 0xF);

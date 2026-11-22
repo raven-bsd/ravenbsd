@@ -112,6 +112,10 @@ mod program {
     static RX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_DROPS: AtomicU64 = AtomicU64::new(0);
+    static TX_STALL: AtomicBool = AtomicBool::new(false);
+    static IRQ_TX_LOGGED: AtomicBool = AtomicBool::new(false);
+    static IRQ_PROGRESS_LOGGED: AtomicBool = AtomicBool::new(false);
+    static IRQ_TOTAL: AtomicU64 = AtomicU64::new(0);
 
     fn main(args: raven_rt::Args) -> i32 {
         match run(args) {
@@ -156,6 +160,9 @@ mod program {
                     .map_err(|_| format!("bad irq argument `{argument}`"))?;
             } else if argument == "msix=1" || argument == "msix" {
                 msix = true;
+            } else if argument == "tx-stall" {
+                // Test-only mutation: drop TX completions so the qtest must catch the wedge.
+                TX_STALL.store(true, Ordering::Release);
             } else if let Some(value) = argument.strip_prefix("msix_addr_lo=") {
                 msix_addr_lo = Some(
                     value
@@ -368,6 +375,9 @@ mod program {
         rx_prod: u32,
         rx_cons_seen: u32,
         tx_busy: bool,
+        tx_waits: u32,
+        last_fired: usize,
+        last_isr: u8,
         broken: bool,
     }
 
@@ -523,6 +533,9 @@ mod program {
                 rx_prod: 0,
                 rx_cons_seen: 0,
                 tx_busy: false,
+                tx_waits: 0,
+                last_fired: 0,
+                last_isr: 0,
                 broken: false,
             };
             // The queues are programmed; the device is live from here.
@@ -631,9 +644,27 @@ mod program {
                 return Err("device is broken".to_string());
             }
             let fired = self.irq.wait(IRQ_PUMP_NS).unwrap_or(0);
+            self.last_fired = fired;
             if fired > 0 {
-                let _isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
+                let isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
+                self.last_isr = isr;
                 let _ = self.irq.ack();
+                let tx = TX_FRAMES.load(Ordering::Acquire);
+                if tx > 0 && !IRQ_TX_LOGGED.swap(true, Ordering::AcqRel) {
+                    raven_rt::println!(
+                        "virtio-net: irq tx fired={fired} isr={isr:#x} tx={tx} rx={}",
+                        RX_FRAMES.load(Ordering::Acquire)
+                    );
+                }
+                let total = IRQ_TOTAL.fetch_add(fired as u64, Ordering::AcqRel)
+                    + u64::try_from(fired).unwrap_or(0);
+                if total >= 24 && !IRQ_PROGRESS_LOGGED.swap(true, Ordering::AcqRel) {
+                    raven_rt::println!(
+                        "virtio-net: irq progress fired={total} tx={} rx={}",
+                        TX_FRAMES.load(Ordering::Acquire),
+                        RX_FRAMES.load(Ordering::Acquire)
+                    );
+                }
             }
             self.update_link()?;
             if !STARTED.load(Ordering::Acquire) {
@@ -735,6 +766,20 @@ mod program {
                     .dma
                     .read_u16(self.tx.layout.used_idx())
                     .map_err(describe)?;
+                if TX_STALL.load(Ordering::Acquire) {
+                    // Test-only mutation: leave the used entry unread and the frame in flight.
+                    self.tx_waits = self.tx_waits.wrapping_add(1);
+                    if self.tx_waits.is_multiple_of(100) {
+                        raven_rt::println!(
+                            "virtio-net: tx-wait used={used} expected={} avail={} fired={} isr={:#x}",
+                            self.tx.used,
+                            self.tx.avail,
+                            self.last_fired,
+                            self.last_isr
+                        );
+                    }
+                    return Ok(());
+                }
                 if used != self.tx.used {
                     if used.wrapping_sub(self.tx.used) != 1 {
                         return self.fail("TX used index drift".to_string());
@@ -758,7 +803,19 @@ mod program {
                         let _ = consumer.pop();
                     }
                     self.tx_busy = false;
+                    self.tx_waits = 0;
                     TX_FRAMES.fetch_add(1, Ordering::AcqRel);
+                } else {
+                    self.tx_waits = self.tx_waits.wrapping_add(1);
+                    if self.tx_waits.is_multiple_of(100) {
+                        raven_rt::println!(
+                            "virtio-net: tx-wait used={used} expected={} avail={} fired={} isr={:#x}",
+                            self.tx.used,
+                            self.tx.avail,
+                            self.last_fired,
+                            self.last_isr
+                        );
+                    }
                 }
                 return Ok(());
             }
