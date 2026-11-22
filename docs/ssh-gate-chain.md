@@ -122,11 +122,11 @@ this deviation is recorded in the K434 report.
   termios defaults and returns `EBUSY` when the slave is already open. `openpty` (`lib/libutil/pty.c:63`)
   and `forkpty` (`:139`) are the libutil convenience over that path.
 - Raven: ptyd supplies the `pty:` scheme pair; libc `openpty`/`grantpt`/`unlockpt`/`ptsname_r` must
-  match the libutil sequence. K430, K436, K438, K442 and K444 are merged; the `pty-alloc`/`pty-calls`
-  and `termios`/TCSADRAIN qtests pass. The SSH PTY request still answers
-  `PTY allocation request failed on channel 0`; the server log records `openpty: Broken pipe` then
-  `session_pty_req: session 0 alloc failed`. A test-only `/bin/tty` is staged from
-  `tests/fixtures/ssh-tty` but the allocation fails before it runs.
+  match the libutil sequence. K430, K436, K438, K442, K444 and K458 are merged; the
+  `pty-alloc`/`pty-calls` and `termios`/TCSADRAIN qtests pass. OpenSSH `sshpty.c:63` `openpty`
+  returns -1 and `:65` logs `openpty: Broken pipe`; the libc path is
+  `pty/openpty.rs:53` `posix_openpt`, `:57` `grantpt`, `:58` `unlockpt`, `:59` `ptsname_r`, `:60`
+  `open(slave)`. The log does not name the failing subcall. The test-only `/bin/tty` is not reached.
 
 ### C10 exec
 
@@ -278,6 +278,18 @@ this deviation is recorded in the K434 report.
 4. **S1/S1-repeat/S3/S7 remain unstable.** S1 attempt 1 0 bytes with control exact; S1-repeat 8/10
    auth; the sampled S3 auth exits 255 while a later auth line exists; S7 is 4/10 exact with the
    byte-correct attempts exiting -9 at ~30 s. K443 is pending.
+
+## Rev 26 observations (K458, A/B, K443)
+
+1. **K458 (pty unit allocation) does not change S8.** OpenSSH `sshpty.c:63` `openpty` returns -1;
+   `:65` logs `openpty: Broken pipe`; the libc openpty subcall is not logged. pty-alloc and termios
+   pass.
+2. **A/B disproves the netns hypothesis.** Same image, N=10: shared `qemu-net` = 5/10 ok (5 banner
+   failures), private netns = 4/10 ok (4 banner, 2 auth failures). The banner/auth instability is in
+   the guest/sshd path, not the network namespace.
+3. **K443 is not testable.** `origin/tim/K443` (`1d8cba580`) does not contain master
+   (`b63275882`); the conditional S7 run was skipped.
+4. **S7 is 8/10 exact**; the byte-correct attempts exit -9 at ~30 s; attempts 9-10 exit 255/0 bytes.
 
 ## Gaps (not evidence)
 
