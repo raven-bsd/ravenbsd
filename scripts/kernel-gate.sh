@@ -38,7 +38,8 @@ default_max_load() {
 }
 max_load=${S107_MAX_LOAD:-$(default_max_load)}
 
-# case | arch | owner | subsystem note
+# case | arch | owner | subsystem note | optional explicit case path
+# The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
 cases='boot-uname|x86_64|stuart|boot/uname
 kernel-early-boot|x86_64|stuart|boot
 exc-int3|x86_64|stuart|exceptions
@@ -56,6 +57,7 @@ irq-dist-off|x86_64|stuart|irq
 locking|x86_64|lance|locking
 lockstat|x86_64|lance|locking
 ipc-donation|x86_64|lance|ipc
+duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator
 proc-death-cleanup|x86_64|stuart|process
@@ -68,7 +70,7 @@ kernel-paging-aarch64|aarch64|dave|paging
 kernel-timer-aarch64|aarch64|dave|timer'
 
 if [ "${1:-}" = "--list" ]; then
-    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note; do
+    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note _path; do
         printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
     done
     exit 0
@@ -97,12 +99,13 @@ printf '%s\n' "$cases" > "$cases_file" || exit 2
 results=$log_dir/results.txt
 : > "$results" || exit 2
 
-while IFS='|' read -r name arch owner note; do
+while IFS='|' read -r name arch owner note case_path; do
     [ -n "$name" ] || continue
     log="$log_dir/$name.$arch.log"
+    case_selector=${case_path:-$name}
     printf 'kernel-gate: %-28s %-8s ' "$name" "$arch"
     # stdin is /dev/null: neither cargo nor QEMU may consume the remaining case lines.
-    if cargo xtask qtest --case "$name" --arch "$arch" </dev/null >"$log" 2>&1; then
+    if cargo xtask qtest --case "$case_selector" --arch "$arch" </dev/null >"$log" 2>&1; then
         status=pass
         detail=ok
         printf 'pass\n'
