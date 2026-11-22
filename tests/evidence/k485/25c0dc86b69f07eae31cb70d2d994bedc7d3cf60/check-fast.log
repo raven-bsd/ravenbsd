@@ -1,0 +1,21 @@
+==> guard
+==> fmt
+==> clippy (changed)
+    Blocking waiting for file lock on package cache
+    Checking raven-tty-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-tty-core)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.50s
+==> tests (changed, parallel)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+────────────
+ Nextest run ID 31308301-77b7-4b59-8981-2d5b32ecc135 with nextest profile: default
+    Starting 59 tests across 1 binary
+────────────
+     Summary [   0.083s] 59 tests run: 59 passed, 0 skipped
+==> profiles
+check-fast summary:
+  ok       guard (exit 0, 26.63s)
+  ok       fmt (exit 0, 27.37s)
+  ok       clippy (changed) (exit 0, 1.55s)
+  ok       tests (changed, parallel) (exit 0, 1.18s)
+  ok       profiles (exit 0, 0.16s)
+check-fast: PASSED

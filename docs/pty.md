@@ -105,6 +105,47 @@ The four worker exits print increasing free-frame counts because each exit relea
 worker while the other three are still alive; the count never falls, and the final post-churn
 value is the baseline. Evidence: `tests/evidence/k458/<sha>/`.
 
+## SSH-shape integration (K473)
+
+`pty-ssh-shape` runs the exact server-side pty sequence without sshd or the network: the libutil
+`openpty` call order (`posix_openpt`, `grantpt`, `unlockpt`, `ptsname`, `open` slave), the K444
+pty-req termios record, the K455 43x120 window size, a fork+`execve` session child on the slave
+that prints `ttyname(0)` and `tcgetwinsize(0)`, an ECHO/input round-trip, then close-all. Each call
+logs `pty-ssh-shape: step=N call=... rv=...`, so a failure names the syscall.
+
+```sh
+timeout 300 cargo xtask qtest --case pty-ssh-shape --arch x86_64
+# pty-ssh-shape: pass
+```
+
+The child is a true `fork` + `execve` of the test binary. `posix_spawn` of the same dynamic
+`/bin/libc-test` returned `ENOENT` (2) in the libc-test profile; `execve` works and is the path
+OpenSSH uses. The case is the reference the S8 `openpty: Broken pipe` owner should cite.
+
+## Line discipline behaviour (K485)
+
+The stored `Termios` record drives the pty, not just the round-trip:
+
+* canonical `VERASE`/`VKILL`/`VEOF` and `VWERASE` edit the line; echo is gated by `ECHO`;
+* `ISIG` consumes `VINTR` (`^C`) and the discipline raises the interrupt event; foreground pgrp
+  delivery still needs a `tcsetpgrp` path, so that part is not claimed;
+* `OPOST|ONLCR` maps slave `\n` to `\r\n` on the master;
+* `ICRNL`/`INLCR`/`IGNCR`/`ISTRIP` apply to input in both canonical and raw mode (raw skips only
+  editing/echo; `cfmakeraw` clears the translation flags for a true byte pipe);
+* `VMIN`/`VTIME` are applied in the `ptyd` slave read with a monotonic deadline and 1 ms yield.
+  A queued byte with `VMIN=1` returns immediately; `VMIN=0,VTIME=1` returns 0 after ~100 ms.
+  The server is single-threaded, so a read that waits for a *later* concurrent master write
+  blocks the server; that wait-queue case is a known gap (it needs a pty event/wait design), not
+  claimed by the case.
+
+The guest case `tty-discipline` drives each row through `tcsetattr`/`read`/`write` and prints the
+observed bytes/timing:
+
+```sh
+timeout 300 cargo xtask qtest --case tty-discipline --arch x86_64
+# tty-discipline: pass
+```
+
 ## Privsep wire shape
 
 The `pty-monitor` guest test implements the monitor side over `socketpair(AF_UNIX)`:

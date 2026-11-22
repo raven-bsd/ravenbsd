@@ -1,0 +1,102 @@
+[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0): Not Found
+BdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00001 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x0,0xFFFF,0x0)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: RavenBSD loader 0.1 (x86_64)
+loader: memory map: 28 regions
+frames: base=256 count=131072 free=107330 reserved=23742
+paging: kernel tables active (HHDM 771 MiB, reclaimed 39 MiB)
+heap: 4096 KiB
+vtd: disabled (iommu=on not set); DMA unprotected
+fpu: fxsave 512 bytes
+acpi: mcfg base=0xb0000000 buses=0-255
+acpi: 4 cpus, 1 ioapics, 5 overrides
+apic: id 0 (xapic)
+keyboard: i8042 irq 1 gsi 1 vector 0x23
+console: rx irq 4 gsi 4 vector 0x22 (active-high)
+cyclic: ok fired=3 order=5ms,10ms,15ms
+time: tsc 2719 MHz (pit)
+time: tsc not invariant
+timer: 1000 Hz
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+fpu: fxsave 512 bytes
+smp: 4 cpus online
+RavenBSD kernel 0.1 (x86_64) 25c0dc86b 2026-11-22
+mem: 419 MiB usable in 8 regions
+cmdline: console=ttyS0 test-exit=1
+process: starting /init
+process: /init entry=0x466d14 sp=0x7fffffffde60
+sched: running (4 cpus, slice 10 ms)
+svcd: logd up
+svcd: logd timing: generation=1 start=5255 spawn=5571 first_poll=5597 deadline=10571 stalled=0 ready_at=5656
+rtc: 2026-11-22 13:00:57 (epoch 1795352457s)
+1795352464.600 nulld: started
+svcd: nulld up
+svcd: nulld timing: generation=1 start=5707 spawn=7380 first_poll=7481 deadline=12380 stalled=0 ready_at=7844
+1795352465.229 zerod: started
+1795352465.289 randd: started
+svcd: consd up
+svcd: consd timing: generation=1 start=5667 spawn=7892 first_poll=7978 deadline=67892 stalled=0 ready_at=8336
+1795352465.505 ramfsd: started
+svcd: zerod up
+svcd: zerod timing: generation=1 start=6024 spawn=7996 first_poll=8013 deadline=12996 stalled=0 ready_at=8428
+1795352465.625 sysd: started
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=5871 spawn=8321 first_poll=8339 deadline=13321 stalled=0 ready_at=8636
+svcd: randd up
+svcd: randd timing: generation=1 start=5886 spawn=8271 first_poll=8331 deadline=13271 stalled=0 ready_at=8659
+ptyd: files=0 pairs=0
+ptyd: files=0 pairs=0
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=5747 spawn=8678 first_poll=8696 deadline=38678 stalled=0 ready_at=8727
+svcd: sysd up
+svcd: sysd timing: generation=1 start=5950 spawn=8608 first_poll=8614 deadline=13608 stalled=0 ready_at=8749
+1795352468.979 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=5682 spawn=7532 first_poll=7583 deadline=127532 stalled=0 ready_at=12003
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=12007 spawn=12308 first_poll=12320 deadline=72308 stalled=0 ready_at=12489
+tty-discipline: start uid=0
+tty-discipline: row=canonical-erase ok
+ptyd: files=0 pairs=0
+tty-discipline: row=canonical-kill ok
+ptyd: files=0 pairs=0
+tty-discipline: row=canonical-werase ok
+ptyd: files=0 pairs=0
+tty-discipline: row=canonical-eof ok
+tty-discipline: row=canonical-eof-empty ok
+ptyd: files=0 pairs=0
+tty-discipline: row=isig-intr-data ok
+tty-discipline: row=isig-intr-echo ok
+tty-discipline: row=isig-intr sigint=pgrp-unset not-measured
+ptyd: files=0 pairs=0
+tty-discipline: row=opost-onlcr ok
+ptyd: files=0 pairs=0
+tty-discipline: row=opost-off ok
+ptyd: files=0 pairs=0
+tty-discipline: row=icrnl ok
+ptyd: files=0 pairs=0
+tty-discipline: row=inlcr ok
+ptyd: files=0 pairs=0
+tty-discipline: row=igncr silent ok
+ptyd: files=0 pairs=0
+tty-discipline: row=istrip ok
+ptyd: files=0 pairs=0
+tty-discipline: vmin1 read=1 byte=88 elapsed_ms=6
+tty-discipline: row=vmin1 ok
+ptyd: files=0 pairs=0
+tty-discipline: vtime child count=0 elapsed_ms=110
+tty-discipline: row=vtime ok
+ptyd: files=0 pairs=0
+tty-discipline: ok
+svcd: libc-test up
+svcd: libc-test timing: generation=1 start=12491 spawn=13097 first_poll=none deadline=73097 stalled=0 ready_at=14424
+svcd: settled
+init exited (0)

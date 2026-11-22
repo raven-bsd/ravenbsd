@@ -1197,6 +1197,10 @@ name = "raven-abi"
 version = "0.1.0"
 
 [[package]]
+name = "raven-abi-completeness"
+version = "0.1.0"
+
+[[package]]
 name = "raven-abi-coverage"
 version = "0.1.0"
 dependencies = [
@@ -1853,6 +1857,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-init-worker-eintr"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-init",
+ "raven-initfs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-svc-manifest",
+]
+
+[[package]]
 name = "raven-initfs"
 version = "0.1.0"
 
@@ -1894,6 +1910,15 @@ name = "raven-ipc"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+]
+
+[[package]]
+name = "raven-ipc-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-ipc",
+ "raven-rt",
 ]
 
 [[package]]
@@ -2172,9 +2197,12 @@ version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
  "raven-libc-compat",
+ "raven-libc-iconv-cjk",
+ "raven-libc-m",
  "raven-libc-signal",
  "raven-libc-stdio",
  "raven-libc-str",
+ "raven-tcpip",
 ]
 
 [[package]]

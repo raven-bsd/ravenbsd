@@ -54,6 +54,18 @@ regex = '^CONTRACT K7 PASS .*$'
 regex = '^smp-memory: contract PASS 7/7$'
 
 [[expect]]
+regex = '^oom: round=[12] children=2$'
+
+[[expect]]
+regex = '^oom: round=[12] done$'
+
+[[expect]]
+regex = '^oom: pass refusals=\d+ frames_back=\d+$'
+
+[[expect]]
+regex = '^oom: parent-ok next=4096$'
+
+[[expect]]
 regex = '^smp-memory: summary alloc_ops=\d+ fault_pages=\d+ maps=\d+ forks=4 tlb_rounds=64 tlb_stale=0$'
 
 [[expect]]
@@ -63,4 +75,4 @@ regex = '^smp-memory: ok$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|smp-memory: failed|smp-memory: worker .* failed|stale round|tlb shootdown timeout'
+regex = '(?i)panic|EXCEPTION|smp-memory: failed|smp-memory: worker .* failed|stale round|tlb shootdown timeout|oom: fail'

@@ -622,6 +622,9 @@ pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapfra
     if !frame.is_null() {
         // SAFETY: the syscall stub passes its live trap frame in `rdi`; this call owns it.
         let number = unsafe { (*frame).rax };
+        // SAFETY: `frame` is the live trap frame the syscall stub passed in `rdi`; the
+        // enclosing `!frame.is_null()` check proves it is non-null, and the stub keeps the
+        // frame alive for the duration of this call.
         let pc = unsafe { (*frame).rip };
         thread.process.last_syscall.store(number, Ordering::Relaxed);
         thread.process.last_pc.store(pc, Ordering::Relaxed);

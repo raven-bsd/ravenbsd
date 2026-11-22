@@ -12,6 +12,7 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicI32, AtomicU32, AtomicU64, Ordering};
 
+use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_proto_svc::State;
 use raven_rt::spawn::RtSys;
@@ -26,6 +27,26 @@ const WAIT_SLOT_COUNT: usize = 256;
 const READINESS_POLL_MS: u64 = 10;
 /// A poll gap above this is a stall of the worker itself, not service slowness.
 const READINESS_STALL_MS: u64 = 500;
+/// Status published for a genuine wait error. A child exit is 0..=255, so this cannot be
+/// confused with a real exit or a signal-derived 128+signal status.
+pub const WAIT_ERROR_CODE: i32 = -1;
+
+/// Wait for `handle` and return the child's real exit status.
+///
+/// `THREAD_KICK` may interrupt `PROC_WAIT` with `EINTR`; that is not an exit and must be
+/// retried. A genuine wait error is returned so the caller can publish [`WAIT_ERROR_CODE`]
+/// instead of inventing a child exit.
+pub fn wait_child_status(handle: Handle) -> Result<i32, Errno> {
+    let mut sys = RtSys;
+    loop {
+        let mut code = 0i32;
+        match sys.proc_wait(handle, &mut code) {
+            Ok(()) => return Ok(code),
+            Err(Errno::EINTR) => continue,
+            Err(error) => return Err(error),
+        }
+    }
+}
 
 struct WaitSlot {
     handle: AtomicU32,
@@ -74,13 +95,7 @@ fn waiter_thread(index: usize) {
         return;
     }
     let handle = Handle(slot.handle.load(Ordering::Acquire));
-    let mut code = 1i32;
-    let mut sys = RtSys;
-    let code = if sys.proc_wait(handle, &mut code).is_ok() {
-        code
-    } else {
-        1
-    };
+    let code = wait_child_status(handle).unwrap_or(WAIT_ERROR_CODE);
     if slot.generation.load(Ordering::Acquire) == generation {
         slot.code.store(code, Ordering::Release);
         slot.finished.store(1, Ordering::Release);
@@ -100,7 +115,7 @@ fn waiter_code(index: usize, generation: u64) -> Option<i32> {
 
 fn wait_waiter(index: usize, generation: u64) -> i32 {
     let Some(slot) = WAIT_SLOTS.get(index) else {
-        return 1;
+        return WAIT_ERROR_CODE;
     };
     loop {
         if let Some(code) = waiter_code(index, generation) {
@@ -157,7 +172,6 @@ fn run(argument: usize) {
             let _ = raven_rt::proc_terminate(handle, 0);
         }
 
-        let mut sys = RtSys;
         let waited = if manifest.readiness == Readiness::Scheme {
             let waiter = start_waiter(index, generation, handle);
             match wait_for_scheme(&core, index, generation, &manifest, waiter) {
@@ -165,11 +179,7 @@ fn run(argument: usize) {
                     if waiter {
                         Some(wait_waiter(index, generation))
                     } else {
-                        let mut code = 0i32;
-                        if sys.proc_wait(handle, &mut code).is_err() {
-                            return;
-                        }
-                        Some(code)
+                        Some(wait_child_status(handle).unwrap_or(WAIT_ERROR_CODE))
                     }
                 }
                 ReadinessOutcome::Exited(code) => Some(code),
@@ -183,15 +193,10 @@ fn run(argument: usize) {
                 }
             }
         } else {
-            let mut code = 0i32;
-            if sys.proc_wait(handle, &mut code).is_err() {
-                // STOP closed the handle before the wait started, or the child vanished.
-                return;
-            }
-            Some(code)
+            Some(wait_child_status(handle).unwrap_or(WAIT_ERROR_CODE))
         };
 
-        let code = waited.unwrap_or(1);
+        let code = waited.unwrap_or(WAIT_ERROR_CODE);
         let _ = raven_rt::handle_close(handle);
         let now = boot::now_ms();
         let (outcome, exit_when_exits) = {

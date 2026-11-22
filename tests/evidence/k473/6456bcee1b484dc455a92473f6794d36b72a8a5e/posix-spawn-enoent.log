@@ -1,0 +1,59 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running `target/debug/xtask qtest --case pty-ssh-shape --arch x86_64`
+pty-ssh-shape: fail
+--- serial (last 40 lines) ---
+svcd: nulld timing: generation=1 start=5798 spawn=8399 first_poll=8526 deadline=13399 stalled=0 ready_at=9848
+ptyd: files=0 pairs=0
+1795348404.894 zerod: started
+1795348405.052 sysd: started
+svcd: zerod up
+svcd: zerod timing: generation=1 start=6341 spawn=9326 first_poll=9769 deadline=14326 stalled=0 ready_at=10092
+svcd: ptyd up
+svcd: ptyd timing: generation=1 start=5895 spawn=9932 first_poll=9976 deadline=39932 stalled=0 ready_at=10130
+svcd: randd up
+svcd: randd timing: generation=1 start=6022 spawn=8970 first_poll=9167 deadline=13970 stalled=0 ready_at=10135
+1795348405.156 ramfsd: started
+ptyd: files=0 pairs=0
+svcd: ramfsd up
+svcd: ramfsd timing: generation=1 start=5958 spawn=9593 first_poll=9637 deadline=14593 stalled=0 ready_at=10295
+svcd: sysd up
+svcd: sysd timing: generation=1 start=6306 spawn=9936 first_poll=10048 deadline=14936 stalled=0 ready_at=10336
+1795348408.136 initfsd: started
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=5751 spawn=9171 first_poll=9620 deadline=129171 stalled=0 ready_at=13165
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=13182 spawn=13657 first_poll=13666 deadline=73657 stalled=0 ready_at=13901
+pty-ssh-shape: start uid=0
+pty-ssh-shape: step=1 call=posix_openpt rv=3 errno=0
+pty-ssh-shape: step=2 call=grantpt rv=0 errno=0
+pty-ssh-shape: step=3 call=unlockpt rv=0 errno=0
+pty-ssh-shape: step=4 call=ptsname rv=0 path=/dev/pts/1 errno=0
+pty-ssh-shape: step=5 call=open_slave rv=4 path=/dev/pts/1 errno=0
+pty-ssh-shape: step=6 call=tcsetattr rv=0 errno=0
+pty-ssh-shape: step=7 call=tcsetwinsize rv=0 rows=43 cols=120 errno=0
+pty-ssh-shape: step=8 call=posix_spawn rv=2 pid=-1 errno=0
+ptyd: files=0 pairs=0
+svcd: libc-test crash loop, giving up
+svcd: settled
+init exited (1)
+--- unmatched expectations ---
+^pty-ssh-shape: step=8 call=posix_spawn rv=0 pid=[0-9]+ errno=0$
+^pty-ssh-shape: child tty=/dev/pts/[0-9]+ rows=43 cols=120$
+^pty-ssh-shape: step=9 call=read_master rv=[1-9][0-9]*$
+^pty-ssh-shape: step=9 call=tcgetwinsize_master rv=0 rows=43 cols=120$
+^pty-ssh-shape: step=10 call=read_echo rv=[1-9][0-9]*$
+^pty-ssh-shape: child read=2$
+^pty-ssh-shape: step=10 call=read_line rv=[1-9][0-9]*$
+^pty-ssh-shape: child done$
+^pty-ssh-shape: step=11 call=waitpid rv=[1-9][0-9]* status=0$
+^pty-ssh-shape: step=12 call=close rv=0/0$
+^pty-ssh-shape: ok$
+^init exited \(0\)$
+--- result ---
+exit status 35; expected success; unmatched expectations: ^pty-ssh-shape: step=8 call=posix_spawn rv=0 pid=[0-9]+ errno=0$, ^pty-ssh-shape: child tty=/dev/pts/[0-9]+ rows=43 cols=120$, ^pty-ssh-shape: step=9 call=read_master rv=[1-9][0-9]*$, ^pty-ssh-shape: step=9 call=tcgetwinsize_master rv=0 rows=43 cols=120$, ^pty-ssh-shape: step=10 call=read_echo rv=[1-9][0-9]*$, ^pty-ssh-shape: child read=2$, ^pty-ssh-shape: step=10 call=read_line rv=[1-9][0-9]*$, ^pty-ssh-shape: child done$, ^pty-ssh-shape: step=11 call=waitpid rv=[1-9][0-9]* status=0$, ^pty-ssh-shape: step=12 call=close rv=0/0$, ^pty-ssh-shape: ok$, ^init exited \(0\)$

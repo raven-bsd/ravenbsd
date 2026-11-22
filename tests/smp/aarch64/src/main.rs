@@ -21,7 +21,7 @@ use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
-use raven_abi::types::{Handle, map, prot};
+use raven_abi::types::{Handle, clock, map, prot};
 use raven_rt::entry;
 use raven_rt::println;
 use raven_rt::sys;
@@ -36,6 +36,8 @@ const STACK_LEN: usize = 16 * PAGE;
 const TLB_ROUNDS: u32 = 64;
 /// Bounded handshake budget; this is a spin count, not a wall-clock claim.
 const POLL_LIMIT: u32 = 20_000_000;
+/// Raw kernel `pipe(fds)` number (kernel-owned, not a `Syscall` variant).
+const PIPE: usize = 0x6e;
 
 const VALUE_LOW: u64 = 0x1111_1111_1111_1111;
 const VALUE_HIGH: u64 = 0x2222_2222_2222_2222;
@@ -109,6 +111,110 @@ fn map_shared(
 
 fn unmap(address: usize, len: usize) -> Result<(), Errno> {
     sys::unmap(Handle::SELF_PROC, address, len)
+}
+
+fn protect(address: usize, len: usize, protection: usize) -> Result<(), Errno> {
+    // SAFETY: PROTECT takes scalar arguments; the kernel validates the range and protection.
+    Errno::from_ret(unsafe {
+        sys::syscall4(
+            Syscall::PROTECT as usize,
+            Handle::SELF_PROC.0 as usize,
+            address,
+            len,
+            protection,
+        )
+    })
+    .map(|_| ())
+}
+
+fn debug_write_raw(pointer: usize, length: usize) -> Result<usize, Errno> {
+    // SAFETY: DEBUG_WRITE takes a user pointer and length; the kernel validates the pointer.
+    Errno::from_ret(unsafe { sys::syscall2(Syscall::DEBUG_WRITE as usize, pointer, length) })
+}
+
+fn uname_raw(pointer: usize) -> Result<usize, Errno> {
+    // SAFETY: UNAME writes a fixed utsname record to the user pointer; the kernel validates it.
+    Errno::from_ret(unsafe { sys::syscall1(Syscall::UNAME as usize, pointer) })
+}
+
+fn clock_get_raw(clock_id: usize, pointer: usize) -> Result<usize, Errno> {
+    // SAFETY: CLOCK_GET writes a timespec to the user pointer; the kernel validates it.
+    Errno::from_ret(unsafe { sys::syscall2(Syscall::CLOCK_GET as usize, clock_id, pointer) })
+}
+
+fn pipe_create() -> Result<(Handle, Handle), Errno> {
+    let mut fds = [0u32; 2];
+    // SAFETY: PIPE writes two u32 handles into the live array.
+    Errno::from_ret(unsafe { sys::syscall1(PIPE, fds.as_mut_ptr() as usize) })?;
+    Ok((Handle(fds[0]), Handle(fds[1])))
+}
+
+fn write_raw(handle: Handle, pointer: usize, length: usize) -> Result<usize, Errno> {
+    // SAFETY: WRITE takes a handle, user pointer and length; the kernel validates both.
+    Errno::from_ret(unsafe {
+        sys::syscall3(Syscall::WRITE as usize, handle.0 as usize, pointer, length)
+    })
+}
+
+/// K461 vector class on aarch64: PROT_NONE/straddle reads and PROT_NONE copy-out must EFAULT.
+fn usercopy_contracts() -> Result<(), Errno> {
+    let none = sys::map_anonymous(PAGE)?;
+    protect(none, PAGE, 0)?;
+    let straddle = sys::map_anonymous(2usize.saturating_mul(PAGE))?;
+    protect(straddle.saturating_add(PAGE), PAGE, 0)?;
+    let boundary = straddle.saturating_add(PAGE).saturating_sub(8);
+    let (pipe_r, pipe_w) = pipe_create()?;
+    let mut next = [0u8; 512];
+
+    let d_none = debug_write_raw(none, 1);
+    let d_str = debug_write_raw(boundary, 16);
+    let w_none = write_raw(pipe_w, none, 1);
+    let w_str = write_raw(pipe_w, boundary, 16);
+    let u_none = uname_raw(none);
+    let c_none = clock_get_raw(clock::MONOTONIC as usize, none);
+    let d_next = debug_write_raw(next.as_ptr() as usize, 1);
+    let u_next = uname_raw(next.as_mut_ptr() as usize);
+    let w_next = write_raw(pipe_w, next.as_ptr() as usize, 1);
+
+    let _ = sys::handle_close(pipe_r);
+    let _ = sys::handle_close(pipe_w);
+    let _ = sys::unmap(Handle::SELF_PROC, none, PAGE);
+    let _ = sys::unmap(Handle::SELF_PROC, straddle, 2usize.saturating_mul(PAGE));
+
+    let d_none_err = d_none.as_ref().err().copied();
+    let d_str_err = d_str.as_ref().err().copied();
+    let w_none_err = w_none.as_ref().err().copied();
+    let w_str_err = w_str.as_ref().err().copied();
+    let u_none_err = u_none.as_ref().err().copied();
+    let c_none_err = c_none.as_ref().err().copied();
+    let d_next_ok = d_next.is_ok();
+    let u_next_ok = u_next.is_ok();
+    let w_next_ok = w_next.is_ok();
+    let ok = d_none_err == Some(Errno::EFAULT)
+        && d_str_err == Some(Errno::EFAULT)
+        && w_none_err == Some(Errno::EFAULT)
+        && w_str_err == Some(Errno::EFAULT)
+        && u_none_err == Some(Errno::EFAULT)
+        && c_none_err == Some(Errno::EFAULT)
+        && d_next_ok
+        && u_next_ok
+        && w_next_ok;
+    println!(
+        "smp-aarch64-copy: protnone-debug={:?} straddle-debug={:?} protnone-write={:?} straddle-write={:?} protnone-uname={:?} protnone-clock={:?} next-debug={d_next_ok} next-uname={u_next_ok} next-write={w_next_ok}",
+        d_none_err.map(|error| error.0),
+        d_str_err.map(|error| error.0),
+        w_none_err.map(|error| error.0),
+        w_str_err.map(|error| error.0),
+        u_none_err.map(|error| error.0),
+        c_none_err.map(|error| error.0)
+    );
+    if ok {
+        println!("smp-aarch64-copy: ok");
+        Ok(())
+    } else {
+        println!("smp-aarch64-copy: fail want=14");
+        Err(Errno::EIO)
+    }
 }
 
 /// Sample one aligned word through a raw user address.
@@ -346,6 +452,11 @@ fn main(_args: raven_rt::Args) -> i32 {
     if let Err(error) = stop_workers() {
         println!("smp-aarch64-tlb: worker join failed errno={}", error.0);
         return 1;
+    }
+
+    if let Err(error) = usercopy_contracts() {
+        println!("smp-aarch64-copy: failed errno={}", error.0);
+        return fail("usercopy");
     }
 
     let _ = unmap(sampled, PAGE);
