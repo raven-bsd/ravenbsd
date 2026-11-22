@@ -76,8 +76,14 @@ while [ "$iteration" -le "$iterations" ]; do
         grep -E '^stack-selftest:|^stack: fail' "$serial" | tail -n 10 >&2 || true
         exit 1
     fi
-    # MAX_THREADS is 1024; 1100 is the small scheduling/init margin and still far below the
-    # 100,000 fresh stacks the leaky tree would carve over 100 cycles.
+    if ! grep -q '^stack-selftest: guard-unmapped ok$' "$serial"; then
+        echo "smp-stack: FAIL guard probe missing or mapped" >&2
+        grep -E '^stack-selftest:|^stack: fail' "$serial" | tail -n 10 >&2 || true
+        exit 1
+    fi
+    # MAX_THREADS is 1024; 1100 is the small scheduling/init margin. The leaky 64-entry mutation
+    # carves 64 new stacks every cycle (5 + 128 + 99 * 64 = 6,469) and still stays under this
+    # guest's memory, so the bound is the reuse property, not an OOM side effect.
     if [ "$fresh" -gt 1100 ] || [ "$cached" -gt 1100 ]; then
         echo "smp-stack: FAIL mode=$mode stack_fresh=$fresh stack_cached=$cached (bound 1100)" >&2
         exit 1

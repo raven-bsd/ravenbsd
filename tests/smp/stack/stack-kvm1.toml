@@ -17,7 +17,9 @@ expect_exit = "success"
 regex = '^stack-selftest: reuse-zero ok$'
 
 [[expect]]
-regex = '^stack: start threads=256 cycles=100$'
+regex = '^stack-selftest: guard-unmapped ok$'
+[[expect]]
+regex = '^stack: start threads=128 cycles=100$'
 
 [[expect]]
 regex = '^stack: cycle=100 done$'

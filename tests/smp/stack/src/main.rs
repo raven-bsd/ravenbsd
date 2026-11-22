@@ -3,13 +3,14 @@
 
 //! K530 kernel stack lifetime fixture.
 //!
-//! Create one thousand user threads, join them, and repeat for one hundred cycles. Every joined
-//! thread releases its kernel stack; the kernel `s69` line at `/init` exit records `stack_fresh`,
-//! `stack_cached` and `heap`. On the leaky tree `stack_fresh` grows by the threads beyond the
-//! 64-entry cache every cycle; the stack cache must reuse every freed stack instead.
+//! Create 128 user threads, join them, and repeat for one hundred cycles. Every joined thread
+//! releases its kernel stack; the kernel `s69` line at `/init` exit records `stack_fresh`,
+//! `stack_cached` and `heap`. On the leaky tree every cycle frees 128 stacks into a 64-entry cache,
+//! so 64 `(base, top)` pairs are dropped and `stack_fresh` grows by 64 per cycle; the bounded
+//! cache must reuse every freed stack instead.
 //!
-//! The `s69-stackcheck` cmdline also runs the kernel's one-shot dirty/reuse/zero probe and the
-//! `s24-framecheck` line records the free-frame count at exit.
+//! The `s69-stackcheck` cmdline also runs the kernel's one-shot dirty/reuse/zero and guard probes;
+//! the `s24-framecheck` line records the free-frame count at exit.
 
 #![no_std]
 #![no_main]
@@ -26,17 +27,18 @@ use raven_rt::{entry, nanosleep, println, proc};
 
 entry!(main);
 
-/// Threads spawned concurrently in one cycle. The sched-core admission bound is 1024, but the
-/// 400 s ticket cap on this host supports 256; the 64-entry leaky cache is still exceeded by 192
-/// every cycle. The measured count is stated in the report, never claimed as 1000.
-const THREADS: usize = 256;
+/// Threads spawned concurrently in one cycle. The sched-core admission bound is 1024, but live
+/// threads all spin at a barrier, so the cycle holds every kernel stack at once. The measured
+/// production count is stated in the report and never claimed as 1,000: 128 keeps the leaky
+/// mutation inside the guest's 447 MiB while still exceeding the 64-entry cache by 64 per cycle.
+const THREADS: usize = 128;
 /// Churn cycles.
 const CYCLES: u32 = 100;
 /// User stack per thread (one guard page is added and unmapped by `raven-rt`).
 const STACK_SIZE: usize = 64 * 1024;
 
 /// Set by the main thread once all workers exist; workers spin until then so the kernel holds
-/// all 1000 kernel stacks at once and the cache bound, not the spawn rate, decides reuse.
+/// all 128 kernel stacks at once and the cache bound, not the spawn rate, decides reuse.
 static RELEASE: AtomicBool = AtomicBool::new(false);
 /// Workers that reached their spin barrier in this cycle.
 static READY: AtomicU32 = AtomicU32::new(0);
