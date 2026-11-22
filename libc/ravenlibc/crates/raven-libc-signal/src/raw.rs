@@ -12,11 +12,21 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::{JmpBuf, McontextT, SiginfoT, UcontextT};
 use raven_libc_tls::raw as tls_raw;
 use raven_libc_tls::tcb;
 
 use crate::critical::SigThreadState;
+#[cfg(not(target_os = "none"))]
+use crate::errors::ENOSYS_ERR;
+
+/// `SIG_SETUP(entry, ctx_offset, flags) -> 0` (committed raw 0x80).
+#[cfg(target_os = "none")]
+const SIG_SETUP: usize = 0x80;
+/// `THREAD_KICK(thread, bits) -> 0` (committed raw 0x81).
+#[cfg(target_os = "none")]
+const THREAD_KICK: usize = 0x81;
 
 #[cfg(target_arch = "aarch64")]
 mod context_aarch64;
@@ -59,8 +69,34 @@ pub const JMP_SS_SCRATCH: usize = 272;
 /// Offset of our `__ss[2]`, the mask-word pointer saved by `sigsetjmp`.
 pub const JMP_SS_MASK_PTR: usize = 280;
 
-/// The context area is registered at `tp + SIG_CTX_AREA_OFFSET` (PROPOSED, RD-new 3).
+/// The default context area offset (PROPOSED, RD-new 3).
+///
+/// The shell registers the offset returned by [`signal_context_area`] at run time; this
+/// constant is the host/fixture default.
 pub const SIG_CTX_AREA_OFFSET: usize = 4096;
+
+/// Locate the kernel context window for a main thread whose TLS image is `tp`.
+///
+/// The builtin TLS buffer is one page and the TCB is placed inside it. The bytes after the TCB
+/// are unused padding, so the `mcontext_t` + `FaultRecord` window can live there without
+/// overwriting `SigThreadState` (which occupies `Pthread.sig_private`). A program whose TLS
+/// layout fills the page has no such tail; it gets `None` and the shell reports `ENOMEM` instead
+/// of registering an area that would fault.
+#[must_use]
+pub fn signal_context_area(tp: usize) -> Option<(usize, usize)> {
+    let base = raven_libc_tls::raw::BUILTIN_TLS.as_ptr() as usize;
+    let end = base.checked_add(raven_libc_tls::raw::BUILTIN_TLS.capacity())?;
+    let context = tp
+        .checked_add(core::mem::size_of::<tcb::Pthread>())?
+        .checked_add(15)?
+        & !15;
+    let needed = core::mem::size_of::<McontextT>()
+        .checked_add(core::mem::size_of::<crate::kernel::FaultRecord>())?;
+    if context < tp || context.checked_add(needed)? > end {
+        return None;
+    }
+    Some((context, context.checked_sub(tp)?))
+}
 
 /// `Pthread` size sanity: the private signal block is 32 words.
 const _: () = assert!(tcb::SIG_PRIVATE_BYTES == 256);
@@ -525,6 +561,52 @@ pub fn entry_function() -> usize {
 #[must_use]
 pub fn sigentry_address() -> usize {
     __raven_sigentry as *const () as usize
+}
+
+/// Register the entry and the TLS context offset for the calling thread.
+///
+/// # Errors
+///
+/// The kernel's `EINVAL` (bad offset/flags) or `EFAULT` (entry not executable).
+pub fn sig_setup(entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
+    #[cfg(target_os = "none")]
+    {
+        // SAFETY: SIG_SETUP takes three scalar words; the kernel validates the executable entry
+        // and the context window before storing either.
+        let result = unsafe {
+            raven_libc_sys::arch::syscall3(SIG_SETUP, entry, ctx_area_offset, flags as usize)
+        };
+        raven_libc_sys::errno::ret(result)
+            .map(|_| ())
+            .map_err(|error| Errno(error.0))
+    }
+    #[cfg(not(target_os = "none"))]
+    {
+        let _ = (entry, ctx_area_offset, flags);
+        Err(ENOSYS_ERR)
+    }
+}
+
+/// Set the calling thread's sticky kick word and wake an interruptible wait.
+///
+/// # Errors
+///
+/// The kernel's `EINVAL` for unknown bits, `EBADF`/`ESRCH` for a bad thread handle.
+pub fn kick(handle: u32, bits: u32) -> Result<(), Errno> {
+    #[cfg(target_os = "none")]
+    {
+        // SAFETY: THREAD_KICK takes two scalar words; the kernel validates the handle and bits.
+        let result =
+            unsafe { raven_libc_sys::arch::syscall2(THREAD_KICK, handle as usize, bits as usize) };
+        raven_libc_sys::errno::ret(result)
+            .map(|_| ())
+            .map_err(|error| Errno(error.0))
+    }
+    #[cfg(not(target_os = "none"))]
+    {
+        let _ = (handle, bits);
+        Err(ENOSYS_ERR)
+    }
 }
 
 /// The address of the `makecontext` start stub.
