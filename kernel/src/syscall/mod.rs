@@ -216,6 +216,12 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_SIGRECV {
         return process_ctl::sigrecv(frame);
     }
+    if number == process_ctl::PROC_SIGRECV_EX {
+        return process_ctl::sigrecv_ex(frame);
+    }
+    if number == process_ctl::PROC_SIGQUEUE {
+        return process_ctl::sigqueue(frame);
+    }
     if number == process_ctl::PROC_TIMES {
         return process_ctl::times(frame);
     }
