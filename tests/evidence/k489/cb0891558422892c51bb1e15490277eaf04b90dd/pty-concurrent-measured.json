@@ -1,0 +1,39 @@
+{
+  "case": "pty-concurrent",
+  "arch": "x86_64",
+  "result": "fail",
+  "duration_ms": 32116,
+  "exit_status": 35,
+  "matched": [
+    "^ptyd: files=0 pairs=0$",
+    "^pty-concurrent: start uid=0 blocked=8$",
+    "^pty-concurrent: B write=1 read=1 byte=66 wall_ms=[0-9]+$",
+    "^pty-concurrent: A read=1 byte=65 wall_ms=[0-9]+$",
+    "^pty-concurrent: pair A/B done$",
+    "^pty-concurrent: idle_ms=5000 blocked=8$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$",
+    "^pty-concurrent: pair=[0-7] read=1 byte=[0-9]+ wall_ms=[0-9]+ latency_ms=[0-9]+$",
+    "^ptyd: reader-wakes=[0-9]+$",
+    "^pty-concurrent: ninth pair ok$",
+    "^ptyd: files=0 pairs=0$"
+  ],
+  "unmatched": [
+    "^pty-concurrent: ok$",
+    "^init exited \\(0\\)$"
+  ],
+  "forbidden_hits": [
+    "pty-concurrent: FAIL pair=2 status=256",
+    "pty-concurrent: FAIL pair=3 status=256",
+    "pty-concurrent: FAIL pair=4 status=256",
+    "pty-concurrent: FAIL pair=5 status=256",
+    "pty-concurrent: FAIL pair=6 status=256",
+    "pty-concurrent: FAIL pair=7 status=256",
+    "pty-concurrent: FAIL rows=6"
+  ]
+}

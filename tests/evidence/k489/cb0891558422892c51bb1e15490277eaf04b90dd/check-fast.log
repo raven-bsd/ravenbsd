@@ -1,0 +1,20 @@
+==> guard
+==> fmt
+==> clippy (changed)
+    Checking raven-qtest v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/tests/qtest)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.96s
+==> tests (changed, parallel)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+────────────
+ Nextest run ID 4c0f3ef6-895f-485e-98fd-9ab61de6d2b8 with nextest profile: default
+    Starting 183 tests across 5 binaries
+────────────
+     Summary [   2.923s] 183 tests run: 183 passed, 0 skipped
+==> profiles
+check-fast summary:
+  ok       guard (exit 0, 10.01s)
+  ok       fmt (exit 0, 10.49s)
+  ok       clippy (changed) (exit 0, 1.01s)
+  ok       tests (changed, parallel) (exit 0, 3.69s)
+  ok       profiles (exit 0, 0.18s)
+check-fast: PASSED

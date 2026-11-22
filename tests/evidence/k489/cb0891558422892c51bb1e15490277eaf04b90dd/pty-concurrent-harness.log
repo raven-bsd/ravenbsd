@@ -1,0 +1,57 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running `target/debug/xtask qtest --case pty-concurrent --arch x86_64`
+pty-concurrent: fail
+--- serial (last 40 lines) ---
+svcd: initfsd up
+svcd: initfsd timing: generation=1 start=4163 spawn=5952 first_poll=6152 deadline=125952 stalled=0 ready_at=9270
+vfsd: mounted / on initfs:
+vfsd: mounted /tmp on ramfs:
+vfsd: mounted /dev/null on null:
+vfsd: mounted /dev/zero on zero:
+vfsd: mounted /dev/random on rand:
+vfsd: mounted /dev/urandom on rand:
+svcd: vfsd up
+svcd: vfsd timing: generation=1 start=9275 spawn=9547 first_poll=9554 deadline=69547 stalled=0 ready_at=9810
+pty-concurrent: start uid=0 blocked=8
+pty-concurrent: B write=1 read=1 byte=66 wall_ms=32
+pty-concurrent: A read=1 byte=65 wall_ms=171
+pty-concurrent: pair A/B done
+ptyd: files=0 pairs=0
+ptyd: reader-wakes=1076
+pty-concurrent: idle_ms=5000 blocked=8
+pty-concurrent: pair=0 read=1 byte=97 wall_ms=6421 latency_ms=16
+pty-concurrent: pair=1 read=1 byte=98 wall_ms=6135 latency_ms=33
+pty-concurrent: pair=2 read=1 byte=99 wall_ms=6770 latency_ms=679
+pty-concurrent: pair=3 read=1 byte=100 wall_ms=6693 latency_ms=1056
+pty-concurrent: pair=4 read=1 byte=101 wall_ms=6982 latency_ms=1350
+pty-concurrent: pair=5 read=1 byte=102 wall_ms=6391 latency_ms=1372
+pty-concurrent: pair=6 read=1 byte=103 wall_ms=7015 latency_ms=2004
+pty-concurrent: pair=7 read=1 byte=104 wall_ms=7251 latency_ms=2250
+pty-concurrent: FAIL pair=2 status=256
+pty-concurrent: FAIL pair=3 status=256
+pty-concurrent: FAIL pair=4 status=256
+pty-concurrent: FAIL pair=5 status=256
+pty-concurrent: FAIL pair=6 status=256
+pty-concurrent: FAIL pair=7 status=256
+ptyd: files=0 pairs=0
+ptyd: reader-wakes=2314
+pty-concurrent: ninth pair ok
+ptyd: files=0 pairs=0
+ptyd: reader-wakes=2318
+pty-concurrent: FAIL rows=6
+svcd: libc-test crash loop, giving up
+svcd: settled
+init exited (1)
+--- unmatched expectations ---
+^pty-concurrent: ok$
+^init exited \(0\)$
+--- forbidden hits ---
+pty-concurrent: FAIL pair=2 status=256
+pty-concurrent: FAIL pair=3 status=256
+pty-concurrent: FAIL pair=4 status=256
+pty-concurrent: FAIL pair=5 status=256
+pty-concurrent: FAIL pair=6 status=256
+pty-concurrent: FAIL pair=7 status=256
+pty-concurrent: FAIL rows=6
+--- result ---
+exit status 35; expected success; unmatched expectations: ^pty-concurrent: ok$, ^init exited \(0\)$; 7 forbidden line(s) matched
