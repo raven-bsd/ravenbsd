@@ -2172,9 +2172,12 @@ version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
  "raven-libc-compat",
+ "raven-libc-iconv-cjk",
+ "raven-libc-m",
  "raven-libc-signal",
  "raven-libc-stdio",
  "raven-libc-str",
+ "raven-tcpip",
 ]
 
 [[package]]

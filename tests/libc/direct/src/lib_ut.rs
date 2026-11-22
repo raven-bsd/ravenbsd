@@ -531,3 +531,207 @@ fn pty_shared_openpty_name_and_flags() {
     assert_eq!(name[10], 0);
     assert!(pty.closed.is_empty());
 }
+
+// --- TCP path MTU and SACK (C5-C7) -------------------------------------------------
+
+#[test]
+fn tcpip_pmtu_floor_and_headers() {
+    // source: crates/raven-tcpip/src/pmtu.rs
+    use raven_tcpip::{IpAddr, IpFamily, Ipv4Addr, Ipv6Addr, floor_for, mss_headers, mssopt};
+    let v4 = IpAddr::V4(Ipv4Addr::new([192, 0, 2, 1]));
+    let v6 = IpAddr::V6(Ipv6Addr::LOOPBACK);
+    assert_eq!(floor_for(v4), 576);
+    assert_eq!(floor_for(v6), 1280);
+    assert_eq!(mss_headers(IpFamily::V4), 40);
+    assert_eq!(mss_headers(IpFamily::V6), 60);
+    assert_eq!(mssopt(1500, 0, 536, IpFamily::V4), 1460);
+}
+
+#[test]
+fn tcpip_sack_option_bytes_round_trip() {
+    // source: crates/raven-tcpip/src/sack.rs
+    use raven_tcpip::{receiver_blocks, sack_option_bytes};
+    let blocks = [(0x10u32, 0x20u32)];
+    assert_eq!(
+        sack_option_bytes(&blocks),
+        [5, 10, 0, 0, 0, 0x10, 0, 0, 0, 0x20]
+    );
+    assert_eq!(
+        receiver_blocks(&[(1, 2), (3, 4)], false, None),
+        vec![(3, 4), (1, 2)]
+    );
+}
+
+// --- login output helpers ----------------------------------------------------------
+
+#[test]
+fn humanize_expand_number_scaled() {
+    // source: libc/ravenlibc/crates/raven-libc-compat/src/humanize/expand.rs
+    use raven_libc_compat::humanize::expand_number;
+    assert_eq!(expand_number(b"1K"), Ok(1024));
+    assert_eq!(expand_number(b"3MB"), Ok(3 << 20));
+    assert_eq!(expand_number(b"0x10"), Ok(16));
+}
+
+#[test]
+fn humanize_fmt_scaled_unit() {
+    // source: libc/ravenlibc/crates/raven-libc-compat/src/humanize/scaled.rs
+    use raven_libc_compat::humanize::{FMT_SCALED_STRSIZE, fmt_scaled};
+    let mut buffer = [0u8; FMT_SCALED_STRSIZE];
+    fmt_scaled(1024, &mut buffer).expect("fmt_scaled");
+    assert_eq!(&buffer[..4], b"1.0K");
+}
+
+// --- CJK terminal tables -----------------------------------------------------------
+
+#[test]
+fn iconv_cjk_big5_first_cell() {
+    // source: libc/ravenlibc/crates/raven-libc-iconv-cjk/src/big5.rs
+    assert_eq!(raven_libc_iconv_cjk::BIG5[0][0], 12288);
+    assert_eq!(raven_libc_iconv_cjk::BIG5[0][1], 65292);
+}
+
+#[test]
+fn iconv_cjk_gb18030_first_cell() {
+    // source: libc/ravenlibc/crates/raven-libc-iconv-cjk/src/gb18030.rs
+    assert_eq!(raven_libc_iconv_cjk::GB18030[0][0], 19970);
+    assert_eq!(raven_libc_iconv_cjk::GB18030[0][1], 19972);
+}
+
+#[test]
+fn iconv_cjk_gb18030utf_first_cell() {
+    // source: libc/ravenlibc/crates/raven-libc-iconv-cjk/src/gb18030utf.rs
+    assert_eq!(raven_libc_iconv_cjk::GB18030UTF[0][0], 128);
+    assert_eq!(raven_libc_iconv_cjk::GB18030UTF[0][1], 36);
+}
+
+#[test]
+fn iconv_cjk_hkscs_first_cell() {
+    // source: libc/ravenlibc/crates/raven-libc-iconv-cjk/src/hkscs.rs
+    assert_eq!(raven_libc_iconv_cjk::HKSCS[0], 17392);
+}
+
+#[test]
+fn iconv_cjk_jis0208_first_cell() {
+    // source: libc/ravenlibc/crates/raven-libc-iconv-cjk/src/jis0208.rs
+    assert_eq!(raven_libc_iconv_cjk::JIS0208[0][0], 12288);
+    assert_eq!(raven_libc_iconv_cjk::JIS0208[0][1], 12289);
+}
+
+#[test]
+fn iconv_cjk_ksc_first_cell() {
+    // source: libc/ravenlibc/crates/raven-libc-iconv-cjk/src/ksc.rs
+    assert_eq!(raven_libc_iconv_cjk::KSC[0][0], 12288);
+    assert_eq!(raven_libc_iconv_cjk::KSC[0][1], 12289);
+}
+
+#[test]
+fn iconv_cjk_revjis_first_cell() {
+    // source: libc/ravenlibc/crates/raven-libc-iconv-cjk/src/revjis.rs
+    assert_eq!(raven_libc_iconv_cjk::REVJIS[0], 31);
+    assert_eq!(raven_libc_iconv_cjk::REVJIS[1], 80);
+}
+
+// --- libm generic and fdlibm --------------------------------------------------------
+
+#[test]
+fn math_generic_sqrt_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/sqrt.rs
+    assert_eq!(raven_libc_m::sqrt(0.0), 0.0);
+    assert_eq!(raven_libc_m::sqrt(4.0), 2.0);
+}
+
+#[test]
+fn math_generic_fabs() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/fabs.rs
+    assert_eq!(raven_libc_m::fabs(-3.0), 3.0);
+    assert_eq!(raven_libc_m::fabs(2.5), 2.5);
+}
+
+#[test]
+fn math_generic_ceil() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/ceil.rs
+    assert_eq!(raven_libc_m::ceil(1.0), 1.0);
+    assert_eq!(raven_libc_m::ceil(1.2), 2.0);
+}
+
+#[test]
+fn math_generic_fmin() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/fmin.rs
+    assert_eq!(raven_libc_m::fmin(2.0, 3.0), 2.0);
+    assert_eq!(raven_libc_m::fmin(3.0, 2.0), 2.0);
+}
+
+#[test]
+fn math_generic_fmax() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/fmax.rs
+    assert_eq!(raven_libc_m::fmax(2.0, 3.0), 3.0);
+    assert_eq!(raven_libc_m::fmax(3.0, 2.0), 3.0);
+}
+
+#[test]
+fn math_generic_fmod() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/fmod.rs
+    assert_eq!(raven_libc_m::fmod(1.0, 3.0), 1.0);
+    assert_eq!(raven_libc_m::fmod(5.0, 2.0), 1.0);
+}
+
+#[test]
+fn math_generic_rint() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/rint.rs
+    assert_eq!(raven_libc_m::rint(1.0), 1.0);
+    assert_eq!(raven_libc_m::rint(2.5), 2.0);
+}
+
+#[test]
+fn math_generic_fdim() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/generic/fdim.rs
+    assert_eq!(raven_libc_m::fdim(5.0, 3.0), 2.0);
+    assert_eq!(raven_libc_m::fdim(2.0, 3.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_sin_small() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/sin.rs
+    assert_eq!(raven_libc_m::sin(1e-9), 1e-9);
+    assert_eq!(raven_libc_m::sin(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_exp2_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp2.rs
+    assert_eq!(raven_libc_m::exp2(0.0), 1.0);
+    assert_eq!(raven_libc_m::exp2(1.0), 2.0);
+}
+
+#[test]
+fn math_fdlibm_cos_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/cos.rs
+    assert_eq!(raven_libc_m::cos(0.0), 1.0);
+}
+
+#[test]
+fn math_fdlibm_tan_small() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tan.rs
+    assert_eq!(raven_libc_m::tan(1e-9), 1e-9);
+    assert_eq!(raven_libc_m::tan(0.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_exp_zero() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp.rs
+    assert_eq!(raven_libc_m::exp(0.0), 1.0);
+}
+
+#[test]
+fn math_fdlibm_log_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log.rs
+    assert_eq!(raven_libc_m::log(1.0), 0.0);
+}
+
+#[test]
+fn math_fdlibm_powf_one() {
+    // source: libc/ravenlibc/crates/raven-libc-m/src/fdlibm/powf.rs
+    assert_eq!(raven_libc_m::powf(1.0, 3.0), 1.0);
+    assert_eq!(raven_libc_m::powf(2.0, 3.0), 8.0);
+}
