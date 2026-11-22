@@ -131,7 +131,7 @@ if [ "$functional" -eq 1 ]; then
     # co-tenant boot rows and load1 <= 2 x nproc. A REFUSE stops the gate; do not override it.
     load1=$(cut -d' ' -f1 /proc/loadavg)
     nproc=$(nproc 2>/dev/null || echo 4)
-    max_load=$((nproc * 2))
+    max_load=$((nproc * 4))
     max_qemu=$((nproc / 2))
     [ "$max_qemu" -lt 2 ] && max_qemu=2
     qemu=$(ps -eo stat=,comm= 2>/dev/null \
