@@ -3,9 +3,10 @@
 
 //! Thread objects and kernel-stack allocation.
 //!
-//! A thread owns a 28 KiB kernel stack with an unmapped guard page below it. The stack is never
-//! freed in S09: exiting threads leave their stacks mapped for the kernel's lifetime, which is
-//! safe (no use-after-free) and bounded by the test workload. A later ticket adds a stack cache.
+//! A thread owns a 28 KiB kernel stack with an unmapped guard page below it. Exiting threads
+//! return their stacks to a cache bounded by the live-thread admission bound; reuse zeroes the
+//! mapped frames and leaves the guard unmapped. The heap block is never returned because its
+//! guard page mapping cannot be restored from the general heap.
 
 use core::alloc::Layout;
 use core::sync::atomic::{
