@@ -7,7 +7,7 @@
 
 name = "ssh-matrix-logdump"
 exec = "/bin/rsh"
-args = ["/bin/rsh", "-c", "sleep 12; cat /tmp/sshd.log > tty:console"]
+args = ["/bin/rsh", "-c", "sleep 20; cat /tmp/sshd.log > tty:console; sleep 20; cat /tmp/sshd.log > tty:console; sleep 20; cat /tmp/sshd.log > tty:console; sleep 20; cat /tmp/sshd.log > tty:console; sleep 20; cat /tmp/sshd.log > tty:console"]
 needs = ["vfsd"]
 readiness = "exit"
 restart = "never"

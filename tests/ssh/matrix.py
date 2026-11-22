@@ -53,6 +53,11 @@ ECHO_PORT = 23097
 ECHO_PAYLOAD = b"K434-S0-ECHO-0123456789abcdef\n"
 MARKER = b"K434-SSH-MARKER-2026-11-22\n"
 
+ROW_ORDER = [
+    "S0", "S1", "S1-client-first", "S2", "S3", "S4", "S5", "S5-identity",
+    "S5-session", "S6", "S6-length", "S7", "S8", "S8-pty-alloc",
+]
+
 rows: list[tuple[str, str, str]] = []
 attempts: list[dict[str, str]] = []
 
@@ -404,7 +409,7 @@ def ssh_run(command: list[str], log_name: str, user: str = USER,
             "elapsed_ms": elapsed, "timed_out": timed_out, "argv": argv}
 
 
-def row_s3(serial: Path) -> None:
+def row_s3_start() -> dict[str, object]:
     good = ssh_run(["true"], "s3-raven.log", extra=["-v"])
     good_text = (good["stderr"] + good["stdout"]).decode("utf-8", "replace")
     auth_line = next((line for line in good_text.splitlines()
@@ -413,16 +418,6 @@ def row_s3(serial: Path) -> None:
     attempt("S3-auth-raven", 1, "fresh", 'Authenticated to ... using "password"',
             auth_line or f"exit {good['returncode']}",
             float(good["elapsed_ms"]), "PASS" if client_auth else "FAIL")
-    started = time.monotonic()
-    data = wait_serial(serial, b"Accepted password for raven", 30)
-    wait_ms = (time.monotonic() - started) * 1000
-    serial_text = data.decode("utf-8", "replace")
-    accepted = [line.replace("\r", "").strip() for line in serial_text.splitlines()
-                if "Accepted password for raven " in line]
-    attempt("S3-server-line", 1, "fresh",
-            "Accepted password for raven from 10.0.2.2 port N ssh2",
-            accepted[0] if accepted else "not in serial.log",
-            wait_ms, "PASS" if accepted else "FAIL")
     bad = ssh_run(["true"], "s3-wrong.log", password="wrong-password",
                   extra=["-v"])
     bad_text = (bad["stderr"] + bad["stdout"]).decode("utf-8", "replace")
@@ -430,15 +425,32 @@ def row_s3(serial: Path) -> None:
     attempt("S3-wrong", 1, "fresh", "exit 255 + Permission denied",
             f"exit {bad['returncode']} + {'Permission denied' if 'Permission denied' in bad_text else 'no refusal line'}",
             float(bad["elapsed_ms"]), "PASS" if refused else "FAIL")
+    return {"client_auth": client_auth, "auth_line": auth_line,
+            "refused": refused, "bad_exit": bad["returncode"]}
+
+
+def row_s3_finish(serial: Path, state: dict[str, object]) -> None:
+    started = time.monotonic()
+    data = wait_serial(serial, b"Accepted password for raven", 120)
+    wait_ms = (time.monotonic() - started) * 1000
+    serial_text = data.decode("utf-8", "replace")
+    accepted = [line.replace("\r", "").strip() for line in serial_text.splitlines()
+                if "Accepted password for raven " in line]
+    attempt("S3-server-line", 1, "fresh",
+            "Accepted password for raven from 10.0.2.2 port N ssh2",
+            accepted[0] if accepted else "not in serial.log", wait_ms,
+            "PASS" if accepted else "FAIL")
+    client_auth = bool(state["client_auth"])
+    refused = bool(state["refused"])
     if client_auth and accepted and refused:
         record("S3", "PASS",
-               f"client `{auth_line}`; serial server line `{accepted[0]}`; wrong password "
+               f"client `{state['auth_line']}`; serial server line `{accepted[0]}`; wrong password "
                f"exit 255 + Permission denied (auth-passwd; C5/C9)")
     else:
         record("S3", "FAIL",
                f"client auth {'yes' if client_auth else 'no'}; server line "
-               f"{'present' if accepted else 'missing'}; wrong exit {bad['returncode']} "
-               f"(auth-passwd; C5/C9)")
+               f"{'present' if accepted else 'missing'} ({accepted[0] if accepted else 'none'}); "
+               f"wrong exit {state['bad_exit']} (auth-passwd; C5/C9)")
 
 
 def row_s4() -> None:
@@ -566,14 +578,18 @@ def write_tables() -> None:
     attempts_path = OUT / "attempts.tsv"
     columns = ["row", "attempt", "connection", "expected", "received", "elapsed_ms",
                "result", "detail"]
+    order = {name: index for index, name in enumerate(ROW_ORDER)}
+    ordered_attempts = sorted(attempts, key=lambda item: (
+        order.get(item["row"], len(ROW_ORDER)), item["row"], int(item["attempt"])))
     with open(attempts_path, "w", encoding="utf-8") as handle:
         handle.write("\t".join(columns) + "\n")
-        for item in attempts:
+        for item in ordered_attempts:
             handle.write("\t".join(item[column].replace("\t", " ") for column in columns) + "\n")
     rows_path = OUT / "matrix.tsv"
     with open(rows_path, "w", encoding="utf-8") as handle:
         handle.write("row\tstatus\tdetail\n")
-        for row, status, detail in rows:
+        for row, status, detail in sorted(rows, key=lambda item: (
+                order.get(item[0], len(ROW_ORDER)), item[0])):
             handle.write(f"{row}\t{status}\t{detail}\n")
     print(f"matrix: attempts {attempts_path}")
     print(f"matrix: table {rows_path}")
@@ -601,9 +617,10 @@ def main() -> int:
                              ready_timeout=180)
         row_s1()
         row_s2()
-        row_s3(serial)
+        s3_state = row_s3_start()
         row_s4()
         row_s5_s6()
+        row_s3_finish(serial, s3_state)
         row_s7()
         row_s8()
     except Exception as error:  # noqa: BLE001 - a boot failure is a BLOCKED row, not a crash
