@@ -252,6 +252,8 @@ pub struct Thread {
     pub signal_entry: AtomicU64,
     /// Registered context-area offset relative to the TLS base.
     pub signal_ctx_offset: AtomicU64,
+    /// Absolute registered context area (non-zero overrides `signal_ctx_offset`; K443).
+    pub signal_ctx_abs: AtomicU64,
     /// Registered `SIG_SETUP` flags.
     pub signal_flags: AtomicU32,
     /// Resolved user context area of the signal currently being handled.
@@ -425,6 +427,7 @@ impl Thread {
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),
             signal_ctx_offset: AtomicU64::new(0),
+            signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
@@ -525,6 +528,7 @@ impl Thread {
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),
             signal_ctx_offset: AtomicU64::new(0),
+            signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
@@ -580,6 +584,7 @@ impl Thread {
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),
             signal_ctx_offset: AtomicU64::new(0),
+            signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
