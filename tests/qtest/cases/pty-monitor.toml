@@ -1,0 +1,123 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K442: the OpenSSH privsep PTY exchange with a stub monitor over socketpair(AF_UNIX).
+# The session sends MONITOR_REQ_PTY (28); the monitor runs the pty_allocate sequence, opens the
+# slave, replies MONITOR_ANS_PTY (29) with success/name/login message, then sends the master and
+# slave fds as two monitor_fdpass-style SCM_RIGHTS messages. The session asserts the cmsg fields,
+# the fstat dev/ino identity against the monitor's own descriptors, opens the slave by name, and
+# round-trips a byte each way. Negatives: dropped master fd, a different pty's name, and a
+# request missing its type byte.
+
+name = "pty-monitor"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-monitor"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^pty-monitor: start uid=0$'
+
+[[expect]]
+regex = '^pty-monitor: session request type=28$'
+
+[[expect]]
+regex = '^pty-monitor: monitor request type=28$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: monitor pty master=[0-9]+ slave=[0-9]+ name=/dev/pts/[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: monitor reply type=29 name=/dev/pts/[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: session reply type=29 success=1$'
+
+[[expect]]
+regex = '^pty-monitor: session name=/dev/pts/[0-9]+ msg=k442-login$'
+
+[[expect]]
+regex = '^pty-monitor: monitor send master cmsg_len=20$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: monitor send slave cmsg_len=20$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: session master cmsg_len=20 level=1 type=1 count=1 controllen=20$'
+
+# recv_fd() prints the master cmsg, then the slave cmsg; the fstat lines follow both receives.
+[[expect]]
+regex = '^pty-monitor: session slave cmsg_len=20 level=1 type=1 count=1 controllen=20$'
+
+[[expect]]
+regex = '^pty-monitor: session master fd=[0-9]+ dev=[0-9]+ ino=[0-9]+$'
+
+[[expect]]
+regex = '^pty-monitor: session slave fd=[0-9]+ dev=[0-9]+ ino=[0-9]+$'
+
+[[expect]]
+regex = '^pty-monitor: session slave-by-name fd=[0-9]+ dev=[0-9]+ ino=[0-9]+$'
+
+[[expect]]
+regex = '^pty-monitor: roundtrip master->slave=M$'
+
+[[expect]]
+regex = '^pty-monitor: roundtrip slave->master=S$'
+
+[[expect]]
+regex = '^pty-monitor: session cleanup type=30$'
+
+[[expect]]
+regex = '^pty-monitor: monitor cleanup type=30$'
+unordered = true
+
+# Negative 1: the monitor sends the reply but no master fd.
+[[expect]]
+regex = '^pty-monitor: drop-master recv=0$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: drop-fd=detected$'
+
+# Negative 2: the name is a different pty, so the opened slave does not match the passed slave.
+[[expect]]
+regex = '^pty-monitor: monitor wrong-name=/dev/pts/[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: session wrong-master cmsg_len=20 level=1 type=1 count=1 controllen=20$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: session wrong-slave cmsg_len=20 level=1 type=1 count=1 controllen=20$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: wrong-name=detected (mismatch|open_errno=[0-9]+)$'
+
+# Negative 3: the request has the 4-byte length but no type byte.
+[[expect]]
+regex = '^pty-monitor: session missing-request header=1$'
+
+[[expect]]
+regex = '^pty-monitor: monitor short-request type$'
+unordered = true
+
+[[expect]]
+regex = '^pty-monitor: missing-request=detected status=2$'
+
+[[expect]]
+regex = '^pty-monitor: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-monitor: fail'
