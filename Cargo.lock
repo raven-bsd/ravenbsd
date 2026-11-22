@@ -3752,6 +3752,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-syscall-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-sysd"
 version = "0.1.0"
 dependencies = [
