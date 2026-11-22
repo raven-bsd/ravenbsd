@@ -124,6 +124,7 @@ members = [
     "tests/qtest",
     "tests/genet",
     "tests/ufs-oracle",
+    "tests/libc/abi",
     "tests/libc/oracle",
     "tests/libc/p1c-ipc",
     "tests/libc/va",
