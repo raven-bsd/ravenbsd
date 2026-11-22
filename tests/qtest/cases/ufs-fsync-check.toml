@@ -56,6 +56,12 @@ regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
 [[forbid]]
 regex = '(?i)mismatch|short at chunk|longer than'
 
+# K542: the write boot's syncs must leave the filesystem clean. A skipped sync
+# leaves the superblock dirty (mount writes clean=0) and this recovery line
+# appears on the remount, so the durability row is load-bearing for fsync.
+[[forbid]]
+regex = 'fsd-ufs: (repaired|journal replayed|refused to serve a dirty image)'
+
 [[step]]
 wait = '(?i)^.*login: ?$'
 timeout_secs = 240

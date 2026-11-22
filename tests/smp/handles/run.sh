@@ -4,7 +4,7 @@
 #
 # Run the K528 capability-lineage race on 1 or 4 CPUs.
 #
-# usage: sh tests/smp/handles/run.sh kvm1|kvm4|all [--iterations N]
+# usage: sh tests/smp/handles/run.sh kvm1|kvm2|kvm4|all [--iterations N]
 #
 # Each iteration boots the same image once; a failure stops the campaign and is preserved.
 
@@ -14,8 +14,8 @@ cd "$root"
 
 mode=${1:-kvm4}
 case "$mode" in
-    kvm1|kvm4|all) ;;
-    *) printf 'usage: %s kvm1|kvm4|all [--iterations N]\n' "$0" >&2; exit 2 ;;
+    kvm1|kvm2|kvm4|all) ;;
+    *) printf 'usage: %s kvm1|kvm2|kvm4|all [--iterations N]\n' "$0" >&2; exit 2 ;;
 esac
 shift || true
 
@@ -73,11 +73,15 @@ case "$mode" in
     kvm1)
         run_case smp-handles-kvm1 tests/smp/handles/handles-kvm1.toml
         ;;
+    kvm2)
+        run_case smp-handles-kvm2 tests/smp/handles/handles-kvm2.toml
+        ;;
     kvm4)
         run_case smp-handles-kvm4 tests/smp/handles/handles-kvm4.toml
         ;;
     all)
         run_case smp-handles-kvm1 tests/smp/handles/handles-kvm1.toml
+        run_case smp-handles-kvm2 tests/smp/handles/handles-kvm2.toml
         run_case smp-handles-kvm4 tests/smp/handles/handles-kvm4.toml
         ;;
 esac
