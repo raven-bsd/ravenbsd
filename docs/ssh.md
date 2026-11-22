@@ -7,14 +7,13 @@ SSH is the upstream OpenSSH 10.6p2 add-on (DR-65). The Raven tree does not vendo
 implementation and does not implement SSH in Rust. K200 owns `addons/ssh/**` and the source pin;
 K195 stages the built binaries as a release service and owns the login gate.
 
-Status: **build, service staging, the `sshd` account, libc `pipe(2)`, pollable pipes and the
-scheme-socket poll wake are DONE; the host-to-guest login is BLOCKED at the session data stage.**
-The banner, KEX, password authentication, the channel-open confirmation and the doorbell wake all
-work; the 10/10 tap gate currently reports class d: every command session authenticates without
-receiving command output, `ssh -tt` is answered with `PTY allocation request failed on channel 0`,
-and the guest `/tmp/sshd.log` shows `Read error from remote host ...: Bad address` (EFAULT) on the
-post-auth connection read. Both session-layer defects are handed to their owners; login is not
-claimed. The real tap gate is **0/10**.
+Status: **build, service staging, the `sshd` account, libc `pipe(2)`, pollable pipes, the
+scheme-socket poll wake and the post-auth read EFAULT (K429) are DONE; the host-to-guest login is
+BLOCKED at the session delivery stage.** The banner, KEX, password authentication, the channel
+confirmation composition and the write wake all work: the 44-byte confirmation is written to netd
+promptly. The bytes do not reach the peer in every run (the intermittent 0-byte peer probe
+persists), so the command sessions still fail; `ssh -tt` additionally fails with `PTY allocation
+request failed on channel 0` (K430). Login is not claimed; the real tap gate is **0/10**.
 
 ## Pinned source
 
