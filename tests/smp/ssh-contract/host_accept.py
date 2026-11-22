@@ -5,10 +5,58 @@
 exact echo and send the acknowledgement that makes the guest print `CONTRACT K6 PASS`."""
 
 import argparse
+import re
 import socket
 import struct
 import sys
 import time
+
+
+def parse_usernet(text):
+    """Map guest port 23097/23098 to the ephemeral host port QEMU chose for it."""
+    ports = {}
+    pattern = re.compile(
+        r"TCP\[HOST_FORWARD\]\s+\d+\s+\S+\s+(\d+)\s+\S+\s+(\d+)"
+    )
+    for line in text.splitlines():
+        match = pattern.search(line)
+        if match is None:
+            continue
+        host_port = int(match.group(1))
+        guest_port = int(match.group(2))
+        if guest_port in (23097, 23098):
+            ports[guest_port] = host_port
+    return ports
+
+
+def discover_ports(path, deadline):
+    """Read QEMU's `info usernet` from the monitor socket until both forwards are known."""
+    last = "monitor socket did not appear"
+    while time.monotonic() < deadline:
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as monitor:
+                remaining = max(0.1, deadline - time.monotonic())
+                monitor.settimeout(min(2.0, remaining))
+                monitor.connect(path)
+                monitor.sendall(b"info usernet\n")
+                data = b""
+                read_deadline = min(deadline, time.monotonic() + 2.0)
+                while time.monotonic() < read_deadline:
+                    try:
+                        chunk = monitor.recv(4096)
+                    except socket.timeout:
+                        break
+                    if not chunk:
+                        break
+                    data += chunk
+                    ports = parse_usernet(data.decode(errors="replace"))
+                    if 23097 in ports and 23098 in ports:
+                        return ports[23097], ports[23098]
+            last = f"incomplete forwarding table: {parse_usernet(data.decode(errors='replace'))!r}"
+        except OSError as error:
+            last = str(error)
+        time.sleep(0.1)
+    raise RuntimeError(f"QEMU monitor {path}: {last}")
 
 
 def exchange(host, port, payload, ack, deadline):
@@ -91,12 +139,24 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=23097)
     parser.add_argument("--eof-port", type=int, default=23098)
+    parser.add_argument("--monitor", default="")
     parser.add_argument("--result", required=True)
     parser.add_argument("--log", default="")
     parser.add_argument("--timeout", type=float, default=120.0)
     args = parser.parse_args()
 
     deadline = time.monotonic() + args.timeout
+    if args.monitor:
+        try:
+            args.port, args.eof_port = discover_ports(args.monitor, deadline)
+        except RuntimeError as error:
+            with open(args.result, "w", encoding="utf-8") as handle:
+                handle.write(f"fail monitor: {error}\n")
+            if args.log:
+                with open(args.log, "a", encoding="utf-8") as handle:
+                    handle.write(f"monitor fail: {error}\n")
+            print(f"host peer: {error}", file=sys.stderr)
+            return 1
     steps = [(b"ACCEPT1", b"K6ACK1"), (b"ACCEPT2", b"K6ACK2")]
     for payload, ack in steps:
         if not exchange(args.host, args.port, payload, ack, deadline):

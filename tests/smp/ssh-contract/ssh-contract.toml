@@ -2,8 +2,9 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # K440: guest SSH kernel-contract conformance suite (K1-K10). The fixture runs on the
-# network-config-test profile with netd and ptyd; the host peer opens two TCP connections for K6
-# and two EOF/half-close connections on 23098.
+# network-config-test profile with netd and ptyd; the host peer discovers QEMU's per-run
+# ephemeral host ports from the monitor and opens two TCP connections for K6 and two
+# EOF/half-close connections on guest port 23098.
 name = "ssh-contract"
 arch = "x86_64"
 profile = "network-config-test"
@@ -20,8 +21,9 @@ initfs = "build/fixtures/ssh-contract/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
-    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23097-:23097,hostfwd=tcp:127.0.0.1:23098-:23098",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23097,hostfwd=tcp:127.0.0.1:0-:23098",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-monitor", "unix:build/fixtures/ssh-contract/monitor.sock,server=on,wait=off",
 ]
 expect_exit = "success"
 

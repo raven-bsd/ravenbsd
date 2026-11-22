@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K435 K6: start the host peer before QEMU boots. It retries the hostfwd port until the guest
-# listener accepts both connections.
+# K435 K6: start the host peer before QEMU boots. QEMU forwards two ephemeral host ports to the
+# fixed guest ports; the peer reads the assigned host ports from QEMU's monitor socket.
 
 set -eu
 
@@ -12,11 +12,11 @@ cd "$root"
 
 out=build/fixtures/ssh-contract
 mkdir -p "$out"
-rm -f "$out/host.result" "$out/host.log" "$out/host.stdout"
+rm -f "$out/host.result" "$out/host.log" "$out/host.stdout" "$out/monitor.sock"
 pkill -f "ssh-contract/host_accept.py" 2>/dev/null || true
 python3 tests/smp/ssh-contract/host_accept.py \
     --host 127.0.0.1 \
-    --port 23097 \
+    --monitor "$out/monitor.sock" \
     --result "$out/host.result" \
     --log "$out/host.log" \
     --timeout 120 \
