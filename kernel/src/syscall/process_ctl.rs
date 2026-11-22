@@ -817,6 +817,11 @@ pub fn exec_cred(frame: &SyscallFrame) -> Result<usize, Errno> {
     if mode & S_IFMT != S_IFREG {
         return Err(Errno::EACCES);
     }
+    // A scheme server's `fstat` is not authority for root credentials.  Elevated bits are
+    // accepted only from the kernel-recorded live owner of a boot-trusted executable source.
+    if mode & (S_ISUID | S_ISGID) != 0 && !registry::file_source_trusted(&file.server) {
+        return Err(Errno::EPERM);
+    }
 
     let caller_ids = caller.ids.lock();
     if !executable(&caller_ids, mode, uid, gid) {
