@@ -18,9 +18,11 @@
 #   --list   print the case table and exit (no QEMU run)
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
-# These are functional rows, not latency rows: the management qemu-hygiene script allows the
-# functional budget (up to nproc/2 QEMU boots, load <= 2*nproc). The exclusive latency window is
-# not required here; the hygiene script's refusal is the stop condition.
+# These are functional rows, not latency rows: the preflight refuses another QEMU but tolerates
+# co-tenant cargo/rustc builds and allows load <= 2*nproc. S107_LATENCY=1 switches to the strict
+# no-job, max(2, nproc/4) contract for wall-clock rows.
+# A clean clone runs without RAVEN_MGMT_ROOT: the table is then kept under target/kernel-gate/
+# instead of the management tree, and the rows still run.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -29,6 +31,22 @@ cd "$root" || exit 2
 
 doc=
 log_dir=target/kernel-gate
+wait_idle=${S107_WAIT_FOR_IDLE:-0}
+latency=${S107_LATENCY:-0}
+default_max_load() {
+    n=$(nproc 2>/dev/null || echo 4)
+    case "$n" in ''|*[!0-9]*) n=4 ;; esac
+    if [ "$latency" = 1 ]; then
+        m=$((n / 4))
+        [ "$m" -lt 2 ] && m=2
+        echo "$m"
+    else
+        echo $((n * 2))
+    fi
+}
+max_load=${S107_MAX_LOAD:-$(default_max_load)}
+preflight_args=
+[ "$latency" = 1 ] || preflight_args=--allow-jobs
 
 # case | arch | owner | subsystem note | optional explicit case path
 # The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
@@ -73,15 +91,18 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     exit 0
 fi
 
-doc=$(mgmt_path architecture/product-data/kernel-gate.md) || exit 2
-
 mkdir -p "$log_dir" || exit 2
-hygiene=$(mgmt_path scripts/qemu-hygiene.sh) || exit 2
-if ! sh "$hygiene" > "$log_dir/host-state.txt" 2>&1; then
-    cat "$log_dir/host-state.txt" >&2
-    exit 2
+if ! doc=$(mgmt_path architecture/product-data/kernel-gate.md); then
+    doc=$log_dir/kernel-gate.md
+    echo "kernel-gate: management root absent; table stays at $doc (set RAVEN_MGMT_ROOT to file it)"
 fi
-cat "$log_dir/host-state.txt"
+# shellcheck disable=SC2086
+sh tests/smp/boot/host-idle.sh \
+    --context "kernel-gate" \
+    --wait "$wait_idle" \
+    --max-load "$max_load" \
+    $preflight_args \
+    --state-file "$log_dir/host-state.txt" || exit 2
 
 commit=$(git rev-parse HEAD 2>/dev/null) || { echo "kernel-gate: not a git checkout" >&2; exit 2; }
 short=$(git rev-parse --short=12 HEAD 2>/dev/null) || short=$commit
