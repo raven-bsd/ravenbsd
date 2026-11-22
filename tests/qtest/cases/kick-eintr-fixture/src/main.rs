@@ -317,7 +317,11 @@ impl Sys for KickSys {
         arg: usize,
     ) -> Result<Handle, Errno> {
         let thread = self.inner.thread_create(proc, entry, stack_top, arg)?;
-        self.thread = Some(thread);
+        // `spawn_elf` closes the handle it gets back.  Keep a duplicate for the cross-process
+        // kick rows; duplicating the original would leave the fixture holding a closed handle
+        // (EBADF at the no-SIGNAL probe).
+        let retained = sys::handle_dup(thread, Rights::SIGNAL.union(Rights::DUP))?;
+        self.thread = Some(retained);
         Ok(thread)
     }
 

@@ -17,6 +17,9 @@ qemu_extra = [
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
 expect_exit = "success"
+# A clean clone has no build/ssh/x86_64/bin/sshd; the release initfs cannot be assembled.
+# K463 records the reason instead of reporting a silent green.
+skip = "needs build/ssh/x86_64/bin/sshd, absent in a clean clone (K463)"
 
 [[expect]]
 regex = 'Type: UNKNOWN \(0x0\)$'
