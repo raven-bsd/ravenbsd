@@ -320,6 +320,19 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         self.install_impl(None, Handle::NONE, kind, status, path, cloexec, 0)
     }
 
+    /// The kernel handle currently cached by an OFD.
+    ///
+    /// `fork_child_inherit` replaces a socket's parent handle with the child's fresh handle; a
+    /// caller holding the old `Sock` value must query the OFD instead of using the stale copy.
+    #[must_use]
+    pub fn ofd_handle(&self, index: u32) -> Option<Handle> {
+        let arena = self.ofd.borrow();
+        arena
+            .get(index)
+            .map(|ofd| ofd.handle.get())
+            .filter(|handle| *handle != Handle::NONE)
+    }
+
     /// Attach the kernel handle to an OFD installed with [`Platform::install_pending`].
     ///
     /// The handle is owned by the fd table from this point on. A second attach is `EEXIST`, and

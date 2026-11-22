@@ -18,7 +18,7 @@ use crate::sync::IrqSpinLock;
 
 pub use self::evq_core::SIGNALED;
 #[cfg(target_arch = "x86_64")]
-pub use self::evq_core::{HUP, READABLE};
+pub use self::evq_core::{HUP, READABLE, WRITABLE};
 
 /// An event queue registration table with waiters.
 #[allow(dead_code)] // Wake integration is completed by the source hooks in this module.

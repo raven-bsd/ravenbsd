@@ -114,7 +114,10 @@ pub fn poll<B: SysBackend, L: Lock>(
         if !registration.scheme {
             continue;
         }
-        let Some(bits) = live_readiness(backend, registration.reference.poll_handle()) else {
+        // K409: the attached event is only the wake hint. The live level query must go to the
+        // socket's data handle, not `poll_handle()` (which becomes the event once attached), or
+        // a POLLOUT-only request never sees the socket's writable level.
+        let Some(bits) = live_readiness(backend, registration.reference.handle()) else {
             continue;
         };
         ready = ready.saturating_add(apply_bits(registration, fds, bits));
@@ -181,7 +184,7 @@ pub fn poll<B: SysBackend, L: Lock>(
                 continue;
             };
             if registration.scheme
-                && let Some(bits) = live_readiness(backend, registration.reference.poll_handle())
+                && let Some(bits) = live_readiness(backend, registration.reference.handle())
             {
                 // Only the current live directions are a verdict; a delivered event is a
                 // wake hint and may be stale.
@@ -198,7 +201,7 @@ pub fn poll<B: SysBackend, L: Lock>(
             if !registration.scheme {
                 continue;
             }
-            if let Some(bits) = live_readiness(backend, registration.reference.poll_handle()) {
+            if let Some(bits) = live_readiness(backend, registration.reference.handle()) {
                 let fired = apply_bits(registration, fds, bits);
                 if fired > 0 {
                     return Ok(fired);

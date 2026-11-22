@@ -208,6 +208,11 @@ fn fork_child_duplicates_an_inherited_socket_handle() {
         "the child takes a fresh scheme handle"
     );
     assert_eq!(
+        platform.ofd_handle(index),
+        Some(new_socket),
+        "the OFD is the authority for the live handle"
+    );
+    assert_eq!(
         platform.get(socket).expect("socket").index(),
         index,
         "the fd keeps the same OFD"

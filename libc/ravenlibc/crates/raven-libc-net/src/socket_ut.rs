@@ -937,3 +937,25 @@ fn lazy_socket_binds_and_listens() {
     net.listen(fd, 128).expect("listen");
     assert!(net.poll_interest(fd).is_ok());
 }
+
+#[test]
+fn refresh_handles_replaces_a_stale_socket_cache() {
+    let caps = Caps {
+        bare_open: true,
+        ..Caps::default()
+    };
+    let net = net_without_unix(caps);
+    let fd = net.socket(AF_INET, SOCK_STREAM, 0).expect("socket");
+    let info = net.fds().resolve(fd).expect("resolve");
+    let live = info.sock.expect("live handle");
+    {
+        let mut table = net.table.borrow_mut();
+        let record = table.get_mut(info.ofd).expect("record");
+        record.sock = Some(Sock(live.0.wrapping_add(1000)));
+    }
+    net.refresh_handles();
+    assert_eq!(
+        net.table.borrow().get(info.ofd).expect("record").sock,
+        Some(live)
+    );
+}

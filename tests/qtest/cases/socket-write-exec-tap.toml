@@ -38,6 +38,9 @@ regex = '^socket-write-exec: same sent$'
 regex = '^socket-write-exec: fork sent$'
 
 [[expect]]
+regex = '^socket-write-exec-child: pollout ready$'
+
+[[expect]]
 regex = '^socket-write-exec: exec sent$'
 
 [[expect]]
@@ -56,4 +59,4 @@ regex = '^socket-write-exec: host done$'
 regex = '^socket-write-exec: done$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|socket-write-exec: write failed|socket-write-exec: .*trigger missing|socket-write-exec: .*child status='
+regex = '(?i)panic|EXCEPTION|socket-write-exec: write failed|socket-write-exec: .*trigger missing|socket-write-exec: .*child status=|socket-write-exec-child: pollout (timeout|failed)'
