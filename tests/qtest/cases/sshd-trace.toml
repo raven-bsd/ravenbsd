@@ -1,17 +1,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K498: boot the release image with a DEBUG3 sshd overlay, make one guest
-# loopback password login and one command that exits, and print the full sshd
-# debug log plus the client log to the serial console. The command output and
-# the client/session close are measured from the log; the case collects the
-# trace and does not assert a fix.
+# K498: the pre-step builds the DEBUG3 overlay image and runs the host-client
+# trace over an isolated K194 tap/bridge (tests/fixtures/sshd-trace/run.sh).
+# The host client is the real Linux OpenSSH: slirp hostfwd is the known FIN/RST
+# failure, so the tap is required. The case then boots the same image as a
+# console-login smoke, so a broken overlay cannot pass silently.
 
 name = "sshd-trace"
 arch = "x86_64"
 profile = "release"
-timeout_secs = 600
-pre = ["sh tests/fixtures/sshd-trace/build.sh"]
+timeout_secs = 300
+pre = ["sh tests/fixtures/sshd-trace/run.sh"]
 image = "build/fixtures/sshd-trace/sshd-trace.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = ["-nic", "none"]
@@ -21,25 +21,22 @@ expect_exit = "success"
 regex = '^svcd: sshd up$'
 
 [[expect]]
-regex = '^sshd-trace: client-started$'
+regex = '^svcd: getty up$'
 
 [[expect]]
-regex = '^sshd-trace: waited$'
+regex = '(?i)^.*login: ?root'
 
 [[expect]]
-regex = '^sshd-trace-command-ok$'
+regex = '(?i)^password: ?$'
 
 [[expect]]
-regex = '^sshd-trace: log-end$'
-
-[[expect]]
-regex = '^sshd-trace: done$'
+regex = '^raven# $'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|sshd-trace: FAIL'
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|bad ELF'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
@@ -60,38 +57,6 @@ delay_ms = 100
 [[step]]
 wait = '^raven# $'
 timeout_secs = 120
-
-[[step]]
-send = "/bin/brush /etc/ssh/trace-client.sh > /tmp/client.log 2>&1 & echo sshd-trace: client-started\n"
-delay_ms = 100
-
-[[step]]
-wait = '^sshd-trace: client-started$'
-timeout_secs = 90
-
-[[step]]
-send = "sleep 12; echo sshd-trace: waited\n"
-delay_ms = 100
-
-[[step]]
-wait = '^sshd-trace: waited$'
-timeout_secs = 60
-
-[[step]]
-send = "echo sshd-trace: client-log; cat /tmp/client.log; echo sshd-trace: sshd-log; cat /tmp/sshd-trace.log; echo sshd-trace: log-end\n"
-delay_ms = 100
-
-[[step]]
-wait = '^sshd-trace: log-end$'
-timeout_secs = 180
-
-[[step]]
-send = "echo sshd-trace: done\n"
-delay_ms = 100
-
-[[step]]
-wait = '^sshd-trace: done$'
-timeout_secs = 30
 
 [[step]]
 send = "exit 0\n"

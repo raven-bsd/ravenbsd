@@ -5,27 +5,23 @@
 
 This fixture boots the release image with the unmodified upstream OpenSSH 10.6p2 `sshd` built
 from the current tree. The overlay changes only test inputs: `/etc/ssh/sshd_config` gets
-`LogLevel DEBUG3`, the `sshd` service runs `-D -ddd -E /tmp/sshd-trace.log`, and
-`/bin/sshd-trace-askpass` is installed 0755 for the guest client.
+`LogLevel DEBUG3` and the `sshd` service runs `-D -ddd -E /tmp/sshd-trace.log`.
 
-The qtest drives one password login and one command over guest loopback:
+`run.sh` isolates the network path: it creates the private `ravenbrtrace`/`ravetrace0` bridge
+with the host at 10.0.2.2 and boots the image with a tap. The guest publishes its static
+10.0.2.15 address, so no DHCP or NAT is involved. The slirp hostfwd proxy is not used because
+K382 proved it emits a FIN/RST after the seed; the K194 tap is the path the K195 gate uses.
 
-1. the root console starts `/bin/brush /etc/ssh/trace-client.sh` in the background; the kernel
-   executes ELF only, so the script is passed to brush rather than exec'd. The script waits 2 s,
-   then runs `/bin/ssh ... raven@127.0.0.1 'echo sshd-trace-command-ok'` with
-   `SSH_ASKPASS_REQUIRE=force`; the ELF askpass helper supplies the image password and no
-   `/dev/tty` prompt is needed. The long command lives in the script, so the brush line editor
-   only redraws the short launcher line;
-2. the console sleeps 12 s, then prints `/tmp/client.log` and the full
-   `/tmp/sshd-trace.log` between the `sshd-trace: client-log`/`sshd-trace: log-end` markers.
-   The script writes `sshd-trace-client: exit=<n>` only when the client returns; a missing exit
-   marker is part of the close trace.
+`trace-host.py` runs two host OpenSSH clients:
 
-The qtest serial log is the artifact. The report quotes the six-step session-close sequence and
-the first step the server loop does not reach, with the OpenSSH source expectation and the exact
-log line. The fixture is a trace: it does not patch sshd and does not touch `tests/ssh/**`.
+1. `ssh raven@10.0.2.15 'echo sshd-trace-command-ok'` (password login). It records whether the
+   command output arrives and whether the client then reaches EOF (`closed`) or waits past
+   20 s (`close-timeout`); the timeout is the S7/S5 symptom, not a harness failure.
+2. `ssh raven@10.0.2.15 'cat /tmp/sshd-trace.log'` opens a second session and copies the full
+   sshd DEBUG3 log to `build/fixtures/sshd-trace/host-sshd.log`. This avoids the guest console
+   for log extraction.
 
-The guest has no `/bin/chmod`, so the overlay tool installs the askpass helper with mode 0755.
-The OpenSSH binaries are built by `sh addons/ssh/build.sh`; `build.sh` here verifies them,
-builds the release initfs when it is missing, overlays the three test files and wraps the
-overlay initfs in `build/fixtures/sshd-trace/sshd-trace.img`.
+Artifacts: `host-client1.log`, `host-sshd.log`, `host-serial.log`, `host-summary.txt`. The
+report quotes the six-step session-close sequence and the first step the server loop does not
+reach, with the OpenSSH source expectation and the exact log line. The fixture does not patch
+sshd and does not touch `tests/ssh/**` or the shared `ravenbr0`/`ravendemo0`.
