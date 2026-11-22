@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K560: the same duplex ownership/cycle/control/abandoned/fuzz table on aarch64. The fixture and
+# rows are shared with the x86-64 case; only the architecture, console, image path and boot extras
+# differ. The table hash is compared byte-for-byte with x86-64.
+
+name = "duplex-matrix-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/smp/duplex-matrix/build.sh"]
+initfs = "build/duplex-matrix/aarch64/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1 smp_user=on"
+qemu_extra = ["-smp", "4", "-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^duplex-matrix: start seed=0x[0-9a-f]+ fuzz-ops=10000 groups=7$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=fuzz name=stateful-10k ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=abandoned name=recv-bad-message-close-installed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=self-send-closed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=self-send-reachable-retained ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=self-send-delivered ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=two-object-ring-closed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: row group=cycles name=three-object-ring-closed ok=yes value=[0-9]+$'
+
+[[expect]]
+regex = '^duplex-matrix: summary rows=[0-9]+ deviations=0 seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^duplex-matrix: alive$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|setup-failed|duplex-matrix: fuzz-break'
