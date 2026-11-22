@@ -1,3 +1,0 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s
-     Running `target/debug/xtask qtest --case pty-ssh-shape --arch x86_64`
-pty-ssh-shape: pass

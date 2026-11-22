@@ -20,6 +20,7 @@
 //! tests/`testutil`; it is not part of the production path.
 
 use alloc::collections::BTreeMap;
+#[cfg(any(test, feature = "testutil"))]
 use core::cell::RefCell;
 
 use raven_abi::errno::Errno;

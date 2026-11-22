@@ -61,6 +61,11 @@ pub struct PipeEnd {
 }
 
 impl PipeEnd {
+    /// Watcher key shared by both ends of this pipe.
+    pub(crate) fn event_key(&self) -> u64 {
+        crate::event::pipe_key(self.pipe.id)
+    }
+
     /// True for the read end.
     pub const fn is_reader(&self) -> bool {
         !self.writer
@@ -129,7 +134,7 @@ impl PipeEnd {
             state.ring = empty;
         }
         drop(state);
-        crate::event::notify_all();
+        crate::event::notify_source(self.event_key());
     }
 }
 
@@ -150,7 +155,7 @@ impl Drop for PipeEnd {
         if wake_readers {
             self.pipe.readers.wake_all();
         }
-        crate::event::notify_all();
+        crate::event::notify_source(self.event_key());
     }
 }
 
@@ -255,7 +260,7 @@ pub fn read(end: &Arc<PipeEnd>, destination: UserSlice) -> Result<usize, Errno> 
         state.ring.consume(copied);
         drop(state);
         end.pipe.writers.wake_all();
-        crate::event::notify_all();
+        crate::event::notify_source(end.event_key());
         return Ok(copied);
     }
 }
@@ -327,7 +332,7 @@ pub fn write(end: &Arc<PipeEnd>, source: UserSlice) -> Result<usize, Errno> {
         state.ring.produce(copied);
         drop(state);
         end.pipe.readers.wake_all();
-        crate::event::notify_all();
+        crate::event::notify_source(end.event_key());
         done = done.saturating_add(copied);
         if done >= total {
             return Ok(done);

@@ -4,6 +4,7 @@
 //! Tests for the ABI completeness model.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use super::*;
 
@@ -108,7 +109,8 @@ fn an_undocumented_gap_fails() {
 #[test]
 fn focus_rows_are_regenerated_with_real_numbers() {
     let root = root();
-    let doc = std::fs::read_to_string(root.join("docs/syscall-abi.md")).expect("doc");
+    let doc = std::fs::read_to_string(mgmt_file(&root, "architecture/product-data/syscall-abi.md"))
+        .expect("doc");
     let snapshot = std::fs::read_to_string(root.join("tests/abi/abi-v1.txt")).expect("snapshot");
     for (number, name, argc, ret) in [
         ("0x0D", "PROC_CHROOT", "2", "0"),
@@ -125,6 +127,54 @@ fn focus_rows_are_regenerated_with_real_numbers() {
         );
         assert!(snapshot.contains(&line), "snapshot line missing: {line}");
     }
+}
+
+#[test]
+fn wave_syscalls_are_in_the_served_table() {
+    let root = root();
+    let doc = std::fs::read_to_string(mgmt_file(&root, "architecture/product-data/syscall-abi.md"))
+        .expect("doc");
+    let model = model(&root);
+    for (number, name, reason) in [
+        (0x08_u64, "GETRANDOM", "public: libc getrandom/getentropy"),
+        (0x110, "DUPLEX_PAIR", "public: libc socketpair"),
+        (0x111, "DUPLEX_SHUTDOWN", "public: libc shutdown"),
+        (0x112, "DUPLEX_SENDMSG", "public: libc sendmsg"),
+        (0x113, "DUPLEX_RECVMSG", "public: libc recvmsg"),
+        (
+            0x114,
+            "DUPLEX_PEERCRED",
+            "public: libc getpeereid/getpeercred",
+        ),
+        (0x1E1, "PROC_CTTY_GET", "public: libc tcgetpgrp"),
+        (0x1E2, "PROC_CTTY_SET_FG", "public: libc tcsetpgrp"),
+    ] {
+        let hex = format!("0x{number:02X}");
+        let key = (number, name.to_string());
+        assert_eq!(
+            model.known.get(&key).map(String::as_str),
+            Some(reason),
+            "served known-omission reason for {hex} {name}"
+        );
+        let comment = format!("<!-- abi-completeness: known-omission {hex} {name} {reason} -->");
+        assert!(doc.contains(&comment), "served table missing: {comment}");
+        assert!(
+            doc.contains(&format!("| `{hex}` | `{name}` |")),
+            "served table row missing: {hex} {name}"
+        );
+        assert!(
+            model
+                .dispatch
+                .iter()
+                .any(|entry| entry.number == number && entry.name == name),
+            "dispatch surface missing: {hex} {name}"
+        );
+    }
+    assert!(doc.contains("`AT_RANDOM`"), "AT_RANDOM note missing");
+    assert!(
+        doc.contains("not a syscall number"),
+        "AT_RANDOM must be documented as an auxv entry, not a syscall"
+    );
 }
 
 #[test]
@@ -153,4 +203,68 @@ fn dispatch_and_documented_table_are_complete() {
         43,
         "the kernel-only omission register must hold 43 rows"
     );
+}
+
+fn mgmt_temp(label: &str) -> PathBuf {
+    let root = std::env::temp_dir().join(format!("raven-abi-mgmt-{}-{label}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).expect("temp root");
+    root
+}
+
+#[test]
+fn mgmt_root_honours_the_env_override() {
+    let root = mgmt_temp("env");
+    let product = root.join("product");
+    let mgmt = root.join("mgmt");
+    std::fs::create_dir_all(&product).expect("product");
+    std::fs::create_dir_all(&mgmt).expect("mgmt");
+    let resolved =
+        resolve_mgmt_root(&product, Some(mgmt.to_str().expect("utf8"))).expect("resolve");
+    assert_eq!(resolved, mgmt);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn mgmt_root_defaults_to_the_sibling() {
+    let root = mgmt_temp("sibling");
+    let product = root.join("ravenbsd");
+    let mgmt = root.join("ravenbsd-prjmgmt");
+    std::fs::create_dir_all(&product).expect("product");
+    std::fs::create_dir_all(&mgmt).expect("mgmt");
+    let resolved = resolve_mgmt_root(&product, Some("")).expect("resolve");
+    assert_eq!(resolved, mgmt);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn mgmt_root_names_env_when_the_sibling_is_missing() {
+    let root = mgmt_temp("no-sibling");
+    let product = root.join("ravenbsd");
+    std::fs::create_dir_all(&product).expect("product");
+    let error = resolve_mgmt_root(&product, Some("")).expect_err("missing sibling");
+    assert!(
+        error.contains("RAVEN_MGMT_ROOT"),
+        "error must name RAVEN_MGMT_ROOT: {error}"
+    );
+    assert!(
+        error.contains("ravenbsd-prjmgmt"),
+        "error must name the expected tree: {error}"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn mgmt_root_rejects_a_missing_env_path() {
+    let root = mgmt_temp("missing-env");
+    let product = root.join("ravenbsd");
+    std::fs::create_dir_all(&product).expect("product");
+    let missing = root.join("missing");
+    let error = resolve_mgmt_root(&product, Some(missing.to_str().expect("utf8")))
+        .expect_err("missing env root");
+    assert!(
+        error.contains("RAVEN_MGMT_ROOT"),
+        "error must name RAVEN_MGMT_ROOT: {error}"
+    );
+    let _ = std::fs::remove_dir_all(&root);
 }

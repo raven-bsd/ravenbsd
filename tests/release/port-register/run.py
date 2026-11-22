@@ -10,11 +10,13 @@ test is INDIRECT; otherwise the row is NONE and carries an owner lane and a prop
 
 Usage::
 
-    python3 tests/release/port-register/run.py --write   # regenerate register.tsv and the doc
+    python3 tests/release/port-register/run.py --write   # regenerate register.tsv
     python3 tests/release/port-register/run.py --check   # fail if a donor file has no row
 
-The check is a reducer gate: adding a donor-marked file without regenerating the register (and
-the doc) makes it exit non-zero.  No product source or test is changed by this script.
+The check is a reducer gate: adding a donor-marked file without regenerating the register
+makes it exit non-zero.  No product source or test is changed by this script.  The rendered
+summary is lead-maintained in ``ravenbsd-prjmgmt`` because the product documentation tree is
+frozen (AGENTS.md rule 31); this tool writes only the machine-readable TSV.
 """
 
 from __future__ import annotations
@@ -28,7 +30,6 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[3]
 REGISTER = Path("tests/release/port-register/register.tsv")
-DOC = Path("docs/releases/0.1.0-port-register.md")
 
 AREAS = ("kernel", "libc", "crates", "userland")
 SOURCE_EXTS = {".rs", ".c", ".h", ".s", ".ld", ".sh", ".toml", ".py", ".inc"}
@@ -72,14 +73,6 @@ PROPOSED = {
     "kernel": "K452",
     "crates": "K453",
     "userland": "K454",
-}
-PROPOSED_TITLE = {
-    "K451": "libc ABI descriptor behaviour tests (misc/poll/stat/time)",
-    "K452": "kernel donor-file behaviour tests",
-    "K453": "crate donor-file behaviour tests",
-    "K454": "libc ABI group coverage: misc/poll/stat/time descriptors",
-    "K459": "SSH-critical INDIRECT rows with direct tests",
-    "K465": "next 25 INDIRECT rows with direct tests",
 }
 CLOSED_BY = {
     "libc/ravenlibc/abi/misc.toml": "K454",
@@ -131,6 +124,31 @@ CLOSED_BY = {
     "libc/ravenlibc/crates/raven-libc-m/src/generic/fmod.rs": "K465",
     "libc/ravenlibc/crates/raven-libc-m/src/generic/rint.rs": "K465",
     "libc/ravenlibc/crates/raven-libc-m/src/generic/sqrt.rs": "K465",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/acos.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/acosf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/acoshf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/asin.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/asinf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/asinhf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/atan2f.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/atanf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/atanhf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/cosf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/cosh.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/coshf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/erf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/erff.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp10.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp2f.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expm1f.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/generic/fma.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log10f.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log1pf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log2.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log2f.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/logf.rs": "K479",
+    "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tgammaf.rs": "K479",
 }
 
 
@@ -451,130 +469,6 @@ def counts(rows: List[Dict[str, str]]) -> List[Tuple[str, int, int, int, int]]:
     return table
 
 
-def render_doc(rows: List[Dict[str, str]]) -> str:
-    table = counts(rows)
-    total = sum(row[1] for row in table)
-    total_covered = sum(row[2] for row in table)
-    total_indirect = sum(row[3] for row in table)
-    total_none = sum(row[4] for row in table)
-    none_rows = [row for row in rows if row["status"] == "NONE"]
-    closed_rows = [
-        row for row in rows
-        if row["status"] != "NONE" and row["proposed_ticket"] in CLOSED_BY.values()
-    ]
-    proposed: Dict[str, List[str]] = {}
-    for row in none_rows + closed_rows:
-        proposed.setdefault(row["proposed_ticket"], []).append(row["file"])
-
-    lines = [
-        "<!-- SPDX-License-Identifier: BSD-3-Clause -->",
-        "<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->",
-        "",
-        "# 0.1.0 donor port test register (K450)",
-        "",
-        "Status: OBSERVED. The complete machine-readable register is",
-        "[`tests/release/port-register/register.tsv`](../../tests/release/port-register/register.tsv).",
-        "Regenerate it with `python3 tests/release/port-register/run.py --write`; the reducer gate is",
-        "`python3 tests/release/port-register/run.py --check`.",
-        "",
-        "This is a static file-to-test mapping, not line or branch coverage. A COVERED row means a test",
-        "file or fixture names the donor file's path, basename or module stem; INDIRECT means only the",
-        "file's crate has tests; NONE means neither. The register is a gap list: NONE rows name an",
-        "owner lane and a proposed ticket, and are not fixed by K450.",
-        "",
-        "## Method",
-        "",
-        "The reducer unions every `PROVENANCE.toml` import under `kernel/`, `libc/`, `crates/` and",
-        "`userland/` with every source file in those trees whose first 20 lines carry a donor marker",
-        "(`RavenBSD: transpiled/adapted/ported/derived from`, The Regents, NetBSD/FreeBSD/OpenBSD/",
-        "DragonFly/Illumos/Sun copyright, or a BSD-2/BSD-4/CDDL SPDX header). It excludes `addons/`,",
-        "`donors/`, and the unbuilt vendor worktrees `userland/brush/`, `userland/uutils/` and",
-        "`toolchain/` (directory-group imports, not transpiled Raven files).",
-        "",
-        "The test index is every `*_ut.rs`, every file below a `tests/` directory under the four",
-        "areas, and the repository `tests/` tree (Rust, shell, TOML, C and header fixtures). A mapping",
-        "requires the donor path, its path suffix, its basename or its module stem to appear in that",
-        "test file; the row records the exact test path and the basis.",
-        "",
-        "## Counts",
-        "",
-        "| Area | Donor files | COVERED | INDIRECT | NONE |",
-        "|---|---:|---:|---:|---:|",
-    ]
-    for area, files, covered, indirect, none in table:
-        lines.append(f"| `{area}/` | {files} | {covered} | {indirect} | {none} |")
-    lines.append(
-        f"| **Total** | **{total}** | **{total_covered}** | **{total_indirect}** | **{total_none}** |"
-    )
-    lines.extend(
-        [
-            "",
-            "## NONE rows",
-            "",
-            "Every NONE row needs a test or an explicit exception; this ticket does not write those tests.",
-            "",
-            "| File | Owner | Proposed ticket |",
-            "|---|---|---|",
-        ]
-    )
-    if none_rows:
-        for row in none_rows:
-            lines.append(
-                f"| `{row['file']}` | {row['owner']} | {row['proposed_ticket']} |"
-            )
-    else:
-        lines.append("| - | - | - |")
-    lines.extend(
-        [
-            "",
-            "## Closed by later tickets",
-            "",
-            "Rows that moved from NONE/INDIRECT to COVERED with a named direct test:",
-            "",
-            "| File | Status | Test | Closed by |",
-            "|---|---|---|---|",
-        ]
-    )
-    if closed_rows:
-        for row in closed_rows:
-            lines.append(
-                f"| `{row['file']}` | {row['status']} | `{row['evidence']}` | {row['proposed_ticket']} |"
-            )
-    else:
-        lines.append("| - | - | - | - |")
-    lines.extend(["", "## Proposed tickets", ""])
-    if proposed:
-        for ticket in sorted(proposed):
-            lines.append(f"- **{ticket}** ({PROPOSED_TITLE[ticket]}): " + ", ".join(
-                f"`{path}`" for path in sorted(proposed[ticket])
-            ))
-    else:
-        lines.append("- None.")
-    lines.extend(
-        [
-            "",
-            "## Gate",
-            "",
-            "```text",
-            "timeout 120 python3 tests/release/port-register/run.py --check",
-            "timeout 60 make docs",
-            "timeout 900 make check-fast",
-            "```",
-            "",
-            "`--check` fails when a donor-marked file has no register row, when a row is stale, or when",
-            "the recorded status/evidence or this document differs from a fresh regeneration.",
-            "",
-            "## Open gaps",
-            "",
-            "- COVERED and INDIRECT are file-name mappings. They do not prove the named test runs in the",
-            "  host or guest gate; kernel unit tests are currently not host-buildable (K416).",
-            "- The NONE rows below are proposed work, not fixes from K450.",
-            "- Vendor worktrees and `addons/` are outside this register by the ticket's exclusion.",
-        ]
-    )
-    return "\n".join(lines) + "\n"
-
-
 def read_register(path: Path) -> Optional[List[str]]:
     if not path.is_file():
         return None
@@ -584,21 +478,17 @@ def read_register(path: Path) -> Optional[List[str]]:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--write", action="store_true", help="regenerate register.tsv and the doc")
+    group.add_argument("--write", action="store_true", help="regenerate register.tsv")
     group.add_argument("--check", action="store_true", help="fail when the register is stale")
     args = parser.parse_args(argv)
 
     rows = build_rows()
     register_text = render_register(rows)
-    doc_text = render_doc(rows)
     register_path = ROOT / REGISTER
-    doc_path = ROOT / DOC
 
     if args.write:
         register_path.parent.mkdir(parents=True, exist_ok=True)
-        doc_path.parent.mkdir(parents=True, exist_ok=True)
         register_path.write_text(register_text, encoding="utf-8")
-        doc_path.write_text(doc_text, encoding="utf-8")
         for area, files, covered, indirect, none in counts(rows):
             print(f"port-register: {area}: {files} files, {covered} covered, {indirect} indirect, {none} none")
         return 0
@@ -620,10 +510,6 @@ def main(argv: Optional[List[str]] = None) -> int:
                 problems.append(f"{len(stale)} register row(s) are stale: {', '.join(stale[:5])}")
             if not missing and not stale:
                 problems.append("register rows are stale (status/evidence changed); run --write")
-    if not doc_path.is_file():
-        problems.append(f"missing {DOC}; run --write")
-    elif doc_path.read_text(encoding="utf-8") != doc_text:
-        problems.append(f"{DOC} is stale; run --write")
 
     if problems:
         for problem in problems:

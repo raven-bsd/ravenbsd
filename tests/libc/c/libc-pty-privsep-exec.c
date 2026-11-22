@@ -284,8 +284,23 @@ static int session_child(int sock) {
             return fail("read-slave", round);
         if (write(slave, "S\n", 2) != 2)
             return fail("write-slave", round);
-        if (read(master, &byte, 1) != 1 || byte != 'S')
-            return fail("read-master", round);
+        /* The slave line discipline echoes the master's "M\n" back to the master. Drain that
+         * echo before requiring the slave's "S". K476's case originally read one byte and saw
+         * the echo; the libc fd handoff is independent of this pty termios fact. */
+        for (int spin = 0; spin < 50; spin++) {
+            ssize_t got = read(master, &byte, 1);
+            if (got < 0) {
+                if (errno == EINTR)
+                    continue;
+                return fail("read-master", round);
+            }
+            if (got == 0)
+                return fail("read-master", round);
+            if (byte == 'S')
+                break;
+            if (spin == 49)
+                return fail("read-master", round);
+        }
         printf("pty-privsep-exec: child round=%d roundtrip=MS\n", round);
         fflush(stdout);
         close(slave);

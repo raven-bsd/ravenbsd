@@ -7,6 +7,7 @@
 #![no_main]
 
 use raven_rt::entry;
+use raven_rt::println;
 use raven_s26_evq::{EDGE, EvqEvent, HUP, O_RDWR, evq_create, evq_ctl, evq_wait, open, write};
 
 entry!(main);
@@ -36,11 +37,15 @@ fn main(_args: raven_rt::Args) -> i32 {
     }
 
     let mut output = [EvqEvent::default(); 1];
-    let count = match evq_wait(queue, &mut output, 300_000_000_000) {
+    let count = match evq_wait(queue, &mut output, 200_000_000_000) {
         Ok(count) => count,
         Err(_) => return 34,
     };
     if count != 1 || output[0].cookie != FILE_COOKIE || output[0].events != HUP as u32 {
+        println!(
+            "s26: client bad hup count={} cookie={:#x} events={:#x}",
+            count, output[0].cookie, output[0].events
+        );
         return 35;
     }
     // The HUP is an edge: the still-set level must not be reported a second time.

@@ -152,6 +152,31 @@ fn interrupt_echoes_caret_c_and_a_newline() {
 }
 
 #[test]
+fn quit_discards_the_line_and_echoes_caret_backslash() {
+    let mut discipline = Discipline::new();
+    feed(&mut discipline, b"half");
+    let output = feed(&mut discipline, b"\x1c");
+    assert_eq!(discipline.pending(), 0);
+    assert!(output.quit);
+    assert!(output.events.is_empty());
+    assert_eq!(output.echo, b"^\\\r\n");
+    assert!(output.lines.is_empty());
+}
+
+#[test]
+fn quit_does_not_echo_when_echo_is_off() {
+    let mut discipline = Discipline::new();
+    discipline.set_settings(Settings {
+        mode: Mode::Canonical,
+        echo: false,
+    });
+    let output = feed(&mut discipline, b"\x1c");
+    assert!(output.echo.is_empty());
+    assert!(output.quit);
+    assert!(output.events.is_empty());
+}
+
+#[test]
 fn interrupt_after_a_partial_line_raises_one_event() {
     let mut discipline = Discipline::new();
     feed(&mut discipline, b"ab");
@@ -242,10 +267,11 @@ fn without_echo_editing_still_happens() {
 #[test]
 fn raw_mode_passes_bytes_through() {
     let mut discipline = Discipline::new();
-    discipline.set_settings(Settings {
-        mode: Mode::Raw,
-        echo: true,
-    });
+    let mut termios = Termios::sane();
+    termios.iflag = 0;
+    termios.oflag = 0;
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
     let output = feed(&mut discipline, b"ab\r\n");
     assert_eq!(output.data, b"ab\r\n");
     assert!(output.lines.is_empty());
@@ -548,6 +574,34 @@ fn output_is_raw_without_opost() {
     let mut out = Vec::new();
     discipline.process_output(b"line\n", &mut out);
     assert_eq!(out, b"line\n");
+}
+
+#[test]
+fn vwerase_removes_the_previous_word() {
+    let mut discipline = Discipline::new();
+    let output = feed(&mut discipline, b"one two\x17X\n");
+    assert_eq!(lines(&output), vec![&b"one X\n"[..]]);
+}
+
+#[test]
+fn raw_input_still_honours_translation_and_istrip() {
+    let mut crlf = Termios::sane();
+    crlf.iflag = ICRNL;
+    crlf.oflag = 0;
+    crlf.lflag = 0;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(crlf);
+    let output = feed(&mut discipline, b"\r");
+    assert_eq!(output.data, b"\n");
+
+    let mut strip = Termios::sane();
+    strip.iflag = ISTRIP;
+    strip.oflag = 0;
+    strip.lflag = 0;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(strip);
+    let output = feed(&mut discipline, &[0xff]);
+    assert_eq!(output.data, &[0x7f]);
 }
 
 #[test]

@@ -4,6 +4,7 @@
 //! Bounded chunk loop for the vfsd proxy.
 
 /// Failure while copying through a chunk callback.
+#[allow(dead_code)] // the proxy caller is target-only; the host build omits it
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum ChunkError<E> {
     /// The callback failed.
@@ -17,6 +18,7 @@ pub(crate) enum ChunkError<E> {
 /// The callback receives the number of bytes already copied and a slice no larger than `scratch`;
 /// it returns the bytes written into that slice. A short read ends the copy, matching a file EOF or
 /// a target that cannot fill the requested chunk.
+#[allow(dead_code)] // the proxy caller is target-only; the host build omits it
 pub(crate) fn copy_chunks<E>(
     out: &mut [u8],
     scratch: &mut [u8],

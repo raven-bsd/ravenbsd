@@ -13,7 +13,7 @@ qemu_extra = ["-enable-kvm", "-cpu", "host"]
 expect_exit = "success"
 
 [[expect]]
-regex = '^svcd: all services up$'
+regex = '^(raven# )?svcd: all services up$'
 
 [[expect]]
 regex = '103 /tmp/list'

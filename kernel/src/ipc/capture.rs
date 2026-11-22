@@ -218,8 +218,11 @@ impl CaptureSlots {
         None
     }
 
-    /// Release a page range. Releasing an already-free range is a no-op, so a double drop
-    /// cannot underflow the counters or hand the same pages to another capture.
+    /// Release a page range.
+    ///
+    /// Releasing an already-free range is a programming error: a `Capture` must release its
+    /// range exactly once. In release builds a second release is a no-op, so a latent double
+    /// drop cannot underflow the counters or hand the same pages to another capture.
     fn release(&mut self, range: SlotRange) {
         let pages = usize::try_from(range.pages).unwrap_or(usize::MAX);
         let mut released = 0usize;

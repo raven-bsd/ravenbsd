@@ -186,6 +186,11 @@ fn read_at(
     if len == 0 {
         return Ok(0);
     }
+    if let Some(offset) = positional
+        && offset.checked_add(len).is_none()
+    {
+        return Err(Errno::EOVERFLOW);
+    }
     let trace = super::trace_k147() && K147_RT.fetch_add(1, Ordering::Relaxed) < 64;
     let trace_start = if trace { crate::time::now_ns() } else { 0 };
     ensure_server(&file.server)?;
@@ -264,6 +269,11 @@ fn write_at(
 ) -> Result<usize, Errno> {
     if len == 0 {
         return Ok(0);
+    }
+    if let Some(offset) = positional
+        && offset.checked_add(len).is_none()
+    {
+        return Err(Errno::EOVERFLOW);
     }
     ensure_server(&file.server)?;
     let capture = capture::create(caller, &file.server, address, len, false)?;
@@ -1079,7 +1089,7 @@ fn submit_checked(request: &Arc<PendingRequest>, bounded: bool) -> Result<(), Er
         .server
         .scheme_waiters
         .wake(request.server.id, 0, usize::MAX);
-    crate::event::notify_all();
+    crate::event::notify_source(Arc::as_ptr(&request.server) as usize as u64);
     Ok(())
 }
 

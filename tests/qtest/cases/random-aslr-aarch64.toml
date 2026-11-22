@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K565: aarch64 with QEMU's cortex-a72 has no RNDR. The boot must fall back to the measured
+# timer/RTC jitter source and still produce 20/20 distinct ASLR layouts on each run.
+name = "random-aslr-aarch64"
+arch = "aarch64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/aslr/build.sh"]
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^entropy: source=jitter$'
+unordered = true
+
+[[expect]]
+regex = '^entropy: jitter samples=64 nonzero=\d+ distinct=\d+ min=\d+ max=\d+ rtc=[01]$'
+unordered = true
+
+[[expect]]
+regex = '^aslr: stable same=1$'
+
+[[expect]]
+regex = '^aslr: fork inherits same=1$'
+
+[[expect]]
+regex = '^aslr: run=\d+ stack=0x[0-9a-f]+ mmap=0x[0-9a-f]+ pie=0x[0-9a-f]+ interp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^aslr: summary distinct-stack=20 distinct-mmap=20 distinct-pie=20 distinct-interp=20$'
+
+[[expect]]
+regex = '^aslr: pass runs=20$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|aslr: FAIL|aslr: fixed-layout|entropy: source=none'

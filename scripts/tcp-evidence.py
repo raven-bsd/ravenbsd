@@ -14,8 +14,9 @@ FreeBSD sys/netinet (BSD-3-Clause, no advertising) and DragonFly sys/netinet/tcp
   --all       audit + unit + matrix (default)
   --selftest  pure, fast self-test; no nextest and no QEMU
 
-Every command is recorded in a timestamped packet under tests/evidence/tcp/. A missing K253
-harness, a missing donor object or a non-root host is recorded as `blocked`, never as a pass.
+Every command is recorded in a timestamped packet under
+RAVEN_MGMT_ROOT/tickets/evidence/tcp/. A missing K253 harness, a missing donor object or a
+non-root host is recorded as `blocked`, never as a pass.
 """
 
 from __future__ import annotations
@@ -36,8 +37,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CRATE = "crates/raven-tcpip"
-CLAIMS_PATH = "tests/evidence/tcp/port-claims.json"
+CLAIMS_REL = "tickets/evidence/tcp/port-claims.json"
 DEFAULT_CONFORMANCE = "scripts/net-conformance.sh"
+
+
+def mgmt_root() -> Path:
+    """RAVEN_MGMT_ROOT or ../ravenbsd-prjmgmt; missing is a loud failure."""
+    raw = os.environ.get("RAVEN_MGMT_ROOT")
+    root = Path(raw) if raw else ROOT.parent / "ravenbsd-prjmgmt"
+    if not root.is_dir():
+        print(
+            f"tcp-evidence: RAVEN_MGMT_ROOT: management root {root} is not a directory; "
+            "set RAVEN_MGMT_ROOT to the ravenbsd-prjmgmt checkout "
+            "(no product evidence fallback)",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return root
+
+
+def mgmt_path(relative: str) -> Path:
+    return mgmt_root() / relative
 
 FREEBSD_REV = "133344405f532bd54ff3629a77d4c4e062f01fdb"
 DRAGONFLY_REV = "94448f622a06cde90ba42d688e9cab2448ad9ab3"
@@ -902,11 +922,7 @@ def host_info(root: Path) -> dict:
             )
             value = proc.stdout.strip()
             if key == "dirty":
-                lines = [
-                    line for line in value.splitlines()
-                    if not line[3:].startswith("tests/evidence/tcp/run-")
-                ]
-                value = "yes" if lines else "no"
+                value = "yes" if value else "no"
             info[key] = value.splitlines()[0] if value else ""
         except (OSError, subprocess.TimeoutExpired):
             info[key] = None
@@ -991,14 +1007,14 @@ def write_hashes(packet: Path) -> None:
 
 
 def command_run(root: Path, args) -> int:
-    claims = Path(args.claims)
+    claims = Path(args.claims) if args.claims else mgmt_path(CLAIMS_REL)
     if not claims.is_absolute():
         claims = root / claims
     reports_root = Path(args.reports_root) if args.reports_root else None
     freebsd_root = Path(args.freebsd_root) if args.freebsd_root else None
     dragonfly_root = Path(args.dragonfly_root) if args.dragonfly_root else None
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    packet = Path(args.out) if args.out else root / "tests" / "evidence" / "tcp" / f"run-{stamp}"
+    packet = Path(args.out) if args.out else mgmt_path("tickets/evidence/tcp") / f"run-{stamp}"
     if packet.exists() and any(packet.iterdir()):
         print(f"tcp-evidence: refusing to overwrite non-empty packet {packet}", file=sys.stderr)
         return 1
@@ -1062,7 +1078,7 @@ upstream = "dragonfly"
     assert matches("crates/raven-tcpip/src/x.rs", ["crates/raven-tcpip/src/*.rs"])
     assert not matches("crates/raven-tcpip/src/x.rs", ["tests/**"])
 
-    claims = root / CLAIMS_PATH
+    claims = mgmt_path(CLAIMS_REL)
     result = audit(root, claims, None, None, None)
     if result["result"] != "pass":
         print("tcp-evidence-selftest: FAIL audit", file=sys.stderr)
@@ -1120,8 +1136,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--matrix", action="store_true", help="run the K253 conformance matrix")
     parser.add_argument("--all", action="store_true", help="audit + unit + matrix")
     parser.add_argument("--selftest", action="store_true", help="fast self-test; no nextest/QEMU")
-    parser.add_argument("--out", help="packet directory (default tests/evidence/tcp/run-<UTC>)")
-    parser.add_argument("--claims", default=CLAIMS_PATH, help="port claims JSON")
+    parser.add_argument(
+        "--out",
+        help="packet directory (default RAVEN_MGMT_ROOT/tickets/evidence/tcp/run-<UTC>)",
+    )
+    parser.add_argument("--claims", help="port claims JSON (default mgmt tickets/evidence/tcp/port-claims.json)")
     parser.add_argument("--reports-root", help="tickets/ root for the report DONE/quarantine check")
     parser.add_argument("--freebsd-root", default=DEFAULT_FREEBSD_ROOT, help="FreeBSD donor checkout")
     parser.add_argument("--dragonfly-root", default=DEFAULT_DRAGONFLY_ROOT, help="DragonFly donor checkout")

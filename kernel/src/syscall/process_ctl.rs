@@ -300,7 +300,7 @@ fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
             u64::from(target.wake_pending.load(Ordering::Relaxed)),
             u64::from(target.wake_last_cpu.load(Ordering::Relaxed)),
             cpu_need_resched,
-            cpu_runqueue as u64,
+            cpu_runqueue,
         ];
         for (chunk, value) in bytes
             .get_mut(328..488)
@@ -402,6 +402,10 @@ pub fn set_command(frame: &SyscallFrame) -> Result<usize, Errno> {
 pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let pid = frame.rdi as u32 as i32;
+    let pgid = frame.rsi as u32 as i32;
+    if pgid < 0 {
+        return Err(Errno::EINVAL);
+    }
     let target = if pid == 0 || u64::try_from(pid).ok() == Some(caller.id) {
         Arc::clone(&caller)
     } else {
@@ -420,14 +424,23 @@ pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
         let ids = target.ids.lock();
         (ids.sid, ids.pgid)
     };
+    if target_id != caller.id {
+        // A child must still be in the caller's session and must not have exec'd. The donor
+        // order is same-session EPERM before the exec EACCES.
+        if target_sid != caller.ids.lock().sid {
+            return Err(Errno::EPERM);
+        }
+        if target.exec_done.load(Ordering::Acquire) {
+            return Err(Errno::EACCES);
+        }
+    }
     if target_sid == target_id {
         return Err(Errno::EPERM);
     }
-    let pgid = frame.rsi as u32 as i32;
     let group = if pgid == 0 {
         target_id
     } else {
-        u64::try_from(pgid).map_err(|_| Errno::EPERM)?
+        u64::try_from(pgid).map_err(|_| Errno::EINVAL)?
     };
     let valid = group == target_id
         || group == current_group
@@ -1226,7 +1239,7 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let target = frame.rdi as u32 as i32;
     let signo = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
-    if !signal_valid(signo) {
+    if signo != 0 && !signal_valid(signo) {
         return Err(Errno::EINVAL);
     }
     let targets: Vec<Arc<Process>> = if target > 0 {
@@ -1256,6 +1269,10 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
         if !signal_allowed(&caller, target) {
             return Err(Errno::EPERM);
         }
+    }
+    if signo == 0 {
+        // POSIX `kill(pid, 0)` is an existence/permission check; it never queues a signal.
+        return Ok(0);
     }
     for target in targets {
         signal_one(&caller, &target, signo)?;
@@ -1394,10 +1411,34 @@ pub fn getrlimit(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// Apply one `setrlimit` request to `old`.
+///
+/// The rules follow NetBSD `dosetrlimit`: an explicit soft limit above the new hard limit is
+/// `EINVAL`, and an unprivileged process may not raise the hard limit (`EPERM`). The one
+/// divergence is the BSD "lower the hard limit" form: when the caller passes the current soft
+/// value unchanged and lowers the hard below it, the soft value is clamped to the new hard
+/// (FreeBSD/OpenBSD clamp; NetBSD rejects). An explicit `cur > max` request remains `EINVAL`.
+fn rlimit_set(old: Rlimit, requested: Rlimit, privileged: bool) -> Result<Rlimit, Errno> {
+    if requested.cur > requested.max {
+        if requested.cur == old.cur {
+            if !privileged && requested.max > old.max {
+                return Err(Errno::EPERM);
+            }
+            return Ok(Rlimit::new(requested.max, requested.max));
+        }
+        return Err(Errno::EINVAL);
+    }
+    if !privileged && requested.max > old.max {
+        return Err(Errno::EPERM);
+    }
+    Ok(requested)
+}
+
 /// `proc_setrlimit(resource, cur, max) -> 0`.
 ///
-/// A soft limit above the existing hard limit needs effective uid 0; every pair
-/// must satisfy `cur <= max`.
+/// An unprivileged process may lower either value and may raise the soft limit up to the
+/// existing hard limit, but it may not raise the hard limit; only effective uid 0 may do that.
+/// `RLIM_INFINITY` is stored verbatim and is subject to the same hard-limit rule.
 pub fn setrlimit(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let resource = usize::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
@@ -1408,15 +1449,9 @@ pub fn setrlimit(frame: &SyscallFrame) -> Result<usize, Errno> {
         cur: frame.rsi,
         max: frame.rdx,
     };
-    if !limit.valid() {
-        return Err(Errno::EINVAL);
-    }
     let privileged = caller.ids.lock().euid == 0;
     let mut limits = caller.limits.lock();
     let slot = limits.get_mut(resource).ok_or(Errno::EINVAL)?;
-    if limit.cur > slot.max && !privileged {
-        return Err(Errno::EPERM);
-    }
-    *slot = limit;
+    *slot = rlimit_set(*slot, limit, privileged)?;
     Ok(0)
 }

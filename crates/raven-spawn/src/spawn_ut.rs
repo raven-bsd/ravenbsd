@@ -9,6 +9,12 @@ use std::cell::RefCell;
 
 const TEST_TOP: u64 = 0x8000_0000;
 const TEST_BUFFER: usize = 64 * 1024;
+const TEST_ID: ProcessIdentity = ProcessIdentity {
+    uid: 1000,
+    euid: 0,
+    gid: 1000,
+    egid: 0,
+};
 
 fn build(
     path: &str,
@@ -908,7 +914,7 @@ fn auxv_has_the_pg50_keys_and_at_base() {
     let interpreter = interp_elf();
     let main = child_elf(true, false);
     let main_elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
-    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE, None, None);
+    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE, None, None, TEST_ID, true);
     let pairs = &auxv[..len];
     let has = |key: usize, value: Option<usize>| {
         pairs
@@ -922,16 +928,30 @@ fn auxv_has_the_pg50_keys_and_at_base() {
     assert!(has(AT_PLATFORM, Some(0)));
     assert!(has(AT_EXECFN, Some(0)));
     assert!(has(AT_MINSIGSTKSZ, Some(8192)));
+    assert!(has(AT_UID, Some(1000)));
+    assert!(has(AT_EUID, Some(0)));
+    assert!(has(AT_GID, Some(1000)));
+    assert!(has(AT_EGID, Some(0)));
+    assert!(has(AT_SECURE, Some(1)));
     let interp_elf = Elf::parse(&interpreter, target_machine(), USER_MIN..USER_END).unwrap();
     assert_eq!(main_elf.interp(), Some("/lib/ld.so"));
     assert_eq!(interp_elf.interp(), None);
 }
 
 #[test]
+fn no_alloc_fdmap_rejects_inherited_descriptors() {
+    assert_eq!(no_alloc_fdmap(&[]), Ok(()));
+    assert_eq!(
+        no_alloc_fdmap(&[(1, 7)]),
+        Err(SpawnError::Sys(Errno::ENOTSUP))
+    );
+}
+
+#[test]
 fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     let main = child_elf(false, false);
     let elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
-    let (auxv, len) = build_auxv(&elf, 0, 0, None, Some((0x7fff_0000, 2)));
+    let (auxv, len) = build_auxv(&elf, 0, 0, None, Some((0x7fff_0000, 2)), TEST_ID, false);
     let pairs = &auxv[..len];
     let has = |key: usize, value: usize| pairs.iter().any(|(k, v)| *k == key && *v == value);
     assert!(has(0x7003, 0x7fff_0000));
@@ -1187,10 +1207,22 @@ fn exec_spawn_applies_credentials_before_the_first_thread() {
             nosuid: false,
         }
     );
-    assert!(matches!(
-        calls.get(exec + 1),
-        Some(Call::ThreadCreate { .. })
-    ));
+    let stack_image = calls
+        .iter()
+        .enumerate()
+        .skip(exec + 1)
+        .find(|(_, call)| matches!(call, Call::WriteParentMem { .. }))
+        .map(|(index, _)| index)
+        .expect("stack image write after credentials");
+    assert!(
+        exec < stack_image,
+        "credentials at {exec} must precede the auxv/stack image at {stack_image}: {calls:?}"
+    );
+    let thread = calls
+        .iter()
+        .position(|call| matches!(call, Call::ThreadCreate { .. }))
+        .expect("thread create");
+    assert!(exec < thread, "credentials must precede the first thread");
 }
 
 #[test]
@@ -1226,7 +1258,7 @@ fn exec_spawn_failure_closes_the_child_before_a_thread_starts() {
 fn libc_auxv_carries_the_initfs_offset() {
     let main = child_elf(false, false);
     let elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
-    let (auxv, len) = build_auxv(&elf, 0, 0, Some(0x4000), None);
+    let (auxv, len) = build_auxv(&elf, 0, 0, Some(0x4000), None, TEST_ID, false);
     let pairs = &auxv[..len];
     assert!(pairs.contains(&(AT_RAVEN_LIBC, 0x4000)));
 }

@@ -376,7 +376,7 @@ class Driver:
             f"{self.expected} stall_seconds={self.args.stall}",
             f"gap_s={round(self.monitor.gap(), 3)}",
             "pcap: n/a (in-guest tcpdump is not packaged in the tcp-soak profile yet; "
-            "see docs/tcp-soak.md backlog)",
+            "see the TCP soak runbook backlog)",
             "",
             "--- last socket-state evidence lines ---",
         ]

@@ -1498,11 +1498,15 @@ pub fn reconcile_header_status(profile: &mut Profile, claimed: &BTreeSet<String>
 
 /// Write the seed profile, traceability file and generated gap matrix.
 ///
-/// The owner overlays under `docs/posix/evidence/` are merged after the derivation. Unsupported
-/// claims are ignored here; the gate reports them as failures.
+/// The owner overlays under the management `posix/evidence/` are merged after the derivation.
+/// Unsupported claims are ignored here; the gate reports them as failures.
 pub fn seed(root: &Path) -> Result<()> {
+    seed_at(root, &crate::mgmt::posix_dir(root)?)
+}
+
+pub(crate) fn seed_at(root: &Path, posix: &Path) -> Result<()> {
     let mut profile = seed_profile(root)?;
-    let overlay = crate::overlay::Overlay::load(root)?;
+    let overlay = crate::overlay::Overlay::load_at(posix)?;
     let outcome = overlay.apply(root, &mut profile);
     for claim in &outcome.unsupported {
         eprintln!(
@@ -1517,7 +1521,7 @@ pub fn seed(root: &Path) -> Result<()> {
         .collect();
     reconcile_header_status(&mut profile, &claimed);
     let trace = trace_from_profile(&profile);
-    let dir = root.join("docs/posix");
+    let dir = posix.to_path_buf();
     std::fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
     std::fs::write(
         dir.join("profile.toml"),

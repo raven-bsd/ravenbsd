@@ -16,10 +16,10 @@ ipc::SEEK	0x6d	kernel/src/syscall/ipc.rs:28	fuzz	direct	SEEK
 raven_abi::syscall::MSYNC	0x44	crates/raven-abi/src/syscall.rs:231	fuzz	direct	MSYNC
 exec::PROC_EXEC	0x6a	kernel/src/syscall/exec.rs:22	fuzz	direct	PROC_EXEC
 duplex::DUPLEX_PAIR	0x110	kernel/src/syscall/duplex.rs:24	fuzz	direct	DUPLEX_PAIR
-duplex::DUPLEX_SHUTDOWN	0x111	kernel/src/syscall/duplex.rs:26	fuzz	direct	DUPLEX_SHUTDOWN
-duplex::DUPLEX_SENDMSG	0x112	kernel/src/syscall/duplex.rs:28	fuzz	direct	DUPLEX_SENDMSG
-duplex::DUPLEX_RECVMSG	0x113	kernel/src/syscall/duplex.rs:30	fuzz	direct	DUPLEX_RECVMSG
-duplex::DUPLEX_PEERCRED	0x114	kernel/src/syscall/duplex.rs:32	fuzz	direct	DUPLEX_PEERCRED
+duplex::DUPLEX_SHUTDOWN	0x111	kernel/src/syscall/duplex.rs:39	fuzz	direct	DUPLEX_SHUTDOWN
+duplex::DUPLEX_SENDMSG	0x112	kernel/src/syscall/duplex.rs:41	fuzz	direct	DUPLEX_SENDMSG
+duplex::DUPLEX_RECVMSG	0x113	kernel/src/syscall/duplex.rs:43	fuzz	direct	DUPLEX_RECVMSG
+duplex::DUPLEX_PEERCRED	0x114	kernel/src/syscall/duplex.rs:45	fuzz	direct	DUPLEX_PEERCRED
 pipe::PIPE	0x6e	kernel/src/syscall/pipe.rs:19	fuzz	direct	PIPE
 pipe::PIPE2	0x6f	kernel/src/syscall/pipe.rs:21	fuzz	direct	PIPE2
 priority::GETPRIORITY	0x78	kernel/src/syscall/priority.rs:23	fuzz	direct	GETPRIORITY
@@ -61,8 +61,8 @@ raven_abi::syscall::HANDLE_TRANSFER_FILE	0x55	crates/raven-abi/src/syscall.rs:28
 raven_abi::syscall::THREAD_EXIT_EX	0x25	crates/raven-abi/src/syscall.rs:292	fuzz	direct	THREAD_EXIT_EX
 raven_abi::signal::SIG_SETUP	0x80	crates/raven-abi/src/signal.rs:18	fuzz	direct	SIG_SETUP
 raven_abi::signal::SIGRESEND	0x84	crates/raven-abi/src/signal.rs:33	fuzz	direct	SIGRESEND
-basic::GETRANDOM	0x08	kernel/src/syscall/basic.rs:26	fuzz	direct	GETRANDOM
-basic::CLOCK_SET	0x09	kernel/src/syscall/basic.rs:28	fuzz	direct	CLOCK_SET
+basic::GETRANDOM	0x08	kernel/src/syscall/basic.rs:27	fuzz	direct	GETRANDOM
+basic::CLOCK_SET	0x09	kernel/src/syscall/basic.rs:29	fuzz	direct	CLOCK_SET
 raven_abi::syscall::TRACE_SET	0x0b	crates/raven-abi/src/syscall.rs:207	fuzz	direct	TRACE_SET
 raven_abi::syscall::RECORD_LOCK	0x0c	crates/raven-abi/src/syscall.rs:216	fuzz	direct	RECORD_LOCK
 dtrace::PROBE_LIST	0x90	kernel/src/syscall/dtrace.rs:26	fuzz	is_control	PROBE_LIST
