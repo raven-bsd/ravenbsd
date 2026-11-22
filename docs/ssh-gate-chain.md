@@ -122,10 +122,10 @@ this deviation is recorded in the K434 report.
   termios defaults and returns `EBUSY` when the slave is already open. `openpty` (`lib/libutil/pty.c:63`)
   and `forkpty` (`:139`) are the libutil convenience over that path.
 - Raven: ptyd supplies the `pty:` scheme pair; libc `openpty`/`grantpt`/`unlockpt`/`ptsname_r` must
-  match the libutil sequence. K430, K436 and K438 are merged; the `pty-alloc` and `pty-calls` qtests
-  pass, including `ptsname`/`ttyname` `/dev/pts/N`. The SSH PTY request still answers
-  `PTY allocation request failed on channel 0` on `87779be6`. A test-only `/bin/tty` is staged from
-  `tests/fixtures/ssh-tty` but the allocation fails before it runs.
+  match the libutil sequence. K430, K436, K438 and K442 are merged; the `pty-alloc`/`pty-calls`
+  qtests pass, including `ptsname`/`ttyname` `/dev/pts/N`. The SSH PTY request still answers
+  `PTY allocation request failed on channel 0` on a dedicated fresh boot. A test-only `/bin/tty` is
+  staged from `tests/fixtures/ssh-tty` but the allocation fails before it runs.
 
 ### C10 exec
 
@@ -251,6 +251,18 @@ this deviation is recorded in the K434 report.
 3. **S7 is 10/10 exact** with console delta 0, but all ten attempts exit -9 at ~30 s; S7's exit/wall
    gate is red.
 4. **S8** still returns `PTY allocation request failed` after K438; K442 is next.
+
+## Rev 24 observations (K442 merged)
+
+1. **Boots are snapshot-isolated.** Repeated boots were writing the release image; `-snapshot` and a
+   2 s tap-release gap make S1-repeat, S8 and the main boot independent.
+2. **S1-repeat is 10/10** banner/auth. S2 in the same run got a 0-record peer probe; S3 auth
+   remained green.
+3. **S8 still fails on a dedicated fresh boot.** K442 is merged, `pty-alloc` passes, but
+   `ssh -tt ... tty` returns `PTY allocation request failed on channel 0`; the test-only `/bin/tty`
+   is not reached.
+4. **S7 is 5/10 exact** in this run; five attempts exit 255 with 0 bytes, byte-correct attempts exit
+   -9 at ~30 s. K443 is pending.
 
 ## Gaps (not evidence)
 
