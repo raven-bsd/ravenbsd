@@ -14,6 +14,8 @@ use raven_abi::errno::Errno;
 #[cfg(target_os = "none")]
 use raven_abi::syscall::Syscall;
 #[cfg(target_os = "none")]
+use raven_abi::types::Handle;
+#[cfg(target_os = "none")]
 use raven_abi::types::Timespec;
 
 /// Raw syscall with one argument.
@@ -438,6 +440,10 @@ pub fn clock_get(clock_id: u32) -> Result<Timespec, Errno> {
 #[cfg(target_os = "none")]
 pub const PROC_HANDLE_INFO: usize = 0x3E;
 
+/// Raw `PROC_PID_INFO` (P2a): a process's identity words (`pid == 0` means the caller).
+#[cfg(target_os = "none")]
+pub const PROC_PID_INFO: usize = 0x3A;
+
 /// Map a process handle owned by the caller to its pid.
 #[cfg(target_os = "none")]
 pub fn pid_for_handle(handle: u32) -> Result<i32, Errno> {
@@ -445,6 +451,39 @@ pub fn pid_for_handle(handle: u32) -> Result<i32, Errno> {
     let raw = unsafe { syscall1(PROC_HANDLE_INFO, handle as usize) };
     let value = Errno::from_ret(raw)?;
     i32::try_from(value).map_err(|_| Errno::EINVAL)
+}
+
+#[cfg(target_os = "none")]
+fn read_ids(pid: i32) -> Result<crate::ProcessIdentity, Errno> {
+    let mut words = [0u64; 8];
+    // SAFETY: PROC_PID_INFO writes at most eight u64 identity words into the live array.
+    let raw = unsafe {
+        syscall3(
+            PROC_PID_INFO,
+            pid as u32 as usize,
+            words.as_mut_ptr() as usize,
+            words.len(),
+        )
+    };
+    Errno::from_ret(raw)?;
+    Ok(crate::ProcessIdentity {
+        uid: u32::try_from(words[4]).map_err(|_| Errno::EINVAL)?,
+        euid: u32::try_from(words[5]).map_err(|_| Errno::EINVAL)?,
+        gid: u32::try_from(words[6]).map_err(|_| Errno::EINVAL)?,
+        egid: u32::try_from(words[7]).map_err(|_| Errno::EINVAL)?,
+    })
+}
+
+/// Read the caller's final identity.
+#[cfg(target_os = "none")]
+pub fn self_ids() -> Result<crate::ProcessIdentity, Errno> {
+    read_ids(0)
+}
+
+/// Read a child's final identity; the child must have no thread yet.
+#[cfg(target_os = "none")]
+pub fn child_ids(handle: Handle) -> Result<crate::ProcessIdentity, Errno> {
+    read_ids(pid_for_handle(handle.0)?)
 }
 
 /// Wait for `handle` to exit and return the kernel's raw exit code.
