@@ -229,10 +229,11 @@ fn stage_sysroot(out: &Path, libc: &Path, loader: &Path) -> Result<()> {
     std::fs::copy(loader, libexec.join("ld-elf.so.1"))
         .with_context(|| format!("cannot copy {} to sysroot/libexec", loader.display()))?;
     let libc_so = usr_lib.join("libc.so");
-    if !libc_so.is_file() {
-        std::fs::write(&libc_so, b"INPUT ( libc.so.1 )\n")
-            .with_context(|| "cannot write sysroot libc.so script")?;
-    }
+    // Always replace a stale sysroot `libc.so`. Older trees carry a real shared object here;
+    // leaving it in place makes `-lc` prefer that stale image over the freshly linked
+    // `lib/libc.so.1`, which is how the dynamic pty exports disappeared from C links.
+    std::fs::write(&libc_so, b"INPUT ( libc.so.1 )\n")
+        .with_context(|| "cannot write sysroot libc.so script")?;
     Ok(())
 }
 
