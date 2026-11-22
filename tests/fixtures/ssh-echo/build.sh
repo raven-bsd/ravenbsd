@@ -7,7 +7,7 @@
 # profile or product source is changed.
 #
 # Usage: sh tests/fixtures/ssh-echo/build.sh
-# Output: build/fixtures/ssh-echo/initfs.img
+# Output: build/fixtures/ssh-echo/echo.img
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
@@ -88,4 +88,7 @@ overlay=$target_dir/debug/raven-b70-overlay
     "/bin/ssh-echo=$out/ssh-echo:0755" \
     "/etc/services.d/ssh-echo.toml=$root/tests/fixtures/ssh-echo/ssh-echo.service.manifest"
 
-echo "ssh-echo fixture: staged $out/initfs.img"
+cargo xtask image --arch "$arch" --profile server --initfs "$out/initfs.img" \
+    --output "$out/echo.img" > /dev/null
+
+echo "ssh-echo fixture: staged $out/echo.img"

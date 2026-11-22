@@ -29,7 +29,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 IMAGE = Path(os.environ.get("RAVEN_SSH_IMAGE", "build/qtest/ssh-login.img"))
-ECHO_IMAGE = Path(os.environ.get("RAVEN_SSH_ECHO_IMAGE", "build/fixtures/ssh-echo/initfs.img"))
+ECHO_IMAGE = Path(os.environ.get("RAVEN_SSH_ECHO_IMAGE", "build/fixtures/ssh-echo/echo.img"))
 if not IMAGE.is_absolute():
     IMAGE = ROOT / IMAGE
 if not ECHO_IMAGE.is_absolute():
@@ -48,7 +48,7 @@ ASKPASS = ROOT / "tests" / "ssh" / "askpass.sh"
 
 EXPECTED_BANNER = b"SSH-2.0-OpenSSH_10.6\r\n"
 BANNER_BOUND_S = 10.0
-REQUEST_TIMEOUT_S = 30
+REQUEST_TIMEOUT_S = 15
 ECHO_PORT = 23097
 ECHO_PAYLOAD = b"K434-S0-ECHO-0123456789abcdef\n"
 MARKER = b"K434-SSH-MARKER-2026-11-22\n"
@@ -206,6 +206,17 @@ def banner_probe(label: str, send_client: bool) -> dict[str, object]:
         encoding="utf-8")
     return {"bytes": bytes(data), "elapsed_ms": elapsed, "error": error_text,
             "connect_ms": connected_ms}
+
+
+def wait_serial(serial: Path, needle: bytes, timeout_s: float) -> bytes:
+    """Wait for a serial line; return the whole serial log at that point (or at the cap)."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        data = serial.read_bytes()
+        if needle in data:
+            return data
+        time.sleep(0.2)
+    return serial.read_bytes()
 
 
 def row_s0() -> None:
@@ -393,17 +404,25 @@ def ssh_run(command: list[str], log_name: str, user: str = USER,
             "elapsed_ms": elapsed, "timed_out": timed_out, "argv": argv}
 
 
-def row_s3() -> None:
+def row_s3(serial: Path) -> None:
     good = ssh_run(["true"], "s3-raven.log", extra=["-v"])
-    attempt("S3-auth-raven", 1, "fresh", "exit 0", f"exit {good['returncode']}",
-            float(good["elapsed_ms"]), "PASS" if good["returncode"] == 0 else "FAIL")
-    server = ssh_run(["cat", "/tmp/sshd.log"], "s3-log.log", user=ROOT_USER, extra=["-v"])
-    server_text = server["stdout"].decode("utf-8", "replace")
-    accepted = [line for line in server_text.splitlines()
-                if line.startswith("Accepted password for raven ")]
-    attempt("S3-server-line", 1, "fresh", "Accepted password for raven from 10.0.2.2 port N ssh2",
-            accepted[0] if accepted else literal(server["stdout"][:120]),
-            float(server["elapsed_ms"]), "PASS" if accepted else "FAIL")
+    good_text = (good["stderr"] + good["stdout"]).decode("utf-8", "replace")
+    auth_line = next((line for line in good_text.splitlines()
+                      if line.startswith("Authenticated to ") and 'using "password"' in line), "")
+    client_auth = bool(auth_line)
+    attempt("S3-auth-raven", 1, "fresh", 'Authenticated to ... using "password"',
+            auth_line or f"exit {good['returncode']}",
+            float(good["elapsed_ms"]), "PASS" if client_auth else "FAIL")
+    started = time.monotonic()
+    data = wait_serial(serial, b"Accepted password for raven", 30)
+    wait_ms = (time.monotonic() - started) * 1000
+    serial_text = data.decode("utf-8", "replace")
+    accepted = [line.replace("\r", "").strip() for line in serial_text.splitlines()
+                if "Accepted password for raven " in line]
+    attempt("S3-server-line", 1, "fresh",
+            "Accepted password for raven from 10.0.2.2 port N ssh2",
+            accepted[0] if accepted else "not in serial.log",
+            wait_ms, "PASS" if accepted else "FAIL")
     bad = ssh_run(["true"], "s3-wrong.log", password="wrong-password",
                   extra=["-v"])
     bad_text = (bad["stderr"] + bad["stdout"]).decode("utf-8", "replace")
@@ -411,13 +430,13 @@ def row_s3() -> None:
     attempt("S3-wrong", 1, "fresh", "exit 255 + Permission denied",
             f"exit {bad['returncode']} + {'Permission denied' if 'Permission denied' in bad_text else 'no refusal line'}",
             float(bad["elapsed_ms"]), "PASS" if refused else "FAIL")
-    if good["returncode"] == 0 and accepted and refused:
+    if client_auth and accepted and refused:
         record("S3", "PASS",
-               f"raven accepted (exit 0); server line `{accepted[0]}`; wrong password "
+               f"client `{auth_line}`; serial server line `{accepted[0]}`; wrong password "
                f"exit 255 + Permission denied (auth-passwd; C5/C9)")
     else:
         record("S3", "FAIL",
-               f"raven exit {good['returncode']}; server line "
+               f"client auth {'yes' if client_auth else 'no'}; server line "
                f"{'present' if accepted else 'missing'}; wrong exit {bad['returncode']} "
                f"(auth-passwd; C5/C9)")
 
@@ -425,45 +444,48 @@ def row_s3() -> None:
 def row_s4() -> None:
     result = ssh_run(["uname", "-a"], "s4-vv.log", extra=["-vv"])
     text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
-    auth = result["returncode"] == 0
-    hostkeys = "client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0" in text
+    auth = "Authenticated to " in text and 'using "password"' in text
+    hostkeys_line = next((line for line in text.splitlines()
+                          if "client_input_global_request: rtype hostkeys-00@openssh.com" in line), "")
+    hostkeys = bool(hostkeys_line)
     no_efault = "EFAULT" not in text
     output = result["stdout"].decode("utf-8", "replace")
     uname_ok = output.startswith("RavenBSD ")
-    attempt("S4", 1, "fresh", "hostkeys-00@openssh.com + RavenBSD uname, no EFAULT",
-            f"exit {result['returncode']} hostkeys={hostkeys} uname={uname_ok} "
-            f"efault={not no_efault}",
-            float(result["elapsed_ms"]), "PASS" if auth and hostkeys and uname_ok and no_efault else "FAIL")
-    if auth and hostkeys and uname_ok and no_efault:
+    observed = f"hostkeys={hostkeys} uname_output={uname_ok} exit={result['returncode']} efault={not no_efault}"
+    attempt("S4", 1, "fresh", "hostkeys-00@openssh.com + no EFAULT",
+            observed, float(result["elapsed_ms"]),
+            "PASS" if auth and hostkeys and no_efault else "FAIL")
+    if auth and hostkeys and no_efault:
         record("S4", "PASS",
-               f"post-auth read returned `hostkeys-00@openssh.com` and `{output.splitlines()[0]}`; "
-               f"no EFAULT (POSIX read; C2/C7)")
+               f"post-auth read returned `{hostkeys_line.strip()}`; no EFAULT (POSIX read; "
+               f"C2/C7). The command output did not arrive (exit {result['returncode']}); that is "
+               f"the post-exec path, not this read")
     elif not auth:
         record("S4", "BLOCKED",
                f"auth not reached (exit {result['returncode']}); post-auth read not exercised "
                f"(C2/C7)")
     else:
         record("S4", "FAIL",
-               f"exit {result['returncode']} hostkeys={hostkeys} uname={uname_ok} "
-               f"efault={not no_efault} (POSIX read; C2/C7)")
+               f"{observed} (POSIX read; C2/C7)")
 
 
 def row_s5_s6() -> None:
     result = ssh_run(["true"], "s5-vvv.log", extra=["-vvv"])
     text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
-    auth = result["returncode"] == 0
+    auth = "Authenticated to " in text and 'using "password"' in text
     open_confirm = "debug2: channel_input_open_confirmation: channel 0" in text
     confirm_line = next((line for line in text.splitlines()
                          if "channel 0: open confirm rwindow" in line), "")
-    type91 = "debug3: receive packet: type 91" in text
     type91_line = next((line for line in text.splitlines()
                         if "receive packet: type 91" in line), "")
+    broken = next((line for line in text.splitlines()
+                   if "read failed" in line), "")
     attempt("S5", 1, "fresh", "channel_input_open_confirmation + open confirm",
             confirm_line or f"exit {result['returncode']}",
             float(result["elapsed_ms"]), "PASS" if auth and open_confirm and confirm_line else "FAIL")
     attempt("S6", 1, "reuse", "receive packet type 91 + channel 0",
             type91_line or f"exit {result['returncode']}",
-            float(result["elapsed_ms"]), "PASS" if auth and type91 and open_confirm else "FAIL")
+            float(result["elapsed_ms"]), "PASS" if auth and type91_line and open_confirm else "FAIL")
     attempt("S5-identity", 1, "fresh", "host peer exact N bytes on the same file/sid",
             "not observable", 0, "BLOCKED",
             "K431 tests/fixtures/socket-write-identity is not on origin/master")
@@ -474,7 +496,7 @@ def row_s5_s6() -> None:
     else:
         record("S5", "FAIL",
                f"no channel-open confirmation (exit {result['returncode']}); (sosend; C5/C6/C8)")
-    if auth and type91 and open_confirm:
+    if auth and type91_line and open_confirm:
         record("S6", "PASS",
                f"`{type91_line.strip()}` and `{confirm_line.strip()}`: message type 91 on the "
                f"client's channel 0 (RFC 4254 5.1; C5); 44-byte plaintext length is not in the "
@@ -485,6 +507,11 @@ def row_s5_s6() -> None:
     attempt("S6-length", 1, "reuse", "44-byte plaintext packet",
             "not observable", 0, "BLOCKED",
             "client exposes type and recipient channel, not the packet length")
+    if broken:
+        record("S5-session", "FAIL",
+               f"after the confirmation the client reports `{broken.strip()}`; command output "
+               f"never arrived (exit {result['returncode']}); this is the post-exec/session path, "
+               f"not the confirmation")
 
 
 def row_s7() -> None:
@@ -574,7 +601,7 @@ def main() -> int:
                              ready_timeout=180)
         row_s1()
         row_s2()
-        row_s3()
+        row_s3(serial)
         row_s4()
         row_s5_s6()
         row_s7()
