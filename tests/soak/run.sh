@@ -10,4 +10,11 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)
 cd "$root"
+for arg in "$@"; do
+    case "$arg" in
+        --hours|--hours=*|--resume|--resume=*|--prove-hung-boot|--prove-stall)
+            exec python3 "$root/tests/soak/soak.py" "$@"
+            ;;
+    esac
+done
 exec python3 "$root/tests/soak/run.py" "$@"
