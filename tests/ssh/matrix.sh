@@ -56,4 +56,6 @@ timeout 120 sh tests/fixtures/ssh-echo/build.sh || echo "matrix: S0 fixture buil
 net down >/dev/null 2>&1 || true
 net up
 up=1
-RAVEN_QEMU_TAP="$tap" timeout 600 python3 tests/ssh/matrix.py
+RAVEN_QEMU_TAP="$tap" # matrix.py measured: the 600 s cap expired during S7 on rev 25; the row set needs ~550-600 s,
+# so 780 s is the measured runtime plus margin. The outer acceptance cap is 900 s.
+timeout 780 python3 tests/ssh/matrix.py
