@@ -8,7 +8,7 @@
 
 name = "sshd-trace-dump"
 exec = "/bin/brush"
-args = ["/bin/brush", "-c", "sleep 40; echo sshd-trace-dump: begin > /dev/console; cat /tmp/sshd-trace.log > /dev/console; echo sshd-trace-dump: end > /dev/console"]
+args = ["/bin/brush", "-c", "sleep 40; echo sshd-trace-dump: begin > /dev/ttyS0; cat /tmp/sshd-trace.log > /dev/ttyS0; echo sshd-trace-dump: end > /dev/ttyS0; echo sshd-trace-dump: begin > /dev/console; cat /tmp/sshd-trace.log > /dev/console; echo sshd-trace-dump: end > /dev/console"]
 needs = ["sshd"]
 readiness = "none"
 restart = "never"
