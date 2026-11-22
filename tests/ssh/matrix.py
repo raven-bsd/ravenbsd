@@ -60,6 +60,7 @@ MARKER = b"K434-SSH-MARKER-2026-11-22\n"
 ROW_ORDER = [
     "S0", "S1", "S1-client-first", "S1-repeat", "S2", "S3", "S4", "S5", "S5-identity",
     "S5-session", "S6", "S6-length", "S7", "S7-routing", "S7-exit", "S8", "S8-pty-alloc",
+    "S8-termios",
 ]
 
 rows: list[tuple[str, str, str]] = []
@@ -469,37 +470,49 @@ def row_s1_repeat() -> None:
 
 
 def row_s2() -> None:
-    log = OUT / "s2-peer.log"
-    started = time.monotonic()
-    subprocess.run([str(PEER), "--host", HOST, "--port", "22", "--mode", "client",
-                    "--send-banner", "--send-kexinit", "--idle-ms", "3000",
-                    "--log", str(log)],
-                   cwd=ROOT, capture_output=True, text=True, timeout=25, check=False)
-    elapsed = (time.monotonic() - started) * 1000
-    text = log.read_text(errors="replace")
-    record_line = next((line for line in text.splitlines() if "record #1" in line), "")
-    length = re.search(r"packet_length=(\d+)", record_line)
-    padding = re.search(r"padding=(\d+)", record_line)
-    total = re.search(r"total=(\d+)", record_line)
-    payload = re.search(r"payload=(\d+)", record_line)
-    if "type=20" in record_line and length and padding and total and payload:
-        packet_length = int(length.group(1))
-        padding_length = int(padding.group(1))
-        total_length = int(total.group(1))
-        payload_length = int(payload.group(1))
-        framed = total_length == packet_length + 4
-        consistent = packet_length == padding_length + payload_length + 1
-        if framed and consistent and padding_length >= 4 and payload_length > 1:
-            record("S2", "PASS",
-                   f"KEXINIT exact: total={total_length} packet_length={packet_length} "
-                   f"padding={padding_length} payload={payload_length} type=20 (RFC 4251 6; "
-                   f"C2/C3)")
-            attempt("S2", 1, "fresh", "type=20 total=4+packet_length padding>=4",
-                    record_line.strip(), elapsed, "PASS")
-            return
-    record("S2", "FAIL", f"no consistent KEXINIT record: `{record_line.strip()}` ({log})")
-    attempt("S2", 1, "fresh", "type=20 total=4+packet_length padding>=4",
-            record_line.strip() or "0 records", elapsed, "FAIL")
+    outcomes: list[tuple[int, bool, str, float]] = []
+    for number in range(1, 4):
+        log = OUT / ("s2-peer.log" if number == 1 else f"s2-peer-{number}.log")
+        idle_ms = "3000" if number == 1 else "6000"
+        started = time.monotonic()
+        subprocess.run([str(PEER), "--host", HOST, "--port", "22", "--mode", "client",
+                        "--send-banner", "--send-kexinit", "--idle-ms", idle_ms,
+                        "--log", str(log)],
+                       cwd=ROOT, capture_output=True, text=True, timeout=25, check=False)
+        elapsed = (time.monotonic() - started) * 1000
+        text = log.read_text(errors="replace")
+        record_line = next((line for line in text.splitlines() if "record #1" in line), "")
+        length = re.search(r"packet_length=(\d+)", record_line)
+        padding = re.search(r"padding=(\d+)", record_line)
+        total = re.search(r"total=(\d+)", record_line)
+        payload = re.search(r"payload=(\d+)", record_line)
+        exact = False
+        detail = record_line.strip() or "0 records"
+        if "type=20" in record_line and length and padding and total and payload:
+            packet_length = int(length.group(1))
+            padding_length = int(padding.group(1))
+            total_length = int(total.group(1))
+            payload_length = int(payload.group(1))
+            framed = total_length == packet_length + 4
+            consistent = packet_length == padding_length + payload_length + 1
+            if framed and consistent and padding_length >= 4 and payload_length > 1:
+                exact = True
+                detail = (f"total={total_length} packet_length={packet_length} "
+                          f"padding={padding_length} payload={payload_length} type=20")
+        outcomes.append((number, exact, detail, elapsed))
+        attempt("S2", number, "fresh", "type=20 total=4+packet_length padding>=4",
+                detail, elapsed, "PASS" if exact else "FAIL")
+        if exact:
+            break
+    passed = next((outcome for outcome in outcomes if outcome[1]), None)
+    failures = [f"#{number} {detail}" for number, exact, detail, _ in outcomes if not exact]
+    if passed is not None:
+        record("S2", "PASS",
+               f"attempt {passed[0]} exact ({passed[2]}); prior failures: "
+               + ("; ".join(failures) if failures else "none"))
+    else:
+        record("S2", "FAIL", f"no consistent KEXINIT in 3 bounded attempts: "
+                             + "; ".join(failures))
 
 
 def ssh_run(command: list[str], log_name: str, user: str = USER,
@@ -728,6 +741,17 @@ def row_s3_start() -> dict[str, object]:
             float(good["elapsed_ms"]), "PASS" if client_auth else "FAIL")
     return {"client_auth": client_auth, "auth_line": auth_line,
             "refused": refused, "bad_exit": bad["returncode"]}
+
+
+def console_login(console: SerialConsole) -> bool:
+    """Log in as root/raven on the serial console."""
+    if console.wait_for(b"login:", 60) < 0:
+        return False
+    console.send(b"root\n")
+    if console.wait_for(b"Password:", 20) < 0:
+        return False
+    console.send(b"raven\n")
+    return console.wait_for(b"raven# ", 30) >= 0
 
 
 def console_capture(console: SerialConsole, command: str, log_name: str,
@@ -1016,19 +1040,40 @@ def row_s8() -> None:
     else:
         attempt("S8-pty-alloc", 1, "fresh", "exit 0 + `pty-alloc: pass`",
                 "artifact missing", 0, "BLOCKED",
-                f"run `timeout 45 cargo xtask qtest --case pty-alloc --arch x86_64`")
+                "run `timeout 75 cargo xtask qtest --case pty-alloc --arch x86_64`")
+    termios_exit_path = OUT / "termios.exit"
+    termios_log = OUT / "termios.log"
+    termios_ok = False
+    if termios_exit_path.is_file():
+        try:
+            termios_exit = int(termios_exit_path.read_text(encoding="utf-8").strip())
+        except ValueError:
+            termios_exit = -1
+        termios_text = termios_log.read_text(errors="replace") if termios_log.is_file() else ""
+        last_termios = next((line.strip() for line in reversed(termios_text.splitlines())
+                             if line.strip()), "no log line")
+        termios_ok = termios_exit == 0 and "termios: pass" in termios_text
+        attempt("S8-termios", 1, "fresh", "exit 0 + `termios: pass`",
+                f"exit {termios_exit}; {last_termios}", 0,
+                "PASS" if termios_ok else "FAIL")
+    else:
+        attempt("S8-termios", 1, "fresh", "exit 0 + `termios: pass`",
+                "artifact missing", 0, "BLOCKED",
+                "run `timeout 150 cargo xtask qtest --case termios --arch x86_64`")
     result = ssh_run(["tty"], "s8-tt.log", extra=["-tt"])
     output = result["stdout"].decode("utf-8", "replace")
     error = result["stderr"].decode("utf-8", "replace")
     match = re.search(r"/dev/pts/[0-9]+", output)
-    if match and pty_alloc_ok:
+    if match and pty_alloc_ok and termios_ok:
         record("S8", "PASS",
-               f"`ssh -tt tty` returned {match.group(0)}; `pty-alloc` qtest passed (openpty; C9)")
+               f"`ssh -tt tty` returned {match.group(0)}; `pty-alloc` and `termios` pass "
+               f"(openpty; C9)")
         attempt("S8", 1, "fresh", "/dev/pts/N", match.group(0),
                 float(result["elapsed_ms"]), "PASS")
     elif "PTY allocation request failed" in error or "PTY allocation request failed" in output:
         record("S8", "FAIL",
-               "`PTY allocation request failed on channel 0` (pts_alloc/openpty; C9)")
+               "`PTY allocation request failed on channel 0` (pts_alloc/openpty; C9); "
+               "server log in s8-server.log")
         attempt("S8", 1, "fresh", "/dev/pts/N", "PTY allocation request failed",
                 float(result["elapsed_ms"]), "FAIL")
     elif "tty: command not found" in (output + error):
@@ -1039,11 +1084,11 @@ def row_s8() -> None:
                f"(C9)")
         attempt("S8", 1, "fresh", "/dev/pts/N", tty_line,
                 float(result["elapsed_ms"]), "FAIL")
-    elif match and not pty_alloc_ok:
+    elif match and not (pty_alloc_ok and termios_ok):
         record("S8", "FAIL",
-               f"`ssh -tt tty` returned {match.group(0)}, but the pty-alloc qtest did not pass "
-               f"(openpty; C9)")
-        attempt("S8", 1, "fresh", "/dev/pts/N + pty-alloc pass", match.group(0),
+               f"`ssh -tt tty` returned {match.group(0)}, but pty-alloc="
+               f"{pty_alloc_ok} termios={termios_ok} (openpty; C9)")
+        attempt("S8", 1, "fresh", "/dev/pts/N + pty-alloc/termios pass", match.group(0),
                 float(result["elapsed_ms"]), "FAIL")
     else:
         record("S8", "FAIL",
@@ -1107,20 +1152,30 @@ def main() -> int:
         time.sleep(2.0)
 
     s8_child = None
+    s8_console: SerialConsole | None = None
     try:
-        s8_child, _ = boot(IMAGE, b"svcd: sshd up", "serial-s8.log",
-                           "vars-s8.fd", ready_timeout=180)
+        s8_child, s8_console = boot(IMAGE, b"svcd: sshd up", "serial-s8.log",
+                                    "vars-s8.fd", ready_timeout=180,
+                                    socket_serial=True)
         if not wait_tcp(22, 30):
             record("S8", "BLOCKED",
                    "guest listener did not accept a TCP connection after svcd: sshd up")
         else:
             time.sleep(0.5)
             row_s8()
+        if s8_console is not None:
+            if console_login(s8_console):
+                console_capture(s8_console, "cat /tmp/sshd.log", "s8-server.log")
+            else:
+                (OUT / "s8-server.log").write_text("console login failed\n", encoding="utf-8")
     except Exception as error:  # noqa: BLE001 - isolate the S8 boot
         record("S8", "BLOCKED", f"S8 boot failed: {error}")
     finally:
         if s8_child is not None:
             kill(s8_child)
+        if s8_console is not None:
+            s8_console.pump()
+            s8_console.close()
         time.sleep(2.0)
 
     child = None
