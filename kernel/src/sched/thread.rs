@@ -9,7 +9,7 @@
 
 use core::alloc::Layout;
 use core::sync::atomic::{
-    AtomicBool, AtomicI32, AtomicI64, AtomicU8, AtomicU32, AtomicU64, Ordering,
+    AtomicBool, AtomicI32, AtomicI64, AtomicU8, AtomicU32, AtomicU64, AtomicUsize, Ordering,
 };
 
 use alloc::alloc::alloc_zeroed;
@@ -20,6 +20,7 @@ use spin::Mutex;
 
 use raven_abi::errno::Errno;
 use raven_rmm::VirtAddr;
+use raven_sched_core::MAX_THREADS;
 
 #[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::fpu::FpuArea;
@@ -52,6 +53,49 @@ const STACK_RESERVED_PAGES: u64 = KERNEL_STACK_PAGES + 1;
 static NEXT_THREAD_ID: AtomicU64 = AtomicU64::new(1);
 /// 30-bit userspace thread ids (PG-2); zero is never handed out.
 static NEXT_TID: AtomicU32 = AtomicU32::new(1);
+
+/// Live non-idle threads (K527).
+///
+/// This is the kernel side of the run-queue admission proof: a thread that is not idle can be
+/// a member of at most one run-queue level, so bounding the live thread count by
+/// [`MAX_THREADS`] and sizing every level to the same bound means the queue can never refuse a
+/// runnable thread. Idle threads are never enqueued and are excluded.
+static LIVE_THREADS: AtomicUsize = AtomicUsize::new(0);
+
+/// RAII reservation for the kernel-wide thread bound.
+struct ThreadSlot {
+    counted: bool,
+}
+
+impl ThreadSlot {
+    /// Reserve one non-idle thread slot, or fail the thread creation with `EAGAIN`.
+    fn reserve() -> Result<Self, Errno> {
+        if LIVE_THREADS.fetch_add(1, Ordering::AcqRel) >= MAX_THREADS {
+            LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
+            return Err(Errno::EAGAIN);
+        }
+        Ok(Self { counted: true })
+    }
+
+    /// The per-CPU idle threads are not run-queue members and do not consume the bound.
+    const fn idle() -> Self {
+        Self { counted: false }
+    }
+}
+
+impl Drop for ThreadSlot {
+    fn drop(&mut self) {
+        if self.counted {
+            LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
+}
+
+/// Number of live non-idle threads (diagnostic and the K527 bound).
+#[allow(dead_code)] // used by the scheduler saturation self-test and diagnostics
+pub fn live_threads() -> usize {
+    LIVE_THREADS.load(Ordering::Acquire)
+}
 /// Mask keeping a tid in the musl lock-word / PG-2 30-bit range.
 const TID_MASK: u32 = 0x3fff_ffff;
 
@@ -207,6 +251,8 @@ pub struct Thread {
     pub resend: AtomicBool,
     /// Current cross-process trace id (`R-OBS-6`); zero means "not traced".
     pub trace_id: AtomicU64,
+    /// Kernel-wide thread-bound reservation (K527); released when the thread object drops.
+    _thread_slot: ThreadSlot,
 }
 
 // SAFETY: all interior mutability is accessed from scheduler critical sections (interrupts off)
@@ -324,6 +370,9 @@ impl Thread {
         if !crate::sched::runqueue::valid_priority(priority) {
             return Err(Errno::EINVAL);
         }
+        // K527: enforce the bound before allocating; the reservation drops on every error path
+        // below, and later when the thread object itself drops.
+        let slot = ThreadSlot::reserve()?;
         let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
         let thread = Arc::new(Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
@@ -369,6 +418,7 @@ impl Thread {
             signal_mask: AtomicU64::new(0),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
+            _thread_slot: slot,
         });
         Ok(thread)
     }
@@ -468,6 +518,7 @@ impl Thread {
             signal_mask: AtomicU64::new(0),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
+            _thread_slot: ThreadSlot::idle(),
         })
     }
 
@@ -522,6 +573,7 @@ impl Thread {
             signal_mask: AtomicU64::new(0),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
+            _thread_slot: ThreadSlot::idle(),
         }))
     }
 }
