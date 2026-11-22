@@ -57,6 +57,94 @@ fn bare_socket_opens_immediately() {
 }
 
 #[test]
+fn mptcp_socket_opens_immediately_without_bare_open() {
+    let net = net_without_unix(Caps::default());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+        .expect("mptcp socket");
+    assert_eq!(logs(&net), vec![WireLog::Open(b"net:mptcp".to_vec())]);
+    let mut protocol = [0u8; 4];
+    let written = net
+        .getsockopt(fd, SOL_SOCKET, SO_PROTOCOL, &mut protocol)
+        .expect("protocol");
+    assert_eq!(written, 4);
+    assert_eq!(i32::from_ne_bytes(protocol), crate::mptcp::IPPROTO_MPTCP);
+}
+
+#[test]
+fn mptcp_datagram_protocol_is_eprotonosupport() {
+    let net = net_without_unix(Caps::default());
+    assert_eq!(
+        net.socket(AF_INET, SOCK_DGRAM, crate::mptcp::IPPROTO_MPTCP),
+        Err(Errno::EPROTONOSUPPORT)
+    );
+    assert!(
+        net.socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+            .is_ok()
+    );
+}
+
+#[test]
+fn mptcp_add_path_is_encoded_for_netd() {
+    let fake = FakeNetd::with_caps(Caps::default());
+    let net = Net::new(fake.clone(), fake.clone(), fake.clone());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+        .expect("mptcp socket");
+    let mut value = [0u8; 12];
+    value[0] = AF_INET as u8;
+    value[1] = 1;
+    value
+        .get_mut(4..8)
+        .expect("addr")
+        .copy_from_slice(&[10, 77, 2, 16]);
+    net.setsockopt(
+        fd,
+        crate::mptcp::SOL_MPTCP,
+        crate::mptcp::MPTCP_PM_CMD_ADD_ADDR,
+        &value,
+    )
+    .expect("add path");
+    let requests = fake.mptcp_requests();
+    let request = requests.first().expect("request");
+    assert_eq!(u16::from_le_bytes([request[0], request[1]]), 1);
+    assert_eq!(u16::from_le_bytes([request[2], request[3]]), 4);
+    assert_eq!(
+        u16::from_le_bytes([request[4], request[5]]),
+        crate::mptcp::OP_MPTCP_ADD_ADDR
+    );
+    let decoded = crate::mptcp::PmAddr::decode(request.get(6..).expect("payload")).expect("decode");
+    assert_eq!(decoded.id, 1);
+    assert_eq!(decoded.addr, [10, 77, 2, 16]);
+}
+
+#[test]
+fn mptcp_info_reply_is_copied() {
+    let fake = FakeNetd::with_caps(Caps::default());
+    let net = Net::new(fake.clone(), fake.clone(), fake.clone());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+        .expect("mptcp socket");
+    let info = [2u8, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0];
+    let mut reply = Vec::new();
+    reply.extend_from_slice(&8u16.to_le_bytes());
+    reply.extend_from_slice(&(info.len() as u16).to_le_bytes());
+    reply.extend_from_slice(&info);
+    fake.set_mptcp_reply(&reply);
+    let mut out = [0u8; 12];
+    let used = net
+        .getsockopt(
+            fd,
+            crate::mptcp::SOL_MPTCP,
+            crate::mptcp::MPTCP_INFO,
+            &mut out,
+        )
+        .expect("info");
+    assert_eq!(used, 12);
+    assert_eq!(out, info);
+}
+
+#[test]
 fn type_flags_and_errors() {
     let net = net_without_unix(Caps::default());
     let fd = net

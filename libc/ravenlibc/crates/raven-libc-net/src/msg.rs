@@ -55,7 +55,22 @@ pub fn scatter(data: &[u8], iov: &mut [&mut [u8]]) -> usize {
 
 /// Build `net:tcp/<ipv4>:<port>` or `net:udp/...`.
 pub fn socket_path(ty: i32, endpoint: Endpoint, out: &mut [u8]) -> Result<&str, Errno> {
-    let prefix: &[u8] = if ty == SOCK_STREAM {
+    socket_path_proto(0, ty, endpoint, out)
+}
+
+/// Build the endpoint path for `proto` (0 means the socket-type default).
+///
+/// `IPPROTO_MPTCP` selects the MPTCP scheme path; every other value keeps the plain TCP/UDP
+/// path byte-for-byte.
+pub fn socket_path_proto(
+    proto: i32,
+    ty: i32,
+    endpoint: Endpoint,
+    out: &mut [u8],
+) -> Result<&str, Errno> {
+    let prefix: &[u8] = if proto == crate::mptcp::IPPROTO_MPTCP && ty == SOCK_STREAM {
+        b"net:mptcp/"
+    } else if ty == SOCK_STREAM {
         b"net:tcp/"
     } else if ty == SOCK_DGRAM {
         b"net:udp/"
@@ -87,7 +102,14 @@ pub fn socket_path(ty: i32, endpoint: Endpoint, out: &mut [u8]) -> Result<&str, 
 
 /// Build a bare `net:tcp` or `net:udp` path.
 pub fn bare_path(ty: i32, out: &mut [u8]) -> Result<&str, Errno> {
-    let text: &[u8] = if ty == SOCK_STREAM {
+    bare_path_proto(0, ty, out)
+}
+
+/// Build the bare path for `proto` (0 means the socket-type default).
+pub fn bare_path_proto(proto: i32, ty: i32, out: &mut [u8]) -> Result<&str, Errno> {
+    let text: &[u8] = if proto == crate::mptcp::IPPROTO_MPTCP && ty == SOCK_STREAM {
+        b"net:mptcp"
+    } else if ty == SOCK_STREAM {
         b"net:tcp"
     } else if ty == SOCK_DGRAM {
         b"net:udp"

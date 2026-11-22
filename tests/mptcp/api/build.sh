@@ -20,7 +20,10 @@ if [ "$arch" != x86_64 ]; then
 fi
 
 sysroot=$root/build/$arch/sysroot
-if [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$sysroot/usr/lib/crt1.o" ]; then
+if [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$sysroot/usr/lib/crt1.o" ] ||
+    [ -n "$(find "$root/libc/ravenlibc/crates" "$root/libc/ravenlibc/abi" \
+        "$root/libc/ravenlibc/crt" "$root/libc/ravenlibc/Cargo.toml" \
+        -newer "$sysroot/usr/lib/libc.a" -print -quit 2>/dev/null)" ]; then
     cargo xtask libc-pack --arch "$arch"
 fi
 for file in crt1.o crti.o crtn.o libc.a; do
@@ -77,12 +80,14 @@ else
         "$sysroot/usr/lib/crtn.o" -o "$out/mptcp-api"
 fi
 
-cargo xtask initfs --arch "$arch" --profile libc-test > /dev/null
+cargo xtask initfs --arch "$arch" --profile network-config-test > /dev/null
 cp "build/$arch/initfs.img" "$out/base.img"
 
 cargo build -q -p raven-b70-overlay
 overlay=$root/target/debug/raven-b70-overlay
 "$overlay" "$out/base.img" "$out/initfs.img" \
-    "/bin/libc-test=$out/mptcp-api:0755"
+    "/bin/mptcp-api=$out/mptcp-api:0755" \
+    "/etc/services.d/mptcp-api.toml=$root/tests/mptcp/api/service.toml" \
+    "/etc/svcd.conf=$root/tests/mptcp/api/svcd.conf"
 
 echo "mptcp-api fixture: staged $out/initfs.img"

@@ -179,31 +179,22 @@ band); the API `recv` reads the active real subflow until the wire DSS mapping l
 
 ## Userland socket API (MPTCP2c1)
 
-The API contract the two-tap fixture needs is the Linux-shaped `socket(AF_INET/AF_INET6,
-SOCK_STREAM, IPPROTO_MPTCP)` plus a path-manager control and a state query. The guest probe is
-`tests/mptcp/api/main.c` and the qtest is `mptcp-api`; it is red on the current tree:
+The libc half of the Linux-shaped `socket(AF_INET/AF_INET6, SOCK_STREAM, IPPROTO_MPTCP)` surface is
+implemented in `raven-libc-net`: protocol validation, the `net:mptcp`/`net:mptcp/<ip>:<port>` scheme
+paths, and the `SOL_MPTCP` control encoding. Plain TCP/UDP keeps its existing `net:tcp`/`net:udp`
+paths byte-for-byte, and `SOCK_DGRAM + IPPROTO_MPTCP` returns `EPROTONOSUPPORT` (93) before any
+request.
+
+The guest probe (`tests/mptcp/api/main.c`, qtest `mptcp-api`) is still red because the server half
+is MPTCP2c2 (`netd`/`raven-netcore`): `netd` does not yet recognize `net:mptcp`, so the first
+listener open returns `EINVAL`:
 
 ```text
 mptcp-api: start
-mptcp-api: socket errno=93
+mptcp-api: listener errno=22
 ```
 
-The transport does not exist in the layers this ticket owns:
-
-* `raven-libc-net::validate_proto` accepts only protocol 0/6 for `SOCK_STREAM`, so libc rejects
-  `IPPROTO_MPTCP` (262) before it reaches `netd`.
-* `netd`/`raven-netcore` expose plain TCP/UDP only and attach one `nic:`; there is no MPTCP
-  socket, path-manager request or subflow query in the `net:` protocol.
-* `raven-tcpip::MptcpSocket` is a host-testable API over an in-process `Stack<Device>`. It is not
-  reachable from libc's `net:` handles, and `raven-mptcp::MetaSocket` stores `Box<dyn Subflow>`
-  (a `'static` transport), while libc's backend is a borrow of the process platform.
-
-A libc-only userspace framing over two plain `net:` TCP sockets is not a valid acceptance: it
-would be a new protocol, would not put MP_CAPABLE/MP_JOIN on the wire, and would not interoperate
-with the MPTCP2c Linux host peer. The correct owner is `netd`/`raven-netcore` (or the TCP wire
-path), which is outside this ticket's Owns.
-
-The intended API surface, documented here for the follow-up ticket:
+The C API surface:
 
 | Operation | Shape |
 |---|---|
@@ -213,6 +204,21 @@ The intended API surface, documented here for the follow-up ticket:
 | backup | `setsockopt(fd, SOL_MPTCP, MPTCP_PM_CMD_SET_FLAGS, backup flag)` |
 | state | `getsockopt(fd, SOL_MPTCP, MPTCP_INFO, ...)`; per-subflow ids via `MPTCP_SUBFLOW_ADDRS` |
 | fallback | an MP_CAPABLE negotiation failure keeps the connection on plain TCP |
+
+The libc-to-netd control frames use the existing `KIND_CALL` header (`u16` version 1, `u16` kind 4)
+followed by one of the MPTCP opcodes; the payload follows the opcode:
+
+| Opcode | Request payload | Reply |
+|---|---|---|
+| 12 `OP_MPTCP_ADD_ADDR` | 12-byte `mptcp_pm_addr` (family, id, flags, IPv4, port) | `TAG_OK` |
+| 13 `OP_MPTCP_DEL_ADDR` | 1-byte id | `TAG_OK` |
+| 14 `OP_MPTCP_SET_FLAGS` | 12-byte `mptcp_pm_addr` with the backup flag | `TAG_OK` |
+| 15 `OP_MPTCP_INFO` | none | `TAG_MPTCP_INFO` (8), `u16` length, 12-byte C `mptcp_info` |
+| 16 `OP_MPTCP_SUBFLOWS` | none | `TAG_MPTCP_SUBFLOWS` (9), `u16` length, 16-byte records |
+
+Errors use the existing `TAG_ERR` (6) + `u16` errno. The server side (MPTCP2c2) owns the opcode
+table in `raven-proto-net`/`netd`; libc only encodes and decodes it. The `raven-tcpip::MptcpSocket`
+host API remains the backend the server drives; it is not reachable from libc directly.
 
 ## Phase 2 boundary
 
