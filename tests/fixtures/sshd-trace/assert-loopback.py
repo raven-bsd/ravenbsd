@@ -138,7 +138,7 @@ def main() -> int:
             child.expect("raven# ", timeout=120)
             console(child, "/bin/brush /etc/ssh/trace-client.sh > /tmp/loop.log 2>&1 & "
                            "M=Q; echo ${M}S", "QS", 90)
-            time.sleep(12)
+            time.sleep(20)
             console(child, "cat /tmp/loop.log; M=Q; echo ${M}L", "QL", 60)
             console(child, "/bin/sshd-trace-logdump", "LOGDONE", 90)
             state = "collected"
