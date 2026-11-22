@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# K531: /tmp must be POSIX 1777 with the sticky bit. The release image is booted once and the
-# serial root session runs the rows: the mode/owner, a non-root create, a non-root attempt to
-# remove a root-owned file (EPERM by the sticky bit), a non-root directory and mode-600 file, and a
-# root remove. Today /tmp is 0755 root root, so the first expectation is red; the fix must be in the
-# image assembly (see the report: the mounted ramfs root mode is outside this ticket's Owns).
+# K531: /tmp must be POSIX 1777 with the sticky bit. The release image is booted once; the root
+# console runs /bin/tmp-writable, which forks and drops to uid 1000 for the non-root rows. Today the
+# image is 1777; the 0755 mutation image fails the create row. No `su` is required.
 
 name = "tmp-writable"
 arch = "x86_64"
@@ -16,13 +14,13 @@ boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 
 [[expect]]
-regex = '^1777 root root$'
+regex = '^tmp-writable: mode=1777 uid=0 gid=0$'
 
 [[expect]]
 regex = '^user-create-ok$'
 
 [[expect]]
-regex = '^user-remove-denied$'
+regex = '^user-remove-denied errno=[0-9]+ \(.*\)$'
 
 [[expect]]
 regex = '(?i)(operation not permitted|permission denied)'
@@ -35,6 +33,9 @@ regex = '^file-mode=600$'
 
 [[expect]]
 regex = '^root-remove-ok$'
+
+[[expect]]
+regex = '^tmp-writable: ok$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
@@ -60,52 +61,12 @@ wait = '^\s*raven#\s*$'
 timeout_secs = 60
 
 [[step]]
-send = "stat -c '%a %U %G' /tmp\n"
+send = "/bin/tmp-writable\n"
 delay_ms = 100
 
 [[step]]
-wait = '^(1777 root root|[0-9]+ [a-z]+ [a-z]+)$'
-timeout_secs = 30
-
-[[step]]
-send = "su raven -c 'touch /tmp/k531-user && echo user-create-ok'\n"
-delay_ms = 100
-
-[[step]]
-wait = '^(user-create-ok|.*[Pp]ermission denied.*)$'
-timeout_secs = 30
-
-[[step]]
-send = "rm -f /tmp/k531-root; touch /tmp/k531-root; chmod 600 /tmp/k531-root; echo root-file-ok\n"
-delay_ms = 100
-
-[[step]]
-wait = '^root-file-ok$'
-timeout_secs = 30
-
-[[step]]
-send = "su raven -c 'rm /tmp/k531-root' || echo user-remove-denied\n"
-delay_ms = 100
-
-[[step]]
-wait = '^(user-remove-denied|.*[Pp]ermission denied.*)$'
-timeout_secs = 30
-
-[[step]]
-send = "su raven -c 'mkdir /tmp/k531-dir && touch /tmp/k531-dir/mode600 && chmod 600 /tmp/k531-dir/mode600 && stat -c \"dir-mode=%a\" /tmp/k531-dir && stat -c \"file-mode=%a\" /tmp/k531-dir/mode600'\n"
-delay_ms = 100
-
-[[step]]
-wait = '^(dir-mode=755|.*[Pp]ermission denied.*)$'
-timeout_secs = 30
-
-[[step]]
-send = "rm -rf /tmp/k531-root /tmp/k531-user /tmp/k531-dir && echo root-remove-ok\n"
-delay_ms = 100
-
-[[step]]
-wait = '^root-remove-ok$'
-timeout_secs = 30
+wait = '^tmp-writable: ok$'
+timeout_secs = 60
 
 [[step]]
 send = "exit 0\n"
