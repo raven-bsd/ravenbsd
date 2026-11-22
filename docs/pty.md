@@ -122,6 +122,33 @@ The child is a true `fork` + `execve` of the test binary. `posix_spawn` of the s
 `/bin/libc-test` returned `ENOENT` (2) in the libc-test profile; `execve` works and is the path
 OpenSSH uses. The case is the reference the S8 `openpty: Broken pipe` owner should cite.
 
+## Line discipline behaviour (K485)
+
+The stored `Termios` record drives the pty, not just the round-trip:
+
+* canonical `VERASE`/`VKILL`/`VEOF` edit the line; `VWERASE` erases the previous word when
+  `IEXTEN` is set, as in `ttydisc_rint` (FreeBSD `sys/kern/tty_ttydisc.c`);
+* `ISIG` consumes `VINTR`/`VQUIT` in canonical and raw mode, echoes `^C`/`^\`, and raises the
+  interrupt/quit event. The event is mapped to `SIGINT`/`SIGQUIT` for the foreground process
+  group when `OP_SET_FG` has set one; libc has no `tcsetpgrp` yet, so the guest case measures
+  consumption/echo and reports the pgrp delivery as unset;
+* `OPOST|ONLCR` maps slave `\n` to `\r\n` on the master;
+* `ICRNL`/`INLCR`/`IGNCR`/`ISTRIP` apply to input in both canonical and raw mode (raw skips only
+  editing/echo; `cfmakeraw` clears the translation flags for a true byte pipe);
+* `VMIN=0,VTIME=n` is applied in the `ptyd` slave read with a monotonic deadline and 1 ms yield:
+  a queued byte returns immediately, and an empty read returns 0 after ~`n`×100 ms.
+  `VMIN=0,VTIME=0` is the polling read and returns 0. `VMIN>0` with no queued byte returns
+  `EAGAIN` because the single-threaded server would otherwise block the master writer; waiting
+  for a future byte needs a pty wait queue and is a known gap, not claimed by the case.
+
+The guest case `tty-discipline` drives each row through `tcsetattr`/`read`/`write` and prints the
+observed bytes/timing:
+
+```sh
+timeout 300 cargo xtask qtest --case tty-discipline --arch x86_64
+# tty-discipline: pass
+```
+
 ## Privsep wire shape
 
 The `pty-monitor` guest test implements the monitor side over `socketpair(AF_UNIX)`:

@@ -130,6 +130,8 @@ pub const VSTOP: usize = 9;
 pub const VSUSP: usize = 10;
 /// Index of `VEOL` in `c_cc`.
 pub const VEOL: usize = 11;
+/// Index of `VWERASE` in `c_cc`.
+pub const VWERASE: usize = 14;
 
 /// The disabled special-character value (`_POSIX_VDISABLE` in Raven libc is 0).
 pub const VDISABLE: u8 = 0;
@@ -173,6 +175,7 @@ impl Termios {
         cc[VSTART] = 0x11;
         cc[VSTOP] = 0x13;
         cc[VSUSP] = 0x1a;
+        cc[VWERASE] = 0x17;
         cc[VMIN] = 1;
         cc[VTIME] = 0;
         Self {
@@ -275,6 +278,11 @@ pub struct Output {
     pub data: Vec<u8>,
     /// Events in the order they happened.
     pub events: Vec<Event>,
+    /// `^\`: the current line was discarded and the reader must raise `SIGQUIT` on the
+    /// foreground process group. This is a flag rather than a new [`Event`] variant because
+    /// `Event` is matched exhaustively by the console server (`userland/servers/consd`), which is
+    /// outside this ticket's Owns paths; a new variant would force an unrelated edit there.
+    pub quit: bool,
 }
 
 /// The terminal window size (`struct winsize`).
@@ -392,13 +400,9 @@ impl Discipline {
             if self.termios.cflag & CREAD == 0 {
                 continue;
             }
-            // Raw mode is a byte pipe in this pty: the console's raw-mode clients never expect
-            // editing, echo or translation (they clear the termios bits themselves when they use
-            // cfmakeraw). This preserves the pre-K444 scheme contract.
-            if self.termios.settings().mode == Mode::Raw {
-                out.data.push(raw);
-                continue;
-            }
+            // Raw mode skips editing and echo, but the input translation and signal flags below
+            // apply in both modes, as in the BSD line discipline (cfmakeraw clears those flags
+            // for a true byte pipe).
             let mut byte = raw;
             if self.termios.iflag & ISTRIP != 0 {
                 byte &= 0x7f;
@@ -422,12 +426,28 @@ impl Discipline {
                 byte = b'\r';
             }
 
-            if self.termios.lflag & ISIG != 0 && self.special(VINTR, byte) {
-                self.interrupt(out);
+            // ISIG is independent of ICANON in the donor (`ttydisc_rint`): signal characters are
+            // consumed and delivered as an event, never as line data.
+            if self.termios.lflag & ISIG != 0 {
+                if self.special(VINTR, byte) {
+                    self.interrupt(out);
+                    continue;
+                }
+                if self.special(VQUIT, byte) {
+                    self.quit(out);
+                    continue;
+                }
+            }
+            if self.termios.settings().mode == Mode::Raw {
+                out.data.push(byte);
                 continue;
             }
             if byte == NEWLINE || (self.special(VEOL, byte) && self.termios.lflag & IEXTEN != 0) {
                 self.complete_line(out);
+                continue;
+            }
+            if self.special(VWERASE, byte) && self.termios.lflag & IEXTEN != 0 {
+                self.werase(out);
                 continue;
             }
             if self.special(VERASE, byte) || byte == BACKSPACE || byte == DEL {
@@ -476,6 +496,23 @@ impl Discipline {
         }
     }
 
+    fn werase(&mut self, out: &mut Output) {
+        let mut erased = 0usize;
+        while self.len > 0 && matches!(self.line[self.len - 1], b' ' | b'\t') {
+            self.len -= 1;
+            erased += 1;
+        }
+        while self.len > 0 && !matches!(self.line[self.len - 1], b' ' | b'\t') {
+            self.len -= 1;
+            erased += 1;
+        }
+        if self.termios.lflag & ECHO != 0 {
+            for _ in 0..erased {
+                out.echo.extend_from_slice(ERASE);
+            }
+        }
+    }
+
     fn kill_line(&mut self, out: &mut Output) {
         if self.len == 0 {
             return;
@@ -496,6 +533,15 @@ impl Discipline {
             out.echo.extend_from_slice(b"\r\n");
         }
         out.events.push(Event::Interrupt);
+    }
+
+    fn quit(&mut self, out: &mut Output) {
+        self.len = 0;
+        if self.termios.lflag & ECHO != 0 {
+            out.echo.extend_from_slice(b"^\\");
+            out.echo.extend_from_slice(b"\r\n");
+        }
+        out.quit = true;
     }
 
     fn eof_or_complete(&mut self, out: &mut Output) {

@@ -242,10 +242,11 @@ fn without_echo_editing_still_happens() {
 #[test]
 fn raw_mode_passes_bytes_through() {
     let mut discipline = Discipline::new();
-    discipline.set_settings(Settings {
-        mode: Mode::Raw,
-        echo: true,
-    });
+    let mut termios = Termios::sane();
+    termios.iflag = 0;
+    termios.oflag = 0;
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
     let output = feed(&mut discipline, b"ab\r\n");
     assert_eq!(output.data, b"ab\r\n");
     assert!(output.lines.is_empty());
@@ -265,10 +266,11 @@ fn raw_mode_does_not_echo() {
 #[test]
 fn raw_mode_does_not_edit() {
     let mut discipline = Discipline::new();
-    discipline.set_settings(Settings {
-        mode: Mode::Raw,
-        echo: false,
-    });
+    let mut termios = Termios::sane();
+    termios.iflag = 0;
+    termios.oflag = 0;
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
     let output = feed(&mut discipline, b"a\x7f\x15\x03");
     assert_eq!(output.data, b"a\x7f\x15\x03");
     assert!(output.events.is_empty());
@@ -277,10 +279,11 @@ fn raw_mode_does_not_edit() {
 #[test]
 fn raw_mode_has_no_events() {
     let mut discipline = Discipline::new();
-    discipline.set_settings(Settings {
-        mode: Mode::Raw,
-        echo: false,
-    });
+    let mut termios = Termios::sane();
+    termios.iflag = 0;
+    termios.oflag = 0;
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
     let output = feed(&mut discipline, b"\x03\x04");
     assert!(output.events.is_empty());
     assert_eq!(output.data, b"\x03\x04");
@@ -551,6 +554,34 @@ fn output_is_raw_without_opost() {
 }
 
 #[test]
+fn vwerase_removes_the_previous_word() {
+    let mut discipline = Discipline::new();
+    let output = feed(&mut discipline, b"one two\x17X\n");
+    assert_eq!(lines(&output), vec![&b"one X\n"[..]]);
+}
+
+#[test]
+fn raw_input_still_honours_translation_and_istrip() {
+    let mut crlf = Termios::sane();
+    crlf.iflag = ICRNL;
+    crlf.oflag = 0;
+    crlf.lflag = 0;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(crlf);
+    let output = feed(&mut discipline, b"\r");
+    assert_eq!(output.data, b"\n");
+
+    let mut strip = Termios::sane();
+    strip.iflag = ISTRIP;
+    strip.oflag = 0;
+    strip.lflag = 0;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(strip);
+    let output = feed(&mut discipline, &[0xff]);
+    assert_eq!(output.data, &[0x7f]);
+}
+
+#[test]
 fn a_fresh_winsize_is_zero() {
     assert_eq!(
         Winsize::default(),
@@ -582,4 +613,37 @@ fn a_custom_verase_byte_erases() {
     let output = feed(&mut discipline, b"\x18");
     assert_eq!(output.echo, b"\x08 \x08");
     assert_eq!(discipline.pending(), 1);
+}
+
+#[test]
+fn vwerase_is_gated_by_iexten() {
+    let mut termios = Termios::sane();
+    termios.lflag &= !IEXTEN;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(termios);
+    let output = feed(&mut discipline, b"one two\x17X\n");
+    // Without IEXTEN the donor treats 0x17 as an ordinary byte.
+    assert_eq!(lines(&output), vec![&b"one two\x17X\n"[..]]);
+}
+
+#[test]
+fn quit_discards_the_line_and_is_not_data() {
+    let mut discipline = Discipline::new();
+    let output = feed(&mut discipline, b"ab\x1ccd\n");
+    // A signal character is consumed: the pending "ab" is discarded and the next line is "cd".
+    assert_eq!(lines(&output), vec![&b"cd\n"[..]]);
+    assert!(output.quit);
+    assert!(output.events.is_empty());
+    assert!(output.data.is_empty());
+}
+
+#[test]
+fn isig_applies_without_canonical_mode() {
+    let mut termios = Termios::sane();
+    termios.lflag = ISIG;
+    let mut discipline = Discipline::new();
+    discipline.set_termios(termios);
+    let output = feed(&mut discipline, b"\x03");
+    assert!(output.data.is_empty());
+    assert_eq!(output.events, vec![Event::Interrupt]);
 }
