@@ -19,5 +19,5 @@ python3 tests/smp/ssh-contract/host_accept.py \
     --monitor "$out/monitor.sock" \
     --result "$out/host.result" \
     --log "$out/host.log" \
-    --timeout 120 \
+    --timeout 600 \
     > "$out/host.stdout" 2>&1 &

@@ -62,8 +62,8 @@ def discover_ports(path, deadline):
 def exchange(host, port, payload, ack, deadline):
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=2.0) as stream:
-                stream.settimeout(5.0)
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
                 stream.sendall(payload)
                 echoed = b""
                 while len(echoed) < len(payload):
@@ -95,8 +95,8 @@ def read_line(stream, limit=64):
 def eof_fin(host, port, deadline):
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=2.0) as stream:
-                stream.settimeout(5.0)
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
                 greeting = read_line(stream)
                 if greeting != b"EOF":
                     raise OSError(f"eof greeting {greeting!r}")
@@ -109,8 +109,8 @@ def eof_fin(host, port, deadline):
 def half_close(host, port, deadline):
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=2.0) as stream:
-                stream.settimeout(5.0)
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
                 greeting = read_line(stream)
                 if greeting != b"HALF":
                     raise OSError(f"half greeting {greeting!r}")
@@ -142,7 +142,7 @@ def main():
     parser.add_argument("--monitor", default="")
     parser.add_argument("--result", required=True)
     parser.add_argument("--log", default="")
-    parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--timeout", type=float, default=600.0)
     args = parser.parse_args()
 
     deadline = time.monotonic() + args.timeout

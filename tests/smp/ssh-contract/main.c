@@ -144,6 +144,7 @@ static int read_exact(int fd, void *buffer, size_t length) {
 
 static int read_exact_trace(int fd, void *buffer, size_t length, ssize_t *last, int *last_errno) {
     size_t done = 0;
+    int retries = 0;
 
     *last = 0;
     *last_errno = 0;
@@ -153,10 +154,26 @@ static int read_exact_trace(int fd, void *buffer, size_t length, ssize_t *last, 
         got = read(fd, (char *)buffer + done, length - done);
         *last = got;
         *last_errno = errno;
-        if (got <= 0) {
+        if (got > 0) {
+            done += (size_t)got;
+            retries = 0;
+            continue;
+        }
+        if (got == 0) {
             return -1;
         }
-        done += (size_t)got;
+        // A scheme read may return EAGAIN after the readiness doorbell was consumed by an
+        // earlier query.  Wait for the next readable transition instead of treating it as EOF.
+        if (errno == EAGAIN && retries < 12) {
+            int revents = poll_one(fd, POLLIN | POLLHUP, 5000);
+            if (revents < 0) {
+                *last_errno = errno;
+                return -1;
+            }
+            retries++;
+            continue;
+        }
+        return -1;
     }
     return 0;
 }
