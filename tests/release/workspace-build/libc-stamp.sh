@@ -44,6 +44,19 @@ grep -q 'artifact stale: run cargo xtask libc-pack' "$err" || {
 }
 echo "libc-stamp: source edit -> artifact stale"
 
+for fixture in socketpair-fixture itimer-fixture; do
+    if timeout 300 sh "tests/qtest/cases/$fixture/build.sh" > "$err.out" 2> "$err"; then
+        echo "libc-stamp: expected $fixture to fail closed on the stale artifact" >&2
+        exit 1
+    fi
+    grep -q 'artifact stale: run cargo xtask libc-pack' "$err" || {
+        echo "libc-stamp: $fixture did not print the stale message:" >&2
+        cat "$err" >&2
+        exit 1
+    }
+    echo "libc-stamp: $fixture -> artifact stale"
+done
+
 if [ -f "build/$arch/libc-dso.stamp" ]; then
     if timeout 300 cargo xtask libc-link --arch "$arch" --verify 2> "$err"; then
         echo "libc-stamp: expected the DSO stale error after the source edit" >&2
