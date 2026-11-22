@@ -8,7 +8,7 @@ use std::path::Path;
 
 use super::{
     Arch, apply_arch_waivers, build_spec, clean_compiler_headers, copy_headers, is_compiler_header,
-    parse,
+    parse, source_hash,
 };
 use crate::process::CommandSpec;
 
@@ -42,11 +42,13 @@ fn every_flag_parses_in_any_order() {
         "tiny",
         "--arch",
         "aarch64",
+        "--verify",
     ]))
     .expect("all flags");
     assert_eq!(options.arch, Arch::Aarch64);
     assert_eq!(options.set, "tiny");
     assert!(options.check);
+    assert!(options.verify);
     assert_eq!(options.probe.as_deref(), Some("all"));
     assert!(options.host_run);
     assert!(options.json);
@@ -92,6 +94,24 @@ fn an_unknown_flag_is_rejected() {
     assert!(parse(&args(&["--arch=x86_64"])).is_err());
     assert!(parse(&args(&["--clean"])).is_err());
     assert!(parse(&args(&["x86_64"])).is_err());
+}
+
+#[test]
+fn source_hash_tracks_content_not_mtime() {
+    let dir = std::env::temp_dir().join(format!("k441-source-hash-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let source = dir.join("libc/ravenlibc/crates/raven-libc/src/lib.rs");
+    std::fs::create_dir_all(source.parent().expect("parent")).expect("mkdir");
+    std::fs::write(&source, b"one").expect("write");
+    std::fs::write(dir.join("Cargo.lock"), b"lock").expect("lock");
+    std::fs::write(dir.join("rust-toolchain.toml"), b"toolchain").expect("toolchain");
+    let first = source_hash(&dir).expect("first hash");
+    std::fs::write(&source, b"two").expect("rewrite");
+    let second = source_hash(&dir).expect("second hash");
+    assert_ne!(first, second);
+    std::fs::write(&source, b"two").expect("same content");
+    assert_eq!(second, source_hash(&dir).expect("stable hash"));
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]

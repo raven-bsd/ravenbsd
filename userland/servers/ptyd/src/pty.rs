@@ -4,9 +4,10 @@
 //! The pty queues and the foreground process group.
 
 use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
-use raven_tty_core::{Discipline, Event, Output, Settings};
+use raven_tty_core::{Discipline, Event, Output, Settings, Termios, Winsize};
 
 /// POSIX SIGINT.
 pub const SIGINT: u32 = 2;
@@ -20,6 +21,7 @@ pub trait SignalSink {
 /// One pty pair.
 pub struct Pty<S: SignalSink> {
     discipline: Discipline,
+    winsize: Winsize,
     to_master: VecDeque<u8>,
     to_slave: VecDeque<u8>,
     eof: bool,
@@ -33,6 +35,7 @@ impl<S: SignalSink> Pty<S> {
     pub fn new(sink: S) -> Self {
         Self {
             discipline: Discipline::new(),
+            winsize: Winsize::default(),
             to_master: VecDeque::new(),
             to_slave: VecDeque::new(),
             eof: false,
@@ -50,6 +53,28 @@ impl<S: SignalSink> Pty<S> {
     /// Set the mode/echo settings and return the discarded pending input count.
     pub fn set_settings(&mut self, settings: Settings) -> usize {
         self.discipline.set_settings(settings)
+    }
+
+    /// The complete terminal attribute record shared by the master and the slave.
+    #[must_use]
+    pub fn termios(&self) -> Termios {
+        self.discipline.termios()
+    }
+
+    /// Set the complete terminal attribute record and return the discarded pending input count.
+    pub fn set_termios(&mut self, termios: Termios) -> usize {
+        self.discipline.set_termios(termios)
+    }
+
+    /// The window size shared by the master and the slave.
+    #[must_use]
+    pub const fn winsize(&self) -> Winsize {
+        self.winsize
+    }
+
+    /// Set the window size. A fresh pair starts at `0x0` (NetBSD).
+    pub fn set_winsize(&mut self, winsize: Winsize) {
+        self.winsize = winsize;
     }
 
     /// Drive input from the master side through the discipline.
@@ -73,9 +98,11 @@ impl<S: SignalSink> Pty<S> {
         }
     }
 
-    /// Write output from the slave side; it becomes readable on the master.
+    /// Write output from the slave side; it becomes readable on the master after `OPOST`.
     pub fn write_slave(&mut self, data: &[u8]) {
-        self.to_master.extend(data.iter().copied());
+        let mut output = Vec::with_capacity(data.len());
+        self.discipline.process_output(data, &mut output);
+        self.to_master.extend(output);
     }
 
     /// Read bytes for the master side, or `EAGAIN` when no data is queued.

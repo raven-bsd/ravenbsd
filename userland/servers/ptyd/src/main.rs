@@ -150,14 +150,28 @@ mod program {
                 return Err(Errno::EINVAL.into());
             }
             let op = u16::from_le_bytes([request[2], request[3]]);
+            if matches!(
+                op,
+                raven_proto_tty::OP_GET_TERMIOS | raven_proto_tty::OP_SET_TERMIOS
+            ) && response.len() < raven_proto_tty::TERMIOS_LEN
+            {
+                return Err(Errno::EINVAL.into());
+            }
+            if matches!(
+                op,
+                raven_proto_tty::OP_GET_WINSIZE | raven_proto_tty::OP_SET_WINSIZE
+            ) && response.len() < raven_proto_tty::WINSIZE_LEN
+            {
+                return Err(Errno::EINVAL.into());
+            }
             let arg0 = u32::from_le_bytes([request[4], request[5], request[6], request[7]]);
             let arg1 = u32::from_le_bytes([request[8], request[9], request[10], request[11]]);
             match op {
                 raven_proto_tty::OP_SET_MODE
                 | raven_proto_tty::OP_GET_MODE
                 | raven_proto_tty::OP_FLUSH => {
-                    let request = decode_request(&request[..raven_proto_tty::CALL_LEN])
-                        .map_err(|_| Errno::EINVAL)?;
+                    let request = decode_request(request).map_err(|_| Errno::EINVAL)?;
+                    let mut body = [0u8; raven_proto_tty::CALL_LEN];
                     let reply = match request {
                         Request::SetMode { settings } => {
                             pty.set_settings(settings);
@@ -166,8 +180,35 @@ mod program {
                         Request::GetMode => Response::Mode(pty.settings()),
                         Request::Flush => Response::Flushed { bytes: pty.flush() },
                     };
-                    let mut body = [0u8; raven_proto_tty::CALL_LEN];
                     encode_response(reply, &mut body);
+                    response[..body.len()].copy_from_slice(&body);
+                    Ok(body.len())
+                }
+                raven_proto_tty::OP_GET_TERMIOS | raven_proto_tty::OP_SET_TERMIOS => {
+                    match raven_proto_tty::decode_termios_request(request)
+                        .map_err(|_| Errno::EINVAL)?
+                    {
+                        raven_proto_tty::TermiosRequest::Set { termios } => {
+                            pty.set_termios(termios);
+                        }
+                        raven_proto_tty::TermiosRequest::Get => {}
+                    }
+                    let mut body = [0u8; raven_proto_tty::TERMIOS_LEN];
+                    raven_proto_tty::encode_termios_response(&pty.termios(), &mut body);
+                    response[..body.len()].copy_from_slice(&body);
+                    Ok(body.len())
+                }
+                raven_proto_tty::OP_GET_WINSIZE | raven_proto_tty::OP_SET_WINSIZE => {
+                    match raven_proto_tty::decode_winsize_request(request)
+                        .map_err(|_| Errno::EINVAL)?
+                    {
+                        raven_proto_tty::WinsizeRequest::Set { winsize } => {
+                            pty.set_winsize(winsize);
+                        }
+                        raven_proto_tty::WinsizeRequest::Get => {}
+                    }
+                    let mut body = [0u8; raven_proto_tty::WINSIZE_LEN];
+                    raven_proto_tty::encode_winsize_response(&pty.winsize(), &mut body);
                     response[..body.len()].copy_from_slice(&body);
                     Ok(body.len())
                 }

@@ -3,14 +3,18 @@
 
 //! Termios glue over the tty `CALL` protocol (`PG-54`).
 //!
-//! The protocol carries only `mode` (canonical/raw) and `echo`; the remaining `termios` fields
-//! are filled with the documented constants. This is a PARTIAL implementation, honestly marked
-//! in `FUNCTIONS.md`: `tcdrain`, flow control, break and window size return `ENOSYS` until the
-//! tty protocol grows those operations.
+//! The pty server carries the complete terminal attribute record in `GET_TERMIOS`/`SET_TERMIOS`
+//! (K444); `tcgetattr`/`tcsetattr` round-trip every field. Older tty servers that only answer
+//! `GET_MODE`/`SET_MODE` (the console scheme) fall back to the canonical/raw plus echo view and
+//! the documented defaults. `tcdrain`, flow control, break and window size still return
+//! `ENOSYS` until the protocol grows those operations.
 
 use raven_abi::errno::Errno;
 use raven_libc_abi::structs::Termios;
-use raven_proto_tty::{self, Request, Response, Settings};
+pub use raven_proto_tty::Winsize;
+use raven_proto_tty::{
+    self, Request, Response, Settings, TERMIOS_LEN, Termios as WireTermios, WINSIZE_LEN,
+};
 
 use crate::backend::SysBackend;
 use crate::fd::ofd::OfdKind;
@@ -34,15 +38,7 @@ pub const B38400: u32 = 0o17;
 
 /// A termios record for a canonical, echoing terminal.
 pub fn default_termios() -> Termios {
-    let mut termios = Termios::ZERO;
-    termios.c_lflag = ICANON | ECHO;
-    termios.c_cflag = CS8 | CREAD;
-    if let Some(slot) = termios.c_cc.get_mut(VMIN) {
-        *slot = 1;
-    }
-    termios.__c_ispeed = B38400;
-    termios.__c_ospeed = B38400;
-    termios
+    termios_from_wire(WireTermios::sane())
 }
 
 fn tty_call<B: SysBackend, L: Lock>(
@@ -72,14 +68,69 @@ fn tty_call<B: SysBackend, L: Lock>(
     Ok(decoded)
 }
 
+fn tty_get_termios<B: SysBackend, L: Lock>(
+    platform: &Platform<B, L>,
+    fd: i32,
+) -> Result<WireTermios, Errno> {
+    let reference = platform.get(fd)?;
+    if reference.kind() != OfdKind::Tty {
+        return Err(Errno::ENOTTY);
+    }
+    let mut body = [0u8; TERMIOS_LEN];
+    raven_proto_tty::encode_get_termios_request(&mut body);
+    let mut response = [0u8; TERMIOS_LEN];
+    let count = match platform
+        .backend()
+        .call(reference.handle(), &body, &mut response)
+    {
+        Err(Errno::ENOSYS) => return Err(Errno::ENOTTY),
+        other => other?,
+    };
+    if count < TERMIOS_LEN {
+        return Err(Errno::EPROTO);
+    }
+    raven_proto_tty::decode_termios_response(response.get(..count).unwrap_or(&[]))
+        .map_err(|_| Errno::EPROTO)
+}
+
+fn tty_set_termios<B: SysBackend, L: Lock>(
+    platform: &Platform<B, L>,
+    fd: i32,
+    termios: &WireTermios,
+) -> Result<WireTermios, Errno> {
+    let reference = platform.get(fd)?;
+    if reference.kind() != OfdKind::Tty {
+        return Err(Errno::ENOTTY);
+    }
+    let mut body = [0u8; TERMIOS_LEN];
+    raven_proto_tty::encode_set_termios_request(termios, &mut body);
+    let mut response = [0u8; TERMIOS_LEN];
+    let count = match platform
+        .backend()
+        .call(reference.handle(), &body, &mut response)
+    {
+        Err(Errno::ENOSYS) => return Err(Errno::ENOTTY),
+        other => other?,
+    };
+    if count < TERMIOS_LEN {
+        return Err(Errno::EPROTO);
+    }
+    raven_proto_tty::decode_termios_response(response.get(..count).unwrap_or(&[]))
+        .map_err(|_| Errno::EPROTO)
+}
+
 /// `tcgetattr`.
 pub fn tcgetattr<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fd: i32,
 ) -> Result<Termios, Errno> {
-    match tty_call(platform, fd, Request::GetMode)? {
-        Response::Mode(settings) => Ok(termios_from(settings)),
-        _ => Err(Errno::EPROTO),
+    match tty_get_termios(platform, fd) {
+        Ok(termios) => Ok(termios_from_wire(termios)),
+        Err(Errno::ENOTTY) => match tty_call(platform, fd, Request::GetMode)? {
+            Response::Mode(settings) => Ok(termios_from_settings(settings)),
+            _ => Err(Errno::EPROTO),
+        },
+        Err(error) => Err(error),
     }
 }
 
@@ -89,10 +140,17 @@ pub fn tcsetattr<B: SysBackend, L: Lock>(
     fd: i32,
     termios: &Termios,
 ) -> Result<(), Errno> {
-    let settings = settings_from(termios);
-    match tty_call(platform, fd, Request::SetMode { settings })? {
-        Response::Mode(_) => Ok(()),
-        _ => Err(Errno::EPROTO),
+    let wire = wire_from_termios(termios);
+    match tty_set_termios(platform, fd, &wire) {
+        Ok(_) => Ok(()),
+        Err(Errno::ENOTTY) => {
+            let settings = settings_from(termios);
+            match tty_call(platform, fd, Request::SetMode { settings })? {
+                Response::Mode(_) => Ok(()),
+                _ => Err(Errno::EPROTO),
+            }
+        }
+        Err(error) => Err(error),
     }
 }
 
@@ -171,29 +229,67 @@ pub fn cfsetospeed(termios: &mut Termios, speed: u32) -> i32 {
     0
 }
 
-/// `tcgetwinsize`: `ENOSYS` until PG-54.
+/// `tcgetwinsize`: the pty window size, `ENOTTY` for a non-tty or a tty server without the call.
 pub fn tcgetwinsize<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fd: i32,
-) -> Result<(), Errno> {
-    let _ = platform.get(fd)?;
-    Err(Errno::ENOSYS)
+) -> Result<Winsize, Errno> {
+    let reference = platform.get(fd)?;
+    if reference.kind() != OfdKind::Tty {
+        return Err(Errno::ENOTTY);
+    }
+    let mut body = [0u8; WINSIZE_LEN];
+    raven_proto_tty::encode_get_winsize_request(&mut body);
+    let mut response = [0u8; WINSIZE_LEN];
+    let count = match platform
+        .backend()
+        .call(reference.handle(), &body, &mut response)
+    {
+        Err(Errno::ENOSYS) => return Err(Errno::ENOTTY),
+        other => other?,
+    };
+    if count < WINSIZE_LEN {
+        return Err(Errno::EPROTO);
+    }
+    raven_proto_tty::decode_winsize_response(response.get(..count).unwrap_or(&[]))
+        .map_err(|_| Errno::EPROTO)
 }
 
-/// `tcsetwinsize`: `ENOSYS` until PG-54.
+/// `tcsetwinsize`: store the pty window size, `ENOTTY` for a non-tty or a tty server without the
+/// call.
 pub fn tcsetwinsize<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fd: i32,
+    winsize: &Winsize,
 ) -> Result<(), Errno> {
-    let _ = platform.get(fd)?;
-    Err(Errno::ENOSYS)
+    let reference = platform.get(fd)?;
+    if reference.kind() != OfdKind::Tty {
+        return Err(Errno::ENOTTY);
+    }
+    let mut body = [0u8; WINSIZE_LEN];
+    raven_proto_tty::encode_set_winsize_request(winsize, &mut body);
+    let mut response = [0u8; WINSIZE_LEN];
+    let count = match platform
+        .backend()
+        .call(reference.handle(), &body, &mut response)
+    {
+        Err(Errno::ENOSYS) => return Err(Errno::ENOTTY),
+        other => other?,
+    };
+    if count < WINSIZE_LEN {
+        return Err(Errno::EPROTO);
+    }
+    raven_proto_tty::decode_winsize_response(response.get(..count).unwrap_or(&[]))
+        .map(|_| ())
+        .map_err(|_| Errno::EPROTO)
 }
 
-fn termios_from(settings: Settings) -> Termios {
+fn termios_from_settings(settings: Settings) -> Termios {
     let mut termios = default_termios();
     if settings.mode == raven_proto_tty::Mode::Raw {
         termios.c_lflag = 0;
         termios.c_iflag = 0;
+        termios.c_oflag = 0;
     } else {
         termios.c_lflag |= ICANON;
     }
@@ -213,6 +309,32 @@ fn settings_from(termios: &Termios) -> Settings {
             raven_proto_tty::Mode::Raw
         },
         echo: termios.c_lflag & ECHO != 0,
+    }
+}
+
+fn termios_from_wire(wire: WireTermios) -> Termios {
+    let mut termios = Termios::ZERO;
+    termios.c_iflag = wire.iflag;
+    termios.c_oflag = wire.oflag;
+    termios.c_cflag = wire.cflag;
+    termios.c_lflag = wire.lflag;
+    termios.c_line = wire.line;
+    termios.c_cc = wire.cc;
+    termios.__c_ispeed = wire.ispeed;
+    termios.__c_ospeed = wire.ospeed;
+    termios
+}
+
+fn wire_from_termios(termios: &Termios) -> WireTermios {
+    WireTermios {
+        iflag: termios.c_iflag,
+        oflag: termios.c_oflag,
+        cflag: termios.c_cflag,
+        lflag: termios.c_lflag,
+        line: termios.c_line,
+        cc: termios.c_cc,
+        ispeed: termios.__c_ispeed,
+        ospeed: termios.__c_ospeed,
     }
 }
 
