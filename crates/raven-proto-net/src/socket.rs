@@ -61,6 +61,22 @@ pub const OP_EVENT: u16 = 10;
 /// The reply is [`Response::Value`] carrying the `READY_*` bits. The query reads no bytes, pops
 /// no UDP datagram, accepts no connection, clears no pending error and opens no socket.
 pub const OP_POLL: u16 = 11;
+/// `MPTCP_PM_CMD_ADD_ADDR` (`SOL_MPTCP`).
+pub const OP_MPTCP_ADD_ADDR: u16 = 12;
+/// `MPTCP_PM_CMD_DEL_ADDR` (`SOL_MPTCP`).
+pub const OP_MPTCP_DEL_ADDR: u16 = 13;
+/// `MPTCP_PM_CMD_SET_FLAGS` (`SOL_MPTCP`).
+pub const OP_MPTCP_SET_FLAGS: u16 = 14;
+/// `MPTCP_INFO` (`SOL_MPTCP`).
+pub const OP_MPTCP_INFO: u16 = 15;
+/// `MPTCP_SUBFLOW_ADDRS` (`SOL_MPTCP`).
+pub const OP_MPTCP_SUBFLOWS: u16 = 16;
+/// C-layout `struct mptcp_pm_addr` payload bytes.
+pub const MPTCP_PM_ADDR_LEN: usize = 12;
+/// C-layout `struct mptcp_info` bytes.
+pub const MPTCP_INFO_LEN: usize = 12;
+/// One subflow-address record bytes.
+pub const MPTCP_SUBFLOW_LEN: usize = 16;
 
 /// Readiness bit: data may be read, or the peer finished sending (EOF is readable).
 pub const READY_READABLE: i32 = 1 << 0;
@@ -98,6 +114,18 @@ const TAG_VALUE: u16 = 5;
 const TAG_ERR: u16 = 6;
 /// Response tag: ICMP echo reply header.
 const TAG_ICMP: u16 = 7;
+/// Response tag: `MPTCP_INFO` record.
+const TAG_MPTCP_INFO: u16 = 8;
+/// Response tag: subflow-address table.
+const TAG_MPTCP_SUBFLOWS: u16 = 9;
+/// Raw `SOL_MPTCP` reply: success (the MPTCP reply is tag-first, without the socket version).
+pub const MPTCP_REPLY_OK: u16 = TAG_OK;
+/// Raw `SOL_MPTCP` reply: error number.
+pub const MPTCP_REPLY_ERR: u16 = TAG_ERR;
+/// Raw `SOL_MPTCP` reply: `MPTCP_INFO` record.
+pub const MPTCP_REPLY_INFO: u16 = TAG_MPTCP_INFO;
+/// Raw `SOL_MPTCP` reply: subflow-address records.
+pub const MPTCP_REPLY_SUBFLOWS: u16 = TAG_MPTCP_SUBFLOWS;
 
 /// Write flag: a destination endpoint follows.
 const WRITE_FLAG_ENDPOINT: u8 = 0x01;

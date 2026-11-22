@@ -106,6 +106,19 @@ pub fn parse(path: &str) -> Result<SchemePath, PathError> {
             }),
         });
     }
+    if rest == "mptcp" {
+        // The client opens the MPTCP socket before it knows an endpoint; bind/connect carry it.
+        return Ok(SchemePath {
+            transport: Transport::Tcp,
+            endpoint: None,
+        });
+    }
+    if let Some(rest) = rest.strip_prefix("mptcp/") {
+        return Ok(SchemePath {
+            transport: Transport::Tcp,
+            endpoint: Some(parse_endpoint(rest)?),
+        });
+    }
     let (transport, rest) = if let Some(rest) = rest.strip_prefix("tcp/") {
         (Transport::Tcp, rest)
     } else if let Some(rest) = rest.strip_prefix("udp/") {

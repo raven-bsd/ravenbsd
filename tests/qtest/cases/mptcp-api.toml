@@ -12,6 +12,11 @@ profile = "network-config-test"
 timeout_secs = 240
 initfs = "build/mptcp-api/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
 expect_exit = "success"
 pre = ["sh tests/mptcp/api/build.sh"]
 

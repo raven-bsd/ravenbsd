@@ -57,7 +57,7 @@ static int make_listener(struct sockaddr_in *address) {
     }
     memset(address, 0, sizeof(*address));
     address->sin_family = AF_INET;
-    address->sin_port = 0;
+    address->sin_port = htons(24080);
     address->sin_addr.s_addr = htonl(0x7f000001); /* 127.0.0.1 */
     if (bind(fd, (const struct sockaddr *)address, sizeof(*address)) != 0 ||
         listen(fd, 1) != 0 || getsockname(fd, (struct sockaddr *)address, &length) != 0) {

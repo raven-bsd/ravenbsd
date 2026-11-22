@@ -1175,3 +1175,80 @@ fn a_filtered_server_drains_the_shared_filter_log() {
     );
     assert!(netd.take_filter_log().is_empty());
 }
+
+#[test]
+fn mptcp_bind_zero_allocates_and_getsockname_reports_the_port() {
+    let mut netd = new_netd();
+    let file = netd.open("net:mptcp").expect("mptcp open");
+    let bound = call_socket(
+        &mut netd,
+        file,
+        Call::Bind(Endpoint {
+            ip: [127, 0, 0, 1],
+            port: 0,
+        }),
+    );
+    assert_eq!(bound, Response::Ok);
+    match call_socket(&mut netd, file, Call::GetSockName) {
+        Response::Endpoint(endpoint) => assert_ne!(endpoint.port, 0),
+        other => panic!("unexpected getsockname: {other:?}"),
+    }
+    assert_eq!(
+        call_socket(&mut netd, file, Call::Listen { backlog: 1 }),
+        Response::Ok
+    );
+}
+
+#[test]
+fn mptcp_listen_without_bind_allocates_a_port() {
+    let mut netd = new_netd();
+    let file = netd.open("net:mptcp").expect("mptcp open");
+    assert_eq!(
+        call_socket(&mut netd, file, Call::Listen { backlog: 1 }),
+        Response::Ok
+    );
+    match call_socket(&mut netd, file, Call::GetSockName) {
+        Response::Endpoint(endpoint) => assert_ne!(endpoint.port, 0),
+        other => panic!("unexpected getsockname: {other:?}"),
+    }
+}
+
+#[test]
+fn mptcp_connect_to_a_loopback_listener_opens_a_meta_socket() {
+    let mut netd = new_netd();
+    let listener = netd.open("net:mptcp").expect("listener open");
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            listener,
+            Call::Bind(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24080,
+            }),
+        ),
+        Response::Ok
+    );
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 1 }),
+        Response::Ok
+    );
+    let client = netd.open("net:mptcp").expect("client open");
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Connect(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24080,
+            }),
+        ),
+        Response::Ok
+    );
+    let mut now = 0;
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    assert_eq!(netd.write(accepted, 0, b"hello").unwrap(), 5);
+    let mut buffer = [0u8; 8];
+    let read = read_retry(&mut netd, client, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"hello");
+}

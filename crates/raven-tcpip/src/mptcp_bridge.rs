@@ -14,7 +14,9 @@
 //! handshake. MPTCP2b owns the wire integration.
 
 use alloc::rc::Rc;
+#[cfg(any(test, feature = "testutil"))]
 use alloc::vec::Vec;
+#[cfg(any(test, feature = "testutil"))]
 use core::cell::RefCell;
 
 use raven_abi::errno::Errno;
@@ -77,6 +79,10 @@ impl<D: Device + 'static> StackSubflow<D> {
 }
 
 impl<D: Device + 'static> Subflow for StackSubflow<D> {
+    #[cfg_attr(
+        not(any(test, feature = "testutil")),
+        allow(unused_variables, reason = "mapping log is a testutil seam")
+    )]
     fn send(&mut self, mapping: Mapping, payload: &[u8], _data_fin: bool) -> Result<(), Error> {
         let mut stack = self.stack.borrow_mut();
         match stack.send_on(self.id, payload) {

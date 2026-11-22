@@ -13,8 +13,8 @@ use crate::filter::{FilterDevice, FilterLog, FilterPolicy, new_log};
 use crate::network::StaticConfig;
 use raven_abi::errno::Errno;
 use raven_netcore::{
-    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, Readiness,
-    RouteEntry, SocketId, SocketState, SocketTransport,
+    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, IpAddr, Ipv4Addr, MptcpInfo, NetCore,
+    Readiness, RouteEntry, SocketId, SocketState, SocketTransport, SubflowInfo,
 };
 use raven_proto_fs::{S_IFSOCK, Stat};
 use raven_proto_net::{
@@ -25,8 +25,10 @@ use raven_proto_net::{
     SOCKET_STATE_LAST_ACK, SOCKET_STATE_LISTEN, SOCKET_STATE_SYN_RECEIVED, SOCKET_STATE_SYN_SENT,
     SOCKET_STATE_TIME_WAIT, SOCKET_STATE_UDP, SOCKET_TCP, SOCKET_UDP, SocketEntry, Transport, path,
     socket::{
-        Call, Endpoint, READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE, Response, SockOpt,
-        SocketRequest,
+        Call, Endpoint, MPTCP_INFO_LEN, MPTCP_REPLY_ERR, MPTCP_REPLY_INFO, MPTCP_REPLY_OK,
+        MPTCP_REPLY_SUBFLOWS, MPTCP_SUBFLOW_LEN, OP_MPTCP_ADD_ADDR, OP_MPTCP_DEL_ADDR,
+        OP_MPTCP_INFO, OP_MPTCP_SET_FLAGS, OP_MPTCP_SUBFLOWS, READY_ERROR, READY_HUP,
+        READY_READABLE, READY_WRITABLE, Response, SockOpt, SocketRequest,
     },
 };
 
@@ -188,6 +190,26 @@ trait SocketCore {
         remote: (Ipv4Addr, u16),
         local_port: Option<u16>,
     ) -> Result<SocketId, Errno>;
+    fn mptcp_connect(
+        &mut self,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+    ) -> Result<SocketId, Errno>;
+    fn mptcp_send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno>;
+    fn mptcp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno>;
+    fn mptcp_readiness(&self, s: SocketId) -> Result<Readiness, Errno>;
+    fn mptcp_close(&mut self, s: SocketId) -> Result<(), Errno>;
+    fn mptcp_add_path(
+        &mut self,
+        s: SocketId,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+        backup: bool,
+    ) -> Result<u32, Errno>;
+    fn mptcp_remove_path(&mut self, s: SocketId, subflow: u32) -> Result<(), Errno>;
+    fn mptcp_set_backup(&mut self, s: SocketId, subflow: u32, backup: bool) -> Result<(), Errno>;
+    fn mptcp_info(&self, s: SocketId) -> Result<MptcpInfo, Errno>;
+    fn mptcp_subflows(&self, s: SocketId) -> Result<Vec<SubflowInfo>, Errno>;
     fn send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno>;
     fn recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno>;
     fn shutdown_write(&mut self, s: SocketId) -> Result<(), Errno>;
@@ -210,7 +232,7 @@ trait SocketCore {
     fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno>;
 }
 
-impl<D: Device> SocketCore for NetCore<D> {
+impl<D: Device + 'static> SocketCore for NetCore<D> {
     fn set_ipv4(&mut self, addr: Ipv4Addr, prefix: u8, gateway: Option<Ipv4Addr>) {
         NetCore::set_ipv4(self, addr, prefix, gateway);
     }
@@ -284,6 +306,56 @@ impl<D: Device> SocketCore for NetCore<D> {
         local_port: Option<u16>,
     ) -> Result<SocketId, Errno> {
         NetCore::tcp_connect(self, remote, local_port)
+    }
+
+    fn mptcp_connect(
+        &mut self,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+    ) -> Result<SocketId, Errno> {
+        NetCore::mptcp_connect(self, remote, local)
+    }
+
+    fn mptcp_send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno> {
+        NetCore::mptcp_send(self, s, data)
+    }
+
+    fn mptcp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
+        NetCore::mptcp_recv(self, s, buf)
+    }
+
+    fn mptcp_readiness(&self, s: SocketId) -> Result<Readiness, Errno> {
+        NetCore::mptcp_readiness(self, s)
+    }
+
+    fn mptcp_close(&mut self, s: SocketId) -> Result<(), Errno> {
+        NetCore::mptcp_close(self, s)
+    }
+
+    fn mptcp_add_path(
+        &mut self,
+        s: SocketId,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+        backup: bool,
+    ) -> Result<u32, Errno> {
+        NetCore::mptcp_add_path(self, s, remote, local, backup)
+    }
+
+    fn mptcp_remove_path(&mut self, s: SocketId, subflow: u32) -> Result<(), Errno> {
+        NetCore::mptcp_remove_path(self, s, subflow)
+    }
+
+    fn mptcp_set_backup(&mut self, s: SocketId, subflow: u32, backup: bool) -> Result<(), Errno> {
+        NetCore::mptcp_set_backup(self, s, subflow, backup)
+    }
+
+    fn mptcp_info(&self, s: SocketId) -> Result<MptcpInfo, Errno> {
+        NetCore::mptcp_info(self, s)
+    }
+
+    fn mptcp_subflows(&self, s: SocketId) -> Result<Vec<SubflowInfo>, Errno> {
+        NetCore::mptcp_subflows(self, s)
     }
 
     fn send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno> {
@@ -367,6 +439,52 @@ struct IcmpState {
     pending: BTreeMap<u16, PendingIcmp>,
 }
 
+/// One `struct mptcp_pm_addr` payload (the C layout, 12 bytes).
+struct PmAddr {
+    id: u8,
+    flags: u16,
+    addr: [u8; 4],
+}
+
+impl PmAddr {
+    fn decode(bytes: &[u8]) -> Result<Self, Errno> {
+        if bytes.len() < 12 {
+            return Err(Errno::EINVAL);
+        }
+        Ok(Self {
+            id: bytes[1],
+            flags: u16::from_le_bytes([bytes[2], bytes[3]]),
+            addr: [bytes[4], bytes[5], bytes[6], bytes[7]],
+        })
+    }
+}
+
+/// Write the raw `SOL_MPTCP` success reply (tag-first, without the socket version).
+fn mptcp_reply_ok(response: &mut [u8]) -> Result<usize, Errno> {
+    response
+        .get_mut(..2)
+        .ok_or(Errno::E2BIG)?
+        .copy_from_slice(&MPTCP_REPLY_OK.to_le_bytes());
+    Ok(2)
+}
+
+/// Write a raw `SOL_MPTCP` record reply: tag, `u16` length, payload.
+fn mptcp_reply_records(response: &mut [u8], tag: u16, payload: &[u8]) -> Result<usize, Errno> {
+    let length = u16::try_from(payload.len()).map_err(|_| Errno::E2BIG)?;
+    let total = 4usize.saturating_add(payload.len());
+    let slot = response.get_mut(..total).ok_or(Errno::E2BIG)?;
+    slot.get_mut(..2)
+        .ok_or(Errno::E2BIG)?
+        .copy_from_slice(&tag.to_le_bytes());
+    slot.get_mut(2..4)
+        .ok_or(Errno::E2BIG)?
+        .copy_from_slice(&length.to_le_bytes());
+    slot.get_mut(4..)
+        .ok_or(Errno::E2BIG)?
+        .copy_from_slice(payload);
+    Ok(total)
+}
+
 struct SocketFile {
     transport: Transport,
     interface: Interface,
@@ -384,6 +502,8 @@ struct SocketFile {
     sndbuf: i32,
     nodelay: bool,
     icmp: Option<IcmpState>,
+    mptcp: bool,
+    mptcp_paths: BTreeMap<u8, u32>,
 }
 
 impl SocketFile {
@@ -413,6 +533,8 @@ impl SocketFile {
                 id: None,
                 pending: BTreeMap::new(),
             }),
+            mptcp: false,
+            mptcp_paths: BTreeMap::new(),
         }
     }
 
@@ -434,6 +556,8 @@ impl SocketFile {
             sndbuf: 64 * 1024,
             nodelay: false,
             icmp: None,
+            mptcp: false,
+            mptcp_paths: BTreeMap::new(),
         }
     }
 
@@ -460,7 +584,7 @@ struct NicControl {
 }
 
 /// The host-testable `net:` server.
-pub struct Netd<D: Device> {
+pub struct Netd<D: Device + 'static> {
     core: NetCore<FilterDevice<D>>,
     filter_log: FilterLog,
     nic: Option<Box<dyn SocketCore>>,
@@ -480,7 +604,7 @@ pub struct Netd<D: Device> {
     now_ms: i64,
 }
 
-impl<D: Device> Netd<D> {
+impl<D: Device + 'static> Netd<D> {
     /// Create the server over `device` and configure IPv4 loopback.
     #[must_use]
     pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
@@ -819,14 +943,19 @@ impl<D: Device> Netd<D> {
         } else if path.starts_with(path::ACCEPT_PREFIX) {
             return Err(Errno::EINVAL);
         } else {
+            let mptcp = path == "net:mptcp" || path.starts_with("net:mptcp/");
             let parsed = path::parse(path).map_err(|_| Errno::EINVAL)?;
-            let endpoint = parsed.endpoint.ok_or(Errno::EINVAL)?;
-            let interface = if self.nic_control.is_some() && endpoint.ip[0] != 127 {
+            let endpoint = parsed.endpoint.unwrap_or_default();
+            let interface = if mptcp {
+                Interface::Loopback
+            } else if self.nic_control.is_some() && endpoint.ip[0] != 127 {
                 Interface::Nic
             } else {
                 Interface::Loopback
             };
-            File::Socket(SocketFile::new(parsed.transport, interface, endpoint))
+            let mut socket = SocketFile::new(parsed.transport, interface, endpoint);
+            socket.mptcp = mptcp;
+            File::Socket(socket)
         };
         let id = self.next_file;
         self.next_file = self.next_file.checked_add(1).ok_or(Errno::ENFILE)?;
@@ -837,12 +966,13 @@ impl<D: Device> Netd<D> {
 
     /// Read stream bytes or one datagram from `file`.
     pub fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
-        let (interface, transport, id, read_shutdown) = match self.files.get(&file) {
+        let (interface, transport, id, read_shutdown, mptcp) = match self.files.get(&file) {
             Some(File::Socket(socket)) => (
                 socket.interface,
                 socket.transport,
                 socket.socket,
                 socket.read_shutdown,
+                socket.mptcp,
             ),
             Some(File::Control) => return Err(Errno::EINVAL),
             None => return Err(Errno::EBADF),
@@ -852,6 +982,7 @@ impl<D: Device> Netd<D> {
         }
         let id = id.ok_or(Errno::ENOTCONN)?;
         match transport {
+            Transport::Tcp if mptcp => self.core_mut(interface).mptcp_recv(id, buffer),
             Transport::Tcp => self.core_mut(interface).recv(id, buffer),
             Transport::Udp => self
                 .core_mut(interface)
@@ -863,13 +994,14 @@ impl<D: Device> Netd<D> {
 
     /// Write stream bytes or one datagram to `file`.
     pub fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
-        let (interface, transport, id, peer, write_shutdown) = match self.files.get(&file) {
+        let (interface, transport, id, peer, write_shutdown, mptcp) = match self.files.get(&file) {
             Some(File::Socket(socket)) => (
                 socket.interface,
                 socket.transport,
                 socket.socket,
                 socket.peer,
                 socket.write_shutdown,
+                socket.mptcp,
             ),
             Some(File::Control) => return Err(Errno::EINVAL),
             None => return Err(Errno::EBADF),
@@ -879,6 +1011,7 @@ impl<D: Device> Netd<D> {
         }
         let id = id.ok_or(Errno::ENOTCONN)?;
         match transport {
+            Transport::Tcp if mptcp => self.core_mut(interface).mptcp_send(id, buffer),
             Transport::Tcp => self.core_mut(interface).send(id, buffer),
             Transport::Udp => {
                 let to = peer.ok_or(Errno::EADDRNOTAVAIL)?;
@@ -904,6 +1037,18 @@ impl<D: Device> Netd<D> {
         };
         if kind == 0 {
             return self.control_call(request, response);
+        }
+        let mptcp = matches!(self.files.get(&file), Some(File::Socket(socket)) if socket.mptcp);
+        if mptcp && request.len() >= 6 {
+            let version = u16::from_le_bytes([request[0], request[1]]);
+            let call_kind = u16::from_le_bytes([request[2], request[3]]);
+            let op = u16::from_le_bytes([request[4], request[5]]);
+            if version == 1
+                && call_kind == 4
+                && (OP_MPTCP_ADD_ADDR..=OP_MPTCP_SUBFLOWS).contains(&op)
+            {
+                return self.mptcp_control(file, op, &request[6..], response);
+            }
         }
         let request = SocketRequest::decode(request).map_err(|_| Errno::EINVAL)?;
         match request {
@@ -937,7 +1082,11 @@ impl<D: Device> Netd<D> {
         if let File::Socket(socket) = file
             && let Some(id) = socket.socket
         {
-            let _ = self.core_mut(socket.interface).close(id);
+            if socket.mptcp && id.0 & 0x8000_0000 != 0 {
+                let _ = self.core_mut(socket.interface).mptcp_close(id);
+            } else {
+                let _ = self.core_mut(socket.interface).close(id);
+            }
         }
         Ok(true)
     }
@@ -1128,12 +1277,13 @@ impl<D: Device> Netd<D> {
         if len as usize > raven_proto_net::MAX_DATAGRAM {
             return self.write_socket_error(response, Errno::EINVAL);
         }
-        let (interface, transport, socket, read_shutdown) = match self.files.get(&file) {
+        let (interface, transport, socket, read_shutdown, mptcp) = match self.files.get(&file) {
             Some(File::Socket(socket)) => (
                 socket.interface,
                 socket.transport,
                 socket.socket,
                 socket.read_shutdown,
+                socket.mptcp,
             ),
             Some(File::Control) => return Err(Errno::EINVAL),
             None => return Err(Errno::EBADF),
@@ -1158,6 +1308,7 @@ impl<D: Device> Netd<D> {
         let payload = &mut response[header_len..payload_end];
         let core = self.core_mut(interface);
         let (read, from) = match transport {
+            Transport::Tcp if mptcp => (core.mptcp_recv(id, payload), None),
             Transport::Tcp => (core.recv(id, payload), None),
             Transport::Udp => {
                 let result = core.udp_recv_from(id, payload);
@@ -1196,23 +1347,26 @@ impl<D: Device> Netd<D> {
         to: Option<Endpoint>,
         response: &mut [u8],
     ) -> Result<usize, Errno> {
-        let (interface, transport, socket, peer, write_shutdown) = match self.files.get(&file) {
-            Some(File::Socket(socket)) => (
-                socket.interface,
-                socket.transport,
-                socket.socket,
-                socket.peer,
-                socket.write_shutdown,
-            ),
-            Some(File::Control) => return Err(Errno::EINVAL),
-            None => return Err(Errno::EBADF),
-        };
+        let (interface, transport, socket, peer, write_shutdown, mptcp) =
+            match self.files.get(&file) {
+                Some(File::Socket(socket)) => (
+                    socket.interface,
+                    socket.transport,
+                    socket.socket,
+                    socket.peer,
+                    socket.write_shutdown,
+                    socket.mptcp,
+                ),
+                Some(File::Control) => return Err(Errno::EINVAL),
+                None => return Err(Errno::EBADF),
+            };
         if write_shutdown {
             return self.write_socket_error(response, Errno::EPIPE);
         }
         let id = socket.ok_or(Errno::ENOTCONN)?;
         let core = self.core_mut(interface);
         let result = match transport {
+            Transport::Tcp if mptcp => core.mptcp_send(id, data),
             Transport::Tcp => core.send(id, data),
             Transport::Udp => {
                 let endpoint = to.or(peer).ok_or(Errno::EADDRNOTAVAIL)?;
@@ -1227,6 +1381,147 @@ impl<D: Device> Netd<D> {
         match result {
             Ok(len) => self.write_response(response, &Response::Write { len: len as u32 }),
             Err(error) => self.write_socket_error(response, error),
+        }
+    }
+
+    fn mptcp_control(
+        &mut self,
+        file: u64,
+        op: u16,
+        data: &[u8],
+        response: &mut [u8],
+    ) -> Result<usize, Errno> {
+        match self.mptcp_control_inner(file, op, data, response) {
+            Ok(len) => Ok(len),
+            Err(error) => {
+                let slot = response.get_mut(..4).ok_or(Errno::E2BIG)?;
+                slot.get_mut(..2)
+                    .ok_or(Errno::E2BIG)?
+                    .copy_from_slice(&MPTCP_REPLY_ERR.to_le_bytes());
+                slot.get_mut(2..)
+                    .ok_or(Errno::E2BIG)?
+                    .copy_from_slice(&error.0.to_le_bytes());
+                Ok(4)
+            }
+        }
+    }
+
+    fn mptcp_control_inner(
+        &mut self,
+        file: u64,
+        op: u16,
+        data: &[u8],
+        response: &mut [u8],
+    ) -> Result<usize, Errno> {
+        let (interface, socket, remote) = match self.files.get(&file) {
+            Some(File::Socket(socket)) if socket.mptcp => {
+                (socket.interface, socket.socket, socket.remote)
+            }
+            _ => return Err(Errno::EINVAL),
+        };
+        let id = socket.ok_or(Errno::ENOTCONN)?;
+        match op {
+            OP_MPTCP_ADD_ADDR => {
+                let path = PmAddr::decode(data)?;
+                let remote = remote.ok_or(Errno::ENOTCONN)?;
+                let subflow = self.core_mut(interface).mptcp_add_path(
+                    id,
+                    (Ipv4Addr::from_octets(remote.ip), remote.port),
+                    Some(Ipv4Addr::from_octets(path.addr)),
+                    path.flags & 1 != 0,
+                )?;
+                if let Some(File::Socket(socket)) = self.files.get_mut(&file) {
+                    socket.mptcp_paths.insert(path.id, subflow);
+                }
+                mptcp_reply_ok(response)
+            }
+            OP_MPTCP_DEL_ADDR => {
+                let path_id = *data.first().ok_or(Errno::EINVAL)?;
+                let subflow = self
+                    .files
+                    .get(&file)
+                    .and_then(|file| match file {
+                        File::Socket(socket) => socket.mptcp_paths.get(&path_id).copied(),
+                        File::Control => None,
+                    })
+                    .ok_or(Errno::ENOENT)?;
+                self.core_mut(interface).mptcp_remove_path(id, subflow)?;
+                if let Some(File::Socket(socket)) = self.files.get_mut(&file) {
+                    socket.mptcp_paths.remove(&path_id);
+                }
+                mptcp_reply_ok(response)
+            }
+            OP_MPTCP_SET_FLAGS => {
+                let path = PmAddr::decode(data)?;
+                let fallback = u32::from(path.id);
+                let subflow = self
+                    .files
+                    .get(&file)
+                    .and_then(|file| match file {
+                        File::Socket(socket) => socket.mptcp_paths.get(&path.id).copied(),
+                        File::Control => None,
+                    })
+                    .unwrap_or(fallback);
+                self.core_mut(interface)
+                    .mptcp_set_backup(id, subflow, path.flags & 1 != 0)?;
+                mptcp_reply_ok(response)
+            }
+            OP_MPTCP_INFO => {
+                let info = self.core_ref(interface).mptcp_info(id)?;
+                let mut record = [0u8; MPTCP_INFO_LEN];
+                record[0] = info.state;
+                record
+                    .get_mut(4..8)
+                    .ok_or(Errno::E2BIG)?
+                    .copy_from_slice(&info.subflows.to_le_bytes());
+                record
+                    .get_mut(8..12)
+                    .ok_or(Errno::E2BIG)?
+                    .copy_from_slice(&info.active.to_le_bytes());
+                mptcp_reply_records(response, MPTCP_REPLY_INFO, &record)
+            }
+            OP_MPTCP_SUBFLOWS => {
+                let subflows = self.core_ref(interface).mptcp_subflows(id)?;
+                let mut records = [0u8; 128];
+                let mut used = 0usize;
+                for path in subflows.iter().take(128 / MPTCP_SUBFLOW_LEN) {
+                    let base = used;
+                    records
+                        .get_mut(base..base + 4)
+                        .ok_or(Errno::E2BIG)?
+                        .copy_from_slice(&path.subflow_id.to_le_bytes());
+                    if let Some(slot) = records.get_mut(base + 4) {
+                        *slot = u8::from(path.backup);
+                    }
+                    let local = match path.local {
+                        IpAddr::V4(ip) => ip.octets(),
+                        IpAddr::V6(_) => [0; 4],
+                    };
+                    let remote = match path.remote {
+                        IpAddr::V4(ip) => ip.octets(),
+                        IpAddr::V6(_) => [0; 4],
+                    };
+                    records
+                        .get_mut(base + 5..base + 9)
+                        .ok_or(Errno::E2BIG)?
+                        .copy_from_slice(&local);
+                    records
+                        .get_mut(base + 9..base + 13)
+                        .ok_or(Errno::E2BIG)?
+                        .copy_from_slice(&remote);
+                    records
+                        .get_mut(base + 13..base + 15)
+                        .ok_or(Errno::E2BIG)?
+                        .copy_from_slice(&path.remote_port.to_le_bytes());
+                    used = base + MPTCP_SUBFLOW_LEN;
+                }
+                mptcp_reply_records(
+                    response,
+                    MPTCP_REPLY_SUBFLOWS,
+                    records.get(..used).unwrap_or(&[]),
+                )
+            }
+            _ => Err(Errno::EINVAL),
         }
     }
 
@@ -1262,6 +1557,27 @@ impl<D: Device> Netd<D> {
         }
         match transport {
             Transport::Tcp => {
+                let mptcp = matches!(
+                    self.files.get(&file),
+                    Some(File::Socket(socket)) if socket.mptcp
+                );
+                if mptcp && endpoint.port == 0 {
+                    // The libc bind(0) asks for the chosen port before listen; allocate the
+                    // listener now so getsockname reports it and the later listen is a no-op.
+                    let (id, port) = self.mptcp_listen_ephemeral(interface)?;
+                    let socket = match self.files.get_mut(&file).ok_or(Errno::EBADF)? {
+                        File::Socket(socket) => socket,
+                        File::Control => return Err(Errno::EINVAL),
+                    };
+                    socket.socket = Some(id);
+                    socket.listener = true;
+                    socket.local = Endpoint {
+                        ip: endpoint.ip,
+                        port,
+                    };
+                    socket.bound = true;
+                    return Ok(Response::Ok);
+                }
                 let socket = match self.files.get_mut(&file).ok_or(Errno::EBADF)? {
                     File::Socket(socket) => socket,
                     File::Control => return Err(Errno::EINVAL),
@@ -1286,8 +1602,24 @@ impl<D: Device> Netd<D> {
         }
     }
 
+    fn mptcp_listen_ephemeral(&mut self, interface: Interface) -> Result<(SocketId, u16), Errno> {
+        let mut port = 49_152u16;
+        loop {
+            match self.core_mut(interface).tcp_listen(port, 8) {
+                Ok(id) => return Ok((id, port)),
+                Err(Errno::EADDRINUSE) => {
+                    if port == u16::MAX {
+                        return Err(Errno::EADDRNOTAVAIL);
+                    }
+                    port = port.saturating_add(1);
+                }
+                Err(error) => return Err(error),
+            }
+        }
+    }
+
     fn listen(&mut self, file: u64, backlog: u16) -> Result<Response, Errno> {
-        let (interface, transport, port, has_socket) =
+        let (interface, transport, port, has_socket, mptcp) =
             match self.files.get(&file).ok_or(Errno::EBADF)? {
                 File::Control => return Err(Errno::EINVAL),
                 File::Socket(socket) => (
@@ -1295,17 +1627,31 @@ impl<D: Device> Netd<D> {
                     socket.transport,
                     socket.port_for_listen(),
                     socket.socket.is_some(),
+                    socket.mptcp,
                 ),
             };
         if has_socket {
+            let socket = match self.files.get(&file).ok_or(Errno::EBADF)? {
+                File::Socket(socket) => socket,
+                File::Control => return Err(Errno::EINVAL),
+            };
+            if socket.listener {
+                return Ok(Response::Ok);
+            }
             return Err(Errno::EINVAL);
         }
         if transport != Transport::Tcp {
             return Err(Errno::EOPNOTSUPP);
         }
-        let id = self
-            .core_mut(interface)
-            .tcp_listen(port, backlog as usize)?;
+        let (id, port) = if mptcp && port == 0 {
+            self.mptcp_listen_ephemeral(interface)?
+        } else {
+            (
+                self.core_mut(interface)
+                    .tcp_listen(port, backlog as usize)?,
+                port,
+            )
+        };
         let socket = match self.files.get_mut(&file).ok_or(Errno::EBADF)? {
             File::Socket(socket) => socket,
             File::Control => return Err(Errno::EINVAL),
@@ -1319,7 +1665,7 @@ impl<D: Device> Netd<D> {
     }
 
     fn accept(&mut self, file: u64) -> Result<Response, Errno> {
-        let (interface, listener, local) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+        let (interface, listener, local, mptcp) = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
             File::Socket(socket) => {
                 if !socket.listener {
@@ -1329,10 +1675,27 @@ impl<D: Device> Netd<D> {
                     socket.interface,
                     socket.socket.ok_or(Errno::EBADF)?,
                     socket.local,
+                    socket.mptcp,
                 )
             }
         };
-        let Some(socket) = self.core_mut(interface).tcp_accept(listener)? else {
+        let Some(socket) = ({
+            if mptcp {
+                // The MPTCP listener's first subflow is still in the loopback handshake when the
+                // client returns from connect; pump the stack a bounded number of times.
+                let mut accepted = None;
+                for spin in 0..64 {
+                    let _ = self.poll(self.now_ms.saturating_add(spin));
+                    if let Some(socket) = self.core_mut(interface).tcp_accept(listener)? {
+                        accepted = Some(socket);
+                        break;
+                    }
+                }
+                accepted
+            } else {
+                self.core_mut(interface).tcp_accept(listener)?
+            }
+        }) else {
             return Err(Errno::EAGAIN);
         };
         if self.accepted.len() >= MAX_PENDING_ACCEPTS {
@@ -1370,7 +1733,7 @@ impl<D: Device> Netd<D> {
     }
 
     fn connect(&mut self, file: u64, endpoint: Endpoint) -> Result<Response, Errno> {
-        let (interface, transport, local, bound, has_socket) =
+        let (interface, transport, local, bound, has_socket, mptcp) =
             match self.files.get(&file).ok_or(Errno::EBADF)? {
                 File::Control => return Err(Errno::EINVAL),
                 File::Socket(socket) => (
@@ -1379,6 +1742,7 @@ impl<D: Device> Netd<D> {
                     socket.local,
                     socket.bound,
                     socket.socket.is_some(),
+                    socket.mptcp,
                 ),
             };
         if has_socket {
@@ -1386,11 +1750,17 @@ impl<D: Device> Netd<D> {
         }
         match transport {
             Transport::Tcp => {
-                let local_port = bound.then_some(local.port);
-                let id = self.core_mut(interface).tcp_connect(
-                    (Ipv4Addr::from_octets(endpoint.ip), endpoint.port),
-                    local_port,
-                )?;
+                let id = if mptcp {
+                    self.core_mut(interface).mptcp_connect(
+                        (Ipv4Addr::from_octets(endpoint.ip), endpoint.port),
+                        bound.then(|| Ipv4Addr::from_octets(local.ip)),
+                    )?
+                } else {
+                    self.core_mut(interface).tcp_connect(
+                        (Ipv4Addr::from_octets(endpoint.ip), endpoint.port),
+                        bound.then_some(local.port),
+                    )?
+                };
                 let socket = match self.files.get_mut(&file).ok_or(Errno::EBADF)? {
                     File::Socket(socket) => socket,
                     File::Control => return Err(Errno::EINVAL),
@@ -1503,12 +1873,16 @@ impl<D: Device> Netd<D> {
     /// on that interface and socket id. A control file and a file without a socket have a defined
     /// error instead of a made-up "ready" bit.
     pub fn socket_readiness(&self, file: u64) -> Result<Readiness, Errno> {
-        let (interface, socket) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+        let (interface, socket, mptcp) = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
-            File::Socket(socket) => (socket.interface, socket.socket),
+            File::Socket(socket) => (socket.interface, socket.socket, socket.mptcp),
         };
         let id = socket.ok_or(Errno::ENOTCONN)?;
-        self.core_ref(interface).readiness(id)
+        if mptcp && id.0 & 0x8000_0000 != 0 {
+            self.core_ref(interface).mptcp_readiness(id)
+        } else {
+            self.core_ref(interface).readiness(id)
+        }
     }
 
     /// Answer the live readiness query for an open socket file.
