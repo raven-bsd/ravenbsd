@@ -5,10 +5,10 @@
 //!
 //! The kernel dispatch surface is parsed the same way the K451 `inventory.py` does: the
 //! `raven-abi` enum variants plus every raw `pub const NAME: usize = 0xNN;` that the kernel
-//! dispatches before `Syscall::from_usize`. The documented set is parsed from the generated
-//! table in `docs/syscall-abi.md`. The test asserts equality modulo an explicit, machine-readable
-//! known-omission register in `docs/abi-completeness.md`, so a new omission or a stale register
-//! fails instead of silently shipping.
+//! dispatches before `Syscall::from_usize`. The documented set is read from the management copy
+//! `architecture/product-data/syscall-abi.md`; the product docs tree is frozen (AGENTS 31) and is
+//! not a fallback. The test asserts equality modulo the machine-readable known-omission register
+//! in that same table, so a new omission or a stale register fails instead of silently shipping.
 
 #![forbid(unsafe_code)]
 
@@ -50,6 +50,51 @@ pub fn root() -> PathBuf {
         .join("../..")
         .canonicalize()
         .expect("repo root")
+}
+
+/// Resolve the management-tree root.
+///
+/// One policy for every consumer: `RAVEN_MGMT_ROOT` when set and non-empty, otherwise
+/// `../ravenbsd-prjmgmt` relative to the product checkout. An empty `env` value means "unset"
+/// so tests can exercise the default without mutating the process environment.
+pub fn resolve_mgmt_root(product_root: &Path, env: Option<&str>) -> Result<PathBuf, String> {
+    let raw = match env {
+        Some(value) if !value.is_empty() => Some(value.to_string()),
+        Some(_) => None,
+        None => std::env::var("RAVEN_MGMT_ROOT")
+            .ok()
+            .filter(|value| !value.is_empty()),
+    };
+    let root = match raw {
+        Some(value) => PathBuf::from(value),
+        None => product_root
+            .parent()
+            .unwrap_or(product_root)
+            .join("ravenbsd-prjmgmt"),
+    };
+    if !root.is_dir() {
+        return Err(format!(
+            "RAVEN_MGMT_ROOT: management root {} is not a directory; set RAVEN_MGMT_ROOT to the \
+             ravenbsd-prjmgmt checkout (no product docs fallback)",
+            root.display()
+        ));
+    }
+    Ok(root)
+}
+
+/// Return a required management-tree file, failing loudly when the root/file is absent.
+#[must_use]
+pub fn mgmt_file(product_root: &Path, relative: &str) -> PathBuf {
+    let root = resolve_mgmt_root(product_root, None).unwrap_or_else(|error| panic!("{error}"));
+    let path = root.join(relative);
+    if !path.is_file() {
+        panic!(
+            "RAVEN_MGMT_ROOT: missing management copy {}; set RAVEN_MGMT_ROOT to the \
+             ravenbsd-prjmgmt checkout (no product docs fallback)",
+            path.display()
+        );
+    }
+    path
 }
 
 fn read(path: &Path) -> String {
@@ -222,10 +267,11 @@ pub fn parse_dispatch(root: &Path) -> Vec<Entry> {
     entries
 }
 
-/// Parse the generated syscall table from `docs/syscall-abi.md`.
+/// Parse the generated syscall table from the management `syscall-abi.md`.
 #[must_use]
 pub fn parse_documented(root: &Path) -> Vec<Entry> {
-    let text = read(&root.join("docs/syscall-abi.md"));
+    let path = mgmt_file(root, "architecture/product-data/syscall-abi.md");
+    let text = read(&path);
     let mut in_table = false;
     let mut rows = Vec::new();
     for line in text.lines() {
@@ -264,10 +310,11 @@ pub fn parse_documented(root: &Path) -> Vec<Entry> {
     rows
 }
 
-/// Parse the machine-readable known-omission and reserved-range register in `docs/syscall-abi.md`.
+/// Parse the known-omission and reserved-range register in the management `syscall-abi.md`.
 #[must_use]
 pub fn parse_register(root: &Path) -> (KnownRegister, Vec<(u64, u64)>) {
-    let text = read(&root.join("docs/syscall-abi.md"));
+    let path = mgmt_file(root, "architecture/product-data/syscall-abi.md");
+    let text = read(&path);
     let mut known: KnownRegister = BTreeMap::new();
     let mut reserved = Vec::new();
     for line in text.lines() {

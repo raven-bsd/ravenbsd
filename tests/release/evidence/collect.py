@@ -21,12 +21,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+import mgmt
+
 ROOT = Path(__file__).resolve().parents[3]
 VERSION = "0.1.0"
 PACKET = ROOT / "docs/releases/0.1.0-evidence.md"
 EVIDENCE = ROOT / "build/release" / VERSION
-KERNEL_GATE = ROOT / "docs/kernel-gate.md"
-POSIX_REPORT = ROOT / "docs/posix/CONFORMANCE.md"
 RELEASE_IMAGES = ROOT / "docs/release-images.md"
 SMP_SOAK = ROOT / "docs/smp-boot-soak.md"
 SMP_CLOSEOUT = ROOT / "docs/smp-closeout.md"
@@ -77,6 +77,11 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def display(path: Path) -> str:
+    """Path for the packet: product-relative when inside the tree, else absolute."""
+    return mgmt.display(ROOT, path)
 
 
 def read_text(path: Path) -> str:
@@ -171,10 +176,11 @@ def run_gate(name: str, argv: list[str], head: str, dirty: bool) -> Gate:
 
 def parse_kernel_gate(path: Path, head: str) -> Gate:
     text = read_text(path)
+    source = f"read {display(path)}"
     if not text:
         return Gate(
-            "kernel-gate", "MISSING", "read docs/kernel-gate.md", utc(), utc(), "",
-            str(path.relative_to(ROOT)), "", "recorded gate document is missing"
+            "kernel-gate", "MISSING", source, utc(), utc(), "",
+            display(path), "", "recorded gate document is missing"
         )
     current = re.search(r"current master `([0-9a-f]{7,40})`", text)
     full = re.search(r"\(`?([0-9a-f]{40})`?\)", text)
@@ -194,8 +200,8 @@ def parse_kernel_gate(path: Path, head: str) -> Gate:
     result = "PASS" if re.search(r"Result: \*\*PASS\*\*", text) else "FAIL"
     if not recorded:
         return Gate(
-            "kernel-gate", "MISSING", "read docs/kernel-gate.md", stamp, utc(), "",
-            str(path.relative_to(ROOT)), sha256(path), "document has no commit stamp"
+            "kernel-gate", "MISSING", source, stamp, utc(), "",
+            display(path), sha256(path), "document has no commit stamp"
         )
     if result != "PASS" or passes != 27:
         status = "FAIL"
@@ -207,17 +213,18 @@ def parse_kernel_gate(path: Path, head: str) -> Gate:
         status = "PASS"
         note = f"27/27 pass at {recorded} (current)"
     return Gate(
-        "kernel-gate", status, "read docs/kernel-gate.md", stamp, utc(), "",
-        str(path.relative_to(ROOT)), sha256(path), note
+        "kernel-gate", status, source, stamp, utc(), "",
+        display(path), sha256(path), note
     )
 
 
 def parse_posix(path: Path, head: str) -> Gate:
     text = read_text(path)
+    source = f"read {display(path)}"
     if not text:
         return Gate(
-            "posix", "MISSING", "read docs/posix/CONFORMANCE.md", utc(), utc(), "",
-            str(path.relative_to(ROOT)), "", "host-only report is missing"
+            "posix", "MISSING", source, utc(), utc(), "",
+            display(path), "", "host-only report is missing"
         )
     date = re.search(r"^- Date: (\S+)", text, re.MULTILINE)
     result = re.search(r"^- Result: \*\*(.+?)\*\*", text, re.MULTILINE)
@@ -247,8 +254,8 @@ def parse_posix(path: Path, head: str) -> Gate:
             f"{head[:12] or 'unknown'}; rerun required"
         )
     return Gate(
-        "posix", status, "read docs/posix/CONFORMANCE.md", stamp, utc(), "",
-        str(path.relative_to(ROOT)), sha256(path), note
+        "posix", status, source, stamp, utc(), "",
+        display(path), sha256(path), note
     )
 
 
@@ -948,13 +955,19 @@ def packet_text(gates: list[Gate], head: str, dirty: bool, owner_attestation: bo
 def collect(args: argparse.Namespace) -> int:
     head = args.commit or head_commit()
     dirty = tree_dirty()
+    posix_report = args.posix_report or mgmt.require_file(
+        ROOT, "architecture/product-data/posix-conformance.md"
+    )
+    kernel_gate = args.kernel_gate or mgmt.require_file(
+        ROOT, "architecture/product-data/kernel-gate.md"
+    )
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     gates = []
     if not args.no_make_check:
         gates.append(run_gate("make-check", ["make", "check"], head, dirty))
-    gates.append(parse_posix(args.posix_report, head))
+    gates.append(parse_posix(posix_report, head))
     gates.append(parse_libc(head))
-    gates.append(parse_kernel_gate(args.kernel_gate, head))
+    gates.append(parse_kernel_gate(kernel_gate, head))
     gates.append(smp_soak_gate(SMP_SOAK, SMP_CLOSEOUT, head, RELEASE_NOTES, FREEZE_CHECKLIST))
     gates.append(libc_1cpu_gate(RELEASE_NOTES, head, FREEZE_CHECKLIST))
     gates.append(dynamic_gate("x86_64", head, args.run_qtests))
@@ -1050,7 +1063,54 @@ def pi4_mode(args: argparse.Namespace) -> int:
     return 2 if gate.status == "REFUSED" else 1
 
 
+def resolver_self_test() -> None:
+    """Prove the one resolver policy: env override, sibling default, loud miss."""
+    import tempfile
+
+    relative = "architecture/product-data/posix-conformance.md"
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        product = tmp / "ravenbsd"
+        product.mkdir()
+        mgmt_dir = tmp / "ravenbsd-prjmgmt"
+        target = mgmt_dir / relative
+        target.parent.mkdir(parents=True)
+        target.write_text("- Counts: 1 pass, 0 fail, 0 skip\n", encoding="utf-8")
+
+        overridden = mgmt.require_file(product, relative, env_value=str(mgmt_dir))
+        if overridden != target:
+            raise AssertionError(f"env override resolved {overridden}, expected {target}")
+
+        missing_env = tmp / "missing"
+        try:
+            mgmt.require_file(product, relative, env_value=str(missing_env))
+        except SystemExit as error:
+            if "RAVEN_MGMT_ROOT" not in str(error):
+                raise AssertionError(f"missing env root does not name RAVEN_MGMT_ROOT: {error}")
+        else:
+            raise AssertionError("missing env root was accepted")
+
+        no_sibling = tmp / "no-sibling"
+        product2 = no_sibling / "ravenbsd"
+        product2.mkdir(parents=True)
+        try:
+            mgmt.require_file(product2, relative, env_value="")
+        except SystemExit as error:
+            if "RAVEN_MGMT_ROOT" not in str(error):
+                raise AssertionError(f"missing sibling does not name RAVEN_MGMT_ROOT: {error}")
+        else:
+            raise AssertionError("missing sibling was accepted")
+
+        sibling = no_sibling / "ravenbsd-prjmgmt"
+        sibling_target = sibling / relative
+        sibling_target.parent.mkdir(parents=True)
+        sibling_target.write_text("sibling\n", encoding="utf-8")
+        if mgmt.require_file(product2, relative, env_value="") != sibling_target:
+            raise AssertionError("default sibling path was not used")
+
+
 def self_test() -> int:
+    resolver_self_test()
     fixtures = ROOT / "tests/release/evidence/fixtures"
     head = "1" * 40
     good = parse_kernel_gate(fixtures / "kernel-gate-good.md", head)
@@ -1310,8 +1370,18 @@ def main(argv: list[str]) -> int:
     mode.add_argument("--record-qemu", action="store_true", help="alias for --qemu")
     parser.add_argument("--commit", help="evidence commit (default HEAD)")
     parser.add_argument("--packet", type=Path, default=PACKET)
-    parser.add_argument("--kernel-gate", type=Path, default=KERNEL_GATE)
-    parser.add_argument("--posix-report", type=Path, default=POSIX_REPORT)
+    parser.add_argument(
+        "--kernel-gate",
+        type=Path,
+        default=None,
+        help="override the mgmt architecture/product-data/kernel-gate.md",
+    )
+    parser.add_argument(
+        "--posix-report",
+        type=Path,
+        default=None,
+        help="override the mgmt architecture/product-data/posix-conformance.md",
+    )
     parser.add_argument("--image-x86", type=Path, default=IMAGE_X86_DEFAULT)
     parser.add_argument("--image-aarch64", type=Path, default=IMAGE_AARCH64_DEFAULT)
     parser.add_argument("--board-log", type=Path, help="Pi 4 serial log for the packet")

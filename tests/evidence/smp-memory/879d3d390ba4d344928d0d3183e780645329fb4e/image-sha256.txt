@@ -1,2 +1,0 @@
-bb50b1ee7eefaeb6e321a7816c9c55bc40321f3b9fb4278d86519e5c4f982b54  build/smp-memory/smp-memory.img
-e227b982f7d1304aff2860a509c927fb309c3fbf688df878eb619fb023f5bc1c  build/x86_64/kernel-debug.elf

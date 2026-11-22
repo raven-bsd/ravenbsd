@@ -1,3 +1,0 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s
-     Running `target/debug/xtask qtest --case tcp-soak-kvm4 --arch x86_64`
-tcp-soak-kvm4: pass
