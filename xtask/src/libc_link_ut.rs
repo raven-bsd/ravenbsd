@@ -233,3 +233,32 @@ fn a_stale_loader_or_manifest_does_not_match() {
     assert!(!loader_manifest_matches(&root, "x86_64"));
     std::fs::remove_dir_all(&root).unwrap();
 }
+
+#[test]
+fn stage_sysroot_replaces_a_stale_libc_so_with_the_script() {
+    let out = std::env::temp_dir().join(format!("k430-sysroot-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&out);
+    let stale = out.join("sysroot/usr/lib/libc.so");
+    std::fs::create_dir_all(stale.parent().unwrap()).unwrap();
+    std::fs::write(&stale, b"stale ELF, not the dynamic libc script").unwrap();
+    let libc = out.join("libc.so.1");
+    let loader = out.join("ld-elf.so.1");
+    std::fs::write(&libc, b"libc").unwrap();
+    std::fs::write(&loader, b"loader").unwrap();
+
+    stage_sysroot(&out, &libc, &loader).expect("stage");
+
+    assert_eq!(
+        std::fs::read(&stale).expect("script"),
+        b"INPUT ( libc.so.1 )\n"
+    );
+    assert_eq!(
+        std::fs::read(out.join("sysroot/lib/libc.so.1")).expect("libc"),
+        b"libc"
+    );
+    assert_eq!(
+        std::fs::read(out.join("sysroot/libexec/ld-elf.so.1")).expect("loader"),
+        b"loader"
+    );
+    std::fs::remove_dir_all(&out).unwrap();
+}
