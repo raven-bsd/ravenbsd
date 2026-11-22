@@ -113,10 +113,10 @@ def build_peer() -> bool:
     return result.returncode == 0
 
 
-def qemu_argv(image: Path, serial: Path, vars_path: Path) -> list[str]:
+def qemu_argv(image: Path, serial_arg: str, vars_path: Path) -> list[str]:
     return [
         "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
-        "-serial", f"file:{serial}", "-display", "none", "-monitor", "none", "-no-reboot",
+        "-serial", serial_arg, "-display", "none", "-monitor", "none", "-no-reboot",
         "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE}",
         "-drive", f"if=pflash,format=raw,file={vars_path}",
         "-drive", f"format=raw,file={image}",
@@ -135,14 +135,96 @@ def kill(child: subprocess.Popen) -> None:
     child.wait()
 
 
+class SerialConsole:
+    """QEMU serial over a Unix socket, with an exact byte log."""
+
+    def __init__(self, path: Path, log_path: Path) -> None:
+        self.path = path
+        self.log_path = log_path
+        self.buffer = bytearray()
+        self.socket: socket.socket | None = None
+        self.log = open(log_path, "wb")  # noqa: SIM115 - closed in close()
+
+    def connect(self, timeout_s: float = 10.0) -> None:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            try:
+                connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                connection.connect(str(self.path))
+                connection.settimeout(0.2)
+                self.socket = connection
+                return
+            except OSError:
+                time.sleep(0.05)
+        raise RuntimeError(f"cannot connect to serial socket {self.path}")
+
+    def pump(self) -> None:
+        if self.socket is None:
+            return
+        while True:
+            try:
+                chunk = self.socket.recv(4096)
+            except socket.timeout:
+                return
+            except OSError:
+                return
+            if not chunk:
+                return
+            self.buffer.extend(chunk)
+            self.log.write(chunk)
+            self.log.flush()
+
+    def wait_for(self, needle: bytes, timeout_s: float, start: int = 0) -> int:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            self.pump()
+            found = self.buffer.find(needle, start)
+            if found >= 0:
+                return found
+            time.sleep(0.05)
+        return -1
+
+    def send(self, data: bytes) -> None:
+        if self.socket is None:
+            raise RuntimeError("serial socket not connected")
+        self.socket.sendall(data)
+
+    def close(self) -> None:
+        if self.socket is not None:
+            try:
+                self.socket.close()
+            except OSError:
+                pass
+            self.socket = None
+        self.log.close()
+
+
 def boot(image: Path, ready: bytes, serial_name: str, vars_name: str,
-         ready_timeout: int = 180) -> tuple[subprocess.Popen, Path]:
+         ready_timeout: int = 180,
+         socket_serial: bool = False) -> tuple[subprocess.Popen, Path | SerialConsole]:
     OUT.mkdir(parents=True, exist_ok=True)
     serial = OUT / serial_name
     vars_path = OUT / vars_name
     shutil.copyfile(OVMF_VARS, vars_path)
+    if socket_serial:
+        socket_path = OUT / serial_name.replace(".log", ".sock")
+        try:
+            socket_path.unlink()
+        except FileNotFoundError:
+            pass
+        serial_arg = f"unix:{socket_path},server=on,wait=off"
+        console = SerialConsole(socket_path, serial)
+        child = subprocess.Popen(qemu_argv(image, serial_arg, vars_path), cwd=ROOT,
+                                 start_new_session=True,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        console.connect(10)
+        if console.wait_for(ready, ready_timeout) < 0:
+            kill(child)
+            console.close()
+            raise RuntimeError(f"guest never reached {ready!r}; serial {serial}")
+        return child, console
     serial.write_bytes(b"")
-    child = subprocess.Popen(qemu_argv(image, serial, vars_path), cwd=ROOT,
+    child = subprocess.Popen(qemu_argv(image, f"file:{serial}", vars_path), cwd=ROOT,
                              start_new_session=True,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     deadline = time.monotonic() + ready_timeout
@@ -211,17 +293,6 @@ def banner_probe(label: str, send_client: bool) -> dict[str, object]:
         encoding="utf-8")
     return {"bytes": bytes(data), "elapsed_ms": elapsed, "error": error_text,
             "connect_ms": connected_ms}
-
-
-def wait_serial(serial: Path, needle: bytes, timeout_s: float) -> bytes:
-    """Wait for a serial line; return the whole serial log at that point (or at the cap)."""
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        data = serial.read_bytes()
-        if needle in data:
-            return data
-        time.sleep(0.2)
-    return serial.read_bytes()
 
 
 def row_s0() -> None:
@@ -429,17 +500,50 @@ def row_s3_start() -> dict[str, object]:
             "refused": refused, "bad_exit": bad["returncode"]}
 
 
-def row_s3_finish(serial: Path, state: dict[str, object]) -> None:
+def row_s3_finish(console: SerialConsole, state: dict[str, object]) -> None:
     started = time.monotonic()
-    data = wait_serial(serial, b"Accepted password for raven", 120)
+    login = console.wait_for(b"login:", 60)
+    if login < 0:
+        wait_ms = (time.monotonic() - started) * 1000
+        attempt("S3-server-line", 1, "fresh",
+                "Accepted password for raven from 10.0.2.2 port N ssh2",
+                "serial console login prompt not reached", wait_ms, "FAIL")
+        record("S3", "FAIL",
+               f"client auth {'yes' if state['client_auth'] else 'no'}; server line unreadable "
+               f"(no console login prompt); wrong exit {state['bad_exit']} (auth-passwd; C5/C9)")
+        return
+    console.send(b"root\n")
+    if console.wait_for(b"Password:", 20) < 0:
+        wait_ms = (time.monotonic() - started) * 1000
+        attempt("S3-server-line", 1, "fresh",
+                "Accepted password for raven from 10.0.2.2 port N ssh2",
+                "serial console password prompt not reached", wait_ms, "FAIL")
+        record("S3", "FAIL",
+               f"client auth {'yes' if state['client_auth'] else 'no'}; server line unreadable "
+               f"(console password prompt missing); wrong exit {state['bad_exit']} "
+               f"(auth-passwd; C5/C9)")
+        return
+    console.send(b"raven\n")
+    if console.wait_for(b"raven# ", 30) < 0:
+        wait_ms = (time.monotonic() - started) * 1000
+        attempt("S3-server-line", 1, "fresh",
+                "Accepted password for raven from 10.0.2.2 port N ssh2",
+                "serial console root prompt not reached", wait_ms, "FAIL")
+        record("S3", "FAIL",
+               f"client auth {'yes' if state['client_auth'] else 'no'}; server line unreadable "
+               f"(console root login failed); wrong exit {state['bad_exit']} (auth-passwd; C5/C9)")
+        return
+    mark = len(console.buffer)
+    console.send(b"cat /tmp/sshd.log\n")
+    console.wait_for(b"raven# ", 30, start=mark)
     wait_ms = (time.monotonic() - started) * 1000
-    serial_text = data.decode("utf-8", "replace")
-    accepted = [line.replace("\r", "").strip() for line in serial_text.splitlines()
+    segment = bytes(console.buffer[mark:]).decode("utf-8", "replace").replace("\r", "")
+    accepted = [line.strip() for line in segment.splitlines()
                 if "Accepted password for raven " in line]
     attempt("S3-server-line", 1, "fresh",
             "Accepted password for raven from 10.0.2.2 port N ssh2",
-            accepted[0] if accepted else "not in serial.log", wait_ms,
-            "PASS" if accepted else "FAIL")
+            accepted[0] if accepted else f"not in serial log ({literal(segment[-120:].encode())})",
+            wait_ms, "PASS" if accepted else "FAIL")
     client_auth = bool(state["client_auth"])
     refused = bool(state["refused"])
     if client_auth and accepted and refused:
@@ -612,15 +716,16 @@ def main() -> int:
     row_s0()
 
     child = None
+    console: SerialConsole | None = None
     try:
-        child, serial = boot(IMAGE, b"svcd: sshd up", "serial.log", "vars.fd",
-                             ready_timeout=180)
+        child, console = boot(IMAGE, b"svcd: sshd up", "serial.log", "vars.fd",
+                              ready_timeout=180, socket_serial=True)
         row_s1()
         row_s2()
         s3_state = row_s3_start()
         row_s4()
         row_s5_s6()
-        row_s3_finish(serial, s3_state)
+        row_s3_finish(console, s3_state)
         row_s7()
         row_s8()
     except Exception as error:  # noqa: BLE001 - a boot failure is a BLOCKED row, not a crash
@@ -630,6 +735,9 @@ def main() -> int:
     finally:
         if child is not None:
             kill(child)
+        if console is not None:
+            console.pump()
+            console.close()
     write_tables()
     serial = OUT / "serial.log"
     if serial.is_file():
