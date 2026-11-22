@@ -288,7 +288,7 @@ EOF
 
     awk -v src="$source" '
         FNR == NR {
-            if ($0 ~ /^\| `0x[0-9A-Fa-f]+` \| `[A-Za-z0-9_]+` \|/) {
+            if ($0 ~ /^\| `0x[0-9A-Fa-f]+` \| `[[:alnum:]_]+` \|/) {
                 n = split($0, fields, "|")
                 name = fields[3]
                 label = fields[6]
