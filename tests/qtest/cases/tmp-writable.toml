@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K531: /tmp must be POSIX 1777 with the sticky bit. The release image is booted once; the root
+# console runs /bin/tmp-writable, which forks and drops to uid 1000 for the non-root rows. Today the
+# image is 1777; the 0755 mutation image fails the create row. No `su` is required.
+
+name = "tmp-writable"
+arch = "x86_64"
+profile = "release"
+image = "build/qtest/tmp-writable.img"
+timeout_secs = 300
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^tmp-writable: mode=1777 uid=0 gid=0$'
+
+[[expect]]
+regex = '^user-create-ok$'
+
+[[expect]]
+regex = '^user-remove-denied errno=[0-9]+ \(.*\)$'
+
+[[expect]]
+regex = '(?i)(operation not permitted|permission denied)'
+
+[[expect]]
+regex = '^dir-mode=755$'
+
+[[expect]]
+regex = '^file-mode=600$'
+
+[[expect]]
+regex = '^root-remove-ok$'
+
+[[expect]]
+regex = '^tmp-writable: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 180
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*raven#\s*$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/tmp-writable\n"
+delay_ms = 100
+
+[[step]]
+wait = '^tmp-writable: ok$'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
