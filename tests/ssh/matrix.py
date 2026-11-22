@@ -538,12 +538,15 @@ def row_s3_finish(console: SerialConsole, state: dict[str, object]) -> None:
     console.wait_for(b"raven# ", 30, start=mark)
     wait_ms = (time.monotonic() - started) * 1000
     segment = bytes(console.buffer[mark:]).decode("utf-8", "replace").replace("\r", "")
-    accepted = [line.strip() for line in segment.splitlines()
-                if "Accepted password for raven " in line]
+    clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", segment)
+    lines = [line.strip() for line in clean.splitlines() if line.strip()]
+    log_lines = [line for line in lines
+                 if "cat /tmp/sshd.log" not in line and not line.startswith("raven#")]
+    accepted = [line for line in log_lines if "Accepted password for raven " in line]
+    observed = accepted[0] if accepted else (" | ".join(log_lines[-4:]) or "no log lines")
     attempt("S3-server-line", 1, "fresh",
             "Accepted password for raven from 10.0.2.2 port N ssh2",
-            accepted[0] if accepted else f"not in serial log ({literal(segment[-120:].encode())})",
-            wait_ms, "PASS" if accepted else "FAIL")
+            observed, wait_ms, "PASS" if accepted else "FAIL")
     client_auth = bool(state["client_auth"])
     refused = bool(state["refused"])
     if client_auth and accepted and refused:
@@ -553,7 +556,7 @@ def row_s3_finish(console: SerialConsole, state: dict[str, object]) -> None:
     else:
         record("S3", "FAIL",
                f"client auth {'yes' if client_auth else 'no'}; server line "
-               f"{'present' if accepted else 'missing'} ({accepted[0] if accepted else 'none'}); "
+               f"{'present' if accepted else 'missing'} ({observed}); "
                f"wrong exit {state['bad_exit']} (auth-passwd; C5/C9)")
 
 
