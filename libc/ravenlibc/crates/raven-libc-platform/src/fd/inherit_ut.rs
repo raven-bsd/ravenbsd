@@ -105,6 +105,60 @@ fn socket_metadata_round_trips() {
 }
 
 #[test]
+fn version_five_socket_entry_keeps_the_v4_peer_offsets() {
+    let local = SocketEndpoint {
+        ip: [10, 0, 2, 15],
+        port: 22,
+    };
+    let peer = SocketEndpoint {
+        ip: [10, 0, 2, 2],
+        port: 40_000,
+    };
+    let mut entry = FdMapEntry::new(3, 0x44, OfdKind::Socket, 0, 2);
+    entry.socket = Some(SocketMeta {
+        domain: 1,
+        ty: 1,
+        proto: 0,
+        state: 5,
+        local: Some(local),
+        peer: Some(peer),
+    });
+    let bytes = FdMap {
+        entries: vec![entry],
+    }
+    .encode()
+    .expect("encode");
+    assert_eq!(
+        u16::from_le_bytes([bytes[4], bytes[5]]),
+        FDMAP_VERSION,
+        "the block is version 5"
+    );
+    let record = bytes
+        .get(HEADER_LEN..HEADER_LEN + ENTRY_LEN_V5)
+        .expect("one v5 entry");
+    assert_eq!(record[39], 0b11, "local and peer are both present");
+    assert_eq!(&record[40..44], &local.ip, "local ip is at the v4 offset");
+    assert_eq!(
+        u16::from_le_bytes([record[44], record[45]]),
+        local.port,
+        "local port follows the local ip"
+    );
+    assert_eq!(&record[46..50], &peer.ip, "peer ip is at the v4 offset");
+    assert_eq!(
+        u16::from_le_bytes([record[50], record[51]]),
+        peer.port,
+        "peer port ends at byte 51"
+    );
+    assert_eq!(record[52], 0, "the v5 role byte is after the peer");
+
+    let decoded = FdMap::decode(&bytes).expect("decode");
+    let socket = decoded.entries[0].socket.expect("socket");
+    assert_eq!(socket.local, Some(local));
+    assert_eq!(socket.peer, Some(peer));
+    assert!(!decoded.entries[0].pty_master);
+}
+
+#[test]
 fn string_table_is_shared() {
     let mut map = sample();
     map.entries[1].path = Some(b"/tmp/a".to_vec());
