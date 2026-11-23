@@ -21,8 +21,11 @@ for file in build/ssh/x86_64/bin/sshd build/ssh/x86_64/bin/ssh \
     fi
 done
 
-if [ ! -f build/x86_64/initfs.img ]; then
-    echo "sshd-trace: building the release initfs" >&2
+# The shared build/<arch>/initfs.img is addressed by path only; another lane may leave the base
+# profile there. This fixture needs the release profile (sshd, ptyd, ssh host keys). Regenerate
+# only when the packed image lacks ptyd: a rebuild is minutes, the overlay below is seconds.
+if ! strings build/x86_64/initfs.img 2>/dev/null | grep -q '/etc/services.d/ptyd.toml'; then
+    echo "sshd-trace: rebuilding the release initfs" >&2
     cargo xtask initfs --arch x86_64 --profile release
 fi
 
