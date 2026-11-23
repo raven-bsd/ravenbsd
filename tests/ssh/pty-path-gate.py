@@ -110,9 +110,20 @@ def run(command: str, tty: bool, timeout: int = 12) -> tuple[int, str]:
         return -1, (error.stdout or b"").decode("utf-8", "replace")
 
 
-def metrics_snapshot() -> tuple[int, int, int] | None:
-    """Newest K449-METRICS procs/threads/ofds from a `k449-metrics=2` image."""
-    matches = METRICS_RE.findall(serial_text())
+def metrics_snapshot(wait: float = 0.0) -> tuple[int, int, int] | None:
+    """Newest K449-METRICS procs/threads/ofds from a `k449-metrics=2` image.
+
+    `PROC_PID_INFO` hides `Exited` entries, so `ps -e` cannot see an unreaped session child;
+    the kernel's live-process counter can. Wait for a fresh sample so the baseline is after the
+    boot/probe traffic and the after-snapshot is after the last session.
+    """
+    deadline = time.monotonic() + wait
+    matches: list[tuple[str, str, str]] = []
+    while True:
+        matches = METRICS_RE.findall(serial_text())
+        if matches or time.monotonic() >= deadline:
+            break
+        time.sleep(0.2)
     if not matches:
         return None
     procs, threads, ofds = matches[-1]
@@ -148,7 +159,7 @@ def main() -> int:
         time.sleep(0.2)
 
     baseline_rows, baseline_child, _ = ps_snapshot()
-    baseline_metrics = metrics_snapshot()
+    baseline_metrics = metrics_snapshot(5.0)
     print(f"PTY-PATH-GATE {LABEL} baseline rows={baseline_rows} child_rows={baseline_child} "
           f"metrics={baseline_metrics}", flush=True)
 
@@ -173,7 +184,7 @@ def main() -> int:
         if not fixture_ok:
             failures.append(f"session{number}:PTY-PATH FAIL")
 
-    after_metrics = metrics_snapshot()
+    after_metrics = metrics_snapshot(3.0)
     after_rows, after_child, table = ps_snapshot()
     if baseline_metrics is not None and after_metrics is not None:
         orphan = after_metrics[0] - baseline_metrics[0]
