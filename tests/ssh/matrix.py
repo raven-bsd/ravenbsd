@@ -153,7 +153,8 @@ def build_peer() -> bool:
 
 
 def qemu_argv(image: Path, serial_arg: str, vars_path: Path) -> list[str]:
-    return [
+    accel = os.environ.get("RAVEN_QEMU_ACCEL", "")
+    argv = [
         "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
         "-serial", serial_arg, "-display", "none", "-monitor", "none", "-no-reboot",
         "-snapshot",
@@ -165,6 +166,13 @@ def qemu_argv(image: Path, serial_arg: str, vars_path: Path) -> list[str]:
         "-netdev", f"tap,id=n0,ifname={TAP},script=no,downscript=no",
         "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     ]
+    if accel == "kvm":
+        argv.extend(["-enable-kvm", "-cpu", "host"])
+    elif accel == "tcg":
+        argv.extend(["-accel", "tcg"])
+    elif accel:
+        raise SystemExit(f"matrix: unknown RAVEN_QEMU_ACCEL={accel}")
+    return argv
 
 
 def kill(child: subprocess.Popen) -> None:
