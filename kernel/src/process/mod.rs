@@ -198,10 +198,11 @@ pub fn queue_owner_state() -> [u64; 6] {
 /// Leaked-process reference histogram (S36b diagnostic).
 ///
 /// Returns `(leaked, external_refs_1, external_refs_2, external_refs_3plus, self_handles,
-/// dead_handles_in_all_processes)`. The `external` count excludes the diagnostic's temporary
-/// upgrade, so it is the number of real owners still holding the torn-down process.
-pub fn leaked_process_stats() -> [u64; 6] {
-    let mut stats = [0u64; 6];
+/// dead_handles_in_all_processes, leaked_threads)`. The `external` count excludes the
+/// diagnostic's temporary upgrade, so it is the number of real owners still holding the
+/// torn-down process.
+pub fn leaked_process_stats() -> [u64; 7] {
+    let mut stats = [0u64; 7];
     for weak in ALL_PROCESSES.lock().iter() {
         let Some(process) = weak.upgrade() else {
             continue;
@@ -210,6 +211,7 @@ pub fn leaked_process_stats() -> [u64; 6] {
             continue;
         }
         stats[0] = stats[0].saturating_add(1);
+        stats[6] = stats[6].saturating_add(u64::from(process.threads.load(Ordering::Acquire)));
         let external = Arc::strong_count(&process).saturating_sub(1);
         match external {
             0 => {}
@@ -2028,11 +2030,12 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let (notices, dead_clients, dead_servers) = crate::ipc::router::close_notice_stats();
         let leaked = leaked_process_stats();
         kprintln!(
-            "s36: procs={} threads={} zombies={} proc_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={}",
+            "s36: procs={} threads={} zombies={} proc_size={} thread_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={} leaked_threads={}",
             live_processes(),
             crate::sched::thread::live_threads(),
             ZOMBIES.lock().len(),
             core::mem::size_of::<Process>(),
+            core::mem::size_of::<crate::sched::thread::Thread>(),
             crate::process::handle::lineage_nodes(),
             dead_handles,
             top_pid,
@@ -2047,7 +2050,8 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             leaked[2],
             leaked[3],
             leaked[4],
-            leaked[5]
+            leaked[5],
+            leaked[6]
         );
         let holders = request_holder_stats();
         kprintln!(
