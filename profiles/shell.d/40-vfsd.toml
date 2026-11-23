@@ -32,3 +32,15 @@ path = "/dev/random"
 [[initfs.files]]
 src = "profiles/shell.d/mounts"
 path = "/dev/urandom"
+
+# K536 rev181: the pty namespace. `/dev/pts` is a directory mount point for the `pty:` scheme;
+# `/dev/pts/<N>` resolves to the live slave pair through the pty server. `/dev/tty` is the
+# per-process controlling-terminal path (resolved by libc/kernel), with the placeholder so the
+# name exists before the first `/dev/tty` open.
+[[initfs.files]]
+src = "profiles/shell.d/mounts"
+path = "/dev/pts/.keep"
+
+[[initfs.files]]
+src = "profiles/shell.d/mounts"
+path = "/dev/tty"

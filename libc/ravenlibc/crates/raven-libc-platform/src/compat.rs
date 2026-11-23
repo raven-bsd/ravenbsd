@@ -465,28 +465,13 @@ pub fn ttyname<B: SysBackend, L: Lock>(
     fd: i32,
 ) -> Result<Vec<u8>, Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() == OfdKind::Tty
-        && let Some(path) = reference.path()
-    {
-        return Ok(path.to_vec());
-    }
-    drop(reference);
-    // A child created by `posix_spawn` can lose the parent's public path and kind: the shell
-    // spawn map carries the handle only. The terminal's server still answers `tcgetattr`, and the
-    // pty slave's inode names its pair (`/dev/pts/N`, the `ptsname` identity). A regular file or
-    // a non-terminal char device fails `tcgetattr`, so this cannot name a non-tty.
-    if platform.tcgetattr(fd).is_err() {
+    if reference.kind() != OfdKind::Tty {
         return Err(Errno::ENOTTY);
     }
-    let stat = platform.fstat(fd)?;
-    if stat.st_mode & raven_libc_abi::stat::S_IFMT == raven_libc_abi::stat::S_IFCHR
-        && stat.st_ino >= 4
-        && stat.st_ino % 2 == 0
-    {
-        let pair = (stat.st_ino - 2) / 2;
-        return Ok(alloc::format!("/dev/pts/{pair}").into_bytes());
-    }
-    Err(Errno::ENOTTY)
+    reference
+        .path()
+        .map(|path| path.to_vec())
+        .ok_or(Errno::ENOTTY)
 }
 
 /// `ttyname_r`.

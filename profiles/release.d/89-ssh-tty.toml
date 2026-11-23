@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K434 S8 test-only /bin/tty. The release profile has no tty utility; this stages the fixture built
-# by tests/fixtures/ssh-tty/build.sh so `ssh -tt ... tty` can print /dev/pts/N. It is test tooling.
+# K434 S8 diagnostic probe. K548 now stages the real uutils `tty` at /bin/tty, so the official
+# `ssh -tt ... tty` row exercises the product tool. This stages the TTY-PROBE build of
+# tests/fixtures/ssh-tty/build.sh under a distinct name for extra fd/ttyname evidence. Test tooling.
 
 [[initfs.files]]
 src = "build/fixtures/ssh-tty/tty"
-path = "/bin/tty"
+path = "/bin/tty-probe"
 mode = 0o755
 generated = true

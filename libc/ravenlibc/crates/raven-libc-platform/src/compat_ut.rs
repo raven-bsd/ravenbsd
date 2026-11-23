@@ -87,32 +87,3 @@ fn ttyname_rejects_a_file() {
         Err(crate::Errno::ENOTTY)
     );
 }
-
-#[test]
-fn ttyname_names_a_pathless_pty_slave_from_the_server_inode() {
-    // The spawned-child shape: the fd has the pty handle but no public path. The pty server's
-    // FSTAT inode (slave = 2*pair + 2) is the pts name. The fake FSTAT inode is handle + 100.
-    let fake = FakeSys::new();
-    fake.tty(b"/dev/tty");
-    let platform = Platform::new(fake);
-    let first = open64(&platform, b"/dev/tty", fcntl::O_RDWR as u32, 0).expect("first");
-    let second = open64(&platform, b"/dev/tty", fcntl::O_RDWR as u32, 0).expect("second");
-    let handle = platform.get(second).expect("fd").handle();
-    let fd = platform
-        .install(
-            handle,
-            crate::OfdKind::Tty,
-            fcntl::O_RDWR as u32,
-            None,
-            false,
-        )
-        .expect("install");
-    // The second open's fake handle is 6, so FSTAT ino = 106 and pair = 52.
-    assert_eq!(
-        crate::compat::ttyname(&platform, fd),
-        Ok(b"/dev/pts/52".to_vec())
-    );
-    let _ = platform.close(fd);
-    let _ = platform.close(first);
-    let _ = platform.close(second);
-}
