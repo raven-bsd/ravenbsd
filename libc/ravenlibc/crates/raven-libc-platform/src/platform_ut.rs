@@ -61,12 +61,15 @@ fn restore_keeps_a_pathless_tty_path_unset() {
 }
 
 #[test]
-fn restore_leaves_an_unknown_handle_unprobed() {
+fn restore_leaves_an_unknown_handle_for_ttyname_to_probe() {
+    // Restore does not FSTAT or CALL the inherited handle; ttyname probes an Unknown-kind
+    // descriptor later, when the caller asks (the v1 spawn shape).
     let platform = platform();
     let fd = restore(&platform, OfdKind::Unknown, None);
     assert_eq!(platform.get(fd).expect("fd").kind(), OfdKind::Unknown);
+    assert!(platform.get(fd).expect("fd").path().is_none());
     assert_eq!(
         crate::compat::ttyname(&platform, fd),
-        Err(crate::Errno::ENOTTY)
+        Ok(b"/dev/pts/52".to_vec())
     );
 }

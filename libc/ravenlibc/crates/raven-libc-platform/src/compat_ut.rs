@@ -89,6 +89,33 @@ fn ttyname_rejects_a_file() {
 }
 
 #[test]
+fn isatty_probes_an_unknown_kind_pty() {
+    // The v1 spawn map marks the inherited pty Unknown; `isatty` must ask the terminal instead
+    // of rejecting it on the kind, or uutils `tty` never reaches `ttyname`.
+    let fake = FakeSys::new();
+    fake.tty(b"/dev/tty");
+    let platform = Platform::new(fake);
+    let _first = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("first");
+    let second = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("second");
+    let handle = platform.get(second).expect("fd").handle();
+    let fd = platform
+        .install(
+            handle,
+            crate::fd::ofd::OfdKind::Unknown,
+            fcntl::O_RDWR as u32,
+            None,
+            false,
+        )
+        .expect("install");
+    assert!(crate::tty::isatty(&platform, fd));
+    assert!(platform.tcgetattr(fd).is_ok());
+}
+
+#[test]
 fn pty_pair_names_a_master_and_slave_from_the_service() {
     let fake = FakeSys::new();
     fake.tty(b"/dev/tty");
