@@ -21,7 +21,9 @@ use crate::memory::paging;
 
 /// K495 rev180 diagnostic gate: the pty gate image boots with `k495-debug=1`.
 fn debug_enabled() -> bool {
-    CmdLine::parse(paging::cmdline()).get("k495-debug").is_some()
+    CmdLine::parse(paging::cmdline())
+        .get("k495-debug")
+        .is_some()
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -108,11 +110,7 @@ pub fn session(sid: u64) -> Option<Arc<Ctty>> {
             return Some(ctty);
         }
         if debug {
-            kprintln!(
-                "ctty: registry entry sid={} wanted={}",
-                ctty.sid(),
-                sid
-            );
+            kprintln!("ctty: registry entry sid={} wanted={}", ctty.sid(), sid);
         }
     }
     if debug {
@@ -155,7 +153,10 @@ pub fn acquire(process: &Arc<Process>, file: &Arc<SchemeFile>) -> Result<(), Err
     }
     if !is_tty_file(file) {
         if debug {
-            kprintln!("ctty: acquire pid={} rejected ENOTTY (not a tty file)", process.id);
+            kprintln!(
+                "ctty: acquire pid={} rejected ENOTTY (not a tty file)",
+                process.id
+            );
         }
         return Err(Errno::ENOTTY);
     }

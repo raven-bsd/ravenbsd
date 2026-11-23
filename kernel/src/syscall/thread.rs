@@ -392,7 +392,10 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
         .store(context_absolute, Ordering::Release);
     thread.signal_flags.store(flags, Ordering::Release);
     thread.signal_entry.store(entry, Ordering::Release);
-    if CmdLine::parse(paging::cmdline()).get("k495-debug").is_some() {
+    if CmdLine::parse(paging::cmdline())
+        .get("k495-debug")
+        .is_some()
+    {
         // K495 rev180: record the registered entry so a fault RIP can be compared with it. A
         // caller address here is the class Ken identified for the SIG_SETUP resume defect.
         kprintln!(

@@ -15,9 +15,9 @@ use raven_usercopy::UserSlice;
 
 #[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::ipc::SchemeFile;
+use crate::cmdline::CmdLine;
 #[cfg(target_arch = "x86_64")]
 use crate::ipc::SchemeFile;
-use crate::cmdline::CmdLine;
 use crate::kprintln;
 use crate::memory::paging;
 use crate::process::handle::Object;
@@ -27,7 +27,9 @@ use crate::usercopy::copy_to_user;
 
 /// K495 rev180 diagnostic gate: the pty gate image boots with `k495-debug=1`.
 fn debug_enabled() -> bool {
-    CmdLine::parse(paging::cmdline()).get("k495-debug").is_some()
+    CmdLine::parse(paging::cmdline())
+        .get("k495-debug")
+        .is_some()
 }
 
 /// Raw `TIOCSCTTY(handle) -> 0`.
@@ -72,7 +74,11 @@ pub fn set_ctty(frame: &SyscallFrame) -> Result<usize, Errno> {
         match &result {
             Ok(()) => kprintln!("ctty: PROC_CTTY_SET pid={} result=ok", caller.id),
             Err(error) => {
-                kprintln!("ctty: PROC_CTTY_SET pid={} result=err({:?})", caller.id, error)
+                kprintln!(
+                    "ctty: PROC_CTTY_SET pid={} result=err({:?})",
+                    caller.id,
+                    error
+                )
             }
         }
     }
