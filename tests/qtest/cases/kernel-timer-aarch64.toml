@@ -5,6 +5,7 @@ name = "kernel-timer-aarch64"
 arch = "aarch64"
 profile = "base"
 timeout_secs = 60
+pre = ["sh tests/qtest/preflight-load.sh --max-load 5.0"]
 boot_cmdline = "console=ttyAMA0 test-exit=1 selftest=timer"
 qemu_extra = []
 expect_exit = "success"
