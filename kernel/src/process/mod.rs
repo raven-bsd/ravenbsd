@@ -201,13 +201,22 @@ pub fn queue_owner_state() -> [u64; 6] {
 /// dead_handles_in_all_processes, leaked_threads)`. The `external` count excludes the
 /// diagnostic's temporary upgrade, so it is the number of real owners still holding the
 /// torn-down process.
-pub fn leaked_process_stats() -> [u64; 10] {
-    let mut stats = [0u64; 10];
+pub fn leaked_process_stats() -> [u64; 12] {
+    let mut stats = [0u64; 12];
     let processes: alloc::vec::Vec<Arc<Process>> = ALL_PROCESSES
         .lock()
         .iter()
         .filter_map(Weak::upgrade)
         .collect();
+    stats[10] = processes.len() as u64;
+    for (index, process) in processes.iter().enumerate() {
+        if !processes[..index]
+            .iter()
+            .any(|previous| Arc::ptr_eq(previous, process))
+        {
+            stats[11] = stats[11].saturating_add(1);
+        }
+    }
     for process in &processes {
         if !process.torn_down.load(Ordering::Acquire) {
             continue;
@@ -2066,7 +2075,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let leaked = leaked_process_stats();
         let leaked_threads = crate::sched::thread::leaked_thread_objects();
         kprintln!(
-            "s36: procs={} threads={} zombies={} proc_size={} thread_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={} leaked_threads={} file_refs={} request_refs={} thread_handles={}",
+            "s36: procs={} threads={} zombies={} proc_size={} thread_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={} leaked_threads={} file_refs={} request_refs={} thread_handles={} all_entries={} unique={}",
             live_processes(),
             crate::sched::thread::live_threads(),
             ZOMBIES.lock().len(),
@@ -2090,7 +2099,9 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             leaked[6],
             leaked[7],
             leaked[8],
-            leaked[9]
+            leaked[9],
+            leaked[10],
+            leaked[11]
         );
         kprintln!(
             "s36: leaked_tobj={} t_ext1={} t_ext2plus={}",
