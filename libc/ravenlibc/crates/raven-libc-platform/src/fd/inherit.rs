@@ -330,12 +330,7 @@ impl FdMap {
     }
 }
 
-/// The `FdMap` wire kind byte for one OFD kind.
-///
-/// The exec encoder and the spawn fd table share this mapping; a spawned child gets the parent's
-/// real kind instead of `Unknown`, so it never has to probe an inherited handle.
-#[must_use]
-pub const fn kind_byte(kind: OfdKind) -> u8 {
+fn kind_byte(kind: OfdKind) -> u8 {
     match kind {
         OfdKind::File => 0,
         OfdKind::Dir => 1,
