@@ -18,6 +18,7 @@
 //   total_ns      = wait - fork_t
 // The fixture prints the raw values; it does not claim a policy.
 
+#include <signal.h>
 #include <spawn.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -197,6 +198,56 @@ int main(int argc, char **argv) {
         }
     }
 
+    int spawnp_ok = canary != NULL;
+    if (canary != NULL) {
+        int sv2[2] = {-1, -1};
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv2) == 0) {
+            posix_spawn_file_actions_t actions2;
+            posix_spawnattr_t attr;
+            int ready = posix_spawn_file_actions_init(&actions2) == 0;
+            if (ready) {
+                ready = posix_spawnattr_init(&attr) == 0;
+            }
+            if (ready) {
+                sigset_t empty;
+                (void)sigemptyset(&empty);
+                (void)posix_spawn_file_actions_adddup2(&actions2, sv2[0], 0);
+                (void)posix_spawn_file_actions_adddup2(&actions2, sv2[0], 1);
+                (void)posix_spawnattr_setsigdefault(&attr, &empty);
+                (void)posix_spawnattr_setsigmask(&attr, &empty);
+                (void)posix_spawnattr_setflags(&attr,
+                                               POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK);
+                char *spawnp_args[] = {"libc-test", "spawn-child", NULL};
+                char *spawnp_env[] = {"PATH=/bin", "HOME=/root", "USER=root",
+                                      "SHELL=/bin/brush",
+                                      "SSH_CONNECTION=10.0.2.2 12345 10.0.2.15 22",
+                                      "SSH_CLIENT=10.0.2.2 12345 22", "TERM=xterm", NULL};
+                pid_t spawnp_child = -1;
+                if (posix_spawnp(&spawnp_child, "libc-test", &actions2, &attr, spawnp_args,
+                                 spawnp_env) == 0) {
+                    int spawnp_status = 0;
+                    (void)waitpid(spawnp_child, &spawnp_status, 0);
+                } else {
+                    spawnp_ok = 0;
+                }
+                (void)posix_spawnattr_destroy(&attr);
+            } else {
+                spawnp_ok = 0;
+            }
+            (void)posix_spawn_file_actions_destroy(&actions2);
+            (void)close(sv2[0]);
+            (void)close(sv2[1]);
+        } else {
+            spawnp_ok = 0;
+        }
+        for (size_t index = 0; index < canary_len; index++) {
+            if (canary[index] != 0xA5) {
+                spawnp_ok = 0;
+                break;
+            }
+        }
+    }
+
     printf("EXEC-TIMING parent fork=%llu exec_ret=%llu wait=%llu pid=%d status=%d\n",
            (unsigned long long)fork_ns, (unsigned long long)exec_ret_ns,
            (unsigned long long)wait_ns, (int)child, status);
@@ -204,8 +255,8 @@ int main(int argc, char **argv) {
         printf("EXEC-TIMING fork_ns=%llu\n", (unsigned long long)(exec_ret_ns - fork_ns));
         printf("EXEC-TIMING total_ns=%llu\n", (unsigned long long)(wait_ns - fork_ns));
     }
-    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s\n", fork_ok ? "ok" : "bad",
-           spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad");
+    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s\n", fork_ok ? "ok" : "bad",
+           spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad", spawnp_ok ? "ok" : "bad");
     fflush(stdout);
     free(canary);
     return child < 0 ? 1 : 0;
