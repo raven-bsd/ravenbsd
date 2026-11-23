@@ -65,9 +65,18 @@ static LIVE_THREADS: AtomicUsize = AtomicUsize::new(0);
 
 /// Every thread object ever created, weakly (S36b leaked-thread diagnostic only).
 static ALL_THREADS: Mutex<Vec<alloc::sync::Weak<Thread>>> = Mutex::new(Vec::new());
+/// Prune dead weak entries once the registry reaches this length.
+const ALL_THREADS_PRUNE: usize = 256;
 
 fn remember_thread(thread: &Arc<Thread>) {
-    ALL_THREADS.lock().push(Arc::downgrade(thread));
+    let mut registry = ALL_THREADS.lock();
+    // A Weak keeps the ArcInner allocation alive after the value is dropped. The diagnostic
+    // registry must not retain the 960-byte Thread block of every exited thread: prune weak
+    // entries whose strong count is zero, keeping live and genuinely leaked threads visible.
+    if registry.len() >= ALL_THREADS_PRUNE {
+        registry.retain(|weak| weak.strong_count() > 0);
+    }
+    registry.push(Arc::downgrade(thread));
 }
 
 /// Leaked thread objects (thread whose process is torn down) and their strong-ref histogram.
@@ -254,6 +263,33 @@ impl Drop for ThreadSlot {
 #[allow(dead_code)] // used by the scheduler saturation self-test and diagnostics
 pub fn live_threads() -> usize {
     LIVE_THREADS.load(Ordering::Acquire)
+}
+
+/// Thread-slot drops since boot (diagnostic).
+pub fn slots_dropped() -> usize {
+    SLOTS_DROPPED.load(Ordering::Acquire)
+}
+
+/// Every Thread object still reachable from the weak registry.
+///
+/// Returns `(alive, strong_refs_1, strong_refs_2plus, dead_state)`.
+pub fn all_thread_census() -> [u64; 4] {
+    let mut stats = [0u64; 4];
+    for weak in ALL_THREADS.lock().iter() {
+        let Some(thread) = weak.upgrade() else {
+            continue;
+        };
+        stats[0] = stats[0].saturating_add(1);
+        if Arc::strong_count(&thread).saturating_sub(1) <= 1 {
+            stats[1] = stats[1].saturating_add(1);
+        } else {
+            stats[2] = stats[2].saturating_add(1);
+        }
+        if thread.state() == ThreadState::Dead {
+            stats[3] = stats[3].saturating_add(1);
+        }
+    }
+    stats
 }
 /// Mask keeping a tid in the musl lock-word / PG-2 30-bit range.
 const TID_MASK: u32 = 0x3fff_ffff;

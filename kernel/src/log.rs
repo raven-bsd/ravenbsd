@@ -245,12 +245,79 @@ fn panic(info: &PanicInfo<'_>) -> ! {
         file,
         line
     );
-    let (fail_size, ra0, ra1) = crate::memory::heap::fail_info();
+    let (fail_size, fail_align, ra0, ra1) = crate::memory::heap::fail_info();
     if fail_size != 0 {
         let _ = writeln!(
             serial,
-            "K434 alloc-fail size={fail_size} ra0=0x{ra0:x} ra1=0x{ra1:x}"
+            "K434 alloc-fail size={fail_size} align={fail_align} ra0=0x{ra0:x} ra1=0x{ra1:x}"
         );
+        let reap = crate::sched::reap_len();
+        let live = crate::sched::thread::live_threads();
+        let dead_live = crate::process::dead_live_threads();
+        let dropped = crate::sched::thread::slots_dropped();
+        let census = crate::sched::thread::all_thread_census();
+        let _ = writeln!(
+            serial,
+            "K434 holders reap={reap} live_threads={live} slots_dropped={dropped} dead_live_weak={dead_live}"
+        );
+        let _ = writeln!(
+            serial,
+            "K434 thread-census alive={} refs1={} refs2={} dead={}",
+            census[0], census[1], census[2], census[3]
+        );
+        if let Some((kmem_fail, large_live, in_use)) = crate::memory::heap::kmem_counters() {
+            let _ = writeln!(
+                serial,
+                "K434 kmem alloc_fail={kmem_fail} large_live={large_live} in_use={in_use}"
+            );
+        }
+        let (free_fails, free_size, free_align, free_ptr) = crate::memory::heap::free_fail_info();
+        let _ = writeln!(
+            serial,
+            "K434 free-fail count={free_fails} size={free_size} align={free_align} ptr=0x{free_ptr:x}"
+        );
+        if let Some((counts, bytes)) = crate::memory::heap::segment_histogram() {
+            let _ = writeln!(
+                serial,
+                "K434 segments count 1K={} 2K={} 4K={} 8K={} 16K={} 64K={} 1M={} big={}",
+                counts[0],
+                counts[1],
+                counts[2],
+                counts[3],
+                counts[4],
+                counts[5],
+                counts[6],
+                counts[7]
+            );
+            let _ = writeln!(
+                serial,
+                "K434 segments bytes 1K={} 2K={} 4K={} 8K={} 16K={} 64K={} 1M={} big={}",
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]
+            );
+        }
+        let bt = crate::memory::heap::fail_backtrace();
+        let _ = writeln!(
+            serial,
+            "K434 alloc-bt 0x{:x} 0x{:x} 0x{:x} 0x{:x} 0x{:x} 0x{:x}",
+            bt[0], bt[1], bt[2], bt[3], bt[4], bt[5]
+        );
+        if let Some(index) = raven_kmem::class_for(fail_size) {
+            if let Some(stats) = crate::memory::heap::class_stats(index) {
+                let class = raven_kmem::SIZE_CLASSES.get(index).copied().unwrap_or(0);
+                let _ = writeln!(
+                    serial,
+                    "K434 class size={fail_size} index={index} class={class} slabs={} used={} free={} waste={} fail={}",
+                    stats.slabs, stats.in_use, stats.free, stats.waste_bytes, stats.alloc_fail
+                );
+            }
+        }
+        let grow = crate::memory::heap::grow_fail();
+        if let Some((spans, free, largest, fail, used)) = crate::memory::heap::arena_stats() {
+            let _ = writeln!(
+                serial,
+                "K434 arena grow_fail={grow} spans={spans} free={free} largest={largest} fail={fail} used={used}"
+            );
+        }
     }
     if test_exit() {
         crate::boot::exit_qemu(0x11);
