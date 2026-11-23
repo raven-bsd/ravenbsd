@@ -25,6 +25,8 @@ import time
 QEMU = "qemu-system-x86_64"
 DEFAULT_CODE = "/usr/share/OVMF/OVMF_CODE_4M.fd"
 DEFAULT_VARS = "/usr/share/OVMF/OVMF_VARS_4M.fd"
+STARTED_RE = re.compile(r"^([0-9]+(?:\.[0-9]+)?)\s+(\S+):\s+started$")
+UP_RE = re.compile(r"^svcd:\s+(\S+)\s+up$")
 
 
 def ms(value):
@@ -49,6 +51,18 @@ def read_load():
             return handle.read().split()[0]
     except OSError:
         return "unknown"
+
+
+def parse_service_start(line):
+    """Return the service name from a guest ``<epoch> <name>: started`` line."""
+    match = STARTED_RE.match(line)
+    return match.group(2) if match else None
+
+
+def parse_service_up(line):
+    """Return the service name from a ``svcd: <name> up`` line."""
+    match = UP_RE.search(line)
+    return match.group(1) if match else None
 
 
 def run_once(args, image, vars_file, run_number, out_dir):
@@ -110,6 +124,8 @@ def run_once(args, image, vars_file, run_number, out_dir):
         data = b""
         line_buf = b""
         services = []
+        service_start_ns = {}
+        service_ready_ns = {}
         loader_ns = None
         kernel_ns = None
         first_svc_ns = None
@@ -146,15 +162,19 @@ def run_once(args, image, vars_file, run_number, out_dir):
             while b"\n" in line_buf:
                 raw, line_buf = line_buf.split(b"\n", 1)
                 line = raw.decode("utf-8", "replace").rstrip("\r")
-                match = re.search(r"svcd:\s+(\S+)\s+up", line)
-                if match:
-                    services.append((match.group(1), now))
+                unit = parse_service_up(line)
+                if unit:
+                    services.append((unit, now))
+                    service_ready_ns.setdefault(unit, now)
                     if first_svc_ns is None:
                         first_svc_ns = now
-                    if match.group(1) == "getty" and getty_ns is None:
+                    if unit == "getty" and getty_ns is None:
                         getty_ns = now
                 elif "svcd:" in line and first_svc_ns is None:
                     first_svc_ns = now
+                started = parse_service_start(line)
+                if started:
+                    service_start_ns.setdefault(started, now)
 
             if loader_ns is None and b"loader: RavenBSD loader" in data:
                 loader_ns = now
@@ -232,6 +252,20 @@ def run_once(args, image, vars_file, run_number, out_dir):
         slowest.append((ms(when - first_svc_ns), unit))
     slowest.sort(reverse=True)
     top = ",".join("%s:%.1f" % (unit, value) for value, unit in slowest[:3])
+    service_timing = []
+    for unit in sorted(set(service_start_ns) | set(service_ready_ns)):
+        start_ns = service_start_ns.get(unit)
+        ready_ns = service_ready_ns.get(unit)
+        service_timing.append(
+            {
+                "name": unit,
+                "start": ms(start_ns - first_svc_ns) if start_ns is not None else None,
+                "ready": ms(ready_ns - first_svc_ns) if ready_ns is not None else None,
+            }
+        )
+    service_timing.sort(
+        key=lambda item: (item["ready"] is None, item["ready"] or 0.0, item["name"])
+    )
     return {
         "run": run_number,
         "kernel_id": kernel_id,
@@ -239,6 +273,7 @@ def run_once(args, image, vars_file, run_number, out_dir):
         "load_after": load_after,
         "stage": stage,
         "slowest": top,
+        "service_timing": service_timing,
         "log": log_path,
     }
 
@@ -322,6 +357,17 @@ def main():
                     result["kernel_id"],
                 )
             )
+            print(
+                "boot-time-login: services run=%d %s"
+                % (
+                    result["run"],
+                    ",".join(
+                        "%s:%s:%s"
+                        % (item["name"], fmt(item["start"]), fmt(item["ready"]))
+                        for item in result["service_timing"]
+                    ),
+                )
+            )
 
     keys = (
         "firmware",
@@ -357,6 +403,28 @@ def main():
         "boot-time-login: max firmware_ms=%s loader_ms=%s kernel_ms=%s services_ms=%s "
         "getty_ms=%s login_ms=%s login_to_password_ms=%s password_ms=%s auth_ms=%s total_ms=%s"
         % tuple(fmt(summary[key][2]) for key in keys)
+    )
+
+    service_values = {}
+    for result in results:
+        for item in result["service_timing"]:
+            entry = service_values.setdefault(item["name"], {"start": [], "ready": []})
+            if item["start"] is not None:
+                entry["start"].append(item["start"])
+            if item["ready"] is not None:
+                entry["ready"].append(item["ready"])
+    service_summary = []
+    for name, values in service_values.items():
+        start = statistics.median(values["start"]) if values["start"] else None
+        ready = statistics.median(values["ready"]) if values["ready"] else None
+        service_summary.append((ready, start, name))
+    service_summary.sort(key=lambda item: (item[0] is None, item[0] or 0.0, item[2]))
+    print(
+        "boot-time-login: service_p50="
+        + ",".join(
+            "%s:%s:%s" % (name, fmt(start), fmt(ready))
+            for ready, start, name in service_summary
+        )
     )
 
     total = summary["total"][0]
