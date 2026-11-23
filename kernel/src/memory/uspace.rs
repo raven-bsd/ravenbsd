@@ -1250,6 +1250,35 @@ impl UserAddressSpace {
         dirty
     }
 
+    /// Count the present user pages in this address space (K449 test-only metric).
+    ///
+    /// Walks every VMA and counts translated 4 KiB leaves, including initfs and memory-object
+    /// pages. The kernel-owned capture window is skipped. This is diagnostic and changes no
+    /// mapping.
+    pub fn mapped_pages(&mut self) -> u64 {
+        let vmas: Vec<Vma> = self.vmas.iter().copied().collect();
+        let mut pages = 0u64;
+        if let Ok(mut mapper) = self.aspace.mapper() {
+            for vma in vmas {
+                if overlaps_capture_window(vma.start(), vma.len()) {
+                    continue;
+                }
+                let count = pages_in(vma.len()).unwrap_or(0);
+                let mut page = 0u64;
+                while page < count {
+                    let address = vma.start().saturating_add(page.saturating_mul(PAGE_SIZE));
+                    if let Some(virt) = VirtAddr::new(address)
+                        && mapper.translate(virt).is_some()
+                    {
+                        pages = pages.saturating_add(1);
+                    }
+                    page = page.saturating_add(1);
+                }
+            }
+        }
+        pages
+    }
+
     /// Free every data frame owned by this address space and clear the VMA tree.
     pub fn free_user_frames(&mut self) {
         let vmas: Vec<Vma> = self.vmas.iter().copied().collect();

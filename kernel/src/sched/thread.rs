@@ -741,3 +741,13 @@ pub fn stack_fresh() -> u64 {
 pub fn stack_cached() -> u64 {
     u64::try_from(STACK_CACHE.lock().len()).unwrap_or(0)
 }
+
+/// Frames reserved by every kernel stack carved so far (K449 test-only metric).
+///
+/// Stack heap blocks are never returned to the heap (the guard-page mapping cannot be restored),
+/// so every fresh stack keeps its reserved page count. Cached stacks are included.
+pub fn stack_frames() -> u64 {
+    STACK_FRESH
+        .load(Ordering::Relaxed)
+        .saturating_mul(STACK_RESERVED_PAGES)
+}

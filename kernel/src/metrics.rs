@@ -5,8 +5,10 @@
 //!
 //! Enabled by `k449-metrics=<seconds>` on the kernel command line. A kernel thread prints one
 //! `K449-METRICS ...` line to the serial every interval with the existing allocator, frame,
-//! process, thread and handle counters. This is a diagnostic path for the SSH soak harness, not a
-//! product service: with the command-line key absent nothing is spawned and no line is printed.
+//! process, thread and handle counters, plus page-table frames, kernel-stack frames and the
+//! present user pages of the init/vfsd/netd/sshd processes. This is a diagnostic path for the
+//! SSH soak harness, not a product service: with the command-line key absent nothing is spawned
+//! and no line is printed.
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -55,12 +57,41 @@ fn sampler() {
                 procs,
                 threads,
                 raven_handles::live_lineage_nodes(),
+                memory::paging::page_table_frames(),
+                sched::thread::stack_frames(),
+                process_pages("init"),
+                process_pages("vfsd"),
+                process_pages("netd"),
+                process_pages("sshd"),
             )
         );
     }
 }
 
+/// Present user pages of the named process, or zero when it is not running.
+fn process_pages(role: &str) -> u64 {
+    for target in process::processes() {
+        let command = target.command.lock().clone();
+        let matched = match role {
+            "init" => target.id == 1,
+            "vfsd" => command.ends_with("vfsd"),
+            "netd" => command.ends_with("netd"),
+            "sshd" => command == "/sbin/sshd" || command == "sshd",
+            _ => false,
+        };
+        if !matched {
+            continue;
+        }
+        let mut slot = target.address_space.lock();
+        if let Some(space) = slot.as_mut() {
+            return space.mapped_pages();
+        }
+    }
+    0
+}
+
 /// Format one machine-readable metric line.
+#[allow(clippy::too_many_arguments)] // one machine-readable row; the fields are the interface
 pub fn format_line(
     heap_used: usize,
     heap_free: usize,
@@ -69,11 +100,19 @@ pub fn format_line(
     procs: usize,
     threads: u32,
     ofds: u64,
+    pt_frames: u64,
+    stack_frames: u64,
+    init_pages: u64,
+    vfsd_pages: u64,
+    netd_pages: u64,
+    sshd_pages: u64,
 ) -> String {
     format!(
         "K449-METRICS heap_used={heap_used} heap_free={heap_free} \
          frames_free={frames_free} frames_alloc={frames_allocated} \
-         procs={procs} threads={threads} ofds={ofds}"
+         procs={procs} threads={threads} ofds={ofds} \
+         pt_frames={pt_frames} stack_frames={stack_frames} init_pages={init_pages} \
+         vfsd_pages={vfsd_pages} netd_pages={netd_pages} sshd_pages={sshd_pages}"
     )
 }
 

@@ -124,15 +124,30 @@ impl From<MapError> for PagingError {
     }
 }
 
+/// Page-table frames currently allocated through [`KernelFrameAllocator`] (test-only metric).
+static PAGE_TABLE_FRAMES: AtomicU64 = AtomicU64::new(0);
+
+/// Page-table frames currently allocated (K449 test-only metric).
+pub fn page_table_frames() -> u64 {
+    PAGE_TABLE_FRAMES.load(Ordering::Acquire)
+}
+
 /// A frame allocator backed by the kernel's own bitmap allocator.
 pub struct KernelFrameAllocator;
 
 impl RmmFrameAllocator for KernelFrameAllocator {
     fn allocate(&mut self) -> Option<PhysAddr> {
-        frame::alloc_zeroed_frame().map(rmm_phys)
+        let physical = frame::alloc_zeroed_frame().map(rmm_phys);
+        if physical.is_some() {
+            PAGE_TABLE_FRAMES.fetch_add(1, Ordering::AcqRel);
+        }
+        physical
     }
 
     fn free(&mut self, frame: PhysAddr) {
+        let _ = PAGE_TABLE_FRAMES.fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+            count.checked_sub(1)
+        });
         let _ = frame::free_frame(frame_phys(frame));
     }
 }
