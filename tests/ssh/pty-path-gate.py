@@ -42,6 +42,7 @@ IMAGE = Path(os.environ.get("PTY_GATE_IMAGE", ROOT / "build/qtest/pty-path-mutat
 LABEL = os.environ.get("PTY_GATE_LABEL", "before")
 SESSIONS = int(os.environ.get("PTY_GATE_SESSIONS", "3"))
 EXPECT_METRICS = os.environ.get("PTY_GATE_EXPECT_METRICS", "0") == "1"
+SSHD_LOG = os.environ.get("PTY_GATE_SSHD_LOG", "0") == "1"
 OUT = Path(os.environ.get("PTY_GATE_OUT", f"/tmp/opencode/pty-gate-{LABEL}"))
 OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
 OVMF_VARS = Path("/usr/share/OVMF/OVMF_VARS_4M.fd")
@@ -244,6 +245,15 @@ def main() -> int:
             print(f"PTY-PATH-GATE {LABEL} child {line}", flush=True)
     if orphan > 0:
         failures.append(f"orphan sshd-session children={orphan}")
+
+    if SSHD_LOG:
+        code, output = run("cat /tmp/sshd.log", tty=False, timeout=12)
+        print(f"PTY-PATH-GATE {LABEL} sshdlog exit={code}", flush=True)
+        for line in output.splitlines():
+            if re.search(r"TIOCSCTTY|controlling|setsid|Accepted password|Failed to", line):
+                print(f"PTY-PATH-GATE {LABEL} sshdlog {line.strip()}", flush=True)
+        for line in output.splitlines()[-20:]:
+            print(f"PTY-PATH-GATE {LABEL} sshdlog-tail {line}", flush=True)
 
     if failures:
         print(f"PTY-PATH-GATE {LABEL} FAIL reasons={';'.join(failures)}", flush=True)
