@@ -178,6 +178,114 @@ static int get_size(const char *who, int fd, const struct winsize *want) {
     return 0;
 }
 
+/* K536 rev166: when the only slave endpoint exits, the master must see EOF
+ * (NetBSD tty_pty.c ptsclose -> ttyclose, ptcclose carrier drop; FreeBSD
+ * ttydisc_close flushes the discipline). A master read after the child exits
+ * must not block: a hung pty keeps the SSH session channel open. */
+static void child_exit_eof(void) {
+    int master = posix_openpt(O_RDWR | O_NOCTTY);
+    if (master < 0) {
+        printf("pty-winsize: close child-exit open FAIL errno=%d\n", errno);
+        failures++;
+        return;
+    }
+    if (grantpt(master) != 0 || unlockpt(master) != 0) {
+        printf("pty-winsize: close child-exit grant FAIL errno=%d\n", errno);
+        failures++;
+        close(master);
+        return;
+    }
+    char *name = ptsname(master);
+    if (name == NULL) {
+        printf("pty-winsize: close child-exit ptsname FAIL errno=%d\n", errno);
+        failures++;
+        close(master);
+        return;
+    }
+    int parent_slave = open(name, O_RDWR);
+    if (parent_slave < 0) {
+        printf("pty-winsize: close child-exit slave FAIL errno=%d\n", errno);
+        failures++;
+        close(master);
+        return;
+    }
+    pid_t child = fork();
+    if (child < 0) {
+        printf("pty-winsize: close child-exit fork FAIL errno=%d\n", errno);
+        failures++;
+        close(parent_slave);
+        close(master);
+        return;
+    }
+    if (child == 0) {
+        close(master);
+        int slave = open(name, O_RDWR);
+        if (slave < 0)
+            _exit(1);
+        char byte = 'Z';
+        if (write(slave, &byte, 1) != 1)
+            _exit(1);
+        close(slave);
+        _exit(0);
+    }
+    close(parent_slave);
+    struct pollfd waiting;
+    waiting.fd = master;
+    waiting.events = POLLIN;
+    waiting.revents = 0;
+    char byte = 0;
+    int count = 0;
+    int got = 0;
+    for (int attempt = 0; attempt < 20 && !got; attempt++) {
+        waiting.revents = 0;
+        int ready = poll(&waiting, 1, 100);
+        if (ready < 0)
+            break;
+        if (ready == 0)
+            continue;
+        if (ready == 0)
+            continue;
+        count = (int)read(master, &byte, 1);
+        if (count == 1 && byte == 'Z') {
+            got = 1;
+        } else if (count < 0 && errno == EAGAIN) {
+            continue;
+        } else {
+            break;
+        }
+    }
+    printf("pty-winsize: close child-exit read=%d byte=%u\n", got ? 1 : count,
+           (unsigned)byte);
+    if (!got) {
+        failures++;
+        (void)raw_syscall2(0x4A, child, SIGKILL);
+        close(master);
+        return;
+    }
+    int eof = 0;
+    for (int attempt = 0; attempt < 20 && !eof; attempt++) {
+        waiting.revents = 0;
+        int ready = poll(&waiting, 1, 100);
+        if (ready < 0)
+            break;
+        if (ready == 0)
+            continue;
+        count = (int)read(master, &byte, 1);
+        if (count == 0) {
+            eof = 1;
+        } else if (count < 0 && errno != EAGAIN) {
+            break;
+        }
+    }
+    printf("pty-winsize: close child-exit eof=%d\n", eof);
+    if (!eof) {
+        printf("pty-winsize: close child-exit FAIL eof=hang\n");
+        failures++;
+        (void)raw_syscall2(0x4A, child, SIGKILL);
+    }
+    close(master);
+}
+
 int main(void) {
     printf("pty-winsize: start uid=%d\n", (int)getuid());
 
@@ -405,6 +513,8 @@ int main(void) {
            queued);
     if (closed != -1 || closed_errno != EBADF || queued != -EAGAIN)
         failures++;
+
+    child_exit_eof();
 
     if (failures != 0) {
         printf("pty-winsize: FAIL fields=%d\n", failures);

@@ -128,6 +128,12 @@ regex = '^pty-winsize: sigwinch bg count=0$'
 regex = '^pty-winsize: sigwinch closed errno=9 signal=-11$'
 
 [[expect]]
+regex = '^pty-winsize: close child-exit read=1 byte=90$'
+
+[[expect]]
+regex = '^pty-winsize: close child-exit eof=1$'
+
+[[expect]]
 regex = '^pty-winsize: ok$'
 
 [[expect]]
