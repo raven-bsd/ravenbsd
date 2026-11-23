@@ -20,6 +20,9 @@
 //! * sibling-exit: a sibling child exits while a worker is blocked in a pipe read, a futex wait,
 //!   or an EVQ_WAIT. A no-handler `THREAD_KICK` must not turn any of them into EINTR; only the
 //!   ready byte/futex/event wakes the worker.
+//! * sshd-shape: a worker registers `SIG_SETUP`, blocks in EVQ_WAIT on a pipe read end, and a
+//!   forked child exits. The SIGCHLD entry must run, the retry must see the pipe HUP, and
+//!   `PROC_WAIT_EX` must return the child's exact status - not EINTR with a lost event.
 //!
 //! The fixture is a guest proof; the mutating negative checks run against the kernel event core.
 
@@ -99,6 +102,14 @@ const SIBLING_WAKE_NS: u64 = 150_000_000;
 const SIBLING_EVENT_TIMEOUT_NS: u64 = 1_000_000_000;
 /// Event cookie used by the sibling-exit row.
 const SIBLING_EVENT_COOKIE: u64 = 7;
+/// Child exit delay for the sshd-shape row.
+const SSHD_CHILD_NS: u64 = 200_000_000;
+/// Child exit code for the sshd-shape row.
+const SSHD_CHILD_CODE: i32 = 77;
+/// EVQ_WAIT timeout for the sshd-shape row.
+const SSHD_TIMEOUT_NS: u64 = 1_000_000_000;
+/// Event cookie for the sshd-shape pipe.
+const SSHD_EVENT_COOKIE: u64 = 11;
 
 #[repr(align(16))]
 struct ChildStack(#[allow(dead_code)] [u8; 16 * 1024]);
@@ -106,6 +117,7 @@ struct ChildStack(#[allow(dead_code)] [u8; 16 * 1024]);
 static mut CHILD_STACK_A: ChildStack = ChildStack([0; 16 * 1024]);
 static mut CHILD_STACK_B: ChildStack = ChildStack([0; 16 * 1024]);
 static mut SIBLING_STACK: ChildStack = ChildStack([0; 16 * 1024]);
+static mut SSHD_STACK: ChildStack = ChildStack([0; 16 * 1024]);
 
 static PROC_WAIT_ARMED: AtomicBool = AtomicBool::new(false);
 static PROC_WAIT_FAIL: AtomicU32 = AtomicU32::new(0);
@@ -131,10 +143,18 @@ static EINTR_EVENT: AtomicU32 = AtomicU32::new(u32::MAX);
 static EINTR_SAW: AtomicU32 = AtomicU32::new(0);
 static EINTR_DONE: AtomicI32 = AtomicI32::new(0);
 
+static SSHD_ARMED: AtomicBool = AtomicBool::new(false);
+static SSHD_FAIL: AtomicU32 = AtomicU32::new(0);
+static SSHD_HANDLER_RUNS: AtomicU32 = AtomicU32::new(0);
+static SSHD_EINTR: AtomicU32 = AtomicU32::new(0);
+static SSHD_STATUS: AtomicI32 = AtomicI32::new(0);
+static SSHD_QUEUE: AtomicU32 = AtomicU32::new(u32::MAX);
+
 #[repr(align(16))]
 struct SignalContext(#[allow(dead_code)] [u8; 4096]);
 
 static mut EINTR_SIGNAL_CONTEXT: SignalContext = SignalContext([0; 4096]);
+static mut SSHD_SIGNAL_CONTEXT: SignalContext = SignalContext([0; 4096]);
 
 type R = Result<(), &'static str>;
 
@@ -677,6 +697,151 @@ fn sibling_exit() -> R {
     }
 }
 
+extern "C" fn sshd_signal_handler(_: usize) -> ! {
+    SSHD_HANDLER_RUNS.fetch_add(1, Ordering::AcqRel);
+    // SAFETY: the kernel enters this handler with the interrupted EVQ_WAIT context; SIGRETURN
+    // restores it after the handler has counted the delivery.
+    unsafe { sys::syscall1(SIGRETURN, 0) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+extern "C" fn sshd_child(_: usize) -> ! {
+    let _ = nanosleep(SSHD_CHILD_NS);
+    // SAFETY: EXIT terminates only the forked child process.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, SSHD_CHILD_CODE as usize) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+fn sshd_waiter(_: usize) {
+    let context = core::ptr::addr_of_mut!(SSHD_SIGNAL_CONTEXT) as usize;
+    // SAFETY: SIG_SETUP takes scalar user addresses; the context is a live 16-byte-aligned
+    // static page and the entry is in the fixture text mapping.
+    let setup = unsafe {
+        sys::syscall4(
+            SIG_SETUP,
+            sshd_signal_handler as *const () as usize,
+            context,
+            SIG_SETUP_ABS as usize,
+            0,
+        )
+    };
+    if setup < 0 {
+        SSHD_FAIL.store(1, Ordering::Release);
+        return;
+    }
+    let queue = SSHD_QUEUE.load(Ordering::Acquire);
+    let stack = core::ptr::addr_of_mut!(SSHD_STACK);
+    let (child, pid) = match fork_wait_child(sshd_child, child_stack_top(stack)) {
+        Ok(child) => child,
+        Err(_) => {
+            SSHD_FAIL.store(2, Ordering::Release);
+            return;
+        }
+    };
+    SSHD_ARMED.store(true, Ordering::Release);
+
+    let mut output = [EvqEvent::default(); 1];
+    let mut got_hup = false;
+    for _ in 0..8 {
+        // SAFETY: EVQ_WAIT reads one output record from the live stack array and takes the queue
+        // handle and scalar timeout; the queue is created by the main thread.
+        let raw = unsafe {
+            sys::syscall4(
+                Syscall::EVQ_WAIT as usize,
+                queue as usize,
+                output.as_mut_ptr() as usize,
+                1,
+                SSHD_TIMEOUT_NS as usize,
+            )
+        };
+        if raw == Errno::EINTR.to_ret() {
+            SSHD_EINTR.fetch_add(1, Ordering::AcqRel);
+            continue;
+        }
+        if raw == 1 && output[0].events & HUP != 0 {
+            got_hup = true;
+            break;
+        }
+        break;
+    }
+    if !got_hup {
+        SSHD_FAIL.store(3, Ordering::Release);
+        let _ = handle_close(Handle(child as u32));
+        return;
+    }
+
+    match wait_one_pid(pid) {
+        Ok(status) => {
+            SSHD_STATUS.store(status, Ordering::Release);
+            if status != SSHD_CHILD_CODE << 8 {
+                SSHD_FAIL.store(6, Ordering::Release);
+            }
+        }
+        Err(1) => SSHD_FAIL.store(4, Ordering::Release),
+        Err(2) => SSHD_FAIL.store(5, Ordering::Release),
+        Err(_) => SSHD_FAIL.store(7, Ordering::Release),
+    }
+    let _ = handle_close(Handle(child as u32));
+}
+
+fn sshd_shape() -> R {
+    SSHD_ARMED.store(false, Ordering::Release);
+    SSHD_FAIL.store(0, Ordering::Release);
+    SSHD_HANDLER_RUNS.store(0, Ordering::Release);
+    SSHD_EINTR.store(0, Ordering::Release);
+    SSHD_STATUS.store(0, Ordering::Release);
+
+    let queue = EventQueue::create().map_err(|_| "queue")?;
+    let (read, write) = pipe().map_err(|_| "pipe")?;
+    queue
+        .add(read, READABLE | HUP, SSHD_EVENT_COOKIE)
+        .map_err(|_| "add pipe")?;
+    SSHD_QUEUE.store(queue.handle().0, Ordering::Release);
+    let worker = thread::spawn(sshd_waiter, 0, STACK_SIZE).map_err(|_| "thread")?;
+
+    let mut armed = false;
+    for _ in 0..PROC_ARM_POLLS {
+        if SSHD_ARMED.load(Ordering::Acquire) {
+            armed = true;
+            break;
+        }
+        let _ = nanosleep(PROC_ARM_NS);
+    }
+    if !armed {
+        return Err("arm timeout");
+    }
+    // The child inherited the write end at fork; closing the parent's copy leaves the child as
+    // the only writer, so its exit produces the HUP the retry must observe.
+    handle_close(write).map_err(|_| "close writer")?;
+    worker.join().map_err(|_| "join")?;
+
+    match SSHD_FAIL.load(Ordering::Acquire) {
+        0 => {}
+        1 => return Err("signal setup"),
+        2 => return Err("child fork"),
+        3 => return Err("event"),
+        4 => return Err("waitpid EINTR"),
+        5 => return Err("waitpid wrong pid"),
+        6 => return Err("waitpid status"),
+        _ => return Err("waitpid"),
+    }
+    let handler = SSHD_HANDLER_RUNS.load(Ordering::Acquire);
+    if handler == 0 {
+        return Err("handler");
+    }
+    println!(
+        "readiness: sshd-shape handler={} eintr={} event=hup waitpid={} ok",
+        handler,
+        SSHD_EINTR.load(Ordering::Acquire),
+        SSHD_STATUS.load(Ordering::Acquire)
+    );
+    Ok(())
+}
+
 struct NetHandler;
 
 impl Handler for NetHandler {
@@ -825,6 +990,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         ("eintr", eintr_reevaluate),
         ("sibling-exit", sibling_exit),
         ("proc-wait", proc_wait),
+        ("sshd-shape", sshd_shape),
         ("net-listen", net_listen),
     ] {
         if let Err(reason) = row() {
