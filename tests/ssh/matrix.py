@@ -66,8 +66,8 @@ RELEASE_SESSIONS = 10
 RELEASE_COMMANDS = (
     ("uname", ["uname"], lambda out: out.startswith(b"RavenBSD"),
      "stdout starts with RavenBSD"),
-    ("pwd", ["pwd"], lambda out: out == b"/home/raven\n",
-     "stdout == /home/raven\\n"),
+    ("pwd", ["pwd"], lambda out: out == b"/\n",
+     "stdout == /\\n (release session cwd)"),
     ("ls", ["ls"], lambda out: True,
      "any listing, no child fault"),
     ("cat-hosts", ["cat", "/etc/hosts"], lambda out: b"127.0.0.1" in out,
