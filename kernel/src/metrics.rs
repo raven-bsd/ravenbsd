@@ -71,12 +71,12 @@ fn sampler() {
 /// Present user pages of the named process, or zero when it is not running.
 fn process_pages(role: &str) -> u64 {
     for target in process::processes() {
-        let command = target.command.lock().clone();
         let matched = match role {
             "init" => target.id == 1,
-            "vfsd" => command.ends_with("vfsd"),
-            "netd" => command.ends_with("netd"),
-            "sshd" => command == "/sbin/sshd" || command == "sshd",
+            "vfsd" => serves_scheme(&target, "file"),
+            "netd" => serves_scheme(&target, "net"),
+            // sshd is the listener that holds a `net:` client file but serves no scheme itself.
+            "sshd" => !serves_any(&target) && uses_server_scheme(&target, "net"),
             _ => false,
         };
         if !matched {
@@ -88,6 +88,38 @@ fn process_pages(role: &str) -> u64 {
         }
     }
     0
+}
+
+/// True when `target` registered a scheme with this name.
+fn serves_scheme(target: &process::Process, name: &str) -> bool {
+    target
+        .schemes
+        .lock()
+        .iter()
+        .any(|scheme| scheme.name == name)
+}
+
+/// True when `target` registered any scheme.
+fn serves_any(target: &process::Process) -> bool {
+    !target.schemes.lock().is_empty()
+}
+
+/// True when any of `target`'s scheme-file handles points at a server of `name`.
+fn uses_server_scheme(target: &process::Process, name: &str) -> bool {
+    let mut found = false;
+    target.handles.lock().for_each_live(|_, object, _, _| {
+        if let crate::process::handle::Object::SchemeFile(file) = object
+            && file
+                .server
+                .schemes
+                .lock()
+                .iter()
+                .any(|scheme| scheme.name == name)
+        {
+            found = true;
+        }
+    });
+    found
 }
 
 /// Format one machine-readable metric line.
