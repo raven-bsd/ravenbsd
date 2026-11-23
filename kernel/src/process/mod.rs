@@ -587,6 +587,29 @@ pub struct Process {
     pub child_system_ns: AtomicU64,
     /// Accumulated reaped-child user time.
     pub child_user_ns: AtomicU64,
+    /// Maximum resident user pages observed for this process, in bytes.
+    pub maxrss_bytes: AtomicU64,
+    /// Maximum resident user pages of any reaped child, in bytes.
+    pub child_maxrss_bytes: AtomicU64,
+}
+
+impl Process {
+    /// Resident user pages for this process, in bytes, from the page tables.
+    ///
+    /// `UserAddressSpace::mapped_pages` walks the VMA tree and counts present 4 KiB leaves; it
+    /// includes the initfs and memory-object mappings, so this is resident user memory, not
+    /// private RSS. Zero for the kernel process or after the address space is released.
+    pub fn resident_rss_bytes(&self) -> u64 {
+        let mut slot = self.address_space.lock();
+        slot.as_mut()
+            .map_or(0, |space| space.mapped_pages().saturating_mul(PAGE))
+    }
+
+    /// Fold the current resident bytes into the process's `maxrss` high-water mark.
+    pub fn update_maxrss(&self) {
+        let rss = self.resident_rss_bytes();
+        self.maxrss_bytes.fetch_max(rss, Ordering::AcqRel);
+    }
 }
 
 /// Per-process syscall personality and Linux handler handle.
@@ -721,6 +744,11 @@ pub fn sshd_totals() -> (usize, u32) {
     (procs, threads)
 }
 
+/// K449 diagnostic: exited processes still retained for `PROC_WAIT`.
+pub fn zombie_count() -> usize {
+    ZOMBIES.lock().len()
+}
+
 /// Live waiters on the process-owned queues (S36 timeout-retention diagnostic).
 pub fn wait_queue_len() -> usize {
     let mut total = 0usize;
@@ -814,6 +842,8 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     }))
 }
 
@@ -893,6 +923,8 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
     register_pid(&process);
@@ -965,6 +997,8 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
 
     {
@@ -1269,6 +1303,10 @@ pub fn notify_parent(process: &Process, sigchld: bool) {
         parent
             .child_user_ns
             .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
+        parent.child_maxrss_bytes.fetch_max(
+            process.maxrss_bytes.load(Ordering::Acquire),
+            Ordering::AcqRel,
+        );
         let uid = process.ids.lock().uid;
         parent.queue_signal_info(SIGCHLD, process.id, CLD_EXITED_CODE, uid, 0);
     }
@@ -1385,6 +1423,8 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;
@@ -1930,15 +1970,18 @@ fn cleanup_evidence(process: &Process) -> bool {
 /// thread's own exit path and run in that context only; a foreign caller skips them (an
 /// unstarted process has no thread to print from, and a terminated process prints on its last
 /// thread's exit).
-/// True when the kernel command line contains `token` as a whitespace-separated word.
+/// Presence check for a boot command-line gate without building the 64-token `CmdLine` table.
 ///
-/// Teardown runs on a kernel stack that may already be close to its guard page after a pager
-/// fault (S40/S17). The deep `CmdLine` parser is not safe there; FreeBSD `kern_environment.c`
-/// `_getenv_static_from` is the same shallow linear token scan with no allocation.
-fn cmdline_has(token: &str) -> bool {
-    paging::cmdline()
-        .split_ascii_whitespace()
-        .any(|word| word == token)
+/// `teardown` runs on the 28 KiB kernel stack. An inlined `CmdLine::parse` copy is about 1.5 KiB,
+/// and the seven gate copies below exhausted the stack before the IPC/event close hooks ran (the
+/// K434 init-exit double fault). This is the same token walk the s17 gate already uses.
+fn cmdline_has(key: &str) -> bool {
+    paging::cmdline().split_ascii_whitespace().any(|token| {
+        token == key
+            || token
+                .strip_prefix(key)
+                .is_some_and(|rest| rest.starts_with('='))
+    })
 }
 
 fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
@@ -1955,6 +1998,8 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let _irq = crate::sync::critical();
         ipc::on_process_exit(process);
     }
+    // The RSS high-water mark is snapshotted in `terminate_once` before IPC teardown; do not
+    // walk the address space again after that teardown has altered the mappings.
     let address_space = process.address_space.lock().take();
     if let Some(mut address_space) = address_space {
         if own_context {
@@ -2057,8 +2102,8 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // S24 leak evidence: the free-frame count after every child exit.
     if cmdline_has("s24-framecheck") {
         kprintln!("s24: frames free={}", frame::stats().free_bytes);
-        // K570: the pty-churn frame line rides the same shallow scan, so no parse is added to
-        // the teardown frame (K536 rev187 double fault).
+        // K570: the pty-churn frame line rides the same gate. A second top-level parse/print
+        // block enlarged the teardown frame past the kernel stack (K536 rev187 double fault).
         if cmdline_has("s24-alloccheck") {
             kprintln!("s24: frames allocated={}", frame::stats().allocated_bytes);
         }
@@ -2506,6 +2551,11 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     // are owned by the process, so release them on the single teardown path before any waiter
     // can observe a stale owner.
     crate::syscall::record_lock::release_process(process.id);
+    // Snapshot the final resident footprint while the address space still exists. This runs
+    // before the critical section (the VMA walk allocates) and before `notify_parent`, so the
+    // reaped-child maxrss fold sees the completed footprint. The stack fault that forced the
+    // earlier removal was the inlined CmdLine parser in `teardown`, now gone.
+    process.update_maxrss();
     // The state/wake graph takes the per-CPU scheduler lock through `sched::wake`. The syscall
     // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
     // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space

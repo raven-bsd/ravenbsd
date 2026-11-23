@@ -300,6 +300,22 @@ pub fn getrusage() -> Result<[u64; 8], Errno> {
     Ok(values)
 }
 
+pub fn getrusage_who(who: i32) -> Result<[u64; 8], Errno> {
+    let mut values = [0u64; 8];
+    checked(unsafe {
+        syscall6(
+            PROC_GETRUSAGE,
+            who as usize,
+            values.as_mut_ptr() as usize,
+            values.len(),
+            0,
+            0,
+            0,
+        )
+    })?;
+    Ok(values)
+}
+
 pub fn getrlimit(resource: usize) -> Result<[u64; 2], Errno> {
     let mut values = [0u64; 2];
     checked(unsafe {

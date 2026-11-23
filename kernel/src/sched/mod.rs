@@ -497,6 +497,10 @@ fn schedule_locked() {
                 .remove_where(|(thread, _, _)| thread.id == next.id);
             cancel_thread_sleepers_except(next.id, cpu);
             crate::syscall::futex::remove_thread(next.id);
+            // This filter reaps a runnable terminal-process thread without running `exit_thread`,
+            // so it must perform the same donation-graph teardown here. Without it the session's
+            // remaining threads stay registered and the 3072-byte class still fills.
+            crate::sync::unregister_thread(next.tid);
             push_reap(Arc::into_raw(next) as usize);
             next = match state.runqueue.pop_front() {
                 Some(next) => next,
@@ -1286,6 +1290,10 @@ pub fn exit_thread(code: i32) -> ! {
     crate::syscall::futex::remove_thread(thread.id);
     crate::sched::wait::WaitQueue::purge_thread(thread.id);
     thread.process.unregister_thread(&thread);
+    // FreeBSD `thread_fini`/NetBSD `lwp_dtor`: a thread's turnstile registration does not outlive
+    // the thread. The graph node holds base/effective map entries and donation edges; dropping it
+    // here also restores any server or lock owner this thread was boosting.
+    crate::sync::unregister_thread(thread.tid);
     // `block_current`/`sleep_until` exit a terminal-process thread before the caller runs
     // `end_block`, so the timeout entry (which holds an `Arc<Thread>`) must be removed here.
     cancel_thread_sleepers(thread.id);

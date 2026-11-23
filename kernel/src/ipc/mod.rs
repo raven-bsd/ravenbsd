@@ -375,6 +375,19 @@ fn pop_request(
     requests.lock().pop()
 }
 
+/// K449 diagnostic: total request entries in the per-process scheme, active and client queues.
+pub fn pending_counts() -> (usize, usize, usize) {
+    let mut queued = 0usize;
+    let mut active = 0usize;
+    let mut client = 0usize;
+    for process in crate::process::processes() {
+        queued = queued.saturating_add(process.scheme_queue.lock().len());
+        active = active.saturating_add(process.active_requests.lock().len());
+        client = client.saturating_add(process.client_requests.lock().len());
+    }
+    (queued, active, client)
+}
+
 /// Fail pending requests and remove the registry entries of an exiting process.
 ///
 /// Called from `process::notify_exit` before the address space is released, so capture mappings

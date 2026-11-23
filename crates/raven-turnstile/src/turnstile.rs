@@ -235,6 +235,76 @@ impl Turnstiles {
         Ok(())
     }
 
+    /// Unregister a thread that is leaving (FreeBSD `thread_fini`, NetBSD `lwp_dtor`).
+    ///
+    /// Drops the thread's base/effective entries, its wait-queue entry and any object it owns.
+    /// The removal is allocation-free: the effective fixed point is recomputed in place for the
+    /// remaining registered threads, so an exiting thread cannot leave a map entry behind or pin
+    /// the 3072-byte class. An object whose owner exits with waiters stays behind (with no owner)
+    /// until those waiters leave; a reused thread id never inherits it.
+    pub fn unregister(&mut self, thread: ThreadId) -> bool {
+        let was_registered = self.threads.remove(&thread).is_some();
+        self.effective.remove(&thread);
+        for turnstile in self.objects.values_mut() {
+            turnstile.waiters.retain(|waiter| waiter.thread != thread);
+            if turnstile.owner == Some(thread) {
+                turnstile.owner = None;
+            }
+            turnstile.pi = turnstile.waiters.first().map(|waiter| waiter.priority);
+        }
+        self.objects
+            .retain(|_, turnstile| turnstile.owner.is_some() || !turnstile.waiters.is_empty());
+        self.refresh_without_alloc();
+        was_registered
+    }
+
+    /// Recompute every effective priority in place, then re-sort the waiter lists.
+    ///
+    /// [`Turnstiles::refresh`] clones the base map; the thread-exit path cannot allocate. Every
+    /// registered thread has an `effective` entry (`register` and `unregister` maintain the pair),
+    /// so resetting in place is exact and the fixed point is the same as `compute_effective`.
+    fn refresh_without_alloc(&mut self) {
+        for (thread, base) in &self.threads {
+            if let Some(effective) = self.effective.get_mut(thread) {
+                *effective = *base;
+            }
+        }
+        loop {
+            let mut changed = false;
+            for turnstile in self.objects.values() {
+                let Some(owner) = turnstile.owner else {
+                    continue;
+                };
+                let mut pi = Priority::LOWEST;
+                for waiter in &turnstile.waiters {
+                    if let Some(priority) = self.effective.get(&waiter.thread).copied() {
+                        pi = pi.min(priority);
+                    }
+                }
+                if let Some(current) = self.effective.get_mut(&owner)
+                    && pi < *current
+                {
+                    *current = pi;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        for turnstile in self.objects.values_mut() {
+            for waiter in &mut turnstile.waiters {
+                if let Some(priority) = self.effective.get(&waiter.thread).copied() {
+                    waiter.priority = priority;
+                }
+            }
+            turnstile
+                .waiters
+                .sort_by_key(|waiter| (waiter.priority, waiter.arrival));
+            turnstile.pi = turnstile.waiters.first().map(|waiter| waiter.priority);
+        }
+    }
+
     /// The thread's base priority, if it is registered.
     #[must_use]
     pub fn base_priority(&self, thread: ThreadId) -> Option<Priority> {
