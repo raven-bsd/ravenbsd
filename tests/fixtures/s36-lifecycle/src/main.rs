@@ -15,7 +15,7 @@
 //!    handle gets `EBADF`; a second terminate gets `ESRCH`.
 //! 6. a terminated server's scheme name can be registered again immediately.
 //! 7. a child exits while the parent is blocked in `PROC_WAIT_EX` with a registered signal
-//!    entry; the wait returns the child pid and status, not `EINTR`.
+//!    entry; the wait reports `EINTR`, the retry returns the child pid and status.
 //!
 //! Roles: `marker` (exit 0), `twomain`, `sleep` (sleep forever), `delayed` (exit 42 after a
 //! short sleep), `server` (register scheme `s36`, then sleep).
@@ -28,6 +28,7 @@ use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
+use raven_abi::signal::{SIG_SETUP, SIG_SETUP_ABS, SIGRETURN};
 use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_elf::{Elf, LoadMode, Machine, StepKind, plan_load};
@@ -42,12 +43,6 @@ const PAGE: usize = 4096;
 const PROC_WAIT_EX: usize = 0x48;
 /// Raw `proc_handle_info(handle) -> pid`.
 const PROC_HANDLE_INFO: usize = 0x3E;
-/// Raw `sig_setup(entry, ctx, flags)`.
-const SIG_SETUP: usize = 0x80;
-/// Raw `sigreturn()`.
-const SIGRETURN: usize = 0x82;
-/// The absolute `SIG_SETUP` context-area flag.
-const SIG_SETUP_ABS: usize = 2;
 /// Kernel `P_PID` wait id type.
 const P_PID: usize = 1;
 /// The registered signal context area.
@@ -654,28 +649,49 @@ fn scheme_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
 
 /// Scenario 7: a child exits while the parent is blocked in `PROC_WAIT_EX`.
 ///
-/// The parent has a registered signal entry, so the child's `SIGCHLD` kick and the wait wakeup
-/// race. The wait must return the requested pid and exit code, not `EINTR`.
+/// The parent has a registered signal entry, so the child's `SIGCHLD` kick interrupts the wait.
+/// POSIX and FreeBSD `kern_wait6` report `EINTR`; the retry then collects the child's pid and
+/// exit code. The status stays queued, so nothing is lost.
 fn wait_interrupt_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     let entry: extern "C" fn(usize, usize, usize) -> ! = signal_entry;
     // SAFETY: only the static's address is taken; the kernel validates the executable entry and
     // the 4096-byte absolute context area before storing the per-thread registration.
     let context = core::ptr::addr_of_mut!(SIGNAL_CONTEXT) as usize;
-    result(syscall3(SIG_SETUP, entry as usize, context, SIG_SETUP_ABS))
-        .map_err(|_| "wait signal setup")?;
+    result(syscall3(
+        SIG_SETUP,
+        entry as usize,
+        context,
+        SIG_SETUP_ABS as usize,
+    ))
+    .map_err(|_| "wait signal setup")?;
     let child = spawn_role(initfs, "delayed").map_err(|_| "wait race spawn")?;
     let pid = proc_handle_info(child).map_err(|_| "wait race pid")?;
     let mut status = 0i32;
-    match proc_wait_ex(P_PID, pid, &mut status) {
-        Ok(got) if got == pid as usize && status == 42 << 8 => {}
-        Ok(got) => {
-            println!("s36: wait race got={} pid={} status={}", got, pid, status);
-            return Err("wait race pid/status");
+    let mut got = 0usize;
+    let mut interrupted = false;
+    for _ in 0..8 {
+        match proc_wait_ex(P_PID, pid, &mut status) {
+            Ok(value) => {
+                got = value;
+                break;
+            }
+            Err(error) if error == Errno::EINTR => {
+                interrupted = true;
+                continue;
+            }
+            Err(error) => {
+                println!("s36: wait race errno={}", error.0);
+                return Err("wait race interrupted");
+            }
         }
-        Err(error) => {
-            println!("s36: wait race errno={}", error.0);
-            return Err("wait race interrupted");
-        }
+    }
+    if !interrupted {
+        return Err("wait race did not report EINTR");
+    }
+    println!("s36: wait race eintr");
+    if got != pid as usize || status != 42 << 8 {
+        println!("s36: wait race got={} pid={} status={}", got, pid, status);
+        return Err("wait race pid/status");
     }
     handle_close(child);
     println!("s36: wait race ok");
@@ -700,7 +716,7 @@ fn main(args: raven_rt::Args) -> i32 {
     if let Err(message) = unstarted_part() {
         fail(message);
     }
-    // Scenario 7: the SIGCHLD kick must not replace an available child status with EINTR.
+    // Scenario 7: the SIGCHLD kick reports EINTR; the retry collects the child.
     if let Err(message) = wait_interrupt_part(&initfs) {
         fail(message);
     }

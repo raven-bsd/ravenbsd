@@ -15,7 +15,10 @@ expect_exit = "success"
 [[expect]]
 regex = '^s36: unstarted reaped$'
 
-# Scenario 7: the child exit and its SIGCHLD kick must not turn the wait into EINTR.
+# Scenario 7: the child exit/SIGCHLD kick reports EINTR; the retry collects the child.
+[[expect]]
+regex = '^s36: wait race eintr$'
+
 [[expect]]
 regex = '^s36: wait race ok$'
 
