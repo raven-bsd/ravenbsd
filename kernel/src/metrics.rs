@@ -51,7 +51,6 @@ fn sampler() {
         let frames = memory::frame::stats();
         let (procs, threads) = process::live_totals();
         let class = memory::heap::class_stats(16);
-        let (sshd_procs, sshd_threads) = process::sshd_totals();
         kprintln!(
             "{}",
             format_line(
@@ -62,25 +61,25 @@ fn sampler() {
                 procs,
                 threads,
                 raven_handles::live_lineage_nodes(),
-                memory::paging::page_table_frames(),
-                sched::thread::stack_frames(),
-                process_pages("init"),
-                process_pages("vfsd"),
-                process_pages("netd"),
-                process_pages("sshd"),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
                 class.map_or(0, |stats| stats.free as u64),
                 class.map_or(0, |stats| stats.in_use as u64),
                 class.map_or(0, |stats| stats.slabs as u64),
-                sched::thread::live_threads(),
-                sched::reap_len(),
-                sched::thread::slot_drops(),
-                sched::thread::slot_denies(),
-                sched::thread::stack_fresh(),
-                sched::thread::stack_cached(),
-                sched::thread::stack_drops(),
-                sshd_procs,
-                sshd_threads,
-                crate::driver::dma_in_use(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
                 crate::sync::registered_count(),
             )
         );
@@ -106,6 +105,7 @@ fn sampler() {
 }
 
 /// Present user pages of the named process, or zero when it is not running.
+#[allow(dead_code)] // Kept for the next diagnostic image; the correlation sampler zeroes it.
 fn process_pages(role: &str) -> u64 {
     for target in process::processes() {
         let matched = match role {
@@ -128,6 +128,7 @@ fn process_pages(role: &str) -> u64 {
 }
 
 /// True when `target` registered a scheme with this name.
+#[allow(dead_code)] // Helper for `process_pages` in the next diagnostic image.
 fn serves_scheme(target: &process::Process, name: &str) -> bool {
     target
         .schemes
@@ -137,11 +138,13 @@ fn serves_scheme(target: &process::Process, name: &str) -> bool {
 }
 
 /// True when `target` registered any scheme.
+#[allow(dead_code)] // Helper for `process_pages` in the next diagnostic image.
 fn serves_any(target: &process::Process) -> bool {
     !target.schemes.lock().is_empty()
 }
 
 /// True when any of `target`'s scheme-file handles points at a server of `name`.
+#[allow(dead_code)] // Helper for `process_pages` in the next diagnostic image.
 fn uses_server_scheme(target: &process::Process, name: &str) -> bool {
     let mut found = false;
     target.handles.lock().for_each_live(|_, object, _, _| {
