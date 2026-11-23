@@ -27,8 +27,14 @@ static int same_inode(int left, int right) {
 
 int main(void) {
     struct stat st;
-    int mount_ok = stat("/dev/pts", &st) == 0 && S_ISDIR(st.st_mode);
-    printf("PTY-PATH mount=/dev/pts stat=%s errno=%d\n", mount_ok ? "ok" : "fail", errno);
+    int mount_stat = stat("/dev/pts", &st);
+    // The `/dev/pts/.keep` placeholder keeps a real initfs directory at the mount point, so
+    // S_ISDIR alone also holds when the mount is absent. The pty scheme root reports inode 0;
+    // the placeholder's initfs directory has a nonzero inode, so this row fails on a missing
+    // mount instead of accepting the placeholder.
+    int mount_ok = mount_stat == 0 && S_ISDIR(st.st_mode) && st.st_ino == 0;
+    printf("PTY-PATH mount=/dev/pts stat=%s ino=%llu errno=%d\n", mount_ok ? "ok" : "fail",
+           mount_stat == 0 ? (unsigned long long)st.st_ino : 0ULL, errno);
 
     char *session = ttyname(STDIN_FILENO);
     int session_stat = 0;
