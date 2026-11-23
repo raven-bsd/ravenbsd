@@ -1745,6 +1745,9 @@ def row_close_probe(console: SerialConsole | None) -> None:
     sshd_text = ""
     sshd_ls_text = ""
     ps_text = ""
+    debug_log_text = ""
+    debug_client_text = ""
+    debug_result: dict[str, object] | None = None
     if console is not None and console_shell_login(console):
         sshd_ls_text = console_cr_capture(
             console, "ls -l /tmp/sshd.log; echo K434-$((7*11))",
@@ -1754,6 +1757,20 @@ def row_close_probe(console: SerialConsole | None) -> None:
             "close-sshd.log", "K434-169")
         ps_text = console_cr_capture(
             console, "ps -e; echo K434-$((17*13))", "close-ps.log", "K434-221")
+        console_cr_capture(
+            console,
+            "/sbin/sshd -d -p 2222 -E /tmp/sshd-debug.log & echo K434-$((19*11))",
+            "close-debug-start.log", "K434-209", timeout=10)
+        time.sleep(1.0)
+        debug_result = ssh_run(["echo", "K449-DIAG"], "close-debug-client.log",
+                               extra=["-vvv", "-p", "2222"], timeout=15)
+        debug_client_text = (debug_result["stderr"]
+                             + debug_result["stdout"]).decode("utf-8", "replace")
+        (OUT / "close-debug-client-vvv.log").write_text(debug_client_text,
+                                                       encoding="utf-8")
+        debug_log_text = console_cr_capture(
+            console, "cat /tmp/sshd-debug.log; echo K434-$((17*13))",
+            "close-sshd-debug.log", "K434-221", timeout=20)
     elif console is not None:
         record("close-probe", "BLOCKED", "console login failed before the sshd log dump")
         return
@@ -1783,6 +1800,24 @@ def row_close_probe(console: SerialConsole | None) -> None:
                            if "channel" in line.lower() or "close" in line.lower()
                            or "disconnect" in line.lower()]
     client_tail = " || ".join(client_lines[-12:])
+    debug_lines = [line.strip() for line in debug_log_text.splitlines()
+                   if line.strip() and "K434-221" not in line
+                   and "cat /tmp/sshd-debug.log" not in line
+                   and not line.startswith("raven#")]
+    debug_sigchld = [line for line in debug_lines
+                     if "SIGCHLD" in line or "Received SIGCHLD" in line]
+    debug_collect = [line for line in debug_lines
+                     if "collect_children" in line or "collect" in line.lower()]
+    debug_session = [line for line in debug_lines
+                     if "session_exit_message" in line or "exit-status" in line]
+    debug_close = [line for line in debug_lines
+                   if "channel" in line.lower()
+                   and ("close" in line.lower() or "free" in line.lower())]
+    debug_client_lines = [line for line in debug_client_text.splitlines() if line.strip()]
+    debug_exit_status = any("rtype exit-status" in line for line in debug_client_lines)
+    debug_eof = any("rcvd eof" in line for line in debug_client_lines)
+    debug_close_client = any("rcvd close" in line or "channel 0: free" in line
+                             for line in debug_client_lines)
     accepted = next((line for line in sshd_lines if "Accepted password" in line), "")
     closed = next((line for line in sshd_lines if "Connection closed" in line), "")
     cleanup = next((line for line in sshd_lines if "cleanup_exit" in line), "")
@@ -1817,6 +1852,13 @@ def row_close_probe(console: SerialConsole | None) -> None:
         f"sshd_session_exit={session_exit_lines or 'none'}\n"
         f"sshd_channel_close={channel_close_lines or 'none'}\n"
         f"client_tail={client_tail}\n"
+        f"debug_client_exit={debug_result['returncode'] if debug_result else 'n/a'} "
+        f"timed_out={debug_result['timed_out'] if debug_result else 'n/a'} "
+        f"exit_status={debug_exit_status} eof={debug_eof} close={debug_close_client}\n"
+        f"debug_sigchld={debug_sigchld or 'none'}\n"
+        f"debug_collect_children={debug_collect or 'none'}\n"
+        f"debug_session_exit={debug_session or 'none'}\n"
+        f"debug_channel_close={debug_close or 'none'}\n"
         f"ps={ps_lines or 'none'}\n"
     )
     (OUT / "close-summary.txt").write_text(summary, encoding="utf-8")
