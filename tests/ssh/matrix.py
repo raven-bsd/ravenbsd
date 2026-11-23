@@ -1770,6 +1770,19 @@ def row_close_probe(console: SerialConsole | None) -> None:
     exit_lines = [line for line in sshd_lines
                   if "exit-status" in line.lower() or "channel" in line.lower()
                   or "session" in line.lower() or "close" in line.lower()]
+    accept_lines = [line for line in sshd_lines
+                    if "Server listening" in line or "Connection from" in line
+                    or "Accepted password" in line]
+    auth_lines = [line for line in sshd_lines
+                  if "Accepted password" in line or "Failed password" in line
+                  or "Postponed" in line or "Authenticat" in line]
+    session_exit_lines = [line for line in sshd_lines
+                          if "session_exit_message" in line or "exit-status" in line
+                          or "session 0" in line]
+    channel_close_lines = [line for line in sshd_lines
+                           if "channel" in line.lower() or "close" in line.lower()
+                           or "disconnect" in line.lower()]
+    client_tail = " || ".join(client_lines[-12:])
     accepted = next((line for line in sshd_lines if "Accepted password" in line), "")
     closed = next((line for line in sshd_lines if "Connection closed" in line), "")
     cleanup = next((line for line in sshd_lines if "cleanup_exit" in line), "")
@@ -1799,6 +1812,11 @@ def row_close_probe(console: SerialConsole | None) -> None:
         f"sshd_cleanup={cleanup or 'none'}\n"
         f"sshd_collect_sigchld={collect_lines or 'none'}\n"
         f"sshd_exit_channel={exit_lines or 'none'}\n"
+        f"sshd_accept={accept_lines or 'none'}\n"
+        f"sshd_auth={auth_lines or 'none'}\n"
+        f"sshd_session_exit={session_exit_lines or 'none'}\n"
+        f"sshd_channel_close={channel_close_lines or 'none'}\n"
+        f"client_tail={client_tail}\n"
         f"ps={ps_lines or 'none'}\n"
     )
     (OUT / "close-summary.txt").write_text(summary, encoding="utf-8")
