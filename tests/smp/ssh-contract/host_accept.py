@@ -66,6 +66,7 @@ def wait_ready(host, port, deadline):
             with socket.create_connection((host, port), timeout=5.0) as stream:
                 stream.settimeout(30.0)
                 if read_line(stream) == b"READY":
+                    stream.sendall(b"A")
                     return True
         except OSError:
             time.sleep(0.2)

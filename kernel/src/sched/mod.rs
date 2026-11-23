@@ -495,6 +495,10 @@ fn schedule_locked() {
                 .remove_where(|(thread, _, _)| thread.id == next.id);
             cancel_thread_sleepers_except(next.id, cpu);
             crate::syscall::futex::remove_thread(next.id);
+            // This filter reaps a runnable terminal-process thread without running `exit_thread`,
+            // so it must perform the same donation-graph teardown here. Without it the session's
+            // remaining threads stay registered and the 3072-byte class still fills.
+            crate::sync::unregister_thread(next.tid);
             push_reap(Arc::into_raw(next) as usize);
             next = match state.runqueue.pop_front() {
                 Some(next) => next,
@@ -1247,12 +1251,13 @@ pub fn exit_thread(code: i32) -> ! {
     thread.process.unregister_thread(&thread);
     crate::syscall::futex::remove_thread(thread.id);
     thread.process.unregister_thread(&thread);
+    // FreeBSD `thread_fini`/NetBSD `lwp_dtor`: a thread's turnstile registration does not outlive
+    // the thread. The graph node holds base/effective map entries and donation edges; dropping it
+    // here also restores any server or lock owner this thread was boosting.
+    crate::sync::unregister_thread(thread.tid);
     // `block_current`/`sleep_until` exit a terminal-process thread before the caller runs
     // `end_block`, so the timeout entry (which holds an `Arc<Thread>`) must be removed here.
     cancel_thread_sleepers(thread.id);
-    // The exit boundary drops the thread's donation registration; `reap_dead` also does this for
-    // terminal-filter threads that never run this function.
-    crate::sync::unregister_thread(thread.tid);
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }
@@ -1363,9 +1368,6 @@ fn reap_dead() {
         // SAFETY: each pointer was produced by `Arc::into_raw` exactly once and is owned by the
         // queue; the thread is neither current nor runnable.
         let thread = unsafe { Arc::from_raw(raw as *const Thread) };
-        // Threads dropped by the terminal-process filter never run `exit_thread`; release their
-        // donation registration here as well (idempotent with the exit-path call).
-        crate::sync::unregister_thread(thread.tid);
         // A terminal-process filter reaps a runnable thread without resuming the frame that
         // switched it out; the self-reference parked by `schedule_locked` is released here with
         // the reaper's own reference. Without this, the abandoned stack owns an Arc forever.

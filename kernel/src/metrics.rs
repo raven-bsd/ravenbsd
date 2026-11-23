@@ -38,8 +38,21 @@ pub fn start(cmdline: &CmdLine) {
     }
 }
 
+/// Print one-time object sizes for the 3072-class attribution.
+fn print_sizes() {
+    kprintln!(
+        "K449-SIZES thread={} process={} uspace={} pending={} buffers={}",
+        core::mem::size_of::<crate::sched::thread::Thread>(),
+        core::mem::size_of::<crate::process::Process>(),
+        core::mem::size_of::<crate::memory::uspace::UserAddressSpace>(),
+        core::mem::size_of::<crate::ipc::PendingRequest>(),
+        core::mem::size_of::<crate::ipc::RequestBuffers>(),
+    );
+}
+
 /// Sample and print one line per interval.
 fn sampler() {
+    print_sizes();
     loop {
         sleep_ns(INTERVAL_NS.load(Ordering::Relaxed));
         let (heap_used, heap_free) = memory::heap::stats();
@@ -69,6 +82,50 @@ fn sampler() {
                 crate::sync::registered_count(),
             )
         );
+        let (graph_threads, weak_threads) = crate::sync::turnstile_counts();
+        let (class_in_use, class_slabs, class_fail) =
+            memory::heap::class_stats(3072).unwrap_or((0, 0, 0));
+        let (class1024, _, _) = memory::heap::class_stats(1024).unwrap_or((0, 0, 0));
+        let (class1536, _, _) = memory::heap::class_stats(1536).unwrap_or((0, 0, 0));
+        let (class192, _, _) = memory::heap::class_stats(192).unwrap_or((0, 0, 0));
+        let (queued, active, client) = crate::ipc::pending_counts();
+        kprintln!(
+            "K449-GRAPH graph_threads={graph_threads} weak_threads={weak_threads} \
+             class3072_in_use={class_in_use} class3072_slabs={class_slabs} \
+             class3072_fail={class_fail} class1024_in_use={class1024} \
+             class1536_in_use={class1536} class192_in_use={class192} \
+             queued={queued} active={active} client={client} \
+             zombies={} deadlive={} clsenotices={}",
+            process::zombie_count(),
+            process::dead_live_threads(),
+            crate::ipc::router::close_notice_count(),
+        );
+        let mut shown = 0usize;
+        for entry in process::processes() {
+            let queued = entry.scheme_queue.lock().len();
+            if queued == 0 {
+                continue;
+            }
+            let mut names = alloc::string::String::new();
+            for scheme in entry.schemes.lock().iter() {
+                if !names.is_empty() {
+                    names.push(',');
+                }
+                names.push_str(&scheme.name);
+            }
+            let command = entry.command.lock().clone();
+            kprintln!(
+                "K449-PENDING pid={} queued={queued} path={} command={} schemes={}",
+                entry.id,
+                entry.path,
+                command,
+                names
+            );
+            shown = shown.saturating_add(1);
+            if shown >= 8 {
+                break;
+            }
+        }
     }
 }
 
