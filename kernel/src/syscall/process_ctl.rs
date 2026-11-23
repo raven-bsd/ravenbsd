@@ -1531,19 +1531,24 @@ pub fn getrusage(frame: &SyscallFrame) -> Result<usize, Errno> {
     if count != 8 {
         return Err(Errno::EINVAL);
     }
-    let (user, system) = match who {
-        0 => (
-            caller.user_ns.load(Ordering::Acquire),
-            caller.system_ns.load(Ordering::Acquire),
-        ),
+    let (user, system, maxrss) = match who {
+        0 => {
+            caller.update_maxrss();
+            (
+                caller.user_ns.load(Ordering::Acquire),
+                caller.system_ns.load(Ordering::Acquire),
+                caller.maxrss_bytes.load(Ordering::Acquire),
+            )
+        }
         -1 => (
             caller.child_user_ns.load(Ordering::Acquire),
             caller.child_system_ns.load(Ordering::Acquire),
+            caller.child_maxrss_bytes.load(Ordering::Acquire),
         ),
         _ => return Err(Errno::EINVAL),
     };
     let destination = UserSlice::new(frame.rsi, 64)?;
-    let values = [user, system, 0, 0, 0, 0, 0, caller.start_ns];
+    let values = [user, system, maxrss, 0, 0, 0, 0, caller.start_ns];
     let mut bytes = [0u8; 64];
     for (chunk, value) in bytes.chunks_exact_mut(8).zip(values) {
         chunk.copy_from_slice(&value.to_le_bytes());

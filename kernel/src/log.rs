@@ -245,6 +245,13 @@ fn panic(info: &PanicInfo<'_>) -> ! {
         file,
         line
     );
+    let (fail_size, ra0, ra1) = crate::memory::heap::fail_info();
+    if fail_size != 0 {
+        let _ = writeln!(
+            serial,
+            "K434 alloc-fail size={fail_size} ra0=0x{ra0:x} ra1=0x{ra1:x}"
+        );
+    }
     if test_exit() {
         crate::boot::exit_qemu(0x11);
     }

@@ -271,3 +271,88 @@ fn end_call_no_alloc_marks_wide_graphs_dirty() {
     d.check_invariants()
         .expect("invariant after deferred refresh");
 }
+
+#[test]
+fn session_thread_exit_releases_donation_entries() {
+    // One SSH session registers four graph threads (client, server, lock owner, waker). The
+    // session's thread-exit teardown must drop every registered/effective entry; at +4 entries
+    // per session the 3072-byte map class fills at session 56.
+    const SESSIONS: u32 = 58;
+    const PER_SESSION: u32 = 4;
+
+    let mut d = Donation::new();
+    for session in 0..SESSIONS {
+        let first = session * PER_SESSION;
+        for offset in 0..PER_SESSION {
+            d.register(first + offset, prio(10 + offset as u8)).unwrap();
+        }
+        d.begin_call(first + 1, first).unwrap();
+        d.begin_call(first + 3, first + 2).unwrap();
+
+        // A session thread exits: the graph unregister is the teardown boundary that the old
+        // code lacked (it removed call edges only).
+        for offset in 0..PER_SESSION {
+            assert!(d.unregister(first + offset));
+        }
+
+        assert!(
+            d.call_edges().is_empty(),
+            "session {session}: call edge retained after thread exit"
+        );
+        for offset in 0..PER_SESSION {
+            let thread = first + offset;
+            assert_eq!(
+                d.base_priority(thread),
+                None,
+                "session {session}: registered entry for thread {thread} retained after exit"
+            );
+            assert_eq!(
+                d.effective_priority(thread),
+                None,
+                "session {session}: effective entry for thread {thread} retained after exit"
+            );
+        }
+        d.check_invariants()
+            .expect("invariant after session thread exit");
+    }
+
+    // Id reuse: a new thread with the same id starts from its own base, never the dead thread's.
+    d.register(0, prio(2)).unwrap();
+    assert_eq!(d.base_priority(0), Some(prio(2)));
+    assert_eq!(d.effective_priority(0), Some(prio(2)));
+    assert!(d.unregister(0));
+    assert_eq!(d.base_priority(0), None);
+    assert_eq!(d.effective_priority(0), None);
+    d.check_invariants().expect("invariant after id reuse");
+}
+
+#[test]
+fn unregister_restores_boost_and_clears_owned_state() {
+    let mut d = Donation::new();
+    d.register(0, prio(20)).unwrap(); // lock owner
+    d.register(1, prio(0)).unwrap(); // high-priority waiter, also owns 9 and calls 2
+    d.register(2, prio(10)).unwrap(); // server
+    d.register(3, prio(5)).unwrap(); // second client of 2
+    d.acquire(7, 0).unwrap();
+    d.block(7, 1).unwrap();
+    d.acquire(9, 1).unwrap();
+    d.begin_call(1, 2).unwrap();
+    d.begin_call(3, 2).unwrap();
+    assert_eq!(d.effective_priority(0), Some(prio(0)));
+    assert_eq!(d.effective_priority(2), Some(prio(0)));
+
+    assert!(d.unregister(1));
+    // The waiter's boost on 0 and call edge to 2 are gone; 2 keeps the surviving client's 5.
+    assert_eq!(d.effective_priority(0), Some(prio(20)));
+    assert_eq!(d.effective_priority(2), Some(prio(5)));
+    assert_eq!(d.effective_priority(3), Some(prio(5)));
+    assert_eq!(d.base_priority(1), None);
+    assert_eq!(d.effective_priority(1), None);
+    assert_eq!(d.waiting_on(1), None);
+    assert!(d.waiters(7).is_empty());
+    assert_eq!(d.owner(9), None);
+    assert_eq!(d.call_edges(), vec![(3, 2)]);
+    // Idempotent: a second exit cleanup finds no state and does not disturb the graph.
+    assert!(!d.unregister(1));
+    d.check_invariants().expect("invariant after unregister");
+}
