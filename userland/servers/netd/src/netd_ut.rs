@@ -157,6 +157,97 @@ fn tcp_loopback_echo_and_orderly_close() {
     assert_eq!(netd.socket_files(), 0);
 }
 
+fn read_to_eof(netd: &mut Netd<Loopback>, file: u64, now: &mut i64) -> Vec<u8> {
+    let mut output = Vec::new();
+    let mut buffer = [0u8; 2048];
+    for _ in 0..400 {
+        match netd.read(file, 0, &mut buffer) {
+            Ok(0) => return output,
+            Ok(count) => output.extend_from_slice(&buffer[..count]),
+            Err(Errno::EAGAIN) => poll(netd, now),
+            Err(error) => panic!("read before EOF failed: {error:?}"),
+        }
+    }
+    panic!("EOF timed out after {} bytes", output.len());
+}
+
+fn server_output_connection() -> (Netd<Loopback>, u64, u64, u64, i64) {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+
+    // The SSH client sends its request and half-closes before the server writes the
+    // command output. That puts the accepted socket in CLOSE_WAIT when it closes.
+    assert_eq!(netd.write(client, 0, b"r").unwrap(), 1);
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+    let mut request = [0u8; 4];
+    let read = read_retry(&mut netd, accepted, &mut request, &mut now);
+    assert_eq!(&request[..read], b"r");
+    assert_eq!(read_retry(&mut netd, accepted, &mut request, &mut now), 0);
+    (netd, listener, client, accepted, now)
+}
+
+#[test]
+fn tcp_server_write_then_shutdown_delivers_all_output_before_eof() {
+    let (mut netd, listener, client, accepted, mut now) = server_output_connection();
+    let payload: Vec<u8> = (0..300u16).map(|value| value as u8).collect();
+    assert_eq!(netd.write(accepted, 0, &payload).unwrap(), payload.len());
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            accepted,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+
+    let received = read_to_eof(&mut netd, client, &mut now);
+    assert_eq!(received, payload, "server output must precede the EOF");
+
+    netd.close(accepted).unwrap();
+    netd.close(client).unwrap();
+    netd.close(listener).unwrap();
+}
+
+#[test]
+fn tcp_server_close_after_output_delivers_all_output_before_eof() {
+    let (mut netd, listener, client, accepted, mut now) = server_output_connection();
+    let payload: Vec<u8> = (0..300u16).map(|value| (value % 251) as u8).collect();
+    assert_eq!(netd.write(accepted, 0, &payload).unwrap(), payload.len());
+    netd.close(accepted).unwrap();
+
+    let received = read_to_eof(&mut netd, client, &mut now);
+    assert_eq!(
+        received, payload,
+        "server output must precede the close/EOF"
+    );
+
+    netd.close(client).unwrap();
+    netd.close(listener).unwrap();
+}
+
 #[test]
 fn nic_core_serves_non_loopback_paths_and_lists_eth0() {
     let mut netd = new_netd_with_nic();
