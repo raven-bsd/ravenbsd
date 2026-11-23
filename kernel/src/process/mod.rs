@@ -479,6 +479,11 @@ pub fn live_totals() -> (usize, u32) {
     (procs, threads)
 }
 
+/// K449 diagnostic: exited processes still retained for `PROC_WAIT`.
+pub fn zombie_count() -> usize {
+    ZOMBIES.lock().len()
+}
+
 /// Live waiters on the process-owned queues (S36 timeout-retention diagnostic).
 pub fn wait_queue_len() -> usize {
     let mut total = 0usize;

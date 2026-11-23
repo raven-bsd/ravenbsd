@@ -38,8 +38,21 @@ pub fn start(cmdline: &CmdLine) {
     }
 }
 
+/// Print one-time object sizes for the 3072-class attribution.
+fn print_sizes() {
+    kprintln!(
+        "K449-SIZES thread={} process={} uspace={} pending={} buffers={}",
+        core::mem::size_of::<crate::sched::thread::Thread>(),
+        core::mem::size_of::<crate::process::Process>(),
+        core::mem::size_of::<crate::memory::uspace::UserAddressSpace>(),
+        core::mem::size_of::<crate::ipc::PendingRequest>(),
+        core::mem::size_of::<crate::ipc::RequestBuffers>(),
+    );
+}
+
 /// Sample and print one line per interval.
 fn sampler() {
+    print_sizes();
     loop {
         sleep_ns(INTERVAL_NS.load(Ordering::Relaxed));
         let (heap_used, heap_free) = memory::heap::stats();
@@ -63,7 +76,9 @@ fn sampler() {
         kprintln!(
             "K449-GRAPH graph_threads={graph_threads} weak_threads={weak_threads} \
              class3072_in_use={class_in_use} class3072_slabs={class_slabs} \
-             class3072_fail={class_fail}"
+             class3072_fail={class_fail} zombies={} deadlive={}",
+            process::zombie_count(),
+            process::dead_live_threads(),
         );
     }
 }
