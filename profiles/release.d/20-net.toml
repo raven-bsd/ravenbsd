@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# The release network stack from profiles/server.toml: pcid/devd find the QEMU virtio-net
-# function, devd launches it in serve mode, netd publishes the static QEMU user-network address
-# (10.0.2.15/24, gateway 10.0.2.2) immediately and does not wait for DHCP, resolvd follows the
-# lease/static DNS, and the ifconfig/ping/route/netstat tools are available in the shell.
+# The release network stack from profiles/server.toml. On x86_64 pcid finds the virtio-pci
+# function and devd launches it in serve mode; on aarch64 there is no PCI scheme, so devd runs
+# `dtb launch` against the staged QEMU `virt` tree and the driver binds the virtio-mmio window.
+# netd publishes the static QEMU user-network address (10.0.2.15/24, gateway 10.0.2.2) once
+# `nic:info` exists; resolvd follows the lease/static DNS, and the ifconfig/ping/route/netstat
+# tools are available in the shell.
 
 [[initfs.programs]]
 package = "raven-pcid"
@@ -43,16 +45,25 @@ package = "raven-netstat"
 path = "/sbin/netstat"
 
 [[initfs.files]]
-src = "etc/services.d/pcid.toml"
+src = "build/fixtures/virt-dtb/{arch}/pcid.toml"
 path = "/etc/services.d/pcid.toml"
+generated = true
 
 [[initfs.files]]
-src = "profiles/server.d/devd.manifest"
+src = "build/fixtures/virt-dtb/{arch}/devd.manifest"
 path = "/etc/services.d/devd.toml"
+generated = true
 
 [[initfs.files]]
-src = "userland/init/release-drivers.conf"
+src = "build/fixtures/virt-dtb/{arch}/drivers.conf"
 path = "/etc/drivers.toml"
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/virt-dtb/virt.dtb"
+path = "/etc/pi4.dtb"
+mode = 0o644
+generated = true
 
 [[initfs.files]]
 src = "rootfs/server/etc/services.d/netd.toml"

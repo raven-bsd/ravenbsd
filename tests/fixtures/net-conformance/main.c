@@ -139,6 +139,9 @@ int main(void) {
         } else {
             say("netconf: peer-idle\n");
         }
+        // K548 fuzz: leave a short window for a duplicate FIN to reach the stack
+        // before the application closes the connection.
+        (void)poll(NULL, 0, 150);
         (void)close(connection);
         say("netconf: closed\n");
     }

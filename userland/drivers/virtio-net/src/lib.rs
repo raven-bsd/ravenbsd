@@ -130,6 +130,75 @@ pub mod common {
     pub const QUEUE_USED: usize = 48;
 }
 
+/// Byte offsets inside the single virtio-mmio transport window (`version 2`) and the register
+/// helpers the device layer shares between the PCI and MMIO transports.
+///
+/// Source of the layout: virtio 1.2 `virtio-mmio` (FreeBSD `sys/dev/virtio/mmio/virtio_mmio.c`,
+/// NetBSD `sys/dev/virtio/virtio_mmio.c`); no donor code copied.
+pub mod mmio {
+    /// `MagicValue` ("virt", little-endian).
+    pub const MAGIC: u32 = 0x7472_6976;
+    /// Modern transport version.
+    pub const VERSION: u32 = 2;
+    /// Device id for a network device.
+    pub const DEVICE_ID_NET: u32 = 1;
+    /// Length of the whole transport window.
+    pub const WINDOW_LEN: usize = 0x200;
+
+    /// `MagicValue` register.
+    pub const MAGIC_VALUE: usize = 0x000;
+    /// `Version` register.
+    pub const VERSION_REG: usize = 0x004;
+    /// `DeviceID` register.
+    pub const DEVICE_ID: usize = 0x008;
+    /// `VendorID` register.
+    pub const VENDOR_ID: usize = 0x00c;
+    /// `DeviceFeatures` (word selected by `DeviceFeaturesSel`).
+    pub const DEVICE_FEATURES: usize = 0x010;
+    /// `DeviceFeaturesSel`.
+    pub const DEVICE_FEATURES_SEL: usize = 0x014;
+    /// `DriverFeatures` (word selected by `DriverFeaturesSel`).
+    pub const DRIVER_FEATURES: usize = 0x020;
+    /// `DriverFeaturesSel`.
+    pub const DRIVER_FEATURES_SEL: usize = 0x024;
+    /// `QueueSel`.
+    pub const QUEUE_SEL: usize = 0x030;
+    /// `QueueNumMax` (read after selecting a queue).
+    pub const QUEUE_NUM_MAX: usize = 0x034;
+    /// `QueueNum` (programmed queue size).
+    pub const QUEUE_NUM: usize = 0x038;
+    /// `QueueReady`.
+    pub const QUEUE_READY: usize = 0x044;
+    /// `QueueNotify` (32-bit queue index).
+    pub const QUEUE_NOTIFY: usize = 0x050;
+    /// `InterruptStatus`.
+    pub const INTERRUPT_STATUS: usize = 0x060;
+    /// `InterruptACK`.
+    pub const INTERRUPT_ACK: usize = 0x064;
+    /// `Status`.
+    pub const STATUS: usize = 0x070;
+    /// `QueueDescLow` / `QueueDescHigh`.
+    pub const QUEUE_DESC_LOW: usize = 0x080;
+    /// `QueueDriverLow` / `QueueDriverHigh`.
+    pub const QUEUE_DRIVER_LOW: usize = 0x090;
+    /// `QueueDeviceLow` / `QueueDeviceHigh`.
+    pub const QUEUE_DEVICE_LOW: usize = 0x0a0;
+    /// `ConfigGeneration`.
+    pub const CONFIG_GENERATION: usize = 0x0fc;
+    /// Device-specific configuration (MAC, status, MTU for virtio-net).
+    pub const CONFIG: usize = 0x100;
+
+    /// Split a 64-bit queue address into its low and high 32-bit registers.
+    pub fn address_parts(address: u64) -> (u32, u32) {
+        (address as u32, (address >> 32) as u32)
+    }
+
+    /// The `(low, high)` register offsets for a queue address register base.
+    pub fn address_offsets(base: usize) -> (usize, usize) {
+        (base, base + 4)
+    }
+}
+
 /// Layout of one split virtqueue inside a DMA window.
 ///
 /// The descriptor table is 16-byte aligned, the available ring 2-byte and the used ring 4-byte,
