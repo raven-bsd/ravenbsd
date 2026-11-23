@@ -35,6 +35,13 @@ cd "$root" || exit 2
 
 doc=
 log_dir=target/kernel-gate
+# K567 follow-up: release-login's image is reused only when its sidecar stamp carries the exact
+# HEAD hash. The stamp is the image's tree tag; a different HEAD forces a rebuild.
+release_image=build/qtest/release-login.img
+release_stamp=$release_image.head
+release_lock=build/qtest/.release-login.lock
+release_build_cap=${RAVEN_GATE_RELEASE_BUILD_CAP:-600}
+release_build_wait=${RAVEN_GATE_RELEASE_BUILD_WAIT:-600}
 wait_idle=${S107_WAIT_FOR_IDLE:-0}
 latency=${S107_LATENCY:-0}
 default_max_load() {
@@ -75,6 +82,7 @@ irq-dist-off|x86_64|stuart|irq
 locking|x86_64|lance|locking
 lockstat|x86_64|lance|locking
 ipc-donation|x86_64|lance|ipc
+ipc-fuzz|x86_64|bob|ipc fuzz|tests/smp/ipc-fuzz/ipc-fuzz.toml
 duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator
@@ -125,7 +133,7 @@ else
     fi
 fi
 
-mkdir -p "$log_dir" || exit 2
+mkdir -p "$log_dir" build/qtest || exit 2
 if [ "$functional" -eq 1 ]; then
     # Functional rows use the functional hygiene budget, not the exclusive window: up to two
     # co-tenant boot rows and load1 <= 2 x nproc. A REFUSE stops the gate; do not override it.
@@ -174,9 +182,52 @@ while IFS='|' read -r name arch owner note case_path; do
             "$name" "$arch" "$owner" "$note" >> "$results"
         continue
     fi
+    release_flags=
+    if [ "$name" = release-login ]; then
+        if [ -f "$release_image" ] && [ -f "$release_stamp" ] &&
+            [ "$(cat "$release_stamp" 2>/dev/null)" = "$commit" ]; then
+            release_flags=--no-build
+            printf 'kernel-gate: release-login reuse image stamp=%s\n' "$short"
+        else
+            printf 'kernel-gate: release-login prebuild (cap=%ss lock-wait=%ss stamp=%s)\n' \
+                "$release_build_cap" "$release_build_wait" "$short"
+            prebuild_start=$(date +%s)
+            prebuild_ok=1
+            (
+                if command -v flock >/dev/null 2>&1; then
+                    exec 9>"$release_lock"
+                    flock -w "$release_build_wait" 9 || exit 1
+                fi
+                # Another gate may have built the same HEAD while we waited for the lane lock.
+                if [ -f "$release_image" ] && [ -f "$release_stamp" ] &&
+                    [ "$(cat "$release_stamp" 2>/dev/null)" = "$commit" ]; then
+                    exit 0
+                fi
+                # The case's pre rebuilds the fresh loader/initfs; build the image after it so
+                # the reused image carries that loader. The case still runs the pre; nothing is
+                # skipped, only the repeated image build is removed.
+                timeout "$release_build_cap" sh tests/release/check-loader.sh \
+                    >"$log_dir/release-login.pre.log" 2>&1 || exit 1
+                timeout "$release_build_cap" cargo xtask image --arch x86_64 --profile release \
+                    --cmdline 'console=ttyS0 test-exit=1' --output "$release_image" \
+                    >>"$log_dir/release-login.pre.log" 2>&1 || exit 1
+                printf '%s\n' "$commit" >"$release_stamp"
+            ) || prebuild_ok=0
+            prebuild_elapsed=$(( $(date +%s) - prebuild_start ))
+            printf 'kernel-gate: release-login prebuild seconds=%s ok=%s\n' \
+                "$prebuild_elapsed" "$prebuild_ok"
+            if [ "$prebuild_ok" -eq 1 ]; then
+                release_flags=--no-build
+            else
+                # Fall back to the case's own build; the case contract is unchanged.
+                release_flags=
+            fi
+        fi
+    fi
     printf 'kernel-gate: %-28s %-8s ' "$name" "$arch"
     # stdin is /dev/null: neither cargo nor QEMU may consume the remaining case lines.
-    if cargo xtask qtest --case "$case_selector" --arch "$arch" </dev/null >"$log" 2>&1; then
+    # shellcheck disable=SC2086
+    if cargo xtask qtest --case "$case_selector" --arch "$arch" $release_flags </dev/null >"$log" 2>&1; then
         status=pass
         detail=ok
         printf 'pass\n'

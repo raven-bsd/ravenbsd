@@ -27,16 +27,19 @@ regex = '^readiness: hup-repoll first=0x[0-9a-f]+ second=0x[0-9a-f]+ ok$'
 regex = '^readiness: eintr retries=[1-9][0-9]* result=1 ok$'
 
 [[expect]]
-regex = '^readiness: net-server ready$'
+regex = '^readiness: sibling-exit pipe=ok futex=ok event=ok$'
 
 [[expect]]
-regex = '^net-server: bind$'
+regex = '^readiness: proc-wait first_pid=[0-9]+ first_status=[0-9]+ second_pid=[0-9]+ second_status=[0-9]+ ok$'
 
 [[expect]]
-regex = '^net-server: listen$'
+regex = '^readiness: sshd-shape handler=[1-9][0-9]* eintr=[0-9]+ event=hup waitpid=19712 ok$'
 
 [[expect]]
-regex = '^net-child: bind=ok listen=ok$'
+regex = '^net-child: before net=EACCES file=EACCES$'
+
+[[expect]]
+regex = '^net-child: after net=ok file=ok bind=ok listen=ok$'
 
 [[expect]]
 regex = '^readiness: net-listen ok$'
