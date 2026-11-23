@@ -11,7 +11,7 @@ use raven_libc_abi::fcntl;
 use raven_libc_abi::poll::{POLLHUP, POLLIN, POLLNVAL, POLLOUT};
 use raven_libc_abi::structs::Pollfd;
 
-use crate::backend::FakeSys;
+use crate::backend::{FakeSys, SysBackend};
 use crate::fd::OfdKind;
 use crate::platform::Platform;
 use crate::poll::{EV_SIGNALED, MAX_POLL_FDS, poll, ppoll};
@@ -91,6 +91,66 @@ fn tty_hup_is_reported() {
     }];
     assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
     assert_eq!(fds[0].revents as i32, POLLHUP);
+}
+
+/// A pathless `Tty` is the `posix_openpt` master (the slave carries `/dev/pts/N`).
+fn pathless_tty_platform() -> (Platform<FakeSys>, i32) {
+    let fake = FakeSys::new();
+    fake.tty(b"/dev/tty");
+    let flags = u32::from(raven_proto_fs::WIRE_OPEN_READ | raven_proto_fs::WIRE_OPEN_WRITE);
+    let handle = fake.open(b"file:/dev/tty", flags).expect("open");
+    fake.ready(handle, 1);
+    let platform = Platform::new(fake);
+    let fd = platform
+        .install(handle, OfdKind::Tty, fcntl::O_RDWR as u32, None, false)
+        .expect("install");
+    (platform, fd)
+}
+
+#[test]
+fn a_pty_master_eof_read_makes_the_next_poll_report_hup() {
+    let (platform, fd) = pathless_tty_platform();
+    let mut byte = [0u8; 1];
+    assert_eq!(platform.read(fd, &mut byte), Ok(0), "fake tty read is EOF");
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN | POLLHUP);
+}
+
+#[test]
+fn a_zero_length_master_read_is_not_a_hangup() {
+    let (platform, fd) = pathless_tty_platform();
+    assert_eq!(platform.read(fd, &mut []), Ok(0));
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN, "an empty read is not EOF");
+}
+
+#[test]
+fn a_named_tty_read_eof_is_not_a_master_hangup() {
+    let (platform, fd) = tty_platform();
+    let handle = platform.get(fd).expect("ref").handle();
+    platform.backend().ready(handle, 1);
+    let mut byte = [0u8; 1];
+    assert_eq!(platform.read(fd, &mut byte), Ok(0), "fake tty read is EOF");
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(
+        fds[0].revents as i32, POLLIN,
+        "a slave/console is not a hung-up master"
+    );
 }
 
 #[test]

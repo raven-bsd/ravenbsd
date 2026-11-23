@@ -30,6 +30,7 @@ use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
+use raven_abi::signal::{SIG_SETUP, SIG_SETUP_ABS, SIGRETURN};
 use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_elf::{Elf, LoadMode, Machine, StepKind, plan_load};
@@ -53,11 +54,7 @@ const SIGUSR1: usize = 10;
 /// Raw `proc_handle_info(handle) -> pid`.
 const PROC_HANDLE_INFO: usize = 0x3E;
 /// Raw `sig_setup(entry, ctx, flags)`.
-const SIG_SETUP: usize = 0x80;
 /// Raw `sigreturn()`.
-const SIGRETURN: usize = 0x82;
-/// The absolute `SIG_SETUP` context-area flag.
-const SIG_SETUP_ABS: usize = 2;
 /// Kernel `P_PID` wait id type.
 const P_PID: usize = 1;
 /// The registered signal context area.
@@ -692,8 +689,13 @@ fn wait_interrupt_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     // SAFETY: only the static's address is taken; the kernel validates the executable entry and
     // the 4096-byte absolute context area before storing the per-thread registration.
     let context = core::ptr::addr_of_mut!(SIGNAL_CONTEXT) as usize;
-    result(syscall3(SIG_SETUP, entry as usize, context, SIG_SETUP_ABS))
-        .map_err(|_| "wait signal setup")?;
+    result(syscall3(
+        SIG_SETUP,
+        entry as usize,
+        context,
+        SIG_SETUP_ABS as usize,
+    ))
+    .map_err(|_| "wait signal setup")?;
     let child = spawn_role(initfs, "delayed").map_err(|_| "wait race spawn")?;
     let pid = proc_handle_info(child).map_err(|_| "wait race pid")?;
     let mut status = 0i32;
