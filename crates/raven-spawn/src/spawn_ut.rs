@@ -981,10 +981,16 @@ fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     assert_eq!(block.get(..4), Some(b"RFDM".as_slice()));
     assert_eq!(block.get(4..6), Some(5u16.to_le_bytes().as_slice()));
     assert_eq!(block.get(6..8), Some(2u16.to_le_bytes().as_slice()));
-    // The child entry carries the parent's kind and status, and no path.
+    // The tty entry carries its real kind/status; a non-terminal keeps the conservative
+    // Unknown/O_RDWR pair because this map has no socket metadata. Both have no path.
     assert_eq!(block.get(16), Some(&2));
     assert_eq!(block.get(18..22), Some(2u32.to_le_bytes().as_slice()));
     assert_eq!(block.get(22..26), Some(u32::MAX.to_le_bytes().as_slice()));
+    assert_eq!(block.get(16 + 53), Some(&255));
+    assert_eq!(
+        block.get(18 + 53..22 + 53),
+        Some(2u32.to_le_bytes().as_slice())
+    );
     assert_eq!(block.len(), 8 + 2 * 53);
 }
 

@@ -1779,11 +1779,15 @@ fn encode_fdmap(entries: &[SpawnFd]) -> Result<alloc_crate::vec::Vec<u8>, SpawnE
     out.extend_from_slice(&5u16.to_le_bytes());
     out.extend_from_slice(&count.to_le_bytes());
     for entry in entries {
+        let tty = entry.kind == 2;
         out.extend_from_slice(&entry.fd.to_le_bytes());
         out.extend_from_slice(&entry.handle.to_le_bytes());
-        out.push(entry.kind);
+        // The terminal identity is what the child cannot re-derive without entering a server.
+        // A non-terminal keeps the conservative version-1 kind and O_RDWR: this map carries no
+        // socket/event metadata, so claiming `Socket` would be a partial file object.
+        out.push(if tty { 2 } else { 255 });
         out.push(0); // FD_CLOEXEC already filtered by apply_actions
-        out.extend_from_slice(&entry.status.to_le_bytes());
+        out.extend_from_slice(&if tty { entry.status } else { 2 }.to_le_bytes());
         out.extend_from_slice(&u32::MAX.to_le_bytes()); // NO_PATH
         out.extend_from_slice(&0u32.to_le_bytes()); // event
         out.extend_from_slice(&0u32.to_le_bytes()); // readiness
