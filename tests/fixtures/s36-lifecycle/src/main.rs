@@ -72,10 +72,6 @@ const STACK_BASE: usize = STACK_TOP - STACK_SIZE;
 const CYCLES: usize = 10_000;
 /// Full process/address-space/stack lifecycles in the bounded session churn.
 const SESSIONS: usize = 32;
-/// vfsd pager map/unmap cycles in the red frame row.
-const MAP_CYCLES: usize = 32;
-/// Fixed scratch address for the vfsd pager chunk.
-const MAP_SCRATCH: usize = 0x3000_0000;
 /// Futex wake iterations in the lock/time churn.
 const LOCK_WAKES: usize = 5_000;
 /// Futex timeout iterations in the lock/time churn.
@@ -84,6 +80,17 @@ const LOCK_TIMEOUTS: usize = 1_000;
 const LOCK_TIMEOUT_NS: u64 = 1_000_000;
 /// Delay between the worker arming and the wake.
 const LOCK_DELAY_NS: u64 = 1_000_000;
+/// Fork/exec/exit cycles with a known mapped address space in the VMA churn.
+const VMA_CYCLES: usize = 100;
+/// Four VMAs per child; the large variant maps one MiB total.
+const VMA_REGIONS: usize = 4;
+const VMA_BASE: usize = 0x3000_0000;
+const VMA_REGION_GAP: usize = 0x10_0000;
+const VMA_LARGE: usize = 256 * 1024;
+/// vfsd pager map/unmap cycles in the red frame row.
+const MAP_CYCLES: usize = 1000;
+/// Fixed scratch address for the vfsd pager chunk.
+const MAP_SCRATCH: usize = 0x3000_0000;
 /// User stacks for the fixture's extra threads (16 KiB each, one helper live at a time).
 const HELPER_STACK_SIZE: usize = 16 * 1024;
 
@@ -543,6 +550,76 @@ fn session_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// The VMA churn child: map four shared memory objects, touch every page, then exit.
+///
+/// The `large` variant maps 1 MiB of data; the `small` variant maps only four pages. The
+/// page-table cost is the same for both (four VMAs); the data-frame cost differs by almost 1 MiB.
+/// Comparing the marker counters after the two churns separates page tables from VMA data.
+fn vma_child(large: bool) {
+    let size = if large { VMA_LARGE } else { PAGE };
+    let mut region = 0usize;
+    while region < VMA_REGIONS {
+        let address = VMA_BASE.saturating_add(region.saturating_mul(VMA_REGION_GAP));
+        let object = match memobj_create(size) {
+            Ok(object) => object,
+            Err(_) => {
+                println!("s36: failed vma object");
+                exit(1);
+            }
+        };
+        if map_memory(
+            Handle::SELF_PROC,
+            object,
+            0,
+            address,
+            size,
+            map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
+        )
+        .is_err()
+        {
+            println!("s36: failed vma map");
+            exit(1);
+        }
+        handle_close(object);
+        let pages = size / PAGE;
+        let mut page = 0usize;
+        while page < pages {
+            // SAFETY: the mapping is writable and `page` stays inside `size`.
+            unsafe {
+                ((address.saturating_add(page.saturating_mul(PAGE))) as *mut u8)
+                    .write_volatile(0x5a);
+            }
+            page = page.saturating_add(1);
+        }
+        region = region.saturating_add(1);
+    }
+}
+
+/// Spawn one marker and reap it; its exit prints the kernel counters.
+fn marker_once(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let marker = spawn_role(initfs, "marker").map_err(|_| "marker spawn")?;
+    if proc_wait(marker).unwrap_or(-1) != 0 {
+        return Err("marker wait");
+    }
+    handle_close(marker);
+    Ok(())
+}
+
+/// The large/small VMA churn: fork, map/touch four VMAs, exit, reap, repeat.
+fn vma_churn_part(initfs: &Initfs<'_>, role: &str, cycles: usize) -> Result<(), &'static str> {
+    let mut cycle = 0usize;
+    while cycle < cycles {
+        let child = spawn_role(initfs, role).map_err(|_| "vma spawn")?;
+        if proc_wait(child).unwrap_or(-1) != 0 {
+            return Err("vma wait");
+        }
+        handle_close(child);
+        cycle = cycle.saturating_add(1);
+    }
+    println!("s36: vma {} done={}", role, cycles);
+    Ok(())
+}
+
 /// Open the fixture binary through vfsd, retrying until the file scheme is ready.
 fn open_map_file(client: &Client) -> Result<Handle, Errno> {
     let paths = ["file:/bin/s36-lifecycle", "file:/bin/brush", "file:/init"];
@@ -795,6 +872,14 @@ fn child_main(role: &str) -> i32 {
             server_part();
             0
         }
+        "vma-large" => {
+            vma_child(true);
+            0
+        }
+        "vma-small" => {
+            vma_child(false);
+            0
+        }
         _ => 2,
     }
 }
@@ -1018,30 +1103,27 @@ fn main(args: raven_rt::Args) -> i32 {
     if let Err(message) = wait_eintr_part(&initfs) {
         fail(message);
     }
-    // Scenario 2, baseline marker: the kernel prints the stack/heap counters on this exit.
-    let marker = match spawn_role(&initfs, "marker") {
-        Ok(marker) => marker,
-        Err(_) => fail("marker spawn"),
-    };
-    if proc_wait(marker).unwrap_or(-1) != 0 {
-        fail("marker wait");
+    // Scenario 2, baseline marker: the kernel prints the stack/heap/frame counters on this exit.
+    if let Err(message) = marker_once(&initfs) {
+        fail(message);
     }
-    handle_close(marker);
     if let Err(message) = churn_part() {
         fail(message);
     }
     if let Err(message) = session_churn_part(&initfs) {
         fail(message);
     }
-    // Scenario 2, closing marker: its exit prints the counters again; the report compares.
-    let marker = match spawn_role(&initfs, "marker") {
-        Ok(marker) => marker,
-        Err(_) => fail("marker spawn"),
-    };
-    if proc_wait(marker).unwrap_or(-1) != 0 {
-        fail("marker wait");
+    if let Err(message) = vma_churn_part(&initfs, "vma-large", VMA_CYCLES) {
+        fail(message);
     }
-    handle_close(marker);
+    // Sample after the large churn; the next close is the small-VMA sample.
+    if let Err(message) = marker_once(&initfs) {
+        fail(message);
+    }
+    // Scenario 2, closing marker: its exit prints the counters again; the report compares.
+    if let Err(message) = marker_once(&initfs) {
+        fail(message);
+    }
     // Scenario 1: two-thread child.
     if let Err(message) = two_thread_part(&initfs) {
         fail(message);

@@ -1792,12 +1792,14 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         .is_some()
     {
         let (heap_used, _) = crate::memory::heap::stats();
+        let stats = crate::memory::frame::stats();
         kprintln!(
-            "s36: stacks fresh={} cached={} heap={} frames={}",
+            "s36: stacks fresh={} cached={} heap={} frames={} allocated={}",
             crate::sched::thread::stack_fresh(),
             crate::sched::thread::stack_cached(),
             heap_used,
-            crate::memory::frame::stats().free_bytes
+            stats.free_bytes,
+            stats.allocated_bytes
         );
     }
     // S36 vfsd map/unmap red row: exit 88 records the baseline, exit 89 compares the allocated
@@ -1810,14 +1812,19 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let stats = crate::memory::frame::stats();
         if code == 88 {
             S36_MAP_BASE.store(stats.allocated_bytes, Ordering::Release);
-            kprintln!("s36: mapcheck base allocated={}", stats.allocated_bytes);
+            kprintln!(
+                "s36: mapcheck base allocated={} pager={}",
+                stats.allocated_bytes,
+                crate::process::handle::pager_objects()
+            );
         } else if code == 89 {
             let base = S36_MAP_BASE.load(Ordering::Acquire);
             let delta = stats.allocated_bytes.saturating_sub(base);
             kprintln!(
-                "s36: mapcheck delta={} allocated={}",
+                "s36: mapcheck delta={} allocated={} pager={}",
                 delta,
-                stats.allocated_bytes
+                stats.allocated_bytes,
+                crate::process::handle::pager_objects()
             );
             if delta <= 64 * 1024 {
                 kprintln!("s36: mapcheck ok");
