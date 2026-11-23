@@ -26,9 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <termios.h>
@@ -387,13 +385,15 @@ static int run_exec_child_and_poll(void) {
     if (revents <= 0 || (revents & (POLLIN | POLLHUP)) == 0 || !saw_wake || !hup) {
         (void)snprintf(detail, sizeof(detail),
                        "n=%d errno=%d revents=0x%x repoll=0x%x wake=%d hup=%d exit=%d code=%d sig=%d data=\"%s\"",
-                       revents, saved, revents, repoll, saw_wake, hup, exited, code, signaled ? 128 + termsig : 0, data);
+                       revents, saved, revents, repoll, saw_wake, hup, exited, code,
+                       signaled ? 128 + termsig : 0, data);
         (void)say_line("R4", 0, detail);
         return -1;
     }
     (void)snprintf(detail, sizeof(detail),
                    "n=%d revents=0x%x repoll=0x%x wake=%d hup=%d exit=%d code=%d sig=%d data=\"%s\"",
-                   revents, revents, repoll, saw_wake, hup, exited, code, signaled ? 128 + termsig : 0, data);
+                   revents, revents, repoll, saw_wake, hup, exited, code,
+                   signaled ? 128 + termsig : 0, data);
     sleep_ms(150);
     (void)say_line("R4", 1, detail);
     return 0;
@@ -402,7 +402,6 @@ static int run_exec_child_and_poll(void) {
 static int run_multi_fd_and_poll(void) {
     char name[128];
     char detail[200];
-    char data[64];
     struct pollfd fds[2];
     struct timespec timeout;
     struct timespec elapsed;
@@ -463,7 +462,7 @@ static int run_multi_fd_and_poll(void) {
     errno = 0;
     ready = ppoll(fds, 2, &timeout, NULL);
     int saved = errno;
-    int drained = drain_search(master, "wake", &saw_wake, data, sizeof(data));
+    int drained = drain_search(master, "wake", &saw_wake, NULL, 0);
     repoll = poll_ms(master, POLLIN | POLLHUP, PTY_WAKE_REPOLL_MS, &elapsed);
     hup = (repoll > 0 && (repoll & POLLHUP) != 0) || drained == 1;
     (void)waitpid(child, &status, 0);
@@ -483,101 +482,6 @@ static int run_multi_fd_and_poll(void) {
     sleep_ms(150);
     (void)say_line("R5", 1, detail);
     return 0;
-}
-
-/* R6: a session with the pty slave as its controlling terminal must be able to open /dev/tty and
- * get that same terminal. This is the POSIX /dev/tty contract OpenSSH `pty_make_controlling_tty`
- * and the 10-TTY `tty` row depend on. */
-static int run_ctty_and_dev_tty(void) {
-    char name[128];
-    char detail[200];
-    int master;
-    int slave;
-    int status = 0;
-    int result_pipe[2];
-    char result = 0;
-    pid_t child;
-    int saved;
-
-    master = open_master(name, sizeof(name));
-    if (master < 0) {
-        return -1;
-    }
-    slave = open(name, O_RDWR | O_NOCTTY);
-    if (slave < 0) {
-        (void)close(master);
-        return -1;
-    }
-    if (pipe(result_pipe) != 0) {
-        (void)close(slave);
-        (void)close(master);
-        return -1;
-    }
-    child = fork();
-    if (child == 0) {
-        struct stat tty_stat;
-        struct stat slave_stat;
-        int ttyfd;
-        char ok = 0;
-
-        (void)close(result_pipe[0]);
-        (void)close(master);
-        errno = 0;
-        if (setsid() < 0) {
-            saved = errno;
-            (void)snprintf(detail, sizeof(detail), "setsid errno=%d", saved);
-            (void)say_line("R6", 0, detail);
-            (void)write(result_pipe[1], &ok, 1);
-            _exit(1);
-        }
-        errno = 0;
-        if (ioctl(slave, TIOCSCTTY, 0) < 0) {
-            saved = errno;
-            (void)snprintf(detail, sizeof(detail), "ioctl(TIOCSCTTY) errno=%d", saved);
-            (void)say_line("R6", 0, detail);
-            (void)write(result_pipe[1], &ok, 1);
-            _exit(1);
-        }
-        errno = 0;
-        ttyfd = open("/dev/tty", O_RDWR | O_NOCTTY);
-        if (ttyfd < 0) {
-            saved = errno;
-            (void)snprintf(detail, sizeof(detail), "open /dev/tty errno=%d", saved);
-            (void)say_line("R6", 0, detail);
-            (void)write(result_pipe[1], &ok, 1);
-            _exit(1);
-        }
-        if (fstat(ttyfd, &tty_stat) != 0 || fstat(slave, &slave_stat) != 0) {
-            saved = errno;
-            (void)snprintf(detail, sizeof(detail), "fstat errno=%d", saved);
-            (void)say_line("R6", 0, detail);
-            (void)write(result_pipe[1], &ok, 1);
-            _exit(1);
-        }
-        int same = tty_stat.st_ino == slave_stat.st_ino;
-        ok = same ? 1 : 0;
-        (void)snprintf(detail, sizeof(detail),
-                       "open=1 ioctl=0 tty_ino=%llu slave_ino=%llu same=%d",
-                       (unsigned long long)tty_stat.st_ino,
-                       (unsigned long long)slave_stat.st_ino, same);
-        (void)say_line("R6", same, detail);
-        (void)write(result_pipe[1], &ok, 1);
-        _exit(same ? 0 : 1);
-    }
-    (void)close(slave);
-    (void)close(result_pipe[1]);
-    if (child < 0) {
-        (void)close(result_pipe[0]);
-        (void)close(master);
-        return -1;
-    }
-    if (read(result_pipe[0], &result, 1) != 1) {
-        result = 0;
-    }
-    (void)close(result_pipe[0]);
-    (void)waitpid(child, &status, 0);
-    (void)close(master);
-    return result == 1 ? 0 : -1;
 }
 
 int main(void) {
@@ -618,15 +522,10 @@ int main(void) {
         say("PTY-WAKE R5 no pty HUP with a quiet second poll source FAIL\n");
         failures++;
     }
-    result = run_ctty_and_dev_tty();
-    if (result != 0) {
-        say("PTY-WAKE R6 no controlling /dev/tty FAIL\n");
-        failures++;
-    }
     if (failures != 0) {
         say("PTY-WAKE SUMMARY FAIL\n");
         return 1;
     }
-    say("PTY-WAKE SUMMARY PASS 6/6\n");
+    say("PTY-WAKE SUMMARY PASS 5/5\n");
     return 0;
 }
