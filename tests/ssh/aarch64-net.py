@@ -223,23 +223,18 @@ def main(argv: list[str]) -> int:
                 client_ok, client_banner, client_detail = ssh_client(client_host, client_port, 40)
             else:
                 client_detail = "forwarded-port-never-listened"
-            # Best-effort guest probes: the staged client must start, then the guest loopback
-            # connection must see the server banner. A hang here is recorded, not allowed to
-            # replace the primary client result.
+            # Guest child probes: prove ordinary spawned children work, then capture the
+            # hanging /bin/ssh -V child's K391 state and last syscall with proc-probe.
             guest_note = "not-run"
+            # The svcd-spawned proc-probe scanner (release image) prints the state/last syscall
+            # of syscall-blocked or ssh processes. The shell foreground ssh is the hanging child;
+            # the same shell-spawn hang blocks running the probe from this shell.
             try:
                 child.sendline("/bin/ssh -V 2>&1; echo SSHTOOL-$?")
-                child.expect(r"SSHTOOL-[0-9]+", timeout=15)
+                child.expect(r"SSHTOOL-[0-9]+", timeout=20)
                 guest_note = "ssh-tool-ok"
-                child.sendline(
-                    "/bin/ssh -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-                    "-o BatchMode=yes -o ConnectTimeout=3 -o NumberOfPasswordPrompts=1 "
-                    "root@127.0.0.1 true 2>&1; echo LOOPDONE-$?"
-                )
-                child.expect(r"LOOPDONE-[0-9]+", timeout=20)
-                guest_note = "loopback-done"
             except (pexpect.TIMEOUT, pexpect.EOF):
-                guest_note = "guest-probe-hung"
+                guest_note = "ssh-foreground-hung"
         except (pexpect.EOF, pexpect.TIMEOUT) as error:
             print(f"aarch64-net: console wait {type(error).__name__}", file=sys.stderr)
             print((child.before or "")[-1200:], file=sys.stderr)
@@ -275,6 +270,13 @@ def main(argv: list[str]) -> int:
             for token in ("svcd: netd", "svcd: sshd", "netd: ready", "nic:info", "Server listening")
         ):
             print("serial:", line.strip()[-200:])
+    for line in text.splitlines():
+        if (
+            line.startswith("proc-probe:")
+            or line.startswith("proc-scan:")
+            or line.startswith("SSHTOOL-")
+        ):
+            print("probe:", line.strip()[-220:])
     traces = [line.strip() for line in text.splitlines() if line.startswith("systrace:")]
     for line in traces[-8:]:
         print("systrace:", line)
