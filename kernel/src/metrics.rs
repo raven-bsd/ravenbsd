@@ -94,10 +94,20 @@ fn sampler() {
             if queued == 0 {
                 continue;
             }
+            let mut names = alloc::string::String::new();
+            for scheme in entry.schemes.lock().iter() {
+                if !names.is_empty() {
+                    names.push(',');
+                }
+                names.push_str(&scheme.name);
+            }
+            let command = entry.command.lock().clone();
             kprintln!(
-                "K449-PENDING pid={} queued={queued} path={}",
+                "K449-PENDING pid={} queued={queued} path={} command={} schemes={}",
                 entry.id,
-                entry.path
+                entry.path,
+                command,
+                names
             );
             shown = shown.saturating_add(1);
             if shown >= 8 {
