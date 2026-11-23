@@ -159,13 +159,15 @@ unsafe impl GlobalAlloc for Allocator {
         let (mut ra0, mut ra1) = (0usize, 0usize);
         #[cfg(target_arch = "x86_64")]
         unsafe {
+            // The allocator is built with a frame pointer: `[rbp + 8]` is this call's return
+            // address and `[rbp]` the caller's frame pointer.
             core::arch::asm!(
-                "mov {}, [rsp]",
+                "mov {}, [rbp + 8]",
                 out(reg) ra0,
                 options(nomem, nostack, preserves_flags)
             );
             core::arch::asm!(
-                "mov {}, [rsp + 8]",
+                "mov {}, [rbp]",
                 out(reg) ra1,
                 options(nomem, nostack, preserves_flags)
             );
