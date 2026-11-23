@@ -96,6 +96,61 @@ class ReadyWaitTest(unittest.TestCase):
             self.assertGreaterEqual(delta, 0.25)
 
 
+class FailurePathTest(unittest.TestCase):
+    """An empty serial must never be the whole failure.
+
+    The rev 348 failure was ``pre[0] RuntimeError: sshd service never started`` with a
+    0-byte ``serial.log``: QEMU died before the guest booted (tap missing or TUNSETIFF
+    denied) and the probe waited the full 180 s on a silent file.  These tests pin the
+    real diagnostics: the tap is checked first, a QEMU exit is reported with its stderr,
+    and the serial is seeded with the run context.
+    """
+
+    def test_missing_tap_is_named_before_qemu(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaises(RuntimeError) as caught:
+                probe.ensure_tap("k567-tap", root=root)
+            message = str(caught.exception)
+            self.assertIn("k567-tap", message)
+            self.assertIn("qemu-net.sh up", message)
+            (root / "k567-tap").mkdir()
+            probe.ensure_tap("k567-tap", root=root)
+
+    def test_qemu_exit_before_ready_carries_its_error(self) -> None:
+        class Exited:
+            def poll(self) -> int:
+                return 1
+
+        with tempfile.TemporaryDirectory() as directory:
+            serial = Path(directory) / "serial.log"
+            serial.write_bytes(b"")
+            stderr = Path(directory) / "qemu.log"
+            stderr.write_text(
+                "qemu-system-x86_64: -netdev tap: TUNSETIFF failed: Operation not permitted\n"
+            )
+            with self.assertRaises(RuntimeError) as caught:
+                probe.wait_serial(
+                    serial, READY, time.monotonic(), 1.0,
+                    child=Exited(), stderr_path=stderr,
+                )
+            message = str(caught.exception)
+            self.assertIn("qemu exited", message)
+            self.assertIn("TUNSETIFF", message)
+
+    def test_serial_header_is_written_before_qemu(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            serial = Path(directory) / "serial.log"
+            probe.write_serial_header(
+                serial, "build/qtest/x.img", "ravendemo0",
+                ["qemu-system-x86_64", "-m", "512M"],
+            )
+            text = serial.read_text(encoding="utf-8")
+            self.assertIn("build/qtest/x.img", text)
+            self.assertIn("ravendemo0", text)
+            self.assertIn("qemu-system-x86_64", text)
+
+
 class ImageAlignmentTest(unittest.TestCase):
     """The case, the fixture and the probe name one freshly built image."""
 

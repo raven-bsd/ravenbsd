@@ -5,6 +5,7 @@ name = "kernel-timer"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 60
+pre = ["sh tests/qtest/preflight-load.sh --max-load 5.0"]
 boot_cmdline = "console=ttyS0 test-exit=1 selftest=timer"
 expect_exit = "success"
 
