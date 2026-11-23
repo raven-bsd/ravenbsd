@@ -227,6 +227,28 @@ fn libc_missing(arch: Arch, dynamic: bool, exists: impl Fn(&str) -> bool) -> Vec
         .collect()
 }
 
+/// True when the libc stamp's source hash matches the current libc tree.
+///
+/// `libc-pack --verify` uses the same stamp for the archive and sysroot hashes; the image
+/// path only needs the source gate, because a matching source hash means the pack was made
+/// from this tree.
+pub(crate) fn libc_stamp_current(root: &Path, arch: Arch) -> bool {
+    let stamp = root
+        .join("build")
+        .join(arch.as_str())
+        .join(crate::libc_pack::STAMP_FILE);
+    let Ok(text) = fs::read_to_string(stamp) else {
+        return false;
+    };
+    let Some(sources) = crate::libc_pack::stamp_field(&text, "sources") else {
+        return false;
+    };
+    let Ok(sources) = u64::from_str_radix(sources, 16) else {
+        return false;
+    };
+    crate::libc_pack::source_hash(root).is_ok_and(|hash| hash == sources)
+}
+
 fn brush_path(arch: Arch) -> String {
     crate::brush::staged_for(arch)
 }
@@ -327,8 +349,10 @@ pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -
     }
     let plan = prerequisite_plan(profile, arch, |source| root.join(source).is_file());
     let dynamic = profile.initfs.dynamic && build::dynamic_supported(arch);
+    let needs_libc = brush_requested(profile, arch) || uutils_requested(profile, arch) || dynamic;
     let manifest_stale = dynamic && !crate::libc_link::loader_manifest_matches(root, arch.as_str());
-    if !plan.libc.is_empty() || manifest_stale {
+    let sources_stale = needs_libc && !libc_stamp_current(root, arch);
+    if !plan.libc.is_empty() || manifest_stale || sources_stale {
         ensure_libc(root, arch, dynamic)?;
     }
     if plan.brush {
@@ -394,15 +418,28 @@ where
 /// loader when its manifest is missing or does not describe the file on disk.
 pub(crate) fn ensure_libc(root: &Path, arch: Arch, dynamic: bool) -> Result<()> {
     let manifest_stale = dynamic && !crate::libc_link::loader_manifest_matches(root, arch.as_str());
+    let sources_stale = !libc_stamp_current(root, arch);
     let missing = libc_missing(arch, dynamic, |source| root.join(source).is_file());
-    if missing.is_empty() && !manifest_stale {
+    if missing.is_empty() && !manifest_stale && !sources_stale {
         return Ok(());
     }
     if missing.is_empty() {
-        println!(
-            "==> libc {}: relinking the dynamic loader (missing or stale manifest)",
-            arch.as_str()
-        );
+        if sources_stale {
+            println!(
+                "==> libc {}: packing changed sources (the sysroot stamp is stale)",
+                arch.as_str()
+            );
+            let code =
+                crate::libc_pack::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
+            if code != 0 {
+                bail!("libc-pack failed with exit code {code}");
+            }
+        } else {
+            println!(
+                "==> libc {}: relinking the dynamic loader (missing or stale manifest)",
+                arch.as_str()
+            );
+        }
     } else {
         println!(
             "==> libc {}: packing missing prerequisites ({})",
