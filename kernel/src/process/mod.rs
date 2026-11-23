@@ -239,7 +239,7 @@ pub fn leaked_process_stats() -> [u64; 9] {
                     stats[7] = stats[7].saturating_add(1);
                 }
             });
-            let check = |request: &Arc<crate::ipc::PendingRequest>| {
+            let mut check = |request: &Arc<crate::ipc::PendingRequest>| {
                 if Arc::ptr_eq(&request.server, process)
                     || request
                         .file
