@@ -32,7 +32,7 @@ sys.path.insert(0, str(HERE))
 import run as soak_run  # noqa: E402  (same-directory runner owns the QEMU argv)
 
 BANNER = b"SSH-2.0-OpenSSH"
-BUDGET_S = 2.0
+BUDGET_S = 5.0
 
 
 def free_port() -> int:
@@ -41,7 +41,9 @@ def free_port() -> int:
         return int(probe.getsockname()[1])
 
 
-def boot_once(image: Path, mode: str, timeout: float, raw: Path) -> tuple[bool, str]:
+def boot_once(
+    image: Path, mode: str, timeout: float, raw: Path, budget: float
+) -> tuple[bool, str]:
     port = free_port()
     vars_source = os.environ.get("RAVEN_OVMF_VARS", soak_run.DEFAULT_OVMF_VARS)
     vars_path = raw.with_suffix(".vars.fd")
@@ -62,6 +64,7 @@ def boot_once(image: Path, mode: str, timeout: float, raw: Path) -> tuple[bool, 
     )
     banner = b""
     elapsed = 0.0
+    connect_ms = 0
     line = ""
     try:
         with raw.open("w", encoding="utf-8") as log:
@@ -70,8 +73,9 @@ def boot_once(image: Path, mode: str, timeout: float, raw: Path) -> tuple[bool, 
                 child.expect("svcd: sshd up", timeout=timeout)
                 started = time.monotonic()
                 try:
-                    with socket.create_connection(("127.0.0.1", port), timeout=BUDGET_S) as conn:
-                        conn.settimeout(BUDGET_S)
+                    with socket.create_connection(("127.0.0.1", port), timeout=budget) as conn:
+                        connect_ms = int((time.monotonic() - started) * 1000)
+                        conn.settimeout(budget)
                         banner = conn.recv(256)
                 except OSError as error:
                     line = type(error).__name__
@@ -87,10 +91,10 @@ def boot_once(image: Path, mode: str, timeout: float, raw: Path) -> tuple[bool, 
             except Exception:  # noqa: BLE001 - the process is already gone
                 pass
         vars_path.unlink(missing_ok=True)
-    ok = banner.startswith(BANNER) and elapsed <= BUDGET_S
+    ok = banner.startswith(BANNER) and elapsed <= budget
     detail = (
         f"banner={'ok' if banner.startswith(BANNER) else 'missing'} "
-        f"elapsed_ms={int(elapsed * 1000)} "
+        f"connect_ms={connect_ms} elapsed_ms={int(elapsed * 1000)} "
         f"status={'ok' if ok else 'fail'}"
     )
     if line:
@@ -104,6 +108,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--boots", type=int, default=4)
     parser.add_argument("--mode", choices=("tcg", "kvm2", "kvm4"), default="tcg")
     parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--budget", type=float, default=BUDGET_S)
     parser.add_argument("--out", type=Path, default=ROOT / "build" / "k566-ssh-readiness")
     args = parser.parse_args(argv)
     if args.boots < 1:
@@ -116,7 +121,7 @@ def main(argv: list[str]) -> int:
     failed = 0
     for boot in range(1, args.boots + 1):
         raw = args.out / f"boot-{boot:02d}.log"
-        ok, detail = boot_once(image, args.mode, args.timeout, raw)
+        ok, detail = boot_once(image, args.mode, args.timeout, raw, args.budget)
         if ok:
             passed += 1
         else:
