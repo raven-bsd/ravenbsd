@@ -201,6 +201,15 @@ def main(argv: list[str]) -> int:
             # line means the SYN/handshake never reached the listener.
             child.sendline("cat /tmp/sshd.log 2>/dev/null; echo POST-$((6*7+1))")
             child.expect("POST-43", timeout=30)
+            # Guest loopback probe: if the guest's own ssh client sees the server banner, sshd
+            # listens and accepts; if it times out too, the stop is the guest accept path, not
+            # netd/NIC. BatchMode avoids a password prompt; the exit status is not the row.
+            child.sendline(
+                "timeout 12 /bin/ssh -v -o StrictHostKeyChecking=no "
+                "-o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5 "
+                "-o NumberOfPasswordPrompts=1 root@127.0.0.1 true 2>&1; echo LOOPDONE-$?"
+            )
+            child.expect(r"LOOPDONE-[0-9]+", timeout=30)
         except (pexpect.EOF, pexpect.TIMEOUT) as error:
             print(f"aarch64-net: console wait {type(error).__name__}", file=sys.stderr)
             print((child.before or "")[-1200:], file=sys.stderr)
@@ -217,11 +226,16 @@ def main(argv: list[str]) -> int:
         for line in text.splitlines()
         if "child killed" in line or line.lstrip().startswith("exception:")
     ]
+    loop_banner = "Remote protocol version 2.0" in text
     print(
         f"aarch64-net: netd_up={int(netd)} netd_ready={int(nic)} sshd_up={int(sshd)} "
         f"listening={int(listening)} marker={int(console_ok)} client_ok={int(client_ok)} "
-        f"banner={int(client_banner)} client={client_detail} faults={len(faults)} transport={'tap' if args.tap else 'user'}"
+        f"banner={int(client_banner)} loop_banner={int(loop_banner)} client={client_detail} "
+        f"faults={len(faults)} transport={'tap' if args.tap else 'user'}"
     )
+    for line in text.splitlines():
+        if any(token in line for token in ("Remote protocol version", "banner exchange", "Permission denied")):
+            print("loop:", line.strip()[-220:])
     for line in faults[:4]:
         print(f"serial-fault: {line[-220:]}")
     for line in text.splitlines():
