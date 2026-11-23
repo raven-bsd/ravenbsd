@@ -28,6 +28,7 @@ extern crate alloc;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 
 use raven_abi::errno::Errno;
+use raven_abi::signal::{SIG_SETUP, SIG_SETUP_ABS, SIGRETURN};
 use raven_abi::syscall::{Syscall, THREAD_KICK};
 use raven_abi::types::Handle;
 use raven_initfs::Initfs;
@@ -106,6 +107,11 @@ static EINTR_QUEUE: AtomicU32 = AtomicU32::new(u32::MAX);
 static EINTR_EVENT: AtomicU32 = AtomicU32::new(u32::MAX);
 static EINTR_SAW: AtomicU32 = AtomicU32::new(0);
 static EINTR_DONE: AtomicI32 = AtomicI32::new(0);
+
+#[repr(align(16))]
+struct SignalContext(#[allow(dead_code)] [u8; 4096]);
+
+static mut EINTR_SIGNAL_CONTEXT: SignalContext = SignalContext([0; 4096]);
 
 type R = Result<(), &'static str>;
 
@@ -197,7 +203,34 @@ fn hup_repoll() -> R {
     Ok(())
 }
 
+extern "C" fn eintr_signal_handler(_: usize) -> ! {
+    // SAFETY: the kernel enters this handler with a live signal context; SIGRETURN restores the
+    // interrupted syscall return path for this thread.
+    unsafe { sys::syscall1(SIGRETURN, 0) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
 fn eintr_waiter(_: usize) {
+    // A raw THREAD_KICK is an interrupt only when this thread has a registered SIG_SETUP
+    // handler that the kernel can run. Register the minimal absolute-context handler first.
+    let context = core::ptr::addr_of_mut!(EINTR_SIGNAL_CONTEXT) as usize;
+    // SAFETY: SIG_SETUP takes scalar user addresses; the context is a live 16-byte-aligned
+    // static page and the entry is in the fixture text mapping.
+    let setup = unsafe {
+        sys::syscall4(
+            SIG_SETUP,
+            eintr_signal_handler as *const () as usize,
+            context,
+            SIG_SETUP_ABS as usize,
+            0,
+        )
+    };
+    if setup < 0 {
+        EINTR_DONE.store(-3, Ordering::Release);
+        return;
+    }
     let queue = EINTR_QUEUE.load(Ordering::Acquire);
     let mut output = [EvqEvent::default(); 1];
     let mut saw = 0u32;
