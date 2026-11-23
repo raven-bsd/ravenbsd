@@ -2531,6 +2531,11 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     // are owned by the process, so release them on the single teardown path before any waiter
     // can observe a stale owner.
     crate::syscall::record_lock::release_process(process.id);
+    // Snapshot the final resident footprint while the address space still exists. This runs
+    // before the critical section (the VMA walk allocates) and before `notify_parent`, so the
+    // reaped-child maxrss fold sees the completed footprint. The stack fault that forced the
+    // earlier removal was the inlined CmdLine parser in `teardown`, now gone.
+    process.update_maxrss();
     // The state/wake graph takes the per-CPU scheduler lock through `sched::wake`. The syscall
     // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
     // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space
