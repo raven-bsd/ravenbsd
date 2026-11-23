@@ -7,7 +7,9 @@
  * write-only pty slave carries WRITE but not READ; the kernel EVQ source lookup must observe it
  * without returning EACCES.  Rev 330 adds the sshd server-side close shape (the session child
  * exits, the pty master reports HUP after EOF within a bounded ppoll) and the ppoll signal-mask
- * rows.  The qtest expects every line below and forbids a failure line. */
+ * rows.  Rev 331 adds the same close shape for the master opened through the public `pty:` clone
+ * path `/dev/ptmx`, so the test covers the SchemeFile master and not only `posix_openpt`.  The
+ * qtest expects every line below and forbids a failure line. */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -17,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -119,6 +122,89 @@ static int pty_ssh_close(void) {
     if ((ready.revents & POLLHUP) == 0)
         return fail("ssh-hup-revents", ready.revents, 0);
     printf("posix-poll: pty-ssh-close hup=1 elapsed-ms=%d\n",
+           elapsed_ms(&before, &after));
+    (void)close(master);
+    return 0;
+}
+
+/* K548 rev 331: the sshd master as the public `pty:` clone device. `/dev/ptmx` is the clone
+ * path; the pty server allocates the pair and fstat reports the pair/role inode, so the slave is
+ * `/dev/pts/<pair>`. This is the SchemeFile master with a remembered public path, not the
+ * pathless `posix_openpt` install. */
+static int open_scheme_master(char *name, size_t capacity) {
+    struct stat info;
+    unsigned long pair;
+    int master;
+
+    master = open("/dev/ptmx", O_RDWR | O_NOCTTY);
+    if (master < 0)
+        return -1;
+    if (fstat(master, &info) != 0 || info.st_ino < 3) {
+        (void)close(master);
+        errno = EIO;
+        return -1;
+    }
+    pair = (unsigned long)((info.st_ino - 1) / 2);
+    (void)snprintf(name, capacity, "/dev/pts/%lu", pair);
+    return master;
+}
+
+/* K548 rev 331: the same sshd close shape as `pty_ssh_close`, but the master was opened through
+ * the `pty:` scheme's clone path. The SchemeFile branch must report the hangup too. */
+static int pty_scheme_close(void) {
+    struct pollfd ready;
+    struct timespec timeout;
+    struct timespec before;
+    struct timespec after;
+    char name[128];
+    char byte = 0;
+    int master;
+    int slave;
+    int status = 0;
+    int ready_count;
+    pid_t child;
+
+    master = open_scheme_master(name, sizeof(name));
+    if (master < 0)
+        return fail("scheme-master", -1, errno);
+    slave = open(name, O_RDWR | O_NOCTTY);
+    if (slave < 0)
+        return fail("scheme-slave", -1, errno);
+
+    child = fork();
+    if (child == 0) {
+        (void)close(master);
+        if (write(slave, "S", 1) != 1)
+            _exit(2);
+        (void)close(slave);
+        _exit(0);
+    }
+    if (child < 0)
+        return fail("scheme-fork", -1, errno);
+    (void)close(slave);
+
+    if (waitpid(child, &status, 0) != child)
+        return fail("scheme-waitpid", child, errno);
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        return fail("scheme-child-status", status, 0);
+    if (read(master, &byte, 1) != 1 || byte != 'S')
+        return fail("scheme-byte", (long)byte, errno);
+    if (read(master, &byte, 1) != 0)
+        return fail("scheme-eof", (long)byte, errno);
+
+    ready.fd = master;
+    ready.events = POLLIN;
+    ready.revents = 0;
+    timeout.tv_sec = 2;
+    timeout.tv_nsec = 0;
+    (void)clock_gettime(CLOCK_MONOTONIC, &before);
+    ready_count = ppoll(&ready, 1, &timeout, NULL);
+    (void)clock_gettime(CLOCK_MONOTONIC, &after);
+    if (ready_count <= 0)
+        return fail("scheme-hup-poll", ready_count, errno);
+    if ((ready.revents & POLLHUP) == 0)
+        return fail("scheme-hup-revents", ready.revents, 0);
+    printf("posix-poll: pty-scheme-close hup=1 elapsed-ms=%d\n",
            elapsed_ms(&before, &after));
     (void)close(master);
     return 0;
@@ -273,6 +359,8 @@ int main(void) {
     printf("posix-poll: pty ok\n");
 
     if (pty_ssh_close() != 0)
+        return 1;
+    if (pty_scheme_close() != 0)
         return 1;
     if (ppoll_mask_rows() != 0)
         return 1;

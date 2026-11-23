@@ -98,6 +98,11 @@ pub struct Ofd {
     /// does not report it. A non-empty read that reaches EOF is therefore the libc's evidence
     /// that the terminal hung up, and the condition is sticky like the donor tty state.
     pub eof: Arc<AtomicBool>,
+    /// The terminal is the `pty:` master (clone/master endpoint), not the slave or console.
+    ///
+    /// The role is recorded at open time from the scheme path, so a public clone path such as
+    /// `/dev/ptmx` is a master even though its OFD remembers that path.
+    pub pty_master: Cell<bool>,
 }
 
 impl Ofd {
@@ -121,6 +126,7 @@ impl Ofd {
             epoch,
             socket: Cell::new(None),
             eof: Arc::new(AtomicBool::new(false)),
+            pty_master: Cell::new(false),
         }
     }
 
@@ -143,6 +149,16 @@ impl Ofd {
     /// Whether this tty master has reached EOF.
     pub fn is_eof(&self) -> bool {
         self.eof.load(Ordering::Relaxed)
+    }
+
+    /// Record that the terminal is the pty master.
+    pub fn set_pty_master(&self) {
+        self.pty_master.set(true);
+    }
+
+    /// Whether the terminal is the pty master.
+    pub fn is_pty_master(&self) -> bool {
+        self.pty_master.get()
     }
 
     /// Set the kernel handle of a pending OFD.
@@ -381,6 +397,16 @@ impl<'a, B: SysBackend, L: Lock> OfdRef<'a, B, L> {
         self.snapshot().is_some_and(|ofd| ofd.is_eof())
     }
 
+    /// Record that the terminal is the pty master.
+    pub fn set_pty_master(&self) {
+        self.platform.set_ofd_pty_master(self.index);
+    }
+
+    /// Whether the terminal is the pty master.
+    pub fn is_pty_master(&self) -> bool {
+        self.snapshot().is_some_and(|ofd| ofd.is_pty_master())
+    }
+
     /// The OFD status (`F_GETFL`).
     pub fn status(&self) -> u32 {
         self.snapshot().map_or(0, |ofd| {
@@ -460,6 +486,7 @@ impl Clone for Ofd {
             epoch: self.epoch,
             socket: Cell::new(self.socket.get()),
             eof: Arc::clone(&self.eof),
+            pty_master: Cell::new(self.pty_master.get()),
         }
     }
 }
