@@ -5,8 +5,12 @@
 # K434 per-step SSH gate matrix (S0-S8). Runs the pty-alloc qtest, builds the throw-away S0 echo
 # initfs, then runs matrix.py. RAVEN_NET_MODE=netns (default) uses a private ken434 namespace with
 # its own ravenbr0/ravendemo0; RAVEN_NET_MODE=shared uses scripts/qemu-net.sh for the rev-24 A/B.
-# RAVEN_MATRIX_ONLY=s4|mutation|s1-repeat|s7|s7-exit|s8 runs one boot-only row set. The s4 mode
-# boots once and runs three single-attempt auth-then-read proofs; mutation boots the 0755 image and
+# RAVEN_MATRIX_ONLY=s4|mutation|s1-repeat|s7|s7-exit|s8|s5|s8-proof|full runs one boot-only row set.
+# `full` is the single-shot K434 gate: S1, S2, S3, S4, S5/S6 (including S5-session), S7 and S8 in
+# order on one image, writing serial-<row>.log deltas. The wrapper tests/ssh/run-k434-matrix.sh pins
+# one tree/image hash and runs it:
+#   sh tests/ssh/run-k434-matrix.sh
+# The s4 mode boots once and runs three single-attempt auth-then-read proofs; mutation boots the 0755 image and
 # asserts the non-root /tmp create fails:
 #   timeout 600 env RAVEN_MATRIX_ONLY=s4 sh tests/ssh/matrix.sh
 #   timeout 300 env RAVEN_MATRIX_ONLY=mutation RAVEN_SSH_IMAGE=build/qtest/ssh-login.img \
@@ -34,6 +38,14 @@ mode=${RAVEN_NET_MODE:-netns}
 only=${RAVEN_MATRIX_ONLY:-}
 out=${RAVEN_MATRIX_OUT:-build/ssh/matrix}
 matrix_timeout=${RAVEN_MATRIX_TIMEOUT:-780}
+close_env=
+if [ -n "${RAVEN_CLOSE_TIMEOUT:-}" ]; then
+    close_env="RAVEN_CLOSE_TIMEOUT=$RAVEN_CLOSE_TIMEOUT"
+fi
+image_env=
+if [ -n "${RAVEN_SSH_IMAGE:-}" ]; then
+    image_env="RAVEN_SSH_IMAGE=$RAVEN_SSH_IMAGE"
+fi
 
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=
@@ -99,7 +111,7 @@ if [ "$mode" = shared ]; then
     $SUDO sh scripts/qemu-net.sh up
     up=1
     RAVEN_SSH_HOST="$guest_ip" RAVEN_QEMU_TAP="$tap" \
-        RAVEN_MATRIX_ONLY="$only" RAVEN_MATRIX_OUT="$out" \
+        RAVEN_MATRIX_ONLY="$only" RAVEN_MATRIX_OUT="$out" $close_env $image_env \
         timeout "$matrix_timeout" python3 "$root/tests/ssh/matrix.py"
 else
     echo "matrix: private netns $ns bridge=$bridge tap=$tap guest=$guest_ip" >&2
@@ -128,6 +140,6 @@ else
 
     timeout "$matrix_timeout" $SUDO ip netns exec "$ns" runuser -u "$user" -- \
         env RAVEN_SSH_HOST="$guest_ip" RAVEN_QEMU_TAP="$tap" \
-            RAVEN_MATRIX_ONLY="$only" RAVEN_MATRIX_OUT="$out" \
+            RAVEN_MATRIX_ONLY="$only" RAVEN_MATRIX_OUT="$out" $close_env $image_env \
         python3 "$root/tests/ssh/matrix.py"
 fi

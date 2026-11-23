@@ -4,10 +4,10 @@
 name = "process-lifecycle"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 180
+timeout_secs = 300
 pre = ["sh tests/fixtures/s36-lifecycle/build.sh"]
 initfs = "build/fixtures/s36-lifecycle/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1"
+boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1 s36-mapcheck=1"
 qemu_extra = []
 expect_exit = "success"
 
@@ -15,10 +15,7 @@ expect_exit = "success"
 [[expect]]
 regex = '^s36: unstarted reaped$'
 
-# Scenario 7: the child exit/SIGCHLD kick reports EINTR; the retry collects the child.
-[[expect]]
-regex = '^s36: wait race eintr$'
-
+# Scenario 7: the child status wins over the SIGCHLD kick; no spurious EINTR.
 [[expect]]
 regex = '^s36: wait race ok$'
 
@@ -31,14 +28,22 @@ regex = '^s36: wait eintr ok$'
 
 # Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
 [[expect]]
-regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
 
 [[expect]]
-regex = '^s36: cycles done=10000$'
+regex = '^.*s36: cycles done=10000$'
+
+# Bounded process/address-space/stack churn between the same counter markers.
+[[expect]]
+regex = '^s36: sessions done=32$'
+
+# Bounded VMA churn; the marker after it separates data/page-table frames from baseline.
+[[expect]]
+regex = '^s36: vma vma-large done=100$'
 
 # Scenario 2, closing marker exit: the counters again (the report compares the two lines).
 [[expect]]
-regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
 
 # Scenario 1: one thread exits (process alive), then EXIT kills every thread.
 [[expect]]
@@ -65,8 +70,23 @@ regex = '^s36: server ready$'
 [[expect]]
 regex = '^s36: scheme reregistered$'
 
+# vfsd pager frame-return row: baseline at exit 88, map/unmap cycles, closing at exit 89.
+# The `mapcheck ok` line is required and the leak line is forbidden: this row is red until
+# the vfsd/rt allocator owner returns the mapped-chunk frames.
+[[expect]]
+regex = '^s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^s36: vfsd map done=1000$'
+
+[[expect]]
+regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^s36: mapcheck ok$'
+
 [[expect]]
 regex = '^s36: lifecycle ok$'
 
 [[forbid]]
-regex = '(?i)panic|s36: failed'
+regex = '(?i)panic|s36: failed|s36: mapcheck leak'
