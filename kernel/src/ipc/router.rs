@@ -1164,6 +1164,33 @@ pub(crate) fn defer_close(server: &Arc<Process>, id: u64, cookie: u64, count: u3
     crate::event::notify_source(Arc::as_ptr(server) as usize as u64);
 }
 
+/// Deferred last-close queue depth and dead-process references (S36b diagnostic).
+///
+/// Returns `(queued, dead_clients, dead_servers)`. A growing queue with dead clients means the
+/// notice retains a dead client `Arc<Process>` until a live server drains it.
+pub fn close_notice_stats() -> (usize, usize, usize) {
+    let notices = CLOSE_NOTICES.lock();
+    let dead_clients = notices
+        .iter()
+        .filter(|notice| {
+            notice
+                .client
+                .torn_down
+                .load(core::sync::atomic::Ordering::Acquire)
+        })
+        .count();
+    let dead_servers = notices
+        .iter()
+        .filter(|notice| {
+            notice
+                .server
+                .torn_down
+                .load(core::sync::atomic::Ordering::Acquire)
+        })
+        .count();
+    (notices.len(), dead_clients, dead_servers)
+}
+
 /// Drop deferred last-close notices whose server is exiting.
 ///
 /// A notice is the client's last word to a *live* server; once the server is gone there is no
