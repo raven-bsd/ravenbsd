@@ -670,9 +670,10 @@ pub fn entry_function() -> usize {
 /// into the middle of another function. A normal Rust function symbol has the link-time address
 /// the kernel needs.
 #[must_use]
+#[inline(never)]
 #[cfg(target_arch = "x86_64")]
 pub fn sigentry_address() -> usize {
-    __raven_sigentry_rs as *const () as usize
+    core::hint::black_box(__raven_sigentry_rs as *const () as usize)
 }
 
 /// The address of the assembly entry stub the kernel resumes at.
