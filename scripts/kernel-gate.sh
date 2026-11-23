@@ -86,6 +86,10 @@ ssh-first-byte|x86_64|bob|ssh first byte|tests/fixtures/ssh-first-byte/ssh-first
 net-fuzz|x86_64|jorge|net fuzz|tests/qtest/cases/net-fuzz.toml
 net-fuzz-l4|x86_64|jorge|net fuzz l4|tests/qtest/cases/net-fuzz-l4.toml
 net-fuzz-frag-timeout|x86_64|jorge|net fuzz frag|tests/qtest/cases/net-fuzz-frag-timeout.toml
+net-fuzz-release|x86_64|jorge|net fuzz release|tests/qtest/cases/net-fuzz-release.toml
+net-fuzz-l4-release|x86_64|jorge|net fuzz l4 release|tests/qtest/cases/net-fuzz-l4-release.toml
+net-fuzz-frag-timeout-release|x86_64|jorge|net fuzz frag release|tests/qtest/cases/net-fuzz-frag-timeout-release.toml
+net-churn-release|x86_64|jorge|net churn release|tests/qtest/cases/net-churn-release.toml
 duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator
