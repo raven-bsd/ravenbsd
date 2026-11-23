@@ -238,7 +238,16 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             let ret = unsafe {
                 core::ptr::read_unaligned((frame.rsp.saturating_add(0x1d8)) as *const u64)
             };
-            crate::kprintln!("PFRET {:#x} rsp={:#x}", ret, frame.rsp);
+            // SAFETY: the prologue saved rbx at rsp+0x1a8 in the same live stack frame.
+            let saved_rbx = unsafe {
+                core::ptr::read_unaligned((frame.rsp.saturating_add(0x1a8)) as *const u64)
+            };
+            crate::kprintln!(
+                "PFRET {:#x} saved_rbx={:#x} rsp={:#x}",
+                ret,
+                saved_rbx,
+                frame.rsp
+            );
             crate::process::page_fault(cr2);
         }
     }
