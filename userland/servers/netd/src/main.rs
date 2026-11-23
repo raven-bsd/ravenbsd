@@ -154,14 +154,23 @@ mod program {
             handler.publish_and_feed();
             if now >= tcp_debug_ms.saturating_add(100) {
                 let c = raven_netcore::debug_counters();
+                let s = raven_netcore::debug_last_send();
                 raven_rt::println!(
-                    "netd: tcpdbg send={} se={} runs={} unsent={} ok={} ea={}",
+                    "netd: tcpdbg send={} se={} runs={} unsent={} ok={} ea={} last={}:{} acc={} tx={} nxt={} una={} st={} rs={}",
                     c[0],
                     c[1],
                     c[2],
                     c[3],
                     c[4],
-                    c[5]
+                    c[5],
+                    s[0],
+                    s[1],
+                    s[2],
+                    s[3],
+                    s[4],
+                    s[5],
+                    s[6],
+                    s[7]
                 );
                 tcp_debug_ms = now;
             }

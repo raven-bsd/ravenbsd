@@ -73,6 +73,32 @@ pub fn debug_counters() -> [u64; 6] {
         RETRY_EAGAIN.load(Ordering::Relaxed),
     ]
 }
+
+static LAST_LOCAL_PORT: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static LAST_REMOTE_PORT: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static LAST_ACCEPTED: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static LAST_TX_LEN: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static LAST_SND_NXT: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static LAST_SND_UNA: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static LAST_STATE: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static LAST_RESULT: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
+/// Snapshot the last `tcp_send_data` attempt:
+/// `[local_port, remote_port, accepted, tx_len, snd_nxt, snd_una, state, result]`.
+#[must_use]
+pub fn debug_last_send() -> [u64; 8] {
+    use core::sync::atomic::Ordering;
+    [
+        LAST_LOCAL_PORT.load(Ordering::Relaxed),
+        LAST_REMOTE_PORT.load(Ordering::Relaxed),
+        LAST_ACCEPTED.load(Ordering::Relaxed),
+        LAST_TX_LEN.load(Ordering::Relaxed),
+        LAST_SND_NXT.load(Ordering::Relaxed),
+        LAST_SND_UNA.load(Ordering::Relaxed),
+        LAST_STATE.load(Ordering::Relaxed),
+        LAST_RESULT.load(Ordering::Relaxed),
+    ]
+}
 /// FreeBSD `TCP_MAXRXTSHIFT` / `V_tcp_retries`.
 const TCP_MAXRXTSHIFT: u8 = 12;
 /// FreeBSD `TCPTV_MIN` (`tcp_timer.h`): minimum persist base, 30 ms.
@@ -264,16 +290,30 @@ impl<D: Device> Stack<D> {
         // segments that were sent and lost. NetBSD turns `ENOBUFS` into success after
         // `sbappendstream` in `tcp_output`, and illumos `tcp_send_data` discards the result of
         // `conn_ip_output`.
-        match self.tcp_try_send(socket) {
-            Ok(()) => {
-                SEND_CALLS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-            }
-            Err(Errno::EAGAIN) => {
-                SEND_CALLS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-                SEND_EAGAIN.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-            }
-            Err(error) => {
-                SEND_CALLS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        let result = self.tcp_try_send(socket);
+        let result_code = match result {
+            Ok(()) => 0,
+            Err(Errno::EAGAIN) => 1,
+            Err(_) => 2,
+        };
+        SEND_CALLS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        if result_code == 1 {
+            SEND_EAGAIN.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        }
+        if let Ok(record) = self.sockets.record(socket)
+            && let Kind::Tcp(connection) = &record.kind
+        {
+            LAST_LOCAL_PORT.store(u64::from(connection.local_port), core::sync::atomic::Ordering::Relaxed);
+            LAST_REMOTE_PORT.store(u64::from(connection.remote.map_or(0, |remote| remote.1)), core::sync::atomic::Ordering::Relaxed);
+            LAST_ACCEPTED.store(u64::try_from(accepted).unwrap_or(0), core::sync::atomic::Ordering::Relaxed);
+            LAST_TX_LEN.store(u64::try_from(record.tx.len()).unwrap_or(u64::MAX), core::sync::atomic::Ordering::Relaxed);
+            LAST_SND_NXT.store(u64::from(connection.snd_nxt), core::sync::atomic::Ordering::Relaxed);
+            LAST_SND_UNA.store(u64::from(connection.snd_una), core::sync::atomic::Ordering::Relaxed);
+            LAST_STATE.store(connection.state as u8 as u64, core::sync::atomic::Ordering::Relaxed);
+            LAST_RESULT.store(result_code, core::sync::atomic::Ordering::Relaxed);
+        }
+        if let Err(error) = result {
+            if result_code == 2 {
                 return Err(error);
             }
         }

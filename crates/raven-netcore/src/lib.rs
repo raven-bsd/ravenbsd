@@ -30,6 +30,7 @@ pub use core::Core;
 pub use raven_abi::errno::Errno;
 pub use raven_tcpip::{
     ChecksumOffload, Device, DeviceCaps, Instant, Medium, Readiness, TxError, debug_counters,
+    debug_last_send,
 };
 
 /// The native raven-tcpip-backed core.
