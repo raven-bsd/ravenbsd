@@ -1757,20 +1757,25 @@ def row_close_probe(console: SerialConsole | None) -> None:
             "close-sshd.log", "K434-169")
         ps_text = console_cr_capture(
             console, "ps -e; echo K434-$((17*13))", "close-ps.log", "K434-221")
-        console_cr_capture(
-            console,
-            "/sbin/sshd -d -p 2222 -E /tmp/sshd-debug.log & echo K434-$((19*11))",
-            "close-debug-start.log", "K434-209", timeout=10)
-        time.sleep(1.0)
+        debug_mark = len(console.buffer)
+        console.send(b"/sbin/sshd -d -p 2222 -f /etc/ssh/sshd_config &")
+        time.sleep(0.3)
+        console.send(b"\r")
+        time.sleep(0.2)
+        console.send(b"\r")
+        time.sleep(2.0)
         debug_result = ssh_run(["echo", "K449-DIAG"], "close-debug-client.log",
                                extra=["-vvv", "-p", "2222"], timeout=15)
         debug_client_text = (debug_result["stderr"]
                              + debug_result["stdout"]).decode("utf-8", "replace")
         (OUT / "close-debug-client-vvv.log").write_text(debug_client_text,
                                                        encoding="utf-8")
-        debug_log_text = console_cr_capture(
-            console, "cat /tmp/sshd-debug.log; echo K434-$((17*13))",
-            "close-sshd-debug.log", "K434-221", timeout=20)
+        console.pump()
+        debug_log_text = bytes(console.buffer[debug_mark:]).decode("utf-8", "replace")
+        debug_log_text = debug_log_text.replace("\r", "")
+        debug_log_text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", debug_log_text)
+        (OUT / "close-sshd-debug-console.log").write_text(debug_log_text,
+                                                          encoding="utf-8")
     elif console is not None:
         record("close-probe", "BLOCKED", "console login failed before the sshd log dump")
         return
@@ -1801,9 +1806,10 @@ def row_close_probe(console: SerialConsole | None) -> None:
                            or "disconnect" in line.lower()]
     client_tail = " || ".join(client_lines[-12:])
     debug_lines = [line.strip() for line in debug_log_text.splitlines()
-                   if line.strip() and "K434-221" not in line
-                   and "cat /tmp/sshd-debug.log" not in line
-                   and not line.startswith("raven#")]
+                   if line.strip()
+                   and any(key in line.lower() for key in
+                           ("debug", "sigchld", "collect", "session_exit",
+                            "exit-status", "channel"))]
     debug_sigchld = [line for line in debug_lines
                      if "SIGCHLD" in line or "Received SIGCHLD" in line]
     debug_collect = [line for line in debug_lines
