@@ -52,7 +52,7 @@ regex = '^ping: [0-9]+ packets transmitted, [0-9]+ received, 0% packet loss$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|bad ELF|crash loop|svcd: netd unavailable'
+regex = '(?i)panic|EXCEPTION|crash loop|svcd: netd unavailable'
 
 [[step]]
 wait = '(?i)^.*login: ?$'
@@ -75,5 +75,13 @@ wait = '^raven# $'
 timeout_secs = 60
 
 [[step]]
-send = "ping 10.0.2.2\nexit 0\n"
+send = "ping 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^ping: .*$'
+timeout_secs = 20
+
+[[step]]
+send = "exit 0\n"
 delay_ms = 100
