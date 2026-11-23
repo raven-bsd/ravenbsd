@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_code)]
 
+mod addons;
 mod brush;
 mod build;
 mod check;
