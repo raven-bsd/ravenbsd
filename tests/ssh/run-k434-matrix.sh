@@ -55,6 +55,15 @@ if [ "${RAVEN_K434_PTY_PATH_GATE:-1}" = 1 ]; then
     rm -f build/fixtures/pty-path/pty-path
 fi
 
+# The staged OpenSSH binaries are static against the Raven libc, and the image build refuses a
+# stale sshd whenever libc.a is newer (any libc change, including a merged platform ticket).
+# Rebuild the SSH addon here so the gate measures the current tree (measured 101.17 s at rev178).
+if timeout 180 sh addons/ssh/build.sh > "$out/addons-ssh-build.log" 2>&1; then
+    echo 0 > "$out/addons-ssh-build.exit"
+else
+    echo $? > "$out/addons-ssh-build.exit"
+fi
+
 if [ ! -f "$image" ]; then
     echo "k434: building one image from tree $tree"
     timeout 900 cargo xtask image --arch x86_64 --profile release \
