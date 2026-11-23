@@ -948,6 +948,10 @@ fn no_alloc_fdmap_rejects_inherited_descriptors() {
             kind: 2,
             status: 2,
             path: None,
+            event: 0,
+            readiness: 0,
+            socket: None,
+            pty_master: false,
         }]),
         Err(SpawnError::Sys(Errno::ENOTSUP))
     );
@@ -971,33 +975,79 @@ fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
             kind: 2,
             status: 2,
             path: Some(b"/dev/pts/7"),
+            event: 0,
+            readiness: 0,
+            socket: None,
+            pty_master: false,
         },
         SpawnFd {
             fd: 2,
             handle: 8,
-            kind: 0,
+            kind: 3,
             status: 2,
             path: None,
+            event: 9,
+            readiness: 0x5,
+            socket: Some(SpawnSocket {
+                domain: 2,
+                ty: 1,
+                proto: 6,
+                state: 5,
+                local: Some(SpawnEndpoint {
+                    ip: [10, 0, 2, 15],
+                    port: 22,
+                }),
+                peer: Some(SpawnEndpoint {
+                    ip: [10, 0, 2, 2],
+                    port: 40000,
+                }),
+            }),
+            pty_master: false,
         },
     ])
     .unwrap();
     assert_eq!(block.get(..4), Some(b"RFDM".as_slice()));
     assert_eq!(block.get(4..6), Some(5u16.to_le_bytes().as_slice()));
     assert_eq!(block.get(6..8), Some(2u16.to_le_bytes().as_slice()));
-    // The tty entry carries its real kind/status and resolved path; a non-terminal keeps the
-    // conservative Unknown/O_RDWR pair with no path (this map has no socket metadata).
+    // Entry 1: a tty with the resolved name. Entry 2: a socket with its full v5 identity, the
+    // notification event and the readiness mask.
     assert_eq!(block.get(16), Some(&2));
     assert_eq!(block.get(18..22), Some(2u32.to_le_bytes().as_slice()));
     assert_eq!(block.get(22..26), Some(0u32.to_le_bytes().as_slice()));
-    assert_eq!(block.get(16 + 53), Some(&255));
+    let base = 8 + 53;
+    let word = |offset: usize| {
+        block
+            .get(offset..offset + 4)
+            .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
+            .map(u32::from_le_bytes)
+    };
+    assert_eq!(block.get(base + 8), Some(&3));
+    assert_eq!(word(base + 10), Some(2)); // status
+    assert_eq!(word(base + 14), Some(u32::MAX)); // no path
+    assert_eq!(word(base + 18), Some(9)); // event
+    assert_eq!(word(base + 22), Some(0x5)); // readiness
+    assert_eq!(word(base + 26), Some(2)); // AF_INET
+    assert_eq!(word(base + 30), Some(1)); // SOCK_STREAM
+    assert_eq!(word(base + 34), Some(6)); // TCP
+    assert_eq!(block.get(base + 38), Some(&5)); // state
+    assert_eq!(block.get(base + 39), Some(&3)); // local+peer flags
     assert_eq!(
-        block.get(18 + 53..22 + 53),
-        Some(2u32.to_le_bytes().as_slice())
+        block.get(base + 40..base + 44),
+        Some([10, 0, 2, 15].as_slice())
     );
     assert_eq!(
-        block.get(22 + 53..26 + 53),
-        Some(u32::MAX.to_le_bytes().as_slice())
+        block.get(base + 44..base + 46),
+        Some(22u16.to_le_bytes().as_slice())
     );
+    assert_eq!(
+        block.get(base + 46..base + 50),
+        Some([10, 0, 2, 2].as_slice())
+    );
+    assert_eq!(
+        block.get(base + 50..base + 52),
+        Some(40000u16.to_le_bytes().as_slice())
+    );
+    assert_eq!(block.get(base + 52), Some(&0)); // pty_master
     assert_eq!(block.get(8 + 2 * 53..), Some(b"/dev/pts/7\0".as_slice()));
 }
 

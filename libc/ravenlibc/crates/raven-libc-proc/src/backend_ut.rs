@@ -28,6 +28,10 @@ fn fd_map_entry_carries_the_ofd_identity() {
         kind: 2,
         status: 2,
         path: Some(b"/dev/pts/3".to_vec()),
+        event: 0,
+        readiness: 0,
+        socket: None,
+        pty_master: false,
     };
     assert_eq!(entry.fd, 3);
     assert_eq!(entry.handle, 8);

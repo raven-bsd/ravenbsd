@@ -305,6 +305,33 @@ pub fn spawn_image_with<S: Sys>(
 ///
 /// The kind and status are the parent's open-file-description values, the same fields the exec
 /// `FdMap` carries (version 5). The child never re-derives them by probing a handle.
+/// One IPv4 endpoint in the v5 socket record.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SpawnEndpoint {
+    /// The address octets.
+    pub ip: [u8; 4],
+    /// The TCP/UDP port.
+    pub port: u16,
+}
+
+/// The socket identity carried in a version-5 `FdMap` entry.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SpawnSocket {
+    /// `AF_INET`, `AF_INET6` or `AF_UNIX`.
+    pub domain: i32,
+    /// `SOCK_STREAM` or `SOCK_DGRAM`.
+    pub ty: i32,
+    /// The protocol number.
+    pub proto: i32,
+    /// Encoded socket state (0 pending .. 6 shutdown).
+    pub state: u8,
+    /// The local endpoint, when the socket had one.
+    pub local: Option<SpawnEndpoint>,
+    /// The accepted/connected peer endpoint, when the socket had one.
+    pub peer: Option<SpawnEndpoint>,
+}
+
+/// One inherited descriptor for the child, in the version-5 `FdMap` shape.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SpawnFd<'a> {
     /// Descriptor number in the child.
@@ -317,6 +344,14 @@ pub struct SpawnFd<'a> {
     pub status: u32,
     /// Public absolute path, when the parent's OFD remembers one.
     pub path: Option<&'a [u8]>,
+    /// Scheme notification event handle, or zero.
+    pub event: u32,
+    /// The one-shot readiness replay mask.
+    pub readiness: u32,
+    /// The socket identity, when the descriptor is a socket.
+    pub socket: Option<SpawnSocket>,
+    /// The inherited tty is the `pty:` master.
+    pub pty_master: bool,
 }
 
 /// Spawn an in-memory image and inherit `fdmap` descriptors into the child.
@@ -828,19 +863,32 @@ fn spawn_elf<S: Sys>(
     } else {
         let mut entries = alloc_crate::vec::Vec::with_capacity(fdmap.len());
         for entry in fdmap {
-            match sys.handle_transfer(child, Handle(entry.handle)) {
-                Ok(handle) => entries.push(SpawnFd {
-                    fd: entry.fd,
-                    handle: handle.0,
-                    kind: entry.kind,
-                    status: entry.status,
-                    path: entry.path,
-                }),
+            let handle = match sys.handle_transfer(child, Handle(entry.handle)) {
+                Ok(handle) => handle,
                 Err(error) => {
                     let _ = sys.handle_close(child);
                     return Err(SpawnError::Sys(error));
                 }
-            }
+            };
+            // The event is a separate kernel handle. Transfer it like the data handle; if that
+            // fails the descriptor still works for I/O and loses only its poll doorbell.
+            let event = if entry.event == 0 {
+                0
+            } else {
+                sys.handle_transfer(child, Handle(entry.event))
+                    .map_or(0, |event| event.0)
+            };
+            entries.push(SpawnFd {
+                fd: entry.fd,
+                handle: handle.0,
+                kind: entry.kind,
+                status: entry.status,
+                path: entry.path,
+                event,
+                readiness: entry.readiness,
+                socket: entry.socket,
+                pty_master: entry.pty_master,
+            });
         }
         let block = match encode_fdmap(&entries) {
             Ok(block) => block,
@@ -1778,8 +1826,7 @@ fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, Sp
     let mut strings = alloc_crate::vec::Vec::new();
     let mut offsets = alloc_crate::vec::Vec::with_capacity(entries.len());
     for entry in entries {
-        let path = if entry.kind == 2 { entry.path } else { None };
-        match path {
+        match entry.path {
             Some(path) => {
                 if path.is_empty() || path.len() > 4095 || path.contains(&0) {
                     return Err(SpawnError::TooLarge);
@@ -1801,28 +1848,27 @@ fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, Sp
     out.extend_from_slice(&5u16.to_le_bytes());
     out.extend_from_slice(&count.to_le_bytes());
     for (entry, offset) in entries.iter().zip(offsets) {
-        let tty = entry.kind == 2;
+        let socket = entry.socket.unwrap_or_default();
         out.extend_from_slice(&entry.fd.to_le_bytes());
         out.extend_from_slice(&entry.handle.to_le_bytes());
-        // The terminal identity and its resolved path are what the child cannot re-derive
-        // without entering a server. A non-terminal keeps the conservative version-1 kind,
-        // O_RDWR and no path: this map carries no socket/event metadata.
-        out.push(if tty { 2 } else { 255 });
+        out.push(entry.kind);
         out.push(0); // FD_CLOEXEC already filtered by apply_actions
-        out.extend_from_slice(&if tty { entry.status } else { 2 }.to_le_bytes());
+        out.extend_from_slice(&entry.status.to_le_bytes());
         out.extend_from_slice(&offset.to_le_bytes());
-        out.extend_from_slice(&0u32.to_le_bytes()); // event
-        out.extend_from_slice(&0u32.to_le_bytes()); // readiness
-        out.extend_from_slice(&0i32.to_le_bytes()); // socket.domain
-        out.extend_from_slice(&0i32.to_le_bytes()); // socket.type
-        out.extend_from_slice(&0i32.to_le_bytes()); // socket.proto
-        out.push(0); // socket.state
-        out.push(0); // socket endpoint flags
-        for _ in 0..2 {
-            out.extend_from_slice(&[0u8; 4]); // local/peer ip
-            out.extend_from_slice(&0u16.to_le_bytes()); // local/peer port
+        out.extend_from_slice(&entry.event.to_le_bytes());
+        out.extend_from_slice(&entry.readiness.to_le_bytes());
+        out.extend_from_slice(&socket.domain.to_le_bytes());
+        out.extend_from_slice(&socket.ty.to_le_bytes());
+        out.extend_from_slice(&socket.proto.to_le_bytes());
+        out.push(socket.state);
+        let flags = u8::from(socket.local.is_some()) | (u8::from(socket.peer.is_some()) << 1);
+        out.push(flags);
+        for endpoint in [socket.local, socket.peer] {
+            let endpoint = endpoint.unwrap_or_default();
+            out.extend_from_slice(&endpoint.ip);
+            out.extend_from_slice(&endpoint.port.to_le_bytes());
         }
-        out.push(0); // pty_master
+        out.push(u8::from(entry.pty_master));
     }
     out.extend_from_slice(&strings);
     Ok(out)

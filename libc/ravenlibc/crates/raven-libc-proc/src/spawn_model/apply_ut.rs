@@ -71,6 +71,10 @@ fn entry(fd: i32, handle: u32, cloexec: bool) -> FdEntry {
         kind: 0,
         status: 2,
         path: None,
+        event: 0,
+        readiness: 0,
+        socket: None,
+        pty_master: false,
         cloexec,
     }
 }
@@ -82,6 +86,10 @@ fn tty_entry(fd: i32, handle: u32, path: &[u8]) -> FdEntry {
         kind: 2,
         status: 2,
         path: Some(path.to_vec()),
+        event: 0,
+        readiness: 0,
+        socket: None,
+        pty_master: false,
         cloexec: false,
     }
 }
@@ -93,7 +101,43 @@ fn map(fd: i32, handle: u32, kind: u8, status: u32) -> FdMapEntry {
         kind,
         status,
         path: None,
+        event: 0,
+        readiness: 0,
+        socket: None,
+        pty_master: false,
     }
+}
+
+#[test]
+fn a_socket_entry_carries_its_identity_event_and_readiness() {
+    let mut env = FakeEnv::new(vec![]);
+    let actions = FileActions::new();
+    let socket = crate::request::SocketMeta {
+        domain: 2,
+        ty: 1,
+        proto: 6,
+        state: 5,
+        local: Some(crate::request::SocketEndpoint {
+            ip: [10, 0, 2, 15],
+            port: 22,
+        }),
+        peer: Some(crate::request::SocketEndpoint {
+            ip: [10, 0, 2, 2],
+            port: 40000,
+        }),
+    };
+    let mut inherited = entry(3, 9, false);
+    inherited.kind = 3;
+    inherited.event = 9;
+    inherited.readiness = 5;
+    inherited.socket = Some(socket);
+    let table = vec![inherited];
+    let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
+    let carried = scratch.fdmap.first().expect("entry");
+    assert_eq!(carried.kind, 3);
+    assert_eq!(carried.event, 9);
+    assert_eq!(carried.readiness, 5);
+    assert_eq!(carried.socket, Some(socket));
 }
 
 #[test]

@@ -197,6 +197,10 @@ fn reference(
             kind: *kind,
             status: *status,
             path: None,
+            event: 0,
+            readiness: 0,
+            socket: None,
+            pty_master: false,
         })
         .collect();
     Ok(RefScratch {
@@ -283,6 +287,10 @@ fn two_thousand_seeded_action_lists_match_the_reference() {
                     kind: 0,
                     status: 2,
                     path: None,
+                    event: 0,
+                    readiness: 0,
+                    socket: None,
+                    pty_master: false,
                     cloexec: rng.next() & 1 == 0,
                 });
             }

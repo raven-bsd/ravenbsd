@@ -150,12 +150,30 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
             let fds: Vec<raven_spawn::SpawnFd> = request
                 .fdmap
                 .iter()
-                .map(|entry| raven_spawn::SpawnFd {
-                    fd: entry.fd,
-                    handle: entry.handle,
-                    kind: entry.kind,
-                    status: entry.status,
-                    path: entry.path.as_deref(),
+                .map(|entry| {
+                    let endpoint =
+                        |value: crate::request::SocketEndpoint| raven_spawn::SpawnEndpoint {
+                            ip: value.ip,
+                            port: value.port,
+                        };
+                    raven_spawn::SpawnFd {
+                        fd: entry.fd,
+                        handle: entry.handle,
+                        kind: entry.kind,
+                        status: entry.status,
+                        path: entry.path.as_deref(),
+                        event: entry.event,
+                        readiness: entry.readiness,
+                        socket: entry.socket.map(|meta| raven_spawn::SpawnSocket {
+                            domain: meta.domain,
+                            ty: meta.ty,
+                            proto: meta.proto,
+                            state: meta.state,
+                            local: meta.local.map(endpoint),
+                            peer: meta.peer.map(endpoint),
+                        }),
+                        pty_master: entry.pty_master,
+                    }
                 })
                 .collect();
             let handle = self

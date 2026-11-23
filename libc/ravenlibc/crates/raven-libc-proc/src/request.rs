@@ -8,6 +8,32 @@
 
 use alloc::vec::Vec;
 
+/// One IPv4 endpoint carried with an inherited socket's identity.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SocketEndpoint {
+    /// The address octets.
+    pub ip: [u8; 4],
+    /// The TCP/UDP port.
+    pub port: u16,
+}
+
+/// The socket identity carried with an inherited socket descriptor.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SocketMeta {
+    /// `AF_INET`, `AF_INET6` or `AF_UNIX`.
+    pub domain: i32,
+    /// `SOCK_STREAM` or `SOCK_DGRAM`.
+    pub ty: i32,
+    /// The protocol number.
+    pub proto: i32,
+    /// Encoded socket state (0 pending .. 6 shutdown).
+    pub state: u8,
+    /// The local endpoint, when the socket had one.
+    pub local: Option<SocketEndpoint>,
+    /// The accepted/connected peer endpoint, when the socket had one.
+    pub peer: Option<SocketEndpoint>,
+}
+
 /// One inherited descriptor in a spawn or exec map.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FdMapEntry {
@@ -21,6 +47,14 @@ pub struct FdMapEntry {
     pub status: u32,
     /// Public absolute path, when the parent's OFD remembers one.
     pub path: Option<Vec<u8>>,
+    /// Scheme notification event handle, or zero.
+    pub event: u32,
+    /// The one-shot readiness replay mask.
+    pub readiness: u32,
+    /// The socket identity for an inherited socket.
+    pub socket: Option<SocketMeta>,
+    /// The inherited tty is the `pty:` master.
+    pub pty_master: bool,
 }
 
 /// A request to spawn a new image.

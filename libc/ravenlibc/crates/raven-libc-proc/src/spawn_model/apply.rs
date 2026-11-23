@@ -9,7 +9,7 @@
 use alloc::vec::Vec;
 
 use crate::errors::{EBADF, ENOSYS, ENOTDIR, Errno};
-use crate::request::FdMapEntry;
+use crate::request::{FdMapEntry, SocketMeta};
 use crate::spawn_model::api::{FileAction, FileActions};
 
 /// One inherited descriptor.
@@ -25,6 +25,14 @@ pub struct FdEntry {
     pub status: u32,
     /// Public absolute path, when the parent's OFD remembers one.
     pub path: Option<Vec<u8>>,
+    /// Scheme notification event handle, or zero.
+    pub event: u32,
+    /// The one-shot readiness replay mask.
+    pub readiness: u32,
+    /// The socket identity for an inherited socket.
+    pub socket: Option<SocketMeta>,
+    /// The inherited tty is the `pty:` master.
+    pub pty_master: bool,
     /// Whether the descriptor closes at exec.
     pub cloexec: bool,
 }
@@ -95,6 +103,10 @@ pub fn apply_actions(
             kind: entry.kind,
             status: entry.status,
             path: entry.path.clone(),
+            event: entry.event,
+            readiness: entry.readiness,
+            socket: entry.socket,
+            pty_master: entry.pty_master,
         })
         .collect();
     Ok(scratch)
@@ -124,6 +136,10 @@ fn apply_inner(
                         kind: 0,
                         status: u32::try_from(*oflag & 0o3).unwrap_or_default(),
                         path: None,
+                        event: 0,
+                        readiness: 0,
+                        socket: None,
+                        pty_master: false,
                         cloexec: false,
                     },
                 );
@@ -142,6 +158,10 @@ fn apply_inner(
                         kind: source.kind,
                         status: source.status,
                         path: source.path,
+                        event: source.event,
+                        readiness: source.readiness,
+                        socket: source.socket,
+                        pty_master: source.pty_master,
                         cloexec: false,
                     },
                 );
