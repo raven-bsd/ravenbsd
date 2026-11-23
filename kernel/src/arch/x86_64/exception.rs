@@ -234,6 +234,11 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
                 words[6],
                 words[7]
             );
+            // SAFETY: same live stack mapping; the return slot is inside the launcher's frame.
+            let ret = unsafe {
+                core::ptr::read_unaligned((frame.rsp.saturating_add(0x1d8)) as *const u64)
+            };
+            crate::kprintln!("PFRET {:#x} rsp={:#x}", ret, frame.rsp);
             crate::process::page_fault(cr2);
         }
     }
