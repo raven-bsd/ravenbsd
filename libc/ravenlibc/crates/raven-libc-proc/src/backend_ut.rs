@@ -21,23 +21,11 @@ fn wait_result_has_the_documented_shape() {
 }
 
 #[test]
-fn fd_map_entry_carries_the_ofd_identity() {
-    let entry = FdMapEntry {
-        fd: 3,
-        handle: 8,
-        kind: 2,
-        status: 2,
-        path: Some(b"/dev/pts/3".to_vec()),
-        event: 0,
-        readiness: 0,
-        socket: None,
-        pty_master: false,
-    };
+fn fd_map_entry_is_two_words() {
+    let entry = FdMapEntry { fd: 3, handle: 8 };
     assert_eq!(entry.fd, 3);
     assert_eq!(entry.handle, 8);
-    assert_eq!(entry.kind, 2);
-    assert_eq!(entry.status, 2);
-    assert_eq!(entry.path.as_deref(), Some(b"/dev/pts/3".as_slice()));
+    assert_eq!(core::mem::size_of::<FdMapEntry>(), 8);
 }
 
 #[test]
