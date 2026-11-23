@@ -1952,7 +1952,6 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     }
 }
 
-
 /// Wake every wait-queue entry owned by a dying process before its objects are released.
 ///
 /// A blocked thread holds the `Arc` of the object it waits on and a queue entry that keeps its
