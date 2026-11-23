@@ -563,10 +563,6 @@ unsafe extern "C" {
     ) -> usize;
     fn __rl_sigreturn_stub() -> !;
     fn __raven_sigentry();
-    /// The stub address in a data word: the linker resolves the code symbol here, so a Rust
-    /// reference cannot fold it to the call site under LTO.
-    #[cfg(target_arch = "x86_64")]
-    static __raven_sigentry_addr: usize;
     fn __rl_start_context();
     fn __rl_current_sp() -> usize;
     /// The function pointer the `__raven_sigentry` stub calls.
@@ -668,11 +664,15 @@ pub fn entry_function() -> usize {
 }
 
 /// The address of the assembly entry stub the kernel resumes at.
+///
+/// The stub is defined as a Rust naked function rather than a hidden `global_asm!` symbol: the
+/// hidden symbol was resolved to the wrong address under the brush LTO link, so the kernel jumped
+/// into the middle of another function. A normal Rust function symbol has the link-time address
+/// the kernel needs.
 #[must_use]
 #[cfg(target_arch = "x86_64")]
 pub fn sigentry_address() -> usize {
-    // SAFETY: the data word is defined by the entry asm and only read here.
-    unsafe { __raven_sigentry_addr }
+    __raven_sigentry_rs as *const () as usize
 }
 
 /// The address of the assembly entry stub the kernel resumes at.
@@ -680,6 +680,25 @@ pub fn sigentry_address() -> usize {
 #[cfg(not(target_arch = "x86_64"))]
 pub fn sigentry_address() -> usize {
     __raven_sigentry as *const () as usize
+}
+
+/// x86-64 signal entry: align, call the libc entry function, then `SIGRETURN`.
+#[cfg(target_arch = "x86_64")]
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __raven_sigentry_rs() {
+    core::arch::naked_asm!(
+        "and $-16, %rsp",
+        "mov {cell}(%rip), %rax",
+        "test %rax, %rax",
+        "jz 1f",
+        "call *%rax",
+        "1:",
+        "jmp {stub}",
+        cell = sym __rl_entry_fn,
+        stub = sym __rl_sigreturn_stub,
+        options(att_syntax),
+    );
 }
 
 /// Register the entry and the TLS context offset for the calling thread.

@@ -37,14 +37,6 @@ __rl_sigreturn_stub:
     .align 8
 __rl_entry_fn:
     .quad 0
-
-    /* The kernel needs the stub's address, not a code pointer the compiler can fold to the
-       call site. Keep it in a data word the linker resolves. */
-    .global __raven_sigentry_addr
-    .hidden __raven_sigentry_addr
-    .align 8
-__raven_sigentry_addr:
-    .quad __raven_sigentry
 "#,
     sigreturn = const raven_abi::signal::SIGRETURN,
     options(att_syntax)
