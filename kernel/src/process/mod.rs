@@ -1873,31 +1873,6 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             }
         }
     }
-    // S36 lock/time churn: exit 90 records the baseline, exit 91 compares the allocated frame
-    // bytes after the futex wake/timeout churn.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-lockcheck")
-        .is_some()
-    {
-        let stats = crate::memory::frame::stats();
-        if code == 90 {
-            S36_LOCK_BASE.store(stats.allocated_bytes, Ordering::Release);
-            kprintln!("s36: lockcheck base allocated={}", stats.allocated_bytes);
-        } else if code == 91 {
-            let base = S36_LOCK_BASE.load(Ordering::Acquire);
-            let delta = stats.allocated_bytes.saturating_sub(base);
-            kprintln!(
-                "s36: lockcheck delta={} allocated={}",
-                delta,
-                stats.allocated_bytes
-            );
-            if delta <= 64 * 1024 {
-                kprintln!("s36: lockcheck ok");
-            } else {
-                kprintln!("s36: lockcheck leak delta={}", delta);
-            }
-        }
-    }
     // S36 timeout-retention row: exit 90 records the live non-idle Thread count and the queued
     // timeout sleepers; exit 91 compares them after the bounded terminate-while-waiting churn.
     // A dead Thread retained by a timeout entry keeps both counters above the tolerance.
@@ -1952,6 +1927,31 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
                     live_delta,
                     sleepers_delta
                 );
+            }
+        }
+    }
+    // S36 lock/time churn: exit 90 records the baseline, exit 91 compares the allocated frame
+    // bytes after the futex wake/timeout churn.
+    if CmdLine::parse(paging::cmdline())
+        .get("s36-lockcheck")
+        .is_some()
+    {
+        let stats = crate::memory::frame::stats();
+        if code == 90 {
+            S36_LOCK_BASE.store(stats.allocated_bytes, Ordering::Release);
+            kprintln!("s36: lockcheck base allocated={}", stats.allocated_bytes);
+        } else if code == 91 {
+            let base = S36_LOCK_BASE.load(Ordering::Acquire);
+            let delta = stats.allocated_bytes.saturating_sub(base);
+            kprintln!(
+                "s36: lockcheck delta={} allocated={}",
+                delta,
+                stats.allocated_bytes
+            );
+            if delta <= 64 * 1024 {
+                kprintln!("s36: lockcheck ok");
+            } else {
+                kprintln!("s36: lockcheck leak delta={}", delta);
             }
         }
     }
