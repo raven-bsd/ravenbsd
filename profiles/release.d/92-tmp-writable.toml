@@ -5,7 +5,7 @@
 # to uid 1000 for the non-root rows. Built by tests/fixtures/tmp-writable/build.sh.
 
 [[initfs.files]]
-src = "build/fixtures/tmp-writable/tmp-writable"
+src = "build/fixtures/tmp-writable/{arch}/tmp-writable"
 path = "/bin/tmp-writable"
 mode = 0o755
 generated = true

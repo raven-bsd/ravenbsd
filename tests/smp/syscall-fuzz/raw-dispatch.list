@@ -56,11 +56,11 @@ process_ctl::PROC_SETRLIMIT	0x4f	kernel/src/syscall/process_ctl.rs:202	fuzz	dire
 raven_abi::syscall::PROC_SET_PERSONALITY	0x34	crates/raven-abi/src/syscall.rs:242	fuzz	direct	PROC_SET_PERSONALITY
 raven_abi::syscall::THREAD_SET_TLS	0x23	crates/raven-abi/src/syscall.rs:250	fuzz	direct	THREAD_SET_TLS
 raven_abi::syscall::THREAD_KICK	0x81	crates/raven-abi/src/syscall.rs:258	fuzz	direct	THREAD_KICK
-raven_abi::syscall::THREAD_SELF	0x24	crates/raven-abi/src/syscall.rs:264	fuzz	direct	THREAD_SELF
-raven_abi::syscall::ROBUST_LIST_SET	0x26	crates/raven-abi/src/syscall.rs:270	fuzz	direct	ROBUST_LIST_SET
-raven_abi::syscall::HANDLE_COPY	0x54	crates/raven-abi/src/syscall.rs:276	fuzz	direct	HANDLE_COPY
-raven_abi::syscall::HANDLE_TRANSFER_FILE	0x55	crates/raven-abi/src/syscall.rs:286	fuzz	direct	HANDLE_TRANSFER_FILE
-raven_abi::syscall::THREAD_EXIT_EX	0x25	crates/raven-abi/src/syscall.rs:292	fuzz	direct	THREAD_EXIT_EX
+raven_abi::syscall::THREAD_SELF	0x24	crates/raven-abi/src/syscall.rs:279	fuzz	direct	THREAD_SELF
+raven_abi::syscall::ROBUST_LIST_SET	0x26	crates/raven-abi/src/syscall.rs:285	fuzz	direct	ROBUST_LIST_SET
+raven_abi::syscall::HANDLE_COPY	0x54	crates/raven-abi/src/syscall.rs:291	fuzz	direct	HANDLE_COPY
+raven_abi::syscall::HANDLE_TRANSFER_FILE	0x55	crates/raven-abi/src/syscall.rs:301	fuzz	direct	HANDLE_TRANSFER_FILE
+raven_abi::syscall::THREAD_EXIT_EX	0x25	crates/raven-abi/src/syscall.rs:307	fuzz	direct	THREAD_EXIT_EX
 raven_abi::signal::SIG_SETUP	0x80	crates/raven-abi/src/signal.rs:18	fuzz	direct	SIG_SETUP
 raven_abi::signal::SIGRESEND	0x84	crates/raven-abi/src/signal.rs:33	fuzz	direct	SIGRESEND
 basic::GETRANDOM	0x08	kernel/src/syscall/basic.rs:27	fuzz	direct	GETRANDOM
