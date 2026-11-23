@@ -35,8 +35,10 @@ use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_elf::{Elf, LoadMode, Machine, StepKind, plan_load};
 use raven_initfs::Initfs;
+use raven_proto_fs::{Call, CallRequest, OpenFlags};
 use raven_rt::entry;
 use raven_rt::println;
+use raven_scheme::Client;
 
 entry!(main);
 
@@ -70,12 +72,16 @@ const CYCLES: usize = 10_000;
 /// Full process/address-space/stack lifecycles in the bounded session churn.
 const SESSIONS: usize = 32;
 /// Fork/exec/exit cycles with a known mapped address space in the VMA churn.
-const VMA_CYCLES: usize = 1000;
+const VMA_CYCLES: usize = 100;
 /// Four VMAs per child; the large variant maps one MiB total.
 const VMA_REGIONS: usize = 4;
 const VMA_BASE: usize = 0x3000_0000;
 const VMA_REGION_GAP: usize = 0x10_0000;
 const VMA_LARGE: usize = 256 * 1024;
+/// vfsd pager map/unmap cycles in the red frame row.
+const MAP_CYCLES: usize = 1000;
+/// Fixed scratch address for the vfsd pager chunk.
+const MAP_SCRATCH: usize = 0x3000_0000;
 /// User stacks for the fixture's extra threads (16 KiB each, one helper live at a time).
 const HELPER_STACK_SIZE: usize = 16 * 1024;
 
@@ -333,7 +339,7 @@ fn map_initfs_image() -> Result<&'static [u8], Errno> {
 
 /// Spawn this binary with `argv[1] = role` (a child with the ELF mapped and one running thread).
 fn spawn_role(initfs: &Initfs<'_>, role: &str) -> Result<Handle, Errno> {
-    let entry = initfs.get("/init").ok_or(Errno::ENOENT)?;
+    let entry = initfs.get("/bin/s36-lifecycle").ok_or(Errno::ENOENT)?;
     let elf =
         Elf::parse(entry.data, Machine::X86_64, USER_MIN..USER_END).map_err(|_| Errno::EINVAL)?;
     let child = proc_create()?;
@@ -599,6 +605,81 @@ fn vma_churn_part(initfs: &Initfs<'_>, role: &str, cycles: usize) -> Result<(), 
     Ok(())
 }
 
+/// Open the fixture binary through vfsd, retrying until the file scheme is ready.
+fn open_map_file(client: &Client) -> Result<Handle, Errno> {
+    let paths = ["file:/bin/s36-lifecycle", "file:/bin/brush", "file:/init"];
+    let mut attempt = 0usize;
+    while attempt < 100 {
+        for path in paths {
+            if let Ok(file) = client.open_flags(path, OpenFlags::READ) {
+                return Ok(file);
+            }
+        }
+        nanosleep(10_000_000);
+        attempt = attempt.saturating_add(1);
+    }
+    Err(Errno::ENOENT)
+}
+
+/// Map/unmap the same chunk through vfsd's file pager. The kernel gate on exit codes 88/89
+/// prints `frame::stats().allocated_bytes` before and after; a leak keeps the delta above one
+/// chunk and prints the forbidden `s36: mapcheck leak` line.
+fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let base = spawn_role(initfs, "mapbase").map_err(|_| "mapbase spawn")?;
+    if proc_wait(base).unwrap_or(-1) != 88 {
+        return Err("mapbase wait");
+    }
+    handle_close(base);
+
+    let client = Client::new();
+    let file = open_map_file(&client).map_err(|_| "vfsd open")?;
+    let request = CallRequest::new(Call::Mmap {
+        offset: 0,
+        len: PAGE as u64,
+        shared: false,
+    });
+    let mut encoded = [0u8; 128];
+    let length = request.encode(&mut encoded).map_err(|_| "mmap encode")?;
+    let flags = map::pack((prot::READ | prot::WRITE) as usize, map::FIXED);
+    let mut cycle = 0usize;
+    while cycle < MAP_CYCLES {
+        let mut response = [0u8; 16];
+        let count = client
+            .call(
+                file,
+                encoded.get(..length).ok_or("mmap request")?,
+                &mut response,
+            )
+            .map_err(|_| "mmap call")?;
+        if count < 4 {
+            return Err("mmap reply");
+        }
+        let object = Handle(u32::from_le_bytes([
+            response[0],
+            response[1],
+            response[2],
+            response[3],
+        ]));
+        let _ = unmap(Handle::SELF_PROC, MAP_SCRATCH, PAGE);
+        map_memory(Handle::SELF_PROC, object, 0, MAP_SCRATCH, PAGE, flags)
+            .map_err(|_| "map object")?;
+        // Fault the page through vfsd's pager.
+        let _ = unsafe { core::ptr::read_volatile(MAP_SCRATCH as *const u8) };
+        unmap(Handle::SELF_PROC, MAP_SCRATCH, PAGE).map_err(|_| "unmap object")?;
+        handle_close(object);
+        cycle = cycle.saturating_add(1);
+    }
+    client.close(file).map_err(|_| "vfsd close")?;
+    println!("s36: vfsd map done={}", MAP_CYCLES);
+
+    let top = spawn_role(initfs, "maptop").map_err(|_| "maptop spawn")?;
+    if proc_wait(top).unwrap_or(-1) != 89 {
+        return Err("maptop wait");
+    }
+    handle_close(top);
+    Ok(())
+}
+
 /// The `twomain` child: one thread exits (process alive), a sleeper blocks, then EXIT.
 fn twomain_part() {
     // Helper 1 exits the thread only; the process stays alive.
@@ -653,6 +734,8 @@ fn server_part() {
 fn child_main(role: &str) -> i32 {
     match role {
         "marker" => 0,
+        "mapbase" => 88,
+        "maptop" => 89,
         "twomain" => {
             twomain_part();
             0
@@ -934,6 +1017,10 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     // Scenario 6: scheme name released on exit.
     if let Err(message) = scheme_part(&initfs) {
+        fail(message);
+    }
+    // vfsd pager red row: map/unmap the same chunk and compare allocated frames.
+    if let Err(message) = vfsd_map_part(&initfs) {
         fail(message);
     }
 

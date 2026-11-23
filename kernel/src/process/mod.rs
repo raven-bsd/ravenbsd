@@ -76,6 +76,8 @@ const PAGE: u64 = 4096;
 /// and headroom. The first process gets the same 256 KiB mapping.
 const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+/// S36 vfsd map/unmap baseline (`frame::stats().allocated_bytes` at the exit-88 marker).
+static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
@@ -1783,6 +1785,37 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             stats.free_bytes,
             stats.allocated_bytes
         );
+    }
+    // S36 vfsd map/unmap red row: exit 88 records the baseline, exit 89 compares the allocated
+    // frame bytes. The markers run around the fixture's vfsd pager map/unmap cycles; a leak keeps
+    // allocated_bytes above the one-chunk tolerance and prints the forbidden `leak` line.
+    if CmdLine::parse(paging::cmdline())
+        .get("s36-mapcheck")
+        .is_some()
+    {
+        let stats = crate::memory::frame::stats();
+        if code == 88 {
+            S36_MAP_BASE.store(stats.allocated_bytes, Ordering::Release);
+            kprintln!(
+                "s36: mapcheck base allocated={} pager={}",
+                stats.allocated_bytes,
+                crate::process::handle::pager_objects()
+            );
+        } else if code == 89 {
+            let base = S36_MAP_BASE.load(Ordering::Acquire);
+            let delta = stats.allocated_bytes.saturating_sub(base);
+            kprintln!(
+                "s36: mapcheck delta={} allocated={} pager={}",
+                delta,
+                stats.allocated_bytes,
+                crate::process::handle::pager_objects()
+            );
+            if delta <= 64 * 1024 {
+                kprintln!("s36: mapcheck ok");
+            } else {
+                kprintln!("s36: mapcheck leak delta={}", delta);
+            }
+        }
     }
 }
 
