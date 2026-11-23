@@ -431,6 +431,23 @@ pub(crate) fn loader_manifest_matches(root: &Path, arch: &str) -> bool {
         && manifest.crc32 == format!("{:08x}", raven_initfs::crc32(&bytes))
 }
 
+/// True when the linked `libc.so.1`/loader DSO stamp matches the current sources and files.
+///
+/// The loader manifest above is the fast reuse check for the loader file; the DSO stamp is
+/// the source gate. A `libc-pack` of changed static sources does not relink the dynamic pair,
+/// so the image path must compare this stamp before staging `libc.so.1`/`ld-elf.so.1`.
+pub(crate) fn dso_stamp_current(root: &Path, arch: &str) -> bool {
+    let args = vec![
+        "--arch".to_string(),
+        arch.to_string(),
+        "--verify".to_string(),
+    ];
+    let Ok(options) = parse(&args) else {
+        return false;
+    };
+    verify_dso_stamp(root, &options).is_ok()
+}
+
 /// Run the K7 part of the mkmap check against the linked `libc.so.1`.
 fn check_mkmap(
     root: &Path,

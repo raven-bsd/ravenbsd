@@ -28,6 +28,8 @@ pub const PROC_CTTY_SET: usize = 0x1e0;
 pub const PROC_CTTY_GET: usize = 0x1e1;
 /// Raw `tcsetpgrp(handle, pgrp) -> 0`.
 pub const PROC_CTTY_SET_FG: usize = 0x1e2;
+/// Raw `proc_ctty_handle() -> handle`.
+pub const PROC_CTTY_HANDLE: usize = 0x1e3;
 
 fn file_from_handle(
     caller: &Arc<process::Process>,
@@ -46,6 +48,27 @@ pub fn set_ctty(frame: &SyscallFrame) -> Result<usize, Errno> {
     let file = file_from_handle(&caller, handle)?;
     tty::acquire(&caller, &file)?;
     Ok(0)
+}
+
+/// `proc_ctty_handle`: a new handle for the caller session's controlling terminal.
+///
+/// `/dev/tty` is not a VFS node: it names the process's controlling terminal. The caller gets a
+/// fresh handle to the same open terminal (the session keeps it alive), or `ENXIO` when it has no
+/// controlling terminal for its session, exactly as FreeBSD's `cttyopen`/`ttyopen` path returns.
+pub fn ctty_handle() -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let ids = *caller.ids.lock();
+    let ctty = caller.ctty.lock().clone().ok_or(Errno::ENXIO)?;
+    if ctty.sid() == 0 || ctty.sid() != ids.sid {
+        return Err(Errno::ENXIO);
+    }
+    let file = Arc::clone(ctty.file());
+    drop(ctty);
+    let handle = caller
+        .handles
+        .lock()
+        .insert(Object::SchemeFile(file), Rights::ALL)?;
+    Ok(handle.0 as usize)
 }
 
 /// `tcgetpgrp`: write the foreground process group of the handle's tty.
