@@ -82,6 +82,7 @@ lockstat|x86_64|lance|locking
 ipc-donation|x86_64|lance|ipc
 ipc-fuzz|x86_64|bob|ipc fuzz|tests/smp/ipc-fuzz/ipc-fuzz.toml
 syscall-fuzz|x86_64|bob|syscall fuzz|tests/smp/syscall-fuzz/syscall-fuzz.toml
+ssh-first-byte|x86_64|bob|ssh first byte|tests/fixtures/ssh-first-byte/ssh-first-byte.toml
 duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator
