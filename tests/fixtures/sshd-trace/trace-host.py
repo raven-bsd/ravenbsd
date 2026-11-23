@@ -47,16 +47,22 @@ def wait_tcp(host: str, port: int, timeout: float) -> bool:
     return False
 
 
-def probe_client(host: str) -> str:
+def probe_port(host: str, port: int) -> str:
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, 23147), timeout=3) as connection:
+            with socket.create_connection((host, port), timeout=3) as connection:
                 connection.settimeout(10)
-                return f"banner={connection.recv(32)!r}"
+                return f"{connection.recv(32)!r}"
         except OSError:
             time.sleep(1)
     return "no-connect"
+
+
+def probe_client(host: str) -> str:
+    tap = probe_port(host, 23147)
+    ppoll = probe_port(host, 23149)
+    return f"tap={tap} ppoll={ppoll}"
 
 
 def host_client(host: str) -> str:
