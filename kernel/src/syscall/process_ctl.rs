@@ -1147,8 +1147,9 @@ fn take_event(child: &Process, event: WaitEvent) {
 /// `P_PID`, `P_PGID` and `P_ALL` select children; `WNOHANG` returns 0 when no
 /// event is ready. Exit, stop and continue statuses use the POSIX encoding from
 /// [`crate::process::status`]. A blocking wait sleeps on the caller's child queue
-/// and is woken by exit/stop/continue notifications. A signal interruption returns
-/// `EINTR` only when no selected child has a ready event.
+/// and is woken by exit/stop/continue notifications. A caught signal that
+/// interrupts the sleep returns `EINTR` (FreeBSD `kern_wait6` `msleep(... PCATCH)`,
+/// NetBSD `find_stopped_child`); the caller retries and the status stays queued.
 pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let idtype = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
@@ -1159,7 +1160,6 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let destination = UserSlice::new(frame.r10, 4)?;
 
-    let mut interrupted = false;
     loop {
         let children = children_for(&caller, idtype, id)?;
         if children.is_empty() {
@@ -1177,18 +1177,11 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
         if options & WNOHANG != 0 {
             return Ok(0);
         }
-        // A signal wakeup can carry the event that satisfies this wait: the child exit queues
-        // SIGCHLD and kicks the thread before/while `child_waiters` wakes it. Scan the selected
-        // children once more before reporting EINTR, so an available status is never lost.
-        if interrupted {
-            return Err(Errno::EINTR);
-        }
 
         let token = sched::begin_block_interruptible()?;
         if sched::take_kick() {
             sched::end_block(token);
-            interrupted = true;
-            continue;
+            return Err(Errno::EINTR);
         }
         let queued = caller.child_waiters.enqueue_if(caller.id, 0, || {
             let children = children_for(&caller, idtype, id)?;
@@ -1213,7 +1206,9 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
         let status = sched::block_current();
         let kicked = sched::take_kick();
         sched::end_block(token);
-        interrupted = status == Errno::EINTR.to_ret() || kicked;
+        if status == Errno::EINTR.to_ret() || kicked {
+            return Err(Errno::EINTR);
+        }
     }
 }
 
