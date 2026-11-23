@@ -78,6 +78,10 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
     }
+    // Capture the UEFI ACPI bundle before the boot blobs are built. The tables live in ACPI
+    // reclaimable memory, which paging keeps mapped; `pcid` needs the MCFG window to enumerate
+    // the QEMU virt PCIe root complex.
+    super::acpi::capture_early(data.info.acpi_rsdp);
     // The Pi device windows are mapped only after the kernel's own tables and MMIO window exist.
     #[cfg(raven_pi4)]
     crate::arch::aarch64::pi4::map_platform_devices();

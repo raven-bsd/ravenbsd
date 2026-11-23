@@ -3,6 +3,7 @@
 
 //! aarch64 architecture support.
 
+pub mod acpi;
 pub mod ap_start;
 #[allow(dead_code)] // `feed_byte`/diagnostic accessors are ready for the USB/kbd path.
 pub mod console;

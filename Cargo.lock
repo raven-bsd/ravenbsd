@@ -1208,6 +1208,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-acpi"
+version = "0.1.0"
+
+[[package]]
 name = "raven-at-fixture"
 version = "0.1.0"
 dependencies = [

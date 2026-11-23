@@ -240,8 +240,20 @@ pub fn init_aarch64(gicd: u64, gicc: u64, uart: u64) {
             domain.max_bus_addr
         );
     }
+    // K434 rev 247: the aarch64 boot path captures the UEFI ACPI bundle after paging init; wrap
+    // it exactly as the x86 `init` path does so `BOOT_BLOB` kind 1 serves MCFG to `pcid`.
+    let acpi = match crate::arch::aarch64::acpi::early_blob() {
+        Some(bytes) => match MemObject::from_bytes(bytes) {
+            Ok(object) => Some(object),
+            Err(error) => {
+                kprintln!("driver: acpi blob frames failed: {error:?}");
+                None
+            }
+        },
+        None => None,
+    };
     *BLOBS.lock() = Some(BlobSet {
-        acpi: None,
+        acpi,
         dtb,
         memory_map: build_memory_map_blob(),
     });
