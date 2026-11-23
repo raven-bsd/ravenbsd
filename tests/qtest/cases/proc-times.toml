@@ -27,7 +27,7 @@ regex = '^proc-times: sleep-child=1 sleep-user-ns=[0-9]+$'
 regex = '^proc-times: priority=1 accounting=1$'
 
 [[expect]]
-regex = '^proc-times: reaped-fold=1$'
+regex = '^proc-times: reaped-fold=1 maxrss=[0-9]+$'
 
 [[expect]]
 regex = '^proc-times: cpuclock=not-exposed$'

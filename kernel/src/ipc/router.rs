@@ -1164,6 +1164,52 @@ pub(crate) fn defer_close(server: &Arc<Process>, id: u64, cookie: u64, count: u3
     crate::event::notify_source(Arc::as_ptr(server) as usize as u64);
 }
 
+/// Withdraw an undelivered DUP notification from the server queue (client exit).
+///
+/// Returns true when the notification was still queued and was removed. A delivered DUP stays
+/// with the server; its reference is then released by the client's CLOSE notification.
+pub(crate) fn withdraw_undelivered_dup(request: &Arc<PendingRequest>) -> bool {
+    let removed = {
+        let mut queue = request.server.scheme_queue.lock();
+        let before = queue.len();
+        queue.retain(|queued| !Arc::ptr_eq(queued, request));
+        queue.len() != before
+    };
+    if removed {
+        if let Some(file) = request.file.as_ref() {
+            file.server_refs.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
+    removed
+}
+
+/// Deferred last-close queue depth and dead-process references (S36b diagnostic).
+///
+/// Returns `(queued, dead_clients, dead_servers)`. A growing queue with dead clients means the
+/// notice retains a dead client `Arc<Process>` until a live server drains it.
+pub fn close_notice_stats() -> (usize, usize, usize) {
+    let notices = CLOSE_NOTICES.lock();
+    let dead_clients = notices
+        .iter()
+        .filter(|notice| {
+            notice
+                .client
+                .torn_down
+                .load(core::sync::atomic::Ordering::Acquire)
+        })
+        .count();
+    let dead_servers = notices
+        .iter()
+        .filter(|notice| {
+            notice
+                .server
+                .torn_down
+                .load(core::sync::atomic::Ordering::Acquire)
+        })
+        .count();
+    (notices.len(), dead_clients, dead_servers)
+}
+
 /// Drop deferred last-close notices whose server is exiting.
 ///
 /// A notice is the client's last word to a *live* server; once the server is gone there is no
@@ -1173,6 +1219,11 @@ pub(crate) fn defer_close(server: &Arc<Process>, id: u64, cookie: u64, count: u3
 pub(crate) fn on_process_exit(process: &Arc<Process>) {
     let mut notices = CLOSE_NOTICES.lock();
     notices.retain(|notice| notice.server.id != process.id);
+}
+
+/// K449 diagnostic: deferred last-close notices still queued.
+pub(crate) fn close_notice_count() -> usize {
+    CLOSE_NOTICES.lock().len()
 }
 
 /// Submit every queued last-close notification. Called at the top of the `RECV` loop.

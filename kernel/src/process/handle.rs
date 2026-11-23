@@ -490,6 +490,32 @@ pub fn lineage_nodes() -> u64 {
     raven_handles::live_lineage_nodes()
 }
 
+/// Count handles that still point at a torn-down process (S36b diagnostic).
+///
+/// Returns `(total, top_holder_pid, top_holder_count)`. A growing total while the pid registry is
+/// flat means a long-lived process retains dead children through process handles.
+pub fn dead_process_handles() -> (usize, u64, usize) {
+    let mut total = 0usize;
+    let mut top_pid = 0u64;
+    let mut top_count = 0usize;
+    for holder in crate::process::processes() {
+        let mut count = 0usize;
+        holder.handles.lock().for_each_live(|_, object, _, _| {
+            if let Object::Process(target) = object
+                && target.torn_down.load(core::sync::atomic::Ordering::Acquire)
+            {
+                count = count.saturating_add(1);
+            }
+        });
+        total = total.saturating_add(count);
+        if count > top_count {
+            top_count = count;
+            top_pid = holder.id;
+        }
+    }
+    (total, top_pid, top_count)
+}
+
 /// Install the well-known handles 0, 1 and 2 (and 3 for the first process) in a fresh process.
 ///
 /// Every process gets `READ|MAP|EXEC` on the initfs; only the first process (the spawner) also
