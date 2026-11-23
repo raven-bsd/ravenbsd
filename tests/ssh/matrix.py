@@ -60,6 +60,11 @@ S4_FILE = "/tmp/k514-s4-input"
 S4_AUTH_BOUND_S = 30
 S4_READ_BOUND_S = 15
 S4_TOTAL_BOUND_S = 50
+# K514 rev 93: the builtin-only read proof and the release command-exit assertion.
+S4_ASSERT_ATTEMPTS = 3
+S4_ECHO_COMMAND = ["echo", "K514-S4-ECHO-2026-11-22"]
+S4_ECHO_BYTES = b"K514-S4-ECHO-2026-11-22\n"
+S4_EXIT_COMMAND = ["cat", "/etc/ssh-matrix-marker"]
 # K514 rev 92 release blast-radius measurement: every command is attempted ten times as the
 # release user. The S4 row's own expectations are unchanged.
 RELEASE_SESSIONS = 10
@@ -1091,6 +1096,80 @@ def row_s4_only() -> None:
                f"walls_ms={walls}; exits={exits}; detail={first['detail']}")
 
 
+def serial_faults(serial: Path | None, before: int) -> list[str]:
+    """Return child page-fault addresses appended to the serial since `before`."""
+    if serial is None:
+        return []
+    try:
+        segment = serial.read_bytes()[before:] if serial.is_file() else b""
+    except OSError:
+        return []
+    return [address.decode() for address in RELEASE_FAULT.findall(segment)]
+
+
+def s4_assert_attempt(row: str, number: int, command: list[str],
+                      expected: bytes, serial: Path | None) -> dict[str, object]:
+    """One release assertion: exit 0, exact bytes, no child page fault."""
+    try:
+        before = serial.stat().st_size if serial is not None and serial.is_file() else 0
+    except OSError:
+        before = 0
+    result = ssh_run(command, f"{row.lower()}-{number}.log", extra=["-v"], timeout=20)
+    faults = serial_faults(serial, before)
+    stdout = bytes(result["stdout"])  # type: ignore[arg-type]
+    stderr = bytes(result["stderr"])  # type: ignore[arg-type]
+    auth = b"Authenticated to " in stderr
+    exit_ok = int(result["returncode"]) == 0  # type: ignore[arg-type]
+    exact = stdout == expected
+    ok = auth and exit_ok and exact and not faults
+    step = ("auth" if not auth else "fault" if faults else
+            "exit" if not exit_ok else "read" if not exact else "done")
+    received = (f"bytes={literal(stdout)}; exit={result['returncode']}; "
+                f"auth={auth}; faults={faults}")
+    attempt(row, number, "fresh",
+            f"exit 0 + exact {literal(expected)} + no child fault",
+            received, float(result["elapsed_ms"]), "PASS" if ok else "FAIL",  # type: ignore[arg-type]
+            f"step={step}; stdout_hex={stdout.hex()}")
+    return {"ok": ok, "step": step, "exit": result["returncode"],
+            "stdout": stdout, "faults": faults, "elapsed": result["elapsed_ms"]}
+
+
+def row_s4_echo(serial: Path | None) -> None:
+    """K514 rev93: the builtin-only post-auth read proof (server push + exit 0)."""
+    results = [s4_assert_attempt("S4-echo", number, S4_ECHO_COMMAND, S4_ECHO_BYTES, serial)
+               for number in range(1, S4_ASSERT_ATTEMPTS + 1)]
+    passed = sum(1 for result in results if result["ok"])
+    exits = [result["exit"] for result in results]
+    faults = [address for result in results for address in result["faults"]]
+    if passed == S4_ASSERT_ATTEMPTS:
+        record("S4-echo", "PASS",
+               f"{passed}/{S4_ASSERT_ATTEMPTS}: builtin echo returned exit 0 and exact "
+               f"{literal(S4_ECHO_BYTES)} with no child fault; exits={exits}")
+    else:
+        first = next(result for result in results if not result["ok"])
+        record("S4-echo", "FAIL",
+               f"{passed}/{S4_ASSERT_ATTEMPTS}: first failure step={first['step']}; "
+               f"exits={exits}; faults={faults}")
+
+
+def row_s4_exit0(serial: Path | None) -> None:
+    """K514 rev93: a real command must return exit 0 and its exact bytes (release gate)."""
+    results = [s4_assert_attempt("S4-exit0", number, S4_EXIT_COMMAND, MARKER, serial)
+               for number in range(1, S4_ASSERT_ATTEMPTS + 1)]
+    passed = sum(1 for result in results if result["ok"])
+    exits = [result["exit"] for result in results]
+    faults = [address for result in results for address in result["faults"]]
+    if passed == S4_ASSERT_ATTEMPTS:
+        record("S4-exit0", "PASS",
+               f"{passed}/{S4_ASSERT_ATTEMPTS}: `cat /etc/ssh-matrix-marker` returned exit 0 "
+               f"and exact {literal(MARKER)} with no child fault; exits={exits}")
+    else:
+        first = next(result for result in results if not result["ok"])
+        record("S4-exit0", "FAIL",
+               f"{passed}/{S4_ASSERT_ATTEMPTS}: first failure step={first['step']}; "
+               f"exits={exits}; faults={faults}; expected exit 0 + {literal(MARKER)}")
+
+
 def row_release_commands(serial: Path) -> None:
     """K514 rev92: ten sessions per release command; exit, bytes and serial fault."""
     for name, command, expected, expected_text in RELEASE_COMMANDS:
@@ -2069,6 +2148,8 @@ def row_full(console: SerialConsole) -> None:
     mark = serial_row_capture(console, "S3", mark)
     row_s4()
     mark = serial_row_capture(console, "S4", mark)
+    row_s4_echo(None)
+    row_s4_exit0(None)
     row_s5_s6()
     mark = serial_row_capture(console, "S5-S6", mark)
     row_s7(console)
@@ -2124,6 +2205,8 @@ def main() -> int:
                     row_s1_repeat()
                 elif only == "s4":
                     row_s4_only()
+                    row_s4_echo(handle)  # type: ignore[arg-type]
+                    row_s4_exit0(handle)  # type: ignore[arg-type]
                 elif only == "commands":
                     row_release_commands(handle)  # type: ignore[arg-type]
                 elif only == "mutation":
@@ -2228,6 +2311,8 @@ def main() -> int:
         row_s2()
         s3_state = row_s3_start()
         row_s4()
+        row_s4_echo(None)
+        row_s4_exit0(None)
         row_s5_s6()
         row_s3_finish(console, s3_state)
         row_s7(console)
