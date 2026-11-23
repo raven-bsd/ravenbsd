@@ -54,7 +54,9 @@ fn tty_call<B: SysBackend, L: Lock>(
     request: Request,
 ) -> Result<Response, Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() != OfdKind::Tty {
+    // A v1 spawn entry has no kind; the tty server answers the request for a terminal and a
+    // non-tty handle fails it, so an Unknown-kind descriptor is probed instead of rejected.
+    if !matches!(reference.kind(), OfdKind::Tty | OfdKind::Unknown) {
         return Err(Errno::ENOTTY);
     }
     let mut body = [0u8; raven_proto_tty::CALL_LEN];
@@ -80,7 +82,9 @@ fn tty_get_termios<B: SysBackend, L: Lock>(
     fd: i32,
 ) -> Result<WireTermios, Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() != OfdKind::Tty {
+    // A v1 spawn entry has no kind; the tty server answers the request for a terminal and a
+    // non-tty handle fails it, so an Unknown-kind descriptor is probed instead of rejected.
+    if !matches!(reference.kind(), OfdKind::Tty | OfdKind::Unknown) {
         return Err(Errno::ENOTTY);
     }
     let mut body = [0u8; TERMIOS_LEN];
@@ -100,13 +104,23 @@ fn tty_get_termios<B: SysBackend, L: Lock>(
         .map_err(|_| Errno::EPROTO)
 }
 
+/// Whether `fd` is a pty endpoint the K444 termios service answers for.
+///
+/// The console servers implement only `GET_MODE` and answer `GET_TERMIOS` with `ENOSYS`; the pty
+/// server answers the full record. This separates a pty from a console without a guess.
+pub(crate) fn is_pty_endpoint<B: SysBackend, L: Lock>(platform: &Platform<B, L>, fd: i32) -> bool {
+    tty_get_termios(platform, fd).is_ok()
+}
+
 fn tty_set_termios<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fd: i32,
     termios: &WireTermios,
 ) -> Result<WireTermios, Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() != OfdKind::Tty {
+    // A v1 spawn entry has no kind; the tty server answers the request for a terminal and a
+    // non-tty handle fails it, so an Unknown-kind descriptor is probed instead of rejected.
+    if !matches!(reference.kind(), OfdKind::Tty | OfdKind::Unknown) {
         return Err(Errno::ENOTTY);
     }
     let mut body = [0u8; TERMIOS_LEN];
@@ -242,7 +256,9 @@ pub fn tcgetwinsize<B: SysBackend, L: Lock>(
     fd: i32,
 ) -> Result<Winsize, Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() != OfdKind::Tty {
+    // A v1 spawn entry has no kind; the tty server answers the request for a terminal and a
+    // non-tty handle fails it, so an Unknown-kind descriptor is probed instead of rejected.
+    if !matches!(reference.kind(), OfdKind::Tty | OfdKind::Unknown) {
         return Err(Errno::ENOTTY);
     }
     let mut body = [0u8; WINSIZE_LEN];
@@ -270,7 +286,9 @@ pub fn tcsetwinsize<B: SysBackend, L: Lock>(
     winsize: &Winsize,
 ) -> Result<(), Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() != OfdKind::Tty {
+    // A v1 spawn entry has no kind; the tty server answers the request for a terminal and a
+    // non-tty handle fails it, so an Unknown-kind descriptor is probed instead of rejected.
+    if !matches!(reference.kind(), OfdKind::Tty | OfdKind::Unknown) {
         return Err(Errno::ENOTTY);
     }
     let mut body = [0u8; WINSIZE_LEN];
@@ -339,7 +357,9 @@ fn tty_custom<B: SysBackend, L: Lock>(
     arg0: u32,
 ) -> Result<u32, Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() != OfdKind::Tty {
+    // A v1 spawn entry has no kind; the tty server answers the request for a terminal and a
+    // non-tty handle fails it, so an Unknown-kind descriptor is probed instead of rejected.
+    if !matches!(reference.kind(), OfdKind::Tty | OfdKind::Unknown) {
         return Err(Errno::ENOTTY);
     }
     let body = custom_body(op, arg0);

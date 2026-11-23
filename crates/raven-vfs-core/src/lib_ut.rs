@@ -358,6 +358,28 @@ fn mount_defaults_twice_is_eexist() {
 }
 
 #[test]
+fn shell_profile_routes_the_pty_namespace() {
+    // K536 rev181: `/dev/pts/<N>` must reach the pty server as slot `N`, not fall through to the
+    // root initfs mount (which has no `/dev/pts`). The real profile file is the input, so deleting
+    // the `/dev/pts pty:` line makes this row red.
+    const PROFILE: &str = include_str!("../../../profiles/shell.d/mounts");
+    let parsed = parse_mounts(PROFILE).expect("shell.d/mounts");
+    let mut table = MountTable::new();
+    for (path, scheme) in &parsed {
+        table.mount(path, scheme).expect("mount");
+    }
+    let (id, suffix) = table.resolve("/dev/pts/1").expect("pty slave");
+    assert_eq!(table.get(id).expect("mount").scheme, "pty:");
+    assert_eq!(suffix, "1");
+    let (id, suffix) = table.resolve("/dev/pts/42").expect("pty slave");
+    assert_eq!(table.get(id).expect("mount").scheme, "pty:");
+    assert_eq!(suffix, "42");
+    // A sibling name that shares the prefix but not a whole component stays on the root mount.
+    let (id, _) = table.resolve("/dev/ptsx").expect("sibling");
+    assert_eq!(table.get(id).expect("mount").scheme, "initfs:");
+}
+
+#[test]
 fn same_mount_uses_the_longest_prefix() {
     let mut table = table();
     table.mount("/tmp", "ramfs:").expect("tmp");
