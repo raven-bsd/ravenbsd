@@ -451,6 +451,7 @@ pub fn start() -> ! {
 fn schedule_locked() {
     let cpu = this_cpu();
     let mut first_user: Option<(usize, u64, u32)> = None;
+    let mut from_queued = false;
     let (from, to) = {
         let mut slot = lock_cpu(cpu);
         let Some(state) = slot.as_mut() else {
@@ -473,6 +474,7 @@ fn schedule_locked() {
                 return;
             }
             current.set_state(ThreadState::Ready);
+            from_queued = true;
         }
         state.need_resched = false;
         // A terminal process must never run user code again: drop every runnable thread that
@@ -527,9 +529,20 @@ fn schedule_locked() {
     if let Some((cpu, pid, tid)) = first_user {
         kprintln!("smp-user: cpu {cpu} first user thread pid={pid} tid={tid}");
     }
-    // SAFETY: the critical section is live; both `Arc`s keep the threads alive across the switch.
+    // A switched-out terminal thread never resumes, so its stack's `from`/`to` Arcs would keep
+    // the outgoing and incoming Threads alive forever. The run queue owns `from` when it was
+    // queued; the per-CPU `current` slot owns `to`. Drop the stack clones before the switch.
+    let from_ptr = Arc::as_ptr(&from);
+    let to_ptr = Arc::as_ptr(&to);
+    let drop_from = from_queued && from.process.exiting.load(Ordering::Acquire);
+    drop(to);
+    if drop_from {
+        drop(from);
+    }
+    // SAFETY: the critical section is live; the run queue and the per-CPU `current` slot keep
+    // the outgoing/incoming Threads alive across the switch.
     unsafe {
-        context::switch(&from, &to);
+        context::switch(&*from_ptr, &*to_ptr);
     }
     // Resumed on the incoming thread's stack: the outgoing stack is not this one, so deferred
     // dead stacks can be freed here.
