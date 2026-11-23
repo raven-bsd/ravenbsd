@@ -385,7 +385,7 @@ members = [
     "libc/ravenlibc/crt",
     "libc/ravenlibc/ld",
 ]
-default-members = ["crates/*", "libc/ravenlibc/crates/*", "tests/genet"]
+default-members = ["crates/*", "libc/ravenlibc/crates/*", "tests/genet", "tests/host/kernel-conformance"]
 
 [workspace.package]
 edition = "2024"
