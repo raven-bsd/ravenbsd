@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K548 rev351: the clean-prefix smoke crate. It is built by toolchain/test-dist.sh with the
+# installed distributable toolchain and --target x86_64-unknown-ravenbsd.
+
+[package]
+name = "smoke"
+version = "0.0.0"
+edition = "2021"
+
+[workspace]
+
+[[bin]]
+name = "smoke"
+path = "src/main.rs"
+
+# No debuginfo: rustc emits `__rustc_debug_gdb_scripts_section__` only for a debuginfo build, and
+# the product link script discards `.debug_gdb_scripts`, which would leave a dangling relocation.
+[profile.dev]
+strip = "symbols"
+debug = 0
