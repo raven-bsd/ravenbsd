@@ -649,7 +649,15 @@ pub fn recv(caller: &Arc<Process>, packet_address: u64, capacity: u64) -> Result
             return deliver(caller, request, packet_address);
         }
 
-        let token = sched::begin_block()?;
+        // Mirror the child-wait interlock: arm the interruptible block and consume a wake
+        // that arrived between the queue check and the enqueue before sleeping. Without this
+        // the server can enqueue a request, miss the wake and leave `queued=1 active=0` with
+        // the process blocked in `RECV` (rev197 consd stall).
+        let token = sched::begin_block_interruptible()?;
+        if sched::take_kick() {
+            sched::end_block(token);
+            continue;
+        }
         let queued = {
             let mut queue = caller.scheme_queue.lock();
             if let Some(request) = queue.pop_front() {
@@ -676,6 +684,7 @@ pub fn recv(caller: &Arc<Process>, packet_address: u64, capacity: u64) -> Result
                 return Err(error);
             }
         }
+        let _ = sched::take_kick();
         sched::end_block(token);
     }
 }
