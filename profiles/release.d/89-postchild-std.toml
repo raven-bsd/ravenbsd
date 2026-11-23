@@ -5,7 +5,7 @@
 # this stages only the post-child std fixture built by tests/fixtures/postchild-std/build.sh.
 
 [[initfs.files]]
-src = "build/fixtures/postchild-std/postchild-std"
+src = "build/fixtures/postchild-std/{arch}/postchild-std"
 path = "/bin/postchild-std"
 mode = 0o755
 generated = true
