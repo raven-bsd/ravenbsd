@@ -948,6 +948,12 @@ fn wildcard_listener_serves_loopback_and_nic() {
     );
     let id = accept(&mut netd, listener, &mut now);
     let nic_accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    let nic_client_local = call_socket(&mut netd, nic_client, Call::GetSockName);
+    assert_eq!(
+        call_socket(&mut netd, nic_accepted, Call::GetPeerName),
+        nic_client_local,
+        "the accepted NIC socket must report the client's address and port"
+    );
     assert_eq!(netd.write(nic_client, 0, b"nic").unwrap(), 3);
     let read = read_retry(&mut netd, nic_accepted, &mut buffer, &mut now);
     assert_eq!(&buffer[..read], b"nic");

@@ -42,6 +42,15 @@ pub enum OfdKind {
     Unknown,
 }
 
+/// One IPv4 endpoint carried with an inherited socket's peer/local identity.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SocketEndpoint {
+    /// The address octets.
+    pub ip: [u8; 4],
+    /// The TCP/UDP port.
+    pub port: u16,
+}
+
 /// The socket identity carried across `execve` with an inherited socket OFD.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SocketMeta {
@@ -54,6 +63,10 @@ pub struct SocketMeta {
     /// Encoded `raven_libc_net::SocketState` (0 pending, 1 open, 2 bound, 3 listening,
     /// 4 connecting, 5 connected, 6 shutdown).
     pub state: u8,
+    /// The local endpoint, when the socket had one at `execve`.
+    pub local: Option<SocketEndpoint>,
+    /// The accepted/connected peer endpoint, when the socket had one at `execve`.
+    pub peer: Option<SocketEndpoint>,
 }
 
 /// One open-file description.
