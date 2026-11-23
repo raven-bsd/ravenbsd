@@ -21,28 +21,30 @@ qemu_extra = [
 expect_exit = "success"
 
 [[expect]]
-regex = '^stdprobe: start$'
+regex = '^.*stdprobe: start$'
 
 # A valid table allocation is non-null and the two inserts are present.
 [[expect]]
-regex = '^stdprobe: hashmap len=2 cap=[0-9]+ key_ptr=0x[0-9a-f]+$'
+regex = '^.*stdprobe: hashmap len=2 cap=[0-9]+ key_ptr=0x[0-9a-f]+$'
 
 # 128 more inserts force RawTable::reserve_rehash.
 [[expect]]
-regex = '^stdprobe: rehash ok len=130 cap=[0-9]+$'
+regex = '^.*stdprobe: rehash ok len=130 cap=[0-9]+$'
 
-# The spawned copy of the same static binary runs.
+# Step 1: the libc posix_spawn return (pid/handle) and the raw waitpid/status.
 [[expect]]
-regex = '^stdprobe: child-ok$'
-
-[[expect]]
-regex = '^stdprobe: child status=Some\(0\)$'
+regex = '^.*stdprobe: raw posix_spawn rc=0 pid=[0-9]+$'
 
 [[expect]]
-regex = '^stdprobe: done$'
+regex = '^.*stdprobe: raw waitpid rc=[0-9]+ errno=Some\(0\) status=0x[0-9a-f]+ slot=0x[0-9a-f]+$'
 
 [[expect]]
-regex = '^init exited \(0\)$'
+regex = '^.*stdprobe: raw from_raw success=true code=Some\(0\)$'
+
+# Step 2: the std spawn path. Its result pointer is the null one (QEMU RBX=0), not the libc pid
+# or the raw wait status; the run then hits the forbidden fault below. This case is expected-red.
+[[expect]]
+regex = '^.*stdprobe: std spawn next$'
 
 [[forbid]]
 regex = '(?i)panic|killed by page fault'
