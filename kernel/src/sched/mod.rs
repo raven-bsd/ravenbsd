@@ -1243,6 +1243,10 @@ pub fn exit_thread(code: i32) -> ! {
     thread.process.unregister_thread(&thread);
     crate::syscall::futex::remove_thread(thread.id);
     thread.process.unregister_thread(&thread);
+    // FreeBSD `thread_fini`/NetBSD `lwp_dtor`: a thread's turnstile registration does not outlive
+    // the thread. The graph node holds base/effective map entries and donation edges; dropping it
+    // here also restores any server or lock owner this thread was boosting.
+    crate::sync::unregister_thread(thread.tid);
     // `block_current`/`sleep_until` exit a terminal-process thread before the caller runs
     // `end_block`, so the timeout entry (which holds an `Arc<Thread>`) must be removed here.
     cancel_thread_sleepers(thread.id);

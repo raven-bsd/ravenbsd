@@ -75,6 +75,21 @@ impl Donation {
         Ok(())
     }
 
+    /// Unregister a thread that is leaving (FreeBSD `thread_fini`, NetBSD `lwp_dtor`).
+    ///
+    /// Removes every call edge where the thread is the client or the server, drops its turnstile
+    /// registration (base, effective, wait queue and owned objects) and recomputes the remaining
+    /// fixed point in place. The exit path does not allocate, so the 3072-byte graph entries are
+    /// released rather than carried into the next thread that reuses the id.
+    pub fn unregister(&mut self, thread: ThreadId) -> bool {
+        self.calls.remove(&thread);
+        self.calls.retain(|_, server| *server != thread);
+        let was_registered = self.turnstiles.unregister(thread);
+        self.effective.remove(&thread);
+        self.refresh_without_alloc();
+        was_registered
+    }
+
     /// The thread's base priority.
     #[must_use]
     pub fn base_priority(&self, thread: ThreadId) -> Option<Priority> {
@@ -458,6 +473,55 @@ impl Donation {
         let (effective, depth) = self.compute_effective();
         self.effective = effective;
         self.max_depth = self.max_depth.max(depth);
+        self.dirty = false;
+    }
+
+    /// Recompute the combined fixed point in place, without cloning either map.
+    ///
+    /// The thread-exit path cannot allocate; every registered thread has an `effective` entry, so
+    /// resetting to the base priorities and iterating over the current edges is exact.
+    fn refresh_without_alloc(&mut self) {
+        for (thread, base) in self.turnstiles.threads() {
+            if let Some(effective) = self.effective.get_mut(&thread) {
+                *effective = base;
+            }
+        }
+        let mut sweeps = 0usize;
+        loop {
+            let mut changed = false;
+            for object in self.turnstiles.objects() {
+                let Some(owner) = self.turnstiles.owner(object) else {
+                    continue;
+                };
+                let mut pi = Priority::LOWEST;
+                let effective = &self.effective;
+                self.turnstiles.for_each_waiter(object, |waiter| {
+                    if let Some(priority) = effective.get(&waiter).copied() {
+                        pi = pi.min(priority);
+                    }
+                });
+                if let Some(current) = self.effective.get_mut(&owner)
+                    && pi < *current
+                {
+                    *current = pi;
+                    changed = true;
+                }
+            }
+            for (&client, &server) in &self.calls {
+                if let Some(priority) = self.effective.get(&client).copied()
+                    && let Some(current) = self.effective.get_mut(&server)
+                    && priority < *current
+                {
+                    *current = priority;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+            sweeps = sweeps.saturating_add(1);
+        }
+        self.max_depth = self.max_depth.max(sweeps);
         self.dirty = false;
     }
 }
