@@ -207,8 +207,12 @@ fn cantrcvmore(record: &SocketRecord) -> bool {
 }
 
 /// NetBSD `SS_CANTSENDMORE`: a local write shutdown or a completed/disconnected close.
+///
+/// A peer FIN is `SS_CANTRCVMORE`, not `SS_CANTSENDMORE`; it must not make a full send buffer
+/// writable. Keeping the two directions separate is what makes a non-blocking send return EAGAIN
+/// on a full buffer after the peer has closed, and succeed while send space remains.
 fn cantsendmore(record: &SocketRecord) -> bool {
-    record.tx_shutdown || record.closed || record.peer_closed
+    record.tx_shutdown || record.closed
 }
 
 /// `SS_ISCONNECTED || !(pr_flags & PR_CONNREQUIRED)`.

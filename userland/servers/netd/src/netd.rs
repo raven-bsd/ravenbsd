@@ -1578,25 +1578,39 @@ impl<D: Device> Netd<D> {
     /// core predicate on its one interface and socket id. A control file and a file without a
     /// socket have a defined error instead of a made-up "ready" bit.
     pub fn socket_readiness(&self, file: u64) -> Result<Readiness, Errno> {
-        let (interface, socket, listeners) = match self.files.get(&file).ok_or(Errno::EBADF)? {
-            File::Control => return Err(Errno::EINVAL),
-            File::Socket(socket) => (socket.interface, socket.socket, socket.listeners.clone()),
-        };
-        if listeners.is_empty() {
-            let id = socket.ok_or(Errno::ENOTCONN)?;
-            return self.core_ref(interface).readiness(id);
-        }
+        let (interface, socket, listeners, write_shutdown) =
+            match self.files.get(&file).ok_or(Errno::EBADF)? {
+                File::Control => return Err(Errno::EINVAL),
+                File::Socket(socket) => (
+                    socket.interface,
+                    socket.socket,
+                    socket.listeners.clone(),
+                    socket.write_shutdown,
+                ),
+            };
         // A wildcard listener is one POSIX socket over several cores: the level is the OR of
-        // every core's listener (pending connections on any interface). The core predicate is the
-        // sole level source for every socket: FreeBSD `SBS_CANTSENDMORE` keeps POLLOUT after
-        // SHUT_WR (K279).
-        let mut ready = Readiness::NONE;
-        for (core_interface, id) in listeners {
-            let level = self.core_ref(core_interface).readiness(id)?;
-            ready.readable |= level.readable;
-            ready.writable |= level.writable;
-            ready.hup |= level.hup;
-            ready.error |= level.error;
+        // every core's listener (pending connections on any interface).
+        let mut ready = if listeners.is_empty() {
+            let id = socket.ok_or(Errno::ENOTCONN)?;
+            self.core_ref(interface).readiness(id)?
+        } else {
+            let mut ready = Readiness::NONE;
+            for (core_interface, id) in listeners {
+                let level = self.core_ref(core_interface).readiness(id)?;
+                ready.readable |= level.readable;
+                ready.writable |= level.writable;
+                ready.hup |= level.hup;
+                ready.error |= level.error;
+            }
+            ready
+        };
+        // K8 Raven file contract: after the application's own SHUT_WR the file is not writable,
+        // even though the donor-core `sowritable` keeps POLLOUT set on `SBS_CANTSENDMORE` so a
+        // blocked writer wakes to EPIPE. The core predicate stays donor-literal; this layer
+        // implements the K8 contract (`tests/smp/ssh-contract/main.c::check_eof_socket`). The
+        // K279 report named this as the decision outside its Owns; rev97 resolves it for K8.
+        if write_shutdown {
+            ready.writable = false;
         }
         Ok(ready)
     }
