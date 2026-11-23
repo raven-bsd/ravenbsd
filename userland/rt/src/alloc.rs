@@ -116,8 +116,8 @@ impl State {
         let mut previous: *mut FreeNode = ptr::null_mut();
         let mut node = self.free;
         while !node.is_null() && (node as usize) < (pointer as usize) {
-            // SAFETY: every node in the list is a live `FreeNode` inside a mapped chunk.
             previous = node;
+            // SAFETY: every node in the list is a live `FreeNode` inside a mapped chunk.
             node = unsafe { (*node).next };
         }
         // SAFETY: the caller transferred this region; writing the node header is the only use.
@@ -140,6 +140,7 @@ impl State {
         }
         // Merge with the preceding node when exactly adjacent.
         if !previous.is_null() {
+            // SAFETY: `previous` is a live free node in the address-ordered list.
             let previous_end = (previous as usize).saturating_add(unsafe { (*previous).size });
             if previous_end == pointer as usize {
                 // SAFETY: `previous` and `pointer` are adjacent live free nodes.
@@ -160,6 +161,7 @@ impl State {
             let node_size = unsafe { (*node).size };
             let node_align = (node as usize).is_multiple_of(align);
             if node_size >= size && node_align {
+                // SAFETY: `node` is a live free node whose size was read above.
                 let next = unsafe { (*node).next };
                 if previous.is_null() {
                     self.free = next;
@@ -169,6 +171,7 @@ impl State {
                 }
                 let split = round_up(size, core::mem::align_of::<FreeNode>())?;
                 if node_size >= split.saturating_add(MIN_FREE) {
+                    // SAFETY: the split offset stays inside the live `node_size` block.
                     let remainder = unsafe { (node as *mut u8).add(split) }.cast::<FreeNode>();
                     // SAFETY: the tail is inside the same live block, aligned for `FreeNode`,
                     // and is no longer reachable through the caller's allocation.
@@ -177,6 +180,7 @@ impl State {
                 return Some(node.cast::<u8>());
             }
             previous = node;
+            // SAFETY: `node` is a live free node from the list.
             node = unsafe { (*node).next };
         }
         None
@@ -211,6 +215,7 @@ impl State {
             if !self.chunk.is_null() && self.chunk_offset < self.chunk_len {
                 let tail = self.chunk_len - self.chunk_offset;
                 if tail >= size_of::<FreeNode>() {
+                    // SAFETY: the offset is inside the current mapped chunk.
                     let tail_pointer = unsafe { self.chunk.add(self.chunk_offset) };
                     // SAFETY: the tail is mapped, aligned by the allocation rounding, and
                     // no live allocation starts inside it.
