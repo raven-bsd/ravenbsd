@@ -1173,6 +1173,14 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .cwd
             .resolve(path, false, &self.limits)
             .map_err(crate::path::path_errno)?;
+        // The public pty slave name is a scheme endpoint, not a VFS node: the pty server owns
+        // the node metadata (`fstat` reports a root-owned 0600 chr device). FreeBSD devfs allows
+        // `chmod` on the pts node; Raven models that node as read-only, and OpenSSH
+        // `sshpty.c` `pty_setowner` explicitly tolerates `EROFS` for a root-owned tty whose mode
+        // has no group/other bits.
+        if pty_slave_wire(&resolved.abs).is_some() {
+            return Err(Errno::EROFS);
+        }
         self.root_call(Call::Chmod {
             mode: mode & 0o7777,
             path: &resolved.abs,
@@ -1202,6 +1210,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .cwd
             .resolve(path, false, &self.limits)
             .map_err(crate::path::path_errno)?;
+        // See `chmod`: the pty slave node metadata is server-owned and read-only. OpenSSH's
+        // `pty_setowner` treats `EROFS` on a root-owned tty as "warn and continue".
+        if pty_slave_wire(&resolved.abs).is_some() {
+            return Err(Errno::EROFS);
+        }
         self.root_call(Call::Chown {
             uid,
             gid,

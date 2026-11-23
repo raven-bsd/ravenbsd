@@ -448,10 +448,15 @@ extern "C" fn signal_entry(_bits: usize, _context: usize, _mask: usize) -> ! {
     }
 }
 
-/// Deliver `SIGUSR1` to the process group after the controller has blocked in the wait.
+/// Deliver `SIGUSR1` to the controller process after it has blocked in the wait.
+///
+/// The target is this process's pid, not the process group: the sleeping child is in the same
+/// group and has no signal entry, so a group signal would correctly take its default terminate
+/// action before the parent's wait returns.
 extern "C" fn wait_signal_thread(_arg: usize) -> ! {
     nanosleep(50_000_000);
-    let _ = syscall2(PROC_SIGNAL, 0, SIGUSR1);
+    let pid = proc_handle_info(Handle::SELF_PROC).unwrap_or(0);
+    let _ = syscall2(PROC_SIGNAL, pid as usize, SIGUSR1);
     thread_exit(0)
 }
 
