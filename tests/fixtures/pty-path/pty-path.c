@@ -57,8 +57,10 @@ int main(void) {
     // The shell spawns this probe, so the child may start without its own ctty slot; `/dev/tty`
     // must resolve through the session ctty fallback to the same slave as fd 0.
     int devtty = open("/dev/tty", O_RDWR | O_NOCTTY);
+    int devtty_errno = errno;
     int devtty_same = devtty >= 0 ? same_inode(STDIN_FILENO, devtty) : 0;
-    printf("PTY-PATH devtty open=%d same=%d\n", devtty, devtty_same);
+    printf("PTY-PATH devtty open=%d same=%d errno=%d sid=%d parent_sid=%d\n", devtty,
+           devtty_same, devtty_errno, (int)getsid(0), (int)getsid(getppid()));
     if (devtty >= 0) {
         (void)close(devtty);
     }
