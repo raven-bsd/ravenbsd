@@ -514,5 +514,18 @@ int main(int argc, char **argv) {
         free(chunks[index]);
     }
     free(canary);
+
+    // K548 rev348: run the Rust std Command canary in a child of this tested process. Its own
+    // output (EXEC-CANARY) is the first divergence check above the libc spawn copy.
+    pid_t rust_canary = fork();
+    if (rust_canary == 0) {
+        char *rust_args[] = {"exec-canary", NULL};
+        (void)execve("/bin/exec-canary", rust_args, environ);
+        _exit(127);
+    }
+    if (rust_canary > 0) {
+        int rust_status = 0;
+        (void)waitpid(rust_canary, &rust_status, 0);
+    }
     return child < 0 ? 1 : 0;
 }

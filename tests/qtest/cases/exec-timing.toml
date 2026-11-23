@@ -12,7 +12,7 @@ name = "exec-timing"
 arch = "x86_64"
 profile = "libc-test"
 timeout_secs = 240
-pre = ["sh tests/libc/target/build.sh exec-timing"]
+pre = ["sh tests/libc/target/build.sh exec-timing", "sh tests/fixtures/exec-canary/build.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 
@@ -30,6 +30,9 @@ regex = '^.*EXEC-TIMING fork_ns=[0-9]+$'
 
 [[expect]]
 regex = '^.*EXEC-TIMING canary fork=ok spawn=ok socket=ok spawnp=ok big=ok inh=ok dup=ok same=ok chdir=ok heap=ok chunks=ok$'
+
+[[expect]]
+regex = '^.*EXEC-CANARY status_ok=true canary_ok=true$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|EXEC-TIMING .* FAIL'
