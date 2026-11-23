@@ -270,6 +270,13 @@ fn enter_signal(
             None => process::exit_process(Errno::EFAULT.to_ret() as i32),
         }
     };
+    // The registered entry is the C-ABI signal body, not an aligning trampoline. Enter it with
+    // the SysV stack shape a `call` would produce (8 mod 16) so its prologue and nested calls
+    // keep the ABI alignment.
+    let stack = match stack.checked_sub(8) {
+        Some(stack) => stack,
+        None => process::exit_process(Errno::EFAULT.to_ret() as i32),
+    };
     if !is_user_address(stack) {
         process::exit_process(Errno::EFAULT.to_ret() as i32);
     }

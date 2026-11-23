@@ -49,7 +49,7 @@ pub(crate) fn ensure_entry() -> Result<(), Errno> {
         let result = unsafe {
             raven_libc_sys::arch::syscall3(
                 raven_abi::signal::SIG_SETUP,
-                raw::sigentry_address(),
+                shell_signal_entry as *const () as usize,
                 area.argument(),
                 area.flags() as usize,
             )

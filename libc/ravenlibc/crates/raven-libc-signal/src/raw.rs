@@ -645,6 +645,20 @@ pub fn call_handler(stack: usize, handler: usize, arg1: usize, arg2: usize, arg3
 }
 
 /// `SIGRETURN` (the ABI signal-return call, PROPOSED PG-7).
+#[cfg(target_arch = "x86_64")]
+pub fn sigreturn() -> ! {
+    // SAFETY: SIGRETURN restores the user context and never returns to this instruction.
+    unsafe {
+        core::arch::asm!(
+            "syscall",
+            in("rax") raven_abi::signal::SIGRETURN,
+            options(noreturn, nostack)
+        );
+    }
+}
+
+/// `SIGRETURN` for the architectures that still use the assembly stub.
+#[cfg(not(target_arch = "x86_64"))]
 pub fn sigreturn() -> ! {
     // SAFETY: the kernel contract restores the context area and never returns here.
     unsafe { __rl_sigreturn_stub() }
