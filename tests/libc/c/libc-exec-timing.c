@@ -454,6 +454,35 @@ int main(int argc, char **argv) {
         }
     }
 
+    int heap_ok = canary != NULL;
+    if (canary != NULL) {
+        char *heap_args[3] = {NULL, NULL, NULL};
+        char *heap_env[2] = {NULL, NULL};
+        heap_args[0] = strdup("libc-test");
+        heap_args[1] = strdup("spawn-child");
+        heap_env[0] = strdup("PATH=/bin");
+        if (heap_args[0] != NULL && heap_args[1] != NULL && heap_env[0] != NULL) {
+            pid_t heap_child = -1;
+            if (posix_spawn(&heap_child, "/bin/libc-test", NULL, NULL, heap_args, heap_env) == 0) {
+                int heap_status = 0;
+                (void)waitpid(heap_child, &heap_status, 0);
+            } else {
+                heap_ok = 0;
+            }
+        } else {
+            heap_ok = 0;
+        }
+        free(heap_args[0]);
+        free(heap_args[1]);
+        free(heap_env[0]);
+        for (size_t index = 0; index < canary_len; index++) {
+            if (canary[index] != 0xA5) {
+                heap_ok = 0;
+                break;
+            }
+        }
+    }
+
     int chunks_ok = 1;
     for (int index = 0; index < CHUNK_COUNT; index++) {
         if (chunks[index] == NULL) {
@@ -475,11 +504,11 @@ int main(int argc, char **argv) {
         printf("EXEC-TIMING fork_ns=%llu\n", (unsigned long long)(exec_ret_ns - fork_ns));
         printf("EXEC-TIMING total_ns=%llu\n", (unsigned long long)(wait_ns - fork_ns));
     }
-    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s big=%s inh=%s dup=%s same=%s chdir=%s chunks=%s\n",
+    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s big=%s inh=%s dup=%s same=%s chdir=%s heap=%s chunks=%s\n",
            fork_ok ? "ok" : "bad", spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad",
            spawnp_ok ? "ok" : "bad", big_ok ? "ok" : "bad", inh_ok ? "ok" : "bad",
            dup_ok ? "ok" : "bad", same_ok ? "ok" : "bad", chdir_ok ? "ok" : "bad",
-           chunks_ok ? "ok" : "bad");
+           heap_ok ? "ok" : "bad", chunks_ok ? "ok" : "bad");
     fflush(stdout);
     for (int index = 0; index < CHUNK_COUNT; index++) {
         free(chunks[index]);
