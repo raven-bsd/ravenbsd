@@ -4,7 +4,7 @@
 [package]
 name = "raven-trace-core"
 version = "0.1.0"
-description = "Pure trace id, span and correlation model for the native IPC path."
+description = "Pure trace id, span and correlation model for cross-process tracing."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
