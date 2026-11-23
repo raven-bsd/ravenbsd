@@ -247,6 +247,48 @@ fn a_failing_pre_command_is_an_error() {
 }
 
 #[test]
+fn a_preflight_77_is_skipped_not_error() {
+    let temp = TempDir::new("execute-preflight-skip");
+    let marker = temp.path().join("ran.txt");
+    let script = format!("{}/preflight-load.sh", env!("CARGO_MANIFEST_DIR"));
+    let text = format!(
+        "name = \"preflight-skip\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
+         expect_exit = \"success\"\n\
+         pre = [\"sh {script} --load1 6.32 --max-load 5.0\"]\n"
+    );
+    let case = Case::parse(&text).unwrap();
+    let outcome = execute(&case, &runner(&format!("touch {}", marker.display())));
+    assert_eq!(
+        outcome.report.result,
+        ResultKind::Skipped,
+        "{:?}",
+        outcome.detail
+    );
+    let detail = outcome.detail.expect("detail");
+    assert!(detail.contains("pre[0]"), "{detail}");
+    assert!(detail.contains("waiting-for-window"), "{detail}");
+    assert!(!marker.exists(), "the runner must not start under load");
+}
+
+#[test]
+fn a_preflight_safe_value_continues() {
+    let script = format!("{}/preflight-load.sh", env!("CARGO_MANIFEST_DIR"));
+    let text = format!(
+        "name = \"preflight-safe\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
+         expect_exit = \"success\"\n\
+         pre = [\"sh {script} --load1 4.59 --max-load 5.0\"]\n"
+    );
+    let case = Case::parse(&text).unwrap();
+    let outcome = execute(&case, &runner("exit 33"));
+    assert_eq!(
+        outcome.report.result,
+        ResultKind::Pass,
+        "{:?}",
+        outcome.detail
+    );
+}
+
+#[test]
 fn a_skipped_case_does_not_run_pre_commands() {
     let temp = TempDir::new("execute-skip-pre");
     let marker = temp.path().join("ran.txt");
