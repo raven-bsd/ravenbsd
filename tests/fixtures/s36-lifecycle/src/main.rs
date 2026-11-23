@@ -67,6 +67,8 @@ const STACK_BASE: usize = STACK_TOP - STACK_SIZE;
 
 /// Cycles in the thread create/exit churn.
 const CYCLES: usize = 10_000;
+/// Full process/address-space/stack lifecycles in the bounded session churn.
+const SESSIONS: usize = 32;
 /// User stacks for the fixture's extra threads (16 KiB each, one helper live at a time).
 const HELPER_STACK_SIZE: usize = 16 * 1024;
 
@@ -500,6 +502,26 @@ fn churn_part() -> Result<(), &'static str> {
     Ok(())
 }
 
+/// The bounded process/session churn: 32 full exec/address-space/stack lifecycles.
+///
+/// Each cycle creates a new process, maps its own address space and user stack, runs the
+/// `marker` role to exit 0, reaps it, and closes the handle. The kernel `s36` counter lines on
+/// the surrounding marker exits are compared by the qtest evidence; a per-cycle frame/stack/handle
+/// leak would show as a closing delta, not a one-time stack-cache entry.
+fn session_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let mut session = 0usize;
+    while session < SESSIONS {
+        let child = spawn_role(initfs, "marker").map_err(|_| "session spawn")?;
+        if proc_wait(child).unwrap_or(-1) != 0 {
+            return Err("session wait");
+        }
+        handle_close(child);
+        session = session.saturating_add(1);
+    }
+    println!("s36: sessions done={}", SESSIONS);
+    Ok(())
+}
+
 /// The `twomain` child: one thread exits (process alive), a sleeper blocks, then EXIT.
 fn twomain_part() {
     // Helper 1 exits the thread only; the process stays alive.
@@ -802,6 +824,9 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     handle_close(marker);
     if let Err(message) = churn_part() {
+        fail(message);
+    }
+    if let Err(message) = session_churn_part(&initfs) {
         fail(message);
     }
     // Scenario 2, closing marker: its exit prints the counters again; the report compares.

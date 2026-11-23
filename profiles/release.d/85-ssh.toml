@@ -9,33 +9,37 @@
 # The build output must exist before the image build (sh addons/ssh/build.sh).
 # The split server binaries are staged at the paths the listener embeds from
 # K212: /usr/libexec/sshd-session and /usr/libexec/sshd-auth.
+#
+# `{arch}` is the image target, not the host: the add-on is built per arch, and
+# staging a foreign-arch ELF is refused by the initfs builder (the target loader
+# would reject it as `bad ELF: BadMachine`).
 
 [[initfs.files]]
-src = "build/ssh/x86_64/bin/sshd"
+src = "build/ssh/{arch}/bin/sshd"
 path = "/sbin/sshd"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/ssh/x86_64/bin/ssh"
+src = "build/ssh/{arch}/bin/ssh"
 path = "/bin/ssh"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/ssh/x86_64/bin/ssh-keygen"
+src = "build/ssh/{arch}/bin/ssh-keygen"
 path = "/bin/ssh-keygen"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/ssh/x86_64/libexec/sshd-session"
+src = "build/ssh/{arch}/libexec/sshd-session"
 path = "/usr/libexec/sshd-session"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/ssh/x86_64/libexec/sshd-auth"
+src = "build/ssh/{arch}/libexec/sshd-auth"
 path = "/usr/libexec/sshd-auth"
 mode = 0o755
 generated = true
