@@ -180,17 +180,6 @@ def half_close(host, port, deadline):
                     ack += chunk
                 if ack != b"HALFACK":
                     raise OSError(f"half ack {ack!r}")
-                # Wait for the guest's post-HALFACK byte (the contract's X) before the RST. The
-                # K9 narrative is "the peer closes after HALFACK; the next guest write triggers
-                # the RST and the guest observes EPIPE/POLLHUP". Closing first races the RST
-                # against the X and can leave the guest without an RST at all, which is a host
-                # timing artifact, not the contract. A guest that never sends X still fails: the
-                # RST is delayed past its poll window.
-                stream.settimeout(5.0)
-                try:
-                    stream.recv(1)
-                except socket.timeout:
-                    pass
                 # Full close with RST: the peer has closed its read side, so the guest's next
                 # write must observe EPIPE and POLLHUP rather than a graceful half-close.
                 stream.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,

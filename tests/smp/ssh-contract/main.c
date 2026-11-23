@@ -927,6 +927,14 @@ static int check_half_close(void) {
     if (conn < 0) {
         return fail("half accept");
     }
+    {
+        int one = 1;
+        // The K9 peer half-closes and then closes with RST; the contract is about HUP/EPIPE, not
+        // Nagle. sshd sets TCP_NODELAY on its sessions, so the accepted contract socket does too.
+        if (setsockopt(conn, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0) {
+            return fail("half nodelay");
+        }
+    }
     if (send(conn, "HALF\n", 5, 0) != 5) {
         return fail("half greeting");
     }
