@@ -1940,15 +1940,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         let mut by_handle: alloc::collections::BTreeMap<u32, u32> =
             alloc::collections::BTreeMap::new();
         for entry in &block.entries {
-            // A version-1 spawn entry carries no kind. The handle names the same file object the
-            // parent had, so probe it exactly as `adopt` does (FreeBSD `fdcopy` keeps the
-            // `struct file`, not a fresh descriptor).
-            let kind = if entry.kind == OfdKind::Unknown {
-                crate::scheme::probe_kind(&self.backend, Handle(entry.handle))
-            } else {
-                entry.kind
-            };
-            if !transferable(kind) {
+            if !transferable(entry.kind) {
                 return Err(Errno::EINVAL);
             }
             // A handle has exactly one OFD: fds that were dup'd from each other must share the
@@ -1959,7 +1951,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             } else {
                 let index = self.ofd.borrow_mut().insert(
                     Handle(entry.handle),
-                    kind,
+                    entry.kind,
                     entry.status,
                     entry.path.clone().map(Vec::into_boxed_slice),
                 );
@@ -2016,25 +2008,21 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 reference.handle(),
             )
         };
-        if kind != OfdKind::Tty || has_path {
+        if kind == OfdKind::Tty && has_path {
             return;
         }
-        let mut request = [0u8; raven_proto_tty::TERMIOS_LEN];
-        raven_proto_tty::encode_get_termios_request(&mut request);
-        let mut response = [0u8; raven_proto_tty::TERMIOS_LEN];
-        if self.backend.call(handle, &request, &mut response).is_err() {
+        if kind != OfdKind::Tty && kind != OfdKind::Unknown {
             return;
         }
+        // Only a character device can be a terminal. FSTAT is one kernel read and never enters a
+        // scheme server, so a regular file, pipe or socket stays untouched; a scheme CALL on a
+        // socket handle would enter netd during startup.
         let Ok(status) = self.fstat(fd) else {
             return;
         };
-        if status.st_mode & raven_libc_abi::stat::S_IFMT != raven_libc_abi::stat::S_IFCHR
-            || status.st_ino < 2
-            || status.st_ino % 2 != 0
-        {
+        if status.st_mode & raven_libc_abi::stat::S_IFMT != raven_libc_abi::stat::S_IFCHR {
             return;
         }
-        let name = alloc::format!("/dev/pts/{}", (status.st_ino - 2) / 2);
         let index = {
             let table = self.fd.borrow();
             let Some(entry) = table.entry(fd) else {
@@ -2042,6 +2030,32 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             };
             entry.ofd
         };
+        if kind == OfdKind::Unknown {
+            // A version-1 spawn entry carries no kind. The handle names the same file object the
+            // parent had, so probe it exactly as `adopt` does (FreeBSD `fdcopy` keeps the
+            // `struct file`, not a fresh descriptor).
+            if crate::scheme::probe_kind(&self.backend, handle) != OfdKind::Tty {
+                return;
+            }
+            if let Some(ofd) = self.ofd.borrow_mut().get_mut(index) {
+                ofd.kind = OfdKind::Tty;
+            }
+        }
+        if has_path {
+            return;
+        }
+        // A pty endpoint answers the K444 `GET_TERMIOS` request; the console servers implement
+        // only `GET_MODE` and answer `ENOSYS`, so a console fd is never given a pty name.
+        let mut request = [0u8; raven_proto_tty::TERMIOS_LEN];
+        raven_proto_tty::encode_get_termios_request(&mut request);
+        let mut response = [0u8; raven_proto_tty::TERMIOS_LEN];
+        if self.backend.call(handle, &request, &mut response).is_err() {
+            return;
+        }
+        if status.st_ino < 2 || status.st_ino % 2 != 0 {
+            return;
+        }
+        let name = alloc::format!("/dev/pts/{}", (status.st_ino - 2) / 2);
         if let Some(ofd) = self.ofd.borrow_mut().get_mut(index)
             && ofd.path.is_none()
         {
