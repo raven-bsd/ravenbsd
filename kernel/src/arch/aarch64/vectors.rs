@@ -129,8 +129,17 @@ __exception_vectors:
 
     /* Shared return path. A lower-EL frame carries the interrupted SP_EL0; it must be restored
      * before `eret`, because a context switch to another user thread changes the single SP_EL0
-     * register. Current-EL frames carry SP_ELx there and must leave SP_EL0 alone. */
+     * register. Current-EL frames carry SP_ELx there and must leave SP_EL0 alone.
+     *
+     * The return state is loaded once and then installed into ELR_EL1/SPSR_EL1 before the GPRs
+     * are popped. Mask IRQs for the whole window: a syscall handler runs with interrupts enabled,
+     * and a timer IRQ taken after the `msr ELR_EL1`/`msr SPSR_EL1` above would run this same
+     * shared path for the nested current-EL frame, overwriting ELR_EL1/SPSR_EL1 with the
+     * interrupted kernel PC and PSTATE. The outer path would then `eret` to that kernel PC,
+     * re-enter itself and climb the stack by 288 bytes per pass until it faults at the stack top.
+     * Masking here is safe: `eret` restores the interrupted DAIF from SPSR. */
 __exception_restore:
+    msr daifset, #2
     cbz x2, 1f
     ldr x9, [sp, #248]
     msr sp_el0, x9
