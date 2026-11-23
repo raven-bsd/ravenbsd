@@ -356,14 +356,27 @@ mod program {
                 "ptmx" => (self.pairs.alloc(), Role::Master),
                 "slave" => (0u64, Role::Slave),
                 _ => {
-                    let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
-                        (Role::Master, rest)
-                    } else if let Some(rest) = path.strip_prefix("slave/") {
-                        (Role::Slave, rest)
+                    // The `/dev/pts` namespace mount maps `/dev/pts/<N>` to `pty:<N>`; the
+                    // public slave number names the live pair's slave endpoint (the same inode
+                    // `fstat` reports, 2N+2).
+                    if let Ok(id) = path.parse::<u64>() {
+                        // Only a live pair has a `/dev/pts/<N>` node: the donor devfs installs the
+                        // slave node when the master allocates the unit (FreeBSD `pts_alloc`), so
+                        // an unallocated number is `ENOENT`, never an implicit new pair.
+                        if self.pairs.get_mut(id).is_none() {
+                            return Err(Errno::ENOENT.into());
+                        }
+                        (id, Role::Slave)
                     } else {
-                        return Err(Errno::ENOENT.into());
-                    };
-                    (id.parse::<u64>().map_err(|_| Errno::ENOENT)?, role)
+                        let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
+                            (Role::Master, rest)
+                        } else if let Some(rest) = path.strip_prefix("slave/") {
+                            (Role::Slave, rest)
+                        } else {
+                            return Err(Errno::ENOENT.into());
+                        };
+                        (id.parse::<u64>().map_err(|_| Errno::ENOENT)?, role)
+                    }
                 }
             };
             let readable = flags & 1 != 0;
