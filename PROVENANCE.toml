@@ -9715,3 +9715,14 @@ tier = "A"
 copied = "2026-11-23"
 modified = true
 notes = "lwkt_domsg() synchronous-completion rule (line 184) and the MSGF_SYNC arm of lwkt_thread_replyport() (line 591) transcribed into a pure bounded state model; no IPI, scheduler, port callback table or kernel glue copied."
+
+[[import]]
+path = "kernel/src/time.rs"
+upstream = "dragonfly"
+upstream_path = "sys/kern/kern_timeout.c"
+upstream_rev = "94448f622a06cde90ba42d688e9cab2448ad9ab3"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-23"
+modified = true
+notes = "Per-CPU wheel selection ported from softclock_pcpu_ary (per-CPU wheels and locks) and callout_reset_bycpu (target-CPU add) into the kernel time integration; the cyclic heap itself is original Raven Rust. No C expression copied."
