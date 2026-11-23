@@ -220,6 +220,20 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
                 frame.rbx,
                 frame.rbp
             );
+            // SAFETY: the interrupted stack pointer is a live user mapping; the eight words
+            // are inside the same stack page and only read for this diagnostic.
+            let words = unsafe { core::ptr::read_unaligned(frame.rsp as *const [u64; 8]) };
+            crate::kprintln!(
+                "PFSTACK {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
+                words[0],
+                words[1],
+                words[2],
+                words[3],
+                words[4],
+                words[5],
+                words[6],
+                words[7]
+            );
             crate::process::page_fault(cr2);
         }
     }
