@@ -15,5 +15,8 @@ expect_exit = "success"
 [[expect]]
 regex = '^cyclic: ok fired=3 order=5ms,10ms,15ms$'
 
+[[expect]]
+regex = '^cyclic: percpu ok cpu0=1 cpu1=1$'
+
 [[forbid]]
-regex = '(?i)cyclic: fail|panic'
+regex = '(?i)cyclic: (fail|percpu fail)|panic'

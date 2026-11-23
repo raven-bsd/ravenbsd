@@ -17,6 +17,9 @@ target = "none"
 name = "raven-s36-lifecycle"
 path = "src/main.rs"
 
+[features]
+s36-churn-only = []
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-elf = { path = "../../../crates/raven-elf" }
@@ -25,6 +28,8 @@ raven-initfs = { path = "../../../crates/raven-initfs" }
 # though it never allocates.  The no-alloc `raven-spawn` path is proven separately by building
 # that crate without features (K463).
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [lints]
 workspace = true
