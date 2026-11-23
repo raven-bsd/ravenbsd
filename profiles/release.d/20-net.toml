@@ -49,12 +49,12 @@ src = "etc/services.d/pcid.toml"
 path = "/etc/services.d/pcid.toml"
 
 [[initfs.files]]
-src = "profiles/release.d/devd-net-{arch}.manifest"
+src = "build/fixtures/virt-dtb/{arch}/devd.manifest"
 path = "/etc/services.d/devd.toml"
 generated = true
 
 [[initfs.files]]
-src = "profiles/release.d/release-drivers-{arch}.conf"
+src = "build/fixtures/virt-dtb/{arch}/drivers.conf"
 path = "/etc/drivers.toml"
 generated = true
 
