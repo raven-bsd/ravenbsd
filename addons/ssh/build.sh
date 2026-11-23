@@ -7,13 +7,19 @@
 # OpenSSL add-on. SSH is never implemented in-house (DR-65); this script only builds upstream.
 #
 # Usage:
-#   sh addons/ssh/build.sh --check   verify the pinned source, provenance and host tools
-#   sh addons/ssh/build.sh           build ssh, sshd, sshd-session, sshd-auth and ssh-keygen
-#   sh addons/ssh/build.sh --qtest   stage a minimal initfs (requires a completed build)
+#   sh addons/ssh/build.sh [--arch x86_64|aarch64] --check   verify the pinned source, provenance
+#   sh addons/ssh/build.sh [--arch x86_64|aarch64]           build ssh, sshd, sshd-session,
+#                                                            sshd-auth and ssh-keygen
+#   sh addons/ssh/build.sh [--arch x86_64|aarch64] --qtest   stage a minimal initfs
+#
+# The aarch64 build uses the aarch64 libc sysroot, userland/linker/aarch64.ld, the cross aarch64
+# libgcc builtins and the aarch64 T1 OpenSSL (build/tls/aarch64). The ssh-version qtest wrapper is
+# x86_64-only; the aarch64 lane builds the image binaries only. No upstream OpenSSH source is
+# modified.
 #
 # OpenSSH 10.6 splits the server into `sshd` (the listener), `sshd-session` and `sshd-auth`.
 # The target runtime paths are `/usr/libexec/sshd-session` and `/usr/libexec/sshd-auth`; the
-# build outputs are staged at `build/ssh/x86_64/libexec/` so K195 can install them there.
+# build outputs are staged at `build/ssh/<arch>/libexec/` so K195 can install them there.
 # No SSH protocol, crypto or privilege-separation source is changed.
 
 set -eu
@@ -23,10 +29,11 @@ cd "$root"
 
 arch=x86_64
 mode=--build
-for argument in "$@"; do
-    case "$argument" in
-        --check | --build | --qtest) mode=$argument ;;
-        *) echo "ssh: unknown argument $argument" >&2; exit 2 ;;
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --check | --build | --qtest) mode=$1; shift ;;
+        --arch) arch=$2; shift 2 ;;
+        *) echo "ssh: unknown argument $1" >&2; exit 2 ;;
     esac
 done
 
@@ -49,6 +56,26 @@ die() {
     echo "ssh: $*" >&2
     exit 2
 }
+
+case "$arch" in
+    x86_64)
+        target=x86_64-unknown-ravenbsd
+        host_triplet=x86_64-unknown-linux-gnu
+        ld_script=$root/tests/libc/target/x86_64.ld
+        fp_flags=
+        linker_flavor=
+        ;;
+    aarch64)
+        target=aarch64-unknown-ravenbsd
+        host_triplet=aarch64-unknown-linux-gnu
+        ld_script=$root/userland/linker/aarch64.ld
+        fp_flags=-mgeneral-regs-only
+        linker_flavor=-Wl,-m,aarch64linux
+        ;;
+    *)
+        die "unsupported arch $arch (x86_64 or aarch64)"
+        ;;
+esac
 
 find_lld() {
     if command -v ld.lld >/dev/null 2>&1; then
@@ -122,8 +149,12 @@ stage_sysroot() {
         fi
     done
     resource=$(clang --print-resource-dir)
-    builtins=$resource/lib/linux/libclang_rt.builtins-x86_64.a
-    [ -f "$builtins" ] || die "missing compiler-rt builtins: $builtins"
+    if [ "$arch" = aarch64 ]; then
+        builtins=/usr/lib/gcc-cross/aarch64-linux-gnu/11/libgcc.a
+    else
+        builtins=$resource/lib/linux/libclang_rt.builtins-x86_64.a
+    fi
+    [ -f "$builtins" ] || die "missing builtins: $builtins"
     cp "$builtins" "$sysroot/usr/lib/libclang_rt.builtins.a"
 
     # K200 portability workaround: the RavenBSD forwarding stdatomic.h shadows clang's header
@@ -152,10 +183,10 @@ configure() {
         ac_cv_func_getline=yes ac_cv_func_getdelim=yes ac_cv_func_setsid=yes ac_cv_func_getcwd=yes \
         ac_cv_func_setresuid=yes ac_cv_func_setresgid=yes \
         ac_cv_func_snprintf=yes ac_cv_func_vsnprintf=yes ac_cv_func_arc4random_buf=yes \
-        CFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector -I$t1_stage/include -include $compat/ssh_compat.h" \
-        LDFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -fuse-ld=lld -nostdlib -nostartfiles -static -T$root/tests/libc/target/x86_64.ld -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 $sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o -L$sysroot/usr/lib -L$t1_stage/lib" \
+        CFLAGS="--target=$target --sysroot=$sysroot -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector $fp_flags -I$t1_stage/include -include $compat/ssh_compat.h" \
+        LDFLAGS="--target=$target --sysroot=$sysroot -fuse-ld=lld $linker_flavor -nostdlib -nostartfiles -static -T$ld_script -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 $sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o -L$sysroot/usr/lib -L$t1_stage/lib" \
         LIBS="-L$sysroot/usr/lib -L$t1_stage/lib -lc -lclang_rt.builtins $sysroot/usr/lib/crtn.o" \
-        "$source/configure" --host=x86_64-unknown-linux-gnu --build=x86_64-pc-linux-gnu \
+        "$source/configure" --host="$host_triplet" --build=x86_64-pc-linux-gnu \
             --prefix="$install" --sysconfdir="$install/etc/ssh" --libexecdir=/usr/libexec \
             --with-ssl-dir="$t1_stage" --without-openssl-header-check \
             --without-zlib --without-pam --without-selinux --without-audit --without-kerberos5 --without-libedit
@@ -165,12 +196,12 @@ configure() {
 build() {
     if [ ! -f "$t1/lib/libcrypto.a" ] || [ ! -f "$t1/lib/libssl.a" ]; then
         log "T1 libcrypto/libssl missing; building T1 OpenSSL first"
-        sh "$root/addons/tls/build.sh"
+        sh "$root/addons/tls/build.sh" --arch "$arch"
     fi
     check_t1
     stage_sysroot
     find_lld
-    log "build: configuring OpenSSH 10.6p2 for x86_64-unknown-ravenbsd"
+    log "build: configuring OpenSSH 10.6p2 for $target"
     configure
     # The linux-gnu host selection forces USE_BTMP/_PATH_BTMP, but RavenBSD has no <utmp.h>.
     # Drop the generated btmp defines; OpenSSH then uses the available utmpx path and does not
@@ -201,6 +232,9 @@ build() {
 }
 
 build_version_wrapper() {
+    if [ "$arch" != x86_64 ]; then
+        die "the ssh-version wrapper is x86_64-only; the aarch64 lane builds the image binaries only"
+    fi
     [ -f "$build/sshd.o" ] || die "sshd.o missing; run --build first"
     llvm-objcopy --redefine-sym main=sshd_main "$build/sshd.o" "$build/sshd_version.o" ||
         die "cannot rename the upstream sshd main"
