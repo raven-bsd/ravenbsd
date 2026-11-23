@@ -93,6 +93,51 @@ pub fn live_processes() -> u64 {
     LIVE_PROCESSES.load(Ordering::Acquire)
 }
 
+/// Every process ever created, weakly (S36b leaked-reference diagnostic only).
+static ALL_PROCESSES: Mutex<Vec<Weak<Process>>> = Mutex::new(Vec::new());
+
+/// Remember a new process so the diagnostic can inspect leaked objects after the pid registry
+/// dropped them (S36b only).
+fn note_process_weak(process: &Arc<Process>) {
+    ALL_PROCESSES.lock().push(Arc::downgrade(process));
+}
+
+/// Leaked-process reference histogram (S36b diagnostic).
+///
+/// Returns `(leaked, external_refs_1, external_refs_2, external_refs_3plus, self_handles,
+/// dead_handles_in_all_processes)`. The `external` count excludes the diagnostic's temporary
+/// upgrade, so it is the number of real owners still holding the torn-down process.
+pub fn leaked_process_stats() -> [u64; 6] {
+    let mut stats = [0u64; 6];
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        if !process.torn_down.load(Ordering::Acquire) {
+            continue;
+        }
+        stats[0] = stats[0].saturating_add(1);
+        let external = Arc::strong_count(&process).saturating_sub(1);
+        match external {
+            0 => {}
+            1 => stats[1] = stats[1].saturating_add(1),
+            2 => stats[2] = stats[2].saturating_add(1),
+            _ => stats[3] = stats[3].saturating_add(1),
+        }
+        process.handles.lock().for_each_live(|_, object, _, _| {
+            if let crate::process::handle::Object::Process(target) = object {
+                if Arc::ptr_eq(target, &process) {
+                    stats[4] = stats[4].saturating_add(1);
+                }
+                if target.torn_down.load(Ordering::Acquire) {
+                    stats[5] = stats[5].saturating_add(1);
+                }
+            }
+        });
+    }
+    stats
+}
+
 impl Drop for Process {
     fn drop(&mut self) {
         LIVE_PROCESSES.fetch_sub(1, Ordering::AcqRel);
@@ -439,6 +484,7 @@ pub fn current() -> Option<Arc<Process>> {
 
 /// Register a live process in the pid registry.
 pub fn register_pid(process: &Arc<Process>) {
+    note_process_weak(process);
     PID_REGISTRY
         .lock()
         .insert(process.id, Arc::downgrade(process));
@@ -1887,8 +1933,9 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     {
         let (dead_handles, top_pid, top_count) = crate::process::handle::dead_process_handles();
         let (notices, dead_clients, dead_servers) = crate::ipc::router::close_notice_stats();
+        let leaked = leaked_process_stats();
         kprintln!(
-            "s36: procs={} threads={} zombies={} proc_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={}",
+            "s36: procs={} threads={} zombies={} proc_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={}",
             live_processes(),
             crate::sched::thread::live_threads(),
             ZOMBIES.lock().len(),
@@ -1901,7 +1948,13 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             dead_clients,
             dead_servers,
             crate::ipc::live_requests(),
-            crate::sched::reap_pending()
+            crate::sched::reap_pending(),
+            leaked[0],
+            leaked[1],
+            leaked[2],
+            leaked[3],
+            leaked[4],
+            leaked[5]
         );
     }
 }
