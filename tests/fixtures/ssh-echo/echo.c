@@ -19,6 +19,20 @@
 #define PAYLOAD_MAX 64
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
+#if defined(__aarch64__)
+static long raven_debug_write(const char *bytes, size_t len) {
+    register long result asm("x0") = 0;
+    register long number asm("x8") = 3;
+    register const char *pointer asm("x0") = bytes;
+    register size_t length asm("x1") = len;
+    __asm__ volatile("svc #0"
+                     : "+r"(pointer)
+                     : "r"(number), "r"(length)
+                     : "memory");
+    result = (long)(size_t)pointer;
+    return result;
+}
+#else
 static long raven_debug_write(const char *bytes, size_t len) {
     register long number asm("rax") = 3;
     register const char *pointer asm("rdi") = bytes;
@@ -29,6 +43,7 @@ static long raven_debug_write(const char *bytes, size_t len) {
                      : "rcx", "r11", "memory");
     return number;
 }
+#endif
 
 static void say(const char *text) {
     size_t length = 0;
