@@ -52,7 +52,7 @@ impl Loader for FakeLoader {
         argv: &[&str],
         _env: &[&str],
         cwd: &[u8],
-        _fdmap: &[(i32, u32)],
+        _fdmap: &[raven_spawn::SpawnFd],
     ) -> Result<u32, Errno> {
         assert_eq!(image, self.image.borrow().as_slice());
         *self.load_path.borrow_mut() = path.into();
