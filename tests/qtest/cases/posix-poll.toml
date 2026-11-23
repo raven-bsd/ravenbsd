@@ -8,8 +8,11 @@
 # exercises the ppoll signal mask. Rev 331 repeats the close shape on the
 # `/dev/ptmx` pty: SchemeFile master. Rev 207 execs this binary with the master
 # as an inherited fd and requires the `pty_master` role to survive the `FdMap`, so
-# the read EOF still reports HUP. It runs as /bin/libc-test under the
-# libc-test profile so the pty server is available.
+# the read EOF still reports HUP. Rev 208 adds the privsep ppoll row: the
+# waiting process is forked after the handler is registered (as OpenSSH's
+# monitor/session split does), so the per-thread kernel signal entry must be
+# registered again or a child exit never wakes the wait.
+# It runs as /bin/libc-test under the libc-test profile so the pty server is available.
 
 name = "posix-poll"
 arch = "x86_64"
@@ -39,6 +42,9 @@ regex = '^posix-poll: pty-ssh-close hup=1 elapsed-ms=[0-9]+$'
 
 [[expect]]
 regex = '^posix-poll: pty-scheme-close hup=1 elapsed-ms=[0-9]+$'
+
+[[expect]]
+regex = '^posix-poll: ppoll-mask fork ok$'
 
 [[expect]]
 regex = '^posix-poll: ppoll-mask idle\+child ok$'

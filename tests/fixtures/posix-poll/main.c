@@ -316,6 +316,75 @@ static void on_sigchld(int signo) {
  * timeout and return 0 (a naive sigprocmask+wait swap would self-kick and return EINTR).
  * Row B: the child exits during the wait, so the unblocked SIGCHLD must interrupt ppoll and its
  * handler must have run before ppoll returns. */
+/* K548 rev208: the OpenSSH privsep shape. The parent's handler is already registered, then the
+ * session process is forked; it re-installs SIGCHLD and waits on its own child. SIG_SETUP is
+ * per thread, so the forked thread must register the kernel signal entry again or the child
+ * exit never wakes the ppoll. */
+static int ppoll_fork_child_row(void) {
+    struct sigaction action;
+    struct pollfd ready;
+    struct timespec timeout;
+    sigset_t block;
+    sigset_t saved;
+    sigset_t unblocked;
+    int pipefd[2];
+    int status = 0;
+    int ready_count;
+    pid_t child;
+
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = on_sigchld;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    if (sigaction(SIGCHLD, &action, NULL) != 0)
+        return fail("fork-mask-sigaction", -1, errno);
+
+    /* The parent left SIGCHLD blocked; the session starts from the caller's unblocked mask. */
+    sigemptyset(&unblocked);
+    sigaddset(&unblocked, SIGCHLD);
+    if (sigprocmask(SIG_UNBLOCK, &unblocked, NULL) != 0)
+        return fail("fork-mask-unblock", -1, errno);
+    sigemptyset(&block);
+    sigaddset(&block, SIGCHLD);
+    if (sigprocmask(SIG_BLOCK, &block, &saved) != 0)
+        return fail("fork-mask-block", -1, errno);
+    if (pipe(pipefd) != 0)
+        return fail("fork-mask-pipe", -1, errno);
+
+    sigchld_seen = 0;
+    child = fork();
+    if (child == 0) {
+        struct timespec delay;
+        delay.tv_sec = 0;
+        delay.tv_nsec = 50 * 1000 * 1000L;
+        (void)nanosleep(&delay, NULL);
+        _exit(0);
+    }
+    if (child < 0)
+        return fail("fork-mask-fork", -1, errno);
+
+    ready.fd = pipefd[0];
+    ready.events = POLLIN;
+    ready.revents = 0;
+    timeout.tv_sec = 2;
+    timeout.tv_nsec = 0;
+    ready_count = ppoll(&ready, 1, &timeout, &saved);
+    if (ready_count != -1 || errno != EINTR) {
+        int saved_errno = errno;
+        (void)waitpid(child, &status, 0);
+        return fail("fork-mask-poll", ready_count, saved_errno);
+    }
+    if (!sigchld_seen) {
+        (void)waitpid(child, &status, 0);
+        return fail("fork-mask-handler", 0, 0);
+    }
+    if (waitpid(child, &status, 0) != child)
+        return fail("fork-mask-waitpid", child, errno);
+    (void)close(pipefd[0]);
+    (void)close(pipefd[1]);
+    return 0;
+}
+
 static int ppoll_mask_rows(void) {
     struct sigaction action;
     struct pollfd ready;
@@ -380,6 +449,25 @@ static int ppoll_mask_rows(void) {
         return fail("mask-child-handler", 0, 0);
     if (waitpid(child, &status, 0) != child)
         return fail("mask-child-waitpid", child, errno);
+
+    /* Row C: OpenSSH's privsep shape. The waiting process was forked after its parent
+     * registered the handler, so it must register the per-thread kernel entry again. */
+    sigchld_seen = 0;
+    child = fork();
+    if (child == 0)
+        _exit(ppoll_fork_child_row() == 0 ? 0 : 1);
+    if (child < 0)
+        return fail("mask-session-fork", -1, errno);
+    pid_t waited;
+    do {
+        waited = waitpid(child, &status, 0);
+    } while (waited == -1 && errno == EINTR);
+    if (waited != child)
+        return fail("mask-session-waitpid", child, errno);
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        return fail("mask-session-status", status, 0);
+    printf("posix-poll: ppoll-mask fork ok\n");
+
     if (sigprocmask(SIG_SETMASK, &saved, NULL) != 0)
         return fail("mask-restore", -1, errno);
     printf("posix-poll: ppoll-mask idle+child ok\n");
