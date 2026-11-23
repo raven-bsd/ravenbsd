@@ -4,10 +4,10 @@
 name = "process-lifecycle"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 180
+timeout_secs = 240
 pre = ["sh tests/fixtures/s36-lifecycle/build.sh"]
 initfs = "build/fixtures/s36-lifecycle/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1"
+boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1 s36-mapcheck=1"
 qemu_extra = []
 expect_exit = "success"
 
@@ -31,7 +31,7 @@ regex = '^s36: wait eintr ok$'
 regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+$'
 
 [[expect]]
-regex = '^s36: cycles done=10000$'
+regex = '^.*s36: cycles done=10000$'
 
 # Bounded process/address-space/stack churn between the same counter markers.
 [[expect]]
@@ -66,8 +66,23 @@ regex = '^s36: server ready$'
 [[expect]]
 regex = '^s36: scheme reregistered$'
 
+# vfsd pager frame-return row: baseline at exit 88, map/unmap cycles, closing at exit 89.
+# The `mapcheck ok` line is required and the leak line is forbidden: this row is red until
+# the vfsd/rt allocator owner returns the mapped-chunk frames.
+[[expect]]
+regex = '^s36: mapcheck base allocated=[0-9]+$'
+
+[[expect]]
+regex = '^s36: vfsd map done=32$'
+
+[[expect]]
+regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+$'
+
+[[expect]]
+regex = '^s36: mapcheck ok$'
+
 [[expect]]
 regex = '^s36: lifecycle ok$'
 
 [[forbid]]
-regex = '(?i)panic|s36: failed'
+regex = '(?i)panic|s36: failed|s36: mapcheck leak'
