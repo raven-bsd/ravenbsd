@@ -1885,13 +1885,17 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         .split_ascii_whitespace()
         .any(|token| token == "s36-proccheck")
     {
+        let (dead_handles, top_pid, top_count) = crate::process::handle::dead_process_handles();
         kprintln!(
-            "s36: procs={} threads={} zombies={} proc_size={} lineage={}",
+            "s36: procs={} threads={} zombies={} proc_size={} lineage={} dead_handles={} top_pid={} top_count={}",
             live_processes(),
             crate::sched::thread::live_threads(),
             ZOMBIES.lock().len(),
             core::mem::size_of::<Process>(),
-            crate::process::handle::lineage_nodes()
+            crate::process::handle::lineage_nodes(),
+            dead_handles,
+            top_pid,
+            top_count
         );
     }
 }
