@@ -108,7 +108,7 @@ const PROBE_ROUNDS: u32 = 200;
 /// after the 10 s deadline. NetBSD destroys the LWP timeout callout in `lwp_exit` and halts it in
 /// `sleepq_block`; FreeBSD and Illumos drop the sleep-queue entry on wake. A retained entry is a
 /// leak, so this row reports both the sleeper count and the live-Thread delta.
-fn sleeper_close_test(cpus: usize) -> Result<(usize, usize), (&'static str, usize, usize)> {
+fn sleeper_close_test(cpus: usize) -> Result<[usize; 4], (&'static str, [usize; 4])> {
     use crate::sched::thread::{ThreadState, live_threads};
 
     const CYCLES: usize = 8;
@@ -118,48 +118,46 @@ fn sleeper_close_test(cpus: usize) -> Result<(usize, usize), (&'static str, usiz
     sleep::sleep_ns(20_000_000);
     let base = sched::sleepers_len();
     let live_base = live_threads();
+    // sleeper delta, live-Thread delta, run-queue entries, deferred-reap entries. The last two
+    // are absolute: the audit shows the other scheduler holders are empty.
     let ledger = || {
-        (
+        [
             sched::sleepers_len().saturating_sub(base),
             live_threads().saturating_sub(live_base),
-        )
+            sched::queued_threads(),
+            sched::reap_pending(),
+        ]
     };
     for _ in 0..CYCLES {
         let thread = match sched::spawn_kernel_on(target, "sleeper-close", sleeper_thread) {
             Ok(thread) => thread,
-            Err(_) => {
-                let (sleepers, live) = ledger();
-                return Err(("spawn", sleepers, live));
-            }
+            Err(_) => return Err(("spawn", ledger())),
         };
         let deadline = sleep::now_ns().saturating_add(WAIT_NS);
         while thread.state() != ThreadState::Blocked {
             if sleep::now_ns() > deadline {
-                let (sleepers, live) = ledger();
-                return Err(("not blocked", sleepers, live));
+                return Err(("not blocked", ledger()));
             }
             sleep::sleep_ns(50_000);
         }
         if !sched::wake(alloc::sync::Arc::clone(&thread), None, 0) {
-            let (sleepers, live) = ledger();
-            return Err(("wake refused", sleepers, live));
+            return Err(("wake refused", ledger()));
         }
         let deadline = sleep::now_ns().saturating_add(WAIT_NS);
         while thread.state() != ThreadState::Dead {
             if sleep::now_ns() > deadline {
-                let (sleepers, live) = ledger();
-                return Err(("not dead", sleepers, live));
+                return Err(("not dead", ledger()));
             }
             sleep::sleep_ns(50_000);
         }
     }
     // Give the next scheduling point on this CPU time to run the deferred reaper.
     sleep::sleep_ns(20_000_000);
-    let (sleepers, live) = ledger();
-    if sleepers != 0 || live != 0 {
-        return Err(("retained", sleepers, live));
+    let counts = ledger();
+    if counts[0] != 0 || counts[1] != 0 {
+        return Err(("retained", counts));
     }
-    Ok((sleepers, live))
+    Ok(counts)
 }
 
 fn sleeper_thread() {
@@ -387,12 +385,12 @@ fn monitor() {
         }
     }
     match sleeper_close_test(cpus) {
-        Ok((sleepers, live)) => {
-            kprintln!("selftest: smp sleeper-close cycles=8 sleepers={sleepers} live={live} ok")
-        }
-        Err((reason, sleepers, live)) => {
+        Ok([sleepers, live, queued, reap]) => kprintln!(
+            "selftest: smp sleeper-close cycles=8 sleepers={sleepers} live={live} queued={queued} reap={reap} ok"
+        ),
+        Err((reason, [sleepers, live, queued, reap])) => {
             kprintln!(
-                "selftest: smp sleeper-close failed: {reason} sleepers={sleepers} live={live}"
+                "selftest: smp sleeper-close failed: {reason} sleepers={sleepers} live={live} queued={queued} reap={reap}"
             );
             boot::exit_qemu(0x11);
         }

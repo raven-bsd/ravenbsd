@@ -757,6 +757,34 @@ fn cancel_sleep(token: u64) {
     }
 }
 
+/// Drop every per-CPU timeout-sleeper entry owned by thread `id`.
+///
+/// A woken thread normally calls `end_block`, which removes its entry. A terminal process
+/// exits from `block_current` / the syscall path without `end_block`, and the entry then holds
+/// an `Arc<Thread>` (and through it the `Process`) until the deadline. NetBSD `lwp_exit`
+/// destroys `l->l_timeout_ch`; `sleepq_block` halts the callout after the switch; FreeBSD and
+/// Illumos drop the sleep-queue reference on wake. Cancel the same entry before the exiting
+/// thread's `Arc` moves to the reap queue.
+fn cancel_thread_sleepers(id: u64) {
+    if !INITIALIZED.load(Ordering::Acquire) {
+        return;
+    }
+    let _guard = sync::critical();
+    for cpu in 0..smp::online_cpus() {
+        let mut slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_mut() {
+            // The caller still owns an `Arc<Thread>`, so this drop is never the last reference
+            // and cannot run a destructor that needs the scheduler critical section.
+            while let Some((thread, _, _)) = state
+                .sleepers
+                .remove_where(|(thread, _, _)| thread.id == id)
+            {
+                drop(thread);
+            }
+        }
+    }
+}
+
 /// Start a blocking operation and return its wake token.
 ///
 /// The caller then optionally registers a timeout with [`add_sleep`], publishes a waiter, and
@@ -1116,6 +1144,9 @@ pub fn exit_thread(code: i32) -> ! {
         None => crate::arch::halt(),
     };
     thread.exit_code.store(code, Ordering::SeqCst);
+    // A terminal exit skips `end_block`; the registered timeout would pin this Thread and its
+    // Process until the deadline. Remove it before the Arc moves to the reap queue.
+    cancel_thread_sleepers(thread.id);
     // FreeBSD `thread_unlink`/NetBSD `lwp_free` remove the thread from the process linkage at
     // exit. The live list is weak, but an unremoved entry is a permanent 16-byte leak.
     thread.process.unregister_thread(&thread);
@@ -1244,6 +1275,30 @@ pub fn sleepers_len() -> usize {
         }
     }
     total
+}
+
+/// Number of threads currently queued on any CPU's run queue.
+///
+/// A dead thread must never appear here: `exit_thread` is the running thread, and `wake`
+/// refuses a `Dead` target. This counter is the run-queue half of the K495 retention audit.
+pub fn queued_threads() -> usize {
+    if !INITIALIZED.load(Ordering::Acquire) {
+        return 0;
+    }
+    let _guard = sync::critical();
+    let mut total = 0usize;
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_ref() {
+            total = total.saturating_add(state.runqueue.len());
+        }
+    }
+    total
+}
+
+/// Number of dead threads waiting for the deferred stack/Arc reaper.
+pub fn reap_pending() -> usize {
+    REAP.lock().len()
 }
 
 /// Number of successful context switches across all CPUs.
