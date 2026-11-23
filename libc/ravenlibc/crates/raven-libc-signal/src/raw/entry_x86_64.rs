@@ -5,8 +5,8 @@
 //!
 //! The kernel resumes at `__raven_sigentry` with the kick bits in `rdi` and the optional fault
 //! record pointer in `rsi`, on a stack of `interrupted_sp - 128`. The stub reads the entry
-//! function cell set by the shell (`__rl_entry_fn`), calls it and issues `SIGRETURN` (0x82).
-//! `SIGRETURN` is the only invented number and is the labelled PROPOSED PG-7 value.
+//! function cell set by the shell (`__rl_entry_fn`), calls it and issues `SIGRETURN`.
+//! `SIGRETURN` is the labelled PROPOSED PG-7 value from `raven-abi`.
 
 core::arch::global_asm!(
     r#"
@@ -27,7 +27,7 @@ __raven_sigentry:
     .hidden __rl_sigreturn_stub
     .type __rl_sigreturn_stub,@function
 __rl_sigreturn_stub:
-    mov $0x82,%eax
+    mov ${sigreturn},%eax
     syscall
     ud2
 
@@ -38,5 +38,6 @@ __rl_sigreturn_stub:
 __rl_entry_fn:
     .quad 0
 "#,
+    sigreturn = const raven_abi::signal::SIGRETURN,
     options(att_syntax)
 );

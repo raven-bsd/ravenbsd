@@ -5,7 +5,7 @@
 name = "ssh-contract"
 exec = "/bin/ssh-contract"
 args = []
-needs = ["scheme:net", "scheme:pty"]
+needs = ["scheme:file", "scheme:net", "scheme:pty"]
 readiness = "none"
 restart = "never"
 max_restarts = 0
