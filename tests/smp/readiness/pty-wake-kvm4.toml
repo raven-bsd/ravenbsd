@@ -49,6 +49,15 @@ regex = 'PTY-WAKE R6 .* ok$'
 regex = 'PTY-WAKE SUMMARY PASS 6/6$'
 
 [[expect]]
+regex = '^.*PTY-WAKE R4 .* ok$'
+
+[[expect]]
+regex = '^.*PTY-WAKE R5 .* ok$'
+
+[[expect]]
+regex = '^.*PTY-WAKE SUMMARY PASS 5/5$'
+
+[[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
