@@ -3114,6 +3114,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-rss"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-spawn-attrs"
 version = "0.1.0"
 dependencies = [

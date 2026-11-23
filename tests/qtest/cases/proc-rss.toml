@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Per-process RSS: map a known 64-page region and assert PROC_GETRUSAGE maxrss
+# is nonzero and tracks the mapping.
+
+name = "proc-rss"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/proc-rss/build.sh"]
+initfs = "build/fixtures/proc-rss/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-rss: rss=1 bytes=[0-9]+ delta=[0-9]+$'
+
+[[expect]]
+regex = '^proc-rss: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-rss: fail'
