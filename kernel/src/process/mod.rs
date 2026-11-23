@@ -102,6 +102,29 @@ fn note_process_weak(process: &Arc<Process>) {
     ALL_PROCESSES.lock().push(Arc::downgrade(process));
 }
 
+/// Live scheme requests held by each process list, including leaked processes (S36b diagnostic).
+///
+/// Returns `(client_total, active_total, queued_total, top_holder_pid, top_client_total)`.
+pub fn request_holder_stats() -> [u64; 5] {
+    let mut stats = [0u64; 5];
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        let client = process.client_requests.lock().len() as u64;
+        let active = process.active_requests.lock().len() as u64;
+        let queued = process.scheme_queue.lock().len() as u64;
+        stats[0] = stats[0].saturating_add(client);
+        stats[1] = stats[1].saturating_add(active);
+        stats[2] = stats[2].saturating_add(queued);
+        if client > stats[4] {
+            stats[4] = client;
+            stats[3] = process.id;
+        }
+    }
+    stats
+}
+
 /// Leaked-process reference histogram (S36b diagnostic).
 ///
 /// Returns `(leaked, external_refs_1, external_refs_2, external_refs_3plus, self_handles,
@@ -1955,6 +1978,15 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             leaked[3],
             leaked[4],
             leaked[5]
+        );
+        let holders = request_holder_stats();
+        kprintln!(
+            "s36: ipc client={} active={} queued={} top_pid={} top_client={}",
+            holders[0],
+            holders[1],
+            holders[2],
+            holders[3],
+            holders[4]
         );
     }
 }
