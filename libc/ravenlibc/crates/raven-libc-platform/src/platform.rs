@@ -830,6 +830,19 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                     || self.backend.read(handle, buf),
                 )
             });
+            // A terminal master read of zero past a real buffer is the pty hangup (EOF). Keep it
+            // sticky so the next `poll` reports `POLLHUP` even though the scheme-file readiness
+            // fallback still reports the master as readable (PG-25 is the server-side fix).
+            // `posix_openpt` installs the master without a name; the slave and the console carry
+            // their `/dev/...` path and must not inherit the master's hangup from a slave-side
+            // VEOF/^D read.
+            if matches!(&result, Ok(0))
+                && reference.kind() == OfdKind::Tty
+                && reference.path().is_none()
+                && !buf.is_empty()
+            {
+                reference.set_eof();
+            }
             match result {
                 Err(Errno::EAGAIN) if blocking && (doorbell || pipe) => {
                     // The kernel pipe end is created non-blocking (there is no runtime setter);
