@@ -10,14 +10,14 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
 
-out=build/fixtures/ssh-contract
+out=${SSH_CONTRACT_OUT:-build/fixtures/ssh-contract}
 mkdir -p "$out"
 rm -f "$out/host.result" "$out/host.log" "$out/host.stdout" "$out/monitor.sock"
 pkill -f "$root/tests/smp/ssh-contract/host_accept.py" 2>/dev/null || true
-python3 "$root/tests/smp/ssh-contract/host_accept.py" \
-    --host 127.0.0.1 \
-    --monitor "$out/monitor.sock" \
-    --result "$out/host.result" \
-    --log "$out/host.log" \
-    --timeout 600 \
+set -- --host 127.0.0.1 --monitor "$out/monitor.sock" \
+    --result "$out/host.result" --log "$out/host.log" --timeout 600
+if [ -n "${SSH_CONTRACT_K6_LOOP:-}" ]; then
+    set -- "$@" --k6-loop "$SSH_CONTRACT_K6_LOOP"
+fi
+python3 "$root/tests/smp/ssh-contract/host_accept.py" "$@" \
     > "$out/host.stdout" 2>&1 &

@@ -106,6 +106,32 @@ def eof_fin(host, port, deadline):
     return False
 
 
+def k6_exchange(host, port, deadline):
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
+                stream.sendall(b"PING")
+                echoed = b""
+                while len(echoed) < 4:
+                    chunk = stream.recv(4 - len(echoed))
+                    if not chunk:
+                        raise OSError("eof before PING echo")
+                    echoed += chunk
+                if echoed == b"PING":
+                    return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
+def k6_loop(host, port, loops, deadline):
+    for _ in range(loops):
+        if not k6_exchange(host, port, deadline):
+            return False
+    return True
+
+
 def own_shutdown(host, port, deadline):
     while time.monotonic() < deadline:
         try:
@@ -156,6 +182,7 @@ def main():
     parser.add_argument("--port", type=int, default=23097)
     parser.add_argument("--eof-port", type=int, default=23098)
     parser.add_argument("--monitor", default="")
+    parser.add_argument("--k6-loop", type=int, default=0)
     parser.add_argument("--result", required=True)
     parser.add_argument("--log", default="")
     parser.add_argument("--timeout", type=float, default=600.0)
@@ -173,6 +200,20 @@ def main():
                     handle.write(f"monitor fail: {error}\n")
             print(f"host peer: {error}", file=sys.stderr)
             return 1
+    if args.k6_loop:
+        if not k6_loop(args.host, args.port, args.k6_loop, deadline):
+            with open(args.result, "w", encoding="utf-8") as handle:
+                handle.write("fail k6-loop\n")
+            if args.log:
+                with open(args.log, "a", encoding="utf-8") as handle:
+                    handle.write("K6-loop fail\n")
+            return 1
+        with open(args.result, "w", encoding="utf-8") as handle:
+            handle.write("ok\n")
+        if args.log:
+            with open(args.log, "a", encoding="utf-8") as handle:
+                handle.write(f"K6-loop ok {args.k6_loop}\n")
+        return 0
     steps = [(b"ACCEPT1", b"K6ACK1"), (b"ACCEPT2", b"K6ACK2")]
     for payload, ack in steps:
         if not exchange(args.host, args.port, payload, ack, deadline):
