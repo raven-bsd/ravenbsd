@@ -42,6 +42,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -166,6 +167,23 @@ def parse_metrics_line(text: str) -> dict | None:
     return {key: int(value) for key, value in zip(keys, matches[-1])}
 
 
+def utc_from_epoch(epoch: float) -> str:
+    """Format a Unix timestamp as a UTC ISO-8601 string with milliseconds."""
+    return datetime.fromtimestamp(epoch, timezone.utc).isoformat(
+        timespec="milliseconds"
+    ).replace("+00:00", "Z")
+
+
+def utc_now() -> str:
+    """Current UTC timestamp in the harness log format."""
+    return utc_from_epoch(time.time())
+
+
+def is_banner_line(line: str) -> bool:
+    """True for the OpenSSH client line that proves the server banner arrived."""
+    return "Remote protocol version" in line or "remote software version" in line
+
+
 def format_resource_table(rows: list[dict]) -> str:
     """Render the resource samples as a compact table (missing values are '-')."""
     header = ["after", "rss_kb", "heap_u", "heap_f", "fr_free", "fr_alloc",
@@ -213,6 +231,19 @@ def selftest() -> int:
     check("metrics-threads", metrics and metrics["threads"], 6)
     check("metrics-ofds", metrics and metrics["ofds"], 7)
     check("metrics-missing", parse_metrics_line("no metrics here\n"), None)
+    check(
+        "banner-line-remote",
+        is_banner_line(
+            "debug1: Remote protocol version 2.0, remote software version OpenSSH_10.6"
+        ),
+        True,
+    )
+    check(
+        "banner-line-local",
+        is_banner_line("debug1: Local version string SSH-2.0-OpenSSH_8.9p1"),
+        False,
+    )
+    check("utc-format", utc_from_epoch(0).endswith("Z"), True)
     table = format_resource_table([
         {"after_session": 0, "qemu_rss_kb": 1000, "serial_heap_kb": 4096,
          "panic": False},
@@ -274,7 +305,8 @@ def kill(child: subprocess.Popen) -> None:
     child.wait()
 
 
-def boot(run: Path, image: Path, net: str) -> tuple[subprocess.Popen, Path, str, int]:
+def boot(run: Path, image: Path, net: str) -> tuple[
+        subprocess.Popen, Path, str, int, str, str]:
     host, port = HOST, 22
     if net == "tap":
         ensure_tap()
@@ -314,6 +346,7 @@ def boot(run: Path, image: Path, net: str) -> tuple[subprocess.Popen, Path, str,
     if not wait_serial(serial, b"svcd: sshd up", 180):
         kill(child)
         raise RuntimeError(f"sshd never started; serial {serial}")
+    ready_utc = utc_now()
     if not wait_serial(serial, b"netd: interface eth0 10.0.2.15/24", 30):
         kill(child)
         raise RuntimeError("netd never published 10.0.2.15")
@@ -321,7 +354,7 @@ def boot(run: Path, image: Path, net: str) -> tuple[subprocess.Popen, Path, str,
     while time.monotonic() < deadline:
         try:
             with socket.create_connection((host, port), timeout=1):
-                return child, serial, host, port
+                return child, serial, host, port, ready_utc, utc_now()
         except OSError:
             time.sleep(0.5)
     kill(child)
@@ -358,11 +391,25 @@ def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool,
     env["SSH_ASKPASS_REQUIRE"] = "force"
     env["K434_SSH_PASSWORD"] = PASSWORD
     started = time.monotonic()
-    with open(log, "wb") as log_file, open(out_path, "wb") as out_file:
+    start_epoch = time.time()
+    banner_mono: float | None = None
+    captured: list[str] = []
+
+    def reader(stream) -> None:
+        nonlocal banner_mono
+        for raw in iter(stream.readline, b""):
+            line = raw.decode("utf-8", errors="replace")
+            captured.append(line)
+            if banner_mono is None and is_banner_line(line):
+                banner_mono = time.monotonic()
+
+    with open(out_path, "wb") as out_file:
         child = subprocess.Popen(
             ssh_argv(marker, tty, host, port), cwd=ROOT, stdin=subprocess.DEVNULL,
-            stdout=out_file, stderr=log_file, env=env, start_new_session=True,
+            stdout=out_file, stderr=subprocess.PIPE, env=env, start_new_session=True,
         )
+        thread = threading.Thread(target=reader, args=(child.stderr,), daemon=True)
+        thread.start()
         timed_out = False
         try:
             child.wait(timeout=timeout)
@@ -370,8 +417,16 @@ def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool,
             timed_out = True
             os.killpg(child.pid, signal.SIGKILL)
             child.wait()
+        thread.join(timeout=5)
+        child.stderr.close()
+    text = "".join(captured)
+    log.write_text(text, encoding="utf-8")
     elapsed = (time.monotonic() - started) * 1000.0
-    text = log.read_text(encoding="utf-8", errors="replace")
+    banner_ms = round((banner_mono - started) * 1000.0, 1) if banner_mono is not None else ""
+    banner_utc = (
+        utc_from_epoch(start_epoch + (banner_mono - started))
+        if banner_mono is not None else ""
+    )
     stdout = out_path.read_bytes()
     auth = next((line for line in text.splitlines() if 'Authenticated to ' in line), "")
     exit_line = next(
@@ -388,6 +443,10 @@ def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool,
         "exit": None if timed_out else child.returncode,
         "timed_out": timed_out,
         "wall_ms": round(elapsed, 1),
+        "start_utc": utc_from_epoch(start_epoch),
+        "banner_utc": banner_utc,
+        "banner_ms": banner_ms,
+        "end_utc": utc_now(),
         "marker_expected": expected.decode(errors="replace").rstrip("\n"),
         "marker_ok": marker_ok,
         "stdout_hex": stdout.hex(),
@@ -455,9 +514,10 @@ def main(argv: list[str]) -> int:
     failures = 0
     child = None
     try:
-        child, serial, host, port = boot(run, image, options["net"])
+        child, serial, host, port, ready_utc, listening_utc = boot(run, image, options["net"])
         print(
             f"reconnect-soak: booted net={options['net']} target={host}:{port}; "
+            f"sshd ready at={ready_utc} listening at={listening_utc}; "
             f"hygiene after boot: {hygiene()}"
         )
         if options["resource_every"] > 0:
@@ -472,7 +532,9 @@ def main(argv: list[str]) -> int:
             last_session = number
             print(
                 f"session {number}/{total}: exit={row['exit']} timed_out={row['timed_out']} "
-                f"wall_ms={row['wall_ms']} marker_ok={row['marker_ok']} "
+                f"wall_ms={row['wall_ms']} start={row['start_utc']} "
+                f"banner_ms={row['banner_ms']} banner={row['banner_utc']} "
+                f"end={row['end_utc']} marker_ok={row['marker_ok']} "
                 f"auth={bool(row['auth_line'])} exit_status={bool(row['exit_status_line'])} "
                 f"free={bool(row['free_line'])} {row['result']}"
             )
@@ -492,6 +554,8 @@ def main(argv: list[str]) -> int:
                 print(
                     f"tty {number}/{options['tty_sessions']}: exit={row['exit']} "
                     f"timed_out={row['timed_out']} wall_ms={row['wall_ms']} "
+                    f"start={row['start_utc']} banner_ms={row['banner_ms']} "
+                    f"banner={row['banner_utc']} end={row['end_utc']} "
                     f"marker_ok={row['marker_ok']} {row['result']}"
                 )
                 if row["result"] != "PASS":
@@ -511,7 +575,8 @@ def main(argv: list[str]) -> int:
                 cwd=ROOT, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
     columns = [
-        "session", "batch", "exit", "timed_out", "wall_ms", "marker_expected",
+        "session", "batch", "exit", "timed_out", "wall_ms", "start_utc",
+        "banner_utc", "banner_ms", "end_utc", "marker_expected",
         "marker_ok", "stdout_hex", "auth_line", "exit_status_line", "free_line",
         "result",
     ]
@@ -542,6 +607,8 @@ def main(argv: list[str]) -> int:
         "resource_every": options["resource_every"],
         "resource_note": RESOURCE_NOTE,
         "resource_curve": resource_rows,
+        "sshd_ready_utc": ready_utc,
+        "listening_utc": listening_utc,
     }
     (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     with open(run / "SHA256SUMS", "w", encoding="utf-8") as sums:
