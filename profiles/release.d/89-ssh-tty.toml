@@ -9,3 +9,11 @@ src = "build/fixtures/ssh-tty/tty"
 path = "/bin/tty"
 mode = 0o755
 generated = true
+
+# K495 rev166 test-only shell-step probe: posix_spawn/fork + waitpid with a SIGSEGV watchdog, used
+# to separate a brush post-child fault from the libc/std process path.
+[[initfs.files]]
+src = "build/fixtures/ssh-tty/shellstep"
+path = "/bin/shellstep"
+mode = 0o755
+generated = true

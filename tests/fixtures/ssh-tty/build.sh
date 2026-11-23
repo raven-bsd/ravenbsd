@@ -56,25 +56,33 @@ builtins=
 if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
     builtins=1
 fi
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
-    -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
-    -c "$root/tests/fixtures/ssh-tty/tty.c" -o "$out/tty.o"
 
-if [ -n "$builtins" ]; then
-    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-        -nostdlib -nostartfiles -static -T"$link_script" \
-        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/tty.o" \
-        -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
-        "$sysroot/usr/lib/crtn.o" -o "$out/tty"
-else
-    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-        -nostdlib -nostartfiles -static -T"$link_script" \
-        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/tty.o" \
-        -L"$sysroot/usr/lib" -lc \
-        "$sysroot/usr/lib/crtn.o" -o "$out/tty"
-fi
+build_fixture() {
+    src=$1
+    name=$2
+    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+        -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+        -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+        -c "$root/tests/fixtures/ssh-tty/$src" -o "$out/$name.o"
 
-echo "ssh-tty fixture: staged $out/tty"
+    if [ -n "$builtins" ]; then
+        "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+            -nostdlib -nostartfiles -static -T"$link_script" \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/$name.o" \
+            -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
+            "$sysroot/usr/lib/crtn.o" -o "$out/$name"
+    else
+        "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+            -nostdlib -nostartfiles -static -T"$link_script" \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/$name.o" \
+            -L"$sysroot/usr/lib" -lc \
+            "$sysroot/usr/lib/crtn.o" -o "$out/$name"
+    fi
+}
+
+build_fixture tty.c tty
+build_fixture shellstep.c shellstep
+
+echo "ssh-tty fixture: staged $out/tty $out/shellstep"
