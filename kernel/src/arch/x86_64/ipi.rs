@@ -220,6 +220,7 @@ extern "C" fn call_interrupt(_rsp: u64) {
 extern "C" fn ap_timer_interrupt(rsp: u64) {
     // SAFETY: `rsp` is the interrupted kernel stack pointer; RIP is at `rsp + 80`, CS at +88.
     let cs = unsafe { core::ptr::read_volatile(rsp.saturating_add(88) as *const u64) };
+    crate::time::on_ap_tick();
     crate::sched::tick();
     apic::eoi();
     crate::sched::timer_return(cs & 3 == 3);

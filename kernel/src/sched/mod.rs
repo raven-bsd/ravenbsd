@@ -480,6 +480,17 @@ fn schedule_locked() {
                 break;
             }
             next.set_state(ThreadState::Dead);
+            // The woken terminal-process thread never runs its own exit path, so remove its
+            // timeout sleeper entry here as well as in `exit_thread`; otherwise the entry keeps
+            // an `Arc<Thread>` until its deadline. The current CPU's list is under this slot;
+            // the other CPUs are scanned without reacquiring it. The global futex queues are
+            // also not process-owned: a wait entry enqueued after the process-exit sweep would
+            // otherwise keep the dead Thread.
+            let _ = state
+                .sleepers
+                .remove_where(|(thread, _, _)| thread.id == next.id);
+            cancel_thread_sleepers_except(next.id, cpu);
+            crate::syscall::futex::remove_thread(next.id);
             push_reap(Arc::into_raw(next) as usize);
             next = match state.runqueue.pop_front() {
                 Some(next) => next,
@@ -757,6 +768,37 @@ fn cancel_sleep(token: u64) {
     }
 }
 
+/// Remove an exiting thread from every per-CPU timeout sleeper list.
+///
+/// The donor removes a woken sleeper before the thread runs (NetBSD `sleepq_remove`,
+/// FreeBSD `sleepq_abort`/`thread_unlink`). Raven defers that cleanup to the blocked caller's
+/// `end_block`, but `block_current` and `sleep_until` exit a terminal-process thread before the
+/// caller can run it, so the entry (which owns an `Arc<Thread>`) would stay until its deadline
+/// and keep the dead Thread and its Process alive. Exit removes it explicitly; the scan is
+/// bounded by the online CPU count and the queued sleeper count.
+fn cancel_thread_sleepers(thread_id: u64) {
+    let _guard = sync::critical();
+    cancel_thread_sleepers_except(thread_id, usize::MAX);
+}
+
+/// Remove `thread_id` from every CPU's sleeper list except `skip`.
+///
+/// The caller either holds `skip`'s slot lock (the scheduler terminal filter removes that list
+/// directly before calling here) or passes `usize::MAX` with the scheduler critical section held.
+fn cancel_thread_sleepers_except(thread_id: u64, skip: usize) {
+    for cpu in 0..smp::online_cpus() {
+        if cpu == skip {
+            continue;
+        }
+        let mut slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_mut() {
+            let _ = state
+                .sleepers
+                .remove_where(|(thread, _, _)| thread.id == thread_id);
+        }
+    }
+}
+
 /// Start a blocking operation and return its wake token.
 ///
 /// The caller then optionally registers a timeout with [`add_sleep`], publishes a waiter, and
@@ -1025,6 +1067,48 @@ pub fn cpu_status(cpu: usize) -> (bool, usize) {
     })
 }
 
+/// Total queued timeout sleepers across the online CPUs (S36 diagnostic).
+pub fn sleepers_len() -> usize {
+    let mut total = 0usize;
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_ref() {
+            total = total.saturating_add(state.sleepers.len());
+        }
+    }
+    total
+}
+
+/// Total runnable threads across the online CPUs (S36 diagnostic).
+pub fn runqueue_len() -> usize {
+    let mut total = 0usize;
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_ref() {
+            total = total.saturating_add(state.runqueue.len());
+        }
+    }
+    total
+}
+
+/// Current threads whose process is terminal (S36 diagnostic).
+pub fn exiting_current() -> usize {
+    let mut total = 0usize;
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_ref() {
+            if state
+                .current
+                .as_ref()
+                .is_some_and(|thread| thread.process.exiting.load(Ordering::Acquire))
+            {
+                total = total.saturating_add(1);
+            }
+        }
+    }
+    total
+}
+
 /// CPU a blocked thread should resume on.
 fn target_cpu(thread: &Thread) -> usize {
     let cpu = usize::try_from(thread.last_cpu.load(Ordering::Acquire)).unwrap_or(0);
@@ -1116,8 +1200,14 @@ pub fn exit_thread(code: i32) -> ! {
         None => crate::arch::halt(),
     };
     thread.exit_code.store(code, Ordering::SeqCst);
+    // FreeBSD `thread_unlink`/NetBSD `lwp_free` remove the thread from the process linkage at
+    // exit. The live list is weak, but an unremoved entry is a permanent 16-byte leak.
+    thread.process.unregister_thread(&thread);
     crate::syscall::futex::remove_thread(thread.id);
     thread.process.unregister_thread(&thread);
+    // `block_current`/`sleep_until` exit a terminal-process thread before the caller runs
+    // `end_block`, so the timeout entry (which holds an `Arc<Thread>`) must be removed here.
+    cancel_thread_sleepers(thread.id);
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }
@@ -1196,6 +1286,11 @@ static REAP: SpinMutex<Vec<usize>> = SpinMutex::new(Vec::new());
 
 fn push_reap(raw: usize) {
     REAP.lock().push(raw);
+}
+
+/// Threads waiting for the deferred stack reaper (S36 timeout diagnostic).
+pub fn reap_len() -> usize {
+    REAP.lock().len()
 }
 
 /// Queue a thread whose stack must be freed by the next scheduling point.
