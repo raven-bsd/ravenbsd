@@ -51,6 +51,7 @@ fn sampler() {
         let frames = memory::frame::stats();
         let (procs, threads) = process::live_totals();
         let class = memory::heap::class_stats(16);
+        let (sshd_procs, sshd_threads) = process::sshd_totals();
         kprintln!(
             "{}",
             format_line(
@@ -70,6 +71,17 @@ fn sampler() {
                 class.map_or(0, |stats| stats.free as u64),
                 class.map_or(0, |stats| stats.in_use as u64),
                 class.map_or(0, |stats| stats.slabs as u64),
+                sched::thread::live_threads(),
+                sched::reap_len(),
+                sched::thread::slot_drops(),
+                sched::thread::slot_denies(),
+                sched::thread::stack_fresh(),
+                sched::thread::stack_cached(),
+                sched::thread::stack_drops(),
+                sshd_procs,
+                sshd_threads,
+                crate::driver::dma_in_use(),
+                crate::sync::registered_count(),
             )
         );
         if HOLDER_SCAN.load(Ordering::Relaxed) {
@@ -166,6 +178,17 @@ pub fn format_line(
     c3072_free: u64,
     c3072_used: u64,
     c3072_slabs: u64,
+    live_threads: usize,
+    reap: usize,
+    slot_drops: usize,
+    slot_denies: usize,
+    stacks_fresh: u64,
+    stacks_cached: u64,
+    stacks_dropped: u64,
+    sshd_procs: usize,
+    sshd_threads: u32,
+    dma_used: u64,
+    donations: usize,
 ) -> String {
     format!(
         "K449-METRICS heap_used={heap_used} heap_free={heap_free} \
@@ -173,7 +196,12 @@ pub fn format_line(
          procs={procs} threads={threads} ofds={ofds} \
          pt_frames={pt_frames} stack_frames={stack_frames} init_pages={init_pages} \
          vfsd_pages={vfsd_pages} netd_pages={netd_pages} sshd_pages={sshd_pages} \
-         c3072_free={c3072_free} c3072_used={c3072_used} c3072_slabs={c3072_slabs}"
+         c3072_free={c3072_free} c3072_used={c3072_used} c3072_slabs={c3072_slabs} \
+         live_threads={live_threads} reap={reap} slot_drops={slot_drops} \
+         slot_denies={slot_denies} stacks_fresh={stacks_fresh} \
+         stacks_cached={stacks_cached} stacks_dropped={stacks_dropped} \
+         sshd_procs={sshd_procs} sshd_threads={sshd_threads} dma_used={dma_used} \
+         donations={donations}"
     )
 }
 

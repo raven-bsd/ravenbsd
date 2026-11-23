@@ -255,6 +255,16 @@ impl Drop for ThreadSlot {
 pub fn live_threads() -> usize {
     LIVE_THREADS.load(Ordering::Acquire)
 }
+
+/// Thread slots released since boot (K530 churn diagnostic).
+pub fn slot_drops() -> usize {
+    SLOTS_DROPPED.load(Ordering::Acquire)
+}
+
+/// Thread admission denials since boot (K530 churn diagnostic).
+pub fn slot_denies() -> usize {
+    SLOT_DENIES.load(Ordering::Acquire)
+}
 /// Mask keeping a tid in the musl lock-word / PG-2 30-bit range.
 const TID_MASK: u32 = 0x3fff_ffff;
 
@@ -910,4 +920,9 @@ pub fn stack_frames() -> u64 {
     STACK_FRESH
         .load(Ordering::Relaxed)
         .saturating_mul(STACK_RESERVED_PAGES)
+}
+
+/// Stacks dropped because the cache was full (diagnostic).
+pub fn stack_drops() -> u64 {
+    STACK_DROPS.load(Ordering::Relaxed)
 }
