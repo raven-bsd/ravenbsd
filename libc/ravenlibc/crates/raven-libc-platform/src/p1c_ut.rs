@@ -32,10 +32,7 @@ fn pty_slave_chown_and_chmod_are_read_only_device_metadata() {
     // accepts `EROFS` for exactly that read-only, root-owned node; a literal VFS `Chown` here is
     // what made `ssh -tt` fatal at `chown(/dev/pts/1, 1000, 1000)`.
     let platform = platform();
-    assert_eq!(
-        platform.chown(b"/dev/pts/1", 1000, 1000),
-        Err(Errno::EROFS)
-    );
+    assert_eq!(platform.chown(b"/dev/pts/1", 1000, 1000), Err(Errno::EROFS));
     assert_eq!(platform.chmod(b"/dev/pts/1", 0o600), Err(Errno::EROFS));
     // An ordinary VFS path still goes through the root handle.
     assert_eq!(platform.chown(b"/a", 1, 2), Ok(()));
