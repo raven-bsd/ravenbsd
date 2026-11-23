@@ -815,6 +815,18 @@ impl Process {
         self.threads_live.lock().push(Arc::downgrade(thread));
     }
 
+    /// True when any live thread has a registered PG-7 signal entry.
+    ///
+    /// Such a process has a libc entry that will run the disposition/default action in user
+    /// space; a process without one must have its default action applied by the kernel.
+    pub fn has_signal_entry(&self) -> bool {
+        self.threads_live
+            .lock()
+            .iter()
+            .filter_map(Weak::upgrade)
+            .any(|thread| thread.signal_entry.load(Ordering::Acquire) != 0)
+    }
+
     /// Queue a signal, wake a `PROC_SIGRECV` waiter and kick every live thread.
     ///
     /// The kick is the PG-7 bridge from the kernel's per-process queue to libc's signal entry:

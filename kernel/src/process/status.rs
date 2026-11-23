@@ -140,6 +140,57 @@ pub const fn exit_status(code: i32) -> i32 {
     (code & 0xff) << 8
 }
 
+/// The POSIX wait status for a process terminated by `signo` (core flag optional).
+#[must_use]
+pub const fn signal_status(signo: u32, core: bool) -> i32 {
+    ((signo & 0x7f) as i32) | if core { 0x80 } else { 0 }
+}
+
+/// What a signal does when its disposition is `SIG_DFL`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DefaultAction {
+    /// Terminate with the signal status.
+    Terminate,
+    /// Terminate with the signal status and the core flag.
+    Core,
+    /// Discard the signal.
+    Ignore,
+    /// Stop the process.
+    Stop,
+    /// Continue a stopped process.
+    Continue,
+}
+
+const DEFAULT_TERMINATE: u8 = 1;
+const DEFAULT_CORE: u8 = 2;
+const DEFAULT_IGNORE: u8 = 3;
+const DEFAULT_STOP: u8 = 4;
+const DEFAULT_CONTINUE: u8 = 5;
+
+/// Signals 0..=64 (Linux numbering; 32..34 are libc-internal).
+const DEFAULT_ACTIONS: [u8; 65] = [
+    0, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 3, 5, 4, 4, 4, 4, 3, 2, 2, 1, 1, 3, 1, 1, 2,
+    0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1,
+];
+
+/// The default action of `signo`, or `None` for 0, 32..34 and values above 64.
+#[must_use]
+#[allow(clippy::indexing_slicing)] // the range is checked before the index
+pub const fn default_action(signo: u32) -> Option<DefaultAction> {
+    if signo == 0 || signo > 64 {
+        return None;
+    }
+    match DEFAULT_ACTIONS[signo as usize] {
+        DEFAULT_TERMINATE => Some(DefaultAction::Terminate),
+        DEFAULT_CORE => Some(DefaultAction::Core),
+        DEFAULT_IGNORE => Some(DefaultAction::Ignore),
+        DEFAULT_STOP => Some(DefaultAction::Stop),
+        DEFAULT_CONTINUE => Some(DefaultAction::Continue),
+        _ => None,
+    }
+}
+
 /// The POSIX wait status for a stopped child.
 #[must_use]
 pub const fn stop_status(signo: u32) -> i32 {
@@ -165,6 +216,10 @@ impl WaitEvent {
     #[must_use]
     pub const fn status(self) -> i32 {
         match self {
+            Self::Exited(code) if code < 0 => {
+                let raw = code.unsigned_abs();
+                signal_status(raw & 0x7f, raw & 0x80 != 0)
+            }
             Self::Exited(code) => exit_status(code),
             Self::Stopped(signo) => stop_status(signo),
             Self::Continued => CONTINUED_STATUS,

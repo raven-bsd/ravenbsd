@@ -29,14 +29,9 @@ target_dir=${CARGO_TARGET_DIR:-target}
 RUSTFLAGS="$rustflags" \
     cargo build -p raven-proc-rlimit --target "$target" --release
 
-sysroot=$root/build/$arch/sysroot
-if [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$sysroot/usr/lib/crt1.o" ]; then
-    cargo xtask libc-pack --arch "$arch"
-fi
-if [ ! -f "$sysroot/usr/lib/libc.a" ]; then
-    printf 'proc-rlimit fixture: missing %s/usr/lib/libc.a\n' "$sysroot" >&2
-    exit 77
-fi
+sysroot=${RAVENLIBC_SYSROOT:-$root/build/$arch/sysroot}
+. "$root/tests/fixtures/libc-sysroot.sh"
+ensure_libc_sysroot "$root" "$arch" "$sysroot" proc-rlimit
 
 CC=${CC:-clang}
 if ! command -v "$CC" >/dev/null 2>&1; then
