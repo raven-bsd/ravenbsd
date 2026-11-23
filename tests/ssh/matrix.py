@@ -90,8 +90,9 @@ RELEASE_COMMANDS = (
      "stdout == /\\n (release session cwd)"),
     ("ls", ["ls", "/"], release_root_listing,
      "root listing contains all expected namespace entries"),
-    ("cat-hosts", ["cat", "/etc/hosts"], lambda out: b"127.0.0.1" in out,
-     "stdout contains 127.0.0.1"),
+    ("cat-marker", ["cat", "/etc/ssh-matrix-marker"],
+     lambda out: out == b"K434-SSH-MARKER-2026-11-22\n",
+     "stdout == K434-SSH-MARKER-2026-11-22\\n (existing image file)"),
     ("echo-builtin", ["echo", "K514-BUILTIN"], lambda out: out == b"K514-BUILTIN\n",
      "stdout == K514-BUILTIN\\n"),
 )

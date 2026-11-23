@@ -55,7 +55,9 @@ ROWS = (
     ("uname", ["uname"], lambda out: out == b"RavenBSD\n", "RavenBSD\\n"),
     ("pwd", ["pwd"], lambda out: out == b"/\n", "/\\n"),
     ("ls", ["ls", "/"], root_listing, "root namespace listing"),
-    ("cat-hosts", ["cat", "/etc/hosts"], lambda out: b"127.0.0.1" in out, "127.0.0.1"),
+    ("cat-marker", ["cat", "/etc/ssh-matrix-marker"],
+     lambda out: out == b"K434-SSH-MARKER-2026-11-22\n",
+     "K434-SSH-MARKER-2026-11-22\\n"),
     ("echo-builtin", ["echo", "K514-BUILTIN"],
      lambda out: out == b"K514-BUILTIN\n", "K514-BUILTIN\\n"),
 )
