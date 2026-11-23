@@ -540,3 +540,7 @@ pub fn install_initial(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "handle_ut.rs"]
+mod tests;
