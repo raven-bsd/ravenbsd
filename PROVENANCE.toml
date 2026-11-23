@@ -9704,3 +9704,14 @@ tier = "A"
 copied = "2026-11-23"
 modified = true
 notes = "Immediate cancellation in Cyclics::cancel and the O(1) next_deadline ported from DragonFly callout_stop/_callout_cancel_quick and the sleepqueue _tsleep_remove unlink path (sys/kern/kern_synch.c); the rest of the crate is original Raven Rust. No C expression copied."
+
+[[import]]
+path = "crates/raven-chan/src/msgport.rs"
+upstream = "dragonfly"
+upstream_path = "sys/kern/lwkt_msgport.c"
+upstream_rev = "94448f622a06cde90ba42d688e9cab2448ad9ab3"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-23"
+modified = true
+notes = "lwkt_domsg() synchronous-completion rule (line 184) and the MSGF_SYNC arm of lwkt_thread_replyport() (line 591) transcribed into a pure bounded state model; no IPI, scheduler, port callback table or kernel glue copied."
