@@ -18,7 +18,8 @@ mkdir -p "$out"
 target=x86_64-unknown-ravenbsd
 target_dir=build/cargo/std-spawn
 RUSTFLAGS="--cfg getrandom_backend=\"custom\" -C strip=symbols -C relocation-model=static -C code-model=small -C link-arg=-T$root/xtask/brush-x86_64.ld -C link-arg=$root/build/x86_64/crt1.o -C link-arg=$root/build/x86_64/crti.o -C link-arg=-L$root/build/x86_64 -C link-arg=-lc -C link-arg=$root/build/x86_64/crtn.o -C link-arg=-Map=$root/build/fixtures/std-spawn/probe.map" \
-    cargo +ravenbsd build --manifest-path tests/fixtures/std-spawn/Cargo.toml \
+    RUSTUP_TOOLCHAIN=ravenbsd \
+    cargo build --manifest-path tests/fixtures/std-spawn/Cargo.toml \
     --bin std-spawn --target "$target" --target-dir "$target_dir" --release
 
 probe=$root/$target_dir/$target/release/std-spawn
