@@ -1774,12 +1774,14 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         .is_some()
     {
         let (heap_used, _) = crate::memory::heap::stats();
+        let stats = crate::memory::frame::stats();
         kprintln!(
-            "s36: stacks fresh={} cached={} heap={} frames={}",
+            "s36: stacks fresh={} cached={} heap={} frames={} allocated={}",
             crate::sched::thread::stack_fresh(),
             crate::sched::thread::stack_cached(),
             heap_used,
-            crate::memory::frame::stats().free_bytes
+            stats.free_bytes,
+            stats.allocated_bytes
         );
     }
 }
