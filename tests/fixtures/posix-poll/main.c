@@ -210,6 +210,99 @@ static int pty_scheme_close(void) {
     return 0;
 }
 
+/* K548 rev 207: the master role across execve. The sshd session child is an exec'd image, so
+ * the master OFD must keep `pty_master` in the `FdMap`; otherwise the read EOF cannot mark the
+ * hangup and poll never reports POLLHUP. The parent opens the scheme master, forks and execs
+ * this same binary with the master as fd 3, then closes the slave. The exec'd child reads EOF
+ * and requires POLLHUP within a bounded ppoll. */
+static int pty_exec_child_row(void) {
+    struct pollfd ready;
+    struct timespec timeout;
+    char byte = 0;
+    int master = 3;
+    int ready_count;
+    int saw_eof = 0;
+
+    /* The slave was closed before the fork, so this read is a level EOF. O_NONBLOCK keeps a
+     * retry path from adding a blocking wait; the bounded loop is the row's own limit. */
+    int flags = fcntl(master, F_GETFL, 0);
+    if (flags >= 0)
+        (void)fcntl(master, F_SETFL, flags | O_NONBLOCK);
+    printf("posix-poll: pty-exec-start\n");
+
+    for (int spins = 0; spins < 2000; spins++) {
+        ssize_t count = read(master, &byte, 1);
+        if (count == 0) {
+            saw_eof = 1;
+            break;
+        }
+        if (count > 0) {
+            usleep(1000);
+            continue;
+        }
+        if (errno == EAGAIN || errno == EINTR) {
+            usleep(1000);
+            continue;
+        }
+        return fail("exec-read", master, errno);
+    }
+    if (!saw_eof)
+        return fail("exec-eof", master, 0);
+
+    ready.fd = master;
+    ready.events = POLLIN;
+    ready.revents = 0;
+    timeout.tv_sec = 2;
+    timeout.tv_nsec = 0;
+    ready_count = ppoll(&ready, 1, &timeout, NULL);
+    if (ready_count <= 0)
+        return fail("exec-hup-poll", ready_count, errno);
+    if ((ready.revents & POLLHUP) == 0)
+        return fail("exec-hup-revents", ready.revents, 0);
+    printf("posix-poll: pty-exec-close hup=1\n");
+    return 0;
+}
+
+static int pty_exec_close(void) {
+    char name[128];
+    int master;
+    int slave;
+    int status = 0;
+    pid_t child;
+
+    master = open_scheme_master(name, sizeof(name));
+    if (master < 0)
+        return fail("exec-master", -1, errno);
+    slave = open(name, O_RDWR | O_NOCTTY);
+    if (slave < 0)
+        return fail("exec-slave", -1, errno);
+
+    /* Close the last slave before the fork, so the hangup is already a level when the exec'd
+     * child reads; the role, not the close race, is then the only thing under test. */
+    (void)close(slave);
+
+    child = fork();
+    if (child == 0) {
+        if (master != 3) {
+            if (dup2(master, 3) != 3)
+                _exit(12);
+            (void)close(master);
+        }
+        execl("/bin/libc-test", "libc-test", "exec-row-child", (char *)NULL);
+        _exit(127);
+    }
+    if (child < 0)
+        return fail("exec-fork", -1, errno);
+
+    (void)close(master);
+    if (waitpid(child, &status, 0) != child)
+        return fail("exec-waitpid", child, errno);
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        return fail("exec-child-status", status, 0);
+    printf("posix-poll: pty-exec-parent child=%d\n", (int)child);
+    return 0;
+}
+
 static volatile sig_atomic_t sigchld_seen;
 
 static void on_sigchld(int signo) {
@@ -295,7 +388,7 @@ static int ppoll_mask_rows(void) {
     return 0;
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     int pair[2];
     int pipefd[2];
     int master;
@@ -304,6 +397,12 @@ int main(void) {
     int revents;
 
     setvbuf(stdout, NULL, _IONBF, 0);
+
+    if (argc > 1 && strcmp(argv[1], "exec-row-child") == 0)
+        return pty_exec_child_row();
+
+    if (pty_exec_close() != 0)
+        return 1;
 
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) != 0)
         return fail("socketpair", -1, errno);
