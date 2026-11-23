@@ -47,10 +47,12 @@ process_ctl::PROC_WAIT_EX	0x48	kernel/src/syscall/process_ctl.rs:182	fuzz	direct
 process_ctl::PROC_GETPGID	0x49	kernel/src/syscall/process_ctl.rs:184	fuzz	direct	PROC_GETPGID
 process_ctl::PROC_SIGNAL	0x4a	kernel/src/syscall/process_ctl.rs:186	fuzz	direct	PROC_SIGNAL
 process_ctl::PROC_SIGRECV	0x4b	kernel/src/syscall/process_ctl.rs:188	fuzz	direct	PROC_SIGRECV
-process_ctl::PROC_TIMES	0x4c	kernel/src/syscall/process_ctl.rs:190	fuzz	direct	PROC_TIMES
-process_ctl::PROC_GETRUSAGE	0x4d	kernel/src/syscall/process_ctl.rs:192	fuzz	direct	PROC_GETRUSAGE
-process_ctl::PROC_GETRLIMIT	0x4e	kernel/src/syscall/process_ctl.rs:194	fuzz	direct	PROC_GETRLIMIT
-process_ctl::PROC_SETRLIMIT	0x4f	kernel/src/syscall/process_ctl.rs:196	fuzz	direct	PROC_SETRLIMIT
+process_ctl::PROC_SIGRECV_EX	0x85	kernel/src/syscall/process_ctl.rs:190	fuzz	direct	PROC_SIGRECV_EX
+process_ctl::PROC_SIGQUEUE	0x86	kernel/src/syscall/process_ctl.rs:192	fuzz	direct	PROC_SIGQUEUE
+process_ctl::PROC_TIMES	0x4c	kernel/src/syscall/process_ctl.rs:196	fuzz	direct	PROC_TIMES
+process_ctl::PROC_GETRUSAGE	0x4d	kernel/src/syscall/process_ctl.rs:198	fuzz	direct	PROC_GETRUSAGE
+process_ctl::PROC_GETRLIMIT	0x4e	kernel/src/syscall/process_ctl.rs:200	fuzz	direct	PROC_GETRLIMIT
+process_ctl::PROC_SETRLIMIT	0x4f	kernel/src/syscall/process_ctl.rs:202	fuzz	direct	PROC_SETRLIMIT
 raven_abi::syscall::PROC_SET_PERSONALITY	0x34	crates/raven-abi/src/syscall.rs:242	fuzz	direct	PROC_SET_PERSONALITY
 raven_abi::syscall::THREAD_SET_TLS	0x23	crates/raven-abi/src/syscall.rs:250	fuzz	direct	THREAD_SET_TLS
 raven_abi::syscall::THREAD_KICK	0x81	crates/raven-abi/src/syscall.rs:258	fuzz	direct	THREAD_KICK
