@@ -476,14 +476,9 @@ impl Donation {
         self.turnstiles.stats(object)
     }
 
-    /// The live turnstile object ids (delegated to the turnstile).
+    /// The object ids with recorded statistics (delegated to the turnstile).
     pub fn objects(&self) -> impl Iterator<Item = ObjectId> + '_ {
         self.turnstiles.objects()
-    }
-
-    /// The object ids with recorded statistics; they outlive a reclaimed turnstile.
-    pub fn stats_objects(&self) -> impl Iterator<Item = ObjectId> + '_ {
-        self.turnstiles.stats_objects()
     }
 }
 

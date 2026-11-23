@@ -5,7 +5,6 @@
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
-use core::hash::{Hash, Hasher};
 
 /// Identifier of a thread in the model.
 pub type ThreadId = u32;
@@ -151,12 +150,18 @@ struct Waiter {
 }
 
 /// One turnstile: the wait queue plus the inheritance link to its owner.
+///
+/// Equality and hashing deliberately ignore the [`LockStats`] counters (when compiled in): the
+/// exhaustive model check deduplicates on the *logical* state, so two reachable states that differ
+/// only in their accumulated statistics must still collapse.
 #[derive(Clone, Debug, Default)]
 struct Turnstile {
     owner: Option<ThreadId>,
     waiters: Vec<Waiter>,
     pi: Option<Priority>,
     next_arrival: u64,
+    #[cfg(feature = "lockstat")]
+    stats: LockStats,
 }
 
 impl PartialEq for Turnstile {
@@ -186,36 +191,11 @@ impl core::hash::Hash for Turnstile {
 /// priority only ever rises (its numeric value falls) toward `0`, the fixed point is unique and is
 /// reached by iterating to stability. This is the transitive inheritance of `R-LCK-6`; the kernel
 /// glue may replace the recomputation with incremental propagation that yields the same value.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Turnstiles {
     threads: BTreeMap<ThreadId, Priority>,
     effective: BTreeMap<ThreadId, Priority>,
     objects: BTreeMap<ObjectId, Turnstile>,
-    /// Per-lock statistics keyed by object id. They outlive the transient turnstile: an idle
-    /// turnstile is reclaimed (FreeBSD `turnstile_free`), while the counters belong to the lock
-    /// object (FreeBSD `lock_profile_object` keyed by `lock_object`; NetBSD `lockdebug` is
-    /// allocated at lock init and freed at lock destroy). Excluded from equality and hashing so
-    /// the exhaustive model check still deduplicates on the logical state.
-    #[cfg(feature = "lockstat")]
-    stats: BTreeMap<ObjectId, LockStats>,
-}
-
-impl PartialEq for Turnstiles {
-    fn eq(&self, other: &Self) -> bool {
-        self.threads == other.threads
-            && self.effective == other.effective
-            && self.objects == other.objects
-    }
-}
-
-impl Eq for Turnstiles {}
-
-impl Hash for Turnstiles {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.threads.hash(state);
-        self.effective.hash(state);
-        self.objects.hash(state);
-    }
 }
 
 impl Turnstiles {
@@ -650,49 +630,25 @@ impl Turnstiles {
     }
 }
 
-/// Upper bound on the per-object lockstat records.
-///
-/// FreeBSD's `LPROF_CACHE_SIZE` profiling cache is fixed too: when it is exhausted it rejects
-/// new objects (`lock_prof_rejected`) instead of growing without bound. Kernel locks that are
-/// created and destroyed per process (the `Process` fields are `Mutex` instances) must not turn
-/// the diagnostic into a new leak; existing records stay valid and new objects are simply not
-/// profiled once the cap is reached.
-#[cfg(feature = "lockstat")]
-const MAX_STATS_OBJECTS: usize = 4096;
-
 #[cfg(feature = "lockstat")]
 impl Turnstiles {
     /// Snapshot the lock statistics for `object` (all zero when it has never been touched).
     #[must_use]
     pub fn stats(&self, object: ObjectId) -> LockStats {
-        self.stats.get(&object).copied().unwrap_or_default()
-    }
-
-    /// The object ids that have recorded statistics.
-    pub fn stats_objects(&self) -> impl Iterator<Item = ObjectId> + '_ {
-        self.stats.keys().copied()
-    }
-
-    fn stat_entry(&mut self, object: ObjectId) -> Option<&mut LockStats> {
-        if self.stats.len() >= MAX_STATS_OBJECTS && !self.stats.contains_key(&object) {
-            return None;
-        }
-        Some(self.stats.entry(object).or_default())
+        self.objects
+            .get(&object)
+            .map_or(LockStats::default(), |turnstile| turnstile.stats)
     }
 
     fn stat_acquire(&mut self, object: ObjectId) {
-        let Some(stats) = self.stat_entry(object) else {
-            return;
-        };
+        let stats = &mut self.objects.entry(object).or_default().stats;
         stats.immediate_acquisitions = stats.immediate_acquisitions.saturating_add(1);
     }
 
     fn stat_block(&mut self, object: ObjectId, owner: ThreadId, changed: bool) {
         let depth = self.waiter_count(object) as u64;
         let chain = 1u64.saturating_add(self.chain_length(owner) as u64);
-        let Some(stats) = self.stat_entry(object) else {
-            return;
-        };
+        let stats = &mut self.objects.entry(object).or_default().stats;
         stats.wait_entries = stats.wait_entries.saturating_add(1);
         stats.max_queue_depth = stats.max_queue_depth.max(depth);
         stats.max_inheritance_depth = stats.max_inheritance_depth.max(chain);
@@ -702,16 +658,12 @@ impl Turnstiles {
     }
 
     fn stat_wake(&mut self, object: ObjectId, count: u64) {
-        let Some(stats) = self.stat_entry(object) else {
-            return;
-        };
+        let stats = &mut self.objects.entry(object).or_default().stats;
         stats.wakes = stats.wakes.saturating_add(count);
     }
 
     fn stat_cancel(&mut self, object: ObjectId, changed: bool) {
-        let Some(stats) = self.stat_entry(object) else {
-            return;
-        };
+        let stats = &mut self.objects.entry(object).or_default().stats;
         stats.cancels = stats.cancels.saturating_add(1);
         if changed {
             stats.inherited_priority_changes = stats.inherited_priority_changes.saturating_add(1);
@@ -719,9 +671,7 @@ impl Turnstiles {
     }
 
     fn stat_priority_change(&mut self, object: ObjectId) {
-        let Some(stats) = self.stat_entry(object) else {
-            return;
-        };
+        let stats = &mut self.objects.entry(object).or_default().stats;
         stats.inherited_priority_changes = stats.inherited_priority_changes.saturating_add(1);
     }
 

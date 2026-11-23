@@ -214,22 +214,6 @@ fn stats_and_objects_are_delegated() {
     assert_eq!(d.stats(99), crate::LockStats::default());
 }
 
-#[cfg(feature = "lockstat")]
-#[test]
-fn stats_objects_outlive_reclamation() {
-    let mut d = Donation::new();
-    d.register(0, prio(10)).unwrap();
-    d.register(1, prio(2)).unwrap();
-    d.acquire(7, 0).unwrap();
-    d.block(7, 1).unwrap();
-    assert_eq!(d.wake_one(7), Some(1)); // handoff
-    assert_eq!(d.wake_one(7), None); // released; the turnstile is reclaimed
-    assert!(d.objects().next().is_none());
-    let objects: vec::Vec<ObjectId> = d.stats_objects().collect();
-    assert_eq!(objects, vec![7]);
-    assert_eq!(d.stats(7).wait_entries, 1);
-}
-
 #[test]
 fn end_call_no_alloc_matches_full_refresh() {
     let mut d = Donation::new();

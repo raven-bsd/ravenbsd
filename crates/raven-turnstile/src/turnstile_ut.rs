@@ -448,47 +448,6 @@ fn lockstat_cancel_and_wake_one_counts() {
 
 #[cfg(feature = "lockstat")]
 #[test]
-fn lockstat_survives_turnstile_reclamation() {
-    let mut t = Turnstiles::new();
-    t.register(0, prio(10)).unwrap();
-    t.register(1, prio(2)).unwrap();
-    t.acquire(2, 0).unwrap();
-    t.block(2, 1).unwrap();
-    assert_eq!(t.wake_one(2), Some(1)); // handoff to the waiter
-    assert_eq!(t.wake_one(2), None); // last owner releases: idle turnstile reclaimed
-    assert_eq!(t.objects().count(), 0, "empty turnstile must be reclaimed");
-    // The counters belong to the lock object, not the transient turnstile: FreeBSD
-    // `lock_profile_object` is keyed by `lock_object` and NetBSD `lockdebug` is allocated at
-    // lock init and freed at lock destroy. Reclaiming the empty turnstile must not zero them.
-    let s = t.stats(2);
-    assert_eq!(s.immediate_acquisitions, 1);
-    assert_eq!(s.wait_entries, 1);
-    assert_eq!(s.wakes, 1);
-    let stats_objects: vec::Vec<ObjectId> = t.stats_objects().collect();
-    assert_eq!(stats_objects, vec![2]);
-}
-
-#[cfg(feature = "lockstat")]
-#[test]
-fn lockstat_cache_is_bounded() {
-    let mut t = Turnstiles::new();
-    t.register(0, prio(10)).unwrap();
-    for object in 0..MAX_STATS_OBJECTS as ObjectId {
-        t.acquire(object, 0).unwrap();
-        assert_eq!(t.wake_one(object), None);
-    }
-    assert_eq!(t.stats_objects().count(), MAX_STATS_OBJECTS);
-    // A full cache rejects only the new object; the existing records stay valid.
-    let extra = MAX_STATS_OBJECTS as ObjectId;
-    t.acquire(extra, 0).unwrap();
-    assert_eq!(t.wake_one(extra), None);
-    assert_eq!(t.stats(extra), LockStats::default());
-    assert_eq!(t.stats_objects().count(), MAX_STATS_OBJECTS);
-    assert_eq!(t.stats(0).immediate_acquisitions, 1);
-}
-
-#[cfg(feature = "lockstat")]
-#[test]
 fn lockstat_max_inheritance_depth_is_transitive() {
     let mut t = Turnstiles::new();
     t.register(0, prio(10)).unwrap(); // C
