@@ -80,7 +80,7 @@ fn sampler() {
                 0,
                 0,
                 turnstile.0,
-                turnstile.1,
+                u32::try_from(turnstile.1).unwrap_or(u32::MAX),
                 zombies,
                 crate::sync::registered_count(),
             )
