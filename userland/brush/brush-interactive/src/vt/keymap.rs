@@ -47,17 +47,46 @@ pub(crate) struct Lookup {
     pub prefix: bool,
 }
 
+/// K495 rev183 diagnostic: read the map's inline prefix at `default`/`set` so the parent and the
+/// spawned child can be compared. Enabled only when `K495_DEBUG_KEYMAP` is in the environment.
+/// The `IndexMap` starts with the indices `RawTable`, so the first words are its
+/// `bucket_mask`/`ctrl`/`growth_left`/`items` (the compiler may order `ctrl` first; the raw words
+/// are printed so the host gdb values can be matched).
+fn debug_keymap(stage: &str, map: &IndexMap<KeySequence, Target>) {
+    let enabled = std::env::var_os("K495_DEBUG_KEYMAP").is_some()
+        || std::path::Path::new("/etc/k495-debug-keymap").exists();
+    if !enabled {
+        return;
+    }
+    let pid = std::process::id();
+    let address = map as *const IndexMap<KeySequence, Target> as usize;
+    // SAFETY: diagnostic only. `map` is a live `IndexMap`; the four words are its inline prefix
+    // (the indices RawTable), inside the object, and the read is unaligned-safe for a live object.
+    let words: [usize; 4] = unsafe { core::ptr::read_unaligned(address as *const [usize; 4]) };
+    eprintln!(
+        "K495-KEYMAP pid={} stage={} map=0x{:x} cap={} len={} words={:x?}",
+        pid,
+        stage,
+        address,
+        map.capacity(),
+        map.len(),
+        words
+    );
+}
+
 impl Default for VtKeyBindings {
     fn default() -> Self {
         let mut bindings = Self {
             targets: IndexMap::new(),
         };
+        debug_keymap("default-new", &bindings.targets);
         for (stroke, function) in default_bindings() {
             bindings.set(
                 KeySequence::Strokes(vec![stroke]),
                 Target::Action(KeyAction::DoInputFunction(function)),
             );
         }
+        debug_keymap("default-filled", &bindings.targets);
         bindings
     }
 }
@@ -83,8 +112,10 @@ impl VtKeyBindings {
     /// Binds `seq` to `target`, replacing what it was bound to; it's then the
     /// latest binding.
     fn set(&mut self, seq: KeySequence, target: Target) {
+        debug_keymap("set-before", &self.targets);
         self.remove(&seq);
         self.targets.insert(seq, target);
+        debug_keymap("set-after", &self.targets);
     }
 
     /// Removes the binding of `seq`, and of any other way of writing it (e.g.,
