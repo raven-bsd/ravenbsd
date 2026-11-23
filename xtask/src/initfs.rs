@@ -352,7 +352,8 @@ pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -
     let needs_libc = brush_requested(profile, arch) || uutils_requested(profile, arch) || dynamic;
     let manifest_stale = dynamic && !crate::libc_link::loader_manifest_matches(root, arch.as_str());
     let sources_stale = needs_libc && !libc_stamp_current(root, arch);
-    if !plan.libc.is_empty() || manifest_stale || sources_stale {
+    let dso_stale = dynamic && !crate::libc_link::dso_stamp_current(root, arch.as_str());
+    if !plan.libc.is_empty() || manifest_stale || sources_stale || dso_stale {
         ensure_libc(root, arch, dynamic)?;
     }
     if plan.brush {
@@ -419,8 +420,9 @@ where
 pub(crate) fn ensure_libc(root: &Path, arch: Arch, dynamic: bool) -> Result<()> {
     let manifest_stale = dynamic && !crate::libc_link::loader_manifest_matches(root, arch.as_str());
     let sources_stale = !libc_stamp_current(root, arch);
+    let dso_stale = dynamic && !crate::libc_link::dso_stamp_current(root, arch.as_str());
     let missing = libc_missing(arch, dynamic, |source| root.join(source).is_file());
-    if missing.is_empty() && !manifest_stale && !sources_stale {
+    if missing.is_empty() && !manifest_stale && !sources_stale && !dso_stale {
         return Ok(());
     }
     if missing.is_empty() {
@@ -454,7 +456,7 @@ pub(crate) fn ensure_libc(root: &Path, arch: Arch, dynamic: bool) -> Result<()> 
     let dynamic_missing = missing
         .iter()
         .any(|source| DYNAMIC_OUTPUTS.iter().any(|name| source.ends_with(name)));
-    if dynamic && (dynamic_missing || manifest_stale) {
+    if dynamic && (dynamic_missing || manifest_stale || sources_stale || dso_stale) {
         let code = crate::libc_link::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
         if code != 0 {
             bail!("libc-link failed with exit code {code}");

@@ -145,10 +145,14 @@ static int drain_master(int fd) {
     return 0;
 }
 
-static int drain_search(int fd, const char *needle, int *seen) {
+static int drain_search(int fd, const char *needle, int *seen, char *head, size_t head_size) {
     char buffer[128];
     int found = 0;
+    size_t used = 0;
 
+    if (head != NULL && head_size > 0) {
+        head[0] = '\0';
+    }
     for (int attempt = 0; attempt < 256; attempt++) {
         ssize_t count = read(fd, buffer, sizeof(buffer) - 1);
         if (count == 0) {
@@ -158,6 +162,13 @@ static int drain_search(int fd, const char *needle, int *seen) {
         if (count < 0) {
             *seen = found;
             return errno == EAGAIN || errno == EWOULDBLOCK ? 0 : -1;
+        }
+        if (head != NULL) {
+            for (ssize_t index = 0; index < count && used + 1 < head_size; index++) {
+                unsigned char byte = (unsigned char)buffer[index];
+                head[used++] = byte >= 32 && byte < 127 ? (char)byte : '.';
+            }
+            head[used] = '\0';
         }
         buffer[count] = '\0';
         if (strstr(buffer, needle) != NULL) {
@@ -321,7 +332,7 @@ static int run_child_and_poll(int explicit_close, int handler) {
 static int run_exec_child_and_poll(void) {
     char name[128];
     char detail[200];
-    char buffer[64];
+    char data[64];
     struct timespec elapsed;
     int master;
     int slave;
@@ -364,20 +375,25 @@ static int run_exec_child_and_poll(void) {
 
     revents = poll_ms(master, POLLIN | POLLHUP, PTY_WAKE_BOUND_MS, &elapsed);
     int saved = errno;
-    int drained = drain_search(master, "wake", &saw_wake);
+    int drained = drain_search(master, "wake", &saw_wake, data, sizeof(data));
     repoll = poll_ms(master, POLLIN | POLLHUP, PTY_WAKE_REPOLL_MS, &elapsed);
     hup = (repoll > 0 && (repoll & POLLHUP) != 0) || drained == 1;
     (void)waitpid(child, &status, 0);
     (void)close(master);
+    int exited = WIFEXITED(status) ? 1 : 0;
+    int code = exited ? WEXITSTATUS(status) : -1;
+    int signaled = WIFSIGNALED(status) ? 1 : 0;
+    int termsig = signaled ? WTERMSIG(status) : 0;
     if (revents <= 0 || (revents & (POLLIN | POLLHUP)) == 0 || !saw_wake || !hup) {
         (void)snprintf(detail, sizeof(detail),
-                       "n=%d errno=%d revents=0x%x repoll=0x%x wake=%d hup=%d", revents, saved,
-                       revents, repoll, saw_wake, hup);
+                       "n=%d errno=%d revents=0x%x repoll=0x%x wake=%d hup=%d exit=%d code=%d sig=%d data=\"%s\"",
+                       revents, saved, revents, repoll, saw_wake, hup, exited, code, signaled ? 128 + termsig : 0, data);
         (void)say_line("R4", 0, detail);
         return -1;
     }
-    (void)snprintf(detail, sizeof(detail), "n=%d revents=0x%x repoll=0x%x wake=%d hup=%d", revents,
-                   revents, repoll, saw_wake, hup);
+    (void)snprintf(detail, sizeof(detail),
+                   "n=%d revents=0x%x repoll=0x%x wake=%d hup=%d exit=%d code=%d sig=%d data=\"%s\"",
+                   revents, revents, repoll, saw_wake, hup, exited, code, signaled ? 128 + termsig : 0, data);
     sleep_ms(150);
     (void)say_line("R4", 1, detail);
     return 0;
@@ -386,7 +402,7 @@ static int run_exec_child_and_poll(void) {
 static int run_multi_fd_and_poll(void) {
     char name[128];
     char detail[200];
-    char buffer[64];
+    char data[64];
     struct pollfd fds[2];
     struct timespec timeout;
     struct timespec elapsed;
@@ -447,7 +463,7 @@ static int run_multi_fd_and_poll(void) {
     errno = 0;
     ready = ppoll(fds, 2, &timeout, NULL);
     int saved = errno;
-    int drained = drain_search(master, "wake", &saw_wake);
+    int drained = drain_search(master, "wake", &saw_wake, data, sizeof(data));
     repoll = poll_ms(master, POLLIN | POLLHUP, PTY_WAKE_REPOLL_MS, &elapsed);
     hup = (repoll > 0 && (repoll & POLLHUP) != 0) || drained == 1;
     (void)waitpid(child, &status, 0);

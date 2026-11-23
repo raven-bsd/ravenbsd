@@ -10,13 +10,13 @@ fn args(values: &[&str]) -> Vec<String> {
 }
 
 #[test]
-fn the_selected_set_is_the_thirty_first_slice() {
-    assert_eq!(SELECTED.len(), 30);
+fn the_selected_set_is_the_current_slice() {
+    assert_eq!(SELECTED.len(), 31);
     let names: Vec<&str> = SELECTED.iter().map(|(name, _)| *name).collect();
     for name in [
         "ls", "cat", "cp", "mv", "rm", "ln", "mkdir", "rmdir", "touch", "stat", "df", "du", "echo",
         "pwd", "basename", "dirname", "true", "false", "sleep", "date", "head", "tail", "wc",
-        "sort", "cut", "tr", "env", "id", "chmod", "chown",
+        "sort", "cut", "tr", "env", "id", "chmod", "chown", "tty",
     ] {
         assert!(names.contains(&name), "{name}");
     }
