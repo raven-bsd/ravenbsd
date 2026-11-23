@@ -71,13 +71,25 @@ TTY10_RE = re.compile(rb"/dev/pts/[0-9]+")
 # K514 rev 92 release blast-radius measurement: every command is attempted ten times as the
 # release user. The S4 row's own expectations are unchanged.
 RELEASE_SESSIONS = 10
+RELEASE_ROOT_NAMES = (
+    b"bin", b"dev", b"etc", b"home", b"init", b"lib", b"libexec",
+    b"root", b"sbin", b"tmp", b"usr", b"var",
+)
+
+
+def release_root_listing(out: bytes) -> bool:
+    """The root listing must contain every expected namespace entry."""
+    words = out.split()
+    return all(name in words for name in RELEASE_ROOT_NAMES)
+
+
 RELEASE_COMMANDS = (
-    ("uname", ["uname"], lambda out: out.startswith(b"RavenBSD"),
-     "stdout starts with RavenBSD"),
+    ("uname", ["uname"], lambda out: out == b"RavenBSD\n",
+     "stdout == RavenBSD\\n"),
     ("pwd", ["pwd"], lambda out: out == b"/\n",
      "stdout == /\\n (release session cwd)"),
-    ("ls", ["ls"], lambda out: True,
-     "any listing, no child fault"),
+    ("ls", ["ls", "/"], release_root_listing,
+     "root listing contains all expected namespace entries"),
     ("cat-hosts", ["cat", "/etc/hosts"], lambda out: b"127.0.0.1" in out,
      "stdout contains 127.0.0.1"),
     ("echo-builtin", ["echo", "K514-BUILTIN"], lambda out: out == b"K514-BUILTIN\n",
