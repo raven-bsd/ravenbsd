@@ -9,6 +9,8 @@ use raven_libc_platform::xlat::{
     FIOCLEX, FIONBIO, TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, TIOCSWINSZ,
 };
 
+use crate::compat::TIOCSCTTY;
+use crate::compat::pty_state::PROC_CTTY_SET;
 use crate::stdio::va::{List, reader};
 use crate::va::VaReaderExt;
 
@@ -93,6 +95,15 @@ fn dispatch(
             request,
             argument as i32,
         ),
+        // `TIOCSCTTY` is a kernel session operation, not a scheme CALL: give the kernel the
+        // descriptor's live terminal handle. OpenSSH `pty_make_controlling_tty` calls this.
+        request if request == TIOCSCTTY as u32 => {
+            let handle = crate::ffi::platform::global().get(fd)?.handle();
+            // SAFETY: `PROC_CTTY_SET` takes one live scheme-file handle owned by the caller.
+            let raw = unsafe { raven_libc_sys::arch::syscall1(PROC_CTTY_SET, handle.0 as usize) };
+            raven_libc_sys::errno::ret(raw)?;
+            Ok(0)
+        }
         _ => raven_libc_platform::ioctl::ioctl(
             crate::ffi::platform::global(),
             fd,

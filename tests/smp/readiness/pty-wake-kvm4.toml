@@ -11,6 +11,8 @@
 #     HUP (the sshd session-child shape).
 # R5: same child exit with a quiet second poll source (a socketpair), like sshd's connection_in;
 #     the pty HUP must still wake ppoll.
+# R6: a child sets the pty slave as its controlling terminal (setsid + TIOCSCTTY) and opens
+#     /dev/tty; the open must succeed and fstat the same slave inode (the sshd `tty` row).
 
 name = "smp-readiness-pty-wake"
 arch = "x86_64"
@@ -41,7 +43,19 @@ regex = 'PTY-WAKE R4 .* ok$'
 regex = 'PTY-WAKE R5 .* ok$'
 
 [[expect]]
-regex = 'PTY-WAKE SUMMARY PASS 5/5$'
+regex = 'PTY-WAKE R6 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE SUMMARY PASS 6/6$'
+
+[[expect]]
+regex = '^.*PTY-WAKE R4 .* ok$'
+
+[[expect]]
+regex = '^.*PTY-WAKE R5 .* ok$'
+
+[[expect]]
+regex = '^.*PTY-WAKE SUMMARY PASS 5/5$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
