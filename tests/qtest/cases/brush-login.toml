@@ -32,6 +32,9 @@ regex = '^(raven# )?no-rsh$'
 regex = '^(raven# )?command-status:0$'
 
 [[expect]]
+regex = '^(raven# )?ls-status:0$'
+
+[[expect]]
 regex = '^(raven# )?still-alive$'
 
 [[expect]]
@@ -93,6 +96,14 @@ delay_ms = 100
 
 [[step]]
 wait = '^(raven# )?command-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/ls /; echo ls-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?ls-status:0$'
 timeout_secs = 60
 
 [[step]]
