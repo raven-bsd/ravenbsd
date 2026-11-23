@@ -993,15 +993,25 @@ pub fn namespace(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// `sched::thread::Thread::kick_bits` signal-check bit.
 const KICK_CHECK_BIT: u32 = 1;
 
+/// Number of queued `SIGCHLD` records, used to tell a new child exit from a raw kick.
+fn pending_sigchld(caller: &Process) -> usize {
+    caller
+        .pending_signals
+        .lock()
+        .iter()
+        .filter(|signal| signal.signo == SIGCHLD)
+        .count()
+}
+
 /// True when an interrupted wakeup is a caught signal that will run a handler.
 ///
 /// A child exit queues `SIGCHLD` and kicks every thread with a registered signal entry. When the
 /// caller waits for a different child, that sibling's `SIGCHLD` is not an interrupt: the wait
-/// keeps blocking. A raw `THREAD_KICK` with no queued signal is an explicit interrupt, and any
+/// keeps blocking. A raw `THREAD_KICK` with no new queued signal is an explicit interrupt, and any
 /// queued signal other than `SIGCHLD` is a caught signal for this thread.
-fn wait_interrupt_is_signal(caller: &Process) -> bool {
+fn wait_interrupt_is_signal(caller: &Process, sigchld_seen: usize) -> bool {
     caller.has_pending_signal_where(|signal| signal.signo != SIGCHLD)
-        || !caller.has_pending_signal()
+        || pending_sigchld(caller) == sigchld_seen
 }
 
 /// Consume a sticky signal-check kick so the wait can block again.
@@ -1048,6 +1058,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
 
     let mut interrupted = false;
     let mut rearm = false;
+    let mut sigchld_seen = pending_sigchld(&caller);
     loop {
         let state = target.state.lock();
         if *state == ProcessState::Exited {
@@ -1070,7 +1081,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
         // terminal on the wakeup. Re-check it before reporting the interruption as `EINTR`.
         if interrupted {
             drop(state);
-            if wait_interrupt_is_signal(&caller) {
+            if wait_interrupt_is_signal(&caller, sigchld_seen) {
                 rearm_wait_kick(&mut rearm);
                 return Err(Errno::EINTR);
             }
@@ -1080,6 +1091,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
                 rearm_wait_kick(&mut rearm);
                 return Err(Errno::EINTR);
             }
+            sigchld_seen = pending_sigchld(&caller);
             rearm = true;
             interrupted = false;
             continue;
@@ -1222,6 +1234,7 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
 
     let mut interrupted = false;
     let mut rearm = false;
+    let mut sigchld_seen = pending_sigchld(&caller);
     loop {
         let children = match children_for(&caller, idtype, id) {
             Ok(children) => children,
@@ -1252,7 +1265,7 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
         // SIGCHLD and kicks the thread before/while `child_waiters` wakes it. Scan the selected
         // children once more before reporting EINTR, so an available status is never lost.
         if interrupted {
-            if wait_interrupt_is_signal(&caller) {
+            if wait_interrupt_is_signal(&caller, sigchld_seen) {
                 rearm_wait_kick(&mut rearm);
                 return Err(Errno::EINTR);
             }
@@ -1262,6 +1275,7 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
                 rearm_wait_kick(&mut rearm);
                 return Err(Errno::EINTR);
             }
+            sigchld_seen = pending_sigchld(&caller);
             rearm = true;
             interrupted = false;
         }
