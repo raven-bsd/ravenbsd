@@ -761,6 +761,28 @@ fn wait_eintr_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// Bounded churn row: baseline counters, 10,000 thread create/exit cycles, closing counters.
+///
+/// This mode skips the unrelated lifecycle scenarios so the thread teardown leak can be
+/// reproduced and measured without the wait/ABI rows. The marker child's exit makes the kernel
+/// print `s36: stacks fresh=... cached=... heap=...` before and after the churn.
+#[cfg(feature = "s36-churn-only")]
+fn churn_only(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let marker = spawn_role(initfs, "marker").map_err(|_| "marker spawn")?;
+    if proc_wait(marker).unwrap_or(-1) != 0 {
+        return Err("marker wait");
+    }
+    handle_close(marker);
+    churn_part()?;
+    let marker = spawn_role(initfs, "marker").map_err(|_| "marker spawn")?;
+    if proc_wait(marker).unwrap_or(-1) != 0 {
+        return Err("marker wait");
+    }
+    handle_close(marker);
+    println!("s36: churn done");
+    Ok(())
+}
+
 fn main(args: raven_rt::Args) -> i32 {
     if let Some(role) = args.get(1) {
         return child_main(role);
@@ -775,58 +797,69 @@ fn main(args: raven_rt::Args) -> i32 {
         Err(_) => fail("initfs parse"),
     };
 
-    // Scenario 4: unstarted process reaped by wait.
-    if let Err(message) = unstarted_part() {
-        fail(message);
-    }
-    // Scenario 7: the SIGCHLD kick must not replace an available child status with EINTR.
-    if let Err(message) = wait_interrupt_part(&initfs) {
-        fail(message);
-    }
-    // Scenario 8: a caught signal must still interrupt the wait (no EINTR suppression).
-    if let Err(message) = wait_eintr_part(&initfs) {
-        fail(message);
-    }
-    // Scenario 2, baseline marker: the kernel prints the stack/heap counters on this exit.
-    let marker = match spawn_role(&initfs, "marker") {
-        Ok(marker) => marker,
-        Err(_) => fail("marker spawn"),
-    };
-    if proc_wait(marker).unwrap_or(-1) != 0 {
-        fail("marker wait");
-    }
-    handle_close(marker);
-    if let Err(message) = churn_part() {
-        fail(message);
-    }
-    // Scenario 2, closing marker: its exit prints the counters again; the report compares.
-    let marker = match spawn_role(&initfs, "marker") {
-        Ok(marker) => marker,
-        Err(_) => fail("marker spawn"),
-    };
-    if proc_wait(marker).unwrap_or(-1) != 0 {
-        fail("marker wait");
-    }
-    handle_close(marker);
-    // Scenario 1: two-thread child.
-    if let Err(message) = two_thread_part(&initfs) {
-        fail(message);
-    }
-    // Scenario 3: admission into a terminal process.
-    if let Err(message) = admission_part(&initfs) {
-        fail(message);
-    }
-    // Scenario 5: authorized termination and its errors.
-    if let Err(message) = terminate_part(&initfs) {
-        fail(message);
-    }
-    // Scenario 6: scheme name released on exit.
-    if let Err(message) = scheme_part(&initfs) {
-        fail(message);
+    #[cfg(feature = "s36-churn-only")]
+    {
+        if let Err(message) = churn_only(&initfs) {
+            fail(message);
+        }
+        return 0;
     }
 
-    println!("s36: lifecycle ok");
-    0
+    #[cfg(not(feature = "s36-churn-only"))]
+    {
+        // Scenario 4: unstarted process reaped by wait.
+        if let Err(message) = unstarted_part() {
+            fail(message);
+        }
+        // Scenario 7: the SIGCHLD kick must not replace an available child status with EINTR.
+        if let Err(message) = wait_interrupt_part(&initfs) {
+            fail(message);
+        }
+        // Scenario 8: a caught signal must still interrupt the wait (no EINTR suppression).
+        if let Err(message) = wait_eintr_part(&initfs) {
+            fail(message);
+        }
+        // Scenario 2, baseline marker: the kernel prints the stack/heap counters on this exit.
+        let marker = match spawn_role(&initfs, "marker") {
+            Ok(marker) => marker,
+            Err(_) => fail("marker spawn"),
+        };
+        if proc_wait(marker).unwrap_or(-1) != 0 {
+            fail("marker wait");
+        }
+        handle_close(marker);
+        if let Err(message) = churn_part() {
+            fail(message);
+        }
+        // Scenario 2, closing marker: its exit prints the counters again; the report compares.
+        let marker = match spawn_role(&initfs, "marker") {
+            Ok(marker) => marker,
+            Err(_) => fail("marker spawn"),
+        };
+        if proc_wait(marker).unwrap_or(-1) != 0 {
+            fail("marker wait");
+        }
+        handle_close(marker);
+        // Scenario 1: two-thread child.
+        if let Err(message) = two_thread_part(&initfs) {
+            fail(message);
+        }
+        // Scenario 3: admission into a terminal process.
+        if let Err(message) = admission_part(&initfs) {
+            fail(message);
+        }
+        // Scenario 5: authorized termination and its errors.
+        if let Err(message) = terminate_part(&initfs) {
+            fail(message);
+        }
+        // Scenario 6: scheme name released on exit.
+        if let Err(message) = scheme_part(&initfs) {
+            fail(message);
+        }
+
+        println!("s36: lifecycle ok");
+        0
+    }
 }
 
 #[panic_handler]
