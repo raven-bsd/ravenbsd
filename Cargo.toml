@@ -390,7 +390,7 @@ edition = "2024"
 license = "BSD-3-Clause"
 authors = ["Bo Maryniuk and RavenBSD contributors"]
 repository = "https://example.invalid/ravenbsd"
-rust-version = "1.97"
+rust-version = "1.97.1"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
