@@ -220,6 +220,42 @@ fn closing_an_fd_releases_its_doorbell_with_handle_close() {
 }
 
 #[test]
+fn fork_child_duplicates_an_inherited_pty_master_handle() {
+    let platform = platform();
+    let file = platform.open(b"/a", 0, 0).expect("file");
+    let handle = platform.get(file).expect("file").handle();
+    let pty = platform
+        .install(handle, OfdKind::Tty, 2, None, false)
+        .expect("pty");
+    let old_pty = platform.get(pty).expect("pty").handle();
+    let index = platform.get(pty).expect("pty").index();
+
+    platform.fork_child_inherit();
+
+    let new_pty = platform.get(pty).expect("pty").handle();
+    assert_ne!(
+        new_pty, old_pty,
+        "the child takes a fresh scheme handle for the pty master"
+    );
+    assert_eq!(
+        platform.ofd_handle(index),
+        Some(new_pty),
+        "the OFD is the authority for the live pty handle"
+    );
+
+    // Model the parent closing its copy after the fork: the child's session must still own a
+    // usable pty main until it closes its own descriptor (otherwise the slave would lose HUP or
+    // stay open depending on which side closed first).
+    platform.backend().close(old_pty).expect("parent close");
+    let mut byte = [0u8; 1];
+    assert_eq!(
+        platform.backend().read(new_pty, &mut byte),
+        Ok(1),
+        "the child pty handle survives the parent close"
+    );
+}
+
+#[test]
 fn fork_child_duplicates_an_inherited_socket_handle() {
     let platform = platform();
     let file = platform.open(b"/a", 0, 0).expect("file");
