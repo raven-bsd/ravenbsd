@@ -43,9 +43,9 @@ OUT.mkdir(parents=True, exist_ok=True)
 shutil.copyfile(OVMF_VARS, OUT / "vars.fd")
 SERIAL.write_bytes(b"")
 
+accel = os.environ.get("PTY_GATE_ACCEL", os.environ.get("RAVEN_QEMU_ACCEL", "kvm"))
 argv = [
     "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
-    "-enable-kvm", "-cpu", "host",
     "-serial", f"file:{SERIAL}", "-display", "none", "-monitor", "none", "-no-reboot",
     "-snapshot",
     "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE}",
@@ -56,6 +56,12 @@ argv = [
     "-netdev", f"user,id=n0,hostfwd=tcp:127.0.0.1:{PORT}-:22",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
+if accel == "kvm":
+    argv.extend(["-enable-kvm", "-cpu", "host"])
+elif accel == "tcg":
+    argv.extend(["-accel", "tcg"])
+else:
+    raise SystemExit(f"pty-path-gate: unknown accelerator {accel}")
 
 qemu = subprocess.Popen(argv, cwd=str(ROOT), stdin=subprocess.DEVNULL,
                         stdout=subprocess.DEVNULL,
