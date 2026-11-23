@@ -27,8 +27,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -484,6 +486,73 @@ static int run_multi_fd_and_poll(void) {
     return 0;
 }
 
+static int run_ctty_and_open(void) {
+    char name[128];
+    char detail[200];
+    int master;
+    int slave;
+    int status = 0;
+    pid_t child;
+
+    master = open_master(name, sizeof(name));
+    if (master < 0) {
+        return -1;
+    }
+    slave = open(name, O_RDWR | O_NOCTTY);
+    if (slave < 0) {
+        (void)close(master);
+        return -1;
+    }
+    (void)make_raw(slave);
+
+    child = fork();
+    if (child == 0) {
+        (void)close(master);
+        if (setsid() < 0) {
+            _exit(11);
+        }
+        if (ioctl(slave, TIOCSCTTY, 0) != 0) {
+            _exit(12);
+        }
+        int ctty = open("/dev/tty", O_RDWR);
+        if (ctty < 0) {
+            _exit(13);
+        }
+        struct stat slave_stat;
+        struct stat ctty_stat;
+        if (fstat(slave, &slave_stat) != 0) {
+            _exit(14);
+        }
+        if (fstat(ctty, &ctty_stat) != 0) {
+            _exit(15);
+        }
+        if (slave_stat.st_dev != ctty_stat.st_dev || slave_stat.st_ino != ctty_stat.st_ino) {
+            _exit(16);
+        }
+        (void)write(slave, "ctty\n", 5);
+        _exit(0);
+    }
+    if (child < 0) {
+        (void)close(slave);
+        (void)close(master);
+        return -1;
+    }
+    (void)close(slave);
+    (void)waitpid(child, &status, 0);
+    (void)close(master);
+    int exited = WIFEXITED(status);
+    int code = exited ? WEXITSTATUS(status) : -1;
+    if (!exited || code != 0) {
+        (void)snprintf(detail, sizeof(detail), "setsid/ioctl/open/fstat child code=%d", code);
+        (void)say_line("R6", 0, detail);
+        return -1;
+    }
+    (void)snprintf(detail, sizeof(detail), "setsid=ok ctty=open-ok fstat=same");
+    sleep_ms(150);
+    (void)say_line("R6", 1, detail);
+    return 0;
+}
+
 int main(void) {
     int failures = 0;
     int result;
@@ -522,10 +591,15 @@ int main(void) {
         say("PTY-WAKE R5 no pty HUP with a quiet second poll source FAIL\n");
         failures++;
     }
+    result = run_ctty_and_open();
+    if (result != 0) {
+        say("PTY-WAKE R6 no controlling terminal / /dev/tty open FAIL\n");
+        failures++;
+    }
     if (failures != 0) {
         say("PTY-WAKE SUMMARY FAIL\n");
         return 1;
     }
-    say("PTY-WAKE SUMMARY PASS 5/5\n");
+    say("PTY-WAKE SUMMARY PASS 6/6\n");
     return 0;
 }
