@@ -492,6 +492,7 @@ impl Thread {
         unsafe {
             thread.set_saved_rsp(saved);
         }
+        remember_thread(&thread);
         Ok(thread)
     }
 
