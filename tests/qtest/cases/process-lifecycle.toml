@@ -26,6 +26,10 @@ regex = '^s36: wait race handle ok$'
 [[expect]]
 regex = '^s36: wait sibling ok$'
 
+# Scenario 9: a raw THREAD_KICK with no queued signal still returns EINTR.
+[[expect]]
+regex = '^s36: wait eintr ok$'
+
 # Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
 [[expect]]
 regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
