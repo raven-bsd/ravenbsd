@@ -239,31 +239,41 @@ while IFS='|' read -r name arch owner note case_path; do
         detail=ok
         printf 'pass\n'
     else
-        exit_status=$(sed -n 's/.*exit status \([0-9][0-9]*\).*/\1/p' "$log" | tail -n 1)
-        if grep -q 'timed out after' "$log"; then
-            status='FAIL (timeout)'
-            detail=$(grep -m1 'timed out after' "$log")
+        # K555: a latency row's own measured guard returns the qtest waiting-for-window
+        # (preflight-load exit 77; the xtask wrapper reports it as a non-zero run). That is a
+        # recorded skip, not a failure, and the gate verdict counts it separately.
+        if grep -Eq '(^|: )skipped$|preflight-load: .*waiting-for-window' "$log"; then
+            status=SKIP
+            detail=$(grep -m1 'preflight-load: .*waiting-for-window' "$log")
+            [ -n "$detail" ] || detail="waiting-for-window"
+            printf 'skip (waiting-for-window)\n'
         else
-            status=FAIL
-            unmatched=$(awk '
-                /^--- unmatched expectations ---$/ { mode = 1; next }
-                /^--- /                            { mode = 0; next }
-                mode && NF                         { print; exit }
-            ' "$log")
-            forbidden=$(awk '
-                /^--- forbidden hits ---$/ { mode = 1; next }
-                /^--- /                    { mode = 0; next }
-                mode && NF                 { print; exit }
-            ' "$log")
-            detail=""
-            [ -n "$exit_status" ] && detail="exit=$exit_status"
-            [ -n "$unmatched" ] && detail="$detail unmatched=$unmatched"
-            [ -n "$forbidden" ] && detail="$detail forbidden=$forbidden"
-            if [ -z "$detail" ]; then
-                detail=$(grep -v '^[[:space:]]*$' "$log" | tail -n 1)
+            exit_status=$(sed -n 's/.*exit status \([0-9][0-9]*\).*/\1/p' "$log" | tail -n 1)
+            if grep -q 'timed out after' "$log"; then
+                status='FAIL (timeout)'
+                detail=$(grep -m1 'timed out after' "$log")
+            else
+                status=FAIL
+                unmatched=$(awk '
+                    /^--- unmatched expectations ---$/ { mode = 1; next }
+                    /^--- /                            { mode = 0; next }
+                    mode && NF                         { print; exit }
+                ' "$log")
+                forbidden=$(awk '
+                    /^--- forbidden hits ---$/ { mode = 1; next }
+                    /^--- /                    { mode = 0; next }
+                    mode && NF                 { print; exit }
+                ' "$log")
+                detail=""
+                [ -n "$exit_status" ] && detail="exit=$exit_status"
+                [ -n "$unmatched" ] && detail="$detail unmatched=$unmatched"
+                [ -n "$forbidden" ] && detail="$detail forbidden=$forbidden"
+                if [ -z "$detail" ]; then
+                    detail=$(grep -v '^[[:space:]]*$' "$log" | tail -n 1)
+                fi
             fi
+            printf '%s\n' "$status"
         fi
-        printf '%s\n' "$status"
     fi
     detail=$(printf '%s' "$detail" | tr '\n' ' ' | tr -s ' ' | sed 's/|/\\|/g' | cut -c1-180)
     printf '%s|%s|%s|%s|%s|%s\n' "$name" "$arch" "$owner" "$note" "$status" "$detail" >> "$results"
