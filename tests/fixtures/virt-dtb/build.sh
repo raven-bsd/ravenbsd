@@ -30,5 +30,5 @@ mkdir -p "$out"
 python3 tests/fixtures/virt-dtb/generate.py
 cp "profiles/release.d/devd-net-$arch.manifest" "$out/devd.manifest"
 cp "profiles/release.d/release-drivers-$arch.conf" "$out/drivers.conf"
-cp "profiles/release.d/pcid-net-$arch.toml" "$out/pcid.toml"
+cp "profiles/release.d/pcid-net-$arch.manifest" "$out/pcid.toml"
 printf 'virt-dtb: staged %s (%s)\n' "$out" "$arch"
