@@ -21,8 +21,11 @@ for file in build/ssh/x86_64/bin/sshd build/ssh/x86_64/bin/ssh \
     fi
 done
 
-if [ ! -f build/x86_64/initfs.img ]; then
-    echo "sshd-trace: building the release initfs" >&2
+# The shared build/<arch>/initfs.img is addressed by path only; another lane may leave the base
+# profile there. This fixture needs the release profile (sshd, ptyd, ssh host keys). Regenerate
+# only when the packed image lacks ptyd: a rebuild is minutes, the overlay below is seconds.
+if ! strings build/x86_64/initfs.img 2>/dev/null | grep -q '/etc/services.d/ptyd.toml'; then
+    echo "sshd-trace: rebuilding the release initfs" >&2
     cargo xtask initfs --arch x86_64 --profile release
 fi
 
@@ -94,6 +97,10 @@ overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
     "/etc/services.d/sshd.toml=$root/tests/fixtures/sshd-trace/sshd.service.toml:0644" \
     "/etc/services.d/sshd-trace-accept.toml=$root/tests/fixtures/sshd-trace/sshd-trace-accept.service.toml:0644" \
     "/etc/raven/conf.d/network.toml=$root/tests/fixtures/sshd-trace/network-static.toml:0644" \
+    "/sbin/sshd=$root/build/ssh/x86_64/bin/sshd:0755" \
+    "/bin/ssh=$root/build/ssh/x86_64/bin/ssh:0755" \
+    "/usr/libexec/sshd-session=$root/build/ssh/x86_64/libexec/sshd-session:0755" \
+    "/usr/libexec/sshd-auth=$root/build/ssh/x86_64/libexec/sshd-auth:0755" \
     "/bin/sshd-trace-askpass=$out/askpass:0755" \
     "/bin/sshd-trace-accept=$out/accept-probe:0755" \
     "/bin/sshd-trace-logdump=$out/logdump:0755" \

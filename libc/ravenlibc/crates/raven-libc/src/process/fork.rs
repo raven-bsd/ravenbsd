@@ -105,6 +105,14 @@ extern "C" fn raven_fork_resume(sp: usize) -> c_int {
 /// One event queue allows one waiter. The child must create its own queue rather than share the
 /// parent's cached handle; the next `poll` creates it lazily.
 extern "C" fn raven_fork_child_reset() {
+    // SIG_SETUP is per kernel thread: the child's thread inherits the parent's TCB but not its
+    // kernel entry. Clear the stale registration and, when the parent had one, register the
+    // child's entry immediately so an inherited handler works before the next signal call.
+    let had_entry =
+        raven_libc_signal::raw::reset_after_fork(raven_libc_sys::tp::thread_pointer() as usize);
+    if had_entry {
+        let _ = crate::signal::ensure_entry();
+    }
     let platform = crate::ffi::platform::global();
     platform.reset_event_queue();
     // The child keeps its inherited socket descriptors alive after the parent closes its copies.
