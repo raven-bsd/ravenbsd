@@ -104,6 +104,7 @@ pub fn dispatch(from_user: bool) {
             timer::handle();
         } else {
             timer::rearm();
+            crate::time::on_ap_tick();
         }
     } else if id != 0 && id == uart_irq() {
         crate::arch::aarch64::console::handle_irq();

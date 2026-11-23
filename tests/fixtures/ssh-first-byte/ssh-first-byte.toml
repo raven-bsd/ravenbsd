@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K567 rev 339: the SSH first-byte gate row. The pre-step runs the timestamped
+# probe (tests/fixtures/ssh-first-byte/run.sh), which waits for the sshd
+# `svcd: sshd up` readiness marker before its first connect and keeps the 8 s
+# per-connection budget. The case then boots the same release image for a
+# console-login smoke. The image is the last good prebuilt `ssh-login.img`;
+# the release image build is blocked by the profile duplicate `/bin/tty` and
+# the `raven-theme` regression.
+
+name = "ssh-first-byte"
+arch = "x86_64"
+profile = "release"
+image = "build/qtest/ssh-login.img"
+timeout_secs = 300
+pre = ["sh tests/fixtures/ssh-first-byte/run.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = 'svcd: sshd up'
+unordered = true
+
+[[expect]]
+regex = 'svcd: getty up'
+unordered = true
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|bad ELF'
+
+[[forbid]]
+regex = '(?i)SegmentOutsideUserRange'

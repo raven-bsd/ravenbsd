@@ -11,6 +11,7 @@
 
 use std::collections::BTreeSet;
 use std::path::Path;
+use std::thread;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -50,9 +51,50 @@ struct Summary {
 /// Run the check gate. Returns 0 when every executed step passed, 1 otherwise.
 pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8> {
     let steps = build_steps(workspace, fast, changed)?;
+    let order: Vec<String> = steps.iter().map(|step| step.name.clone()).collect();
+    // The guard scan and the provenance checker are independent single-process passes; run them
+    // beside the cargo/clippy/nextest steps instead of after them. On the full gate the
+    // provenance scan is the largest serial phase, and nextest releases the cargo lock while it
+    // runs the tests, so the two overlap (K548 rev335 gate wall).
+    let mut deferred = Vec::new();
+    let mut jobs: Vec<(String, Instant, thread::JoinHandle<Status>)> = Vec::new();
+    for step in steps {
+        let Step { name, kind } = step;
+        match kind {
+            StepKind::Guard => {
+                println!("==> {name}");
+                let root = workspace.root.clone();
+                let started = Instant::now();
+                let job = thread::spawn(move || match guard::scan_repo(&root) {
+                    Ok(violations) => {
+                        guard::print_violations(&violations);
+                        status_for(i32::from(!violations.is_empty()))
+                    }
+                    Err(error) => {
+                        eprintln!("check: `guard` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
+                });
+                jobs.push((name, started, job));
+            }
+            StepKind::Command(spec) if name == "provenance" => {
+                println!("==> {name}");
+                let started = Instant::now();
+                let job = thread::spawn(move || match run_command(&spec) {
+                    Ok(code) => status_for(code),
+                    Err(error) => {
+                        eprintln!("check: `provenance` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
+                });
+                jobs.push((name, started, job));
+            }
+            other => deferred.push(Step { name, kind: other }),
+        }
+    }
     let mut summaries = Vec::new();
     let mut failed = false;
-    for step in steps {
+    for step in deferred {
         let Step { name, kind } = step;
         let started = Instant::now();
         let status = match kind {
@@ -60,19 +102,7 @@ pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8
                 println!("==> {name}: skipped ({reason})");
                 Status::Skipped(reason)
             }
-            StepKind::Guard => {
-                println!("==> {name}");
-                match guard::scan_repo(&workspace.root) {
-                    Ok(violations) => {
-                        guard::print_violations(&violations);
-                        status_for(i32::from(!violations.is_empty()))
-                    }
-                    Err(error) => {
-                        eprintln!("check: `{name}` could not run: {error:#}");
-                        Status::Failed(1)
-                    }
-                }
-            }
+            StepKind::Guard => Status::Failed(1),
             StepKind::Command(spec) => {
                 println!("==> {name}");
                 match run_command(&spec) {
@@ -119,6 +149,24 @@ pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8
             seconds,
         });
     }
+    for (name, started, job) in jobs {
+        let status = job.join().unwrap_or(Status::Failed(1));
+        let seconds = started.elapsed().as_secs_f64();
+        if matches!(status, Status::Failed(_)) {
+            failed = true;
+        }
+        summaries.push(Summary {
+            name,
+            status,
+            seconds,
+        });
+    }
+    summaries.sort_by_key(|summary| {
+        order
+            .iter()
+            .position(|name| name == &summary.name)
+            .unwrap_or(usize::MAX)
+    });
     print_summary(&summaries, changed);
     Ok(u8::from(failed))
 }
@@ -675,5 +723,33 @@ mod tests {
             "make check must run provenance with --strict: {:?}",
             spec.args
         );
+    }
+
+    #[test]
+    fn independent_command_steps_overlap() {
+        let dir =
+            std::env::temp_dir().join(format!("raven-xtask-check-overlap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let left = dir.join("left");
+        let right = dir.join("right");
+        let job = |mine: PathBuf, other: PathBuf| {
+            thread::spawn(move || {
+                std::fs::write(&mine, b"x").unwrap();
+                let deadline = Instant::now() + std::time::Duration::from_secs(5);
+                while !other.exists() {
+                    if Instant::now() >= deadline {
+                        return false;
+                    }
+                    thread::sleep(std::time::Duration::from_millis(2));
+                }
+                true
+            })
+        };
+        let one = job(left.clone(), right.clone());
+        let two = job(right, left);
+        assert!(one.join().unwrap(), "the first step never saw the second");
+        assert!(two.join().unwrap(), "the second step never saw the first");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# aarch64 release on QEMU `virt`: there is no ACPI/PCI scheme, so devd runs the platform launch
+# against the staged QEMU `virt` tree (`/etc/pi4.dtb`, virtio_mmio@a000000) and spawns the
+# matching `virtio,mmio` driver. The driver registers `nic:`; that scheme is the readiness gate.
+# `platform-root` is the devd-only platform capability (the pcid `root` grant is separate).
+name = "devd"
+exec = "/sbin/devd"
+args = ["devd", "dtb", "launch"]
+needs = ["logd", "vfsd", "initfsd"]
+provides = ["scheme:nic"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+grants = ["platform-root"]

@@ -6,7 +6,7 @@
 # tests/fixtures/ssh-openpty/build.sh, never base code.
 
 [[initfs.files]]
-src = "build/fixtures/ssh-openpty/openpty-null"
+src = "build/fixtures/ssh-openpty/{arch}/openpty-null"
 path = "/bin/openpty-null"
 mode = 0o755
 generated = true

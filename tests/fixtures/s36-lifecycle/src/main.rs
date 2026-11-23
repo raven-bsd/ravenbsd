@@ -956,6 +956,28 @@ fn wait_eintr_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// Bounded churn row: baseline counters, 10,000 thread create/exit cycles, closing counters.
+///
+/// This mode skips the unrelated lifecycle scenarios so the thread teardown leak can be
+/// reproduced and measured without the wait/ABI rows. The marker child's exit makes the kernel
+/// print `s36: stacks fresh=... cached=... heap=...` before and after the churn.
+#[cfg(feature = "s36-churn-only")]
+fn churn_only(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let marker = spawn_role(initfs, "marker").map_err(|_| "marker spawn")?;
+    if proc_wait(marker).unwrap_or(-1) != 0 {
+        return Err("marker wait");
+    }
+    handle_close(marker);
+    churn_part()?;
+    let marker = spawn_role(initfs, "marker").map_err(|_| "marker spawn")?;
+    if proc_wait(marker).unwrap_or(-1) != 0 {
+        return Err("marker wait");
+    }
+    handle_close(marker);
+    println!("s36: churn done");
+    Ok(())
+}
+
 fn main(args: raven_rt::Args) -> i32 {
     if let Some(role) = args.get(1) {
         return child_main(role);
@@ -969,6 +991,14 @@ fn main(args: raven_rt::Args) -> i32 {
         Ok(initfs) => initfs,
         Err(_) => fail("initfs parse"),
     };
+
+    #[cfg(feature = "s36-churn-only")]
+    {
+        if let Err(message) = churn_only(&initfs) {
+            fail(message);
+        }
+        return 0;
+    }
 
     // Scenario 4: unstarted process reaped by wait.
     if let Err(message) = unstarted_part() {
