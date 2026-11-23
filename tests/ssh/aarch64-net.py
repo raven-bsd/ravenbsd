@@ -131,6 +131,23 @@ def ssh_client(host: str, port: int, timeout: float) -> tuple[bool, bool, str]:
     return True, banner, "ok"
 
 
+def host_echo(host: str, port: int = 23097, timeout: float = 10.0) -> tuple[bool, str]:
+    """Send one exact payload to the guest echo service and require the same bytes back."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as stream:
+            stream.settimeout(timeout)
+            stream.sendall(b"PING\n")
+            data = b""
+            while len(data) < 5:
+                chunk = stream.recv(5 - len(data))
+                if not chunk:
+                    break
+                data += chunk
+            return data == b"PING\n", f"got={data!r}"
+    except OSError as error:
+        return False, f"err={error}"
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", type=Path, default=DEFAULT_IMAGE)
@@ -192,6 +209,14 @@ def main(argv: list[str]) -> int:
             child.sendline(CONSOLE_COMMAND)
             child.expect(MARKER, timeout=120)
             console_ok = True
+            # Accepted-socket data path without sshd: the release-echo image runs the tiny echo
+            # service on 23097; the host sends PING and requires the exact bytes back.
+            echo_ok = False
+            echo_detail = "not-run"
+            if wait_listener(client_host, 23097, 30):
+                echo_ok, echo_detail = host_echo(client_host)
+            else:
+                echo_detail = "echo-port-never-listened"
             # Primary row: the host client exchange. Capture it before any guest-side diagnostic
             # so a diagnostic that wedges the console cannot hide the client result.
             if wait_listener(client_host, client_port, 30):
@@ -236,7 +261,8 @@ def main(argv: list[str]) -> int:
         f"aarch64-net: netd_up={int(netd)} netd_ready={int(nic)} sshd_up={int(sshd)} "
         f"listening={int(listening)} marker={int(console_ok)} client_ok={int(client_ok)} "
         f"banner={int(client_banner)} loop_banner={int(loop_banner)} client={client_detail} "
-        f"faults={len(faults)} guest={guest_note} transport={'tap' if args.tap else 'user'}"
+        f"echo_ok={int(echo_ok)} echo={echo_detail} faults={len(faults)} guest={guest_note} "
+        f"transport={'tap' if args.tap else 'user'}"
     )
     for line in text.splitlines():
         if any(token in line for token in ("Remote protocol version", "banner exchange", "Permission denied")):
@@ -249,6 +275,9 @@ def main(argv: list[str]) -> int:
             for token in ("svcd: netd", "svcd: sshd", "netd: ready", "nic:info", "Server listening")
         ):
             print("serial:", line.strip()[-200:])
+    traces = [line.strip() for line in text.splitlines() if line.startswith("systrace:")]
+    for line in traces[-8:]:
+        print("systrace:", line)
     if client_detail != "ok":
         client_log = OUT / "client.log"
         if client_log.is_file():
