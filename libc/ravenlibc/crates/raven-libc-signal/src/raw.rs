@@ -20,22 +20,10 @@ use raven_libc_tls::tcb;
 use crate::critical::SigThreadState;
 #[cfg(not(target_os = "none"))]
 use crate::errors::ENOSYS_ERR;
-
-/// `SIG_SETUP(entry, ctx_offset, flags) -> 0` (committed raw 0x80).
 #[cfg(target_os = "none")]
-const SIG_SETUP: usize = 0x80;
-/// `THREAD_KICK(thread, bits) -> 0` (committed raw 0x81).
+use raven_abi::signal::SIG_SETUP;
 #[cfg(target_os = "none")]
-const THREAD_KICK: usize = 0x81;
-/// `PROC_SIGRECV_EX(out, flags, deliverable) -> signo` (six-word output).
-#[cfg(target_os = "none")]
-const PROC_SIGRECV_EX: usize = 0x85;
-/// `PROC_SIGQUEUE(target, signo, value) -> 0`.
-#[cfg(target_os = "none")]
-const PROC_SIGQUEUE: usize = 0x86;
-/// `PROC_SIGRECV_EX` flag: select only signals whose bit is in the deliverable mask.
-#[cfg(target_os = "none")]
-const SIGRECV_DELIVERABLE: u32 = 2;
+use raven_abi::syscall::{PROC_SIGQUEUE, PROC_SIGRECV_DELIVERABLE, PROC_SIGRECV_EX, THREAD_KICK};
 
 /// Receive one queued process signal, selecting only a deliverable one.
 ///
@@ -50,7 +38,7 @@ pub fn proc_sigrecv_ex(words: &mut [u64; 6], deliverable: u64) -> Result<i32, Er
         raven_libc_sys::arch::syscall3(
             PROC_SIGRECV_EX,
             words.as_mut_ptr() as usize,
-            (raven_libc_sys::signal::WNOHANG | SIGRECV_DELIVERABLE) as usize,
+            (raven_libc_sys::signal::WNOHANG | PROC_SIGRECV_DELIVERABLE) as usize,
             deliverable as usize,
         )
     };
@@ -116,7 +104,7 @@ pub const JMP_SS_MASK_PTR: usize = 280;
 /// constant is the host/fixture default.
 pub const SIG_CTX_AREA_OFFSET: usize = 4096;
 /// `SIG_SETUP` flag: the second argument is an absolute address (K443).
-pub const SIG_SETUP_ABS: u32 = 2;
+pub use raven_abi::signal::SIG_SETUP_ABS;
 /// The ABI page size used for a dedicated context window.
 const CONTEXT_PAGE: usize = 4096;
 
@@ -383,6 +371,20 @@ pub fn set_ctx_area(tp: usize, address: usize) {
     with_state(tp, |state| state.set_ctx_area(address));
 }
 
+/// Reset the per-thread signal delivery state for a fork child.
+///
+/// `SIG_SETUP` is per kernel thread. The child's thread is new but inherits the parent's TCB, so
+/// the inherited context registration is stale: clear it (and the thread-directed pending and
+/// deferred records) so the entry can be registered for the child thread. The mask and the
+/// process-wide dispositions are inherited and are not touched. Returns whether the parent had a
+/// registered entry, so the caller can re-register it immediately for the child.
+pub fn reset_after_fork(tp: usize) -> bool {
+    let had_entry = with_state(tp, |state| state.ctx_area() != 0);
+    with_state(tp, |state| state.reset_for_fork());
+    pending_store(tp, 0);
+    had_entry
+}
+
 /// COPY-IN: copy the kernel area into a `ucontext_t`.
 pub fn copy_ctx_in(tp: usize, context: &mut UcontextT) {
     let source = ctx_area(tp) as *const u8;
@@ -642,7 +644,7 @@ pub fn call_handler(stack: usize, handler: usize, arg1: usize, arg2: usize, arg3
     unsafe { __rl_call_handler(stack, handler, arg1, arg2, arg3) }
 }
 
-/// `SIGRETURN` (syscall 0x82, PROPOSED PG-7).
+/// `SIGRETURN` (the ABI signal-return call, PROPOSED PG-7).
 pub fn sigreturn() -> ! {
     // SAFETY: the kernel contract restores the context area and never returns here.
     unsafe { __rl_sigreturn_stub() }

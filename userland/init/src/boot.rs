@@ -379,8 +379,41 @@ fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) ->
             .services()
             .iter()
             .position(|service| service.name == "getty" && service.enable);
-        let critical = getty.map(|index| guard.supervisor.dependency_closure(index));
-        (getty, critical)
+        // FreeBSD rcorder/rc.d REQUIRE and NetBSD rc.d: every service is a prerequisite when
+        // another enabled manifest names it (directly or through a scheme provider). The start
+        // plan waits for those prerequisites, and only those, before moving on. No service is
+        // named here; the graph is entirely manifest-declared.
+        let mut critical = alloc::vec![false; guard.supervisor.len()];
+        for service in guard
+            .supervisor
+            .services()
+            .iter()
+            .filter(|service| service.enable)
+        {
+            for need in &service.needs {
+                let dependency = if need.starts_with("scheme:") {
+                    guard.supervisor.services().iter().position(|provider| {
+                        provider.enable
+                            && provider
+                                .provides
+                                .iter()
+                                .any(|provide| provide.as_str() == need.as_str())
+                    })
+                } else {
+                    guard
+                        .supervisor
+                        .services()
+                        .iter()
+                        .position(|provider| provider.enable && provider.name == *need)
+                };
+                if let Some(dependency) = dependency
+                    && let Some(slot) = critical.get_mut(dependency)
+                {
+                    *slot = true;
+                }
+            }
+        }
+        (getty, Some(critical))
     };
     let selected = getty.map(|index| {
         let mut mask = alloc::vec![true; core.lock().supervisor.len()];

@@ -42,7 +42,19 @@ pub(crate) fn ensure_entry() -> Result<(), Errno> {
         let area = raw::signal_context_area(tp).ok_or(ENOMEM_ERR)?;
         raw::set_ctx_area(tp, area.context());
         raw::set_entry_function(shell_signal_entry as *const () as usize);
-        kernel.sig_setup(raw::sigentry_address(), area.argument(), area.flags())?;
+        // The install path uses the contract crate's syscall number; the entry is the asm stub
+        // and the context area is the one the kernel validates for this thread.
+        // SAFETY: SIG_SETUP takes three scalar words; the kernel validates the executable entry
+        // and the context window before storing either.
+        let result = unsafe {
+            raven_libc_sys::arch::syscall3(
+                raven_abi::signal::SIG_SETUP,
+                raw::sigentry_address(),
+                area.argument(),
+                area.flags() as usize,
+            )
+        };
+        raven_libc_sys::errno::ret(result).map_err(|error| Errno(error.0))?;
     }
     Ok(())
 }

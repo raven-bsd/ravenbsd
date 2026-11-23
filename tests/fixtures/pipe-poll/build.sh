@@ -17,16 +17,9 @@ if [ "$arch" != x86_64 ]; then
     exit 77
 fi
 
-sysroot=$root/build/$arch/sysroot
-if [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$sysroot/usr/lib/crt1.o" ]; then
-    cargo xtask libc-pack --arch "$arch"
-fi
-for file in crt1.o crti.o crtn.o libc.a; do
-    [ -f "$sysroot/usr/lib/$file" ] || {
-        echo "pipe-poll fixture: missing $sysroot/usr/lib/$file" >&2
-        exit 1
-    }
-done
+sysroot=${RAVENLIBC_SYSROOT:-$root/build/$arch/sysroot}
+. "$root/tests/fixtures/libc-sysroot.sh"
+ensure_libc_sysroot "$root" "$arch" "$sysroot" pipe-poll
 
 CC=${CC:-clang}
 command -v "$CC" >/dev/null 2>&1 || {

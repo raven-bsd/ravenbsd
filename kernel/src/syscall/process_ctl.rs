@@ -17,8 +17,8 @@ use raven_usercopy::UserSlice;
 use crate::ipc::model::{self, NAME_MAX, PATH_MAX};
 use crate::ipc::{registry, router};
 use crate::process::status::{
-    P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit, SIGKILL, WAIT_OPTIONS,
-    WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, signal_valid,
+    DefaultAction, P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit,
+    SIGKILL, WAIT_OPTIONS, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, default_action, signal_valid,
 };
 use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
@@ -200,8 +200,6 @@ pub const PROC_GETRUSAGE: usize = 0x4D;
 pub const PROC_GETRLIMIT: usize = 0x4E;
 /// Raw `proc_setrlimit(resource, cur, max) -> 0` number.
 pub const PROC_SETRLIMIT: usize = 0x4F;
-/// Exit code used for an uncatchable `SIGKILL` (`128 + 9`).
-const KILL_EXIT_CODE: i32 = 137;
 /// Suppress setuid/setgid bits for this exec.
 pub const EXEC_NOSUID: u64 = 1;
 
@@ -1006,6 +1004,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let destination = UserSlice::new(frame.rsi, 4)?;
 
+    let mut interrupted = false;
     loop {
         let state = target.state.lock();
         if *state == ProcessState::Exited {
@@ -1023,10 +1022,18 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             let _ = process::reap_pid(&target);
             continue;
         }
+        // The child exit queues SIGCHLD and kicks this thread; the target state may already be
+        // terminal on the wakeup. Re-check it before reporting the interruption as `EINTR`.
+        if interrupted {
+            drop(state);
+            return Err(Errno::EINTR);
+        }
         let token = sched::begin_block_interruptible()?;
         if sched::take_kick() {
             sched::end_block(token);
-            return Err(Errno::EINTR);
+            drop(state);
+            interrupted = true;
+            continue;
         }
         // The state lock is held, so the process cannot pass Exited between the check above and
         // the enqueue; `mark_exited` takes the same lock before waking.
@@ -1046,9 +1053,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
         let status = sched::block_current();
         let kicked = sched::take_kick();
         sched::end_block(token);
-        if status == Errno::EINTR.to_ret() || kicked {
-            return Err(Errno::EINTR);
-        }
+        interrupted = status == Errno::EINTR.to_ret() || kicked;
     }
 }
 
@@ -1135,12 +1140,43 @@ fn take_event(child: &Process, event: WaitEvent) {
     }
 }
 
+/// Consume one ready child event, if any.
+///
+/// The caller's selection is re-checked at every pass: a child exit may race a signal kick
+/// (`SIGCHLD`), and the status must win over `EINTR` when both are ready. This mirrors the
+/// FreeBSD `kern_wait6` loop, which re-scans the child list after `msleep` before returning the
+/// interrupted error.
+fn take_ready_event(
+    caller: &Arc<Process>,
+    idtype: u32,
+    id: i32,
+    options: u32,
+    destination: UserSlice,
+) -> Result<Option<usize>, Errno> {
+    let children = children_for(caller, idtype, id)?;
+    if children.is_empty() {
+        return Err(Errno::ECHILD);
+    }
+    for child in &children {
+        if let Some(event) = peek_event(child, options) {
+            let status = event.status();
+            take_event(child, event);
+            let pid = usize::try_from(child.id).map_err(|_| Errno::EINVAL)?;
+            copy_to_user(destination, &status.to_le_bytes())?;
+            return Ok(Some(pid));
+        }
+    }
+    Ok(None)
+}
+
 /// `proc_wait_ex(idtype, id, options, out_status) -> pid`.
 ///
 /// `P_PID`, `P_PGID` and `P_ALL` select children; `WNOHANG` returns 0 when no
 /// event is ready. Exit, stop and continue statuses use the POSIX encoding from
 /// [`crate::process::status`]. A blocking wait sleeps on the caller's child queue
-/// and is woken by exit/stop/continue notifications.
+/// and is woken by exit/stop/continue notifications. A caught signal that
+/// interrupts the sleep returns `EINTR` (FreeBSD `kern_wait6` `msleep(... PCATCH)`,
+/// NetBSD `find_stopped_child`); the caller retries and the status stays queued.
 pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let idtype = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
@@ -1152,18 +1188,8 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
     let destination = UserSlice::new(frame.r10, 4)?;
 
     loop {
-        let children = children_for(&caller, idtype, id)?;
-        if children.is_empty() {
-            return Err(Errno::ECHILD);
-        }
-        for child in &children {
-            if let Some(event) = peek_event(child, options) {
-                let status = event.status();
-                take_event(child, event);
-                let pid = usize::try_from(child.id).map_err(|_| Errno::EINVAL)?;
-                copy_to_user(destination, &status.to_le_bytes())?;
-                return Ok(pid);
-            }
+        if let Some(pid) = take_ready_event(&caller, idtype, id, options, destination)? {
+            return Ok(pid);
         }
         if options & WNOHANG != 0 {
             return Ok(0);
@@ -1198,6 +1224,12 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
         let kicked = sched::take_kick();
         sched::end_block(token);
         if status == Errno::EINTR.to_ret() || kicked {
+            // A child-exit notification is a plain wake, but its `SIGCHLD` queue entry kicks
+            // this thread through the PG-7 bridge. If the status is already ready, return it;
+            // only a signal with no child event is an interruption.
+            if let Some(pid) = take_ready_event(&caller, idtype, id, options, destination)? {
+                return Ok(pid);
+            }
             return Err(Errno::EINTR);
         }
     }
@@ -1243,12 +1275,42 @@ fn signal_one_info(
     value: u64,
 ) -> Result<(), Errno> {
     if signo == SIGKILL {
-        if Arc::ptr_eq(caller, target) {
-            process::exit_process(KILL_EXIT_CODE);
+        return terminate_by_signal(caller, target, SIGKILL, false);
+    }
+    if !target.has_signal_entry()
+        && let Some(action) = default_action(signo)
+    {
+        match action {
+            DefaultAction::Terminate => {
+                return terminate_by_signal(caller, target, signo, false);
+            }
+            DefaultAction::Core => {
+                return terminate_by_signal(caller, target, signo, true);
+            }
+            DefaultAction::Ignore => return Ok(()),
+            // Stop/continue keep the existing job-control bookkeeping in `deliver_signal_info`.
+            DefaultAction::Stop | DefaultAction::Continue => {}
         }
-        return process::terminate(target, KILL_EXIT_CODE);
     }
     process::deliver_signal_info(target, signo, caller.id, code, uid, value)
+}
+
+/// Apply the default terminate action for a process without a registered libc entry.
+///
+/// The exit code is negative so `WaitEvent::status` reports the POSIX signal status (low seven
+/// bits, plus the core bit) rather than a normal exit byte.
+fn terminate_by_signal(
+    caller: &Arc<Process>,
+    target: &Arc<Process>,
+    signo: u32,
+    core: bool,
+) -> Result<(), Errno> {
+    let raw = (signo & 0x7f) | if core { 0x80 } else { 0 };
+    let code = -(raw as i32);
+    if Arc::ptr_eq(caller, target) {
+        process::exit_process(code);
+    }
+    process::terminate(target, code)
 }
 
 /// Resolve a `PROC_SIGNAL` target into the concrete processes it names.

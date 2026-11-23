@@ -9,28 +9,36 @@
 //!
 //! ```text
 //! 0   4  magic "RFDM"
-//! 4   2  version = 2
+//! 4   2  version = 5
 //! 6   2  count
-//! 8  26*count  entries { fd: i32, handle: u32, kind: u8, fd_flags: u8,
-//!                        status: u32, path_off: u32, event: u32, readiness: u32 }
+//! 8  53*count  entries { fd: i32, handle: u32, kind: u8, fd_flags: u8,
+//!                        status: u32, path_off: u32, event: u32, readiness: u32,
+//!                        socket domain/type/proto/state, endpoint flags, two IPv4
+//!                        endpoints, pty_master: u8 }
 //! ..  string table: NUL-terminated paths; path_off 0xFFFF_FFFF means none
 //! ```
 //!
 //! Version 1 (18-byte entries, no event/readiness) is still decoded: `raven-spawn` publishes
-//! that form for ordinary inherited stdio. The libc `execve` path uses version 2 so the child
-//! keeps the scheme notification event and the one-shot poll replay across the image swap.
+//! that form for ordinary inherited stdio. Version 5 adds the tty `pty_master` role, a property
+//! of the open file description that the donor keeps across `fdcopy` and `execve`; the libc
+//! `execve` path uses version 5 so the rebuilt table keeps the role and its sticky master EOF.
+//! Versions 2-4 still decode with `pty_master` false.
 
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 
-use crate::fd::ofd::{OfdKind, SocketMeta};
+use crate::fd::ofd::{OfdKind, SocketEndpoint, SocketMeta};
 
 /// Magic at the start of the block.
 pub const FDMAP_MAGIC: [u8; 4] = *b"RFDM";
-/// Current block version.
-pub const FDMAP_VERSION: u16 = 3;
+/// Current block version (adds the tty `pty_master` role).
+pub const FDMAP_VERSION: u16 = 5;
+/// Version 4, with socket endpoint metadata but without the tty master role.
+pub const FDMAP_VERSION_V4: u16 = 4;
+/// Version 3, with socket identity but without the endpoint metadata.
+pub const FDMAP_VERSION_V3: u16 = 3;
 /// The previous version, without socket identity.
 pub const FDMAP_VERSION_V2: u16 = 2;
 /// The legacy version `raven-spawn` publishes.
@@ -41,8 +49,12 @@ pub const HEADER_LEN: usize = 8;
 pub const ENTRY_LEN: usize = 18;
 /// Version-2 entry length, with the event handle and readiness mask.
 pub const ENTRY_LEN_V2: usize = 26;
-/// Current entry length: version 2 plus domain/type/proto/state.
+/// Version-3 entry length: version 2 plus domain/type/proto/state.
 pub const ENTRY_LEN_V3: usize = 39;
+/// Version-4 entry length: version 3 plus endpoint flags and two IPv4 endpoints.
+pub const ENTRY_LEN_V4: usize = 52;
+/// Current entry length: version 4 plus the tty `pty_master` role.
+pub const ENTRY_LEN_V5: usize = 53;
 /// No-path marker in `path_off`.
 pub const NO_PATH: u32 = u32::MAX;
 
@@ -74,6 +86,11 @@ pub struct FdMapEntry {
     pub readiness: u32,
     /// Socket identity for an inherited socket OFD (`FDMAP_VERSION` 3).
     pub socket: Option<SocketMeta>,
+    /// The inherited tty is the `pty:` master (`FDMAP_VERSION` 5).
+    ///
+    /// The role is a property of the open file description, so the donor keeps it across
+    /// `fdcopy` and `execve`; this block is the equivalent carrier for the rebuilt libc table.
+    pub pty_master: bool,
 }
 
 impl FdMapEntry {
@@ -89,6 +106,7 @@ impl FdMapEntry {
             event: 0,
             readiness: 0,
             socket: None,
+            pty_master: false,
         }
     }
 }
@@ -128,7 +146,7 @@ impl FdMap {
             }
         }
         let mut out = Vec::with_capacity(
-            HEADER_LEN + ENTRY_LEN_V3.saturating_mul(self.entries.len()) + strings.len(),
+            HEADER_LEN + ENTRY_LEN_V5.saturating_mul(self.entries.len()) + strings.len(),
         );
         out.extend_from_slice(&FDMAP_MAGIC);
         out.extend_from_slice(&FDMAP_VERSION.to_le_bytes());
@@ -147,6 +165,14 @@ impl FdMap {
             out.extend_from_slice(&socket.ty.to_le_bytes());
             out.extend_from_slice(&socket.proto.to_le_bytes());
             out.push(socket.state);
+            let flags = u8::from(socket.local.is_some()) | (u8::from(socket.peer.is_some()) << 1);
+            out.push(flags);
+            for endpoint in [socket.local, socket.peer] {
+                let endpoint = endpoint.unwrap_or_default();
+                out.extend_from_slice(&endpoint.ip);
+                out.extend_from_slice(&endpoint.port.to_le_bytes());
+            }
+            out.push(u8::from(entry.pty_master));
         }
         out.extend_from_slice(&strings);
         Ok(out)
@@ -193,7 +219,9 @@ impl FdMap {
         let entry_len = match version {
             FDMAP_VERSION_V1 => ENTRY_LEN,
             FDMAP_VERSION_V2 => ENTRY_LEN_V2,
-            FDMAP_VERSION => ENTRY_LEN_V3,
+            FDMAP_VERSION_V3 => ENTRY_LEN_V3,
+            FDMAP_VERSION_V4 => ENTRY_LEN_V4,
+            FDMAP_VERSION => ENTRY_LEN_V5,
             _ => return Err(Errno::EPROTO),
         };
         let count = usize::from(read_u16(input, 6).ok_or(Errno::EPROTO)?);
@@ -221,19 +249,58 @@ impl FdMap {
             } else {
                 0
             };
-            let socket = if version >= FDMAP_VERSION {
+            let socket = if version >= FDMAP_VERSION_V3 {
                 let domain = read_i32(record, 26).ok_or(Errno::EPROTO)?;
                 let ty = read_i32(record, 30).ok_or(Errno::EPROTO)?;
                 let proto = read_i32(record, 34).ok_or(Errno::EPROTO)?;
                 let state = *record.get(38).ok_or(Errno::EPROTO)?;
+                let (local, peer) = if version >= FDMAP_VERSION_V4 {
+                    let flags = *record.get(39).ok_or(Errno::EPROTO)?;
+                    let endpoint = |offset: usize| -> Result<SocketEndpoint, Errno> {
+                        let ip: [u8; 4] = record
+                            .get(offset..offset + 4)
+                            .ok_or(Errno::EPROTO)?
+                            .try_into()
+                            .map_err(|_| Errno::EPROTO)?;
+                        let port = u16::from_le_bytes(
+                            record
+                                .get(offset + 4..offset + 6)
+                                .ok_or(Errno::EPROTO)?
+                                .try_into()
+                                .map_err(|_| Errno::EPROTO)?,
+                        );
+                        Ok(SocketEndpoint { ip, port })
+                    };
+                    (
+                        if flags & 1 != 0 {
+                            Some(endpoint(40)?)
+                        } else {
+                            None
+                        },
+                        if flags & 2 != 0 {
+                            Some(endpoint(46)?)
+                        } else {
+                            None
+                        },
+                    )
+                } else {
+                    (None, None)
+                };
                 (domain != 0 || ty != 0 || proto != 0 || state != 0).then_some(SocketMeta {
                     domain,
                     ty,
                     proto,
                     state,
+                    local,
+                    peer,
                 })
             } else {
                 None
+            };
+            let pty_master = if version >= FDMAP_VERSION {
+                *record.get(ENTRY_LEN_V4).ok_or(Errno::EPROTO)? != 0
+            } else {
+                false
             };
             let path = if offset == NO_PATH {
                 None
@@ -255,6 +322,7 @@ impl FdMap {
                 event,
                 readiness,
                 socket,
+                pty_master,
             });
             index = index.saturating_add(1);
         }

@@ -43,6 +43,11 @@ fn remember(fd: c_int, pair: u64) -> bool {
 
 /// The pair id bound to `fd`.
 pub(crate) fn pair_for(fd: c_int) -> Option<u64> {
+    // A negative descriptor has no pty pair. `-1` is also the empty-slot sentinel in `PAIRS`;
+    // without this guard `pair_for(-1)` matches the first empty slot and reports pair 0.
+    if fd < 0 {
+        return None;
+    }
     for slot in &PAIRS {
         if slot.0.load(Ordering::Relaxed) == fd {
             return Some(slot.1.load(Ordering::Relaxed));
@@ -83,6 +88,11 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
             return -1;
         }
     };
+    // The clone endpoint is the pty master; record the role so the poll/EOF path does not have to
+    // guess it from a path (`posix_openpt` installs this master with no public name).
+    if let Ok(reference) = platform.get(fd) {
+        reference.set_pty_master();
+    }
     let pair = match platform.fstat(fd) {
         Ok(stat) if stat.st_ino >= 3 => (stat.st_ino - 1) / 2,
         _ => {

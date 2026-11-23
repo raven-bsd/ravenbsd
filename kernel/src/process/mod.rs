@@ -815,6 +815,32 @@ impl Process {
         self.threads_live.lock().push(Arc::downgrade(thread));
     }
 
+    /// Remove an exiting thread from the live-kick list.
+    ///
+    /// The list mirrors FreeBSD `thread_unlink` in `kern_thread.c` and NetBSD `lwp_free` in
+    /// `kern_lwp.c`: the thread is removed from its process's thread list before its stack is
+    /// reclaimed. Without this, every `THREAD_CREATE`/`THREAD_EXIT` cycle leaves one `Weak`
+    /// entry behind, growing the list by 16 bytes per cycle until the churn exhausts the heap.
+    pub fn unregister_thread(&self, thread: &Arc<Thread>) {
+        let pointer = Arc::as_ptr(thread);
+        self.threads_live.lock().retain(|weak| {
+            weak.upgrade()
+                .is_some_and(|live| Arc::as_ptr(&live) != pointer)
+        });
+    }
+
+    /// True when any live thread has a registered PG-7 signal entry.
+    ///
+    /// Such a process has a libc entry that will run the disposition/default action in user
+    /// space; a process without one must have its default action applied by the kernel.
+    pub fn has_signal_entry(&self) -> bool {
+        self.threads_live
+            .lock()
+            .iter()
+            .filter_map(Weak::upgrade)
+            .any(|thread| thread.signal_entry.load(Ordering::Acquire) != 0)
+    }
+
     /// Queue a signal, wake a `PROC_SIGRECV` waiter and kick every live thread.
     ///
     /// The kick is the PG-7 bridge from the kernel's per-process queue to libc's signal entry:
@@ -1749,10 +1775,11 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     {
         let (heap_used, _) = crate::memory::heap::stats();
         kprintln!(
-            "s36: stacks fresh={} cached={} heap={}",
+            "s36: stacks fresh={} cached={} heap={} frames={}",
             crate::sched::thread::stack_fresh(),
             crate::sched::thread::stack_cached(),
-            heap_used
+            heap_used,
+            crate::memory::frame::stats().free_bytes
         );
     }
 }

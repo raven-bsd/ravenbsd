@@ -23,6 +23,18 @@ regex = '^libc-forkpty: parent pid=[0-9]+ name=/dev/pts/[0-9]+$'
 regex = '^libc-forkpty: master=pty-child$'
 
 [[expect]]
+regex = '^libc-forkpty: pipe child=[0-9]+$'
+
+[[expect]]
+regex = '^libc-forkpty: pipe byte=x$'
+
+[[expect]]
+regex = '^libc-forkpty: pipe eof=1$'
+
+[[expect]]
+regex = '^libc-forkpty: pipe ok$'
+
+[[expect]]
 regex = '^libc-forkpty: ok$'
 
 [[expect]]

@@ -96,6 +96,8 @@ mod program {
         /// Capture buffer mapped by the kernel for this deferred request.
         capture: usize,
         length: usize,
+        /// Which end of the pair the blocked read belongs to.
+        role: Role,
         /// `VTIME` deadline in nanoseconds; zero means wait for data only.
         vtime_ns: u64,
         start_ns: u64,
@@ -158,6 +160,7 @@ mod program {
             token: u64,
             capture: usize,
             length: usize,
+            role: Role,
             vtime: u64,
         ) -> Result<(), Errno> {
             let Some(completer) = self.completer.clone() else {
@@ -170,6 +173,7 @@ mod program {
                     token,
                     capture,
                     length,
+                    role,
                     vtime_ns,
                     start_ns: now_ns(),
                     completer,
@@ -191,8 +195,8 @@ mod program {
             Ok(())
         }
 
-        /// Complete this pair's blocked reads from data the writer just queued.
-        fn complete_pair(&mut self, pair: u64) {
+        /// Complete this pair's blocked reads on `role` from data the writer just queued.
+        fn complete_pair(&mut self, pair: u64, role: Role) {
             let jobs = {
                 let mut map = self.deferred.lock();
                 map.remove(&pair)
@@ -207,6 +211,10 @@ mod program {
                 if job.vtime_ns != 0 {
                     has_vtime = true;
                 }
+                if job.role != role {
+                    keep.push(job);
+                    continue;
+                }
                 let Some(pty) = self.pairs.get_mut(pair) else {
                     completed.push((job, Err(Errno::EBADF)));
                     continue;
@@ -216,7 +224,11 @@ mod program {
                 // the timer cannot see it until a non-empty keep vector is reinserted.
                 let buffer =
                     unsafe { core::slice::from_raw_parts_mut(job.capture as *mut u8, job.length) };
-                match pty.read_slave(buffer) {
+                let result = match role {
+                    Role::Master => pty.read_master(buffer),
+                    Role::Slave => pty.read_slave(buffer),
+                };
+                match result {
                     Ok(count) => completed.push((job, Ok(count))),
                     Err(Errno::EAGAIN) => keep.push(job),
                     Err(error) => completed.push((job, Err(error))),
@@ -385,8 +397,28 @@ mod program {
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
             let entry = self.file(file)?;
-            if entry.role == Role::Master || buffer.is_empty() {
+            if buffer.is_empty() {
                 return self.read(file, 0, buffer);
+            }
+            if entry.role == Role::Master {
+                {
+                    let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
+                    match pty.read_master(buffer) {
+                        Ok(count) => return Ok(count),
+                        Err(Errno::EAGAIN) => {}
+                        Err(error) => return Err(HandlerError::Errno(error)),
+                    }
+                }
+                self.defer_read(
+                    entry.pair,
+                    ctx.token,
+                    buffer.as_mut_ptr() as usize,
+                    buffer.len(),
+                    Role::Master,
+                    0,
+                )
+                .map_err(HandlerError::Errno)?;
+                return Err(HandlerError::Defer(ctx.token));
             }
             let (vmin, vtime) = {
                 let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
@@ -406,6 +438,7 @@ mod program {
                 ctx.token,
                 buffer.as_mut_ptr() as usize,
                 buffer.len(),
+                Role::Slave,
                 vtime,
             )
             .map_err(HandlerError::Errno)?;
@@ -422,7 +455,9 @@ mod program {
                 }
             }
             if entry.role == Role::Master {
-                self.complete_pair(entry.pair);
+                self.complete_pair(entry.pair, Role::Slave);
+            } else {
+                self.complete_pair(entry.pair, Role::Master);
             }
             Ok(buffer.len())
         }
@@ -526,8 +561,17 @@ mod program {
 
         fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
             let entry = self.file(file)?;
+            // The slave is the session's tty node: root-owned and 0600, like a devfs pty node
+            // after `pty_setowner`. OpenSSH treats a chown/chmod `EROFS` on such a node as a
+            // read-only device and continues. The master is opened by the session owner and
+            // keeps the permissive device mode.
+            let mode = if entry.role == Role::Slave {
+                S_IFCHR | 0o600
+            } else {
+                S_IFCHR | 0o666
+            };
             Ok(Stat {
-                mode: S_IFCHR | 0o666,
+                mode,
                 nlink: 1,
                 // The donor devfs pty node has a device inode. The scheme Stat has `ino`, so
                 // report the pair/role identity that the SCM_RIGHTS exchange can compare.

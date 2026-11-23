@@ -104,6 +104,36 @@ regex = '^pty-winsize: non-tty-get=-1 errno=25$'
 regex = '^pty-winsize: non-tty-set=-1 errno=25$'
 
 [[expect]]
+regex = '^pty-winsize: sigwinch fg pgrp=[0-9]+$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch change-1 count=1 row=43 col=120$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch noop count=1$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch change-2 count=2 row=24 col=80$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch bg pgrp=[0-9]+$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch change-3 count=3 row=30 col=100$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch bg count=0$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch closed errno=9 signal=-11$'
+
+[[expect]]
+regex = '^pty-winsize: close child-exit read=1 byte=90$'
+
+[[expect]]
+regex = '^pty-winsize: close child-exit eof=1$'
+
+[[expect]]
 regex = '^pty-winsize: ok$'
 
 [[expect]]

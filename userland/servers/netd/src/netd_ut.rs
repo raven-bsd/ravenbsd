@@ -931,6 +931,12 @@ fn wildcard_listener_serves_loopback_and_nic() {
     assert_eq!(bits & READY_WRITABLE, 0);
     let id = accept(&mut netd, listener, &mut now);
     let loop_accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    let loop_client_local = call_socket(&mut netd, loop_client, Call::GetSockName);
+    assert_eq!(
+        call_socket(&mut netd, loop_accepted, Call::GetPeerName),
+        loop_client_local,
+        "the wildcard loopback accepted peer must be the client address"
+    );
     assert_eq!(netd.write(loop_client, 0, b"loop").unwrap(), 4);
     let mut buffer = [0u8; 8];
     let read = read_retry(&mut netd, loop_accepted, &mut buffer, &mut now);
@@ -948,6 +954,12 @@ fn wildcard_listener_serves_loopback_and_nic() {
     );
     let id = accept(&mut netd, listener, &mut now);
     let nic_accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    let nic_client_local = call_socket(&mut netd, nic_client, Call::GetSockName);
+    assert_eq!(
+        call_socket(&mut netd, nic_accepted, Call::GetPeerName),
+        nic_client_local,
+        "the accepted NIC socket must report the client's address and port"
+    );
     assert_eq!(netd.write(nic_client, 0, b"nic").unwrap(), 3);
     let read = read_retry(&mut netd, nic_accepted, &mut buffer, &mut now);
     assert_eq!(&buffer[..read], b"nic");

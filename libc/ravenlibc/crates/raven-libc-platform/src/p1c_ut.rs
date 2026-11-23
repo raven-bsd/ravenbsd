@@ -26,6 +26,20 @@ fn chown_family_uses_the_root_handle() {
 }
 
 #[test]
+fn pty_slave_chown_and_chmod_are_read_only_device_metadata() {
+    // The pty slave name is a `pty:` scheme endpoint, not a VFS node: the pty server owns the
+    // node metadata and reports a root-owned 0600 chr device. OpenSSH `sshpty.c` `pty_setowner`
+    // accepts `EROFS` for exactly that read-only, root-owned node; a literal VFS `Chown` here is
+    // what made `ssh -tt` fatal at `chown(/dev/pts/1, 1000, 1000)`.
+    let platform = platform();
+    assert_eq!(platform.chown(b"/dev/pts/1", 1000, 1000), Err(Errno::EROFS));
+    assert_eq!(platform.chmod(b"/dev/pts/1", 0o600), Err(Errno::EROFS));
+    // An ordinary VFS path still goes through the root handle.
+    assert_eq!(platform.chown(b"/a", 1, 2), Ok(()));
+    assert_eq!(platform.chmod(b"/a", 0o644), Ok(()));
+}
+
+#[test]
 fn mkfifoat_and_mknodat_resolve_through_the_cwd() {
     let platform = platform();
     assert_eq!(platform.mkfifoat(-100, b"fifo", 0o644), Ok(()));
@@ -217,6 +231,92 @@ fn closing_an_fd_releases_its_doorbell_with_handle_close() {
         "the doorbell goes through HANDLE_CLOSE"
     );
     assert_eq!(platform.backend().open_handles(), base, "nothing leaks");
+}
+
+#[test]
+fn fork_child_duplicates_an_inherited_pty_master_handle() {
+    let platform = platform();
+    let file = platform.open(b"/a", 0, 0).expect("file");
+    let handle = platform.get(file).expect("file").handle();
+    let pty = platform
+        .install(handle, OfdKind::Tty, 2, None, false)
+        .expect("pty");
+    let old_pty = platform.get(pty).expect("pty").handle();
+    let index = platform.get(pty).expect("pty").index();
+
+    platform.fork_child_inherit();
+
+    let new_pty = platform.get(pty).expect("pty").handle();
+    assert_ne!(
+        new_pty, old_pty,
+        "the child takes a fresh scheme handle for the pty master"
+    );
+    assert_eq!(
+        platform.ofd_handle(index),
+        Some(new_pty),
+        "the OFD is the authority for the live pty handle"
+    );
+
+    // Model the parent closing its copy after the fork: the child's session must still own a
+    // usable pty main until it closes its own descriptor (otherwise the slave would lose HUP or
+    // stay open depending on which side closed first).
+    platform.backend().close(old_pty).expect("parent close");
+    let mut byte = [0u8; 1];
+    assert_eq!(
+        platform.backend().read(new_pty, &mut byte),
+        Ok(1),
+        "the child pty handle survives the parent close"
+    );
+}
+
+#[test]
+fn fork_child_pipe_close_keeps_the_parents_read_end_open() {
+    let platform = platform();
+    let file = platform
+        .open(b"/a", fcntl::O_RDONLY as u32, 0)
+        .expect("file");
+    let file_handle = platform.get(file).expect("file").handle();
+    let pipe_handle = platform.backend().dup(file_handle, 0).expect("pipe handle");
+    let pipe = platform
+        .install(
+            pipe_handle,
+            OfdKind::Pipe,
+            fcntl::O_RDONLY as u32,
+            None,
+            false,
+        )
+        .expect("pipe");
+    let old_pipe = platform.get(pipe).expect("pipe").handle();
+    let index = platform.get(pipe).expect("pipe").index();
+
+    platform.fork_child_inherit();
+
+    let new_pipe = platform.get(pipe).expect("pipe").handle();
+    assert_ne!(
+        new_pipe, old_pipe,
+        "the child takes a fresh scheme handle for the pipe"
+    );
+    assert_eq!(
+        platform.ofd_handle(index),
+        Some(new_pipe),
+        "the OFD is the authority for the live pipe handle"
+    );
+
+    // The child closes its duplicate first; the parent's read end must still be open.
+    platform.close(pipe).expect("child close");
+    let mut byte = [0u8; 1];
+    assert_eq!(
+        platform.backend().read(old_pipe, &mut byte),
+        Ok(1),
+        "the parent pipe read stays open after the child close"
+    );
+
+    // The last close releases the pipe: a further read sees no handle (EOF at the OFD level).
+    platform.backend().close(old_pipe).expect("parent close");
+    assert_eq!(
+        platform.backend().read(old_pipe, &mut byte),
+        Err(Errno::EBADF)
+    );
 }
 
 #[test]
