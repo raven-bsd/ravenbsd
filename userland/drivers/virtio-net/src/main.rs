@@ -289,7 +289,7 @@ mod program {
         thread::spawn(pump_thread, 0, 128 * 1024)
             .map_err(|error| format!("pump thread: {}", error.description()))?;
 
-        let mut handler = NicHandler::new(test);
+        let mut handler = NicHandler::new(test, dma_handle);
         let mut server = match Server::register(NIC_SCHEME) {
             Ok(server) => server,
             Err(error) => {
@@ -964,6 +964,7 @@ mod program {
     /// The control scheme handler.
     struct NicHandler {
         test: bool,
+        dma_handle: Handle,
         pending: Option<(u64, String)>,
         opens: BTreeMap<u64, OpenKind>,
         next_id: u64,
@@ -978,9 +979,10 @@ mod program {
     }
 
     impl NicHandler {
-        fn new(test: bool) -> Self {
+        fn new(test: bool, dma_handle: Handle) -> Self {
             Self {
                 test,
+                dma_handle,
                 pending: None,
                 opens: BTreeMap::new(),
                 next_id: 1,
@@ -1049,7 +1051,7 @@ mod program {
                 if !flags.readable() {
                     return Err(Errno::EACCES.into());
                 }
-                return Ok(Opened::Attach(DMA_HANDLE));
+                return Ok(Opened::Attach(self.dma_handle));
             }
             let kind = match path {
                 NIC_INFO | NIC_MAC | NIC_MTU | NIC_LINK => {
