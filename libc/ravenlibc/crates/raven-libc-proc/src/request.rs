@@ -8,13 +8,17 @@
 
 use alloc::vec::Vec;
 
-/// One fd-to-handle pair in a spawn or exec map.
+/// One inherited descriptor in a spawn or exec map.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FdMapEntry {
     /// Destination file descriptor.
     pub fd: i32,
     /// Sender's handle value.
     pub handle: u32,
+    /// OFD kind byte, the `FdMap` encoding (`2` is a terminal).
+    pub kind: u8,
+    /// Access mode and status bits from the parent's open-file description.
+    pub status: u32,
 }
 
 /// A request to spawn a new image.

@@ -68,7 +68,18 @@ fn entry(fd: i32, handle: u32, cloexec: bool) -> FdEntry {
     FdEntry {
         fd,
         handle,
+        kind: 0,
+        status: 2,
         cloexec,
+    }
+}
+
+fn map(fd: i32, handle: u32, kind: u8, status: u32) -> FdMapEntry {
+    FdMapEntry {
+        fd,
+        handle,
+        kind,
+        status,
     }
 }
 
@@ -80,7 +91,7 @@ fn open_records_a_temp_and_replaces_the_fd() {
     let table = vec![entry(3, 1, true)];
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
     assert_eq!(scratch.temp_handles, vec![9]);
-    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 3, handle: 9 }]);
+    assert_eq!(scratch.fdmap, vec![map(3, 9, 0, 0)]);
     assert!(env.closed.is_empty());
 }
 
@@ -102,13 +113,7 @@ fn dup2_copies_and_clears_cloexec() {
     actions.add_dup2(1, 5).expect("dup2");
     let table = vec![entry(1, 7, false)];
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
-    assert_eq!(
-        scratch.fdmap,
-        vec![
-            FdMapEntry { fd: 1, handle: 7 },
-            FdMapEntry { fd: 5, handle: 7 }
-        ]
-    );
+    assert_eq!(scratch.fdmap, vec![map(1, 7, 0, 2), map(5, 7, 0, 2)]);
 }
 
 #[test]
@@ -118,7 +123,7 @@ fn dup2_to_the_same_fd_still_clears_cloexec() {
     actions.add_dup2(1, 1).expect("dup2");
     let table = vec![entry(1, 7, true)];
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 1, handle: 7 }]);
+    assert_eq!(scratch.fdmap, vec![map(1, 7, 0, 2)]);
 }
 
 #[test]
@@ -139,7 +144,7 @@ fn close_of_a_free_fd_is_a_no_op() {
     actions.add_close(99).expect("close");
     let scratch =
         apply_actions(&[entry(1, 7, false)], b"/", false, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 1, handle: 7 }]);
+    assert_eq!(scratch.fdmap, vec![map(1, 7, 0, 2)]);
 }
 
 #[test]
@@ -220,7 +225,7 @@ fn closefrom_drops_high_fds() {
     actions.add_closefrom(10).expect("closefrom");
     let table = vec![entry(9, 1, false), entry(10, 2, false), entry(11, 3, false)];
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 9, handle: 1 }]);
+    assert_eq!(scratch.fdmap, vec![map(9, 1, 0, 2)]);
 }
 
 #[test]
@@ -239,7 +244,7 @@ fn an_open_after_cloexec_default_survives() {
     actions.add_open(3, b"/dev/null", 0, 0).expect("open");
     let table = vec![entry(1, 7, false)];
     let scratch = apply_actions(&table, b"/", true, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 3, handle: 9 }]);
+    assert_eq!(scratch.fdmap, vec![map(3, 9, 0, 0)]);
 }
 
 #[test]
@@ -259,11 +264,7 @@ fn the_fdmap_is_sorted_by_fd() {
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
     assert_eq!(
         scratch.fdmap,
-        vec![
-            FdMapEntry { fd: 2, handle: 2 },
-            FdMapEntry { fd: 5, handle: 3 },
-            FdMapEntry { fd: 7, handle: 1 }
-        ]
+        vec![map(2, 2, 0, 2), map(5, 3, 0, 2), map(7, 1, 0, 2)]
     );
 }
 

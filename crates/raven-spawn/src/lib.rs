@@ -301,18 +301,34 @@ pub fn spawn_image_with<S: Sys>(
     }
 }
 
+/// One inherited descriptor for the child.
+///
+/// The kind and status are the parent's open-file-description values, the same fields the exec
+/// `FdMap` carries (version 5). The child never re-derives them by probing a handle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpawnFd {
+    /// Descriptor number in the child.
+    pub fd: i32,
+    /// Handle transferred into the child.
+    pub handle: u32,
+    /// OFD kind byte, the `FdMap` encoding (`2` is `OfdKind::Tty`).
+    pub kind: u8,
+    /// Access mode and status bits.
+    pub status: u32,
+}
+
 /// Spawn an in-memory image and inherit `fdmap` descriptors into the child.
 ///
-/// Each `(child_fd, parent_handle)` is transferred with `HANDLE_TRANSFER`; the child handles are
-/// packed into the `RFDM` block published as `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. Only static
-/// ET_EXEC images are supported on this path; an interpreter is a separate dynamic-loading
-/// feature.
+/// Each `SpawnFd.handle` is transferred with `HANDLE_TRANSFER`; the child handles and their kind
+/// and status are packed into the version-5 `RFDM` block published as
+/// `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. Only static ET_EXEC images are supported on this path; an
+/// interpreter is a separate dynamic-loading feature.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 pub fn spawn_image_with_fdmap<S: Sys>(
     image: &[u8],
     path: &str,
     options: &SpawnOptions<'_>,
-    fdmap: &[(i32, u32)],
+    fdmap: &[SpawnFd],
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
     spawn_image_with_fdmap_cwd(image, path, options, b"/", fdmap, sys)
@@ -329,7 +345,7 @@ pub fn spawn_image_with_fdmap_cwd<S: Sys>(
     path: &str,
     options: &SpawnOptions<'_>,
     cwd: &[u8],
-    fdmap: &[(i32, u32)],
+    fdmap: &[SpawnFd],
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
     if image.len() > MAX_FILE_IMAGE {
@@ -734,7 +750,7 @@ fn spawn_elf<S: Sys>(
     cwd: &[u8],
     path: &str,
     options: &SpawnOptions<'_>,
-    fdmap: &[(i32, u32)],
+    fdmap: &[SpawnFd],
     exec: Option<(Handle, bool)>,
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
@@ -809,9 +825,14 @@ fn spawn_elf<S: Sys>(
         None
     } else {
         let mut entries = alloc_crate::vec::Vec::with_capacity(fdmap.len());
-        for (fd, source) in fdmap {
-            match sys.handle_transfer(child, Handle(*source)) {
-                Ok(handle) => entries.push((*fd, handle.0)),
+        for entry in fdmap {
+            match sys.handle_transfer(child, Handle(entry.handle)) {
+                Ok(handle) => entries.push(SpawnFd {
+                    fd: entry.fd,
+                    handle: handle.0,
+                    kind: entry.kind,
+                    status: entry.status,
+                }),
                 Err(error) => {
                     let _ = sys.handle_close(child);
                     return Err(SpawnError::Sys(error));
@@ -1724,16 +1745,18 @@ fn plan_image<'a>(
 
 /// Encode the `RFDM` block consumed by `raven_libc_platform::fd::inherit::FdMap::decode`.
 ///
-/// Entries carry no path or status; the child's `restore_fdmap` creates unknown-kind OFDs with
-/// read/write status and the transferred handles. The loader only publishes this block for
-/// inherited stdio and ordinary file descriptors.
+/// This is the version-5 record the exec path already uses: the parent's real kind and status,
+/// no socket/event metadata and `NO_PATH`. The child adopts the public name of a pathless `Tty`
+/// from the endpoint device identity, so a spawned terminal keeps its termios and its
+/// `/dev/pts/<N>` name without re-probing unrelated handles.
+///
 /// Reject an inherited fd map when the crate is built without `alloc`.
 ///
 /// The wire block is built in a heap `Vec`; a no-alloc image cannot publish it.  Empty is the
 /// common case and stays supported (K463).
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[allow(dead_code)] // ravenbsd target builds compile this for the no-alloc path; the alloc build uses encode_fdmap
-fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
+fn no_alloc_fdmap(fdmap: &[SpawnFd]) -> Result<(), SpawnError> {
     if fdmap.is_empty() {
         Ok(())
     } else {
@@ -1745,19 +1768,35 @@ fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
     test,
     all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
 ))]
-fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
+fn encode_fdmap(entries: &[SpawnFd]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
+    /// One version-5 `FdMap` entry, the 53-byte record the decoder reads.
+    const FDMAP_V5_ENTRY: usize = 53;
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
-    let mut out = alloc_crate::vec::Vec::with_capacity(8usize.saturating_add(18 * entries.len()));
+    let mut out = alloc_crate::vec::Vec::with_capacity(
+        8usize.saturating_add(FDMAP_V5_ENTRY.saturating_mul(entries.len())),
+    );
     out.extend_from_slice(b"RFDM");
-    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&5u16.to_le_bytes());
     out.extend_from_slice(&count.to_le_bytes());
-    for (fd, handle) in entries {
-        out.extend_from_slice(&fd.to_le_bytes());
-        out.extend_from_slice(&handle.to_le_bytes());
-        out.push(255); // OfdKind::Unknown
+    for entry in entries {
+        out.extend_from_slice(&entry.fd.to_le_bytes());
+        out.extend_from_slice(&entry.handle.to_le_bytes());
+        out.push(entry.kind);
         out.push(0); // FD_CLOEXEC already filtered by apply_actions
-        out.extend_from_slice(&2u32.to_le_bytes()); // O_RDWR
+        out.extend_from_slice(&entry.status.to_le_bytes());
         out.extend_from_slice(&u32::MAX.to_le_bytes()); // NO_PATH
+        out.extend_from_slice(&0u32.to_le_bytes()); // event
+        out.extend_from_slice(&0u32.to_le_bytes()); // readiness
+        out.extend_from_slice(&0i32.to_le_bytes()); // socket.domain
+        out.extend_from_slice(&0i32.to_le_bytes()); // socket.type
+        out.extend_from_slice(&0i32.to_le_bytes()); // socket.proto
+        out.push(0); // socket.state
+        out.push(0); // socket endpoint flags
+        for _ in 0..2 {
+            out.extend_from_slice(&[0u8; 4]); // local/peer ip
+            out.extend_from_slice(&0u16.to_le_bytes()); // local/peer port
+        }
+        out.push(0); // pty_master
     }
     Ok(out)
 }

@@ -942,7 +942,12 @@ fn auxv_has_the_pg50_keys_and_at_base() {
 fn no_alloc_fdmap_rejects_inherited_descriptors() {
     assert_eq!(no_alloc_fdmap(&[]), Ok(()));
     assert_eq!(
-        no_alloc_fdmap(&[(1, 7)]),
+        no_alloc_fdmap(&[SpawnFd {
+            fd: 1,
+            handle: 7,
+            kind: 2,
+            status: 2,
+        }]),
         Err(SpawnError::Sys(Errno::ENOTSUP))
     );
 }
@@ -958,10 +963,29 @@ fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     assert!(has(0x7004, 2));
     assert!(has(0x7006, raven_abi::ABI_VERSION as usize));
 
-    let block = encode_fdmap(&[(1, 7), (2, 8)]).unwrap();
+    let block = encode_fdmap(&[
+        SpawnFd {
+            fd: 1,
+            handle: 7,
+            kind: 2,
+            status: 2,
+        },
+        SpawnFd {
+            fd: 2,
+            handle: 8,
+            kind: 0,
+            status: 2,
+        },
+    ])
+    .unwrap();
     assert_eq!(block.get(..4), Some(b"RFDM".as_slice()));
+    assert_eq!(block.get(4..6), Some(5u16.to_le_bytes().as_slice()));
     assert_eq!(block.get(6..8), Some(2u16.to_le_bytes().as_slice()));
-    assert_eq!(block.len(), 8 + 2 * 18);
+    // The child entry carries the parent's kind and status, and no path.
+    assert_eq!(block.get(16), Some(&2));
+    assert_eq!(block.get(18..22), Some(2u32.to_le_bytes().as_slice()));
+    assert_eq!(block.get(22..26), Some(u32::MAX.to_le_bytes().as_slice()));
+    assert_eq!(block.len(), 8 + 2 * 53);
 }
 
 #[test]

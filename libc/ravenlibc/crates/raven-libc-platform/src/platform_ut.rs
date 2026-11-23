@@ -41,14 +41,27 @@ fn restore_pathless(platform: &Platform<FakeSys>, node: &[u8], kind: OfdKind) ->
 
 #[test]
 fn restore_adopts_a_spawn_pty_slave_from_its_endpoint() {
-    // The spawn map is version 1: kind Unknown and no path. The child must recover the tty
-    // identity from the endpoint (FreeBSD fdcopy keeps the file object; ttyname uses fstat).
+    // The version-5 spawn map carries the parent's real kind but no path. The child recovers the
+    // public name from the endpoint (FreeBSD fdcopy keeps the file object; ttyname uses fstat).
     let platform = platform_with_pty(false);
-    let fd = restore_pathless(&platform, b"/dev/tty", OfdKind::Unknown);
+    let fd = restore_pathless(&platform, b"/dev/tty", OfdKind::Tty);
     assert_eq!(platform.get(fd).expect("fd").kind(), OfdKind::Tty);
     assert_eq!(
         crate::compat::ttyname(&platform, fd),
         Ok(b"/dev/pts/52".to_vec())
+    );
+}
+
+#[test]
+fn restore_leaves_an_unknown_handle_unprobed() {
+    // An entry the parent did not classify must not enter its server: the startup path is
+    // exercised for every inherited descriptor, including sockets.
+    let platform = platform_with_pty(false);
+    let fd = restore_pathless(&platform, b"/dev/tty", OfdKind::Unknown);
+    assert_eq!(platform.get(fd).expect("fd").kind(), OfdKind::Unknown);
+    assert_eq!(
+        crate::compat::ttyname(&platform, fd),
+        Err(crate::Errno::ENOTTY)
     );
 }
 

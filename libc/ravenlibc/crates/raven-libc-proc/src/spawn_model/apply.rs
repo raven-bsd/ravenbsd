@@ -19,6 +19,10 @@ pub struct FdEntry {
     pub fd: i32,
     /// Scheme handle.
     pub handle: u32,
+    /// OFD kind byte, the `FdMap` encoding (`2` is a terminal).
+    pub kind: u8,
+    /// Access mode and status bits from the parent's open-file description.
+    pub status: u32,
     /// Whether the descriptor closes at exec.
     pub cloexec: bool,
 }
@@ -86,6 +90,8 @@ pub fn apply_actions(
         .map(|entry| FdMapEntry {
             fd: entry.fd,
             handle: entry.handle,
+            kind: entry.kind,
+            status: entry.status,
         })
         .collect();
     Ok(scratch)
@@ -112,6 +118,8 @@ fn apply_inner(
                     FdEntry {
                         fd: *fd,
                         handle,
+                        kind: 0,
+                        status: u32::try_from(*oflag & 0o3).unwrap_or_default(),
                         cloexec: false,
                     },
                 );
@@ -127,6 +135,8 @@ fn apply_inner(
                     FdEntry {
                         fd: *newfd,
                         handle: source.handle,
+                        kind: source.kind,
+                        status: source.status,
                         cloexec: false,
                     },
                 );

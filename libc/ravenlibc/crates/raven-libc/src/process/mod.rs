@@ -110,6 +110,8 @@ pub(crate) fn parent_fd_table() -> alloc::vec::Vec<raven_libc_proc::spawn_model:
             table.push(raven_libc_proc::spawn_model::FdEntry {
                 fd,
                 handle: ofd.handle().0,
+                kind: raven_libc_platform::fd::inherit::kind_byte(ofd.kind()),
+                status: ofd.status(),
                 cloexec: platform.cloexec(fd).unwrap_or(false),
             });
         }

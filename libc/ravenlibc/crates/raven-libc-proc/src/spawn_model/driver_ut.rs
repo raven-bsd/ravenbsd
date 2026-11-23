@@ -282,6 +282,8 @@ fn the_request_carries_the_inherited_fdmap() {
     let table = [FdEntry {
         fd: 1,
         handle: 7,
+        kind: 0,
+        status: 2,
         cloexec: false,
     }];
     let context = ctx(&table, b"/tmp");
@@ -300,7 +302,12 @@ fn the_request_carries_the_inherited_fdmap() {
     let request = spawn_request(&backend);
     assert_eq!(
         request.fdmap,
-        vec![crate::request::FdMapEntry { fd: 1, handle: 7 }]
+        vec![crate::request::FdMapEntry {
+            fd: 1,
+            handle: 7,
+            kind: 0,
+            status: 2,
+        }]
     );
     assert_eq!(request.cwd, b"/tmp".to_vec());
     assert_eq!(request.umask, 0o022);
@@ -330,7 +337,12 @@ fn temporary_handles_are_closed_after_success() {
     assert_eq!(env.closed, vec![9]);
     assert_eq!(
         spawn_request(&backend).fdmap,
-        vec![crate::request::FdMapEntry { fd: 3, handle: 9 }]
+        vec![crate::request::FdMapEntry {
+            fd: 3,
+            handle: 9,
+            kind: 0,
+            status: 0,
+        }]
     );
 }
 
@@ -558,6 +570,8 @@ fn cloexec_default_sets_the_hint_and_hides_inherited_fds() {
     let table = [FdEntry {
         fd: 1,
         handle: 7,
+        kind: 0,
+        status: 2,
         cloexec: false,
     }];
     let context = ctx(&table, b"/");
@@ -624,7 +638,12 @@ fn an_open_action_is_in_the_request_and_closed() {
     assert_eq!(env.closed, vec![9]);
     assert_eq!(
         spawn_request(&backend).fdmap,
-        vec![crate::request::FdMapEntry { fd: 3, handle: 9 }]
+        vec![crate::request::FdMapEntry {
+            fd: 3,
+            handle: 9,
+            kind: 0,
+            status: 0,
+        }]
     );
 }
 
