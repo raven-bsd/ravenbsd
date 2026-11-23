@@ -130,6 +130,44 @@ pub fn request_holder_stats() -> [u64; 7] {
     stats
 }
 
+/// Opcode histogram of the largest server request queue (S36b diagnostic).
+///
+/// Returns `(close, dup, open, other, top_queue_pid)`. It names the request kind that is
+/// accumulating on the server that does not drain its queue.
+pub fn queue_opcode_stats() -> [u64; 5] {
+    let mut top_pid = 0u64;
+    let mut top_len = 0usize;
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        let len = process.scheme_queue.lock().len();
+        if len > top_len {
+            top_len = len;
+            top_pid = process.id;
+        }
+    }
+    let mut stats = [0u64; 5];
+    stats[4] = top_pid;
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        if process.id != top_pid {
+            continue;
+        }
+        for request in process.scheme_queue.lock().iter() {
+            match request.opcode {
+                crate::ipc::protocol::Opcode::Close => stats[0] = stats[0].saturating_add(1),
+                crate::ipc::protocol::Opcode::Dup => stats[1] = stats[1].saturating_add(1),
+                crate::ipc::protocol::Opcode::Open => stats[2] = stats[2].saturating_add(1),
+                _ => stats[3] = stats[3].saturating_add(1),
+            }
+        }
+    }
+    stats
+}
+
 /// Leaked-process reference histogram (S36b diagnostic).
 ///
 /// Returns `(leaked, external_refs_1, external_refs_2, external_refs_3plus, self_handles,
@@ -1994,6 +2032,15 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             holders[4],
             holders[5],
             holders[6]
+        );
+        let opcodes = queue_opcode_stats();
+        kprintln!(
+            "s36: qop close={} dup={} open={} other={} top_queue_pid={}",
+            opcodes[0],
+            opcodes[1],
+            opcodes[2],
+            opcodes[3],
+            opcodes[4]
         );
     }
 }
