@@ -120,3 +120,9 @@ src = "build/{arch}/uutils/false"
 path = "/bin/false"
 mode = 0o755
 generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/tty"
+path = "/bin/tty"
+mode = 0o755
+generated = true

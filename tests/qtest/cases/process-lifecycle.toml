@@ -4,7 +4,7 @@
 name = "process-lifecycle"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 240
+timeout_secs = 300
 pre = ["sh tests/fixtures/s36-lifecycle/build.sh"]
 initfs = "build/fixtures/s36-lifecycle/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1 s36-mapcheck=1"
@@ -28,7 +28,7 @@ regex = '^s36: wait eintr ok$'
 
 # Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
 [[expect]]
-regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+$'
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
 
 [[expect]]
 regex = '^.*s36: cycles done=10000$'
@@ -37,9 +37,13 @@ regex = '^.*s36: cycles done=10000$'
 [[expect]]
 regex = '^s36: sessions done=32$'
 
+# Bounded VMA churn; the marker after it separates data/page-table frames from baseline.
+[[expect]]
+regex = '^s36: vma vma-large done=100$'
+
 # Scenario 2, closing marker exit: the counters again (the report compares the two lines).
 [[expect]]
-regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+$'
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
 
 # Scenario 1: one thread exits (process alive), then EXIT kills every thread.
 [[expect]]
@@ -70,13 +74,13 @@ regex = '^s36: scheme reregistered$'
 # The `mapcheck ok` line is required and the leak line is forbidden: this row is red until
 # the vfsd/rt allocator owner returns the mapped-chunk frames.
 [[expect]]
-regex = '^s36: mapcheck base allocated=[0-9]+$'
+regex = '^s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
 
 [[expect]]
-regex = '^s36: vfsd map done=32$'
+regex = '^s36: vfsd map done=1000$'
 
 [[expect]]
-regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+$'
+regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=[0-9]+$'
 
 [[expect]]
 regex = '^s36: mapcheck ok$'

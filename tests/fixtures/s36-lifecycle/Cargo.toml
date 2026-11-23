@@ -17,6 +17,9 @@ target = "none"
 name = "raven-s36-lifecycle"
 path = "src/main.rs"
 
+[features]
+s36-churn-only = []
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-elf = { path = "../../../crates/raven-elf" }

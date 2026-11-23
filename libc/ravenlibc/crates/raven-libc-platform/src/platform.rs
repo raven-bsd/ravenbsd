@@ -737,6 +737,31 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         let resolved =
             resolve(&base, path, false, &self.limits).map_err(crate::path::path_errno)?;
         let spec = xlat::open_flags(flags)?;
+        // `/dev/tty` names the process's controlling terminal, not a VFS node. FreeBSD `cttyopen`
+        // resolves it from the session's controlling vnode; Raven asks the kernel for the live
+        // terminal handle. With no controlling terminal the kernel answers `ENXIO` (POSIX).
+        if resolved.abs == b"/dev/tty" {
+            match self.backend.ctty_handle() {
+                Ok(handle) => {
+                    let path_box: Box<[u8]> = resolved.abs.clone().into_boxed_slice();
+                    return match self.install(
+                        handle,
+                        OfdKind::Tty,
+                        spec.status,
+                        Some(path_box),
+                        spec.cloexec,
+                    ) {
+                        Ok(fd) => Ok(fd),
+                        Err(error) => {
+                            let _ = self.backend.close(handle);
+                            Err(error)
+                        }
+                    };
+                }
+                Err(Errno::ENOSYS) => {}
+                Err(error) => return Err(error),
+            }
+        }
         let mut wire = spec.wire;
         if resolved.must_be_dir {
             if flags & fcntl::O_CREAT as u32 != 0 {

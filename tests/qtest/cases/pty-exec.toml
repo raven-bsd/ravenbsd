@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K548 rev333: the sshd do_exec_pty stdio step trace. The child runs setsid + TIOCSCTTY +
+# dup2(slave, 0/1/2), reports PRE (isatty/fstat type/tty name), execve's the same binary, and the
+# post image reports the same fields. The parent prints the child transcript, naming the first
+# step where 0/1/2 stop being the pty slave.
+
+name = "pty-exec"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-exec"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*PTY-EXEC start uid=0$'
+
+[[expect]]
+regex = '^.*PTY-EXEC pair master=[0-9]+ slave=[0-9]+ path=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^.*PTY-EXEC PRE isatty=1/1/1 fstat=0 type=20000 tty=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^.*PTY-EXEC POST isatty=1/1/1 fstat=0 type=20000 tty=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^.*PTY-EXEC SUMMARY eof=1 exit=0$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|PTY-EXEC FAIL'

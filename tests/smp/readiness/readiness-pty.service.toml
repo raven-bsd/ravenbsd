@@ -5,8 +5,7 @@
 name = "readiness-pty"
 exec = "/bin/readiness-pty"
 args = []
-needs = ["scheme:pty", "vfsd", "initfsd"]
-grants = ["initfs"]
+needs = ["scheme:pty", "vfsd", "initfsd", "ramfsd"]
 readiness = "none"
 restart = "never"
 max_restarts = 0

@@ -302,22 +302,20 @@ pub(crate) fn prerequisite_plan(
     }
 }
 
-/// Staged and target paths that a release image must not inherit from an older build.
+/// Staged paths that a release image must not inherit from an older build.
 ///
-/// `build/<arch>/brush`/`uutils` are copied into the image, the cargo target directories can
-/// carry a stale feature set, RUSTFLAGS or vendored dependency build, and the dynamic
-/// `libc.so.1`/`ld-elf.so.1` pair is linked from the current sources. A release image must be
-/// reproducible from the current checkout, not from whichever cache happens to exist.
+/// `build/<arch>/brush`/`uutils` are copied into the image and the dynamic
+/// `libc.so.1`/`ld-elf.so.1` pair is linked from the current sources, so those outputs are
+/// discarded first: a release image must be reproducible from the current checkout.
+///
+/// The cargo target caches (`build/cargo/brush-*`, `build/cargo/uutils-*`) are deliberately
+/// kept. Cargo fingerprints the feature set and RUSTFLAGS, and the staged tree is rebuilt from
+/// the cache, so keeping the cache cannot pack a stale binary; it only avoids paying the full
+/// cold compile of both slices on every release image (K548 image wall).
 pub(crate) fn release_userspace_paths(root: &Path, arch: Arch) -> Vec<PathBuf> {
     vec![
         root.join(brush_path(arch)),
         root.join("build").join(arch.as_str()).join("uutils"),
-        root.join("build")
-            .join("cargo")
-            .join(format!("brush-{}", arch.as_str())),
-        root.join("build")
-            .join("cargo")
-            .join(format!("uutils-{}", arch.as_str())),
         root.join("build").join(arch.as_str()).join("libc.so.1"),
         root.join("build").join(arch.as_str()).join("ld-elf.so.1"),
         crate::libc_link::loader_manifest_path(root, arch.as_str()),
@@ -340,8 +338,9 @@ fn purge_release_userspace(root: &Path, arch: Arch) -> Result<()> {
 ///
 /// Each step runs at most once per call and only when its outputs are missing. libc is checked
 /// first because brush and uutils link against its archive and crt objects. A release profile
-/// discards the staged brush/uutils tree and their target caches first, so a stale binary or a
-/// stale feature/RUSTFLAGS target cannot be packed into the image.
+/// discards the staged brush/uutils outputs and the dynamic loader first, then rebuilds them
+/// from the cargo target cache; cargo's own fingerprint (features/RUSTFLAGS/sources) decides what
+/// recompiles, so a stale binary cannot be packed but the cold compile is not paid every image.
 pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
     let release = release_user_programs(
         profile.initfs.release,
@@ -355,7 +354,8 @@ pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -
     let needs_libc = brush_requested(profile, arch) || uutils_requested(profile, arch) || dynamic;
     let manifest_stale = dynamic && !crate::libc_link::loader_manifest_matches(root, arch.as_str());
     let sources_stale = needs_libc && !libc_stamp_current(root, arch);
-    if !plan.libc.is_empty() || manifest_stale || sources_stale {
+    let dso_stale = dynamic && !crate::libc_link::dso_stamp_current(root, arch.as_str());
+    if !plan.libc.is_empty() || manifest_stale || sources_stale || dso_stale {
         ensure_libc(root, arch, dynamic)?;
     }
     if plan.brush {
@@ -422,8 +422,9 @@ where
 pub(crate) fn ensure_libc(root: &Path, arch: Arch, dynamic: bool) -> Result<()> {
     let manifest_stale = dynamic && !crate::libc_link::loader_manifest_matches(root, arch.as_str());
     let sources_stale = !libc_stamp_current(root, arch);
+    let dso_stale = dynamic && !crate::libc_link::dso_stamp_current(root, arch.as_str());
     let missing = libc_missing(arch, dynamic, |source| root.join(source).is_file());
-    if missing.is_empty() && !manifest_stale && !sources_stale {
+    if missing.is_empty() && !manifest_stale && !sources_stale && !dso_stale {
         return Ok(());
     }
     if missing.is_empty() {
@@ -457,7 +458,7 @@ pub(crate) fn ensure_libc(root: &Path, arch: Arch, dynamic: bool) -> Result<()> 
     let dynamic_missing = missing
         .iter()
         .any(|source| DYNAMIC_OUTPUTS.iter().any(|name| source.ends_with(name)));
-    if dynamic && (dynamic_missing || manifest_stale) {
+    if dynamic && (dynamic_missing || manifest_stale || sources_stale || dso_stale) {
         let code = crate::libc_link::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
         if code != 0 {
             bail!("libc-link failed with exit code {code}");
