@@ -122,6 +122,11 @@ impl<T> RunQueue<T> {
     pub fn level_len(&self, priority: u8) -> usize {
         self.len.get(usize::from(priority)).copied().unwrap_or(0)
     }
+
+    /// Iterate the live entries (S36 holder diagnostic).
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.slots.iter().filter_map(Option::as_ref)
+    }
 }
 
 impl<T> Default for RunQueue<T> {
@@ -220,6 +225,11 @@ impl<T> SleepList<T> {
     /// True when no thread is sleeping.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// Iterate the sleeping values (S36 holder diagnostic).
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.entries.iter().map(|entry| &entry.value)
     }
 }
 

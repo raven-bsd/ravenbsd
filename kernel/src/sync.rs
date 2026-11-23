@@ -205,6 +205,21 @@ impl<T> IrqSpinLock<T> {
         percpu::preempt_inc();
         IrqGuard { lock: self, flags }
     }
+
+    /// Try to acquire the lock without spinning (S36 diagnostic).
+    pub fn try_lock(&self) -> Option<IrqGuard<'_, T>> {
+        let flags = disable_interrupts();
+        if self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            restore_interrupts(flags);
+            return None;
+        }
+        percpu::preempt_inc();
+        Some(IrqGuard { lock: self, flags })
+    }
 }
 
 /// Guard returned by [`IrqSpinLock::lock`].
@@ -294,6 +309,17 @@ impl KernelTurnstile {
         }
         self.threads.insert(tid, Arc::downgrade(thread));
     }
+
+    /// Unregister a thread that is leaving.
+    ///
+    /// FreeBSD `thread_fini`/`turnstile_free` and NetBSD `lwp_dtor`/`lwp_free` release the
+    /// thread's turnstile with the thread itself. Raven's graph entry is the equivalent
+    /// allocation: dropping the weak map entry and the graph node here does not keep the thread
+    /// alive and does not hand a stale base priority to a reused tid.
+    fn unregister(&mut self, tid: ThreadId) {
+        self.graph.unregister(tid);
+        self.threads.remove(&tid);
+    }
 }
 
 static TURNSTILES: IrqSpinLock<Option<KernelTurnstile>> = IrqSpinLock::new(None);
@@ -358,6 +384,34 @@ pub fn register_thread(thread: &Arc<Thread>) {
     let mut guard = TURNSTILES.lock();
     let kernel = guard.get_or_insert_with(KernelTurnstile::new);
     kernel.register(thread.tid, thread);
+}
+
+/// Unregister a thread at exit: drop its graph node and weak map entry, then reapply the boosts
+/// of the remaining threads.
+///
+/// Called from `sched::exit_thread`. The weak map never kept the dead thread alive, but the graph
+/// entry was permanent; at four entries per SSH session it exhausted the 3072-byte class. The
+/// graph removal is allocation-free (thread-exit context) and restores any server or lock owner
+/// the thread had boosted.
+pub fn unregister_thread(tid: ThreadId) {
+    let mut guard = TURNSTILES.lock();
+    let Some(kernel) = guard.as_mut() else {
+        return;
+    };
+    kernel.unregister(tid);
+    sync_all_boosts_locked(kernel);
+}
+
+/// K449 diagnostic: `(graph_threads, weak_threads)` for the donation registry.
+///
+/// `graph_threads` is the base/effective/call graph size; `weak_threads` is the boost map. Both
+/// must return to their baseline after a session's threads exit.
+#[must_use]
+pub fn turnstile_counts() -> (usize, usize) {
+    let guard = TURNSTILES.lock();
+    guard.as_ref().map_or((0, 0), |kernel| {
+        (kernel.graph.registered_threads(), kernel.threads.len())
+    })
 }
 
 /// Open the IPC call edge `client -> server` and apply the resulting boosts.
