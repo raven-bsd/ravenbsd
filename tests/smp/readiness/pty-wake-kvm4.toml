@@ -7,6 +7,10 @@
 # R2: same child with a caught SIGCHLD handler; the handler must run and ppoll must return
 #     EINTR or a ready master/self-pipe.
 # R3: child writes and exits without an explicit close; the master must still report HUP.
+# R4: child execs /bin/brush -c "echo wake" on the pty and exits; the master must deliver wake and
+#     HUP (the sshd session-child shape).
+# R5: same child exit with a quiet second poll source (a socketpair), like sshd's connection_in;
+#     the pty HUP must still wake ppoll.
 
 name = "smp-readiness-pty-wake"
 arch = "x86_64"
@@ -31,7 +35,13 @@ regex = 'PTY-WAKE R2 .* ok$'
 regex = 'PTY-WAKE R3 .* ok$'
 
 [[expect]]
-regex = 'PTY-WAKE SUMMARY PASS 3/3$'
+regex = 'PTY-WAKE R4 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R5 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE SUMMARY PASS 5/5$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
