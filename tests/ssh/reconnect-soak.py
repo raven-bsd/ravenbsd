@@ -142,12 +142,14 @@ def parse_args(argv: list[str]) -> dict:
 RESOURCE_COLUMNS = [
     "after_session", "qemu_rss_kb", "heap_used", "heap_free", "frames_free",
     "frames_alloc", "procs", "threads", "ofds", "pt_frames", "stack_frames",
-    "init_pages", "vfsd_pages", "netd_pages", "sshd_pages", "serial_heap_kb", "panic",
+    "init_pages", "vfsd_pages", "netd_pages", "sshd_pages",
+    "c3072_free", "c3072_used", "c3072_slabs", "serial_heap_kb", "panic",
 ]
 RESOURCE_NOTE = (
     "guest heap/frame bytes, live processes/threads, handle (OFD) lineage, page-table frames, "
-    "kernel-stack frames and per-process user pages come from the test-only K449-METRICS kernel "
-    "line, enabled by `k449-metrics=<seconds>` on the image cmdline; on an image without that "
+    "kernel-stack frames, per-process user pages and the 3072-byte kmem class counters come from "
+    "the test-only K449-METRICS kernel line, enabled by `k449-metrics=<seconds>` on the image "
+    "cmdline; on an image without that "
     "key those fields are '-' and only the host QEMU RSS and the serial boot heap/panic remain. "
     "The K449-METRICS sampler is a diagnostic, not a product service, and the SSH rows are "
     "untouched."
@@ -168,7 +170,8 @@ METRICS_RE = re.compile(
     r"K449-METRICS heap_used=(\d+) heap_free=(\d+) frames_free=(\d+) "
     r"frames_alloc=(\d+) procs=(\d+) threads=(\d+) ofds=(\d+) "
     r"pt_frames=(\d+) stack_frames=(\d+) init_pages=(\d+) "
-    r"vfsd_pages=(\d+) netd_pages=(\d+) sshd_pages=(\d+)"
+    r"vfsd_pages=(\d+) netd_pages=(\d+) sshd_pages=(\d+) "
+    r"c3072_free=(\d+) c3072_used=(\d+) c3072_slabs=(\d+)"
 )
 
 
@@ -179,7 +182,8 @@ def parse_metrics_line(text: str) -> dict | None:
         return None
     keys = ["heap_used", "heap_free", "frames_free", "frames_alloc",
             "procs", "threads", "ofds", "pt_frames", "stack_frames",
-            "init_pages", "vfsd_pages", "netd_pages", "sshd_pages"]
+            "init_pages", "vfsd_pages", "netd_pages", "sshd_pages",
+            "c3072_free", "c3072_used", "c3072_slabs"]
     return {key: int(value) for key, value in zip(keys, matches[-1])}
 
 
@@ -204,7 +208,7 @@ def format_resource_table(rows: list[dict]) -> str:
     """Render the resource samples as a compact table (missing values are '-')."""
     header = ["after", "rss_kb", "heap_u", "heap_f", "fr_free", "fr_alloc",
               "procs", "thr", "ofds", "pt", "stk", "init", "vfsd", "netd",
-              "sshd", "heap_kb", "panic"]
+              "sshd", "c3f", "c3u", "c3s", "heap_kb", "panic"]
     lines = ["  ".join(header)]
 
     def value(item: object) -> str:
@@ -227,6 +231,9 @@ def format_resource_table(rows: list[dict]) -> str:
             value(row.get("vfsd_pages")),
             value(row.get("netd_pages")),
             value(row.get("sshd_pages")),
+            value(row.get("c3072_free")),
+            value(row.get("c3072_used")),
+            value(row.get("c3072_slabs")),
             value(row.get("serial_heap_kb")),
             "yes" if row.get("panic") else "no",
         ]))
@@ -247,7 +254,8 @@ def selftest() -> int:
         "K449-METRICS: sampler every 5s\n"
         "K449-METRICS heap_used=10 heap_free=20 frames_free=30 frames_alloc=40 "
         "procs=5 threads=6 ofds=7 pt_frames=8 stack_frames=9 init_pages=10 "
-        "vfsd_pages=11 netd_pages=12 sshd_pages=13\n"
+        "vfsd_pages=11 netd_pages=12 sshd_pages=13 "
+        "c3072_free=14 c3072_used=15 c3072_slabs=16\n"
     )
     check("metrics-heap-used", metrics and metrics["heap_used"], 10)
     check("metrics-frames-free", metrics and metrics["frames_free"], 30)
@@ -260,6 +268,9 @@ def selftest() -> int:
     check("metrics-vfsd-pages", metrics and metrics["vfsd_pages"], 11)
     check("metrics-netd-pages", metrics and metrics["netd_pages"], 12)
     check("metrics-sshd-pages", metrics and metrics["sshd_pages"], 13)
+    check("metrics-c3072-free", metrics and metrics["c3072_free"], 14)
+    check("metrics-c3072-used", metrics and metrics["c3072_used"], 15)
+    check("metrics-c3072-slabs", metrics and metrics["c3072_slabs"], 16)
     check("metrics-missing", parse_metrics_line("no metrics here\n"), None)
     check(
         "banner-line-remote",

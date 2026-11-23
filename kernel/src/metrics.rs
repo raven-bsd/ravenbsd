@@ -50,6 +50,7 @@ fn sampler() {
         let (heap_used, heap_free) = memory::heap::stats();
         let frames = memory::frame::stats();
         let (procs, threads) = process::live_totals();
+        let class = memory::heap::class_stats(16);
         kprintln!(
             "{}",
             format_line(
@@ -66,6 +67,9 @@ fn sampler() {
                 process_pages("vfsd"),
                 process_pages("netd"),
                 process_pages("sshd"),
+                class.map_or(0, |stats| stats.free as u64),
+                class.map_or(0, |stats| stats.in_use as u64),
+                class.map_or(0, |stats| stats.slabs as u64),
             )
         );
         if HOLDER_SCAN.load(Ordering::Relaxed) {
@@ -159,13 +163,17 @@ pub fn format_line(
     vfsd_pages: u64,
     netd_pages: u64,
     sshd_pages: u64,
+    c3072_free: u64,
+    c3072_used: u64,
+    c3072_slabs: u64,
 ) -> String {
     format!(
         "K449-METRICS heap_used={heap_used} heap_free={heap_free} \
          frames_free={frames_free} frames_alloc={frames_allocated} \
          procs={procs} threads={threads} ofds={ofds} \
          pt_frames={pt_frames} stack_frames={stack_frames} init_pages={init_pages} \
-         vfsd_pages={vfsd_pages} netd_pages={netd_pages} sshd_pages={sshd_pages}"
+         vfsd_pages={vfsd_pages} netd_pages={netd_pages} sshd_pages={sshd_pages} \
+         c3072_free={c3072_free} c3072_used={c3072_used} c3072_slabs={c3072_slabs}"
     )
 }
 
