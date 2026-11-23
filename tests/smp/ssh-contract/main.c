@@ -1169,6 +1169,9 @@ int main(int argc, char **argv) {
     return diag_main();
 #else
     signal(SIGPIPE, SIG_IGN);
+    // The release console prints the getty prompt without a newline; terminate that line before
+    // the contract rows so the release smoke can assert both the brush login and K1-K10.
+    say("\n");
     if (argc > 1 && strcmp(argv[1], "diag") == 0) {
         return diag_main();
     }
