@@ -294,6 +294,16 @@ impl KernelTurnstile {
         }
         self.threads.insert(tid, Arc::downgrade(thread));
     }
+
+    /// Drop a dead thread from the kernel weak registry and reapply the remaining boosts.
+    ///
+    /// The crate-owned `Turnstiles.threads`/`effective` entries and call edges are removed by
+    /// Lance's `Donation::unregister(tid)`; until that API is on origin the kernel cannot touch
+    /// them, so only the kernel map is released here.
+    fn unregister(&mut self, tid: ThreadId) {
+        self.threads.remove(&tid);
+        sync_all_boosts_locked(self);
+    }
 }
 
 static TURNSTILES: IrqSpinLock<Option<KernelTurnstile>> = IrqSpinLock::new(None);
@@ -364,6 +374,14 @@ pub fn register_thread(thread: &Arc<Thread>) {
 pub fn registered_count() -> usize {
     let guard = TURNSTILES.lock();
     guard.as_ref().map_or(0, |kernel| kernel.threads.len())
+}
+
+/// Remove a dead thread from the donation registry at its exit/reap boundary.
+pub fn unregister_thread(tid: ThreadId) {
+    let mut guard = TURNSTILES.lock();
+    if let Some(kernel) = guard.as_mut() {
+        kernel.unregister(tid);
+    }
 }
 
 /// Open the IPC call edge `client -> server` and apply the resulting boosts.
