@@ -41,21 +41,26 @@ static int wait_status(pid_t child) {
     return 255;
 }
 
+static int child_shared_fd(int fd) {
+    unsigned char *p = mmap(NULL, PAGE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) {
+        die("child mmap fd");
+    }
+    int ok = p[0] == FILL && p[PAGE - 1] == FILL;
+    printf("K495-COW exec-child pid=%d fd=%d addr=%p first=%02x last=%02x\n", getpid(), fd, p,
+           p[0], p[PAGE - 1]);
+    fflush(stdout);
+    return ok ? 0 : 2;
+}
+
 static int child_shared(const char *path) {
     int fd = open(path, O_RDWR);
     if (fd < 0) {
         die("child open");
     }
-    unsigned char *p = mmap(NULL, PAGE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (p == MAP_FAILED) {
-        die("child mmap");
-    }
-    int ok = p[0] == FILL && p[PAGE - 1] == FILL;
-    printf("K495-COW exec-child pid=%d addr=%p first=%02x last=%02x\n", getpid(), p, p[0],
-           p[PAGE - 1]);
-    fflush(stdout);
+    int result = child_shared_fd(fd);
     close(fd);
-    return ok ? 0 : 2;
+    return result;
 }
 
 int main(int argc, char **argv) {
@@ -63,6 +68,10 @@ int main(int argc, char **argv) {
 
     if (strcmp(mode, "child") == 0) {
         return child_shared(argc > 2 ? argv[2] : PATH);
+    }
+
+    if (strcmp(mode, "child-fd") == 0) {
+        return child_shared_fd(3);
     }
 
     if (strcmp(mode, "fork") == 0) {
@@ -112,7 +121,12 @@ int main(int argc, char **argv) {
             wrote += (size_t)n;
         }
         free(seed);
-        unsigned char *p = mmap(NULL, PAGE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        // Pass the already-open shared file descriptor across the exec; the child maps fd 3
+        // instead of reopening the path (the ramfs open is denied for the exec child here).
+        if (dup2(fd, 3) < 0) {
+            die("spawn dup2");
+        }
+        unsigned char *p = mmap(NULL, PAGE, PROT_READ | PROT_WRITE, MAP_SHARED, 3, 0);
         if (p == MAP_FAILED) {
             die("spawn mmap");
         }
@@ -125,7 +139,7 @@ int main(int argc, char **argv) {
             die("spawn fork");
         }
         if (child == 0) {
-            execl(argv[0], argv[0], "child", PATH, (char *)NULL);
+            execl(argv[0], argv[0], "child-fd", (char *)NULL);
             die("execl");
         }
         int status = wait_status(child);
