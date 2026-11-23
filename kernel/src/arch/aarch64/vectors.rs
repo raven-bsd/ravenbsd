@@ -269,12 +269,18 @@ pub extern "C" fn exception_dispatch(slot: u64, frame: *mut TrapFrame) {
     match slot {
         // Lower EL, AArch64.
         8 => match ec {
-            EC_SVC64 => crate::syscall::svc_dispatch(frame),
+            EC_SVC64 => crate::arch::aarch64::syscall::dispatch(frame),
             EC_DABT_LOWER => {
                 let kind = abort_kind(data_abort(esr.iss()).dfsc);
                 // Translation and permission faults may be COW/pager-resolvable; an
-                // alignment fault must go straight to the signal/default path.
-                if kind != signal::FAULT_MISALIGN && crate::process::handle_page_fault(frame.far) {
+                // alignment fault must go straight to the signal/default path. Resolve the
+                // fault with IRQ enabled: it takes the address-space lock, and a peer inside
+                // `unmap` may be waiting for this CPU's TLB SGI.
+                let resolved = kind != signal::FAULT_MISALIGN
+                    && crate::arch::aarch64::syscall::with_irq_enabled(|| {
+                        crate::process::handle_page_fault(frame.far)
+                    });
+                if resolved {
                     return;
                 }
                 if deliver_fault(frame, kind, frame.far) {
