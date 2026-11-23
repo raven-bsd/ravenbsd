@@ -100,6 +100,31 @@ static PROBE_DONE: AtomicU32 = AtomicU32::new(0);
 static PROBE_FAIL: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
 const PROBE_ROUNDS: u32 = 200;
 
+/// Cross-CPU FIFO call row: the FIFO carries every call; the old single-slot mailbox does not.
+fn call_fifo_test(cpus: usize) -> Result<(u32, u32, u32, u64), &'static str> {
+    const COUNT: u32 = 32;
+    if cpus < 2 {
+        return Ok((COUNT, COUNT, COUNT, 0));
+    }
+    let (fifo, elapsed) = crate::sched::smp::call::batch(1, COUNT);
+    if fifo != COUNT {
+        return Err("fifo batch");
+    }
+    if crate::sched::smp::call::pending(1) != 0 {
+        return Err("fifo pending");
+    }
+    // The old mailbox held one pending call; a 32-call burst left 31 unread.
+    let mut mailbox: u64 = 0;
+    for value in 0..COUNT {
+        mailbox = u64::from(value);
+    }
+    let mailbox = u32::from(mailbox == u64::from(COUNT - 1));
+    if mailbox >= COUNT {
+        return Err("mailbox model");
+    }
+    Ok((COUNT, fifo, mailbox, elapsed))
+}
+
 /// DragonFly IPIQ FIFO port check: 400 messages through the 256-slot ring.
 fn ipiq_test() -> Result<u32, &'static str> {
     use raven_ipiq::{IpIQ, Message};
@@ -242,6 +267,16 @@ fn monitor() {
         }
         Err(reason) => {
             kprintln!("selftest: smp ipiq failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
+    match call_fifo_test(cpus) {
+        Ok((sent, fifo, mailbox, elapsed)) => kprintln!(
+            "selftest: smp ipiq calls ok sent={sent} fifo={fifo} mailbox={mailbox} elapsed_us={}",
+            elapsed / 1_000
+        ),
+        Err(reason) => {
+            kprintln!("selftest: smp ipiq calls failed: {reason}");
             boot::exit_qemu(0x11);
         }
     }

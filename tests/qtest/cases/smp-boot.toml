@@ -21,6 +21,9 @@ regex = '^selftest: smp counter ok cpus=4 counter=800$'
 regex = '^selftest: smp ipiq ok messages=400 wrap=1 xindex=400$'
 
 [[expect]]
+regex = '^selftest: smp ipiq calls ok sent=32 fifo=32 mailbox=1 elapsed_us=\d+$'
+
+[[expect]]
 regex = '^selftest: smp tlb gs ok absent=1 invalid=1$'
 
 [[expect]]
