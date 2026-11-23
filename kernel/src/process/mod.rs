@@ -78,6 +78,10 @@ const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// S36 vfsd map/unmap baseline (`frame::stats().allocated_bytes` at the exit-88 marker).
 static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
+/// S36 timeout-retention baseline: live non-idle Threads at exit 90.
+static S36_TIMEOUT_LIVE: AtomicU64 = AtomicU64::new(0);
+/// S36 timeout-retention baseline: queued timeout sleepers at exit 90.
+static S36_TIMEOUT_SLEEPERS: AtomicU64 = AtomicU64::new(0);
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
@@ -463,6 +467,34 @@ pub fn live_totals() -> (usize, u32) {
         }
     }
     (procs, threads)
+}
+
+/// Live waiters on the process-owned queues (S36 timeout-retention diagnostic).
+pub fn wait_queue_len() -> usize {
+    let mut total = 0usize;
+    for process in processes() {
+        total = total.saturating_add(process.waiters.len());
+        total = total.saturating_add(process.scheme_waiters.len());
+        total = total.saturating_add(process.signal_waiters.len());
+        total = total.saturating_add(process.child_waiters.len());
+    }
+    total
+}
+
+/// Dead Threads still reachable from a process's weak live-thread list (S36 diagnostic).
+pub fn dead_live_threads() -> usize {
+    let mut total = 0usize;
+    for process in processes() {
+        let threads = process.threads_live.lock();
+        for weak in threads.iter() {
+            if let Some(thread) = weak.upgrade() {
+                if thread.state() == crate::sched::thread::ThreadState::Dead {
+                    total = total.saturating_add(1);
+                }
+            }
+        }
+    }
+    total
 }
 
 /// True when at least one live process is in `pgid` inside `sid`.
@@ -1828,6 +1860,66 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
                 kprintln!("s36: mapcheck ok");
             } else {
                 kprintln!("s36: mapcheck leak delta={}", delta);
+            }
+        }
+    }
+    // S36 timeout-retention row: exit 90 records the live non-idle Thread count and the queued
+    // timeout sleepers; exit 91 compares them after the bounded terminate-while-waiting churn.
+    // A dead Thread retained by a timeout entry keeps both counters above the tolerance.
+    if CmdLine::parse(paging::cmdline())
+        .get("s36-timeoutcheck")
+        .is_some()
+    {
+        let live = crate::sched::thread::live_threads() as u64;
+        let sleepers = crate::sched::sleepers_len() as u64;
+        let reap = crate::sched::reap_len() as u64;
+        let handles = crate::process::handle::thread_handles();
+        let rq = crate::sched::runqueue_len();
+        let current = crate::sched::exiting_current();
+        let futex = crate::syscall::futex::waiters_len();
+        let procq = wait_queue_len();
+        let deadlive = dead_live_threads();
+        if code == 90 {
+            S36_TIMEOUT_LIVE.store(live, Ordering::Release);
+            S36_TIMEOUT_SLEEPERS.store(sleepers, Ordering::Release);
+            kprintln!(
+                "s36: timeoutcheck base live={} sleepers={} reap={} handles={} rq={} current={} futex={} procq={} deadlive={}",
+                live,
+                sleepers,
+                reap,
+                handles,
+                rq,
+                current,
+                futex,
+                procq,
+                deadlive
+            );
+        } else if code == 91 {
+            let live_delta = live.saturating_sub(S36_TIMEOUT_LIVE.load(Ordering::Acquire));
+            let sleepers_delta =
+                sleepers.saturating_sub(S36_TIMEOUT_SLEEPERS.load(Ordering::Acquire));
+            kprintln!(
+                "s36: timeoutcheck delta live={} sleepers={} reap={} handles={} rq={} current={} futex={} procq={} deadlive={} live_delta={} sleepers_delta={}",
+                live,
+                sleepers,
+                reap,
+                handles,
+                rq,
+                current,
+                futex,
+                procq,
+                deadlive,
+                live_delta,
+                sleepers_delta
+            );
+            if live_delta <= 8 && sleepers_delta <= 8 {
+                kprintln!("s36: timeoutcheck ok");
+            } else {
+                kprintln!(
+                    "s36: timeoutcheck leak live_delta={} sleepers_delta={}",
+                    live_delta,
+                    sleepers_delta
+                );
             }
         }
     }

@@ -55,6 +55,12 @@ const SIGRECV_DELIVERABLE: usize = 2;
 const SIGUSR1: usize = 10;
 /// Raw `proc_handle_info(handle) -> pid`.
 const PROC_HANDLE_INFO: usize = 0x3E;
+/// Raw `proc_pid_info(pid, out, count) -> 0` (K391 words at byte 328).
+const PROC_PID_INFO: usize = 0x3A;
+/// Raw `futex(addr, op, val, timeout_ns)`.
+const FUTEX: usize = 0x22;
+/// Terminate-while-waiting cycles in the timeout-retention row.
+const TIMEOUT_CYCLES: usize = 40;
 /// Raw `sig_setup(entry, ctx, flags)`.
 /// Raw `sigreturn()`.
 /// Kernel `P_PID` wait id type.
@@ -225,6 +231,38 @@ fn proc_wait(process: Handle) -> Result<i32, Errno> {
 fn proc_handle_info(process: Handle) -> Result<i32, Errno> {
     let pid = result(syscall1(PROC_HANDLE_INFO, process.0 as usize))?;
     i32::try_from(pid).map_err(|_| Errno::EINVAL)
+}
+
+/// True while `pid` is inside the futex wait, using the K391 `PROC_PID_INFO` words.
+fn child_in_futex(pid: i32) -> bool {
+    let mut words = [0u64; 61];
+    let raw = unsafe {
+        syscall4(
+            PROC_PID_INFO,
+            pid as usize,
+            words.as_mut_ptr() as usize,
+            words.len(),
+            0,
+        )
+    };
+    if raw < 0 {
+        return false;
+    }
+    words[43] == FUTEX as u64 && words[45] != 0
+}
+
+/// Block on a private futex with a long timeout; the parent terminates the process while blocked.
+fn futex_wait_timeout(word: &AtomicU32, expected: u32, timeout_ns: u64) -> Result<(), Errno> {
+    result(unsafe {
+        syscall4(
+            FUTEX,
+            word.as_ptr() as usize,
+            0,
+            expected as usize,
+            timeout_ns as usize,
+        )
+    })?;
+    Ok(())
 }
 
 fn proc_wait_ex(idtype: usize, id: i32, status: &mut i32) -> Result<usize, Errno> {
@@ -605,6 +643,41 @@ fn vma_churn_part(initfs: &Initfs<'_>, role: &str, cycles: usize) -> Result<(), 
     Ok(())
 }
 
+/// Terminate-while-waiting timeout retention: spawn a child that blocks in a futex wait with a
+/// 60 s timeout, wait until it is inside the futex, then terminate the process. The kernel exit
+/// path must cancel the child's timeout sleeper; otherwise the dead Thread stays on the per-CPU
+/// sleeper list and both the live Thread and queued-sleeper counters grow by one per cycle.
+fn timeout_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let base = spawn_role(initfs, "timebase").map_err(|_| "timebase spawn")?;
+    if proc_wait(base).unwrap_or(-1) != 90 {
+        return Err("timebase wait");
+    }
+    handle_close(base);
+
+    let mut cycle = 0usize;
+    while cycle < TIMEOUT_CYCLES {
+        let child = spawn_role(initfs, "futex-wait").map_err(|_| "timeout spawn")?;
+        let pid = proc_handle_info(child).map_err(|_| "timeout pid")?;
+        let mut polls = 0usize;
+        while !child_in_futex(pid) && polls < 200 {
+            nanosleep(10_000_000);
+            polls = polls.saturating_add(1);
+        }
+        proc_terminate(child, 9).map_err(|_| "timeout terminate")?;
+        let _ = proc_wait(child);
+        handle_close(child);
+        cycle = cycle.saturating_add(1);
+    }
+    println!("s36: timeout churn done={}", TIMEOUT_CYCLES);
+
+    let top = spawn_role(initfs, "timetop").map_err(|_| "timetop spawn")?;
+    if proc_wait(top).unwrap_or(-1) != 91 {
+        return Err("timetop wait");
+    }
+    handle_close(top);
+    Ok(())
+}
+
 /// Open the fixture binary through vfsd, retrying until the file scheme is ready.
 fn open_map_file(client: &Client) -> Result<Handle, Errno> {
     let paths = ["file:/bin/s36-lifecycle", "file:/bin/brush", "file:/init"];
@@ -734,8 +807,15 @@ fn server_part() {
 fn child_main(role: &str) -> i32 {
     match role {
         "marker" => 0,
+        "timebase" => 90,
+        "timetop" => 91,
         "mapbase" => 88,
         "maptop" => 89,
+        "futex-wait" => {
+            let word = AtomicU32::new(0);
+            let _ = futex_wait_timeout(&word, 0, 60_000_000_000);
+            0
+        }
         "twomain" => {
             twomain_part();
             0
@@ -980,7 +1060,9 @@ fn churn_only(initfs: &Initfs<'_>) -> Result<(), &'static str> {
 
 fn main(args: raven_rt::Args) -> i32 {
     if let Some(role) = args.get(1) {
-        return child_main(role);
+        if role != "timeout-check" {
+            return child_main(role);
+        }
     }
 
     let image = match map_initfs_image() {
@@ -991,6 +1073,13 @@ fn main(args: raven_rt::Args) -> i32 {
         Ok(initfs) => initfs,
         Err(_) => fail("initfs parse"),
     };
+
+    if args.get(1).is_some_and(|role| role == "timeout-check") {
+        if let Err(message) = timeout_churn_part(&initfs) {
+            fail(message);
+        }
+        return 0;
+    }
 
     #[cfg(feature = "s36-churn-only")]
     {
