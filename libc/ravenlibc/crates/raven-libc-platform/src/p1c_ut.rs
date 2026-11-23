@@ -26,6 +26,21 @@ fn chown_family_uses_the_root_handle() {
 }
 
 #[test]
+fn dev_tty_opens_the_controlling_terminal_handle() {
+    // `/dev/tty` names the process's controlling terminal, not a VFS node. The backend supplies
+    // the live terminal handle; the public path stays on the OFD for `ttyname`.
+    let fake = FakeSys::new();
+    fake.dir(b"/");
+    fake.ctty(Handle(0x1234));
+    let platform = Platform::new(fake);
+    let fd = platform.open(b"/dev/tty", 0, 0).expect("open /dev/tty");
+    let reference = platform.get(fd).expect("fd");
+    assert_eq!(reference.kind(), OfdKind::Tty);
+    assert_eq!(reference.handle(), Handle(0x1234));
+    assert_eq!(platform.close(fd), Ok(()));
+}
+
+#[test]
 fn pty_slave_chown_and_chmod_are_read_only_device_metadata() {
     // The pty slave name is a `pty:` scheme endpoint, not a VFS node: the pty server owns the
     // node metadata and reports a root-owned 0600 chr device. OpenSSH `sshpty.c` `pty_setowner`
@@ -85,6 +100,35 @@ fn exec_fdmap_env_carries_the_table_and_closes_cloexec() {
     platform.close_cloexec_fds().expect("close");
     assert!(platform.get(cloexec).is_err());
     assert!(platform.get(plain).is_ok());
+}
+
+#[test]
+fn exec_fdmap_env_excludes_the_closed_session_fds() {
+    use crate::fd::inherit::{ENV_NAME, FdMap};
+
+    // The no-TTY command child: fds 0/1/2 are the stdin read, stdout write and
+    // stderr write ends; the session's parent-side channel ends are 12/13/15
+    // (wfd 12, rfd 13, efd 15 in the OpenSSH DEBUG3 trace). OpenSSH
+    // session.c::do_child closes every descriptor >= STDERR_FILENO + 1 before
+    // the execve, so the exec FdMap must carry only 0/1/2.
+    let platform = platform();
+    let mut fds = Vec::new();
+    for _ in 0..16 {
+        fds.push(platform.open(b"/a", 0, 0).expect("open"));
+    }
+    assert_eq!(fds.first().copied(), Some(0));
+    assert_eq!(fds.get(12).copied(), Some(12));
+    assert_eq!(fds.get(13).copied(), Some(13));
+    assert_eq!(fds.get(15).copied(), Some(15));
+
+    platform.close_from(3).expect("closefrom");
+
+    let entry = platform.exec_fdmap_env().expect("env").expect("some");
+    let (name, value) = entry.split_at(ENV_NAME.len());
+    assert_eq!(name, ENV_NAME);
+    let map = FdMap::decode_env(value.strip_prefix(b"=").expect("separator")).expect("decode");
+    let carried: Vec<i32> = map.entries.iter().map(|row| row.fd).collect();
+    assert_eq!(carried, vec![0, 1, 2]);
 }
 
 #[test]

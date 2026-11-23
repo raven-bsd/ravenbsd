@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+//
+// Immediate cancellation ported from DragonFlyBSD sys/kern/kern_timeout.c
+// `callout_stop`/`_callout_cancel_quick` and sys/kern/kern_synch.c `_tsleep_remove`
+// @ 94448f622a06cde90ba42d688e9cab2448ad9ab3 (3-clause BSD; The DragonFly Project).
+// Rust reimplementation; no C expression copied.
 
 //! Pure per-CPU deadline timer core.
 //!
@@ -14,9 +19,10 @@
 //!
 //! * [`Cyclics::add`] inserts a cyclic and reprograms the backend if the new deadline is earlier
 //!   than the one already programmed.
-//! * [`Cyclics::cancel`] is lazy: it marks a cyclic cancelled and it is skipped (and reclaimed)
-//!   when its deadline arrives. Cancelling an unknown or already-cancelled id is a no-op.
-//! * [`Cyclics::on_interrupt`] fires every due, non-cancelled cyclic in deadline order (equal
+//! * [`Cyclics::cancel`] unlinks the timer immediately and reprograms the backend, following the
+//!   DragonFly callout/sleepqueue stop path. Cancelling an unknown or already-cancelled id is a
+//!   no-op.
+//! * [`Cyclics::on_interrupt`] fires every due cyclic in deadline order (equal
 //!   deadlines fire in id order), re-inserting periodic cyclics at `when + interval`, then
 //!   reprograms the backend. Firing is the "ordered merge" of `R-TIM-10`: every deadline reached
 //!   since the previous interrupt is drained in one pass, so nearby deadlines coalesce.
@@ -77,7 +83,6 @@ struct Entry {
     interval: u64,
     level: Level,
     slack_ns: u64,
-    cancelled: bool,
 }
 
 impl Entry {
@@ -88,7 +93,6 @@ impl Entry {
             interval: spec.interval,
             level: spec.level,
             slack_ns: spec.slack_ns,
-            cancelled: false,
         }
     }
 
@@ -129,20 +133,25 @@ impl<B: Backend> Cyclics<B> {
         id
     }
 
-    /// Cancel a cyclic.
+    /// Cancel a cyclic and unlink it from the heap immediately.
     ///
-    /// Returns `false` when the id is unknown or already cancelled; the cyclic, if still live, is
-    /// skipped (and reclaimed) when its deadline arrives. This is idempotent and never panics.
+    /// Returns `false` when the id is unknown or already cancelled. Removing the entry, rather
+    /// than marking it, matches DragonFly's `callout_stop`/`_callout_cancel_quick` and the
+    /// sleepqueue `_tsleep_remove`, and prevents a cancelled last timer from being retained after
+    /// the backend is disarmed. This is idempotent and never panics.
     pub fn cancel(&mut self, id: CyclicId) -> bool {
-        let found = self.heap.iter_mut().find(|entry| entry.id == id);
-        match found {
-            Some(entry) => {
-                if entry.cancelled {
-                    return false;
-                }
-                entry.cancelled = true;
+        let Some(index) = self.heap.iter().position(|entry| entry.id == id) else {
+            return false;
+        };
+        let last = self.heap.len().saturating_sub(1);
+        self.heap.swap_remove(index);
+        if index < last {
+            let parent = index.saturating_sub(1) / 2;
+            if index > 0 && self.heap[index].less(&self.heap[parent]) {
+                self.sift_up(index);
+            } else {
+                self.sift_down(index);
             }
-            None => return false,
         }
         self.reprogram();
         true
@@ -167,11 +176,6 @@ impl<B: Backend> Cyclics<B> {
     /// allocation.
     pub fn on_interrupt_with(&mut self, now: u64, mut fire: impl FnMut(CyclicId, CyclicSpec)) {
         while let Some(root) = self.heap.first().copied() {
-            if root.cancelled {
-                // Reclaim a lazily-cancelled entry that reached the front.
-                self.heap_pop();
-                continue;
-            }
             if root.when > now {
                 break;
             }
@@ -193,14 +197,10 @@ impl<B: Backend> Cyclics<B> {
         self.reprogram();
     }
 
-    /// The earliest non-cancelled deadline, or `None` when nothing is pending.
+    /// The earliest deadline, or `None` when nothing is pending.
     #[must_use]
     pub fn next_deadline(&self) -> Option<u64> {
-        self.heap
-            .iter()
-            .filter(|entry| !entry.cancelled)
-            .map(|entry| entry.when)
-            .min()
+        self.heap.first().map(|entry| entry.when)
     }
 
     /// The live cyclic's current specification, or `None` when it is unknown or cancelled.
@@ -208,7 +208,7 @@ impl<B: Backend> Cyclics<B> {
     pub fn spec(&self, id: CyclicId) -> Option<CyclicSpec> {
         self.heap
             .iter()
-            .find(|entry| entry.id == id && !entry.cancelled)
+            .find(|entry| entry.id == id)
             .map(|entry| CyclicSpec {
                 when: entry.when,
                 interval: entry.interval,
@@ -217,7 +217,7 @@ impl<B: Backend> Cyclics<B> {
             })
     }
 
-    /// Number of entries in the heap, including cancelled ones awaiting reclamation.
+    /// Number of live timers in the heap.
     #[must_use]
     pub fn len(&self) -> usize {
         self.heap.len()

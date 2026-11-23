@@ -46,8 +46,13 @@ mod channel;
 mod endpoint;
 mod error;
 mod limits;
+mod msgport;
 
 pub use channel::{Channel, Completion, ReceivedCall};
 pub use endpoint::Endpoint;
 pub use error::Error;
 pub use limits::{DEFAULT_IN_FLIGHT, DEFAULT_RECEIVE_QUEUE, Limits, MAX_CAPACITY};
+pub use msgport::{
+    MSGF_ABORTABLE, MSGF_DONE, MSGF_QUEUED, MSGF_REPLY, MSGF_SYNC, MSGPORTF_WAITING, Message,
+    MsgError, ReplyPort, SendResult, abort, domsg, reply,
+};

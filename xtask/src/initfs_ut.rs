@@ -383,36 +383,36 @@ fn missing_fixtures_skips_existing_sources() {
 }
 
 #[test]
-fn release_userspace_paths_cover_staged_and_target_caches() {
+fn release_userspace_paths_keep_the_cargo_target_caches() {
     let root = Path::new("/repo");
+    let x86 = release_userspace_paths(root, Arch::X86_64);
     assert_eq!(
-        release_userspace_paths(root, Arch::X86_64),
+        x86,
         [
             PathBuf::from("/repo/build/x86_64/brush"),
             PathBuf::from("/repo/build/x86_64/uutils"),
-            PathBuf::from("/repo/build/cargo/brush-x86_64"),
-            PathBuf::from("/repo/build/cargo/uutils-x86_64"),
             PathBuf::from("/repo/build/x86_64/libc.so.1"),
             PathBuf::from("/repo/build/x86_64/ld-elf.so.1"),
             PathBuf::from("/repo/build/x86_64/loader-manifest.toml"),
         ]
     );
+    assert!(!x86.iter().any(|path| path.starts_with("/repo/build/cargo")));
+    let arm = release_userspace_paths(root, Arch::Aarch64);
     assert_eq!(
-        release_userspace_paths(root, Arch::Aarch64),
+        arm,
         [
             PathBuf::from("/repo/build/aarch64/brush"),
             PathBuf::from("/repo/build/aarch64/uutils"),
-            PathBuf::from("/repo/build/cargo/brush-aarch64"),
-            PathBuf::from("/repo/build/cargo/uutils-aarch64"),
             PathBuf::from("/repo/build/aarch64/libc.so.1"),
             PathBuf::from("/repo/build/aarch64/ld-elf.so.1"),
             PathBuf::from("/repo/build/aarch64/loader-manifest.toml"),
         ]
     );
+    assert!(!arm.iter().any(|path| path.starts_with("/repo/build/cargo")));
 }
 
 #[test]
-fn release_purge_removes_staged_target_caches_and_the_loader() {
+fn release_purge_removes_staged_outputs_and_keeps_target_caches() {
     let root = std::env::temp_dir().join(format!("raven-k131-purge-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("build/x86_64/uutils")).unwrap();
@@ -420,8 +420,8 @@ fn release_purge_removes_staged_target_caches_and_the_loader() {
     std::fs::create_dir_all(root.join("build/cargo/uutils-x86_64")).unwrap();
     std::fs::write(root.join("build/x86_64/brush"), b"stale").unwrap();
     std::fs::write(root.join("build/x86_64/uutils/ls"), b"stale").unwrap();
-    std::fs::write(root.join("build/cargo/brush-x86_64/artifact"), b"stale").unwrap();
-    std::fs::write(root.join("build/cargo/uutils-x86_64/artifact"), b"stale").unwrap();
+    std::fs::write(root.join("build/cargo/brush-x86_64/artifact"), b"warm").unwrap();
+    std::fs::write(root.join("build/cargo/uutils-x86_64/artifact"), b"warm").unwrap();
     // The K131 stale shape: a non-ELF loader plus a manifest from another build.
     std::fs::write(root.join("build/x86_64/ld-elf.so.1"), b"STALE-NOT-ELF").unwrap();
     std::fs::write(root.join("build/x86_64/libc.so.1"), b"stale libc").unwrap();
@@ -431,6 +431,10 @@ fn release_purge_removes_staged_target_caches_and_the_loader() {
     for path in release_userspace_paths(&root, Arch::X86_64) {
         assert!(!path.exists(), "{} still exists", path.display());
     }
+    // The cargo target caches are reused: cargo fingerprints features and RUSTFLAGS, and the
+    // staged outputs are rebuilt from them, so a stale image binary still cannot be packed.
+    assert!(root.join("build/cargo/brush-x86_64/artifact").exists());
+    assert!(root.join("build/cargo/uutils-x86_64/artifact").exists());
     std::fs::remove_dir_all(&root).unwrap();
 }
 
