@@ -9,14 +9,142 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
 
 static int failures;
+
+/* K536: one SIGWINCH per actual size change, delivered to the foreground group only. The libc
+ * on this base has no asynchronous handler dispatch (PG-7 is absent; see
+ * libc/ravenlibc/crates/raven-libc-signal/README.md), so the child consumes the queued signal
+ * through the kernel seam (PROC_SIGRECV) and immediately reads the size, which is the action a
+ * SIGWINCH handler performs. */
+struct winch_report {
+    int count;
+    int row;
+    int col;
+};
+
+static volatile sig_atomic_t winch_count;
+
+/* The libc `syscall()` symbol is a one-argument stub and libc `kill()` returns ENOSYS (the
+ * procd-kill capability PG-44 is absent). The fixture therefore calls the two documented raw
+ * kernel numbers directly: PROC_SIGNAL 0x4A and PROC_SIGRECV 0x4B. */
+static long raw_syscall2(long number, long first, long second) {
+    long result;
+    __asm__ volatile("syscall"
+                     : "=a"(result)
+                     : "a"(number), "D"(first), "S"(second)
+                     : "rcx", "r11", "memory");
+    return result;
+}
+
+static int winch_child(int slave, int master, int report, int make_group) {
+    unsigned long info[3];
+    int pgrp;
+    int pid;
+    char ready = 'R';
+
+    close(master);
+    if (make_group && setpgid(0, 0) != 0)
+        return 1;
+    pgrp = (int)getpgrp();
+    pid = (int)getpid();
+    if (write(report, &pgrp, sizeof(pgrp)) != (ssize_t)sizeof(pgrp))
+        return 1;
+    if (write(report, &pid, sizeof(pid)) != (ssize_t)sizeof(pid))
+        return 1;
+    if (write(report, &ready, 1) != 1)
+        return 1;
+    for (;;) {
+        struct winsize size;
+        struct winch_report value;
+        long signo;
+        memset(info, 0, sizeof(info));
+        signo = raw_syscall2(0x4B, (long)info, 0);
+        if (signo == SIGWINCH) {
+            memset(&size, 0, sizeof(size));
+            (void)tcgetwinsize(slave, &size);
+            winch_count++;
+            value.count = (int)winch_count;
+            value.row = size.ws_row;
+            value.col = size.ws_col;
+            if (write(report, &value, sizeof(value)) != (ssize_t)sizeof(value))
+                return 1;
+        } else if (signo == SIGUSR2) {
+            break;
+        } else if (signo < 0 && signo != -EINTR) {
+            break;
+        }
+    }
+    return 0;
+}
+
+static pid_t spawn_winch_child(int slave, int master, int make_group, int *report) {
+    int report_pipe[2];
+    pid_t pid;
+    if (pipe(report_pipe) != 0)
+        return -1;
+    pid = fork();
+    if (pid < 0)
+        return -1;
+    if (pid == 0) {
+        close(report_pipe[0]);
+        _exit(winch_child(slave, master, report_pipe[1], make_group));
+    }
+    close(report_pipe[1]);
+    *report = report_pipe[0];
+    return pid;
+}
+
+static int child_ready(pid_t pid, int report, int *pgrp, int *child_pid) {
+    char ready = 0;
+    if (pid < 0)
+        return 0;
+    if (read(report, pgrp, sizeof(*pgrp)) != (ssize_t)sizeof(*pgrp))
+        return 0;
+    if (read(report, child_pid, sizeof(*child_pid)) != (ssize_t)sizeof(*child_pid))
+        return 0;
+    if (read(report, &ready, 1) != 1 || ready != 'R')
+        return 0;
+    return 1;
+}
+
+/* 1 = a report arrived, 0 = timeout, -1 = error. */
+static int child_report(int report, struct winch_report *value, int timeout_ms) {
+    struct pollfd waiting;
+    int ready;
+    waiting.fd = report;
+    waiting.events = POLLIN;
+    waiting.revents = 0;
+    ready = poll(&waiting, 1, timeout_ms);
+    if (ready == 0)
+        return 0;
+    if (ready < 0)
+        return -1;
+    return read(report, value, sizeof(*value)) == (ssize_t)sizeof(*value) ? 1 : -1;
+}
+
+static void child_stop(int child_pid) {
+    (void)raw_syscall2(0x4A, child_pid, SIGUSR2);
+}
+
+static void drain_parent_signals(void) {
+    unsigned long info[3];
+    for (;;) {
+        memset(info, 0, sizeof(info));
+        if (raw_syscall2(0x4B, (long)info, 1) < 0)
+            break;
+    }
+}
 
 static void field(const char *who, const char *name, unsigned short want,
                   unsigned short got) {
@@ -138,8 +266,146 @@ int main(void) {
     }
     close(plain);
 
+    /* K536: one SIGWINCH per actual size change, foreground group only. The parent makes itself
+     * the group leader so tcsetpgrp's POSIX same-session check can use its own pid; the
+     * foreground child inherits that group, and the background child leaves it. */
+    if (setpgid(0, 0) != 0) {
+        printf("pty-winsize: sigwinch setpgid FAIL errno=%d\n", errno);
+        return 1;
+    }
+    if (tcsetpgrp(master, getpgrp()) != 0) {
+        printf("pty-winsize: sigwinch set-fg FAIL errno=%d\n", errno);
+        return 1;
+    }
+    int fg_rep = -1;
+    pid_t fg_pid = spawn_winch_child(slave, master, 0, &fg_rep);
+    int fg_pgrp = 0;
+    int fg_child = 0;
+    if (!child_ready(fg_pid, fg_rep, &fg_pgrp, &fg_child)) {
+        printf("pty-winsize: sigwinch fg FAIL errno=%d\n", errno);
+        return 1;
+    }
+    printf("pty-winsize: sigwinch fg pgrp=%d\n", fg_pgrp);
+
+    struct winsize change1;
+    memset(&change1, 0, sizeof(change1));
+    change1.ws_row = 43;
+    change1.ws_col = 120;
+    if (tcsetwinsize(master, &change1) != 0) {
+        printf("pty-winsize: sigwinch change-1-set FAIL errno=%d\n", errno);
+        return 1;
+    }
+    struct winch_report r1;
+    if (child_report(fg_rep, &r1, 2000) != 1) {
+        printf("pty-winsize: sigwinch change-1 FAIL errno=%d\n", errno);
+        return 1;
+    }
+    printf("pty-winsize: sigwinch change-1 count=%d row=%d col=%d\n", r1.count,
+           r1.row, r1.col);
+    if (r1.count != 1 || r1.row != 43 || r1.col != 120)
+        failures++;
+    drain_parent_signals();
+
+    if (tcsetwinsize(slave, &change1) != 0) {
+        printf("pty-winsize: sigwinch noop-set FAIL errno=%d\n", errno);
+        return 1;
+    }
+    struct winch_report r2;
+    int noop = child_report(fg_rep, &r2, 300);
+    printf("pty-winsize: sigwinch noop count=%d\n", noop == 1 ? r2.count : r1.count);
+    if (noop != 0)
+        failures++;
+    drain_parent_signals();
+
+    struct winsize change2;
+    memset(&change2, 0, sizeof(change2));
+    change2.ws_row = 24;
+    change2.ws_col = 80;
+    change2.ws_xpixel = 640;
+    change2.ws_ypixel = 480;
+    /* The slave path must signal too; change-1 and change-3 use the master. */
+    if (tcsetwinsize(slave, &change2) != 0) {
+        printf("pty-winsize: sigwinch change-2-set FAIL errno=%d\n", errno);
+        return 1;
+    }
+    struct winch_report r3;
+    if (child_report(fg_rep, &r3, 2000) != 1) {
+        printf("pty-winsize: sigwinch change-2 FAIL errno=%d\n", errno);
+        return 1;
+    }
+    printf("pty-winsize: sigwinch change-2 count=%d row=%d col=%d\n", r3.count,
+           r3.row, r3.col);
+    if (r3.count != 2 || r3.row != 24 || r3.col != 80)
+        failures++;
+    drain_parent_signals();
+
+    int bg_rep = -1;
+    pid_t bg_pid = spawn_winch_child(slave, master, 1, &bg_rep);
+    int bg_pgrp = 0;
+    int bg_child = 0;
+    if (!child_ready(bg_pid, bg_rep, &bg_pgrp, &bg_child)) {
+        printf("pty-winsize: sigwinch bg FAIL errno=%d\n", errno);
+        return 1;
+    }
+    printf("pty-winsize: sigwinch bg pgrp=%d\n", bg_pgrp);
+    struct winsize change3;
+    memset(&change3, 0, sizeof(change3));
+    change3.ws_row = 30;
+    change3.ws_col = 100;
+    if (tcsetwinsize(master, &change3) != 0) {
+        printf("pty-winsize: sigwinch change-3-set FAIL errno=%d\n", errno);
+        return 1;
+    }
+    struct winch_report r4;
+    if (child_report(fg_rep, &r4, 2000) != 1) {
+        printf("pty-winsize: sigwinch change-3 FAIL errno=%d\n", errno);
+        return 1;
+    }
+    printf("pty-winsize: sigwinch change-3 count=%d row=%d col=%d\n", r4.count,
+           r4.row, r4.col);
+    if (r4.count != 3 || r4.row != 30 || r4.col != 100)
+        failures++;
+    drain_parent_signals();
+    struct winch_report rb;
+    int bg = child_report(bg_rep, &rb, 300);
+    printf("pty-winsize: sigwinch bg count=%d\n", bg == 1 ? rb.count : 0);
+    if (bg != 0)
+        failures++;
+    child_stop(fg_child);
+    child_stop(bg_child);
+    int status = 0;
+    if (waitpid(fg_pid, &status, 0) != fg_pid || !WIFEXITED(status) ||
+        WEXITSTATUS(status) != 0)
+        failures++;
+    if (waitpid(bg_pid, &status, 0) != bg_pid || !WIFEXITED(status) ||
+        WEXITSTATUS(status) != 0)
+        failures++;
+    close(fg_rep);
+    close(bg_rep);
+
+    /* No SIGWINCH after the pair closes, even with the parent as the foreground group. */
+    drain_parent_signals();
+    if (setpgid(0, 0) != 0)
+        failures++;
+    if (tcsetpgrp(master, getpgrp()) != 0)
+        failures++;
     close(slave);
     close(master);
+    struct winsize closed_size;
+    memset(&closed_size, 0, sizeof(closed_size));
+    closed_size.ws_row = 10;
+    closed_size.ws_col = 20;
+    errno = 0;
+    int closed = tcsetwinsize(master, &closed_size);
+    int closed_errno = errno;
+    unsigned long info[3];
+    memset(info, 0, sizeof(info));
+    long queued = raw_syscall2(0x4B, (long)info, 1);
+    printf("pty-winsize: sigwinch closed errno=%d signal=%ld\n", closed_errno,
+           queued);
+    if (closed != -1 || closed_errno != EBADF || queued != -EAGAIN)
+        failures++;
+
     if (failures != 0) {
         printf("pty-winsize: FAIL fields=%d\n", failures);
         return 1;
