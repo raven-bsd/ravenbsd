@@ -97,9 +97,21 @@ int main(int argc, char **argv) {
         if (fd < 0) {
             die("spawn open");
         }
-        if (ftruncate(fd, PAGE) < 0) {
-            die("ftruncate");
+        // Raven's ramfs ftruncate is not reliable (C55); size the file with a full write.
+        unsigned char *seed = malloc(PAGE);
+        if (seed == NULL) {
+            die("spawn malloc");
         }
+        memset(seed, FILL, PAGE);
+        size_t wrote = 0;
+        while (wrote < PAGE) {
+            ssize_t n = write(fd, seed + wrote, PAGE - wrote);
+            if (n <= 0) {
+                die("spawn write");
+            }
+            wrote += (size_t)n;
+        }
+        free(seed);
         unsigned char *p = mmap(NULL, PAGE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (p == MAP_FAILED) {
             die("spawn mmap");
