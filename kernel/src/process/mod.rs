@@ -1430,7 +1430,11 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         .map_err(ProcessError::Handle)?;
     register_pid(&process);
     crate::sched::init().map_err(ProcessError::Sched)?;
-    let thread = crate::sched::new_user_thread(&process, elf.entry(), user_stack, user_stack)
+    // C8 exec donor: the C8 stack pointer is in `rsp`/`sp`; the argument register is zero
+    // (NetBSD `setregs` clears `tf_rdi` and sets `tf_rsp = stack`). `_start` takes `sp0` from
+    // `rsp`, so passing `sp0` again in the argument register is not the ABI.
+    let (stack_top, arg) = user_start_args(user_stack);
+    let thread = crate::sched::new_user_thread(&process, elf.entry(), stack_top, arg)
         .map_err(ProcessError::Sched)?;
     arch_syscall::init();
 
@@ -1658,8 +1662,14 @@ pub(crate) struct StackAuxv {
     pub(crate) phnum: u64,
 }
 
-fn build_stack(
-    address_space: &mut UserAddressSpace,
+/// C8 user-start registers: the stack pointer is `sp0`; the argument register is zero.
+fn user_start_args(sp0: u64) -> (u64, u64) {
+    (sp0, 0)
+}
+
+fn build_stack_image(
+    buffer: &mut [u8],
+    stack_base: u64,
     path: &[u8],
     argv: &[&[u8]],
     envp: &[&[u8]],
@@ -1713,8 +1723,6 @@ fn build_stack(
         return Err(ProcessError::ArgTooLong);
     }
 
-    let stack_base = address_space.stack_base();
-    let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
     let mut cursor = buffer.len();
 
     // AT_RANDOM comes from the same boot-seeded pool as GETRANDOM. On a platform with no
@@ -1737,21 +1745,21 @@ fn build_stack(
         None => 0,
     };
 
-    let platform_address = place_bytes(&mut buffer, &mut cursor, stack_base, platform.as_bytes())?;
-    let path_address = place_bytes(&mut buffer, &mut cursor, stack_base, path)?;
+    let platform_address = place_bytes(buffer, &mut cursor, stack_base, platform.as_bytes())?;
+    let path_address = place_bytes(buffer, &mut cursor, stack_base, path)?;
     let mut argv_addresses = Vec::new();
     argv_addresses
         .try_reserve(argv.len())
         .map_err(|_| ProcessError::OutOfFrames)?;
     for argument in argv {
-        argv_addresses.push(place_bytes(&mut buffer, &mut cursor, stack_base, argument)?);
+        argv_addresses.push(place_bytes(buffer, &mut cursor, stack_base, argument)?);
     }
     let mut env_addresses = Vec::new();
     env_addresses
         .try_reserve(envp.len())
         .map_err(|_| ProcessError::OutOfFrames)?;
     for variable in envp {
-        env_addresses.push(place_bytes(&mut buffer, &mut cursor, stack_base, variable)?);
+        env_addresses.push(place_bytes(buffer, &mut cursor, stack_base, variable)?);
     }
 
     let auxv_pairs = 19usize;
@@ -1782,18 +1790,18 @@ fn build_stack(
 
     let mut block_cursor = block_start;
     write_word(
-        &mut buffer,
+        buffer,
         &mut block_cursor,
         u64::try_from(argv.len()).map_err(|_| ProcessError::ArgTooLong)?,
     )?;
     for address in &argv_addresses {
-        write_word(&mut buffer, &mut block_cursor, *address)?;
+        write_word(buffer, &mut block_cursor, *address)?;
     }
-    write_word(&mut buffer, &mut block_cursor, 0)?;
+    write_word(buffer, &mut block_cursor, 0)?;
     for address in &env_addresses {
-        write_word(&mut buffer, &mut block_cursor, *address)?;
+        write_word(buffer, &mut block_cursor, *address)?;
     }
-    write_word(&mut buffer, &mut block_cursor, 0)?;
+    write_word(buffer, &mut block_cursor, 0)?;
     for (key, value) in [
         (AT_PHDR, aux.phdr),
         (AT_PHENT, PHENT),
@@ -1815,18 +1823,26 @@ fn build_stack(
         (AT_EXECFN, path_address),
         (AT_MINSIGSTKSZ, 8192),
     ] {
-        write_word(&mut buffer, &mut block_cursor, key)?;
-        write_word(&mut buffer, &mut block_cursor, value)?;
+        write_word(buffer, &mut block_cursor, key)?;
+        write_word(buffer, &mut block_cursor, value)?;
     }
-    write_word(&mut buffer, &mut block_cursor, 0)?;
-    write_word(&mut buffer, &mut block_cursor, 0)?;
+    write_word(buffer, &mut block_cursor, 0)?;
+    write_word(buffer, &mut block_cursor, 0)?;
     if block_cursor > cursor {
         return Err(ProcessError::ArgTooLong);
     }
     let sp0 = stack_base
         .checked_add(u64::try_from(block_start).map_err(|_| ProcessError::BadAddress)?)
         .ok_or(ProcessError::BadAddress)?;
+    Ok(sp0)
+}
 
+/// Map the already-built C8 stack image into `address_space`.
+fn map_stack_image(
+    address_space: &mut UserAddressSpace,
+    buffer: &[u8],
+    stack_base: u64,
+) -> Result<(), ProcessError> {
     address_space
         .vmas_mut()
         .insert(
@@ -1872,6 +1888,22 @@ fn build_stack(
             .map_err(ProcessError::Map)?;
         page = page.saturating_add(1);
     }
+    Ok(())
+}
+
+/// Build the C8 stack image, map it, and return the initial stack pointer.
+fn build_stack(
+    address_space: &mut UserAddressSpace,
+    path: &[u8],
+    argv: &[&[u8]],
+    envp: &[&[u8]],
+    ids: &ProcessIds,
+    aux: StackAuxv,
+) -> Result<u64, ProcessError> {
+    let stack_base = address_space.stack_base();
+    let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
+    let sp0 = build_stack_image(&mut buffer, stack_base, path, argv, envp, ids, aux)?;
+    map_stack_image(address_space, &buffer, stack_base)?;
     Ok(sp0)
 }
 

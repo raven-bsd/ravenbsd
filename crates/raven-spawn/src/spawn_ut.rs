@@ -670,14 +670,16 @@ fn success_call_sequence() {
         }
     );
     assert_eq!(calls[7], Call::HandleClose(MEMOBJ.0));
+    // C8: the stack pointer is the `stack_top` kernel register (rsp/sp); the argument
+    // register is not the C8 stack ABI, so it is deliberately not tied to `stack_top`.
     assert!(matches!(
         &calls[8],
         Call::ThreadCreate {
             proc,
             entry: 0x0040_0100,
             stack_top,
-            arg
-        } if *proc == CHILD.0 && stack_top == arg && *stack_top >= stack_base
+            ..
+        } if *proc == CHILD.0 && stack_top % 16 == 0 && *stack_top >= stack_base
     ));
     assert_eq!(calls[9], Call::HandleClose(THREAD.0));
 }
@@ -1353,4 +1355,59 @@ fn a_short_read_is_an_io_error() {
     });
     assert!(matches!(result, Err(SpawnError::Sys(Errno::EIO))));
     assert_eq!(calls, 2);
+}
+
+#[test]
+fn c8_block_pins_argv_env_auxv_and_terminator() {
+    let auxv = [
+        (3, 0x40_0000),
+        (4, 56),
+        (5, 7),
+        (6, 4096),
+        (9, 0x40_1000),
+        (25, 0),
+    ];
+    let (buffer, _, sp0) = build("/child", &["/child", "arg"], &["A=1", "B=2"], &auxv);
+    assert_eq!(sp0 % 16, 0, "sp0 is 16-byte aligned");
+    assert!(sp0 >= base() && sp0 < TEST_TOP);
+
+    let argc = word(&buffer, sp0);
+    assert_eq!(argc, 2);
+    assert_eq!(
+        bytes_at(&buffer, word(&buffer, sp0 + WORD as u64)),
+        b"/child"
+    );
+    assert_eq!(
+        bytes_at(&buffer, word(&buffer, sp0 + 2 * WORD as u64)),
+        b"arg"
+    );
+    let argv_null = sp0 + 3 * WORD as u64;
+    assert_eq!(word(&buffer, argv_null), 0);
+    let env0 = argv_null + WORD as u64;
+    assert_eq!(bytes_at(&buffer, word(&buffer, env0)), b"A=1");
+    let env1 = env0 + WORD as u64;
+    assert_eq!(bytes_at(&buffer, word(&buffer, env1)), b"B=2");
+    let env_null = env1 + WORD as u64;
+    assert_eq!(word(&buffer, env_null), 0);
+
+    let auxv0 = env_null + WORD as u64;
+    for (index, (key, value)) in auxv.iter().enumerate() {
+        let key_address = auxv0 + 2 * WORD as u64 * index as u64;
+        assert_eq!(word(&buffer, key_address), *key, "auxv key {index}");
+        let value_address = key_address + WORD as u64;
+        if *key == 25 {
+            let pointer = word(&buffer, value_address);
+            let offset = usize::try_from(pointer as u64 - base()).expect("random offset");
+            assert_eq!(buffer[offset..offset + RANDOM_LEN], [0xAB; RANDOM_LEN]);
+        } else {
+            assert_eq!(word(&buffer, value_address), *value, "auxv value {index}");
+        }
+    }
+    let terminator = auxv0 + 2 * WORD as u64 * auxv.len() as u64;
+    assert_eq!(word(&buffer, terminator), 0, "auxv terminator key");
+    assert_eq!(
+        word(&buffer, terminator + WORD as u64),
+        0,
+        "auxv terminator value"
+    );
 }

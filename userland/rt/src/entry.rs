@@ -3,8 +3,9 @@
 
 //! The `_start` trampoline and `__raven_start`.
 //!
-//! The kernel/spawn enters a new thread with `sp0` in the first argument register and the C8 stack
-//! at that pointer. The assembly aligns the stack and calls the Rust entry function.
+//! The kernel enters a new thread with the C8 stack pointer in `rsp`/`sp`; on exec the argument
+//! registers are zero (NetBSD `setregs`: `tf_rdi = 0`, `tf_rsp = stack`). The `_start` trampoline
+//! aligns the stack and passes the pointer to Rust in `rdi`/`x0`.
 
 #[cfg(not(test))]
 use crate::Args;
