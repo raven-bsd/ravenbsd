@@ -19,8 +19,10 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import json
 import os
 import random
+import re
 import select
 import signal
 import socket
@@ -41,6 +43,7 @@ TCP_SYN = 0x02
 TCP_RST = 0x04
 TCP_PSH = 0x08
 TCP_ACK = 0x10
+TCP_URG = 0x20
 TCP_ECE = 0x40
 TCP_CWR = 0x80
 IP_ECN_CE = 0x03
@@ -355,13 +358,16 @@ class RawPeer:
 
 
 def handshake(peer: RawPeer, local_port: int, remote_port: int, final_window: int,
-              window_scale: int | None = 7, ecn: bool = False) -> dict:
+              window_scale: int | None = 7, ecn: bool = False, mss: int = 1460,
+              isn: int | None = None) -> dict:
     peer.our_port = local_port
     peer.peer_port = remote_port
-    isn = random.randrange(1, 0x7FFFFFFF)
+    if isn is None:
+        isn = random.randrange(1, 0x7FFFFFFF)
+    isn &= 0xFFFFFFFF
     syn_flags = TCP_SYN | ((TCP_ECE | TCP_CWR) if ecn else 0)
     peer.send(local_port, remote_port, isn, 0, syn_flags, 65535,
-              tcp_options(1460, window_scale), tos=0x02 if ecn else 0)
+              tcp_options(mss, window_scale), tos=0x02 if ecn else 0)
     synack = peer.wait(
         5.0, lambda p: p["flags"] & TCP_SYN and p["flags"] & TCP_ACK and p["ack"] == isn + 1
     )
@@ -385,7 +391,8 @@ def ack(peer: RawPeer, state: dict, local_port: int, remote_port: int, next_seq:
 
 def collect_stream(peer: RawPeer, state: dict, local_port: int, remote_port: int,
                    timeout: float, window: int,
-                   start_seq: int | None = None) -> tuple[bytes, list[dict], int, bool]:
+                   start_seq: int | None = None,
+                   stop_after: int | None = None) -> tuple[bytes, list[dict], int, bool]:
     """Read the server byte stream in order, ACKing each in-order segment.
 
     Returns the reassembled bytes, the frames, the next expected sequence and a
@@ -415,6 +422,8 @@ def collect_stream(peer: RawPeer, state: dict, local_port: int, remote_port: int
                 received += parsed["payload"][offset:]
                 next_seq += len(parsed["payload"]) - offset
                 ack(peer, state, local_port, remote_port, next_seq, window)
+                if stop_after is not None and len(received) >= stop_after:
+                    break
     return bytes(received), frames, next_seq, replayed
 
 
@@ -558,6 +567,315 @@ def scenario_ecn(peer: RawPeer, local_port: int, remote_port: int) -> tuple[bool
     return True, "ECN negotiated; CE data echoed as ECE"
 
 
+# K548 network fuzz.  The case table is generated from a fixed seed, and the FNV-1a hash of the
+# canonical table is printed and asserted, so a gate run cannot silently shrink or reorder it.
+FUZZ_SEED = 0x4B35_3438_4655_5A5A
+FUZZ_CASES = 224
+FUZZ_TABLE_HASH = 0x3006_6A6F_544F_F0BC
+TCP_MINMSS = 536
+FNV64_OFFSET = 0xCBF2_9CE4_8422_2325
+FNV64_PRIME = 0x0000_0100_0000_01B3
+
+FUZZ_RESERVED = (
+    (TCP_SYN, 0, 0, 65535, b"", "challenge"),
+    (TCP_SYN | TCP_FIN, 0, 0, 65535, b"", "challenge"),
+    (TCP_SYN | TCP_PSH | TCP_URG, 0, 0, 8192, b"", "challenge"),
+    (TCP_SYN | TCP_ECE | TCP_CWR, 0, 0, 65535, b"", "challenge"),
+    (TCP_SYN | TCP_ACK, 0, 0, 65535, b"", "challenge"),
+    (TCP_RST, 0, 0, 0, b"", "close"),
+    (TCP_FIN | TCP_RST, 0, 0, 0, b"", "close"),
+    (TCP_RST, 100, 0, 0, b"", "challenge"),
+    (TCP_RST, 1_000_000, 0, 0, b"", "ignore"),
+    (TCP_ACK, 0, 1_000_000, 65535, b"", "challenge"),
+    (TCP_PSH | TCP_ACK, 0, 0, 65535, b"FZZ1", "data-ack"),
+    (TCP_ECE | TCP_CWR | TCP_ACK, 0, 0, 65535, b"FZZ2", "data-ack"),
+)
+
+
+def fnv64_update(value: int, data: bytes) -> int:
+    for byte in data:
+        value ^= byte
+        value = (value * FNV64_PRIME) & 0xFFFFFFFFFFFFFFFF
+    return value
+
+
+def fuzz_lcg(seed: int, count: int) -> list[int]:
+    value = seed & 0xFFFFFFFFFFFFFFFF
+    numbers = []
+    for _ in range(count):
+        value = (value * 6364136223846793005 + 1442695040888963407) & 0xFFFFFFFFFFFFFFFF
+        numbers.append(value)
+    return numbers
+
+
+def fuzz_table(seed: int) -> list[dict]:
+    numbers = fuzz_lcg(seed, FUZZ_CASES)
+    cases: list[dict] = []
+
+    def add(group: str, index: int, **fields) -> None:
+        port = 42000 + len(cases)
+        case = {
+            "group": group,
+            "index": index,
+            "port": port,
+            "isn": (0x10000000 + (numbers[len(cases)] & 0x0FFFFFFF)),
+        }
+        case.update(fields)
+        cases.append(case)
+
+    for index in range(48):
+        variant = index % len(FUZZ_RESERVED)
+        flags, seq_offset, ack_offset, window, payload, expect = FUZZ_RESERVED[variant]
+        add("reserved", index, variant=variant, flags=flags, seq_offset=seq_offset,
+            ack_offset=ack_offset, window=window, payload=payload.hex(), expect=expect)
+    for index in range(48):
+        add("out-of-window", index, seq_offset=1_000_000 + (numbers[len(cases)] % 1_000_000),
+            window=65535, payload=b"past-window".hex())
+    for index in range(32):
+        windows = (536, 1024, 1460, 4096, 16384, 32768, 65535, 8192)
+        add("zero-window", index, reopen=windows[index % len(windows)])
+    for index in range(40):
+        mss_values = (1, 64, 128, 256, 535, 536, 537, 1000, 1460, 2000)
+        add("tiny-mss", index, mss=mss_values[index % len(mss_values)])
+    for index in range(40):
+        add("duplicate-fin", index, window=(4096, 16384, 65535, 8192)[index % 4])
+    for index in range(16):
+        add("rst-after-close", index, rst_offset=(1, 2, 100, 1_000_000)[index % 4])
+
+    if len(cases) != FUZZ_CASES:
+        raise RuntimeError(f"fuzz table has {len(cases)} cases, expected {FUZZ_CASES}")
+    return cases
+
+
+def fuzz_table_hash(cases: list[dict]) -> int:
+    value = FNV64_OFFSET
+    for case in cases:
+        encoded = json.dumps(case, sort_keys=True, separators=(",", ":")).encode()
+        value = fnv64_update(value, encoded)
+    return value
+
+
+def fuzz_quiet(peer: RawPeer, timeout: float, allow=None) -> dict | None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        frame = peer.recv(min(0.1, max(0.0, deadline - time.monotonic())))
+        if frame is None:
+            continue
+        if allow is not None and allow(frame):
+            continue
+        return frame
+    return None
+
+
+def fuzz_payload(peer: RawPeer, timeout: float) -> dict | None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        frame = peer.recv(min(0.1, max(0.0, deadline - time.monotonic())))
+        if frame is not None and frame["payload"]:
+            return frame
+    return None
+
+
+def scenario_fuzz(peer: RawPeer, local_port: int, remote_port: int) -> tuple[bool, str]:
+    cases = fuzz_table(FUZZ_SEED)
+    table_hash = fuzz_table_hash(cases)
+    deviations = 0
+
+    def check(case: dict, name: str, passed: bool, detail: str) -> None:
+        nonlocal deviations
+        if passed:
+            return
+        deviations += 1
+        log(f"deviation case={case['group']}[{case['index']}] check={name} {detail}")
+
+    log(f"fuzz: start seed=0x{FUZZ_SEED:016x} cases={len(cases)} "
+        f"table-hash=0x{table_hash:016x}")
+    group_started = time.monotonic()
+    group_cases = 0
+    previous_group = cases[0]["group"]
+
+    for case in cases:
+        port = case["port"]
+        group = case["group"]
+        isn = case["isn"]
+        if group != previous_group:
+            log(f"fuzz: group={previous_group} cases={group_cases} "
+                f"elapsed={time.monotonic() - group_started:.2f}s")
+            group_started = time.monotonic()
+            group_cases = 0
+            previous_group = group
+        group_cases += 1
+        case_started = time.monotonic()
+        try:
+            if group == "reserved":
+                state = handshake(peer, port, remote_port, 65535, window_scale=7, isn=isn)
+                data, _frames, next_seq, _ = collect_stream(
+                    peer, state, port, remote_port, 1.0, 65535,
+                    stop_after=len(PAYLOAD))
+                check(case, "setup-data", data == PAYLOAD, f"delivered={len(data)}/44")
+                payload = bytes.fromhex(case["payload"])
+                seq = (isn + 1 + case["seq_offset"]) & 0xFFFFFFFF
+                ack = (next_seq + case["ack_offset"]) & 0xFFFFFFFF
+                peer.send(port, remote_port, seq, ack, case["flags"], case["window"],
+                          payload=payload)
+                if case["expect"] == "challenge":
+                    reply = peer.wait(
+                        1.0, lambda p: bool(p["flags"] & TCP_ACK)
+                        and not p["flags"] & (TCP_SYN | TCP_RST))
+                    check(case, "challenge-ack",
+                          reply is not None and reply["ack"] == isn + 1,
+                          f"reply={None if reply is None else hex(reply['flags'])} "
+                          f"ack={None if reply is None else reply['ack']}")
+                    reset(peer, state, port, remote_port)
+                elif case["expect"] == "data-ack":
+                    reply = peer.wait(
+                        1.0, lambda p: bool(p["flags"] & TCP_ACK)
+                        and p["ack"] == (isn + 1 + len(payload)) & 0xFFFFFFFF)
+                    check(case, "data-ack", reply is not None,
+                          f"reply={None if reply is None else hex(reply['flags'])}")
+                    reset(peer, state, port, remote_port)
+                elif case["expect"] == "ignore":
+                    reply = fuzz_quiet(peer, 0.2)
+                    check(case, "rst-out-of-window-ignored", reply is None,
+                          f"unexpected={None if reply is None else hex(reply['flags'])}")
+                    reset(peer, state, port, remote_port)
+                else:
+                    reply = fuzz_quiet(peer, 0.2)
+                    check(case, "reset-not-answered", reply is None,
+                          f"unexpected={None if reply is None else hex(reply['flags'])}")
+            elif group == "out-of-window":
+                state = handshake(peer, port, remote_port, 65535, window_scale=7, isn=isn)
+                data, _frames, _next_seq, _ = collect_stream(
+                    peer, state, port, remote_port, 1.0, 65535,
+                    stop_after=len(PAYLOAD))
+                check(case, "setup-data", data == PAYLOAD, f"delivered={len(data)}/44")
+                seq = (isn + 1 + case["seq_offset"]) & 0xFFFFFFFF
+                peer.send(port, remote_port, seq, state["server_isn"] + 1,
+                          TCP_ACK, case["window"], payload=b"past-window")
+                reply = peer.wait(
+                    1.0, lambda p: bool(p["flags"] & TCP_ACK)
+                    and not p["flags"] & (TCP_SYN | TCP_RST) and not p["payload"])
+                check(case, "past-window-ack",
+                      reply is not None and reply["ack"] == isn + 1,
+                      f"reply={None if reply is None else hex(reply['flags'])} "
+                      f"ack={None if reply is None else reply['ack']}")
+                reset(peer, state, port, remote_port)
+            elif group == "zero-window":
+                state = handshake(peer, port, remote_port, 0, window_scale=7, isn=isn)
+                early = fuzz_payload(peer, 0.15)
+                check(case, "zero-window-stall", early is None,
+                      f"unexpected-payload={0 if early is None else len(early['payload'])}")
+                peer.send(port, remote_port, isn + 1, state["server_isn"] + 1,
+                          TCP_ACK, case["reopen"])
+                data, _frames, _next_seq, _ = collect_stream(
+                    peer, state, port, remote_port, 1.5, case["reopen"],
+                    stop_after=len(PAYLOAD))
+                check(case, "zero-window-reopen", data == PAYLOAD,
+                      f"delivered={len(data)}/44 window={case['reopen']}")
+                reset(peer, state, port, remote_port)
+            elif group == "tiny-mss":
+                state = handshake(peer, port, remote_port, 65535, window_scale=7,
+                                  mss=case["mss"], isn=isn)
+                data, frames, _next_seq, _ = collect_stream(
+                    peer, state, port, remote_port, 1.5, 65535,
+                    stop_after=len(PAYLOAD))
+                bound = 1460 if case["mss"] >= TCP_MINMSS else TCP_MINMSS
+                largest = max((len(frame["payload"]) for frame in frames if frame["payload"]),
+                              default=0)
+                check(case, "tiny-mss-data",
+                      data == PAYLOAD and largest <= bound,
+                      f"delivered={len(data)}/44 largest={largest} bound={bound} "
+                      f"peer-mss={case['mss']}")
+                reset(peer, state, port, remote_port)
+            elif group == "duplicate-fin":
+                state = handshake(peer, port, remote_port, 65535, window_scale=7, isn=isn)
+                fin_seq = isn + 1
+                for _ in range(2):
+                    peer.send(port, remote_port, fin_seq, state["server_isn"] + 1,
+                              TCP_FIN | TCP_ACK, case["window"])
+                delivered = bytearray()
+                acks = []
+                saw_reset = False
+                deadline = time.monotonic() + 0.7
+                while time.monotonic() < deadline:
+                    frame = peer.recv(min(0.1, max(0.0, deadline - time.monotonic())))
+                    if frame is None:
+                        continue
+                    if frame["flags"] & TCP_RST:
+                        saw_reset = True
+                        break
+                    if frame["payload"]:
+                        delivered += frame["payload"]
+                        peer.send(port, remote_port, isn + 2,
+                                  (frame["seq"] + len(frame["payload"])) & 0xFFFFFFFF,
+                                  TCP_ACK, case["window"])
+                    if frame["flags"] & TCP_FIN:
+                        peer.send(port, remote_port, isn + 2, frame["seq"] + 1,
+                                  TCP_ACK, case["window"])
+                    if frame["flags"] & TCP_ACK:
+                        acks.append(frame["ack"])
+                    if len(delivered) >= len(PAYLOAD) and acks.count(isn + 2) >= 2:
+                        break
+                check(case, "duplicate-fin-ack",
+                      bytes(delivered) == PAYLOAD and acks.count(isn + 2) >= 2
+                      and not saw_reset,
+                      f"delivered={len(delivered)}/44 acks={acks.count(isn + 2)} "
+                      f"rst={saw_reset}")
+                reset(peer, state, port, remote_port)
+            elif group == "rst-after-close":
+                state = handshake(peer, port, remote_port, 65535, window_scale=7, isn=isn)
+                data, _frames, next_seq, _ = collect_stream(
+                    peer, state, port, remote_port, 1.0, 65535,
+                    stop_after=len(PAYLOAD))
+                check(case, "setup-data", data == PAYLOAD, f"delivered={len(data)}/44")
+                peer.send(port, remote_port, isn + 1, next_seq, TCP_FIN | TCP_ACK, 65535)
+                fin_ack = peer.wait(
+                    0.8, lambda p: bool(p["flags"] & TCP_ACK) and p["ack"] == isn + 2
+                    and not p["flags"] & TCP_RST)
+                check(case, "fin-acked", fin_ack is not None, "no ACK for the peer FIN")
+                server_fin = peer.wait(
+                    1.2, lambda p: bool(p["flags"] & TCP_FIN) and not p["flags"] & TCP_RST)
+                check(case, "server-closed", server_fin is not None, "no server FIN")
+                if server_fin is not None:
+                    peer.send(port, remote_port, isn + 2, server_fin["seq"] + 1,
+                              TCP_ACK, 65535)
+                    time.sleep(0.02)
+                    rst_seq = (isn + 2 + case["rst_offset"]) & 0xFFFFFFFF
+                    peer.send(port, remote_port, rst_seq, server_fin["seq"] + 1, TCP_RST, 0)
+                    reply = fuzz_quiet(
+                        peer, 0.2,
+                        allow=lambda p: bool(p["flags"] & TCP_FIN)
+                        and p["seq"] == server_fin["seq"])
+                    check(case, "rst-after-close-not-answered", reply is None,
+                          f"unexpected={None if reply is None else hex(reply['flags'])}")
+                canary_port = port + 10000
+                canary = handshake(peer, canary_port, remote_port, 65535, window_scale=7,
+                                   isn=isn ^ 0x5A5A5A5A)
+                canary_data, _frames, _next_seq, _ = collect_stream(
+                    peer, canary, canary_port, remote_port, 1.0, 65535,
+                    stop_after=len(PAYLOAD))
+                check(case, "listener-canary", canary_data == PAYLOAD,
+                      f"delivered={len(canary_data)}/44")
+                reset(peer, canary, canary_port, remote_port)
+        except RuntimeError as error:
+            check(case, "harness", False, str(error))
+            try:
+                reset(peer, {"isn": isn, "server_isn": 0}, port, remote_port)
+            except Exception:
+                pass
+        elapsed = time.monotonic() - case_started
+        if elapsed >= 0.5:
+            log(f"fuzz: slow case={group}[{case['index']}] elapsed={elapsed:.2f}s")
+
+    log(f"fuzz: group={previous_group} cases={group_cases} "
+        f"elapsed={time.monotonic() - group_started:.2f}s")
+    log(f"fuzz: summary cases={len(cases)} deviations={deviations} "
+        f"seed=0x{FUZZ_SEED:016x} table-hash=0x{table_hash:016x}")
+    detail = (f"cases={len(cases)} deviations={deviations} "
+              f"seed=0x{FUZZ_SEED:016x} table-hash=0x{table_hash:016x}")
+    return deviations == 0, detail
+
+
 SCENARIOS = {
     "handshake": scenario_handshake,
     "ecn": scenario_ecn,
@@ -565,6 +883,7 @@ SCENARIOS = {
     "window-update": scenario_window_update,
     "retransmit": scenario_retransmit,
     "fin-rst": scenario_fin_rst,
+    "fuzz": scenario_fuzz,
 }
 NARROWED = {
     "dup-ack": "a single client cannot make the server's receiver see duplicate ACKs; needs a server-to-client data phase",
@@ -670,9 +989,13 @@ def qemu_boot(image: Path, serial: Path, tap: str) -> subprocess.Popen:
         "-netdev", f"tap,id=n0,ifname={tap},script=no,downscript=no",
         "-device", f"virtio-net-pci,netdev=n0,disable-legacy=on,mac={RAVEN_GUEST_MAC}",
     ]
-    return subprocess.Popen(
+    process = subprocess.Popen(
         argv, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True
     )
+    # A cap can kill this Python process before its finally block; the caller uses the pid file
+    # to reap only this QEMU rather than leaving an image lock behind.
+    serial.with_suffix(".qemu.pid").write_text(str(process.pid))
+    return process
 
 
 def wait_serial(serial: Path, needle: bytes, timeout: float) -> bool:
@@ -704,15 +1027,30 @@ def run_raven(scenario: str, image: Path, pcap: Path, serial: Path,
         time.sleep(1.0)
         peer = RawPeer(tap, RAVEN_HOST, RAVEN_GUEST, RAVEN_GUEST_MAC, pcap)
         try:
-            return SCENARIOS[scenario](peer, 40000 + random.randrange(1000), RAVEN_PORT)
+            ok, detail = SCENARIOS[scenario](peer, 40000 + random.randrange(1000), RAVEN_PORT)
         finally:
             peer.close()
+        if scenario == "fuzz":
+            time.sleep(0.2)
+            serial_text = serial.read_text(errors="replace") if serial.is_file() else ""
+            fault = re.search(r"(?i)\bpanic\b|EXCEPTION|BUG:|Oops|double fault", serial_text)
+            if fault is not None:
+                ok = False
+                detail += f"; guest-fault={fault.group(0)}"
+            if qemu.poll() is not None:
+                ok = False
+                detail += f"; qemu-exit={qemu.returncode}"
+        return ok, detail
     finally:
         try:
             os.killpg(qemu.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         qemu.wait()
+        try:
+            serial.with_suffix(".qemu.pid").unlink()
+        except FileNotFoundError:
+            pass
 
 
 def selftest() -> int:
@@ -736,7 +1074,14 @@ def selftest() -> int:
     writer.write(frame)
     writer.close()
     assert pcap.read_bytes()[:4] == b"\xd4\xc3\xb2\xa1"
-    assert {"handshake", "zero-window", "window-update", "retransmit", "fin-rst"} <= set(SCENARIOS)
+    assert {"handshake", "zero-window", "window-update", "retransmit", "fin-rst",
+            "fuzz"} <= set(SCENARIOS)
+    cases = fuzz_table(FUZZ_SEED)
+    assert len(cases) == FUZZ_CASES
+    assert len({case["port"] for case in cases}) == FUZZ_CASES
+    assert fuzz_table_hash(cases) == FUZZ_TABLE_HASH
+    log(f"fuzz table seed=0x{FUZZ_SEED:016x} cases={FUZZ_CASES} "
+        f"table-hash=0x{FUZZ_TABLE_HASH:016x}")
     log("selftest PASS")
     return 0
 
