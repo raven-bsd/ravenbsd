@@ -81,9 +81,9 @@ else
 fi
 
 for tool in raven-init raven-ptyd; do
-    if [ ! -x "$root/build/$arch/user/$tool" ]; then
-        cargo xtask build user --arch "$arch" -p "$tool"
-    fi
+    # Always rebuild the supervisor binaries. The fixture previously reused an existing
+    # binary, so a fix/mutation run could test a stale ptyd and invert the rows.
+    cargo xtask build user --arch "$arch" -p "$tool"
 done
 init=$root/build/$arch/user/raven-init
 ptyd=$root/build/$arch/user/raven-ptyd
