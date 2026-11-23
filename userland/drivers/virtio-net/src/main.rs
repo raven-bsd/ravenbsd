@@ -653,12 +653,7 @@ mod program {
         fn reset(&mut self) -> Result<(), String> {
             write_status(&mut self.bar, &self.caps, 0)?;
             let mut spins = 0;
-            while self
-                .bar
-                .read_u8(common(&self.caps, DEVICE_STATUS))
-                .map_err(describe)?
-                != 0
-            {
+            while read_device_status(&self.bar, &self.caps)? != 0 {
                 spins += 1;
                 if spins > 1000 {
                     return Err("device did not reset".to_string());
@@ -1521,14 +1516,30 @@ mod program {
     }
 
     fn write_status(bar: &mut MmioRegion, caps: &Caps, status: u8) -> Result<(), String> {
-        bar.write_u8(common(caps, DEVICE_STATUS), status)
-            .map_err(describe)
+        if caps.mmio {
+            bar.write_u32(common(caps, DEVICE_STATUS), u32::from(status))
+                .map_err(describe)
+        } else {
+            bar.write_u8(common(caps, DEVICE_STATUS), status)
+                .map_err(describe)
+        }
+    }
+
+    fn read_device_status(bar: &MmioRegion, caps: &Caps) -> Result<u8, String> {
+        if caps.mmio {
+            let value = bar
+                .read_u32(common(caps, DEVICE_STATUS))
+                .map_err(describe)?;
+            Ok((value & 0xff) as u8)
+        } else {
+            bar.read_u8(common(caps, DEVICE_STATUS)).map_err(describe)
+        }
     }
 
     fn reset_and_negotiate(bar: &mut MmioRegion, caps: &Caps) -> Result<Features, String> {
         write_status(bar, caps, 0)?;
         let mut spins = 0;
-        while bar.read_u8(common(caps, DEVICE_STATUS)).map_err(describe)? != 0 {
+        while read_device_status(bar, caps)? != 0 {
             spins += 1;
             if spins > 1000 {
                 return Err("device did not reset".to_string());
@@ -1585,7 +1596,7 @@ mod program {
             caps,
             STATUS_ACKNOWLEDGE | STATUS_DRIVER | STATUS_FEATURES_OK,
         )?;
-        let status = bar.read_u8(common(caps, DEVICE_STATUS)).map_err(describe)?;
+        let status = read_device_status(bar, caps)?;
         if caps.mmio {
             raven_rt::println!(
                 "virtio-net: mmio driver features low={:#010x} high={:#010x} status={status:#04x}",
@@ -1645,8 +1656,10 @@ mod program {
 
     /// `QueueNumMax` after selecting `queue` in the virtio-mmio transport.
     fn queue_maximum_mmio(bar: &mut MmioRegion, queue: u16) -> Result<u16, String> {
-        bar.write_u16(mmio::QUEUE_SEL, queue).map_err(describe)?;
-        bar.read_u16(mmio::QUEUE_NUM_MAX).map_err(describe)
+        bar.write_u32(mmio::QUEUE_SEL, u32::from(queue))
+            .map_err(describe)?;
+        let maximum = bar.read_u32(mmio::QUEUE_NUM_MAX).map_err(describe)?;
+        Ok(u16::try_from(maximum).unwrap_or(u16::MAX))
     }
 
     /// Program one split queue through the virtio-mmio register window.
@@ -1656,8 +1669,9 @@ mod program {
         layout: &SplitLayout,
         bus: u64,
     ) -> Result<usize, String> {
-        bar.write_u16(mmio::QUEUE_SEL, queue).map_err(describe)?;
-        bar.write_u16(mmio::QUEUE_NUM, layout.size)
+        bar.write_u32(mmio::QUEUE_SEL, u32::from(queue))
+            .map_err(describe)?;
+        bar.write_u32(mmio::QUEUE_NUM, u32::from(layout.size))
             .map_err(describe)?;
         let (desc_lo, desc_hi) = mmio::address_parts(bus + layout.desc as u64);
         let (avail_lo, avail_hi) = mmio::address_parts(bus + layout.avail as u64);
@@ -1671,8 +1685,8 @@ mod program {
         bar.write_u32(avail_hi_reg, avail_hi).map_err(describe)?;
         bar.write_u32(used_lo_reg, used_lo).map_err(describe)?;
         bar.write_u32(used_hi_reg, used_hi).map_err(describe)?;
-        bar.write_u16(mmio::QUEUE_READY, 1).map_err(describe)?;
-        if bar.read_u16(mmio::QUEUE_READY).map_err(describe)? != 1 {
+        bar.write_u32(mmio::QUEUE_READY, 1).map_err(describe)?;
+        if bar.read_u32(mmio::QUEUE_READY).map_err(describe)? != 1 {
             return Err(format!("queue {queue} did not become ready"));
         }
         Ok(0)
