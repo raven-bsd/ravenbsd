@@ -8,11 +8,21 @@ Row definition:
   * `ttyname(0)` must resolve: the fixture line `PTY-PATH session path=/dev/pts/<N>`;
   * the new pair must be released after close: `PTY-PATH ... release=ok`;
   * the fixture must finish `PTY-PATH ok`;
-  * no orphan sshd-session/session child may remain: a `ps -e` snapshot after the sessions must
-    have no more `child` rows than the baseline snapshot.
+  * no orphan sshd-session/session child may remain: on a `k449-metrics=2` image the K449 `procs`
+    after the sessions must not exceed the baseline (a `ps -e` `child` count is the fallback for
+    images without K449; the zombie children are not in the ps table).
 
 Pass iff all conditions hold. The mount mutation (no `/dev/pts pty:` entry) must fail the row.
 Before K536 is re-landed the row is red; the exact failing output is the before-state.
+
+Environment:
+  PTY_GATE_IMAGE           image to boot (required for a real row)
+  PTY_GATE_LABEL           row label in the output and the default artifact directory
+  PTY_GATE_OUT             artifact directory (default /tmp/opencode/pty-gate-<label>)
+  PTY_GATE_SESSIONS        session count (default 3)
+  PTY_GATE_ACCEL           qemu accelerator: kvm or tcg (falls back to RAVEN_QEMU_ACCEL)
+  PTY_GATE_PORT            host ssh port; an ephemeral port is chosen when unset
+  PTY_GATE_EXPECT_METRICS  1: require K449 samples (the image has k449-metrics=2)
 """
 
 from __future__ import annotations
@@ -21,6 +31,7 @@ import os
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -30,11 +41,24 @@ ROOT = Path("/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd")
 IMAGE = Path(os.environ.get("PTY_GATE_IMAGE", ROOT / "build/qtest/pty-path-mutation.img"))
 LABEL = os.environ.get("PTY_GATE_LABEL", "before")
 SESSIONS = int(os.environ.get("PTY_GATE_SESSIONS", "3"))
-OUT = Path(f"/tmp/opencode/pty-gate-{LABEL}")
+EXPECT_METRICS = os.environ.get("PTY_GATE_EXPECT_METRICS", "0") == "1"
+OUT = Path(os.environ.get("PTY_GATE_OUT", f"/tmp/opencode/pty-gate-{LABEL}"))
 OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
 OVMF_VARS = Path("/usr/share/OVMF/OVMF_VARS_4M.fd")
 ASKPASS = ROOT / "tests/ssh/askpass.sh"
-PORT = int(os.environ.get("PTY_GATE_PORT", "22224"))
+
+
+def choose_port() -> int:
+    """Use PTY_GATE_PORT, or an ephemeral loopback port so parallel rows cannot collide."""
+    value = os.environ.get("PTY_GATE_PORT")
+    if value:
+        return int(value)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
+PORT = choose_port()
 METRICS_RE = re.compile(
     r"K449-METRICS .* procs=(\d+) threads=(\d+) ofds=(\d+)"
 )
@@ -125,6 +149,18 @@ def metrics_snapshot() -> tuple[int, int, int] | None:
     return int(procs), int(threads), int(ofds)
 
 
+def wait_metrics(marker: int, timeout: float = 10.0) -> tuple[int, int, int] | None:
+    """Wait for a K449-METRICS sample appended after `marker`; newest one wins."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        matches = METRICS_RE.findall(serial_text()[marker:])
+        if matches:
+            procs, threads, ofds = matches[-1]
+            return int(procs), int(threads), int(ofds)
+        time.sleep(0.25)
+    return None
+
+
 def ps_snapshot() -> tuple[int, int, list[str]]:
     """Run `ps -e` and count the process rows printed on the serial.
 
@@ -153,12 +189,15 @@ def main() -> int:
             break
         time.sleep(0.2)
 
+    baseline_marker = len(serial_text())
+    baseline_metrics = wait_metrics(baseline_marker) if EXPECT_METRICS else metrics_snapshot()
     baseline_rows, baseline_child, _ = ps_snapshot()
-    baseline_metrics = metrics_snapshot()
     print(f"PTY-PATH-GATE {LABEL} baseline rows={baseline_rows} child_rows={baseline_child} "
           f"metrics={baseline_metrics}", flush=True)
 
     failures: list[str] = []
+    if EXPECT_METRICS and baseline_metrics is None:
+        failures.append("k449 baseline sample missing")
     for number in range(1, SESSIONS + 1):
         exit_code, output = run("/bin/pty-path", tty=True, timeout=15)
         text = "\n".join(line for line in output.splitlines() if "PTY-PATH" in line)
@@ -179,8 +218,11 @@ def main() -> int:
         if not fixture_ok:
             failures.append(f"session{number}:PTY-PATH FAIL")
 
-    after_metrics = metrics_snapshot()
+    after_marker = len(serial_text())
+    after_metrics = wait_metrics(after_marker) if EXPECT_METRICS else None
     after_rows, after_child, table = ps_snapshot()
+    if EXPECT_METRICS and after_metrics is None:
+        failures.append("k449 after sample missing")
     if baseline_metrics is not None and after_metrics is not None:
         orphan = after_metrics[0] - baseline_metrics[0]
         orphan_source = "k449.procs"

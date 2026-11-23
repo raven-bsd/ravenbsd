@@ -112,11 +112,20 @@ fi
 
 if [ "${RAVEN_K434_PTY_PATH_GATE:-1}" = 1 ]; then
     echo "k434: pty-path acceptance gate"
+    # The S8 qtests above rebuild build/<arch>/initfs.img for their own images, so the release
+    # initfs must be rebuilt here from the release profile before the pty-path overlay. Otherwise
+    # the gate boots a libc-test image with no sshd and every session fails with exit 255.
+    if timeout 300 cargo xtask initfs --arch x86_64 --profile release \
+        > "$out/pty-path-release-initfs.log" 2>&1; then
+        echo 0 > "$out/pty-path-release-initfs.exit"
+    else
+        echo $? > "$out/pty-path-release-initfs.exit"
+    fi
     timeout 120 sh tests/fixtures/pty-path/build.sh > "$out/pty-path-build.log" 2>&1 || true
     timeout 120 cargo build -q -p raven-b70-overlay > "$out/pty-path-overlay-build.log" 2>&1 || true
     overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
     initfs=build/x86_64/initfs.img
-    if [ -x "$overlay" ] && [ -f "$initfs" ]; then
+    if [ -x "$overlay" ] && [ -f "$initfs" ] && [ "$(cat "$out/pty-path-release-initfs.exit")" = 0 ]; then
         timeout 60 "$overlay" "$initfs" "$out/pty-path-initfs.img" \
             "/bin/pty-path=$root/build/fixtures/pty-path/pty-path:0755" \
             > "$out/pty-path-overlay.log" 2>&1 || true
@@ -127,6 +136,7 @@ if [ "${RAVEN_K434_PTY_PATH_GATE:-1}" = 1 ]; then
     fi
     if [ -f "$out/pty-path.img" ]; then
         if timeout 180 env PTY_GATE_IMAGE="$out/pty-path.img" PTY_GATE_LABEL=release \
+            PTY_GATE_OUT="$out/pty-gate" PTY_GATE_EXPECT_METRICS=1 \
             PTY_GATE_SESSIONS=3 python3 tests/ssh/pty-path-gate.py \
             > "$out/pty-path.log" 2>&1; then
             echo 0 > "$out/pty-path.exit"
@@ -138,8 +148,9 @@ if [ "${RAVEN_K434_PTY_PATH_GATE:-1}" = 1 ]; then
         echo 1 > "$out/pty-path.exit"
         echo "k434: pty-path image missing; gate not run" > "$out/pty-path.log"
     fi
-    printf 'pty_path_image=%s\npty_path_exit=%s\n' "$out/pty-path.img" \
-        "$(cat "$out/pty-path.exit")" >> "$out/manifest.txt"
+    printf 'pty_path_image=%s\npty_path_exit=%s\npty_path_initfs_exit=%s\n' \
+        "$out/pty-path.img" "$(cat "$out/pty-path.exit")" \
+        "$(cat "$out/pty-path-release-initfs.exit")" >> "$out/manifest.txt"
 else
     echo "k434: pty-path gate skipped (RAVEN_K434_PTY_PATH_GATE=0)"
 fi
