@@ -187,6 +187,29 @@ def parse_metrics_line(text: str) -> dict | None:
     return {key: int(value) for key, value in zip(keys, matches[-1])}
 
 
+def class_gate(sample: dict, session: int) -> str | None:
+    """Return a loud line when the 3072-byte kmem class has no free object.
+
+    The 3072-byte class, not the frame pool, is the release-gate resource: a 2160-byte
+    request can fail while frames are free when this class is full. Samples from an
+    image without the counters carry None and do not trip the gate.
+    """
+    free = sample.get("c3072_free")
+    if free is None or free != 0:
+        return None
+    return (
+        f"CLASS-EXHAUSTED session={session} c3072_free=0 "
+        f"c3072_used={sample.get('c3072_used')} "
+        f"c3072_slabs={sample.get('c3072_slabs')} "
+        f"frames_free={sample.get('frames_free')} "
+        f"frames_alloc={sample.get('frames_alloc')} "
+        f"heap_used={sample.get('heap_used')} "
+        f"heap_free={sample.get('heap_free')} "
+        f"pt_frames={sample.get('pt_frames')} "
+        f"stack_frames={sample.get('stack_frames')}"
+    )
+
+
 def utc_from_epoch(epoch: float) -> str:
     """Format a Unix timestamp as a UTC ISO-8601 string with milliseconds."""
     return datetime.fromtimestamp(epoch, timezone.utc).isoformat(
@@ -272,6 +295,17 @@ def selftest() -> int:
     check("metrics-c3072-used", metrics and metrics["c3072_used"], 15)
     check("metrics-c3072-slabs", metrics and metrics["c3072_slabs"], 16)
     check("metrics-missing", parse_metrics_line("no metrics here\n"), None)
+    exhausted = class_gate({
+        "c3072_free": 0, "c3072_used": 256, "c3072_slabs": 256,
+        "frames_free": 377507840, "frames_alloc": 38944768,
+        "heap_used": 6344848, "heap_free": 995184,
+        "pt_frames": 1, "stack_frames": 2,
+    }, 57)
+    check("class-gate-zero", bool(exhausted) and "session=57" in exhausted, True)
+    check("class-gate-used", "c3072_used=256" in (exhausted or ""), True)
+    check("class-gate-frames", "frames_free=377507840" in (exhausted or ""), True)
+    check("class-gate-one", class_gate({"c3072_free": 1}, 57), None)
+    check("class-gate-absent", class_gate({"c3072_free": None}, 57), None)
     check(
         "banner-line-remote",
         is_banner_line(
@@ -636,8 +670,15 @@ def main(argv: list[str]) -> int:
                 f"auth={bool(row['auth_line'])} exit_status={bool(row['exit_status_line'])} "
                 f"free={bool(row['free_line'])} {row['result']}"
             )
+            gate_sample = sample_host(child, serial, number)
+            alarm = class_gate(gate_sample, number)
+            if alarm:
+                (run / "class-gate.txt").write_text(alarm + "\n", encoding="utf-8")
+                print(f"reconnect-soak: {alarm}")
+                failures += 1
+                break
             if options["resource_every"] > 0 and number % options["resource_every"] == 0:
-                resource_rows.append(sample_host(child, serial, number))
+                resource_rows.append(gate_sample)
             if row["result"] != "PASS":
                 failures += 1
                 if not options["keep_going"]:
