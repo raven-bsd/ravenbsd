@@ -231,7 +231,14 @@ mod program {
             return Err("devd did not pass a usable BAR and DMA buffer".to_string());
         }
 
-        let bar_window = raven_rt::map_mmio_mut(BAR_HANDLE, bar_size)
+        // The virtio-mmio window is 0x200 bytes, but the kernel maps page-granular objects; map
+        // the whole page the devd platform grant created (0x1000) and keep the register offsets.
+        let bar_map_size = if mmio {
+            bar_size.saturating_add(0xfff) & !0xfff
+        } else {
+            bar_size
+        };
+        let bar_window = raven_rt::map_mmio_mut(BAR_HANDLE, bar_map_size)
             .map_err(|error| format!("bar map: {}", error.description()))?;
         let bar = MmioRegion::new(bar_window);
         let (config, dma_handle, irq_handle, msix_bar) = if mmio {
