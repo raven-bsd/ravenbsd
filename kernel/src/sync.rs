@@ -386,6 +386,12 @@ pub fn register_thread(thread: &Arc<Thread>) {
     kernel.register(thread.tid, thread);
 }
 
+/// Number of donation-registered thread ids still in the kernel weak registry (K449 diagnostic).
+pub fn registered_count() -> usize {
+    let guard = TURNSTILES.lock();
+    guard.as_ref().map_or(0, |kernel| kernel.threads.len())
+}
+
 /// Unregister a thread at exit: drop its graph node and weak map entry, then reapply the boosts
 /// of the remaining threads.
 ///

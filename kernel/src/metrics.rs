@@ -37,6 +37,12 @@ pub fn start(cmdline: &CmdLine) {
     let seconds = value.parse::<u64>().unwrap_or(DEFAULT_SECONDS).max(1);
     INTERVAL_NS.store(seconds.saturating_mul(NS_PER_SECOND), Ordering::Relaxed);
     HOLDER_SCAN.store(cmdline.get("s36-holders").is_some(), Ordering::Relaxed);
+    kprintln!(
+        "K449-SIZES process={} thread={} pending_request={}",
+        core::mem::size_of::<crate::process::Process>(),
+        core::mem::size_of::<crate::sched::thread::Thread>(),
+        core::mem::size_of::<crate::ipc::PendingRequest>(),
+    );
     match sched::spawn_kernel("k449-metrics", sampler) {
         Ok(_) => kprintln!("K449-METRICS: sampler every {seconds}s"),
         Err(error) => kprintln!("K449-METRICS: spawn failed: {error:?}"),
@@ -64,6 +70,10 @@ fn sampler() {
         let frames = memory::frame::stats();
         let (procs, threads) = process::live_totals();
         let class = memory::heap::class_stats(16);
+        let turnstile = crate::sync::turnstile_counts();
+        let zombies = process::zombie_count();
+        let pending = crate::ipc::pending_counts();
+        let leaked = process::leaked_process_stats();
         kprintln!(
             "{}",
             format_line(
@@ -74,15 +84,26 @@ fn sampler() {
                 procs,
                 threads,
                 raven_handles::live_lineage_nodes(),
-                memory::paging::page_table_frames(),
-                sched::thread::stack_frames(),
-                process_pages("init"),
-                process_pages("vfsd"),
-                process_pages("netd"),
-                process_pages("sshd"),
+                leaked[0],
+                leaked[1],
+                leaked[2],
+                leaked[3],
+                leaked[4],
+                leaked[5],
                 class.map_or(0, |stats| stats.free as u64),
                 class.map_or(0, |stats| stats.in_use as u64),
                 class.map_or(0, |stats| stats.slabs as u64),
+                pending.0,
+                pending.1,
+                pending.2,
+                usize::try_from(leaked[6]).unwrap_or(usize::MAX),
+                leaked[7],
+                leaked[8],
+                leaked[12],
+                turnstile.0,
+                u32::try_from(turnstile.1).unwrap_or(u32::MAX),
+                u64::try_from(zombies).unwrap_or(u64::MAX),
+                crate::sync::registered_count(),
             )
         );
         let (graph_threads, weak_threads) = crate::sync::turnstile_counts();
@@ -155,6 +176,7 @@ fn sampler() {
 }
 
 /// Present user pages of the named process, or zero when it is not running.
+#[allow(dead_code)] // Kept for the next diagnostic image; the correlation sampler zeroes it.
 fn process_pages(role: &str) -> u64 {
     for target in process::processes() {
         let matched = match role {
@@ -177,6 +199,7 @@ fn process_pages(role: &str) -> u64 {
 }
 
 /// True when `target` registered a scheme with this name.
+#[allow(dead_code)] // Helper for `process_pages` in the next diagnostic image.
 fn serves_scheme(target: &process::Process, name: &str) -> bool {
     target
         .schemes
@@ -186,11 +209,13 @@ fn serves_scheme(target: &process::Process, name: &str) -> bool {
 }
 
 /// True when `target` registered any scheme.
+#[allow(dead_code)] // Helper for `process_pages` in the next diagnostic image.
 fn serves_any(target: &process::Process) -> bool {
     !target.schemes.lock().is_empty()
 }
 
 /// True when any of `target`'s scheme-file handles points at a server of `name`.
+#[allow(dead_code)] // Helper for `process_pages` in the next diagnostic image.
 fn uses_server_scheme(target: &process::Process, name: &str) -> bool {
     let mut found = false;
     target.handles.lock().for_each_live(|_, object, _, _| {
@@ -227,6 +252,17 @@ pub fn format_line(
     c3072_free: u64,
     c3072_used: u64,
     c3072_slabs: u64,
+    live_threads: usize,
+    reap: usize,
+    slot_drops: usize,
+    slot_denies: usize,
+    stacks_fresh: u64,
+    stacks_cached: u64,
+    stacks_dropped: u64,
+    sshd_procs: usize,
+    sshd_threads: u32,
+    dma_used: u64,
+    donations: usize,
 ) -> String {
     format!(
         "K449-METRICS heap_used={heap_used} heap_free={heap_free} \
@@ -234,7 +270,12 @@ pub fn format_line(
          procs={procs} threads={threads} ofds={ofds} \
          pt_frames={pt_frames} stack_frames={stack_frames} init_pages={init_pages} \
          vfsd_pages={vfsd_pages} netd_pages={netd_pages} sshd_pages={sshd_pages} \
-         c3072_free={c3072_free} c3072_used={c3072_used} c3072_slabs={c3072_slabs}"
+         c3072_free={c3072_free} c3072_used={c3072_used} c3072_slabs={c3072_slabs} \
+         live_threads={live_threads} reap={reap} slot_drops={slot_drops} \
+         slot_denies={slot_denies} stacks_fresh={stacks_fresh} \
+         stacks_cached={stacks_cached} stacks_dropped={stacks_dropped} \
+         sshd_procs={sshd_procs} sshd_threads={sshd_threads} dma_used={dma_used} \
+         donations={donations}"
     )
 }
 

@@ -730,6 +730,20 @@ pub fn live_totals() -> (usize, u32) {
     (procs, threads)
 }
 
+/// Live sshd/sshd-session processes and their thread count (K449 frame-cliff diagnostic).
+pub fn sshd_totals() -> (usize, u32) {
+    let mut procs = 0usize;
+    let mut threads = 0u32;
+    for process in processes() {
+        let command = process.command.lock().clone();
+        if process.path.contains("sshd") || command.contains("sshd") {
+            procs = procs.saturating_add(1);
+            threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
+        }
+    }
+    (procs, threads)
+}
+
 /// K449 diagnostic: exited processes still retained for `PROC_WAIT`.
 pub fn zombie_count() -> usize {
     ZOMBIES.lock().len()
@@ -2094,6 +2108,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             kprintln!("s24: frames allocated={}", frame::stats().allocated_bytes);
         }
     }
+
     // S25 handle-transfer leak evidence: the dying process's live handle count. A transferred
     // handle that survived process death, or a slot leaked by the transfer path, drifts this
     // number across repeated spawn/exit cycles.
