@@ -911,6 +911,33 @@ fn zero_or_stale_stall_extension_leaves_the_deadline_alone() {
 }
 
 #[test]
+fn release_plan_starts_ptyd_before_vfsd() {
+    let vfsd =
+        Manifest::parse(include_str!("../../../etc/services.d/vfsd.toml")).expect("vfsd manifest");
+    let ptyd = Manifest::parse(include_str!(
+        "../../../profiles/ssh.d/ptyd.service.manifest"
+    ))
+    .expect("ptyd manifest");
+    let mut services = vec![vfsd, ptyd];
+    for name in ["logd", "initfsd", "ramfsd", "nulld", "zerod", "randd"] {
+        services.push(service(name));
+    }
+    let plan = start_order(&services).expect("release service graph");
+    let wave = |name: &str| {
+        plan.waves
+            .iter()
+            .position(|wave| wave.iter().any(|&index| services[index].name == name))
+            .unwrap_or(usize::MAX)
+    };
+    assert!(
+        wave("ptyd") < wave("vfsd"),
+        "ptyd wave {} and vfsd wave {}: vfsd must declare the pty scheme dependency, or its /dev/pts mount waits for the 5 s scheme timeout",
+        wave("ptyd"),
+        wave("vfsd")
+    );
+}
+
+#[test]
 fn a_ready_worker_still_times_out_a_hung_child() {
     let mut manifest = service("a");
     manifest.readiness = Readiness::Scheme;

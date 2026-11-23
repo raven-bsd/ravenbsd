@@ -301,71 +301,18 @@ pub fn spawn_image_with<S: Sys>(
     }
 }
 
-/// One inherited descriptor for the child.
-///
-/// The kind and status are the parent's open-file-description values, the same fields the exec
-/// `FdMap` carries (version 5). The child never re-derives them by probing a handle.
-/// One IPv4 endpoint in the v5 socket record.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct SpawnEndpoint {
-    /// The address octets.
-    pub ip: [u8; 4],
-    /// The TCP/UDP port.
-    pub port: u16,
-}
-
-/// The socket identity carried in a version-5 `FdMap` entry.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct SpawnSocket {
-    /// `AF_INET`, `AF_INET6` or `AF_UNIX`.
-    pub domain: i32,
-    /// `SOCK_STREAM` or `SOCK_DGRAM`.
-    pub ty: i32,
-    /// The protocol number.
-    pub proto: i32,
-    /// Encoded socket state (0 pending .. 6 shutdown).
-    pub state: u8,
-    /// The local endpoint, when the socket had one.
-    pub local: Option<SpawnEndpoint>,
-    /// The accepted/connected peer endpoint, when the socket had one.
-    pub peer: Option<SpawnEndpoint>,
-}
-
-/// One inherited descriptor for the child, in the version-5 `FdMap` shape.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SpawnFd<'a> {
-    /// Descriptor number in the child.
-    pub fd: i32,
-    /// Handle transferred into the child.
-    pub handle: u32,
-    /// OFD kind byte, the `FdMap` encoding (`2` is `OfdKind::Tty`).
-    pub kind: u8,
-    /// Access mode and status bits.
-    pub status: u32,
-    /// Public absolute path, when the parent's OFD remembers one.
-    pub path: Option<&'a [u8]>,
-    /// Scheme notification event handle, or zero.
-    pub event: u32,
-    /// The one-shot readiness replay mask.
-    pub readiness: u32,
-    /// The socket identity, when the descriptor is a socket.
-    pub socket: Option<SpawnSocket>,
-    /// The inherited tty is the `pty:` master.
-    pub pty_master: bool,
-}
-
 /// Spawn an in-memory image and inherit `fdmap` descriptors into the child.
 ///
-/// Each `SpawnFd.handle` is transferred with `HANDLE_TRANSFER`; the child handles and their kind
-/// and status are packed into the version-5 `RFDM` block published as
-/// `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. Only static ET_EXEC images are supported on this path; an
-/// interpreter is a separate dynamic-loading feature.
+/// Each `(child_fd, parent_handle)` is transferred with `HANDLE_TRANSFER`; the child handles are
+/// packed into the `RFDM` block published as `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. Only static
+/// ET_EXEC images are supported on this path; an interpreter is a separate dynamic-loading
+/// feature.
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 pub fn spawn_image_with_fdmap<S: Sys>(
     image: &[u8],
     path: &str,
     options: &SpawnOptions<'_>,
-    fdmap: &[SpawnFd<'_>],
+    fdmap: &[(i32, u32)],
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
     spawn_image_with_fdmap_cwd(image, path, options, b"/", fdmap, sys)
@@ -382,7 +329,7 @@ pub fn spawn_image_with_fdmap_cwd<S: Sys>(
     path: &str,
     options: &SpawnOptions<'_>,
     cwd: &[u8],
-    fdmap: &[SpawnFd<'_>],
+    fdmap: &[(i32, u32)],
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
     if image.len() > MAX_FILE_IMAGE {
@@ -787,7 +734,7 @@ fn spawn_elf<S: Sys>(
     cwd: &[u8],
     path: &str,
     options: &SpawnOptions<'_>,
-    fdmap: &[SpawnFd<'_>],
+    fdmap: &[(i32, u32)],
     exec: Option<(Handle, bool)>,
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
@@ -862,33 +809,14 @@ fn spawn_elf<S: Sys>(
         None
     } else {
         let mut entries = alloc_crate::vec::Vec::with_capacity(fdmap.len());
-        for entry in fdmap {
-            let handle = match sys.handle_transfer(child, Handle(entry.handle)) {
-                Ok(handle) => handle,
+        for (fd, source) in fdmap {
+            match sys.handle_transfer(child, Handle(*source)) {
+                Ok(handle) => entries.push((*fd, handle.0)),
                 Err(error) => {
                     let _ = sys.handle_close(child);
                     return Err(SpawnError::Sys(error));
                 }
-            };
-            // The event is a separate kernel handle. Transfer it like the data handle; if that
-            // fails the descriptor still works for I/O and loses only its poll doorbell.
-            let event = if entry.event == 0 {
-                0
-            } else {
-                sys.handle_transfer(child, Handle(entry.event))
-                    .map_or(0, |event| event.0)
-            };
-            entries.push(SpawnFd {
-                fd: entry.fd,
-                handle: handle.0,
-                kind: entry.kind,
-                status: entry.status,
-                path: entry.path,
-                event,
-                readiness: entry.readiness,
-                socket: entry.socket,
-                pty_master: entry.pty_master,
-            });
+            }
         }
         let block = match encode_fdmap(&entries) {
             Ok(block) => block,
@@ -1796,18 +1724,16 @@ fn plan_image<'a>(
 
 /// Encode the `RFDM` block consumed by `raven_libc_platform::fd::inherit::FdMap::decode`.
 ///
-/// This is the version-5 record the exec path already uses: the parent's real kind and status,
-/// no socket/event metadata and `NO_PATH`. The child adopts the public name of a pathless `Tty`
-/// from the endpoint device identity, so a spawned terminal keeps its termios and its
-/// `/dev/pts/<N>` name without re-probing unrelated handles.
-///
+/// Entries carry no path or status; the child's `restore_fdmap` creates unknown-kind OFDs with
+/// read/write status and the transferred handles. The loader only publishes this block for
+/// inherited stdio and ordinary file descriptors.
 /// Reject an inherited fd map when the crate is built without `alloc`.
 ///
 /// The wire block is built in a heap `Vec`; a no-alloc image cannot publish it.  Empty is the
 /// common case and stays supported (K463).
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[allow(dead_code)] // ravenbsd target builds compile this for the no-alloc path; the alloc build uses encode_fdmap
-fn no_alloc_fdmap(fdmap: &[SpawnFd<'_>]) -> Result<(), SpawnError> {
+fn no_alloc_fdmap(fdmap: &[(i32, u32)]) -> Result<(), SpawnError> {
     if fdmap.is_empty() {
         Ok(())
     } else {
@@ -1819,58 +1745,20 @@ fn no_alloc_fdmap(fdmap: &[SpawnFd<'_>]) -> Result<(), SpawnError> {
     test,
     all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
 ))]
-fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
-    /// One version-5 `FdMap` entry, the 53-byte record the decoder reads.
-    const FDMAP_V5_ENTRY: usize = 53;
+fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
-    let mut strings = alloc_crate::vec::Vec::new();
-    let mut offsets = alloc_crate::vec::Vec::with_capacity(entries.len());
-    for entry in entries {
-        match entry.path {
-            Some(path) => {
-                if path.is_empty() || path.len() > 4095 || path.contains(&0) {
-                    return Err(SpawnError::TooLarge);
-                }
-                let offset = u32::try_from(strings.len()).map_err(|_| SpawnError::TooLarge)?;
-                offsets.push(offset);
-                strings.extend_from_slice(path);
-                strings.push(0);
-            }
-            None => offsets.push(u32::MAX),
-        }
-    }
-    let mut out = alloc_crate::vec::Vec::with_capacity(
-        8usize
-            .saturating_add(FDMAP_V5_ENTRY.saturating_mul(entries.len()))
-            .saturating_add(strings.len()),
-    );
+    let mut out = alloc_crate::vec::Vec::with_capacity(8usize.saturating_add(18 * entries.len()));
     out.extend_from_slice(b"RFDM");
-    out.extend_from_slice(&5u16.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
     out.extend_from_slice(&count.to_le_bytes());
-    for (entry, offset) in entries.iter().zip(offsets) {
-        let socket = entry.socket.unwrap_or_default();
-        out.extend_from_slice(&entry.fd.to_le_bytes());
-        out.extend_from_slice(&entry.handle.to_le_bytes());
-        out.push(entry.kind);
+    for (fd, handle) in entries {
+        out.extend_from_slice(&fd.to_le_bytes());
+        out.extend_from_slice(&handle.to_le_bytes());
+        out.push(255); // OfdKind::Unknown
         out.push(0); // FD_CLOEXEC already filtered by apply_actions
-        out.extend_from_slice(&entry.status.to_le_bytes());
-        out.extend_from_slice(&offset.to_le_bytes());
-        out.extend_from_slice(&entry.event.to_le_bytes());
-        out.extend_from_slice(&entry.readiness.to_le_bytes());
-        out.extend_from_slice(&socket.domain.to_le_bytes());
-        out.extend_from_slice(&socket.ty.to_le_bytes());
-        out.extend_from_slice(&socket.proto.to_le_bytes());
-        out.push(socket.state);
-        let flags = u8::from(socket.local.is_some()) | (u8::from(socket.peer.is_some()) << 1);
-        out.push(flags);
-        for endpoint in [socket.local, socket.peer] {
-            let endpoint = endpoint.unwrap_or_default();
-            out.extend_from_slice(&endpoint.ip);
-            out.extend_from_slice(&endpoint.port.to_le_bytes());
-        }
-        out.push(u8::from(entry.pty_master));
+        out.extend_from_slice(&2u32.to_le_bytes()); // O_RDWR
+        out.extend_from_slice(&u32::MAX.to_le_bytes()); // NO_PATH
     }
-    out.extend_from_slice(&strings);
     Ok(out)
 }
 
