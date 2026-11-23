@@ -1442,6 +1442,10 @@ fn receive(frame: &SyscallFrame, words: usize, extended: bool) -> Result<usize, 
             caller.pop_signal()
         };
         if let Some(signal) = selected {
+            crate::kprintln!(
+                "K514DIAG sigrecv pid={} signo={} sender={} code={} uid={} value={:#x}",
+                caller.id, signal.signo, signal.sender, signal.code, signal.uid, signal.value
+            );
             let values = if extended {
                 [
                     u64::from(signal.signo),

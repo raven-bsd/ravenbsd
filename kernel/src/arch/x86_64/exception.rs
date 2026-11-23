@@ -206,9 +206,17 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             } else {
                 signal::FAULT_PAGE_PERM
             };
+            crate::kprintln!(
+                "K514DIAG fault-try rip={:#x} cr2={:#x} err={:#x}",
+                frame.rip, cr2, frame.error_code
+            );
             if deliver_fault(frame, kind, cr2) {
                 return;
             }
+            crate::kprintln!(
+                "K514DIAG pagefault rip={:#x} rsp={:#x} cr2={:#x} err={:#x}",
+                frame.rip, frame.rsp, cr2, frame.error_code
+            );
             crate::process::page_fault(cr2);
         }
     }

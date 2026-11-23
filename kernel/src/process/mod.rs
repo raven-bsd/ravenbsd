@@ -2736,7 +2736,15 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
 /// Terminate the current process because of a user page fault.
 pub fn page_fault(cr2: u64) -> ! {
     let path = current().map_or_else(String::new, |process| process.path.clone());
+    let pid = current().map_or(0, |process| process.id);
+    let thread = crate::sched::current_thread();
+    let entry = thread.as_ref().map_or(0, |thread| thread.signal_entry.load(Ordering::Acquire));
+    let depth = thread.as_ref().map_or(0, |thread| thread.signal_depth.load(Ordering::Acquire));
     kprintln!("process: {} killed by page fault at 0x{:x}", path, cr2);
+    crate::kprintln!(
+        "K514DIAG fault pid={} cr2={:#x} signal_entry={:#x} signal_depth={}",
+        pid, cr2, entry, depth
+    );
     exit_current(-11)
 }
 
