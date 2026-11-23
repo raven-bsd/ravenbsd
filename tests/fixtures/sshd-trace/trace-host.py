@@ -152,13 +152,13 @@ def main() -> int:
             log("ready", f"{GUEST}:22")
             tap = host_client(GUEST)
             log("host-tap", tap)
-            tap_tail = console(child, "tail -30 /tmp/sshd-trace.log; M=Q; echo ${M}A",
+            tap_tail = console(child, "cat /tmp/sshd-trace.log; M=Q; echo ${M}A",
                                "QA", 90)
             log("tap-log", tap_tail)
             console(child, "/bin/brush /etc/ssh/trace-client.sh > /tmp/loop.log 2>&1 & "
                            "M=Q; echo ${M}S", "QS", 90)
             time.sleep(12)
-            loop_tail = console(child, "tail -30 /tmp/sshd-trace.log; M=Q; echo ${M}B",
+            loop_tail = console(child, "cat /tmp/sshd-trace.log; M=Q; echo ${M}B",
                                 "QB", 90)
             log("loop-log", loop_tail)
             console(child, "cat /tmp/loop.log; M=Q; echo ${M}L", "QL", 60)
