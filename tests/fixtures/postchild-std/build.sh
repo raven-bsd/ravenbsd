@@ -35,7 +35,7 @@ flags="--cfg getrandom_backend=\"custom\" -C strip=none -C relocation-model=stat
  -C link-arg=-L$root/build/$arch -C link-arg=-lc \
  -C link-arg=$root/build/$arch/crtn.o"
 
-RUSTFLAGS="$flags" cargo +ravenbsd build \
+RUSTFLAGS="$flags" RUSTUP_TOOLCHAIN=ravenbsd cargo build \
     --manifest-path "$root/tests/fixtures/postchild-std/Cargo.toml" \
     --target x86_64-unknown-ravenbsd --release \
     --target-dir "$root/build/cargo/postchild-std"
