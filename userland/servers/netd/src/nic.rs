@@ -284,6 +284,19 @@ impl Device for NicDevice {
         match pushed {
             Ok(()) => {
                 self.tx_inflight.push_back(index);
+                if self.tx_debug {
+                    let tx_cons = RingHeader::read_from(self.ring())
+                        .map(|header| header.tx_cons)
+                        .unwrap_or(0);
+                    raven_rt::println!(
+                        "netd: tx-debug send len={} free={} inflight={} cons_seen={} tx_cons={}",
+                        len,
+                        self.tx_free.len(),
+                        self.tx_inflight.len(),
+                        self.tx_cons_seen,
+                        tx_cons
+                    );
+                }
                 Ok(())
             }
             Err(_) => {
