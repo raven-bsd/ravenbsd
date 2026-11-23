@@ -76,6 +76,8 @@ const PAGE: u64 = 4096;
 /// and headroom. The first process gets the same 256 KiB mapping.
 const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+/// S36 vfsd map/unmap baseline (`frame::stats().allocated_bytes` at the exit-88 marker).
+static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
@@ -449,6 +451,20 @@ pub fn processes() -> alloc::vec::Vec<Arc<Process>> {
         .collect()
 }
 
+/// Count live processes and their live threads without allocating or taking process locks.
+pub fn live_totals() -> (usize, u32) {
+    let registry = PID_REGISTRY.lock();
+    let mut procs = 0usize;
+    let mut threads = 0u32;
+    for weak in registry.values() {
+        if let Some(process) = weak.upgrade() {
+            procs += 1;
+            threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
+        }
+    }
+    (procs, threads)
+}
+
 /// True when at least one live process is in `pgid` inside `sid`.
 pub fn group_in_session(pgid: u64, sid: u64) -> bool {
     let registry = PID_REGISTRY.lock();
@@ -813,6 +829,20 @@ impl Process {
     /// Publish a live thread so a process-directed signal can kick it.
     pub fn register_thread(&self, thread: &Arc<Thread>) {
         self.threads_live.lock().push(Arc::downgrade(thread));
+    }
+
+    /// Remove an exiting thread from the live-kick list.
+    ///
+    /// The list mirrors FreeBSD `thread_unlink` in `kern_thread.c` and NetBSD `lwp_free` in
+    /// `kern_lwp.c`: the thread is removed from its process's thread list before its stack is
+    /// reclaimed. Without this, every `THREAD_CREATE`/`THREAD_EXIT` cycle leaves one `Weak`
+    /// entry behind, growing the list by 16 bytes per cycle until the churn exhausts the heap.
+    pub fn unregister_thread(&self, thread: &Arc<Thread>) {
+        let pointer = Arc::as_ptr(thread);
+        self.threads_live.lock().retain(|weak| {
+            weak.upgrade()
+                .is_some_and(|live| Arc::as_ptr(&live) != pointer)
+        });
     }
 
     /// True when any live thread has a registered PG-7 signal entry.
@@ -1760,12 +1790,46 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         .is_some()
     {
         let (heap_used, _) = crate::memory::heap::stats();
+        let stats = crate::memory::frame::stats();
         kprintln!(
-            "s36: stacks fresh={} cached={} heap={}",
+            "s36: stacks fresh={} cached={} heap={} frames={} allocated={}",
             crate::sched::thread::stack_fresh(),
             crate::sched::thread::stack_cached(),
-            heap_used
+            heap_used,
+            stats.free_bytes,
+            stats.allocated_bytes
         );
+    }
+    // S36 vfsd map/unmap red row: exit 88 records the baseline, exit 89 compares the allocated
+    // frame bytes. The markers run around the fixture's vfsd pager map/unmap cycles; a leak keeps
+    // allocated_bytes above the one-chunk tolerance and prints the forbidden `leak` line.
+    if CmdLine::parse(paging::cmdline())
+        .get("s36-mapcheck")
+        .is_some()
+    {
+        let stats = crate::memory::frame::stats();
+        if code == 88 {
+            S36_MAP_BASE.store(stats.allocated_bytes, Ordering::Release);
+            kprintln!(
+                "s36: mapcheck base allocated={} pager={}",
+                stats.allocated_bytes,
+                crate::process::handle::pager_objects()
+            );
+        } else if code == 89 {
+            let base = S36_MAP_BASE.load(Ordering::Acquire);
+            let delta = stats.allocated_bytes.saturating_sub(base);
+            kprintln!(
+                "s36: mapcheck delta={} allocated={} pager={}",
+                delta,
+                stats.allocated_bytes,
+                crate::process::handle::pager_objects()
+            );
+            if delta <= 64 * 1024 {
+                kprintln!("s36: mapcheck ok");
+            } else {
+                kprintln!("s36: mapcheck leak delta={}", delta);
+            }
+        }
     }
 }
 

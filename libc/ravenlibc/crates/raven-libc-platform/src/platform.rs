@@ -323,6 +323,12 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
     }
 
+    pub(crate) fn set_ofd_pty_master(&self, index: u32) {
+        if let Some(ofd) = self.ofd.borrow_mut().get_mut(index) {
+            ofd.set_pty_master();
+        }
+    }
+
     /// Attach the notification event a scheme-backed socket uses for `poll` readiness.
     pub fn set_ofd_event(&self, index: u32, event: Handle) -> Result<(), Errno> {
         let mut arena = self.ofd.borrow_mut();
@@ -731,6 +737,31 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         let resolved =
             resolve(&base, path, false, &self.limits).map_err(crate::path::path_errno)?;
         let spec = xlat::open_flags(flags)?;
+        // `/dev/tty` names the process's controlling terminal, not a VFS node. FreeBSD `cttyopen`
+        // resolves it from the session's controlling vnode; Raven asks the kernel for the live
+        // terminal handle. With no controlling terminal the kernel answers `ENXIO` (POSIX).
+        if resolved.abs == b"/dev/tty" {
+            match self.backend.ctty_handle() {
+                Ok(handle) => {
+                    let path_box: Box<[u8]> = resolved.abs.clone().into_boxed_slice();
+                    return match self.install(
+                        handle,
+                        OfdKind::Tty,
+                        spec.status,
+                        Some(path_box),
+                        spec.cloexec,
+                    ) {
+                        Ok(fd) => Ok(fd),
+                        Err(error) => {
+                            let _ = self.backend.close(handle);
+                            Err(error)
+                        }
+                    };
+                }
+                Err(Errno::ENOSYS) => {}
+                Err(error) => return Err(error),
+            }
+        }
         let mut wire = spec.wire;
         if resolved.must_be_dir {
             if flags & fcntl::O_CREAT as u32 != 0 {
@@ -738,9 +769,10 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             wire |= raven_proto_fs::WIRE_OPEN_DIRECTORY;
         }
-        // `/dev/pts/<N>` is the public pty slave name; the pty server is the `pty:` scheme. Keep
-        // the public path on the OFD (ttyname) and send the scheme path to the backend.
-        let pty_wire = pty_slave_wire(&resolved.abs);
+        // `/dev/pts/<N>` is the public pty slave name and `/dev/ptmx` the clone device; the pty
+        // server is the `pty:` scheme. Keep the public path on the OFD (ttyname) and send the
+        // scheme path to the backend.
+        let pty_wire = pty_wire(&resolved.abs);
         let wire_path = match &pty_wire {
             Some(wire) => wire.clone(),
             None => file_path(&resolved.abs),
@@ -767,6 +799,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 return Err(error);
             }
         };
+        // The public clone/master path carries the `pty:ptmx` wire name, so the OFD records the
+        // terminal role even though it remembers the public path for `ttyname`.
+        if pty_wire.as_deref().is_some_and(is_pty_master_wire)
+            && let Ok(reference) = self.get(fd)
+        {
+            reference.set_pty_master();
+        }
         if flags & fcntl::O_CREAT as u32 != 0 {
             // PG-24: protocol v1 has no mode on the wire; apply `mode & ~umask` after the create.
             let wanted = (mode & 0o777) & !self.umask.get();
@@ -832,13 +871,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             });
             // A terminal master read of zero past a real buffer is the pty hangup (EOF). Keep it
             // sticky so the next `poll` reports `POLLHUP` even though the scheme-file readiness
-            // fallback still reports the master as readable (PG-25 is the server-side fix).
-            // `posix_openpt` installs the master without a name; the slave and the console carry
-            // their `/dev/...` path and must not inherit the master's hangup from a slave-side
-            // VEOF/^D read.
+            // fallback still reports the master as readable (PG-25 is the server-side fix). The
+            // OFD role is recorded at open time, so both `posix_openpt` and the `/dev/ptmx`
+            // SchemeFile master qualify; the slave and the console must not inherit a master
+            // hangup from a slave-side VEOF/^D read.
             if matches!(&result, Ok(0))
                 && reference.kind() == OfdKind::Tty
-                && reference.path().is_none()
+                && reference.is_pty_master()
                 && !buf.is_empty()
             {
                 reference.set_eof();
@@ -1159,6 +1198,14 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .cwd
             .resolve(path, false, &self.limits)
             .map_err(crate::path::path_errno)?;
+        // The public pty slave name is a scheme endpoint, not a VFS node: the pty server owns
+        // the node metadata (`fstat` reports a root-owned 0600 chr device). FreeBSD devfs allows
+        // `chmod` on the pts node; Raven models that node as read-only, and OpenSSH
+        // `sshpty.c` `pty_setowner` explicitly tolerates `EROFS` for a root-owned tty whose mode
+        // has no group/other bits.
+        if pty_slave_wire(&resolved.abs).is_some() {
+            return Err(Errno::EROFS);
+        }
         self.root_call(Call::Chmod {
             mode: mode & 0o7777,
             path: &resolved.abs,
@@ -1188,6 +1235,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .cwd
             .resolve(path, false, &self.limits)
             .map_err(crate::path::path_errno)?;
+        // See `chmod`: the pty slave node metadata is server-owned and read-only. OpenSSH's
+        // `pty_setowner` treats `EROFS` on a root-owned tty as "warn and continue".
+        if pty_slave_wire(&resolved.abs).is_some() {
+            return Err(Errno::EROFS);
+        }
         self.root_call(Call::Chown {
             uid,
             gid,
@@ -1776,6 +1828,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             inherited.event = event_number(ofd.event.get());
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
             inherited.socket = ofd.socket_meta();
+            inherited.pty_master = ofd.is_pty_master();
             out.push(inherited);
         }
         Ok(FdMap { entries: out })
@@ -1817,6 +1870,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             };
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
             inherited.socket = ofd.socket_meta();
+            inherited.pty_master = ofd.is_pty_master();
             block.entries.push(inherited);
         }
         if block.entries.is_empty() {
@@ -1908,6 +1962,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                     inherited.set_poll_rearm(entry.readiness);
                     if let Some(socket) = entry.socket {
                         inherited.set_socket_meta(socket);
+                    }
+                    if entry.pty_master {
+                        inherited.set_pty_master();
                     }
                 }
                 by_handle.insert(entry.handle, index);
@@ -2249,6 +2306,22 @@ fn event_number(event: Handle) -> u32 {
 
 fn is_tty_path(path: &[u8]) -> bool {
     matches!(path, b"/dev/tty" | b"/dev/console" | b"/dev/ptmx")
+}
+
+/// Map a public pty path to the pty server's scheme path.
+///
+/// `/dev/ptmx` is the clone device (FreeBSD `sys/kern/tty_pty.c` `ptmxopen`, NetBSD `ptyattach`)
+/// and `/dev/pts/<N>` is the slave, exactly as the NetBSD/FreeBSD `pty:` node names.
+fn pty_wire(path: &[u8]) -> Option<Vec<u8>> {
+    if path == b"/dev/ptmx" {
+        return Some(Vec::from(b"pty:ptmx" as &[u8]));
+    }
+    pty_slave_wire(path)
+}
+
+/// The `pty:` wire paths that name the master endpoint.
+fn is_pty_master_wire(wire: &[u8]) -> bool {
+    wire == b"pty:ptmx" || wire.starts_with(b"pty:master")
 }
 
 /// Map the public `/dev/pts/<N>` slave path to the pty server's `pty:slave/<N>` scheme path.

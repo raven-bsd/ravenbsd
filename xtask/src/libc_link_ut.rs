@@ -264,3 +264,40 @@ fn stage_sysroot_replaces_a_stale_libc_so_with_the_script() {
     );
     std::fs::remove_dir_all(&out).unwrap();
 }
+
+#[test]
+fn dso_stamp_goes_stale_with_the_sources_and_files() {
+    let root = std::env::temp_dir().join(format!("k548-dso-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let source = root.join("libc/ravenlibc/crates/raven-libc/src.rs");
+    std::fs::create_dir_all(source.parent().expect("parent")).expect("mkdir");
+    std::fs::write(&source, b"one").expect("source");
+    let out = root.join("build/x86_64");
+    std::fs::create_dir_all(out.join("sysroot/lib")).expect("lib");
+    std::fs::create_dir_all(out.join("sysroot/libexec")).expect("libexec");
+    for path in [
+        "libc.so.1",
+        "ld-elf.so.1",
+        "sysroot/lib/libc.so.1",
+        "sysroot/libexec/ld-elf.so.1",
+    ] {
+        std::fs::write(out.join(path), path.as_bytes()).expect("file");
+    }
+    let hash = |path: &str| crate::libc_pack::hash_file(&out.join(path)).expect("hash");
+    let sources = crate::libc_pack::source_hash(&root).expect("sources");
+    let text = format!(
+        "format={DSO_STAMP_FORMAT}\narch=x86_64\nset=server\nsources={sources:016x}\nlibc_so={:016x}\nsysroot_libc_so={:016x}\nloader={:016x}\nsysroot_loader={:016x}\n",
+        hash("libc.so.1"),
+        hash("sysroot/lib/libc.so.1"),
+        hash("ld-elf.so.1"),
+        hash("sysroot/libexec/ld-elf.so.1"),
+    );
+    std::fs::write(out.join(DSO_STAMP_FILE), text).expect("stamp");
+    assert!(dso_stamp_current(&root, "x86_64"));
+    std::fs::write(&source, b"two").expect("rewrite");
+    assert!(!dso_stamp_current(&root, "x86_64"));
+    std::fs::write(&source, b"one").expect("restore");
+    std::fs::write(out.join("ld-elf.so.1"), b"changed loader").expect("loader");
+    assert!(!dso_stamp_current(&root, "x86_64"));
+    let _ = std::fs::remove_dir_all(&root);
+}

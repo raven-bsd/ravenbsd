@@ -93,23 +93,40 @@ fn tty_hup_is_reported() {
     assert_eq!(fds[0].revents as i32, POLLHUP);
 }
 
-/// A pathless `Tty` is the `posix_openpt` master (the slave carries `/dev/pts/N`).
-fn pathless_tty_platform() -> (Platform<FakeSys>, i32) {
+/// A `Tty` marked as the pty master; `path` is `None` for `posix_openpt` and `/dev/ptmx` for
+/// the clone-device SchemeFile.
+fn master_tty_platform(path: Option<&[u8]>) -> (Platform<FakeSys>, i32) {
     let fake = FakeSys::new();
     fake.tty(b"/dev/tty");
     let flags = u32::from(raven_proto_fs::WIRE_OPEN_READ | raven_proto_fs::WIRE_OPEN_WRITE);
     let handle = fake.open(b"file:/dev/tty", flags).expect("open");
     fake.ready(handle, 1);
     let platform = Platform::new(fake);
+    let path = path.map(|value| alloc::vec::Vec::from(value).into_boxed_slice());
     let fd = platform
-        .install(handle, OfdKind::Tty, fcntl::O_RDWR as u32, None, false)
+        .install(handle, OfdKind::Tty, fcntl::O_RDWR as u32, path, false)
         .expect("install");
+    platform.get(fd).expect("ref").set_pty_master();
     (platform, fd)
 }
 
 #[test]
 fn a_pty_master_eof_read_makes_the_next_poll_report_hup() {
-    let (platform, fd) = pathless_tty_platform();
+    let (platform, fd) = master_tty_platform(None);
+    let mut byte = [0u8; 1];
+    assert_eq!(platform.read(fd, &mut byte), Ok(0), "fake tty read is EOF");
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN | POLLHUP);
+}
+
+#[test]
+fn a_scheme_clone_master_eof_read_makes_the_next_poll_report_hup() {
+    let (platform, fd) = master_tty_platform(Some(b"/dev/ptmx"));
     let mut byte = [0u8; 1];
     assert_eq!(platform.read(fd, &mut byte), Ok(0), "fake tty read is EOF");
     let mut fds = [Pollfd {
@@ -123,7 +140,7 @@ fn a_pty_master_eof_read_makes_the_next_poll_report_hup() {
 
 #[test]
 fn a_zero_length_master_read_is_not_a_hangup() {
-    let (platform, fd) = pathless_tty_platform();
+    let (platform, fd) = master_tty_platform(None);
     assert_eq!(platform.read(fd, &mut []), Ok(0));
     let mut fds = [Pollfd {
         fd,

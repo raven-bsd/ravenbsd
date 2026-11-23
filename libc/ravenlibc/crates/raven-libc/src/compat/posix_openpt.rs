@@ -88,6 +88,11 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
             return -1;
         }
     };
+    // The clone endpoint is the pty master; record the role so the poll/EOF path does not have to
+    // guess it from a path (`posix_openpt` installs this master with no public name).
+    if let Ok(reference) = platform.get(fd) {
+        reference.set_pty_master();
+    }
     let pair = match platform.fstat(fd) {
         Ok(stat) if stat.st_ino >= 3 => (stat.st_ino - 1) / 2,
         _ => {

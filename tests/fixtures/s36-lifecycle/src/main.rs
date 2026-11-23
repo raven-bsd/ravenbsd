@@ -35,8 +35,10 @@ use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_elf::{Elf, LoadMode, Machine, StepKind, plan_load};
 use raven_initfs::Initfs;
+use raven_proto_fs::{Call, CallRequest, OpenFlags};
 use raven_rt::entry;
 use raven_rt::println;
+use raven_scheme::Client;
 
 entry!(main);
 
@@ -67,6 +69,19 @@ const STACK_BASE: usize = STACK_TOP - STACK_SIZE;
 
 /// Cycles in the thread create/exit churn.
 const CYCLES: usize = 10_000;
+/// Full process/address-space/stack lifecycles in the bounded session churn.
+const SESSIONS: usize = 32;
+/// Fork/exec/exit cycles with a known mapped address space in the VMA churn.
+const VMA_CYCLES: usize = 100;
+/// Four VMAs per child; the large variant maps one MiB total.
+const VMA_REGIONS: usize = 4;
+const VMA_BASE: usize = 0x3000_0000;
+const VMA_REGION_GAP: usize = 0x10_0000;
+const VMA_LARGE: usize = 256 * 1024;
+/// vfsd pager map/unmap cycles in the red frame row.
+const MAP_CYCLES: usize = 1000;
+/// Fixed scratch address for the vfsd pager chunk.
+const MAP_SCRATCH: usize = 0x3000_0000;
 /// User stacks for the fixture's extra threads (16 KiB each, one helper live at a time).
 const HELPER_STACK_SIZE: usize = 16 * 1024;
 
@@ -324,7 +339,7 @@ fn map_initfs_image() -> Result<&'static [u8], Errno> {
 
 /// Spawn this binary with `argv[1] = role` (a child with the ELF mapped and one running thread).
 fn spawn_role(initfs: &Initfs<'_>, role: &str) -> Result<Handle, Errno> {
-    let entry = initfs.get("/init").ok_or(Errno::ENOENT)?;
+    let entry = initfs.get("/bin/s36-lifecycle").ok_or(Errno::ENOENT)?;
     let elf =
         Elf::parse(entry.data, Machine::X86_64, USER_MIN..USER_END).map_err(|_| Errno::EINVAL)?;
     let child = proc_create()?;
@@ -448,10 +463,15 @@ extern "C" fn signal_entry(_bits: usize, _context: usize, _mask: usize) -> ! {
     }
 }
 
-/// Deliver `SIGUSR1` to the process group after the controller has blocked in the wait.
+/// Deliver `SIGUSR1` to the controller process after it has blocked in the wait.
+///
+/// The target is this process's pid, not the process group: the sleeping child is in the same
+/// group and has no signal entry, so a group signal would correctly take its default terminate
+/// action before the parent's wait returns.
 extern "C" fn wait_signal_thread(_arg: usize) -> ! {
     nanosleep(50_000_000);
-    let _ = syscall2(PROC_SIGNAL, 0, SIGUSR1);
+    let pid = proc_handle_info(Handle::SELF_PROC).unwrap_or(0);
+    let _ = syscall2(PROC_SIGNAL, pid as usize, SIGUSR1);
     thread_exit(0)
 }
 
@@ -492,6 +512,171 @@ fn churn_part() -> Result<(), &'static str> {
         cycle = cycle.saturating_add(1);
     }
     println!("s36: cycles done={}", CYCLES);
+    Ok(())
+}
+
+/// The bounded process/session churn: 32 full exec/address-space/stack lifecycles.
+///
+/// Each cycle creates a new process, maps its own address space and user stack, runs the
+/// `marker` role to exit 0, reaps it, and closes the handle. The kernel `s36` counter lines on
+/// the surrounding marker exits are compared by the qtest evidence; a per-cycle frame/stack/handle
+/// leak would show as a closing delta, not a one-time stack-cache entry.
+fn session_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let mut session = 0usize;
+    while session < SESSIONS {
+        let child = spawn_role(initfs, "marker").map_err(|_| "session spawn")?;
+        if proc_wait(child).unwrap_or(-1) != 0 {
+            return Err("session wait");
+        }
+        handle_close(child);
+        session = session.saturating_add(1);
+    }
+    println!("s36: sessions done={}", SESSIONS);
+    Ok(())
+}
+
+/// The VMA churn child: map four shared memory objects, touch every page, then exit.
+///
+/// The `large` variant maps 1 MiB of data; the `small` variant maps only four pages. The
+/// page-table cost is the same for both (four VMAs); the data-frame cost differs by almost 1 MiB.
+/// Comparing the marker counters after the two churns separates page tables from VMA data.
+fn vma_child(large: bool) {
+    let size = if large { VMA_LARGE } else { PAGE };
+    let mut region = 0usize;
+    while region < VMA_REGIONS {
+        let address = VMA_BASE.saturating_add(region.saturating_mul(VMA_REGION_GAP));
+        let object = match memobj_create(size) {
+            Ok(object) => object,
+            Err(_) => {
+                println!("s36: failed vma object");
+                exit(1);
+            }
+        };
+        if map_memory(
+            Handle::SELF_PROC,
+            object,
+            0,
+            address,
+            size,
+            map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
+        )
+        .is_err()
+        {
+            println!("s36: failed vma map");
+            exit(1);
+        }
+        handle_close(object);
+        let pages = size / PAGE;
+        let mut page = 0usize;
+        while page < pages {
+            // SAFETY: the mapping is writable and `page` stays inside `size`.
+            unsafe {
+                ((address.saturating_add(page.saturating_mul(PAGE))) as *mut u8)
+                    .write_volatile(0x5a);
+            }
+            page = page.saturating_add(1);
+        }
+        region = region.saturating_add(1);
+    }
+}
+
+/// Spawn one marker and reap it; its exit prints the kernel counters.
+fn marker_once(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let marker = spawn_role(initfs, "marker").map_err(|_| "marker spawn")?;
+    if proc_wait(marker).unwrap_or(-1) != 0 {
+        return Err("marker wait");
+    }
+    handle_close(marker);
+    Ok(())
+}
+
+/// The large/small VMA churn: fork, map/touch four VMAs, exit, reap, repeat.
+fn vma_churn_part(initfs: &Initfs<'_>, role: &str, cycles: usize) -> Result<(), &'static str> {
+    let mut cycle = 0usize;
+    while cycle < cycles {
+        let child = spawn_role(initfs, role).map_err(|_| "vma spawn")?;
+        if proc_wait(child).unwrap_or(-1) != 0 {
+            return Err("vma wait");
+        }
+        handle_close(child);
+        cycle = cycle.saturating_add(1);
+    }
+    println!("s36: vma {} done={}", role, cycles);
+    Ok(())
+}
+
+/// Open the fixture binary through vfsd, retrying until the file scheme is ready.
+fn open_map_file(client: &Client) -> Result<Handle, Errno> {
+    let paths = ["file:/bin/s36-lifecycle", "file:/bin/brush", "file:/init"];
+    let mut attempt = 0usize;
+    while attempt < 100 {
+        for path in paths {
+            if let Ok(file) = client.open_flags(path, OpenFlags::READ) {
+                return Ok(file);
+            }
+        }
+        nanosleep(10_000_000);
+        attempt = attempt.saturating_add(1);
+    }
+    Err(Errno::ENOENT)
+}
+
+/// Map/unmap the same chunk through vfsd's file pager. The kernel gate on exit codes 88/89
+/// prints `frame::stats().allocated_bytes` before and after; a leak keeps the delta above one
+/// chunk and prints the forbidden `s36: mapcheck leak` line.
+fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let base = spawn_role(initfs, "mapbase").map_err(|_| "mapbase spawn")?;
+    if proc_wait(base).unwrap_or(-1) != 88 {
+        return Err("mapbase wait");
+    }
+    handle_close(base);
+
+    let client = Client::new();
+    let file = open_map_file(&client).map_err(|_| "vfsd open")?;
+    let request = CallRequest::new(Call::Mmap {
+        offset: 0,
+        len: PAGE as u64,
+        shared: false,
+    });
+    let mut encoded = [0u8; 128];
+    let length = request.encode(&mut encoded).map_err(|_| "mmap encode")?;
+    let flags = map::pack((prot::READ | prot::WRITE) as usize, map::FIXED);
+    let mut cycle = 0usize;
+    while cycle < MAP_CYCLES {
+        let mut response = [0u8; 16];
+        let count = client
+            .call(
+                file,
+                encoded.get(..length).ok_or("mmap request")?,
+                &mut response,
+            )
+            .map_err(|_| "mmap call")?;
+        if count < 4 {
+            return Err("mmap reply");
+        }
+        let object = Handle(u32::from_le_bytes([
+            response[0],
+            response[1],
+            response[2],
+            response[3],
+        ]));
+        let _ = unmap(Handle::SELF_PROC, MAP_SCRATCH, PAGE);
+        map_memory(Handle::SELF_PROC, object, 0, MAP_SCRATCH, PAGE, flags)
+            .map_err(|_| "map object")?;
+        // Fault the page through vfsd's pager.
+        let _ = unsafe { core::ptr::read_volatile(MAP_SCRATCH as *const u8) };
+        unmap(Handle::SELF_PROC, MAP_SCRATCH, PAGE).map_err(|_| "unmap object")?;
+        handle_close(object);
+        cycle = cycle.saturating_add(1);
+    }
+    client.close(file).map_err(|_| "vfsd close")?;
+    println!("s36: vfsd map done={}", MAP_CYCLES);
+
+    let top = spawn_role(initfs, "maptop").map_err(|_| "maptop spawn")?;
+    if proc_wait(top).unwrap_or(-1) != 89 {
+        return Err("maptop wait");
+    }
+    handle_close(top);
     Ok(())
 }
 
@@ -549,6 +734,8 @@ fn server_part() {
 fn child_main(role: &str) -> i32 {
     match role {
         "marker" => 0,
+        "mapbase" => 88,
+        "maptop" => 89,
         "twomain" => {
             twomain_part();
             0
@@ -562,6 +749,14 @@ fn child_main(role: &str) -> i32 {
         }
         "server" => {
             server_part();
+            0
+        }
+        "vma-large" => {
+            vma_child(true);
+            0
+        }
+        "vma-small" => {
+            vma_child(false);
             0
         }
         _ => 2,
@@ -787,27 +982,27 @@ fn main(args: raven_rt::Args) -> i32 {
     if let Err(message) = wait_eintr_part(&initfs) {
         fail(message);
     }
-    // Scenario 2, baseline marker: the kernel prints the stack/heap counters on this exit.
-    let marker = match spawn_role(&initfs, "marker") {
-        Ok(marker) => marker,
-        Err(_) => fail("marker spawn"),
-    };
-    if proc_wait(marker).unwrap_or(-1) != 0 {
-        fail("marker wait");
+    // Scenario 2, baseline marker: the kernel prints the stack/heap/frame counters on this exit.
+    if let Err(message) = marker_once(&initfs) {
+        fail(message);
     }
-    handle_close(marker);
     if let Err(message) = churn_part() {
         fail(message);
     }
-    // Scenario 2, closing marker: its exit prints the counters again; the report compares.
-    let marker = match spawn_role(&initfs, "marker") {
-        Ok(marker) => marker,
-        Err(_) => fail("marker spawn"),
-    };
-    if proc_wait(marker).unwrap_or(-1) != 0 {
-        fail("marker wait");
+    if let Err(message) = session_churn_part(&initfs) {
+        fail(message);
     }
-    handle_close(marker);
+    if let Err(message) = vma_churn_part(&initfs, "vma-large", VMA_CYCLES) {
+        fail(message);
+    }
+    // Sample after the large churn; the next close is the small-VMA sample.
+    if let Err(message) = marker_once(&initfs) {
+        fail(message);
+    }
+    // Scenario 2, closing marker: its exit prints the counters again; the report compares.
+    if let Err(message) = marker_once(&initfs) {
+        fail(message);
+    }
     // Scenario 1: two-thread child.
     if let Err(message) = two_thread_part(&initfs) {
         fail(message);
@@ -822,6 +1017,10 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     // Scenario 6: scheme name released on exit.
     if let Err(message) = scheme_part(&initfs) {
+        fail(message);
+    }
+    // vfsd pager red row: map/unmap the same chunk and compare allocated frames.
+    if let Err(message) = vfsd_map_part(&initfs) {
         fail(message);
     }
 

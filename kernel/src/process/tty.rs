@@ -25,6 +25,9 @@ use super::{Process, group_in_session, group_orphaned, signal_group, status};
 /// One controlling-terminal state, shared by every process in its session.
 pub struct Ctty {
     key: (u64, u64),
+    /// The terminal open-file description. `/dev/tty` opens this live object; FreeBSD keeps the
+    /// controlling vnode alive for the session in the same way.
+    file: Arc<SchemeFile>,
     fg_pgrp: AtomicI64,
     sid: AtomicU64,
     hung: AtomicBool,
@@ -34,6 +37,11 @@ impl Ctty {
     /// The session that owns this terminal.
     pub fn sid(&self) -> u64 {
         self.sid.load(Ordering::Acquire)
+    }
+
+    /// The terminal open-file description for `/dev/tty`.
+    pub fn file(&self) -> &Arc<SchemeFile> {
+        &self.file
     }
 
     /// The foreground process group, or zero when unset.
@@ -72,12 +80,13 @@ fn find(file: &SchemeFile) -> Option<Arc<Ctty>> {
     None
 }
 
-fn get_or_create(file: &SchemeFile) -> Arc<Ctty> {
+fn get_or_create(file: &Arc<SchemeFile>) -> Arc<Ctty> {
     if let Some(ctty) = find(file) {
         return ctty;
     }
     let ctty = Arc::new(Ctty {
         key: (file.server.id, file.server_id()),
+        file: Arc::clone(file),
         fg_pgrp: AtomicI64::new(0),
         sid: AtomicU64::new(0),
         hung: AtomicBool::new(false),

@@ -91,14 +91,21 @@ rsh=$root/build/"$arch"/user/raven-rsh
     echo "socket-write-identity ssh fixture: missing $rsh (build the userland first)" >&2
     exit 1
 }
+consd=$root/build/"$arch"/user/raven-consd
+[ -x "$consd" ] || {
+    echo "socket-write-identity ssh fixture: missing $consd (build the userland first)" >&2
+    exit 1
+}
 
 cargo build -q -p raven-b70-overlay
 overlay=$root/target/debug/raven-b70-overlay
 "$overlay" "$out/base-ssh.img" "$out/initfs-ssh.img" \
     "/bin/rsh=$rsh:0755" \
+    "/sbin/consd=$consd:0755" \
     "/bin/socket-write-identity=$out/socket-write-identity:0755" \
     "/bin/socket-write-identity-ssh-child=$out/socket-write-identity-ssh-child:0755" \
     "/etc/raven/conf.d/network.toml=$root/tests/fixtures/socket-write-identity/network-static.toml" \
+    "/etc/services.d/consd.toml=$root/tests/fixtures/socket-write-identity/consd.service.manifest" \
     "/etc/services.d/socket-write-identity.toml=$root/tests/fixtures/socket-write-identity/socket-write-identity-ssh.toml" \
     "/etc/svcd.conf=$root/tests/fixtures/socket-write-identity/svcd.conf"
 
