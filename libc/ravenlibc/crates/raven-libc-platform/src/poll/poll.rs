@@ -235,7 +235,7 @@ fn apply_bits<B: SysBackend, L: Lock>(
         if bits & READY_WRITABLE != 0 && requested & POLLOUT != 0 {
             revents |= POLLOUT as i16;
         }
-        if bits & READY_HUP != 0 {
+        if bits & READY_HUP != 0 || registration.reference.is_eof() {
             revents |= POLLHUP as i16;
         }
         if bits & READY_ERROR != 0 {
@@ -261,7 +261,7 @@ fn apply_mask<B: SysBackend, L: Lock>(
             continue;
         };
         let requested = i32::from(entry.events);
-        let revents = delivered_revents(mask, requested);
+        let revents = delivered_revents(mask, requested, registration.reference.is_eof());
         if revents != 0 {
             entry.revents = revents;
             fired = fired.saturating_add(1);
@@ -324,7 +324,10 @@ pub fn wait_writable<B: SysBackend, L: Lock>(
 }
 
 /// Translate a kernel readiness mask into the caller's `poll` bits.
-fn delivered_revents(mask: u32, requested: i32) -> i16 {
+///
+/// `eof` is the sticky tty-master hangup observed by `read`; it is the pty server's `POLLHUP`
+/// until the scheme-file readiness path (PG-25) reports the level directly.
+fn delivered_revents(mask: u32, requested: i32, eof: bool) -> i16 {
     let mut revents = 0i16;
     if mask & EV_SIGNALED != 0 {
         // The notification event is level-only: report the caller's requested bits.
@@ -341,7 +344,7 @@ fn delivered_revents(mask: u32, requested: i32) -> i16 {
     if mask & EV_WRITABLE != 0 && requested & POLLOUT != 0 {
         revents |= POLLOUT as i16;
     }
-    if mask & EV_HUP != 0 {
+    if mask & EV_HUP != 0 || eof {
         revents |= POLLHUP as i16;
     }
     revents

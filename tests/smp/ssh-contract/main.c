@@ -512,10 +512,26 @@ static int check_pty(void) {
 static int accept_one(int listener, const char *payload, const char *ack) {
     int fd;
     char buffer[32];
+    struct sockaddr_in peer;
+    socklen_t peer_len = sizeof(peer);
     size_t length = strlen(payload);
 
     fd = accept(listener, NULL, NULL);
     if (fd < 0) {
+        return -1;
+    }
+    // K548: the accepted fd must carry the host peer's address, not the UNKNOWN/zero peer the
+    // pre-fix inheritance path returned. The hostfwd client arrives as the slirp gateway
+    // 10.0.2.2 with a live port; 0.0.0.0:0 or a getpeername error is the failure.
+    memset(&peer, 0, sizeof(peer));
+    if (getpeername(fd, (struct sockaddr *)&peer, &peer_len) != 0) {
+        (void)close(fd);
+        return -1;
+    }
+    if (peer_len != sizeof(peer) || peer.sin_family != AF_INET ||
+        peer.sin_addr.s_addr != inet_addr("10.0.2.2") || peer.sin_port == 0) {
+        (void)close(fd);
+        errno = EPROTO;
         return -1;
     }
     if (read_exact(fd, buffer, length) != 0 || memcmp(buffer, payload, length) != 0) {

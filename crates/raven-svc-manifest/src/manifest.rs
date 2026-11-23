@@ -38,7 +38,7 @@ pub enum Readiness {
     /// Ready when the service exits successfully.
     Exit,
     /// Ready when `ready_file` contains `ready_match`.
-    Log,
+    File,
     /// No readiness wait.
     #[default]
     None,
@@ -69,9 +69,9 @@ pub struct Manifest {
     pub max_restarts: u32,
     /// Readiness policy.
     pub readiness: Readiness,
-    /// Absolute file path polled by [`Readiness::Log`].
+    /// Absolute file path polled by [`Readiness::File`].
     pub ready_file: String,
-    /// Exact byte string that marks [`Readiness::Log`] ready.
+    /// Exact byte string that marks [`Readiness::File`] ready.
     pub ready_match: String,
     /// How long readiness may take, in milliseconds, `0..=MAX_READY_TIMEOUT_MS`.
     pub ready_timeout_ms: u32,
@@ -295,7 +295,7 @@ impl Manifest {
                     readiness = match value.as_str() {
                         "scheme" => Readiness::Scheme,
                         "exit" => Readiness::Exit,
-                        "log" => Readiness::Log,
+                        "file" => Readiness::File,
                         "none" => Readiness::None,
                         _ => return Err(error(line, ParseErrorKind::InvalidValue("readiness"))),
                     };
@@ -352,7 +352,7 @@ impl Manifest {
         let Some(exec) = exec else {
             return Err(error(error_line, ParseErrorKind::MissingKey("exec")));
         };
-        if readiness == Readiness::Log {
+        if readiness == Readiness::File {
             if ready_file.is_empty() {
                 return Err(error(error_line, ParseErrorKind::MissingKey("ready_file")));
             }
