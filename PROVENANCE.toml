@@ -9725,7 +9725,7 @@ license = "BSD-3-Clause"
 tier = "A"
 copied = "2026-11-23"
 modified = true
-notes = "lwkt_domsg() synchronous-completion rule (line 184) and the MSGF_SYNC arm of lwkt_thread_replyport() (line 591) transcribed into a pure bounded state model; no IPI, scheduler, port callback table or kernel glue copied."
+notes = "lwkt_sendmsg() (line 141), lwkt_domsg() (184), lwkt_abortmsg() (231), lwkt_thread_replyport() (591), lwkt_thread_dropmsg() (652) and lwkt_thread_waitmsg() (770) from sys/kern/lwkt_msgport.c, plus lwkt_replymsg()/lwkt_dropmsg() from sys/sys/msgport2.h (50/98) and the MSGF_*/MSGPORTF_* flags from sys/sys/msgport.h, transcribed into a pure bounded state model; no IPI, scheduler, port callback table or kernel glue copied."
 
 [[import]]
 path = "kernel/src/time.rs"
