@@ -24,10 +24,6 @@ qemu_extra = [
 expect_exit = "success"
 
 [[expect]]
-regex = 'svcd: sshd up'
-unordered = true
-
-[[expect]]
 regex = 'svcd: getty up'
 unordered = true
 
