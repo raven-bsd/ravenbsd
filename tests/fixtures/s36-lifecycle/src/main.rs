@@ -957,11 +957,23 @@ fn wait_eintr_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
 }
 
 /// Bounded churn row: baseline counters, 10,000 thread create/exit cycles, closing counters.
+///
+/// This mode skips the unrelated lifecycle scenarios so the thread teardown leak can be
+/// reproduced and measured without the wait/ABI rows. The marker child's exit makes the kernel
+/// print `s36: stacks fresh=... cached=... heap=...` before and after the churn.
 #[cfg(feature = "s36-churn-only")]
 fn churn_only(initfs: &Initfs<'_>) -> Result<(), &'static str> {
-    marker_once(initfs)?;
+    let marker = spawn_role(initfs, "marker").map_err(|_| "marker spawn")?;
+    if proc_wait(marker).unwrap_or(-1) != 0 {
+        return Err("marker wait");
+    }
+    handle_close(marker);
     churn_part()?;
-    marker_once(initfs)?;
+    let marker = spawn_role(initfs, "marker").map_err(|_| "marker spawn")?;
+    if proc_wait(marker).unwrap_or(-1) != 0 {
+        return Err("marker wait");
+    }
+    handle_close(marker);
     println!("s36: churn done");
     Ok(())
 }
