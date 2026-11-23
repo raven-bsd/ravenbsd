@@ -155,6 +155,15 @@ pub fn remove_process(process_id: u64) {
     let _ = FALLBACK.wake_process(process_id);
 }
 
+/// Live futex waiters across all buckets (S36 timeout-retention diagnostic).
+pub fn waiters_len() -> usize {
+    let mut total = 0usize;
+    for queue in QUEUES.iter() {
+        total = total.saturating_add(queue.len());
+    }
+    total.saturating_add(FALLBACK.len())
+}
+
 /// Wake private-key waiters in `[start, end)` after an unmap.
 pub fn remove_private_range(process_id: u64, start: u64, end: u64) {
     for queue in QUEUES.iter() {

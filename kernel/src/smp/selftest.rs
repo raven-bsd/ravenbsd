@@ -125,8 +125,8 @@ fn sleeper_close_test(cpus: usize) -> Result<[usize; 4], (&'static str, [usize; 
         [
             sched::sleepers_len().saturating_sub(base),
             live_threads().saturating_sub(live_base),
-            sched::queued_threads(),
-            sched::reap_pending(),
+            sched::runqueue_len(),
+            sched::reap_len(),
         ]
     };
     for _ in 0..CYCLES {

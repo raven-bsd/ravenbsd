@@ -480,6 +480,17 @@ fn schedule_locked() {
                 break;
             }
             next.set_state(ThreadState::Dead);
+            // The woken terminal-process thread never runs its own exit path, so remove its
+            // timeout sleeper entry here as well as in `exit_thread`; otherwise the entry keeps
+            // an `Arc<Thread>` until its deadline. The current CPU's list is under this slot;
+            // the other CPUs are scanned without reacquiring it. The global futex queues are
+            // also not process-owned: a wait entry enqueued after the process-exit sweep would
+            // otherwise keep the dead Thread.
+            let _ = state
+                .sleepers
+                .remove_where(|(thread, _, _)| thread.id == next.id);
+            cancel_thread_sleepers_except(next.id, cpu);
+            crate::syscall::futex::remove_thread(next.id);
             push_reap(Arc::into_raw(next) as usize);
             next = match state.runqueue.pop_front() {
                 Some(next) => next,
@@ -757,31 +768,33 @@ fn cancel_sleep(token: u64) {
     }
 }
 
-/// Drop every per-CPU timeout-sleeper entry owned by dead thread `id`.
+/// Remove an exiting thread from every per-CPU timeout sleeper list.
 ///
-/// A woken thread normally calls `end_block`, which removes its entry. A terminal process
-/// exits from `block_current` / the syscall path without `end_block`, and the entry then holds
-/// an `Arc<Thread>` (and through it the `Process`) until the deadline. NetBSD `lwp_exit`
-/// destroys `l->l_timeout_ch`, `sleepq_block` halts the callout after the switch, and `lwp_free`
-/// frees the LWP off-CPU; FreeBSD and Illumos drop the sleep-queue reference on wake. Run this
-/// from [`reap_dead`], the one point every terminal path (`exit_thread` and the scheduler's
-/// terminal-process filter) hands the dead `Arc` to.
-fn cancel_thread_sleepers(id: u64) {
-    if !INITIALIZED.load(Ordering::Acquire) {
-        return;
-    }
+/// The donor removes a woken sleeper before the thread runs (NetBSD `sleepq_remove`,
+/// FreeBSD `sleepq_abort`/`thread_unlink`). Raven defers that cleanup to the blocked caller's
+/// `end_block`, but `block_current` and `sleep_until` exit a terminal-process thread before the
+/// caller can run it, so the entry (which owns an `Arc<Thread>`) would stay until its deadline
+/// and keep the dead Thread and its Process alive. Exit removes it explicitly; the scan is
+/// bounded by the online CPU count and the queued sleeper count.
+fn cancel_thread_sleepers(thread_id: u64) {
     let _guard = sync::critical();
+    cancel_thread_sleepers_except(thread_id, usize::MAX);
+}
+
+/// Remove `thread_id` from every CPU's sleeper list except `skip`.
+///
+/// The caller either holds `skip`'s slot lock (the scheduler terminal filter removes that list
+/// directly before calling here) or passes `usize::MAX` with the scheduler critical section held.
+fn cancel_thread_sleepers_except(thread_id: u64, skip: usize) {
     for cpu in 0..smp::online_cpus() {
+        if cpu == skip {
+            continue;
+        }
         let mut slot = lock_cpu(cpu);
         if let Some(state) = slot.as_mut() {
-            // The caller still owns an `Arc<Thread>`, so this drop is never the last reference
-            // and cannot run a destructor that needs the scheduler critical section.
-            while let Some((thread, _, _)) = state
+            let _ = state
                 .sleepers
-                .remove_where(|(thread, _, _)| thread.id == id)
-            {
-                drop(thread);
-            }
+                .remove_where(|(thread, _, _)| thread.id == thread_id);
         }
     }
 }
@@ -1054,6 +1067,48 @@ pub fn cpu_status(cpu: usize) -> (bool, usize) {
     })
 }
 
+/// Total queued timeout sleepers across the online CPUs (S36 diagnostic).
+pub fn sleepers_len() -> usize {
+    let mut total = 0usize;
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_ref() {
+            total = total.saturating_add(state.sleepers.len());
+        }
+    }
+    total
+}
+
+/// Total runnable threads across the online CPUs (S36 diagnostic).
+pub fn runqueue_len() -> usize {
+    let mut total = 0usize;
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_ref() {
+            total = total.saturating_add(state.runqueue.len());
+        }
+    }
+    total
+}
+
+/// Current threads whose process is terminal (S36 diagnostic).
+pub fn exiting_current() -> usize {
+    let mut total = 0usize;
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_ref() {
+            if state
+                .current
+                .as_ref()
+                .is_some_and(|thread| thread.process.exiting.load(Ordering::Acquire))
+            {
+                total = total.saturating_add(1);
+            }
+        }
+    }
+    total
+}
+
 /// CPU a blocked thread should resume on.
 fn target_cpu(thread: &Thread) -> usize {
     let cpu = usize::try_from(thread.last_cpu.load(Ordering::Acquire)).unwrap_or(0);
@@ -1150,6 +1205,9 @@ pub fn exit_thread(code: i32) -> ! {
     thread.process.unregister_thread(&thread);
     crate::syscall::futex::remove_thread(thread.id);
     thread.process.unregister_thread(&thread);
+    // `block_current`/`sleep_until` exit a terminal-process thread before the caller runs
+    // `end_block`, so the timeout entry (which holds an `Arc<Thread>`) must be removed here.
+    cancel_thread_sleepers(thread.id);
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }
@@ -1230,6 +1288,11 @@ fn push_reap(raw: usize) {
     REAP.lock().push(raw);
 }
 
+/// Threads waiting for the deferred stack reaper (S36 timeout diagnostic).
+pub fn reap_len() -> usize {
+    REAP.lock().len()
+}
+
 /// Queue a thread whose stack must be freed by the next scheduling point.
 ///
 /// Used for creation rollback (a thread that was never enqueued) as well as for dead threads.
@@ -1253,55 +1316,9 @@ fn reap_dead() {
         // SAFETY: each pointer was produced by `Arc::into_raw` exactly once and is owned by the
         // queue; the thread is neither current nor runnable.
         let thread = unsafe { Arc::from_raw(raw as *const Thread) };
-        // A terminal exit skips `end_block`; its registered timeout would otherwise pin this
-        // Thread and its Process until the deadline. The terminal-process filter in
-        // `schedule_locked` also reaches the dead state through this queue, so cancelling here
-        // covers both paths.
-        cancel_thread_sleepers(thread.id);
         self::thread::free_kernel_stack(thread.kernel_stack_base, thread.kernel_stack_top);
         drop(thread);
     }
-}
-
-/// Number of per-CPU timeout-sleeper entries. Each entry holds an `Arc<Thread>` until it is
-/// removed by `end_block`, the timer, or thread exit.
-pub fn sleepers_len() -> usize {
-    if !INITIALIZED.load(Ordering::Acquire) {
-        return 0;
-    }
-    let _guard = sync::critical();
-    let mut total = 0usize;
-    for cpu in 0..smp::online_cpus() {
-        let slot = lock_cpu(cpu);
-        if let Some(state) = slot.as_ref() {
-            total = total.saturating_add(state.sleepers.len());
-        }
-    }
-    total
-}
-
-/// Number of threads currently queued on any CPU's run queue.
-///
-/// A dead thread must never appear here: `exit_thread` is the running thread, and `wake`
-/// refuses a `Dead` target. This counter is the run-queue half of the K495 retention audit.
-pub fn queued_threads() -> usize {
-    if !INITIALIZED.load(Ordering::Acquire) {
-        return 0;
-    }
-    let _guard = sync::critical();
-    let mut total = 0usize;
-    for cpu in 0..smp::online_cpus() {
-        let slot = lock_cpu(cpu);
-        if let Some(state) = slot.as_ref() {
-            total = total.saturating_add(state.runqueue.len());
-        }
-    }
-    total
-}
-
-/// Number of dead threads waiting for the deferred stack/Arc reaper.
-pub fn reap_pending() -> usize {
-    REAP.lock().len()
 }
 
 /// Number of successful context switches across all CPUs.
