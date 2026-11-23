@@ -135,6 +135,7 @@ members = [
     "tests/qtest/cases/proc-fork-fixture",
     "tests/qtest/cases/thread-tid-fixture",
     "xtask",
+    "tests/host/kernel-conformance",
     "tests/qtest",
     "tests/genet",
     "tests/ufs-oracle",
