@@ -760,24 +760,24 @@ FUZZ_TABLE_HASH = 0x3006_6A6F_544F_F0BC
 TCP_MINMSS = 536
 
 # Per-case wall guard. The deviation checks are the pass/fail assertions; this
-# guard only reports a case far outside the completed run's measured wall
-# distribution.  The measured 224-case distribution at load1=20.47 was
-# p50=0.055, p90=0.233, p99=0.312, max=0.320 s, so 3*p99=0.936 s.  The old
-# hardcoded 0.5 s flagged a legitimate 0.60 s scheduling outlier.  The 1.0 s
-# ceiling stays below the 1.5 s collect_stream wait, so a real stall still
-# reports.
-FUZZ_SLOW_FLOOR = 0.5
-FUZZ_SLOW_FACTOR = 3.0
-FUZZ_SLOW_CEILING = 1.0
+# guard only reports a case far outside its own group's completed wall
+# distribution.  Per-group matters: at load1=16.15 the zero-window group p99 is
+# 0.188 s, reserved 0.551 s, rst-after-close 1.508 s.  The gate-2 run at
+# load1=15.81 observed zero-window[8]=0.60 s and reserved[0]=1.10 s, so the
+# floor is 1.25 s (1.10 + 14%).  The 1.5*p99 factor covers the rst 1.508 s
+# high-load case (2.262 s); a genuine extra stall is >=1.5 s in the short
+# groups and >=3 s in rst, above the bounds.
+FUZZ_SLOW_FLOOR = 1.25
+FUZZ_SLOW_FACTOR = 1.5
 
 
 def fuzz_slow_limit(samples: list[float]) -> float:
-    """Upper measured per-case wall bound for the completed cases."""
+    """Upper measured per-group case wall bound from the completed cases."""
     if not samples:
         return FUZZ_SLOW_FLOOR
     ordered = sorted(samples)
     p99 = ordered[min(len(ordered) - 1, int(len(ordered) * 0.99))]
-    return min(FUZZ_SLOW_CEILING, max(FUZZ_SLOW_FLOOR, FUZZ_SLOW_FACTOR * p99))
+    return max(FUZZ_SLOW_FLOOR, FUZZ_SLOW_FACTOR * p99)
 
 
 def fuzz_is_slow(elapsed: float, samples: list[float]) -> bool:
@@ -894,7 +894,7 @@ def scenario_fuzz(peer: RawPeer, local_port: int, remote_port: int) -> tuple[boo
     mutations = set(filter(None, os.environ.get("NETCONF_FUZZ_MUTATION", "").split(",")))
     mutated = "all" in mutations or "tcp" in mutations
     deviations = 0
-    case_times: list[float] = []
+    group_times: dict[str, list[float]] = {}
 
     def check(case: dict, name: str, passed: bool, detail: str) -> None:
         nonlocal deviations
@@ -1082,10 +1082,11 @@ def scenario_fuzz(peer: RawPeer, local_port: int, remote_port: int) -> tuple[boo
         elapsed = time.monotonic() - case_started
         if os.environ.get("NETCONF_FUZZ_TIMING"):
             log(f"fuzz: timing case={group}[{case['index']}] elapsed={elapsed:.3f}s")
-        if fuzz_is_slow(elapsed, case_times):
+        samples = group_times.setdefault(group, [])
+        if fuzz_is_slow(elapsed, samples):
             log(f"fuzz: slow case={group}[{case['index']}] elapsed={elapsed:.2f}s "
-                f"limit={fuzz_slow_limit(case_times):.2f}s")
-        case_times.append(elapsed)
+                f"limit={fuzz_slow_limit(samples):.2f}s")
+        samples.append(elapsed)
 
     log(f"fuzz: group={previous_group} cases={group_cases} "
         f"elapsed={time.monotonic() - group_started:.2f}s")
@@ -1849,15 +1850,18 @@ def selftest() -> int:
     assert len(cases) == FUZZ_CASES
     assert len({case["port"] for case in cases}) == FUZZ_CASES
     assert fuzz_table_hash(cases) == FUZZ_TABLE_HASH
-    # Measured 224-case distribution at load1=20.47: p50=0.055, p90=0.233,
-    # p99=0.312, max=0.320 s.  The old 0.5 s per-case guard flagged a
-    # legitimate 0.60 s scheduling outlier; the measured guard must not.
-    timing_samples = [0.055, 0.090, 0.177, 0.233, 0.307, 0.312]
-    assert not fuzz_is_slow(0.60, timing_samples)
-    assert fuzz_is_slow(1.50, timing_samples)
-    loaded_samples = [sample * 2 for sample in timing_samples]
-    assert not fuzz_is_slow(0.60, loaded_samples)
-    assert fuzz_is_slow(1.50, loaded_samples)
+    # Measured per-group walls: at load1=16.15 the zero-window group p99 is
+    # 0.188, reserved 0.551, rst-after-close 1.508; the gate-2 outlier at
+    # load1=15.81 was zero-window[8]=0.60 and reserved[0]=1.10.  The guard is
+    # per group, max(1.25, 1.5*p99): the floor covers the gate-2 1.10 outlier,
+    # and 1.5*p99 covers the rst 1.508 high-load case.
+    quiet = [0.055, 0.090, 0.177, 0.233, 0.307, 0.312]
+    assert not fuzz_is_slow(0.60, quiet)
+    assert not fuzz_is_slow(1.10, quiet)
+    assert fuzz_is_slow(1.50, quiet)
+    rst = [0.472, 0.548, 0.669, 1.121, 1.256, 1.508]
+    assert not fuzz_is_slow(1.508, rst)
+    assert fuzz_is_slow(3.0, rst)
     log(f"fuzz table seed=0x{FUZZ_SEED:016x} cases={FUZZ_CASES} "
         f"table-hash=0x{FUZZ_TABLE_HASH:016x}")
     l4_cases = fuzz_l4_table(FUZZ_SEED)
