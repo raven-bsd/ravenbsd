@@ -124,15 +124,41 @@ impl From<MapError> for PagingError {
     }
 }
 
+/// Page-table frames currently allocated through [`KernelFrameAllocator`] (test-only metric).
+static PAGE_TABLE_FRAMES: AtomicU64 = AtomicU64::new(0);
+
+/// Page-table frames currently allocated (K449 test-only metric).
+pub fn page_table_frames() -> u64 {
+    PAGE_TABLE_FRAMES.load(Ordering::Acquire)
+}
+
+/// Release one page-table frame allocated through [`KernelFrameAllocator`].
+///
+/// Address-space teardown frees the table frames directly instead of going through the mapper,
+/// so it must update the same live counter here; otherwise the metric only ever grows.
+fn release_page_table_frame(physical: PhysAddr) {
+    let _ = PAGE_TABLE_FRAMES.fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+        count.checked_sub(1)
+    });
+    let _ = frame::free_frame(frame_phys(physical));
+}
+
 /// A frame allocator backed by the kernel's own bitmap allocator.
 pub struct KernelFrameAllocator;
 
 impl RmmFrameAllocator for KernelFrameAllocator {
     fn allocate(&mut self) -> Option<PhysAddr> {
-        frame::alloc_zeroed_frame().map(rmm_phys)
+        let physical = frame::alloc_zeroed_frame().map(rmm_phys);
+        if physical.is_some() {
+            PAGE_TABLE_FRAMES.fetch_add(1, Ordering::AcqRel);
+        }
+        physical
     }
 
     fn free(&mut self, frame: PhysAddr) {
+        let _ = PAGE_TABLE_FRAMES.fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+            count.checked_sub(1)
+        });
         let _ = frame::free_frame(frame_phys(frame));
     }
 }
@@ -546,7 +572,7 @@ pub fn free_user_tables(root: PhysAddr) {
             free_table(entry.address(), 2, &memory);
         }
     }
-    let _ = frame::free_frame(frame_phys(root));
+    release_page_table_frame(root);
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -563,7 +589,7 @@ fn free_table(table_phys: PhysAddr, level: u8, memory: &KernelPhysMemory) {
             }
         }
     }
-    let _ = frame::free_frame(frame_phys(table_phys));
+    release_page_table_frame(table_phys);
 }
 
 /// Free the user half of an aarch64 address-space root (TTBR0), including the root frame.
@@ -585,7 +611,7 @@ pub fn free_user_tables(root: PhysAddr) {
             free_table_aarch64(entry.address(), table.level().saturating_sub(1), &memory);
         }
     }
-    let _ = frame::free_frame(frame_phys(root));
+    release_page_table_frame(root);
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -603,7 +629,7 @@ fn free_table_aarch64(table_phys: PhysAddr, level: u8, memory: &KernelPhysMemory
             }
         }
     }
-    let _ = frame::free_frame(frame_phys(table_phys));
+    release_page_table_frame(table_phys);
 }
 
 #[cfg(target_arch = "x86_64")]

@@ -246,6 +246,11 @@ impl<const MAX_SLABS: usize, const TAGS: usize> KmemGeneric<MAX_SLABS, TAGS> {
         self.caches.get(id.0)?.as_ref().map(Cache::stats)
     }
 
+    /// Statistics for a general size-class slot (0-based index into `SIZE_CLASSES`).
+    pub fn general_stats(&self, index: usize) -> Option<CacheStats> {
+        self.caches.get(index)?.as_ref().map(Cache::stats)
+    }
+
     /// Snapshot the allocator's counters and accounting.
     pub fn stats(&self) -> KmemStats {
         let mut stats = KmemStats {
