@@ -15,6 +15,17 @@ expect_exit = "success"
 [[expect]]
 regex = '^s36: unstarted reaped$'
 
+# Scenario 7: the child exit and its SIGCHLD kick must not turn the wait into EINTR.
+[[expect]]
+regex = '^s36: wait race ok$'
+
+[[expect]]
+regex = '^s36: wait race handle ok$'
+
+# Scenario 8: a caught signal delivered while blocked still returns EINTR.
+[[expect]]
+regex = '^s36: wait eintr ok$'
+
 # Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
 [[expect]]
 regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
