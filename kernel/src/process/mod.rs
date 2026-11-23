@@ -1802,11 +1802,14 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         return;
     }
     // S24 leak evidence: the free-frame count after every child exit.
-    if CmdLine::parse(paging::cmdline())
-        .get("s24-framecheck")
-        .is_some()
-    {
+    let command_line = CmdLine::parse(paging::cmdline());
+    if command_line.get("s24-framecheck").is_some() {
         kprintln!("s24: frames free={}", frame::stats().free_bytes);
+        // K570: the pty-churn frame line rides the same parse. A second top-level parse/print
+        // block enlarged the teardown frame past the kernel stack (K536 rev187 double fault).
+        if command_line.get("s24-alloccheck").is_some() {
+            kprintln!("s24: frames allocated={}", frame::stats().allocated_bytes);
+        }
     }
     // S25 handle-transfer leak evidence: the dying process's live handle count. A transferred
     // handle that survived process death, or a slot leaked by the transfer path, drifts this
