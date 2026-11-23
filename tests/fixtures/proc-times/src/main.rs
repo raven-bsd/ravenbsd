@@ -7,6 +7,8 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
 #[path = "common.rs"]
 mod common;
 
@@ -26,6 +28,8 @@ const MODE_SLEEP: usize = 2;
 const BUSY_ITERS: u64 = 30_000_000;
 const BUSY_MIN_NS: u64 = 1_000_000;
 const SLEEP_NS_MAX: u64 = 20_000_000;
+/// Pages the busy child touches before it exits without calling `getrusage`.
+const RSS_PAGES: usize = 256;
 
 fn spin(iterations: u64) -> u64 {
     let mut value = 0x9e37_79b9_7f4a_7c15u64;
@@ -37,7 +41,14 @@ fn spin(iterations: u64) -> u64 {
 
 extern "C" fn child_entry(mode: usize) -> ! {
     if mode == MODE_BUSY {
+        // Known resident footprint for the parent's RUSAGE_CHILDREN maxrss assertion. The child
+        // must not call getrusage: only the at-exit snapshot can fold this footprint.
+        let mut block: alloc::vec::Vec<u8> = alloc::vec![0u8; RSS_PAGES * PAGE];
+        for page in 0..RSS_PAGES {
+            block[page * PAGE] = (page as u8).wrapping_add(1);
+        }
         let _ = spin(BUSY_ITERS);
+        core::hint::black_box(&block);
         sys::exit(7);
     }
     if mode == MODE_SLEEP {
@@ -120,7 +131,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         Ok(value) => value,
         Err(_) => return 1,
     };
-    let before_children = match getrusage() {
+    let before_children = match getrusage_who(-1) {
         Ok(value) => value,
         Err(_) => return 1,
     };
@@ -142,19 +153,21 @@ fn main(_args: raven_rt::Args) -> i32 {
         Ok(value) => value,
         Err(_) => return 1,
     };
-    let after_children = match getrusage() {
+    let after_children = match getrusage_who(-1) {
         Ok(value) => value,
         Err(_) => return 1,
     };
     let child_user = after_busy[2].saturating_sub(before_busy[2]);
     let child_system = after_busy[3].saturating_sub(before_busy[3]);
     let child_rusage_user = after_children[0].saturating_sub(before_children[0]);
+    let child_maxrss = after_children[2];
     if exit_code(busy_status) != 7
         || child_user.saturating_add(child_system) < BUSY_MIN_NS
         || child_rusage_user < BUSY_MIN_NS
+        || child_maxrss < (RSS_PAGES * PAGE) as u64
     {
         println!(
-            "proc-times: fail busy child exit={} user={child_user} system={child_system} rusage={child_rusage_user}",
+            "proc-times: fail busy child exit={} user={child_user} system={child_system} rusage={child_rusage_user} maxrss={child_maxrss}",
             exit_code(busy_status)
         );
         return 1;
@@ -213,7 +226,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         return 1;
     }
     println!("proc-times: priority=1 accounting=1");
-    println!("proc-times: reaped-fold=1");
+    println!("proc-times: reaped-fold=1 maxrss={child_maxrss}");
     println!("proc-times: cpuclock=not-exposed");
     println!("proc-times: ok");
     0
