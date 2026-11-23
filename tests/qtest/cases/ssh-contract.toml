@@ -43,7 +43,10 @@ regex = '^.*CONTRACT K18 PASS .*$'
 regex = '^.*CONTRACT K19 PASS .*$'
 
 [[expect]]
-regex = '^.*CONTRACT SUMMARY PASS 9/9$'
+regex = '^.*CONTRACT K20 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 10/10$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
