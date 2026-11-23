@@ -55,6 +55,29 @@ fn thread_state_view_fits_the_private_block() {
 }
 
 #[test]
+fn reset_after_fork_clears_delivery_state_and_keeps_the_mask() {
+    let kernel = HostSigKernel::new();
+    let tp = kernel.pointer();
+    mask_store(tp, 0x55);
+    set_ctx_area(tp, 0x4000);
+    pending_store(tp, 9);
+    let mut info = SiginfoT::ZERO;
+    info.si_signo = 17;
+    store_pending_info(tp, &info);
+
+    assert!(reset_after_fork(tp), "the parent had a registered entry");
+
+    assert_eq!(mask_load(tp), 0x55, "the child inherits the signal mask");
+    assert_eq!(with_state(tp, |state| state.ctx_area()), 0);
+    assert_eq!(pending_load(tp), 0);
+    assert_eq!(load_pending_info(tp).si_signo, 0);
+    assert!(
+        !reset_after_fork(tp),
+        "a second reset has no entry to report"
+    );
+}
+
+#[test]
 fn pending_info_slot_round_trips() {
     let kernel = HostSigKernel::new();
     let mut info = SiginfoT::ZERO;

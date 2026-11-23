@@ -6,12 +6,13 @@
 use alloc::vec;
 
 use raven_abi::errno::Errno;
+use raven_abi::types::Handle;
 
 use crate::Platform;
 use crate::backend::FakeSys;
 use crate::fd::inherit::{
-    ENTRY_LEN_V4, FDMAP_MAGIC, FDMAP_VERSION, FDMAP_VERSION_V1, FdMap, FdMapEntry, HEADER_LEN,
-    NO_PATH, entry_handle, transferable,
+    ENTRY_LEN_V4, ENTRY_LEN_V5, FDMAP_MAGIC, FDMAP_VERSION, FDMAP_VERSION_V1, FDMAP_VERSION_V4,
+    FdMap, FdMapEntry, HEADER_LEN, NO_PATH, entry_handle, transferable,
 };
 use crate::fd::ofd::{OfdKind, SocketEndpoint, SocketMeta};
 
@@ -46,6 +47,40 @@ fn round_trip_keeps_every_field() {
 }
 
 #[test]
+fn pty_master_role_round_trips() {
+    let mut entry = FdMapEntry::new(3, 0x61, OfdKind::Tty, 0, 2);
+    entry.path = Some(b"/dev/ptmx".to_vec());
+    entry.pty_master = true;
+    let map = FdMap {
+        entries: vec![entry],
+    };
+    let decoded = FdMap::decode(&map.encode().expect("encode")).expect("decode");
+    assert_eq!(decoded, map);
+    assert!(
+        decoded.entries[0].pty_master,
+        "the master role must survive exec"
+    );
+}
+
+#[test]
+fn restore_fdmap_restores_the_pty_master_role() {
+    let platform = Platform::new(FakeSys::new());
+    let mut entry = FdMapEntry::new(3, 0x62, OfdKind::Tty, 0, 2);
+    entry.pty_master = true;
+    platform
+        .restore_fdmap(&FdMap {
+            entries: vec![entry],
+        })
+        .expect("restore");
+    let reference = platform.get(3).expect("fd3");
+    assert!(
+        reference.is_pty_master(),
+        "the rebuilt OFD keeps the master role"
+    );
+    assert_eq!(reference.kind(), OfdKind::Tty);
+}
+
+#[test]
 fn socket_metadata_round_trips() {
     let mut entry = FdMapEntry::new(3, 0x44, OfdKind::Socket, 0, 2);
     entry.socket = Some(SocketMeta {
@@ -75,7 +110,7 @@ fn string_table_is_shared() {
     map.entries[1].path = Some(b"/tmp/a".to_vec());
     let bytes = map.encode().expect("encode");
     // Header + two entries + one NUL-terminated string.
-    assert_eq!(bytes.len(), HEADER_LEN + 2 * ENTRY_LEN_V4 + 14);
+    assert_eq!(bytes.len(), HEADER_LEN + 2 * ENTRY_LEN_V5 + 14);
     let decoded = FdMap::decode(&bytes).expect("decode");
     assert_eq!(
         decoded.entries[1].path.as_deref(),
@@ -241,6 +276,39 @@ fn restored_cloexec_socket_is_closed_before_main() {
     platform.close_cloexec_fds().expect("close cloexec");
     assert!(platform.get(3).is_err());
     assert!(platform.inherited_sockets().is_empty());
+}
+
+#[test]
+fn exec_fdmap_env_carries_the_pty_master_role() {
+    let platform = Platform::new(FakeSys::new());
+    let path = b"/dev/ptmx".to_vec().into_boxed_slice();
+    let fd = platform
+        .install(Handle(0x71), OfdKind::Tty, 2, Some(path), false)
+        .expect("install");
+    platform.get(fd).expect("fd").set_pty_master();
+    let env = platform.exec_fdmap_env().expect("env").expect("entry");
+    let value = env.split(|byte| *byte == b'=').nth(1).expect("value");
+    let block = FdMap::decode_env(value).expect("decode");
+    let entry = block
+        .entries
+        .iter()
+        .find(|entry| entry.fd == fd)
+        .expect("inherited entry");
+    assert!(entry.pty_master, "exec must serialize the master role");
+}
+
+#[test]
+fn version_four_block_decodes_without_the_pty_role() {
+    let map = FdMap {
+        entries: vec![FdMapEntry::new(3, 0x63, OfdKind::Tty, 0, 2)],
+    };
+    let mut bytes = map.encode().expect("encode");
+    bytes[4..6].copy_from_slice(&FDMAP_VERSION_V4.to_le_bytes());
+    // A version-4 entry is version 5 minus the trailing role byte.
+    bytes.remove(HEADER_LEN + ENTRY_LEN_V4);
+    let decoded = FdMap::decode(&bytes).expect("v4 decode");
+    assert_eq!(decoded.entries.len(), 1);
+    assert!(!decoded.entries[0].pty_master);
 }
 
 #[test]
