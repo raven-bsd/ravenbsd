@@ -314,6 +314,15 @@ impl Turnstiles {
         if woken.is_some() {
             self.stat_wake(object, 1);
         }
+        // FreeBSD `turnstile_free`/NetBSD `turnstile_free`: an idle turnstile does not outlive
+        // the last owner/waiter. The next acquire recreates it from the object id.
+        if self
+            .objects
+            .get(&object)
+            .is_some_and(|t| t.owner.is_none() && t.waiters.is_empty())
+        {
+            self.objects.remove(&object);
+        }
         woken
     }
 
@@ -330,6 +339,14 @@ impl Turnstiles {
         #[cfg(feature = "lockstat")]
         self.stat_wake(object, woken.len() as u64);
         self.refresh();
+        // Reclaim an idle turnstile after the last waiter drains.
+        if self
+            .objects
+            .get(&object)
+            .is_some_and(|t| t.owner.is_none() && t.waiters.is_empty())
+        {
+            self.objects.remove(&object);
+        }
         woken
     }
 
@@ -370,6 +387,14 @@ impl Turnstiles {
         #[cfg(feature = "lockstat")]
         if removed {
             self.stat_cancel(object, effect.is_some_and(InheritEffect::changed));
+        }
+        // Reclaim an idle turnstile when a cancellation leaves no owner or waiter.
+        if self
+            .objects
+            .get(&object)
+            .is_some_and(|t| t.owner.is_none() && t.waiters.is_empty())
+        {
+            self.objects.remove(&object);
         }
         CancelOutcome { removed, effect }
     }

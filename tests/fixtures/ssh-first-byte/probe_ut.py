@@ -8,10 +8,17 @@ Run from the fixture directory: ``python3 -m unittest probe_ut``.
 No QEMU is started: a temporary serial file and a timed writer stand in for the
 guest.  The synthetic early connect is the negative: a connect before the ready
 marker would read 0 bytes and be logged as a banner failure.
+
+``ImageAlignmentTest`` is the case/image contract: the qtest case must boot the
+same image the pre-step probe boots, and that image must be built from the
+current tree.  A stale or foreign image can carry a different console login (the
+release root password), which is the K567 case-wrapper failure: the smoke waits
+for a password prompt the image never prints.
 """
 
 from __future__ import annotations
 
+import re
 import tempfile
 import threading
 import time
@@ -21,6 +28,7 @@ from pathlib import Path
 import probe
 
 READY = b"svcd: sshd up\n"
+HERE = Path(__file__).resolve().parent
 
 
 class ReadyWaitTest(unittest.TestCase):
@@ -55,8 +63,11 @@ class ReadyWaitTest(unittest.TestCase):
 
             def writer() -> None:
                 time.sleep(0.3)
-                serial.write_bytes(b"boot loading\n" + READY)
+                # Record the intent time before the write: wait_serial may observe the file
+                # before this thread appends, so the connect must be compared to the writer's
+                # own ready time, not to a later append.
                 marker_written.append(time.monotonic())
+                serial.write_bytes(b"boot loading\n" + READY)
 
             calls: list[tuple[float, int]] = []
 
@@ -83,6 +94,62 @@ class ReadyWaitTest(unittest.TestCase):
                 "the connect ran before the ready marker (would have timed out)",
             )
             self.assertGreaterEqual(delta, 0.25)
+
+
+class ImageAlignmentTest(unittest.TestCase):
+    """The case, the fixture and the probe name one freshly built image."""
+
+    def _case_image(self) -> str:
+        text = (HERE / "ssh-first-byte.toml").read_text(encoding="utf-8")
+        match = re.search(r"^image\s*=\s*\"([^\"]+)\"\s*$", text, re.MULTILINE)
+        self.assertIsNotNone(match, "the case declares no image")
+        return match.group(1)
+
+    def _run_sh(self) -> str:
+        return (HERE / "run.sh").read_text(encoding="utf-8")
+
+    def test_case_boots_the_image_the_probe_boots(self) -> None:
+        case_image = self._case_image()
+        run_sh = self._run_sh()
+        image = re.search(r"^image=(\S+)\s*$", run_sh, re.MULTILINE)
+        self.assertIsNotNone(
+            image, "run.sh does not name the image it builds and probes"
+        )
+        self.assertEqual(
+            image.group(1),
+            case_image,
+            "the qtest case and the fixture probe must boot the same image",
+        )
+        self.assertIn(
+            'RAVEN_SSH_IMAGE="$image"',
+            run_sh,
+            "the probe must be pointed at the case image, not its own default",
+        )
+
+    def test_image_is_built_from_the_release_profile_at_head(self) -> None:
+        run_sh = self._run_sh()
+        self.assertRegex(
+            run_sh,
+            r"cargo xtask image --arch x86_64 --profile release\b",
+            "the fixture image must be the release profile",
+        )
+        self.assertRegex(
+            run_sh,
+            r"--output \"\$image\"",
+            "the fixture image must be written to the case image path",
+        )
+        self.assertRegex(
+            run_sh,
+            r"rev-parse HEAD",
+            "the image stamp must track the tree revision",
+        )
+
+    def test_first_byte_bound_is_not_loosened(self) -> None:
+        self.assertEqual(
+            probe.FIRST_BYTE_BOUND,
+            8.0,
+            "the first-byte assertion stays at the measured 8 s budget",
+        )
 
 
 if __name__ == "__main__":

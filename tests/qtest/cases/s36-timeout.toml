@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "s36-timeout"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/s36-lifecycle/build-timeout.sh"]
+initfs = "build/fixtures/s36-lifecycle/timeout-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s36-timeoutcheck=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^s36: timeoutcheck base live=[0-9]+ .*$'
+
+[[expect]]
+regex = '^s36: timeout churn done=40$'
+
+[[expect]]
+regex = '^s36: timeoutcheck delta live=[0-9]+ .*live_delta=[0-9]+ sleepers_delta=[0-9]+$'
+
+[[expect]]
+regex = '^s36: timeoutcheck ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|s36: failed|s36: timeoutcheck leak'
