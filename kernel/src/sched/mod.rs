@@ -1229,6 +1229,23 @@ fn reap_dead() {
     }
 }
 
+/// Number of per-CPU timeout-sleeper entries. Each entry holds an `Arc<Thread>` until it is
+/// removed by `end_block`, the timer, or thread exit.
+pub fn sleepers_len() -> usize {
+    if !INITIALIZED.load(Ordering::Acquire) {
+        return 0;
+    }
+    let _guard = sync::critical();
+    let mut total = 0usize;
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_ref() {
+            total = total.saturating_add(state.sleepers.len());
+        }
+    }
+    total
+}
+
 /// Number of successful context switches across all CPUs.
 pub fn switch_count() -> u64 {
     if !INITIALIZED.load(Ordering::Acquire) {
