@@ -459,6 +459,31 @@ pub fn epoll_create<B: SysBackend, L: Lock>(
     crate::poll::epoll_create1(platform, 0)
 }
 
+/// The live pty pair behind `fd`, and whether it is the master endpoint.
+///
+/// A descriptor inherited across exec has no `ofd.path` (the kernel keeps no name for it). The
+/// pty service still knows the live pair: FreeBSD `ttyname_r` names the device from the file
+/// identity (`fdevname_r` -> `fstat` + `devname`), and Raven's wire `Stat` has no `st_rdev`, so
+/// ptyd reports the endpoint in `st_ino` (slave `2N+2`, master `2N+1`; `docs/pty.md`,
+/// `pairs.rs`). A console answers `GET_TERMIOS` with `ENOSYS`, so it is never named as a pty.
+pub fn pty_pair<B: SysBackend, L: Lock>(platform: &Platform<B, L>, fd: i32) -> Option<(u64, bool)> {
+    if !crate::ioctl::tty::is_pty_endpoint(platform, fd) {
+        return None;
+    }
+    let stat = platform.fstat(fd).ok()?;
+    if stat.st_mode & raven_libc_abi::stat::S_IFMT != raven_libc_abi::stat::S_IFCHR {
+        return None;
+    }
+    let ino = stat.st_ino;
+    if ino >= 2 && ino % 2 == 0 {
+        Some(((ino - 2) / 2, false))
+    } else if ino >= 1 {
+        Some(((ino - 1) / 2, true))
+    } else {
+        None
+    }
+}
+
 /// `ttyname`; the shell copies the returned bytes into its per-thread buffer.
 pub fn ttyname<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
@@ -468,10 +493,14 @@ pub fn ttyname<B: SysBackend, L: Lock>(
     if reference.kind() != OfdKind::Tty {
         return Err(Errno::ENOTTY);
     }
-    reference
-        .path()
-        .map(|path| path.to_vec())
-        .ok_or(Errno::ENOTTY)
+    if let Some(path) = reference.path() {
+        return Ok(path.to_vec());
+    }
+    drop(reference);
+    match pty_pair(platform, fd) {
+        Some((pair, false)) => Ok(alloc::format!("/dev/pts/{pair}").into_bytes()),
+        _ => Err(Errno::ENOTTY),
+    }
 }
 
 /// `ttyname_r`.

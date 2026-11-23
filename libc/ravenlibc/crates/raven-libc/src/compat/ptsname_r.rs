@@ -55,7 +55,16 @@ pub unsafe extern "C" fn ptsname_r(fd: c_int, buffer: *mut c_char, length: usize
     if buffer.is_null() || length == 0 {
         return ERANGE as c_int;
     }
-    let Some(pair) = pair_for(fd) else {
+    // The process-local table covers a master this process opened. A master inherited from
+    // another process has no table entry; the pty service still knows the live pair, and its
+    // endpoint identity names the slave (FreeBSD `ptsname` asks the pty, not a process table).
+    let pair = pair_for(fd).or_else(|| {
+        let platform = crate::ffi::platform::global();
+        raven_libc_platform::compat::pty_pair(platform, fd)
+            .filter(|(_, master)| *master)
+            .map(|(pair, _)| pair)
+    });
+    let Some(pair) = pair else {
         // SAFETY: the errno cell is this thread's.
         unsafe { super::set_errno(EBADF as c_int) };
         return EBADF as c_int;

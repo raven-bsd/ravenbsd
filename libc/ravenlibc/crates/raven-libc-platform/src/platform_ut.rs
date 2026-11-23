@@ -47,15 +47,16 @@ fn restore_keeps_the_spawn_tty_kind_and_path() {
 }
 
 #[test]
-fn restore_keeps_a_pathless_tty_unnamed() {
-    // A pathless terminal stays unnamed and untouched: no FSTAT/probe of an inherited handle
-    // happens during startup.
+fn restore_keeps_a_pathless_tty_path_unset() {
+    // Restore itself does not FSTAT or CALL an inherited handle; the OFD path stays unset and
+    // `ttyname` resolves the live pair later, when the caller asks for the name.
     let platform = platform();
     let fd = restore(&platform, OfdKind::Tty, None);
     assert_eq!(platform.get(fd).expect("fd").kind(), OfdKind::Tty);
+    assert!(platform.get(fd).expect("fd").path().is_none());
     assert_eq!(
         crate::compat::ttyname(&platform, fd),
-        Err(crate::Errno::ENOTTY)
+        Ok(b"/dev/pts/52".to_vec())
     );
 }
 

@@ -100,6 +100,14 @@ fn tty_get_termios<B: SysBackend, L: Lock>(
         .map_err(|_| Errno::EPROTO)
 }
 
+/// Whether `fd` is a pty endpoint the K444 termios service answers for.
+///
+/// The console servers implement only `GET_MODE` and answer `GET_TERMIOS` with `ENOSYS`; the pty
+/// server answers the full record. This separates a pty from a console without a guess.
+pub(crate) fn is_pty_endpoint<B: SysBackend, L: Lock>(platform: &Platform<B, L>, fd: i32) -> bool {
+    tty_get_termios(platform, fd).is_ok()
+}
+
 fn tty_set_termios<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fd: i32,
