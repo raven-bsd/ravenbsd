@@ -1336,6 +1336,10 @@ pub fn holder_state(thread_id: u64) -> [u64; 4] {
     if !INITIALIZED.load(Ordering::Acquire) {
         return stats;
     }
+    // The per-CPU slot locks are normally taken with interrupts masked (the timer tick uses the
+    // same lock). The census must do the same, or the timer ISR on this CPU spins on the lock the
+    // census holds.
+    let _guard = sync::critical();
     for cpu in 0..smp::online_cpus() {
         let Some(slot) = try_lock_cpu(cpu) else {
             continue;
