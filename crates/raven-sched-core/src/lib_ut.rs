@@ -391,3 +391,25 @@ fn runqueue_accounting_has_no_duplicate_membership() {
     assert_eq!(live, 0);
     assert_eq!(queued, 0);
 }
+
+#[test]
+fn runqueue_iter_visits_live_entries_only() {
+    let mut queue: RunQueue<u32> = RunQueue::with_capacity(4);
+    queue.push_back(2, 10).unwrap();
+    queue.push_back(0, 11).unwrap();
+    queue.push_back(2, 12).unwrap();
+    assert_eq!(queue.pop_front(), Some(11));
+    let mut seen: Vec<u32> = queue.iter().copied().collect();
+    seen.sort_unstable();
+    assert_eq!(seen, [10, 12]);
+}
+
+#[test]
+fn sleep_iter_visits_entries_in_deadline_order() {
+    let mut list: SleepList<u32> = SleepList::with_capacity(4);
+    list.insert(30, 3);
+    list.insert(10, 1);
+    list.insert(20, 2);
+    let seen: Vec<u32> = list.iter().copied().collect();
+    assert_eq!(seen, [1, 2, 3]);
+}
