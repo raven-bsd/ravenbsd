@@ -320,6 +320,90 @@ fn orderly_close_from_the_server() {
 }
 
 #[test]
+fn banner_server_close_after_reading_the_command_reaches_eof() {
+    let (_link, mut a, mut b) = pair();
+    let client = handshake(&mut a, &mut b);
+    let server = b
+        .tcp_accept(raven_tcpip::SocketId(1))
+        .expect("accept")
+        .expect("conn");
+    let banner = b"220 banner\r\n";
+    assert_eq!(b.send(server, banner), Ok(banner.len()));
+    drive(&mut a, &mut b, &[210, 220, 230, 240]);
+    let mut buffer = [0u8; 64];
+    let count = a.recv(client, &mut buffer).expect("banner");
+    assert_eq!(&buffer[..count], banner, "the client receives the banner");
+    let command = b"USER x\r\n";
+    assert_eq!(a.send(client, command), Ok(command.len()));
+    drive(&mut a, &mut b, &[250, 260, 270, 280, 290, 300, 320, 340]);
+    let count = b.recv(server, &mut buffer).expect("command");
+    assert_eq!(&buffer[..count], command, "the server reads the command");
+    b.close(server).expect("server close");
+    // The close/FIN handshake must complete inside this bound; the guest ssh hang leaves both
+    // ends in ESTABLISHED well past it.
+    for millis in (350..=900).step_by(10) {
+        let now = Instant::from_millis(millis);
+        a.poll(now);
+        b.poll(now);
+    }
+    assert_eq!(
+        a.recv(client, &mut buffer),
+        Ok(0),
+        "the client receives EOF after the banner"
+    );
+    assert!(
+        matches!(a.tcp_state(client), Ok(state) if state != TcpState::Established),
+        "the client leaves ESTABLISHED"
+    );
+    assert!(
+        !matches!(b.tcp_state(server), Ok(TcpState::Established)),
+        "the server leaves ESTABLISHED"
+    );
+}
+
+#[test]
+fn banner_close_before_the_client_reads_still_reaches_eof() {
+    let (_link, mut a, mut b) = pair();
+    let client = handshake(&mut a, &mut b);
+    let server = b
+        .tcp_accept(raven_tcpip::SocketId(1))
+        .expect("accept")
+        .expect("conn");
+    let banner = b"220 banner\r\n";
+    assert_eq!(b.send(server, banner), Ok(banner.len()));
+    // The server closes while its banner is still queued and unacknowledged; the deferred FIN
+    // must follow the ACK that drains the send queue.
+    b.close(server).expect("server close");
+    for millis in (210..=900).step_by(10) {
+        let now = Instant::from_millis(millis);
+        a.poll(now);
+        b.poll(now);
+    }
+    let mut buffer = [0u8; 64];
+    let mut received = Vec::new();
+    loop {
+        match a.recv(client, &mut buffer) {
+            Ok(0) => break,
+            Ok(count) => received.extend_from_slice(&buffer[..count]),
+            Err(Errno::EAGAIN) => break,
+            Err(error) => panic!("recv: {error:?}"),
+        }
+    }
+    assert_eq!(
+        received, banner,
+        "the client receives the queued banner then EOF"
+    );
+    assert!(
+        !matches!(b.tcp_state(server), Ok(TcpState::Established)),
+        "the server leaves ESTABLISHED after the deferred FIN"
+    );
+    assert!(
+        matches!(a.tcp_state(client), Ok(state) if state != TcpState::Established),
+        "the client leaves ESTABLISHED after the FIN"
+    );
+}
+
+#[test]
 fn simultaneous_open_reaches_established() {
     let (_link, mut a, mut b) = pair();
     let sa = a
