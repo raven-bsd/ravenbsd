@@ -3588,7 +3588,9 @@ dependencies = [
  "raven-abi",
  "raven-elf",
  "raven-initfs",
+ "raven-proto-fs",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
