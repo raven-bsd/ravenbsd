@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow, bail};
+use raven_elf::{Elf, Machine};
 use raven_initfs::InitfsBuilder;
 
 use crate::build::{self, Arch, Component};
@@ -147,6 +148,8 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
                 source.display()
             )
         })?;
+        verify_staged_elf(arch, &source, &data)
+            .with_context(|| format!("initfs path {}", file.path))?;
         builder.add_file(&file.path, &data, file.mode)?;
     }
     let image = builder.build();
@@ -557,14 +560,44 @@ pub(crate) fn ensure_brush(root: &Path, arch: Arch, profile: &Profile) -> Result
     Ok(())
 }
 
-/// Resolve a profile source; the legacy mutable `build/brush` maps to the arch-correct path.
+/// The ELF machine the target expects for a staged executable.
+fn expected_machine(arch: Arch) -> Machine {
+    match arch {
+        Arch::X86_64 => Machine::X86_64,
+        Arch::Aarch64 => Machine::Aarch64,
+        Arch::Riscv64 => Machine::Riscv64,
+    }
+}
+
+/// Mirror of `raven-abi`'s user mapping end; only the ELF header is inspected here.
+const USER_END: u64 = 0x0000_7FFF_FFFF_F000;
+
+/// Reject a staged executable whose ELF machine does not match the image architecture.
+///
+/// The target loader refuses a foreign-arch ELF at spawn (`bad ELF: BadMachine`). Staging must
+/// fail at build time instead of embedding a binary the image cannot run. Non-ELF files
+/// (configuration, firmware, device trees) are passed through unchanged.
+pub(crate) fn verify_staged_elf(arch: Arch, source: &Path, data: &[u8]) -> Result<()> {
+    if data.len() < 4 || !data.starts_with(b"\x7fELF") {
+        return Ok(());
+    }
+    match Elf::parse(data, expected_machine(arch), 0..USER_END) {
+        Err(raven_elf::ElfError::BadMachine) => bail!(
+            "staged ELF {} is not a {} executable: the target loader rejects a foreign e_machine (bad ELF: BadMachine)",
+            source.display(),
+            arch.as_str()
+        ),
+        _ => Ok(()),
+    }
+}
+
+/// Resolve a profile source; `{arch}` expands to the target and the legacy mutable
+/// `build/brush` maps to the arch-correct path.
 pub(crate) fn source_path(root: &Path, arch: Arch, source: &str) -> PathBuf {
     if source == "build/brush" {
         root.join(brush_path(arch))
-    } else if let Some(rest) = source.strip_prefix("build/{arch}/") {
-        root.join("build").join(arch.as_str()).join(rest)
     } else {
-        root.join(source)
+        root.join(source.replace("{arch}", arch.as_str()))
     }
 }
 
