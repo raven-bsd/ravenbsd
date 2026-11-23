@@ -4,8 +4,9 @@
 //! aarch64 SMP: per-CPU state, PSCI bring-up, cross-CPU reschedule IPIs and TLB shootdown.
 //!
 //! This replaces the single-CPU `smp_shim` stand-in. Kernel and user threads may run on
-//! application processors; the scheduler spreads user threads when `smp_user=on`, and every user
-//! mapping change is broadcast to the other CPUs through the SGI mailbox below.
+//! application processors; the scheduler spreads user threads by default (`smp_user=off` is the
+//! emergency disable), and every user mapping change is broadcast to the other CPUs through the
+//! SGI mailbox below.
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 

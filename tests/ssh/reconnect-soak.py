@@ -480,8 +480,10 @@ def boot(run: Path, image: Path, net: str, accel: str) -> tuple[
     shutil.copyfile(OVMF_VARS, vars_path)
     serial = boot_dir / "serial.log"
     serial.write_bytes(b"")
+    smp = os.environ.get("RAVEN_QEMU_SMP", "4")
+    accel = os.environ.get("RAVEN_QEMU_ACCEL", "")
     argv = [
-        "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
+        "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", smp,
         *qemu_accel_args(accel),
         "-serial", f"file:{serial}", "-display", "none", "-monitor", "none",
         "-no-reboot",
@@ -493,6 +495,8 @@ def boot(run: Path, image: Path, net: str, accel: str) -> tuple[
         "-netdev", netdev,
         "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     ]
+    if accel:
+        argv.extend(["-accel", accel])
     qemu_err = boot_dir / "qemu.err"
     with open(qemu_err, "wb") as err:
         child = subprocess.Popen(

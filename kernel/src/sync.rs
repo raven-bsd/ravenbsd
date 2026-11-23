@@ -386,19 +386,13 @@ pub fn register_thread(thread: &Arc<Thread>) {
     kernel.register(thread.tid, thread);
 }
 
-/// Number of donation-registered thread ids still in the kernel weak registry (K449 diagnostic).
-pub fn registered_count() -> usize {
-    let guard = TURNSTILES.lock();
-    guard.as_ref().map_or(0, |kernel| kernel.threads.len())
-}
-
 /// Unregister a thread at exit: drop its graph node and weak map entry, then reapply the boosts
 /// of the remaining threads.
 ///
-/// Called from `sched::exit_thread`. The weak map never kept the dead thread alive, but the graph
-/// entry was permanent; at four entries per SSH session it exhausted the 3072-byte class. The
-/// graph removal is allocation-free (thread-exit context) and restores any server or lock owner
-/// the thread had boosted.
+/// Called from `sched::exit_thread` and `reap_dead`. The weak map never kept the dead thread
+/// alive, but the graph entry was permanent; at four entries per SSH session it exhausted the
+/// 3072-byte class. The graph removal is allocation-free (thread-exit context) and restores any
+/// server or lock owner the thread had boosted.
 pub fn unregister_thread(tid: ThreadId) {
     let mut guard = TURNSTILES.lock();
     let Some(kernel) = guard.as_mut() else {
@@ -418,6 +412,11 @@ pub fn turnstile_counts() -> (usize, usize) {
     guard.as_ref().map_or((0, 0), |kernel| {
         (kernel.graph.registered_threads(), kernel.threads.len())
     })
+}
+
+/// Number of donation-registered thread ids in the graph (K449 diagnostic).
+pub fn registered_count() -> usize {
+    turnstile_counts().0
 }
 
 /// Open the IPC call edge `client -> server` and apply the resulting boosts.
