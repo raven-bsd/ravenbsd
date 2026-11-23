@@ -453,6 +453,20 @@ pub fn processes() -> alloc::vec::Vec<Arc<Process>> {
         .collect()
 }
 
+/// Count live processes and their live threads without allocating or taking process locks.
+pub fn live_totals() -> (usize, u32) {
+    let registry = PID_REGISTRY.lock();
+    let mut procs = 0usize;
+    let mut threads = 0u32;
+    for weak in registry.values() {
+        if let Some(process) = weak.upgrade() {
+            procs += 1;
+            threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
+        }
+    }
+    (procs, threads)
+}
+
 /// True when at least one live process is in `pgid` inside `sid`.
 pub fn group_in_session(pgid: u64, sid: u64) -> bool {
     let registry = PID_REGISTRY.lock();
