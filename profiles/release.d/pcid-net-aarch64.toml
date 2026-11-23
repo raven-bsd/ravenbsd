@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# aarch64 QEMU `virt` has no ACPI MCFG/ECAM and no `pci:` scheme; devd runs the DTB platform
+# launch instead. Keep the pcid manifest valid but disabled so a restart loop on the missing ACPI
+# blob cannot churn the kernel blob lookup.
+name = "pcid"
+exec = "/sbin/pcid"
+provides = ["scheme:pci"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+grants = ["root"]
+enable = false

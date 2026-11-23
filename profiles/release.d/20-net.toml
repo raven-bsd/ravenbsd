@@ -45,8 +45,9 @@ package = "raven-netstat"
 path = "/sbin/netstat"
 
 [[initfs.files]]
-src = "etc/services.d/pcid.toml"
+src = "build/fixtures/virt-dtb/{arch}/pcid.toml"
 path = "/etc/services.d/pcid.toml"
+generated = true
 
 [[initfs.files]]
 src = "build/fixtures/virt-dtb/{arch}/devd.manifest"
