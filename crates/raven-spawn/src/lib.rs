@@ -1792,10 +1792,11 @@ fn plan_image<'a>(
 /// Encode the `RFDM` block consumed by `raven_libc_platform::fd::inherit::FdMap::decode`.
 ///
 /// This is the version-5 record the exec path already uses. Only a terminal carries its real
-/// kind/status/path; a non-terminal keeps the conservative version-1 `Unknown`/`O_RDWR`/`NO_PATH`
-/// pair and no socket/event metadata. Carrying the full socket/event identity into a spawned
-/// uutils child faulted at startup (`0x703`/`0x704`/`0x708`); the exec path remains the full
-/// carrier, and the spawn socket/event gap is recorded in the report.
+/// kind/status; a non-terminal keeps the conservative version-1 `Unknown`/`O_RDWR` pair. The
+/// block has no string table and no socket/event metadata: the child slices exactly the entry
+/// array from the auxv, and the full socket/event carry faulted a spawned uutils child at startup
+/// (`0x703`/`0x704`/`0x708`). The exec path remains the full carrier; the spawn gap is in the
+/// report.
 ///
 /// Reject an inherited fd map when the crate is built without `alloc`.
 ///
@@ -1819,46 +1820,29 @@ fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, Sp
     /// One version-5 `FdMap` entry, the 53-byte record the decoder reads.
     const FDMAP_V5_ENTRY: usize = 53;
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
-    let mut strings = alloc_crate::vec::Vec::new();
-    let mut offsets = alloc_crate::vec::Vec::with_capacity(entries.len());
-    for entry in entries {
-        let path = if entry.kind == 2 { entry.path } else { None };
-        match path {
-            Some(path) => {
-                if path.is_empty() || path.len() > 4095 || path.contains(&0) {
-                    return Err(SpawnError::TooLarge);
-                }
-                let offset = u32::try_from(strings.len()).map_err(|_| SpawnError::TooLarge)?;
-                offsets.push(offset);
-                strings.extend_from_slice(path);
-                strings.push(0);
-            }
-            None => offsets.push(u32::MAX),
-        }
-    }
     let mut out = alloc_crate::vec::Vec::with_capacity(
-        8usize
-            .saturating_add(FDMAP_V5_ENTRY.saturating_mul(entries.len()))
-            .saturating_add(strings.len()),
+        8usize.saturating_add(FDMAP_V5_ENTRY.saturating_mul(entries.len())),
     );
     out.extend_from_slice(b"RFDM");
     out.extend_from_slice(&5u16.to_le_bytes());
     out.extend_from_slice(&count.to_le_bytes());
-    for (entry, offset) in entries.iter().zip(offsets) {
-        let socket = SpawnSocket::default();
+    for entry in entries {
         let tty = entry.kind == 2;
         out.extend_from_slice(&entry.fd.to_le_bytes());
         out.extend_from_slice(&entry.handle.to_le_bytes());
         out.push(if tty { 2 } else { 255 });
         out.push(0); // FD_CLOEXEC already filtered by apply_actions
         out.extend_from_slice(&if tty { entry.status } else { 2 }.to_le_bytes());
-        out.extend_from_slice(&offset.to_le_bytes());
+        // No path: the child slices exactly `HEADER_LEN + ENTRY_LEN_V5 * count` from the auxv,
+        // so a string table would be outside the slice and decode would fail. `ttyname` resolves a
+        // pathless Tty from the pty service by handle (rev184).
+        out.extend_from_slice(&u32::MAX.to_le_bytes());
         out.extend_from_slice(&0u32.to_le_bytes()); // event
         out.extend_from_slice(&0u32.to_le_bytes()); // readiness
-        out.extend_from_slice(&socket.domain.to_le_bytes());
-        out.extend_from_slice(&socket.ty.to_le_bytes());
-        out.extend_from_slice(&socket.proto.to_le_bytes());
-        out.push(socket.state);
+        out.extend_from_slice(&0i32.to_le_bytes()); // socket.domain
+        out.extend_from_slice(&0i32.to_le_bytes()); // socket.type
+        out.extend_from_slice(&0i32.to_le_bytes()); // socket.proto
+        out.push(0); // socket.state
         out.push(0); // socket endpoint flags
         for _ in 0..2 {
             out.extend_from_slice(&[0u8; 4]); // local/peer ip
@@ -1866,7 +1850,6 @@ fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, Sp
         }
         out.push(0); // pty_master
     }
-    out.extend_from_slice(&strings);
     Ok(out)
 }
 

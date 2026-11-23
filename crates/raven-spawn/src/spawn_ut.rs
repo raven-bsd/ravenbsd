@@ -1009,12 +1009,13 @@ fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     assert_eq!(block.get(..4), Some(b"RFDM".as_slice()));
     assert_eq!(block.get(4..6), Some(5u16.to_le_bytes().as_slice()));
     assert_eq!(block.get(6..8), Some(2u16.to_le_bytes().as_slice()));
-    // Entry 1: a tty with the resolved name. Entry 2: the request carried a socket identity, but
-    // the spawn encoder keeps a non-terminal at the conservative v1 values (Unknown/O_RDWR/no
-    // path/socket/event): the full socket/event carry faulted a spawned uutils child at startup.
+    // Entry 1: a tty with its real kind/status and no path. Entry 2: the request carried a socket
+    // identity, but the spawn encoder keeps a non-terminal at the conservative v1 values. The
+    // block is exactly the header + two 53-byte entries: no string table (the child's auxv slice
+    // is exact) and no event/socket metadata.
     assert_eq!(block.get(16), Some(&2));
     assert_eq!(block.get(18..22), Some(2u32.to_le_bytes().as_slice()));
-    assert_eq!(block.get(22..26), Some(0u32.to_le_bytes().as_slice()));
+    assert_eq!(block.get(22..26), Some(u32::MAX.to_le_bytes().as_slice()));
     let base = 8 + 53;
     let word = |offset: usize| {
         block
@@ -1033,7 +1034,7 @@ fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     assert_eq!(block.get(base + 38), Some(&0)); // state
     assert_eq!(block.get(base + 39), Some(&0)); // endpoint flags
     assert_eq!(block.get(base + 52), Some(&0)); // pty_master
-    assert_eq!(block.get(8 + 2 * 53..), Some(b"/dev/pts/7\0".as_slice()));
+    assert_eq!(block.len(), 8 + 2 * 53);
 }
 
 #[test]
