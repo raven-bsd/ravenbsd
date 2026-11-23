@@ -32,6 +32,7 @@ use raven_abi::errno::Errno;
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::signal::{SIG_SETUP, SIG_SETUP_ABS, SIGRETURN};
 use raven_abi::syscall::Syscall;
+use raven_abi::types::futex::{WAIT as FUTEX_WAIT, WAKE as FUTEX_WAKE};
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_elf::{Elf, LoadMode, Machine, StepKind, plan_load};
 use raven_initfs::Initfs;
@@ -77,6 +78,14 @@ const STACK_BASE: usize = STACK_TOP - STACK_SIZE;
 const CYCLES: usize = 10_000;
 /// Full process/address-space/stack lifecycles in the bounded session churn.
 const SESSIONS: usize = 32;
+/// Futex wake iterations in the lock/time churn.
+const LOCK_WAKES: usize = 5_000;
+/// Futex timeout iterations in the lock/time churn.
+const LOCK_TIMEOUTS: usize = 1_000;
+/// One futex timeout.
+const LOCK_TIMEOUT_NS: u64 = 1_000_000;
+/// Delay between the worker arming and the wake.
+const LOCK_DELAY_NS: u64 = 1_000_000;
 /// Fork/exec/exit cycles with a known mapped address space in the VMA churn.
 const VMA_CYCLES: usize = 100;
 /// Four VMAs per child; the large variant maps one MiB total.
@@ -93,6 +102,11 @@ const HELPER_STACK_SIZE: usize = 16 * 1024;
 
 static CYCLE_DONE: AtomicBool = AtomicBool::new(false);
 static HELPER_FLAG: AtomicU32 = AtomicU32::new(0);
+static LOCK_FUTEX: AtomicU32 = AtomicU32::new(0);
+static LOCK_TIMEOUT: AtomicU32 = AtomicU32::new(0);
+static LOCK_READY: AtomicU32 = AtomicU32::new(0);
+static LOCK_DONE: AtomicU32 = AtomicU32::new(0);
+static LOCK_STOP: AtomicBool = AtomicBool::new(false);
 
 #[repr(align(16))]
 struct HelperStack(#[allow(dead_code)] [u8; HELPER_STACK_SIZE]);
@@ -101,6 +115,7 @@ static mut CYCLE_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 static mut TW_HELPER_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 static mut TW_SLEEP_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 static mut WAIT_SIGNAL_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
+static mut LOCK_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 
 #[repr(align(16))]
 struct SignalContext(#[allow(dead_code)] [u8; SIGNAL_CONTEXT_SIZE]);
@@ -739,15 +754,133 @@ fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
         // Fault the page through vfsd's pager.
         let _ = unsafe { core::ptr::read_volatile(MAP_SCRATCH as *const u8) };
         unmap(Handle::SELF_PROC, MAP_SCRATCH, PAGE).map_err(|_| "unmap object")?;
-        handle_close(object);
+        let mut closed =
+            Errno::from_ret(syscall1(Syscall::HANDLE_CLOSE as usize, object.0 as usize));
+        if closed.is_err() {
+            nanosleep(1_000_000);
+            closed = Errno::from_ret(syscall1(Syscall::HANDLE_CLOSE as usize, object.0 as usize));
+        }
+        if let Err(error) = closed {
+            println!(
+                "s36: mapclose fail cycle={cycle} object={} errno={error:?}",
+                object.0
+            );
+        }
         cycle = cycle.saturating_add(1);
     }
     client.close(file).map_err(|_| "vfsd close")?;
+    // The scheme close is fire-and-forget: give vfsd a bounded window to retire the 1000 pager
+    // keys before the exit-89 frame sample, so the gate measures the steady state.
+    nanosleep(100_000_000);
     println!("s36: vfsd map done={}", MAP_CYCLES);
 
     let top = spawn_role(initfs, "maptop").map_err(|_| "maptop spawn")?;
     if proc_wait(top).unwrap_or(-1) != 89 {
         return Err("maptop wait");
+    }
+    handle_close(top);
+    Ok(())
+}
+
+fn futex_wait(addr: &AtomicU32, value: u32, timeout_ns: u64) -> Result<(), Errno> {
+    result(syscall4(
+        Syscall::FUTEX as usize,
+        addr as *const AtomicU32 as usize,
+        FUTEX_WAIT as usize,
+        value as usize,
+        timeout_ns as usize,
+    ))
+    .map(|_| ())
+}
+
+fn futex_wake(addr: &AtomicU32, count: usize) {
+    let _ = syscall4(
+        Syscall::FUTEX as usize,
+        addr as *const AtomicU32 as usize,
+        FUTEX_WAKE as usize,
+        count,
+        0,
+    );
+}
+
+extern "C" fn lock_waiter(_: usize) -> ! {
+    let address = core::ptr::addr_of!(LOCK_FUTEX) as usize;
+    let mut seq = 0u32;
+    while !LOCK_STOP.load(Ordering::Acquire) {
+        seq = seq.wrapping_add(1);
+        LOCK_READY.store(seq, Ordering::Release);
+        let value = LOCK_FUTEX.load(Ordering::Acquire);
+        let raw = syscall4(
+            Syscall::FUTEX as usize,
+            address,
+            FUTEX_WAIT as usize,
+            value as usize,
+            0,
+        );
+        if raw != 0 && raw != Errno::EAGAIN.to_ret() && raw != Errno::EINTR.to_ret() {
+            LOCK_READY.store(u32::MAX, Ordering::Release);
+            thread_exit(1);
+        }
+        LOCK_DONE.store(seq, Ordering::Release);
+    }
+    thread_exit(0)
+}
+
+fn wait_lock_flag(flag: &AtomicU32, value: u32) -> Result<(), &'static str> {
+    let mut spins = 0usize;
+    while flag.load(Ordering::Acquire) < value {
+        yield_now();
+        spins = spins.saturating_add(1);
+        if spins > 10_000_000 {
+            return Err("lock flag");
+        }
+    }
+    Ok(())
+}
+
+fn lock_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let base = spawn_role(initfs, "lockbase").map_err(|_| "lockbase spawn")?;
+    if proc_wait(base).unwrap_or(-1) != 90 {
+        return Err("lockbase wait");
+    }
+    handle_close(base);
+
+    let entry: extern "C" fn(usize) -> ! = lock_waiter;
+    let stack_top = helper_stack_top(core::ptr::addr_of_mut!(LOCK_STACK));
+    let worker = thread_create(Handle::SELF_PROC, entry as usize, stack_top, 0)
+        .map_err(|_| "lock worker")?;
+    let mut cycle = 0u32;
+    while (cycle as usize) < LOCK_WAKES {
+        cycle = cycle.wrapping_add(1);
+        wait_lock_flag(&LOCK_READY, cycle)?;
+        nanosleep(LOCK_DELAY_NS);
+        LOCK_FUTEX.fetch_add(1, Ordering::AcqRel);
+        futex_wake(&LOCK_FUTEX, 1);
+        wait_lock_flag(&LOCK_DONE, cycle)?;
+    }
+    LOCK_STOP.store(true, Ordering::Release);
+    LOCK_FUTEX.fetch_add(1, Ordering::AcqRel);
+    futex_wake(&LOCK_FUTEX, 1);
+    nanosleep(LOCK_DELAY_NS);
+    handle_close(worker);
+
+    let mut timeouts = 0usize;
+    while timeouts < LOCK_TIMEOUTS {
+        match futex_wait(&LOCK_TIMEOUT, 0, LOCK_TIMEOUT_NS) {
+            Err(Errno::ETIMEDOUT) | Err(Errno::EAGAIN) => {}
+            Err(_) => return Err("lock timeout errno"),
+            Ok(()) => return Err("lock timeout wake"),
+        }
+        timeouts = timeouts.saturating_add(1);
+    }
+    println!(
+        "s36: lock churn wake={} timeout={}",
+        LOCK_WAKES, LOCK_TIMEOUTS
+    );
+
+    let top = spawn_role(initfs, "locktop").map_err(|_| "locktop spawn")?;
+    if proc_wait(top).unwrap_or(-1) != 91 {
+        return Err("locktop wait");
     }
     handle_close(top);
     Ok(())
@@ -811,6 +944,8 @@ fn child_main(role: &str) -> i32 {
         "timetop" => 91,
         "mapbase" => 88,
         "maptop" => 89,
+        "lockbase" => 90,
+        "locktop" => 91,
         "futex-wait" => {
             let word = AtomicU32::new(0);
             let _ = futex_wait_timeout(&word, 0, 60_000_000_000);
@@ -1136,6 +1271,10 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     // Scenario 6: scheme name released on exit.
     if let Err(message) = scheme_part(&initfs) {
+        fail(message);
+    }
+    // Lock/time churn: futex wake and timeout paths around allocated_bytes markers.
+    if let Err(message) = lock_churn_part(&initfs) {
         fail(message);
     }
     // vfsd pager red row: map/unmap the same chunk and compare allocated frames.
