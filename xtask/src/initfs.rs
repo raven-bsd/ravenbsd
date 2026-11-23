@@ -302,22 +302,20 @@ pub(crate) fn prerequisite_plan(
     }
 }
 
-/// Staged and target paths that a release image must not inherit from an older build.
+/// Staged paths that a release image must not inherit from an older build.
 ///
-/// `build/<arch>/brush`/`uutils` are copied into the image, the cargo target directories can
-/// carry a stale feature set, RUSTFLAGS or vendored dependency build, and the dynamic
-/// `libc.so.1`/`ld-elf.so.1` pair is linked from the current sources. A release image must be
-/// reproducible from the current checkout, not from whichever cache happens to exist.
+/// `build/<arch>/brush`/`uutils` are copied into the image and the dynamic
+/// `libc.so.1`/`ld-elf.so.1` pair is linked from the current sources, so those outputs are
+/// discarded first: a release image must be reproducible from the current checkout.
+///
+/// The cargo target caches (`build/cargo/brush-*`, `build/cargo/uutils-*`) are deliberately
+/// kept. Cargo fingerprints the feature set and RUSTFLAGS, and the staged tree is rebuilt from
+/// the cache, so keeping the cache cannot pack a stale binary; it only avoids paying the full
+/// cold compile of both slices on every release image (K548 image wall).
 pub(crate) fn release_userspace_paths(root: &Path, arch: Arch) -> Vec<PathBuf> {
     vec![
         root.join(brush_path(arch)),
         root.join("build").join(arch.as_str()).join("uutils"),
-        root.join("build")
-            .join("cargo")
-            .join(format!("brush-{}", arch.as_str())),
-        root.join("build")
-            .join("cargo")
-            .join(format!("uutils-{}", arch.as_str())),
         root.join("build").join(arch.as_str()).join("libc.so.1"),
         root.join("build").join(arch.as_str()).join("ld-elf.so.1"),
         crate::libc_link::loader_manifest_path(root, arch.as_str()),
@@ -340,8 +338,9 @@ fn purge_release_userspace(root: &Path, arch: Arch) -> Result<()> {
 ///
 /// Each step runs at most once per call and only when its outputs are missing. libc is checked
 /// first because brush and uutils link against its archive and crt objects. A release profile
-/// discards the staged brush/uutils tree and their target caches first, so a stale binary or a
-/// stale feature/RUSTFLAGS target cannot be packed into the image.
+/// discards the staged brush/uutils outputs and the dynamic loader first, then rebuilds them
+/// from the cargo target cache; cargo's own fingerprint (features/RUSTFLAGS/sources) decides what
+/// recompiles, so a stale binary cannot be packed but the cold compile is not paid every image.
 pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
     let release = release_user_programs(
         profile.initfs.release,
