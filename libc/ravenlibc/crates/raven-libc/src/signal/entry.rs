@@ -36,6 +36,12 @@ pub(crate) fn ensure_entry() -> Result<(), Errno> {
     {
         let kernel = SysKernel::new();
         let tp = kernel.thread_pointer();
+        // A thread with no TLS cannot run the libc entry (it reads its per-thread state through
+        // this pointer). Do not register it; the process-directed signal then goes to a thread
+        // that can handle it instead of taking this one down with a null TLS.
+        if tp == 0 {
+            return Err(ENOMEM_ERR);
+        }
         if raw::with_state(tp, |state| state.ctx_area()) != 0 {
             return Ok(());
         }
