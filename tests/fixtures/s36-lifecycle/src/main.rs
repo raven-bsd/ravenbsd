@@ -14,8 +14,8 @@
 //! 5. `PROC_TERMINATE` stops a running child; a handle without `SIGNAL` gets `EPERM`; a stale
 //!    handle gets `EBADF`; a second terminate gets `ESRCH`.
 //! 6. a terminated server's scheme name can be registered again immediately.
-//! 7. a child exits while the parent is blocked in `PROC_WAIT_EX` with a registered signal
-//!    entry; the wait returns the child pid and status, not `EINTR`.
+//! 7. a child exits while the parent is blocked in `PROC_WAIT_EX`/`PROC_WAIT` with a registered
+//!    signal entry; both waits return the child status, not `EINTR`.
 //!
 //! Roles: `marker` (exit 0), `twomain`, `sleep` (sleep forever), `delayed` (exit 42 after a
 //! short sleep), `server` (register scheme `s36`, then sleep).
@@ -652,10 +652,11 @@ fn scheme_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// Scenario 7: a child exits while the parent is blocked in `PROC_WAIT_EX`.
+/// Scenario 7: a child exits while the parent is blocked in a wait.
 ///
 /// The parent has a registered signal entry, so the child's `SIGCHLD` kick and the wait wakeup
-/// race. The wait must return the requested pid and exit code, not `EINTR`.
+/// race. `PROC_WAIT_EX` must return the requested pid and exit code, and the handle `PROC_WAIT`
+/// must return the code; neither may report `EINTR` while the child status is available.
 fn wait_interrupt_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     let entry: extern "C" fn(usize, usize, usize) -> ! = signal_entry;
     // SAFETY: only the static's address is taken; the kernel validates the executable entry and
@@ -679,6 +680,22 @@ fn wait_interrupt_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     }
     handle_close(child);
     println!("s36: wait race ok");
+
+    // The handle-based PROC_WAIT has the same interrupted-wakeup contract.
+    let child = spawn_role(initfs, "delayed").map_err(|_| "wait race handle spawn")?;
+    match proc_wait(child) {
+        Ok(42) => {}
+        Ok(code) => {
+            println!("s36: wait race handle code={}", code);
+            return Err("wait race handle code");
+        }
+        Err(error) => {
+            println!("s36: wait race handle errno={}", error.0);
+            return Err("wait race handle interrupted");
+        }
+    }
+    handle_close(child);
+    println!("s36: wait race handle ok");
     Ok(())
 }
 

@@ -19,6 +19,9 @@ regex = '^s36: unstarted reaped$'
 [[expect]]
 regex = '^s36: wait race ok$'
 
+[[expect]]
+regex = '^s36: wait race handle ok$'
+
 # Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
 [[expect]]
 regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
