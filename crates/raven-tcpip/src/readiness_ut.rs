@@ -395,6 +395,32 @@ fn a_shutdown_connecting_socket_is_writable_through_cantsendmore() {
 }
 
 #[test]
+fn peer_fin_with_a_full_send_buffer_is_not_writable_and_send_is_eagain() {
+    let (mut stack, connection) = established();
+    {
+        let record = stack.sockets.record_mut(connection).expect("record");
+        record.peer_closed = true;
+        let cap = record.tx_cap;
+        record.tx.clear();
+        record.tx.resize(cap, 0);
+    }
+    {
+        let record = stack.sockets.record(connection).expect("record");
+        assert!(
+            !sowritable(record),
+            "peer FIN is SS_CANTRCVMORE, not SS_CANTSENDMORE; \
+             a full send buffer is not writable"
+        );
+        assert_eq!(sodopoll(record, POLLOUT), 0);
+    }
+    assert_eq!(
+        stack.send(connection, b"x"),
+        Err(Errno::EAGAIN),
+        "a non-blocking send with a full buffer after peer FIN must return EAGAIN"
+    );
+}
+
+#[test]
 fn the_query_and_the_edges_read_the_same_sopoll_result() {
     let (mut stack, connection) = established();
     stack.test_push_rx(connection, b"x").expect("push");

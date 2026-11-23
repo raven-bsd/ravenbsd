@@ -791,7 +791,7 @@ fn readiness_query_is_non_consuming_and_directional() {
 }
 
 #[test]
-fn readiness_shutdown_follows_freebsd_directions() {
+fn readiness_shutdown_applies_k8_file_contract() {
     let mut netd = new_netd();
     let mut now = 0i64;
     let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
@@ -818,31 +818,7 @@ fn readiness_shutdown_follows_freebsd_directions() {
     assert_eq!(readable & READY_READABLE, READY_READABLE);
     assert_eq!(readable & READY_WRITABLE, READY_WRITABLE);
 
-    // FreeBSD sowriteable: SHUT_WR sets SBS_CANTSENDMORE and POLLOUT stays set.
-    assert_eq!(
-        call_socket(
-            &mut netd,
-            accepted,
-            Call::Shutdown {
-                how: Shutdown::Write
-            }
-        ),
-        Response::Ok
-    );
-    let write_shutdown = ready_bits(&mut netd, accepted);
-    assert_eq!(
-        write_shutdown & READY_WRITABLE,
-        READY_WRITABLE,
-        "FreeBSD SBS_CANTSENDMORE keeps POLLOUT"
-    );
-    assert_eq!(
-        write_shutdown & READY_READABLE,
-        READY_READABLE,
-        "write shutdown must not clear pending read data"
-    );
-    assert_eq!(netd.write(accepted, 0, b"x"), Err(Errno::EPIPE));
-
-    // FreeBSD soreadable: SHUT_RD does not clear the write side.
+    // FreeBSD soreadable: SHUT_RD stops reads but does not clear the write side.
     assert_eq!(
         call_socket(
             &mut netd,
@@ -862,7 +838,28 @@ fn readiness_shutdown_follows_freebsd_directions() {
     let mut buffer = [0u8; 4];
     assert_eq!(netd.read(accepted, 0, &mut buffer), Ok(0));
 
-    // Full shutdown closes both file directions; the FreeBSD poll predicate remains writable.
+    // K8 file contract: the application's own SHUT_WR clears file-level POLLOUT. The donor-core
+    // `sowritable` keeps POLLOUT set on `SBS_CANTSENDMORE` so a blocked writer wakes to EPIPE;
+    // that core rule is tested in `crates/raven-tcpip/src/readiness_ut.rs`.
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            accepted,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+    let write_shutdown = ready_bits(&mut netd, accepted);
+    assert_eq!(
+        write_shutdown & READY_WRITABLE,
+        0,
+        "K8: a local SHUT_WR clears file-level POLLOUT"
+    );
+    assert_eq!(netd.write(accepted, 0, b"x"), Err(Errno::EPIPE));
+
+    // Full shutdown closes both file directions.
     assert_eq!(
         call_socket(
             &mut netd,
@@ -878,9 +875,65 @@ fn readiness_shutdown_follows_freebsd_directions() {
     let both = ready_bits(&mut netd, accepted);
     assert_eq!(
         both & READY_WRITABLE,
-        READY_WRITABLE,
-        "FreeBSD SBS_CANTSENDMORE keeps POLLOUT"
+        0,
+        "K8: full shutdown keeps file-level POLLOUT cleared"
     );
+}
+
+#[test]
+fn local_write_shutdown_clears_file_writable_after_peer_fin() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+
+    // Peer FIN: the client closes its write direction. The accepted side reads EOF.
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+    let mut buffer = [0u8; 4];
+    assert_eq!(read_retry(&mut netd, accepted, &mut buffer, &mut now), 0);
+
+    // K9: before our own shutdown the half-closed socket is still writable.
+    let before = ready_bits(&mut netd, accepted);
+    assert_eq!(before & READY_WRITABLE, READY_WRITABLE);
+    assert_eq!(netd.write(accepted, 0, b"x"), Ok(1));
+
+    // K8: the application's own SHUT_WR clears file-level POLLOUT; writes return EPIPE.
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            accepted,
+            Call::Shutdown {
+                how: Shutdown::Write
+            }
+        ),
+        Response::Ok
+    );
+    let after = ready_bits(&mut netd, accepted);
+    assert_eq!(
+        after & READY_WRITABLE,
+        0,
+        "K8: a local SHUT_WR clears file-level POLLOUT"
+    );
+    assert_eq!(netd.write(accepted, 0, b"x"), Err(Errno::EPIPE));
 }
 
 #[test]
