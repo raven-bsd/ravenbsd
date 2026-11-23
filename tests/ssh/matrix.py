@@ -1922,8 +1922,8 @@ def row_close_hang(console: SerialConsole | None) -> None:
                 console, "ps -e; echo K434-$((7*11))",
                 "close-hang-ps.log", "K434-77", timeout=10)
             ps_alt_text = console_cr_capture(
-                console, "ps -o pid,ppid,stat,sigmask,cmd; echo K434-$((13*13))",
-                "close-hang-ps-alt.log", "K434-169", timeout=10)
+                console, "ps --json; echo K434-$((13*13))",
+                "close-hang-ps-json.log", "K434-169", timeout=10)
             proc_text = console_cr_capture(
                 console, "ls /proc; echo K434-$((17*13))",
                 "close-hang-proc.log", "K434-221", timeout=10)
