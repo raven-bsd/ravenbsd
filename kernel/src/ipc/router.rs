@@ -1175,6 +1175,11 @@ pub(crate) fn on_process_exit(process: &Arc<Process>) {
     notices.retain(|notice| notice.server.id != process.id);
 }
 
+/// K449 diagnostic: deferred last-close notices still queued.
+pub(crate) fn close_notice_count() -> usize {
+    CLOSE_NOTICES.lock().len()
+}
+
 /// Submit every queued last-close notification. Called at the top of the `RECV` loop.
 pub(crate) fn drain_close_notices() {
     let notices = {
