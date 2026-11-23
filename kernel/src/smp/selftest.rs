@@ -100,6 +100,38 @@ static PROBE_DONE: AtomicU32 = AtomicU32::new(0);
 static PROBE_FAIL: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
 const PROBE_ROUNDS: u32 = 200;
 
+/// DragonFly IPIQ FIFO port check: 400 messages through the 256-slot ring.
+fn ipiq_test() -> Result<u32, &'static str> {
+    use raven_ipiq::{IpIQ, Message};
+
+    let queue: IpIQ<u32> = IpIQ::new();
+    let mut expected = 0u32;
+    let mut ordered = true;
+    for round in 0..4u32 {
+        for value in 0..100u32 {
+            let message = Message {
+                func: round * 100 + value,
+                arg1: (round * 100 + value) as usize,
+                arg2: 0,
+            };
+            queue.push(message).map_err(|_| "ipiq full")?;
+        }
+        queue.process(0, |message| {
+            if message.func != expected {
+                ordered = false;
+            }
+            expected = expected.saturating_add(1);
+        });
+    }
+    if !ordered {
+        return Err("ipiq order");
+    }
+    if queue.xindex() != 400 || queue.pending() != 0 {
+        return Err("ipiq index");
+    }
+    Ok(400)
+}
+
 /// Run the SMP self-test; on success this never returns.
 pub fn run() -> ! {
     let cpus = online_cpus();
@@ -201,6 +233,15 @@ fn monitor() {
         Ok(probes) => kprintln!("selftest: smp call ok cpus={} probes={probes}", cpus.min(2)),
         Err(reason) => {
             kprintln!("selftest: smp call failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
+    match ipiq_test() {
+        Ok(messages) => {
+            kprintln!("selftest: smp ipiq ok messages={messages} wrap=1 xindex={messages}")
+        }
+        Err(reason) => {
+            kprintln!("selftest: smp ipiq failed: {reason}");
             boot::exit_qemu(0x11);
         }
     }
