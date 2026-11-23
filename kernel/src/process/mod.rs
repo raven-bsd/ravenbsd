@@ -201,18 +201,20 @@ pub fn queue_owner_state() -> [u64; 6] {
 /// dead_handles_in_all_processes, leaked_threads)`. The `external` count excludes the
 /// diagnostic's temporary upgrade, so it is the number of real owners still holding the
 /// torn-down process.
-pub fn leaked_process_stats() -> [u64; 7] {
-    let mut stats = [0u64; 7];
-    for weak in ALL_PROCESSES.lock().iter() {
-        let Some(process) = weak.upgrade() else {
-            continue;
-        };
+pub fn leaked_process_stats() -> [u64; 9] {
+    let mut stats = [0u64; 9];
+    let processes: alloc::vec::Vec<Arc<Process>> = ALL_PROCESSES
+        .lock()
+        .iter()
+        .filter_map(Weak::upgrade)
+        .collect();
+    for process in &processes {
         if !process.torn_down.load(Ordering::Acquire) {
             continue;
         }
         stats[0] = stats[0].saturating_add(1);
         stats[6] = stats[6].saturating_add(u64::from(process.threads.load(Ordering::Acquire)));
-        let external = Arc::strong_count(&process).saturating_sub(1);
+        let external = Arc::strong_count(process).saturating_sub(1);
         match external {
             0 => {}
             1 => stats[1] = stats[1].saturating_add(1),
@@ -221,7 +223,7 @@ pub fn leaked_process_stats() -> [u64; 7] {
         }
         process.handles.lock().for_each_live(|_, object, _, _| {
             if let crate::process::handle::Object::Process(target) = object {
-                if Arc::ptr_eq(target, &process) {
+                if Arc::ptr_eq(target, process) {
                     stats[4] = stats[4].saturating_add(1);
                 }
                 if target.torn_down.load(Ordering::Acquire) {
@@ -229,6 +231,34 @@ pub fn leaked_process_stats() -> [u64; 7] {
                 }
             }
         });
+        for holder in &processes {
+            holder.handles.lock().for_each_live(|_, object, _, _| {
+                if let crate::process::handle::Object::SchemeFile(file) = object
+                    && Arc::ptr_eq(&file.server, process)
+                {
+                    stats[7] = stats[7].saturating_add(1);
+                }
+            });
+            let check = |request: &Arc<crate::ipc::PendingRequest>| {
+                if Arc::ptr_eq(&request.server, process)
+                    || request
+                        .file
+                        .as_ref()
+                        .is_some_and(|file| Arc::ptr_eq(&file.server, process))
+                {
+                    stats[8] = stats[8].saturating_add(1);
+                }
+            };
+            for request in holder.scheme_queue.lock().iter() {
+                check(request);
+            }
+            for request in holder.active_requests.lock().iter() {
+                check(request);
+            }
+            for request in holder.client_requests.lock().iter() {
+                check(request);
+            }
+        }
     }
     stats
 }
@@ -2030,7 +2060,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let (notices, dead_clients, dead_servers) = crate::ipc::router::close_notice_stats();
         let leaked = leaked_process_stats();
         kprintln!(
-            "s36: procs={} threads={} zombies={} proc_size={} thread_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={} leaked_threads={}",
+            "s36: procs={} threads={} zombies={} proc_size={} thread_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={} leaked_threads={} file_refs={} request_refs={}",
             live_processes(),
             crate::sched::thread::live_threads(),
             ZOMBIES.lock().len(),
@@ -2051,7 +2081,9 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             leaked[3],
             leaked[4],
             leaked[5],
-            leaked[6]
+            leaked[6],
+            leaked[7],
+            leaked[8]
         );
         let holders = request_holder_stats();
         kprintln!(
