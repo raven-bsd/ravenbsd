@@ -45,6 +45,34 @@ fn socket_is_pending_today() {
 }
 
 #[test]
+fn exec_meta_survives_the_original_fd_close() {
+    let caps = Caps {
+        bare_open: true,
+        ..Caps::default()
+    };
+    let fake = FakeNetd::with_caps(caps);
+    let net = Net::with_unix(fake.clone(), fake.clone(), fake.clone(), Some(fake.clone()));
+    // sshd accepts, then dup2()s the accepted socket onto stdio and closes the original fd.
+    // The OFD (and its netd file) still lives on the duplicated fd; the socket identity must
+    // still be published by the table's OFD key, not by resolving the closed original fd.
+    let ofd = 7u32;
+    let mut rec = SocketRec::new(AF_INET, SOCK_STREAM, 6, SocketState::Connected, 4);
+    rec.sock = Some(Sock(42));
+    net.table.borrow_mut().insert(ofd, rec).expect("insert");
+    assert!(fake.resolve(4).is_err(), "the original accepted fd is gone");
+    net.sync_meta();
+    assert_eq!(
+        fake.socket_meta(ofd),
+        Some(crate::SocketMeta {
+            domain: AF_INET,
+            ty: SOCK_STREAM,
+            proto: 6,
+            state: SocketState::Connected.code(),
+        })
+    );
+}
+
+#[test]
 fn bare_socket_opens_immediately() {
     let caps = Caps {
         bare_open: true,

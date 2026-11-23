@@ -18,7 +18,8 @@ use raven_proto_net::{
 };
 
 use crate::{
-    CallReply, Caps, FdInfo, NetBackend, NetEnv, ReadDone, Sock, SocketFds, UnixBackend, WaitItem,
+    CallReply, Caps, FdInfo, NetBackend, NetEnv, ReadDone, Sock, SocketFds, SocketMeta,
+    UnixBackend, WaitItem,
 };
 
 /// The fake operation selected by [`FakeNetd::fail_next`].
@@ -119,6 +120,8 @@ struct FakeState {
     next_sock: u32,
     next_fd: i32,
     fds: BTreeMap<i32, FdInfo>,
+    /// Socket identity published for the next `execve`, keyed by OFD.
+    metas: BTreeMap<u32, SocketMeta>,
     log: Vec<WireLog>,
     clock_ms: u64,
     entropy: u64,
@@ -195,6 +198,12 @@ impl FakeNetd {
         let mut value = Self::new();
         value.caps = caps;
         value
+    }
+
+    /// Socket identity recorded for `ofd` by [`SocketFds::set_meta`].
+    #[must_use]
+    pub fn socket_meta(&self, ofd: u32) -> Option<SocketMeta> {
+        self.state.borrow().metas.get(&ofd).copied()
     }
 
     /// Replace the interface list.
@@ -895,6 +904,10 @@ impl SocketFds for FakeNetd {
     fn release(&self, ofd: u32) {
         let mut state = self.state.borrow_mut();
         state.fds.retain(|_, info| info.ofd != ofd);
+    }
+
+    fn set_meta(&self, ofd: u32, meta: SocketMeta) {
+        self.state.borrow_mut().metas.insert(ofd, meta);
     }
 }
 
