@@ -166,13 +166,13 @@ fn multiple_allocations_do_not_overlap() {
 }
 
 #[test]
-fn freeing_small_layout_is_ignored() {
+fn small_allocations_are_reusable() {
     let allocator = allocator();
     let layout = Layout::from_size_align(1, 1).unwrap();
     let pointer = test_alloc(&allocator, layout);
     test_dealloc(&allocator, pointer, layout);
     let next = test_alloc(&allocator, layout);
-    assert!(!next.is_null());
+    assert_eq!(pointer, next, "a small freed block must be reusable");
     test_dealloc(&allocator, next, layout);
 }
 
@@ -317,8 +317,8 @@ fn mixed_sizes_never_overlap() {
     let mapped = Arc::new(AtomicUsize::new(0));
     let allocator = Allocator::new(AlignedSource::new(Arc::clone(&mapped)));
     let sizes = [
-        1usize, 2, 3, 5, 6, 8, 9, 15, 16, 17, 24, 31, 32, 48, 63, 64, 100, 127, 128, 255, 256,
-        512, 1000, 4096, 8192,
+        1usize, 2, 3, 5, 6, 8, 9, 15, 16, 17, 24, 31, 32, 48, 63, 64, 100, 127, 128, 255, 256, 512,
+        1000, 4096, 8192,
     ];
     let aligns = [1usize, 2, 4, 8, 16, 32, 64, 128, 4096];
     let mut slots: Vec<Option<(*mut u8, Layout, u8)>> = vec![None; 48];
@@ -330,9 +330,8 @@ fn mixed_sizes_never_overlap() {
         let index = ((rng >> 33) as usize) % slots.len();
         if let Some((pointer, layout, byte)) = slots[index] {
             for offset in 0..layout.size() {
-                // SAFETY: the live allocation has `layout.size()` writable bytes.
                 assert_eq!(
-                    unsafe { *pointer.add(offset) },
+                    test_read(pointer, offset),
                     byte,
                     "overlap or undersize at step {step}, offset {offset}"
                 );

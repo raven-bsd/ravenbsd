@@ -207,14 +207,19 @@ impl State {
         let next_after = if !node.is_null() && end == node as usize {
             // SAFETY: `node` is the address-adjacent successor; absorb it.
             let next = unsafe { (*node).next };
+            // SAFETY: `node` is a live free node with a size field.
             need = need.saturating_add(unsafe { (*node).size });
             next
         } else {
             node
         };
-        if !previous.is_null()
-            && (previous as usize).saturating_add(unsafe { (*previous).size }) == start
-        {
+        let previous_end = if previous.is_null() {
+            0
+        } else {
+            // SAFETY: `previous` is a live free-list node with a size field.
+            (previous as usize).saturating_add(unsafe { (*previous).size })
+        };
+        if !previous.is_null() && previous_end == start {
             // SAFETY: `previous` is the address-adjacent predecessor; extend it over this block
             // and the already-absorbed successor.
             unsafe {
@@ -256,6 +261,7 @@ impl State {
             let size = unsafe { (*node).size };
             let end = (node as usize).saturating_add(size);
             if end == tail {
+                // SAFETY: `node` is a live free-list node with a next pointer.
                 let next = unsafe { (*node).next };
                 if previous.is_null() {
                     self.free = next;
@@ -272,6 +278,7 @@ impl State {
                 return;
             }
             previous = node;
+            // SAFETY: the free list is address-ordered and every node is live.
             node = unsafe { (*node).next };
         }
     }
