@@ -13,7 +13,7 @@ import time
 
 
 def parse_usernet(text):
-    """Map guest port 23097/23098 to the ephemeral host port QEMU chose for it."""
+    """Map guest ports 23096-23098 to the ephemeral host ports QEMU chose."""
     ports = {}
     pattern = re.compile(
         r"TCP\[HOST_FORWARD\]\s+\d+\s+\S+\s+(\d+)\s+\S+\s+(\d+)"
@@ -24,13 +24,13 @@ def parse_usernet(text):
             continue
         host_port = int(match.group(1))
         guest_port = int(match.group(2))
-        if guest_port in (23097, 23098):
+        if guest_port in (23096, 23097, 23098):
             ports[guest_port] = host_port
     return ports
 
 
 def discover_ports(path, deadline):
-    """Read QEMU's `info usernet` from the monitor socket until both forwards are known."""
+    """Read QEMU's `info usernet` from the monitor socket until the K6 forwards are known."""
     last = "monitor socket did not appear"
     while time.monotonic() < deadline:
         try:
@@ -51,12 +51,25 @@ def discover_ports(path, deadline):
                     data += chunk
                     ports = parse_usernet(data.decode(errors="replace"))
                     if 23097 in ports and 23098 in ports:
-                        return ports[23097], ports[23098]
+                        return ports
             last = f"incomplete forwarding table: {parse_usernet(data.decode(errors='replace'))!r}"
         except OSError as error:
             last = str(error)
         time.sleep(0.1)
     raise RuntimeError(f"QEMU monitor {path}: {last}")
+
+
+def wait_ready(host, port, deadline):
+    """Wait for the guest K6-ready marker before opening the first K6 connection."""
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
+                if read_line(stream) == b"READY":
+                    return True
+        except OSError:
+            time.sleep(0.2)
+    return False
 
 
 def exchange(host, port, payload, ack, deadline):
@@ -181,6 +194,8 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=23097)
     parser.add_argument("--eof-port", type=int, default=23098)
+    parser.add_argument("--ready-port", type=int, default=23096)
+    parser.add_argument("--k6-ready", action="store_true")
     parser.add_argument("--monitor", default="")
     parser.add_argument("--k6-loop", type=int, default=0)
     parser.add_argument("--result", required=True)
@@ -191,7 +206,11 @@ def main():
     deadline = time.monotonic() + args.timeout
     if args.monitor:
         try:
-            args.port, args.eof_port = discover_ports(args.monitor, deadline)
+            ports = discover_ports(args.monitor, deadline)
+            args.port = ports[23097]
+            args.eof_port = ports[23098]
+            if 23096 in ports:
+                args.ready_port = ports[23096]
         except RuntimeError as error:
             with open(args.result, "w", encoding="utf-8") as handle:
                 handle.write(f"fail monitor: {error}\n")
@@ -200,6 +219,17 @@ def main():
                     handle.write(f"monitor fail: {error}\n")
             print(f"host peer: {error}", file=sys.stderr)
             return 1
+    if args.k6_ready:
+        if not wait_ready(args.host, args.ready_port, deadline):
+            with open(args.result, "w", encoding="utf-8") as handle:
+                handle.write("fail k6-ready\n")
+            if args.log:
+                with open(args.log, "a", encoding="utf-8") as handle:
+                    handle.write("K6-ready fail\n")
+            return 1
+        if args.log:
+            with open(args.log, "a", encoding="utf-8") as handle:
+                handle.write("K6-ready ok\n")
     if args.k6_loop:
         if not k6_loop(args.host, args.port, args.k6_loop, deadline):
             with open(args.result, "w", encoding="utf-8") as handle:

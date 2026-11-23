@@ -19,5 +19,8 @@ set -- --host 127.0.0.1 --monitor "$out/monitor.sock" \
 if [ -n "${SSH_CONTRACT_K6_LOOP:-}" ]; then
     set -- "$@" --k6-loop "$SSH_CONTRACT_K6_LOOP"
 fi
+if [ "${SSH_CONTRACT_K6_READY:-0}" = "1" ]; then
+    set -- "$@" --k6-ready
+fi
 python3 "$root/tests/smp/ssh-contract/host_accept.py" "$@" \
     > "$out/host.stdout" 2>&1 &

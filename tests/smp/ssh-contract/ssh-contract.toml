@@ -16,13 +16,13 @@ profile = "network-config-test"
 timeout_secs = 894
 pre = [
     "sh tests/smp/ssh-contract/build.sh",
-    "sh tests/smp/ssh-contract/start-host.sh",
+    "SSH_CONTRACT_K6_READY=1 sh tests/smp/ssh-contract/start-host.sh",
 ]
 initfs = "build/fixtures/ssh-contract/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
-    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23097,hostfwd=tcp:127.0.0.1:0-:23098",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23096,hostfwd=tcp:127.0.0.1:0-:23097,hostfwd=tcp:127.0.0.1:0-:23098",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     "-monitor", "unix:build/fixtures/ssh-contract/monitor.sock,server=on,wait=off",
 ]

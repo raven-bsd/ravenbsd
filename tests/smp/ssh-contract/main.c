@@ -46,6 +46,7 @@ extern char *ptsname(int fd);
 
 #define K6_PORT 23097
 #define KEOF_PORT 23098
+#define KREADY_PORT 23096
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
 static long raven_debug_write(const char *bytes, size_t len) {
@@ -624,6 +625,45 @@ static int check_listen_only(void) {
     return 0;
 }
 
+static int signal_k6_ready(void) {
+    int listener;
+    int conn;
+    int revents;
+    struct sockaddr_in address;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        return -1;
+    }
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(KREADY_PORT);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0 ||
+        listen(listener, 2) != 0) {
+        (void)close(listener);
+        return -1;
+    }
+    revents = poll_one(listener, POLLIN, 10000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        (void)close(listener);
+        return -1;
+    }
+    conn = accept(listener, NULL, NULL);
+    if (conn < 0) {
+        (void)close(listener);
+        return -1;
+    }
+    if (send(conn, "READY\n", 6, 0) != 6) {
+        (void)close(conn);
+        (void)close(listener);
+        return -1;
+    }
+    (void)close(conn);
+    (void)close(listener);
+    return 0;
+}
+
 static int check_accept(void) {
     int listener;
     struct sockaddr_in address;
@@ -642,6 +682,11 @@ static int check_accept(void) {
     }
     if (listen(listener, 2) != 0) {
         return fail("listen");
+    }
+    // The K6 listener is already bound.  Tell the host peer it may open the first connection;
+    // connecting before this marker is what makes the first poll race under load.
+    if (signal_k6_ready() != 0) {
+        return fail("k6 ready");
     }
     revents = poll_one(listener, POLLIN, 5000);
     if (revents < 0 || (revents & POLLIN) == 0) {
