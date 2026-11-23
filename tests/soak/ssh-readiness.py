@@ -51,6 +51,8 @@ def boot_once(image: Path, mode: str, timeout: float, raw: Path) -> tuple[bool, 
         f"user,id=n0,hostfwd=tcp:127.0.0.1:{port}-:22" if item == "user,id=n0" else item
         for item in command
     ]
+    # Each boot must not take a write lock on the shared image; the disk is disposable.
+    command = [command[0], "-snapshot", *command[1:]]
     child = pexpect.spawn(
         command[0],
         command[1:],
