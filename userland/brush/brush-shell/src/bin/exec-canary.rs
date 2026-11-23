@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
 //! K548 rev349: the brush's std `Command` sequence inside the same current-thread Tokio runtime
