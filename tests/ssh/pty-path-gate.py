@@ -189,13 +189,21 @@ def main() -> int:
             break
         time.sleep(0.2)
 
+    failures: list[str] = []
     baseline_marker = len(serial_text())
     baseline_metrics = wait_metrics(baseline_marker) if EXPECT_METRICS else metrics_snapshot()
     baseline_rows, baseline_child, _ = ps_snapshot()
+    if EXPECT_METRICS:
+        # The baseline `ps` probe is itself an ssh session. Re-baseline after it so its own
+        # session cannot be mistaken for a pty-path orphan.
+        settled = wait_metrics(len(serial_text()))
+        if settled is None:
+            failures.append("k449 settled baseline sample missing")
+        else:
+            baseline_metrics = settled
     print(f"PTY-PATH-GATE {LABEL} baseline rows={baseline_rows} child_rows={baseline_child} "
           f"metrics={baseline_metrics}", flush=True)
 
-    failures: list[str] = []
     if EXPECT_METRICS and baseline_metrics is None:
         failures.append("k449 baseline sample missing")
     for number in range(1, SESSIONS + 1):
