@@ -69,8 +69,9 @@ pub fn attach(
     mode: NicMode,
     static_config: Option<StaticConfig>,
     filter: Option<FilterPolicy>,
+    tx_debug: bool,
 ) -> Result<NicConfig, String> {
-    let (device, config) = NicDevice::open(mode, static_config.as_ref())?;
+    let (device, config) = NicDevice::open(mode, static_config.as_ref(), tx_debug)?;
     netd.attach_nic_with_filter(device, config, now_ms, filter);
     if let Some(static_config) = static_config {
         netd.set_nic_dns(static_config.dns);
@@ -87,6 +88,7 @@ struct NicDevice {
     tx_free: VecDeque<usize>,
     tx_inflight: VecDeque<usize>,
     tx_cons_seen: u32,
+    tx_debug: bool,
     mac: [u8; 6],
     mtu: u16,
 }
@@ -109,6 +111,7 @@ impl NicDevice {
     fn open(
         mode: NicMode,
         static_config: Option<&StaticConfig>,
+        tx_debug: bool,
     ) -> Result<(Self, NicConfig), String> {
         let client = Client::new();
         let info = read_info(&client)?;
@@ -165,6 +168,7 @@ impl NicDevice {
                 tx_free,
                 tx_inflight: VecDeque::new(),
                 tx_cons_seen: header.tx_cons,
+                tx_debug,
                 mac: info.mac.0,
                 mtu: info.mtu,
             },
@@ -244,6 +248,18 @@ impl Device for NicDevice {
         }
         self.reclaim_tx();
         let Some(index) = self.tx_free.pop_front() else {
+            if self.tx_debug {
+                let tx_cons = RingHeader::read_from(self.ring())
+                    .map(|header| header.tx_cons)
+                    .unwrap_or(0);
+                raven_rt::println!(
+                    "netd: tx-debug free={} inflight={} cons_seen={} tx_cons={}",
+                    self.tx_free.len(),
+                    self.tx_inflight.len(),
+                    self.tx_cons_seen,
+                    tx_cons
+                );
+            }
             return Err(TxError::Busy);
         };
         let Some(offset) = self.layout.buffer_offset(index) else {
@@ -268,6 +284,19 @@ impl Device for NicDevice {
         match pushed {
             Ok(()) => {
                 self.tx_inflight.push_back(index);
+                if self.tx_debug {
+                    let tx_cons = RingHeader::read_from(self.ring())
+                        .map(|header| header.tx_cons)
+                        .unwrap_or(0);
+                    raven_rt::println!(
+                        "netd: tx-debug send len={} free={} inflight={} cons_seen={} tx_cons={}",
+                        len,
+                        self.tx_free.len(),
+                        self.tx_inflight.len(),
+                        self.tx_cons_seen,
+                        tx_cons
+                    );
+                }
                 Ok(())
             }
             Err(_) => {

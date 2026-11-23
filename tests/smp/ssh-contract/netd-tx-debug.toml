@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Test-only netd service manifest: same NIC configuration as the release service, with the
+# bounded `tx-debug` counter print enabled at the B39 reclaim decision.
+name = "netd"
+exec = "/sbin/netd"
+args = ["netd", "nic", "tx-debug"]
+needs = ["logd", "scheme:nic"]
+provides = ["scheme:net"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"

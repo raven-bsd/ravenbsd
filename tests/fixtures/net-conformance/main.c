@@ -131,17 +131,21 @@ int main(void) {
         // Stay open long enough for persist probes, a window reopen, an RTO
         // retransmission, or the peer's FIN/RST.
         revents = wait_readable(connection, 12000);
+        ssize_t got = -2;
         if (revents > 0) {
             char discard[64];
-            ssize_t got = read(connection, discard, sizeof(discard));
+            got = read(connection, discard, sizeof(discard));
             say_value("netconf: peer-event=", revents, "");
             say_value(" read=", (long)got, "\n");
         } else {
             say("netconf: peer-idle\n");
         }
-        // K548 fuzz: leave a short window for a duplicate FIN to reach the stack
-        // before the application closes the connection.
-        (void)poll(NULL, 0, 150);
+        // K548 fuzz: a duplicate FIN needs a short window before the application closes.
+        // A reset read returns -1 and must close immediately so the 1000-connect churn
+        // does not pay this delay on every connection.
+        if (got == 0) {
+            (void)poll(NULL, 0, 150);
+        }
         (void)close(connection);
         say("netconf: closed\n");
     }

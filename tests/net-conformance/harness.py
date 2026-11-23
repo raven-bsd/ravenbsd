@@ -864,6 +864,8 @@ def fuzz_payload(peer: RawPeer, timeout: float) -> dict | None:
 def scenario_fuzz(peer: RawPeer, local_port: int, remote_port: int) -> tuple[bool, str]:
     cases = fuzz_table(FUZZ_SEED)
     table_hash = fuzz_table_hash(cases)
+    mutations = set(filter(None, os.environ.get("NETCONF_FUZZ_MUTATION", "").split(",")))
+    mutated = "all" in mutations or "tcp" in mutations
     deviations = 0
 
     def check(case: dict, name: str, passed: bool, detail: str) -> None:
@@ -907,8 +909,9 @@ def scenario_fuzz(peer: RawPeer, local_port: int, remote_port: int) -> tuple[boo
                     reply = peer.wait(
                         1.0, lambda p: bool(p["flags"] & TCP_ACK)
                         and not p["flags"] & (TCP_SYN | TCP_RST))
+                    expected_ack = isn + (2 if mutated else 1)
                     check(case, "challenge-ack",
-                          reply is not None and reply["ack"] == isn + 1,
+                          reply is not None and reply["ack"] == expected_ack,
                           f"reply={None if reply is None else hex(reply['flags'])} "
                           f"ack={None if reply is None else reply['ack']}")
                     reset(peer, state, port, remote_port)
@@ -1546,6 +1549,64 @@ def scenario_fuzz_frag_timeout(peer: RawPeer, local_port: int,
     return deviations == 0, detail
 
 
+def percentile(values: list[int], fraction: float) -> int:
+    if not values:
+        return 0
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, int(round(fraction * (len(ordered) - 1)))))
+    return ordered[index]
+
+
+def scenario_churn(peer: RawPeer, local_port: int, remote_port: int) -> tuple[bool, str]:
+    total = 1000
+    mutation = os.environ.get("NETCONF_CHURN_MUTATION") == "1"
+    connects: list[int] = []
+    accepted = 0
+    reads = 0
+    deviations = 0
+    timeouts = 0
+    resets = 0
+    started = time.monotonic()
+
+    for index in range(total):
+        port = 47000 + index
+        began = time.monotonic()
+        try:
+            state = handshake(
+                peer, port, remote_port, 65535, window_scale=7,
+                isn=0x20000000 + index,
+            )
+            connects.append(int((time.monotonic() - began) * 1000))
+            accepted += 1
+            data, _frames, _next_seq, _ = collect_stream(
+                peer, state, port, remote_port, 1.0, 65535,
+                stop_after=len(PAYLOAD),
+            )
+            expected = PAYLOAD[:-1] if mutation else PAYLOAD
+            if data == expected:
+                reads += 1
+            else:
+                deviations += 1
+                log(f"churn: deviation index={index} read={len(data)}/{len(expected)}")
+            reset(peer, state, port, remote_port)
+            resets += 1
+        except RuntimeError as error:
+            timeouts += 1
+            log(f"churn: timeout index={index} {error}")
+
+    elapsed = time.monotonic() - started
+    ready_ms = getattr(peer, "ready_ms", 0)
+    summary = (
+        f"connects={total} accepted={accepted} reads={reads} deviations={deviations} "
+        f"timeouts={timeouts} resets={resets} ready-ms={ready_ms} "
+        f"connect-ms min={min(connects) if connects else 0} "
+        f"p50={percentile(connects, 0.50)} p90={percentile(connects, 0.90)} "
+        f"max={max(connects) if connects else 0} elapsed={elapsed:.2f}s"
+    )
+    log(f"churn: summary {summary}")
+    return deviations == 0 and accepted == total and reads + deviations == total, summary
+
+
 SCENARIOS = {
     "handshake": scenario_handshake,
     "ecn": scenario_ecn,
@@ -1556,6 +1617,7 @@ SCENARIOS = {
     "fuzz": scenario_fuzz,
     "fuzz-l4": scenario_fuzz_l4,
     "fuzz-frag-timeout": scenario_fuzz_frag_timeout,
+    "churn": scenario_churn,
 }
 NARROWED = {
     "dup-ack": "a single client cannot make the server's receiver see duplicate ACKs; needs a server-to-client data phase",
@@ -1681,6 +1743,7 @@ def wait_serial(serial: Path, needle: bytes, timeout: float) -> bool:
 
 def run_raven(scenario: str, image: Path, pcap: Path, serial: Path,
               tap: str) -> tuple[bool, str]:
+    started = time.monotonic()
     qemu = qemu_boot(image, serial, tap)
     try:
         if not wait_serial(serial, b"netconf: listening", 150):
@@ -1695,14 +1758,16 @@ def run_raven(scenario: str, image: Path, pcap: Path, serial: Path,
                 "guest did not reach netconf: listening; "
                 f"serial-tail={tail[-400:]!r} qemu={stderr[-300:]!r}"
             )
+        ready_ms = int((time.monotonic() - started) * 1000)
         # The guest loads static 10.0.2.15 and needs its ARP entry to settle.
         time.sleep(1.0)
         peer = RawPeer(tap, RAVEN_HOST, RAVEN_GUEST, RAVEN_GUEST_MAC, pcap)
+        peer.ready_ms = ready_ms
         try:
             ok, detail = SCENARIOS[scenario](peer, 40000 + random.randrange(1000), RAVEN_PORT)
         finally:
             peer.close()
-        if scenario == "fuzz":
+        if scenario.startswith("fuzz") or scenario == "churn":
             time.sleep(0.2)
             serial_text = serial.read_text(errors="replace") if serial.is_file() else ""
             fault = re.search(r"(?i)\bpanic\b|EXCEPTION|BUG:|Oops|double fault", serial_text)
@@ -1747,7 +1812,7 @@ def selftest() -> int:
     writer.close()
     assert pcap.read_bytes()[:4] == b"\xd4\xc3\xb2\xa1"
     assert {"handshake", "zero-window", "window-update", "retransmit", "fin-rst",
-            "fuzz", "fuzz-l4", "fuzz-frag-timeout"} <= set(SCENARIOS)
+            "fuzz", "fuzz-l4", "fuzz-frag-timeout", "churn"} <= set(SCENARIOS)
     cases = fuzz_table(FUZZ_SEED)
     assert len(cases) == FUZZ_CASES
     assert len({case["port"] for case in cases}) == FUZZ_CASES
