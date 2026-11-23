@@ -2375,6 +2375,9 @@ fn wake_process_waiters(process: &Arc<Process>) {
         let _ = other.signal_waiters.wake_process(process.id);
         let _ = other.scheme_waiters.wake_process(process.id);
     }
+    // Object queues (pipe, duplex, memory page waiters, console, record locks) are not reachable
+    // from the dying handle table; the global queue registry reaches every live queue.
+    let _ = crate::sched::wait::WaitQueue::wake_all_queues_for_process(process.id);
     for irq in irqs {
         if !irq_held_elsewhere(process, &irq) {
             irq.retire();

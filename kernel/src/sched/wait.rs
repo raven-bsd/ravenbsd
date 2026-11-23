@@ -17,6 +17,8 @@
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::ptr;
+use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 
 use raven_abi::errno::Errno;
 
@@ -36,14 +38,76 @@ pub struct Waiter {
 /// A FIFO wait queue.
 pub struct WaitQueue {
     waiters: IrqSpinLock<Vec<Waiter>>,
+    /// Global intrusive list of live queues, used to purge a dying thread's entries.
+    next: AtomicPtr<WaitQueue>,
+    /// True while this queue is on the global list.
+    listed: AtomicBool,
 }
+
+/// Head of the global queue list and its mutation lock.
+static QUEUE_HEAD: AtomicPtr<WaitQueue> = AtomicPtr::new(ptr::null_mut());
+static QUEUE_LOCK: IrqSpinLock<()> = IrqSpinLock::new(());
 
 impl WaitQueue {
     /// Create an empty queue.
     pub const fn new() -> Self {
         Self {
             waiters: IrqSpinLock::new(Vec::new()),
+            next: AtomicPtr::new(ptr::null_mut()),
+            listed: AtomicBool::new(false),
         }
+    }
+
+    /// Register this queue for the exit-time purge (idempotent, allocation-free).
+    fn register(&self) {
+        let _guard = QUEUE_LOCK.lock();
+        if self.listed.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let head = QUEUE_HEAD.load(Ordering::Acquire);
+        self.next.store(head, Ordering::Release);
+        QUEUE_HEAD.store(
+            self as *const WaitQueue as *mut WaitQueue,
+            Ordering::Release,
+        );
+    }
+
+    /// Remove every entry for `thread_id` from every live queue.
+    ///
+    /// A direct `sched::wake` (signal kick, thread-handle wake) can leave the waiter's entry
+    /// behind; the queue owns the `Arc<Thread>`, so the entry would outlive the thread and hold
+    /// its process. FreeBSD `kern_sleepq.c:sleepq_remove`/`sleepq_abort` removes the thread from
+    /// its sleep queue at exit; this is the equivalent over all Raven wait queues.
+    pub fn purge_thread(thread_id: u64) {
+        let _guard = QUEUE_LOCK.lock();
+        let mut queue = QUEUE_HEAD.load(Ordering::Acquire);
+        while !queue.is_null() {
+            // SAFETY: the registry lock keeps every listed queue alive until its Drop unlinks
+            // it under the same lock.
+            let current = unsafe { &*queue };
+            current.remove_thread(thread_id);
+            queue = current.next.load(Ordering::Acquire);
+        }
+    }
+
+    /// Wake and remove every waiter of `process_id` from every live queue.
+    ///
+    /// This is the object-queue half of process teardown: a thread can be blocked on a queue
+    /// inside a pipe, duplex or memory object that is no longer in the dying handle table (the
+    /// syscall frame is the last owner). The queue registry reaches it; the wait-queue entry is
+    /// removed and the thread is woken with `EIO` so it runs the terminal exit path.
+    pub fn wake_all_queues_for_process(process_id: u64) -> usize {
+        let _guard = QUEUE_LOCK.lock();
+        let mut count = 0usize;
+        let mut queue = QUEUE_HEAD.load(Ordering::Acquire);
+        while !queue.is_null() {
+            // SAFETY: the registry lock keeps every listed queue alive until its Drop unlinks
+            // it under the same lock.
+            let current = unsafe { &*queue };
+            count = count.saturating_add(current.wake_process(process_id));
+            queue = current.next.load(Ordering::Acquire);
+        }
+        count
     }
 
     /// Enqueue the current thread for `key` when `condition` returns true.
@@ -57,6 +121,7 @@ impl WaitQueue {
         condition: impl FnOnce() -> Result<bool, Errno>,
     ) -> Result<bool, Errno> {
         let thread = super::current_thread().ok_or(Errno::ESRCH)?;
+        self.register();
         crate::sched::smp::percpu::note_wait_phase(1);
         let mut waiters = self.waiters.lock();
         crate::sched::smp::percpu::note_wait_phase(2);
@@ -294,6 +359,33 @@ impl WaitQueue {
     #[allow(dead_code)] // diagnostics
     pub fn len(&self) -> usize {
         self.waiters.lock().len()
+    }
+}
+
+impl Drop for WaitQueue {
+    fn drop(&mut self) {
+        let _guard = QUEUE_LOCK.lock();
+        if !self.listed.swap(false, Ordering::AcqRel) {
+            return;
+        }
+        let target = self as *const WaitQueue as *mut WaitQueue;
+        let mut previous: *mut WaitQueue = ptr::null_mut();
+        let mut current = QUEUE_HEAD.load(Ordering::Acquire);
+        while !current.is_null() {
+            // SAFETY: every listed queue is live under the registry lock.
+            let next = unsafe { (*current).next.load(Ordering::Acquire) };
+            if current == target {
+                if previous.is_null() {
+                    QUEUE_HEAD.store(next, Ordering::Release);
+                } else {
+                    // SAFETY: `previous` is a live listed queue.
+                    unsafe { (*previous).next.store(next, Ordering::Release) };
+                }
+                break;
+            }
+            previous = current;
+            current = next;
+        }
     }
 }
 

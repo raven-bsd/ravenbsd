@@ -1238,6 +1238,7 @@ pub fn exit_thread(code: i32) -> ! {
     // exit. The live list is weak, but an unremoved entry is a permanent 16-byte leak.
     thread.process.unregister_thread(&thread);
     crate::syscall::futex::remove_thread(thread.id);
+    crate::sched::wait::WaitQueue::purge_thread(thread.id);
     thread.process.unregister_thread(&thread);
     // `block_current`/`sleep_until` exit a terminal-process thread before the caller runs
     // `end_block`, so the timeout entry (which holds an `Arc<Thread>`) must be removed here.
