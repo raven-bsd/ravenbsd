@@ -192,7 +192,7 @@ fn run(argument: usize) {
                     return;
                 }
             }
-        } else if manifest.readiness == Readiness::Log {
+        } else if manifest.readiness == Readiness::File {
             let waiter = start_waiter(index, generation, handle);
             match wait_for_log(&core, index, generation, &manifest, waiter) {
                 ReadinessOutcome::Ready => {

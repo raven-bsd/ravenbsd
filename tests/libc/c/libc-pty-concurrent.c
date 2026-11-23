@@ -44,6 +44,16 @@ static void alarm_handler(int signum) {
     _exit(2);
 }
 
+/* A caught SIGCHLD is not SA_RESTART: POSIX lets waitpid return -1/EINTR (FreeBSD
+ * `kern_wait6` returns the `msleep(... PCATCH)` error). The child status stays queued,
+ * so retry the same wait. */
+static pid_t wait_child(pid_t child, int *status) {
+    pid_t waited;
+    while ((waited = waitpid(child, status, 0)) < 0 && errno == EINTR)
+        ;
+    return waited;
+}
+
 static int open_pair(int *master, int *slave, char *name, size_t capacity) {
     int opened = posix_openpt(O_RDWR | O_NOCTTY);
     if (opened < 0)
@@ -130,7 +140,7 @@ static int main_case(void) {
         failures++;
     }
     int status = 0;
-    if (waitpid(a_child, &status, 0) != a_child || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
+    if (wait_child(a_child, &status) != a_child || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
         failures++;
     close(b_slave);
     close(b_master);
@@ -244,7 +254,7 @@ static int run_phase(int pairs, int bound_ms, int idle_secs) {
     }
     for (int index = 0; index < pairs; index++) {
         int status = 0;
-        if (waitpid(children[index], &status, 0) != children[index] || !WIFEXITED(status) ||
+        if (wait_child(children[index], &status) != children[index] || !WIFEXITED(status) ||
             WEXITSTATUS(status) != 0) {
             printf("pty-concurrent: FAIL pair=%d status=%d\n", index, status);
             phase_failures++;
