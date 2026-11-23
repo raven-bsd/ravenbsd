@@ -664,6 +664,56 @@ static int row_secondary_thread(void) {
     return ok ? 0 : 1;
 }
 
+static int row_kill_child(void) {
+    int status = 0;
+    int result = -1;
+    int kill_errno = 0;
+    int reaped = 0;
+    int polls;
+    char detail[220];
+    pid_t child = fork();
+
+    if (child < 0) {
+        say_line("K19", 0, "fork failed");
+        return 1;
+    }
+    if (child == 0) {
+        for (;;) {
+            pause();
+        }
+    }
+    sleep_ms(50);
+    errno = 0;
+    result = kill(child, SIGTERM);
+    kill_errno = errno;
+    if (result != 0) {
+        snprintf(detail, sizeof(detail), "kill failed errno=%d", kill_errno);
+        (void)kill(child, SIGKILL);
+        (void)waitpid(child, &status, 0);
+        say_line("K19", 0, detail);
+        return 1;
+    }
+    for (polls = 0; polls < 200; polls++) {
+        reaped = (int)waitpid(child, &status, WNOHANG);
+        if (reaped == (int)child || (reaped < 0 && errno != EINTR)) {
+            break;
+        }
+        sleep_ms(10);
+    }
+    if (reaped != (int)child || !WIFSIGNALED(status) || WTERMSIG(status) != SIGTERM) {
+        snprintf(detail, sizeof(detail), "waitpid=%d status=%d signaled=%d sig=%d", reaped, status,
+                 WIFSIGNALED(status), WTERMSIG(status));
+        (void)kill(child, SIGKILL);
+        (void)waitpid(child, &status, 0);
+        say_line("K19", 0, detail);
+        return 1;
+    }
+    snprintf(detail, sizeof(detail), "kill=SIGTERM waitpid=%d status=%d sig=%d", reaped, status,
+             WTERMSIG(status));
+    say_line("K19", 1, detail);
+    return 0;
+}
+
 int main(void) {
     int failures = 0;
 
@@ -675,10 +725,11 @@ int main(void) {
     failures += row_two_masked();
     failures += row_sigqueue_info();
     failures += row_secondary_thread();
+    failures += row_kill_child();
     if (failures != 0) {
         say("CONTRACT SUMMARY FAIL\n");
         return 1;
     }
-    say("CONTRACT SUMMARY PASS 8/8\n");
+    say("CONTRACT SUMMARY PASS 9/9\n");
     return 0;
 }
