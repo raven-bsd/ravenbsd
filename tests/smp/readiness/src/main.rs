@@ -17,6 +17,10 @@
 //!   A SIGCHLD from the earlier child and a `THREAD_KICK` must not lose the wait or turn it into
 //!   EINTR.
 //!
+//! * sibling-exit: a sibling child exits while a worker is blocked in a pipe read, a futex wait,
+//!   or an EVQ_WAIT. A no-handler `THREAD_KICK` must not turn any of them into EINTR; only the
+//!   ready byte/futex/event wakes the worker.
+//!
 //! The fixture is a guest proof; the mutating negative checks run against the kernel event core.
 
 #![no_std]
@@ -31,6 +35,7 @@ use raven_abi::errno::Errno;
 use raven_abi::signal::{SIG_SETUP, SIG_SETUP_ABS, SIGRETURN};
 use raven_abi::syscall::{Syscall, THREAD_KICK};
 use raven_abi::types::Handle;
+use raven_abi::types::futex::{WAIT as FUTEX_WAIT, WAKE as FUTEX_WAKE};
 use raven_initfs::Initfs;
 use raven_proto_fs::OpenFlags;
 use raven_proto_net::socket::{Call, Response, SocketRequest};
@@ -84,12 +89,23 @@ const PROC_KICK_DELAY_NS: u64 = 20_000_000;
 const PROC_ARM_POLLS: u32 = 1000;
 /// Poll interval while waiting for the worker to arm.
 const PROC_ARM_NS: u64 = 1_000_000;
+/// Sibling child exit delay while a primitive wait is armed.
+const SIBLING_CHILD_NS: u64 = 100_000_000;
+/// Delay before sending the no-handler kick to the armed worker.
+const SIBLING_KICK_NS: u64 = 20_000_000;
+/// Delay after the kick, so the child exit lands before the primitive wake.
+const SIBLING_WAKE_NS: u64 = 150_000_000;
+/// Bounded EVQ_WAIT timeout for the sibling-exit row.
+const SIBLING_EVENT_TIMEOUT_NS: u64 = 1_000_000_000;
+/// Event cookie used by the sibling-exit row.
+const SIBLING_EVENT_COOKIE: u64 = 7;
 
 #[repr(align(16))]
 struct ChildStack(#[allow(dead_code)] [u8; 16 * 1024]);
 
 static mut CHILD_STACK_A: ChildStack = ChildStack([0; 16 * 1024]);
 static mut CHILD_STACK_B: ChildStack = ChildStack([0; 16 * 1024]);
+static mut SIBLING_STACK: ChildStack = ChildStack([0; 16 * 1024]);
 
 static PROC_WAIT_ARMED: AtomicBool = AtomicBool::new(false);
 static PROC_WAIT_FAIL: AtomicU32 = AtomicU32::new(0);
@@ -97,6 +113,11 @@ static PROC_WAIT_FIRST_PID: AtomicI32 = AtomicI32::new(0);
 static PROC_WAIT_FIRST_STATUS: AtomicI32 = AtomicI32::new(0);
 static PROC_WAIT_SECOND_PID: AtomicI32 = AtomicI32::new(0);
 static PROC_WAIT_SECOND_STATUS: AtomicI32 = AtomicI32::new(0);
+
+static SIBLING_ARMED: AtomicBool = AtomicBool::new(false);
+static SIBLING_FAIL: AtomicU32 = AtomicU32::new(0);
+static SIBLING_EVENT_QUEUE: AtomicU32 = AtomicU32::new(u32::MAX);
+static SIBLING_FUTEX: AtomicU32 = AtomicU32::new(0);
 
 static ROUND: AtomicU32 = AtomicU32::new(0);
 static STOP: AtomicBool = AtomicBool::new(false);
@@ -311,6 +332,15 @@ extern "C" fn proc_wait_child_b(_: usize) -> ! {
     }
 }
 
+extern "C" fn sibling_child(_: usize) -> ! {
+    let _ = nanosleep(SIBLING_CHILD_NS);
+    // SAFETY: EXIT terminates only the forked sibling process.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, 0) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
 fn fork_wait_child(
     entry: extern "C" fn(usize) -> !,
     stack_top: usize,
@@ -465,6 +495,186 @@ fn proc_wait() -> R {
     Ok(())
 }
 
+fn sibling_wait_armed() -> R {
+    for _ in 0..PROC_ARM_POLLS {
+        if SIBLING_ARMED.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        nanosleep(PROC_ARM_NS).map_err(|_| "arm sleep")?;
+    }
+    Err("arm timeout")
+}
+
+fn sibling_pipe_waiter(read_raw: usize) {
+    SIBLING_ARMED.store(true, Ordering::Release);
+    let mut byte = [0u8; 1];
+    match sys::read(Handle(read_raw as u32), &mut byte) {
+        Ok(1) if byte[0] == 0x5a => {}
+        Err(Errno::EINTR) => SIBLING_FAIL.store(1, Ordering::Release),
+        _ => SIBLING_FAIL.store(2, Ordering::Release),
+    }
+}
+
+fn sibling_futex_waiter(_: usize) {
+    SIBLING_ARMED.store(true, Ordering::Release);
+    let address = core::ptr::addr_of!(SIBLING_FUTEX) as usize;
+    // SAFETY: FUTEX takes a live aligned u32 address, a scalar op/value and a timeout; the
+    // address is the static word the main thread wakes.
+    let raw = unsafe {
+        sys::syscall4(
+            Syscall::FUTEX as usize,
+            address,
+            FUTEX_WAIT as usize,
+            0,
+            SIBLING_EVENT_TIMEOUT_NS as usize,
+        )
+    };
+    if raw == Errno::EINTR.to_ret() {
+        SIBLING_FAIL.store(1, Ordering::Release);
+    } else if raw != 0 {
+        SIBLING_FAIL.store(2, Ordering::Release);
+    }
+}
+
+fn sibling_event_waiter(_: usize) {
+    SIBLING_ARMED.store(true, Ordering::Release);
+    let queue = SIBLING_EVENT_QUEUE.load(Ordering::Acquire);
+    let mut output = [EvqEvent::default(); 1];
+    // SAFETY: EVQ_WAIT reads one output record from the live stack array and takes the queue
+    // handle and scalar timeout; the queue is created by the main thread.
+    let raw = unsafe {
+        sys::syscall4(
+            Syscall::EVQ_WAIT as usize,
+            queue as usize,
+            output.as_mut_ptr() as usize,
+            1,
+            SIBLING_EVENT_TIMEOUT_NS as usize,
+        )
+    };
+    if raw == Errno::EINTR.to_ret() {
+        SIBLING_FAIL.store(1, Ordering::Release);
+    } else if raw != 1 || output[0].cookie != SIBLING_EVENT_COOKIE {
+        SIBLING_FAIL.store(2, Ordering::Release);
+    }
+}
+
+fn sibling_pipe() -> R {
+    let (read, write) = pipe().map_err(|_| "pipe")?;
+    let stack = core::ptr::addr_of_mut!(SIBLING_STACK);
+    let (child, _) = fork_wait_child(sibling_child, child_stack_top(stack)).map_err(|_| "child")?;
+    SIBLING_ARMED.store(false, Ordering::Release);
+    SIBLING_FAIL.store(0, Ordering::Release);
+    let worker =
+        thread::spawn(sibling_pipe_waiter, read.0 as usize, STACK_SIZE).map_err(|_| "thread")?;
+    sibling_wait_armed()?;
+    nanosleep(SIBLING_KICK_NS).map_err(|_| "kick sleep")?;
+    let handle = worker.handle().ok_or("no thread handle")?;
+    // SAFETY: THREAD_KICK takes the worker thread handle and a scalar bit mask.
+    let kicked = unsafe { sys::syscall2(THREAD_KICK, handle.0 as usize, KICK_BIT) };
+    if kicked < 0 {
+        return Err("kick");
+    }
+    nanosleep(SIBLING_WAKE_NS).map_err(|_| "wake sleep")?;
+    sys::write(write, &[0x5a]).map_err(|_| "write")?;
+    worker.join().map_err(|_| "join")?;
+    let _ = wait_process(child as u32);
+    let _ = handle_close(read);
+    let _ = handle_close(write);
+    match SIBLING_FAIL.load(Ordering::Acquire) {
+        0 => Ok(()),
+        1 => Err("eintr"),
+        _ => Err("wake"),
+    }
+}
+
+fn sibling_futex() -> R {
+    SIBLING_FUTEX.store(0, Ordering::Release);
+    let stack = core::ptr::addr_of_mut!(SIBLING_STACK);
+    let (child, _) = fork_wait_child(sibling_child, child_stack_top(stack)).map_err(|_| "child")?;
+    SIBLING_ARMED.store(false, Ordering::Release);
+    SIBLING_FAIL.store(0, Ordering::Release);
+    let worker = thread::spawn(sibling_futex_waiter, 0, STACK_SIZE).map_err(|_| "thread")?;
+    sibling_wait_armed()?;
+    nanosleep(SIBLING_KICK_NS).map_err(|_| "kick sleep")?;
+    let handle = worker.handle().ok_or("no thread handle")?;
+    // SAFETY: THREAD_KICK takes the worker thread handle and a scalar bit mask.
+    let kicked = unsafe { sys::syscall2(THREAD_KICK, handle.0 as usize, KICK_BIT) };
+    if kicked < 0 {
+        return Err("kick");
+    }
+    nanosleep(SIBLING_WAKE_NS).map_err(|_| "wake sleep")?;
+    SIBLING_FUTEX.store(1, Ordering::Release);
+    let address = core::ptr::addr_of!(SIBLING_FUTEX) as usize;
+    // SAFETY: FUTEX WAKE takes the live aligned static address and a scalar wake count.
+    let woken =
+        unsafe { sys::syscall4(Syscall::FUTEX as usize, address, FUTEX_WAKE as usize, 1, 0) };
+    if woken < 0 {
+        return Err("futex wake");
+    }
+    worker.join().map_err(|_| "join")?;
+    let _ = wait_process(child as u32);
+    match SIBLING_FAIL.load(Ordering::Acquire) {
+        0 => Ok(()),
+        1 => Err("eintr"),
+        _ => Err("wake"),
+    }
+}
+
+fn sibling_event() -> R {
+    let queue = EventQueue::create().map_err(|_| "queue")?;
+    let event = event_create().map_err(|_| "event")?;
+    queue
+        .add(event, SIGNALED, SIBLING_EVENT_COOKIE)
+        .map_err(|_| "add")?;
+    SIBLING_EVENT_QUEUE.store(queue.handle().0, Ordering::Release);
+    let stack = core::ptr::addr_of_mut!(SIBLING_STACK);
+    let (child, _) = fork_wait_child(sibling_child, child_stack_top(stack)).map_err(|_| "child")?;
+    SIBLING_ARMED.store(false, Ordering::Release);
+    SIBLING_FAIL.store(0, Ordering::Release);
+    let worker = thread::spawn(sibling_event_waiter, 0, STACK_SIZE).map_err(|_| "thread")?;
+    sibling_wait_armed()?;
+    nanosleep(SIBLING_KICK_NS).map_err(|_| "kick sleep")?;
+    let handle = worker.handle().ok_or("no thread handle")?;
+    // SAFETY: THREAD_KICK takes the worker thread handle and a scalar bit mask.
+    let kicked = unsafe { sys::syscall2(THREAD_KICK, handle.0 as usize, KICK_BIT) };
+    if kicked < 0 {
+        return Err("kick");
+    }
+    nanosleep(SIBLING_WAKE_NS).map_err(|_| "wake sleep")?;
+    event_signal(event, 1).map_err(|_| "signal")?;
+    worker.join().map_err(|_| "join")?;
+    let _ = wait_process(child as u32);
+    match SIBLING_FAIL.load(Ordering::Acquire) {
+        0 => Ok(()),
+        1 => Err("eintr"),
+        _ => Err("wake"),
+    }
+}
+
+fn sibling_exit() -> R {
+    let pipe = match sibling_pipe() {
+        Ok(()) => "ok",
+        Err(error) => error,
+    };
+    let futex = match sibling_futex() {
+        Ok(()) => "ok",
+        Err(error) => error,
+    };
+    let event = match sibling_event() {
+        Ok(()) => "ok",
+        Err(error) => error,
+    };
+    println!(
+        "readiness: sibling-exit pipe={} futex={} event={}",
+        pipe, futex, event
+    );
+    if pipe == "ok" && futex == "ok" && event == "ok" {
+        Ok(())
+    } else {
+        Err("pipe/futex/event")
+    }
+}
+
 struct NetHandler;
 
 impl Handler for NetHandler {
@@ -543,6 +753,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         ("lost-wake", lost_wake as fn() -> R),
         ("hup-repoll", hup_repoll),
         ("eintr", eintr_reevaluate),
+        ("sibling-exit", sibling_exit),
         ("proc-wait", proc_wait),
         ("net-listen", net_listen),
     ] {

@@ -11,6 +11,7 @@ use core::cell::RefCell;
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::socket::{SOCK_DGRAM, SOCK_STREAM};
+use raven_libc_platform::fd::InheritedSocket;
 use raven_proto_net::path::{self, Transport};
 use raven_proto_net::{
     Call, Endpoint, IF_LINK_UP, IF_LOOPBACK, IF_UP, IfName, IfaceInfo, IfaceRequest, IfaceResponse,
@@ -139,6 +140,7 @@ struct FakeState {
     route_fail: bool,
     mptcp_requests: Vec<Vec<u8>>,
     mptcp_reply: Vec<u8>,
+    inherited: Vec<InheritedSocket>,
 }
 
 /// A fake netd plus fd table and environment.
@@ -214,6 +216,20 @@ impl FakeNetd {
     /// Add one interface record.
     pub fn add_iface(&self, info: IfaceInfo) {
         self.state.borrow_mut().ifaces.push(info);
+    }
+
+    /// Add an inherited socket record and its fd-table entry (exec restoration test).
+    pub fn push_inherited(&self, inherited: InheritedSocket) {
+        let mut state = self.state.borrow_mut();
+        state.fds.insert(
+            inherited.fd,
+            FdInfo {
+                ofd: inherited.ofd,
+                sock: (inherited.handle.0 != 0).then_some(Sock(inherited.handle.0)),
+                nonblock: inherited.status & raven_libc_abi::fcntl::O_NONBLOCK as u32 != 0,
+            },
+        );
+        state.inherited.push(inherited);
     }
 
     /// Add a DNS answer table row.
@@ -908,6 +924,10 @@ impl SocketFds for FakeNetd {
 
     fn set_meta(&self, ofd: u32, meta: SocketMeta) {
         self.state.borrow_mut().metas.insert(ofd, meta);
+    }
+
+    fn inherited(&self) -> Vec<InheritedSocket> {
+        self.state.borrow().inherited.clone()
     }
 }
 

@@ -958,7 +958,7 @@ fn wildcard_listener_serves_loopback_and_nic() {
     assert_eq!(
         call_socket(&mut netd, nic_accepted, Call::GetPeerName),
         nic_client_local,
-        "the wildcard NIC accepted peer must be the client address"
+        "the accepted NIC socket must report the client's address and port"
     );
     assert_eq!(netd.write(nic_client, 0, b"nic").unwrap(), 3);
     let read = read_retry(&mut netd, nic_accepted, &mut buffer, &mut now);
