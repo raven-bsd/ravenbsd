@@ -246,6 +246,16 @@ impl<const MAX_SLABS: usize, const TAGS: usize> KmemGeneric<MAX_SLABS, TAGS> {
         self.caches.get(id.0)?.as_ref().map(Cache::stats)
     }
 
+    /// The general size-class statistics for `class`, or `None` when no cache serves it.
+    ///
+    /// Diagnostic accessor for the kernel's K449 sampler: the 3072-byte class is one object per
+    /// slab (`SLAB_TARGET_BYTES / 3072`), so its `in_use`, `slabs` and `alloc_fail` expose a
+    /// per-session leak that the aggregate heap bytes hide.
+    pub fn class_stats(&self, class: usize) -> Option<CacheStats> {
+        let index = SIZE_CLASSES.iter().position(|&size| size == class)?;
+        self.caches.get(index)?.as_ref().map(Cache::stats)
+    }
+
     /// Snapshot the allocator's counters and accounting.
     pub fn stats(&self) -> KmemStats {
         let mut stats = KmemStats {
