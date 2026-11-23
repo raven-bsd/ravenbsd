@@ -55,8 +55,11 @@ class ReadyWaitTest(unittest.TestCase):
 
             def writer() -> None:
                 time.sleep(0.3)
-                serial.write_bytes(b"boot loading\n" + READY)
+                # Record the intent time before the write: wait_serial may observe the file
+                # before this thread appends, so the connect must be compared to the writer's
+                # own ready time, not to a later append.
                 marker_written.append(time.monotonic())
+                serial.write_bytes(b"boot loading\n" + READY)
 
             calls: list[tuple[float, int]] = []
 

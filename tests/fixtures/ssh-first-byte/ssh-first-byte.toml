@@ -32,16 +32,16 @@ regex = 'svcd: getty up'
 unordered = true
 
 [[expect]]
-regex = '(?i)^.*login: ?root'
+regex = '(?i)login: ?root'
 
 [[expect]]
-regex = '(?i)^password: ?$'
+regex = '(?i)password:'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[step]]
-wait = '(?i)^.*login: ?$'
+wait = '(?i)login:'
 timeout_secs = 120
 
 [[step]]
@@ -49,7 +49,7 @@ send = "root\n"
 delay_ms = 100
 
 [[step]]
-wait = '(?i)^password: ?$'
+wait = '(?i)password:'
 timeout_secs = 30
 
 [[step]]
