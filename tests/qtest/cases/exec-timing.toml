@@ -16,7 +16,7 @@ boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 
 [[expect]]
-regex = '^.*EXEC-TIMING child ctor=[0-9]+ main=[0-9]+ pid=[0-9]+$'
+regex = '^.*EXEC-TIMING child ctor=[1-9][0-9]* main=[0-9]+ pid=[0-9]+$'
 
 [[expect]]
 regex = '^.*EXEC-TIMING child io=[0-9]+$'
