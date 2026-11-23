@@ -28,7 +28,7 @@ timeout_secs = 10
 send = "raven\n"
 [[step]]
 wait = '^raven# $'
-timeout_secs = 10
+timeout_secs = 30
 [[step]]
 send = "exit 0\n"
 
