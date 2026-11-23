@@ -13,6 +13,8 @@ use raven_tty_core::{Discipline, Event, Output, Settings, Termios, Winsize};
 pub const SIGINT: u32 = 2;
 /// POSIX SIGQUIT.
 pub const SIGQUIT: u32 = 3;
+/// POSIX SIGWINCH.
+pub const SIGWINCH: u32 = 28;
 
 /// Where an interrupt/hangup signal is sent.
 pub trait SignalSink {
@@ -74,9 +76,21 @@ impl<S: SignalSink> Pty<S> {
         self.winsize
     }
 
-    /// Set the window size. A fresh pair starts at `0x0` (NetBSD).
+    /// Set the window size and signal the foreground group on an actual change.
+    ///
+    /// A fresh pair starts at `0x0` (NetBSD). An identical write is a no-op; a change is stored
+    /// first and then sent as one `SIGWINCH` to the foreground process group (NetBSD
+    /// `sys/kern/tty.c:1478-1487`, FreeBSD `tty_set_winsize` 1838-1845). A hung-up pair sends
+    /// nothing, so a resize cannot reach a job after its terminal closed.
     pub fn set_winsize(&mut self, winsize: Winsize) {
+        if self.winsize == winsize {
+            return;
+        }
         self.winsize = winsize;
+        if self.eof || self.fg_pgrp <= 0 {
+            return;
+        }
+        let _ = self.sink.signal(-self.fg_pgrp, SIGWINCH);
     }
 
     /// Drive input from the master side through the discipline.
