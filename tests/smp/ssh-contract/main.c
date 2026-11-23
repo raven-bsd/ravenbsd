@@ -644,7 +644,7 @@ static int signal_k6_ready(void) {
         (void)close(listener);
         return -1;
     }
-    revents = poll_one(listener, POLLIN, 10000);
+    revents = poll_one(listener, POLLIN, 8000);
     if (revents < 0 || (revents & POLLIN) == 0) {
         (void)close(listener);
         return -1;
