@@ -22,5 +22,8 @@ fi
 if [ "${SSH_CONTRACT_K6_READY:-0}" = "1" ]; then
     set -- "$@" --k6-ready
 fi
+if [ "${SSH_CONTRACT_K1K8:-0}" = "1" ]; then
+    set -- "$@" --k1k8
+fi
 python3 "$root/tests/smp/ssh-contract/host_accept.py" "$@" \
     > "$out/host.stdout" 2>&1 &

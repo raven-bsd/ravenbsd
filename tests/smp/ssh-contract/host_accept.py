@@ -236,6 +236,7 @@ def main():
     parser.add_argument("--eof-port", type=int, default=23098)
     parser.add_argument("--ready-port", type=int, default=23096)
     parser.add_argument("--k6-ready", action="store_true")
+    parser.add_argument("--k1k8", action="store_true")
     parser.add_argument("--monitor", default="")
     parser.add_argument("--k6-loop", type=int, default=0)
     parser.add_argument("--result", required=True)
@@ -298,7 +299,10 @@ def main():
         if args.log:
             with open(args.log, "a", encoding="utf-8") as handle:
                 handle.write(f"K6 host ok {payload!r}\n")
-    for name, role in (("K8", eof_fin), ("K8-shutdown", own_shutdown), ("K9", half_close)):
+    roles = [("K8", eof_fin), ("K8-shutdown", own_shutdown)]
+    if not args.k1k8:
+        roles.append(("K9", half_close))
+    for name, role in roles:
         if not role(args.host, args.eof_port, deadline):
             with open(args.result, "w", encoding="utf-8") as handle:
                 handle.write(f"fail {name}\n")

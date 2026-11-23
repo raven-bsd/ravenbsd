@@ -12,6 +12,7 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
 
 out=${SSH_CONTRACT_OUT:-build/fixtures/ssh-contract-release}
+service=${SSH_CONTRACT_SERVICE:-$root/tests/smp/ssh-contract/ssh-contract.service.toml}
 arch=${RAVEN_QT_ARCH:-x86_64}
 mkdir -p "$out"
 pkill -f "$root/tests/smp/ssh-contract/host_accept.py" 2>/dev/null || true
@@ -79,7 +80,7 @@ cargo build -q -p raven-b70-overlay
 "$root/target/debug/raven-b70-overlay" "$out/base.img" "$out/initfs.img" \
     "/bin/ssh-contract=$out/ssh-contract:0755" \
     "/bin/ssh-contract-child=$out/ssh-contract-child:0755" \
-    "/etc/services.d/ssh-contract.toml=$root/tests/smp/ssh-contract/ssh-contract.service.toml" \
+    "/etc/services.d/ssh-contract.toml=$service" \
     "/etc/svcd.conf=$root/tests/smp/ssh-contract/ssh-contract.svcd.conf"
 
 echo "ssh-contract release fixture: $out/initfs.img"
