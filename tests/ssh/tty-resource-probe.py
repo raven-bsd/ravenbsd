@@ -140,10 +140,11 @@ def session(label: str, tty: bool, command: str = "echo K495") -> int:
         print(f"{label} (tty={tty}): exit={result.returncode} "
               f"stdout={result.stdout.decode('utf-8', 'replace').strip()!r}", flush=True)
         return result.returncode
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as error:
+        partial = (error.stdout or b"").decode("utf-8", "replace")
         print(f"{label} (tty={tty}): TIMEOUT after 12 s (the shell faulted and the "
-              f"client never saw close)", flush=True)
-        return -1
+              f"client never saw close); stdout={partial.strip()!r}", flush=True)
+        return partial
 
 
 try:
@@ -174,6 +175,17 @@ try:
         wait_for_fresh(METRICS_RE, metrics_before, 8)
         wait_for_fresh(PTYD_RE, ptyd_before, 15)
         rows.append(sample(f"tty{number}"))
+
+    metrics_before = len(METRICS_RE.findall(serial_text()))
+    ptyd_before = len(PTYD_RE.findall(serial_text()))
+    session("ps", tty=False, command="ps -e")
+    wait_for_fresh(METRICS_RE, metrics_before, 8)
+    wait_for_fresh(PTYD_RE, ptyd_before, 15)
+    time.sleep(0.5)
+    print("=== serial tail after ps -e ===", flush=True)
+    for line in serial_text().splitlines()[-80:]:
+        print(line, flush=True)
+    rows.append(sample("ps"))
 
     print("=== deltas ===", flush=True)
     for before, after in zip(rows, rows[1:]):
