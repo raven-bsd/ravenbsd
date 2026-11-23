@@ -131,6 +131,20 @@ pub fn _print(args: fmt::Arguments<'_>) {
     let _ = serial.write_fmt(args);
 }
 
+/// Write raw bytes from the `DEBUG_WRITE` syscall through the kernel serial lock.
+///
+/// FreeBSD serializes every console writer through the console/UART lock
+/// (`sys/kern/subr_prf.c` `putchar` under `cons_lock`; `sys/dev/uart/uart_cpu_x86.c`
+/// `uart_cpu_putc`), and NetBSD `sys/dev/ic/com.c` `comcnputc` holds `com_lock` around
+/// `com_putchar`. Raven has one UART and two software writers (the kernel log and the
+/// `DEBUG_WRITE` syscall that copies userland `svcd:`/getty/login output), so both must take
+/// `SERIAL`; without it an SMP `smp-user-trace` line can split a userland readiness line
+/// byte-for-byte and the soak never sees `svcd: sshd up`.
+pub fn _write_bytes(bytes: &[u8]) {
+    let _guard = SERIAL.lock();
+    crate::arch::serial::write_bytes(bytes);
+}
+
 /// Write one formatted line, with a trailing newline.
 pub fn _print_line(args: fmt::Arguments<'_>) {
     let mut serial = SERIAL.lock();
