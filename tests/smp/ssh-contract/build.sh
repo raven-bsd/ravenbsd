@@ -121,6 +121,11 @@ fi
 
 cargo build -q -p raven-b70-overlay
 overlay=$root/target/debug/raven-b70-overlay
+extra=
+if [ "${SSH_CONTRACT_TX_DEBUG:-0}" = "1" ]; then
+    extra="/etc/services.d/netd.toml=$root/tests/smp/ssh-contract/netd-tx-debug.toml"
+fi
+# shellcheck disable=SC2086
 "$overlay" "$out/base.img" "$out/initfs.img" \
     "/init=$init" \
     "/bin/ssh-contract=$out/ssh-contract:0755" \
@@ -129,6 +134,7 @@ overlay=$root/target/debug/raven-b70-overlay
     "/sbin/ptyd=$ptyd:0755" \
     "/etc/services.d/ssh-contract.toml=$service" \
     "/etc/services.d/ptyd.toml=$root/tests/smp/ssh-contract/ptyd.service.toml" \
-    "/etc/svcd.conf=$root/tests/smp/ssh-contract/ssh-contract.svcd.conf"
+    "/etc/svcd.conf=$root/tests/smp/ssh-contract/ssh-contract.svcd.conf" \
+    $extra
 
 echo "ssh-contract fixture: $out/initfs.img"
