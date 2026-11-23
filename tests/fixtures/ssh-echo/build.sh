@@ -107,6 +107,25 @@ if [ "$arch" = x86_64 ]; then
         --output build/fixtures/ssh-echo/echo.img > /dev/null
     echo "ssh-echo fixture: staged $out/ssh-echo and build/fixtures/ssh-echo/echo.img"
 else
+    "$CC" --target=$arch-unknown-ravenbsd --sysroot="$sysroot" \
+        -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+        -D__ravenbsd__=1 -D__unix__=1 \
+        -c "$root/tests/fixtures/ssh-echo/proc-probe.c" -o "$out/proc-probe.o"
+    if [ -n "$builtins" ]; then
+        "$CC" --target=$arch-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
+            -nostdlib -nostartfiles -static -T"$link_script" \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/proc-probe.o" \
+            -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
+            "$sysroot/usr/lib/crtn.o" -o "$out/proc-probe"
+    else
+        "$CC" --target=$arch-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
+            -nostdlib -nostartfiles -static -T"$link_script" \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/proc-probe.o" \
+            -L"$sysroot/usr/lib" -lc \
+            "$sysroot/usr/lib/crtn.o" -o "$out/proc-probe"
+    fi
     cargo xtask initfs --arch "$arch" --profile release > /dev/null
     cp build/"$arch"/initfs.img "$out/base.img"
     cargo build -q -p raven-b70-overlay
@@ -114,7 +133,9 @@ else
     overlay=$target_dir/debug/raven-b70-overlay
     "$overlay" "$out/base.img" "$out/initfs.img" \
         "/bin/ssh-echo=$out/ssh-echo:0755" \
-        "/etc/services.d/ssh-echo.toml=$root/tests/fixtures/ssh-echo/ssh-echo.service.manifest"
+        "/bin/proc-probe=$out/proc-probe:0755" \
+        "/etc/services.d/ssh-echo.toml=$root/tests/fixtures/ssh-echo/ssh-echo.service.manifest" \
+        "/etc/services.d/proc-probe.toml=$root/tests/fixtures/ssh-echo/proc-probe.service.manifest"
     cargo xtask image --arch "$arch" --profile release \
         --initfs "$out/initfs.img" --output "$out/echo.img" > /dev/null
     echo "ssh-echo fixture: staged $out/ssh-echo and $out/echo.img"
