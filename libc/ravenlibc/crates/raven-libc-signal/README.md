@@ -45,13 +45,33 @@ area: once copied in, the area may be reused; the handler's `ucontext_t` is a li
 
 ## Capability matrix (production today)
 
-`SysKernel::caps()` is all false: no PG-7 (`SIG_SETUP`, `THREAD_KICK`, `SIGRETURN`,
-`SIGRESEND`), no PG-8 (`-EINTR`/sticky kick), no PG-10 (stop), no PG-12 (FP in the frame), no
-PG-44 (procd kill). Consequences: `sigaction` stores dispositions; `raise` and self-targeted
-`pthread_kill` run the handler through the libc-only direct entry when unmasked; `kill` to another
-process is `ENOSYS`; asynchronous delivery and `SIGSTOP` are absent; no FP/SIMD state is saved
-(PG-12/PG-50). The kick bits `CHECK=1, CANCEL=2, SYNCCALL=4, TIMER=8` are PROPOSED (RD-new 2) and
-nothing else is set.
+On the Raven target (`cfg!(target_os = "none")`) `SysKernel::caps()` reports the committed PG-7
+entry and PG-8 interruptible wait as present; the host build keeps every kernel bit false because
+the unit tests have no Raven kernel behind them.
+
+| Capability | Target | Host | Meaning |
+|---|---|---|---|
+| `entry` | yes | no | `SIG_SETUP` registers `__raven_sigentry` and the per-thread context area |
+| `kick` | yes | no | `THREAD_KICK` sets the sticky word and wakes an interruptible wait |
+| `sigreturn` | yes | no | `SIGRETURN` restores the kernel-saved frame |
+| `eintr` | yes | no | an interruptible wait returns `-EINTR` for a thread with a registered entry |
+| `proc_kill` | yes | no | `kill`/`killpg`/`sigqueue` through the process signal queue |
+| `resend` | no | no | no `SIGRESEND`; a deferred replay uses restore-mask + pending bit + self kick |
+| `stop` | no | no | no PG-10 stop/continue |
+| `fp_in_frame` | no | no | no PG-12 FP/SIMD state in the signal frame |
+
+`sigaction` installs the real entry for a function handler (`ensure_entry` → `SIG_SETUP`);
+`SIG_DFL`/`SIG_IGN` stay in the libc table. A `THREAD_KICK` makes the return-to-user path resume
+at the registered entry, `signal_entry` COPY-INs the kernel frame, builds `siginfo_t`/`ucontext_t`
+and runs the handler, and `SIGRETURN` restores the interrupted frame. A blocked signal stays in
+the kernel queue; `sigprocmask` re-checks with a fresh kick after an unblock. `raise` and
+self-targeted `pthread_kill` keep the libc-only direct entry for the unmasked case. The kick bits
+`CHECK=1, CANCEL=2, SYNCCALL=4, TIMER=8` are PROPOSED (RD-new 2) and nothing else is set.
+
+The on-target `libc-signal-chld` case (`tests/libc/c/libc-signal-chld.c`, qtest
+`tests/qtest/cases/libc-signal-chld.toml`) proves the entry: a blocked SIGCHLD is delivered when
+the mask is restored, and a child exit interrupts a blocking `waitpid` with `EINTR` while the
+handler runs and the retried wait reaps.
 
 ## Soft-float
 

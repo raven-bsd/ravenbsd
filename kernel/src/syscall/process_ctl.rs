@@ -1006,6 +1006,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let destination = UserSlice::new(frame.rsi, 4)?;
 
+    let mut interrupted = false;
     loop {
         let state = target.state.lock();
         if *state == ProcessState::Exited {
@@ -1023,10 +1024,18 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             let _ = process::reap_pid(&target);
             continue;
         }
+        // The child exit queues SIGCHLD and kicks this thread; the target state may already be
+        // terminal on the wakeup. Re-check it before reporting the interruption as `EINTR`.
+        if interrupted {
+            drop(state);
+            return Err(Errno::EINTR);
+        }
         let token = sched::begin_block_interruptible()?;
         if sched::take_kick() {
             sched::end_block(token);
-            return Err(Errno::EINTR);
+            drop(state);
+            interrupted = true;
+            continue;
         }
         // The state lock is held, so the process cannot pass Exited between the check above and
         // the enqueue; `mark_exited` takes the same lock before waking.
@@ -1046,9 +1055,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
         let status = sched::block_current();
         let kicked = sched::take_kick();
         sched::end_block(token);
-        if status == Errno::EINTR.to_ret() || kicked {
-            return Err(Errno::EINTR);
-        }
+        interrupted = status == Errno::EINTR.to_ret() || kicked;
     }
 }
 
@@ -1140,7 +1147,9 @@ fn take_event(child: &Process, event: WaitEvent) {
 /// `P_PID`, `P_PGID` and `P_ALL` select children; `WNOHANG` returns 0 when no
 /// event is ready. Exit, stop and continue statuses use the POSIX encoding from
 /// [`crate::process::status`]. A blocking wait sleeps on the caller's child queue
-/// and is woken by exit/stop/continue notifications.
+/// and is woken by exit/stop/continue notifications. A caught signal that
+/// interrupts the sleep returns `EINTR` (FreeBSD `kern_wait6` `msleep(... PCATCH)`,
+/// NetBSD `find_stopped_child`); the caller retries and the status stays queued.
 pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let idtype = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
