@@ -66,6 +66,13 @@ fi
 
 # case | arch | owner | subsystem note | optional explicit case path
 # The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
+#
+# K548 release-network rows (wired from the rev-51/52 evidence on c2892c717/5cfb80505):
+# net-fuzz-release 108.000 s cold (90 s case timeout, 28 mutation deviations);
+# net-fuzz-l4-release 34.500 s (90 s, 57); net-fuzz-frag-timeout-release 51.491 s
+# (120 s, 2); net-churn-release 47.333 s (120 s, 1000). The first row builds
+# build/qtest/net-fuzz-release.img; the rest reuse the stamp. All four are
+# functional rows, not latency rows.
 cases='boot-uname|x86_64|stuart|boot/uname
 kernel-early-boot|x86_64|stuart|boot
 exc-int3|x86_64|stuart|exceptions
@@ -90,10 +97,10 @@ ssh-first-byte|x86_64|bob|ssh first byte|tests/fixtures/ssh-first-byte/ssh-first
 net-fuzz|x86_64|jorge|net fuzz|tests/qtest/cases/net-fuzz.toml
 net-fuzz-l4|x86_64|jorge|net fuzz l4|tests/qtest/cases/net-fuzz-l4.toml
 net-fuzz-frag-timeout|x86_64|jorge|net fuzz frag|tests/qtest/cases/net-fuzz-frag-timeout.toml
-net-fuzz-release|x86_64|jorge|net fuzz release|tests/qtest/cases/net-fuzz-release.toml
-net-fuzz-l4-release|x86_64|jorge|net fuzz l4 release|tests/qtest/cases/net-fuzz-l4-release.toml
-net-fuzz-frag-timeout-release|x86_64|jorge|net fuzz frag release|tests/qtest/cases/net-fuzz-frag-timeout-release.toml
-net-churn-release|x86_64|jorge|net churn release|tests/qtest/cases/net-churn-release.toml
+net-fuzz-release|x86_64|jorge|network fuzz release|tests/qtest/cases/net-fuzz-release.toml
+net-fuzz-l4-release|x86_64|jorge|network fuzz l4 release|tests/qtest/cases/net-fuzz-l4-release.toml
+net-fuzz-frag-timeout-release|x86_64|jorge|network fuzz frag timeout release|tests/qtest/cases/net-fuzz-frag-timeout-release.toml
+net-churn-release|x86_64|jorge|network churn release|tests/qtest/cases/net-churn-release.toml
 duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator
