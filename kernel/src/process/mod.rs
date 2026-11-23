@@ -2096,6 +2096,16 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             holders[5],
             holders[6]
         );
+        let (heap_used, heap_free) = crate::memory::heap::stats();
+        let class = crate::memory::heap::class_stats(16);
+        kprintln!(
+            "s36: heap used={} free={} c3072_slabs={} c3072_used={} c3072_free={}",
+            heap_used,
+            heap_free,
+            class.map_or(0, |stats| stats.slabs),
+            class.map_or(0, |stats| stats.in_use),
+            class.map_or(0, |stats| stats.free)
+        );
         let opcodes = queue_opcode_stats();
         kprintln!(
             "s36: qop close={} dup={} open={} other={} top_queue_pid={}",

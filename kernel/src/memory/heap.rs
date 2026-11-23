@@ -83,6 +83,12 @@ pub fn stats() -> (usize, usize) {
     }
 }
 
+/// Statistics for one general size-class slot (S36b diagnostic).
+pub fn class_stats(index: usize) -> Option<raven_kmem::CacheStats> {
+    let guard = HEAP.lock();
+    guard.as_ref()?.heap.general_stats(index)
+}
+
 /// Run the `selftest=heap` workload.
 pub fn selftest() {
     {
