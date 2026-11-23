@@ -168,6 +168,33 @@ pub fn queue_opcode_stats() -> [u64; 5] {
     stats
 }
 
+/// State of the largest server request queue's owner (S36b diagnostic).
+pub fn queue_owner_state() -> [u64; 6] {
+    let top_pid = queue_opcode_stats()[4];
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        if process.id != top_pid {
+            continue;
+        }
+        let state = match *process.state.lock() {
+            ProcessState::Created => 0,
+            ProcessState::Running => 1,
+            ProcessState::Exited => 2,
+        };
+        return [
+            top_pid,
+            state,
+            process.last_syscall.load(Ordering::Acquire),
+            u64::from(process.in_syscall.load(Ordering::Acquire)),
+            process.wait_object.load(Ordering::Acquire),
+            process.threads.load(Ordering::Acquire) as u64,
+        ];
+    }
+    [0; 6]
+}
+
 /// Leaked-process reference histogram (S36b diagnostic).
 ///
 /// Returns `(leaked, external_refs_1, external_refs_2, external_refs_3plus, self_handles,
@@ -2041,6 +2068,16 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             opcodes[2],
             opcodes[3],
             opcodes[4]
+        );
+        let owner = queue_owner_state();
+        kprintln!(
+            "s36: qowner pid={} state={} last_syscall={} in_syscall={} wait_object={} threads={}",
+            owner[0],
+            owner[1],
+            owner[2],
+            owner[3],
+            owner[4],
+            owner[5]
         );
     }
 }
