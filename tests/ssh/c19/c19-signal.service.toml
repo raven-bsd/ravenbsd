@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# C19 conformance first half: frame/context signal test (test-only service).
+
+name = "c19-signal"
+exec = "/bin/c19-signal"
+args = ["/bin/c19-signal"]
+needs = []
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false
