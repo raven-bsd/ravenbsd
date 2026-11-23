@@ -21,13 +21,25 @@ image=build/qtest/ssh-first-byte.img
 stamp=$image.head
 commit=$(git rev-parse HEAD)
 
+mkdir -p build/qtest
+if command -v flock >/dev/null 2>&1; then
+    exec 9>"build/qtest/.ssh-first-byte.lock"
+    flock -w 900 9 || {
+        echo "ssh-first-byte: image build lock timeout" >&2
+        exit 1
+    }
+fi
+
 if [ ! -f "$image" ] || [ ! -f "$stamp" ] ||
     [ "$(cat "$stamp" 2>/dev/null)" != "$commit" ]; then
     printf 'ssh-first-byte: building %s at %s\n' "$image" "$commit"
-    mkdir -p build/qtest
     cargo xtask image --arch x86_64 --profile release \
         --cmdline 'console=ttyS0 test-exit=1' --output "$image"
     printf '%s\n' "$commit" >"$stamp"
+fi
+
+if command -v flock >/dev/null 2>&1; then
+    exec 9>&-
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
