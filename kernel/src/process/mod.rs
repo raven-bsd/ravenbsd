@@ -80,6 +80,24 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
 /// S36 lock/time churn baseline (`frame::stats().allocated_bytes` at the exit-90 marker).
 static S36_LOCK_BASE: AtomicU64 = AtomicU64::new(0);
+/// Process objects currently alive (S36 diagnostic).
+static LIVE_PROCESSES: AtomicU64 = AtomicU64::new(0);
+
+/// Count a newly created process object (S36 diagnostic).
+fn note_process_created() {
+    LIVE_PROCESSES.fetch_add(1, Ordering::Relaxed);
+}
+
+/// Number of live `Process` allocations (S36 diagnostic).
+pub fn live_processes() -> u64 {
+    LIVE_PROCESSES.load(Ordering::Acquire)
+}
+
+impl Drop for Process {
+    fn drop(&mut self) {
+        LIVE_PROCESSES.fetch_sub(1, Ordering::AcqRel);
+    }
+}
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
@@ -478,6 +496,7 @@ pub fn group_in_session(pgid: u64, sid: u64) -> bool {
 
 /// Create the kernel process that owns kernel threads.
 pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
+    note_process_created();
     Ok(Arc::new(Process {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
@@ -556,6 +575,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
             default_limits(),
         )
     };
+    note_process_created();
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -627,6 +647,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
     let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
     let limits = *source.limits.lock();
     let root = source.root.lock().clone();
+    note_process_created();
     let child = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -1046,6 +1067,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     };
     let user_stack = build_stack(&mut user_address_space, path_bytes, &argv, &[], &ids, aux)?;
 
+    note_process_created();
     let process = Arc::new(Process {
         id,
         ids: Mutex::new(ids),
@@ -1857,6 +1879,20 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
                 kprintln!("s36: lockcheck leak delta={}", delta);
             }
         }
+    }
+    // S36b process-object diagnostic: separate line so the stable s36 regex is unchanged.
+    if paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s36-proccheck")
+    {
+        kprintln!(
+            "s36: procs={} threads={} zombies={} proc_size={} lineage={}",
+            live_processes(),
+            crate::sched::thread::live_threads(),
+            ZOMBIES.lock().len(),
+            core::mem::size_of::<Process>(),
+            crate::process::handle::lineage_nodes()
+        );
     }
 }
 
