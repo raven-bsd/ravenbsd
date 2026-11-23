@@ -14,6 +14,8 @@ use raven_libc_abi::socket::{
     SO_PROTOCOL, SO_RCVBUF, SO_RCVTIMEO, SO_TYPE, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_STREAM,
     SOL_SOCKET,
 };
+use raven_libc_platform::Handle;
+use raven_libc_platform::fd::{InheritedSocket, SocketEndpoint, SocketMeta};
 use raven_proto_net::{Call, Endpoint, SockOpt};
 
 fn net(caps: Caps) -> Net<FakeNetd, FakeNetd, FakeNetd, FakeNetd> {
@@ -339,6 +341,51 @@ fn accept_two_round_trips_and_peer() {
             .any(|entry| matches!(entry, WireLog::Call(Call::GetPeerName)))
     );
     assert!(net.poll_interest(accepted).is_ok());
+}
+
+#[test]
+fn inherited_accepted_socket_keeps_its_peer_and_local() {
+    let fake = FakeNetd::with_caps(Caps::default());
+    let peer = Endpoint {
+        ip: [10, 0, 2, 2],
+        port: 40_000,
+    };
+    let local = Endpoint {
+        ip: [10, 0, 2, 15],
+        port: 22,
+    };
+    fake.push_inherited(InheritedSocket {
+        fd: 7,
+        ofd: 9,
+        handle: Handle(0x55),
+        status: 0,
+        socket: SocketMeta {
+            domain: AF_INET,
+            ty: SOCK_STREAM,
+            proto: 0,
+            state: 5,
+            local: Some(SocketEndpoint {
+                ip: local.ip,
+                port: local.port,
+            }),
+            peer: Some(SocketEndpoint {
+                ip: peer.ip,
+                port: peer.port,
+            }),
+        },
+    });
+    let net = Net::new(fake.clone(), fake.clone(), fake.clone());
+    let mut out = [0u8; 16];
+    assert_eq!(net.getpeername(7, &mut out), Ok(16));
+    let parsed = crate::parse_sockaddr(&out).expect("peer");
+    assert_eq!(parsed.ipv4(), Some(peer.ip));
+    assert_eq!(parsed.port(), peer.port);
+
+    let mut local_out = [0u8; 16];
+    assert_eq!(net.getsockname(7, &mut local_out), Ok(16));
+    let parsed = crate::parse_sockaddr(&local_out).expect("local");
+    assert_eq!(parsed.ipv4(), Some(local.ip));
+    assert_eq!(parsed.port(), local.port);
 }
 
 #[test]
