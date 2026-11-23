@@ -9,16 +9,30 @@
 use alloc::vec::Vec;
 
 use crate::errors::{EBADF, ENOSYS, ENOTDIR, Errno};
-use crate::request::FdMapEntry;
+use crate::request::{FdMapEntry, SocketMeta};
 use crate::spawn_model::api::{FileAction, FileActions};
 
 /// One inherited descriptor.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FdEntry {
     /// Descriptor number.
     pub fd: i32,
     /// Scheme handle.
     pub handle: u32,
+    /// OFD kind byte, the `FdMap` encoding (`2` is a terminal).
+    pub kind: u8,
+    /// Access mode and status bits from the parent's open-file description.
+    pub status: u32,
+    /// Public absolute path, when the parent's OFD remembers one.
+    pub path: Option<Vec<u8>>,
+    /// Scheme notification event handle, or zero.
+    pub event: u32,
+    /// The one-shot readiness replay mask.
+    pub readiness: u32,
+    /// The socket identity for an inherited socket.
+    pub socket: Option<SocketMeta>,
+    /// The inherited tty is the `pty:` master.
+    pub pty_master: bool,
     /// Whether the descriptor closes at exec.
     pub cloexec: bool,
 }
@@ -86,6 +100,13 @@ pub fn apply_actions(
         .map(|entry| FdMapEntry {
             fd: entry.fd,
             handle: entry.handle,
+            kind: entry.kind,
+            status: entry.status,
+            path: entry.path.clone(),
+            event: entry.event,
+            readiness: entry.readiness,
+            socket: entry.socket,
+            pty_master: entry.pty_master,
         })
         .collect();
     Ok(scratch)
@@ -112,6 +133,13 @@ fn apply_inner(
                     FdEntry {
                         fd: *fd,
                         handle,
+                        kind: 0,
+                        status: u32::try_from(*oflag & 0o3).unwrap_or_default(),
+                        path: None,
+                        event: 0,
+                        readiness: 0,
+                        socket: None,
+                        pty_master: false,
                         cloexec: false,
                     },
                 );
@@ -120,13 +148,20 @@ fn apply_inner(
                 let source = entries
                     .iter()
                     .find(|entry| entry.fd == *fd)
-                    .copied()
+                    .cloned()
                     .ok_or(EBADF)?;
                 set_entry(
                     entries,
                     FdEntry {
                         fd: *newfd,
                         handle: source.handle,
+                        kind: source.kind,
+                        status: source.status,
+                        path: source.path,
+                        event: source.event,
+                        readiness: source.readiness,
+                        socket: source.socket,
+                        pty_master: source.pty_master,
                         cloexec: false,
                     },
                 );
@@ -141,7 +176,7 @@ fn apply_inner(
                 let entry = entries
                     .iter()
                     .find(|entry| entry.fd == *fd)
-                    .copied()
+                    .cloned()
                     .ok_or(EBADF)?;
                 if !env.is_dir(entry.handle)? {
                     return Err(ENOTDIR);

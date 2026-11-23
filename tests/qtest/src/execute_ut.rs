@@ -247,6 +247,77 @@ fn a_failing_pre_command_is_an_error() {
 }
 
 #[test]
+fn a_preflight_77_is_skipped_not_error() {
+    let temp = TempDir::new("execute-preflight-skip");
+    let marker = temp.path().join("ran.txt");
+    let script = format!("{}/preflight-load.sh", env!("CARGO_MANIFEST_DIR"));
+    let text = format!(
+        "name = \"preflight-skip\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
+         expect_exit = \"success\"\n\
+         pre = [\"sh {script} --load1 6.32 --max-load 5.0\"]\n"
+    );
+    let case = Case::parse(&text).unwrap();
+    let outcome = execute(&case, &runner(&format!("touch {}", marker.display())));
+    assert_eq!(
+        outcome.report.result,
+        ResultKind::Skipped,
+        "{:?}",
+        outcome.detail
+    );
+    let detail = outcome.detail.expect("detail");
+    assert!(detail.contains("pre[0]"), "{detail}");
+    assert!(detail.contains("waiting-for-window"), "{detail}");
+    assert!(!marker.exists(), "the runner must not start under load");
+}
+
+#[test]
+fn a_preflight_safe_value_continues() {
+    let script = format!("{}/preflight-load.sh", env!("CARGO_MANIFEST_DIR"));
+    let text = format!(
+        "name = \"preflight-safe\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
+         expect_exit = \"success\"\n\
+         pre = [\"sh {script} --load1 4.59 --max-load 5.0\"]\n"
+    );
+    let case = Case::parse(&text).unwrap();
+    let outcome = execute(&case, &runner("exit 33"));
+    assert_eq!(
+        outcome.report.result,
+        ResultKind::Pass,
+        "{:?}",
+        outcome.detail
+    );
+}
+
+#[test]
+fn both_timer_cases_carry_the_load_preflight() {
+    for name in ["kernel-timer.toml", "kernel-timer-aarch64.toml"] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("cases")
+            .join(name);
+        let case =
+            Case::load(&path).unwrap_or_else(|error| panic!("{}: {error:#}", path.display()));
+        let preflight: Vec<&str> = case
+            .spec
+            .pre
+            .iter()
+            .map(String::as_str)
+            .filter(|command| command.contains("tests/qtest/preflight-load.sh"))
+            .collect();
+        assert_eq!(
+            preflight.len(),
+            1,
+            "{name}: expected exactly one preflight pre step, got {:?}",
+            case.spec.pre
+        );
+        assert!(
+            preflight[0].contains("--max-load 5.0"),
+            "{name}: the preflight must keep the measured 5.0 load bound: {}",
+            preflight[0]
+        );
+    }
+}
+
+#[test]
 fn a_skipped_case_does_not_run_pre_commands() {
     let temp = TempDir::new("execute-skip-pre");
     let marker = temp.path().join("ran.txt");

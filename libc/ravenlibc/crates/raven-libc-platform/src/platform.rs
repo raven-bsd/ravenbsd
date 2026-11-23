@@ -2349,3 +2349,7 @@ impl<B: SysBackend, L: Lock> OfdRef<'_, B, L> {
 #[cfg(test)]
 #[path = "p1c_ut.rs"]
 mod p1c_tests;
+
+#[cfg(test)]
+#[path = "platform_ut.rs"]
+mod platform_tests;
