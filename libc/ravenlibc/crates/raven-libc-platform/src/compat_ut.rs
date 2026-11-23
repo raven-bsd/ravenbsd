@@ -87,3 +87,124 @@ fn ttyname_rejects_a_file() {
         Err(crate::Errno::ENOTTY)
     );
 }
+
+#[test]
+fn isatty_probes_an_unknown_kind_pty() {
+    // The v1 spawn map marks the inherited pty Unknown; `isatty` must ask the terminal instead
+    // of rejecting it on the kind, or uutils `tty` never reaches `ttyname`.
+    let fake = FakeSys::new();
+    fake.tty(b"/dev/tty");
+    let platform = Platform::new(fake);
+    let _first = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("first");
+    let second = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("second");
+    let handle = platform.get(second).expect("fd").handle();
+    let fd = platform
+        .install(
+            handle,
+            crate::fd::ofd::OfdKind::Unknown,
+            fcntl::O_RDWR as u32,
+            None,
+            false,
+        )
+        .expect("install");
+    assert!(crate::tty::isatty(&platform, fd));
+    assert!(platform.tcgetattr(fd).is_ok());
+}
+
+#[test]
+fn pty_pair_names_a_master_and_slave_from_the_service() {
+    let fake = FakeSys::new();
+    fake.tty(b"/dev/tty");
+    let platform = Platform::new(fake);
+    let first = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("first");
+    let second = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("second");
+    let master_handle = platform.get(first).expect("fd").handle();
+    let slave_handle = platform.get(second).expect("fd").handle();
+    let master = platform
+        .install(
+            master_handle,
+            crate::fd::ofd::OfdKind::Unknown,
+            fcntl::O_RDWR as u32,
+            None,
+            false,
+        )
+        .expect("master");
+    let slave = platform
+        .install(
+            slave_handle,
+            crate::fd::ofd::OfdKind::Unknown,
+            fcntl::O_RDWR as u32,
+            None,
+            false,
+        )
+        .expect("slave");
+    // Handle 5 -> ino 105 -> pair 52 master; handle 6 -> ino 106 -> pair 52 slave.
+    assert_eq!(crate::compat::pty_pair(&platform, master), Some((52, true)));
+    assert_eq!(crate::compat::pty_pair(&platform, slave), Some((52, false)));
+}
+
+#[test]
+fn ttyname_names_a_live_pty_pair_from_the_service() {
+    // An inherited terminal has no `ofd.path`; the pty service knows the live slave pair from
+    // its endpoint identity (slave = 2N+2). FakeSys reports `ino = handle + 100`, so the second
+    // open (handle 6, ino 106) is pair 52.
+    let fake = FakeSys::new();
+    fake.tty(b"/dev/tty");
+    let platform = Platform::new(fake);
+    let _first = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("first");
+    let second = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("second");
+    let handle = platform.get(second).expect("fd").handle();
+    let fd = platform
+        .install(
+            handle,
+            crate::fd::ofd::OfdKind::Unknown,
+            fcntl::O_RDWR as u32,
+            None,
+            false,
+        )
+        .expect("install");
+    assert_eq!(
+        crate::compat::ttyname(&platform, fd),
+        Ok(b"/dev/pts/52".to_vec())
+    );
+}
+
+#[test]
+fn ttyname_does_not_name_a_legacy_console_as_a_pty() {
+    // The console answers GET_MODE only; it is not a pty endpoint and has no /dev/pts name.
+    let fake = FakeSys::new();
+    fake.tty_legacy(b"/dev/console");
+    let platform = Platform::new(fake);
+    let _first = platform
+        .open(b"/dev/console", fcntl::O_RDWR as u32, 0)
+        .expect("first");
+    let second = platform
+        .open(b"/dev/console", fcntl::O_RDWR as u32, 0)
+        .expect("second");
+    let handle = platform.get(second).expect("fd").handle();
+    let fd = platform
+        .install(
+            handle,
+            crate::fd::ofd::OfdKind::Unknown,
+            fcntl::O_RDWR as u32,
+            None,
+            false,
+        )
+        .expect("install");
+    assert_eq!(
+        crate::compat::ttyname(&platform, fd),
+        Err(crate::Errno::ENOTTY)
+    );
+}
