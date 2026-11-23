@@ -8,8 +8,9 @@
 # and preserves the evidence.  The qtest case then boots the same image and asserts the listener
 # is alive.
 #
-# usage: sh tests/net-conformance/fuzz.sh [--no-build] [--scenario fuzz|l4|frag-timeout]
-#   --no-build  reuse the stamped build/qtest/net-conformance.img and qtest image
+# usage: sh tests/net-conformance/fuzz.sh [--release] [--no-build] [--scenario fuzz|l4|frag-timeout]
+#   --release   run the shipped `release` profile with the test listener overlay
+#   --no-build  reuse the stamped image
 #   --scenario  fuzz (TCP), l4 (UDP/ICMP/IPv4 options/fragments), or frag-timeout
 
 set -eu
@@ -17,9 +18,14 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$root"
 
 no_build=0
+release=0
 scenario=fuzz
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --release)
+            release=1
+            shift
+            ;;
         --no-build)
             no_build=1
             shift
@@ -30,7 +36,7 @@ while [ "$#" -gt 0 ]; do
             shift 2
             ;;
         *)
-            echo "usage: $0 [--no-build] [--scenario fuzz|l4|frag-timeout]" >&2
+            echo "usage: $0 [--release] [--no-build] [--scenario fuzz|l4|frag-timeout]" >&2
             exit 2
             ;;
     esac
@@ -52,6 +58,11 @@ case "$scenario" in
         label=net-fuzz-frag-timeout
         run_cap=65
         ;;
+    churn)
+        harness_scenario=churn
+        label=net-churn
+        run_cap=60
+        ;;
     *)
         echo "unknown scenario: $scenario" >&2
         exit 2
@@ -59,20 +70,38 @@ case "$scenario" in
 esac
 
 out=build/net-fuzz
-image=build/qtest/net-conformance.img
-qtest_image=build/qtest/net-fuzz.img
-stamp=$out/image.stamp
-if [ "$scenario" = fuzz ]; then
-    log=$out/fuzz.log
-    pcap=$out/fuzz.pcap
-    serial=$out/fuzz-serial.log
-    summary_file=$out/summary.txt
+if [ "$release" -eq 1 ]; then
+    profile=release
+    fixture=build/fixtures/net-conformance-release
+    image=build/qtest/net-conformance-release.img
+    qtest_image=build/qtest/net-fuzz-release.img
+    stamp=$out/image-release.stamp
+    tag=release
 else
-    log=$out/fuzz-$scenario.log
-    pcap=$out/fuzz-$scenario.pcap
-    serial=$out/fuzz-$scenario-serial.log
-    summary_file=$out/summary-$scenario.txt
+    profile=network-config-test
+    fixture=build/fixtures/net-conformance
+    image=build/qtest/net-conformance.img
+    qtest_image=build/qtest/net-fuzz.img
+    stamp=$out/image.stamp
+    tag=
 fi
+if [ "$scenario" = fuzz ]; then
+    log=$out/fuzz${tag:+-$tag}.log
+    pcap=$out/fuzz${tag:+-$tag}.pcap
+    serial=$out/fuzz${tag:+-$tag}-serial.log
+    summary_file=$out/summary${tag:+-$tag}.txt
+else
+    log=$out/fuzz-${scenario}${tag:+-$tag}.log
+    pcap=$out/fuzz-${scenario}${tag:+-$tag}.pcap
+    serial=$out/fuzz-${scenario}${tag:+-$tag}-serial.log
+    summary_file=$out/summary-${scenario}${tag:+-$tag}.txt
+fi
+if [ "$release" -eq 1 ]; then
+    label=$label-release
+fi
+export NETCONF_PROFILE="$profile"
+export NETCONF_OUT="$fixture"
+export NETCONF_IMAGE="$image"
 pid_file=${serial%.log}.qemu.pid
 mkdir -p "$out"
 
@@ -105,12 +134,12 @@ if [ "$no_build" -eq 0 ]; then
 fi
 
 if [ "$no_build" -eq 0 ]; then
-    # A cold network-config-test initfs compiles libc and uutils; the measured cold cap is
-    # 600 s.  The fuzz run that follows has its own scenario cap.
+    # A cold profile initfs compiles libc and uutils; the measured cold cap is 600 s.  The
+    # fuzz run that follows has its own scenario cap.
     if ! timeout 600 sh scripts/net-conformance.sh --target raven --build-only \
-        > "$out/build.log" 2>&1; then
-        echo "$label: FAIL image build (see $out/build.log)" >&2
-        tail -n 30 "$out/build.log" >&2
+        > "$out/build${tag:+-$tag}.log" 2>&1; then
+        echo "$label: FAIL image build (see $out/build${tag:+-$tag}.log)" >&2
+        tail -n 30 "$out/build${tag:+-$tag}.log" >&2
         exit 1
     fi
 fi
@@ -137,12 +166,12 @@ elapsed=$(( $(date +%s) - started ))
 # The qtest case logs in and exits, so its copy needs test-exit=1.  The fuzz run above keeps the
 # profile's normal cmdline.  This is a cached xtask image build after the fixture initfs exists.
 if [ "$no_build" -eq 0 ]; then
-    if ! timeout 120 cargo xtask image --arch x86_64 --profile network-config-test \
-        --initfs build/fixtures/net-conformance/initfs.img \
+    if ! timeout 120 cargo xtask image --arch x86_64 --profile "$profile" \
+        --initfs "$fixture/initfs.img" \
         --cmdline 'console=ttyS0 test-exit=1' \
-        --output "$qtest_image" > "$out/qtest-image.log" 2>&1; then
-        echo "$label: FAIL qtest image build (see $out/qtest-image.log)" >&2
-        tail -n 30 "$out/qtest-image.log" >&2
+        --output "$qtest_image" > "$out/qtest-image${tag:+-$tag}.log" 2>&1; then
+        echo "$label: FAIL qtest image build (see $out/qtest-image${tag:+-$tag}.log)" >&2
+        tail -n 30 "$out/qtest-image${tag:+-$tag}.log" >&2
         exit 1
     fi
     printf '%s\n' "$stamp_value" > "$stamp"
