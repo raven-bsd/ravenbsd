@@ -1140,6 +1140,35 @@ fn take_event(child: &Process, event: WaitEvent) {
     }
 }
 
+/// Consume one ready child event, if any.
+///
+/// The caller's selection is re-checked at every pass: a child exit may race a signal kick
+/// (`SIGCHLD`), and the status must win over `EINTR` when both are ready. This mirrors the
+/// FreeBSD `kern_wait6` loop, which re-scans the child list after `msleep` before returning the
+/// interrupted error.
+fn take_ready_event(
+    caller: &Arc<Process>,
+    idtype: u32,
+    id: i32,
+    options: u32,
+    destination: UserSlice,
+) -> Result<Option<usize>, Errno> {
+    let children = children_for(caller, idtype, id)?;
+    if children.is_empty() {
+        return Err(Errno::ECHILD);
+    }
+    for child in &children {
+        if let Some(event) = peek_event(child, options) {
+            let status = event.status();
+            take_event(child, event);
+            let pid = usize::try_from(child.id).map_err(|_| Errno::EINVAL)?;
+            copy_to_user(destination, &status.to_le_bytes())?;
+            return Ok(Some(pid));
+        }
+    }
+    Ok(None)
+}
+
 /// `proc_wait_ex(idtype, id, options, out_status) -> pid`.
 ///
 /// `P_PID`, `P_PGID` and `P_ALL` select children; `WNOHANG` returns 0 when no
@@ -1159,18 +1188,8 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
     let destination = UserSlice::new(frame.r10, 4)?;
 
     loop {
-        let children = children_for(&caller, idtype, id)?;
-        if children.is_empty() {
-            return Err(Errno::ECHILD);
-        }
-        for child in &children {
-            if let Some(event) = peek_event(child, options) {
-                let status = event.status();
-                take_event(child, event);
-                let pid = usize::try_from(child.id).map_err(|_| Errno::EINVAL)?;
-                copy_to_user(destination, &status.to_le_bytes())?;
-                return Ok(pid);
-            }
+        if let Some(pid) = take_ready_event(&caller, idtype, id, options, destination)? {
+            return Ok(pid);
         }
         if options & WNOHANG != 0 {
             return Ok(0);
@@ -1205,6 +1224,12 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
         let kicked = sched::take_kick();
         sched::end_block(token);
         if status == Errno::EINTR.to_ret() || kicked {
+            // A child-exit notification is a plain wake, but its `SIGCHLD` queue entry kicks
+            // this thread through the PG-7 bridge. If the status is already ready, return it;
+            // only a signal with no child event is an interruption.
+            if let Some(pid) = take_ready_event(&caller, idtype, id, options, destination)? {
+                return Ok(pid);
+            }
             return Err(Errno::EINTR);
         }
     }
