@@ -341,6 +341,20 @@ impl Drop for MemObject {
     }
 }
 
+/// Live thread handles across all processes (S36 timeout-retention diagnostic).
+pub fn thread_handles() -> u64 {
+    let mut total = 0u64;
+    for process in super::processes() {
+        let handles = process.handles.lock();
+        handles.for_each_live(|_, object, _, _| {
+            if matches!(object, Object::Thread(_)) {
+                total = total.saturating_add(1);
+            }
+        });
+    }
+    total
+}
+
 /// A device-memory window a driver can map (`MMIO_CREATE`). Immutable after creation.
 pub struct MmioRegion {
     /// Physical start address (page aligned).

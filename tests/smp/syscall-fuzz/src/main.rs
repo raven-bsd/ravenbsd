@@ -117,6 +117,7 @@ const RAW_DUPLEX_PEERCRED: usize = 0x114;
 const RAW_PROC_CTTY_SET: usize = 0x1e0;
 const RAW_PROC_CTTY_GET: usize = 0x1e1;
 const RAW_PROC_CTTY_SET_FG: usize = 0x1e2;
+const RAW_PROC_CTTY_HANDLE: usize = 0x1e3;
 /// Marker for the Linux-personality branch; it has no single syscall number.
 const RAW_LINUX_TRAP: usize = 0;
 
@@ -3578,6 +3579,13 @@ fn raw_plan(r: &mut Runner) {
         "pipe",
         [ctx.pipe_r, 0, 0, 0, 0, 0],
         Expect::Err(ENOTTY),
+    );
+    r.raw(
+        RAW_PROC_CTTY_HANDLE,
+        "PROC_CTTY_HANDLE",
+        "baseline",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Any,
     );
 
     // Signals: SIGRESEND without a registration is the safe path; SIG_SETUP is installed last.
