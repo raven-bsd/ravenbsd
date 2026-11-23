@@ -207,6 +207,7 @@ int main(int argc, char **argv) {
     }
 
     int spawnp_ok = canary != NULL;
+    int big_ok = canary != NULL;
     if (canary != NULL) {
         int sv2[2] = {-1, -1};
         if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv2) == 0) {
@@ -237,6 +238,33 @@ int main(int argc, char **argv) {
                     (void)waitpid(spawnp_child, &spawnp_status, 0);
                 } else {
                     spawnp_ok = 0;
+                }
+                char big_env_storage[32][160];
+                char *big_env[34];
+                for (int index = 0; index < 32; index++) {
+                    (void)snprintf(big_env_storage[index], sizeof(big_env_storage[index]),
+                                   "RAVEN_TEST_VAR_%02d=%0128d", index, index);
+                    big_env[index] = big_env_storage[index];
+                }
+                big_env[32] = "PATH=/bin";
+                big_env[33] = NULL;
+                pid_t big_child = -1;
+                if (posix_spawnp(&big_child, "libc-test", &actions2, &attr, spawnp_args,
+                                 big_env) == 0) {
+                    int big_status = 0;
+                    (void)waitpid(big_child, &big_status, 0);
+                } else {
+                    big_ok = 0;
+                }
+                int big_canary_ok = 1;
+                for (size_t index = 0; index < canary_len; index++) {
+                    if (canary[index] != 0xA5) {
+                        big_canary_ok = 0;
+                        break;
+                    }
+                }
+                if (!big_canary_ok) {
+                    big_ok = 0;
                 }
                 (void)posix_spawnattr_destroy(&attr);
             } else {
@@ -277,9 +305,9 @@ int main(int argc, char **argv) {
         printf("EXEC-TIMING fork_ns=%llu\n", (unsigned long long)(exec_ret_ns - fork_ns));
         printf("EXEC-TIMING total_ns=%llu\n", (unsigned long long)(wait_ns - fork_ns));
     }
-    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s chunks=%s\n",
+    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s big=%s chunks=%s\n",
            fork_ok ? "ok" : "bad", spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad",
-           spawnp_ok ? "ok" : "bad", chunks_ok ? "ok" : "bad");
+           spawnp_ok ? "ok" : "bad", big_ok ? "ok" : "bad", chunks_ok ? "ok" : "bad");
     fflush(stdout);
     for (int index = 0; index < CHUNK_COUNT; index++) {
         free(chunks[index]);
