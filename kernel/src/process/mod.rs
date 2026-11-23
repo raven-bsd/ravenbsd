@@ -2104,13 +2104,14 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             leaked[11]
         );
         kprintln!(
-            "s36: leaked_tobj={} t_ext1={} t_ext2plus={} t_blocked={} t_ready={} t_dead={}",
+            "s36: leaked_tobj={} t_ext1={} t_ext2plus={} t_blocked={} t_ready={} t_dead={} t_token={}",
             leaked_threads[0],
             leaked_threads[1],
             leaked_threads[2],
             leaked_threads[3],
             leaked_threads[4],
-            leaked_threads[5]
+            leaked_threads[5],
+            leaked_threads[6]
         );
         let holders = request_holder_stats();
         kprintln!(

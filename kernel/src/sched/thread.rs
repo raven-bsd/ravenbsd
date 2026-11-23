@@ -72,9 +72,9 @@ fn remember_thread(thread: &Arc<Thread>) {
 
 /// Leaked thread objects (thread whose process is torn down) and their strong-ref histogram.
 ///
-/// Returns `(leaked, external_refs_1, external_refs_2plus, blocked, ready, dead)`.
-pub fn leaked_thread_objects() -> [u64; 6] {
-    let mut stats = [0u64; 6];
+/// Returns `(leaked, external_refs_1, external_refs_2plus, blocked, ready, dead, token_set)`.
+pub fn leaked_thread_objects() -> [u64; 7] {
+    let mut stats = [0u64; 7];
     for weak in ALL_THREADS.lock().iter() {
         let Some(thread) = weak.upgrade() else {
             continue;
@@ -92,6 +92,9 @@ pub fn leaked_thread_objects() -> [u64; 6] {
             ThreadState::Ready => stats[4] = stats[4].saturating_add(1),
             ThreadState::Dead => stats[5] = stats[5].saturating_add(1),
             ThreadState::Running => {}
+        }
+        if thread.block_token.load(Ordering::Acquire) != 0 {
+            stats[6] = stats[6].saturating_add(1);
         }
     }
     stats
