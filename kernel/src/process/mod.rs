@@ -1684,6 +1684,17 @@ fn cleanup_evidence(process: &Process) -> bool {
 /// thread's own exit path and run in that context only; a foreign caller skips them (an
 /// unstarted process has no thread to print from, and a terminated process prints on its last
 /// thread's exit).
+/// True when the kernel command line contains `token` as a whitespace-separated word.
+///
+/// Teardown runs on a kernel stack that may already be close to its guard page after a pager
+/// fault (S40/S17). The deep `CmdLine` parser is not safe there; FreeBSD `kern_environment.c`
+/// `_getenv_static_from` is the same shallow linear token scan with no allocation.
+fn cmdline_has(token: &str) -> bool {
+    paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|word| word == token)
+}
+
 fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
@@ -1758,11 +1769,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // controller terminates the fixture server first, so its own final line is the baseline.
     // Keep this own-context only: a foreign teardown (terminate/reap) must return through the
     // caller's path, the S40 rule for every teardown evidence print.
-    if own_context
-        && CmdLine::parse(paging::cmdline())
-            .get("s16-teardowncheck")
-            .is_some()
-    {
+    if own_context && cmdline_has("s16-teardowncheck") {
         kprintln!(
             "s16: exit {} handles={} lineage={}",
             process.path,
@@ -1802,42 +1809,27 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         return;
     }
     // S24 leak evidence: the free-frame count after every child exit.
-    if CmdLine::parse(paging::cmdline())
-        .get("s24-framecheck")
-        .is_some()
-    {
+    if cmdline_has("s24-framecheck") {
         kprintln!("s24: frames free={}", frame::stats().free_bytes);
     }
     // K536 rev176: the pty leak row samples the same counter Mark's harness uses.
-    if CmdLine::parse(paging::cmdline())
-        .get("s24-alloccheck")
-        .is_some()
-    {
+    if cmdline_has("s24-alloccheck") {
         kprintln!("s24: frames allocated={}", frame::stats().allocated_bytes);
     }
     // S25 handle-transfer leak evidence: the dying process's live handle count. A transferred
     // handle that survived process death, or a slot leaked by the transfer path, drifts this
     // number across repeated spawn/exit cycles.
-    if CmdLine::parse(paging::cmdline())
-        .get("s25-handlecheck")
-        .is_some()
-    {
+    if cmdline_has("s25-handlecheck") {
         kprintln!("s25: exit handles={}", process.handles.lock().len());
     }
     // S21b DMA leak evidence: the free-frame count after every child exit. Consecutive exits
     // print the same number when allocation and release are balanced.
-    if CmdLine::parse(paging::cmdline())
-        .get("s21-framecheck")
-        .is_some()
-    {
+    if cmdline_has("s21-framecheck") {
         kprintln!("s21: frames free={}", frame::stats().free_bytes);
     }
     // S36 stack-reuse evidence: the fresh-allocation and cached-stack counters must return to
     // baseline across repeated spawn/exit cycles.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-stackcheck")
-        .is_some()
-    {
+    if cmdline_has("s36-stackcheck") {
         let (heap_used, _) = crate::memory::heap::stats();
         let stats = crate::memory::frame::stats();
         kprintln!(
@@ -1852,10 +1844,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // S36 vfsd map/unmap red row: exit 88 records the baseline, exit 89 compares the allocated
     // frame bytes. The markers run around the fixture's vfsd pager map/unmap cycles; a leak keeps
     // allocated_bytes above the one-chunk tolerance and prints the forbidden `leak` line.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-mapcheck")
-        .is_some()
-    {
+    if cmdline_has("s36-mapcheck") {
         let stats = crate::memory::frame::stats();
         if code == 88 {
             S36_MAP_BASE.store(stats.allocated_bytes, Ordering::Release);
@@ -1939,10 +1928,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     }
     // S36 lock/time churn: exit 90 records the baseline, exit 91 compares the allocated frame
     // bytes after the futex wake/timeout churn.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-lockcheck")
-        .is_some()
-    {
+    if cmdline_has("s36-lockcheck") {
         let stats = crate::memory::frame::stats();
         if code == 90 {
             S36_LOCK_BASE.store(stats.allocated_bytes, Ordering::Release);
