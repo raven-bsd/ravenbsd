@@ -192,24 +192,29 @@ def main(argv: list[str]) -> int:
             child.sendline(CONSOLE_COMMAND)
             child.expect(MARKER, timeout=120)
             console_ok = True
+            # Primary row: the host client exchange. Capture it before any guest-side diagnostic
+            # so a diagnostic that wedges the console cannot hide the client result.
             if wait_listener(client_host, client_port, 30):
                 client_ok, client_banner, client_detail = ssh_client(client_host, client_port, 40)
             else:
                 client_detail = "forwarded-port-never-listened"
-            # Read the sshd log after the client attempt: a "Connection from 10.0.2.2" line means
-            # the guest accepted the TCP connection and the banner is a guest TX path issue; no
-            # line means the SYN/handshake never reached the listener.
-            child.sendline("cat /tmp/sshd.log 2>/dev/null; echo POST-$((6*7+1))")
-            child.expect("POST-43", timeout=30)
-            # Guest loopback probe: if the guest's own ssh client sees the server banner, sshd
-            # listens and accepts; if it times out too, the stop is the guest accept path, not
-            # netd/NIC. BatchMode avoids a password prompt; the exit status is not the row.
-            child.sendline(
-                "timeout 12 /bin/ssh -v -o StrictHostKeyChecking=no "
-                "-o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5 "
-                "-o NumberOfPasswordPrompts=1 root@127.0.0.1 true 2>&1; echo LOOPDONE-$?"
-            )
-            child.expect(r"LOOPDONE-[0-9]+", timeout=30)
+            # Best-effort guest probes: the staged client must start, then the guest loopback
+            # connection must see the server banner. A hang here is recorded, not allowed to
+            # replace the primary client result.
+            guest_note = "not-run"
+            try:
+                child.sendline("/bin/ssh -V 2>&1; echo SSHTOOL-$?")
+                child.expect(r"SSHTOOL-[0-9]+", timeout=15)
+                guest_note = "ssh-tool-ok"
+                child.sendline(
+                    "/bin/ssh -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+                    "-o BatchMode=yes -o ConnectTimeout=3 -o NumberOfPasswordPrompts=1 "
+                    "root@127.0.0.1 true 2>&1; echo LOOPDONE-$?"
+                )
+                child.expect(r"LOOPDONE-[0-9]+", timeout=20)
+                guest_note = "loopback-done"
+            except (pexpect.TIMEOUT, pexpect.EOF):
+                guest_note = "guest-probe-hung"
         except (pexpect.EOF, pexpect.TIMEOUT) as error:
             print(f"aarch64-net: console wait {type(error).__name__}", file=sys.stderr)
             print((child.before or "")[-1200:], file=sys.stderr)
@@ -231,7 +236,7 @@ def main(argv: list[str]) -> int:
         f"aarch64-net: netd_up={int(netd)} netd_ready={int(nic)} sshd_up={int(sshd)} "
         f"listening={int(listening)} marker={int(console_ok)} client_ok={int(client_ok)} "
         f"banner={int(client_banner)} loop_banner={int(loop_banner)} client={client_detail} "
-        f"faults={len(faults)} transport={'tap' if args.tap else 'user'}"
+        f"faults={len(faults)} guest={guest_note} transport={'tap' if args.tap else 'user'}"
     )
     for line in text.splitlines():
         if any(token in line for token in ("Remote protocol version", "banner exchange", "Permission denied")):
