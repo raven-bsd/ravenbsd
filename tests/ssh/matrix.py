@@ -1877,7 +1877,11 @@ def main() -> int:
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
                                  "vars-only.fd", ready_timeout=180,
                                  socket_serial=socket_only)
-            if socket_only:
+            if only == "close-probe":
+                # The close capture needs sshd/TCP, not the DNS lease; resolvd may be red.
+                console = handle  # type: ignore[assignment]
+                lease_ok = True
+            elif socket_only:
                 console = handle  # type: ignore[assignment]
                 lease_ok = serial_has(console, SERIAL_LEASE, 60)
             else:
