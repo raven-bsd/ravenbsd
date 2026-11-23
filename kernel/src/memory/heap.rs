@@ -12,8 +12,29 @@
 
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use spin::Mutex;
+
+/// Failed allocation size and caller addresses (K434 2128-byte owner diagnostic).
+static FAIL_SIZE: AtomicUsize = AtomicUsize::new(0);
+static FAIL_RA0: AtomicUsize = AtomicUsize::new(0);
+static FAIL_RA1: AtomicUsize = AtomicUsize::new(0);
+
+/// Failed allocation `(size, caller_return_addresses)`; size 0 when none.
+pub fn fail_info() -> (usize, usize, usize) {
+    (
+        FAIL_SIZE.load(Ordering::Acquire),
+        FAIL_RA0.load(Ordering::Acquire),
+        FAIL_RA1.load(Ordering::Acquire),
+    )
+}
+
+fn record_fail(size: usize, ra0: usize, ra1: usize) {
+    FAIL_SIZE.store(size, Ordering::Release);
+    FAIL_RA0.store(ra0, Ordering::Release);
+    FAIL_RA1.store(ra1, Ordering::Release);
+}
 
 #[cfg(target_arch = "aarch64")]
 use raven_abi::layout::aarch64::{KERNEL_HEAP_BASE, KERNEL_HEAP_END};
@@ -83,11 +104,10 @@ pub fn stats() -> (usize, usize) {
     }
 }
 
-/// K449 diagnostic: `(in_use, slabs, alloc_fail)` for one general size class.
-pub fn class_stats(class: usize) -> Option<(usize, usize, u64)> {
+/// Statistics for one general size-class slot (S36b diagnostic).
+pub fn class_stats(index: usize) -> Option<raven_kmem::CacheStats> {
     let guard = HEAP.lock();
-    let stats = guard.as_ref()?.heap.class_stats(class)?;
-    Some((stats.in_use, stats.slabs, stats.alloc_fail))
+    guard.as_ref()?.heap.general_stats(index)
 }
 
 /// Run the `selftest=heap` workload.
@@ -136,12 +156,29 @@ fn grow(state: &mut State) -> bool {
 // so no allocation re-enters this lock.
 unsafe impl GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let (mut ra0, mut ra1) = (0usize, 0usize);
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            // The allocator is built with a frame pointer: `[rbp + 8]` is this call's return
+            // address and `[rbp]` the caller's frame pointer.
+            core::arch::asm!(
+                "mov {}, [rbp + 8]",
+                out(reg) ra0,
+                options(nomem, nostack, preserves_flags)
+            );
+            core::arch::asm!(
+                "mov {}, [rbp]",
+                out(reg) ra1,
+                options(nomem, nostack, preserves_flags)
+            );
+        }
         if layout.size() == 0 {
             // A zero-size allocation still needs a non-null, aligned address.
             return layout.align() as *mut u8;
         }
         let mut guard = HEAP.lock();
         let Some(state) = guard.as_mut() else {
+            record_fail(layout.size(), ra0, ra1);
             return ptr::null_mut();
         };
         loop {
@@ -149,6 +186,7 @@ unsafe impl GlobalAlloc for Allocator {
                 Ok(address) => return address as *mut u8,
                 Err(_) => {
                     if !grow(state) {
+                        record_fail(layout.size(), ra0, ra1);
                         return ptr::null_mut();
                     }
                 }

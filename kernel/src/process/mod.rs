@@ -80,6 +80,227 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
 /// S36 lock/time churn baseline (`frame::stats().allocated_bytes` at the exit-90 marker).
 static S36_LOCK_BASE: AtomicU64 = AtomicU64::new(0);
+/// Process objects currently alive (S36 diagnostic).
+static LIVE_PROCESSES: AtomicU64 = AtomicU64::new(0);
+
+/// Count a newly created process object (S36 diagnostic).
+fn note_process_created() {
+    LIVE_PROCESSES.fetch_add(1, Ordering::Relaxed);
+}
+
+/// Number of live `Process` allocations (S36 diagnostic).
+pub fn live_processes() -> u64 {
+    LIVE_PROCESSES.load(Ordering::Acquire)
+}
+
+/// Every process ever created, weakly (S36b leaked-reference diagnostic only).
+static ALL_PROCESSES: Mutex<Vec<Weak<Process>>> = Mutex::new(Vec::new());
+
+/// Remember a new process so the diagnostic can inspect leaked objects after the pid registry
+/// dropped them (S36b only).
+fn note_process_weak(process: &Arc<Process>) {
+    ALL_PROCESSES.lock().push(Arc::downgrade(process));
+}
+
+/// Live scheme requests held by each process list, including leaked processes (S36b diagnostic).
+///
+/// Returns `(client_total, active_total, queued_total, top_client_pid, top_client_total,
+/// top_queue_pid, top_queued_total)`.
+pub fn request_holder_stats() -> [u64; 7] {
+    let mut stats = [0u64; 7];
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        let client = process.client_requests.lock().len() as u64;
+        let active = process.active_requests.lock().len() as u64;
+        let queued = process.scheme_queue.lock().len() as u64;
+        stats[0] = stats[0].saturating_add(client);
+        stats[1] = stats[1].saturating_add(active);
+        stats[2] = stats[2].saturating_add(queued);
+        if client > stats[4] {
+            stats[4] = client;
+            stats[3] = process.id;
+        }
+        if queued > stats[6] {
+            stats[6] = queued;
+            stats[5] = process.id;
+        }
+    }
+    stats
+}
+
+/// Opcode histogram of the largest server request queue (S36b diagnostic).
+///
+/// Returns `(close, dup, open, other, top_queue_pid)`. It names the request kind that is
+/// accumulating on the server that does not drain its queue.
+pub fn queue_opcode_stats() -> [u64; 5] {
+    let mut top_pid = 0u64;
+    let mut top_len = 0usize;
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        let len = process.scheme_queue.lock().len();
+        if len > top_len {
+            top_len = len;
+            top_pid = process.id;
+        }
+    }
+    let mut stats = [0u64; 5];
+    stats[4] = top_pid;
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        if process.id != top_pid {
+            continue;
+        }
+        for request in process.scheme_queue.lock().iter() {
+            match request.opcode {
+                crate::ipc::protocol::Opcode::Close => stats[0] = stats[0].saturating_add(1),
+                crate::ipc::protocol::Opcode::Dup => stats[1] = stats[1].saturating_add(1),
+                crate::ipc::protocol::Opcode::Open => stats[2] = stats[2].saturating_add(1),
+                _ => stats[3] = stats[3].saturating_add(1),
+            }
+        }
+    }
+    stats
+}
+
+/// State of the largest server request queue's owner (S36b diagnostic).
+pub fn queue_owner_state() -> [u64; 6] {
+    let top_pid = queue_opcode_stats()[4];
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        if process.id != top_pid {
+            continue;
+        }
+        let state = match *process.state.lock() {
+            ProcessState::Created => 0,
+            ProcessState::Running => 1,
+            ProcessState::Exited => 2,
+        };
+        return [
+            top_pid,
+            state,
+            process.last_syscall.load(Ordering::Acquire),
+            u64::from(process.in_syscall.load(Ordering::Acquire)),
+            process.wait_object.load(Ordering::Acquire),
+            process.threads.load(Ordering::Acquire) as u64,
+        ];
+    }
+    [0; 6]
+}
+
+/// Leaked-process reference histogram (S36b diagnostic).
+///
+/// Returns `(leaked, external_refs_1, external_refs_2, external_refs_3plus, self_handles,
+/// dead_handles_in_all_processes, leaked_threads)`. The `external` count excludes the
+/// diagnostic's temporary upgrade, so it is the number of real owners still holding the
+/// torn-down process.
+pub fn leaked_process_stats() -> [u64; 15] {
+    let mut stats = [0u64; 15];
+    let processes: alloc::vec::Vec<Arc<Process>> = ALL_PROCESSES
+        .lock()
+        .iter()
+        .filter_map(Weak::upgrade)
+        .collect();
+    stats[10] = processes.len() as u64;
+    for (index, process) in processes.iter().enumerate() {
+        if !processes[..index]
+            .iter()
+            .any(|previous| Arc::ptr_eq(previous, process))
+        {
+            stats[11] = stats[11].saturating_add(1);
+        }
+    }
+    for process in &processes {
+        if !process.torn_down.load(Ordering::Acquire) {
+            continue;
+        }
+        stats[0] = stats[0].saturating_add(1);
+        stats[6] = stats[6].saturating_add(u64::from(process.threads.load(Ordering::Acquire)));
+        let external = Arc::strong_count(process).saturating_sub(1);
+        match external {
+            0 => {}
+            1 => stats[1] = stats[1].saturating_add(1),
+            2 => stats[2] = stats[2].saturating_add(1),
+            _ => stats[3] = stats[3].saturating_add(1),
+        }
+        process.handles.lock().for_each_live(|_, object, _, _| {
+            if let crate::process::handle::Object::Process(target) = object {
+                if Arc::ptr_eq(target, process) {
+                    stats[4] = stats[4].saturating_add(1);
+                }
+                if target.torn_down.load(Ordering::Acquire) {
+                    stats[5] = stats[5].saturating_add(1);
+                }
+            }
+            if let crate::process::handle::Object::Thread(thread) = object
+                && thread.process.torn_down.load(Ordering::Acquire)
+            {
+                stats[9] = stats[9].saturating_add(1);
+            }
+        });
+        for holder in &processes {
+            holder.handles.lock().for_each_live(|_, object, _, _| {
+                if let crate::process::handle::Object::SchemeFile(file) = object
+                    && Arc::ptr_eq(&file.server, process)
+                {
+                    stats[7] = stats[7].saturating_add(1);
+                }
+            });
+            let mut check = |request: &Arc<crate::ipc::PendingRequest>| {
+                if Arc::ptr_eq(&request.server, process)
+                    || request
+                        .file
+                        .as_ref()
+                        .is_some_and(|file| Arc::ptr_eq(&file.server, process))
+                {
+                    stats[8] = stats[8].saturating_add(1);
+                }
+                if Arc::ptr_eq(&request.client, process) {
+                    stats[12] = stats[12].saturating_add(1);
+                }
+            };
+            for request in holder.scheme_queue.lock().iter() {
+                check(request);
+            }
+            for request in holder.active_requests.lock().iter() {
+                check(request);
+            }
+            for request in holder.client_requests.lock().iter() {
+                check(request);
+            }
+            if holder
+                .ctty
+                .lock()
+                .as_ref()
+                .is_some_and(|ctty| Arc::ptr_eq(&ctty.file().server, process))
+            {
+                stats[13] = stats[13].saturating_add(1);
+            }
+        }
+        if ZOMBIES
+            .lock()
+            .iter()
+            .any(|zombie| Arc::ptr_eq(zombie, process))
+        {
+            stats[14] = stats[14].saturating_add(1);
+        }
+    }
+    stats
+}
+
+impl Drop for Process {
+    fn drop(&mut self) {
+        LIVE_PROCESSES.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 /// S36 timeout-retention baseline: live non-idle Threads at exit 90.
 static S36_TIMEOUT_LIVE: AtomicU64 = AtomicU64::new(0);
 /// S36 timeout-retention baseline: queued timeout sleepers at exit 90.
@@ -366,6 +587,29 @@ pub struct Process {
     pub child_system_ns: AtomicU64,
     /// Accumulated reaped-child user time.
     pub child_user_ns: AtomicU64,
+    /// Maximum resident user pages observed for this process, in bytes.
+    pub maxrss_bytes: AtomicU64,
+    /// Maximum resident user pages of any reaped child, in bytes.
+    pub child_maxrss_bytes: AtomicU64,
+}
+
+impl Process {
+    /// Resident user pages for this process, in bytes, from the page tables.
+    ///
+    /// `UserAddressSpace::mapped_pages` walks the VMA tree and counts present 4 KiB leaves; it
+    /// includes the initfs and memory-object mappings, so this is resident user memory, not
+    /// private RSS. Zero for the kernel process or after the address space is released.
+    pub fn resident_rss_bytes(&self) -> u64 {
+        let mut slot = self.address_space.lock();
+        slot.as_mut()
+            .map_or(0, |space| space.mapped_pages().saturating_mul(PAGE))
+    }
+
+    /// Fold the current resident bytes into the process's `maxrss` high-water mark.
+    pub fn update_maxrss(&self) {
+        let rss = self.resident_rss_bytes();
+        self.maxrss_bytes.fetch_max(rss, Ordering::AcqRel);
+    }
 }
 
 /// Per-process syscall personality and Linux handler handle.
@@ -433,6 +677,7 @@ pub fn current() -> Option<Arc<Process>> {
 
 /// Register a live process in the pid registry.
 pub fn register_pid(process: &Arc<Process>) {
+    note_process_weak(process);
     PID_REGISTRY
         .lock()
         .insert(process.id, Arc::downgrade(process));
@@ -463,6 +708,12 @@ pub fn processes() -> alloc::vec::Vec<Arc<Process>> {
         .values()
         .filter_map(Weak::upgrade)
         .collect()
+}
+
+/// Non-blocking [`processes`] for the metrics-thread census.
+pub fn processes_try() -> Option<alloc::vec::Vec<Arc<Process>>> {
+    let registry = PID_REGISTRY.try_lock()?;
+    Some(registry.values().filter_map(Weak::upgrade).collect())
 }
 
 /// Count live processes and their live threads without allocating or taking process locks.
@@ -523,6 +774,7 @@ pub fn group_in_session(pgid: u64, sid: u64) -> bool {
 
 /// Create the kernel process that owns kernel threads.
 pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
+    note_process_created();
     Ok(Arc::new(Process {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
@@ -576,6 +828,8 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     }))
 }
 
@@ -601,6 +855,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
             default_limits(),
         )
     };
+    note_process_created();
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -654,6 +909,8 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
     register_pid(&process);
@@ -672,6 +929,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
     let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
     let limits = *source.limits.lock();
     let root = source.root.lock().clone();
+    note_process_created();
     let child = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -725,6 +983,8 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
 
     {
@@ -1029,6 +1289,10 @@ pub fn notify_parent(process: &Process, sigchld: bool) {
         parent
             .child_user_ns
             .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
+        parent.child_maxrss_bytes.fetch_max(
+            process.maxrss_bytes.load(Ordering::Acquire),
+            Ordering::AcqRel,
+        );
         let uid = process.ids.lock().uid;
         parent.queue_signal_info(SIGCHLD, process.id, CLD_EXITED_CODE, uid, 0);
     }
@@ -1091,6 +1355,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     };
     let user_stack = build_stack(&mut user_address_space, path_bytes, &argv, &[], &ids, aux)?;
 
+    note_process_created();
     let process = Arc::new(Process {
         id,
         ids: Mutex::new(ids),
@@ -1144,6 +1409,8 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;
@@ -1689,6 +1956,20 @@ fn cleanup_evidence(process: &Process) -> bool {
 /// thread's own exit path and run in that context only; a foreign caller skips them (an
 /// unstarted process has no thread to print from, and a terminated process prints on its last
 /// thread's exit).
+/// Presence check for a boot command-line gate without building the 64-token `CmdLine` table.
+///
+/// `teardown` runs on the 28 KiB kernel stack. An inlined `CmdLine::parse` copy is about 1.5 KiB,
+/// and the seven gate copies below exhausted the stack before the IPC/event close hooks ran (the
+/// K434 init-exit double fault). This is the same token walk the s17 gate already uses.
+fn cmdline_has(key: &str) -> bool {
+    paging::cmdline().split_ascii_whitespace().any(|token| {
+        token == key
+            || token
+                .strip_prefix(key)
+                .is_some_and(|rest| rest.starts_with('='))
+    })
+}
+
 fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
@@ -1703,6 +1984,8 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let _irq = crate::sync::critical();
         ipc::on_process_exit(process);
     }
+    // The RSS high-water mark is snapshotted in `terminate_once` before IPC teardown; do not
+    // walk the address space again after that teardown has altered the mappings.
     let address_space = process.address_space.lock().take();
     if let Some(mut address_space) = address_space {
         if own_context {
@@ -1763,11 +2046,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // controller terminates the fixture server first, so its own final line is the baseline.
     // Keep this own-context only: a foreign teardown (terminate/reap) must return through the
     // caller's path, the S40 rule for every teardown evidence print.
-    if own_context
-        && CmdLine::parse(paging::cmdline())
-            .get("s16-teardowncheck")
-            .is_some()
-    {
+    if own_context && cmdline_has("s16-teardowncheck") {
         kprintln!(
             "s16: exit {} handles={} lineage={}",
             process.path,
@@ -1807,38 +2086,28 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         return;
     }
     // S24 leak evidence: the free-frame count after every child exit.
-    let command_line = CmdLine::parse(paging::cmdline());
-    if command_line.get("s24-framecheck").is_some() {
+    if cmdline_has("s24-framecheck") {
         kprintln!("s24: frames free={}", frame::stats().free_bytes);
-        // K570: the pty-churn frame line rides the same parse. A second top-level parse/print
+        // K570: the pty-churn frame line rides the same gate. A second top-level parse/print
         // block enlarged the teardown frame past the kernel stack (K536 rev187 double fault).
-        if command_line.get("s24-alloccheck").is_some() {
+        if cmdline_has("s24-alloccheck") {
             kprintln!("s24: frames allocated={}", frame::stats().allocated_bytes);
         }
     }
     // S25 handle-transfer leak evidence: the dying process's live handle count. A transferred
     // handle that survived process death, or a slot leaked by the transfer path, drifts this
     // number across repeated spawn/exit cycles.
-    if CmdLine::parse(paging::cmdline())
-        .get("s25-handlecheck")
-        .is_some()
-    {
+    if cmdline_has("s25-handlecheck") {
         kprintln!("s25: exit handles={}", process.handles.lock().len());
     }
     // S21b DMA leak evidence: the free-frame count after every child exit. Consecutive exits
     // print the same number when allocation and release are balanced.
-    if CmdLine::parse(paging::cmdline())
-        .get("s21-framecheck")
-        .is_some()
-    {
+    if cmdline_has("s21-framecheck") {
         kprintln!("s21: frames free={}", frame::stats().free_bytes);
     }
     // S36 stack-reuse evidence: the fresh-allocation and cached-stack counters must return to
     // baseline across repeated spawn/exit cycles.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-stackcheck")
-        .is_some()
-    {
+    if cmdline_has("s36-stackcheck") {
         let (heap_used, _) = crate::memory::heap::stats();
         let stats = crate::memory::frame::stats();
         kprintln!(
@@ -1853,10 +2122,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // S36 vfsd map/unmap red row: exit 88 records the baseline, exit 89 compares the allocated
     // frame bytes. The markers run around the fixture's vfsd pager map/unmap cycles; a leak keeps
     // allocated_bytes above the one-chunk tolerance and prints the forbidden `leak` line.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-mapcheck")
-        .is_some()
-    {
+    if cmdline_has("s36-mapcheck") {
         let stats = crate::memory::frame::stats();
         if code == 88 {
             S36_MAP_BASE.store(stats.allocated_bytes, Ordering::Release);
@@ -1940,10 +2206,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     }
     // S36 lock/time churn: exit 90 records the baseline, exit 91 compares the allocated frame
     // bytes after the futex wake/timeout churn.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-lockcheck")
-        .is_some()
-    {
+    if cmdline_has("s36-lockcheck") {
         let stats = crate::memory::frame::stats();
         if code == 90 {
             S36_LOCK_BASE.store(stats.allocated_bytes, Ordering::Release);
@@ -1962,6 +2225,119 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
                 kprintln!("s36: lockcheck leak delta={}", delta);
             }
         }
+    }
+    // S36b process-object diagnostic: separate line so the stable s36 regex is unchanged.
+    if paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s36-proccheck")
+    {
+        let (dead_handles, top_pid, top_count) = crate::process::handle::dead_process_handles();
+        let (notices, dead_clients, dead_servers) = crate::ipc::router::close_notice_stats();
+        let leaked = leaked_process_stats();
+        let leaked_threads = crate::sched::thread::leaked_thread_objects();
+        kprintln!(
+            "s36: procs={} threads={} zombies={} proc_size={} thread_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={} leaked_threads={} file_refs={} request_refs={} thread_handles={} all_entries={} unique={} client_refs={} ctty_refs={} zombie_refs={}",
+            live_processes(),
+            crate::sched::thread::live_threads(),
+            ZOMBIES.lock().len(),
+            core::mem::size_of::<Process>(),
+            core::mem::size_of::<crate::sched::thread::Thread>(),
+            crate::process::handle::lineage_nodes(),
+            dead_handles,
+            top_pid,
+            top_count,
+            notices,
+            dead_clients,
+            dead_servers,
+            crate::ipc::live_requests(),
+            crate::sched::reap_pending(),
+            leaked[0],
+            leaked[1],
+            leaked[2],
+            leaked[3],
+            leaked[4],
+            leaked[5],
+            leaked[6],
+            leaked[7],
+            leaked[8],
+            leaked[9],
+            leaked[10],
+            leaked[11],
+            leaked[12],
+            leaked[13],
+            leaked[14]
+        );
+        kprintln!(
+            "s36: leaked_tobj={} t_ext1={} t_ext2plus={} t_blocked={} t_ready={} t_dead={} t_token={}",
+            leaked_threads[0],
+            leaked_threads[1],
+            leaked_threads[2],
+            leaked_threads[3],
+            leaked_threads[4],
+            leaked_threads[5],
+            leaked_threads[6]
+        );
+        let thread_holders = crate::sched::thread::thread_holder_stats();
+        kprintln!(
+            "s36: hold thr={} cur={} rq={} sleep={} reap={} live={} pwait={} futex={} handle={} multi={} unexp={} reqwait={}",
+            thread_holders[0],
+            thread_holders[1],
+            thread_holders[2],
+            thread_holders[3],
+            thread_holders[4],
+            thread_holders[5],
+            thread_holders[6],
+            thread_holders[7],
+            thread_holders[8],
+            thread_holders[9],
+            thread_holders[10],
+            thread_holders[11]
+        );
+
+        let holders = request_holder_stats();
+        kprintln!(
+            "s36: ipc client={} active={} queued={} top_pid={} top_client={} top_queue_pid={} top_queue={}",
+            holders[0],
+            holders[1],
+            holders[2],
+            holders[3],
+            holders[4],
+            holders[5],
+            holders[6]
+        );
+        let (heap_used, heap_free) = crate::memory::heap::stats();
+        let class = crate::memory::heap::class_stats(16);
+        kprintln!(
+            "s36: heap used={} free={} c3072_slabs={} c3072_used={} c3072_free={} req_size={} file_size={} cap_size={} evq_size={}",
+            heap_used,
+            heap_free,
+            class.map_or(0, |stats| stats.slabs),
+            class.map_or(0, |stats| stats.in_use),
+            class.map_or(0, |stats| stats.free),
+            core::mem::size_of::<crate::ipc::PendingRequest>(),
+            core::mem::size_of::<crate::ipc::SchemeFile>(),
+            core::mem::size_of::<crate::ipc::capture::Capture>(),
+            core::mem::size_of::<crate::event::EventQueue>()
+        );
+        let opcodes = queue_opcode_stats();
+        kprintln!(
+            "s36: qop close={} dup={} open={} other={} top_queue_pid={}",
+            opcodes[0],
+            opcodes[1],
+            opcodes[2],
+            opcodes[3],
+            opcodes[4]
+        );
+        let owner = queue_owner_state();
+        kprintln!(
+            "s36: qowner pid={} state={} last_syscall={} in_syscall={} wait_object={} threads={}",
+            owner[0],
+            owner[1],
+            owner[2],
+            owner[3],
+            owner[4],
+            owner[5]
+        );
     }
 }
 
@@ -1984,6 +2360,8 @@ fn wake_process_waiters(process: &Arc<Process>) {
     let _ = process.scheme_waiters.wake_process(process.id);
     // Futex buckets are global.
     crate::syscall::futex::remove_process(process.id);
+    // Per-CPU sleep lists hold an `Arc<Thread>` until the deadline.
+    crate::sched::cancel_process_sleepers(process.id);
 
     // Resources reachable from the dying table.  A blocked syscall keeps its object `Arc`, so
     // the object is still live even after this table is replaced.  IRQ objects are collected and
@@ -2022,6 +2400,23 @@ fn wake_process_waiters(process: &Arc<Process>) {
             _ => {}
         });
     }
+    // A thread of the dying process may wait on another live process's queue through a pid, not
+    // a handle: `PROC_WAIT_EX`/`waitpid` keeps only the child pid, and libc closes the fork
+    // handle. Sweep every live process's queues by waiter process id so that thread is woken and
+    // its `Waiter` entry (which holds an `Arc<Thread>`) is removed. FreeBSD `kern_wait4` and
+    // NetBSD `kern_lwp.c` abort a killed waiter's sleep queue at process exit.
+    for other in processes() {
+        if Arc::ptr_eq(&other, process) {
+            continue;
+        }
+        let _ = other.waiters.wake_process(process.id);
+        let _ = other.child_waiters.wake_process(process.id);
+        let _ = other.signal_waiters.wake_process(process.id);
+        let _ = other.scheme_waiters.wake_process(process.id);
+    }
+    // Object queues (pipe, duplex, memory page waiters, console, record locks) are not reachable
+    // from the dying handle table; the global queue registry reaches every live queue.
+    let _ = crate::sched::wait::WaitQueue::wake_all_queues_for_process(process.id);
     for irq in irqs {
         if !irq_held_elsewhere(process, &irq) {
             irq.retire();
@@ -2141,6 +2536,11 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     // are owned by the process, so release them on the single teardown path before any waiter
     // can observe a stale owner.
     crate::syscall::record_lock::release_process(process.id);
+    // Snapshot the final resident footprint while the address space still exists. This runs
+    // before the critical section (the VMA walk allocates) and before `notify_parent`, so the
+    // reaped-child maxrss fold sees the completed footprint. The stack fault that forced the
+    // earlier removal was the inlined CmdLine parser in `teardown`, now gone.
+    process.update_maxrss();
     // The state/wake graph takes the per-CPU scheduler lock through `sched::wake`. The syscall
     // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
     // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space
