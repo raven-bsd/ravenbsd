@@ -60,6 +60,22 @@ S4_FILE = "/tmp/k514-s4-input"
 S4_AUTH_BOUND_S = 30
 S4_READ_BOUND_S = 15
 S4_TOTAL_BOUND_S = 50
+# K514 rev 92 release blast-radius measurement: every command is attempted ten times as the
+# release user. The S4 row's own expectations are unchanged.
+RELEASE_SESSIONS = 10
+RELEASE_COMMANDS = (
+    ("uname", ["uname"], lambda out: out.startswith(b"RavenBSD"),
+     "stdout starts with RavenBSD"),
+    ("pwd", ["pwd"], lambda out: out == b"/home/raven\n",
+     "stdout == /home/raven\\n"),
+    ("ls", ["ls"], lambda out: True,
+     "any listing, no child fault"),
+    ("cat-hosts", ["cat", "/etc/hosts"], lambda out: b"127.0.0.1" in out,
+     "stdout contains 127.0.0.1"),
+    ("echo-builtin", ["echo", "K514-BUILTIN"], lambda out: out == b"K514-BUILTIN\n",
+     "stdout == K514-BUILTIN\\n"),
+)
+RELEASE_FAULT = re.compile(rb"killed by page fault at (0x[0-9a-f]+)")
 S7_TIMEOUT_S = 30
 S7_WALL_BOUND_MS = 5000
 ECHO_PORT = 23097
@@ -1075,6 +1091,59 @@ def row_s4_only() -> None:
                f"walls_ms={walls}; exits={exits}; detail={first['detail']}")
 
 
+def row_release_commands(serial: Path) -> None:
+    """K514 rev92: ten sessions per release command; exit, bytes and serial fault."""
+    for name, command, expected, expected_text in RELEASE_COMMANDS:
+        passed = 0
+        exits: list[int] = []
+        sizes: list[int] = []
+        faults_seen: list[str] = []
+        rtypes: list[str] = []
+        walls: list[float] = []
+        for number in range(1, RELEASE_SESSIONS + 1):
+            try:
+                before = serial.stat().st_size
+            except OSError:
+                before = 0
+            result = ssh_run(command, f"release-{name}-{number}.log",
+                             extra=["-v"], timeout=25)
+            try:
+                segment = serial.read_bytes()[before:] if serial.is_file() else b""
+            except OSError:
+                segment = b""
+            faults = [address.decode() for address in RELEASE_FAULT.findall(segment)]
+            stdout = bytes(result["stdout"])  # type: ignore[arg-type]
+            stderr = bytes(result["stderr"])  # type: ignore[arg-type]
+            auth = b"Authenticated to " in stderr
+            if b"rtype exit-status" in stderr:
+                rtype = "exit-status"
+            elif b"rtype exit-signal" in stderr:
+                rtype = "exit-signal"
+            else:
+                rtype = "none"
+            ok = auth and not faults and bool(expected(stdout))
+            if ok:
+                passed += 1
+            step = "auth" if not auth else "fault" if faults else "read"
+            exits.append(int(result["returncode"]))  # type: ignore[arg-type]
+            sizes.append(len(stdout))
+            faults_seen.extend(faults)
+            rtypes.append(rtype)
+            walls.append(round(float(result["elapsed_ms"])))  # type: ignore[arg-type]
+            received = (f"bytes={literal(stdout)}; size={len(stdout)}; "
+                        f"exit={result['returncode']}; faults={faults}; "
+                        f"auth={auth}; rtype={rtype}")
+            attempt(f"C-{name}", number, "fresh", expected_text, received,
+                    float(result["elapsed_ms"]), "PASS" if ok else "FAIL",  # type: ignore[arg-type]
+                    f"step={step}; stdout_hex={stdout.hex()}")
+        unique = sorted(set(faults_seen))
+        record(f"C-{name}",
+               "PASS" if passed == RELEASE_SESSIONS else "FAIL",
+               f"{passed}/{RELEASE_SESSIONS} usable; exits={exits}; sizes={sizes}; "
+               f"faults={unique}; rtypes={sorted(set(rtypes))}; walls_ms={walls}; "
+               f"command={' '.join(command)}")
+
+
 def row_mutation() -> None:
     """K562: the 0755 image must fail the non-root /tmp create row."""
     stat = ssh_run(["stat", "-c", "%a %U %G", "/tmp"], "k562-mutation-stat.log")
@@ -2055,6 +2124,8 @@ def main() -> int:
                     row_s1_repeat()
                 elif only == "s4":
                     row_s4_only()
+                elif only == "commands":
+                    row_release_commands(handle)  # type: ignore[arg-type]
                 elif only == "mutation":
                     row_mutation()
                 elif only == "s7-exit":
