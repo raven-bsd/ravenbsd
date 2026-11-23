@@ -455,14 +455,6 @@ impl<'a, B: SysBackend, L: Lock> OfdRef<'a, B, L> {
             .map_or(0, |ofd| ofd.rearm.swap(0, Ordering::Relaxed))
     }
 
-    /// Read the one-shot rearm mask without consuming it.
-    ///
-    /// A spawn or exec map copies the mask into the child; the parent keeps its own replay.
-    pub fn poll_rearm(&self) -> u32 {
-        self.snapshot()
-            .map_or(0, |ofd| ofd.rearm.load(Ordering::Relaxed))
-    }
-
     /// Change the remembered kind (a successful probe caches it).
     pub fn set_kind(&self, kind: OfdKind) {
         self.platform.set_ofd_kind(self.index, kind);

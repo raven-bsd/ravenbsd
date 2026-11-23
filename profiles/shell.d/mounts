@@ -11,4 +11,3 @@
 /dev/zero zero:
 /dev/random rand:
 /dev/urandom rand:
-/dev/pts pty:
