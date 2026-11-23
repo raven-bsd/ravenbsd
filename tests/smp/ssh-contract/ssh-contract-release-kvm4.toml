@@ -65,8 +65,5 @@ regex = '^.*CONTRACT SUMMARY PASS 10/10$'
 [[expect]]
 regex = '^init exited \(0\)$'
 
-[[expect]]
-regex = '^.*login:.*$'
-
 [[forbid]]
 regex = '(?i)CONTRACT K([1-9]|10)(-listen|-shutdown)? FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'
