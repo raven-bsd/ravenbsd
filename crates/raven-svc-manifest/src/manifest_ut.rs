@@ -42,20 +42,20 @@ fn the_large_image_manifests_have_headroom() {
 }
 
 #[test]
-fn log_readiness_parses_the_file_and_match() {
+fn file_readiness_parses_the_file_and_match() {
     let manifest = parse(
-        "name = \"sshd\"\nexec = \"/sbin/sshd\"\nreadiness = \"log\"\nready_file = \"/tmp/sshd.log\"\nready_match = \"Server listening on 0.0.0.0 port 22.\"",
+        "name = \"sshd\"\nexec = \"/sbin/sshd\"\nreadiness = \"file\"\nready_file = \"/tmp/sshd.log\"\nready_match = \"Server listening on 0.0.0.0 port 22.\"",
     );
-    assert_eq!(manifest.readiness, Readiness::Log);
+    assert_eq!(manifest.readiness, Readiness::File);
     assert_eq!(manifest.ready_file, "/tmp/sshd.log");
     assert_eq!(manifest.ready_match, "Server listening on 0.0.0.0 port 22.");
 }
 
 #[test]
-fn log_readiness_requires_the_file() {
+fn file_readiness_requires_the_file() {
     assert!(matches!(
         Manifest::parse(
-            "name = \"sshd\"\nexec = \"/sbin/sshd\"\nreadiness = \"log\"\nready_match = \"x\""
+            "name = \"sshd\"\nexec = \"/sbin/sshd\"\nreadiness = \"file\"\nready_match = \"x\""
         )
         .expect_err("missing ready_file")
         .kind,
@@ -64,10 +64,10 @@ fn log_readiness_requires_the_file() {
 }
 
 #[test]
-fn log_readiness_requires_the_match() {
+fn file_readiness_requires_the_match() {
     assert!(matches!(
         Manifest::parse(
-            "name = \"sshd\"\nexec = \"/sbin/sshd\"\nreadiness = \"log\"\nready_file = \"/tmp/x\""
+            "name = \"sshd\"\nexec = \"/sbin/sshd\"\nreadiness = \"file\"\nready_file = \"/tmp/x\""
         )
         .expect_err("missing ready_match")
         .kind,
@@ -79,7 +79,7 @@ fn log_readiness_requires_the_match() {
 fn ready_file_must_be_absolute() {
     assert!(matches!(
         Manifest::parse(
-            "name = \"sshd\"\nexec = \"/sbin/sshd\"\nreadiness = \"log\"\nready_file = \"tmp/x\"\nready_match = \"x\""
+            "name = \"sshd\"\nexec = \"/sbin/sshd\"\nreadiness = \"file\"\nready_file = \"tmp/x\"\nready_match = \"x\""
         )
         .expect_err("relative ready_file")
         .kind,

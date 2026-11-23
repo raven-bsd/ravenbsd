@@ -36,16 +36,10 @@ regex = '^readiness: proc-wait first_pid=[0-9]+ first_status=[0-9]+ second_pid=[
 regex = '^readiness: sshd-shape handler=[1-9][0-9]* eintr=[0-9]+ event=hup waitpid=19712 ok$'
 
 [[expect]]
-regex = '^readiness: net-server ready$'
+regex = '^net-child: before net=EACCES file=EACCES$'
 
 [[expect]]
-regex = '^net-server: bind$'
-
-[[expect]]
-regex = '^net-server: listen$'
-
-[[expect]]
-regex = '^net-child: bind=ok listen=ok$'
+regex = '^net-child: after net=ok file=ok bind=ok listen=ok$'
 
 [[expect]]
 regex = '^readiness: net-listen ok$'

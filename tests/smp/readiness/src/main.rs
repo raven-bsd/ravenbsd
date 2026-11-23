@@ -130,6 +130,8 @@ static SIBLING_ARMED: AtomicBool = AtomicBool::new(false);
 static SIBLING_FAIL: AtomicU32 = AtomicU32::new(0);
 static SIBLING_EVENT_QUEUE: AtomicU32 = AtomicU32::new(u32::MAX);
 static SIBLING_FUTEX: AtomicU32 = AtomicU32::new(0);
+static NET_READY: AtomicBool = AtomicBool::new(false);
+static FILE_READY: AtomicBool = AtomicBool::new(false);
 
 static ROUND: AtomicU32 = AtomicU32::new(0);
 static STOP: AtomicBool = AtomicBool::new(false);
@@ -882,30 +884,98 @@ fn net_server(_: usize) {
             return;
         }
     };
-    println!("readiness: net-server ready");
+    NET_READY.store(true, Ordering::Release);
     let mut handler = NetHandler;
     server.run(&mut handler);
+}
+
+struct FileHandler;
+
+impl Handler for FileHandler {
+    fn open_with(
+        &mut self,
+        path: &str,
+        _flags: OpenFlags,
+        _mode: u32,
+        _ctx: &Ctx,
+    ) -> HandlerResult<Opened> {
+        if path.is_empty() {
+            return Err(Errno::EINVAL.into());
+        }
+        Ok(Opened::File(1))
+    }
+
+    fn call(&mut self, _file: u64, _request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
+        let mut encoded = [0u8; 32];
+        let length = Response::Ok
+            .encode(&mut encoded)
+            .map_err(|_| Errno::EPROTO)?;
+        let destination = response.get_mut(..length).ok_or(Errno::E2BIG)?;
+        destination.copy_from_slice(&encoded[..length]);
+        Ok(length)
+    }
+}
+
+fn file_server(_: usize) {
+    let mut server = match Server::register("file") {
+        Ok(server) => server,
+        Err(error) => {
+            println!("readiness: file-server error={}", error.0);
+            return;
+        }
+    };
+    FILE_READY.store(true, Ordering::Release);
+    let mut handler = FileHandler;
+    server.run(&mut handler);
+}
+
+fn wait_servers() -> R {
+    for _ in 0..1000 {
+        if NET_READY.load(Ordering::Acquire) && FILE_READY.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        nanosleep(1_000_000).map_err(|_| "server sleep")?;
+    }
+    Err("servers")
 }
 
 fn net_listen() -> R {
     let image = raven_rt::map_initfs().map_err(|_| "net initfs")?;
     let initfs = Initfs::parse(image).map_err(|_| "net initfs parse")?;
-    let child = spawn_process(
+    // The before child is forked while net/file are absent; its namespace snapshot is the
+    // pre-registration one. It retries ENOENT until both servers register, then must get EACCES.
+    let before = spawn_process(
         &initfs,
         "/child",
         &SpawnOptions {
-            args: &["net-child"],
+            args: &["before"],
             env: &[],
         },
     )
-    .map_err(|_| "net child spawn")?;
-    // The child exists before this thread registers `net`; its namespace snapshot is the
-    // pre-registration one. The child retries until the publisher is live.
-    let server = thread::spawn(net_server, 0, STACK_SIZE).map_err(|_| "net server")?;
-    let code = wait_process(child.0).map_err(|_| "net child wait")?;
-    core::mem::forget(server);
-    if code != 0 {
-        return Err("net listen child");
+    .map_err(|_| "namespace before spawn")?;
+    let net = thread::spawn(net_server, 0, STACK_SIZE).map_err(|_| "net server")?;
+    let file = thread::spawn(file_server, 0, STACK_SIZE).map_err(|_| "file server")?;
+    wait_servers()?;
+    let before_code = wait_process(before.0).map_err(|_| "namespace before wait")?;
+    if before_code != 0 {
+        return Err("strict before");
+    }
+    // A new child forked after registration gets the live names in its snapshot and must resolve
+    // both schemes. This is the positive half of the proof.
+    let after = spawn_process(
+        &initfs,
+        "/child",
+        &SpawnOptions {
+            args: &["after"],
+            env: &[],
+        },
+    )
+    .map_err(|_| "namespace after spawn")?;
+    let after_code = wait_process(after.0).map_err(|_| "namespace after wait")?;
+    core::mem::forget(net);
+    core::mem::forget(file);
+    if after_code != 0 {
+        return Err("strict after");
     }
     println!("readiness: net-listen ok");
     Ok(())

@@ -256,6 +256,56 @@ fn fork_child_duplicates_an_inherited_pty_master_handle() {
 }
 
 #[test]
+fn fork_child_pipe_close_keeps_the_parents_read_end_open() {
+    let platform = platform();
+    let file = platform
+        .open(b"/a", fcntl::O_RDONLY as u32, 0)
+        .expect("file");
+    let file_handle = platform.get(file).expect("file").handle();
+    let pipe_handle = platform.backend().dup(file_handle, 0).expect("pipe handle");
+    let pipe = platform
+        .install(
+            pipe_handle,
+            OfdKind::Pipe,
+            fcntl::O_RDONLY as u32,
+            None,
+            false,
+        )
+        .expect("pipe");
+    let old_pipe = platform.get(pipe).expect("pipe").handle();
+    let index = platform.get(pipe).expect("pipe").index();
+
+    platform.fork_child_inherit();
+
+    let new_pipe = platform.get(pipe).expect("pipe").handle();
+    assert_ne!(
+        new_pipe, old_pipe,
+        "the child takes a fresh scheme handle for the pipe"
+    );
+    assert_eq!(
+        platform.ofd_handle(index),
+        Some(new_pipe),
+        "the OFD is the authority for the live pipe handle"
+    );
+
+    // The child closes its duplicate first; the parent's read end must still be open.
+    platform.close(pipe).expect("child close");
+    let mut byte = [0u8; 1];
+    assert_eq!(
+        platform.backend().read(old_pipe, &mut byte),
+        Ok(1),
+        "the parent pipe read stays open after the child close"
+    );
+
+    // The last close releases the pipe: a further read sees no handle (EOF at the OFD level).
+    platform.backend().close(old_pipe).expect("parent close");
+    assert_eq!(
+        platform.backend().read(old_pipe, &mut byte),
+        Err(Errno::EBADF)
+    );
+}
+
+#[test]
 fn fork_child_duplicates_an_inherited_socket_handle() {
     let platform = platform();
     let file = platform.open(b"/a", 0, 0).expect("file");
