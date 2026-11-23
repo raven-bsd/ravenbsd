@@ -15,6 +15,11 @@ The harness is reusable unchanged for the 100/100 gate:
 and optionally adds the TTY rows:
   python3 tests/ssh/reconnect-soak.py --sessions 100 --tty-sessions 10
 
+The release evidence can select the QEMU accelerator explicitly, so the same 10-session soak is
+measured under software TCG and host KVM:
+  python3 tests/ssh/reconnect-soak.py --sessions 10 --net user --accel tcg
+  python3 tests/ssh/reconnect-soak.py --sessions 10 --net user --accel kvm
+
 Every ``--resource-every N`` command sessions (default 5) the harness also samples the resource
 curve without adding an SSH row: the host QEMU RSS proxy plus, when the image was built with
 ``k449-metrics=<seconds>`` on the kernel cmdline, the guest kernel's heap/frame bytes, live
@@ -29,8 +34,8 @@ run; the frozen product evidence tree is never touched). No QEMU-free shortcut, 
 Usage: python3 tests/ssh/reconnect-soak.py [--sessions N] [--batch N] [--session-timeout S]
                                            [--tty-sessions N] [--connect-timeout S]
                                            [--keep-going] [--image PATH]
-                                           [--net tap|user] [--resource-every N] [--sshd-log]
-                                           [--selftest]
+                                           [--net tap|user] [--accel tcg|kvm]
+                                           [--resource-every N] [--sshd-log] [--selftest]
 Exit: 0 when every session passes, 1 when a session fails, 2 for setup problems.
 """
 
@@ -59,6 +64,16 @@ HOST = os.environ.get("RAVEN_SSH_HOST", "10.0.2.15")
 USER = os.environ.get("RAVEN_SSH_USER", "raven")
 PASSWORD = os.environ.get("RAVEN_SSH_PASSWORD", "raven")
 ASKPASS = ROOT / "tests" / "ssh" / "askpass.sh"
+ACCELS = ("tcg", "kvm")
+
+
+def qemu_accel_args(accel: str) -> list[str]:
+    """QEMU accelerator arguments: software TCG or host KVM."""
+    if accel == "tcg":
+        return ["-accel", "tcg"]
+    if accel == "kvm":
+        return ["-enable-kvm", "-cpu", "host"]
+    raise ValueError(f"unknown accelerator {accel!r}")
 
 
 def sha256(path: Path) -> str:
@@ -79,6 +94,7 @@ def parse_args(argv: list[str]) -> dict:
         "keep_going": False,
         "image": IMAGE,
         "net": "tap",
+        "accel": "tcg",
         "resource_every": 5,
         "selftest": False,
         "sshd_log": False,
@@ -110,6 +126,9 @@ def parse_args(argv: list[str]) -> dict:
         elif arg == "--net" and index + 1 < len(argv):
             options["net"] = argv[index + 1]
             index += 2
+        elif arg == "--accel" and index + 1 < len(argv):
+            options["accel"] = argv[index + 1]
+            index += 2
         elif arg == "--resource-every" and index + 1 < len(argv):
             options["resource_every"] = int(argv[index + 1])
             index += 2
@@ -130,6 +149,9 @@ def parse_args(argv: list[str]) -> dict:
         raise SystemExit(2)
     if options["resource_every"] < 0:
         print("reconnect-soak: --resource-every must be zero or positive", file=sys.stderr)
+        raise SystemExit(2)
+    if options["accel"] not in ACCELS:
+        print(f"reconnect-soak: --accel must be one of {ACCELS}", file=sys.stderr)
         raise SystemExit(2)
     return options
 
@@ -291,6 +313,10 @@ def selftest() -> int:
         parse_args(["--sessions", "1", "--connect-timeout", "30"])["connect_timeout"],
         30.0,
     )
+    check("accel-default", parse_args(["--sessions", "1"])["accel"], "tcg")
+    check("accel-kvm-opt", parse_args(["--sessions", "1", "--accel", "kvm"])["accel"], "kvm")
+    check("accel-tcg-argv", qemu_accel_args("tcg"), ["-accel", "tcg"])
+    check("accel-kvm-argv", qemu_accel_args("kvm"), ["-enable-kvm", "-cpu", "host"])
     table = format_resource_table([
         {"after_session": 0, "qemu_rss_kb": 1000, "serial_heap_kb": 4096,
          "panic": False},
@@ -352,7 +378,7 @@ def kill(child: subprocess.Popen) -> None:
     child.wait()
 
 
-def boot(run: Path, image: Path, net: str) -> tuple[
+def boot(run: Path, image: Path, net: str, accel: str) -> tuple[
         subprocess.Popen, Path, str, int, str, str]:
     host, port = HOST, 22
     if net == "tap":
@@ -374,6 +400,7 @@ def boot(run: Path, image: Path, net: str) -> tuple[
     serial.write_bytes(b"")
     argv = [
         "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
+        *qemu_accel_args(accel),
         "-serial", f"file:{serial}", "-display", "none", "-monitor", "none",
         "-no-reboot",
         "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE}",
@@ -611,9 +638,12 @@ def main(argv: list[str]) -> int:
     failures = 0
     child = None
     try:
-        child, serial, host, port, ready_utc, listening_utc = boot(run, image, options["net"])
+        child, serial, host, port, ready_utc, listening_utc = boot(
+            run, image, options["net"], options["accel"]
+        )
         print(
-            f"reconnect-soak: booted net={options['net']} target={host}:{port}; "
+            f"reconnect-soak: booted net={options['net']} accel={options['accel']} "
+            f"target={host}:{port}; "
             f"sshd ready at={ready_utc} listening at={listening_utc}; "
             f"hygiene after boot: {hygiene()}"
         )
@@ -712,6 +742,7 @@ def main(argv: list[str]) -> int:
         "session_timeout_s": options["session_timeout"],
         "connect_timeout_s": options["connect_timeout"],
         "net": options["net"],
+        "accel": options["accel"],
         "keep_going": options["keep_going"],
         "resource_every": options["resource_every"],
         "resource_note": RESOURCE_NOTE,

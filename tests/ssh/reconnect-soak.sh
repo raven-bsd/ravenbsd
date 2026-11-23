@@ -8,6 +8,7 @@
 #
 # Usage: sh tests/ssh/reconnect-soak.sh [--sessions N] [--batch N] [--tty-sessions N]
 #                                       [--session-timeout S] [--keep-going] [--net tap|user]
+#                                       [--accel tcg|kvm]
 # The 100/100 gate: sh tests/ssh/reconnect-soak.sh --sessions 100 --tty-sessions 10
 # --net user (QEMU host forward, no tap) is for a host where the shared K194 tap is unavailable;
 # the release gate uses the tap.

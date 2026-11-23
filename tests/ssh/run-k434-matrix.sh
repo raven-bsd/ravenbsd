@@ -67,7 +67,7 @@ tree=$tree
 image=$image
 image_sha256=$image_sha
 runner=tests/ssh/run-k434-matrix.sh
-rows=S1,S2,S3,S4,S5,S6,S7,S8,S5-session
+rows=S1,S2,S3,S4,S4-echo,S4-exit0,S5,S6,S7,S8,S5-session
 command=RAVEN_MATRIX_ONLY=full RAVEN_SSH_IMAGE=$image RAVEN_MATRIX_OUT=$out sh tests/ssh/matrix.sh
 EOF
 cat "$out/manifest.txt"
