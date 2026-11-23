@@ -32,7 +32,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 SOAK = ROOT / "tests" / "ssh" / "reconnect-soak.py"
 
-PROCCHECK_RE = re.compile(r"s36: procs= (.*)")
+PROCCHECK_RE = re.compile(r"s36: procs=(.*)")
 METRICS_RE = re.compile(
     r"K449-METRICS .*?procs=(\d+).*?c3072_used=(\d+) c3072_slabs=(\d+)"
 )
@@ -141,7 +141,7 @@ def selftest() -> int:
         "netd_pages=0 sshd_pages=0 c3072_free=4 c3072_used=28 c3072_slabs=32 "
         "live_threads=1 reap=0 slot_drops=0 slot_denies=0 stacks_fresh=0 stacks_cached=0 "
         "stacks_dropped=0 sshd_procs=0 sshd_threads=0 dma_used=0 donations=36\n"
-        "s36: procs= 19 threads=57 zombies=0 proc_size=2456 thread_size=896 "
+        "s36: procs=19 threads=57 zombies=0 proc_size=2456 thread_size=896 "
         "lineage=100 dead_handles=0 top_pid=0 top_count=0 notices=0 dead_clients=0 "
         "dead_servers=0 requests=0 reap=0 leaked=0 ext1=0 ext2=0 ext3=0 self_handles=0 "
         "all_dead_handles=0 leaked_threads=0 file_refs=0 request_refs=0 thread_handles=0 "
