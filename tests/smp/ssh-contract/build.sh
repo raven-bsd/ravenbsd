@@ -14,7 +14,7 @@ cd "$root"
 # A previous hung qtest may still hold the K6 hostfwd port. The suite owns these artifacts;
 # clear the old host peer before rebuilding. Do not kill QEMU here: the qtest harness may have
 # already started its own instance before running the pre commands.
-pkill -f "ssh-contract/host_accept.py" 2>/dev/null || true
+pkill -f "$root/tests/smp/ssh-contract/host_accept.py" 2>/dev/null || true
 
 out=build/fixtures/ssh-contract
 mkdir -p "$out"

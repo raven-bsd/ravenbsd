@@ -13,8 +13,8 @@ cd "$root"
 out=build/fixtures/ssh-contract
 mkdir -p "$out"
 rm -f "$out/host.result" "$out/host.log" "$out/host.stdout" "$out/monitor.sock"
-pkill -f "ssh-contract/host_accept.py" 2>/dev/null || true
-python3 tests/smp/ssh-contract/host_accept.py \
+pkill -f "$root/tests/smp/ssh-contract/host_accept.py" 2>/dev/null || true
+python3 "$root/tests/smp/ssh-contract/host_accept.py" \
     --host 127.0.0.1 \
     --monitor "$out/monitor.sock" \
     --result "$out/host.result" \
