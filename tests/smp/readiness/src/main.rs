@@ -12,6 +12,10 @@
 //!   must still report `HUP` (`seltrue` is level-true, never cached).
 //! * EINTR re-evaluation: `THREAD_KICK` interrupts a blocked wait; after the event is signalled the
 //!   retry must observe the live level (`sel_setevents`/`SEL_RESET`).
+//! * proc-wait: two forked children exit in reverse order; the parent blocks for the later child
+//!   through `PROC_WAIT_EX(P_PID, pid)` and must get that child's pid and POSIX exit status.
+//!   A SIGCHLD from the earlier child and a `THREAD_KICK` must not lose the wait or turn it into
+//!   EINTR.
 //!
 //! The fixture is a guest proof; the mutating negative checks run against the kernel event core.
 
@@ -56,6 +60,42 @@ const KICK_DELAY_NS: u64 = 50_000_000;
 const STACK_SIZE: usize = 64 * 1024;
 /// `THREAD_KICK` bit: an arbitrary non-zero kick makes the next interruptible wait return EINTR.
 const KICK_BIT: usize = 1;
+
+/// Raw `PROC_FORK` pre-enum dispatch number.
+const PROC_FORK: usize = 0x39;
+/// Raw `PROC_HANDLE_INFO` pre-enum dispatch number.
+const PROC_HANDLE_INFO: usize = 0x3e;
+/// Raw `PROC_WAIT_EX` pre-enum dispatch number.
+const PROC_WAIT_EX: usize = 0x48;
+/// `wait6` id type: a single process id.
+const P_PID: usize = 1;
+/// Child A exits after this long (and must be waited for first).
+const CHILD_A_NS: u64 = 200_000_000;
+/// Child B exits after this long, before child A.
+const CHILD_B_NS: u64 = 50_000_000;
+/// Child A exit code.
+const CHILD_A_CODE: i32 = 23;
+/// Child B exit code.
+const CHILD_B_CODE: i32 = 42;
+/// Delay between arming the waiter and the parent kick.
+const PROC_KICK_DELAY_NS: u64 = 20_000_000;
+/// How long to wait for the worker to enter the blocking wait.
+const PROC_ARM_POLLS: u32 = 1000;
+/// Poll interval while waiting for the worker to arm.
+const PROC_ARM_NS: u64 = 1_000_000;
+
+#[repr(align(16))]
+struct ChildStack(#[allow(dead_code)] [u8; 16 * 1024]);
+
+static mut CHILD_STACK_A: ChildStack = ChildStack([0; 16 * 1024]);
+static mut CHILD_STACK_B: ChildStack = ChildStack([0; 16 * 1024]);
+
+static PROC_WAIT_ARMED: AtomicBool = AtomicBool::new(false);
+static PROC_WAIT_FAIL: AtomicU32 = AtomicU32::new(0);
+static PROC_WAIT_FIRST_PID: AtomicI32 = AtomicI32::new(0);
+static PROC_WAIT_FIRST_STATUS: AtomicI32 = AtomicI32::new(0);
+static PROC_WAIT_SECOND_PID: AtomicI32 = AtomicI32::new(0);
+static PROC_WAIT_SECOND_STATUS: AtomicI32 = AtomicI32::new(0);
 
 static ROUND: AtomicU32 = AtomicU32::new(0);
 static STOP: AtomicBool = AtomicBool::new(false);
@@ -216,6 +256,182 @@ fn eintr_reevaluate() -> R {
     Ok(())
 }
 
+fn child_stack_top(stack: *mut ChildStack) -> usize {
+    stack as usize + core::mem::size_of::<ChildStack>()
+}
+
+extern "C" fn proc_wait_child_a(_: usize) -> ! {
+    let _ = nanosleep(CHILD_A_NS);
+    // SAFETY: EXIT terminates only the forked child process.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, CHILD_A_CODE as usize) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+extern "C" fn proc_wait_child_b(_: usize) -> ! {
+    let _ = nanosleep(CHILD_B_NS);
+    // SAFETY: EXIT terminates only the forked child process.
+    unsafe { sys::syscall1(Syscall::EXIT as usize, CHILD_B_CODE as usize) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+fn fork_wait_child(
+    entry: extern "C" fn(usize) -> !,
+    stack_top: usize,
+) -> Result<(usize, i32), &'static str> {
+    // SAFETY: PROC_FORK takes the self-process handle and a zero flag word; the kernel copies the
+    // address space and returns a process handle owned by the caller.
+    let handle = unsafe { sys::syscall2(PROC_FORK, Handle::SELF_PROC.0 as usize, 0) };
+    if handle < 0 {
+        return Err("fork");
+    }
+    // SAFETY: PROC_HANDLE_INFO takes a valid process handle and returns its pid.
+    let pid = unsafe { sys::syscall1(PROC_HANDLE_INFO, handle as usize) };
+    if pid < 0 {
+        return Err("pid");
+    }
+    // SAFETY: THREAD_CREATE takes scalar values; the entry is in the forked text mapping and the
+    // stack top is the 16-byte-aligned top of a writable static mapping.
+    let created = unsafe {
+        sys::syscall6(
+            Syscall::THREAD_CREATE as usize,
+            handle as usize,
+            entry as usize,
+            stack_top,
+            0,
+            0,
+            0,
+        )
+    };
+    if created < 0 {
+        return Err("thread");
+    }
+    Ok((handle as usize, pid as i32))
+}
+
+fn wait_one_pid(pid: i32) -> Result<i32, u32> {
+    let mut status: i32 = 0;
+    // SAFETY: PROC_WAIT_EX takes scalar selectors and a writable i32 pointer in this thread's
+    // stack; P_PID selects the known child pid and options=0 makes the call blocking.
+    let raw = unsafe {
+        sys::syscall4(
+            PROC_WAIT_EX,
+            P_PID,
+            pid as usize,
+            0,
+            &mut status as *mut i32 as usize,
+        )
+    };
+    if raw == Errno::EINTR.to_ret() {
+        return Err(1);
+    }
+    if raw < 0 {
+        return Err(5);
+    }
+    if raw as i32 != pid {
+        return Err(2);
+    }
+    Ok(status)
+}
+
+fn proc_wait_waiter(_: usize) {
+    let stack_a = core::ptr::addr_of_mut!(CHILD_STACK_A);
+    let stack_b = core::ptr::addr_of_mut!(CHILD_STACK_B);
+    let (_handle_a, pid_a) = match fork_wait_child(proc_wait_child_a, child_stack_top(stack_a)) {
+        Ok(child) => child,
+        Err(_) => {
+            PROC_WAIT_FAIL.store(4, Ordering::Release);
+            return;
+        }
+    };
+    let (_handle_b, pid_b) = match fork_wait_child(proc_wait_child_b, child_stack_top(stack_b)) {
+        Ok(child) => child,
+        Err(_) => {
+            PROC_WAIT_FAIL.store(4, Ordering::Release);
+            return;
+        }
+    };
+
+    // Child B exits first; the parent waits for child A first. The child B SIGCHLD and the
+    // parent's THREAD_KICK must not substitute EINTR or B's pid for A's wait.
+    PROC_WAIT_ARMED.store(true, Ordering::Release);
+    let first_status = match wait_one_pid(pid_a) {
+        Ok(status) => status,
+        Err(code) => {
+            PROC_WAIT_FAIL.store(code, Ordering::Release);
+            return;
+        }
+    };
+    if first_status != CHILD_A_CODE << 8 {
+        PROC_WAIT_FAIL.store(3, Ordering::Release);
+        return;
+    }
+    let second_status = match wait_one_pid(pid_b) {
+        Ok(status) => status,
+        Err(code) => {
+            PROC_WAIT_FAIL.store(code, Ordering::Release);
+            return;
+        }
+    };
+    if second_status != CHILD_B_CODE << 8 {
+        PROC_WAIT_FAIL.store(3, Ordering::Release);
+        return;
+    }
+    PROC_WAIT_FIRST_PID.store(pid_a, Ordering::Release);
+    PROC_WAIT_FIRST_STATUS.store(first_status, Ordering::Release);
+    PROC_WAIT_SECOND_PID.store(pid_b, Ordering::Release);
+    PROC_WAIT_SECOND_STATUS.store(second_status, Ordering::Release);
+}
+
+fn proc_wait() -> R {
+    PROC_WAIT_ARMED.store(false, Ordering::Release);
+    PROC_WAIT_FAIL.store(0, Ordering::Release);
+    let worker = thread::spawn(proc_wait_waiter, 0, STACK_SIZE).map_err(|_| "thread")?;
+    let mut armed = false;
+    for _ in 0..PROC_ARM_POLLS {
+        if PROC_WAIT_ARMED.load(Ordering::Acquire) {
+            armed = true;
+            break;
+        }
+        nanosleep(PROC_ARM_NS).map_err(|_| "arm sleep")?;
+    }
+    if !armed {
+        return Err("arm timeout");
+    }
+    nanosleep(PROC_KICK_DELAY_NS).map_err(|_| "kick delay")?;
+    let handle = worker.handle().ok_or("no thread handle")?;
+    // SAFETY: THREAD_KICK takes the worker thread handle and a scalar bit mask.
+    let kicked = unsafe { sys::syscall2(THREAD_KICK, handle.0 as usize, KICK_BIT) };
+    if kicked < 0 {
+        return Err("kick");
+    }
+    worker.join().map_err(|_| "join")?;
+
+    match PROC_WAIT_FAIL.load(Ordering::Acquire) {
+        0 => {}
+        1 => return Err("eintr"),
+        2 => return Err("wrong pid"),
+        3 => return Err("bad status"),
+        4 => return Err("child setup"),
+        _ => return Err("wait"),
+    }
+    let first_pid = PROC_WAIT_FIRST_PID.load(Ordering::Acquire);
+    let first_status = PROC_WAIT_FIRST_STATUS.load(Ordering::Acquire);
+    let second_pid = PROC_WAIT_SECOND_PID.load(Ordering::Acquire);
+    let second_status = PROC_WAIT_SECOND_STATUS.load(Ordering::Acquire);
+    if first_pid <= 0 || second_pid <= 0 || first_pid == second_pid {
+        return Err("missing result");
+    }
+    println!(
+        "readiness: proc-wait first_pid={} first_status={} second_pid={} second_status={} ok",
+        first_pid, first_status, second_pid, second_status
+    );
+    Ok(())
+}
+
 struct NetHandler;
 
 impl Handler for NetHandler {
@@ -294,6 +510,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         ("lost-wake", lost_wake as fn() -> R),
         ("hup-repoll", hup_repoll),
         ("eintr", eintr_reevaluate),
+        ("proc-wait", proc_wait),
         ("net-listen", net_listen),
     ] {
         if let Err(reason) = row() {
