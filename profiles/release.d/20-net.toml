@@ -51,7 +51,7 @@ src = "profiles/server.d/devd.manifest"
 path = "/etc/services.d/devd.toml"
 
 [[initfs.files]]
-src = "userland/init/release-drivers.conf"
+src = "profiles/release.d/release-drivers.conf"
 path = "/etc/drivers.toml"
 
 [[initfs.files]]

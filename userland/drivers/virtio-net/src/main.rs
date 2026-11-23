@@ -109,6 +109,8 @@ mod program {
     static QUIT: AtomicBool = AtomicBool::new(false);
     static PUMP_DONE: AtomicBool = AtomicBool::new(false);
     static LINK_UP: AtomicBool = AtomicBool::new(false);
+    /// True when `devd` granted the legacy IRQ handle; otherwise the pump polls the rings.
+    static IRQ_PRESENT: AtomicBool = AtomicBool::new(false);
     static RX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_DROPS: AtomicU64 = AtomicU64::new(0);
@@ -132,6 +134,7 @@ mod program {
         let mut bar_size = 0usize;
         let mut dma_size = 0usize;
         let mut irq_line = 0u32;
+        let mut has_irq = false;
         let mut test = false;
         let mut serve = false;
         let mut msix = false;
@@ -158,6 +161,7 @@ mod program {
                 irq_line = value
                     .parse()
                     .map_err(|_| format!("bad irq argument `{argument}`"))?;
+                has_irq = true;
             } else if argument == "msix=1" || argument == "msix" {
                 msix = true;
             } else if argument == "tx-stall" {
@@ -223,6 +227,10 @@ mod program {
         if bar_size == 0 || dma_size < RING_REGION_OFFSET + RING_REGION_LEN {
             return Err("devd did not pass a usable BAR and DMA buffer".to_string());
         }
+        // `devd` omits `irq=` when the function has no routed legacy line (QEMU virt PCIe
+        // INTx has no GSI in the current ACPI path). The pump then uses its 10 ms poll bound
+        // instead of waiting on an ungranted handle.
+        IRQ_PRESENT.store(has_irq, Ordering::Release);
 
         let bar_window = raven_rt::map_mmio_mut(BAR_HANDLE, bar_size)
             .map_err(|error| format!("bar map: {}", error.description()))?;
@@ -643,7 +651,12 @@ mod program {
             if self.broken {
                 return Err("device is broken".to_string());
             }
-            let fired = self.irq.wait(IRQ_PUMP_NS).unwrap_or(0);
+            let fired = if IRQ_PRESENT.load(Ordering::Acquire) {
+                self.irq.wait(IRQ_PUMP_NS).unwrap_or(0)
+            } else {
+                let _ = raven_rt::nanosleep(IRQ_PUMP_NS);
+                0
+            };
             self.last_fired = fired;
             if fired > 0 {
                 let isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
