@@ -30,6 +30,7 @@ pub fn run(cmdline: &CmdLine) {
         #[cfg(feature = "lockstat")]
         Some("lockstat") => crate::sync::selftest_lockstat(),
         Some("ipc-donation") => crate::sync::selftest_ipc_donation(),
+        Some("cyclic-smp") => crate::time::cyclic_smp_selftest(),
         _ => {}
     }
 }

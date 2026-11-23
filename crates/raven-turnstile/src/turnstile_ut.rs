@@ -513,3 +513,17 @@ fn fairness_equal_priorities_hand_off_in_arrival_order() {
     assert_eq!(t.waiter_count(0), 0);
     assert_eq!(t.owner(0), None);
 }
+
+#[test]
+fn empty_turnstiles_are_reclaimed() {
+    let mut t = Turnstiles::new();
+    t.register(1, prio(10)).unwrap();
+    t.register(2, prio(20)).unwrap();
+    for object in 0..1000u32 {
+        t.acquire(object, 1).unwrap();
+        t.block(object, 2).unwrap();
+        assert_eq!(t.wake_one(object), Some(2));
+        assert_eq!(t.wake_one(object), None);
+    }
+    assert_eq!(t.objects().count(), 0, "empty turnstiles retained");
+}
