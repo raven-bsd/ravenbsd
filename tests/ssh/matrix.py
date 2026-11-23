@@ -1916,6 +1916,7 @@ def row_close_hang(console: SerialConsole | None) -> None:
 
         ps_text = ""
         ps_alt_text = ""
+        procs_text = ""
         proc_text = ""
         if console is not None and console_shell_login(console):
             ps_text = console_cr_capture(
@@ -1924,6 +1925,9 @@ def row_close_hang(console: SerialConsole | None) -> None:
             ps_alt_text = console_cr_capture(
                 console, "ps --json; echo K434-$((13*13))",
                 "close-hang-ps-json.log", "K434-169", timeout=10)
+            procs_text = console_cr_capture(
+                console, "procs; echo K434-$((19*13))",
+                "close-hang-procs.log", "K434-247", timeout=10)
             proc_text = console_cr_capture(
                 console, "ls /proc; echo K434-$((17*13))",
                 "close-hang-proc.log", "K434-221", timeout=10)
@@ -1946,6 +1950,11 @@ def row_close_hang(console: SerialConsole | None) -> None:
                 if any(key in line for key in
                        ("sshd", "sshd-session", "brush", "defunct", "echo",
                         " K449-DIAG", "sigmask"))]
+    procs_lines = [line.strip() for line in procs_text.splitlines()
+                   if any(key in line.lower() for key in
+                          ("sshd", "session", "brush", "echo", "child",
+                           "zombie", "defunct"))]
+    closed = bool(seen and returncode == 0 and not timed_out)
     zombie = []
     for line in ps_lines:
         fields = line.split()
@@ -1962,6 +1971,8 @@ def row_close_hang(console: SerialConsole | None) -> None:
         f"ps_lines={ps_lines or 'none'}\n"
         f"zombie_lines={zombie or 'none'}\n"
         f"proc={proc_list or 'none'}\n"
+        f"procs={procs_lines or 'none'}\n"
+        f"session_closed={closed}\n"
         f"ps_alt={ps_alt_text.strip() or 'none'}\n"
     )
     (OUT / "close-hang-summary.txt").write_text(summary, encoding="utf-8")
