@@ -66,6 +66,7 @@ fn sampler() {
                 sshd_procs,
                 sshd_threads,
                 crate::driver::dma_in_use(),
+                crate::sync::registered_count(),
             )
         );
     }
@@ -91,6 +92,7 @@ pub fn format_line(
     sshd_procs: usize,
     sshd_threads: u32,
     dma_used: u64,
+    donations: usize,
 ) -> String {
     format!(
         "K449-METRICS heap_used={heap_used} heap_free={heap_free} \
@@ -99,7 +101,8 @@ pub fn format_line(
          live_threads={live_threads} reap={reap} slot_drops={slot_drops} \
          slot_denies={slot_denies} stacks_fresh={stacks_fresh} \
          stacks_cached={stacks_cached} stacks_dropped={stacks_dropped} \
-         sshd_procs={sshd_procs} sshd_threads={sshd_threads} dma_used={dma_used}"
+         sshd_procs={sshd_procs} sshd_threads={sshd_threads} dma_used={dma_used} \
+         donations={donations}"
     )
 }
 
