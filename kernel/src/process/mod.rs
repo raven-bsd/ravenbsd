@@ -2134,21 +2134,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             leaked_threads[5],
             leaked_threads[6]
         );
-        let thread_holders = crate::sched::thread::thread_holder_stats();
-        kprintln!(
-            "s36: hold thr={} cur={} rq={} sleep={} reap={} live={} pwait={} futex={} handle={} multi={} unexp={}",
-            thread_holders[0],
-            thread_holders[1],
-            thread_holders[2],
-            thread_holders[3],
-            thread_holders[4],
-            thread_holders[5],
-            thread_holders[6],
-            thread_holders[7],
-            thread_holders[8],
-            thread_holders[9],
-            thread_holders[10]
-        );
+
         let holders = request_holder_stats();
         kprintln!(
             "s36: ipc client={} active={} queued={} top_pid={} top_client={} top_queue_pid={} top_queue={}",

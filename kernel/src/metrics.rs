@@ -10,7 +10,7 @@
 //! SSH soak harness, not a product service: with the command-line key absent nothing is spawned
 //! and no line is printed.
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use alloc::format;
 use alloc::string::String;
@@ -26,6 +26,8 @@ const NS_PER_SECOND: u64 = 1_000_000_000;
 
 /// Sampling interval in nanoseconds, published before the sampler thread starts.
 static INTERVAL_NS: AtomicU64 = AtomicU64::new(DEFAULT_SECONDS * NS_PER_SECOND);
+/// Print the leaked-thread holder census with each sample (`s36-holders`, test only).
+static HOLDER_SCAN: AtomicBool = AtomicBool::new(false);
 
 /// Start the test-only metric sampler when the command line asks for it.
 pub fn start(cmdline: &CmdLine) {
@@ -34,6 +36,7 @@ pub fn start(cmdline: &CmdLine) {
     };
     let seconds = value.parse::<u64>().unwrap_or(DEFAULT_SECONDS).max(1);
     INTERVAL_NS.store(seconds.saturating_mul(NS_PER_SECOND), Ordering::Relaxed);
+    HOLDER_SCAN.store(cmdline.get("s36-holders").is_some(), Ordering::Relaxed);
     match sched::spawn_kernel("k449-metrics", sampler) {
         Ok(_) => kprintln!("K449-METRICS: sampler every {seconds}s"),
         Err(error) => kprintln!("K449-METRICS: spawn failed: {error:?}"),
@@ -65,6 +68,23 @@ fn sampler() {
                 process_pages("sshd"),
             )
         );
+        if HOLDER_SCAN.load(Ordering::Relaxed) {
+            let holders = sched::thread::thread_holder_stats();
+            kprintln!(
+                "s36: hold thr={} cur={} rq={} sleep={} reap={} live={} pwait={} futex={} handle={} multi={} unexp={}",
+                holders[0],
+                holders[1],
+                holders[2],
+                holders[3],
+                holders[4],
+                holders[5],
+                holders[6],
+                holders[7],
+                holders[8],
+                holders[9],
+                holders[10]
+            );
+        }
     }
 }
 

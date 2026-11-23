@@ -132,20 +132,8 @@ pub fn thread_holder_stats() -> [u64; 11] {
             stats[5] = stats[5].saturating_add(1);
             holders = holders.saturating_add(1);
         }
-        let process_waiters = processes.iter().any(|process| {
-            process.waiters.contains_thread(thread.id)
-                || process.signal_waiters.contains_thread(thread.id)
-                || process.child_waiters.contains_thread(thread.id)
-                || process.scheme_waiters.contains_thread(thread.id)
-        });
-        if process_waiters {
-            stats[6] = stats[6].saturating_add(1);
-            holders = holders.saturating_add(1);
-        }
-        if crate::syscall::futex::contains_thread(thread.id) {
-            stats[7] = stats[7].saturating_add(1);
-            holders = holders.saturating_add(1);
-        }
+        // Handles before queues: the process teardown path holds a process's handle table and then
+        // takes wait-queue locks, so the census must not invert that order.
         let handle = processes.iter().any(|process| {
             let mut found = false;
             process.handles.lock().for_each_live(|_, object, _, _| {
@@ -159,6 +147,20 @@ pub fn thread_holder_stats() -> [u64; 11] {
         });
         if handle {
             stats[8] = stats[8].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        let process_waiters = processes.iter().any(|process| {
+            process.waiters.contains_thread(thread.id)
+                || process.signal_waiters.contains_thread(thread.id)
+                || process.child_waiters.contains_thread(thread.id)
+                || process.scheme_waiters.contains_thread(thread.id)
+        });
+        if process_waiters {
+            stats[6] = stats[6].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        if crate::syscall::futex::contains_thread(thread.id) {
+            stats[7] = stats[7].saturating_add(1);
             holders = holders.saturating_add(1);
         }
         if holders > 1 {
