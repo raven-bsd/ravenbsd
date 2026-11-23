@@ -191,6 +191,14 @@ impl WaitQueue {
         waiters.retain(|waiter| waiter.thread.id != thread_id);
     }
 
+    /// True when `thread_id` still has an entry on this queue (S36 holder diagnostic).
+    pub fn contains_thread(&self, thread_id: u64) -> bool {
+        self.waiters
+            .lock()
+            .iter()
+            .any(|waiter| waiter.thread.id == thread_id)
+    }
+
     /// Wake every waiter belonging to `process_id` with `EIO` and remove it from the queue.
     ///
     /// Used by process teardown for blocked sibling threads.  Removing without waking (the old

@@ -99,6 +99,78 @@ pub fn leaked_thread_objects() -> [u64; 7] {
     }
     stats
 }
+
+/// Holder census for leaked thread objects (S36 diagnostic).
+///
+/// Returns `(total, current, runqueue, sleepers, reap, threads_live, process_waiters, futex,
+/// handles, multi_holder, unexplained)`. A weak `threads_live` entry is counted separately: it is
+/// not a strong owner, but it shows the unregister path missed the thread.
+pub fn thread_holder_stats() -> [u64; 11] {
+    let threads: Vec<Arc<Thread>> = ALL_THREADS
+        .lock()
+        .iter()
+        .filter_map(|weak| weak.upgrade())
+        .filter(|thread| thread.process.torn_down.load(Ordering::Acquire))
+        .collect();
+    let processes = crate::process::processes();
+    let mut stats = [0u64; 11];
+    for thread in &threads {
+        stats[0] = stats[0].saturating_add(1);
+        let mut holders = 0u64;
+        let sched = crate::sched::holder_state(thread.id);
+        for (index, count) in sched.iter().enumerate() {
+            if *count != 0 {
+                stats[index.saturating_add(1)] = stats[index.saturating_add(1)].saturating_add(1);
+                holders = holders.saturating_add(1);
+            }
+        }
+        let live = thread.process.threads_live.lock().iter().any(|weak| {
+            weak.upgrade()
+                .is_some_and(|entry| Arc::ptr_eq(&entry, thread))
+        });
+        if live {
+            stats[5] = stats[5].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        let process_waiters = processes.iter().any(|process| {
+            process.waiters.contains_thread(thread.id)
+                || process.signal_waiters.contains_thread(thread.id)
+                || process.child_waiters.contains_thread(thread.id)
+                || process.scheme_waiters.contains_thread(thread.id)
+        });
+        if process_waiters {
+            stats[6] = stats[6].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        if crate::syscall::futex::contains_thread(thread.id) {
+            stats[7] = stats[7].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        let handle = processes.iter().any(|process| {
+            let mut found = false;
+            process.handles.lock().for_each_live(|_, object, _, _| {
+                if let crate::process::handle::Object::Thread(target) = object
+                    && Arc::ptr_eq(target, thread)
+                {
+                    found = true;
+                }
+            });
+            found
+        });
+        if handle {
+            stats[8] = stats[8].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        if holders > 1 {
+            stats[9] = stats[9].saturating_add(1);
+        }
+        if holders == 0 {
+            stats[10] = stats[10].saturating_add(1);
+        }
+    }
+    stats
+}
+
 /// Admission denials since boot (K530 churn diagnostic).
 static SLOT_DENIES: AtomicUsize = AtomicUsize::new(0);
 /// Slots released since boot (K530 churn diagnostic).

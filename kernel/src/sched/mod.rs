@@ -1206,6 +1206,50 @@ pub fn reap_pending() -> usize {
     REAP.lock().len()
 }
 
+/// Scheduler holders of `thread_id`: `[current, runqueue, sleepers, reap]` (S36 diagnostic).
+///
+/// Each count is per-CPU; a thread can appear in more than one category (for example a woken
+/// thread whose sleep entry has not expired yet). The caller must not hold a CPU slot lock.
+pub fn holder_state(thread_id: u64) -> [u64; 4] {
+    let mut stats = [0u64; 4];
+    if !INITIALIZED.load(Ordering::Acquire) {
+        return stats;
+    }
+    for cpu in 0..smp::online_cpus() {
+        let slot = lock_cpu(cpu);
+        let Some(state) = slot.as_ref() else {
+            continue;
+        };
+        if state
+            .current
+            .as_ref()
+            .is_some_and(|thread| thread.id == thread_id)
+        {
+            stats[0] = stats[0].saturating_add(1);
+        }
+        if state.runqueue.iter().any(|thread| thread.id == thread_id) {
+            stats[1] = stats[1].saturating_add(1);
+        }
+        if state
+            .sleepers
+            .iter()
+            .any(|(thread, _, _)| thread.id == thread_id)
+        {
+            stats[2] = stats[2].saturating_add(1);
+        }
+    }
+    let reap = REAP.lock();
+    for raw in reap.iter() {
+        // SAFETY: every entry is an `Arc::into_raw` owned by REAP; the lock keeps it live and the
+        // reaper only takes the whole vector under the same lock.
+        let thread = unsafe { &*(*raw as *const Thread) };
+        if thread.id == thread_id {
+            stats[3] = stats[3].saturating_add(1);
+        }
+    }
+    stats
+}
+
 /// Queue a thread whose stack must be freed by the next scheduling point.
 ///
 /// Used for creation rollback (a thread that was never enqueued) as well as for dead threads.

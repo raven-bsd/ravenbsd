@@ -147,6 +147,12 @@ pub fn remove_thread(thread_id: u64) {
     FALLBACK.remove_thread(thread_id);
 }
 
+/// True when `thread_id` still has a futex entry (S36 holder diagnostic).
+pub fn contains_thread(thread_id: u64) -> bool {
+    QUEUES.iter().any(|queue| queue.contains_thread(thread_id))
+        || FALLBACK.contains_thread(thread_id)
+}
+
 /// Wake and remove every futex waiter owned by `process_id` (process teardown).
 pub fn remove_process(process_id: u64) {
     for queue in QUEUES.iter() {
