@@ -42,6 +42,10 @@ close_env=
 if [ -n "${RAVEN_CLOSE_TIMEOUT:-}" ]; then
     close_env="RAVEN_CLOSE_TIMEOUT=$RAVEN_CLOSE_TIMEOUT"
 fi
+image_env=
+if [ -n "${RAVEN_SSH_IMAGE:-}" ]; then
+    image_env="RAVEN_SSH_IMAGE=$RAVEN_SSH_IMAGE"
+fi
 
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=
@@ -107,7 +111,7 @@ if [ "$mode" = shared ]; then
     $SUDO sh scripts/qemu-net.sh up
     up=1
     RAVEN_SSH_HOST="$guest_ip" RAVEN_QEMU_TAP="$tap" \
-        RAVEN_MATRIX_ONLY="$only" RAVEN_MATRIX_OUT="$out" $close_env \
+        RAVEN_MATRIX_ONLY="$only" RAVEN_MATRIX_OUT="$out" $close_env $image_env \
         timeout "$matrix_timeout" python3 "$root/tests/ssh/matrix.py"
 else
     echo "matrix: private netns $ns bridge=$bridge tap=$tap guest=$guest_ip" >&2
@@ -136,6 +140,6 @@ else
 
     timeout "$matrix_timeout" $SUDO ip netns exec "$ns" runuser -u "$user" -- \
         env RAVEN_SSH_HOST="$guest_ip" RAVEN_QEMU_TAP="$tap" \
-            RAVEN_MATRIX_ONLY="$only" RAVEN_MATRIX_OUT="$out" $close_env \
+            RAVEN_MATRIX_ONLY="$only" RAVEN_MATRIX_OUT="$out" $close_env $image_env \
         python3 "$root/tests/ssh/matrix.py"
 fi
