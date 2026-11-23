@@ -5,6 +5,13 @@
 //!
 //! The production source maps anonymous memory with `MAP`; host tests use a `Vec`-backed source.
 //! The allocator is serialized by a spin lock, as required by `GlobalAlloc`'s `&self` methods.
+//!
+//! Free blocks are address-ordered and coalesced, and a reused block is split when the remainder
+//! can hold another free node. This is the Raven form of the per-size-class reuse contract in
+//! NetBSD `lib/libc/stdlib/malloc.c:malloc_bytes`/`free_bytes`: a small request must not consume a
+//! large chunk and strand the rest. **Recorded divergence**: Raven is byte-granular over lazily
+//! mapped chunks, not paged size classes; split/coalesce preserves the same reuse outcome without
+//! copying donor code.
 
 use core::alloc::Layout;
 use core::cell::UnsafeCell;
@@ -71,6 +78,14 @@ struct FreeNode {
     next: *mut FreeNode,
 }
 
+/// Round a request to the allocation alignment and at least one free node.
+fn span(size: usize, align: usize) -> Option<usize> {
+    let align = align.max(core::mem::align_of::<FreeNode>());
+    size.max(1)
+        .checked_add(align - 1)
+        .map(|value| value & !(align - 1))
+}
+
 struct State {
     chunk: *mut u8,
     chunk_len: usize,
@@ -89,16 +104,36 @@ impl State {
     }
 
     fn alloc(&mut self, source: &mut dyn PageSource, layout: Layout) -> *mut u8 {
-        let size = layout.size().max(1);
         let align = layout.align().max(core::mem::align_of::<FreeNode>());
+        let Some(need) = span(layout.size(), align) else {
+            return ptr::null_mut();
+        };
 
         let mut previous: *mut FreeNode = ptr::null_mut();
         let mut node = self.free;
         while !node.is_null() {
             // SAFETY: every free-list node was written by `dealloc` and remains in a mapped chunk.
             let current = unsafe { &mut *node };
-            if current.size >= size && (node as usize).is_multiple_of(align) {
-                if previous.is_null() {
+            if current.size >= need && (node as usize).is_multiple_of(align) {
+                let remainder = current.size - need;
+                if remainder >= size_of::<FreeNode>() + core::mem::align_of::<FreeNode>() {
+                    // Return the tail to the free list at its own size; the next request can use
+                    // it without stealing this block's span.
+                    let tail = (node as usize).wrapping_add(need) as *mut FreeNode;
+                    // SAFETY: the tail is inside the same mapped block, after the allocation and
+                    // far enough from the end to hold a `FreeNode`.
+                    unsafe {
+                        tail.write(FreeNode {
+                            size: remainder,
+                            next: current.next,
+                        });
+                        if previous.is_null() {
+                            self.free = tail;
+                        } else {
+                            (*previous).next = tail;
+                        }
+                    }
+                } else if previous.is_null() {
                     self.free = current.next;
                 } else {
                     // SAFETY: `previous` is a free-list node.
@@ -120,14 +155,14 @@ impl State {
         else {
             return ptr::null_mut();
         };
-        let Some(end) = aligned.checked_add(size) else {
+        let Some(end) = aligned.checked_add(need) else {
             return ptr::null_mut();
         };
         let Some(offset_end) = end.checked_sub(base) else {
             return ptr::null_mut();
         };
         if self.chunk.is_null() || offset_end > self.chunk_len {
-            let Some(map_len) = size
+            let Some(map_len) = need
                 .checked_add(align)
                 .and_then(|value| value.checked_add(4095))
                 .map(|value| value & !4095)
@@ -147,18 +182,102 @@ impl State {
     }
 
     fn dealloc(&mut self, pointer: *mut u8, layout: Layout) {
-        if pointer.is_null() || layout.size() < size_of::<FreeNode>() {
+        if pointer.is_null() {
             return;
         }
-        let node = pointer.cast::<FreeNode>();
-        // SAFETY: the caller hands back a live allocation of at least `layout.size()` bytes.
-        unsafe {
-            node.write(FreeNode {
-                size: layout.size(),
-                next: self.free,
-            });
+        let align = layout.align().max(core::mem::align_of::<FreeNode>());
+        let Some(mut need) = span(layout.size(), align) else {
+            return;
+        };
+        let start = pointer as usize;
+        let Some(end) = start.checked_add(need) else {
+            return;
+        };
+
+        let mut previous: *mut FreeNode = ptr::null_mut();
+        let mut node = self.free;
+        while !node.is_null() && (node as usize) < start {
+            previous = node;
+            // SAFETY: the free list is address-ordered and every node is live.
+            node = unsafe { (*node).next };
         }
-        self.free = node;
+        let next_after = if !node.is_null() && end == node as usize {
+            // SAFETY: `node` is the address-adjacent successor free node.
+            let next = unsafe { (*node).next };
+            // SAFETY: `node` is a live free node with a size field.
+            need = need.saturating_add(unsafe { (*node).size });
+            next
+        } else {
+            node
+        };
+        let previous_end = if previous.is_null() {
+            0
+        } else {
+            // SAFETY: `previous` is a live free-list node with a size field.
+            (previous as usize).saturating_add(unsafe { (*previous).size })
+        };
+        if !previous.is_null() && previous_end == start {
+            // SAFETY: `previous` is the address-adjacent predecessor; extend it over this block
+            // and the already-absorbed successor.
+            unsafe {
+                (*previous).size = (*previous).size.saturating_add(need);
+                (*previous).next = next_after;
+            }
+        } else {
+            let node = pointer.cast::<FreeNode>();
+            // SAFETY: the caller hands back a live allocation of at least `need` bytes.
+            unsafe {
+                node.write(FreeNode {
+                    size: need,
+                    next: next_after,
+                });
+            }
+            if previous.is_null() {
+                self.free = node;
+            } else {
+                // SAFETY: `previous` is a free-list node below the new one.
+                unsafe { (*previous).next = node };
+            }
+        }
+        self.salvage_tail();
+    }
+
+    /// Reclaim a free block that ends at the bump pointer.
+    ///
+    /// Without this, freeing the most recent allocation leaves the chunk tail stranded and the
+    /// next allocation maps another chunk even though the space is unused.
+    fn salvage_tail(&mut self) {
+        if self.chunk.is_null() || self.chunk_offset == 0 {
+            return;
+        }
+        let tail = (self.chunk as usize).saturating_add(self.chunk_offset);
+        let mut previous: *mut FreeNode = ptr::null_mut();
+        let mut node = self.free;
+        while !node.is_null() {
+            // SAFETY: the free list is address-ordered and every node is live.
+            let size = unsafe { (*node).size };
+            let end = (node as usize).saturating_add(size);
+            if end == tail {
+                // SAFETY: `node` is a live free-list node with a next pointer.
+                let next = unsafe { (*node).next };
+                if previous.is_null() {
+                    self.free = next;
+                } else {
+                    // SAFETY: `previous` precedes `node`.
+                    unsafe { (*previous).next = next };
+                }
+                if (node as usize) >= self.chunk as usize {
+                    self.chunk_offset = node as usize - self.chunk as usize;
+                }
+                return;
+            }
+            if end > tail {
+                return;
+            }
+            previous = node;
+            // SAFETY: the free list is address-ordered and every node is live.
+            node = unsafe { (*node).next };
+        }
     }
 }
 
@@ -216,184 +335,5 @@ unsafe impl<S: PageSource + Send> GlobalAlloc for Allocator<S> {
 static GLOBAL: Allocator<SysPageSource> = Allocator::new(SysPageSource);
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct TestSource {
-        chunks: Vec<Box<[u8]>>,
-    }
-
-    impl TestSource {
-        fn new() -> Self {
-            Self { chunks: Vec::new() }
-        }
-    }
-
-    impl PageSource for TestSource {
-        fn map(&mut self, len: usize) -> Option<*mut u8> {
-            let mut chunk = vec![0u8; len + 64].into_boxed_slice();
-            let base = chunk.as_mut_ptr() as usize;
-            let pointer = (base + 63) & !63;
-            self.chunks.push(chunk);
-            Some(pointer as *mut u8)
-        }
-
-        fn unmap(&mut self, _pointer: *mut u8, _len: usize) {}
-    }
-
-    fn test_alloc(allocator: &Allocator<TestSource>, layout: Layout) -> *mut u8 {
-        // SAFETY: `layout` is a valid layout and the allocator outlives the allocation.
-        unsafe { allocator.alloc(layout) }
-    }
-
-    fn test_dealloc(allocator: &Allocator<TestSource>, pointer: *mut u8, layout: Layout) {
-        // SAFETY: `pointer` came from `test_alloc` with the same layout and is still live.
-        unsafe { allocator.dealloc(pointer, layout) }
-    }
-
-    fn test_write(pointer: *mut u8, byte: u8, len: usize) {
-        // SAFETY: the caller passes a live allocation of at least `len` bytes.
-        unsafe { pointer.write_bytes(byte, len) }
-    }
-
-    fn test_read(pointer: *const u8, index: usize) -> u8 {
-        // SAFETY: the caller passes a live allocation with `index` in bounds.
-        unsafe { *pointer.add(index) }
-    }
-
-    fn allocator() -> Allocator<TestSource> {
-        Allocator::new(TestSource::new())
-    }
-
-    #[test]
-    fn basic_alignment_and_size() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(100, 16).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        assert!(!pointer.is_null());
-        assert!((pointer as usize).is_multiple_of(16));
-        test_write(pointer, 0xAA, 100);
-        test_dealloc(&allocator, pointer, layout);
-    }
-
-    #[test]
-    fn alignment_one() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(1, 1).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        assert!(!pointer.is_null());
-        test_dealloc(&allocator, pointer, layout);
-    }
-
-    #[test]
-    fn alignment_64() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(33, 64).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        assert!((pointer as usize).is_multiple_of(64));
-        test_dealloc(&allocator, pointer, layout);
-    }
-
-    #[test]
-    fn alignment_beyond_page_size() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(33, 8192).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        assert!(!pointer.is_null());
-        assert!((pointer as usize).is_multiple_of(8192));
-        test_dealloc(&allocator, pointer, layout);
-    }
-
-    #[test]
-    fn free_list_reuses_exact_block() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(32, 8).unwrap();
-        let first = test_alloc(&allocator, layout);
-        test_dealloc(&allocator, first, layout);
-        let second = test_alloc(&allocator, layout);
-        assert_eq!(first, second);
-        test_dealloc(&allocator, second, layout);
-    }
-
-    #[test]
-    fn large_allocation_gets_another_chunk() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(8192, 8).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        assert!(!pointer.is_null());
-        test_write(pointer, 0x55, 8192);
-        test_dealloc(&allocator, pointer, layout);
-    }
-
-    #[test]
-    fn zero_size_returns_writable_pointer() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(0, 1).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        assert!(!pointer.is_null());
-        test_dealloc(&allocator, pointer, layout);
-    }
-
-    #[test]
-    fn multiple_allocations_do_not_overlap() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(48, 8).unwrap();
-        let first = test_alloc(&allocator, layout);
-        let second = test_alloc(&allocator, layout);
-        assert_ne!(first, second);
-        assert!(
-            (first as usize + 48 <= second as usize) || (second as usize + 48 <= first as usize)
-        );
-        test_dealloc(&allocator, first, layout);
-        test_dealloc(&allocator, second, layout);
-    }
-
-    #[test]
-    fn freeing_small_layout_is_ignored() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(1, 1).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        test_dealloc(&allocator, pointer, layout);
-        let next = test_alloc(&allocator, layout);
-        assert!(!next.is_null());
-        test_dealloc(&allocator, next, layout);
-    }
-
-    #[test]
-    fn free_list_handles_multiple_blocks() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(24, 8).unwrap();
-        let first = test_alloc(&allocator, layout);
-        let second = test_alloc(&allocator, layout);
-        test_dealloc(&allocator, first, layout);
-        test_dealloc(&allocator, second, layout);
-        let a = test_alloc(&allocator, layout);
-        let b = test_alloc(&allocator, layout);
-        assert!(a == second || a == first);
-        assert!(b == second || b == first);
-        assert_ne!(a, b);
-    }
-
-    #[test]
-    fn writes_are_visible() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(16, 8).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        test_write(pointer, 0x5A, 16);
-        for index in 0..16 {
-            assert_eq!(test_read(pointer, index), 0x5A);
-        }
-        test_dealloc(&allocator, pointer, layout);
-    }
-
-    #[test]
-    fn allocation_after_dealloc_can_reuse_chunk() {
-        let allocator = allocator();
-        let layout = Layout::from_size_align(32, 8).unwrap();
-        let pointer = test_alloc(&allocator, layout);
-        test_dealloc(&allocator, pointer, layout);
-        let again = test_alloc(&allocator, layout);
-        assert_eq!(pointer, again);
-        test_dealloc(&allocator, again, layout);
-    }
-}
+#[path = "alloc_ut.rs"]
+mod tests;
