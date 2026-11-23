@@ -39,6 +39,9 @@ regex = '^nontty-status:0$'
 regex = '^out-status:0$'
 
 [[expect]]
+regex = '^both-status:0$'
+
+[[expect]]
 regex = '^(brush|ls|true)$'
 unordered = true
 
@@ -102,6 +105,14 @@ delay_ms = 100
 
 [[step]]
 wait = '^out-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/brush -c '/bin/ls /bin' < /dev/null > /tmp/brush-both; echo both-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^both-status:0$'
 timeout_secs = 60
 
 [[step]]
