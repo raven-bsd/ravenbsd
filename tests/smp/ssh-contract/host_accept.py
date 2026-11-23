@@ -11,6 +11,18 @@ import struct
 import sys
 import time
 
+_LOG = ""
+_ORIGIN = time.monotonic()
+
+
+def note(message):
+    """Append a timed diagnostic line to the host peer log, if one was configured."""
+    if not _LOG:
+        return
+    elapsed = time.monotonic() - _ORIGIN
+    with open(_LOG, "a", encoding="utf-8") as handle:
+        handle.write(f"{elapsed:8.3f}s {message}\n")
+
 
 def parse_usernet(text):
     """Map guest ports 23096-23098 to the ephemeral host ports QEMU chose."""
@@ -61,14 +73,37 @@ def discover_ports(path, deadline):
 
 def wait_ready(host, port, deadline):
     """Wait for the guest K6-ready marker before opening the first K6 connection."""
+    started = time.monotonic()
+    attempts = 0
+    last = "no attempt"
     while time.monotonic() < deadline:
+        attempts += 1
         try:
             with socket.create_connection((host, port), timeout=5.0) as stream:
                 stream.settimeout(30.0)
+                if attempts <= 5:
+                    note(
+                        f"K6-ready connected port={port} attempt={attempts} "
+                        f"elapsed={time.monotonic() - started:.3f}s"
+                    )
                 if read_line(stream) == b"READY":
+                    note(
+                        f"K6-ready ok port={port} attempt={attempts} "
+                        f"elapsed={time.monotonic() - started:.3f}s"
+                    )
                     return True
-        except OSError:
+        except OSError as error:
+            last = str(error)
+            if attempts <= 5 or attempts % 100 == 0:
+                note(
+                    f"K6-ready retry port={port} attempt={attempts} "
+                    f"elapsed={time.monotonic() - started:.3f}s error={last}"
+                )
             time.sleep(0.2)
+    note(
+        f"K6-ready timeout port={port} attempts={attempts} "
+        f"elapsed={time.monotonic() - started:.3f}s last={last}"
+    )
     return False
 
 
@@ -190,6 +225,7 @@ def half_close(host, port, deadline):
 
 
 def main():
+    global _LOG
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=23097)
@@ -202,11 +238,13 @@ def main():
     parser.add_argument("--log", default="")
     parser.add_argument("--timeout", type=float, default=600.0)
     args = parser.parse_args()
+    _LOG = args.log
 
     deadline = time.monotonic() + args.timeout
     if args.monitor:
         try:
             ports = discover_ports(args.monitor, deadline)
+            note(f"monitor ports {sorted(ports.items())}")
             args.port = ports[23097]
             args.eof_port = ports[23098]
             if 23096 in ports:
