@@ -65,6 +65,9 @@ S4_ASSERT_ATTEMPTS = 3
 S4_ECHO_COMMAND = ["echo", "K514-S4-ECHO-2026-11-22"]
 S4_ECHO_BYTES = b"K514-S4-ECHO-2026-11-22\n"
 S4_EXIT_COMMAND = ["cat", "/etc/ssh-matrix-marker"]
+# K514 rev 95: 10-TTY verification; every session must print /dev/pts/N from `tty`.
+TTY10_ATTEMPTS = 10
+TTY10_RE = re.compile(rb"/dev/pts/[0-9]+")
 # K514 rev 92 release blast-radius measurement: every command is attempted ten times as the
 # release user. The S4 row's own expectations are unchanged.
 RELEASE_SESSIONS = 10
@@ -1178,6 +1181,76 @@ def row_s4_exit0(serial: Path | None) -> None:
                f"exits={exits}; faults={faults}; expected exit 0 + {literal(MARKER)}")
 
 
+def row_tty10() -> None:
+    """K514 rev95: ten real local-pty SSH sessions; require /dev/pts/N from tty."""
+    import pexpect
+
+    passed = 0
+    exits: list[int] = []
+    walls: list[float] = []
+    outputs: list[str] = []
+    argv = [
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "ConnectTimeout=8",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-tt",
+        f"{USER}@{HOST}",
+        "tty",
+    ]
+    env = os.environ.copy()
+    env["SSH_ASKPASS"] = str(ASKPASS)
+    env["SSH_ASKPASS_REQUIRE"] = "force"
+    env["DISPLAY"] = ":0"
+    env["K434_SSH_PASSWORD"] = PASSWORD
+    for number in range(1, TTY10_ATTEMPTS + 1):
+        started = time.monotonic()
+        log_path = OUT / f"tty10-{number}.log"
+        timed_out = False
+        try:
+            with open(log_path, "w", encoding="utf-8") as log:
+                child = pexpect.spawn("ssh", argv, cwd=str(ROOT), encoding="utf-8",
+                                      codec_errors="replace", timeout=20, env=env)
+                child.logfile = log
+                try:
+                    child.expect([r"(?i)password: ?", pexpect.EOF], timeout=20)
+                    if child.after != pexpect.EOF and "password" in str(child.after).lower():
+                        child.sendline(PASSWORD)
+                        child.expect(pexpect.EOF, timeout=20)
+                except pexpect.TIMEOUT:
+                    timed_out = True
+                finally:
+                    child.close(force=True)
+        except OSError as error:
+            log_path.write_text(f"spawn failed: {error}\n", encoding="utf-8")
+            timed_out = True
+        elapsed = (time.monotonic() - started) * 1000
+        text = log_path.read_text(errors="replace") if log_path.is_file() else ""
+        match = re.search(r"/dev/pts/[0-9]+", text)
+        exit_code = -9
+        try:
+            exit_code = int(child.exitstatus if child.exitstatus is not None
+                            else (child.signalstatus if child.signalstatus is not None else -9))
+        except (NameError, ValueError):
+            exit_code = -9
+        ok = match is not None and not timed_out
+        if ok:
+            passed += 1
+        exits.append(exit_code)
+        walls.append(round(elapsed))
+        outputs.append(match.group(0) if match else "none")
+        received = (f"pts={match.group(0) if match else 'none'}; exit={exit_code}; "
+                    f"timed_out={timed_out}; wall={elapsed:.0f}ms")
+        attempt("S8-tty10", number, "fresh", "/dev/pts/[0-9]+ from tty",
+                received, elapsed, "PASS" if ok else "FAIL",
+                f"step={'done' if ok else 'output'}; log={log_path.name}")
+    record("S8-tty10", "PASS" if passed == TTY10_ATTEMPTS else "FAIL",
+           f"{passed}/{TTY10_ATTEMPTS} real-pty sessions returned /dev/pts/N; outputs={outputs}; "
+           f"exits={exits}; walls_ms={walls}")
+
+
 def row_release_commands(serial: Path) -> None:
     """K514 rev92: ten sessions per release command; exit, bytes and serial fault."""
     for name, command, expected, expected_text in RELEASE_COMMANDS:
@@ -2229,6 +2302,8 @@ def main() -> int:
                         record("S7", "BLOCKED", "console login failed before S7")
                 elif only == "s8":
                     row_s8()
+                elif only == "tty10":
+                    row_tty10()
                 elif only == "s8-proof":
                     row_s8_proof(console)
                 elif only == "close-probe":
