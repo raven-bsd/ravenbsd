@@ -27,6 +27,9 @@ regex = '^readiness: hup-repoll first=0x[0-9a-f]+ second=0x[0-9a-f]+ ok$'
 regex = '^readiness: eintr retries=[1-9][0-9]* result=1 ok$'
 
 [[expect]]
+regex = '^readiness: proc-wait first_pid=[0-9]+ first_status=[0-9]+ second_pid=[0-9]+ second_status=[0-9]+ ok$'
+
+[[expect]]
 regex = '^readiness: net-server ready$'
 
 [[expect]]
