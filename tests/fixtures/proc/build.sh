@@ -40,13 +40,8 @@ build_exec_large() {
         exit 77
     fi
     sysroot=${RAVENLIBC_SYSROOT:-$root/build/$arch/sysroot}
-    if [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$sysroot/usr/lib/crt1.o" ]; then
-        cargo xtask libc-pack --arch "$arch"
-    fi
-    if [ ! -f "$sysroot/usr/lib/libc.a" ]; then
-        echo "exec-large fixture: missing $sysroot/usr/lib/libc.a" >&2
-        exit 77
-    fi
+    . "$root/tests/fixtures/libc-sysroot.sh"
+    ensure_libc_sysroot "$root" "$arch" "$sysroot" exec-large
     CC=${CC:-clang}
     if ! command -v "$CC" >/dev/null 2>&1; then
         echo "exec-large fixture: $CC not found" >&2
