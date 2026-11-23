@@ -26,6 +26,20 @@ fn chown_family_uses_the_root_handle() {
 }
 
 #[test]
+fn pty_slave_chown_and_chmod_are_read_only_device_metadata() {
+    // The pty slave name is a `pty:` scheme endpoint, not a VFS node: the pty server owns the
+    // node metadata and reports a root-owned 0600 chr device. OpenSSH `sshpty.c` `pty_setowner`
+    // accepts `EROFS` for exactly that read-only, root-owned node; a literal VFS `Chown` here is
+    // what made `ssh -tt` fatal at `chown(/dev/pts/1, 1000, 1000)`.
+    let platform = platform();
+    assert_eq!(platform.chown(b"/dev/pts/1", 1000, 1000), Err(Errno::EROFS));
+    assert_eq!(platform.chmod(b"/dev/pts/1", 0o600), Err(Errno::EROFS));
+    // An ordinary VFS path still goes through the root handle.
+    assert_eq!(platform.chown(b"/a", 1, 2), Ok(()));
+    assert_eq!(platform.chmod(b"/a", 0o644), Ok(()));
+}
+
+#[test]
 fn mkfifoat_and_mknodat_resolve_through_the_cwd() {
     let platform = platform();
     assert_eq!(platform.mkfifoat(-100, b"fifo", 0o644), Ok(()));
