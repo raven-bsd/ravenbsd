@@ -563,6 +563,10 @@ unsafe extern "C" {
     ) -> usize;
     fn __rl_sigreturn_stub() -> !;
     fn __raven_sigentry();
+    /// The stub address in a data word: the linker resolves the code symbol here, so a Rust
+    /// reference cannot fold it to the call site under LTO.
+    #[cfg(target_arch = "x86_64")]
+    static __raven_sigentry_addr: usize;
     fn __rl_start_context();
     fn __rl_current_sp() -> usize;
     /// The function pointer the `__raven_sigentry` stub calls.
@@ -665,6 +669,15 @@ pub fn entry_function() -> usize {
 
 /// The address of the assembly entry stub the kernel resumes at.
 #[must_use]
+#[cfg(target_arch = "x86_64")]
+pub fn sigentry_address() -> usize {
+    // SAFETY: the data word is defined by the entry asm and only read here.
+    unsafe { __raven_sigentry_addr }
+}
+
+/// The address of the assembly entry stub the kernel resumes at.
+#[must_use]
+#[cfg(not(target_arch = "x86_64"))]
 pub fn sigentry_address() -> usize {
     __raven_sigentry as *const () as usize
 }
