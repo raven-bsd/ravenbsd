@@ -78,6 +78,8 @@ const RAW_PROC_WAIT_EX: usize = 0x48;
 const RAW_PROC_GETPGID: usize = 0x49;
 const RAW_PROC_SIGNAL: usize = 0x4a;
 const RAW_PROC_SIGRECV: usize = 0x4b;
+const RAW_PROC_SIGRECV_EX: usize = 0x85;
+const RAW_PROC_SIGQUEUE: usize = 0x86;
 const RAW_PROC_TIMES: usize = 0x4c;
 const RAW_PROC_GETRUSAGE: usize = 0x4d;
 const RAW_PROC_GETRLIMIT: usize = 0x4e;
@@ -98,6 +100,7 @@ const RAW_SCHED_GET_PRIORITY_MIN: usize = 0x7c;
 const RAW_SCHED_SETSCHEDULER: usize = 0x7d;
 const RAW_SCHED_GETSCHEDULER: usize = 0x7e;
 const RAW_SIG_SETUP: usize = 0x80;
+const RAW_SIGRETURN: usize = 0x82;
 const RAW_THREAD_KICK: usize = 0x81;
 const RAW_SIGRESEND: usize = 0x84;
 const RAW_DTRACE_PROBE_LIST: usize = 0x90;
@@ -579,6 +582,15 @@ fn emit(row: &Row) {
 extern "C" fn probe_thread(_arg: usize) -> ! {
     // SAFETY: `THREAD_EXIT` terminates only this probe thread.
     unsafe { sys::syscall1(Syscall::THREAD_EXIT as usize, 0) };
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+/// Signal entry probe: a delivered kick must return through `SIGRETURN`, not exit the thread.
+extern "C" fn signal_return(_bits: usize, _fault: usize, _mask: u64) -> ! {
+    // SAFETY: the kernel enters this function only after saving a context for the thread.
+    unsafe { sys::syscall0(RAW_SIGRETURN) };
     loop {
         core::hint::spin_loop();
     }
@@ -2841,6 +2853,41 @@ fn raw_plan(r: &mut Runner) {
         [ctx.out, 1, 0, 0, 0, 0],
         Expect::Err(EAGAIN),
     );
+    r.raw(
+        RAW_PROC_SIGRECV_EX,
+        "PROC_SIGRECV_EX",
+        "ptr0",
+        [0, 1, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    r.raw(
+        RAW_PROC_SIGRECV_EX,
+        "PROC_SIGRECV_EX",
+        "flagsneg",
+        [ctx.out, usize::MAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SIGRECV_EX,
+        "PROC_SIGRECV_EX",
+        "nohang",
+        [ctx.out, 1, 0, 0, 0, 0],
+        Expect::Err(EAGAIN),
+    );
+    r.raw(
+        RAW_PROC_SIGQUEUE,
+        "PROC_SIGQUEUE",
+        "signo0",
+        [0, 0, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
+    r.raw(
+        RAW_PROC_SIGQUEUE,
+        "PROC_SIGQUEUE",
+        "signoneg",
+        [0, usize::MAX, 0, 0, 0, 0],
+        Expect::Err(EINVAL),
+    );
 
     r.raw(
         RAW_PROC_TIMES,
@@ -3562,11 +3609,21 @@ fn raw_plan(r: &mut Runner) {
         [probe_entry, 0, usize::MAX, 0, 0, 0],
         Expect::Err(EINVAL),
     );
+    // A relative offset with no TLS base has no writable context. SIG_SETUP can report this
+    // now, so it must not register a context that would later kill the process on delivery.
+    r.raw(
+        RAW_SIG_SETUP,
+        "SIG_SETUP",
+        "relative0",
+        [probe_entry, 0, 0, 0, 0, 0],
+        Expect::Err(EFAULT),
+    );
+    // The valid baseline uses the absolute context page (SIG_SETUP_ABS = 2).
     r.raw(
         RAW_SIG_SETUP,
         "SIG_SETUP",
         "baseline",
-        [probe_entry, 0, 0, 0, 0, 0],
+        [signal_return as *const () as usize, ctx.out, 2, 0, 0, 0],
         Expect::Success,
     );
     r.raw(

@@ -240,6 +240,54 @@ fn a_watched_run_stops_after_the_last_expectation() {
 }
 
 #[test]
+fn a_watched_run_does_not_match_a_partial_line() {
+    let text = "name = \"partial\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 30\n\
+                expect_exit = \"success\"\n\
+                [[expect]]\nregex = \"^hello$\"\n";
+    let case = Case::parse(text).expect("case");
+    let started = Instant::now();
+    let output = run_watched(
+        &spec(
+            "printf 'hel'; sleep 1; printf 'lo'; sleep 1; printf '\\n'; sleep 30",
+            Duration::from_secs(30),
+        ),
+        None,
+        &case,
+        None,
+    )
+    .unwrap();
+    assert!(output.completed);
+    assert!(
+        started.elapsed() >= Duration::from_millis(1800),
+        "matched before the newline after {:?}",
+        started.elapsed()
+    );
+    assert!(output.lines.contains(&"hello".to_string()));
+}
+
+#[test]
+fn an_unordered_expectation_matches_before_an_earlier_ordered_line() {
+    let text = "name = \"race\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 30\n\
+                expect_exit = \"success\"\n\
+                [[expect]]\nregex = \"^child$\"\n\
+                [[expect]]\nregex = \"^monitor$\"\nunordered = true\n";
+    let case = Case::parse(text).expect("case");
+    let started = Instant::now();
+    let output = run_watched(
+        &spec(
+            "printf 'monitor\\n'; printf 'child\\n'; sleep 30",
+            Duration::from_secs(30),
+        ),
+        None,
+        &case,
+        None,
+    )
+    .unwrap();
+    assert!(output.completed);
+    assert!(started.elapsed() < Duration::from_secs(10));
+}
+
+#[test]
 fn a_watched_run_writes_the_serial_log() {
     let temp = crate::testutil::TempDir::new("runner-log");
     let log = temp.path().join("serial.log");

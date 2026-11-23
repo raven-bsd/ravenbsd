@@ -27,17 +27,27 @@ fn rto_retransmits_same_sequence_with_backoff_before_drop() {
     let RexmtAction::Retransmit {
         rxtcur_ms: first_rxtcur,
         syn,
-        first: first_flag,
-        ..
+        free_sackholes,
+        mtudisc_disabled,
+        losing,
     } = first
     else {
         panic!("expected the first retransmit, got {first:?}");
     };
     assert!(!syn);
-    assert!(first_flag);
+    assert!(free_sackholes, "the retransmit clears the SACK holes");
+    assert!(
+        !mtudisc_disabled,
+        "no PMTUD fallback on the first retransmit"
+    );
+    assert!(!losing, "no losing path on the first retransmit");
     assert_eq!(timer.rxtshift, 1);
     assert_eq!(timer.snd_nxt, timer.snd_una, "retransmit starts at snd_una");
-    assert!(timer.acknow, "the retransmit forces an ACK");
+    assert_eq!(timer.sackholes, 0, "the retransmit clears the SACK holes");
+    assert_eq!(
+        timer.snd_fack, timer.snd_una,
+        "the retransmit resets snd_fack"
+    );
     assert_eq!(
         timer.rexmt_deadline_ms,
         Some(1_000 + first_rxtcur),
@@ -145,7 +155,9 @@ fn two_msl_closes_time_wait_at_the_armed_deadline() {
     fin_wait2.keepintvl_ms = 500;
     fin_wait2.keepcnt = 2;
     fin_wait2.rcvtime_ms = 0;
-    fin_wait2.arm_two_msl(0, 1_000);
+    // NetBSD `tcp_usrreq.c:193/1209` arms TCPT_2MSL with `t_maxidle` outside TIME_WAIT;
+    // the merged `arm_two_msl` helper is the TIME_WAIT 2*MSL arm, so set the donor value here.
+    fin_wait2.two_msl_deadline_ms = Some(fin_wait2.maxidle_ms());
     assert_eq!(fin_wait2.two_msl_deadline_ms, Some(1_000), "TP_MAXIDLE");
     assert_eq!(tcp_timer_2msl(&mut fin_wait2, 1_000), TwoMslOutcome::Rearm);
     assert_eq!(fin_wait2.two_msl_deadline_ms, Some(1_500));

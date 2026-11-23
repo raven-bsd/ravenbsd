@@ -49,6 +49,8 @@ if [ "$build_only" -eq 1 ] && [ "$clean" -eq 1 ] &&
     exit 0
 fi
 
+sh scripts/space-guard.sh "${SPACE_MIN_GB:-15}"
+
 # The bootable UFS root carries the same static disk tools as the S99 demo.
 if [ "${QEMU_UFS_SKIP_TOOLS:-0}" != 1 ]; then
     sh scripts/ufs-demo.sh --prepare-tools
