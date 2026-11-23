@@ -229,6 +229,20 @@ impl Device for NicDevice {
                 let _ = consumer.pop();
             }
             if length > 0 {
+                if length >= 34 && length <= 128 {
+                    let ihl = usize::from(frame[14] & 0xf) * 4;
+                    let tcp = 14 + ihl;
+                    if tcp + 20 <= length {
+                        let src = u16::from_be_bytes([frame[tcp], frame[tcp + 1]]);
+                        let dst = u16::from_be_bytes([frame[tcp + 2], frame[tcp + 3]]);
+                        let flags = frame[tcp + 13];
+                        if src == 23098 || dst == 23098 {
+                            raven_rt::println!(
+                                "netd: nirx src={src} dst={dst} len={length} flags={flags:#x}"
+                            );
+                        }
+                    }
+                }
                 consume(&frame[..length]);
                 delivered = true;
             }
