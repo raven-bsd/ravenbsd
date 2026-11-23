@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K445 diagnostic: run the K1 socketpair and K6 listener readiness rows 50 times each.
+name = "ssh-contract"
+exec = "/bin/ssh-contract-diag"
+args = []
+needs = ["scheme:file", "scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

@@ -1949,6 +1949,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-ipiq"
+version = "0.1.0"
+
+[[package]]
 name = "raven-irq-dist"
 version = "0.1.0"
 dependencies = [
@@ -2101,6 +2105,7 @@ dependencies = [
  "raven-handles",
  "raven-initfs",
  "raven-iommu",
+ "raven-ipiq",
  "raven-kmem",
  "raven-mem",
  "raven-pager",

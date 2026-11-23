@@ -32,6 +32,7 @@ priority::SCHED_GETSCHEDULER	0x7e	kernel/src/syscall/priority.rs:35	fuzz	direct	
 tty::PROC_CTTY_SET	0x1e0	kernel/src/syscall/tty.rs:26	fuzz	direct	PROC_CTTY_SET
 tty::PROC_CTTY_GET	0x1e1	kernel/src/syscall/tty.rs:28	fuzz	direct	PROC_CTTY_GET
 tty::PROC_CTTY_SET_FG	0x1e2	kernel/src/syscall/tty.rs:30	fuzz	direct	PROC_CTTY_SET_FG
+tty::PROC_CTTY_HANDLE	0x1e3	kernel/src/syscall/tty.rs:32	fuzz	direct	PROC_CTTY_HANDLE
 process_ctl::PROC_SELF_INFO	0x35	kernel/src/syscall/process_ctl.rs:158	fuzz	direct	PROC_SELF_INFO
 process_ctl::PROC_SETPGID	0x36	kernel/src/syscall/process_ctl.rs:160	fuzz	direct	PROC_SETPGID
 process_ctl::PROC_SETSID	0x37	kernel/src/syscall/process_ctl.rs:162	fuzz	direct	PROC_SETSID
