@@ -11,11 +11,6 @@ impl<SE: crate::extensions::ShellExtensions> crate::Shell<SE> {
     /// This currently includes invoking the `EXIT` trap handler, if any. If the handler
     /// exits the shell, its exit status becomes the shell's last exit status.
     pub async fn on_exit(&mut self) -> Result<(), error::Error> {
-        // No EXIT trap: do not create and await the trap future at all. The shell's exit path
-        // can otherwise resume the completed future, which aborts the process.
-        if !self.traps.handles(TrapSignal::Exit) {
-            return Ok(());
-        }
         self.run_exit_trap().await?;
         Ok(())
     }
