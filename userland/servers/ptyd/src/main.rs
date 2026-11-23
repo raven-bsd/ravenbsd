@@ -400,7 +400,11 @@ mod program {
             if !readable && !writable && role != Role::Root {
                 return Err(Errno::EACCES.into());
             }
-            self.pairs.open(pair);
+            // The mount root owns no pair; creating pair 0 for it left `files=0 pairs=1` after
+            // the first `/dev/pts` stat (the pty-churn final row).
+            if role != Role::Root {
+                self.pairs.open(pair);
+            }
             let id = self.next;
             self.next = self.next.wrapping_add(1);
             self.files.insert(id, FileEntry { pair, role });
