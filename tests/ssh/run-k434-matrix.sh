@@ -47,10 +47,13 @@ fi
 tree=$(git rev-parse HEAD)
 marker=$image.tree
 mkdir -p "$out"
-# The release profile stages /bin/pty-path from the pty-path test fixture (K570), and the
-# pty-path gate image is built from the same release initfs. Stage the fixture before any image
-# build so a clean clone can build the release image, not just the gate image.
-timeout 120 sh tests/fixtures/pty-path/build.sh > "$out/pty-path-build.log" 2>&1 || true
+# K570: the release profile stages /bin/pty-path from the test fixture, and the C fixture links
+# the static sysroot libc. A pre-existing fixture can be older than a just-refreshed libc (the
+# K570 ttyname/isatty probe would then still be the old code). Remove it so the image/initfs
+# build rebuilds it through ensure_prerequisites(), after libc-pack has refreshed the sysroot.
+if [ "${RAVEN_K434_PTY_PATH_GATE:-1}" = 1 ]; then
+    rm -f build/fixtures/pty-path/pty-path
+fi
 
 if [ ! -f "$image" ]; then
     echo "k434: building one image from tree $tree"
