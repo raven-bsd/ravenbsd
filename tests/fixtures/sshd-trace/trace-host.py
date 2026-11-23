@@ -47,16 +47,22 @@ def wait_tcp(host: str, port: int, timeout: float) -> bool:
     return False
 
 
-def probe_client(host: str) -> str:
+def probe_port(host: str, port: int) -> str:
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, 23147), timeout=3) as connection:
+            with socket.create_connection((host, port), timeout=3) as connection:
                 connection.settimeout(10)
-                return f"banner={connection.recv(32)!r}"
+                return f"{connection.recv(32)!r}"
         except OSError:
             time.sleep(1)
     return "no-connect"
+
+
+def probe_client(host: str) -> str:
+    tap = probe_port(host, 23147)
+    ppoll = probe_port(host, 23149)
+    return f"tap={tap} ppoll={ppoll}"
 
 
 def host_client(host: str) -> str:
@@ -134,18 +140,18 @@ def main() -> int:
         child.logfile = serial
         try:
             child.expect("svcd: getty up", timeout=240)
-            probe = probe_client(GUEST)
-            log("accept-probe", probe)
-            try:
-                child.expect("sshd-trace-accept: done", timeout=60)
-            except pexpect.TIMEOUT:
-                log("accept-probe", "done marker timeout")
             child.expect(r"login: ?", timeout=120)
             child.sendline("root")
             child.expect(r"(?i)password: ?", timeout=30)
             child.sendline("raven")
             child.expect("raven# ", timeout=120)
             log("console", "root login")
+            probe = probe_client(GUEST)
+            log("accept-probe", probe)
+            try:
+                child.expect("sshd-trace-accept: done", timeout=60)
+            except pexpect.TIMEOUT:
+                log("accept-probe", "done marker timeout")
             if not wait_tcp(GUEST, 22, 120):
                 log("error", f"guest sshd did not accept on {GUEST}:22")
                 return 2

@@ -385,13 +385,15 @@ static int run_exec_child_and_poll(void) {
     if (revents <= 0 || (revents & (POLLIN | POLLHUP)) == 0 || !saw_wake || !hup) {
         (void)snprintf(detail, sizeof(detail),
                        "n=%d errno=%d revents=0x%x repoll=0x%x wake=%d hup=%d exit=%d code=%d sig=%d data=\"%s\"",
-                       revents, saved, revents, repoll, saw_wake, hup, exited, code, signaled ? 128 + termsig : 0, data);
+                       revents, saved, revents, repoll, saw_wake, hup, exited, code,
+                       signaled ? 128 + termsig : 0, data);
         (void)say_line("R4", 0, detail);
         return -1;
     }
     (void)snprintf(detail, sizeof(detail),
                    "n=%d revents=0x%x repoll=0x%x wake=%d hup=%d exit=%d code=%d sig=%d data=\"%s\"",
-                   revents, revents, repoll, saw_wake, hup, exited, code, signaled ? 128 + termsig : 0, data);
+                   revents, revents, repoll, saw_wake, hup, exited, code,
+                   signaled ? 128 + termsig : 0, data);
     sleep_ms(150);
     (void)say_line("R4", 1, detail);
     return 0;
@@ -400,7 +402,6 @@ static int run_exec_child_and_poll(void) {
 static int run_multi_fd_and_poll(void) {
     char name[128];
     char detail[200];
-    char data[64];
     struct pollfd fds[2];
     struct timespec timeout;
     struct timespec elapsed;
@@ -461,7 +462,7 @@ static int run_multi_fd_and_poll(void) {
     errno = 0;
     ready = ppoll(fds, 2, &timeout, NULL);
     int saved = errno;
-    int drained = drain_search(master, "wake", &saw_wake, data, sizeof(data));
+    int drained = drain_search(master, "wake", &saw_wake, NULL, 0);
     repoll = poll_ms(master, POLLIN | POLLHUP, PTY_WAKE_REPOLL_MS, &elapsed);
     hup = (repoll > 0 && (repoll & POLLHUP) != 0) || drained == 1;
     (void)waitpid(child, &status, 0);
