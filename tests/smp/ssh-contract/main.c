@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifndef O_NONBLOCK
@@ -47,6 +48,7 @@ extern char *ptsname(int fd);
 #define K6_PORT 23097
 #define KEOF_PORT 23098
 #define KREADY_PORT 23096
+#define K6_READY_MS 8000
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
 static long raven_debug_write(const char *bytes, size_t len) {
@@ -625,11 +627,23 @@ static int check_listen_only(void) {
     return 0;
 }
 
+static long long monotonic_ms(void) {
+    struct timespec now;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return -1;
+    }
+    return (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+// The host may connect before the guest stack is up; such a connection can outlive the host's
+// retry and be accepted here after the host has closed it. Require an explicit host ACK on the
+// same connection so a dead READY never satisfies the handshake. The whole exchange is bounded
+// by K6_READY_MS of guest time.
 static int signal_k6_ready(void) {
     int listener;
-    int conn;
-    int revents;
     struct sockaddr_in address;
+    long long deadline;
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
     if (listener < 0) {
@@ -644,24 +658,47 @@ static int signal_k6_ready(void) {
         (void)close(listener);
         return -1;
     }
-    revents = poll_one(listener, POLLIN, 10000);
-    if (revents < 0 || (revents & POLLIN) == 0) {
+    deadline = monotonic_ms();
+    if (deadline < 0) {
         (void)close(listener);
         return -1;
     }
-    conn = accept(listener, NULL, NULL);
-    if (conn < 0) {
-        (void)close(listener);
-        return -1;
-    }
-    if (send(conn, "READY\n", 6, 0) != 6) {
+    deadline += K6_READY_MS;
+    for (;;) {
+        long long now = monotonic_ms();
+        long long remaining;
+        int conn;
+        int revents;
+        char ack;
+
+        if (now < 0) {
+            (void)close(listener);
+            return -1;
+        }
+        remaining = deadline - now;
+        if (remaining <= 0) {
+            (void)close(listener);
+            return -1;
+        }
+        revents = poll_one(listener, POLLIN, (int)remaining);
+        if (revents < 0 || (revents & POLLIN) == 0) {
+            (void)close(listener);
+            return -1;
+        }
+        conn = accept(listener, NULL, NULL);
+        if (conn < 0) {
+            (void)close(listener);
+            return -1;
+        }
+        if (send(conn, "READY\n", 6, 0) == 6 &&
+            poll_one(conn, POLLIN, 1000) > 0 &&
+            read(conn, &ack, 1) == 1 && ack == 'A') {
+            (void)close(conn);
+            (void)close(listener);
+            return 0;
+        }
         (void)close(conn);
-        (void)close(listener);
-        return -1;
     }
-    (void)close(conn);
-    (void)close(listener);
-    return 0;
 }
 
 static int check_accept(void) {

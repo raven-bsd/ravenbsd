@@ -83,6 +83,13 @@ pub fn stats() -> (usize, usize) {
     }
 }
 
+/// K449 diagnostic: `(in_use, slabs, alloc_fail)` for one general size class.
+pub fn class_stats(class: usize) -> Option<(usize, usize, u64)> {
+    let guard = HEAP.lock();
+    let stats = guard.as_ref()?.heap.class_stats(class)?;
+    Some((stats.in_use, stats.slabs, stats.alloc_fail))
+}
+
 /// Run the `selftest=heap` workload.
 pub fn selftest() {
     {
