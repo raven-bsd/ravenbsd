@@ -21,7 +21,6 @@ use crate::sync::IrqSpinLock;
 use crate::time;
 
 pub use self::evq_core::SIGNALED;
-#[cfg(target_arch = "x86_64")]
 pub use self::evq_core::{HUP, READABLE, WRITABLE};
 
 /// An event queue registration table with waiters.
@@ -203,9 +202,7 @@ pub(crate) fn readiness(process: &Arc<Process>, handle: Handle) -> u32 {
         Ok(Object::Irq(irq)) if irq.pending() != 0 => SIGNALED,
         Ok(Object::Process(target)) if *target.state.lock() == ProcessState::Exited => SIGNALED,
         Ok(Object::Duplex(end)) => end.readiness(),
-        #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeServer(server)) if !server.is_live() => HUP,
-        #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeServer(server)) => server.owner.upgrade().map_or(HUP, |owner| {
             if owner.scheme_queue.lock().is_empty() {
                 0
@@ -213,10 +210,8 @@ pub(crate) fn readiness(process: &Arc<Process>, handle: Handle) -> u32 {
                 READABLE
             }
         }),
-        #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeFile(file)) if *file.server.state.lock() == ProcessState::Exited => HUP,
         // K409: a live scheme file is a pollable source even when no event is attached.
-        #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeFile(_)) => READABLE | WRITABLE,
         _ => 0,
     }
@@ -283,14 +278,15 @@ pub fn source_spec(process: &Arc<Process>, handle: Handle) -> Result<SourceSpec,
         Ok(Object::Irq(irq)) => Ok(SourceSpec::key(irq.event_key())),
         Ok(Object::Process(target)) => Ok(SourceSpec::key(arc_key(target))),
         Ok(Object::Duplex(end)) => Ok(SourceSpec::key(end.event_key())),
-        #[cfg(target_arch = "x86_64")]
+        // The scheme objects are the same `crate::ipc` types on every arch
+        // (`arch::aarch64::ipc` re-exports `crate::ipc`); the previous x86-only gate left the
+        // aarch64 netd EVQ_CTL ADD on its own `net:` server handle at EBADF.
         Ok(Object::SchemeServer(server)) => Ok(SourceSpec::key(
             server.owner.upgrade().as_ref().map_or_else(
                 || Arc::as_ptr(server) as usize as u64,
                 |owner| Arc::as_ptr(owner) as usize as u64,
             ),
         )),
-        #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeFile(file)) => Ok(SourceSpec::key(arc_key(&file.server))),
         _ => Err(Errno::EBADF),
     }
