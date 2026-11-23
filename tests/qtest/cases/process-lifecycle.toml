@@ -7,7 +7,7 @@ profile = "base"
 timeout_secs = 300
 pre = ["sh tests/fixtures/s36-lifecycle/build.sh"]
 initfs = "build/fixtures/s36-lifecycle/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1 s36-mapcheck=1"
+boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1 s36-mapcheck=1 s36-lockcheck=1"
 qemu_extra = []
 expect_exit = "success"
 
@@ -70,6 +70,19 @@ regex = '^s36: server ready$'
 [[expect]]
 regex = '^s36: scheme reregistered$'
 
+# Lock/time churn: futex wake and timeout paths, sampled frame allocated_bytes.
+[[expect]]
+regex = '^s36: lockcheck base allocated=[0-9]+$'
+
+[[expect]]
+regex = '^s36: lock churn wake=5000 timeout=1000$'
+
+[[expect]]
+regex = '^s36: lockcheck delta=[0-9]+ allocated=[0-9]+$'
+
+[[expect]]
+regex = '^s36: lockcheck ok$'
+
 # vfsd pager frame-return row: baseline at exit 88, map/unmap cycles, closing at exit 89.
 # The `mapcheck ok` line is required and the leak line is forbidden: this row is red until
 # the vfsd/rt allocator owner returns the mapped-chunk frames.
@@ -89,4 +102,4 @@ regex = '^s36: mapcheck ok$'
 regex = '^s36: lifecycle ok$'
 
 [[forbid]]
-regex = '(?i)panic|s36: failed|s36: mapcheck leak'
+regex = '(?i)panic|s36: failed|s36: mapcheck leak|s36: lockcheck leak'

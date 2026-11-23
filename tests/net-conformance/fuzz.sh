@@ -1,0 +1,158 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K548 bounded network fuzz pre-step.  It builds the K253 packet-level listener image, then runs
+# the selected deterministic raw-frame fuzz table against the guest over the private tap.  The
+# harness owns the per-case RFC assertions and the summary line; this script only builds, bounds
+# and preserves the evidence.  The qtest case then boots the same image and asserts the listener
+# is alive.
+#
+# usage: sh tests/net-conformance/fuzz.sh [--no-build] [--scenario fuzz|l4|frag-timeout]
+#   --no-build  reuse the stamped build/qtest/net-conformance.img and qtest image
+#   --scenario  fuzz (TCP), l4 (UDP/ICMP/IPv4 options/fragments), or frag-timeout
+
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+cd "$root"
+
+no_build=0
+scenario=fuzz
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --no-build)
+            no_build=1
+            shift
+            ;;
+        --scenario)
+            [ "$#" -ge 2 ] || { echo "--scenario needs a value" >&2; exit 2; }
+            scenario=$2
+            shift 2
+            ;;
+        *)
+            echo "usage: $0 [--no-build] [--scenario fuzz|l4|frag-timeout]" >&2
+            exit 2
+            ;;
+    esac
+done
+
+case "$scenario" in
+    fuzz)
+        harness_scenario=fuzz
+        label=net-fuzz
+        run_cap=55
+        ;;
+    l4)
+        harness_scenario=fuzz-l4
+        label=net-fuzz-l4
+        run_cap=55
+        ;;
+    frag-timeout)
+        harness_scenario=fuzz-frag-timeout
+        label=net-fuzz-frag-timeout
+        run_cap=65
+        ;;
+    *)
+        echo "unknown scenario: $scenario" >&2
+        exit 2
+        ;;
+esac
+
+out=build/net-fuzz
+image=build/qtest/net-conformance.img
+qtest_image=build/qtest/net-fuzz.img
+stamp=$out/image.stamp
+if [ "$scenario" = fuzz ]; then
+    log=$out/fuzz.log
+    pcap=$out/fuzz.pcap
+    serial=$out/fuzz-serial.log
+    summary_file=$out/summary.txt
+else
+    log=$out/fuzz-$scenario.log
+    pcap=$out/fuzz-$scenario.pcap
+    serial=$out/fuzz-$scenario-serial.log
+    summary_file=$out/summary-$scenario.txt
+fi
+pid_file=${serial%.log}.qemu.pid
+mkdir -p "$out"
+
+# A timeout can kill the Python harness before its QEMU finally block.  Reap only this run's
+# QEMU through its pid file so an interrupted fuzz never leaves the image write lock held.
+cleanup() {
+    if [ -f "$pid_file" ]; then
+        pid=$(cat "$pid_file" 2>/dev/null || true)
+        if [ -n "$pid" ]; then
+            kill -KILL "-$pid" 2>/dev/null || true
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+        rm -f "$pid_file"
+    fi
+}
+trap cleanup EXIT INT TERM
+rm -f "$pid_file"
+
+# Reuse a build only when the product tree state is byte-for-byte the one that produced the stamp.
+# The three gate rows then share one cold build; a source edit invalidates it.
+if [ "$no_build" -eq 0 ]; then
+    head=$(git rev-parse HEAD)
+    dirty=$(git status --porcelain | sha256sum | cut -d' ' -f1)
+    stamp_value="$head:$dirty"
+    if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$stamp_value" ] &&
+        [ -f "$image" ] && [ -f "$qtest_image" ]; then
+        no_build=1
+        echo "$label: reusing image stamp $head"
+    fi
+fi
+
+if [ "$no_build" -eq 0 ]; then
+    # A cold network-config-test initfs compiles libc and uutils; the measured cold cap is
+    # 600 s.  The fuzz run that follows has its own scenario cap.
+    if ! timeout 600 sh scripts/net-conformance.sh --target raven --build-only \
+        > "$out/build.log" 2>&1; then
+        echo "$label: FAIL image build (see $out/build.log)" >&2
+        tail -n 30 "$out/build.log" >&2
+        exit 1
+    fi
+fi
+for required in "$image"; do
+    if [ ! -f "$required" ]; then
+        echo "$label: FAIL missing $required (run without --no-build)" >&2
+        exit 1
+    fi
+done
+
+started=$(date +%s)
+if ! timeout "$run_cap" sh scripts/net-conformance.sh --target raven --no-build \
+    --image "$image" \
+    --scenario "$harness_scenario" \
+    --pcap "$pcap" \
+    --serial "$serial" \
+    > "$log" 2>&1; then
+    echo "$label: FAIL bounded run (see $log)" >&2
+    tail -n 40 "$log" >&2
+    exit 1
+fi
+elapsed=$(( $(date +%s) - started ))
+
+# The qtest case logs in and exits, so its copy needs test-exit=1.  The fuzz run above keeps the
+# profile's normal cmdline.  This is a cached xtask image build after the fixture initfs exists.
+if [ "$no_build" -eq 0 ]; then
+    if ! timeout 120 cargo xtask image --arch x86_64 --profile network-config-test \
+        --initfs build/fixtures/net-conformance/initfs.img \
+        --cmdline 'console=ttyS0 test-exit=1' \
+        --output "$qtest_image" > "$out/qtest-image.log" 2>&1; then
+        echo "$label: FAIL qtest image build (see $out/qtest-image.log)" >&2
+        tail -n 30 "$out/qtest-image.log" >&2
+        exit 1
+    fi
+    printf '%s\n' "$stamp_value" > "$stamp"
+fi
+
+grep "^net-conformance: ${harness_scenario}: " "$log" > "$summary_file" || true
+summary=$(sed -n "s/^net-conformance: ${harness_scenario}: summary /summary /p" "$log" | tail -n 1)
+if [ -z "$summary" ]; then
+    echo "$label: FAIL no summary line (see $log)" >&2
+    exit 1
+fi
+echo "$label: PASS elapsed=${elapsed}s $summary"
+echo "$label: pcap=$pcap serial=$serial"
