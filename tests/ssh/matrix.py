@@ -1706,6 +1706,11 @@ def main() -> int:
         console: SerialConsole | None = None
         row_label = ("K562-mutation" if only == "mutation"
                      else "S4" if only == "s4" else only)
+        if only == "full" and not build_peer():
+            record("full", "BLOCKED", "cannot build the ssh-peer tracer")
+            write_tables()
+            print("matrix: RED (1 red rows)")
+            return 2
         try:
             socket_only = only in ("s8", "s7", "s8-proof", "full")
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",

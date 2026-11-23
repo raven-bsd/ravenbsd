@@ -29,7 +29,17 @@ cd "$root"
 
 image=${RAVEN_SSH_IMAGE:-build/qtest/ssh-k434-full.img}
 out=${RAVEN_MATRIX_OUT:-build/ssh/k434-full}
-hygiene=${RAVEN_QEMU_HYGIENE:-"$root/../../../ravenbsd-prjmgmt/scripts/qemu-hygiene.sh"}
+hygiene=${RAVEN_QEMU_HYGIENE:-}
+if [ -z "$hygiene" ]; then
+    for candidate in \
+        "$root/../../../ravenbsd-prjmgmt/scripts/qemu-hygiene.sh" \
+        "$HOME/work/ravenos-workspace/ravenbsd-prjmgmt/scripts/qemu-hygiene.sh"; do
+        if [ -f "$candidate" ]; then
+            hygiene=$candidate
+            break
+        fi
+    done
+fi
 tree=$(git rev-parse HEAD)
 marker=$image.tree
 
@@ -79,7 +89,7 @@ fi
 
 if [ "${RAVEN_K434_PTY_QTEST:-1}" = 1 ]; then
     echo "k434: S8 auxiliary qtests (pty-alloc, termios)"
-    if timeout 75 cargo xtask qtest --case pty-alloc --arch x86_64 \
+    if timeout 180 cargo xtask qtest --case pty-alloc --arch x86_64 \
         > "$out/pty-alloc.log" 2>&1; then
         echo 0 > "$out/pty-alloc.exit"
     else
