@@ -1670,6 +1670,116 @@ def serial_row_capture(console: SerialConsole, name: str, mark: int) -> int:
     return len(console.buffer)
 
 
+def console_shell_login(console: SerialConsole) -> bool:
+    """Log in on the serial console without requiring the shell prompt string."""
+    if console.wait_for(b"login:", 5) < 0:
+        console.send(b"\n")
+        if console.wait_for(b"login:", 30) < 0:
+            return False
+    console.send(b"root\n")
+    if console.wait_for(b"Password:", 10) < 0:
+        return False
+    console.send(b"raven\n")
+    if console.wait_for(b"Welcome to the RavenBSD console", 15) < 0:
+        return False
+    console.send(b"\n")
+    time.sleep(0.5)
+    return True
+
+
+def console_cr_capture(console: SerialConsole, command: str, log_name: str,
+                       marker: str, timeout: float = 20) -> str:
+    """Run one console command with a separate CR and capture up to a unique echo marker."""
+    mark = len(console.buffer)
+    console.send(command.encode())
+    time.sleep(0.3)
+    console.send(b"\r")
+    end = console.wait_for(marker.encode(), timeout, start=mark)
+    if end < 0:
+        console.send(b"\n")
+        console.wait_for(marker.encode(), timeout, start=mark)
+    console.pump()
+    text = bytes(console.buffer[mark:len(console.buffer)]).decode("utf-8", "replace")
+    text = text.replace("\r", "")
+    text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", text)
+    (OUT / log_name).write_text(text, encoding="utf-8")
+    print(f"matrix: console {log_name} marker={end >= 0}", flush=True)
+    return text
+
+
+def row_close_probe(console: SerialConsole | None) -> None:
+    """K449/K448 close acceptance: one session plus client, serial, sshd log and ps capture."""
+    result = ssh_run(["echo", "K449-DIAG"], "close-client.log",
+                     extra=["-vvv"], timeout=15)
+    client_text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
+    (OUT / "close-client-vvv.log").write_text(client_text, encoding="utf-8")
+    client_lines = [line for line in client_text.splitlines() if line.strip()]
+    last_line = client_lines[-1] if client_lines else "no client output"
+    output_ok = b"K449-DIAG" in result["stdout"]
+    exit_status_seen = any("rtype exit-status" in line for line in client_lines)
+    eof_seen = any("rcvd eof" in line for line in client_lines)
+    close_seen = any("rcvd close" in line or "channel 0: free" in line
+                     for line in client_lines)
+    attempt("close-client", 1, "fresh", "exit 0 + K449-DIAG",
+            f"exit {result['returncode']}; timed_out={result['timed_out']}; "
+            f"output={output_ok}; exit_status={exit_status_seen}; eof={eof_seen}; "
+            f"close={close_seen}",
+            float(result["elapsed_ms"]), "OBSERVED")
+
+    sshd_text = ""
+    ps_text = ""
+    if console is not None and console_shell_login(console):
+        sshd_text = console_cr_capture(console, "cat /tmp/sshd.log; echo K434-77",
+                                       "close-sshd.log", "K434-77")
+        ps_text = console_cr_capture(console, "ps -e; echo K434-169",
+                                     "close-ps.log", "K434-169")
+    elif console is not None:
+        record("close-probe", "BLOCKED", "console login failed before the sshd log dump")
+        return
+
+    sshd_lines = [line.strip() for line in sshd_text.splitlines()
+                  if line.strip() and "K434-77" not in line
+                  and "cat /tmp/sshd.log" not in line and not line.startswith("raven#")]
+    ps_lines = [line.strip() for line in ps_text.splitlines()
+                if "sshd" in line or "defunct" in line or line.strip().startswith("Z")]
+    collect_lines = [line for line in sshd_lines
+                     if "collect" in line.lower() or "sigchld" in line.lower()]
+    accepted = next((line for line in sshd_lines if "Accepted password" in line), "")
+    closed = next((line for line in sshd_lines if "Connection closed" in line), "")
+    cleanup = next((line for line in sshd_lines if "cleanup_exit" in line), "")
+
+    if output_ok and result["returncode"] == 0:
+        missing = "none"
+    elif not exit_status_seen:
+        missing = "exit-status (98)"
+    elif not eof_seen:
+        missing = "CHANNEL_EOF (96)"
+    elif not close_seen:
+        missing = "CHANNEL_CLOSE (97)/socket close"
+    else:
+        missing = "session exit path after close"
+
+    summary = (
+        f"client_exit={result['returncode']} timed_out={result['timed_out']} "
+        f"output={output_ok} exit_status={exit_status_seen} eof={eof_seen} "
+        f"close={close_seen}\n"
+        f"first_missing={missing}\n"
+        f"client_last={last_line}\n"
+        f"sshd_accepted={accepted or 'none'}\n"
+        f"sshd_closed={closed or 'none'}\n"
+        f"sshd_cleanup={cleanup or 'none'}\n"
+        f"sshd_collect_sigchld={collect_lines or 'none'}\n"
+        f"ps={ps_lines or 'none'}\n"
+    )
+    (OUT / "close-summary.txt").write_text(summary, encoding="utf-8")
+    print("matrix: --- close summary ---", flush=True)
+    for line in summary.splitlines():
+        print(f"matrix: close| {line}", flush=True)
+    record("close-probe", "OBSERVED",
+           f"first_missing={missing}; client_exit={result['returncode']}; "
+           f"output={output_ok}; artifact=close-summary.txt")
+
+
 def row_full(console: SerialConsole) -> None:
     """S1-S8 plus S5-session in order on one boot, with per-row serial capture."""
     mark = len(console.buffer)
@@ -1712,7 +1822,7 @@ def main() -> int:
             print("matrix: RED (1 red rows)")
             return 2
         try:
-            socket_only = only in ("s8", "s7", "s8-proof", "full")
+            socket_only = only in ("s8", "s7", "s8-proof", "close-probe", "full")
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
                                  "vars-only.fd", ready_timeout=180,
                                  socket_serial=socket_only)
@@ -1747,6 +1857,8 @@ def main() -> int:
                     row_s8()
                 elif only == "s8-proof":
                     row_s8_proof(console)
+                elif only == "close-probe":
+                    row_close_probe(console)
                 elif only == "full":
                     row_full(console)
                 elif only == "s5":
