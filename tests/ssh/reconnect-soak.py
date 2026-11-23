@@ -550,7 +550,7 @@ def main(argv: list[str]) -> int:
                 sums.write(f"{sha256(path)}  {path.relative_to(run)}\n")
     if resource_rows:
         print("reconnect-soak: resource curve "
-              "(host RSS proxy; guest heap-free/threads/fds not exposed):")
+              "(guest K449-METRICS + host RSS; '-' = metrics image not enabled):")
         print(format_resource_table(resource_rows).rstrip("\n"))
     print(f"reconnect-soak: done sessions={summary['sessions']} failures={failures} run={run}")
     return 0 if failures == 0 else 1
