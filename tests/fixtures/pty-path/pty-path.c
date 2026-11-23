@@ -27,8 +27,14 @@ static int same_inode(int left, int right) {
 
 int main(void) {
     struct stat st;
-    int mount_ok = stat("/dev/pts", &st) == 0 && S_ISDIR(st.st_mode);
-    printf("PTY-PATH mount=/dev/pts stat=%s errno=%d\n", mount_ok ? "ok" : "fail", errno);
+    int mount_stat = stat("/dev/pts", &st);
+    // The `/dev/pts/.keep` placeholder keeps a real initfs directory at the mount point, so
+    // S_ISDIR alone also holds when the mount is absent. The pty scheme root reports inode 0;
+    // the placeholder's initfs directory has a nonzero inode, so this row fails on a missing
+    // mount instead of accepting the placeholder.
+    int mount_ok = mount_stat == 0 && S_ISDIR(st.st_mode) && st.st_ino == 0;
+    printf("PTY-PATH mount=/dev/pts stat=%s ino=%llu errno=%d\n", mount_ok ? "ok" : "fail",
+           mount_stat == 0 ? (unsigned long long)st.st_ino : 0ULL, errno);
 
     char *session = ttyname(STDIN_FILENO);
     int session_stat = 0;
@@ -47,6 +53,22 @@ int main(void) {
     if (session_open >= 0) {
         (void)close(session_open);
     }
+
+    // The shell spawns this probe, so the child may start without its own ctty slot; `/dev/tty`
+    // must resolve through the session ctty fallback to the same slave as fd 0.
+    int devtty = open("/dev/tty", O_RDWR | O_NOCTTY);
+    int devtty_same = devtty >= 0 ? same_inode(STDIN_FILENO, devtty) : 0;
+    printf("PTY-PATH devtty open=%d same=%d\n", devtty, devtty_same);
+    if (devtty >= 0) {
+        (void)close(devtty);
+    }
+
+    // The uutils `tty` uses rustix -> `ttyname_r`, not `ttyname`; cover the same buffer path
+    // and the `isatty` probe so a `not a tty` row can be attributed to the exact call.
+    char tty_rbuf[64];
+    int tty_rc = ttyname_r(STDIN_FILENO, tty_rbuf, sizeof tty_rbuf);
+    printf("PTY-PATH session_r rc=%d name=%s isatty=%d\n", tty_rc,
+           tty_rc == 0 ? tty_rbuf : "(none)", isatty(STDIN_FILENO));
 
     int master = posix_openpt(O_RDWR | O_NOCTTY);
     int pair_stat = 0;
@@ -81,8 +103,9 @@ int main(void) {
            pair_name == NULL ? "(none)" : pair_name, pair_stat ? "ok" : "fail", pair_slave,
            pair_same, release ? "ok" : "fail");
 
-    int ok = mount_ok && session != NULL && session_stat && session_same && pair_name != NULL &&
-             pair_stat && pair_slave >= 0 && pair_same && release;
+    int ok = mount_ok && session != NULL && session_stat && session_same && devtty >= 0 &&
+             devtty_same && pair_name != NULL && pair_stat && pair_slave >= 0 && pair_same &&
+             release;
     printf("PTY-PATH %s\n", ok ? "ok" : "FAIL");
     return ok ? 0 : 1;
 }

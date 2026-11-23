@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors */
 
-/* K458: pty lifetime churn. Four concurrent processes each run 50 open/use/close cycles of
+/* K458: pty lifetime churn. Four concurrent processes each run 250 open/use/close cycles of
  * posix_openpt/grantpt/unlockpt/ptsname/open slave/tcsetattr/tcgetwinsize/close, after a
  * handshake that proves their slave paths are distinct while all four ptys are open. The parent
  * then holds 32 pairs at once, checks the paths are distinct, closes them, and proves the fd
@@ -11,6 +11,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +22,9 @@
 #include <unistd.h>
 
 #define WORKERS 4
-#define CYCLES 50
+/* K536 rev176: 4 workers x 250 = 1000 pty open/window/write/read/close cycles. The kernel's
+ * s24 allocated/free frame line after each worker exit is the leak sample. */
+#define CYCLES 250
 #define CONCURRENT 32
 #define NAME_MAX 64
 
@@ -85,7 +88,8 @@ static int open_pair(int *master_out, int *slave_out, char *name, size_t name_le
         close(master);
         return -1;
     }
-    term.c_lflag &= (tcflag_t)~ECHO;
+    term.c_lflag &= (tcflag_t)~(ICANON | ECHO);
+    term.c_iflag &= (tcflag_t)~(ICRNL | IXON);
     if (tcsetattr(slave, TCSANOW, &term) != 0) {
         close(slave);
         close(master);
@@ -97,6 +101,28 @@ static int open_pair(int *master_out, int *slave_out, char *name, size_t name_le
     size.ws_col = 120;
     if (tcsetwinsize(slave, &size) != 0 || tcgetwinsize(slave, &size) != 0 ||
         size.ws_row != 43 || size.ws_col != 120) {
+        close(slave);
+        close(master);
+        return -1;
+    }
+    /* Exercise both directions of the pty data path before closing the pair: the SSH session
+     * writes commands to the slave and reads the master, and the shell writes the slave. */
+    char byte = 'Z';
+    char got = 0;
+    struct pollfd pfd;
+    pfd.fd = slave;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    if (write(master, &byte, 1) != 1 || poll(&pfd, 1, 1000) != 1 ||
+        read(slave, &got, 1) != 1 || got != byte) {
+        close(slave);
+        close(master);
+        return -1;
+    }
+    pfd.fd = master;
+    pfd.revents = 0;
+    if (write(slave, &byte, 1) != 1 || poll(&pfd, 1, 1000) != 1 ||
+        read(master, &got, 1) != 1 || got != byte) {
         close(slave);
         close(master);
         return -1;

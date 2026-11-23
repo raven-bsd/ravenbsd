@@ -58,7 +58,12 @@ pub fn set_ctty(frame: &SyscallFrame) -> Result<usize, Errno> {
 pub fn ctty_handle() -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let ids = *caller.ids.lock();
-    let ctty = caller.ctty.lock().clone().ok_or(Errno::ENXIO)?;
+    // A direct child keeps its own slot; a `posix_spawn` child starts without one and resolves
+    // the session's controlling terminal (FreeBSD `cttyopen` uses the session's ctty).
+    let ctty = match caller.ctty.lock().clone() {
+        Some(ctty) => ctty,
+        None => tty::session(ids.sid).ok_or(Errno::ENXIO)?,
+    };
     if ctty.sid() == 0 || ctty.sid() != ids.sid {
         return Err(Errno::ENXIO);
     }
