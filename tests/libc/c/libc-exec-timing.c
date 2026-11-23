@@ -375,6 +375,58 @@ int main(int argc, char **argv) {
         }
     }
 
+    int same_ok = canary != NULL;
+    if (canary != NULL) {
+        int sv6[2] = {-1, -1};
+        int saved_in = dup(0);
+        int saved_out = dup(1);
+        if (saved_in >= 0 && saved_out >= 0 && socketpair(AF_UNIX, SOCK_STREAM, 0, sv6) == 0) {
+            posix_spawn_file_actions_t same_actions;
+            posix_spawnattr_t same_attr;
+            int ready = posix_spawn_file_actions_init(&same_actions) == 0;
+            if (ready) {
+                ready = posix_spawnattr_init(&same_attr) == 0;
+            }
+            if (ready) {
+                (void)dup2(sv6[0], 0);
+                (void)dup2(sv6[0], 1);
+                (void)posix_spawn_file_actions_adddup2(&same_actions, 0, 0);
+                (void)posix_spawn_file_actions_adddup2(&same_actions, 1, 1);
+                pid_t same_child = -1;
+                char *same_args[] = {"libc-test", "spawn-child", NULL};
+                if (posix_spawn(&same_child, "/bin/libc-test", &same_actions, &same_attr,
+                                same_args, environ) == 0) {
+                    int same_status = 0;
+                    (void)waitpid(same_child, &same_status, 0);
+                } else {
+                    same_ok = 0;
+                }
+                (void)dup2(saved_in, 0);
+                (void)dup2(saved_out, 1);
+                (void)posix_spawnattr_destroy(&same_attr);
+            } else {
+                same_ok = 0;
+            }
+            (void)posix_spawn_file_actions_destroy(&same_actions);
+            (void)close(sv6[0]);
+            (void)close(sv6[1]);
+        } else {
+            same_ok = 0;
+        }
+        if (saved_in >= 0) {
+            (void)close(saved_in);
+        }
+        if (saved_out >= 0) {
+            (void)close(saved_out);
+        }
+        for (size_t index = 0; index < canary_len; index++) {
+            if (canary[index] != 0xA5) {
+                same_ok = 0;
+                break;
+            }
+        }
+    }
+
     int chunks_ok = 1;
     for (int index = 0; index < CHUNK_COUNT; index++) {
         if (chunks[index] == NULL) {
@@ -396,10 +448,10 @@ int main(int argc, char **argv) {
         printf("EXEC-TIMING fork_ns=%llu\n", (unsigned long long)(exec_ret_ns - fork_ns));
         printf("EXEC-TIMING total_ns=%llu\n", (unsigned long long)(wait_ns - fork_ns));
     }
-    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s big=%s inh=%s dup=%s chunks=%s\n",
+    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s big=%s inh=%s dup=%s same=%s chunks=%s\n",
            fork_ok ? "ok" : "bad", spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad",
            spawnp_ok ? "ok" : "bad", big_ok ? "ok" : "bad", inh_ok ? "ok" : "bad",
-           dup_ok ? "ok" : "bad", chunks_ok ? "ok" : "bad");
+           dup_ok ? "ok" : "bad", same_ok ? "ok" : "bad", chunks_ok ? "ok" : "bad");
     fflush(stdout);
     for (int index = 0; index < CHUNK_COUNT; index++) {
         free(chunks[index]);
