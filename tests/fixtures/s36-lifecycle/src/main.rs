@@ -689,8 +689,13 @@ fn wait_interrupt_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     // SAFETY: only the static's address is taken; the kernel validates the executable entry and
     // the 4096-byte absolute context area before storing the per-thread registration.
     let context = core::ptr::addr_of_mut!(SIGNAL_CONTEXT) as usize;
-    result(syscall3(SIG_SETUP, entry as usize, context, SIG_SETUP_ABS as usize))
-        .map_err(|_| "wait signal setup")?;
+    result(syscall3(
+        SIG_SETUP,
+        entry as usize,
+        context,
+        SIG_SETUP_ABS as usize,
+    ))
+    .map_err(|_| "wait signal setup")?;
     let child = spawn_role(initfs, "delayed").map_err(|_| "wait race spawn")?;
     let pid = proc_handle_info(child).map_err(|_| "wait race pid")?;
     let mut status = 0i32;
