@@ -29,6 +29,15 @@ pub const IRQ_MSIX: u32 = 3;
 
 /// Live interrupt objects (S69 cleanup evidence).
 static LIVE_IRQS: AtomicU64 = AtomicU64::new(0);
+/// Temporary K9 KVM diagnostic: last 1 ms pump wait return.
+static PUMP_LAST_WAKE: AtomicU64 = AtomicU64::new(0);
+
+/// True when the `irq-debug` boot flag is set (K9 KVM pump-gap evidence only).
+fn pump_trace() -> bool {
+    crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "irq-debug")
+}
 
 /// Number of live interrupt objects across all processes.
 pub fn live_objects() -> u64 {
@@ -496,7 +505,19 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     let thread_id = sched::current_thread()
         .map(|thread| thread.id)
         .ok_or(Errno::ESRCH)?;
-    let deadline = (timeout_ns != 0).then(|| time::now_ns().saturating_add(timeout_ns));
+    let start = time::now_ns();
+    let deadline = (timeout_ns != 0).then(|| start.saturating_add(timeout_ns));
+    let trace = timeout_ns == 1_000_000 && pump_trace();
+    if trace {
+        let previous = PUMP_LAST_WAKE.load(Ordering::Acquire);
+        if previous != 0 && start.saturating_sub(previous) > 2_000_000 {
+            crate::kprintln!(
+                "IRQP gap gap_us={} now={}",
+                start.saturating_sub(previous) / 1_000,
+                start
+            );
+        }
+    }
     // A legacy line stays masked until its first wait (or ack), then is re-armed by each ack.
     if irq.kind == IrqKind::Legacy && !irq.armed.swap(true, Ordering::AcqRel) {
         ioapic::unmask(irq.gsi).map_err(|_| Errno::EINVAL)?;
@@ -510,6 +531,18 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             return Err(Errno::EIO);
         }
         if let Some(count) = irq.take_pending() {
+            if trace {
+                let now = time::now_ns();
+                let previous = PUMP_LAST_WAKE.swap(now, Ordering::AcqRel);
+                if previous != 0 && now.saturating_sub(previous) > 2_000_000 {
+                    crate::kprintln!(
+                        "IRQP irq gap_us={} wait_us={} now={}",
+                        now.saturating_sub(previous) / 1_000,
+                        now.saturating_sub(start) / 1_000,
+                        now
+                    );
+                }
+            }
             if dist_trace() && !irq.announced.swap(true, Ordering::AcqRel) {
                 let handled = irq.last_cpu.load(Ordering::Acquire);
                 if handled != 0 {
@@ -543,6 +576,24 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
                 irq.waiters.remove(0, u64::from(irq.vector), thread_id);
                 sched::end_block(token);
                 if status == Errno::ETIMEDOUT.to_ret() {
+                    if trace {
+                        let now = time::now_ns();
+                        let previous = PUMP_LAST_WAKE.swap(now, Ordering::AcqRel);
+                        let late = now.saturating_sub(start.saturating_add(timeout_ns));
+                        if late > 1_000_000 {
+                            crate::kprintln!(
+                                "IRQP late wait_us={} late_us={} gap_us={} now={}",
+                                now.saturating_sub(start) / 1_000,
+                                late / 1_000,
+                                if previous == 0 {
+                                    0
+                                } else {
+                                    now.saturating_sub(previous) / 1_000
+                                },
+                                now
+                            );
+                        }
+                    }
                     return Ok(0);
                 }
             }
