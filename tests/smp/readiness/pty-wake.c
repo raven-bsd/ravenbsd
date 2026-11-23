@@ -33,7 +33,7 @@
 #include <unistd.h>
 
 #define PTY_WAKE_BOUND_MS 2000
-#define PTY_WAKE_REPOLL_MS 500
+#define PTY_WAKE_REPOLL_MS 1500
 
 static long raven_debug_write(const char *bytes, size_t len) {
     register long number asm("rax") = 3;
@@ -263,6 +263,7 @@ static int run_child_and_poll(int explicit_close, int handler) {
     if (revents < 0) {
         (void)snprintf(detail, sizeof(detail), "n=%d errno=%d bound=%dms", revents, saved,
                        PTY_WAKE_BOUND_MS);
+        (void)say_line(explicit_close ? "R1" : "R3", 0, detail);
         (void)close(master);
         (void)waitpid(child, &status, 0);
         return -1;
@@ -270,6 +271,7 @@ static int run_child_and_poll(int explicit_close, int handler) {
     if (revents == 0 || (revents & (POLLIN | POLLHUP)) == 0) {
         (void)snprintf(detail, sizeof(detail), "n=%d errno=%d revents=0x%x timeout", revents, saved,
                        revents);
+        (void)say_line(explicit_close ? "R1" : "R3", 0, detail);
         (void)close(master);
         (void)waitpid(child, &status, 0);
         return -1;
@@ -283,6 +285,7 @@ static int run_child_and_poll(int explicit_close, int handler) {
     if (!hup || first_eintr) {
         (void)snprintf(detail, sizeof(detail), "n=%d revents=0x%x repoll=0x%x hup=%d eintr=%d",
                        revents, revents, repoll, hup, first_eintr);
+        (void)say_line(explicit_close ? "R1" : "R3", 0, detail);
         (void)close(master);
         return -1;
     }
