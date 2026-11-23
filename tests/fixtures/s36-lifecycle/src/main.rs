@@ -666,10 +666,24 @@ fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
         // Fault the page through vfsd's pager.
         let _ = unsafe { core::ptr::read_volatile(MAP_SCRATCH as *const u8) };
         unmap(Handle::SELF_PROC, MAP_SCRATCH, PAGE).map_err(|_| "unmap object")?;
-        handle_close(object);
+        let mut closed =
+            Errno::from_ret(syscall1(Syscall::HANDLE_CLOSE as usize, object.0 as usize));
+        if closed.is_err() {
+            nanosleep(1_000_000);
+            closed = Errno::from_ret(syscall1(Syscall::HANDLE_CLOSE as usize, object.0 as usize));
+        }
+        if let Err(error) = closed {
+            println!(
+                "s36: mapclose fail cycle={cycle} object={} errno={error:?}",
+                object.0
+            );
+        }
         cycle = cycle.saturating_add(1);
     }
     client.close(file).map_err(|_| "vfsd close")?;
+    // The scheme close is fire-and-forget: give vfsd a bounded window to retire the 1000 pager
+    // keys before the exit-89 frame sample, so the gate measures the steady state.
+    nanosleep(100_000_000);
     println!("s36: vfsd map done={}", MAP_CYCLES);
 
     let top = spawn_role(initfs, "maptop").map_err(|_| "maptop spawn")?;
