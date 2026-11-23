@@ -40,7 +40,7 @@ regex = '^Welcome to RavenBSD 0\.1 x86_64$'
 regex = '(?i)^.*login: ?root'
 
 [[expect]]
-regex = '(?i)^password: ?$'
+regex = '(?i)^password: ?'
 
 [[expect]]
 regex = '^/root$'
@@ -78,7 +78,7 @@ send = "root\n"
 delay_ms = 100
 
 [[step]]
-wait = '(?i)^password: ?$'
+wait = '(?i)^password: ?'
 timeout_secs = 30
 
 [[step]]
