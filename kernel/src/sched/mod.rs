@@ -795,20 +795,25 @@ fn begin_block_inner(interruptible: bool) -> Result<u64, Errno> {
 
 /// True when the calling thread has a sticky kick pending.
 ///
-/// Without a `SIG_SETUP` registration the word is consumed here, preserving S43's `-EINTR`
-/// discipline. With a registration the bits stay in the word so the return-to-user path can
-/// deliver them to the user entry point and pass the bits as the first argument.
+/// A kick without a `SIG_SETUP` registration is consumed here and is not an interrupt: it must
+/// not turn a child-exit wait (or any other unrelated wait) into `EINTR`. With a registration the
+/// bits stay in the word so the return-to-user path can deliver them to the user entry point.
 pub fn take_kick() -> bool {
     current_thread().is_some_and(|thread| kick_pending(&thread))
 }
 
-/// Test (and, without `SIG_SETUP`, clear) one thread's kick word.
+/// Test (and, without a registered handler, consume) one thread's kick word.
+///
+/// Only a registered `SIG_SETUP` entry can run a user handler, so only that case is a signal
+/// interrupt. NetBSD `sleepq_block` has the same shape: `LW_CATCHINTR` plus a catchable pending
+/// signal (`sigispending`/`issignal`), never a bare wake.
 fn kick_pending(thread: &Thread) -> bool {
     if thread.kick_bits.load(Ordering::Acquire) == 0 {
         return false;
     }
     if thread.signal_entry.load(Ordering::Acquire) == 0 {
         thread.kick_bits.swap(0, Ordering::AcqRel);
+        return false;
     }
     true
 }
@@ -939,6 +944,15 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
     // and `schedule_locked`. Holding the thread's block lock makes "read state" and "publish
     // the wake" atomic with the waiter's "set Blocked, re-check pending" sequence.
     let _block = lock_block(&thread);
+    // A kick without a registered handler cannot run user code, so it is a plain wake, not an
+    // EINTR. Keep the interrupt for a thread with a real SIG_SETUP entry.
+    let status = if status == Errno::EINTR.to_ret()
+        && thread.signal_entry.load(Ordering::Acquire) == 0
+    {
+        0
+    } else {
+        status
+    };
     if let Some(token) = token
         && thread.block_token.load(Ordering::SeqCst) != token
     {
