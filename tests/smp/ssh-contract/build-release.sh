@@ -79,7 +79,7 @@ cargo build -q -p raven-b70-overlay
 "$root/target/debug/raven-b70-overlay" "$out/base.img" "$out/initfs.img" \
     "/bin/ssh-contract=$out/ssh-contract:0755" \
     "/bin/ssh-contract-child=$out/ssh-contract-child:0755" \
-    "/etc/services.d/ssh-contract.toml=$root/tests/smp/ssh-contract/ssh-contract-release.service.toml" \
+    "/etc/services.d/ssh-contract.toml=$root/tests/smp/ssh-contract/ssh-contract.service.toml" \
     "/etc/svcd.conf=$root/tests/smp/ssh-contract/ssh-contract.svcd.conf"
 
 echo "ssh-contract release fixture: $out/initfs.img"

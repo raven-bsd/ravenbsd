@@ -44,10 +44,25 @@ regex = '^.*CONTRACT K6-listen PASS .*$'
 regex = '^.*CONTRACT K6 PASS .*$'
 
 [[expect]]
-regex = '^.*CONTRACT SUMMARY PASS 6/6$'
+regex = '^.*CONTRACT K7 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K8 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K8-shutdown PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K9 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K10 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 10/10$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)CONTRACT K([1-6])(-listen)? FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'
+regex = '(?i)CONTRACT K([1-9]|10)(-listen|-shutdown)? FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'
