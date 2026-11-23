@@ -1767,6 +1767,9 @@ def row_close_probe(console: SerialConsole | None) -> None:
                 if "sshd" in line or "defunct" in line or line.strip().startswith("Z")]
     collect_lines = [line for line in sshd_lines
                      if "collect" in line.lower() or "sigchld" in line.lower()]
+    exit_lines = [line for line in sshd_lines
+                  if "exit-status" in line.lower() or "channel" in line.lower()
+                  or "session" in line.lower() or "close" in line.lower()]
     accepted = next((line for line in sshd_lines if "Accepted password" in line), "")
     closed = next((line for line in sshd_lines if "Connection closed" in line), "")
     cleanup = next((line for line in sshd_lines if "cleanup_exit" in line), "")
@@ -1795,9 +1798,13 @@ def row_close_probe(console: SerialConsole | None) -> None:
         f"sshd_closed={closed or 'none'}\n"
         f"sshd_cleanup={cleanup or 'none'}\n"
         f"sshd_collect_sigchld={collect_lines or 'none'}\n"
+        f"sshd_exit_channel={exit_lines or 'none'}\n"
         f"ps={ps_lines or 'none'}\n"
     )
     (OUT / "close-summary.txt").write_text(summary, encoding="utf-8")
+    serial_path = OUT / "serial-only.log"
+    if serial_path.is_file():
+        (OUT / "close-serial.log").write_bytes(serial_path.read_bytes())
     print("matrix: --- close summary ---", flush=True)
     for line in summary.splitlines():
         print(f"matrix: close| {line}", flush=True)
