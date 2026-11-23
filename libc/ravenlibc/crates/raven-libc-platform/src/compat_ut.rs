@@ -104,7 +104,7 @@ fn pty_pair_names_a_master_and_slave_from_the_service() {
     let master = platform
         .install(
             master_handle,
-            crate::fd::ofd::OfdKind::Tty,
+            crate::fd::ofd::OfdKind::Unknown,
             fcntl::O_RDWR as u32,
             None,
             false,
@@ -113,7 +113,7 @@ fn pty_pair_names_a_master_and_slave_from_the_service() {
     let slave = platform
         .install(
             slave_handle,
-            crate::fd::ofd::OfdKind::Tty,
+            crate::fd::ofd::OfdKind::Unknown,
             fcntl::O_RDWR as u32,
             None,
             false,
@@ -142,7 +142,7 @@ fn ttyname_names_a_live_pty_pair_from_the_service() {
     let fd = platform
         .install(
             handle,
-            crate::fd::ofd::OfdKind::Tty,
+            crate::fd::ofd::OfdKind::Unknown,
             fcntl::O_RDWR as u32,
             None,
             false,
@@ -170,7 +170,7 @@ fn ttyname_does_not_name_a_legacy_console_as_a_pty() {
     let fd = platform
         .install(
             handle,
-            crate::fd::ofd::OfdKind::Tty,
+            crate::fd::ofd::OfdKind::Unknown,
             fcntl::O_RDWR as u32,
             None,
             false,

@@ -1007,34 +1007,24 @@ fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
     ])
     .unwrap();
     assert_eq!(block.get(..4), Some(b"RFDM".as_slice()));
-    assert_eq!(block.get(4..6), Some(5u16.to_le_bytes().as_slice()));
+    assert_eq!(block.get(4..6), Some(1u16.to_le_bytes().as_slice()));
     assert_eq!(block.get(6..8), Some(2u16.to_le_bytes().as_slice()));
-    // Entry 1: a tty with its real kind/status and no path. Entry 2: the request carried a socket
-    // identity, but the spawn encoder keeps a non-terminal at the conservative v1 values. The
-    // block is exactly the header + two 53-byte entries: no string table (the child's auxv slice
-    // is exact) and no event/socket metadata.
-    assert_eq!(block.get(16), Some(&2));
-    assert_eq!(block.get(18..22), Some(2u32.to_le_bytes().as_slice()));
-    assert_eq!(block.get(22..26), Some(u32::MAX.to_le_bytes().as_slice()));
-    let base = 8 + 53;
-    let word = |offset: usize| {
-        block
-            .get(offset..offset + 4)
-            .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
-            .map(u32::from_le_bytes)
-    };
-    assert_eq!(block.get(base + 8), Some(&255));
-    assert_eq!(word(base + 10), Some(2)); // status
-    assert_eq!(word(base + 14), Some(u32::MAX)); // no path
-    assert_eq!(word(base + 18), Some(0)); // event
-    assert_eq!(word(base + 22), Some(0)); // readiness
-    assert_eq!(word(base + 26), Some(0)); // no socket identity
-    assert_eq!(word(base + 30), Some(0));
-    assert_eq!(word(base + 34), Some(0));
-    assert_eq!(block.get(base + 38), Some(&0)); // state
-    assert_eq!(block.get(base + 39), Some(&0)); // endpoint flags
-    assert_eq!(block.get(base + 52), Some(&0)); // pty_master
-    assert_eq!(block.len(), 8 + 2 * 53);
+    // Version 1: both descriptors are Unknown/O_RDWR/no-path. The request carried the tty and
+    // socket identities, but the v5 child startup faulted every spawned uutils process, so the
+    // spawn block stays the known-good v1 shape; ttyname resolves the terminal from the service.
+    for base in [8usize, 8 + 18] {
+        assert_eq!(block.get(base + 8), Some(&255)); // kind
+        assert_eq!(block.get(base + 9), Some(&0)); // fd flags
+        assert_eq!(
+            block.get(base + 10..base + 14),
+            Some(2u32.to_le_bytes().as_slice()) // status
+        );
+        assert_eq!(
+            block.get(base + 14..base + 18),
+            Some(u32::MAX.to_le_bytes().as_slice()) // no path
+        );
+    }
+    assert_eq!(block.len(), 8 + 2 * 18);
 }
 
 #[test]

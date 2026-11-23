@@ -1791,12 +1791,12 @@ fn plan_image<'a>(
 
 /// Encode the `RFDM` block consumed by `raven_libc_platform::fd::inherit::FdMap::decode`.
 ///
-/// This is the version-5 record the exec path already uses. Only a terminal carries its real
-/// kind/status; a non-terminal keeps the conservative version-1 `Unknown`/`O_RDWR` pair. The
-/// block has no string table and no socket/event metadata: the child slices exactly the entry
-/// array from the auxv, and the full socket/event carry faulted a spawned uutils child at startup
-/// (`0x703`/`0x704`/`0x708`). The exec path remains the full carrier; the spawn gap is in the
-/// report.
+/// The spawn block is the version-1 record: `fd`, `handle`, `Unknown`, `O_RDWR`, no path. The
+/// version-5 record (even with conservative field values) faulted every spawned uutils child at
+/// startup (`0x702`/`0x705`); the v1 shape is the known-good child contract and the pre-v5 image
+/// ran the same commands. The exec path keeps the full v5 map; `ttyname` recovers a terminal name
+/// from the pty service by handle, so the spawn map needs no kind/path metadata. The spawn
+/// socket/event gap and the v5 child-startup fault are recorded in the report.
 ///
 /// Reject an inherited fd map when the crate is built without `alloc`.
 ///
@@ -1817,38 +1817,22 @@ fn no_alloc_fdmap(fdmap: &[SpawnFd<'_>]) -> Result<(), SpawnError> {
     all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
 ))]
 fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
-    /// One version-5 `FdMap` entry, the 53-byte record the decoder reads.
-    const FDMAP_V5_ENTRY: usize = 53;
+    /// One version-1 `FdMap` entry: fd, handle, kind, fd_flags, status, path offset.
+    const FDMAP_V1_ENTRY: usize = 18;
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
     let mut out = alloc_crate::vec::Vec::with_capacity(
-        8usize.saturating_add(FDMAP_V5_ENTRY.saturating_mul(entries.len())),
+        8usize.saturating_add(FDMAP_V1_ENTRY.saturating_mul(entries.len())),
     );
     out.extend_from_slice(b"RFDM");
-    out.extend_from_slice(&5u16.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
     out.extend_from_slice(&count.to_le_bytes());
     for entry in entries {
-        let tty = entry.kind == 2;
         out.extend_from_slice(&entry.fd.to_le_bytes());
         out.extend_from_slice(&entry.handle.to_le_bytes());
-        out.push(if tty { 2 } else { 255 });
+        out.push(255); // OfdKind::Unknown
         out.push(0); // FD_CLOEXEC already filtered by apply_actions
-        out.extend_from_slice(&if tty { entry.status } else { 2 }.to_le_bytes());
-        // No path: the child slices exactly `HEADER_LEN + ENTRY_LEN_V5 * count` from the auxv,
-        // so a string table would be outside the slice and decode would fail. `ttyname` resolves a
-        // pathless Tty from the pty service by handle (rev184).
-        out.extend_from_slice(&u32::MAX.to_le_bytes());
-        out.extend_from_slice(&0u32.to_le_bytes()); // event
-        out.extend_from_slice(&0u32.to_le_bytes()); // readiness
-        out.extend_from_slice(&0i32.to_le_bytes()); // socket.domain
-        out.extend_from_slice(&0i32.to_le_bytes()); // socket.type
-        out.extend_from_slice(&0i32.to_le_bytes()); // socket.proto
-        out.push(0); // socket.state
-        out.push(0); // socket endpoint flags
-        for _ in 0..2 {
-            out.extend_from_slice(&[0u8; 4]); // local/peer ip
-            out.extend_from_slice(&0u16.to_le_bytes()); // local/peer port
-        }
-        out.push(0); // pty_master
+        out.extend_from_slice(&2u32.to_le_bytes()); // O_RDWR
+        out.extend_from_slice(&u32::MAX.to_le_bytes()); // NO_PATH
     }
     Ok(out)
 }

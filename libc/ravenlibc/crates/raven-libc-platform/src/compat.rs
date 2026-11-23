@@ -467,7 +467,24 @@ pub fn epoll_create<B: SysBackend, L: Lock>(
 /// ptyd reports the endpoint in `st_ino` (slave `2N+2`, master `2N+1`; `docs/pty.md`,
 /// `pairs.rs`). A console answers `GET_TERMIOS` with `ENOSYS`, so it is never named as a pty.
 pub fn pty_pair<B: SysBackend, L: Lock>(platform: &Platform<B, L>, fd: i32) -> Option<(u64, bool)> {
-    if !crate::ioctl::tty::is_pty_endpoint(platform, fd) {
+    let (kind, handle) = {
+        let reference = platform.get(fd).ok()?;
+        (reference.kind(), reference.handle())
+    };
+    // A v1 spawn entry has no kind; the endpoint itself still answers the termios request. A
+    // regular file, pipe or console fails it, so this cannot name a non-pty descriptor.
+    if kind == OfdKind::Unknown {
+        let mut request = [0u8; raven_proto_tty::TERMIOS_LEN];
+        raven_proto_tty::encode_get_termios_request(&mut request);
+        let mut response = [0u8; raven_proto_tty::TERMIOS_LEN];
+        if platform
+            .backend()
+            .call(handle, &request, &mut response)
+            .is_err()
+        {
+            return None;
+        }
+    } else if kind != OfdKind::Tty || !crate::ioctl::tty::is_pty_endpoint(platform, fd) {
         return None;
     }
     let stat = platform.fstat(fd).ok()?;
@@ -490,7 +507,8 @@ pub fn ttyname<B: SysBackend, L: Lock>(
     fd: i32,
 ) -> Result<Vec<u8>, Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() != OfdKind::Tty {
+    let kind = reference.kind();
+    if kind != OfdKind::Tty && kind != OfdKind::Unknown {
         return Err(Errno::ENOTTY);
     }
     if let Some(path) = reference.path() {
