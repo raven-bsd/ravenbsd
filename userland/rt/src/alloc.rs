@@ -79,9 +79,12 @@ struct FreeNode {
 }
 
 /// Round a request to the allocation alignment and at least one free node.
+///
+/// The minimum span is `size_of::<FreeNode>()`, not just its alignment: a freed 1-byte block must
+/// still have room for the `size` and `next` words, or writing the node overwrites its neighbour.
 fn span(size: usize, align: usize) -> Option<usize> {
     let align = align.max(core::mem::align_of::<FreeNode>());
-    size.max(1)
+    size.max(size_of::<FreeNode>())
         .checked_add(align - 1)
         .map(|value| value & !(align - 1))
 }
@@ -202,21 +205,16 @@ impl State {
             node = unsafe { (*node).next };
         }
         let next_after = if !node.is_null() && end == node as usize {
-            // SAFETY: `node` is the address-adjacent successor free node.
+            // SAFETY: `node` is the address-adjacent successor; absorb it.
             let next = unsafe { (*node).next };
-            // SAFETY: `node` is a live free node with a size field.
             need = need.saturating_add(unsafe { (*node).size });
             next
         } else {
             node
         };
-        let previous_end = if previous.is_null() {
-            0
-        } else {
-            // SAFETY: `previous` is a live free-list node with a size field.
-            (previous as usize).saturating_add(unsafe { (*previous).size })
-        };
-        if !previous.is_null() && previous_end == start {
+        if !previous.is_null()
+            && (previous as usize).saturating_add(unsafe { (*previous).size }) == start
+        {
             // SAFETY: `previous` is the address-adjacent predecessor; extend it over this block
             // and the already-absorbed successor.
             unsafe {
@@ -258,7 +256,6 @@ impl State {
             let size = unsafe { (*node).size };
             let end = (node as usize).saturating_add(size);
             if end == tail {
-                // SAFETY: `node` is a live free-list node with a next pointer.
                 let next = unsafe { (*node).next };
                 if previous.is_null() {
                     self.free = next;
@@ -275,7 +272,6 @@ impl State {
                 return;
             }
             previous = node;
-            // SAFETY: the free list is address-ordered and every node is live.
             node = unsafe { (*node).next };
         }
     }

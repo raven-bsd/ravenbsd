@@ -279,7 +279,89 @@ fn adjacent_frees_coalesce() {
     test_dealloc(&allocator, merged, whole);
 }
 
-/// Freeing the latest allocation must roll the bump pointer back so the tail is reusable.
+/// A page-aligned source like `SysPageSource`, so the stress exercises real chunk addresses.
+struct AlignedSource {
+    chunks: Vec<Box<[u8]>>,
+    mapped: Arc<AtomicUsize>,
+}
+
+impl AlignedSource {
+    fn new(mapped: Arc<AtomicUsize>) -> Self {
+        Self {
+            chunks: Vec::new(),
+            mapped,
+        }
+    }
+}
+
+impl PageSource for AlignedSource {
+    fn map(&mut self, len: usize) -> Option<*mut u8> {
+        let mut chunk = vec![0u8; len + 4096].into_boxed_slice();
+        let base = chunk.as_mut_ptr() as usize;
+        let pointer = (base + 4095) & !4095;
+        self.chunks.push(chunk);
+        self.mapped.fetch_add(len, Ordering::AcqRel);
+        Some(pointer as *mut u8)
+    }
+
+    fn unmap(&mut self, _pointer: *mut u8, len: usize) {
+        self.mapped.fetch_sub(len, Ordering::AcqRel);
+    }
+}
+
+/// Deterministic mixed-size alloc/free stress over page-aligned chunks. Every live block is
+/// filled with its own byte and verified before it is freed, so any overlap or undersized block
+/// fails the row.
+#[test]
+fn mixed_sizes_never_overlap() {
+    let mapped = Arc::new(AtomicUsize::new(0));
+    let allocator = Allocator::new(AlignedSource::new(Arc::clone(&mapped)));
+    let sizes = [
+        1usize, 2, 3, 5, 6, 8, 9, 15, 16, 17, 24, 31, 32, 48, 63, 64, 100, 127, 128, 255, 256,
+        512, 1000, 4096, 8192,
+    ];
+    let aligns = [1usize, 2, 4, 8, 16, 32, 64, 128, 4096];
+    let mut slots: Vec<Option<(*mut u8, Layout, u8)>> = vec![None; 48];
+    let mut rng = 0x1234_5678_9abc_def0u64;
+    for step in 0..20_000 {
+        rng = rng
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        let index = ((rng >> 33) as usize) % slots.len();
+        if let Some((pointer, layout, byte)) = slots[index] {
+            for offset in 0..layout.size() {
+                // SAFETY: the live allocation has `layout.size()` writable bytes.
+                assert_eq!(
+                    unsafe { *pointer.add(offset) },
+                    byte,
+                    "overlap or undersize at step {step}, offset {offset}"
+                );
+            }
+            test_dealloc(&allocator, pointer, layout);
+            slots[index] = None;
+        } else {
+            let size = sizes[((rng >> 8) as usize) % sizes.len()];
+            let align = aligns[((rng >> 20) as usize) % aligns.len()];
+            let layout = Layout::from_size_align(size, align).expect("valid layout");
+            let pointer = test_alloc(&allocator, layout);
+            assert!(!pointer.is_null(), "allocation failed at step {step}");
+            assert!(
+                (pointer as usize).is_multiple_of(align),
+                "misaligned pointer at step {step}"
+            );
+            let byte = (rng >> 48) as u8;
+            for offset in 0..size {
+                // SAFETY: the allocator returned a block of at least `layout.size()` bytes.
+                unsafe { *pointer.add(offset) = byte };
+            }
+            slots[index] = Some((pointer, layout, byte));
+        }
+    }
+    for slot in slots.into_iter().flatten() {
+        test_dealloc(&allocator, slot.0, slot.1);
+    }
+}
+
 #[test]
 fn bump_tail_is_salvaged() {
     let mapped = Arc::new(AtomicUsize::new(0));
