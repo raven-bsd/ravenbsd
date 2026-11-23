@@ -171,6 +171,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == tty::PROC_CTTY_SET_FG {
         return tty::set_pgrp(frame);
     }
+    if number == tty::PROC_CTTY_HANDLE {
+        return tty::ctty_handle();
+    }
     if number == process_ctl::PROC_SELF_INFO {
         return process_ctl::self_info(frame);
     }
