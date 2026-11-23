@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K434 S7 marker. The initfs `/` is read-only and `/tmp` is the ramfs, so the exact marker is
+# staged at /etc/ssh-matrix-marker and written to /tmp/ssh-marker by the one-shot service below.
+# The S7 row asserts the exact bytes returned by `ssh raven@... cat /tmp/ssh-marker`.
+
+[[initfs.files]]
+src = "profiles/release.d/ssh-matrix-marker"
+path = "/etc/ssh-matrix-marker"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/release.d/ssh-matrix-marker.service.manifest"
+path = "/etc/services.d/ssh-matrix-marker.toml"
+mode = 0o644
