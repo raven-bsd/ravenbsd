@@ -9,7 +9,7 @@
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_signal::kernel::FaultRecord;
-use raven_libc_signal::{ENOMEM_ERR, SigKernel, SysKernel, raw, signal_entry};
+use raven_libc_signal::{EINVAL_ERR, ENOMEM_ERR, SigKernel, SysKernel, raw, signal_entry};
 
 use super::DISP;
 
@@ -42,13 +42,17 @@ pub(crate) fn ensure_entry() -> Result<(), Errno> {
         let area = raw::signal_context_area(tp).ok_or(ENOMEM_ERR)?;
         raw::set_ctx_area(tp, area.context());
         raw::set_entry_function(shell_signal_entry as *const () as usize);
-        // K548 rev355: the kernel must never receive an entry that is not the asm stub. Report
-        // the value and its first four bytes at registration so a symbol/runtime mismatch is a
-        // visible fact, then (after this diagnostic run) refuse it.
+        // K548 rev355: the kernel must never receive an entry that is not the asm stub. Check the
+        // prologue at registration and refuse a mismatched value loudly instead of registering
+        // an address the kernel would later `iret` into.
         let entry = raw::sigentry_address();
         // SAFETY: the entry is the package's own asm symbol, so the first four bytes are mapped.
         let prologue = unsafe { core::ptr::read_unaligned(entry as *const u32) }.to_le_bytes();
-        report_entry(entry, prologue);
+        #[cfg(target_arch = "x86_64")]
+        if prologue != [0x48, 0x83, 0xe4, 0xf0] {
+            report_entry(entry, prologue);
+            return Err(EINVAL_ERR);
+        }
         // The install path uses the contract crate's syscall number; the entry is the asm stub
         // and the context area is the one the kernel validates for this thread.
         // SAFETY: SIG_SETUP takes three scalar words; the kernel validates the executable entry
