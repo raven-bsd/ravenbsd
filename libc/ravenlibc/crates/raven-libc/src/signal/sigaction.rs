@@ -3,7 +3,7 @@
 //! `sigaction(3)`.
 use core::ffi::c_int;
 
-use raven_libc_signal::Disposition;
+use raven_libc_signal::{Disposition, ENOSYS_ERR, SigKernel, SysKernel};
 
 use super::DISP;
 
@@ -34,11 +34,16 @@ pub unsafe extern "C" fn sigaction(
         let action = unsafe { &*new };
         // A function handler needs the kernel's PG-7 entry before the first asynchronous
         // signal can be delivered. SIG_DFL/SIG_IGN stay entirely in the libc table.
-        if action.handler > 1
-            && let Err(error) = super::ensure_entry()
-        {
-            crate::ffi::errno::set(error);
-            return -1;
+        if action.handler > 1 {
+            let caps = SysKernel::new().caps();
+            if !caps.entry || !caps.sigreturn {
+                crate::ffi::errno::set(ENOSYS_ERR);
+                return -1;
+            }
+            if let Err(error) = super::ensure_entry() {
+                crate::ffi::errno::set(error);
+                return -1;
+            }
         }
         Some(Disposition {
             handler: action.handler,
