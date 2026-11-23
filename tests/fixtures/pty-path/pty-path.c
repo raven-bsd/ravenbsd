@@ -54,6 +54,15 @@ int main(void) {
         (void)close(session_open);
     }
 
+    // The shell spawns this probe, so the child may start without its own ctty slot; `/dev/tty`
+    // must resolve through the session ctty fallback to the same slave as fd 0.
+    int devtty = open("/dev/tty", O_RDWR | O_NOCTTY);
+    int devtty_same = devtty >= 0 ? same_inode(STDIN_FILENO, devtty) : 0;
+    printf("PTY-PATH devtty open=%d same=%d\n", devtty, devtty_same);
+    if (devtty >= 0) {
+        (void)close(devtty);
+    }
+
     // The uutils `tty` uses rustix -> `ttyname_r`, not `ttyname`; cover the same buffer path
     // and the `isatty` probe so a `not a tty` row can be attributed to the exact call.
     char tty_rbuf[64];
@@ -94,8 +103,9 @@ int main(void) {
            pair_name == NULL ? "(none)" : pair_name, pair_stat ? "ok" : "fail", pair_slave,
            pair_same, release ? "ok" : "fail");
 
-    int ok = mount_ok && session != NULL && session_stat && session_same && pair_name != NULL &&
-             pair_stat && pair_slave >= 0 && pair_same && release;
+    int ok = mount_ok && session != NULL && session_stat && session_same && devtty >= 0 &&
+             devtty_same && pair_name != NULL && pair_stat && pair_slave >= 0 && pair_same &&
+             release;
     printf("PTY-PATH %s\n", ok ? "ok" : "FAIL");
     return ok ? 0 : 1;
 }
