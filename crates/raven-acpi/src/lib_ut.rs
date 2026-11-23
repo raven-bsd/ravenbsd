@@ -140,7 +140,10 @@ fn blob_round_trips_the_mcfg_table() {
     let blob = &blob[..length];
     assert_eq!(read_u32(blob, 0), Some(BLOB_MAGIC));
     assert_eq!(blob_table(blob, b"MCFG"), Some(mcfg_bytes.as_slice()));
-    assert_eq!(mcfg_window(blob_table(blob, b"MCFG").unwrap()), mcfg_window(&mcfg_bytes));
+    assert_eq!(
+        mcfg_window(blob_table(blob, b"MCFG").unwrap()),
+        mcfg_window(&mcfg_bytes)
+    );
 }
 
 #[test]

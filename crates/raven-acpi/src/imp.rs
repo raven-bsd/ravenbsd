@@ -297,11 +297,7 @@ pub fn mcfg_window(mcfg: &[u8]) -> Option<McfgWindow> {
 /// # Errors
 ///
 /// Returns [`Error::TooMany`], [`Error::BlobTooLarge`] or [`Error::Copy`].
-pub fn write_blob<F>(
-    out: &mut [u8],
-    tables: &[TableEntry],
-    mut copy: F,
-) -> Result<usize, Error>
+pub fn write_blob<F>(out: &mut [u8], tables: &[TableEntry], mut copy: F) -> Result<usize, Error>
 where
     F: FnMut(TableEntry, &mut [u8]) -> bool,
 {
@@ -321,17 +317,19 @@ where
         let slot_start = BLOB_HEADER
             .checked_add(index.checked_mul(BLOB_ENTRY).ok_or(Error::BlobTooLarge)?)
             .ok_or(Error::BlobTooLarge)?;
-        let slot_end = slot_start.checked_add(BLOB_ENTRY).ok_or(Error::BlobTooLarge)?;
-        let slot = out.get_mut(slot_start..slot_end).ok_or(Error::BlobTooLarge)?;
+        let slot_end = slot_start
+            .checked_add(BLOB_ENTRY)
+            .ok_or(Error::BlobTooLarge)?;
+        let slot = out
+            .get_mut(slot_start..slot_end)
+            .ok_or(Error::BlobTooLarge)?;
         slot.get_mut(..8)
             .ok_or(Error::BlobTooLarge)?
             .copy_from_slice(&table.signature);
         let offset_u32 = u32::try_from(offset).map_err(|_| Error::BlobTooLarge)?;
         put_u32(slot, 8, offset_u32).ok_or(Error::BlobTooLarge)?;
         put_u32(slot, 12, table.length).ok_or(Error::BlobTooLarge)?;
-        slot.get_mut(16..20)
-            .ok_or(Error::BlobTooLarge)?
-            .fill(0);
+        slot.get_mut(16..20).ok_or(Error::BlobTooLarge)?.fill(0);
         let length = usize::try_from(table.length).map_err(|_| Error::BlobTooLarge)?;
         let end = offset.checked_add(length).ok_or(Error::BlobTooLarge)?;
         let destination = out.get_mut(offset..end).ok_or(Error::BlobTooLarge)?;
@@ -381,10 +379,7 @@ pub fn blob_table<'a>(blob: &'a [u8], signature: &[u8; 4]) -> Option<&'a [u8]> {
 }
 
 fn checksum(bytes: &[u8]) -> bool {
-    bytes
-        .iter()
-        .fold(0u8, |sum, byte| sum.wrapping_add(*byte))
-        == 0
+    bytes.iter().fold(0u8, |sum, byte| sum.wrapping_add(*byte)) == 0
 }
 
 fn read_u16(bytes: &[u8], at: usize) -> Option<u16> {

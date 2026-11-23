@@ -24,8 +24,8 @@ use crate::memory::{frame, paging};
 
 use imp::{
     MAX_BLOB_BYTES, MAX_TABLE_BYTES, MAX_TABLES, RSDP_LENGTH_V2, RSDP_SIGNATURE, TABLE_HEADER,
-    TableEntry, parse_rsdp, root_entries, table_entry, table_entry4, table_length,
-    table_signature, validate_table, write_blob,
+    TableEntry, parse_rsdp, root_entries, table_entry, table_entry4, table_length, table_signature,
+    validate_table, write_blob,
 };
 
 struct Early {
@@ -118,15 +118,17 @@ fn build(rsdp_phys: u64, early: &mut Early) -> Result<(), &'static str> {
     }
 
     let bundle = tables.get(..count).ok_or("too many tables")?;
-    let written = write_blob(&mut early.bytes, bundle, |entry, destination| {
-        match physical(entry.physical, destination.len()) {
+    let written = write_blob(
+        &mut early.bytes,
+        bundle,
+        |entry, destination| match physical(entry.physical, destination.len()) {
             Some(source) => {
                 destination.copy_from_slice(source);
                 true
             }
             None => false,
-        }
-    })
+        },
+    )
     .map_err(|_| "bundle too large")?;
     early.len = written;
     Ok(())
