@@ -51,6 +51,8 @@ fn sampler() {
         let frames = memory::frame::stats();
         let (procs, threads) = process::live_totals();
         let class = memory::heap::class_stats(16);
+        let turnstile = crate::sync::turnstile_counts();
+        let zombies = process::zombie_count();
         kprintln!(
             "{}",
             format_line(
@@ -77,9 +79,9 @@ fn sampler() {
                 0,
                 0,
                 0,
-                0,
-                0,
-                0,
+                turnstile.0,
+                turnstile.1,
+                zombies,
                 crate::sync::registered_count(),
             )
         );
