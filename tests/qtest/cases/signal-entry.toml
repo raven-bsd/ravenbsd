@@ -59,7 +59,7 @@ regex = '^signal-entry: context size=(256|4384) pc=0x[0-9a-f]{16} sp=0x[0-9a-f]{
 unordered = true
 
 [[expect]]
-regex = '^signal-entry: self resume pc=0x[0-9a-f]{16} sp=0x[0-9a-f]{16} pc-match=1 sp-match=1 bits-match=1$'
+regex = '^signal-entry: self resume pc=0x[0-9a-f]{16} sp=0x[0-9a-f]{16} pc-match=1 sp-match=1 bits-match=1 r12=0x[0-9a-f]{16} ctx-r12=0x[0-9a-f]{16} cf=1 ctx-efl=0x[0-9a-f]{16} r12-match=1 cf-match=1$'
 
 [[expect]]
 regex = '^signal-entry: blocked ready$'
