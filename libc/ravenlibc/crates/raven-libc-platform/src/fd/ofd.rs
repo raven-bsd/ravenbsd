@@ -7,7 +7,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cell::Cell;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
@@ -42,6 +42,15 @@ pub enum OfdKind {
     Unknown,
 }
 
+/// One IPv4 endpoint carried with an inherited socket's peer/local identity.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SocketEndpoint {
+    /// The address octets.
+    pub ip: [u8; 4],
+    /// The TCP/UDP port.
+    pub port: u16,
+}
+
 /// The socket identity carried across `execve` with an inherited socket OFD.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SocketMeta {
@@ -54,6 +63,10 @@ pub struct SocketMeta {
     /// Encoded `raven_libc_net::SocketState` (0 pending, 1 open, 2 bound, 3 listening,
     /// 4 connecting, 5 connected, 6 shutdown).
     pub state: u8,
+    /// The local endpoint, when the socket had one at `execve`.
+    pub local: Option<SocketEndpoint>,
+    /// The accepted/connected peer endpoint, when the socket had one at `execve`.
+    pub peer: Option<SocketEndpoint>,
 }
 
 /// One open-file description.
@@ -79,6 +92,12 @@ pub struct Ofd {
     pub epoch: u32,
     /// Socket metadata for an inherited socket; `None` for every other kind.
     pub socket: Cell<Option<SocketMeta>>,
+    /// A tty master whose read returned EOF; `poll` reports `POLLHUP` from then on.
+    ///
+    /// The pty server owns the hangup state, but the intervening scheme-file readiness (PG-25)
+    /// does not report it. A non-empty read that reaches EOF is therefore the libc's evidence
+    /// that the terminal hung up, and the condition is sticky like the donor tty state.
+    pub eof: Arc<AtomicBool>,
 }
 
 impl Ofd {
@@ -101,6 +120,7 @@ impl Ofd {
             dir_cursor_ok: false,
             epoch,
             socket: Cell::new(None),
+            eof: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -113,6 +133,16 @@ impl Ofd {
     /// Record the socket metadata used to re-register the OFD after `execve`.
     pub fn set_socket_meta(&self, meta: SocketMeta) {
         self.socket.set(Some(meta));
+    }
+
+    /// Mark a tty master that reached EOF; the condition is sticky.
+    pub fn set_eof(&self) {
+        self.eof.store(true, Ordering::Relaxed);
+    }
+
+    /// Whether this tty master has reached EOF.
+    pub fn is_eof(&self) -> bool {
+        self.eof.load(Ordering::Relaxed)
     }
 
     /// Set the kernel handle of a pending OFD.
@@ -339,6 +369,18 @@ impl<'a, B: SysBackend, L: Lock> OfdRef<'a, B, L> {
         self.platform.set_ofd_socket_meta(self.index, meta);
     }
 
+    /// Mark a tty master that reached EOF.
+    pub fn set_eof(&self) {
+        if let Some(ofd) = self.snapshot() {
+            ofd.set_eof();
+        }
+    }
+
+    /// Whether this tty master has reached EOF.
+    pub fn is_eof(&self) -> bool {
+        self.snapshot().is_some_and(|ofd| ofd.is_eof())
+    }
+
     /// The OFD status (`F_GETFL`).
     pub fn status(&self) -> u32 {
         self.snapshot().map_or(0, |ofd| {
@@ -417,6 +459,7 @@ impl Clone for Ofd {
             dir_cursor_ok: self.dir_cursor_ok,
             epoch: self.epoch,
             socket: Cell::new(self.socket.get()),
+            eof: Arc::clone(&self.eof),
         }
     }
 }

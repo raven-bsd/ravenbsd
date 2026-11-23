@@ -38,6 +38,8 @@ static ENTRY_COUNT: AtomicU32 = AtomicU32::new(0);
 static SELF_BITS: AtomicU32 = AtomicU32::new(0);
 static SELF_CTX_PC: AtomicU64 = AtomicU64::new(0);
 static SELF_CTX_SP: AtomicU64 = AtomicU64::new(0);
+static SELF_CTX_R12: AtomicU64 = AtomicU64::new(0);
+static SELF_CTX_EFL: AtomicU64 = AtomicU64::new(0);
 static BLOCK_WORD: AtomicU32 = AtomicU32::new(0);
 
 // The kernel enters the registered point with a 16-byte-aligned stack. The
@@ -276,7 +278,7 @@ fn controller() -> i32 {
         Err(Errno::EINVAL) => println!("signal-entry: bad limit=EINVAL"),
         _ => return 1,
     }
-    match sig_setup(signal_entry_address(), CTX_OFF, 2) {
+    match sig_setup(signal_entry_address(), CTX_OFF, 4) {
         Err(Errno::EINVAL) => println!("signal-entry: bad flags=EINVAL"),
         _ => return 1,
     }
@@ -308,7 +310,7 @@ fn controller() -> i32 {
     }
 
     SCENARIO.store(SCENARIO_SELF, Ordering::SeqCst);
-    let (raw, sp_before, after_pc) = unsafe { self_kick_capture() };
+    let (raw, sp_before, after_pc, r12_after, cf_after) = unsafe { self_kick_capture() };
     if raw != 0 {
         println!("signal-entry: self kick failed raw={raw}");
         return 1;
@@ -316,13 +318,19 @@ fn controller() -> i32 {
     let pc_match = SELF_CTX_PC.load(Ordering::SeqCst) == after_pc;
     let sp_match = SELF_CTX_SP.load(Ordering::SeqCst) == sp_before;
     let bits_match = SELF_BITS.load(Ordering::SeqCst) == CANCEL;
+    let ctx_r12 = SELF_CTX_R12.load(Ordering::SeqCst);
+    let ctx_efl = SELF_CTX_EFL.load(Ordering::SeqCst);
+    let r12_match = ctx_r12 == r12_after && r12_after == SELF_R12_MAGIC;
+    let cf_match = ctx_efl & 1 == 1 && cf_after == 1;
     println!(
-        "signal-entry: self resume pc=0x{after_pc:016x} sp=0x{sp_before:016x} pc-match={} sp-match={} bits-match={}",
+        "signal-entry: self resume pc=0x{after_pc:016x} sp=0x{sp_before:016x} pc-match={} sp-match={} bits-match={} r12=0x{r12_after:016x} ctx-r12=0x{ctx_r12:016x} cf={cf_after} ctx-efl=0x{ctx_efl:016x} r12-match={} cf-match={}",
         u8::from(pc_match),
         u8::from(sp_match),
-        u8::from(bits_match)
+        u8::from(bits_match),
+        u8::from(r12_match),
+        u8::from(cf_match)
     );
-    if !pc_match || !sp_match || !bits_match {
+    if !pc_match || !sp_match || !bits_match || !r12_match || !cf_match {
         return 1;
     }
 
@@ -361,20 +369,29 @@ fn controller() -> i32 {
 /// Self-kick with the syscall issued from this frame, so the interrupted SP
 /// and the address after the syscall are known exactly.
 #[cfg(target_arch = "x86_64")]
-unsafe fn self_kick_capture() -> (isize, u64, u64) {
+const SELF_R12_MAGIC: u64 = 0x5a17_c0de_1234_9876;
+
+unsafe fn self_kick_capture() -> (isize, u64, u64, u64, u64) {
     let sp_before: usize;
     let after: usize;
     let raw: isize;
+    let r12_after: u64;
+    let cf_after: u8;
     // SAFETY: the syscall ABI is fixed; the kernel saves and restores all GPRs
-    // around the signal entry, and the label instruction captures the resume PC.
+    // and RFLAGS around the signal entry, and the label instruction captures the
+    // resume PC. r12 and CF are deliberately set to known values before the call.
     unsafe {
         asm!(
             "mov {sp}, rsp",
+            "stc",
             "syscall",
             "2:",
             "lea {after}, [rip + 2b]",
+            "setc {cf}",
             sp = out(reg) sp_before,
             after = out(reg) after,
+            cf = out(reg_byte) cf_after,
+            inlateout("r12") SELF_R12_MAGIC => r12_after,
             inlateout("rax") raven_abi::syscall::THREAD_KICK => raw,
             in("rdi") Handle::NONE.0 as usize,
             in("rsi") CANCEL as usize,
@@ -387,7 +404,13 @@ unsafe fn self_kick_capture() -> (isize, u64, u64) {
             options(nostack),
         );
     }
-    (raw, sp_before as u64, after as u64)
+    (
+        raw,
+        sp_before as u64,
+        after as u64,
+        r12_after,
+        u64::from(cf_after),
+    )
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -451,6 +474,11 @@ extern "C" fn s44_signal_body(bits: usize) -> ! {
         SELF_BITS.store(bits as u32, Ordering::SeqCst);
         SELF_CTX_PC.store(context.pc(), Ordering::SeqCst);
         SELF_CTX_SP.store(context.sp(), Ordering::SeqCst);
+        #[cfg(target_arch = "x86_64")]
+        {
+            SELF_CTX_R12.store(context.gregs[signal::REG_R12], Ordering::SeqCst);
+            SELF_CTX_EFL.store(context.gregs[signal::REG_EFL], Ordering::SeqCst);
+        }
     }
     let raw = sigreturn();
     println!("signal-entry: sigreturn returned raw={raw}");

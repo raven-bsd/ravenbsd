@@ -43,6 +43,11 @@ fn remember(fd: c_int, pair: u64) -> bool {
 
 /// The pair id bound to `fd`.
 pub(crate) fn pair_for(fd: c_int) -> Option<u64> {
+    // A negative descriptor has no pty pair. `-1` is also the empty-slot sentinel in `PAIRS`;
+    // without this guard `pair_for(-1)` matches the first empty slot and reports pair 0.
+    if fd < 0 {
+        return None;
+    }
     for slot in &PAIRS {
         if slot.0.load(Ordering::Relaxed) == fd {
             return Some(slot.1.load(Ordering::Relaxed));

@@ -192,6 +192,26 @@ fn run(argument: usize) {
                     return;
                 }
             }
+        } else if manifest.readiness == Readiness::File {
+            let waiter = start_waiter(index, generation, handle);
+            match wait_for_log(&core, index, generation, &manifest, waiter) {
+                ReadinessOutcome::Ready => {
+                    if waiter {
+                        Some(wait_waiter(index, generation))
+                    } else {
+                        Some(wait_child_status(handle).unwrap_or(WAIT_ERROR_CODE))
+                    }
+                }
+                ReadinessOutcome::Exited(code) => Some(code),
+                ReadinessOutcome::Failed => {
+                    if waiter {
+                        let _ = raven_rt::proc_terminate(handle, 0);
+                        let _ = wait_waiter(index, generation);
+                    }
+                    let _ = raven_rt::handle_close(handle);
+                    return;
+                }
+            }
         } else {
             Some(wait_child_status(handle).unwrap_or(WAIT_ERROR_CODE))
         };
@@ -318,6 +338,109 @@ fn wait_for_scheme(
         // Only observed time counts: credit a gap in which this worker did not run, such as a
         // TCG guest descheduled by the host, back to the readiness window. A hung child leaves
         // the worker polling on time, so the deadline still fires.
+        let stalled = gap.saturating_sub(READINESS_STALL_MS);
+        let timed_out = {
+            let mut guard = core.lock();
+            if stalled > 0 {
+                guard
+                    .supervisor
+                    .extend_readiness(index, generation, stalled);
+            }
+            guard.supervisor.readiness_timed_out(index, generation, now)
+        };
+        if !timed_out.is_empty() {
+            boot::emit(core, &timed_out);
+            return ReadinessOutcome::Failed;
+        }
+        let alive = {
+            let guard = core.lock();
+            guard
+                .supervisor
+                .runtime()
+                .get(index)
+                .is_some_and(|runtime| {
+                    runtime.generation == generation && runtime.state == State::Starting
+                })
+        };
+        if !alive {
+            return ReadinessOutcome::Failed;
+        }
+        let _ = raven_rt::nanosleep(READINESS_POLL_MS * 1_000_000);
+    }
+}
+
+/// Wait until `ready_file` contains `ready_match`, or the child exits/times out.
+///
+/// sshd logs `Server listening on ...` only after `listen()` has succeeded, so the line is a
+/// real listener-ready signal. The file is read through the existing `file:` scheme; a missing or
+/// partially written file is retried, never treated as a sleep.
+fn wait_for_log(
+    core: &Arc<Mutex<Core>>,
+    index: usize,
+    generation: u64,
+    manifest: &Manifest,
+    waiter: bool,
+) -> ReadinessOutcome {
+    let path = alloc::format!("file:{}", manifest.ready_file);
+    let needle = manifest.ready_match.as_bytes();
+    let client = raven_scheme::Client::new();
+    let polled_at = boot::now_ms();
+    let spawned_at = {
+        let mut guard = core.lock();
+        let spawned_at = guard
+            .supervisor
+            .runtime()
+            .get(index)
+            .and_then(|runtime| runtime.ready_timing.spawned_ms);
+        guard.supervisor.polled(index, generation, polled_at);
+        spawned_at
+    };
+    let mut last_poll = spawned_at.unwrap_or(polled_at);
+    loop {
+        if waiter && let Some(code) = waiter_code(index, generation) {
+            return ReadinessOutcome::Exited(code);
+        }
+        if let Ok(handle) = client.open(&path, 1) {
+            let mut data = alloc::vec::Vec::new();
+            let mut offset = 0u64;
+            loop {
+                let mut chunk = [0u8; 1024];
+                match client.read(handle, offset, &mut chunk) {
+                    Ok(0) => break,
+                    Ok(count) => {
+                        data.extend_from_slice(&chunk[..count]);
+                        offset = offset.saturating_add(u64::try_from(count).unwrap_or(0));
+                        if data.windows(needle.len()).any(|window| window == needle) {
+                            break;
+                        }
+                        if data.len() >= 64 * 1024 {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            let found = data.windows(needle.len()).any(|window| window == needle);
+            let _ = client.close(handle);
+            if waiter && let Some(code) = waiter_code(index, generation) {
+                return ReadinessOutcome::Exited(code);
+            }
+            if found {
+                let notices = {
+                    let mut guard = core.lock();
+                    guard.supervisor.ready(index, generation, boot::now_ms())
+                };
+                boot::emit(core, &notices);
+                return if notices.is_empty() {
+                    ReadinessOutcome::Failed
+                } else {
+                    ReadinessOutcome::Ready
+                };
+            }
+        }
+        let now = boot::now_ms();
+        let gap = now.saturating_sub(last_poll);
+        last_poll = now;
         let stalled = gap.saturating_sub(READINESS_STALL_MS);
         let timed_out = {
             let mut guard = core.lock();

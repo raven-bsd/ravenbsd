@@ -10,10 +10,10 @@ use raven_abi::errno::Errno;
 use crate::Platform;
 use crate::backend::FakeSys;
 use crate::fd::inherit::{
-    ENTRY_LEN_V3, FDMAP_MAGIC, FDMAP_VERSION, FDMAP_VERSION_V1, FdMap, FdMapEntry, HEADER_LEN,
+    ENTRY_LEN_V4, FDMAP_MAGIC, FDMAP_VERSION, FDMAP_VERSION_V1, FdMap, FdMapEntry, HEADER_LEN,
     NO_PATH, entry_handle, transferable,
 };
-use crate::fd::ofd::{OfdKind, SocketMeta};
+use crate::fd::ofd::{OfdKind, SocketEndpoint, SocketMeta};
 
 fn sample() -> FdMap {
     let mut first = FdMapEntry::new(0, 0x10, OfdKind::File, 0, 0);
@@ -53,6 +53,14 @@ fn socket_metadata_round_trips() {
         ty: 1,
         proto: 0,
         state: 5,
+        local: Some(SocketEndpoint {
+            ip: [10, 0, 2, 15],
+            port: 22,
+        }),
+        peer: Some(SocketEndpoint {
+            ip: [10, 0, 2, 2],
+            port: 40_000,
+        }),
     });
     let map = FdMap {
         entries: vec![entry],
@@ -67,7 +75,7 @@ fn string_table_is_shared() {
     map.entries[1].path = Some(b"/tmp/a".to_vec());
     let bytes = map.encode().expect("encode");
     // Header + two entries + one NUL-terminated string.
-    assert_eq!(bytes.len(), HEADER_LEN + 2 * ENTRY_LEN_V3 + 14);
+    assert_eq!(bytes.len(), HEADER_LEN + 2 * ENTRY_LEN_V4 + 14);
     let decoded = FdMap::decode(&bytes).expect("decode");
     assert_eq!(
         decoded.entries[1].path.as_deref(),
@@ -183,6 +191,14 @@ fn restored_socket_exposes_its_identity() {
         ty: 1,
         proto: 0,
         state: 5,
+        local: Some(SocketEndpoint {
+            ip: [10, 0, 2, 15],
+            port: 22,
+        }),
+        peer: Some(SocketEndpoint {
+            ip: [10, 0, 2, 2],
+            port: 40_000,
+        }),
     });
     platform
         .restore_fdmap(&FdMap {
@@ -195,6 +211,13 @@ fn restored_socket_exposes_its_identity() {
     assert_eq!(inherited[0].socket.domain, 1);
     assert_eq!(inherited[0].socket.ty, 1);
     assert_eq!(inherited[0].socket.state, 5);
+    assert_eq!(
+        inherited[0].socket.peer,
+        Some(SocketEndpoint {
+            ip: [10, 0, 2, 2],
+            port: 40_000,
+        })
+    );
 }
 
 #[test]
@@ -206,6 +229,8 @@ fn restored_cloexec_socket_is_closed_before_main() {
         ty: 1,
         proto: 0,
         state: 5,
+        local: None,
+        peer: None,
     });
     platform
         .restore_fdmap(&FdMap {
