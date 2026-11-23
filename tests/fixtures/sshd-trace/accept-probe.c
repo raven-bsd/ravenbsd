@@ -10,16 +10,19 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #define TAP_PORT 23147
 #define LOOP_PORT 23148
+#define PPOLL_PORT 23149
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
 static long
@@ -85,6 +88,31 @@ wait_accept(int listener, int timeout_ms)
 	return accept(listener, NULL, NULL);
 }
 
+// sshd.c:1015 waits with ppoll(..., NULL, &osigset); reproduce that exact masked wait so a
+// listener that works under plain poll and fails here isolates the ppoll/signal-mask boundary.
+static int
+wait_accept_ppoll(int listener, int timeout_ms)
+{
+	struct pollfd waiting = {listener, POLLIN, 0};
+	struct timespec timeout;
+	sigset_t blocked;
+	sigset_t previous;
+	int ready;
+
+	sigemptyset(&blocked);
+	sigaddset(&blocked, SIGCHLD);
+	sigprocmask(SIG_BLOCK, &blocked, &previous);
+	timeout.tv_sec = timeout_ms / 1000;
+	timeout.tv_nsec = (long)(timeout_ms % 1000) * 1000000L;
+	ready = ppoll(&waiting, 1, &timeout, &previous);
+	sayf("sshd-trace-accept: ppoll ready=%d revents=0x%x errno=%d\n",
+	    ready, (unsigned)waiting.revents, errno);
+	sigprocmask(SIG_SETMASK, &previous, NULL);
+	if (ready <= 0)
+		return -1;
+	return accept(listener, NULL, NULL);
+}
+
 static void
 report(const char *tag, int fd)
 {
@@ -123,6 +151,8 @@ main(void)
 {
 	int tap_listener;
 	int tap_connection;
+	int ppoll_listener;
+	int ppoll_connection;
 	int loop_listener;
 	int loop_client;
 	int loop_connection;
@@ -145,6 +175,23 @@ main(void)
 		close(tap_connection);
 	}
 	close(tap_listener);
+
+	ppoll_listener = listen_on(htonl(INADDR_ANY), PPOLL_PORT);
+	if (ppoll_listener < 0) {
+		sayf("sshd-trace-accept: ppoll listen errno=%d\n", errno);
+		return 1;
+	}
+	sayf("sshd-trace-accept: ppoll listening port=%d\n", PPOLL_PORT);
+	ppoll_connection = wait_accept_ppoll(ppoll_listener, 10000);
+	if (ppoll_connection < 0) {
+		sayf("sshd-trace-accept: ppoll accept timeout errno=%d\n", errno);
+	} else {
+		report("ppoll", ppoll_connection);
+		wrote = write(ppoll_connection, "PROBE-PPOLL\n", 12);
+		sayf("sshd-trace-accept: ppoll write=%ld\n", (long)wrote);
+		close(ppoll_connection);
+	}
+	close(ppoll_listener);
 
 	loop_listener = listen_on(loopback, LOOP_PORT);
 	if (loop_listener < 0) {
