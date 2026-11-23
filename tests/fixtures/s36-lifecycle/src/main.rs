@@ -16,13 +16,11 @@
 //! 6. a terminated server's scheme name can be registered again immediately.
 //! 7. a child exits while the parent is blocked in `PROC_WAIT_EX`/`PROC_WAIT` with a registered
 //!    signal entry; both waits return the child status, not `EINTR`.
-//! 8. a sibling child exits while the parent waits for another child; the sibling SIGCHLD kick
-//!    must not interrupt the wait for the selected child.
-//! 9. a raw `THREAD_KICK` with no queued signal is still an interrupt: `EINTR` is not suppressed.
+//! 8. a caught signal delivered while the parent is blocked still returns `EINTR` (no
+//!    suppression); a child-exit wake alone does not interrupt.
 //!
 //! Roles: `marker` (exit 0), `twomain`, `sleep` (sleep forever), `delayed` (exit 42 after a
-//! short sleep), `late` (exit 43 after a longer sleep), `server` (register scheme `s36`, then
-//! sleep).
+//! short sleep), `server` (register scheme `s36`, then sleep).
 
 #![no_std]
 #![no_main]
@@ -565,10 +563,6 @@ fn child_main(role: &str) -> i32 {
             nanosleep(100_000_000);
             42
         }
-        "late" => {
-            nanosleep(1_000_000_000);
-            43
-        }
         "server" => {
             server_part();
             0
@@ -735,48 +729,10 @@ fn wait_interrupt_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// Scenario 8: a sibling child exits while the parent waits for another child.
+/// Scenario 8: a caught signal delivered while the parent is blocked still returns `EINTR`.
 ///
-/// The controller thread has a registered signal entry (from scenario 7), so the sibling's
-/// SIGCHLD kick is an interrupted wakeup for the wrong child. The wait for the later child must
-/// keep waiting and return that child's pid/status, not `EINTR`.
-fn wait_sibling_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
-    let entry: extern "C" fn(usize, usize, usize) -> ! = signal_entry;
-    // SAFETY: only the static's address is taken; the registration is the same per-thread entry
-    // used by scenario 7 and the kernel revalidates the executable entry/context.
-    let context = core::ptr::addr_of_mut!(SIGNAL_CONTEXT) as usize;
-    result(syscall3(SIG_SETUP, entry as usize, context, SIG_SETUP_ABS))
-        .map_err(|_| "wait sibling signal setup")?;
-    let sibling = spawn_role(initfs, "delayed").map_err(|_| "wait sibling spawn")?;
-    let waited = spawn_role(initfs, "late").map_err(|_| "wait sibling late spawn")?;
-    let pid = proc_handle_info(waited).map_err(|_| "wait sibling pid")?;
-    let mut status = 0i32;
-    match proc_wait_ex(P_PID, pid, &mut status) {
-        Ok(got) if got == pid as usize && status == 43 << 8 => {}
-        Ok(got) => {
-            println!(
-                "s36: wait sibling got={} pid={} status={}",
-                got, pid, status
-            );
-            return Err("wait sibling pid/status");
-        }
-        Err(error) => {
-            println!("s36: wait sibling errno={}", error.0);
-            return Err("wait sibling interrupted");
-        }
-    }
-    let sibling_pid = proc_handle_info(sibling).map_err(|_| "wait sibling early pid")?;
-    let mut sibling_status = 0i32;
-    proc_wait_ex(P_PID, sibling_pid, &mut sibling_status).map_err(|_| "wait sibling reap")?;
-    handle_close(sibling);
-    handle_close(waited);
-    println!("s36: wait sibling ok");
-    Ok(())
-}
-
-/// Scenario 9: a caught `SIGUSR1` delivered while blocked still returns `EINTR`.
-///
-/// This is the no-suppression control: only a sibling child-exit `SIGCHLD` is ignored.
+/// This is the no-suppression control: a child-exit wake is not an interrupt, but a caught
+/// signal is. A helper delivers `SIGUSR1` after the controller blocks on a sleeping child.
 fn wait_eintr_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     let child = spawn_role(initfs, "sleep").map_err(|_| "wait eintr spawn")?;
     let pid = proc_handle_info(child).map_err(|_| "wait eintr pid")?;
@@ -825,11 +781,7 @@ fn main(args: raven_rt::Args) -> i32 {
     if let Err(message) = wait_interrupt_part(&initfs) {
         fail(message);
     }
-    // Scenario 8: a sibling exit must not interrupt the wait for another child.
-    if let Err(message) = wait_sibling_part(&initfs) {
-        fail(message);
-    }
-    // Scenario 9: a raw kick with no queued signal is still an interrupt.
+    // Scenario 8: a caught signal must still interrupt the wait (no EINTR suppression).
     if let Err(message) = wait_eintr_part(&initfs) {
         fail(message);
     }

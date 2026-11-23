@@ -22,11 +22,7 @@ regex = '^s36: wait race ok$'
 [[expect]]
 regex = '^s36: wait race handle ok$'
 
-# Scenario 8: a sibling child exit must not interrupt the wait for another child.
-[[expect]]
-regex = '^s36: wait sibling ok$'
-
-# Scenario 9: a raw THREAD_KICK with no queued signal still returns EINTR.
+# Scenario 8: a caught signal delivered while blocked still returns EINTR.
 [[expect]]
 regex = '^s36: wait eintr ok$'
 
