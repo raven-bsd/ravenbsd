@@ -79,8 +79,11 @@ def wait_ready(host, port, deadline):
     while time.monotonic() < deadline:
         attempts += 1
         try:
-            with socket.create_connection((host, port), timeout=5.0) as stream:
-                stream.settimeout(30.0)
+            with socket.create_connection((host, port), timeout=2.0) as stream:
+                # A connect issued before the guest has its IP can sit unanswered in slirp
+                # until the guest stack comes up. Bound the greeting so this attempt closes
+                # and retries promptly instead of consuming the guest's 8 s ready window.
+                stream.settimeout(2.0)
                 if attempts <= 5:
                     note(
                         f"K6-ready connected port={port} attempt={attempts} "
