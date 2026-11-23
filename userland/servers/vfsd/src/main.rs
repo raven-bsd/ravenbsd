@@ -49,7 +49,9 @@ mod program {
     use raven_scheme::{
         CallReply, Client, Ctx, Handler, HandlerError, HandlerResult, OpenTable, Opened, Server,
     };
-    use raven_vfs_core::{DEFAULT_MOUNTS, MountTable, normalized, parse_mounts};
+    use raven_vfs_core::{
+        DEFAULT_MOUNTS, MountTable, mount_requires_scheme, normalized, parse_mounts,
+    };
 
     entry!(main);
 
@@ -1569,13 +1571,15 @@ mod program {
         };
         let mut table = MountTable::new();
         for (path, scheme) in mounts {
-            if let Err(error) = wait_scheme(&scheme) {
-                if path == "/" {
-                    println!("vfsd: root scheme {scheme} unavailable");
-                    return 2;
-                }
-                println!("vfsd: skipped {path} on {scheme}: {}", error.description());
-                continue;
+            // Only the root is a startup prerequisite. Every other mount is a route: the service
+            // may register after this server's readiness (svcd's dependency order), and gating
+            // here deadlocks the bootstrap plan and burns the retry budget (`pty:` did exactly
+            // that for 5 s and then dropped `/dev/pts`).
+            if mount_requires_scheme(&path)
+                && let Err(error) = wait_scheme(&scheme)
+            {
+                println!("vfsd: root scheme {scheme} unavailable");
+                return 2;
             }
             match table.mount(&path, &scheme) {
                 Ok(_) => println!("vfsd: mounted {path} on {scheme}"),

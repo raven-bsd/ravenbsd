@@ -358,6 +358,16 @@ fn mount_defaults_twice_is_eexist() {
 }
 
 #[test]
+fn only_the_root_mount_requires_a_live_scheme() {
+    // `/dev/pts` is a route whose pty server registers after the bootstrap plan; waiting for it
+    // delayed vfsd by 5 s and then dropped the mount. Only `/` is a startup prerequisite.
+    assert!(mount_requires_scheme("/"));
+    assert!(!mount_requires_scheme("/tmp"));
+    assert!(!mount_requires_scheme("/dev/pts"));
+    assert!(!mount_requires_scheme("/dev/null"));
+}
+
+#[test]
 fn shell_profile_routes_the_pty_namespace() {
     // K536 rev181: `/dev/pts/<N>` must reach the pty server as slot `N`, not fall through to the
     // root initfs mount (which has no `/dev/pts`). The real profile file is the input, so deleting

@@ -249,6 +249,18 @@ pub fn valid_scheme(scheme: &str) -> bool {
         && !name.contains(':')
 }
 
+/// Whether a mount point is a hard prerequisite for the router to start.
+///
+/// The root is the only one: the router cannot serve anything without it. Every other entry is a
+/// routing record whose scheme server may register later in svcd's dependency order (the `pty:`
+/// mount is the case in point). Gating startup on such a server deadlocks the bootstrap plan and
+/// then stalls on the retry budget; a request made before it registers is `ENOENT`, which is the
+/// correct not-yet-available answer.
+#[must_use]
+pub fn mount_requires_scheme(path: &str) -> bool {
+    path == "/"
+}
+
 /// Parse `/etc/mounts` contents: one `<absolute-path> <scheme>` pair per line.
 ///
 /// Blank lines and lines whose first non-space character is `#` are ignored.
