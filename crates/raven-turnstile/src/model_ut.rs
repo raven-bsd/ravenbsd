@@ -166,9 +166,12 @@ fn exhaustive_two_threads_two_objects_two_priorities() {
     };
     let (states, depth) = explore(&scenario, 6);
     println!("2-thread model: states={states} max_depth={depth}");
-    assert!(
-        states >= 100,
-        "expected a meaningful state space, got {states}"
+    // Idle turnstiles are canonicalized away (reclaimed after the last owner/waiter), so the
+    // exhaustive canonical state space is exactly 79 for this fixed scenario. The exact count is
+    // a stronger regression than the old >=100 threshold, which counted empty object entries.
+    assert_eq!(
+        states, 79,
+        "canonical state space after idle-turnstile reclamation"
     );
 }
 
