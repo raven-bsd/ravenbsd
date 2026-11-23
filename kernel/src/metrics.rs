@@ -73,12 +73,18 @@ fn sampler() {
         let (graph_threads, weak_threads) = crate::sync::turnstile_counts();
         let (class_in_use, class_slabs, class_fail) =
             memory::heap::class_stats(3072).unwrap_or((0, 0, 0));
+        let (class1024, _, _) = memory::heap::class_stats(1024).unwrap_or((0, 0, 0));
+        let (class1536, _, _) = memory::heap::class_stats(1536).unwrap_or((0, 0, 0));
+        let (class192, _, _) = memory::heap::class_stats(192).unwrap_or((0, 0, 0));
         kprintln!(
             "K449-GRAPH graph_threads={graph_threads} weak_threads={weak_threads} \
              class3072_in_use={class_in_use} class3072_slabs={class_slabs} \
-             class3072_fail={class_fail} zombies={} deadlive={}",
+             class3072_fail={class_fail} class1024_in_use={class1024} \
+             class1536_in_use={class1536} class192_in_use={class192} \
+             zombies={} deadlive={} clsenotices={}",
             process::zombie_count(),
             process::dead_live_threads(),
+            crate::ipc::router::close_notice_count(),
         );
     }
 }
