@@ -343,3 +343,37 @@ fn env_rejects_odd_length_and_bad_digits() {
     assert_eq!(FdMap::decode_env(b"abc"), Err(Errno::EINVAL));
     assert_eq!(FdMap::decode_env(b"zz"), Err(Errno::EINVAL));
 }
+
+#[test]
+fn exec_shell_slave_ofd_refs_reach_zero_after_stdio_close() {
+    // K495/R4: an exec'd shell restores the same pty-slave handle on fds 0/1/2. The three fds
+    // share one OFD; the child's original slave fd is gone. Closing stdio at child exit must drop
+    // the last OFD reference, so the ptyd can see the slave's last close.
+    let platform = Platform::new(FakeSys::new());
+    let block = FdMap {
+        entries: vec![
+            FdMapEntry::new(0, 0x5a, OfdKind::Tty, 0, 2),
+            FdMapEntry::new(1, 0x5a, OfdKind::Tty, 0, 2),
+            FdMapEntry::new(2, 0x5a, OfdKind::Tty, 0, 2),
+        ],
+    };
+    platform.restore_fdmap(&block).expect("restore");
+    let ofd = platform.get(0).expect("fd0").index();
+    assert_eq!(platform.get(1).expect("fd1").index(), ofd);
+    assert_eq!(platform.get(2).expect("fd2").index(), ofd);
+    assert_eq!(
+        platform.ofd_refs(),
+        3,
+        "one slave OFD shared by fds 0/1/2 (ofd {ofd}, handle 0x5a)"
+    );
+    platform.close(0).expect("close fd0");
+    platform.close(1).expect("close fd1");
+    let _ = platform.close(2);
+    assert_eq!(
+        platform.ofd_refs(),
+        0,
+        "slave OFD refs after stdio close (ofd {ofd}, handle 0x5a)"
+    );
+    assert!(platform.get(3).is_err());
+    assert!(platform.get(4).is_err());
+}

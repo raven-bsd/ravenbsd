@@ -144,19 +144,33 @@ pub fn on_tick() {
 // Cyclic timer integration (L4)
 // ---------------------------------------------------------------------------
 
+// Per-CPU wheel selection ported from DragonFlyBSD sys/kern/kern_timeout.c
+// `softclock_pcpu_ary` and `callout_reset_bycpu` @ 94448f622a06cde90ba42d688e9cab2448ad9ab3
+// (3-clause BSD; The DragonFly Project). Rust reimplementation; no C expression copied.
+
+/// Number of high bits used for the CPU in a cyclic handle.
+const CYCLIC_CPU_SHIFT: u32 = 56;
+/// Mask of the wheel-local cyclic id in a handle.
+const CYCLIC_ID_MASK: u64 = (1u64 << CYCLIC_CPU_SHIFT) - 1;
+
 /// The kernel backend for `raven-cyclic`: records the next deadline and reads [`now_ns`].
 ///
 /// The hardware timer is still periodic (1000 Hz) until the tickless work (L5) reprograms it, so
 /// `program` records the requested deadline for diagnostics and the self-check rather than
 /// reprogramming the LAPIC/generic timer. The periodic tick stays the fallback interrupt source.
-struct CyclicBackend;
+struct CyclicBackend {
+    cpu: usize,
+}
 
-/// The next deadline the backend was last programmed for (0 = disarmed).
-static CYCLIC_NEXT_DEADLINE: AtomicU64 = AtomicU64::new(0);
+/// The next deadline for each CPU's wheel (0 = disarmed).
+static CYCLIC_NEXT_DEADLINE: [AtomicU64; crate::sched::smp::MAX_CPUS] =
+    [const { AtomicU64::new(0) }; crate::sched::smp::MAX_CPUS];
 
 impl cyclic::Backend for CyclicBackend {
     fn program(&mut self, deadline_ns: Option<u64>) {
-        CYCLIC_NEXT_DEADLINE.store(deadline_ns.unwrap_or(0), Ordering::Release);
+        if let Some(slot) = CYCLIC_NEXT_DEADLINE.get(self.cpu) {
+            slot.store(deadline_ns.unwrap_or(0), Ordering::Release);
+        }
     }
 
     fn now_ns(&self) -> u64 {
@@ -164,47 +178,90 @@ impl cyclic::Backend for CyclicBackend {
     }
 }
 
-/// The global per-CPU cyclic registry, seeded lazily on first [`cyclic_add`].
-static CYCLICS: IrqSpinLock<Option<cyclic::Cyclics<CyclicBackend>>> = IrqSpinLock::new(None);
+/// One wheel per CPU, matching DragonFly `softclock_pcpu_ary`, seeded lazily on first add.
+static CYCLICS: [IrqSpinLock<Option<cyclic::Cyclics<CyclicBackend>>>; crate::sched::smp::MAX_CPUS] =
+    [const { IrqSpinLock::new(None) }; crate::sched::smp::MAX_CPUS];
 
 /// Fire-order recording for the cyclic self-test (bounded; extra firings are dropped).
 static CYCLIC_FIRE_LOG: [AtomicU64; 8] = [const { AtomicU64::new(u64::MAX) }; 8];
 static CYCLIC_FIRE_COUNT: AtomicUsize = AtomicUsize::new(0);
+/// Firings in the current per-CPU wheel batch (self-test only).
+static CYCLIC_FIRE_BATCH: AtomicU64 = AtomicU64::new(0);
+
+fn wheel_cpu(cpu: usize) -> usize {
+    cpu.min(crate::sched::smp::MAX_CPUS.saturating_sub(1))
+}
+
+fn encode_cyclic(cpu: usize, id: cyclic::CyclicId) -> cyclic::CyclicId {
+    ((cpu as u64) << CYCLIC_CPU_SHIFT) | (id & CYCLIC_ID_MASK)
+}
+
+fn decode_cyclic(id: cyclic::CyclicId) -> (usize, cyclic::CyclicId) {
+    ((id >> CYCLIC_CPU_SHIFT) as usize, id & CYCLIC_ID_MASK)
+}
+
+/// Schedule a cyclic on `cpu`'s wheel (DragonFly `callout_reset_bycpu`).
+pub fn cyclic_add_on(cpu: usize, spec: cyclic::CyclicSpec) -> cyclic::CyclicId {
+    let cpu = wheel_cpu(cpu);
+    let Some(wheel) = CYCLICS.get(cpu) else {
+        return 0;
+    };
+    let mut guard = wheel.lock();
+    let registry = guard.get_or_insert_with(|| cyclic::Cyclics::new(CyclicBackend { cpu }));
+    encode_cyclic(cpu, registry.add(spec))
+}
 
 /// Schedule a cyclic timer on this CPU and return its handle.
 pub fn cyclic_add(spec: cyclic::CyclicSpec) -> cyclic::CyclicId {
-    let mut guard = CYCLICS.lock();
-    let registry = guard.get_or_insert_with(|| cyclic::Cyclics::new(CyclicBackend));
-    registry.add(spec)
+    cyclic_add_on(crate::sched::smp::percpu::this_cpu(), spec)
 }
 
 /// Cancel a cyclic timer (idempotent; `false` when unknown or already fired).
 #[allow(dead_code)] // L4 public API; first consumers arrive with R-TIM-9.
 pub fn cyclic_cancel(id: cyclic::CyclicId) -> bool {
-    let mut guard = CYCLICS.lock();
-    guard.as_mut().is_some_and(|registry| registry.cancel(id))
+    let (cpu, local) = decode_cyclic(id);
+    let Some(wheel) = CYCLICS.get(cpu) else {
+        return false;
+    };
+    let mut guard = wheel.lock();
+    guard
+        .as_mut()
+        .is_some_and(|registry| registry.cancel(local))
 }
 
-/// Fire due cyclics and reprogram the next deadline.
+/// Fire due cyclics of `cpu`'s wheel and reprogram its next deadline.
 ///
 /// Runs from the timer interrupt (interrupt context); it performs no allocation. L4 has no cyclic
 /// consumers yet (R-TIM-9), so the fire callback only records the fire order for the self-test.
-fn cyclic_fire() {
-    let mut guard = CYCLICS.lock();
+fn cyclic_fire_on(cpu: usize) {
+    let cpu = wheel_cpu(cpu);
+    let Some(wheel) = CYCLICS.get(cpu) else {
+        return;
+    };
+    let mut guard = wheel.lock();
     if let Some(registry) = guard.as_mut() {
         registry.on_interrupt(now_ns(), |id| {
+            let global = encode_cyclic(cpu, id);
+            CYCLIC_FIRE_BATCH.fetch_add(1, Ordering::Relaxed);
             let index = CYCLIC_FIRE_COUNT.fetch_add(1, Ordering::Relaxed);
             if let Some(slot) = CYCLIC_FIRE_LOG.get(index) {
-                slot.store(id, Ordering::Relaxed);
+                slot.store(global, Ordering::Relaxed);
             }
         });
     }
 }
 
-/// The recorded next deadline (0 when disarmed); for the self-test and diagnostics.
+/// Fire the due cyclics of this CPU's wheel.
+fn cyclic_fire() {
+    cyclic_fire_on(crate::sched::smp::percpu::this_cpu());
+}
+
+/// The recorded next deadline on this CPU (0 when disarmed); for diagnostics.
 #[allow(dead_code)] // Diagnostic accessor for the tickless (L5) work.
 pub fn cyclic_next_deadline() -> u64 {
-    CYCLIC_NEXT_DEADLINE.load(Ordering::Acquire)
+    CYCLIC_NEXT_DEADLINE
+        .get(wheel_cpu(crate::sched::smp::percpu::this_cpu()))
+        .map_or(0, |slot| slot.load(Ordering::Acquire))
 }
 
 /// Boot-time self-check: three one-shots fire in deadline order with no lost wake.
@@ -261,6 +318,41 @@ fn cyclic_selftest() {
     } else {
         kprintln!("cyclic: fail fired={count} order={first},{second},{third}");
         boot::exit_qemu(0x11);
+    }
+
+    // Per-CPU wheel isolation: a due timer armed for CPU 1 must not fire from CPU 0's wheel.
+    // Both deadlines are in the past when the first wheel fires, so a single shared wheel would
+    // drain both here and leave nothing for CPU 1.
+    let cpu_base = now_ns();
+    let _cpu0 = cyclic_add_on(
+        0,
+        cyclic::CyclicSpec {
+            when: cpu_base.saturating_add(5_000_000),
+            interval: 0,
+            level: cyclic::Level::Normal,
+            slack_ns: 0,
+        },
+    );
+    let _cpu1 = cyclic_add_on(
+        1,
+        cyclic::CyclicSpec {
+            when: cpu_base.saturating_add(10_000_000),
+            interval: 0,
+            level: cyclic::Level::Normal,
+            slack_ns: 0,
+        },
+    );
+    delay_ns(20_000_000);
+    CYCLIC_FIRE_BATCH.store(0, Ordering::Relaxed);
+    cyclic_fire_on(0);
+    let cpu0 = CYCLIC_FIRE_BATCH.swap(0, Ordering::Relaxed);
+    cyclic_fire_on(1);
+    let cpu1 = CYCLIC_FIRE_BATCH.swap(0, Ordering::Relaxed);
+    if cpu0 == 1 && cpu1 == 1 {
+        kprintln!("cyclic: percpu ok cpu0={cpu0} cpu1={cpu1}");
+    } else {
+        kprintln!("cyclic: percpu fail cpu0={cpu0} cpu1={cpu1}");
+        boot::exit_qemu(0x12);
     }
 }
 

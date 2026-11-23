@@ -12,7 +12,8 @@
 #
 # The case list is fixed on purpose. Extend it in a ticket that owns the new case; do not add
 # ad-hoc cases at run time. Owners are the lanes that own the subsystem, so a failing row can be
-# routed without re-reading the log.
+# routed without re-reading the log. A row may name a qtest case file in an optional fifth field;
+# without it the case name resolves under tests/qtest/cases/ as before.
 #
 # usage: sh scripts/kernel-gate.sh [--list]
 #   --list   print the case table and exit (no QEMU run)
@@ -69,6 +70,7 @@ exc-pagefault|x86_64|stuart|exceptions
 exc-doublefault|x86_64|stuart|exceptions
 kernel-paging|x86_64|stuart|paging
 kernel-timer|x86_64|stuart|timer
+readiness-kvm4|x86_64|stuart|readiness|tests/smp/readiness/readiness-kvm4.toml
 time-entropy|x86_64|lance|time-entropy
 time-entropy-cyclic|x86_64|lance|time-entropy
 smp-user|x86_64|stuart|smp
@@ -79,6 +81,8 @@ locking|x86_64|lance|locking
 lockstat|x86_64|lance|locking
 ipc-donation|x86_64|lance|ipc
 ipc-fuzz|x86_64|bob|ipc fuzz|tests/smp/ipc-fuzz/ipc-fuzz.toml
+syscall-fuzz|x86_64|bob|syscall fuzz|tests/smp/syscall-fuzz/syscall-fuzz.toml
+ssh-first-byte|x86_64|bob|ssh first byte|tests/fixtures/ssh-first-byte/ssh-first-byte.toml
 duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator

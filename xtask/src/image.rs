@@ -121,6 +121,9 @@ pub(crate) fn run_with_overrides(
             );
         }
     }
+    if overrides.initfs.is_none() {
+        crate::addons::ensure_current(root, arch, &profile)?;
+    }
 
     if platform == Platform::Pi4 {
         if crate::rootfs::spec_path(root, profile_name).is_some() {
@@ -508,6 +511,8 @@ fn build_release_initfs(
                 source.display()
             )
         })?;
+        crate::initfs::verify_staged_elf(arch, &source, &data)
+            .with_context(|| format!("initfs path {}", file.path))?;
         builder.add_file(&file.path, &data, file.mode)?;
     }
     let image = builder.build();

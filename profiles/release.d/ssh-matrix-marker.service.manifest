@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K434 S7 marker writer. /tmp is the writable ramfs; the exact marker is copied from the read-only
+# /etc path before the S7 row runs. One-shot, like ssh-hostkeys.
+
+name = "ssh-matrix-marker"
+exec = "/bin/rsh"
+args = ["/bin/rsh", "-c", "cat /etc/ssh-matrix-marker > /tmp/ssh-marker"]
+needs = ["vfsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false
