@@ -165,7 +165,12 @@ def main() -> int:
 
     failures: list[str] = []
     for number in range(1, SESSIONS + 1):
-        exit_code, output = run("/bin/pty-path", tty=True, timeout=15)
+        # `exec` keeps the probe in the SSH session's ctty context. A plain
+        # `/bin/pty-path` is spawned by the shell's std/Command, which on this
+        # toolchain starts a new session (getsid child=32, shell=1); POSIX
+        # correctly gives a new session no controlling terminal, so that is a
+        # spawn property (K514 area), not the K570 session-ctty row.
+        exit_code, output = run("exec /bin/pty-path", tty=True, timeout=15)
         text = "\n".join(line for line in output.splitlines() if "PTY-PATH" in line)
         path_seen = re.search(r"/dev/pts/[0-9]+", output) is not None
         ttyname_ok = re.search(r"PTY-PATH session path=/dev/pts/[0-9]+", output) is not None
