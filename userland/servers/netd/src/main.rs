@@ -59,6 +59,8 @@ mod program {
         hostname: Option<String>,
         hostname_applied: bool,
         static_mode: bool,
+        /// Test-only `tx-debug` counter print at the NIC reclaim decision.
+        tx_debug: bool,
         /// `/etc/pf.conf` policy shared by every interface.
         pf: Option<FilterPolicy>,
     }
@@ -100,6 +102,7 @@ mod program {
             hostname: None,
             hostname_applied: false,
             static_mode: false,
+            tx_debug: args.iter().any(|argument| argument == "tx-debug"),
             pf,
         };
         handler.load_network(now);
@@ -212,6 +215,7 @@ mod program {
                 self.nic_mode,
                 static_config,
                 self.pf.clone(),
+                self.tx_debug,
             )?;
             Ok(())
         }

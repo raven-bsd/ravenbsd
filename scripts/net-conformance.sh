@@ -98,10 +98,13 @@ if [ "$target" -eq 0 ] && [ "$baseline" -eq 0 ] && [ "$build_only" -eq 0 ]; then
 fi
 
 build_current() {
+    fixture=${NETCONF_OUT:-build/fixtures/net-conformance}
+    profile=${NETCONF_PROFILE:-network-config-test}
+    image=${NETCONF_IMAGE:-build/qtest/net-conformance.img}
     sh tests/fixtures/net-conformance/build.sh
-    cargo xtask image --arch x86_64 --profile network-config-test \
-        --initfs build/fixtures/net-conformance/initfs.img \
-        --output build/qtest/net-conformance.img
+    cargo xtask image --arch x86_64 --profile "$profile" \
+        --initfs "$fixture/initfs.img" \
+        --output "$image"
 }
 
 build_worktree() {
@@ -161,7 +164,7 @@ if [ "$build_only" -eq 1 ]; then
         if [ "$build" -eq 1 ]; then
             build_current
         fi
-        image=$root/build/qtest/net-conformance.img
+        image=${NETCONF_IMAGE:-$root/build/qtest/net-conformance.img}
     fi
     [ -f "$image" ] || die "no image at $image"
     echo "NETCONF_IMAGE=$image"
