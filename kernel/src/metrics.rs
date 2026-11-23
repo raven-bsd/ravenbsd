@@ -72,6 +72,34 @@ fn sampler() {
                 class.map_or(0, |stats| stats.slabs as u64),
             )
         );
+        if crate::memory::paging::cmdline()
+            .split_ascii_whitespace()
+            .any(|token| token == "k449-pending")
+        {
+            for process in process::processes() {
+                let queued = process.scheme_queue.lock().len();
+                let active = process.active_requests.lock().len();
+                let client = process.client_requests.lock().len();
+                if queued == 0 && active == 0 && client == 0 {
+                    continue;
+                }
+                let schemes = process
+                    .schemes
+                    .lock()
+                    .iter()
+                    .map(|server| server.name.clone())
+                    .collect::<alloc::vec::Vec<_>>()
+                    .join(",");
+                kprintln!(
+                    "K449-PENDING pid={} queued={} active={} client={} schemes={}",
+                    process.id,
+                    queued,
+                    active,
+                    client,
+                    schemes
+                );
+            }
+        }
         if HOLDER_SCAN.load(Ordering::Relaxed) {
             let holders = sched::thread::thread_holder_stats();
             kprintln!(
