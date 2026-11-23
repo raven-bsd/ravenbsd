@@ -237,22 +237,23 @@ mod program {
             if buffer.is_empty() {
                 return Ok(0);
             }
-            loop {
-                let sequence = SEQ.load(Ordering::Acquire);
-                {
-                    let mut console = CONSOLE.lock();
-                    if console.take_interrupt() {
-                        return Err(Errno::EINTR.into());
-                    }
-                    if console.has_ready() {
-                        return Ok(console.take(buffer));
-                    }
-                    if console.eof() {
-                        return Ok(0);
-                    }
+            // Never sleep inside the single-threaded scheme server: a blocked `read` keeps the
+            // server from dispatching queued `write` requests (the console submit queue fills and
+            // the session output stalls). A caller that wants blocking semantics retries on
+            // `EAGAIN`; the input thread publishes every state change.
+            {
+                let mut console = CONSOLE.lock();
+                if console.take_interrupt() {
+                    return Err(Errno::EINTR.into());
                 }
-                let _ = raven_rt::futex_wait(&SEQ, sequence, None);
+                if console.has_ready() {
+                    return Ok(console.take(buffer));
+                }
+                if console.eof() {
+                    return Ok(0);
+                }
             }
+            Err(Errno::EAGAIN.into())
         }
 
         fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
