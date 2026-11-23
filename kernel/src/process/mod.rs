@@ -587,6 +587,29 @@ pub struct Process {
     pub child_system_ns: AtomicU64,
     /// Accumulated reaped-child user time.
     pub child_user_ns: AtomicU64,
+    /// Maximum resident user pages observed for this process, in bytes.
+    pub maxrss_bytes: AtomicU64,
+    /// Maximum resident user pages of any reaped child, in bytes.
+    pub child_maxrss_bytes: AtomicU64,
+}
+
+impl Process {
+    /// Resident user pages for this process, in bytes, from the page tables.
+    ///
+    /// `UserAddressSpace::mapped_pages` walks the VMA tree and counts present 4 KiB leaves; it
+    /// includes the initfs and memory-object mappings, so this is resident user memory, not
+    /// private RSS. Zero for the kernel process or after the address space is released.
+    pub fn resident_rss_bytes(&self) -> u64 {
+        let mut slot = self.address_space.lock();
+        slot.as_mut()
+            .map_or(0, |space| space.mapped_pages().saturating_mul(PAGE))
+    }
+
+    /// Fold the current resident bytes into the process's `maxrss` high-water mark.
+    pub fn update_maxrss(&self) {
+        let rss = self.resident_rss_bytes();
+        self.maxrss_bytes.fetch_max(rss, Ordering::AcqRel);
+    }
 }
 
 /// Per-process syscall personality and Linux handler handle.
@@ -800,6 +823,8 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     }))
 }
 
@@ -879,6 +904,8 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
     register_pid(&process);
@@ -951,6 +978,8 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
 
     {
@@ -1255,6 +1284,10 @@ pub fn notify_parent(process: &Process, sigchld: bool) {
         parent
             .child_user_ns
             .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
+        parent.child_maxrss_bytes.fetch_max(
+            process.maxrss_bytes.load(Ordering::Acquire),
+            Ordering::AcqRel,
+        );
         let uid = process.ids.lock().uid;
         parent.queue_signal_info(SIGCHLD, process.id, CLD_EXITED_CODE, uid, 0);
     }
@@ -1371,6 +1404,8 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;
@@ -1930,6 +1965,8 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let _irq = crate::sync::critical();
         ipc::on_process_exit(process);
     }
+    // The RSS high-water mark is snapshotted in `terminate_once` before IPC teardown; do not
+    // walk the address space again after that teardown has altered the mappings.
     let address_space = process.address_space.lock().take();
     if let Some(mut address_space) = address_space {
         if own_context {

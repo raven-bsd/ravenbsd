@@ -55,6 +55,7 @@ members = [
     "tests/fixtures/proc-pgrp",
     "tests/fixtures/proc-orphan",
     "tests/fixtures/proc-times",
+    "tests/fixtures/proc-rss",
     "tests/fixtures/fault",
     "tests/fixtures/s21-edu",
     "tests/fixtures/s21d-aarch64",
