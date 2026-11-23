@@ -770,8 +770,10 @@ fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     }
     client.close(file).map_err(|_| "vfsd close")?;
     // The scheme close is fire-and-forget: give vfsd a bounded window to retire the 1000 pager
-    // keys before the exit-89 frame sample, so the gate measures the steady state.
-    nanosleep(100_000_000);
+    // keys and let the final in-flight page-outs drop their object references before the exit-89
+    // frame sample, so the gate measures the steady state (pager=0) rather than a drained
+    // backlog. Under a loaded host 100 ms left a handful of page-out references.
+    nanosleep(1_000_000_000);
     println!("s36: vfsd map done={}", MAP_CYCLES);
 
     let top = spawn_role(initfs, "maptop").map_err(|_| "maptop spawn")?;

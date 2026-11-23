@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K548 std spawn probe: one one-shot service after vfsd's file scheme is live. It runs the static
+# std program directly; no shell is involved.
+name = "std-spawn"
+exec = "/bin/std-spawn"
+args = []
+needs = ["scheme:file"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false
