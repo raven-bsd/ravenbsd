@@ -37,6 +37,12 @@ pub fn start(cmdline: &CmdLine) {
     let seconds = value.parse::<u64>().unwrap_or(DEFAULT_SECONDS).max(1);
     INTERVAL_NS.store(seconds.saturating_mul(NS_PER_SECOND), Ordering::Relaxed);
     HOLDER_SCAN.store(cmdline.get("s36-holders").is_some(), Ordering::Relaxed);
+    kprintln!(
+        "K449-SIZES process={} thread={} pending_request={}",
+        core::mem::size_of::<crate::process::Process>(),
+        core::mem::size_of::<crate::sched::thread::Thread>(),
+        core::mem::size_of::<crate::ipc::PendingRequest>(),
+    );
     match sched::spawn_kernel("k449-metrics", sampler) {
         Ok(_) => kprintln!("K449-METRICS: sampler every {seconds}s"),
         Err(error) => kprintln!("K449-METRICS: spawn failed: {error:?}"),
