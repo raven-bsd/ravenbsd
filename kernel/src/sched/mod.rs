@@ -757,14 +757,15 @@ fn cancel_sleep(token: u64) {
     }
 }
 
-/// Drop every per-CPU timeout-sleeper entry owned by thread `id`.
+/// Drop every per-CPU timeout-sleeper entry owned by dead thread `id`.
 ///
 /// A woken thread normally calls `end_block`, which removes its entry. A terminal process
 /// exits from `block_current` / the syscall path without `end_block`, and the entry then holds
 /// an `Arc<Thread>` (and through it the `Process`) until the deadline. NetBSD `lwp_exit`
-/// destroys `l->l_timeout_ch`; `sleepq_block` halts the callout after the switch; FreeBSD and
-/// Illumos drop the sleep-queue reference on wake. Cancel the same entry before the exiting
-/// thread's `Arc` moves to the reap queue.
+/// destroys `l->l_timeout_ch`, `sleepq_block` halts the callout after the switch, and `lwp_free`
+/// frees the LWP off-CPU; FreeBSD and Illumos drop the sleep-queue reference on wake. Run this
+/// from [`reap_dead`], the one point every terminal path (`exit_thread` and the scheduler's
+/// terminal-process filter) hands the dead `Arc` to.
 fn cancel_thread_sleepers(id: u64) {
     if !INITIALIZED.load(Ordering::Acquire) {
         return;
@@ -1144,9 +1145,6 @@ pub fn exit_thread(code: i32) -> ! {
         None => crate::arch::halt(),
     };
     thread.exit_code.store(code, Ordering::SeqCst);
-    // A terminal exit skips `end_block`; the registered timeout would pin this Thread and its
-    // Process until the deadline. Remove it before the Arc moves to the reap queue.
-    cancel_thread_sleepers(thread.id);
     // FreeBSD `thread_unlink`/NetBSD `lwp_free` remove the thread from the process linkage at
     // exit. The live list is weak, but an unremoved entry is a permanent 16-byte leak.
     thread.process.unregister_thread(&thread);
@@ -1255,6 +1253,11 @@ fn reap_dead() {
         // SAFETY: each pointer was produced by `Arc::into_raw` exactly once and is owned by the
         // queue; the thread is neither current nor runnable.
         let thread = unsafe { Arc::from_raw(raw as *const Thread) };
+        // A terminal exit skips `end_block`; its registered timeout would otherwise pin this
+        // Thread and its Process until the deadline. The terminal-process filter in
+        // `schedule_locked` also reaches the dead state through this queue, so cancelling here
+        // covers both paths.
+        cancel_thread_sleepers(thread.id);
         self::thread::free_kernel_stack(thread.kernel_stack_base, thread.kernel_stack_top);
         drop(thread);
     }

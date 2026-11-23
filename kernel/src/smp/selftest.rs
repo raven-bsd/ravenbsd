@@ -104,10 +104,11 @@ const PROBE_ROUNDS: u32 = 200;
 ///
 /// Every cycle registers a long timeout through `begin_block`/`add_sleep`, is woken, and then
 /// exits without `end_block` - the terminal-process path Tim S36 measured. The per-CPU sleeper
-/// entry holds an `Arc<Thread>` (and through it the `Process`); it must be gone after exit, not
-/// after the 10 s deadline. NetBSD destroys the LWP timeout callout in `lwp_exit` and halts it in
-/// `sleepq_block`; FreeBSD and Illumos drop the sleep-queue entry on wake. A retained entry is a
-/// leak, so this row reports both the sleeper count and the live-Thread delta.
+/// entry holds an `Arc<Thread>` (and through it the `Process`); it must be gone once the deferred
+/// reaper releases the dead Thread, not after the 10 s deadline. NetBSD destroys the LWP timeout
+/// callout in `lwp_exit` and halts it in `sleepq_block`; FreeBSD and Illumos drop the sleep-queue
+/// entry on wake. A retained entry is a leak, so this row reports both the sleeper count and the
+/// live-Thread delta.
 fn sleeper_close_test(cpus: usize) -> Result<[usize; 4], (&'static str, [usize; 4])> {
     use crate::sched::thread::{ThreadState, live_threads};
 
