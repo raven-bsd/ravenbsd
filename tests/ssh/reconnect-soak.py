@@ -15,12 +15,18 @@ The harness is reusable unchanged for the 100/100 gate:
 and optionally adds the TTY rows:
   python3 tests/ssh/reconnect-soak.py --sessions 100 --tty-sessions 10
 
+Every ``--resource-every N`` command sessions (default 5) the harness also samples the resource
+curve without adding an SSH row: the host QEMU RSS proxy, the boot heap size and the serial panic
+flag. The image exposes no heap-free/thread/fd counter yet, and its `ps`/`kstat` tools print to the
+guest console rather than the SSH stdout, so those stay absent and the summary names the gap; no
+value is fabricated. The samples are written to ``resources.tsv`` and printed as a table.
+
 Evidence is written under build/ssh-reconnect-soak/<UTC>/ (copy it to managed evidence after the
 run; the frozen product evidence tree is never touched). No QEMU-free shortcut, no retry.
 
 Usage: python3 tests/ssh/reconnect-soak.py [--sessions N] [--batch N] [--session-timeout S]
                                            [--tty-sessions N] [--keep-going] [--image PATH]
-                                           [--net tap|user]
+                                           [--net tap|user] [--resource-every N] [--selftest]
 Exit: 0 when every session passes, 1 when a session fails, 2 for setup problems.
 """
 
@@ -29,6 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -66,6 +73,8 @@ def parse_args(argv: list[str]) -> dict:
         "keep_going": False,
         "image": IMAGE,
         "net": "tap",
+        "resource_every": 5,
+        "selftest": False,
     }
     index = 0
     while index < len(argv):
@@ -91,6 +100,12 @@ def parse_args(argv: list[str]) -> dict:
         elif arg == "--net" and index + 1 < len(argv):
             options["net"] = argv[index + 1]
             index += 2
+        elif arg == "--resource-every" and index + 1 < len(argv):
+            options["resource_every"] = int(argv[index + 1])
+            index += 2
+        elif arg == "--selftest":
+            options["selftest"] = True
+            index += 1
         elif arg in ("-h", "--help"):
             print(__doc__)
             raise SystemExit(0)
@@ -100,7 +115,80 @@ def parse_args(argv: list[str]) -> dict:
     if options["sessions"] < 1 or options["batch"] < 1:
         print("reconnect-soak: --sessions and --batch must be positive", file=sys.stderr)
         raise SystemExit(2)
+    if options["resource_every"] < 0:
+        print("reconnect-soak: --resource-every must be zero or positive", file=sys.stderr)
+        raise SystemExit(2)
     return options
+
+
+# Resource sampling. The image exposes no heap-free/thread/fd counters (kstat has only the
+# DTrace provider; the VM/scheduler providers are the documented follow-up in docs/kstat.md),
+# and its ps/kstat print to the console rather than the SSH stdout. The curve is therefore
+# host-side: QEMU RSS, the serial boot heap and the panic flag. No value is fabricated:
+# unavailable counters are absent and named in the summary.
+RESOURCE_COLUMNS = ["after_session", "qemu_rss_kb", "serial_heap_kb", "panic"]
+RESOURCE_NOTE = (
+    "guest heap-free/threads/fds are not exposed by this image; the kstat VM/scheduler "
+    "providers are the documented follow-up (docs/kstat.md). ps/kstat print to the guest "
+    "console, not the SSH stdout, and the ps probe wedged the listener, so the curve uses the "
+    "host QEMU RSS proxy and the serial heap/panic only; the SSH rows are untouched."
+)
+
+
+def parse_qemu_rss(text: str) -> int | None:
+    """Return QEMU's VmRSS in kB from /proc/<pid>/status, or None."""
+    for line in text.splitlines():
+        if line.startswith("VmRSS:"):
+            fields = line.split()
+            if len(fields) >= 2 and fields[1].isdigit():
+                return int(fields[1])
+    return None
+
+
+def format_resource_table(rows: list[dict]) -> str:
+    """Render the resource samples as a compact table (missing values are '-')."""
+    header = ["after", "rss_kb", "heap_kb", "panic"]
+    lines = ["  ".join(header)]
+
+    def value(item: object) -> str:
+        return "-" if item is None else str(item)
+
+    for row in rows:
+        lines.append("  ".join([
+            value(row.get("after_session")),
+            value(row.get("qemu_rss_kb")),
+            value(row.get("serial_heap_kb")),
+            "yes" if row.get("panic") else "no",
+        ]))
+    return "\n".join(lines) + "\n"
+
+
+def selftest() -> int:
+    """Exercise the resource parsers/formatter with fixed fixtures (no QEMU)."""
+    failures: list[str] = []
+
+    def check(name: str, got: object, want: object) -> None:
+        if got != want:
+            failures.append(f"{name}: got {got!r}, want {want!r}")
+
+    check("rss", parse_qemu_rss("Name:\tqemu\nVmRSS:\t12345 kB\n"), 12345)
+    check("rss-missing", parse_qemu_rss("Name:\tqemu\n"), None)
+    table = format_resource_table([
+        {"after_session": 0, "qemu_rss_kb": 1000, "serial_heap_kb": 4096,
+         "panic": False},
+        {"after_session": 5, "qemu_rss_kb": 1200, "serial_heap_kb": 4096,
+         "panic": True},
+    ])
+    header = table.splitlines()[0]
+    check("table-header", "after" in header and "rss_kb" in header, True)
+    check("table-row", "1000" in table and "4096" in table, True)
+    check("table-panic", "yes" in table, True)
+    if failures:
+        for failure in failures:
+            print(f"reconnect-soak: selftest FAIL: {failure}", file=sys.stderr)
+        return 1
+    print("reconnect-soak: selftest PASS")
+    return 0
 
 
 def hygiene() -> str:
@@ -274,8 +362,36 @@ def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool,
     }
 
 
+def sample_host(child: subprocess.Popen, serial: Path, after_session: int) -> dict:
+    """Sample the resource curve the harness can read without touching the SSH rows.
+
+    The guest has no heap-free/thread/fd interface yet and its `ps`/`kstat` tools print to the
+    guest console, not the SSH stdout (a `ps` probe also wedged the listener in the smoke), so
+    the curve uses the host QEMU RSS proxy plus the serial boot heap and panic flag. Unavailable
+    values stay None; nothing is invented.
+    """
+    sample: dict = {column: None for column in RESOURCE_COLUMNS}
+    sample["after_session"] = after_session
+    try:
+        sample["qemu_rss_kb"] = parse_qemu_rss(
+            Path(f"/proc/{child.pid}/status").read_text(encoding="ascii", errors="replace")
+        )
+    except OSError:
+        sample["qemu_rss_kb"] = None
+    try:
+        serial_bytes = serial.read_bytes()
+    except OSError:
+        serial_bytes = b""
+    heap = re.search(rb"heap:\s+(\d+)\s+KiB", serial_bytes)
+    sample["serial_heap_kb"] = int(heap.group(1)) if heap else None
+    sample["panic"] = b"KERNEL PANIC" in serial_bytes
+    return sample
+
+
 def main(argv: list[str]) -> int:
     options = parse_args(argv)
+    if options.get("selftest"):
+        return selftest()
     image = Path(options["image"])
     if not image.is_file():
         print(f"reconnect-soak: missing image {image}", file=sys.stderr)
@@ -291,6 +407,8 @@ def main(argv: list[str]) -> int:
     print(f"reconnect-soak: run={run} image_sha256={sha256(image)} commit={git_head()}")
     print(f"reconnect-soak: hygiene before boot: {hygiene_before}")
     rows: list[dict] = []
+    resource_rows: list[dict] = []
+    last_session = 0
     failures = 0
     child = None
     try:
@@ -299,6 +417,8 @@ def main(argv: list[str]) -> int:
             f"reconnect-soak: booted net={options['net']} target={host}:{port}; "
             f"hygiene after boot: {hygiene()}"
         )
+        if options["resource_every"] > 0:
+            resource_rows.append(sample_host(child, serial, 0))
         total = options["sessions"]
         for number in range(1, total + 1):
             marker = f"K449-OK-{number}"
@@ -306,12 +426,15 @@ def main(argv: list[str]) -> int:
                 run, number, marker, options["session_timeout"], tty=False, host=host, port=port
             )
             rows.append(row)
+            last_session = number
             print(
                 f"session {number}/{total}: exit={row['exit']} timed_out={row['timed_out']} "
                 f"wall_ms={row['wall_ms']} marker_ok={row['marker_ok']} "
                 f"auth={bool(row['auth_line'])} exit_status={bool(row['exit_status_line'])} "
                 f"free={bool(row['free_line'])} {row['result']}"
             )
+            if options["resource_every"] > 0 and number % options["resource_every"] == 0:
+                resource_rows.append(sample_host(child, serial, number))
             if row["result"] != "PASS":
                 failures += 1
                 if not options["keep_going"]:
@@ -332,6 +455,10 @@ def main(argv: list[str]) -> int:
                     failures += 1
                     if not options["keep_going"]:
                         break
+        if (options["resource_every"] > 0 and last_session > 0
+                and (not resource_rows
+                     or resource_rows[-1]["after_session"] != last_session)):
+            resource_rows.append(sample_host(child, serial, last_session))
     finally:
         if child is not None:
             kill(child)
@@ -349,6 +476,13 @@ def main(argv: list[str]) -> int:
         tsv.write("\t".join(columns) + "\n")
         for row in rows:
             tsv.write("\t".join(str(row[column]) for column in columns) + "\n")
+    with open(run / "resources.tsv", "w", encoding="utf-8") as tsv:
+        tsv.write("\t".join(RESOURCE_COLUMNS) + "\n")
+        for row in resource_rows:
+            tsv.write("\t".join(
+                "" if row.get(column) is None else str(row.get(column))
+                for column in RESOURCE_COLUMNS
+            ) + "\n")
     summary = {
         "sessions": len([row for row in rows if row["session"] < 1000]),
         "tty_sessions": len([row for row in rows if row["session"] >= 1000]),
@@ -362,12 +496,19 @@ def main(argv: list[str]) -> int:
         "session_timeout_s": options["session_timeout"],
         "net": options["net"],
         "keep_going": options["keep_going"],
+        "resource_every": options["resource_every"],
+        "resource_note": RESOURCE_NOTE,
+        "resource_curve": resource_rows,
     }
     (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     with open(run / "SHA256SUMS", "w", encoding="utf-8") as sums:
         for path in sorted(run.rglob("*")):
             if path.is_file() and path.name != "SHA256SUMS":
                 sums.write(f"{sha256(path)}  {path.relative_to(run)}\n")
+    if resource_rows:
+        print("reconnect-soak: resource curve "
+              "(host RSS proxy; guest heap-free/threads/fds not exposed):")
+        print(format_resource_table(resource_rows).rstrip("\n"))
     print(f"reconnect-soak: done sessions={summary['sessions']} failures={failures} run={run}")
     return 0 if failures == 0 else 1
 
