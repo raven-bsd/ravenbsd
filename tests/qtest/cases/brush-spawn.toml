@@ -48,6 +48,12 @@ regex = '^shell-env-status:0$'
 regex = '^ssh-env-status:0$'
 
 [[expect]]
+regex = '^pipe-status:0$'
+
+[[expect]]
+regex = '^s4pipe-status:0$'
+
+[[expect]]
 regex = '^(brush|ls|true)$'
 unordered = true
 
@@ -130,11 +136,27 @@ wait = '^shell-env-status:0$'
 timeout_secs = 60
 
 [[step]]
-send = "env SSH_CONNECTION='10.0.2.2 12345 10.0.2.15 22' SSH_CLIENT='10.0.2.2 12345 22' SSH_TTY=/dev/pts/0 TERM=xterm /bin/brush -c '/bin/ls /bin'; echo ssh-env-status:$?\n"
+send = "SSH_CONNECTION='10.0.2.2 12345 10.0.2.15 22' SSH_CLIENT='10.0.2.2 12345 22' SSH_TTY=/dev/pts/0 TERM=xterm /bin/brush -c '/bin/ls /bin'; echo ssh-env-status:$?\n"
 delay_ms = 100
 
 [[step]]
 wait = '^ssh-env-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/brush -c '/bin/ls /bin' | /bin/cat > /dev/null; echo pipe-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^pipe-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "echo S4DATA | /bin/brush -c 'cat > /tmp/brush-s4; cat /tmp/brush-s4'; echo s4pipe-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^s4pipe-status:0$'
 timeout_secs = 60
 
 [[step]]
