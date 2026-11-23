@@ -927,7 +927,10 @@ def row_s4() -> None:
 
 def s4_only_attempt(number: int) -> dict[str, object]:
     """One auth, one fixed line, server writes it to S4_FILE and reads it back."""
-    remote = f"cat > {S4_FILE}; cat {S4_FILE}"
+    # Diagnostic only: RAVEN_S4_REMOTE substitutes the remote command to separate a
+    # server-push failure from a command-child fault; the default S4 row is unchanged.
+    remote = (os.environ.get("RAVEN_S4_REMOTE")
+              or f"cat > {S4_FILE}; cat {S4_FILE}")
     argv = [
         "ssh",
         "-o", "StrictHostKeyChecking=no",
