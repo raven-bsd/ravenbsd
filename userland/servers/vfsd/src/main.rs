@@ -79,9 +79,11 @@ mod program {
 
     #[derive(Clone, Copy)]
     struct PagerRegion {
+        file: u64,
         target: Handle,
         offset: u64,
         shared: bool,
+        object: Handle,
     }
 
     struct Proxy {
@@ -447,9 +449,11 @@ mod program {
             self.pagers.insert(
                 object.0,
                 PagerRegion {
+                    file,
                     target,
                     offset,
                     shared,
+                    object,
                 },
             );
             let mut reply = CallReply::new(0);
@@ -1307,7 +1311,23 @@ mod program {
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
             if let Some(proxy) = self.opens.close(file)? {
-                let _ = Client::new().close(proxy.target);
+                let target = proxy.target;
+                let _ = Client::new().close(target);
+                // The target is the last duplicate of this open. Any pager objects created from
+                // it can no longer supply a page (the target handle is gone), so return the
+                // pager handles now: the client's mappings keep the object alive, and when the
+                // client unmaps/closes it the frames are freed. Without this the server's pager
+                // key holds every mapped page for the life of vfsd (Lance S36 rev103 red row).
+                let objects: Vec<Handle> = self
+                    .pagers
+                    .iter()
+                    .filter(|(_, region)| region.file == file || region.target == target)
+                    .map(|(_, region)| region.object)
+                    .collect();
+                for object in objects {
+                    self.pagers.remove(&object.0);
+                    let _ = raven_rt::sys::handle_close(object);
+                }
             }
             Ok(())
         }
