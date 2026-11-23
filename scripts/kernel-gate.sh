@@ -14,8 +14,10 @@
 # ad-hoc cases at run time. Owners are the lanes that own the subsystem, so a failing row can be
 # routed without re-reading the log.
 #
-# usage: sh scripts/kernel-gate.sh [--list]
-#   --list   print the case table and exit (no QEMU run)
+# usage: sh scripts/kernel-gate.sh [--list | --durability]
+#   --list         print the case table and exit (no QEMU run)
+#   --durability   run only the three UFS durability rows (ENOSPC, fsync write/kill,
+#                  remount check) and write target/kernel-gate/durability.md
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
 # These are functional rows, not latency rows: the preflight refuses another QEMU but tolerates
@@ -77,6 +79,9 @@ kmem-frames-nopcpu|x86_64|mark|allocator
 proc-death-cleanup|x86_64|stuart|process
 trace-context|x86_64|tim|trace
 release-login|x86_64|kevin|release
+ufs-enospc|x86_64|mel|ufs/durability
+ufs-fsync-persist|x86_64|mel|ufs/durability
+ufs-fsync-check|x86_64|mel|ufs/durability
 boot-uname-aarch64|aarch64|dave|boot/uname
 kernel-early-boot-aarch64|aarch64|dave|boot
 kernel-exc-aarch64|aarch64|dave|exceptions
@@ -84,20 +89,34 @@ kernel-paging-aarch64|aarch64|dave|paging
 kernel-timer-aarch64|aarch64|dave|timer
 duplex-matrix-aarch64|aarch64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix-aarch64.toml'
 
-if [ "${1:-}" = "--list" ]; then
-    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note _path; do
-        printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
-    done
-    exit 0
-fi
-
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    sed -n '6,19p' "$0" | sed 's/^# \{0,1\}//'
-    exit 0
-fi
+durability=0
+case "${1:-}" in
+    "")
+        ;;
+    --list)
+        printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note _path; do
+            printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
+        done
+        exit 0
+        ;;
+    --durability)
+        durability=1
+        ;;
+    --help|-h)
+        sed -n '6,21p' "$0" | sed 's/^# \{0,1\}//'
+        exit 0
+        ;;
+    *)
+        echo "kernel-gate: unknown option: $1" >&2
+        exit 2
+        ;;
+esac
 
 mkdir -p "$log_dir" || exit 2
-if ! doc=$(mgmt_path architecture/product-data/kernel-gate.md); then
+if [ "$durability" -eq 1 ]; then
+    cases=$(printf '%s\n' "$cases" | awk -F'|' '$4 == "ufs/durability"')
+    doc=$log_dir/durability.md
+elif ! doc=$(mgmt_path architecture/product-data/kernel-gate.md); then
     doc=$log_dir/kernel-gate.md
     echo "kernel-gate: management root absent; table stays at $doc (set RAVEN_MGMT_ROOT to file it)"
 fi
