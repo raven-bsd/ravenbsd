@@ -60,6 +60,7 @@ mod program {
         DRIVER_FEATURE_SELECT, MSIX_CONFIG, NUM_QUEUES, QUEUE_AVAIL, QUEUE_DESC, QUEUE_ENABLE,
         QUEUE_MSIX_VECTOR, QUEUE_NOTIFY_OFF, QUEUE_SELECT, QUEUE_SIZE, QUEUE_USED,
     };
+    use virtio_net::mmio;
     use virtio_net::{
         CAP_COMMON_CFG, CAP_DEVICE_CFG, CAP_ISR_CFG, CAP_NOTIFY_CFG, ControlInfo, DESC_F_WRITE,
         Descriptor, F_VERSION_1, Features, MAX_FRAME_LEN, MacAddress, NET_F_MAC, NET_F_MTU,
@@ -78,6 +79,9 @@ mod program {
     const DMA_HANDLE: Handle = Handle::new(5, 0);
     const IRQ_HANDLE: Handle = Handle::new(6, 0);
     const MSIX_BAR_HANDLE: Handle = Handle::new(7, 0);
+    /// `devd dtb launch` grants one MMIO window, then DMA, then the IRQ (no PCI config page).
+    const MMIO_DMA_HANDLE: Handle = Handle::new(4, 0);
+    const MMIO_IRQ_HANDLE: Handle = Handle::new(5, 0);
 
     const VIRTIO_VENDOR: u16 = 0x1AF4;
     const VIRTIO_NET_DEVICE: u16 = 0x1041;
@@ -134,6 +138,7 @@ mod program {
         let mut irq_line = 0u32;
         let mut test = false;
         let mut serve = false;
+        let mut mmio = false;
         let mut msix = false;
         let mut msix_addr_lo = None;
         let mut msix_addr_hi = None;
@@ -203,6 +208,8 @@ mod program {
                 test = true;
             } else if argument == "serve" {
                 serve = true;
+            } else if argument == "transport=mmio" {
+                mmio = true;
             }
         }
         let msix = if msix {
@@ -227,29 +234,36 @@ mod program {
         let bar_window = raven_rt::map_mmio_mut(BAR_HANDLE, bar_size)
             .map_err(|error| format!("bar map: {}", error.description()))?;
         let bar = MmioRegion::new(bar_window);
-        let config_window = raven_rt::map_mmio_mut(CONFIG_HANDLE, raven_driver::PAGE)
-            .map_err(|error| format!("config map: {}", error.description()))?;
-        let config = MmioRegion::new(config_window);
-        let dma_info = raven_rt::dma_info(DMA_HANDLE)
+        let (config, dma_handle, irq_handle, msix_bar) = if mmio {
+            // `devd dtb launch` grants one MMIO window, then DMA, then the IRQ.
+            (None, MMIO_DMA_HANDLE, MMIO_IRQ_HANDLE, None)
+        } else {
+            let config_window = raven_rt::map_mmio_mut(CONFIG_HANDLE, raven_driver::PAGE)
+                .map_err(|error| format!("config map: {}", error.description()))?;
+            let config = MmioRegion::new(config_window);
+            let msix_bar = match &msix {
+                Some(info) => {
+                    let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)
+                        .map_err(|error| format!("msix bar map: {}", error.description()))?;
+                    Some(MmioRegion::new(window))
+                }
+                None => None,
+            };
+            (Some(config), DMA_HANDLE, IRQ_HANDLE, msix_bar)
+        };
+        let dma_info = raven_rt::dma_info(dma_handle)
             .map_err(|error| format!("dma info: {}", error.description()))?;
-        let window = raven_rt::map_mmio_mut(DMA_HANDLE, dma_size)
+        let window = raven_rt::map_mmio_mut(dma_handle, dma_size)
             .map_err(|error| format!("dma map: {}", error.description()))?;
         // The split-queue metadata lives in the first 4 KiB; the B39 region and pool follow.
         let (meta, rest) = window.split_at_mut(RING_REGION_OFFSET);
         let (region, _tail) = rest.split_at_mut(RING_REGION_LEN);
         let dma = DmaRegion::new(meta, dma_info.bus_addr);
-        let irq = Irq::new(IRQ_HANDLE);
-        let msix_bar = match &msix {
-            Some(info) => {
-                let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)
-                    .map_err(|error| format!("msix bar map: {}", error.description()))?;
-                Some(MmioRegion::new(window))
-            }
-            None => None,
-        };
+        let irq = Irq::new(irq_handle);
 
         let mut nic = Nic::open(
             bar, config, dma, region, irq, bar_index, bar_size, dma_size, irq_line, msix, msix_bar,
+            mmio,
         )?;
         if !test && !serve {
             // B13b compatibility: the old one-shot qtest profile passes no mode token.
@@ -333,6 +347,7 @@ mod program {
 
     /// The four virtio-pci capabilities on the BAR the driver was given.
     struct Caps {
+        mmio: bool,
         common: Region,
         notify: Region,
         isr: Region,
@@ -385,7 +400,7 @@ mod program {
         #[allow(clippy::too_many_arguments)] // five handles plus the BAR/DMA geometry
         fn open(
             mut bar: MmioRegion,
-            mut config: MmioRegion,
+            config: Option<MmioRegion>,
             mut dma: DmaRegion,
             region: &'static mut [u8],
             irq: Irq,
@@ -395,45 +410,94 @@ mod program {
             irq_line: u32,
             msix: Option<MsixInfo>,
             msix_bar: Option<MmioRegion>,
+            is_mmio: bool,
         ) -> Result<Self, String> {
-            let vendor = config.read_u16(0x00).map_err(describe)?;
-            let device = config.read_u16(0x02).map_err(describe)?;
-            if vendor != VIRTIO_VENDOR || device != VIRTIO_NET_DEVICE {
-                return Err(format!(
-                    "unexpected function {vendor:#06x}:{device:#06x}, expected 1af4:1041"
-                ));
-            }
-            raven_rt::println!("virtio-net: id={vendor:04x}:{device:04x}");
-            let caps = read_capabilities(&config, bar_index, bar_size)?;
-            raven_rt::println!(
-                "virtio-net: common={:#x} notify={:#x} isr={:#x} device={:#x}",
-                caps.common.offset,
-                caps.notify.offset,
-                caps.isr.offset,
-                caps.device.offset
-            );
-            raven_rt::println!(
-                "virtio-net: dma len={dma_len} bus={:#x} irq={irq_line}",
-                dma.bus_address()
-            );
-            let features = reset_and_negotiate(&mut bar, &caps)?;
-            let msix_vector = match (msix, msix_bar) {
-                (Some(info), Some(mut table)) => {
-                    let cap = find_msix(&config)?.ok_or_else(|| {
-                        "MSI-X was requested but the function has no MSI-X capability".to_string()
-                    })?;
-                    configure_msix(&mut table, &mut config, &cap, &info)?;
-                    bar.write_u16(common(&caps, MSIX_CONFIG), 0)
-                        .map_err(describe)?;
-                    1
+            let (caps, features, mac, link, mtu, msix_vector) = if is_mmio {
+                if msix.is_some() {
+                    return Err("MSI-X is not part of virtio-mmio".to_string());
                 }
-                (Some(_), None) => {
-                    return Err("MSI-X table BAR was not transferred".to_string());
+                let magic = bar.read_u32(mmio::MAGIC_VALUE).map_err(describe)?;
+                let version = bar.read_u32(mmio::VERSION_REG).map_err(describe)?;
+                let device = bar.read_u32(mmio::DEVICE_ID).map_err(describe)?;
+                if magic != mmio::MAGIC || version != mmio::VERSION || device != mmio::DEVICE_ID_NET
+                {
+                    return Err(format!(
+                        "unexpected virtio-mmio magic={magic:#010x} version={version} device={device}"
+                    ));
                 }
-                (None, _) => 0xFFFF,
+                raven_rt::println!("virtio-net: transport=mmio id={device} irq={irq_line}");
+                let caps = Caps {
+                    mmio: true,
+                    common: Region {
+                        offset: 0,
+                        length: mmio::WINDOW_LEN,
+                    },
+                    notify: Region {
+                        offset: mmio::QUEUE_NOTIFY,
+                        length: 4,
+                    },
+                    isr: Region {
+                        offset: mmio::INTERRUPT_STATUS,
+                        length: 8,
+                    },
+                    device: Region {
+                        offset: mmio::CONFIG,
+                        length: 0x10,
+                    },
+                    notify_multiplier: 1,
+                };
+                raven_rt::println!(
+                    "virtio-net: dma len={dma_len} bus={:#x} irq={irq_line}",
+                    dma.bus_address()
+                );
+                let features = reset_and_negotiate(&mut bar, &caps)?;
+                let mac = read_mac(&bar, &caps, &features)?;
+                let (link, mtu) = read_status(&bar, &caps, &features)?;
+                (caps, features, mac, link, mtu, 0xFFFF)
+            } else {
+                let mut config =
+                    config.ok_or_else(|| "missing PCI configuration page".to_string())?;
+                let vendor = config.read_u16(0x00).map_err(describe)?;
+                let device = config.read_u16(0x02).map_err(describe)?;
+                if vendor != VIRTIO_VENDOR || device != VIRTIO_NET_DEVICE {
+                    return Err(format!(
+                        "unexpected function {vendor:#06x}:{device:#06x}, expected 1af4:1041"
+                    ));
+                }
+                raven_rt::println!("virtio-net: id={vendor:04x}:{device:04x}");
+                let caps = read_capabilities(&config, bar_index, bar_size)?;
+                raven_rt::println!(
+                    "virtio-net: common={:#x} notify={:#x} isr={:#x} device={:#x}",
+                    caps.common.offset,
+                    caps.notify.offset,
+                    caps.isr.offset,
+                    caps.device.offset
+                );
+                raven_rt::println!(
+                    "virtio-net: dma len={dma_len} bus={:#x} irq={irq_line}",
+                    dma.bus_address()
+                );
+                let features = reset_and_negotiate(&mut bar, &caps)?;
+                let msix_vector = match (msix, msix_bar) {
+                    (Some(info), Some(mut table)) => {
+                        let cap = find_msix(&config)?.ok_or_else(|| {
+                            "MSI-X was requested but the function has no MSI-X capability"
+                                .to_string()
+                        })?;
+                        configure_msix(&mut table, &mut config, &cap, &info)?;
+                        bar.write_u16(common(&caps, MSIX_CONFIG), 0)
+                            .map_err(describe)?;
+                        1
+                    }
+                    (Some(_), None) => {
+                        return Err("MSI-X table BAR was not transferred".to_string());
+                    }
+                    (None, _) => 0xFFFF,
+                };
+                let mac = read_mac(&bar, &caps, &features)?;
+                let (link, mtu) = read_status(&bar, &caps, &features)?;
+                (caps, features, mac, link, mtu, msix_vector)
             };
-            let mac = read_mac(&bar, &caps, &features)?;
-            let (link, mtu) = read_status(&bar, &caps, &features)?;
             raven_rt::println!(
                 "virtio-net: mac={mac} mtu={mtu} link={}",
                 if link { "up" } else { "down" }
@@ -446,11 +510,19 @@ mod program {
             b39.write_header(region, 0, 0)
                 .map_err(|error| format!("ring header: {error}"))?;
 
-            let queues = bar.read_u16(common(&caps, NUM_QUEUES)).map_err(describe)?;
+            let queues = if is_mmio {
+                2
+            } else {
+                bar.read_u16(common(&caps, NUM_QUEUES)).map_err(describe)?
+            };
             if queues < 2 {
                 return Err(format!("device offers {queues} queues, need 2"));
             }
-            let maximum = queue_maximum(&mut bar, &caps, 0)?;
+            let maximum = if is_mmio {
+                queue_maximum_mmio(&mut bar, 0)?
+            } else {
+                queue_maximum(&mut bar, &caps, 0)?
+            };
             let qsize = queue_size(maximum)
                 .ok_or_else(|| format!("device queue size {maximum} is too small"))?;
             let rx_layout = SplitLayout::new(RX_RING_BASE, qsize);
@@ -459,8 +531,17 @@ mod program {
                 return Err("DMA buffer is too small for the split queues".to_string());
             }
             let bus = dma.bus_address();
-            let rx_notify = program_queue(&mut bar, &caps, 0, &rx_layout, bus, msix_vector)?;
-            let tx_notify = program_queue(&mut bar, &caps, 1, &tx_layout, bus, msix_vector)?;
+            let (rx_notify, tx_notify) = if is_mmio {
+                (
+                    program_queue_mmio(&mut bar, 0, &rx_layout, bus)?,
+                    program_queue_mmio(&mut bar, 1, &tx_layout, bus)?,
+                )
+            } else {
+                (
+                    program_queue(&mut bar, &caps, 0, &rx_layout, bus, msix_vector)?,
+                    program_queue(&mut bar, &caps, 1, &tx_layout, bus, msix_vector)?,
+                )
+            };
             raven_rt::println!("virtio-net: queue0 rx size={qsize}");
             raven_rt::println!("virtio-net: queue1 tx size={qsize}");
             raven_rt::println!(
@@ -581,6 +662,12 @@ mod program {
         }
 
         fn notify_queue(&mut self, notify_offset: usize, queue: u16) -> Result<(), String> {
+            if self.caps.mmio {
+                return self
+                    .bar
+                    .write_u32(mmio::QUEUE_NOTIFY, u32::from(queue))
+                    .map_err(describe);
+            }
             let address = self.caps.notify.offset + notify_offset;
             let end = address
                 .checked_add(2)
@@ -648,6 +735,11 @@ mod program {
             if fired > 0 {
                 let isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
                 self.last_isr = isr;
+                if self.caps.mmio {
+                    self.bar
+                        .write_u32(mmio::INTERRUPT_ACK, u32::from(isr))
+                        .map_err(describe)?;
+                }
                 let _ = self.irq.ack();
                 let tx = TX_FRAMES.load(Ordering::Acquire);
                 if tx > 0 && !IRQ_TX_LOGGED.swap(true, Ordering::AcqRel) {
@@ -1260,6 +1352,7 @@ mod program {
             current = next_capability(config, capability.next)?;
         }
         Ok(Caps {
+            mmio: false,
             common: common.ok_or_else(|| "no common configuration capability".to_string())?,
             notify: notify.ok_or_else(|| "no notify capability".to_string())?,
             isr: isr.ok_or_else(|| "no ISR capability".to_string())?,
@@ -1403,7 +1496,21 @@ mod program {
     }
 
     fn common(caps: &Caps, register: usize) -> usize {
-        caps.common.offset + register
+        if !caps.mmio {
+            return caps.common.offset + register;
+        }
+        let offset = match register {
+            DEVICE_FEATURE_SELECT => mmio::DEVICE_FEATURES_SEL,
+            DEVICE_FEATURE => mmio::DEVICE_FEATURES,
+            DRIVER_FEATURE_SELECT => mmio::DRIVER_FEATURES_SEL,
+            DRIVER_FEATURE => mmio::DRIVER_FEATURES,
+            DEVICE_STATUS => mmio::STATUS,
+            QUEUE_SELECT => mmio::QUEUE_SEL,
+            QUEUE_SIZE => mmio::QUEUE_NUM,
+            QUEUE_ENABLE => mmio::QUEUE_READY,
+            _ => register,
+        };
+        caps.common.offset + offset
     }
 
     fn write_status(bar: &mut MmioRegion, caps: &Caps, status: u8) -> Result<(), String> {
@@ -1509,6 +1616,41 @@ mod program {
         bar.write_u16(common(caps, QUEUE_SELECT), queue)
             .map_err(describe)?;
         bar.read_u16(common(caps, QUEUE_SIZE)).map_err(describe)
+    }
+
+    /// `QueueNumMax` after selecting `queue` in the virtio-mmio transport.
+    fn queue_maximum_mmio(bar: &mut MmioRegion, queue: u16) -> Result<u16, String> {
+        bar.write_u16(mmio::QUEUE_SEL, queue).map_err(describe)?;
+        bar.read_u16(mmio::QUEUE_NUM_MAX).map_err(describe)
+    }
+
+    /// Program one split queue through the virtio-mmio register window.
+    fn program_queue_mmio(
+        bar: &mut MmioRegion,
+        queue: u16,
+        layout: &SplitLayout,
+        bus: u64,
+    ) -> Result<usize, String> {
+        bar.write_u16(mmio::QUEUE_SEL, queue).map_err(describe)?;
+        bar.write_u16(mmio::QUEUE_NUM, layout.size)
+            .map_err(describe)?;
+        let (desc_lo, desc_hi) = mmio::address_parts(bus + layout.desc as u64);
+        let (avail_lo, avail_hi) = mmio::address_parts(bus + layout.avail as u64);
+        let (used_lo, used_hi) = mmio::address_parts(bus + layout.used as u64);
+        let (desc_lo_reg, desc_hi_reg) = mmio::address_offsets(mmio::QUEUE_DESC_LOW);
+        let (avail_lo_reg, avail_hi_reg) = mmio::address_offsets(mmio::QUEUE_DRIVER_LOW);
+        let (used_lo_reg, used_hi_reg) = mmio::address_offsets(mmio::QUEUE_DEVICE_LOW);
+        bar.write_u32(desc_lo_reg, desc_lo).map_err(describe)?;
+        bar.write_u32(desc_hi_reg, desc_hi).map_err(describe)?;
+        bar.write_u32(avail_lo_reg, avail_lo).map_err(describe)?;
+        bar.write_u32(avail_hi_reg, avail_hi).map_err(describe)?;
+        bar.write_u32(used_lo_reg, used_lo).map_err(describe)?;
+        bar.write_u32(used_hi_reg, used_hi).map_err(describe)?;
+        bar.write_u16(mmio::QUEUE_READY, 1).map_err(describe)?;
+        if bar.read_u16(mmio::QUEUE_READY).map_err(describe)? != 1 {
+            return Err(format!("queue {queue} did not become ready"));
+        }
+        Ok(0)
     }
 
     fn program_queue(
