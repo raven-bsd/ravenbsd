@@ -18,9 +18,12 @@
 //   total_ns      = wait - fork_t
 // The fixture prints the raw values; it does not claim a policy.
 
+#include <spawn.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -90,21 +93,32 @@ __attribute__((no_stack_protector, used)) void exec_measure_start(void *sp0,
 }
 
 int main(int argc, char **argv) {
-    if (argc > 1 && strcmp(argv[1], "child") == 0) {
+    if (argc > 1 && (strcmp(argv[1], "child") == 0 || strcmp(argv[1], "spawn-child") == 0)) {
+        int spawned = strcmp(argv[1], "spawn-child") == 0;
         uint64_t main_ns = now_ns();
         char line[224];
         int length = snprintf(line, sizeof(line),
-                              "EXEC-TIMING child start=%llu ctor=%llu main=%llu pid=%d called=%d\n",
+                              "EXEC-TIMING %s start=%llu ctor=%llu main=%llu pid=%d called=%d\n",
+                              spawned ? "spawn-child" : "child",
                               (unsigned long long)start_ns, (unsigned long long)ctor_ns,
                               (unsigned long long)main_ns, (int)getpid(), (int)ctor_called);
         uint64_t io_ns = now_ns();
         (void)write(1, line, (size_t)length);
-        length = snprintf(line, sizeof(line), "EXEC-TIMING child io=%llu\n",
-                          (unsigned long long)io_ns);
+        length = snprintf(line, sizeof(line), "EXEC-TIMING %s io=%llu\n",
+                          spawned ? "spawn-child" : "child", (unsigned long long)io_ns);
         (void)write(1, line, (size_t)length);
         return 0;
     }
 
+    // K548 rev346: a parent-heap canary around the two child-creation paths. The child inherits
+    // these pages copy-on-write and execs; the parent's bytes must survive both. A changed canary
+    // after fork+execve or posix_spawn names a kernel COW/exec teardown defect or a libc spawn
+    // descriptor defect, instead of the brush event table (the fault victim).
+    size_t canary_len = 256u * 1024u;
+    unsigned char *canary = malloc(canary_len);
+    if (canary != NULL) {
+        memset(canary, 0xA5, canary_len);
+    }
     uint64_t fork_ns = now_ns();
     pid_t child = fork();
     if (child == 0) {
@@ -119,6 +133,70 @@ int main(int argc, char **argv) {
         (void)waitpid(child, &status, 0);
     }
     uint64_t wait_ns = now_ns();
+    int fork_ok = canary != NULL;
+    if (canary != NULL) {
+        for (size_t index = 0; index < canary_len; index++) {
+            if (canary[index] != 0xA5) {
+                fork_ok = 0;
+                break;
+            }
+        }
+    }
+
+    pid_t spawned = -1;
+    int spawn_ok = canary != NULL;
+    if (canary != NULL) {
+        char *spawn_args[] = {"libc-test", "spawn-child", NULL};
+        char *spawn_env[] = {NULL};
+        if (posix_spawn(&spawned, "/bin/libc-test", NULL, NULL, spawn_args, spawn_env) == 0) {
+            int spawn_status = 0;
+            (void)waitpid(spawned, &spawn_status, 0);
+        } else {
+            spawn_ok = 0;
+        }
+        for (size_t index = 0; index < canary_len; index++) {
+            if (canary[index] != 0xA5) {
+                spawn_ok = 0;
+                break;
+            }
+        }
+    }
+
+    int socket_ok = canary != NULL;
+    if (canary != NULL) {
+        int sv[2] = {-1, -1};
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0) {
+            posix_spawn_file_actions_t actions;
+            if (posix_spawn_file_actions_init(&actions) == 0) {
+                (void)posix_spawn_file_actions_adddup2(&actions, sv[0], 0);
+                (void)posix_spawn_file_actions_adddup2(&actions, sv[0], 1);
+                pid_t socket_child = -1;
+                char *socket_args[] = {"libc-test", "spawn-child", NULL};
+                char *socket_env[] = {NULL};
+                if (posix_spawn(&socket_child, "/bin/libc-test", &actions, NULL,
+                                socket_args, socket_env) == 0) {
+                    int socket_status = 0;
+                    (void)waitpid(socket_child, &socket_status, 0);
+                } else {
+                    socket_ok = 0;
+                }
+                (void)posix_spawn_file_actions_destroy(&actions);
+            } else {
+                socket_ok = 0;
+            }
+            (void)close(sv[0]);
+            (void)close(sv[1]);
+        } else {
+            socket_ok = 0;
+        }
+        for (size_t index = 0; index < canary_len; index++) {
+            if (canary[index] != 0xA5) {
+                socket_ok = 0;
+                break;
+            }
+        }
+    }
+
     printf("EXEC-TIMING parent fork=%llu exec_ret=%llu wait=%llu pid=%d status=%d\n",
            (unsigned long long)fork_ns, (unsigned long long)exec_ret_ns,
            (unsigned long long)wait_ns, (int)child, status);
@@ -126,6 +204,9 @@ int main(int argc, char **argv) {
         printf("EXEC-TIMING fork_ns=%llu\n", (unsigned long long)(exec_ret_ns - fork_ns));
         printf("EXEC-TIMING total_ns=%llu\n", (unsigned long long)(wait_ns - fork_ns));
     }
+    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s\n", fork_ok ? "ok" : "bad",
+           spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad");
     fflush(stdout);
+    free(canary);
     return child < 0 ? 1 : 0;
 }

@@ -28,5 +28,8 @@ regex = '^.*EXEC-TIMING parent fork=[0-9]+ exec_ret=[0-9]+ wait=[0-9]+ pid=[0-9]
 [[expect]]
 regex = '^.*EXEC-TIMING fork_ns=[0-9]+$'
 
+[[expect]]
+regex = '^.*EXEC-TIMING canary fork=ok spawn=ok socket=ok$'
+
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|EXEC-TIMING .* FAIL'
