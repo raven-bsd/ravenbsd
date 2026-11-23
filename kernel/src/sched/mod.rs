@@ -752,6 +752,10 @@ pub fn sleep_until(deadline: u64) -> isize {
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
     if current.process.exiting.load(Ordering::Acquire) {
+        // Drop the frame's strong reference before diverging: the dead stack is freed without
+        // running destructors, so a live `Arc<Thread>` here would keep the Thread and its
+        // Process alive forever.
+        drop(current);
         exit_thread(0);
     }
     note_unblock(&current);
@@ -966,6 +970,10 @@ pub fn block_current() -> isize {
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
     if current.process.exiting.load(Ordering::Acquire) {
+        // Drop the frame's strong reference before diverging: the dead stack is freed without
+        // running destructors, so a live `Arc<Thread>` here would keep the Thread and its
+        // Process alive forever.
+        drop(current);
         exit_thread(0);
     }
     note_unblock(&current);
@@ -1274,10 +1282,15 @@ pub fn exit_thread(code: i32) -> ! {
         state.current = Some(Arc::clone(&next));
         next
     };
+    // The scheduler slot holds the incoming Thread; drop this frame's clone before the final
+    // switch so the abandoned stack does not retain the next Thread's Arc.
+    let to_ptr = Arc::as_ptr(&to);
+    drop(to);
     // SAFETY: the critical section stays live on the dead thread's stack forever; the stack is
-    // freed later by `reap_dead` from another thread's context.
+    // freed later by `reap_dead` from another thread's context. The incoming Thread is kept alive
+    // by the per-CPU `current` slot, so `to_ptr` stays valid across the switch.
     unsafe {
-        context::switch(&*raw, &to);
+        context::switch(&*raw, &*to_ptr);
     }
     loop {
         core::hint::spin_loop();
