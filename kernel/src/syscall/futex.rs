@@ -153,6 +153,23 @@ pub fn contains_thread(thread_id: u64) -> bool {
         || FALLBACK.contains_thread(thread_id)
 }
 
+/// Non-blocking [`contains_thread`] for the metrics-thread census.
+pub fn try_contains_thread(thread_id: u64) -> Option<bool> {
+    let mut busy = false;
+    for queue in QUEUES.iter() {
+        match queue.try_contains_thread(thread_id) {
+            Some(true) => return Some(true),
+            Some(false) => {}
+            None => busy = true,
+        }
+    }
+    match FALLBACK.try_contains_thread(thread_id) {
+        Some(true) => Some(true),
+        Some(false) if !busy => Some(false),
+        _ => None,
+    }
+}
+
 /// Wake and remove every futex waiter owned by `process_id` (process teardown).
 pub fn remove_process(process_id: u64) {
     for queue in QUEUES.iter() {

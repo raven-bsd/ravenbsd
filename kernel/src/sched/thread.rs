@@ -106,13 +106,18 @@ pub fn leaked_thread_objects() -> [u64; 7] {
 /// handles, multi_holder, unexplained)`. A weak `threads_live` entry is counted separately: it is
 /// not a strong owner, but it shows the unregister path missed the thread.
 pub fn thread_holder_stats() -> [u64; 11] {
-    let threads: Vec<Arc<Thread>> = ALL_THREADS
-        .lock()
+    let Some(registry) = ALL_THREADS.try_lock() else {
+        return [0u64; 11];
+    };
+    let threads: Vec<Arc<Thread>> = registry
         .iter()
         .filter_map(|weak| weak.upgrade())
         .filter(|thread| thread.process.torn_down.load(Ordering::Acquire))
         .collect();
-    let processes = crate::process::processes();
+    drop(registry);
+    let Some(processes) = crate::process::processes_try() else {
+        return [0u64; 11];
+    };
     let mut stats = [0u64; 11];
     for thread in &threads {
         stats[0] = stats[0].saturating_add(1);
@@ -124,19 +129,23 @@ pub fn thread_holder_stats() -> [u64; 11] {
                 holders = holders.saturating_add(1);
             }
         }
-        let live = thread.process.threads_live.lock().iter().any(|weak| {
-            weak.upgrade()
-                .is_some_and(|entry| Arc::ptr_eq(&entry, thread))
-        });
-        if live {
-            stats[5] = stats[5].saturating_add(1);
-            holders = holders.saturating_add(1);
+        if let Some(live) = thread.process.threads_live.try_lock() {
+            if live.iter().any(|weak| {
+                weak.upgrade()
+                    .is_some_and(|entry| Arc::ptr_eq(&entry, thread))
+            }) {
+                stats[5] = stats[5].saturating_add(1);
+                holders = holders.saturating_add(1);
+            }
         }
         // Handles before queues: the process teardown path holds a process's handle table and then
         // takes wait-queue locks, so the census must not invert that order.
         let handle = processes.iter().any(|process| {
+            let Some(handles) = process.handles.try_lock() else {
+                return false;
+            };
             let mut found = false;
-            process.handles.lock().for_each_live(|_, object, _, _| {
+            handles.for_each_live(|_, object, _, _| {
                 if let crate::process::handle::Object::Thread(target) = object
                     && Arc::ptr_eq(target, thread)
                 {
@@ -150,16 +159,20 @@ pub fn thread_holder_stats() -> [u64; 11] {
             holders = holders.saturating_add(1);
         }
         let process_waiters = processes.iter().any(|process| {
-            process.waiters.contains_thread(thread.id)
-                || process.signal_waiters.contains_thread(thread.id)
-                || process.child_waiters.contains_thread(thread.id)
-                || process.scheme_waiters.contains_thread(thread.id)
+            [
+                &process.waiters,
+                &process.signal_waiters,
+                &process.child_waiters,
+                &process.scheme_waiters,
+            ]
+            .iter()
+            .any(|queue| queue.try_contains_thread(thread.id) == Some(true))
         });
         if process_waiters {
             stats[6] = stats[6].saturating_add(1);
             holders = holders.saturating_add(1);
         }
-        if crate::syscall::futex::contains_thread(thread.id) {
+        if crate::syscall::futex::try_contains_thread(thread.id) == Some(true) {
             stats[7] = stats[7].saturating_add(1);
             holders = holders.saturating_add(1);
         }

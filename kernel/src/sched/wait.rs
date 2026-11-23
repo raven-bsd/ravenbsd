@@ -199,6 +199,12 @@ impl WaitQueue {
             .any(|waiter| waiter.thread.id == thread_id)
     }
 
+    /// Non-blocking [`Self::contains_thread`] for the metrics-thread census.
+    pub fn try_contains_thread(&self, thread_id: u64) -> Option<bool> {
+        let waiters = self.waiters.try_lock()?;
+        Some(waiters.iter().any(|waiter| waiter.thread.id == thread_id))
+    }
+
     /// Wake every waiter belonging to `process_id` with `EIO` and remove it from the queue.
     ///
     /// Used by process teardown for blocked sibling threads.  Removing without waking (the old

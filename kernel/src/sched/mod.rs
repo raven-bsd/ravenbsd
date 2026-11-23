@@ -215,6 +215,12 @@ fn lock_cpu(cpu: usize) -> SpinMutexGuard<'static, Option<CpuSched>> {
     CPUS.get(index).unwrap_or(&CPUS[0]).lock()
 }
 
+/// Non-blocking per-CPU scheduler lock for the metrics-thread census.
+fn try_lock_cpu(cpu: usize) -> Option<SpinMutexGuard<'static, Option<CpuSched>>> {
+    let index = cpu.min(MAX_CPUS.saturating_sub(1));
+    CPUS.get(index).unwrap_or(&CPUS[0]).try_lock()
+}
+
 /// Initialise the per-CPU scheduler slot for an application processor.
 pub fn init_cpu(cpu: usize, idle: Arc<Thread>) -> Result<(), Errno> {
     if cpu == 0 || cpu >= MAX_CPUS {
@@ -1216,7 +1222,9 @@ pub fn holder_state(thread_id: u64) -> [u64; 4] {
         return stats;
     }
     for cpu in 0..smp::online_cpus() {
-        let slot = lock_cpu(cpu);
+        let Some(slot) = try_lock_cpu(cpu) else {
+            continue;
+        };
         let Some(state) = slot.as_ref() else {
             continue;
         };
@@ -1238,7 +1246,9 @@ pub fn holder_state(thread_id: u64) -> [u64; 4] {
             stats[2] = stats[2].saturating_add(1);
         }
     }
-    let reap = REAP.lock();
+    let Some(reap) = REAP.try_lock() else {
+        return stats;
+    };
     for raw in reap.iter() {
         // SAFETY: every entry is an `Arc::into_raw` owned by REAP; the lock keeps it live and the
         // reaper only takes the whole vector under the same lock.

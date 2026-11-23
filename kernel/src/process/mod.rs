@@ -674,6 +674,12 @@ pub fn processes() -> alloc::vec::Vec<Arc<Process>> {
         .collect()
 }
 
+/// Non-blocking [`processes`] for the metrics-thread census.
+pub fn processes_try() -> Option<alloc::vec::Vec<Arc<Process>>> {
+    let registry = PID_REGISTRY.try_lock()?;
+    Some(registry.values().filter_map(Weak::upgrade).collect())
+}
+
 /// Count live processes and their live threads without allocating or taking process locks.
 pub fn live_totals() -> (usize, u32) {
     let registry = PID_REGISTRY.lock();
