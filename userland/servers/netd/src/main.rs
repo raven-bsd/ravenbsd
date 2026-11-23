@@ -152,7 +152,7 @@ mod program {
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
             handler.publish_and_feed();
-            if now >= tcp_debug_ms.saturating_add(1_000) {
+            if now >= tcp_debug_ms.saturating_add(100) {
                 let c = raven_netcore::debug_counters();
                 raven_rt::println!(
                     "netd: tcpdbg send={} se={} runs={} unsent={} ok={} ea={}",
