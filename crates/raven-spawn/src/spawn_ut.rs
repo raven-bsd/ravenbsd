@@ -750,10 +750,7 @@ fn contract_c13_stack_sequence_and_visibility() {
     assert!(memobj_at < scratch.0);
     assert!(scratch.0 < fill_at);
     assert!(fill_at < child.0);
-    assert_eq!(
-        scratch.1,
-        map::pack(prot::READ | prot::WRITE, map::SHARED)
-    );
+    assert_eq!(scratch.1, map::pack(prot::READ | prot::WRITE, map::SHARED));
     // C13 correction (donor tie-break): the parent scratch is SHARED so it can
     // populate the object, but the child stack is private COW.  NetBSD
     // uvm_mmap.c:1057 `uvm_mmap_anon` uses MAP_PRIVATE|MAP_ANON; uvm_map.c:4626
