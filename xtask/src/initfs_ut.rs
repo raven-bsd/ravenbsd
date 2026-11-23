@@ -433,3 +433,26 @@ fn release_purge_removes_staged_target_caches_and_the_loader() {
     }
     std::fs::remove_dir_all(&root).unwrap();
 }
+
+#[test]
+fn libc_stamp_tracks_the_source_hash() {
+    let root = std::env::temp_dir().join(format!("raven-k548-libc-stamp-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let source = root.join("libc/ravenlibc/crates/raven-libc/src.rs");
+    std::fs::create_dir_all(source.parent().expect("parent")).expect("mkdir");
+    std::fs::write(&source, b"one").expect("write");
+    let stamp = root.join("build/x86_64/libc.stamp");
+    std::fs::create_dir_all(stamp.parent().expect("parent")).expect("mkdir");
+    let hash = crate::libc_pack::source_hash(&root).expect("hash");
+    std::fs::write(
+        &stamp,
+        format!("format=k441.1\narch=x86_64\nset=server\nsources={hash:016x}\n"),
+    )
+    .expect("stamp");
+    assert!(libc_stamp_current(&root, Arch::X86_64));
+    std::fs::write(&source, b"two").expect("rewrite");
+    assert!(!libc_stamp_current(&root, Arch::X86_64));
+    std::fs::remove_file(&stamp).expect("remove stamp");
+    assert!(!libc_stamp_current(&root, Arch::X86_64));
+    let _ = std::fs::remove_dir_all(&root);
+}
