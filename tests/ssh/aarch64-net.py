@@ -49,7 +49,17 @@ def main(argv: list[str]) -> int:
     shutil.copyfile(vars_source, vars_path)
     serial = OUT / "serial.log"
     command = soak.qemu_argv("aarch64", soak.MODES["tcg"], image, vars_path)
-    command += ["-device", "virtio-net-device,netdev=n0", "-netdev", "user,id=n0"]
+    # QEMU `virt` defaults the virtio-mmio transports to legacy and the first `-device` lands on
+    # the last bus; pin the modern transport on bus 0 (0x0a000000, SPI 16/INTID 48) to match the
+    # staged device tree.
+    command += [
+        "-global",
+        "virtio-mmio.force-legacy=false",
+        "-device",
+        "virtio-net-device,netdev=n0,bus=virtio-mmio-bus.0",
+        "-netdev",
+        "user,id=n0",
+    ]
     result = 1
     child = pexpect.spawn(
         command[0], command[1:], encoding="utf-8", codec_errors="replace", timeout=args.timeout

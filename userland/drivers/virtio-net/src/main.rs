@@ -1549,6 +1549,13 @@ mod program {
         device.high = bar
             .read_u32(common(caps, DEVICE_FEATURE))
             .map_err(describe)?;
+        if caps.mmio {
+            raven_rt::println!(
+                "virtio-net: mmio device features low={:#010x} high={:#010x}",
+                device.low,
+                device.high
+            );
+        }
         if !device.has(32) {
             return Err("device does not offer VIRTIO_F_VERSION_1".to_string());
         }
@@ -1578,8 +1585,19 @@ mod program {
             caps,
             STATUS_ACKNOWLEDGE | STATUS_DRIVER | STATUS_FEATURES_OK,
         )?;
-        if bar.read_u8(common(caps, DEVICE_STATUS)).map_err(describe)? & STATUS_FEATURES_OK == 0 {
-            return Err("device rejected the feature set".to_string());
+        let status = bar.read_u8(common(caps, DEVICE_STATUS)).map_err(describe)?;
+        if caps.mmio {
+            raven_rt::println!(
+                "virtio-net: mmio driver features low={:#010x} high={:#010x} status={status:#04x}",
+                driver.low,
+                driver.high
+            );
+        }
+        if status & STATUS_FEATURES_OK == 0 {
+            return Err(format!(
+                "device rejected the feature set (status={status:#04x} device={:#010x}:{:#010x} driver={:#010x}:{:#010x})",
+                device.low, device.high, driver.low, driver.high
+            ));
         }
         Ok(driver)
     }
