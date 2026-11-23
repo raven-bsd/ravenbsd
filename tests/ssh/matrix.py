@@ -1879,6 +1879,100 @@ def row_close_probe(console: SerialConsole | None) -> None:
            f"output={output_ok}; artifact=close-summary.txt")
 
 
+def row_close_hang(console: SerialConsole | None) -> None:
+    """K434: capture guest process state while the close hangs, before the client is killed."""
+    argv = [
+        "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "ConnectTimeout=8",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-vvv",
+        f"{USER}@{HOST}",
+        "echo", "K449-DIAG",
+    ]
+    env = os.environ.copy()
+    env["SSH_ASKPASS"] = str(ASKPASS)
+    env["SSH_ASKPASS_REQUIRE"] = "force"
+    env["DISPLAY"] = ":0"
+    env["K434_SSH_PASSWORD"] = PASSWORD
+    out_path = OUT / "close-hang-client.stdout"
+    err_path = OUT / "close-hang-client.stderr"
+    with open(out_path, "wb") as out_file, open(err_path, "wb") as err_file:
+        process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                   stdout=out_file, stderr=err_file, env=env,
+                                   start_new_session=True)
+        deadline = time.monotonic() + 8
+        seen = False
+        while time.monotonic() < deadline and process.poll() is None:
+            stdout_text = out_path.read_bytes().decode("utf-8", "replace")
+            stderr_text = err_path.read_bytes().decode("utf-8", "replace")
+            if "K449-DIAG" in stdout_text or "rcvd eof" in stderr_text:
+                seen = True
+                break
+            time.sleep(0.1)
+
+        ps_text = ""
+        ps_alt_text = ""
+        proc_text = ""
+        if console is not None and console_shell_login(console):
+            ps_text = console_cr_capture(
+                console, "ps -e; echo K434-$((7*11))",
+                "close-hang-ps.log", "K434-77", timeout=10)
+            ps_alt_text = console_cr_capture(
+                console, "ps -o pid,ppid,stat,sigmask,cmd; echo K434-$((13*13))",
+                "close-hang-ps-alt.log", "K434-169", timeout=10)
+            proc_text = console_cr_capture(
+                console, "ls /proc; echo K434-$((17*13))",
+                "close-hang-proc.log", "K434-221", timeout=10)
+
+        try:
+            returncode = process.wait(timeout=15)
+            timed_out = False
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            returncode = process.wait()
+
+    client_text = err_path.read_text(errors="replace")
+    (OUT / "close-hang-client-vvv.log").write_text(client_text, encoding="utf-8")
+    ps_all = ps_text + "\n" + ps_alt_text
+    ps_lines = [line.strip() for line in ps_all.splitlines()
+                if any(key in line for key in
+                       ("sshd", "sshd-session", "brush", "defunct", "echo",
+                        " K449-DIAG", "sigmask"))]
+    zombie = []
+    for line in ps_lines:
+        fields = line.split()
+        if ("defunct" in line or " Z " in f" {line} "
+                or (len(fields) > 2 and fields[2] == "Z")):
+            zombie.append(line)
+    proc_list = proc_text.strip()
+    attempt("close-hang", 1, "fresh", "process table during the post-EOF hang",
+            f"output_seen={seen} exit={returncode} timed_out={timed_out}; "
+            f"ps={ps_lines[:12]}; proc={proc_list[:160]}",
+            0, "OBSERVED")
+    summary = (
+        f"output_seen={seen} exit={returncode} timed_out={timed_out}\n"
+        f"ps_lines={ps_lines or 'none'}\n"
+        f"zombie_lines={zombie or 'none'}\n"
+        f"proc={proc_list or 'none'}\n"
+        f"ps_alt={ps_alt_text.strip() or 'none'}\n"
+    )
+    (OUT / "close-hang-summary.txt").write_text(summary, encoding="utf-8")
+    print("matrix: --- close-hang summary ---", flush=True)
+    for line in summary.splitlines():
+        print(f"matrix: hang| {line}", flush=True)
+    record("close-hang", "OBSERVED",
+           f"output_seen={seen} exit={returncode} timed_out={timed_out}; "
+           f"ps={ps_lines[:8]}; zombie={zombie or 'none'}")
+
+
 def row_full(console: SerialConsole) -> None:
     """S1-S8 plus S5-session in order on one boot, with per-row serial capture."""
     mark = len(console.buffer)
@@ -1921,12 +2015,12 @@ def main() -> int:
             print("matrix: RED (1 red rows)")
             return 2
         try:
-            socket_only = only in ("s8", "s7", "s8-proof", "close-probe", "full")
+            socket_only = only in ("s8", "s7", "s8-proof", "close-probe", "close-hang", "full")
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
                                  "vars-only.fd", ready_timeout=180,
                                  socket_serial=socket_only)
-            if only == "close-probe":
-                # The close capture needs sshd/TCP, not the DNS lease; resolvd may be red.
+            if only in ("close-probe", "close-hang"):
+                # The close captures need sshd/TCP, not the DNS lease; resolvd may be red.
                 console = handle  # type: ignore[assignment]
                 lease_ok = True
             elif socket_only:
@@ -1962,6 +2056,8 @@ def main() -> int:
                     row_s8_proof(console)
                 elif only == "close-probe":
                     row_close_probe(console)
+                elif only == "close-hang":
+                    row_close_hang(console)
                 elif only == "full":
                     row_full(console)
                 elif only == "s5":
