@@ -60,6 +60,7 @@ fn sampler() {
         let turnstile = crate::sync::turnstile_counts();
         let zombies = process::zombie_count();
         let pending = crate::ipc::pending_counts();
+        let leaked = process::leaked_process_stats();
         kprintln!(
             "{}",
             format_line(
@@ -70,22 +71,22 @@ fn sampler() {
                 procs,
                 threads,
                 raven_handles::live_lineage_nodes(),
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
+                leaked[0],
+                leaked[1],
+                leaked[2],
+                leaked[3],
+                leaked[4],
+                leaked[5],
                 class.map_or(0, |stats| stats.free as u64),
                 class.map_or(0, |stats| stats.in_use as u64),
                 class.map_or(0, |stats| stats.slabs as u64),
                 pending.0,
                 pending.1,
                 pending.2,
-                0,
-                0,
-                0,
-                0,
+                usize::try_from(leaked[6]).unwrap_or(usize::MAX),
+                leaked[7],
+                leaked[8],
+                leaked[12],
                 turnstile.0,
                 u32::try_from(turnstile.1).unwrap_or(u32::MAX),
                 u64::try_from(zombies).unwrap_or(u64::MAX),
