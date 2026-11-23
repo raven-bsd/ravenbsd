@@ -7,7 +7,9 @@
 name = "smp-memory-churn"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 900
+# K540: measured on this host. The 1800 s run completed 9,591 of 10,000 exits, so 10,000 exits
+# is ~1,877 s; 2100 s is that measured runtime plus margin. The KVM4 case keeps the 900 s cap.
+timeout_secs = 2100
 pre = ["sh tests/smp/memory/build.sh"]
 initfs = "build/smp-memory/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1 s24-framecheck init=/churn"
