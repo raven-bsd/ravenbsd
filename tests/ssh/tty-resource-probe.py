@@ -116,7 +116,7 @@ def sample(label: str) -> dict[str, object]:
     return row
 
 
-def session(label: str, tty: bool) -> int:
+def session(label: str, tty: bool, command: str = "echo K495") -> int:
     env = dict(os.environ)
     env["SSH_ASKPASS"] = str(ASKPASS)
     env["SSH_ASKPASS_REQUIRE"] = "force"
@@ -131,14 +131,19 @@ def session(label: str, tty: bool) -> int:
         "-o", "KbdInteractiveAuthentication=no",
         "-o", "NumberOfPasswordPrompts=1",
         "-o", "ConnectTimeout=20",
-        "raven@127.0.0.1", f"echo K495-{label}",
+        "raven@127.0.0.1", command,
     ]
-    result = subprocess.run(ssh_argv, cwd=str(ROOT), stdin=subprocess.DEVNULL,
-                            capture_output=True, timeout=40, env=env,
-                            start_new_session=True)
-    print(f"{label} (tty={tty}): exit={result.returncode} "
-          f"stdout={result.stdout.decode('utf-8', 'replace').strip()!r}", flush=True)
-    return result.returncode
+    try:
+        result = subprocess.run(ssh_argv, cwd=str(ROOT), stdin=subprocess.DEVNULL,
+                                capture_output=True, timeout=12, env=env,
+                                start_new_session=True)
+        print(f"{label} (tty={tty}): exit={result.returncode} "
+              f"stdout={result.stdout.decode('utf-8', 'replace').strip()!r}", flush=True)
+        return result.returncode
+    except subprocess.TimeoutExpired:
+        print(f"{label} (tty={tty}): TIMEOUT after 12 s (the shell faulted and the "
+              f"client never saw close)", flush=True)
+        return -1
 
 
 try:
@@ -156,7 +161,7 @@ try:
 
     metrics_before = len(METRICS_RE.findall(serial_text()))
     ptyd_before = len(PTYD_RE.findall(serial_text()))
-    session("control", tty=False)
+    session("control", tty=False, command="tty")
     wait_for_fresh(METRICS_RE, metrics_before, 8)
     wait_for_fresh(PTYD_RE, ptyd_before, 15)
     control = sample("control-T")
@@ -165,7 +170,7 @@ try:
     for number in range(1, 4):
         metrics_before = len(METRICS_RE.findall(serial_text()))
         ptyd_before = len(PTYD_RE.findall(serial_text()))
-        session(f"tty{number}", tty=True)
+        session(f"tty{number}", tty=True, command="tty")
         wait_for_fresh(METRICS_RE, metrics_before, 8)
         wait_for_fresh(PTYD_RE, ptyd_before, 15)
         rows.append(sample(f"tty{number}"))
