@@ -54,6 +54,13 @@ int main(void) {
         (void)close(session_open);
     }
 
+    // The uutils `tty` uses rustix -> `ttyname_r`, not `ttyname`; cover the same buffer path
+    // and the `isatty` probe so a `not a tty` row can be attributed to the exact call.
+    char tty_rbuf[64];
+    int tty_rc = ttyname_r(STDIN_FILENO, tty_rbuf, sizeof tty_rbuf);
+    printf("PTY-PATH session_r rc=%d name=%s isatty=%d\n", tty_rc,
+           tty_rc == 0 ? tty_rbuf : "(none)", isatty(STDIN_FILENO));
+
     int master = posix_openpt(O_RDWR | O_NOCTTY);
     int pair_stat = 0;
     int pair_slave = -1;
