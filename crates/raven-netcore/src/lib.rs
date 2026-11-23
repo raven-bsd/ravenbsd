@@ -28,7 +28,9 @@ pub use backend::raven::RavenTcpipBackend;
 pub use core::Core;
 
 pub use raven_abi::errno::Errno;
-pub use raven_tcpip::{ChecksumOffload, Device, DeviceCaps, Instant, Medium, Readiness, TxError};
+pub use raven_tcpip::{
+    ChecksumOffload, Device, DeviceCaps, Instant, Medium, Readiness, TxError, debug_counters,
+};
 
 /// The native raven-tcpip-backed core.
 pub type NetCore<D> = Core<RavenTcpipBackend<D>>;

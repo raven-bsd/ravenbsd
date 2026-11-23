@@ -99,6 +99,8 @@ mod udp_stack;
 
 pub use raven_abi::errno::Errno;
 
+pub use tcp_data::debug_counters;
+
 pub use cc::{CcContext, CongestionControl, Cubic, LossKind, NewReno, Prr, icbrt};
 pub use device::{ChecksumOffload, Device, DeviceCaps, Medium, TxError};
 pub use dhcp::{

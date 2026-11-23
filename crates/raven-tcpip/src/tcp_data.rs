@@ -50,6 +50,29 @@ use crate::{Instant, IpAddr, SocketId, Stack};
 const TCP_BACKOFF: [u64; 13] = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 512, 512, 512];
 /// FreeBSD `tcp_totbackoff` (`tcp_timer.c`): sum of `tcp_backoff[]`.
 const TCP_TOTBACKOFF: u64 = 2_559;
+
+/// Temporary K9 diagnostic counters (read by netd's trace line; removed after the fix).
+static SEND_CALLS: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static SEND_EAGAIN: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static RETRY_RUNS: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static RETRY_UNSENT: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static RETRY_OK: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static RETRY_EAGAIN: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
+/// Snapshot the temporary K9 counters:
+/// `[send_calls, send_eagain, retry_runs, retry_unsent, retry_ok, retry_eagain]`.
+#[must_use]
+pub fn debug_counters() -> [u64; 6] {
+    use core::sync::atomic::Ordering;
+    [
+        SEND_CALLS.load(Ordering::Relaxed),
+        SEND_EAGAIN.load(Ordering::Relaxed),
+        RETRY_RUNS.load(Ordering::Relaxed),
+        RETRY_UNSENT.load(Ordering::Relaxed),
+        RETRY_OK.load(Ordering::Relaxed),
+        RETRY_EAGAIN.load(Ordering::Relaxed),
+    ]
+}
 /// FreeBSD `TCP_MAXRXTSHIFT` / `V_tcp_retries`.
 const TCP_MAXRXTSHIFT: u8 = 12;
 /// FreeBSD `TCPTV_MIN` (`tcp_timer.h`): minimum persist base, 30 ms.
@@ -242,8 +265,17 @@ impl<D: Device> Stack<D> {
         // `sbappendstream` in `tcp_output`, and illumos `tcp_send_data` discards the result of
         // `conn_ip_output`.
         match self.tcp_try_send(socket) {
-            Ok(()) | Err(Errno::EAGAIN) => {}
-            Err(error) => return Err(error),
+            Ok(()) => {
+                SEND_CALLS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+            }
+            Err(Errno::EAGAIN) => {
+                SEND_CALLS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+                SEND_EAGAIN.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+            }
+            Err(error) => {
+                SEND_CALLS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+                return Err(error);
+            }
         }
         Ok(accepted)
     }
@@ -974,6 +1006,7 @@ impl<D: Device> Stack<D> {
     /// Retry queued sends after the input batch; window updates and partial ACKs can
     /// leave data ready while no timer is armed.
     pub(crate) fn retry_tcp_sends(&mut self) {
+        RETRY_RUNS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         let sockets: Vec<SocketId> = self
             .sockets
             .records
@@ -991,7 +1024,16 @@ impl<D: Device> Stack<D> {
             })
             .collect();
         for socket in sockets {
-            let _ = self.tcp_try_send(socket);
+            RETRY_UNSENT.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+            match self.tcp_try_send(socket) {
+                Ok(()) => {
+                    RETRY_OK.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+                }
+                Err(Errno::EAGAIN) => {
+                    RETRY_EAGAIN.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+                }
+                Err(_) => {}
+            }
         }
     }
 

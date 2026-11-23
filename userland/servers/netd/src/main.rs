@@ -142,6 +142,7 @@ mod program {
         raven_rt::println!("netd: interface lo 127.0.0.1/8");
         raven_rt::println!("netd: ready");
         let mut events = [EvqEvent::default(); 4];
+        let mut tcp_debug_ms = 0i64;
         loop {
             let now = now_ms();
             if !handler.netd.has_nic() && now >= handler.nic_retry_ms {
@@ -151,6 +152,19 @@ mod program {
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
             handler.publish_and_feed();
+            if now >= tcp_debug_ms.saturating_add(1_000) {
+                let c = raven_netcore::debug_counters();
+                raven_rt::println!(
+                    "netd: tcpdbg send={} se={} runs={} unsent={} ok={} ea={}",
+                    c[0],
+                    c[1],
+                    c[2],
+                    c[3],
+                    c[4],
+                    c[5]
+                );
+                tcp_debug_ms = now;
+            }
             for line in handler.netd.take_filter_log() {
                 raven_rt::println!("{line}");
             }
@@ -175,6 +189,19 @@ mod program {
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
             handler.publish_and_feed();
+            if now >= tcp_debug_ms.saturating_add(1_000) {
+                let c = raven_netcore::debug_counters();
+                raven_rt::println!(
+                    "netd: tcpdbg send={} se={} runs={} unsent={} ok={} ea={}",
+                    c[0],
+                    c[1],
+                    c[2],
+                    c[3],
+                    c[4],
+                    c[5]
+                );
+                tcp_debug_ms = now;
+            }
             for line in handler.netd.take_filter_log() {
                 raven_rt::println!("{line}");
             }
