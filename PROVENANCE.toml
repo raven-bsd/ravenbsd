@@ -13,6 +13,17 @@
 # notes = "..."
 
 [[import]]
+path = "crates/raven-ipiq/src/lib.rs"
+upstream = "dragonfly"
+upstream_path = "sys/kern/lwkt_ipiq.c"
+upstream_rev = "94448f622a06cde90ba42d688e9cab2448ad9ab3"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-23"
+modified = true
+notes = "Literal port of the lwkt_ipiq FIFO ring, indices, entry layout and lwkt_process_ipiq_core; APIC/critical-section/cpusync layers are outside the pure crate."
+
+[[import]]
 path = "crates/raven-linux-abi/src/sysnums.rs"
 upstream = "linux-raw-sys"
 upstream_path = "src/{x86_64,aarch64,riscv64}/general.rs"
