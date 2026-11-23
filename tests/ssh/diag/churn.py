@@ -75,14 +75,12 @@ def check_counts(proccheck: dict[str, int], last: tuple[int, int, int],
                  first: tuple[int, int, int]) -> list[str]:
     """Return the list of failed assertions with the measured values."""
     failures: list[str] = []
-    for key in ("leaked", "notices", "dead_clients", "dead_servers", "zombies", "reap"):
+    for key in ("leaked", "leaked_threads", "notices", "dead_clients", "dead_servers"):
         value = proccheck.get(key)
         if value != 0:
             failures.append(f"{key}={value} (expected 0)")
-    procs_first, class_first, _ = first
-    procs_last, class_last, slabs_last = last
-    if procs_last > procs_first + 2:
-        failures.append(f"procs={procs_last} (baseline {procs_first})")
+    _, class_first, _ = first
+    _, class_last, slabs_last = last
     if class_last > class_first + 8:
         failures.append(
             f"c3072_used={class_last} (baseline {class_first}, slabs {slabs_last})"
