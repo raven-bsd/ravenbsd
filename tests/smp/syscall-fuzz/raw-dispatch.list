@@ -64,8 +64,8 @@ raven_abi::syscall::HANDLE_TRANSFER_FILE	0x55	crates/raven-abi/src/syscall.rs:30
 raven_abi::syscall::THREAD_EXIT_EX	0x25	crates/raven-abi/src/syscall.rs:307	fuzz	direct	THREAD_EXIT_EX
 raven_abi::signal::SIG_SETUP	0x80	crates/raven-abi/src/signal.rs:18	fuzz	direct	SIG_SETUP
 raven_abi::signal::SIGRESEND	0x84	crates/raven-abi/src/signal.rs:33	fuzz	direct	SIGRESEND
-basic::GETRANDOM	0x08	kernel/src/syscall/basic.rs:27	fuzz	direct	GETRANDOM
-basic::CLOCK_SET	0x09	kernel/src/syscall/basic.rs:29	fuzz	direct	CLOCK_SET
+basic::GETRANDOM	0x08	kernel/src/syscall/basic.rs:26	fuzz	direct	GETRANDOM
+basic::CLOCK_SET	0x09	kernel/src/syscall/basic.rs:28	fuzz	direct	CLOCK_SET
 raven_abi::syscall::TRACE_SET	0x0b	crates/raven-abi/src/syscall.rs:207	fuzz	direct	TRACE_SET
 raven_abi::syscall::RECORD_LOCK	0x0c	crates/raven-abi/src/syscall.rs:216	fuzz	direct	RECORD_LOCK
 dtrace::PROBE_LIST	0x90	kernel/src/syscall/dtrace.rs:26	fuzz	is_control	PROBE_LIST
