@@ -20,6 +20,14 @@ pub mod router;
 
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU32, AtomicU64, Ordering};
 
+/// Live in-flight scheme requests (S36b diagnostic).
+static LIVE_REQUESTS: AtomicU64 = AtomicU64::new(0);
+
+/// Number of live `PendingRequest` objects (S36b diagnostic).
+pub fn live_requests() -> u64 {
+    LIVE_REQUESTS.load(Ordering::Acquire)
+}
+
 /// K147 fixed-cost stage trace, enabled by `k147-trace` on the kernel command line.
 ///
 /// The first call parses the command line once; every later check is a cached atomic load.
@@ -203,6 +211,7 @@ impl PendingRequest {
             crate::sync::register_thread(&thread);
             thread.tid
         });
+        LIVE_REQUESTS.fetch_add(1, Ordering::Relaxed);
         Arc::new(Self {
             id: packet.request_id,
             client,
@@ -481,6 +490,12 @@ pub fn on_process_exit(process: &Arc<Process>) {
             capture::frames_in_use(),
             stats.free_bytes
         );
+    }
+}
+
+impl Drop for PendingRequest {
+    fn drop(&mut self) {
+        LIVE_REQUESTS.fetch_sub(1, Ordering::AcqRel);
     }
 }
 

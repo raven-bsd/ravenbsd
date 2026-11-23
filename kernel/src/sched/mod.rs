@@ -1201,6 +1201,11 @@ fn push_reap(raw: usize) {
     REAP.lock().push(raw);
 }
 
+/// Number of dead threads waiting for the next scheduling point (S36b diagnostic).
+pub fn reap_pending() -> usize {
+    REAP.lock().len()
+}
+
 /// Queue a thread whose stack must be freed by the next scheduling point.
 ///
 /// Used for creation rollback (a thread that was never enqueued) as well as for dead threads.

@@ -1888,7 +1888,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let (dead_handles, top_pid, top_count) = crate::process::handle::dead_process_handles();
         let (notices, dead_clients, dead_servers) = crate::ipc::router::close_notice_stats();
         kprintln!(
-            "s36: procs={} threads={} zombies={} proc_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={}",
+            "s36: procs={} threads={} zombies={} proc_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={}",
             live_processes(),
             crate::sched::thread::live_threads(),
             ZOMBIES.lock().len(),
@@ -1899,7 +1899,9 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             top_count,
             notices,
             dead_clients,
-            dead_servers
+            dead_servers,
+            crate::ipc::live_requests(),
+            crate::sched::reap_pending()
         );
     }
 }
