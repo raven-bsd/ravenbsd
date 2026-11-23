@@ -36,6 +36,9 @@ regex = '^brush-spawn:ls:0$'
 regex = '^nontty-status:0$'
 
 [[expect]]
+regex = '^out-status:0$'
+
+[[expect]]
 regex = '^(brush|ls|true)$'
 unordered = true
 
@@ -91,6 +94,14 @@ delay_ms = 100
 
 [[step]]
 wait = '^nontty-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/brush -c '/bin/ls /bin' > /tmp/brush-stdout; echo out-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^out-status:0$'
 timeout_secs = 60
 
 [[step]]
