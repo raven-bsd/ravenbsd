@@ -140,14 +140,17 @@ def parse_args(argv: list[str]) -> dict:
 # unavailable counters are absent and named in the summary.
 RESOURCE_COLUMNS = [
     "after_session", "qemu_rss_kb", "heap_used", "heap_free", "frames_free",
-    "frames_alloc", "procs", "threads", "ofds", "serial_heap_kb", "panic",
+    "frames_alloc", "procs", "threads", "ofds", "live_threads", "reap",
+    "slot_drops", "slot_denies", "stacks_fresh", "stacks_cached",
+    "stacks_dropped", "sshd_procs", "sshd_threads", "serial_heap_kb", "panic",
 ]
 RESOURCE_NOTE = (
-    "guest heap/frame bytes, live processes/threads and handle (OFD) lineage count come from "
-    "the test-only K449-METRICS kernel line, enabled by `k449-metrics=<seconds>` on the image "
-    "cmdline; on an image without that key those fields are '-' and only the host QEMU RSS and "
-    "the serial boot heap/panic remain. The K449-METRICS sampler is a diagnostic, not a product "
-    "service, and the SSH rows are untouched."
+    "guest heap/frame bytes, live processes/threads, handle (OFD) lineage, live thread slots, "
+    "reap depth, kernel stack fresh/cached/dropped counts and sshd/sshd-session process/thread "
+    "counts come from the test-only K449-METRICS kernel line, enabled by "
+    "`k449-metrics=<seconds>` on the image cmdline; on an image without that key those fields "
+    "are '-' and only the host QEMU RSS and the serial boot heap/panic remain. The K449-METRICS "
+    "sampler is a diagnostic, not a product service, and the SSH rows are untouched."
 )
 
 
@@ -164,6 +167,9 @@ def parse_qemu_rss(text: str) -> int | None:
 METRICS_RE = re.compile(
     r"K449-METRICS heap_used=(\d+) heap_free=(\d+) frames_free=(\d+) "
     r"frames_alloc=(\d+) procs=(\d+) threads=(\d+) ofds=(\d+)"
+    r"(?: live_threads=(\d+) reap=(\d+) slot_drops=(\d+) slot_denies=(\d+)"
+    r" stacks_fresh=(\d+) stacks_cached=(\d+) stacks_dropped=(\d+)"
+    r" sshd_procs=(\d+) sshd_threads=(\d+))?"
 )
 
 
@@ -173,8 +179,14 @@ def parse_metrics_line(text: str) -> dict | None:
     if not matches:
         return None
     keys = ["heap_used", "heap_free", "frames_free", "frames_alloc",
-            "procs", "threads", "ofds"]
-    return {key: int(value) for key, value in zip(keys, matches[-1])}
+            "procs", "threads", "ofds", "live_threads", "reap",
+            "slot_drops", "slot_denies", "stacks_fresh", "stacks_cached",
+            "stacks_dropped", "sshd_procs", "sshd_threads"]
+    return {
+        key: int(value)
+        for key, value in zip(keys, matches[-1])
+        if value != ""
+    }
 
 
 def utc_from_epoch(epoch: float) -> str:
@@ -197,7 +209,9 @@ def is_banner_line(line: str) -> bool:
 def format_resource_table(rows: list[dict]) -> str:
     """Render the resource samples as a compact table (missing values are '-')."""
     header = ["after", "rss_kb", "heap_u", "heap_f", "fr_free", "fr_alloc",
-              "procs", "thr", "ofds", "heap_kb", "panic"]
+              "procs", "thr", "ofds", "live_thr", "reap", "slot_d",
+              "slot_n", "stk_f", "stk_c", "stk_d", "sshd_p", "sshd_t",
+              "heap_kb", "panic"]
     lines = ["  ".join(header)]
 
     def value(item: object) -> str:
@@ -214,6 +228,15 @@ def format_resource_table(rows: list[dict]) -> str:
             value(row.get("procs")),
             value(row.get("threads")),
             value(row.get("ofds")),
+            value(row.get("live_threads")),
+            value(row.get("reap")),
+            value(row.get("slot_drops")),
+            value(row.get("slot_denies")),
+            value(row.get("stacks_fresh")),
+            value(row.get("stacks_cached")),
+            value(row.get("stacks_dropped")),
+            value(row.get("sshd_procs")),
+            value(row.get("sshd_threads")),
             value(row.get("serial_heap_kb")),
             "yes" if row.get("panic") else "no",
         ]))
@@ -240,6 +263,17 @@ def selftest() -> int:
     check("metrics-procs", metrics and metrics["procs"], 5)
     check("metrics-threads", metrics and metrics["threads"], 6)
     check("metrics-ofds", metrics and metrics["ofds"], 7)
+    metrics_full = parse_metrics_line(
+        "K449-METRICS heap_used=10 heap_free=20 frames_free=30 frames_alloc=40 "
+        "procs=5 threads=6 ofds=7 live_threads=11 reap=13 slot_drops=15 "
+        "slot_denies=17 stacks_fresh=19 stacks_cached=21 stacks_dropped=23 "
+        "sshd_procs=25 sshd_threads=27\n"
+    )
+    check("metrics-live-threads", metrics_full and metrics_full["live_threads"], 11)
+    check("metrics-reap", metrics_full and metrics_full["reap"], 13)
+    check("metrics-stacks-cached", metrics_full and metrics_full["stacks_cached"], 21)
+    check("metrics-sshd-procs", metrics_full and metrics_full["sshd_procs"], 25)
+    check("metrics-sshd-threads", metrics_full and metrics_full["sshd_threads"], 27)
     check("metrics-missing", parse_metrics_line("no metrics here\n"), None)
     check(
         "banner-line-remote",

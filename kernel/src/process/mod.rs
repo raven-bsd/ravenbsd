@@ -479,6 +479,20 @@ pub fn live_totals() -> (usize, u32) {
     (procs, threads)
 }
 
+/// Live sshd/sshd-session processes and their thread count (K449 frame-cliff diagnostic).
+pub fn sshd_totals() -> (usize, u32) {
+    let mut procs = 0usize;
+    let mut threads = 0u32;
+    for process in processes() {
+        let command = process.command.lock().clone();
+        if process.path.contains("sshd") || command.contains("sshd") {
+            procs = procs.saturating_add(1);
+            threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
+        }
+    }
+    (procs, threads)
+}
+
 /// Live waiters on the process-owned queues (S36 timeout-retention diagnostic).
 pub fn wait_queue_len() -> usize {
     let mut total = 0usize;

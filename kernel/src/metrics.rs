@@ -45,6 +45,7 @@ fn sampler() {
         let (heap_used, heap_free) = memory::heap::stats();
         let frames = memory::frame::stats();
         let (procs, threads) = process::live_totals();
+        let (sshd_procs, sshd_threads) = process::sshd_totals();
         kprintln!(
             "{}",
             format_line(
@@ -55,12 +56,22 @@ fn sampler() {
                 procs,
                 threads,
                 raven_handles::live_lineage_nodes(),
+                sched::thread::live_threads(),
+                sched::reap_len(),
+                sched::thread::slot_drops(),
+                sched::thread::slot_denies(),
+                sched::thread::stack_fresh(),
+                sched::thread::stack_cached(),
+                sched::thread::stack_drops(),
+                sshd_procs,
+                sshd_threads,
             )
         );
     }
 }
 
 /// Format one machine-readable metric line.
+#[allow(clippy::too_many_arguments)]
 pub fn format_line(
     heap_used: usize,
     heap_free: usize,
@@ -69,11 +80,24 @@ pub fn format_line(
     procs: usize,
     threads: u32,
     ofds: u64,
+    live_threads: usize,
+    reap: usize,
+    slot_drops: usize,
+    slot_denies: usize,
+    stacks_fresh: u64,
+    stacks_cached: u64,
+    stacks_dropped: u64,
+    sshd_procs: usize,
+    sshd_threads: u32,
 ) -> String {
     format!(
         "K449-METRICS heap_used={heap_used} heap_free={heap_free} \
          frames_free={frames_free} frames_alloc={frames_allocated} \
-         procs={procs} threads={threads} ofds={ofds}"
+         procs={procs} threads={threads} ofds={ofds} \
+         live_threads={live_threads} reap={reap} slot_drops={slot_drops} \
+         slot_denies={slot_denies} stacks_fresh={stacks_fresh} \
+         stacks_cached={stacks_cached} stacks_dropped={stacks_dropped} \
+         sshd_procs={sshd_procs} sshd_threads={sshd_threads}"
     )
 }
 
