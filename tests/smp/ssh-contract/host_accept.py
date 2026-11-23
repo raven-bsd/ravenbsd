@@ -90,6 +90,7 @@ def wait_ready(host, port, deadline):
                         f"elapsed={time.monotonic() - started:.3f}s"
                     )
                 if read_line(stream) == b"READY":
+                    stream.sendall(b"A")
                     note(
                         f"K6-ready ok port={port} attempt={attempts} "
                         f"elapsed={time.monotonic() - started:.3f}s"
