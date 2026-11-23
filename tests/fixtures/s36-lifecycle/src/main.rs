@@ -67,6 +67,8 @@ const STACK_BASE: usize = STACK_TOP - STACK_SIZE;
 
 /// Cycles in the thread create/exit churn.
 const CYCLES: usize = 10_000;
+/// Full process/address-space/stack lifecycles in the bounded session churn.
+const SESSIONS: usize = 32;
 /// User stacks for the fixture's extra threads (16 KiB each, one helper live at a time).
 const HELPER_STACK_SIZE: usize = 16 * 1024;
 
@@ -448,10 +450,15 @@ extern "C" fn signal_entry(_bits: usize, _context: usize, _mask: usize) -> ! {
     }
 }
 
-/// Deliver `SIGUSR1` to the process group after the controller has blocked in the wait.
+/// Deliver `SIGUSR1` to the controller process after it has blocked in the wait.
+///
+/// The target is this process's pid, not the process group: the sleeping child is in the same
+/// group and has no signal entry, so a group signal would correctly take its default terminate
+/// action before the parent's wait returns.
 extern "C" fn wait_signal_thread(_arg: usize) -> ! {
     nanosleep(50_000_000);
-    let _ = syscall2(PROC_SIGNAL, 0, SIGUSR1);
+    let pid = proc_handle_info(Handle::SELF_PROC).unwrap_or(0);
+    let _ = syscall2(PROC_SIGNAL, pid as usize, SIGUSR1);
     thread_exit(0)
 }
 
@@ -492,6 +499,26 @@ fn churn_part() -> Result<(), &'static str> {
         cycle = cycle.saturating_add(1);
     }
     println!("s36: cycles done={}", CYCLES);
+    Ok(())
+}
+
+/// The bounded process/session churn: 32 full exec/address-space/stack lifecycles.
+///
+/// Each cycle creates a new process, maps its own address space and user stack, runs the
+/// `marker` role to exit 0, reaps it, and closes the handle. The kernel `s36` counter lines on
+/// the surrounding marker exits are compared by the qtest evidence; a per-cycle frame/stack/handle
+/// leak would show as a closing delta, not a one-time stack-cache entry.
+fn session_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let mut session = 0usize;
+    while session < SESSIONS {
+        let child = spawn_role(initfs, "marker").map_err(|_| "session spawn")?;
+        if proc_wait(child).unwrap_or(-1) != 0 {
+            return Err("session wait");
+        }
+        handle_close(child);
+        session = session.saturating_add(1);
+    }
+    println!("s36: sessions done={}", SESSIONS);
     Ok(())
 }
 
@@ -797,6 +824,9 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     handle_close(marker);
     if let Err(message) = churn_part() {
+        fail(message);
+    }
+    if let Err(message) = session_churn_part(&initfs) {
         fail(message);
     }
     // Scenario 2, closing marker: its exit prints the counters again; the report compares.
