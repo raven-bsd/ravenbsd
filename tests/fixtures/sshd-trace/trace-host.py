@@ -140,18 +140,18 @@ def main() -> int:
         child.logfile = serial
         try:
             child.expect("svcd: getty up", timeout=240)
-            probe = probe_client(GUEST)
-            log("accept-probe", probe)
-            try:
-                child.expect("sshd-trace-accept: done", timeout=60)
-            except pexpect.TIMEOUT:
-                log("accept-probe", "done marker timeout")
             child.expect(r"login: ?", timeout=120)
             child.sendline("root")
             child.expect(r"(?i)password: ?", timeout=30)
             child.sendline("raven")
             child.expect("raven# ", timeout=120)
             log("console", "root login")
+            probe = probe_client(GUEST)
+            log("accept-probe", probe)
+            try:
+                child.expect("sshd-trace-accept: done", timeout=60)
+            except pexpect.TIMEOUT:
+                log("accept-probe", "done marker timeout")
             if not wait_tcp(GUEST, 22, 120):
                 log("error", f"guest sshd did not accept on {GUEST}:22")
                 return 2
