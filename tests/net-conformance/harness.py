@@ -864,6 +864,8 @@ def fuzz_payload(peer: RawPeer, timeout: float) -> dict | None:
 def scenario_fuzz(peer: RawPeer, local_port: int, remote_port: int) -> tuple[bool, str]:
     cases = fuzz_table(FUZZ_SEED)
     table_hash = fuzz_table_hash(cases)
+    mutations = set(filter(None, os.environ.get("NETCONF_FUZZ_MUTATION", "").split(",")))
+    mutated = "all" in mutations or "tcp" in mutations
     deviations = 0
 
     def check(case: dict, name: str, passed: bool, detail: str) -> None:
@@ -907,8 +909,9 @@ def scenario_fuzz(peer: RawPeer, local_port: int, remote_port: int) -> tuple[boo
                     reply = peer.wait(
                         1.0, lambda p: bool(p["flags"] & TCP_ACK)
                         and not p["flags"] & (TCP_SYN | TCP_RST))
+                    expected_ack = isn + (2 if mutated else 1)
                     check(case, "challenge-ack",
-                          reply is not None and reply["ack"] == isn + 1,
+                          reply is not None and reply["ack"] == expected_ack,
                           f"reply={None if reply is None else hex(reply['flags'])} "
                           f"ack={None if reply is None else reply['ack']}")
                     reset(peer, state, port, remote_port)
