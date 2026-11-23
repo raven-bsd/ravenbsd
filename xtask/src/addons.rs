@@ -47,6 +47,14 @@ fn newest(inputs: &[PathBuf]) -> Option<(SystemTime, PathBuf)> {
     newest
 }
 
+/// Whether two files exist and hold the same bytes.
+fn same_content(left: &Path, right: &Path) -> bool {
+    match (fs::read(left), fs::read(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
 /// Whether `binary` is older than any input, returning the first newer input.
 #[must_use]
 pub(crate) fn newer_input(binary: &Path, inputs: &[PathBuf]) -> Option<PathBuf> {
@@ -59,6 +67,35 @@ pub(crate) fn newer_input(binary: &Path, inputs: &[PathBuf]) -> Option<PathBuf> 
     newest(inputs)
         .filter(|(modified, _)| *modified > built)
         .map(|(_, path)| path)
+}
+
+/// The first material input newer than the binary.
+///
+/// A staged libc archive or crt object whose bytes match the addon's own staged sysroot copy is
+/// not material: the binary already linked that content, and libc-pack may rewrite the file with
+/// the same bytes (a newer mtime only). This keeps the gate from forcing an addon rebuild on
+/// every image build.
+#[must_use]
+pub(crate) fn newer_material_input(
+    binary: &Path,
+    inputs: &[PathBuf],
+    stage_dir: &Path,
+    sysroot_lib: &Path,
+) -> Option<PathBuf> {
+    let material: Vec<PathBuf> = inputs
+        .iter()
+        .filter(|input| {
+            if input.parent() != Some(stage_dir) {
+                return true;
+            }
+            let Some(name) = input.file_name() else {
+                return true;
+            };
+            !same_content(input, &sysroot_lib.join(name))
+        })
+        .cloned()
+        .collect();
+    newer_input(binary, &material)
 }
 
 /// Whether `binary` is older than any input.
@@ -120,7 +157,13 @@ pub(crate) fn ensure_current(root: &Path, arch: Arch, profile: &Profile) -> Resu
             continue;
         }
         let inputs = addon_inputs(root, addon, arch_name);
-        if let Some(newer) = newer_input(&binary, &inputs) {
+        let stage = root.join("build").join(arch_name);
+        let sysroot_lib = root
+            .join("build")
+            .join(addon)
+            .join(arch_name)
+            .join("sysroot/usr/lib");
+        if let Some(newer) = newer_material_input(&binary, &inputs, &stage, &sysroot_lib) {
             bail!(
                 "stale addon binary {}: {} is newer; rebuild with `sh addons/{}/build.sh`",
                 binary.display(),
@@ -128,16 +171,13 @@ pub(crate) fn ensure_current(root: &Path, arch: Arch, profile: &Profile) -> Resu
                 addon
             );
         }
-        let sysroot = root
-            .join("build")
-            .join(addon)
-            .join(arch_name)
-            .join("sysroot/usr/lib/libc.a");
-        let libc = root.join("build").join(arch_name).join("libc.a");
+        let sysroot = sysroot_lib.join("libc.a");
+        let libc = stage.join("libc.a");
         if let (Ok(sysroot_meta), Ok(libc_meta)) = (fs::metadata(&sysroot), fs::metadata(&libc))
             && let (Ok(sysroot_time), Ok(libc_time)) =
                 (sysroot_meta.modified(), libc_meta.modified())
             && libc_time > sysroot_time
+            && !same_content(&libc, &sysroot)
         {
             bail!(
                 "stale addon sysroot {}: {} is newer; rebuild with `sh addons/{}/build.sh`",

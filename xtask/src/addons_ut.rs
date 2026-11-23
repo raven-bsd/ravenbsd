@@ -18,8 +18,12 @@ fn temp_root(tag: &str) -> PathBuf {
 }
 
 fn write_at(path: &Path, seconds: u64) {
+    write_bytes_at(path, b"x", seconds);
+}
+
+fn write_bytes_at(path: &Path, bytes: &[u8], seconds: u64) {
     fs::create_dir_all(path.parent().expect("parent")).expect("dirs");
-    fs::write(path, b"x").expect("write");
+    fs::write(path, bytes).expect("write");
     let modified = SystemTime::UNIX_EPOCH + Duration::from_secs(seconds);
     let times = fs::FileTimes::new().set_modified(modified);
     fs::File::options()
@@ -74,6 +78,58 @@ fn a_rebuilt_binary_newer_than_its_inputs_is_current() {
     write_at(&source, 100);
     write_at(&libc, 200);
     assert!(!stale(&binary, &[source, libc]));
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn identical_libc_content_ignores_a_newer_mtime() {
+    let root = temp_root("same-content");
+    let binary = root.join("build/ssh/x86_64/bin/sshd");
+    let stage = root.join("build/x86_64");
+    let libc = stage.join("libc.a");
+    let sysroot_lib = root.join("build/ssh/x86_64/sysroot/usr/lib");
+    let sysroot = sysroot_lib.join("libc.a");
+    write_at(&binary, 100);
+    write_bytes_at(&libc, b"same-bytes", 300);
+    write_bytes_at(&sysroot, b"same-bytes", 100);
+    assert_eq!(
+        super::newer_material_input(&binary, std::slice::from_ref(&libc), &stage, &sysroot_lib),
+        None
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn different_libc_content_with_a_newer_mtime_is_stale() {
+    let root = temp_root("diff-content");
+    let binary = root.join("build/ssh/x86_64/bin/sshd");
+    let stage = root.join("build/x86_64");
+    let libc = stage.join("libc.a");
+    let sysroot_lib = root.join("build/ssh/x86_64/sysroot/usr/lib");
+    let sysroot = sysroot_lib.join("libc.a");
+    write_at(&binary, 100);
+    write_bytes_at(&libc, b"new-bytes", 300);
+    write_bytes_at(&sysroot, b"old-bytes", 100);
+    assert_eq!(
+        super::newer_material_input(&binary, std::slice::from_ref(&libc), &stage, &sysroot_lib),
+        Some(libc)
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn a_newer_addon_source_outside_the_libc_stage_is_still_stale() {
+    let root = temp_root("source-material");
+    let binary = root.join("build/ssh/x86_64/bin/sshd");
+    let source = root.join("addons/ssh/openssh/session.c");
+    let stage = root.join("build/x86_64");
+    let sysroot_lib = root.join("build/ssh/x86_64/sysroot/usr/lib");
+    write_at(&binary, 100);
+    write_at(&source, 300);
+    assert_eq!(
+        super::newer_material_input(&binary, std::slice::from_ref(&source), &stage, &sysroot_lib),
+        Some(source)
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
