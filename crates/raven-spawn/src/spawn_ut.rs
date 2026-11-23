@@ -370,6 +370,7 @@ struct Mock {
     fail_exec: bool,
     maps: usize,
     image: RefCell<Vec<u8>>,
+    child_stack: RefCell<Vec<u8>>,
 }
 
 impl Mock {
@@ -384,6 +385,10 @@ impl Mock {
     fn map_failure(&mut self) -> bool {
         self.maps += 1;
         self.fail_map == Some(self.maps)
+    }
+
+    fn child_stack(&self) -> Vec<u8> {
+        self.child_stack.borrow().clone()
     }
 }
 
@@ -425,6 +430,13 @@ impl Sys for Mock {
         });
         if self.map_failure() {
             return Err(Errno::EIO);
+        }
+        // Model the contract's visibility: the child's stack mapping sees the
+        // parent's filled pages at map time.  A private COW mapping is a
+        // snapshot of the object's present pages; a shared mapping would keep
+        // following later parent writes.  The test below asserts the snapshot.
+        if proc == CHILD && memobj == MEMOBJ && len == STACK_SIZE {
+            *self.child_stack.borrow_mut() = self.image.borrow().clone();
         }
         if proc == Handle::SELF_PROC && addr == 0 {
             Ok(SCRATCH)
@@ -680,6 +692,93 @@ fn success_call_sequence() {
         } if *proc == CHILD.0 && stack_top == arg && *stack_top >= stack_base
     ));
     assert_eq!(calls[9], Call::HandleClose(THREAD.0));
+}
+
+#[test]
+fn contract_c13_stack_sequence_and_visibility() {
+    let image = valid_initfs();
+    let initfs = Initfs::parse(&image).unwrap();
+    let mut mock = Mock::default();
+    spawn_with(
+        &initfs,
+        "/child",
+        &options(&["/child", "world"], &[]),
+        &mut mock,
+    )
+    .unwrap();
+    let calls = mock.calls();
+
+    let memobj_at = calls
+        .iter()
+        .position(|call| matches!(call, Call::MemobjCreate(len) if *len == STACK_SIZE))
+        .expect("stack MEMOBJ_CREATE");
+    let scratch = calls
+        .iter()
+        .enumerate()
+        .skip(memobj_at)
+        .find_map(|(index, call)| match call {
+            Call::Map {
+                proc,
+                memobj,
+                flags,
+                ..
+            } if *proc == Handle::SELF_PROC.0 && *memobj == MEMOBJ.0 => Some((index, *flags)),
+            _ => None,
+        })
+        .expect("parent stack MAP");
+    let fill_at = calls
+        .iter()
+        .enumerate()
+        .skip(scratch.0 + 1)
+        .find_map(|(index, call)| matches!(call, Call::WriteParentMem { .. }).then_some(index))
+        .expect("stack fill");
+    let child = calls
+        .iter()
+        .enumerate()
+        .skip(fill_at + 1)
+        .find_map(|(index, call)| match call {
+            Call::Map {
+                proc,
+                memobj,
+                flags,
+                ..
+            } if *proc == CHILD.0 && *memobj == MEMOBJ.0 => Some((index, *flags)),
+            _ => None,
+        })
+        .expect("child stack MAP");
+
+    assert!(memobj_at < scratch.0);
+    assert!(scratch.0 < fill_at);
+    assert!(fill_at < child.0);
+    assert_eq!(
+        scratch.1,
+        map::pack(prot::READ | prot::WRITE, map::SHARED)
+    );
+    // C13 correction (donor tie-break): the parent scratch is SHARED so it can
+    // populate the object, but the child stack is private COW.  NetBSD
+    // uvm_mmap.c:1057 `uvm_mmap_anon` uses MAP_PRIVATE|MAP_ANON; uvm_map.c:4626
+    // `uvmspace_fork` shares only MAP_INHERIT_SHARE entries and copies the
+    // private ones.  Illumos vm_as.c:1626 maps AS_MAP_STACK under MAP_PRIVATE.
+    // A shared stack would be visible across fork and let a child scribble on
+    // the parent's frames.
+    assert_eq!(child.1, map::pack(prot::READ | prot::WRITE, map::FIXED));
+    // Map flags live at `map::SHIFT`; the unpacked `prot|SHARED` form is not used.
+    assert_ne!(scratch.1, prot::READ | prot::WRITE | map::SHARED);
+    assert_ne!(scratch.1 & (map::SHARED << map::SHIFT), 0);
+    assert_eq!(child.1 & (map::SHARED << map::SHIFT), 0);
+
+    // The child sees the parent's filled stack at map time.
+    let snapshot = mock.child_stack();
+    assert!(snapshot.windows(6).any(|window| window == b"/child"));
+    assert!(snapshot.windows(5).any(|window| window == b"world"));
+    // The final contract is private COW: a later parent write is not visible.
+    mock.write_parent_mem(SCRATCH, b"LATE-WRITE");
+    assert!(
+        !mock
+            .child_stack()
+            .windows(10)
+            .any(|window| window == b"LATE-WRITE")
+    );
 }
 
 #[test]
