@@ -209,6 +209,20 @@ pub fn replace_image_from_user(
         let _ = crate::event::close_handle(caller, handle);
     }
     caller.pending_signals.lock().clear();
+    // POSIX execve resets caught signal dispositions, and the RavenBSD `SIG_SETUP` entry is an
+    // address inside the old image. Clear the thread registration so the new image registers its
+    // own entry; otherwise a signal after exec resumes at the previous image's stub address.
+    // Donor: FreeBSD `execsigs()` (`sys/kern/kern_sig.c`, called from `kern_exec.c`), NetBSD
+    // `execsigs()` (`sys/kern/kern_exec.c`), Illumos `exec_common()` (`uts/common/os/exec.c`).
+    thread.signal_entry.store(0, Ordering::Release);
+    thread.signal_ctx_offset.store(0, Ordering::Release);
+    thread.signal_ctx_abs.store(0, Ordering::Release);
+    thread.signal_flags.store(0, Ordering::Release);
+    thread.signal_active_ctx.store(0, Ordering::Release);
+    thread.signal_depth.store(0, Ordering::Release);
+    thread.signal_mask.store(0, Ordering::Release);
+    thread.resend.store(false, Ordering::Release);
+    thread.kick_bits.store(0, Ordering::Release);
     caller.exec_done.store(true, Ordering::Release);
     let command = super::command_from_argv(argv, path);
     *caller.command.lock() = command;
