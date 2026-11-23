@@ -1711,6 +1711,7 @@ def console_cr_capture(console: SerialConsole, command: str, log_name: str,
 
 def row_close_probe(console: SerialConsole | None) -> None:
     """K449/K448 close acceptance: one session plus client, serial, sshd log and ps capture."""
+    close_timeout = int(os.environ.get("RAVEN_CLOSE_TIMEOUT", "15"))
     result = None
     client_text = ""
     output_ok = False
@@ -1721,7 +1722,7 @@ def row_close_probe(console: SerialConsole | None) -> None:
     for number in range(1, 4):
         attempts = number
         result = ssh_run(["echo", "K449-DIAG"], f"close-client-{number}.log",
-                         extra=["-vvv"], timeout=15)
+                         extra=["-vvv"], timeout=close_timeout)
         client_text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
         (OUT / f"close-client-vvv-{number}.log").write_text(client_text, encoding="utf-8")
         lines = [line for line in client_text.splitlines() if line.strip()]
