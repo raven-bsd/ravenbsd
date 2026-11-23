@@ -42,6 +42,12 @@ regex = '^out-status:0$'
 regex = '^both-status:0$'
 
 [[expect]]
+regex = '^shell-env-status:0$'
+
+[[expect]]
+regex = '^ssh-env-status:0$'
+
+[[expect]]
 regex = '^(brush|ls|true)$'
 unordered = true
 
@@ -113,6 +119,22 @@ delay_ms = 100
 
 [[step]]
 wait = '^both-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "SHELL=/bin/brush /bin/brush -c '/bin/ls /bin'; echo shell-env-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^shell-env-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "env SSH_CONNECTION='10.0.2.2 12345 10.0.2.15 22' SSH_CLIENT='10.0.2.2 12345 22' SSH_TTY=/dev/pts/0 TERM=xterm /bin/brush -c '/bin/ls /bin'; echo ssh-env-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ssh-env-status:0$'
 timeout_secs = 60
 
 [[step]]
