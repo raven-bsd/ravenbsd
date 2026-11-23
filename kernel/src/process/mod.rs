@@ -84,6 +84,14 @@ static S36_LOCK_BASE: AtomicU64 = AtomicU64::new(0);
 static S36_TIMEOUT_LIVE: AtomicU64 = AtomicU64::new(0);
 /// S36 timeout-retention baseline: queued timeout sleepers at exit 90.
 static S36_TIMEOUT_SLEEPERS: AtomicU64 = AtomicU64::new(0);
+/// S36 timeout-retention gate, parsed once at boot so the exit path does not re-parse the
+/// command line on a small kernel stack.
+static S36_TIMEOUTCHECK: AtomicBool = AtomicBool::new(false);
+
+/// Record the boot-time S36 gate flags before any process can exit.
+pub fn configure_gates(cmdline: &CmdLine) {
+    S36_TIMEOUTCHECK.store(cmdline.get("s36-timeoutcheck").is_some(), Ordering::Release);
+}
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
@@ -1893,10 +1901,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // S36 timeout-retention row: exit 90 records the live non-idle Thread count and the queued
     // timeout sleepers; exit 91 compares them after the bounded terminate-while-waiting churn.
     // A dead Thread retained by a timeout entry keeps both counters above the tolerance.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-timeoutcheck")
-        .is_some()
-    {
+    if S36_TIMEOUTCHECK.load(Ordering::Acquire) {
         let live = crate::sched::thread::live_threads() as u64;
         let sleepers = crate::sched::sleepers_len() as u64;
         let reap = crate::sched::reap_len() as u64;

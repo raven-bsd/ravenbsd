@@ -116,6 +116,7 @@ pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
     // `data` still points at loader memory that paging just reclaimed. Re-parse the command line
     // from the kernel-owned copy.
     let cmdline = cmdline::CmdLine::parse(memory::paging::cmdline());
+    process::configure_gates(&cmdline);
     metrics::start(&cmdline);
     if cmdline.get("selftest").is_some() {
         selftest::run(&cmdline);
