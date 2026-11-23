@@ -26,8 +26,10 @@ Evidence is written under build/ssh-reconnect-soak/<UTC>/ (copy it to managed ev
 run; the frozen product evidence tree is never touched). No QEMU-free shortcut, no retry.
 
 Usage: python3 tests/ssh/reconnect-soak.py [--sessions N] [--batch N] [--session-timeout S]
-                                           [--tty-sessions N] [--keep-going] [--image PATH]
-                                           [--net tap|user] [--resource-every N] [--selftest]
+                                           [--tty-sessions N] [--connect-timeout S]
+                                           [--keep-going] [--image PATH]
+                                           [--net tap|user] [--resource-every N] [--sshd-log]
+                                           [--selftest]
 Exit: 0 when every session passes, 1 when a session fails, 2 for setup problems.
 """
 
@@ -71,6 +73,7 @@ def parse_args(argv: list[str]) -> dict:
         "sessions": 100,
         "batch": 10,
         "session_timeout": 20.0,
+        "connect_timeout": 8.0,
         "tty_sessions": 0,
         "keep_going": False,
         "image": IMAGE,
@@ -90,6 +93,9 @@ def parse_args(argv: list[str]) -> dict:
             index += 2
         elif arg == "--session-timeout" and index + 1 < len(argv):
             options["session_timeout"] = float(argv[index + 1])
+            index += 2
+        elif arg == "--connect-timeout" and index + 1 < len(argv):
+            options["connect_timeout"] = float(argv[index + 1])
             index += 2
         elif arg == "--tty-sessions" and index + 1 < len(argv):
             options["tty_sessions"] = int(argv[index + 1])
@@ -248,6 +254,12 @@ def selftest() -> int:
         False,
     )
     check("utc-format", utc_from_epoch(0).endswith("Z"), True)
+    check("connect-default", parse_args(["--sessions", "1"])["connect_timeout"], 8.0)
+    check(
+        "connect-set",
+        parse_args(["--sessions", "1", "--connect-timeout", "30"])["connect_timeout"],
+        30.0,
+    )
     table = format_resource_table([
         {"after_session": 0, "qemu_rss_kb": 1000, "serial_heap_kb": 4096,
          "panic": False},
@@ -365,7 +377,8 @@ def boot(run: Path, image: Path, net: str) -> tuple[
     raise RuntimeError("guest TCP 22 never listened")
 
 
-def ssh_argv(marker: str, tty: bool, host: str, port: int) -> list[str]:
+def ssh_argv(marker: str, tty: bool, host: str, port: int,
+             connect_timeout: float = 8.0) -> list[str]:
     command = "tty" if tty else f"echo {marker}"
     argv = ["ssh"]
     if tty:
@@ -379,7 +392,7 @@ def ssh_argv(marker: str, tty: bool, host: str, port: int) -> list[str]:
         "-o", "PubkeyAuthentication=no",
         "-o", "KbdInteractiveAuthentication=no",
         "-o", "NumberOfPasswordPrompts=1",
-        "-o", "ConnectTimeout=8",
+        "-o", f"ConnectTimeout={connect_timeout:g}",
         f"{USER}@{host}",
         command,
     ]
@@ -435,7 +448,7 @@ def collect_sshd_log(run: Path, host: str, port: int, timeout: float = 10.0) -> 
 
 
 def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool,
-                host: str, port: int) -> dict:
+                host: str, port: int, connect_timeout: float = 8.0) -> dict:
     log = run / f"session-{number}.ssh.log"
     out_path = run / f"session-{number}.stdout"
     env = dict(os.environ)
@@ -457,7 +470,7 @@ def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool,
 
     with open(out_path, "wb") as out_file:
         child = subprocess.Popen(
-            ssh_argv(marker, tty, host, port), cwd=ROOT, stdin=subprocess.DEVNULL,
+            ssh_argv(marker, tty, host, port, connect_timeout), cwd=ROOT, stdin=subprocess.DEVNULL,
             stdout=out_file, stderr=subprocess.PIPE, env=env, start_new_session=True,
         )
         thread = threading.Thread(target=reader, args=(child.stderr,), daemon=True)
@@ -579,7 +592,8 @@ def main(argv: list[str]) -> int:
         for number in range(1, total + 1):
             marker = f"K449-OK-{number}"
             row = run_session(
-                run, number, marker, options["session_timeout"], tty=False, host=host, port=port
+                run, number, marker, options["session_timeout"], tty=False,
+                host=host, port=port, connect_timeout=options["connect_timeout"],
             )
             rows.append(row)
             last_session = number
@@ -602,6 +616,7 @@ def main(argv: list[str]) -> int:
                 row = run_session(
                     run, 1000 + number, f"K449-TTY-{number}",
                     options["session_timeout"], tty=True, host=host, port=port,
+                    connect_timeout=options["connect_timeout"],
                 )
                 rows.append(row)
                 print(
@@ -664,6 +679,7 @@ def main(argv: list[str]) -> int:
         "hygiene_before": hygiene_before,
         "hygiene_after": hygiene(),
         "session_timeout_s": options["session_timeout"],
+        "connect_timeout_s": options["connect_timeout"],
         "net": options["net"],
         "keep_going": options["keep_going"],
         "resource_every": options["resource_every"],
