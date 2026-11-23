@@ -18,11 +18,10 @@ use raven_svc_manifest::{
     GraphError, Manifest, Overrides, Plan, Readiness, Restart, apply_overrides, start_order,
 };
 
-/// Readiness timing captured for the standard per-service timing line.
+/// Readiness timing captured for the per-service diagnostic line.
 ///
-/// The supervision transitions do not read this record; the boot log reports it. It keeps the
-/// deadline after [`Runtime::ready_deadline_ms`] is cleared, so the log still reports what the
-/// service raced.
+/// Diagnostics only: no transition reads this record. It keeps the deadline after
+/// [`Runtime::ready_deadline_ms`] is cleared, so the log still reports what the service raced.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ReadyTiming {
     /// Generation these timestamps belong to.
@@ -39,33 +38,6 @@ pub struct ReadyTiming {
     pub stalled_ms: u64,
     /// Monotonic time readiness succeeded, the service exited, or the deadline fired.
     pub finished_ms: Option<u64>,
-}
-
-/// Format the standard per-unit timing line for the release boot log.
-///
-/// The four required stamps are always present: `start`, `spawn`, `first-ready` and `ready`.
-/// `first-ready` is the first readiness poll; `ready` is the finish stamp (success, exit or
-/// timeout). Missing optional stamps print as `none`. `status` keeps the reason for the finish.
-#[must_use]
-pub fn format_ready_timing(name: &str, timing: &ReadyTiming, status: &str) -> String {
-    alloc::format!(
-        "svcd: {name} timing: generation={} start={} spawn={} first-ready={} ready={} deadline={} stalled={} status={status}",
-        timing.generation,
-        timing_ms(timing.start_ms),
-        timing_ms(timing.spawned_ms),
-        timing_ms(timing.first_poll_ms),
-        timing_ms(timing.finished_ms),
-        timing_ms(timing.deadline_ms),
-        timing.stalled_ms,
-    )
-}
-
-/// Format one optional monotonic millisecond stamp.
-fn timing_ms(value: Option<u64>) -> String {
-    match value {
-        Some(ms) => alloc::format!("{ms}"),
-        None => "none".to_string(),
-    }
 }
 
 /// Per-service runtime state.
