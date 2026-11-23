@@ -65,6 +65,9 @@ S4_ASSERT_ATTEMPTS = 3
 S4_ECHO_COMMAND = ["echo", "K514-S4-ECHO-2026-11-22"]
 S4_ECHO_BYTES = b"K514-S4-ECHO-2026-11-22\n"
 S4_EXIT_COMMAND = ["cat", "/etc/ssh-matrix-marker"]
+# K514 rev 95: 10-TTY verification; every session must print /dev/pts/N from `tty`.
+TTY10_ATTEMPTS = 10
+TTY10_RE = re.compile(rb"/dev/pts/[0-9]+")
 # K514 rev 92 release blast-radius measurement: every command is attempted ten times as the
 # release user. The S4 row's own expectations are unchanged.
 RELEASE_SESSIONS = 10
@@ -1170,6 +1173,35 @@ def row_s4_exit0(serial: Path | None) -> None:
                f"exits={exits}; faults={faults}; expected exit 0 + {literal(MARKER)}")
 
 
+def row_tty10() -> None:
+    """K514 rev95: ten SSH pty sessions; require /dev/pts/N from the tty utility."""
+    passed = 0
+    exits: list[int] = []
+    walls: list[float] = []
+    outputs: list[str] = []
+    for number in range(1, TTY10_ATTEMPTS + 1):
+        result = ssh_run(["tty"], f"tty10-{number}.log", extra=["-tt"], timeout=20)
+        stdout = bytes(result["stdout"])  # type: ignore[arg-type]
+        stderr = bytes(result["stderr"])  # type: ignore[arg-type]
+        match = TTY10_RE.search(stdout)
+        exit_code = int(result["returncode"])  # type: ignore[arg-type]
+        ok = match is not None
+        if ok:
+            passed += 1
+        exits.append(exit_code)
+        walls.append(round(float(result["elapsed_ms"])))  # type: ignore[arg-type]
+        outputs.append(match.group(0).decode() if match else "none")
+        received = (f"pts={match.group(0).decode() if match else 'none'}; "
+                    f"exit={exit_code}; bytes={literal(stdout)}")
+        attempt("S8-tty10", number, "fresh", "/dev/pts/[0-9]+ from tty",
+                received, float(result["elapsed_ms"]), "PASS" if ok else "FAIL",  # type: ignore[arg-type]
+                f"step={'done' if ok else 'output'}; stdout_hex={stdout.hex()}; "
+                f"stderr_auth={b'Authenticated to ' in stderr}")
+    record("S8-tty10", "PASS" if passed == TTY10_ATTEMPTS else "FAIL",
+           f"{passed}/{TTY10_ATTEMPTS} sessions returned /dev/pts/N; outputs={outputs}; "
+           f"exits={exits}; walls_ms={walls}")
+
+
 def row_release_commands(serial: Path) -> None:
     """K514 rev92: ten sessions per release command; exit, bytes and serial fault."""
     for name, command, expected, expected_text in RELEASE_COMMANDS:
@@ -2221,6 +2253,8 @@ def main() -> int:
                         record("S7", "BLOCKED", "console login failed before S7")
                 elif only == "s8":
                     row_s8()
+                elif only == "tty10":
+                    row_tty10()
                 elif only == "s8-proof":
                     row_s8_proof(console)
                 elif only == "close-probe":
