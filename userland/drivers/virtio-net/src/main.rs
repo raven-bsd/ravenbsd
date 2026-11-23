@@ -289,8 +289,17 @@ mod program {
         // K9 KVM2: the pump wake is bounded by the running thread's scheduler slice (measured
         // 10-14 ms late on a 1 ms wait), not by the requested timeout. Run the driver at the
         // highest nice so the woken pump preempts the current thread and drains TX before the
-        // contract's half-close window.
-        let _ = raven_rt::priority::setpriority(raven_rt::priority::PRIO_PROCESS, 0, -20);
+        // contract's half-close window. The result is reported: a silently failed setpriority
+        // would leave the pump at the old level.
+        let nice_before = raven_rt::priority::getpriority(raven_rt::priority::PRIO_PROCESS, 0);
+        let nice_set = raven_rt::priority::setpriority(raven_rt::priority::PRIO_PROCESS, 0, -20);
+        let nice_after = raven_rt::priority::getpriority(raven_rt::priority::PRIO_PROCESS, 0);
+        raven_rt::println!(
+            "virtio-net: nice before={:?} set={:?} after={:?}",
+            nice_before,
+            nice_set,
+            nice_after
+        );
         thread::spawn(pump_thread, 0, 128 * 1024)
             .map_err(|error| format!("pump thread: {}", error.description()))?;
 

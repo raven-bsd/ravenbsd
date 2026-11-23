@@ -19,12 +19,13 @@ pre = [
     "SSH_CONTRACT_K6_READY=1 sh tests/smp/ssh-contract/start-host.sh",
 ]
 initfs = "build/fixtures/ssh-contract/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 irq-debug"
+boot_cmdline = "console=ttyS0 test-exit=1 irq-debug priority-debug"
 qemu_extra = [
     "-enable-kvm", "-cpu", "host", "-smp", "2",
     "-nic", "none",
     "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23096,hostfwd=tcp:127.0.0.1:0-:23097,hostfwd=tcp:127.0.0.1:0-:23098",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-object", "filter-dump,id=f0,netdev=n0,file=build/qtest/ssh-contract-kvm2.pcap",
     "-monitor", "unix:build/fixtures/ssh-contract/monitor.sock,server=on,wait=off",
 ]
 expect_exit = "success"

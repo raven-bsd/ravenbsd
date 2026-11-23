@@ -375,6 +375,13 @@ fn new_kernel_thread(name: &str, entry: fn()) -> Result<Arc<Thread>, Errno> {
     Thread::new_kernel(String::from(name), process, entry, cr3, PRIORITY_DEFAULT)
 }
 
+/// Temporary K9 evidence: print the nice value and run-queue priority of each new user thread.
+fn priority_trace() -> bool {
+    crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "priority-debug")
+}
+
 /// Create a ring-3 thread in `process`, without enqueueing it.
 pub fn new_user_thread(
     process: &Arc<Process>,
@@ -400,6 +407,16 @@ pub fn new_user_thread(
         priority,
     )?;
     process.register_thread(&thread);
+    if priority_trace() {
+        crate::kprintln!(
+            "PRIODBG create pid={} tid={} nice={} prio={} name={}",
+            process.id,
+            thread.tid,
+            process.nice(),
+            priority,
+            thread.name
+        );
+    }
     Ok(thread)
 }
 
