@@ -121,6 +121,9 @@ pub(crate) fn run_with_overrides(
             );
         }
     }
+    if overrides.initfs.is_none() {
+        crate::addons::ensure_current(root, arch, &profile)?;
+    }
 
     if platform == Platform::Pi4 {
         if crate::rootfs::spec_path(root, profile_name).is_some() {
