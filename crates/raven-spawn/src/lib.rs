@@ -870,14 +870,9 @@ fn spawn_elf<S: Sys>(
                     return Err(SpawnError::Sys(error));
                 }
             };
-            // The event is a separate kernel handle. Transfer it like the data handle; if that
-            // fails the descriptor still works for I/O and loses only its poll doorbell.
-            let event = if entry.event == 0 {
-                0
-            } else {
-                sys.handle_transfer(child, Handle(entry.event))
-                    .map_or(0, |event| event.0)
-            };
+            // The spawn map no longer carries the notification event (see `encode_fdmap`): do not
+            // transfer a handle the child never decodes. The exec path keeps its own full map.
+            let event = 0;
             entries.push(SpawnFd {
                 fd: entry.fd,
                 handle: handle.0,
@@ -1796,10 +1791,11 @@ fn plan_image<'a>(
 
 /// Encode the `RFDM` block consumed by `raven_libc_platform::fd::inherit::FdMap::decode`.
 ///
-/// This is the version-5 record the exec path already uses: the parent's real kind and status,
-/// no socket/event metadata and `NO_PATH`. The child adopts the public name of a pathless `Tty`
-/// from the endpoint device identity, so a spawned terminal keeps its termios and its
-/// `/dev/pts/<N>` name without re-probing unrelated handles.
+/// This is the version-5 record the exec path already uses. Only a terminal carries its real
+/// kind/status/path; a non-terminal keeps the conservative version-1 `Unknown`/`O_RDWR`/`NO_PATH`
+/// pair and no socket/event metadata. Carrying the full socket/event identity into a spawned
+/// uutils child faulted at startup (`0x703`/`0x704`/`0x708`); the exec path remains the full
+/// carrier, and the spawn socket/event gap is recorded in the report.
 ///
 /// Reject an inherited fd map when the crate is built without `alloc`.
 ///
@@ -1826,7 +1822,8 @@ fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, Sp
     let mut strings = alloc_crate::vec::Vec::new();
     let mut offsets = alloc_crate::vec::Vec::with_capacity(entries.len());
     for entry in entries {
-        match entry.path {
+        let path = if entry.kind == 2 { entry.path } else { None };
+        match path {
             Some(path) => {
                 if path.is_empty() || path.len() > 4095 || path.contains(&0) {
                     return Err(SpawnError::TooLarge);
@@ -1848,27 +1845,26 @@ fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, Sp
     out.extend_from_slice(&5u16.to_le_bytes());
     out.extend_from_slice(&count.to_le_bytes());
     for (entry, offset) in entries.iter().zip(offsets) {
-        let socket = entry.socket.unwrap_or_default();
+        let socket = SpawnSocket::default();
+        let tty = entry.kind == 2;
         out.extend_from_slice(&entry.fd.to_le_bytes());
         out.extend_from_slice(&entry.handle.to_le_bytes());
-        out.push(entry.kind);
+        out.push(if tty { 2 } else { 255 });
         out.push(0); // FD_CLOEXEC already filtered by apply_actions
-        out.extend_from_slice(&entry.status.to_le_bytes());
+        out.extend_from_slice(&if tty { entry.status } else { 2 }.to_le_bytes());
         out.extend_from_slice(&offset.to_le_bytes());
-        out.extend_from_slice(&entry.event.to_le_bytes());
-        out.extend_from_slice(&entry.readiness.to_le_bytes());
+        out.extend_from_slice(&0u32.to_le_bytes()); // event
+        out.extend_from_slice(&0u32.to_le_bytes()); // readiness
         out.extend_from_slice(&socket.domain.to_le_bytes());
         out.extend_from_slice(&socket.ty.to_le_bytes());
         out.extend_from_slice(&socket.proto.to_le_bytes());
         out.push(socket.state);
-        let flags = u8::from(socket.local.is_some()) | (u8::from(socket.peer.is_some()) << 1);
-        out.push(flags);
-        for endpoint in [socket.local, socket.peer] {
-            let endpoint = endpoint.unwrap_or_default();
-            out.extend_from_slice(&endpoint.ip);
-            out.extend_from_slice(&endpoint.port.to_le_bytes());
+        out.push(0); // socket endpoint flags
+        for _ in 0..2 {
+            out.extend_from_slice(&[0u8; 4]); // local/peer ip
+            out.extend_from_slice(&0u16.to_le_bytes()); // local/peer port
         }
-        out.push(u8::from(entry.pty_master));
+        out.push(0); // pty_master
     }
     out.extend_from_slice(&strings);
     Ok(out)
