@@ -12,37 +12,53 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
 
 arch=${1:-x86_64}
-if [ "$arch" != x86_64 ]; then
-    printf 'modern-admin: only x86_64 is in K78b\n' >&2
-    exit 2
-fi
+case "$arch" in
+    x86_64)
+        target=x86_64-unknown-ravenbsd
+        linker=$root/tests/fixtures/modern-admin/raven.ld
+        ;;
+    aarch64)
+        target=aarch64-unknown-ravenbsd
+        # The std layout is arch-independent; it keeps .eh_frame/.debug_gdb_scripts that a
+        # no_std userland script discards (the aarch64 std binary needs them).
+        linker=$root/tests/fixtures/modern-admin/raven.ld
+        ;;
+    *)
+        printf 'modern-admin: unsupported arch %s (x86_64 or aarch64)\n' "$arch" >&2
+        exit 2
+        ;;
+esac
 
-archive=$root/build/x86_64/libc.a
+archive=$root/build/$arch/libc.a
 if [ ! -f "$archive" ]; then
-    printf 'modern-admin: missing %s; run cargo xtask libc-pack --arch x86_64\n' "$archive" >&2
+    printf 'modern-admin: missing %s; run cargo xtask libc-pack --arch %s\n' "$archive" "$arch" >&2
     exit 2
 fi
 
-out=$root/build/fixtures/modern-admin
+out=$root/build/fixtures/modern-admin/$arch
 mkdir -p "$out"
 target_dir=$root/build/cargo/modern-admin
 
-RUSTUP_TOOLCHAIN=ravenbsd cargo rustc -q -p raven --target x86_64-unknown-ravenbsd \
+RUSTUP_TOOLCHAIN=ravenbsd cargo rustc -q -p raven --target "$target" \
     --target-dir "$target_dir" -- \
     -C relocation-model=static \
     -C link-arg=-no-pie \
-    -C "link-arg=-T$root/tests/fixtures/modern-admin/raven.ld" \
-    -C "link-arg=$root/build/x86_64/crt1.o" \
-    -C "link-arg=$root/build/x86_64/crti.o" \
-    -C "link-arg=-L$root/build/x86_64" \
+    -C "link-arg=-T$linker" \
+    -C "link-arg=$root/build/$arch/crt1.o" \
+    -C "link-arg=$root/build/$arch/crti.o" \
+    -C "link-arg=-L$root/build/$arch" \
     -C "link-arg=-lc" \
-    -C "link-arg=$root/build/x86_64/crtn.o" \
+    -C "link-arg=$root/build/$arch/crtn.o" \
     -C strip=symbols \
 
-binary=$target_dir/x86_64-unknown-ravenbsd/debug/raven
+binary=$target_dir/$target/debug/raven
 if [ ! -f "$binary" ]; then
     printf 'modern-admin: cargo did not produce %s\n' "$binary" >&2
     exit 1
 fi
 cp "$binary" "$out/raven"
+# The UFS/admin-test profiles still stage the arch-less path; keep x86_64 working there.
+if [ "$arch" = x86_64 ]; then
+    cp "$binary" "$root/build/fixtures/modern-admin/raven"
+fi
 printf 'modern-admin: %s\n' "$out/raven"
