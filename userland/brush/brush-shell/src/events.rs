@@ -3,7 +3,7 @@
 
 //! Facilities for configuring event tracing in the brush shell.
 
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 use brush_core::Error;
 use tracing_subscriber::{
@@ -56,47 +56,18 @@ impl Display for TraceEvent {
     }
 }
 
-impl TraceEvent {
-    /// Every trace event, in enum-discriminant order.
-    const ALL: [Self; 11] = [
-        Self::Arithmetic,
-        Self::Commands,
-        Self::Complete,
-        Self::Expand,
-        Self::Functions,
-        Self::Input,
-        Self::Jobs,
-        Self::Parse,
-        Self::Pattern,
-        Self::Tokenize,
-        Self::Unimplemented,
-    ];
-
-    /// The bit for this event in [`TraceEventConfig`]'s sets.
-    ///
-    /// The universe is 11 values, so a bitmask avoids a heap `HashSet`; the previous table
-    /// could be reached with a near-null base after an SSH-invoked child (K548: IP in the
-    /// `RawTable<TraceEvent>` reserve, `CR2=0x19`, `rdi=1`), and the set never needs hashing.
-    const fn bit(self) -> u16 {
-        1u16 << (self as u16)
-    }
-}
-
 #[derive(Default)]
 pub(crate) struct TraceEventConfig {
-    enabled_debug_events: u16,
-    disabled_events: u16,
+    enabled_debug_events: HashSet<TraceEvent>,
+    disabled_events: HashSet<TraceEvent>,
     handle: Option<Handle<Targets, Registry>>,
 }
 
 impl TraceEventConfig {
     pub fn init(enabled_debug_events: &[TraceEvent], disabled_events: &[TraceEvent]) -> Self {
-        let enabled_debug_events = enabled_debug_events
-            .iter()
-            .fold(0u16, |bits, event| bits | event.bit());
-        let disabled_events = disabled_events
-            .iter()
-            .fold(0u16, |bits, event| bits | event.bit());
+        let enabled_debug_events: HashSet<TraceEvent> =
+            enabled_debug_events.iter().copied().collect();
+        let disabled_events: HashSet<TraceEvent> = disabled_events.iter().copied().collect();
 
         let mut config = Self {
             enabled_debug_events,
@@ -133,11 +104,8 @@ impl TraceEventConfig {
         let mut filter = tracing_subscriber::filter::Targets::new()
             .with_default(tracing_subscriber::filter::LevelFilter::INFO);
 
-        for event in TraceEvent::ALL {
-            if self.enabled_debug_events & event.bit() == 0 {
-                continue;
-            }
-            let targets = Self::event_to_tracing_targets(&event);
+        for event in &self.enabled_debug_events {
+            let targets = Self::event_to_tracing_targets(event);
             filter = filter.with_targets(
                 targets
                     .into_iter()
@@ -145,11 +113,8 @@ impl TraceEventConfig {
             );
         }
 
-        for event in TraceEvent::ALL {
-            if self.disabled_events & event.bit() == 0 {
-                continue;
-            }
-            let targets = Self::event_to_tracing_targets(&event);
+        for event in &self.disabled_events {
+            let targets = Self::event_to_tracing_targets(event);
             filter = filter.with_targets(
                 targets
                     .into_iter()
@@ -176,29 +141,25 @@ impl TraceEventConfig {
         }
     }
 
-    pub fn get_enabled_events(&self) -> impl Iterator<Item = TraceEvent> + '_ {
-        TraceEvent::ALL
-            .into_iter()
-            .filter(|event| self.enabled_debug_events & event.bit() != 0)
+    pub const fn get_enabled_events(&self) -> &HashSet<TraceEvent> {
+        &self.enabled_debug_events
     }
 
     pub fn enable(&mut self, event: TraceEvent) -> Result<(), Error> {
         // Don't bother to reload config if nothing has changed.
-        if self.enabled_debug_events & event.bit() != 0 {
+        if !self.enabled_debug_events.insert(event) {
             return Ok(());
         }
 
-        self.enabled_debug_events |= event.bit();
         self.reload_filter()
     }
 
     pub fn disable(&mut self, event: TraceEvent) -> Result<(), Error> {
         // Don't bother to reload config if nothing has changed.
-        if self.enabled_debug_events & event.bit() == 0 {
+        if !self.enabled_debug_events.remove(&event) {
             return Ok(());
         }
 
-        self.enabled_debug_events &= !event.bit();
         self.reload_filter()
     }
 
