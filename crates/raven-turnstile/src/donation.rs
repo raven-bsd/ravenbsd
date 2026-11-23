@@ -387,6 +387,14 @@ impl Donation {
             .collect()
     }
 
+    /// Number of threads currently registered in the donation graph.
+    ///
+    /// Diagnostic counter for the thread-exit lifetime: it must stay flat across SSH sessions.
+    #[must_use]
+    pub fn registered_threads(&self) -> usize {
+        self.turnstiles.threads().count()
+    }
+
     /// The maximum donation-chain depth observed so far (an upper bound on the longest chain).
     #[must_use]
     pub fn max_chain_depth(&self) -> usize {

@@ -57,6 +57,14 @@ fn sampler() {
                 raven_handles::live_lineage_nodes(),
             )
         );
+        let (graph_threads, weak_threads) = crate::sync::turnstile_counts();
+        let (class_in_use, class_slabs, class_fail) =
+            memory::heap::class_stats(3072).unwrap_or((0, 0, 0));
+        kprintln!(
+            "K449-GRAPH graph_threads={graph_threads} weak_threads={weak_threads} \
+             class3072_in_use={class_in_use} class3072_slabs={class_slabs} \
+             class3072_fail={class_fail}"
+        );
     }
 }
 

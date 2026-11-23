@@ -387,6 +387,18 @@ pub fn unregister_thread(tid: ThreadId) {
     sync_all_boosts_locked(kernel);
 }
 
+/// K449 diagnostic: `(graph_threads, weak_threads)` for the donation registry.
+///
+/// `graph_threads` is the base/effective/call graph size; `weak_threads` is the boost map. Both
+/// must return to their baseline after a session's threads exit.
+#[must_use]
+pub fn turnstile_counts() -> (usize, usize) {
+    let guard = TURNSTILES.lock();
+    guard.as_ref().map_or((0, 0), |kernel| {
+        (kernel.graph.registered_threads(), kernel.threads.len())
+    })
+}
+
 /// Open the IPC call edge `client -> server` and apply the resulting boosts.
 ///
 /// The client must already be registered (see [`register_thread`]); the server is registered
