@@ -1694,6 +1694,8 @@ def console_cr_capture(console: SerialConsole, command: str, log_name: str,
     console.send(command.encode())
     time.sleep(0.3)
     console.send(b"\r")
+    time.sleep(0.2)
+    console.send(b"\r")
     end = console.wait_for(marker.encode(), timeout, start=mark)
     if end < 0:
         console.send(b"\n")
@@ -1709,37 +1711,58 @@ def console_cr_capture(console: SerialConsole, command: str, log_name: str,
 
 def row_close_probe(console: SerialConsole | None) -> None:
     """K449/K448 close acceptance: one session plus client, serial, sshd log and ps capture."""
-    result = ssh_run(["echo", "K449-DIAG"], "close-client.log",
-                     extra=["-vvv"], timeout=15)
-    client_text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
-    (OUT / "close-client-vvv.log").write_text(client_text, encoding="utf-8")
+    result = None
+    client_text = ""
+    output_ok = False
+    exit_status_seen = False
+    eof_seen = False
+    close_seen = False
+    attempts = 0
+    for number in range(1, 4):
+        attempts = number
+        result = ssh_run(["echo", "K449-DIAG"], f"close-client-{number}.log",
+                         extra=["-vvv"], timeout=15)
+        client_text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
+        (OUT / f"close-client-vvv-{number}.log").write_text(client_text, encoding="utf-8")
+        lines = [line for line in client_text.splitlines() if line.strip()]
+        output_ok = b"K449-DIAG" in result["stdout"]
+        exit_status_seen = any("rtype exit-status" in line for line in lines)
+        eof_seen = any("rcvd eof" in line for line in lines)
+        close_seen = any("rcvd close" in line or "channel 0: free" in line
+                         for line in lines)
+        attempt("close-client", number, "fresh", "exit 0 + K449-DIAG",
+                f"exit {result['returncode']}; timed_out={result['timed_out']}; "
+                f"output={output_ok}; exit_status={exit_status_seen}; eof={eof_seen}; "
+                f"close={close_seen}",
+                float(result["elapsed_ms"]), "OBSERVED")
+        if output_ok or result["timed_out"]:
+            break
+    assert result is not None
     client_lines = [line for line in client_text.splitlines() if line.strip()]
     last_line = client_lines[-1] if client_lines else "no client output"
-    output_ok = b"K449-DIAG" in result["stdout"]
-    exit_status_seen = any("rtype exit-status" in line for line in client_lines)
-    eof_seen = any("rcvd eof" in line for line in client_lines)
-    close_seen = any("rcvd close" in line or "channel 0: free" in line
-                     for line in client_lines)
-    attempt("close-client", 1, "fresh", "exit 0 + K449-DIAG",
-            f"exit {result['returncode']}; timed_out={result['timed_out']}; "
-            f"output={output_ok}; exit_status={exit_status_seen}; eof={eof_seen}; "
-            f"close={close_seen}",
-            float(result["elapsed_ms"]), "OBSERVED")
+    (OUT / "close-client-vvv.log").write_text(client_text, encoding="utf-8")
 
     sshd_text = ""
+    sshd_ls_text = ""
     ps_text = ""
     if console is not None and console_shell_login(console):
-        sshd_text = console_cr_capture(console, "cat /tmp/sshd.log; echo K434-77",
-                                       "close-sshd.log", "K434-77")
-        ps_text = console_cr_capture(console, "ps -e; echo K434-169",
-                                     "close-ps.log", "K434-169")
+        sshd_ls_text = console_cr_capture(
+            console, "ls -l /tmp/sshd.log; echo K434-$((7*11))",
+            "close-sshd-ls.log", "K434-77")
+        sshd_text = console_cr_capture(
+            console, "cat /tmp/sshd.log; echo K434-$((13*13))",
+            "close-sshd.log", "K434-169")
+        ps_text = console_cr_capture(
+            console, "ps -e; echo K434-$((17*13))", "close-ps.log", "K434-221")
     elif console is not None:
         record("close-probe", "BLOCKED", "console login failed before the sshd log dump")
         return
 
     sshd_lines = [line.strip() for line in sshd_text.splitlines()
-                  if line.strip() and "K434-77" not in line
+                  if line.strip() and "K434-169" not in line
                   and "cat /tmp/sshd.log" not in line and not line.startswith("raven#")]
+    sshd_file = next((line.strip() for line in sshd_ls_text.splitlines()
+                      if "/tmp/sshd.log" in line and "ls -l" not in line), "none")
     ps_lines = [line.strip() for line in ps_text.splitlines()
                 if "sshd" in line or "defunct" in line or line.strip().startswith("Z")]
     collect_lines = [line for line in sshd_lines
@@ -1750,6 +1773,8 @@ def row_close_probe(console: SerialConsole | None) -> None:
 
     if output_ok and result["returncode"] == 0:
         missing = "none"
+    elif not output_ok and not eof_seen:
+        missing = "session accept/banner (no output)"
     elif not exit_status_seen:
         missing = "exit-status (98)"
     elif not eof_seen:
@@ -1760,11 +1785,12 @@ def row_close_probe(console: SerialConsole | None) -> None:
         missing = "session exit path after close"
 
     summary = (
-        f"client_exit={result['returncode']} timed_out={result['timed_out']} "
-        f"output={output_ok} exit_status={exit_status_seen} eof={eof_seen} "
-        f"close={close_seen}\n"
+        f"client_attempts={attempts} client_exit={result['returncode']} "
+        f"timed_out={result['timed_out']} output={output_ok} "
+        f"exit_status={exit_status_seen} eof={eof_seen} close={close_seen}\n"
         f"first_missing={missing}\n"
         f"client_last={last_line}\n"
+        f"sshd_file={sshd_file}\n"
         f"sshd_accepted={accepted or 'none'}\n"
         f"sshd_closed={closed or 'none'}\n"
         f"sshd_cleanup={cleanup or 'none'}\n"
