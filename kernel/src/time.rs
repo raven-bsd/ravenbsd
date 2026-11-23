@@ -144,6 +144,15 @@ pub fn on_tick() {
 // Cyclic timer integration (L4)
 // ---------------------------------------------------------------------------
 
+/// Called from an application processor's timer interrupt.
+///
+/// DragonFly runs a softclock per CPU, so each CPU drains its own callout wheel. Raven keeps the
+/// global tick counter, wall clock, console poll and event-timer notification on the BSP; an AP
+/// only drains its local cyclic wheel here.
+pub fn on_ap_tick() {
+    cyclic_fire();
+}
+
 // Per-CPU wheel selection ported from DragonFlyBSD sys/kern/kern_timeout.c
 // `softclock_pcpu_ary` and `callout_reset_bycpu` @ 94448f622a06cde90ba42d688e9cab2448ad9ab3
 // (3-clause BSD; The DragonFly Project). Rust reimplementation; no C expression copied.
@@ -187,6 +196,16 @@ static CYCLIC_FIRE_LOG: [AtomicU64; 8] = [const { AtomicU64::new(u64::MAX) }; 8]
 static CYCLIC_FIRE_COUNT: AtomicUsize = AtomicUsize::new(0);
 /// Firings in the current per-CPU wheel batch (self-test only).
 static CYCLIC_FIRE_BATCH: AtomicU64 = AtomicU64::new(0);
+/// SMP attribution trace, enabled only by `selftest=cyclic-smp` (fixed capacity, no allocation).
+const CYCLIC_TRACE_MAX: usize = 64;
+static CYCLIC_TRACE_ENABLED: AtomicBool = AtomicBool::new(false);
+static CYCLIC_TRACE_COUNT: AtomicUsize = AtomicUsize::new(0);
+static CYCLIC_TRACE_ID: [AtomicU64; CYCLIC_TRACE_MAX] =
+    [const { AtomicU64::new(0) }; CYCLIC_TRACE_MAX];
+static CYCLIC_TRACE_CPU: [AtomicU64; CYCLIC_TRACE_MAX] =
+    [const { AtomicU64::new(0) }; CYCLIC_TRACE_MAX];
+static CYCLIC_TRACE_NS: [AtomicU64; CYCLIC_TRACE_MAX] =
+    [const { AtomicU64::new(0) }; CYCLIC_TRACE_MAX];
 
 fn wheel_cpu(cpu: usize) -> usize {
     cpu.min(crate::sched::smp::MAX_CPUS.saturating_sub(1))
@@ -243,6 +262,20 @@ fn cyclic_fire_on(cpu: usize) {
         registry.on_interrupt(now_ns(), |id| {
             let global = encode_cyclic(cpu, id);
             CYCLIC_FIRE_BATCH.fetch_add(1, Ordering::Relaxed);
+            if CYCLIC_TRACE_ENABLED.load(Ordering::Relaxed) {
+                let index = CYCLIC_TRACE_COUNT.fetch_add(1, Ordering::AcqRel);
+                if index < CYCLIC_TRACE_MAX {
+                    if let Some(slot) = CYCLIC_TRACE_ID.get(index) {
+                        slot.store(global, Ordering::Release);
+                    }
+                    if let Some(slot) = CYCLIC_TRACE_CPU.get(index) {
+                        slot.store(cpu as u64, Ordering::Release);
+                    }
+                    if let Some(slot) = CYCLIC_TRACE_NS.get(index) {
+                        slot.store(now_ns(), Ordering::Release);
+                    }
+                }
+            }
             let index = CYCLIC_FIRE_COUNT.fetch_add(1, Ordering::Relaxed);
             if let Some(slot) = CYCLIC_FIRE_LOG.get(index) {
                 slot.store(global, Ordering::Relaxed);
@@ -354,6 +387,233 @@ fn cyclic_selftest() {
         kprintln!("cyclic: percpu fail cpu0={cpu0} cpu1={cpu1}");
         boot::exit_qemu(0x12);
     }
+}
+
+/// Timer capacity of the SMP attribution test.
+const CYCLIC_SMP_MAX: usize = 16;
+/// A fire later than this after its deadline fails the SMP attribution row.
+const CYCLIC_SMP_WINDOW_NS: u64 = 100_000_000;
+/// Overall wait for the SMP attribution row (all deadlines are <= 160 ms).
+const CYCLIC_SMP_WAIT_NS: u64 = 500_000_000;
+static CYCLIC_SMP_STOP: AtomicBool = AtomicBool::new(false);
+static CYCLIC_SMP_HOPS: AtomicU64 = AtomicU64::new(0);
+
+fn cyclic_smp_spec(when: u64) -> cyclic::CyclicSpec {
+    cyclic::CyclicSpec {
+        when,
+        interval: 0,
+        level: cyclic::Level::Normal,
+        slack_ns: 0,
+    }
+}
+
+fn cyclic_smp_load() {
+    while !CYCLIC_SMP_STOP.load(Ordering::Acquire) {
+        CYCLIC_SMP_HOPS.fetch_add(1, Ordering::Relaxed);
+        core::hint::spin_loop();
+    }
+}
+
+fn cyclic_smp_record(
+    active: &mut [(u64, usize, u64); CYCLIC_SMP_MAX],
+    count: &mut usize,
+    id: u64,
+    cpu: usize,
+    deadline: u64,
+) {
+    if let Some(slot) = active.get_mut(*count) {
+        *slot = (id, cpu, deadline);
+        *count = (*count).saturating_add(1);
+    }
+}
+
+/// `selftest=cyclic-smp`: prove each per-CPU wheel fires on its own CPU under ``-smp 4`` load.
+///
+/// Arms a short, a long, a cancelled and a re-armed timer on every online CPU. One busy kernel
+/// load worker per CPU runs during the window. A fire must match its owner CPU, occur once, and
+/// stay inside [`CYCLIC_SMP_WINDOW_NS`]; a cancelled id must never fire. The BSP wait uses the
+/// scheduler timeout path, so a lost wake would also surface here.
+pub fn cyclic_smp_selftest() {
+    let cpus = crate::sched::smp::online_cpus().min(4);
+    let base = now_ns();
+    if base == 0 {
+        kprintln!("cyclic-smp: skip (no clock)");
+        return;
+    }
+    if cpus < 2 {
+        kprintln!("cyclic-smp: skip cpus={cpus}");
+        return;
+    }
+
+    CYCLIC_SMP_STOP.store(false, Ordering::Release);
+    CYCLIC_SMP_HOPS.store(0, Ordering::Relaxed);
+    let mut load_workers = 0usize;
+    for cpu in 0..cpus {
+        if crate::sched::spawn_kernel_on(cpu, "cyclic-smp-load", cyclic_smp_load).is_ok() {
+            load_workers = load_workers.saturating_add(1);
+        }
+    }
+    if load_workers != cpus {
+        kprintln!("cyclic-smp: fail load_workers={load_workers} cpus={cpus}");
+        boot::exit_qemu(0x14);
+    }
+
+    CYCLIC_TRACE_COUNT.store(0, Ordering::Release);
+    CYCLIC_TRACE_ENABLED.store(true, Ordering::Release);
+    let mut active = [(0u64, 0usize, 0u64); CYCLIC_SMP_MAX];
+    let mut active_count = 0usize;
+    let mut cancelled = [0u64; 4];
+    for cpu in 0..cpus {
+        let short_deadline = base.saturating_add(30_000_000);
+        let short = cyclic_add_on(cpu, cyclic_smp_spec(short_deadline));
+        cyclic_smp_record(&mut active, &mut active_count, short, cpu, short_deadline);
+
+        let long_deadline = base.saturating_add(120_000_000);
+        let long = cyclic_add_on(cpu, cyclic_smp_spec(long_deadline));
+        cyclic_smp_record(&mut active, &mut active_count, long, cpu, long_deadline);
+
+        let cancelled_id = cyclic_add_on(cpu, cyclic_smp_spec(base.saturating_add(60_000_000)));
+        if let Some(slot) = cancelled.get_mut(cpu) {
+            *slot = cancelled_id;
+        }
+        if !cyclic_cancel(cancelled_id) {
+            kprintln!("cyclic-smp: fail cancel armed cpu={cpu}");
+            boot::exit_qemu(0x13);
+        }
+
+        let old = cyclic_add_on(cpu, cyclic_smp_spec(base.saturating_add(50_000_000)));
+        if !cyclic_cancel(old) {
+            kprintln!("cyclic-smp: fail cancel rearm cpu={cpu}");
+            boot::exit_qemu(0x13);
+        }
+        let rearm_deadline = base.saturating_add(160_000_000);
+        let rearm = cyclic_add_on(cpu, cyclic_smp_spec(rearm_deadline));
+        cyclic_smp_record(&mut active, &mut active_count, rearm, cpu, rearm_deadline);
+    }
+
+    let end = base.saturating_add(CYCLIC_SMP_WAIT_NS);
+    while CYCLIC_TRACE_COUNT.load(Ordering::Acquire) < active_count && now_ns() < end {
+        crate::sched::sleep::sleep_ns(1_000_000);
+    }
+    CYCLIC_TRACE_ENABLED.store(false, Ordering::Release);
+
+    let trace_count = CYCLIC_TRACE_COUNT
+        .load(Ordering::Acquire)
+        .min(CYCLIC_TRACE_MAX);
+    let mut delays = [0u64; CYCLIC_SMP_MAX];
+    let mut delay_count = 0usize;
+    let mut per_cpu = [0usize; 4];
+    let mut fired = 0usize;
+    let mut wrong = 0usize;
+    let mut lost = 0usize;
+    let mut dup = 0usize;
+    let mut early = 0usize;
+    let mut late = 0usize;
+    for &(id, owner, deadline) in active.get(..active_count).unwrap_or(&[]) {
+        let mut hits = 0usize;
+        let mut fire_cpu = 0usize;
+        let mut fire_ns = 0u64;
+        for index in 0..trace_count {
+            let trace_id = CYCLIC_TRACE_ID
+                .get(index)
+                .map_or(u64::MAX, |slot| slot.load(Ordering::Acquire));
+            if trace_id != id {
+                continue;
+            }
+            hits = hits.saturating_add(1);
+            fire_cpu = CYCLIC_TRACE_CPU
+                .get(index)
+                .map_or(0, |slot| slot.load(Ordering::Acquire)) as usize;
+            fire_ns = CYCLIC_TRACE_NS
+                .get(index)
+                .map_or(0, |slot| slot.load(Ordering::Acquire));
+        }
+        if hits == 0 {
+            lost = lost.saturating_add(1);
+            continue;
+        }
+        if hits > 1 {
+            dup = dup.saturating_add(1);
+            continue;
+        }
+        fired = fired.saturating_add(1);
+        if fire_cpu != owner {
+            wrong = wrong.saturating_add(1);
+        }
+        if fire_ns < deadline {
+            early = early.saturating_add(1);
+        }
+        let delay = fire_ns.saturating_sub(deadline);
+        if delay > CYCLIC_SMP_WINDOW_NS {
+            late = late.saturating_add(1);
+        }
+        if let Some(slot) = delays.get_mut(delay_count) {
+            *slot = delay;
+            delay_count = delay_count.saturating_add(1);
+        }
+        if let Some(slot) = per_cpu.get_mut(owner) {
+            *slot = (*slot).saturating_add(1);
+        }
+    }
+
+    let mut cancelled_fired = 0usize;
+    for &id in cancelled.get(..cpus).unwrap_or(&[]) {
+        for index in 0..trace_count {
+            if CYCLIC_TRACE_ID
+                .get(index)
+                .is_some_and(|slot| slot.load(Ordering::Acquire) == id)
+            {
+                cancelled_fired = cancelled_fired.saturating_add(1);
+            }
+        }
+    }
+
+    for index in 1..delay_count {
+        let mut cursor = index;
+        while cursor > 0
+            && delays
+                .get(cursor)
+                .zip(delays.get(cursor.saturating_sub(1)))
+                .is_some_and(|(current, previous)| current < previous)
+        {
+            delays.swap(cursor, cursor.saturating_sub(1));
+            cursor = cursor.saturating_sub(1);
+        }
+    }
+
+    let min_us = delays.first().copied().unwrap_or(0) / 1_000;
+    let p50_us = delays.get(delay_count / 2).copied().unwrap_or(0) / 1_000;
+    let max_us = delays
+        .get(delay_count.saturating_sub(1))
+        .copied()
+        .unwrap_or(0)
+        / 1_000;
+    let hops = CYCLIC_SMP_HOPS.load(Ordering::Relaxed);
+    let cpu0 = per_cpu.first().copied().unwrap_or(0);
+    let cpu1 = per_cpu.get(1).copied().unwrap_or(0);
+    let cpu2 = per_cpu.get(2).copied().unwrap_or(0);
+    let cpu3 = per_cpu.get(3).copied().unwrap_or(0);
+    let ok = fired == active_count
+        && wrong == 0
+        && lost == 0
+        && dup == 0
+        && early == 0
+        && late == 0
+        && cancelled_fired == 0;
+
+    if ok {
+        kprintln!(
+            "cyclic-smp: ok cpus={cpus} expected={active_count} fired={fired} cancelled={cpus} wrong=0 lost=0 dup=0 early=0 late=0 min_us={min_us} p50_us={p50_us} max_us={max_us} load_workers={load_workers} load_hops={hops} cpu0={cpu0} cpu1={cpu1} cpu2={cpu2} cpu3={cpu3}"
+        );
+    } else {
+        kprintln!(
+            "cyclic-smp: fail cpus={cpus} expected={active_count} fired={fired} cancelled_fired={cancelled_fired} wrong={wrong} lost={lost} dup={dup} early={early} late={late} min_us={min_us} p50_us={p50_us} max_us={max_us} load_workers={load_workers} load_hops={hops}"
+        );
+        boot::exit_qemu(0x13);
+    }
+
+    CYCLIC_SMP_STOP.store(true, Ordering::Release);
+    crate::sched::sleep::sleep_ns(10_000_000);
 }
 
 /// Uptime as `(seconds, nanoseconds)`.
