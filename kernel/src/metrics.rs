@@ -76,11 +76,13 @@ fn sampler() {
         let (class1024, _, _) = memory::heap::class_stats(1024).unwrap_or((0, 0, 0));
         let (class1536, _, _) = memory::heap::class_stats(1536).unwrap_or((0, 0, 0));
         let (class192, _, _) = memory::heap::class_stats(192).unwrap_or((0, 0, 0));
+        let (queued, active, client) = crate::ipc::pending_counts();
         kprintln!(
             "K449-GRAPH graph_threads={graph_threads} weak_threads={weak_threads} \
              class3072_in_use={class_in_use} class3072_slabs={class_slabs} \
              class3072_fail={class_fail} class1024_in_use={class1024} \
              class1536_in_use={class1536} class192_in_use={class192} \
+             queued={queued} active={active} client={client} \
              zombies={} deadlive={} clsenotices={}",
             process::zombie_count(),
             process::dead_live_threads(),
