@@ -107,18 +107,8 @@ fn compose_std_command(command: LaunchRequest) -> std::io::Result<std::process::
     cmd.arg0(command.argv0);
     cmd.args(command.args);
     cmd.current_dir(command.working_dir);
-    #[cfg(not(target_os = "ravenbsd"))]
-    {
-        cmd.env_clear();
-        cmd.envs(command.env);
-    }
-    #[cfg(target_os = "ravenbsd")]
-    {
-        // K548 rev347 experiment: the shell's exported environment builds a fresh std env array;
-        // inherit the parent environment instead to test whether the env array is the parent-heap
-        // trigger that every raw libc-spawn canary (environ, custom, heap, big) has cleared.
-        let _ = command.env;
-    }
+    cmd.env_clear();
+    cmd.envs(command.env);
 
     // A closed standard stream gets the null device.
     // TODO(redirection): close it instead, as bash does (e.g., with a `pre_exec`
