@@ -289,6 +289,35 @@ fn a_preflight_safe_value_continues() {
 }
 
 #[test]
+fn both_timer_cases_carry_the_load_preflight() {
+    for name in ["kernel-timer.toml", "kernel-timer-aarch64.toml"] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("cases")
+            .join(name);
+        let case =
+            Case::load(&path).unwrap_or_else(|error| panic!("{}: {error:#}", path.display()));
+        let preflight: Vec<&str> = case
+            .spec
+            .pre
+            .iter()
+            .map(String::as_str)
+            .filter(|command| command.contains("tests/qtest/preflight-load.sh"))
+            .collect();
+        assert_eq!(
+            preflight.len(),
+            1,
+            "{name}: expected exactly one preflight pre step, got {:?}",
+            case.spec.pre
+        );
+        assert!(
+            preflight[0].contains("--max-load 5.0"),
+            "{name}: the preflight must keep the measured 5.0 load bound: {}",
+            preflight[0]
+        );
+    }
+}
+
+#[test]
 fn a_skipped_case_does_not_run_pre_commands() {
     let temp = TempDir::new("execute-skip-pre");
     let marker = temp.path().join("ran.txt");
