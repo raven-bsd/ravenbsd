@@ -51,9 +51,14 @@ SECTIONS {
         *(.data .data.*)
         *(.data.rel.ro .data.rel.ro.*)
         *(.got .got.*)
-        *(.init_array .init_array.*)
-        *(.fini_array .fini_array.*)
+        . = ALIGN(8);
+        __preinit_array_start = .;
         *(.preinit_array .preinit_array.*)
+        __preinit_array_end = .;
+        __init_array_start = .;
+        *(.init_array .init_array.*)
+        __init_array_end = .;
+        *(.fini_array .fini_array.*)
         *(.ctors .ctors.*)
         *(.dtors .dtors.*)
         . = ALIGN(4096);
