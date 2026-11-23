@@ -14,8 +14,10 @@
 //! 5. `PROC_TERMINATE` stops a running child; a handle without `SIGNAL` gets `EPERM`; a stale
 //!    handle gets `EBADF`; a second terminate gets `ESRCH`.
 //! 6. a terminated server's scheme name can be registered again immediately.
-//! 7. a child exits while the parent is blocked in `PROC_WAIT_EX` with a registered signal
-//!    entry; the wait returns the child pid and status, not `EINTR`.
+//! 7. a child exits while the parent is blocked in `PROC_WAIT_EX`/`PROC_WAIT` with a registered
+//!    signal entry; both waits return the child status, not `EINTR`.
+//! 8. a caught signal delivered while the parent is blocked still returns `EINTR` (no
+//!    suppression); a child-exit wake alone does not interrupt.
 //!
 //! Roles: `marker` (exit 0), `twomain`, `sleep` (sleep forever), `delayed` (exit 42 after a
 //! short sleep), `server` (register scheme `s36`, then sleep).
@@ -28,6 +30,7 @@ use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
+use raven_abi::signal::{SIG_SETUP, SIG_SETUP_ABS, SIGRETURN};
 use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_elf::{Elf, LoadMode, Machine, StepKind, plan_load};
@@ -40,14 +43,18 @@ entry!(main);
 const PAGE: usize = 4096;
 /// Raw `proc_wait_ex(idtype, id, options, out_status) -> pid`.
 const PROC_WAIT_EX: usize = 0x48;
+/// Raw `proc_signal(target, signo) -> 0`.
+const PROC_SIGNAL: usize = 0x4A;
+/// Raw `proc_sigrecv_ex(out, flags, deliverable) -> signo`.
+const PROC_SIGRECV_EX: usize = 0x85;
+/// `PROC_SIGRECV_EX` flag: select only signals in the deliverable mask.
+const SIGRECV_DELIVERABLE: usize = 2;
+/// `SIGUSR1`.
+const SIGUSR1: usize = 10;
 /// Raw `proc_handle_info(handle) -> pid`.
 const PROC_HANDLE_INFO: usize = 0x3E;
 /// Raw `sig_setup(entry, ctx, flags)`.
-const SIG_SETUP: usize = 0x80;
 /// Raw `sigreturn()`.
-const SIGRETURN: usize = 0x82;
-/// The absolute `SIG_SETUP` context-area flag.
-const SIG_SETUP_ABS: usize = 2;
 /// Kernel `P_PID` wait id type.
 const P_PID: usize = 1;
 /// The registered signal context area.
@@ -72,6 +79,7 @@ struct HelperStack(#[allow(dead_code)] [u8; HELPER_STACK_SIZE]);
 static mut CYCLE_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 static mut TW_HELPER_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 static mut TW_SLEEP_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
+static mut WAIT_SIGNAL_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 
 #[repr(align(16))]
 struct SignalContext(#[allow(dead_code)] [u8; SIGNAL_CONTEXT_SIZE]);
@@ -440,6 +448,25 @@ extern "C" fn signal_entry(_bits: usize, _context: usize, _mask: usize) -> ! {
     }
 }
 
+/// Deliver `SIGUSR1` to the process group after the controller has blocked in the wait.
+extern "C" fn wait_signal_thread(_arg: usize) -> ! {
+    nanosleep(50_000_000);
+    let _ = syscall2(PROC_SIGNAL, 0, SIGUSR1);
+    thread_exit(0)
+}
+
+/// Pop the queued `SIGUSR1` so it cannot interrupt a later wait.
+fn drain_sigusr1() {
+    let mut words = [0u64; 6];
+    let deliverable = 1u64 << (SIGUSR1 - 1);
+    let _ = syscall3(
+        PROC_SIGRECV_EX,
+        words.as_mut_ptr() as usize,
+        SIGRECV_DELIVERABLE,
+        deliverable as usize,
+    );
+}
+
 /// The 10,000 thread create/exit cycles (scenario 2).
 fn churn_part() -> Result<(), &'static str> {
     let entry: extern "C" fn(usize) -> ! = cycle_thread;
@@ -652,17 +679,23 @@ fn scheme_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// Scenario 7: a child exits while the parent is blocked in `PROC_WAIT_EX`.
+/// Scenario 7: a child exits while the parent is blocked in a wait.
 ///
 /// The parent has a registered signal entry, so the child's `SIGCHLD` kick and the wait wakeup
-/// race. The wait must return the requested pid and exit code, not `EINTR`.
+/// race. `PROC_WAIT_EX` must return the requested pid and exit code, and the handle `PROC_WAIT`
+/// must return the code; neither may report `EINTR` while the child status is available.
 fn wait_interrupt_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     let entry: extern "C" fn(usize, usize, usize) -> ! = signal_entry;
     // SAFETY: only the static's address is taken; the kernel validates the executable entry and
     // the 4096-byte absolute context area before storing the per-thread registration.
     let context = core::ptr::addr_of_mut!(SIGNAL_CONTEXT) as usize;
-    result(syscall3(SIG_SETUP, entry as usize, context, SIG_SETUP_ABS))
-        .map_err(|_| "wait signal setup")?;
+    result(syscall3(
+        SIG_SETUP,
+        entry as usize,
+        context,
+        SIG_SETUP_ABS as usize,
+    ))
+    .map_err(|_| "wait signal setup")?;
     let child = spawn_role(initfs, "delayed").map_err(|_| "wait race spawn")?;
     let pid = proc_handle_info(child).map_err(|_| "wait race pid")?;
     let mut status = 0i32;
@@ -679,6 +712,52 @@ fn wait_interrupt_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     }
     handle_close(child);
     println!("s36: wait race ok");
+
+    // The handle-based PROC_WAIT has the same interrupted-wakeup contract.
+    let child = spawn_role(initfs, "delayed").map_err(|_| "wait race handle spawn")?;
+    match proc_wait(child) {
+        Ok(42) => {}
+        Ok(code) => {
+            println!("s36: wait race handle code={}", code);
+            return Err("wait race handle code");
+        }
+        Err(error) => {
+            println!("s36: wait race handle errno={}", error.0);
+            return Err("wait race handle interrupted");
+        }
+    }
+    handle_close(child);
+    println!("s36: wait race handle ok");
+    Ok(())
+}
+
+/// Scenario 8: a caught signal delivered while the parent is blocked still returns `EINTR`.
+///
+/// This is the no-suppression control: a child-exit wake is not an interrupt, but a caught
+/// signal is. A helper delivers `SIGUSR1` after the controller blocks on a sleeping child.
+fn wait_eintr_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let child = spawn_role(initfs, "sleep").map_err(|_| "wait eintr spawn")?;
+    let pid = proc_handle_info(child).map_err(|_| "wait eintr pid")?;
+    let entry: extern "C" fn(usize) -> ! = wait_signal_thread;
+    // SAFETY: only the static's address is taken; the helper runs on it until its thread exits.
+    let stack_top = helper_stack_top(core::ptr::addr_of_mut!(WAIT_SIGNAL_STACK));
+    let helper = thread_create(Handle::SELF_PROC, entry as usize, stack_top, pid as usize)
+        .map_err(|_| "wait eintr helper")?;
+    let mut status = 0i32;
+    match proc_wait_ex(P_PID, pid, &mut status) {
+        Err(Errno::EINTR) => {}
+        Err(_) => return Err("wait eintr wrong errno"),
+        Ok(_) => return Err("wait eintr not delivered"),
+    }
+    drain_sigusr1();
+    proc_terminate(child, 0).map_err(|_| "wait eintr terminate")?;
+    match proc_wait_ex(P_PID, pid, &mut status) {
+        Ok(got) if got == pid as usize && status == 0 => {}
+        _ => return Err("wait eintr reap"),
+    }
+    handle_close(helper);
+    handle_close(child);
+    println!("s36: wait eintr ok");
     Ok(())
 }
 
@@ -702,6 +781,10 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     // Scenario 7: the SIGCHLD kick must not replace an available child status with EINTR.
     if let Err(message) = wait_interrupt_part(&initfs) {
+        fail(message);
+    }
+    // Scenario 8: a caught signal must still interrupt the wait (no EINTR suppression).
+    if let Err(message) = wait_eintr_part(&initfs) {
         fail(message);
     }
     // Scenario 2, baseline marker: the kernel prints the stack/heap counters on this exit.

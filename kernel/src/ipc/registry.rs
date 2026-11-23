@@ -128,20 +128,14 @@ pub fn file_source_trusted(server: &Arc<Process>) -> bool {
     })
 }
 
-/// Resolve `name` for `process`, enforcing the process namespace.
-///
-/// A root process may resolve a protected boot service even when its namespace snapshot
-/// predates that service's registration. Root credentials are the donor's socket authority;
-/// the protected-name registry is a Raven service-visibility divergence. Unprivileged
-/// processes keep the namespace denial, and non-protected names keep the normal snapshot rule.
+/// Resolve `name` for `process`, enforcing the process namespace snapshot.
 pub fn lookup(process: &Arc<Process>, name: &str) -> Result<Arc<Process>, Errno> {
-    let root = process.ids.lock().euid == 0;
     let mut registry = REGISTRY.lock();
     let Some(server) = registry.get(name).cloned() else {
         return Err(Errno::ENOENT);
     };
     let allowed = process.namespace.lock().allows(name);
-    if !allowed && !(root && protected_name(name)) {
+    if !allowed {
         return Err(Errno::EACCES);
     }
     if !server.is_live() {
