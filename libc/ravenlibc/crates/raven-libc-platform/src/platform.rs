@@ -1790,6 +1790,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             inherited.event = event_number(ofd.event.get());
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
             inherited.socket = ofd.socket_meta();
+            inherited.pty_master = ofd.is_pty_master();
             out.push(inherited);
         }
         Ok(FdMap { entries: out })
@@ -1831,6 +1832,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             };
             inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
             inherited.socket = ofd.socket_meta();
+            inherited.pty_master = ofd.is_pty_master();
             block.entries.push(inherited);
         }
         if block.entries.is_empty() {
@@ -1922,6 +1924,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                     inherited.set_poll_rearm(entry.readiness);
                     if let Some(socket) = entry.socket {
                         inherited.set_socket_meta(socket);
+                    }
+                    if entry.pty_master {
+                        inherited.set_pty_master();
                     }
                 }
                 by_handle.insert(entry.handle, index);
