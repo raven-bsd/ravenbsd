@@ -969,15 +969,25 @@ static int check_half_close(void) {
     // the EPIPE the contract requires.
     (void)poll(NULL, 0, 50);
     wrote = write(conn, "X", 1);
-    revents = poll_one(conn, POLLIN | POLLHUP, 3000);
-    for (int attempt = 0; attempt < 50 && (revents & POLLHUP) == 0; attempt++) {
-        (void)poll(NULL, 0, 20);
-        revents = poll_one(conn, POLLIN | POLLHUP, 100);
-    }
-    if (revents < 0 || (revents & POLLHUP) == 0) {
-        char detail[96];
-        (void)snprintf(detail, sizeof(detail), "half hup revents=0x%x", (unsigned)revents);
-        return fail(detail);
+    {
+        ssize_t probe = wrote;
+        int probe_errno = wrote < 0 ? errno : 0;
+        revents = poll_one(conn, POLLIN | POLLHUP, 3000);
+        for (int attempt = 0; attempt < 50 && (revents & POLLHUP) == 0; attempt++) {
+            (void)poll(NULL, 0, 20);
+            revents = poll_one(conn, POLLIN | POLLHUP, 100);
+        }
+        if (revents < 0 || (revents & POLLHUP) == 0) {
+            int so_error = 0;
+            socklen_t so_len = sizeof(so_error);
+            int so_rc = getsockopt(conn, SOL_SOCKET, SO_ERROR, &so_error, &so_len);
+            char detail[192];
+            (void)snprintf(detail, sizeof(detail),
+                           "half hup revents=0x%x errno=%d x_write=%zd x_errno=%d "
+                           "so_rc=%d so_error=%d",
+                           (unsigned)revents, errno, probe, probe_errno, so_rc, so_error);
+            return fail(detail);
+        }
     }
     wrote = write(conn, "X", 1);
     if (wrote >= 0 || errno != EPIPE) {
