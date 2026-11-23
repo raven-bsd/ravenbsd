@@ -1785,8 +1785,9 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         );
     }
     // S36 vfsd map/unmap red row: exit 88 records the baseline, exit 89 compares the allocated
-    // frame bytes. The markers run around the fixture's vfsd pager map/unmap cycles; a leak keeps
-    // allocated_bytes above the one-chunk tolerance and prints the forbidden `leak` line.
+    // frame bytes. The markers run around the fixture's vfsd pager map/unmap cycles; the
+    // tolerance is one 64 KiB allocator chunk. A pager key that is never released leaks ~4 KiB
+    // per map and prints the forbidden `leak` line.
     if CmdLine::parse(paging::cmdline())
         .get("s36-mapcheck")
         .is_some()

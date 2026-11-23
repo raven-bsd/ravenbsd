@@ -93,6 +93,8 @@ struct State {
     chunk: *mut u8,
     chunk_len: usize,
     chunk_offset: usize,
+    /// Offset of the first allocation in the current chunk (alignment padding precedes it).
+    chunk_start: usize,
     free: *mut FreeNode,
 }
 
@@ -102,6 +104,7 @@ impl State {
             chunk: ptr::null_mut(),
             chunk_len: 0,
             chunk_offset: 0,
+            chunk_start: usize::MAX,
             free: ptr::null_mut(),
         }
     }
@@ -178,13 +181,17 @@ impl State {
             self.chunk = chunk;
             self.chunk_len = map_len;
             self.chunk_offset = 0;
+            self.chunk_start = usize::MAX;
             return self.alloc(source, layout);
+        }
+        if self.chunk_start == usize::MAX {
+            self.chunk_start = aligned.saturating_sub(base);
         }
         self.chunk_offset = offset_end;
         aligned as *mut u8
     }
 
-    fn dealloc(&mut self, pointer: *mut u8, layout: Layout) {
+    fn dealloc(&mut self, source: &mut dyn PageSource, pointer: *mut u8, layout: Layout) {
         if pointer.is_null() {
             return;
         }
@@ -243,6 +250,39 @@ impl State {
             }
         }
         self.salvage_tail();
+        self.release_empty_chunk(source);
+    }
+
+    /// Return a fully-free current chunk to the page source.
+    ///
+    /// Reuse alone leaves the high-water mapping resident; a long-lived server such as vfsd then
+    /// keeps user frames that no session owns. Unmap the chunk when the bump pointer is back at
+    /// its base and no free node intersects it. Nodes from other chunks are unaffected.
+    fn release_empty_chunk(&mut self, source: &mut dyn PageSource) {
+        if self.chunk.is_null()
+            || self.chunk_start == usize::MAX
+            || self.chunk_offset != self.chunk_start
+        {
+            return;
+        }
+        let base = self.chunk as usize;
+        let end = base.saturating_add(self.chunk_len);
+        let mut node = self.free;
+        while !node.is_null() {
+            // SAFETY: the free list is address-ordered and every node is live.
+            let size = unsafe { (*node).size };
+            let start = node as usize;
+            if start < end && start.saturating_add(size) > base {
+                return;
+            }
+            // SAFETY: every free-list node has a next pointer.
+            node = unsafe { (*node).next };
+        }
+        source.unmap(self.chunk, self.chunk_len);
+        self.chunk = ptr::null_mut();
+        self.chunk_len = 0;
+        self.chunk_offset = 0;
+        self.chunk_start = usize::MAX;
     }
 
     /// Reclaim a free block that ends at the bump pointer.
@@ -327,7 +367,7 @@ unsafe impl<S: PageSource + Send> GlobalAlloc for Allocator<S> {
     }
 
     unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
-        self.with_state(|state, _| state.dealloc(pointer, layout));
+        self.with_state(|state, source| state.dealloc(source, pointer, layout));
     }
 }
 

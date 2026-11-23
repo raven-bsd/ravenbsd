@@ -84,6 +84,13 @@ fn allocator() -> Allocator<TestSource> {
     Allocator::new(TestSource::new())
 }
 
+/// Keep one small block live so a test can observe free-list reuse without the allocator
+/// returning the now-fully-free chunk to the page source.
+fn anchor<S: PageSource + Send>(allocator: &Allocator<S>) -> (*mut u8, Layout) {
+    let layout = Layout::from_size_align(8, 8).unwrap();
+    (test_alloc(allocator, layout), layout)
+}
+
 #[test]
 fn basic_alignment_and_size() {
     let allocator = allocator();
@@ -126,12 +133,14 @@ fn alignment_beyond_page_size() {
 #[test]
 fn free_list_reuses_exact_block() {
     let allocator = allocator();
+    let (hold, hold_layout) = anchor(&allocator);
     let layout = Layout::from_size_align(32, 8).unwrap();
     let first = test_alloc(&allocator, layout);
     test_dealloc(&allocator, first, layout);
     let second = test_alloc(&allocator, layout);
     assert_eq!(first, second);
     test_dealloc(&allocator, second, layout);
+    test_dealloc(&allocator, hold, hold_layout);
 }
 
 #[test]
@@ -168,17 +177,20 @@ fn multiple_allocations_do_not_overlap() {
 #[test]
 fn small_allocations_are_reusable() {
     let allocator = allocator();
+    let (hold, hold_layout) = anchor(&allocator);
     let layout = Layout::from_size_align(1, 1).unwrap();
     let pointer = test_alloc(&allocator, layout);
     test_dealloc(&allocator, pointer, layout);
     let next = test_alloc(&allocator, layout);
     assert_eq!(pointer, next, "a small freed block must be reusable");
     test_dealloc(&allocator, next, layout);
+    test_dealloc(&allocator, hold, hold_layout);
 }
 
 #[test]
 fn free_list_handles_multiple_blocks() {
     let allocator = allocator();
+    let (hold, hold_layout) = anchor(&allocator);
     let layout = Layout::from_size_align(24, 8).unwrap();
     let first = test_alloc(&allocator, layout);
     let second = test_alloc(&allocator, layout);
@@ -189,6 +201,9 @@ fn free_list_handles_multiple_blocks() {
     assert!(a == second || a == first);
     assert!(b == second || b == first);
     assert_ne!(a, b);
+    test_dealloc(&allocator, a, layout);
+    test_dealloc(&allocator, b, layout);
+    test_dealloc(&allocator, hold, hold_layout);
 }
 
 #[test]
@@ -206,12 +221,14 @@ fn writes_are_visible() {
 #[test]
 fn allocation_after_dealloc_can_reuse_chunk() {
     let allocator = allocator();
+    let (hold, hold_layout) = anchor(&allocator);
     let layout = Layout::from_size_align(32, 8).unwrap();
     let pointer = test_alloc(&allocator, layout);
     test_dealloc(&allocator, pointer, layout);
     let again = test_alloc(&allocator, layout);
     assert_eq!(pointer, again);
     test_dealloc(&allocator, again, layout);
+    test_dealloc(&allocator, hold, hold_layout);
 }
 
 /// The vfsd pattern: a large transient block is freed, then a small request arrives before the
@@ -225,9 +242,11 @@ fn mixed_size_churn_reuses_mapped_chunks() {
     let big = Layout::from_size_align(64 * 1024, 8).unwrap();
     let small = Layout::from_size_align(8 * 1024, 8).unwrap();
 
-    // Warm both sizes: one mapped chunk must serve the whole churn.
+    // Keep one block in the large chunk so the churn exercises split/reuse (not a full unmap),
+    // and the small request cannot consume the large block without returning its tail.
     let pointer = test_alloc(&allocator, big);
     assert!(!pointer.is_null());
+    let (keeper, keeper_layout) = anchor(&allocator);
     test_dealloc(&allocator, pointer, big);
     let pointer = test_alloc(&allocator, small);
     assert!(!pointer.is_null());
@@ -250,6 +269,7 @@ fn mixed_size_churn_reuses_mapped_chunks() {
         baseline,
         "mixed-size churn must reuse the mapped chunk"
     );
+    test_dealloc(&allocator, keeper, keeper_layout);
 }
 
 /// Two adjacent frees must merge so a following larger request does not map a new chunk.
@@ -257,10 +277,12 @@ fn mixed_size_churn_reuses_mapped_chunks() {
 fn adjacent_frees_coalesce() {
     let mapped = Arc::new(AtomicUsize::new(0));
     let allocator = Allocator::new(CountingSource::new(Arc::clone(&mapped)));
+    let (hold, hold_layout) = anchor(&allocator);
     let half = Layout::from_size_align(16, 8).unwrap();
     let whole = Layout::from_size_align(32, 8).unwrap();
     let first = test_alloc(&allocator, half);
     let second = test_alloc(&allocator, half);
+    let (sentinel, sentinel_layout) = anchor(&allocator);
     assert_ne!(first, second);
     test_dealloc(&allocator, first, half);
     test_dealloc(&allocator, second, half);
@@ -277,6 +299,8 @@ fn adjacent_frees_coalesce() {
         "the coalesced pair must not map another chunk"
     );
     test_dealloc(&allocator, merged, whole);
+    test_dealloc(&allocator, sentinel, sentinel_layout);
+    test_dealloc(&allocator, hold, hold_layout);
 }
 
 /// A page-aligned source like `SysPageSource`, so the stress exercises real chunk addresses.
@@ -361,21 +385,43 @@ fn mixed_sizes_never_overlap() {
     }
 }
 
+/// Freeing the only block in the current chunk must return the chunk mapping, not just the bump
+/// pointer: vfsd's mapped user pages must not stay resident after the session's work is gone.
+#[test]
+fn a_fully_free_chunk_is_unmapped() {
+    let mapped = Arc::new(AtomicUsize::new(0));
+    let allocator = Allocator::new(CountingSource::new(Arc::clone(&mapped)));
+    let layout = Layout::from_size_align(64 * 1024, 8).unwrap();
+    let pointer = test_alloc(&allocator, layout);
+    assert!(!pointer.is_null());
+    assert!(
+        mapped.load(Ordering::Acquire) >= 64 * 1024,
+        "the allocation must map a chunk"
+    );
+    test_dealloc(&allocator, pointer, layout);
+    assert_eq!(
+        mapped.load(Ordering::Acquire),
+        0,
+        "the empty chunk must be unmapped"
+    );
+}
+
 #[test]
 fn bump_tail_is_salvaged() {
     let mapped = Arc::new(AtomicUsize::new(0));
     let allocator = Allocator::new(CountingSource::new(Arc::clone(&mapped)));
-    let small = Layout::from_size_align(16, 8).unwrap();
-    let page = Layout::from_size_align(4096, 8).unwrap();
-    let pointer = test_alloc(&allocator, small);
-    test_dealloc(&allocator, pointer, small);
+    let (hold, hold_layout) = anchor(&allocator);
+    let target = Layout::from_size_align(4000, 8).unwrap();
+    let pointer = test_alloc(&allocator, target);
+    test_dealloc(&allocator, pointer, target);
     let baseline = mapped.load(Ordering::Acquire);
-    let pointer = test_alloc(&allocator, page);
+    let pointer = test_alloc(&allocator, target);
     assert!(!pointer.is_null());
     assert_eq!(
         mapped.load(Ordering::Acquire),
         baseline,
-        "the salvaged tail must satisfy the page request"
+        "the salvaged tail must satisfy the next request"
     );
-    test_dealloc(&allocator, pointer, page);
+    test_dealloc(&allocator, pointer, target);
+    test_dealloc(&allocator, hold, hold_layout);
 }
