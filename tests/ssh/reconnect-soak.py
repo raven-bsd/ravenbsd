@@ -187,15 +187,24 @@ def parse_metrics_line(text: str) -> dict | None:
     return {key: int(value) for key, value in zip(keys, matches[-1])}
 
 
+# kernel/src/memory/heap.rs `MAX_SLABS`: the per-class slab table bound.
+C3072_SLAB_CAP = 256
+
+
 def class_gate(sample: dict, session: int) -> str | None:
-    """Return a loud line when the 3072-byte kmem class has no free object.
+    """Return a loud line when the 3072-byte kmem class is exhausted.
 
     The 3072-byte class, not the frame pool, is the release-gate resource: a 2160-byte
-    request can fail while frames are free when this class is full. Samples from an
-    image without the counters carry None and do not trip the gate.
+    request can fail while frames are free when this class is full. A zero free list is
+    normal while the cache can still grow, so the gate also requires the slab table at
+    its cap (kernel/src/memory/heap.rs `MAX_SLABS = 256`). Samples from an image without
+    the counters carry None and do not trip the gate.
     """
     free = sample.get("c3072_free")
-    if free is None or free != 0:
+    slabs = sample.get("c3072_slabs")
+    if free is None or slabs is None:
+        return None
+    if free != 0 or slabs < C3072_SLAB_CAP:
         return None
     return (
         f"CLASS-EXHAUSTED session={session} c3072_free=0 "
@@ -306,6 +315,13 @@ def selftest() -> int:
     check("class-gate-frames", "frames_free=377507840" in (exhausted or ""), True)
     check("class-gate-one", class_gate({"c3072_free": 1}, 57), None)
     check("class-gate-absent", class_gate({"c3072_free": None}, 57), None)
+    check("class-gate-not-capped", class_gate({
+        "c3072_free": 0, "c3072_used": 37, "c3072_slabs": 37,
+        "frames_free": 370499584, "frames_alloc": 45936640,
+    }, 1), None)
+    check("class-gate-capped-one", class_gate({
+        "c3072_free": 1, "c3072_used": 255, "c3072_slabs": 256,
+    }, 56), None)
     check(
         "banner-line-remote",
         is_banner_line(
