@@ -2064,6 +2064,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let (dead_handles, top_pid, top_count) = crate::process::handle::dead_process_handles();
         let (notices, dead_clients, dead_servers) = crate::ipc::router::close_notice_stats();
         let leaked = leaked_process_stats();
+        let leaked_threads = crate::sched::thread::leaked_thread_objects();
         kprintln!(
             "s36: procs={} threads={} zombies={} proc_size={} thread_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={} leaked_threads={} file_refs={} request_refs={} thread_handles={}",
             live_processes(),
@@ -2090,6 +2091,12 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             leaked[7],
             leaked[8],
             leaked[9]
+        );
+        kprintln!(
+            "s36: leaked_tobj={} t_ext1={} t_ext2plus={}",
+            leaked_threads[0],
+            leaked_threads[1],
+            leaked_threads[2]
         );
         let holders = request_holder_stats();
         kprintln!(

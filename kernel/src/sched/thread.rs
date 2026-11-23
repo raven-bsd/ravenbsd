@@ -62,6 +62,34 @@ static NEXT_TID: AtomicU32 = AtomicU32::new(1);
 /// [`MAX_THREADS`] and sizing every level to the same bound means the queue can never refuse a
 /// runnable thread. Idle threads are never enqueued and are excluded.
 static LIVE_THREADS: AtomicUsize = AtomicUsize::new(0);
+
+/// Every thread object ever created, weakly (S36b leaked-thread diagnostic only).
+static ALL_THREADS: Mutex<Vec<alloc::sync::Weak<Thread>>> = Mutex::new(Vec::new());
+
+fn remember_thread(thread: &Arc<Thread>) {
+    ALL_THREADS.lock().push(Arc::downgrade(thread));
+}
+
+/// Leaked thread objects (thread whose process is torn down) and their strong-ref histogram.
+///
+/// Returns `(leaked, external_refs_1, external_refs_2plus)`.
+pub fn leaked_thread_objects() -> [u64; 3] {
+    let mut stats = [0u64; 3];
+    for weak in ALL_THREADS.lock().iter() {
+        let Some(thread) = weak.upgrade() else {
+            continue;
+        };
+        if !thread.process.torn_down.load(Ordering::Acquire) {
+            continue;
+        }
+        stats[0] = stats[0].saturating_add(1);
+        match Arc::strong_count(&thread).saturating_sub(1) {
+            0 | 1 => stats[1] = stats[1].saturating_add(1),
+            _ => stats[2] = stats[2].saturating_add(1),
+        }
+    }
+    stats
+}
 /// Admission denials since boot (K530 churn diagnostic).
 static SLOT_DENIES: AtomicUsize = AtomicUsize::new(0);
 /// Slots released since boot (K530 churn diagnostic).
@@ -486,12 +514,13 @@ impl Thread {
         unsafe {
             thread.set_saved_rsp(saved);
         }
+        remember_thread(&thread);
         Ok(thread)
     }
 
     /// Create the in-place idle thread for the boot CPU.
     pub fn new_idle(process: Arc<Process>, current_rsp: u64, cr3: u64) -> Arc<Thread> {
-        Arc::new(Thread {
+        let thread = Arc::new(Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             tid: next_tid(),
             clear_tid: AtomicU64::new(0),
@@ -537,7 +566,9 @@ impl Thread {
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
-        })
+        });
+        remember_thread(&thread);
+        thread
     }
 
     /// Create the idle thread for an application processor.
@@ -547,7 +578,7 @@ impl Thread {
     /// `sched_switch` saves the live stack pointer.
     pub fn new_idle_ap(process: Arc<Process>, cr3: u64) -> Result<Arc<Thread>, Errno> {
         let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
-        Ok(Arc::new(Thread {
+        let thread = Arc::new(Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             tid: next_tid(),
             clear_tid: AtomicU64::new(0),
@@ -593,7 +624,9 @@ impl Thread {
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
-        }))
+        });
+        remember_thread(&thread);
+        Ok(thread)
     }
 }
 
