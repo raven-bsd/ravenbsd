@@ -16,10 +16,11 @@ and optionally adds the TTY rows:
   python3 tests/ssh/reconnect-soak.py --sessions 100 --tty-sessions 10
 
 Every ``--resource-every N`` command sessions (default 5) the harness also samples the resource
-curve without adding an SSH row: the host QEMU RSS proxy, the boot heap size and the serial panic
-flag. The image exposes no heap-free/thread/fd counter yet, and its `ps`/`kstat` tools print to the
-guest console rather than the SSH stdout, so those stay absent and the summary names the gap; no
-value is fabricated. The samples are written to ``resources.tsv`` and printed as a table.
+curve without adding an SSH row: the host QEMU RSS proxy plus, when the image was built with
+``k449-metrics=<seconds>`` on the kernel cmdline, the guest kernel's heap/frame bytes, live
+process/thread counts and handle (OFD) lineage count from the ``K449-METRICS`` serial line.
+Images without that test-only key report ``-`` for those fields; no value is fabricated. The
+samples are written to ``resources.tsv`` and printed as a table.
 
 Evidence is written under build/ssh-reconnect-soak/<UTC>/ (copy it to managed evidence after the
 run; the frozen product evidence tree is never touched). No QEMU-free shortcut, no retry.
@@ -126,12 +127,16 @@ def parse_args(argv: list[str]) -> dict:
 # and its ps/kstat print to the console rather than the SSH stdout. The curve is therefore
 # host-side: QEMU RSS, the serial boot heap and the panic flag. No value is fabricated:
 # unavailable counters are absent and named in the summary.
-RESOURCE_COLUMNS = ["after_session", "qemu_rss_kb", "serial_heap_kb", "panic"]
+RESOURCE_COLUMNS = [
+    "after_session", "qemu_rss_kb", "heap_used", "heap_free", "frames_free",
+    "frames_alloc", "procs", "threads", "ofds", "serial_heap_kb", "panic",
+]
 RESOURCE_NOTE = (
-    "guest heap-free/threads/fds are not exposed by this image; the kstat VM/scheduler "
-    "providers are the documented follow-up (docs/kstat.md). ps/kstat print to the guest "
-    "console, not the SSH stdout, and the ps probe wedged the listener, so the curve uses the "
-    "host QEMU RSS proxy and the serial heap/panic only; the SSH rows are untouched."
+    "guest heap/frame bytes, live processes/threads and handle (OFD) lineage count come from "
+    "the test-only K449-METRICS kernel line, enabled by `k449-metrics=<seconds>` on the image "
+    "cmdline; on an image without that key those fields are '-' and only the host QEMU RSS and "
+    "the serial boot heap/panic remain. The K449-METRICS sampler is a diagnostic, not a product "
+    "service, and the SSH rows are untouched."
 )
 
 
@@ -145,9 +150,26 @@ def parse_qemu_rss(text: str) -> int | None:
     return None
 
 
+METRICS_RE = re.compile(
+    r"K449-METRICS heap_used=(\d+) heap_free=(\d+) frames_free=(\d+) "
+    r"frames_alloc=(\d+) procs=(\d+) threads=(\d+) ofds=(\d+)"
+)
+
+
+def parse_metrics_line(text: str) -> dict | None:
+    """Parse the newest K449-METRICS line from the guest serial."""
+    matches = METRICS_RE.findall(text)
+    if not matches:
+        return None
+    keys = ["heap_used", "heap_free", "frames_free", "frames_alloc",
+            "procs", "threads", "ofds"]
+    return {key: int(value) for key, value in zip(keys, matches[-1])}
+
+
 def format_resource_table(rows: list[dict]) -> str:
     """Render the resource samples as a compact table (missing values are '-')."""
-    header = ["after", "rss_kb", "heap_kb", "panic"]
+    header = ["after", "rss_kb", "heap_u", "heap_f", "fr_free", "fr_alloc",
+              "procs", "thr", "ofds", "heap_kb", "panic"]
     lines = ["  ".join(header)]
 
     def value(item: object) -> str:
@@ -157,6 +179,13 @@ def format_resource_table(rows: list[dict]) -> str:
         lines.append("  ".join([
             value(row.get("after_session")),
             value(row.get("qemu_rss_kb")),
+            value(row.get("heap_used")),
+            value(row.get("heap_free")),
+            value(row.get("frames_free")),
+            value(row.get("frames_alloc")),
+            value(row.get("procs")),
+            value(row.get("threads")),
+            value(row.get("ofds")),
             value(row.get("serial_heap_kb")),
             "yes" if row.get("panic") else "no",
         ]))
@@ -173,6 +202,17 @@ def selftest() -> int:
 
     check("rss", parse_qemu_rss("Name:\tqemu\nVmRSS:\t12345 kB\n"), 12345)
     check("rss-missing", parse_qemu_rss("Name:\tqemu\n"), None)
+    metrics = parse_metrics_line(
+        "K449-METRICS: sampler every 5s\n"
+        "K449-METRICS heap_used=10 heap_free=20 frames_free=30 frames_alloc=40 "
+        "procs=5 threads=6 ofds=7\n"
+    )
+    check("metrics-heap-used", metrics and metrics["heap_used"], 10)
+    check("metrics-frames-free", metrics and metrics["frames_free"], 30)
+    check("metrics-procs", metrics and metrics["procs"], 5)
+    check("metrics-threads", metrics and metrics["threads"], 6)
+    check("metrics-ofds", metrics and metrics["ofds"], 7)
+    check("metrics-missing", parse_metrics_line("no metrics here\n"), None)
     table = format_resource_table([
         {"after_session": 0, "qemu_rss_kb": 1000, "serial_heap_kb": 4096,
          "panic": False},
@@ -382,6 +422,9 @@ def sample_host(child: subprocess.Popen, serial: Path, after_session: int) -> di
         serial_bytes = serial.read_bytes()
     except OSError:
         serial_bytes = b""
+    metrics = parse_metrics_line(serial_bytes.decode("utf-8", errors="replace"))
+    if metrics:
+        sample.update(metrics)
     heap = re.search(rb"heap:\s+(\d+)\s+KiB", serial_bytes)
     sample["serial_heap_kb"] = int(heap.group(1)) if heap else None
     sample["panic"] = b"KERNEL PANIC" in serial_bytes
