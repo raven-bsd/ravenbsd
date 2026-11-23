@@ -74,6 +74,35 @@ fn exec_fdmap_env_carries_the_table_and_closes_cloexec() {
 }
 
 #[test]
+fn exec_fdmap_env_excludes_the_closed_session_fds() {
+    use crate::fd::inherit::{ENV_NAME, FdMap};
+
+    // The no-TTY command child: fds 0/1/2 are the stdin read, stdout write and
+    // stderr write ends; the session's parent-side channel ends are 12/13/15
+    // (wfd 12, rfd 13, efd 15 in the OpenSSH DEBUG3 trace). OpenSSH
+    // session.c::do_child closes every descriptor >= STDERR_FILENO + 1 before
+    // the execve, so the exec FdMap must carry only 0/1/2.
+    let platform = platform();
+    let mut fds = Vec::new();
+    for _ in 0..16 {
+        fds.push(platform.open(b"/a", 0, 0).expect("open"));
+    }
+    assert_eq!(fds.first().copied(), Some(0));
+    assert_eq!(fds.get(12).copied(), Some(12));
+    assert_eq!(fds.get(13).copied(), Some(13));
+    assert_eq!(fds.get(15).copied(), Some(15));
+
+    platform.close_from(3).expect("closefrom");
+
+    let entry = platform.exec_fdmap_env().expect("env").expect("some");
+    let (name, value) = entry.split_at(ENV_NAME.len());
+    assert_eq!(name, ENV_NAME);
+    let map = FdMap::decode_env(value.strip_prefix(b"=").expect("separator")).expect("decode");
+    let carried: Vec<i32> = map.entries.iter().map(|row| row.fd).collect();
+    assert_eq!(carried, vec![0, 1, 2]);
+}
+
+#[test]
 fn stdio_env_publishes_the_standard_fd_handles() {
     let platform = platform();
     let mut fds = Vec::new();
