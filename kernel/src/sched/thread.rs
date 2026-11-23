@@ -241,6 +241,12 @@ pub struct Thread {
     pub last_cpu: AtomicU32,
     /// Pinned threads are never stolen by another CPU (deterministic SMP self-test workers).
     pub pinned: AtomicBool,
+    /// Owning `Arc<Thread>` parked while this thread is switched out.
+    ///
+    /// `schedule_locked` moves its self-reference here before the context switch and takes it
+    /// back on resume; the deferred reaper drops it when the terminal-process filter removes the
+    /// thread from the run queue without resuming it. Zero while the thread is running.
+    pub parked: AtomicUsize,
     /// User TLS base (`IA32_FS_BASE` / `TPIDR_EL0`), installed on switch-in.
     pub tls_base: AtomicU64,
     /// Monotonic timestamp when this user thread last entered user mode; zero in kernel mode.
@@ -422,6 +428,7 @@ impl Thread {
             idle,
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
+            parked: AtomicUsize::new(0),
             tls_base: AtomicU64::new(0),
             user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
@@ -523,6 +530,7 @@ impl Thread {
             idle: true,
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
+            parked: AtomicUsize::new(0),
             tls_base: AtomicU64::new(0),
             user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
@@ -579,6 +587,7 @@ impl Thread {
             idle: true,
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
+            parked: AtomicUsize::new(0),
             tls_base: AtomicU64::new(0),
             user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
