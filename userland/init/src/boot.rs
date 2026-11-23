@@ -379,28 +379,41 @@ fn run_full_plan(core: &Arc<Mutex<Core>>, only_unstarted: bool, serial: bool) ->
             .services()
             .iter()
             .position(|service| service.name == "getty" && service.enable);
-        let mut critical = getty.map(|index| guard.supervisor.dependency_closure(index));
-        // sshd has no readiness poll of its own, so the full plan must also wait for the
-        // one-shot host-key service before it spawns sshd. Without this barrier sshd races the
-        // key write and exits with "no hostkeys available". The netd prerequisite is handled by
-        // the bootstrap plan (bootstrap_selection), not by this login barrier.
-        if let Some(hostkeys) = guard
+        // FreeBSD rcorder/rc.d REQUIRE and NetBSD rc.d: every service is a prerequisite when
+        // another enabled manifest names it (directly or through a scheme provider). The start
+        // plan waits for those prerequisites, and only those, before moving on. No service is
+        // named here; the graph is entirely manifest-declared.
+        let mut critical = alloc::vec![false; guard.supervisor.len()];
+        for service in guard
             .supervisor
             .services()
             .iter()
-            .position(|service| service.name == "ssh-hostkeys" && service.enable)
+            .filter(|service| service.enable)
         {
-            let closure = guard.supervisor.dependency_closure(hostkeys);
-            match &mut critical {
-                Some(mask) => {
-                    for (slot, bit) in mask.iter_mut().zip(closure) {
-                        *slot |= bit;
-                    }
+            for need in &service.needs {
+                let dependency = if need.starts_with("scheme:") {
+                    guard.supervisor.services().iter().position(|provider| {
+                        provider.enable
+                            && provider
+                                .provides
+                                .iter()
+                                .any(|provide| provide.as_str() == need.as_str())
+                    })
+                } else {
+                    guard
+                        .supervisor
+                        .services()
+                        .iter()
+                        .position(|provider| provider.enable && provider.name == *need)
+                };
+                if let Some(dependency) = dependency
+                    && let Some(slot) = critical.get_mut(dependency)
+                {
+                    *slot = true;
                 }
-                None => critical = Some(closure),
             }
         }
-        (getty, critical)
+        (getty, Some(critical))
     };
     let selected = getty.map(|index| {
         let mut mask = alloc::vec![true; core.lock().supervisor.len()];
@@ -538,11 +551,8 @@ fn boot_color() -> bool {
 
 /// Select the bootstrap services and every dependency they need by service name or scheme.
 fn bootstrap_selection(services: &[Manifest]) -> Vec<bool> {
-    // `netd` must register `net:` before the full plan starts sshd. It is cheap when the
-    // service is absent and it registers the loopback `net:` scheme even without a NIC.
     const SEEDS: &[&str] = &[
-        "logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "blockd", "fsd-ufs", "vfsd",
-        "devd", "netd",
+        "logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "blockd", "fsd-ufs", "vfsd", "devd",
     ];
     let mut selected = alloc::vec![false; services.len()];
     for seed in SEEDS {
