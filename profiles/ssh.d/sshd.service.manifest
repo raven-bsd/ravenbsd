@@ -20,7 +20,13 @@ name = "sshd"
 exec = "/sbin/sshd"
 args = ["/sbin/sshd", "-D", "-E", "/tmp/sshd.log", "-f", "/etc/ssh/sshd_config"]
 needs = ["netd", "vfsd", "consd", "ptyd", "ssh-hostkeys"]
-readiness = "none"
+# K566: do not mark the service ready at spawn. sshd logs this exact line only after
+# listen() succeeded, so svcd's first connection cannot race the listener bind. This is
+# the daemon's own readiness signal, not a sleep, and needs no sshd source change.
+readiness = "log"
+ready_file = "/tmp/sshd.log"
+ready_match = "Server listening on 0.0.0.0 port 22."
+ready_timeout_ms = 30_000
 restart = "never"
 max_restarts = 0
 required = false
