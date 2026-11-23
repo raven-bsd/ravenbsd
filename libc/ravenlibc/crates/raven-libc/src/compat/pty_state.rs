@@ -30,7 +30,7 @@ use raven_libc_platform::xlat::open_flags;
 use raven_libc_platform::{OfdKind, RealSys, SysBackend, scheme::open_scheme_path};
 
 /// Raw `proc_ctty_set(handle) -> 0` (native `TIOCSCTTY`, kernel `syscall/tty.rs`).
-const PROC_CTTY_SET: usize = 0x1e0;
+pub(crate) const PROC_CTTY_SET: usize = 0x1e0;
 
 pub(crate) struct RealPty;
 

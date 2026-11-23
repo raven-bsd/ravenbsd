@@ -602,6 +602,15 @@ pub fn dup(handle: Handle, rights: u32) -> Result<Handle, Errno> {
     })
 }
 
+/// A new handle for the caller's controlling terminal.
+///
+/// Native `PROC_CTTY_HANDLE` (kernel `syscall/tty.rs`, `0x1e3`). `/dev/tty` names this live
+/// terminal, not a VFS node.
+pub fn ctty_handle() -> Result<Handle, Errno> {
+    // SAFETY: no arguments and no user pointer.
+    handle_from_ret(unsafe { arch::syscall0(0x1e3) })
+}
+
 /// Read the 64-byte `FSTAT` record.
 pub fn fstat(handle: Handle, out: &mut [u8; 64]) -> Result<(), Errno> {
     // SAFETY: FSTAT writes at most 64 bytes into the valid output record.

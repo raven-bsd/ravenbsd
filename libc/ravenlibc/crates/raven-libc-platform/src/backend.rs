@@ -68,6 +68,14 @@ pub trait SysBackend {
     }
     /// Duplicate a handle with a rights mask.
     fn dup(&self, handle: Handle, rights: u32) -> Result<Handle, Errno>;
+    /// A new handle for the caller's controlling terminal, or `ENXIO`.
+    ///
+    /// `/dev/tty` names the process's controlling terminal rather than a VFS node. The default
+    /// answers `ENOSYS` for backends without a process/ctty model; [`RealSys`] forwards to the
+    /// native `PROC_CTTY_HANDLE` syscall.
+    fn ctty_handle(&self) -> Result<Handle, Errno> {
+        Err(Errno::ENOSYS)
+    }
     /// Fill the 64-byte `FSTAT` record.
     fn fstat(&self, handle: Handle, out: &mut [u8; 64]) -> Result<(), Errno>;
     /// Apply a POSIX byte-range lock operation to `handle`.
@@ -183,6 +191,10 @@ impl SysBackend for RealSys {
 
     fn dup(&self, handle: Handle, rights: u32) -> Result<Handle, Errno> {
         raven_libc_sys::sys::dup(handle, rights)
+    }
+
+    fn ctty_handle(&self) -> Result<Handle, Errno> {
+        raven_libc_sys::sys::ctty_handle()
     }
 
     fn fstat(&self, handle: Handle, out: &mut [u8; 64]) -> Result<(), Errno> {
@@ -344,6 +356,8 @@ struct FakeWorld {
     record_lock_calls: Vec<(Handle, u32, RecordLock)>,
     record_lock_reply: RecordLock,
     record_lock_error: Option<Errno>,
+    /// Handle returned for the caller's controlling terminal (`/dev/tty`), if any.
+    ctty_handle: Option<Handle>,
 }
 
 /// Deterministic in-memory backend for host tests.
@@ -391,8 +405,15 @@ impl FakeSys {
                     ..RecordLock::default()
                 },
                 record_lock_error: None,
+                ctty_handle: None,
             }),
         }
+    }
+
+    /// Publish the handle returned for `/dev/tty` (the fake's controlling terminal).
+    pub fn ctty(&self, handle: Handle) -> &Self {
+        self.world.borrow_mut().ctty_handle = Some(handle);
+        self
     }
 
     /// Create or replace a regular file at an absolute POSIX path.
@@ -772,6 +793,12 @@ impl SysBackend for FakeSys {
         world.next_handle = world.next_handle.saturating_add(1);
         world.handles.insert(new, file);
         Ok(Handle(new))
+    }
+
+    fn ctty_handle(&self) -> Result<Handle, Errno> {
+        // `ENOSYS` keeps the fake's ordinary `/dev/tty` node path; a test that models a real
+        // controlling terminal publishes one with `FakeSys::ctty`.
+        self.world.borrow().ctty_handle.ok_or(Errno::ENOSYS)
     }
 
     fn fstat(&self, handle: Handle, out: &mut [u8; 64]) -> Result<(), Errno> {

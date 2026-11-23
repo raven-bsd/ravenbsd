@@ -26,6 +26,21 @@ fn chown_family_uses_the_root_handle() {
 }
 
 #[test]
+fn dev_tty_opens_the_controlling_terminal_handle() {
+    // `/dev/tty` names the process's controlling terminal, not a VFS node. The backend supplies
+    // the live terminal handle; the public path stays on the OFD for `ttyname`.
+    let fake = FakeSys::new();
+    fake.dir(b"/");
+    fake.ctty(Handle(0x1234));
+    let platform = Platform::new(fake);
+    let fd = platform.open(b"/dev/tty", 0, 0).expect("open /dev/tty");
+    let reference = platform.get(fd).expect("fd");
+    assert_eq!(reference.kind(), OfdKind::Tty);
+    assert_eq!(reference.handle(), Handle(0x1234));
+    assert_eq!(platform.close(fd), Ok(()));
+}
+
+#[test]
 fn pty_slave_chown_and_chmod_are_read_only_device_metadata() {
     // The pty slave name is a `pty:` scheme endpoint, not a VFS node: the pty server owns the
     // node metadata and reports a root-owned 0600 chr device. OpenSSH `sshpty.c` `pty_setowner`
