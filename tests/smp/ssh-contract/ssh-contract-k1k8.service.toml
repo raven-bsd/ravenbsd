@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K445: one-shot K1-K8 release evidence probe; K9/K10 stay in the canonical gate.
+name = "ssh-contract"
+exec = "/bin/ssh-contract"
+args = ["/bin/ssh-contract", "k1k8"]
+needs = ["scheme:file", "scheme:net", "scheme:pty"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
