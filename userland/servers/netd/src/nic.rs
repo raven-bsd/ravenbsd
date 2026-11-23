@@ -18,6 +18,9 @@ use raven_proto_net::ring::{
     RingProducer,
 };
 use raven_scheme::Client;
+
+/// Temporary K9 TX diagnostic: first 40 small frames or busy attempts.
+static TXDBG: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 use virtio_net::{ControlInfo, MAX_FRAME_LEN, RING_RX_BUFFERS, frame_desc};
 
 use crate::network::StaticConfig;
@@ -244,6 +247,9 @@ impl Device for NicDevice {
         }
         self.reclaim_tx();
         let Some(index) = self.tx_free.pop_front() else {
+            if TXDBG.fetch_add(1, core::sync::atomic::Ordering::Relaxed) < 40 {
+                raven_rt::println!("netd: nitx busy len={len} free=0");
+            }
             return Err(TxError::Busy);
         };
         let Some(offset) = self.layout.buffer_offset(index) else {
@@ -256,6 +262,9 @@ impl Device for NicDevice {
             return Err(TxError::TooLong);
         };
         fill(buffer);
+        if len <= 64 && TXDBG.fetch_add(1, core::sync::atomic::Ordering::Relaxed) < 40 {
+            raven_rt::println!("netd: nitx len={len} free={}", self.tx_free.len());
+        }
         let descriptor = Desc::new(offset as u64, len as u32, DESC_FIRST | DESC_LAST);
         let layout = self.layout;
         let pushed = match RingProducer::new(self.ring_mut(), layout, Ring::Tx) {
