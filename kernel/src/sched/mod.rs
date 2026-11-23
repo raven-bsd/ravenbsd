@@ -1116,6 +1116,9 @@ pub fn exit_thread(code: i32) -> ! {
         None => crate::arch::halt(),
     };
     thread.exit_code.store(code, Ordering::SeqCst);
+    // FreeBSD `thread_unlink`/NetBSD `lwp_free` remove the thread from the process linkage at
+    // exit. The live list is weak, but an unremoved entry is a permanent 16-byte leak.
+    thread.process.unregister_thread(&thread);
     crate::syscall::futex::remove_thread(thread.id);
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);

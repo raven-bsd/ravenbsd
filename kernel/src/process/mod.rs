@@ -815,6 +815,21 @@ impl Process {
         self.threads_live.lock().push(Arc::downgrade(thread));
     }
 
+    /// Remove an exiting thread from the live list.
+    ///
+    /// Donor: FreeBSD `kern_thread.c:1105` `thread_unlink` and NetBSD `kern_lwp.c:1251`
+    /// `lwp_free` remove the thread from the process' live-thread linkage at exit. Raven's
+    /// list holds weak references, but an entry left behind still consumes 16 bytes and grows
+    /// without bound for a long-lived process that creates and exits threads.
+    pub fn unregister_thread(&self, thread: &Arc<Thread>) {
+        self.threads_live
+            .lock()
+            .retain(|weak| match weak.upgrade() {
+                Some(live) => !Arc::ptr_eq(&live, thread),
+                None => false,
+            });
+    }
+
     /// True when any live thread has a registered PG-7 signal entry.
     ///
     /// Such a process has a libc entry that will run the disposition/default action in user
