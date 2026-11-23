@@ -172,6 +172,7 @@ mod program {
                     s[6],
                     s[7]
                 );
+                raven_rt::println!("netd: tcpdbg write1={}", netd::Netd::<netd::Loopback>::debug_write1());
                 tcp_debug_ms = now;
             }
             for line in handler.netd.take_filter_log() {

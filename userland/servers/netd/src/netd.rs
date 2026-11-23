@@ -500,6 +500,9 @@ pub struct Netd<D: Device> {
     now_ms: i64,
 }
 
+/// Temporary K9 diagnostic: one-byte writes that reached the TCP send path.
+static WRITE1: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
 impl<D: Device> Netd<D> {
     /// Create the server over `device` and configure IPv4 loopback.
     #[must_use]
@@ -884,6 +887,12 @@ impl<D: Device> Netd<D> {
         }
     }
 
+    /// Snapshot of one-byte writes that reached the TCP send path (temporary K9 diagnostic).
+    #[must_use]
+    pub fn debug_write1() -> u64 {
+        WRITE1.load(core::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Write stream bytes or one datagram to `file`.
     pub fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
         let (interface, transport, id, peer, write_shutdown) = match self.files.get(&file) {
@@ -904,10 +913,15 @@ impl<D: Device> Netd<D> {
         match transport {
             // POSIX write on a connection whose peer has fully closed is EPIPE, not the
             // core's internal not-connected state; the SSH session close path depends on it.
-            Transport::Tcp => match self.core_mut(interface).send(id, buffer) {
-                Err(Errno::ENOTCONN) => Err(Errno::EPIPE),
-                other => other,
-            },
+            Transport::Tcp => {
+                if buffer.len() == 1 {
+                    WRITE1.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+                }
+                match self.core_mut(interface).send(id, buffer) {
+                    Err(Errno::ENOTCONN) => Err(Errno::EPIPE),
+                    other => other,
+                }
+            }
             Transport::Udp => {
                 let to = peer.ok_or(Errno::EADDRNOTAVAIL)?;
                 self.core_mut(interface).udp_send_to(
