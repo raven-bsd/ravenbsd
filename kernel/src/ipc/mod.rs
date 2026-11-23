@@ -414,10 +414,18 @@ pub fn on_process_exit(process: &Arc<Process>) {
     }
 
     while let Some(request) = pop_request(&process.client_requests) {
-        if matches!(request.opcode, Opcode::Close | Opcode::Dup) {
-            // One-way notifications must still reach the server after the client is gone: the
-            // server releases the open-file description on the last CLOSE, and DUP updates its
-            // reference count. They are the client's last words, not cancellable work.
+        if request.opcode == Opcode::Dup {
+            // A DUP still in the server queue belonged to a descriptor that died with this
+            // client; remove it and roll the server reference back. A delivered DUP stays with
+            // the server and its reference is released by the CLOSE notification.
+            if router::withdraw_undelivered_dup(&request) {
+                request.fail(Errno::EIO);
+                request.release_captures();
+            }
+            continue;
+        }
+        if request.opcode == Opcode::Close {
+            // The last CLOSE must still reach the server after the client is gone.
             continue;
         }
         request.cancel();
