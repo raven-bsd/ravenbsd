@@ -43,8 +43,21 @@ pub fn start(cmdline: &CmdLine) {
     }
 }
 
+/// Print one-time object sizes for the 3072-class attribution.
+fn print_sizes() {
+    kprintln!(
+        "K449-SIZES thread={} process={} uspace={} pending={} buffers={}",
+        core::mem::size_of::<crate::sched::thread::Thread>(),
+        core::mem::size_of::<crate::process::Process>(),
+        core::mem::size_of::<crate::memory::uspace::UserAddressSpace>(),
+        core::mem::size_of::<crate::ipc::PendingRequest>(),
+        core::mem::size_of::<crate::ipc::RequestBuffers>(),
+    );
+}
+
 /// Sample and print one line per interval.
 fn sampler() {
+    print_sizes();
     loop {
         sleep_ns(INTERVAL_NS.load(Ordering::Relaxed));
         let (heap_used, heap_free) = memory::heap::stats();
@@ -72,6 +85,54 @@ fn sampler() {
                 class.map_or(0, |stats| stats.slabs as u64),
             )
         );
+        let (graph_threads, weak_threads) = crate::sync::turnstile_counts();
+        let class3072 = raven_kmem::class_for(3072).and_then(memory::heap::class_stats);
+        let class1024 = raven_kmem::class_for(1024).and_then(memory::heap::class_stats);
+        let class1536 = raven_kmem::class_for(1536).and_then(memory::heap::class_stats);
+        let class192 = raven_kmem::class_for(192).and_then(memory::heap::class_stats);
+        let (queued, active, client) = crate::ipc::pending_counts();
+        kprintln!(
+            "K449-GRAPH graph_threads={graph_threads} weak_threads={weak_threads} \
+             class3072_in_use={} class3072_slabs={} class3072_fail={} \
+             class1024_in_use={} class1536_in_use={} class192_in_use={} \
+             queued={queued} active={active} client={client} \
+             zombies={} deadlive={} clsenotices={}",
+            class3072.map_or(0, |stats| stats.in_use),
+            class3072.map_or(0, |stats| stats.slabs),
+            class3072.map_or(0, |stats| stats.alloc_fail),
+            class1024.map_or(0, |stats| stats.in_use),
+            class1536.map_or(0, |stats| stats.in_use),
+            class192.map_or(0, |stats| stats.in_use),
+            process::zombie_count(),
+            process::dead_live_threads(),
+            crate::ipc::router::close_notice_count(),
+        );
+        let mut shown = 0usize;
+        for entry in process::processes() {
+            let queued = entry.scheme_queue.lock().len();
+            if queued == 0 {
+                continue;
+            }
+            let mut names = alloc::string::String::new();
+            for scheme in entry.schemes.lock().iter() {
+                if !names.is_empty() {
+                    names.push(',');
+                }
+                names.push_str(&scheme.name);
+            }
+            let command = entry.command.lock().clone();
+            kprintln!(
+                "K449-PENDING pid={} queued={queued} path={} command={} schemes={}",
+                entry.id,
+                entry.path,
+                command,
+                names
+            );
+            shown = shown.saturating_add(1);
+            if shown >= 8 {
+                break;
+            }
+        }
         if HOLDER_SCAN.load(Ordering::Relaxed) {
             let holders = sched::thread::thread_holder_stats();
             kprintln!(

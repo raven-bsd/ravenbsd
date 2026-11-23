@@ -11,12 +11,15 @@ profile = "base"
 timeout_secs = 300
 pre = ["sh tests/fixtures/s36-churn/build.sh"]
 initfs = "build/fixtures/s36-churn/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 s36-stackcheck=1"
+boot_cmdline = "console=ttyS0 test-exit=1 s36-stackcheck=1 k449-metrics=1"
 qemu_extra = []
 expect_exit = "success"
 
 [[expect]]
 regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
+
+[[expect]]
+regex = '^K449-GRAPH graph_threads=\d+ weak_threads=\d+ class3072_in_use=\d+ class3072_slabs=\d+ class3072_fail=\d+ .*$'
 
 [[expect]]
 regex = '^s36: cycles done=10000$'
