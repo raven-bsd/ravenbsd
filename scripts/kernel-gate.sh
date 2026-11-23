@@ -83,6 +83,9 @@ ipc-donation|x86_64|lance|ipc
 ipc-fuzz|x86_64|bob|ipc fuzz|tests/smp/ipc-fuzz/ipc-fuzz.toml
 syscall-fuzz|x86_64|bob|syscall fuzz|tests/smp/syscall-fuzz/syscall-fuzz.toml
 ssh-first-byte|x86_64|bob|ssh first byte|tests/fixtures/ssh-first-byte/ssh-first-byte.toml
+net-fuzz|x86_64|jorge|net fuzz|tests/qtest/cases/net-fuzz.toml
+net-fuzz-l4|x86_64|jorge|net fuzz l4|tests/qtest/cases/net-fuzz-l4.toml
+net-fuzz-frag-timeout|x86_64|jorge|net fuzz frag|tests/qtest/cases/net-fuzz-frag-timeout.toml
 duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator

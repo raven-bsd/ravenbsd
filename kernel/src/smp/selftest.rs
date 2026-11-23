@@ -100,6 +100,77 @@ static PROBE_DONE: AtomicU32 = AtomicU32::new(0);
 static PROBE_FAIL: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
 const PROBE_ROUNDS: u32 = 200;
 
+/// Bounded churn for the scheduler-side dead-Thread retention (K495 rev 311).
+///
+/// Every cycle registers a long timeout through `begin_block`/`add_sleep`, is woken, and then
+/// exits without `end_block` - the terminal-process path Tim S36 measured. The per-CPU sleeper
+/// entry holds an `Arc<Thread>` (and through it the `Process`); it must be gone once the deferred
+/// reaper releases the dead Thread, not after the 10 s deadline. NetBSD destroys the LWP timeout
+/// callout in `lwp_exit` and halts it in `sleepq_block`; FreeBSD and Illumos drop the sleep-queue
+/// entry on wake. A retained entry is a leak, so this row reports both the sleeper count and the
+/// live-Thread delta.
+fn sleeper_close_test(cpus: usize) -> Result<[usize; 4], (&'static str, [usize; 4])> {
+    use crate::sched::thread::{ThreadState, live_threads};
+
+    const CYCLES: usize = 8;
+    const WAIT_NS: u64 = 1_000_000_000;
+    let target = cpus.saturating_sub(1);
+    // Drain any reap queued by the earlier self-tests before taking the baseline.
+    sleep::sleep_ns(20_000_000);
+    let base = sched::sleepers_len();
+    let live_base = live_threads();
+    // sleeper delta, live-Thread delta, run-queue entries, deferred-reap entries. The last two
+    // are absolute: the audit shows the other scheduler holders are empty.
+    let ledger = || {
+        [
+            sched::sleepers_len().saturating_sub(base),
+            live_threads().saturating_sub(live_base),
+            sched::runqueue_len(),
+            sched::reap_len(),
+        ]
+    };
+    for _ in 0..CYCLES {
+        let thread = match sched::spawn_kernel_on(target, "sleeper-close", sleeper_thread) {
+            Ok(thread) => thread,
+            Err(_) => return Err(("spawn", ledger())),
+        };
+        let deadline = sleep::now_ns().saturating_add(WAIT_NS);
+        while thread.state() != ThreadState::Blocked {
+            if sleep::now_ns() > deadline {
+                return Err(("not blocked", ledger()));
+            }
+            sleep::sleep_ns(50_000);
+        }
+        if !sched::wake(alloc::sync::Arc::clone(&thread), None, 0) {
+            return Err(("wake refused", ledger()));
+        }
+        let deadline = sleep::now_ns().saturating_add(WAIT_NS);
+        while thread.state() != ThreadState::Dead {
+            if sleep::now_ns() > deadline {
+                return Err(("not dead", ledger()));
+            }
+            sleep::sleep_ns(50_000);
+        }
+    }
+    // Give the next scheduling point on this CPU time to run the deferred reaper.
+    sleep::sleep_ns(20_000_000);
+    let counts = ledger();
+    if counts[0] != 0 || counts[1] != 0 {
+        return Err(("retained", counts));
+    }
+    Ok(counts)
+}
+
+fn sleeper_thread() {
+    let Ok(token) = sched::begin_block() else {
+        sched::exit_thread(1);
+    };
+    sched::add_sleep(token, sleep::now_ns().saturating_add(10_000_000_000), 0);
+    let _ = sched::block_current();
+    // Deliberately skip `end_block`: a terminal process exits from the blocking path.
+    sched::exit_thread(0)
+}
+
 /// Cross-CPU FIFO call row: the FIFO carries every call; the old single-slot mailbox does not.
 fn call_fifo_test(cpus: usize) -> Result<(u32, u32, u32, u64), &'static str> {
     const COUNT: u32 = 32;
@@ -311,6 +382,17 @@ fn monitor() {
         Ok(elapsed_ms) => kprintln!("selftest: smp tlb if0 ok elapsed_ms={elapsed_ms}"),
         Err(reason) => {
             kprintln!("selftest: smp tlb if0 failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
+    match sleeper_close_test(cpus) {
+        Ok([sleepers, live, queued, reap]) => kprintln!(
+            "selftest: smp sleeper-close cycles=8 sleepers={sleepers} live={live} queued={queued} reap={reap} ok"
+        ),
+        Err((reason, [sleepers, live, queued, reap])) => {
+            kprintln!(
+                "selftest: smp sleeper-close failed: {reason} sleepers={sleepers} live={live} queued={queued} reap={reap}"
+            );
             boot::exit_qemu(0x11);
         }
     }

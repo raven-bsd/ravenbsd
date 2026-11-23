@@ -583,7 +583,7 @@ pub fn lockstat() -> Vec<(ObjectId, LockStats)> {
     };
     kernel
         .graph
-        .objects()
+        .stats_objects()
         .map(|object| (object, kernel.graph.stats(object)))
         .collect()
 }
