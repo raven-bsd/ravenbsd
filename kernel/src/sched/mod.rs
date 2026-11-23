@@ -514,17 +514,39 @@ fn schedule_locked() {
             first_user = Some((cpu, next.process.id, next.tid));
         }
         state.switches = state.switches.saturating_add(1);
-        state.current = Some(Arc::clone(&next));
-        (current, next)
+        let to = Arc::as_ptr(&next);
+        state.current = Some(next);
+        (current, to)
     };
 
     if let Some((cpu, pid, tid)) = first_user {
         kprintln!("smp-user: cpu {cpu} first user thread pid={pid} tid={tid}");
     }
-    // SAFETY: the critical section is live; both `Arc`s keep the threads alive across the switch.
+    // Park the outgoing self-reference in the Thread itself. A terminal-process filter can remove
+    // this thread from the run queue and free its stack without ever resuming this frame; an
+    // owning `Arc` local here would then be abandoned and keep the dead Thread alive forever. The
+    // parked reference is taken back on resume, or dropped by `reap_dead` for a reaped thread.
+    let from_raw = Arc::into_raw(from);
+    let from_ptr = from_raw as *const Thread;
+    // SAFETY: `from_raw` owns the Thread; while this frame is switched out no other context clears
+    // this thread's `parked` field (the terminal filter hands the thread to the reaper, which is
+    // the only other reader/writer).
     unsafe {
-        context::switch(&from, &to);
+        (*from_ptr)
+            .parked
+            .store(from_raw as usize, Ordering::Release);
     }
+    // SAFETY: the critical section is live. `from_ptr` is kept alive by its parked self-reference;
+    // `to` is kept alive by `state.current` (the incoming thread is running and cannot be freed).
+    unsafe {
+        context::switch(&*from_ptr, &*to);
+    }
+    // Resumed: reclaim the self-reference parked above. A filter-reaped thread never reaches this
+    // point; `reap_dead` takes the parked reference instead.
+    let parked = unsafe { (*from_ptr).parked.swap(0, Ordering::AcqRel) };
+    debug_assert_eq!(parked, from_raw as usize);
+    // SAFETY: `parked` is the owning reference stored by this frame before the switch.
+    drop(unsafe { Arc::from_raw(parked as *const Thread) });
     // Resumed on the incoming thread's stack: the outgoing stack is not this one, so deferred
     // dead stacks can be freed here.
     reap_dead();
@@ -742,7 +764,15 @@ pub fn sleep_until(deadline: u64) -> isize {
         return Errno::EINTR.to_ret();
     }
     drop(block);
+    // The blocked frame must not own an `Arc<Thread>` across the switch. A terminal-process
+    // filter can reap this thread without resuming it, and every Arc local left on the abandoned
+    // stack can never be dropped. The scheduler keeps the thread alive through the parked
+    // self-reference and the wait-queue/sleeper entries; re-fetch it after resuming.
+    drop(current);
     schedule_locked();
+    let Some(current) = current_thread() else {
+        return 0;
+    };
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
     if current.process.exiting.load(Ordering::Acquire) {
@@ -928,7 +958,15 @@ pub fn block_current() -> isize {
         return Errno::EINTR.to_ret();
     }
     drop(block);
+    // The blocked frame must not own an `Arc<Thread>` across the switch. A terminal-process
+    // filter can reap this thread without resuming it, and every Arc local left on the abandoned
+    // stack can never be dropped. The scheduler keeps the thread alive through the parked
+    // self-reference and the wait-queue/sleeper entries; re-fetch it after resuming.
+    drop(current);
     schedule_locked();
+    let Some(current) = current_thread() else {
+        return 0;
+    };
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
     if current.process.exiting.load(Ordering::Acquire) {
@@ -1236,13 +1274,15 @@ pub fn exit_thread(code: i32) -> ! {
         next.last_cpu
             .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
         state.switches = state.switches.saturating_add(1);
-        state.current = Some(Arc::clone(&next));
-        next
+        let to = Arc::as_ptr(&next);
+        state.current = Some(next);
+        to
     };
     // SAFETY: the critical section stays live on the dead thread's stack forever; the stack is
-    // freed later by `reap_dead` from another thread's context.
+    // freed later by `reap_dead` from another thread's context. `to` is kept alive by
+    // `state.current`; the dead stack owns no Arc to it.
     unsafe {
-        context::switch(&*raw, &to);
+        context::switch(&*raw, &*to);
     }
     loop {
         core::hint::spin_loop();
@@ -1316,6 +1356,15 @@ fn reap_dead() {
         // SAFETY: each pointer was produced by `Arc::into_raw` exactly once and is owned by the
         // queue; the thread is neither current nor runnable.
         let thread = unsafe { Arc::from_raw(raw as *const Thread) };
+        // A terminal-process filter reaps a runnable thread without resuming the frame that
+        // switched it out; the self-reference parked by `schedule_locked` is released here with
+        // the reaper's own reference. Without this, the abandoned stack owns an Arc forever.
+        let parked = thread.parked.swap(0, Ordering::AcqRel);
+        if parked != 0 {
+            // SAFETY: `schedule_locked` parked exactly one owning reference before switching out,
+            // and this thread never resumed to reclaim it.
+            drop(unsafe { Arc::from_raw(parked as *const Thread) });
+        }
         self::thread::free_kernel_stack(thread.kernel_stack_base, thread.kernel_stack_top);
         drop(thread);
     }

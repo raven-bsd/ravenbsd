@@ -61,14 +61,28 @@ down() {
 }
 trap down EXIT HUP INT TERM
 
+tap=${RAVEN_QEMU_TAP:-ravendemo0}
 $SUDO sh scripts/qemu-net.sh up
 up=1
+# qemu-net.sh trusts /run/raven-qemu-net.state; a stale state file returns the
+# contract without creating the interface, and QEMU then dies with an empty
+# serial.  Verify the tap itself and repair the stale state once, deterministically.
+if ! ip link show "$tap" >/dev/null 2>&1; then
+    printf 'ssh-first-byte: tap %s missing after qemu-net.sh up; repairing stale state\n' "$tap" >&2
+    $SUDO sh scripts/qemu-net.sh down >/dev/null 2>&1 || true
+    $SUDO sh scripts/qemu-net.sh up
+fi
+if ! ip link show "$tap" >/dev/null 2>&1; then
+    printf 'ssh-first-byte: tap %s is not up; refusing to boot QEMU (no empty serial)\n' "$tap" >&2
+    exit 4
+fi
 mkdir -p build/ssh/first-byte
 {
     date -u +%Y-%m-%dT%H:%M:%SZ
     uptime
     printf 'qemu=%s\n' "$(pgrep -c -x qemu-system-x86_64 2>/dev/null || true)"
+    printf 'tap=%s\n' "$tap"
 } >> build/ssh/first-byte/host.txt
-RAVEN_SSH_IMAGE="$image" python3 tests/fixtures/ssh-first-byte/probe.py
+RAVEN_QEMU_TAP="$tap" RAVEN_SSH_IMAGE="$image" python3 tests/fixtures/ssh-first-byte/probe.py
 rc=$?
 exit "$rc"
