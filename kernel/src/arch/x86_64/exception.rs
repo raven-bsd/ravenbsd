@@ -209,7 +209,7 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             if deliver_fault(frame, kind, cr2) {
                 return;
             }
-            crate::process::page_fault(cr2);
+            crate::process::page_fault(cr2, frame.rip);
         }
     }
     if vector >= 32 {

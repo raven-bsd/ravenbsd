@@ -15,6 +15,15 @@ use core::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use raven_abi::errno::Errno;
 use spin::Mutex;
 
+use crate::cmdline::CmdLine;
+use crate::kprintln;
+use crate::memory::paging;
+
+/// K495 rev180 diagnostic gate: the pty gate image boots with `k495-debug=1`.
+fn debug_enabled() -> bool {
+    CmdLine::parse(paging::cmdline()).get("k495-debug").is_some()
+}
+
 #[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::ipc::SchemeFile;
 #[cfg(target_arch = "x86_64")]
@@ -89,13 +98,25 @@ pub fn session(sid: u64) -> Option<Arc<Ctty>> {
     if sid == 0 {
         return None;
     }
+    let debug = debug_enabled();
     let registry = REGISTRY.lock();
     for weak in registry.iter() {
-        if let Some(ctty) = weak.upgrade()
-            && ctty.sid() == sid
-        {
+        let Some(ctty) = weak.upgrade() else {
+            continue;
+        };
+        if ctty.sid() == sid {
             return Some(ctty);
         }
+        if debug {
+            kprintln!(
+                "ctty: registry entry sid={} wanted={}",
+                ctty.sid(),
+                sid
+            );
+        }
+    }
+    if debug {
+        kprintln!("ctty: registry no entry wanted={}", sid);
     }
     None
 }
@@ -119,28 +140,77 @@ fn get_or_create(file: &Arc<SchemeFile>) -> Arc<Ctty> {
 
 /// `TIOCSCTTY`: acquire `file` as the calling session leader's controlling terminal.
 pub fn acquire(process: &Arc<Process>, file: &Arc<SchemeFile>) -> Result<(), Errno> {
+    let debug = debug_enabled();
+    let ids = *process.ids.lock();
+    if debug {
+        kprintln!(
+            "ctty: acquire pid={} sid={} pgid={} tty={} server={} file={}",
+            process.id,
+            ids.sid,
+            ids.pgid,
+            is_tty_file(file),
+            file.server.id,
+            file.server_id()
+        );
+    }
     if !is_tty_file(file) {
+        if debug {
+            kprintln!("ctty: acquire pid={} rejected ENOTTY (not a tty file)", process.id);
+        }
         return Err(Errno::ENOTTY);
     }
-    let ids = *process.ids.lock();
     if ids.sid != process.id {
+        if debug {
+            kprintln!(
+                "ctty: acquire pid={} rejected EPERM (sid={} is not the pid)",
+                process.id,
+                ids.sid
+            );
+        }
         return Err(Errno::EPERM);
     }
     let mut slot = process.ctty.lock();
     if let Some(existing) = slot.as_ref() {
         if existing.key == (file.server.id, file.server_id()) && existing.sid() == ids.sid {
+            if debug {
+                kprintln!(
+                    "ctty: acquire pid={} already owns sid={} ctty_sid={}",
+                    process.id,
+                    ids.sid,
+                    existing.sid()
+                );
+            }
             return Ok(());
+        }
+        if debug {
+            kprintln!(
+                "ctty: acquire pid={} rejected EPERM (existing ctty sid={} wanted={})",
+                process.id,
+                existing.sid(),
+                ids.sid
+            );
         }
         return Err(Errno::EPERM);
     }
     let ctty = get_or_create(file);
     if ctty.sid() != 0 && ctty.sid() != ids.sid {
+        if debug {
+            kprintln!(
+                "ctty: acquire pid={} rejected EBUSY (ctty sid={} wanted={})",
+                process.id,
+                ctty.sid(),
+                ids.sid
+            );
+        }
         return Err(Errno::EBUSY);
     }
     ctty.sid.store(ids.sid, Ordering::Release);
     ctty.fg_pgrp.store(ids.pgid as i64, Ordering::Release);
     ctty.hung.store(false, Ordering::Release);
     *slot = Some(Arc::clone(&ctty));
+    if debug {
+        kprintln!("ctty: acquire pid={} ok sid={}", process.id, ids.sid);
+    }
     Ok(())
 }
 

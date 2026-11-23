@@ -14,6 +14,9 @@ use raven_abi::syscall::{THREAD_CREATE_EX, ThreadCreateEx};
 use raven_abi::types::{Handle, Rights, prot};
 use raven_usercopy::{UserSlice, is_user_address};
 
+use crate::cmdline::CmdLine;
+use crate::kprintln;
+use crate::memory::paging;
 use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
 use crate::sched::thread::ThreadState;
@@ -389,6 +392,18 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
         .store(context_absolute, Ordering::Release);
     thread.signal_flags.store(flags, Ordering::Release);
     thread.signal_entry.store(entry, Ordering::Release);
+    if CmdLine::parse(paging::cmdline()).get("k495-debug").is_some() {
+        // K495 rev180: record the registered entry so a fault RIP can be compared with it. A
+        // caller address here is the class Ken identified for the SIG_SETUP resume defect.
+        kprintln!(
+            "signal: SIG_SETUP pid={} entry=0x{:x} offset=0x{:x} abs=0x{:x} flags=0x{:x}",
+            caller.id,
+            entry,
+            context_offset,
+            context_absolute,
+            flags
+        );
+    }
     Ok(0)
 }
 

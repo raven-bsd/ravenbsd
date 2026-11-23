@@ -2329,9 +2329,29 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
 }
 
 /// Terminate the current process because of a user page fault.
-pub fn page_fault(cr2: u64) -> ! {
-    let path = current().map_or_else(String::new, |process| process.path.clone());
-    kprintln!("process: {} killed by page fault at 0x{:x}", path, cr2);
+pub fn page_fault(cr2: u64, rip: u64) -> ! {
+    let (path, pid, ppid, sig_entry) = match current() {
+        Some(process) => {
+            let ids = *process.ids.lock();
+            let sig_entry = crate::sched::current_thread()
+                .map_or(0, |thread| thread.signal_entry.load(Ordering::Acquire));
+            (process.path.clone(), process.id, ids.ppid, sig_entry)
+        }
+        None => (String::new(), 0, 0, 0),
+    };
+    // K495 rev180: the fault address alone does not identify the process or the instruction that
+    // caused it. The SIG_SETUP entry is the caller address the kernel would resume a delivered
+    // signal at; printing it with the fault RIP distinguishes a bad child exit from a bad signal
+    // resume (Ken's SIG_SETUP class).
+    kprintln!(
+        "process: {} pid={} ppid={} killed by page fault at 0x{:x} rip=0x{:x} sig_entry=0x{:x}",
+        path,
+        pid,
+        ppid,
+        cr2,
+        rip,
+        sig_entry
+    );
     exit_current(-11)
 }
 

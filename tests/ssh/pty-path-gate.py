@@ -23,6 +23,8 @@ Environment:
   PTY_GATE_ACCEL           qemu accelerator: kvm or tcg (falls back to RAVEN_QEMU_ACCEL)
   PTY_GATE_PORT            host ssh port; an ephemeral port is chosen when unset
   PTY_GATE_EXPECT_METRICS  1: require K449 samples (the image has k449-metrics=2)
+  PTY_GATE_SSHD_LOG        1: read /tmp/sshd.log over ssh (debug; default off)
+  PTY_GATE_PER_SESSION_PS  1: run ps -e after each session (debug; perturbs the orphan count)
 """
 
 from __future__ import annotations
@@ -43,6 +45,7 @@ LABEL = os.environ.get("PTY_GATE_LABEL", "before")
 SESSIONS = int(os.environ.get("PTY_GATE_SESSIONS", "3"))
 EXPECT_METRICS = os.environ.get("PTY_GATE_EXPECT_METRICS", "0") == "1"
 SSHD_LOG = os.environ.get("PTY_GATE_SSHD_LOG", "0") == "1"
+PER_SESSION_PS = os.environ.get("PTY_GATE_PER_SESSION_PS", "0") == "1"
 OUT = Path(os.environ.get("PTY_GATE_OUT", f"/tmp/opencode/pty-gate-{LABEL}"))
 OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
 OVMF_VARS = Path("/usr/share/OVMF/OVMF_VARS_4M.fd")
@@ -226,6 +229,12 @@ def main() -> int:
             failures.append(f"session{number}:pair not released")
         if not fixture_ok:
             failures.append(f"session{number}:PTY-PATH FAIL")
+        if PER_SESSION_PS:
+            rows, children, table = ps_snapshot()
+            print(f"PTY-PATH-GATE {LABEL} ps session={number} rows={rows} "
+                  f"children={children}", flush=True)
+            for line in table:
+                print(f"PTY-PATH-GATE {LABEL} ps-row {line}", flush=True)
 
     after_marker = len(serial_text())
     after_metrics = wait_metrics(after_marker) if EXPECT_METRICS else None
