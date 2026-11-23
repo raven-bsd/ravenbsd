@@ -411,14 +411,10 @@ async fn run_in_shell(
     // If a command was specified via -c, then run that command and then exit. Its result
     // is also the shell's last exit status, which is what's returned below for every mode.
     if let Some(command) = args.command {
-        let status = {
-            let mut shell = shell_ref.lock().await;
-            let _ = shell.run_dash_c_command(command).await?;
-            shell.last_exit_status()
-        };
-        // A -c shell is done once its command and exit trap have run. Exit the process here so
-        // a late signal wake cannot poll the completed async exit future again.
-        std::process::exit(i32::from(status));
+        let _ = shell_ref.lock().await.run_dash_c_command(command).await?;
+
+    // Otherwise read commands interactively: -s was given (positional args become parameters;
+    // a script named among them is *not* run), or nothing to run was specified.
     } else if read_commands_from_stdin {
         brush_interactive::InteractiveShell::new(shell_ref, input_backend, &interactive_options)?
             .run_interactively()
