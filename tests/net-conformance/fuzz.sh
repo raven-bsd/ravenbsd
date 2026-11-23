@@ -42,26 +42,33 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Functional rows, not latency rows: the cap covers the guest boot plus the
+# campaign.  Measured on c2892c717 at load1=20.47: the TCP campaign was 29.50 s
+# and the whole pre-step under 55 s.  Gate 2 at qemu=3/load1=15.81 cut the
+# campaign at 24.5 s of group time with the old 55 s cap, so the row stopped
+# before its summary.  A 120 s cap is ~2.4x the measured quiet pre-step and
+# stays well inside the pre-step's own 900 s cap.  The per-case wall guard in
+# harness.py is measured separately; this cap is the campaign bound.
 case "$scenario" in
     fuzz)
         harness_scenario=fuzz
         label=net-fuzz
-        run_cap=55
+        run_cap=120
         ;;
     l4)
         harness_scenario=fuzz-l4
         label=net-fuzz-l4
-        run_cap=55
+        run_cap=120
         ;;
     frag-timeout)
         harness_scenario=fuzz-frag-timeout
         label=net-fuzz-frag-timeout
-        run_cap=65
+        run_cap=120
         ;;
     churn)
         harness_scenario=churn
         label=net-churn
-        run_cap=60
+        run_cap=120
         ;;
     *)
         echo "unknown scenario: $scenario" >&2
