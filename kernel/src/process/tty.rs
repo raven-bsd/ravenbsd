@@ -80,6 +80,26 @@ fn find(file: &SchemeFile) -> Option<Arc<Ctty>> {
     None
 }
 
+/// The live controlling terminal of session `sid`, if any.
+///
+/// A process created by `posix_spawn` starts without its own `ctty` slot but stays in the
+/// parent's session; `/dev/tty` resolves to the session's terminal (FreeBSD `cttyopen` looks up
+/// the session's controlling vnode, not a per-process copy).
+pub fn session(sid: u64) -> Option<Arc<Ctty>> {
+    if sid == 0 {
+        return None;
+    }
+    let registry = REGISTRY.lock();
+    for weak in registry.iter() {
+        if let Some(ctty) = weak.upgrade()
+            && ctty.sid() == sid
+        {
+            return Some(ctty);
+        }
+    }
+    None
+}
+
 fn get_or_create(file: &Arc<SchemeFile>) -> Arc<Ctty> {
     if let Some(ctty) = find(file) {
         return ctty;

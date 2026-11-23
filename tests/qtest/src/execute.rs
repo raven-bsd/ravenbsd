@@ -157,16 +157,13 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
     }
 
     if !options.no_pre
-        && let Err(reason) = run_pre_commands(case, &arch)
+        && let Err(error) = run_pre_commands(case, &arch)
     {
-        return finish(
-            report,
-            Vec::new(),
-            Some(reason),
-            ResultKind::Error,
-            started,
-            false,
-        );
+        let (reason, kind) = match error {
+            PrepareError::Skipped(reason) => (reason, ResultKind::Skipped),
+            PrepareError::Error(reason) => (reason, ResultKind::Error),
+        };
+        return finish(report, Vec::new(), Some(reason), kind, started, false);
     }
 
     let mut cleanup = Vec::new();
@@ -417,15 +414,19 @@ fn last_line(text: &str) -> Option<&str> {
 /// Run the case's `pre` commands in order with `sh -c`.
 ///
 /// They run from the harness working directory (the repository root for `cargo xtask qtest`)
-/// and before the image build. A non-zero exit turns the case into `error`.
-fn run_pre_commands(case: &Case, arch: &str) -> Result<(), String> {
+/// and before the image build. Exit 77 is the preflight's waiting-for-window signal and maps to
+/// `skipped`; any other non-zero exit is an error. Exit 77 is deliberately distinct so a
+/// latency-row preflight cannot silently turn into a pass or a product failure.
+fn run_pre_commands(case: &Case, arch: &str) -> Result<(), PrepareError> {
     for (index, command) in case.spec.pre.iter().enumerate() {
         let output = Command::new("sh")
             .arg("-c")
             .arg(command)
             .env("RAVEN_QT_ARCH", arch)
             .output()
-            .map_err(|error| format!("pre[{index}] `{command}` could not start: {error}"))?;
+            .map_err(|error| {
+                PrepareError::Error(format!("pre[{index}] `{command}` could not start: {error}"))
+            })?;
         if output.status.success() {
             continue;
         }
@@ -434,10 +435,15 @@ fn run_pre_commands(case: &Case, arch: &str) -> Result<(), String> {
         let message = last_line(&stderr)
             .or_else(|| last_line(&stdout))
             .unwrap_or("no output");
-        return Err(format!(
+        let reason = format!(
             "pre[{index}] `{command}` failed with {}: {message}",
             output.status
-        ));
+        );
+        return Err(if output.status.code() == Some(77) {
+            PrepareError::Skipped(reason)
+        } else {
+            PrepareError::Error(reason)
+        });
     }
     Ok(())
 }
