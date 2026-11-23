@@ -103,11 +103,13 @@ pub fn leaked_thread_objects() -> [u64; 7] {
 /// Holder census for leaked thread objects (S36 diagnostic).
 ///
 /// Returns `(total, current, runqueue, sleepers, reap, threads_live, process_waiters, futex,
-/// handles, multi_holder, unexplained)`. A weak `threads_live` entry is counted separately: it is
-/// not a strong owner, but it shows the unregister path missed the thread.
-pub fn thread_holder_stats() -> [u64; 11] {
+/// handles, multi_holder, unexplained, request_waiters)`. A weak `threads_live` entry is counted
+/// separately: it is not a strong owner, but it shows the unregister path missed the thread.
+/// `request_waiters` is the client wait queue of every queued or active `PendingRequest`; that
+/// queue holds an `Arc<Thread>` until the request completes or is withdrawn.
+pub fn thread_holder_stats() -> [u64; 12] {
     let Some(registry) = ALL_THREADS.try_lock() else {
-        return [0u64; 11];
+        return [0u64; 12];
     };
     let threads: Vec<Arc<Thread>> = registry
         .iter()
@@ -116,9 +118,21 @@ pub fn thread_holder_stats() -> [u64; 11] {
         .collect();
     drop(registry);
     let Some(processes) = crate::process::processes_try() else {
-        return [0u64; 11];
+        return [0u64; 12];
     };
-    let mut stats = [0u64; 11];
+    let mut requests = Vec::new();
+    for process in &processes {
+        if let Some(queue) = process.scheme_queue.try_lock() {
+            requests.extend(queue.iter().cloned());
+        }
+        if let Some(queue) = process.active_requests.try_lock() {
+            requests.extend(queue.iter().cloned());
+        }
+        if let Some(queue) = process.client_requests.try_lock() {
+            requests.extend(queue.iter().cloned());
+        }
+    }
+    let mut stats = [0u64; 12];
     for thread in &threads {
         stats[0] = stats[0].saturating_add(1);
         let mut holders = 0u64;
@@ -174,6 +188,13 @@ pub fn thread_holder_stats() -> [u64; 11] {
         }
         if crate::syscall::futex::try_contains_thread(thread.id) == Some(true) {
             stats[7] = stats[7].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        if requests
+            .iter()
+            .any(|request| request.waiters.try_contains_thread(thread.id) == Some(true))
+        {
+            stats[11] = stats[11].saturating_add(1);
             holders = holders.saturating_add(1);
         }
         if holders > 1 {

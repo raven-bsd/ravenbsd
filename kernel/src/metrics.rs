@@ -71,7 +71,7 @@ fn sampler() {
         if HOLDER_SCAN.load(Ordering::Relaxed) {
             let holders = sched::thread::thread_holder_stats();
             kprintln!(
-                "s36: hold thr={} cur={} rq={} sleep={} reap={} live={} pwait={} futex={} handle={} multi={} unexp={}",
+                "s36: hold thr={} cur={} rq={} sleep={} reap={} live={} pwait={} futex={} handle={} multi={} unexp={} reqwait={}",
                 holders[0],
                 holders[1],
                 holders[2],
@@ -82,7 +82,8 @@ fn sampler() {
                 holders[7],
                 holders[8],
                 holders[9],
-                holders[10]
+                holders[10],
+                holders[11]
             );
         }
     }
