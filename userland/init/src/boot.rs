@@ -44,8 +44,6 @@ pub(crate) struct Core {
     pub(crate) pending_starts: Vec<StartRequest>,
     pub(crate) pending_terminations: Vec<Handle>,
     pub(crate) all_up_printed: bool,
-    /// True when the image asks for the per-service timing diagnostics.
-    pub(crate) verbose: bool,
     /// The health record read from the UFS root, when the image carries one.
     pub(crate) health: Option<Health>,
     /// True once the marker write has been attempted for this boot.
@@ -144,7 +142,6 @@ pub fn run() -> i32 {
             .any(|service| service.name == *name)
     });
     let root_exec = alloc::vec![false; supervisor.len()];
-    let verbose = boot_timing_enabled(&initfs);
     let core = Arc::new(Mutex::new(Core {
         supervisor,
         config,
@@ -152,7 +149,6 @@ pub fn run() -> i32 {
         pending_starts: Vec::new(),
         pending_terminations: Vec::new(),
         all_up_printed: false,
-        verbose,
         health: None,
         health_written: false,
         root_exec,
@@ -352,18 +348,6 @@ fn start_and_wait(
         }
         let _ = raven_rt::nanosleep(5_000_000);
     }
-}
-
-/// True when the image asks for the per-service timing diagnostics.
-///
-/// `/etc/raven/boot-verbose` enables them explicitly; `/etc/raven/boot-quiet` is staged by the
-/// release profile for the concise default. Images with neither keep the diagnostics used by
-/// the shell/test transcript cases.
-fn boot_timing_enabled(initfs: &Initfs<'_>) -> bool {
-    let verbose = initfs
-        .get("/etc/raven/boot-verbose")
-        .is_some_and(|entry| !entry.data.is_empty() && entry.data != b"0" && entry.data != b"0\n");
-    verbose || initfs.get("/etc/raven/boot-quiet").is_none()
 }
 
 /// Run the full plan with the login service held back until everything else is up.
@@ -896,15 +880,13 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
     }
 }
 
-/// Print the per-service readiness timing on its own line.
+/// Print the standard per-unit timing line.
 ///
 /// The lifecycle lines (`svcd: <name> up`) stay byte-exact because the qtests anchor them with
-/// `^...$`; this diagnostic line follows them and carries the generation, the deadline base and
-/// the spawn, first-poll and finish timestamps in monotonic milliseconds.
+/// `^...$`; this line follows them and carries the unit name plus the four release-critical
+/// stamps (`start`, `spawn`, `first-ready`, `ready`) in monotonic milliseconds. It is standard on
+/// every image, including the quiet release profile, so the release image measures itself.
 fn emit_ready_timing(guard: &Core, index: usize, finish_label: &str) {
-    if !guard.verbose {
-        return;
-    }
     let Some(service) = guard.supervisor.services().get(index) else {
         return;
     };
@@ -920,25 +902,9 @@ fn emit_ready_timing(guard: &Core, index: usize, finish_label: &str) {
         return;
     }
     raven_rt::println!(
-        "svcd: {} timing: generation={} start={} spawn={} first_poll={} deadline={} stalled={} {}={}",
-        service.name,
-        timing.generation,
-        timing_ms(timing.start_ms),
-        timing_ms(timing.spawned_ms),
-        timing_ms(timing.first_poll_ms),
-        timing_ms(timing.deadline_ms),
-        timing.stalled_ms,
-        finish_label,
-        timing_ms(timing.finished_ms),
+        "{}",
+        crate::state::format_ready_timing(&service.name, &timing, finish_label)
     );
-}
-
-/// Format one optional monotonic millisecond stamp for the readiness diagnostic.
-fn timing_ms(value: Option<u64>) -> String {
-    match value {
-        Some(ms) => alloc::format!("{ms}"),
-        None => "none".to_string(),
-    }
 }
 
 /// Spawn `manifest.exec` with its args, environment and grants.

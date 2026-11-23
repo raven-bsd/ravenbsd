@@ -107,9 +107,37 @@ pub(crate) fn parent_fd_table() -> alloc::vec::Vec<raven_libc_proc::spawn_model:
     let mut fd = 0;
     while fd < 1024 {
         if let Ok(ofd) = platform.get(fd) {
+            let endpoint = |value: raven_libc_platform::fd::SocketEndpoint| {
+                raven_libc_proc::request::SocketEndpoint {
+                    ip: value.ip,
+                    port: value.port,
+                }
+            };
+            let socket = ofd
+                .socket_meta()
+                .map(|meta| raven_libc_proc::request::SocketMeta {
+                    domain: meta.domain,
+                    ty: meta.ty,
+                    proto: meta.proto,
+                    state: meta.state,
+                    local: meta.local.map(endpoint),
+                    peer: meta.peer.map(endpoint),
+                });
+            let event = if ofd.poll_signaled() {
+                ofd.poll_handle().0
+            } else {
+                0
+            };
             table.push(raven_libc_proc::spawn_model::FdEntry {
                 fd,
                 handle: ofd.handle().0,
+                kind: raven_libc_platform::fd::inherit::kind_byte(ofd.kind()),
+                status: ofd.status(),
+                path: ofd.path().map(|path| path.into_vec()),
+                event,
+                readiness: ofd.poll_rearm(),
+                socket,
+                pty_master: ofd.is_pty_master(),
                 cloexec: platform.cloexec(fd).unwrap_or(false),
             });
         }
