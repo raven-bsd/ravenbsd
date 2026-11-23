@@ -77,6 +77,7 @@ def parse_args(argv: list[str]) -> dict:
         "net": "tap",
         "resource_every": 5,
         "selftest": False,
+        "sshd_log": False,
     }
     index = 0
     while index < len(argv):
@@ -107,6 +108,9 @@ def parse_args(argv: list[str]) -> dict:
             index += 2
         elif arg == "--selftest":
             options["selftest"] = True
+            index += 1
+        elif arg == "--sshd-log":
+            options["sshd_log"] = True
             index += 1
         elif arg in ("-h", "--help"):
             print(__doc__)
@@ -382,6 +386,54 @@ def ssh_argv(marker: str, tty: bool, host: str, port: int) -> list[str]:
     return argv
 
 
+def remote_argv(user: str, command: str, host: str, port: int) -> list[str]:
+    """One non-interactive command connection for a diagnostic probe."""
+    return [
+        "ssh",
+        "-p", str(port),
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "KbdInteractiveAuthentication=no",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-o", "ConnectTimeout=8",
+        f"{user}@{host}",
+        command,
+    ]
+
+
+def collect_sshd_log(run: Path, host: str, port: int, timeout: float = 10.0) -> dict:
+    """Fetch the guest `/tmp/sshd.log` (0600 root) through a root session."""
+    out = run / "sshd.log"
+    err = run / "sshd-log-probe.ssh.log"
+    env = dict(os.environ)
+    env["SSH_ASKPASS"] = str(ASKPASS)
+    env["SSH_ASKPASS_REQUIRE"] = "force"
+    env["K434_SSH_PASSWORD"] = PASSWORD
+    timed_out = False
+    with open(out, "wb") as out_file, open(err, "wb") as err_file:
+        probe = subprocess.Popen(
+            remote_argv("root", "cat /tmp/sshd.log", host, port), cwd=ROOT,
+            stdin=subprocess.DEVNULL, stdout=out_file, stderr=err_file,
+            env=env, start_new_session=True,
+        )
+        try:
+            probe.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            os.killpg(probe.pid, signal.SIGKILL)
+            probe.wait()
+    text = out.read_text(encoding="utf-8", errors="replace")
+    chown = [line for line in text.splitlines() if "chown" in line or "/dev/pts" in line]
+    return {
+        "path": str(out),
+        "ok": not timed_out and probe.returncode == 0,
+        "chown_lines": chown,
+        "tail": text.splitlines()[-10:],
+    }
+
+
 def run_session(run: Path, number: int, marker: str, timeout: float, tty: bool,
                 host: str, port: int) -> dict:
     log = run / f"session-{number}.ssh.log"
@@ -510,6 +562,7 @@ def main(argv: list[str]) -> int:
     print(f"reconnect-soak: hygiene before boot: {hygiene_before}")
     rows: list[dict] = []
     resource_rows: list[dict] = []
+    sshd_log_info: dict | None = None
     last_session = 0
     failures = 0
     child = None
@@ -566,6 +619,15 @@ def main(argv: list[str]) -> int:
                 and (not resource_rows
                      or resource_rows[-1]["after_session"] != last_session)):
             resource_rows.append(sample_host(child, serial, last_session))
+        if options["sshd_log"]:
+            sshd_log_info = collect_sshd_log(run, host, port)
+            print(
+                f"reconnect-soak: sshd log {sshd_log_info['path']} "
+                f"ok={sshd_log_info['ok']} "
+                f"chown_lines={len(sshd_log_info['chown_lines'])}"
+            )
+            for line in sshd_log_info["chown_lines"][:10]:
+                print(f"reconnect-soak: sshd: {line}")
     finally:
         if child is not None:
             kill(child)
@@ -609,6 +671,7 @@ def main(argv: list[str]) -> int:
         "resource_curve": resource_rows,
         "sshd_ready_utc": ready_utc,
         "listening_utc": listening_utc,
+        "sshd_log": sshd_log_info,
     }
     (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     with open(run / "SHA256SUMS", "w", encoding="utf-8") as sums:
