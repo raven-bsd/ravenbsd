@@ -13,8 +13,8 @@ use common::{
 };
 use raven_abi::errno::Errno;
 use raven_tcpip::{
-    AcceptQueue, HalfOpen, HalfOpenQueue, Instant, IpAddr, Ipv4Addr, IsnGenerator, SocketId,
-    SynCookie, TcpState,
+    AcceptQueue, HalfOpen, HalfOpenQueue, Instant, IpAddr, Ipv4Addr, Ipv4Config, IsnGenerator,
+    LoopbackDevice, SocketId, Stack, StackConfig, SynCookie, TcpState,
 };
 use raven_tcpip_wire::tcp::TcpFlags;
 
@@ -397,6 +397,57 @@ fn accept_pops_completed_connections_in_fifo_order() {
         Some((IpAddr::V4(address(A)), 40_001))
     );
     assert_eq!(b.tcp_accept(listener), Ok(None));
+}
+
+#[test]
+fn loopback_accept_records_the_client_tuple() {
+    let mut stack = Stack::new(
+        LoopbackDevice::new(),
+        StackConfig::default(),
+        9,
+        Instant::ZERO,
+    );
+    stack
+        .set_ipv4(Ipv4Config {
+            addr: Ipv4Addr::new([127, 0, 0, 1]),
+            prefix_len: 8,
+            gateway: None,
+        })
+        .expect("ipv4");
+    stack.test_insert_neighbor(
+        Ipv4Addr::new([127, 0, 0, 1]),
+        [0x02, 0, 0, 0, 0, 0x01],
+        Instant::ZERO,
+        60_000,
+    );
+    let listener = stack.tcp_listen(2222, 4).expect("listen");
+    let client = stack
+        .tcp_connect((IpAddr::V4(Ipv4Addr::new([127, 0, 0, 1])), 2222), None)
+        .expect("connect");
+    for ms in [0, 10, 20, 30, 40, 50] {
+        stack.poll(Instant::from_millis(ms));
+    }
+    let accepted = stack
+        .tcp_accept(listener)
+        .expect("accept")
+        .expect("connection");
+    let (client_port, _) = stack.test_tcp_endpoints(client).expect("client endpoints");
+    assert_eq!(
+        stack
+            .socket_info(accepted)
+            .expect("accepted socket info")
+            .remote,
+        Some((IpAddr::V4(Ipv4Addr::new([127, 0, 0, 1])), client_port)),
+        "the accepted socket exposes the client's tuple through socket_info"
+    );
+    assert_eq!(
+        stack
+            .test_tcp_endpoints(accepted)
+            .expect("accepted endpoints")
+            .1,
+        Some((IpAddr::V4(Ipv4Addr::new([127, 0, 0, 1])), client_port)),
+        "the accepted socket records the loopback client's tuple"
+    );
 }
 
 #[test]
