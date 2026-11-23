@@ -78,6 +78,8 @@ const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// S36 vfsd map/unmap baseline (`frame::stats().allocated_bytes` at the exit-88 marker).
 static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
+/// S36 lock/time churn baseline (`frame::stats().allocated_bytes` at the exit-90 marker).
+static S36_LOCK_BASE: AtomicU64 = AtomicU64::new(0);
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
@@ -1828,6 +1830,31 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
                 kprintln!("s36: mapcheck ok");
             } else {
                 kprintln!("s36: mapcheck leak delta={}", delta);
+            }
+        }
+    }
+    // S36 lock/time churn: exit 90 records the baseline, exit 91 compares the allocated frame
+    // bytes after the futex wake/timeout churn.
+    if CmdLine::parse(paging::cmdline())
+        .get("s36-lockcheck")
+        .is_some()
+    {
+        let stats = crate::memory::frame::stats();
+        if code == 90 {
+            S36_LOCK_BASE.store(stats.allocated_bytes, Ordering::Release);
+            kprintln!("s36: lockcheck base allocated={}", stats.allocated_bytes);
+        } else if code == 91 {
+            let base = S36_LOCK_BASE.load(Ordering::Acquire);
+            let delta = stats.allocated_bytes.saturating_sub(base);
+            kprintln!(
+                "s36: lockcheck delta={} allocated={}",
+                delta,
+                stats.allocated_bytes
+            );
+            if delta <= 64 * 1024 {
+                kprintln!("s36: lockcheck ok");
+            } else {
+                kprintln!("s36: lockcheck leak delta={}", delta);
             }
         }
     }
