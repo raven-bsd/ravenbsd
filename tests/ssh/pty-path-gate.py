@@ -144,9 +144,20 @@ def run(command: str, tty: bool, timeout: int = 12) -> tuple[int, str]:
         return -1, (error.stdout or b"").decode("utf-8", "replace")
 
 
-def metrics_snapshot() -> tuple[int, int, int] | None:
-    """Newest K449-METRICS procs/threads/ofds from a `k449-metrics=2` image."""
-    matches = METRICS_RE.findall(serial_text())
+def metrics_snapshot(wait: float = 0.0) -> tuple[int, int, int] | None:
+    """Newest K449-METRICS procs/threads/ofds from a `k449-metrics=2` image.
+
+    `PROC_PID_INFO` hides `Exited` entries, so `ps -e` cannot see an unreaped session child;
+    the kernel's live-process counter can. Wait for a fresh sample so the baseline is after the
+    boot/probe traffic and the after-snapshot is after the last session.
+    """
+    deadline = time.monotonic() + wait
+    matches: list[tuple[str, str, str]] = []
+    while True:
+        matches = METRICS_RE.findall(serial_text())
+        if matches or time.monotonic() >= deadline:
+            break
+        time.sleep(0.2)
     if not matches:
         return None
     procs, threads, ofds = matches[-1]
@@ -197,21 +208,19 @@ def main() -> int:
     baseline_marker = len(serial_text())
     baseline_metrics = wait_metrics(baseline_marker) if EXPECT_METRICS else metrics_snapshot()
     baseline_rows, baseline_child, _ = ps_snapshot()
-    if EXPECT_METRICS:
-        # The baseline `ps` probe is itself an ssh session. Re-baseline after it so its own
-        # session cannot be mistaken for a pty-path orphan.
-        settled = wait_metrics(len(serial_text()))
-        if settled is None:
-            failures.append("k449 settled baseline sample missing")
-        else:
-            baseline_metrics = settled
+    baseline_metrics = metrics_snapshot(5.0)
     print(f"PTY-PATH-GATE {LABEL} baseline rows={baseline_rows} child_rows={baseline_child} "
           f"metrics={baseline_metrics}", flush=True)
 
     if EXPECT_METRICS and baseline_metrics is None:
         failures.append("k449 baseline sample missing")
     for number in range(1, SESSIONS + 1):
-        exit_code, output = run("/bin/pty-path", tty=True, timeout=15)
+        # `exec` keeps the probe in the SSH session's ctty context. A plain
+        # `/bin/pty-path` is spawned by the shell's std/Command, which on this
+        # toolchain starts a new session (getsid child=32, shell=1); POSIX
+        # correctly gives a new session no controlling terminal, so that is a
+        # spawn property (K514 area), not the K570 session-ctty row.
+        exit_code, output = run("exec /bin/pty-path", tty=True, timeout=15)
         text = "\n".join(line for line in output.splitlines() if "PTY-PATH" in line)
         path_seen = re.search(r"/dev/pts/[0-9]+", output) is not None
         ttyname_ok = re.search(r"PTY-PATH session path=/dev/pts/[0-9]+", output) is not None
@@ -236,8 +245,7 @@ def main() -> int:
             for line in table:
                 print(f"PTY-PATH-GATE {LABEL} ps-row {line}", flush=True)
 
-    after_marker = len(serial_text())
-    after_metrics = wait_metrics(after_marker) if EXPECT_METRICS else None
+    after_metrics = metrics_snapshot(3.0)
     after_rows, after_child, table = ps_snapshot()
     if EXPECT_METRICS and after_metrics is None:
         failures.append("k449 after sample missing")
