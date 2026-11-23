@@ -106,6 +106,22 @@ def eof_fin(host, port, deadline):
     return False
 
 
+def own_shutdown(host, port, deadline):
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
+                greeting = read_line(stream)
+                if greeting != b"SHUT":
+                    raise OSError(f"shutdown greeting {greeting!r}")
+                while stream.recv(64):
+                    pass
+                return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
 def half_close(host, port, deadline):
     while time.monotonic() < deadline:
         try:
@@ -169,7 +185,7 @@ def main():
         if args.log:
             with open(args.log, "a", encoding="utf-8") as handle:
                 handle.write(f"K6 host ok {payload!r}\n")
-    for name, role in (("K8", eof_fin), ("K9", half_close)):
+    for name, role in (("K8", eof_fin), ("K8-shutdown", own_shutdown), ("K9", half_close)):
         if not role(args.host, args.eof_port, deadline):
             with open(args.result, "w", encoding="utf-8") as handle:
                 handle.write(f"fail {name}\n")

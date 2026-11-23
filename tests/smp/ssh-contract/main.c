@@ -11,7 +11,9 @@
 //   K5 PTY open/grant/unlock/ptsname, pair round-trip, termios defaults
 //   K6 accept: accepted fd independent, listener still accepts
 //   K7 pipe EOF: close write -> POLLIN|POLLHUP, read 0
-//   K8 accepted+dup exec socket EOF: peer FIN -> readable, read 0, not writable
+//   K8 accepted+dup exec socket EOF: peer FIN -> readable, read 0, still writable
+//      (NetBSD `sowritable`/FreeBSD `sowriteable` keep POLLOUT after the peer's FIN)
+//   K8-shutdown: our own SHUT_WR -> the next write is EPIPE
 //   K9 half-close: peer SHUT_WR -> readable/EOF, write allowed, then EPIPE + POLLHUP
 //   K10 poll after EOF is level-correct (reports on the next call)
 
@@ -772,15 +774,48 @@ static int check_eof_socket(void) {
     if (read(conn, &byte, 1) != 0) {
         return fail("eof parent read");
     }
-    if (shutdown(conn, SHUT_WR) != 0) {
-        return fail("eof shutdown write");
-    }
+    // NetBSD `sowritable`/FreeBSD `sowriteable` keep POLLOUT after the peer's FIN: EOF is a
+    // receive-side condition and the local send side is still open until our own SHUT_WR.
     revents = poll_one(conn, POLLOUT, 500);
-    if ((revents & POLLOUT) != 0) {
-        return fail("eof socket writable");
+    if (revents < 0 || (revents & POLLOUT) == 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "eof socket not writable revents=0x%x",
+                       (unsigned)revents);
+        return fail(detail);
     }
     (void)close(conn);
-    pass("accepted+dup exec read=0 hup=not-writable");
+    pass("accepted+dup exec read=0 eof-writable");
+    return 0;
+}
+
+static int check_own_shutdown(void) {
+    int conn;
+    ssize_t wrote;
+    int revents;
+
+    conn = accept_eof();
+    if (conn < 0) {
+        return fail("shutdown accept");
+    }
+    if (send(conn, "SHUT\n", 5, 0) != 5) {
+        return fail("shutdown greeting");
+    }
+    if (shutdown(conn, SHUT_WR) != 0) {
+        return fail("own shutdown write");
+    }
+    // The donor predicates keep POLLOUT set after SS_CANTSENDMORE so a blocked writer wakes and
+    // observes the error; the functional "unwritable" assertion is the EPIPE on the next write.
+    revents = poll_one(conn, POLLOUT, 500);
+    errno = 0;
+    wrote = write(conn, "X", 1);
+    if (wrote >= 0 || errno != EPIPE) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail),
+                       "own shutdown write errno=%d poll=0x%x", errno, (unsigned)revents);
+        return fail(detail);
+    }
+    (void)close(conn);
+    pass("own-shutdown write=EPIPE");
     return 0;
 }
 
@@ -927,6 +962,10 @@ int main(int argc, char **argv) {
     }
     row = "K8";
     if (check_eof_socket() != 0) {
+        return 1;
+    }
+    row = "K8-shutdown";
+    if (check_own_shutdown() != 0) {
         return 1;
     }
     row = "K9";
