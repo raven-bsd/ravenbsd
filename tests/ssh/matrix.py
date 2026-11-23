@@ -1094,6 +1094,63 @@ def row_mutation() -> None:
                f"mutation not observed: {observed}")
 
 
+def row_s8_proof(console: SerialConsole | None) -> None:
+    """K548 proof: correlate one client banner timeout with the guest sshd log."""
+    result = ssh_run(["tty"], "s8-proof-tt.log", extra=["-tt"], timeout=15)
+    text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace").strip()
+    attempt("S8-proof-tt", 1, "fresh", "client banner/accept result",
+            f"exit {result['returncode']}; {text[:240]}",
+            float(result["elapsed_ms"]), "OBSERVED")
+    if console is None:
+        record("S8-proof", "BLOCKED", "no serial console for the sshd log")
+        return
+    if console.wait_for(b"login:", 5) < 0:
+        console.send(b"\n")
+        if console.wait_for(b"login:", 30) < 0:
+            record("S8-proof", "BLOCKED", "no console login prompt")
+            return
+    console.send(b"root\n")
+    if console.wait_for(b"Password:", 10) < 0:
+        record("S8-proof", "BLOCKED", "no console password prompt")
+        return
+    console.send(b"raven\n")
+    if console.wait_for(b"Welcome to the RavenBSD console", 15) < 0:
+        record("S8-proof", "BLOCKED", "console login did not reach the shell banner")
+        return
+    console.send(b"\n")
+    time.sleep(0.5)
+    start_mark = len(console.buffer)
+    console.send(b"echo K434-$((7*11))")
+    time.sleep(0.3)
+    console.send(b"\r")
+    started = console.wait_for(b"K434-77", 8, start=start_mark) >= 0
+    mark = len(console.buffer)
+    console.send(b"ls -l /tmp/sshd.log; cat /tmp/sshd.log; echo K434-$((13*13))")
+    time.sleep(0.3)
+    console.send(b"\r")
+    end = console.wait_for(b"K434-169", 15, start=mark)
+    if end < 0:
+        console.send(b"\n")
+        end = console.wait_for(b"K434END", 15, start=mark)
+    segment = bytes(console.buffer[mark:len(console.buffer)])
+    log = segment.decode("utf-8", "replace").replace("\r", "")
+    log = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", log)
+    (OUT / "s8-proof-sshd.log").write_text(log, encoding="utf-8")
+    print(f"matrix: console s8-proof-sshd.log shell={started} end_marker={end >= 0}", flush=True)
+    print("matrix: --- /tmp/sshd.log ---", flush=True)
+    for line in log.splitlines():
+        print(f"matrix: sshd| {line}", flush=True)
+    lines = log.splitlines()
+    listening = [line for line in lines if "Server listening" in line]
+    connections = [line for line in lines if "Connection from" in line]
+    record("S8-proof", "OBSERVED",
+           f"client_exit={result['returncode']}; Server listening={len(listening)}; "
+           f"Connection from={len(connections)}; artifact=s8-proof-sshd.log")
+    attempt("S8-proof-accept", 1, "fresh",
+            "Server listening line and whether a Connection from line follows",
+            f"listening={listening[:2]}; connections={connections[:2]}", 0, "OBSERVED")
+
+
 def row_s5_s6() -> None:
     result = ssh_probe(["true"], "s5-vvv.log", extra=["-vvv"])
     text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
@@ -1604,6 +1661,350 @@ def write_tables() -> None:
     print(f"matrix: table {rows_path}")
 
 
+def serial_row_capture(console: SerialConsole, name: str, mark: int) -> int:
+    """Write the serial bytes produced by one row and return the new offset."""
+    console.pump()
+    chunk = bytes(console.buffer[mark:])
+    (OUT / f"serial-{name}.log").write_bytes(chunk)
+    print(f"matrix: serial-{name}.log {len(chunk)} bytes", flush=True)
+    return len(console.buffer)
+
+
+def console_shell_login(console: SerialConsole) -> bool:
+    """Log in on the serial console without requiring the shell prompt string."""
+    if console.wait_for(b"login:", 5) < 0:
+        console.send(b"\n")
+        if console.wait_for(b"login:", 30) < 0:
+            return False
+    console.send(b"root\n")
+    if console.wait_for(b"Password:", 10) < 0:
+        return False
+    console.send(b"raven\n")
+    if console.wait_for(b"Welcome to the RavenBSD console", 15) < 0:
+        return False
+    console.send(b"\n")
+    time.sleep(0.5)
+    return True
+
+
+def console_cr_capture(console: SerialConsole, command: str, log_name: str,
+                       marker: str, timeout: float = 20) -> str:
+    """Run one console command with a separate CR and capture up to a unique echo marker."""
+    mark = len(console.buffer)
+    console.send(command.encode())
+    time.sleep(0.3)
+    console.send(b"\r")
+    time.sleep(0.2)
+    console.send(b"\r")
+    end = console.wait_for(marker.encode(), timeout, start=mark)
+    if end < 0:
+        console.send(b"\n")
+        console.wait_for(marker.encode(), timeout, start=mark)
+    console.pump()
+    text = bytes(console.buffer[mark:len(console.buffer)]).decode("utf-8", "replace")
+    text = text.replace("\r", "")
+    text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", text)
+    (OUT / log_name).write_text(text, encoding="utf-8")
+    print(f"matrix: console {log_name} marker={end >= 0}", flush=True)
+    return text
+
+
+def row_close_probe(console: SerialConsole | None) -> None:
+    """K449/K448 close acceptance: one session plus client, serial, sshd log and ps capture."""
+    close_timeout = int(os.environ.get("RAVEN_CLOSE_TIMEOUT", "15"))
+    result = None
+    client_text = ""
+    output_ok = False
+    exit_status_seen = False
+    eof_seen = False
+    close_seen = False
+    attempts = 0
+    for number in range(1, 4):
+        attempts = number
+        result = ssh_run(["echo", "K449-DIAG"], f"close-client-{number}.log",
+                         extra=["-vvv"], timeout=close_timeout)
+        client_text = (result["stderr"] + result["stdout"]).decode("utf-8", "replace")
+        (OUT / f"close-client-vvv-{number}.log").write_text(client_text, encoding="utf-8")
+        lines = [line for line in client_text.splitlines() if line.strip()]
+        output_ok = b"K449-DIAG" in result["stdout"]
+        exit_status_seen = any("rtype exit-status" in line for line in lines)
+        eof_seen = any("rcvd eof" in line for line in lines)
+        close_seen = any("rcvd close" in line or "channel 0: free" in line
+                         for line in lines)
+        attempt("close-client", number, "fresh", "exit 0 + K449-DIAG",
+                f"exit {result['returncode']}; timed_out={result['timed_out']}; "
+                f"output={output_ok}; exit_status={exit_status_seen}; eof={eof_seen}; "
+                f"close={close_seen}",
+                float(result["elapsed_ms"]), "OBSERVED")
+        if output_ok or result["timed_out"]:
+            break
+    assert result is not None
+    client_lines = [line for line in client_text.splitlines() if line.strip()]
+    last_line = client_lines[-1] if client_lines else "no client output"
+    (OUT / "close-client-vvv.log").write_text(client_text, encoding="utf-8")
+
+    sshd_text = ""
+    sshd_ls_text = ""
+    ps_text = ""
+    debug_log_text = ""
+    debug_client_text = ""
+    debug_result: dict[str, object] | None = None
+    if console is not None and console_shell_login(console):
+        sshd_ls_text = console_cr_capture(
+            console, "ls -l /tmp/sshd.log; echo K434-$((7*11))",
+            "close-sshd-ls.log", "K434-77")
+        sshd_text = console_cr_capture(
+            console, "cat /tmp/sshd.log; echo K434-$((13*13))",
+            "close-sshd.log", "K434-169")
+        ps_text = console_cr_capture(
+            console, "ps -e; echo K434-$((17*13))", "close-ps.log", "K434-221")
+        debug_mark = len(console.buffer)
+        console.send(b"/sbin/sshd -d -p 2222 -f /etc/ssh/sshd_config &")
+        time.sleep(0.3)
+        console.send(b"\r")
+        time.sleep(0.2)
+        console.send(b"\r")
+        time.sleep(2.0)
+        debug_result = ssh_run(["echo", "K449-DIAG"], "close-debug-client.log",
+                               extra=["-vvv", "-p", "2222"], timeout=15)
+        debug_client_text = (debug_result["stderr"]
+                             + debug_result["stdout"]).decode("utf-8", "replace")
+        (OUT / "close-debug-client-vvv.log").write_text(debug_client_text,
+                                                       encoding="utf-8")
+        console.pump()
+        debug_log_text = bytes(console.buffer[debug_mark:]).decode("utf-8", "replace")
+        debug_log_text = debug_log_text.replace("\r", "")
+        debug_log_text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", debug_log_text)
+        (OUT / "close-sshd-debug-console.log").write_text(debug_log_text,
+                                                          encoding="utf-8")
+    elif console is not None:
+        record("close-probe", "BLOCKED", "console login failed before the sshd log dump")
+        return
+
+    sshd_lines = [line.strip() for line in sshd_text.splitlines()
+                  if line.strip() and "K434-169" not in line
+                  and "cat /tmp/sshd.log" not in line and not line.startswith("raven#")]
+    sshd_file = next((line.strip() for line in sshd_ls_text.splitlines()
+                      if "/tmp/sshd.log" in line and "ls -l" not in line), "none")
+    ps_lines = [line.strip() for line in ps_text.splitlines()
+                if "sshd" in line or "defunct" in line or line.strip().startswith("Z")]
+    collect_lines = [line for line in sshd_lines
+                     if "collect" in line.lower() or "sigchld" in line.lower()]
+    exit_lines = [line for line in sshd_lines
+                  if "exit-status" in line.lower() or "channel" in line.lower()
+                  or "session" in line.lower() or "close" in line.lower()]
+    accept_lines = [line for line in sshd_lines
+                    if "Server listening" in line or "Connection from" in line
+                    or "Accepted password" in line]
+    auth_lines = [line for line in sshd_lines
+                  if "Accepted password" in line or "Failed password" in line
+                  or "Postponed" in line or "Authenticat" in line]
+    session_exit_lines = [line for line in sshd_lines
+                          if "session_exit_message" in line or "exit-status" in line
+                          or "session 0" in line]
+    channel_close_lines = [line for line in sshd_lines
+                           if "channel" in line.lower() or "close" in line.lower()
+                           or "disconnect" in line.lower()]
+    client_tail = " || ".join(client_lines[-12:])
+    debug_lines = [line.strip() for line in debug_log_text.splitlines()
+                   if line.strip()
+                   and any(key in line.lower() for key in
+                           ("debug", "sigchld", "collect", "session_exit",
+                            "exit-status", "channel"))]
+    debug_sigchld = [line for line in debug_lines
+                     if "SIGCHLD" in line or "Received SIGCHLD" in line]
+    debug_collect = [line for line in debug_lines
+                     if "collect_children" in line or "collect" in line.lower()]
+    debug_session = [line for line in debug_lines
+                     if "session_exit_message" in line or "exit-status" in line]
+    debug_close = [line for line in debug_lines
+                   if "channel" in line.lower()
+                   and ("close" in line.lower() or "free" in line.lower())]
+    debug_client_lines = [line for line in debug_client_text.splitlines() if line.strip()]
+    debug_exit_status = any("rtype exit-status" in line for line in debug_client_lines)
+    debug_eof = any("rcvd eof" in line for line in debug_client_lines)
+    debug_close_client = any("rcvd close" in line or "channel 0: free" in line
+                             for line in debug_client_lines)
+    accepted = next((line for line in sshd_lines if "Accepted password" in line), "")
+    closed = next((line for line in sshd_lines if "Connection closed" in line), "")
+    cleanup = next((line for line in sshd_lines if "cleanup_exit" in line), "")
+
+    if output_ok and result["returncode"] == 0:
+        missing = "none"
+    elif not output_ok and not eof_seen:
+        missing = "session accept/banner (no output)"
+    elif not exit_status_seen:
+        missing = "exit-status (98)"
+    elif not eof_seen:
+        missing = "CHANNEL_EOF (96)"
+    elif not close_seen:
+        missing = "CHANNEL_CLOSE (97)/socket close"
+    else:
+        missing = "session exit path after close"
+
+    summary = (
+        f"client_attempts={attempts} client_exit={result['returncode']} "
+        f"timed_out={result['timed_out']} output={output_ok} "
+        f"exit_status={exit_status_seen} eof={eof_seen} close={close_seen}\n"
+        f"first_missing={missing}\n"
+        f"client_last={last_line}\n"
+        f"sshd_file={sshd_file}\n"
+        f"sshd_accepted={accepted or 'none'}\n"
+        f"sshd_closed={closed or 'none'}\n"
+        f"sshd_cleanup={cleanup or 'none'}\n"
+        f"sshd_collect_sigchld={collect_lines or 'none'}\n"
+        f"sshd_exit_channel={exit_lines or 'none'}\n"
+        f"sshd_accept={accept_lines or 'none'}\n"
+        f"sshd_auth={auth_lines or 'none'}\n"
+        f"sshd_session_exit={session_exit_lines or 'none'}\n"
+        f"sshd_channel_close={channel_close_lines or 'none'}\n"
+        f"client_tail={client_tail}\n"
+        f"debug_client_exit={debug_result['returncode'] if debug_result else 'n/a'} "
+        f"timed_out={debug_result['timed_out'] if debug_result else 'n/a'} "
+        f"exit_status={debug_exit_status} eof={debug_eof} close={debug_close_client}\n"
+        f"debug_sigchld={debug_sigchld or 'none'}\n"
+        f"debug_collect_children={debug_collect or 'none'}\n"
+        f"debug_session_exit={debug_session or 'none'}\n"
+        f"debug_channel_close={debug_close or 'none'}\n"
+        f"ps={ps_lines or 'none'}\n"
+    )
+    (OUT / "close-summary.txt").write_text(summary, encoding="utf-8")
+    serial_path = OUT / "serial-only.log"
+    if serial_path.is_file():
+        (OUT / "close-serial.log").write_bytes(serial_path.read_bytes())
+    print("matrix: --- close summary ---", flush=True)
+    for line in summary.splitlines():
+        print(f"matrix: close| {line}", flush=True)
+    record("close-probe", "OBSERVED",
+           f"first_missing={missing}; client_exit={result['returncode']}; "
+           f"output={output_ok}; artifact=close-summary.txt")
+
+
+def row_close_hang(console: SerialConsole | None) -> None:
+    """K434: capture guest process state while the close hangs, before the client is killed."""
+    argv = [
+        "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "ConnectTimeout=8",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-vvv",
+        f"{USER}@{HOST}",
+        "echo", "K449-DIAG",
+    ]
+    env = os.environ.copy()
+    env["SSH_ASKPASS"] = str(ASKPASS)
+    env["SSH_ASKPASS_REQUIRE"] = "force"
+    env["DISPLAY"] = ":0"
+    env["K434_SSH_PASSWORD"] = PASSWORD
+    out_path = OUT / "close-hang-client.stdout"
+    err_path = OUT / "close-hang-client.stderr"
+    with open(out_path, "wb") as out_file, open(err_path, "wb") as err_file:
+        process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                   stdout=out_file, stderr=err_file, env=env,
+                                   start_new_session=True)
+        deadline = time.monotonic() + 8
+        seen = False
+        while time.monotonic() < deadline and process.poll() is None:
+            stdout_text = out_path.read_bytes().decode("utf-8", "replace")
+            stderr_text = err_path.read_bytes().decode("utf-8", "replace")
+            if "K449-DIAG" in stdout_text or "rcvd eof" in stderr_text:
+                seen = True
+                break
+            time.sleep(0.1)
+
+        ps_text = ""
+        ps_alt_text = ""
+        procs_text = ""
+        proc_text = ""
+        if console is not None and console_shell_login(console):
+            ps_text = console_cr_capture(
+                console, "ps -e; echo K434-$((7*11))",
+                "close-hang-ps.log", "K434-77", timeout=10)
+            ps_alt_text = console_cr_capture(
+                console, "ps --json; echo K434-$((13*13))",
+                "close-hang-ps-json.log", "K434-169", timeout=10)
+            procs_text = console_cr_capture(
+                console, "procs; echo K434-$((19*13))",
+                "close-hang-procs.log", "K434-247", timeout=10)
+            proc_text = console_cr_capture(
+                console, "ls /proc; echo K434-$((17*13))",
+                "close-hang-proc.log", "K434-221", timeout=10)
+
+        try:
+            returncode = process.wait(timeout=15)
+            timed_out = False
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            returncode = process.wait()
+
+    client_text = err_path.read_text(errors="replace")
+    (OUT / "close-hang-client-vvv.log").write_text(client_text, encoding="utf-8")
+    ps_all = ps_text + "\n" + ps_alt_text
+    ps_lines = [line.strip() for line in ps_all.splitlines()
+                if any(key in line for key in
+                       ("sshd", "sshd-session", "brush", "defunct", "echo",
+                        " K449-DIAG", "sigmask"))]
+    procs_lines = [line.strip() for line in procs_text.splitlines()
+                   if any(key in line.lower() for key in
+                          ("sshd", "session", "brush", "echo", "child",
+                           "zombie", "defunct"))]
+    closed = bool(seen and returncode == 0 and not timed_out)
+    zombie = []
+    for line in ps_lines:
+        fields = line.split()
+        if ("defunct" in line or " Z " in f" {line} "
+                or (len(fields) > 2 and fields[2] == "Z")):
+            zombie.append(line)
+    proc_list = proc_text.strip()
+    attempt("close-hang", 1, "fresh", "process table during the post-EOF hang",
+            f"output_seen={seen} exit={returncode} timed_out={timed_out}; "
+            f"ps={ps_lines[:12]}; proc={proc_list[:160]}",
+            0, "OBSERVED")
+    summary = (
+        f"output_seen={seen} exit={returncode} timed_out={timed_out}\n"
+        f"ps_lines={ps_lines or 'none'}\n"
+        f"zombie_lines={zombie or 'none'}\n"
+        f"proc={proc_list or 'none'}\n"
+        f"procs={procs_lines or 'none'}\n"
+        f"session_closed={closed}\n"
+        f"ps_alt={ps_alt_text.strip() or 'none'}\n"
+    )
+    (OUT / "close-hang-summary.txt").write_text(summary, encoding="utf-8")
+    print("matrix: --- close-hang summary ---", flush=True)
+    for line in summary.splitlines():
+        print(f"matrix: hang| {line}", flush=True)
+    record("close-hang", "OBSERVED",
+           f"output_seen={seen} exit={returncode} timed_out={timed_out}; "
+           f"ps={ps_lines[:8]}; zombie={zombie or 'none'}")
+
+
+def row_full(console: SerialConsole) -> None:
+    """S1-S8 plus S5-session in order on one boot, with per-row serial capture."""
+    mark = len(console.buffer)
+    row_s1()
+    mark = serial_row_capture(console, "S1", mark)
+    row_s2()
+    mark = serial_row_capture(console, "S2", mark)
+    s3_state = row_s3_start()
+    row_s3_finish(console, s3_state)
+    mark = serial_row_capture(console, "S3", mark)
+    row_s4()
+    mark = serial_row_capture(console, "S4", mark)
+    row_s5_s6()
+    mark = serial_row_capture(console, "S5-S6", mark)
+    row_s7(console)
+    mark = serial_row_capture(console, "S7", mark)
+    row_s8()
+    serial_row_capture(console, "S8", mark)
+
+
 def main() -> int:
     if not IMAGE.is_file():
         print(f"matrix: missing image {IMAGE}", file=sys.stderr)
@@ -1620,12 +2021,21 @@ def main() -> int:
         console: SerialConsole | None = None
         row_label = ("K562-mutation" if only == "mutation"
                      else "S4" if only == "s4" else only)
+        if only == "full" and not build_peer():
+            record("full", "BLOCKED", "cannot build the ssh-peer tracer")
+            write_tables()
+            print("matrix: RED (1 red rows)")
+            return 2
         try:
-            socket_only = only in ("s8", "s7")
+            socket_only = only in ("s8", "s7", "s8-proof", "close-probe", "close-hang", "full")
             child, handle = boot(IMAGE, b"svcd: sshd up", "serial-only.log",
                                  "vars-only.fd", ready_timeout=180,
                                  socket_serial=socket_only)
-            if socket_only:
+            if only in ("close-probe", "close-hang"):
+                # The close captures need sshd/TCP, not the DNS lease; resolvd may be red.
+                console = handle  # type: ignore[assignment]
+                lease_ok = True
+            elif socket_only:
                 console = handle  # type: ignore[assignment]
                 lease_ok = serial_has(console, SERIAL_LEASE, 60)
             else:
@@ -1654,6 +2064,16 @@ def main() -> int:
                         record("S7", "BLOCKED", "console login failed before S7")
                 elif only == "s8":
                     row_s8()
+                elif only == "s8-proof":
+                    row_s8_proof(console)
+                elif only == "close-probe":
+                    row_close_probe(console)
+                elif only == "close-hang":
+                    row_close_hang(console)
+                elif only == "full":
+                    row_full(console)
+                elif only == "s5":
+                    row_s5_s6()
                 else:
                     record(only, "BLOCKED", f"unknown RAVEN_MATRIX_ONLY={only}")
         except Exception as error:  # noqa: BLE001 - isolate the only-mode boot

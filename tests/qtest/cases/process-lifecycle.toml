@@ -33,6 +33,10 @@ regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+$'
 [[expect]]
 regex = '^s36: cycles done=10000$'
 
+# Bounded process/address-space/stack churn between the same counter markers.
+[[expect]]
+regex = '^s36: sessions done=32$'
+
 # Scenario 2, closing marker exit: the counters again (the report compares the two lines).
 [[expect]]
 regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+$'
