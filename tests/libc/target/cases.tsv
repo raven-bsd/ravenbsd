@@ -3,6 +3,7 @@
 # case<TAB>hard PGs<TAB>soft PGs<TAB>binaries<TAB>link
 case	hard	soft	binaries	link
 hello	1 13 22 23 24 29 50 53	52	libc-test	static
+exec-timing	1 13 22 23 24 29 50 53		libc-test	static
 stdio	1 13 22 23 24 29 50 53	12	libc-test	static
 time	1 13 22 23 24 29 50 53	17 18 20	libc-test	static
 threads	1 2 13 22 23 24 29 50 53	3 5 8 9 11	libc-test	static
