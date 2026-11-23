@@ -1808,6 +1808,13 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     {
         kprintln!("s24: frames free={}", frame::stats().free_bytes);
     }
+    // K536 rev176: the pty leak row samples the same counter Mark's harness uses.
+    if CmdLine::parse(paging::cmdline())
+        .get("s24-alloccheck")
+        .is_some()
+    {
+        kprintln!("s24: frames allocated={}", frame::stats().allocated_bytes);
+    }
     // S25 handle-transfer leak evidence: the dying process's live handle count. A transferred
     // handle that survived process death, or a slot leaked by the transfer path, drifts this
     // number across repeated spawn/exit cycles.
