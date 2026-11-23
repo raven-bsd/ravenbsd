@@ -209,6 +209,17 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             if deliver_fault(frame, kind, cr2) {
                 return;
             }
+            crate::kprintln!(
+                "PFDBG rip={:#x} cr2={:#x} rsp={:#x} rdi={:#x} rsi={:#x} rax={:#x} rbx={:#x} rbp={:#x}",
+                frame.rip,
+                cr2,
+                frame.rsp,
+                frame.rdi,
+                frame.rsi,
+                frame.rax,
+                frame.rbx,
+                frame.rbp
+            );
             crate::process::page_fault(cr2);
         }
     }
