@@ -29,6 +29,8 @@
 #include <time.h>
 #include <unistd.h>
 
+extern char **environ;
+
 // Raw `CLOCK_GET` (raven ABI 0x04, not the Linux 228) before libc init; CLOCK_MONOTONIC == 1.
 static uint64_t raw_now_ns(void) {
     struct timespec ts;
@@ -301,9 +303,8 @@ int main(int argc, char **argv) {
                 (void)dup2(sv4[0], 1);
                 pid_t inh_child = -1;
                 char *inh_args[] = {"libc-test", "spawn-child", NULL};
-                char *inh_env[] = {NULL};
                 if (posix_spawn(&inh_child, "/bin/libc-test", &empty_actions, &empty_attr,
-                                inh_args, inh_env) == 0) {
+                                inh_args, environ) == 0) {
                     int inh_status = 0;
                     (void)waitpid(inh_child, &inh_status, 0);
                 } else {
