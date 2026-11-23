@@ -2207,6 +2207,8 @@ fn wake_process_waiters(process: &Arc<Process>) {
     let _ = process.scheme_waiters.wake_process(process.id);
     // Futex buckets are global.
     crate::syscall::futex::remove_process(process.id);
+    // Per-CPU sleep lists hold an `Arc<Thread>` until the deadline.
+    crate::sched::cancel_process_sleepers(process.id);
 
     // Resources reachable from the dying table.  A blocked syscall keeps its object `Arc`, so
     // the object is still live even after this table is replaced.  IRQ objects are collected and
@@ -2244,6 +2246,20 @@ fn wake_process_waiters(process: &Arc<Process>) {
             }
             _ => {}
         });
+    }
+    // A thread of the dying process may wait on another live process's queue through a pid, not
+    // a handle: `PROC_WAIT_EX`/`waitpid` keeps only the child pid, and libc closes the fork
+    // handle. Sweep every live process's queues by waiter process id so that thread is woken and
+    // its `Waiter` entry (which holds an `Arc<Thread>`) is removed. FreeBSD `kern_wait4` and
+    // NetBSD `kern_lwp.c` abort a killed waiter's sleep queue at process exit.
+    for other in processes() {
+        if Arc::ptr_eq(&other, process) {
+            continue;
+        }
+        let _ = other.waiters.wake_process(process.id);
+        let _ = other.child_waiters.wake_process(process.id);
+        let _ = other.signal_waiters.wake_process(process.id);
+        let _ = other.scheme_waiters.wake_process(process.id);
     }
     for irq in irqs {
         if !irq_held_elsewhere(process, &irq) {

@@ -763,6 +763,34 @@ fn cancel_sleep(token: u64) {
     }
 }
 
+/// Wake every sleeper owned by `process_id` on every CPU (process teardown).
+///
+/// `NANOSLEEP` and futex timeouts keep an `Arc<Thread>` in the per-CPU sleep list. A process
+/// terminated while one of its threads sleeps would otherwise retain the thread and its process
+/// until the deadline. FreeBSD `kern_sleepq.c`/`kern_timeout.c` abort a process's sleepers at
+/// exit; NetBSD `kern_sleepq.c` does the same.
+pub fn cancel_process_sleepers(process_id: u64) {
+    if !INITIALIZED.load(Ordering::Acquire) {
+        return;
+    }
+    for cpu in 0..smp::online_cpus() {
+        for _ in 0..raven_sched_core::MAX_THREADS {
+            let victim = {
+                let mut slot = lock_cpu(cpu);
+                slot.as_mut().and_then(|state| {
+                    state
+                        .sleepers
+                        .remove_where(|(thread, _, _)| thread.process.id == process_id)
+                })
+            };
+            let Some((thread, token, _)) = victim else {
+                break;
+            };
+            let _ = wake(thread, Some(token), Errno::EIO.to_ret());
+        }
+    }
+}
+
 /// Start a blocking operation and return its wake token.
 ///
 /// The caller then optionally registers a timeout with [`add_sleep`], publishes a waiter, and
