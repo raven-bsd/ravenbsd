@@ -1158,6 +1158,10 @@ pub(crate) fn defer_close(server: &Arc<Process>, id: u64, cookie: u64, count: u3
         count,
     });
     server.scheme_waiters.wake_all();
+    // The deferred close is a source transition: a server blocked in its event queue must see
+    // it, not only a direct scheme waiter. Without this the slave's process-exit close leaves
+    // the pty master without HUP (K495 rev 300, R3).
+    crate::event::notify_source(Arc::as_ptr(server) as usize as u64);
 }
 
 /// Drop deferred last-close notices whose server is exiting.

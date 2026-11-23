@@ -830,6 +830,19 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                     || self.backend.read(handle, buf),
                 )
             });
+            // A terminal master read of zero past a real buffer is the pty hangup (EOF). Keep it
+            // sticky so the next `poll` reports `POLLHUP` even though the scheme-file readiness
+            // fallback still reports the master as readable (PG-25 is the server-side fix).
+            // `posix_openpt` installs the master without a name; the slave and the console carry
+            // their `/dev/...` path and must not inherit the master's hangup from a slave-side
+            // VEOF/^D read.
+            if matches!(&result, Ok(0))
+                && reference.kind() == OfdKind::Tty
+                && reference.path().is_none()
+                && !buf.is_empty()
+            {
+                reference.set_eof();
+            }
             match result {
                 Err(Errno::EAGAIN) if blocking && (doorbell || pipe) => {
                     // The kernel pipe end is created non-blocking (there is no runtime setter);
@@ -2167,12 +2180,15 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
     }
 
-    /// Take a fresh scheme reference for every inherited socket in the fork child.
+    /// Take a fresh scheme reference for every inherited scheme descriptor in the fork child.
     ///
     /// The kernel copies the handle table on fork, but the scheme server counts references per
     /// open file. A parent `close` must therefore not be the last reference while the child still
     /// holds the descriptor. `DUP` both gives the child its own handle and sends the server the
     /// duplicate notification; `closef`-style last-reference release then works on both sides.
+    /// Sockets, tty/pty masters and pipes are scheme-backed: an sshd session forks after opening
+    /// the accepted socket, the pty master and the privsep/channel pipes, and the parent's close
+    /// must not release the server-side object while the session child still owns it.
     pub fn fork_child_inherit(&self) {
         let mut seen = alloc::collections::BTreeSet::new();
         let indices: Vec<u32> = self
@@ -2193,7 +2209,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 };
                 (ofd.kind, ofd.handle.get())
             };
-            if kind != OfdKind::Socket || handle == Handle::NONE {
+            if !matches!(kind, OfdKind::Socket | OfdKind::Tty | OfdKind::Pipe)
+                || handle == Handle::NONE
+            {
                 continue;
             }
             if let Ok(duplicate) = self
