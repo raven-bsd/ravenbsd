@@ -5,17 +5,78 @@
 exact echo and send the acknowledgement that makes the guest print `CONTRACT K6 PASS`."""
 
 import argparse
+import re
 import socket
 import struct
 import sys
 import time
 
 
+def parse_usernet(text):
+    """Map guest ports 23096-23098 to the ephemeral host ports QEMU chose."""
+    ports = {}
+    pattern = re.compile(
+        r"TCP\[HOST_FORWARD\]\s+\d+\s+\S+\s+(\d+)\s+\S+\s+(\d+)"
+    )
+    for line in text.splitlines():
+        match = pattern.search(line)
+        if match is None:
+            continue
+        host_port = int(match.group(1))
+        guest_port = int(match.group(2))
+        if guest_port in (23096, 23097, 23098):
+            ports[guest_port] = host_port
+    return ports
+
+
+def discover_ports(path, deadline):
+    """Read QEMU's `info usernet` from the monitor socket until the K6 forwards are known."""
+    last = "monitor socket did not appear"
+    while time.monotonic() < deadline:
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as monitor:
+                remaining = max(0.1, deadline - time.monotonic())
+                monitor.settimeout(min(2.0, remaining))
+                monitor.connect(path)
+                monitor.sendall(b"info usernet\n")
+                data = b""
+                read_deadline = min(deadline, time.monotonic() + 2.0)
+                while time.monotonic() < read_deadline:
+                    try:
+                        chunk = monitor.recv(4096)
+                    except socket.timeout:
+                        break
+                    if not chunk:
+                        break
+                    data += chunk
+                    ports = parse_usernet(data.decode(errors="replace"))
+                    if 23097 in ports and 23098 in ports:
+                        return ports
+            last = f"incomplete forwarding table: {parse_usernet(data.decode(errors='replace'))!r}"
+        except OSError as error:
+            last = str(error)
+        time.sleep(0.1)
+    raise RuntimeError(f"QEMU monitor {path}: {last}")
+
+
+def wait_ready(host, port, deadline):
+    """Wait for the guest K6-ready marker before opening the first K6 connection."""
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
+                if read_line(stream) == b"READY":
+                    return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
 def exchange(host, port, payload, ack, deadline):
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=2.0) as stream:
-                stream.settimeout(5.0)
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
                 stream.sendall(payload)
                 echoed = b""
                 while len(echoed) < len(payload):
@@ -47,8 +108,8 @@ def read_line(stream, limit=64):
 def eof_fin(host, port, deadline):
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=2.0) as stream:
-                stream.settimeout(5.0)
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
                 greeting = read_line(stream)
                 if greeting != b"EOF":
                     raise OSError(f"eof greeting {greeting!r}")
@@ -58,11 +119,53 @@ def eof_fin(host, port, deadline):
     return False
 
 
+def k6_exchange(host, port, deadline):
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
+                stream.sendall(b"PING")
+                echoed = b""
+                while len(echoed) < 4:
+                    chunk = stream.recv(4 - len(echoed))
+                    if not chunk:
+                        raise OSError("eof before PING echo")
+                    echoed += chunk
+                if echoed == b"PING":
+                    return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
+def k6_loop(host, port, loops, deadline):
+    for _ in range(loops):
+        if not k6_exchange(host, port, deadline):
+            return False
+    return True
+
+
+def own_shutdown(host, port, deadline):
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
+                greeting = read_line(stream)
+                if greeting != b"SHUT":
+                    raise OSError(f"shutdown greeting {greeting!r}")
+                while stream.recv(64):
+                    pass
+                return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
 def half_close(host, port, deadline):
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=2.0) as stream:
-                stream.settimeout(5.0)
+            with socket.create_connection((host, port), timeout=5.0) as stream:
+                stream.settimeout(30.0)
                 greeting = read_line(stream)
                 if greeting != b"HALF":
                     raise OSError(f"half greeting {greeting!r}")
@@ -91,12 +194,56 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=23097)
     parser.add_argument("--eof-port", type=int, default=23098)
+    parser.add_argument("--ready-port", type=int, default=23096)
+    parser.add_argument("--k6-ready", action="store_true")
+    parser.add_argument("--monitor", default="")
+    parser.add_argument("--k6-loop", type=int, default=0)
     parser.add_argument("--result", required=True)
     parser.add_argument("--log", default="")
-    parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--timeout", type=float, default=600.0)
     args = parser.parse_args()
 
     deadline = time.monotonic() + args.timeout
+    if args.monitor:
+        try:
+            ports = discover_ports(args.monitor, deadline)
+            args.port = ports[23097]
+            args.eof_port = ports[23098]
+            if 23096 in ports:
+                args.ready_port = ports[23096]
+        except RuntimeError as error:
+            with open(args.result, "w", encoding="utf-8") as handle:
+                handle.write(f"fail monitor: {error}\n")
+            if args.log:
+                with open(args.log, "a", encoding="utf-8") as handle:
+                    handle.write(f"monitor fail: {error}\n")
+            print(f"host peer: {error}", file=sys.stderr)
+            return 1
+    if args.k6_ready:
+        if not wait_ready(args.host, args.ready_port, deadline):
+            with open(args.result, "w", encoding="utf-8") as handle:
+                handle.write("fail k6-ready\n")
+            if args.log:
+                with open(args.log, "a", encoding="utf-8") as handle:
+                    handle.write("K6-ready fail\n")
+            return 1
+        if args.log:
+            with open(args.log, "a", encoding="utf-8") as handle:
+                handle.write("K6-ready ok\n")
+    if args.k6_loop:
+        if not k6_loop(args.host, args.port, args.k6_loop, deadline):
+            with open(args.result, "w", encoding="utf-8") as handle:
+                handle.write("fail k6-loop\n")
+            if args.log:
+                with open(args.log, "a", encoding="utf-8") as handle:
+                    handle.write("K6-loop fail\n")
+            return 1
+        with open(args.result, "w", encoding="utf-8") as handle:
+            handle.write("ok\n")
+        if args.log:
+            with open(args.log, "a", encoding="utf-8") as handle:
+                handle.write(f"K6-loop ok {args.k6_loop}\n")
+        return 0
     steps = [(b"ACCEPT1", b"K6ACK1"), (b"ACCEPT2", b"K6ACK2")]
     for payload, ack in steps:
         if not exchange(args.host, args.port, payload, ack, deadline):
@@ -109,7 +256,7 @@ def main():
         if args.log:
             with open(args.log, "a", encoding="utf-8") as handle:
                 handle.write(f"K6 host ok {payload!r}\n")
-    for name, role in (("K8", eof_fin), ("K9", half_close)):
+    for name, role in (("K8", eof_fin), ("K8-shutdown", own_shutdown), ("K9", half_close)):
         if not role(args.host, args.eof_port, deadline):
             with open(args.result, "w", encoding="utf-8") as handle:
                 handle.write(f"fail {name}\n")

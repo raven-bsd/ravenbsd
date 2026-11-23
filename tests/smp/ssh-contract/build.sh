@@ -14,9 +14,9 @@ cd "$root"
 # A previous hung qtest may still hold the K6 hostfwd port. The suite owns these artifacts;
 # clear the old host peer before rebuilding. Do not kill QEMU here: the qtest harness may have
 # already started its own instance before running the pre commands.
-pkill -f "ssh-contract/host_accept.py" 2>/dev/null || true
+pkill -f "$root/tests/smp/ssh-contract/host_accept.py" 2>/dev/null || true
 
-out=build/fixtures/ssh-contract
+out=${SSH_CONTRACT_OUT:-build/fixtures/ssh-contract}
 mkdir -p "$out"
 arch=${RAVEN_QT_ARCH:-x86_64}
 if [ "$arch" != x86_64 ]; then
@@ -95,10 +95,18 @@ link_one() {
 link_one "$out/main.o" "$out/ssh-contract"
 link_one "$out/child.o" "$out/ssh-contract-child"
 
+# The diagnostic binary always runs the K1/K6 50x loops, so service args are not involved.
+"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+    -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+    -DSSH_CONTRACT_DIAG_BINARY=1 \
+    -c "$root/tests/smp/ssh-contract/main.c" -o "$out/main-diag.o"
+link_one "$out/main-diag.o" "$out/ssh-contract-diag"
+
+# Always rebuild the two servers: a fixture must not copy a stale ptyd that predates the
+# current `pty:ptmx` handler. Cargo is incremental when the sources are unchanged.
 for tool in raven-init raven-ptyd; do
-    if [ ! -x "$root/build/$arch/user/$tool" ]; then
-        cargo xtask build user --arch "$arch" -p "$tool"
-    fi
+    cargo xtask build user --arch "$arch" -p "$tool"
 done
 init=$root/build/$arch/user/raven-init
 ptyd=$root/build/$arch/user/raven-ptyd
@@ -106,14 +114,20 @@ ptyd=$root/build/$arch/user/raven-ptyd
 cargo xtask initfs --arch "$arch" --profile network-config-test > /dev/null
 cp build/"$arch"/initfs.img "$out/base.img"
 
+service=$root/tests/smp/ssh-contract/ssh-contract.service.toml
+if [ "${SSH_CONTRACT_DIAG:-0}" = "1" ]; then
+    service=$root/tests/smp/ssh-contract/ssh-contract-diag.service.toml
+fi
+
 cargo build -q -p raven-b70-overlay
 overlay=$root/target/debug/raven-b70-overlay
 "$overlay" "$out/base.img" "$out/initfs.img" \
     "/init=$init" \
     "/bin/ssh-contract=$out/ssh-contract:0755" \
+    "/bin/ssh-contract-diag=$out/ssh-contract-diag:0755" \
     "/bin/ssh-contract-child=$out/ssh-contract-child:0755" \
     "/sbin/ptyd=$ptyd:0755" \
-    "/etc/services.d/ssh-contract.toml=$root/tests/smp/ssh-contract/ssh-contract.service.toml" \
+    "/etc/services.d/ssh-contract.toml=$service" \
     "/etc/services.d/ptyd.toml=$root/tests/smp/ssh-contract/ptyd.service.toml" \
     "/etc/svcd.conf=$root/tests/smp/ssh-contract/ssh-contract.svcd.conf"
 

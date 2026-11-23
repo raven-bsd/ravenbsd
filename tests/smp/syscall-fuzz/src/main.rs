@@ -117,7 +117,6 @@ const RAW_DUPLEX_PEERCRED: usize = 0x114;
 const RAW_PROC_CTTY_SET: usize = 0x1e0;
 const RAW_PROC_CTTY_GET: usize = 0x1e1;
 const RAW_PROC_CTTY_SET_FG: usize = 0x1e2;
-/// `proc_ctty_handle() -> handle`.
 const RAW_PROC_CTTY_HANDLE: usize = 0x1e3;
 /// Marker for the Linux-personality branch; it has no single syscall number.
 const RAW_LINUX_TRAP: usize = 0;
@@ -3581,12 +3580,10 @@ fn raw_plan(r: &mut Runner) {
         [ctx.pipe_r, 0, 0, 0, 0, 0],
         Expect::Err(ENOTTY),
     );
-    // The controlling-terminal handle depends on the caller's session: ENXIO when the session
-    // has no controlling terminal, or a fresh handle when it does. Record either outcome.
     r.raw(
         RAW_PROC_CTTY_HANDLE,
         "PROC_CTTY_HANDLE",
-        "session-ctty",
+        "baseline",
         [0, 0, 0, 0, 0, 0],
         Expect::Any,
     );

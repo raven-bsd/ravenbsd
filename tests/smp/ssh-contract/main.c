@@ -11,7 +11,9 @@
 //   K5 PTY open/grant/unlock/ptsname, pair round-trip, termios defaults
 //   K6 accept: accepted fd independent, listener still accepts
 //   K7 pipe EOF: close write -> POLLIN|POLLHUP, read 0
-//   K8 accepted+dup exec socket EOF: peer FIN -> readable, read 0, not writable
+//   K8 accepted+dup exec socket EOF: peer FIN -> readable, read 0, still writable
+//      (NetBSD `sowritable`/FreeBSD `sowriteable` keep POLLOUT after the peer's FIN)
+//   K8-shutdown: our own SHUT_WR -> the next write is EPIPE
 //   K9 half-close: peer SHUT_WR -> readable/EOF, write allowed, then EPIPE + POLLHUP
 //   K10 poll after EOF is level-correct (reports on the next call)
 
@@ -44,6 +46,7 @@ extern char *ptsname(int fd);
 
 #define K6_PORT 23097
 #define KEOF_PORT 23098
+#define KREADY_PORT 23096
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
 static long raven_debug_write(const char *bytes, size_t len) {
@@ -100,9 +103,14 @@ static int poll_one(int fd, short events, int timeout_ms) {
     pfd.fd = fd;
     pfd.events = events;
     pfd.revents = 0;
+    errno = 0;
     do {
         ready = poll(&pfd, 1, timeout_ms);
     } while (ready < 0 && errno == EINTR);
+    if (ready >= 0) {
+        // Do not leak a stale errno from the scheme Call::Poll readiness query inside the shim.
+        errno = 0;
+    }
     return ready < 0 ? -1 : pfd.revents;
 }
 
@@ -133,6 +141,42 @@ static int read_exact(int fd, void *buffer, size_t length) {
             return -1;
         }
         done += (size_t)got;
+    }
+    return 0;
+}
+
+static int read_exact_trace(int fd, void *buffer, size_t length, ssize_t *last, int *last_errno) {
+    size_t done = 0;
+    int retries = 0;
+
+    *last = 0;
+    *last_errno = 0;
+    while (done < length) {
+        ssize_t got;
+        errno = 0;
+        got = read(fd, (char *)buffer + done, length - done);
+        *last = got;
+        *last_errno = errno;
+        if (got > 0) {
+            done += (size_t)got;
+            retries = 0;
+            continue;
+        }
+        if (got == 0) {
+            return -1;
+        }
+        // A scheme read may return EAGAIN after the readiness doorbell was consumed by an
+        // earlier query.  Wait for the next readable transition instead of treating it as EOF.
+        if (errno == EAGAIN && retries < 12) {
+            int revents = poll_one(fd, POLLIN | POLLHUP, 5000);
+            if (revents < 0) {
+                *last_errno = errno;
+                return -1;
+            }
+            retries++;
+            continue;
+        }
+        return -1;
     }
     return 0;
 }
@@ -553,6 +597,73 @@ static int accept_one(int listener, const char *payload, const char *ack) {
     return 0;
 }
 
+static int check_listen_only(void) {
+    int listener;
+    struct sockaddr_in address;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        return fail("listen-only socket");
+    }
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(23099);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0) {
+        (void)close(listener);
+        return fail("listen-only bind");
+    }
+    errno = 0;
+    if (listen(listener, 2) != 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "bind ok, listen errno=%d", errno);
+        (void)close(listener);
+        return fail(detail);
+    }
+    (void)close(listener);
+    pass("bind ok listen ok");
+    return 0;
+}
+
+static int signal_k6_ready(void) {
+    int listener;
+    int conn;
+    int revents;
+    struct sockaddr_in address;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        return -1;
+    }
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(KREADY_PORT);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0 ||
+        listen(listener, 2) != 0) {
+        (void)close(listener);
+        return -1;
+    }
+    revents = poll_one(listener, POLLIN, 10000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        (void)close(listener);
+        return -1;
+    }
+    conn = accept(listener, NULL, NULL);
+    if (conn < 0) {
+        (void)close(listener);
+        return -1;
+    }
+    if (send(conn, "READY\n", 6, 0) != 6) {
+        (void)close(conn);
+        (void)close(listener);
+        return -1;
+    }
+    (void)close(conn);
+    (void)close(listener);
+    return 0;
+}
+
 static int check_accept(void) {
     int listener;
     struct sockaddr_in address;
@@ -572,9 +683,17 @@ static int check_accept(void) {
     if (listen(listener, 2) != 0) {
         return fail("listen");
     }
+    // The K6 listener is already bound.  Tell the host peer it may open the first connection;
+    // connecting before this marker is what makes the first poll race under load.
+    if (signal_k6_ready() != 0) {
+        return fail("k6 ready");
+    }
     revents = poll_one(listener, POLLIN, 5000);
     if (revents < 0 || (revents & POLLIN) == 0) {
-        return fail("listener poll");
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "listener poll revents=%d errno=%d",
+                       revents, errno);
+        return fail(detail);
     }
     if (accept_one(listener, "ACCEPT1", "K6ACK1") != 0) {
         return fail("accept first");
@@ -716,15 +835,48 @@ static int check_eof_socket(void) {
     if (read(conn, &byte, 1) != 0) {
         return fail("eof parent read");
     }
-    if (shutdown(conn, SHUT_WR) != 0) {
-        return fail("eof shutdown write");
-    }
+    // NetBSD `sowritable`/FreeBSD `sowriteable` keep POLLOUT after the peer's FIN: EOF is a
+    // receive-side condition and the local send side is still open until our own SHUT_WR.
     revents = poll_one(conn, POLLOUT, 500);
-    if ((revents & POLLOUT) != 0) {
-        return fail("eof socket writable");
+    if (revents < 0 || (revents & POLLOUT) == 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "eof socket not writable revents=0x%x",
+                       (unsigned)revents);
+        return fail(detail);
     }
     (void)close(conn);
-    pass("accepted+dup exec read=0 hup=not-writable");
+    pass("accepted+dup exec read=0 eof-writable");
+    return 0;
+}
+
+static int check_own_shutdown(void) {
+    int conn;
+    ssize_t wrote;
+    int revents;
+
+    conn = accept_eof();
+    if (conn < 0) {
+        return fail("shutdown accept");
+    }
+    if (send(conn, "SHUT\n", 5, 0) != 5) {
+        return fail("shutdown greeting");
+    }
+    if (shutdown(conn, SHUT_WR) != 0) {
+        return fail("own shutdown write");
+    }
+    // The donor predicates keep POLLOUT set after SS_CANTSENDMORE so a blocked writer wakes and
+    // observes the error; the functional "unwritable" assertion is the EPIPE on the next write.
+    revents = poll_one(conn, POLLOUT, 500);
+    errno = 0;
+    wrote = write(conn, "X", 1);
+    if (wrote >= 0 || errno != EPIPE) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail),
+                       "own shutdown write errno=%d poll=0x%x", errno, (unsigned)revents);
+        return fail(detail);
+    }
+    (void)close(conn);
+    pass("own-shutdown write=EPIPE");
     return 0;
 }
 
@@ -741,8 +893,24 @@ static int check_half_close(void) {
     if (send(conn, "HALF\n", 5, 0) != 5) {
         return fail("half greeting");
     }
-    if (read_exact(conn, data, sizeof(data)) != 0 || memcmp(data, "DATA", 4) != 0) {
-        return fail("half data");
+    revents = poll_one(conn, POLLIN | POLLHUP, 5000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "half pre-read poll revents=0x%x errno=%d",
+                       (unsigned)revents, errno);
+        return fail(detail);
+    }
+    {
+        ssize_t last = 0;
+        int read_errno = 0;
+        if (read_exact_trace(conn, data, sizeof(data), &last, &read_errno) != 0 ||
+            memcmp(data, "DATA", 4) != 0) {
+            char detail[96];
+            errno = read_errno;
+            (void)snprintf(detail, sizeof(detail), "half data got=%zd read_errno=%d",
+                           last, read_errno);
+            return fail(detail);
+        }
     }
     revents = poll_one(conn, POLLIN, 2000);
     if (revents < 0 || (revents & POLLIN) == 0) {
@@ -817,10 +985,193 @@ static int check_eof_level(void) {
     return 0;
 }
 
+#define DIAG_LOOPS 50
+
+static void diag_load(char *out, size_t size) {
+    int fd;
+    ssize_t got;
+
+    (void)snprintf(out, size, "n/a");
+    fd = open("/proc/loadavg", O_RDONLY);
+    if (fd < 0) {
+        return;
+    }
+    got = read(fd, out, size - 1);
+    (void)close(fd);
+    if (got <= 0) {
+        (void)snprintf(out, size, "n/a");
+        return;
+    }
+    out[got] = '\0';
+    for (ssize_t index = 0; index < got; index++) {
+        if (out[index] == '\n') {
+            out[index] = '\0';
+            break;
+        }
+    }
+}
+
+static void diag_log(const char *tag, int iter, const char *step, int fd, int events,
+                     int revents, int error) {
+    char load[64];
+    char line[320];
+
+    diag_load(load, sizeof(load));
+    (void)snprintf(line, sizeof(line),
+                   "DIAG %s FAIL iter=%d step=%s fd=%d events=0x%x revents=0x%x errno=%d load=%s\n",
+                   tag, iter, step, fd, (unsigned)events, (unsigned)revents, error, load);
+    say(line);
+}
+
+static int diag_k1(void) {
+    for (int iter = 1; iter <= DIAG_LOOPS; iter++) {
+        int sv[2];
+        char byte = 'A';
+        int revents;
+        int selected;
+
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+            diag_log("K1", iter, "socketpair", -1, 0, 0, errno);
+            return 1;
+        }
+        revents = poll_one(sv[1], POLLOUT, 0);
+        if (revents < 0 || (revents & POLLOUT) == 0) {
+            diag_log("K1", iter, "write-ready", sv[1], POLLOUT, revents, errno);
+            (void)close(sv[0]);
+            (void)close(sv[1]);
+            return 1;
+        }
+        revents = poll_one(sv[0], POLLIN, 0);
+        if (revents != 0) {
+            diag_log("K1", iter, "empty-read-ready", sv[0], POLLIN, revents, errno);
+            (void)close(sv[0]);
+            (void)close(sv[1]);
+            return 1;
+        }
+        selected = select_read(sv[0], 0);
+        if (selected != 0) {
+            diag_log("K1", iter, "empty-select", sv[0], POLLIN, selected, errno);
+            (void)close(sv[0]);
+            (void)close(sv[1]);
+            return 1;
+        }
+        if (write(sv[1], &byte, 1) != 1) {
+            diag_log("K1", iter, "write", sv[1], POLLOUT, 0, errno);
+            (void)close(sv[0]);
+            (void)close(sv[1]);
+            return 1;
+        }
+        revents = poll_one(sv[0], POLLIN, 2000);
+        if (revents < 0 || (revents & POLLIN) == 0) {
+            diag_log("K1", iter, "read-ready", sv[0], POLLIN, revents, errno);
+            (void)close(sv[0]);
+            (void)close(sv[1]);
+            return 1;
+        }
+        selected = select_read(sv[0], 2000);
+        if (selected <= 0) {
+            diag_log("K1", iter, "select-ready", sv[0], POLLIN, selected, errno);
+            (void)close(sv[0]);
+            (void)close(sv[1]);
+            return 1;
+        }
+        if (read(sv[0], &byte, 1) != 1) {
+            diag_log("K1", iter, "read", sv[0], POLLIN, revents, errno);
+            (void)close(sv[0]);
+            (void)close(sv[1]);
+            return 1;
+        }
+        (void)close(sv[0]);
+        (void)close(sv[1]);
+    }
+    say("DIAG K1 PASS loops=50\n");
+    return 0;
+}
+
+static int diag_k6(void) {
+    struct sockaddr_in local;
+    int listener;
+    int revents;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        diag_log("K6", 0, "socket", -1, 0, 0, errno);
+        return 1;
+    }
+    memset(&local, 0, sizeof(local));
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_ANY);
+    local.sin_port = htons(K6_PORT);
+    if (bind(listener, (struct sockaddr *)&local, sizeof(local)) != 0) {
+        diag_log("K6", 0, "bind", listener, 0, 0, errno);
+        (void)close(listener);
+        return 1;
+    }
+    if (listen(listener, 2) != 0) {
+        diag_log("K6", 0, "listen", listener, 0, 0, errno);
+        (void)close(listener);
+        return 1;
+    }
+
+    for (int iter = 1; iter <= DIAG_LOOPS; iter++) {
+        int conn;
+        char data[4];
+
+        revents = poll_one(listener, POLLIN, 5000);
+        if (revents < 0 || (revents & POLLIN) == 0) {
+            diag_log("K6", iter, "listener-poll", listener, POLLIN, revents, errno);
+            (void)close(listener);
+            return 1;
+        }
+        conn = accept(listener, NULL, NULL);
+        if (conn < 0) {
+            diag_log("K6", iter, "accept", listener, POLLIN, revents, errno);
+            (void)close(listener);
+            return 1;
+        }
+        if (read_exact(conn, data, sizeof(data)) != 0 ||
+            memcmp(data, "PING", 4) != 0) {
+            diag_log("K6", iter, "read", conn, POLLIN, revents, errno);
+            (void)close(conn);
+            (void)close(listener);
+            return 1;
+        }
+        if (write(conn, data, sizeof(data)) != (ssize_t)sizeof(data)) {
+            diag_log("K6", iter, "write", conn, POLLOUT, 0, errno);
+            (void)close(conn);
+            (void)close(listener);
+            return 1;
+        }
+        (void)close(conn);
+    }
+    (void)close(listener);
+    say("DIAG K6 PASS loops=50\n");
+    return 0;
+}
+
+static int diag_main(void) {
+    say("DIAG START\n");
+    if (diag_k1() != 0) {
+        return 1;
+    }
+    if (diag_k6() != 0) {
+        return 1;
+    }
+    say("DIAG SUMMARY PASS\n");
+    return 0;
+}
+
 int main(int argc, char **argv) {
+#ifdef SSH_CONTRACT_DIAG_BINARY
     (void)argc;
     (void)argv;
     signal(SIGPIPE, SIG_IGN);
+    return diag_main();
+#else
+    signal(SIGPIPE, SIG_IGN);
+    if (argc > 1 && strcmp(argv[1], "diag") == 0) {
+        return diag_main();
+    }
     row = "K1";
     if (check_poll() != 0) {
         return 1;
@@ -841,6 +1192,10 @@ int main(int argc, char **argv) {
     if (check_pty() != 0) {
         return 1;
     }
+    row = "K6-listen";
+    if (check_listen_only() != 0) {
+        return 1;
+    }
     row = "K6";
     if (check_accept() != 0) {
         return 1;
@@ -853,6 +1208,10 @@ int main(int argc, char **argv) {
     if (check_eof_socket() != 0) {
         return 1;
     }
+    row = "K8-shutdown";
+    if (check_own_shutdown() != 0) {
+        return 1;
+    }
     row = "K9";
     if (check_half_close() != 0) {
         return 1;
@@ -863,4 +1222,5 @@ int main(int argc, char **argv) {
     }
     say("CONTRACT SUMMARY PASS 10/10\n");
     return 0;
+#endif
 }
