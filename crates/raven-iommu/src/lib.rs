@@ -452,6 +452,9 @@ impl IovaAllocator {
         if base < self.start || end > self.end {
             return Err(IovaError::NotAllocated);
         }
+        // The free list is sorted. Merge in place: a release must not allocate (the old
+        // `Vec::with_capacity(self.free.len())` temporary is the 3072-byte grow that exhausted
+        // the kmem class under the SSH soak).
         let mut index = 0usize;
         while index < self.free.len() {
             let (start, _) = *self.free.get(index).ok_or(IovaError::NotAllocated)?;
@@ -460,19 +463,38 @@ impl IovaAllocator {
             }
             index += 1;
         }
-        self.free.insert(index, (base, end));
-        self.free.sort_unstable();
-        let mut merged: Vec<(u64, u64)> = Vec::with_capacity(self.free.len());
-        for (start, end) in self.free.drain(..) {
-            if let Some(last) = merged.last_mut()
-                && last.1 == start
-            {
-                last.1 = end;
-            } else {
-                merged.push((start, end));
+        if index > 0 {
+            let (previous_start, previous_end) =
+                *self.free.get(index - 1).ok_or(IovaError::NotAllocated)?;
+            if previous_end == base {
+                let mut merged_end = end;
+                if let Some((next_start, next_end)) = self.free.get(index).copied()
+                    && next_start == merged_end
+                {
+                    merged_end = next_end;
+                    self.free.remove(index);
+                }
+                if let Some(previous) = self.free.get_mut(index - 1) {
+                    *previous = (previous_start, merged_end);
+                }
+                return Ok(());
+            }
+            if previous_end > base {
+                return Err(IovaError::NotAllocated);
             }
         }
-        self.free = merged;
+        if let Some((next_start, next_end)) = self.free.get(index).copied() {
+            if next_start == end {
+                if let Some(next) = self.free.get_mut(index) {
+                    *next = (base, next_end);
+                }
+                return Ok(());
+            }
+            if next_start < end {
+                return Err(IovaError::NotAllocated);
+            }
+        }
+        self.free.insert(index, (base, end));
         Ok(())
     }
 }

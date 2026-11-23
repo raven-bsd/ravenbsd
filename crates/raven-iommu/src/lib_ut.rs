@@ -154,6 +154,30 @@ fn iova_allocator_is_first_fit_and_coalesces() {
 }
 
 #[test]
+fn iova_allocator_release_merges_both_neighbours_in_place() {
+    let mut allocator = IovaAllocator::new(0x10_0000, 0x10_4000).expect("allocator");
+    assert_eq!(allocator.allocate(0x1000, 0x1000), Some(0x10_0000));
+    assert_eq!(allocator.allocate(0x1000, 0x1000), Some(0x10_1000));
+    assert_eq!(allocator.allocate(0x1000, 0x1000), Some(0x10_2000));
+    allocator.release(0x10_1000, 0x1000).expect("middle");
+    allocator.release(0x10_0000, 0x1000).expect("left");
+    allocator.release(0x10_2000, 0x1000).expect("right");
+    assert_eq!(allocator.free_bytes(), 0x4000);
+    assert_eq!(allocator.allocate(0x4000, 0x1000), Some(0x10_0000));
+}
+
+#[test]
+fn iova_allocator_release_rejects_double_free() {
+    let mut allocator = IovaAllocator::new(0x10_0000, 0x10_2000).expect("allocator");
+    assert_eq!(allocator.allocate(0x1000, 0x1000), Some(0x10_0000));
+    allocator.release(0x10_0000, 0x1000).expect("release");
+    assert_eq!(
+        allocator.release(0x10_0000, 0x1000),
+        Err(IovaError::NotAllocated)
+    );
+}
+
+#[test]
 fn iova_allocator_honours_alignment_and_bounds() {
     let mut allocator = IovaAllocator::new(0x10_0000, 0x10_4000).expect("allocator");
     assert_eq!(allocator.allocate(0x1000, 0x2000), Some(0x10_0000));
