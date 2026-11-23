@@ -1,18 +1,18 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K567 rev 339: the SSH first-byte gate row. The pre-step runs the timestamped
-# probe (tests/fixtures/ssh-first-byte/run.sh), which waits for the sshd
-# `svcd: sshd up` readiness marker before its first connect and keeps the 8 s
-# per-connection budget. The case then boots the same release image for a
-# console-login smoke. The image is the last good prebuilt `ssh-login.img`;
-# the release image build is blocked by the profile duplicate `/bin/tty` and
-# the `raven-theme` regression.
+# K567 rev 344: the SSH first-byte gate row. The pre-step builds the release
+# image at HEAD (stamped `build/qtest/ssh-first-byte.img.head`), then runs the
+# timestamped probe (tests/fixtures/ssh-first-byte/run.sh) against that exact
+# image; the probe waits for the sshd `svcd: sshd up` readiness marker before its
+# first connect and keeps the 8 s per-connection budget. The case boots the same
+# image for the console-login smoke, so the smoke's root/`raven` password is the
+# one in the repo's `etc/shadow`, not whatever a stale `ssh-login.img` shipped.
 
 name = "ssh-first-byte"
 arch = "x86_64"
 profile = "release"
-image = "build/qtest/ssh-login.img"
+image = "build/qtest/ssh-first-byte.img"
 timeout_secs = 300
 pre = ["sh tests/fixtures/ssh-first-byte/run.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"

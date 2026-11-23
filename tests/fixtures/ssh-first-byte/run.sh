@@ -2,14 +2,33 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K567 rev 336: bring up the K194 tap and run the timestamped first-byte probe.
-# The probe itself boots QEMU; the tap helper is the only host setup. The wrapper
-# is meant to be run under scripts/build-slot.sh because it starts a QEMU.
+# K567 rev 344: build the release image the row boots, then run the timestamped
+# first-byte probe against that exact image. The probe itself boots QEMU; the tap
+# helper is the only host setup. The wrapper is meant to be run under
+# scripts/build-slot.sh because it builds an image and starts a QEMU.
+#
+# The image is stamped with the tree revision. Reusing a stale or foreign image is
+# what made the case-wrapper console smoke wait for a password prompt the image
+# never printed (Stuart's no-password ssh-login.img); rebuild at HEAD instead and
+# let the probe and the qtest case boot the same artifact.
 
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
+
+image=build/qtest/ssh-first-byte.img
+stamp=$image.head
+commit=$(git rev-parse HEAD)
+
+if [ ! -f "$image" ] || [ ! -f "$stamp" ] ||
+    [ "$(cat "$stamp" 2>/dev/null)" != "$commit" ]; then
+    printf 'ssh-first-byte: building %s at %s\n' "$image" "$commit"
+    mkdir -p build/qtest
+    cargo xtask image --arch x86_64 --profile release \
+        --cmdline 'console=ttyS0 test-exit=1' --output "$image"
+    printf '%s\n' "$commit" >"$stamp"
+fi
 
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=
@@ -38,6 +57,6 @@ mkdir -p build/ssh/first-byte
     uptime
     printf 'qemu=%s\n' "$(pgrep -c -x qemu-system-x86_64 2>/dev/null || true)"
 } >> build/ssh/first-byte/host.txt
-python3 tests/fixtures/ssh-first-byte/probe.py
+RAVEN_SSH_IMAGE="$image" python3 tests/fixtures/ssh-first-byte/probe.py
 rc=$?
 exit "$rc"
