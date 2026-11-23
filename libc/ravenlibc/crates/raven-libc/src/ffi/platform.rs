@@ -17,9 +17,7 @@ use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 
-use raven_libc_platform::fd::inherit::{
-    ENTRY_LEN, ENTRY_LEN_V2, ENTRY_LEN_V3, ENTRY_LEN_V4, ENTRY_LEN_V5, FdMap, HEADER_LEN,
-};
+use raven_libc_platform::fd::inherit::{ENTRY_LEN, FdMap, HEADER_LEN};
 use raven_libc_platform::{Lock, OfdKind, Platform, RealSys, SysBackend};
 
 /// The shell's process lock: one spin word.
@@ -156,27 +154,7 @@ fn restore_inherited_fds(platform: &Platform<RealSys, ShellLock>) {
     let pointer = STARTUP_FDMAP.load(Ordering::Acquire);
     let count = STARTUP_FDMAP_N.load(Ordering::Acquire);
     if pointer != 0 && count != 0 && count <= 1024 {
-        // The entry width is version-specific; the spawner now publishes version 5 (53-byte
-        // records), while older blocks are still decodable. Read the header first, then slice the
-        // whole block.
-        // SAFETY: the spawner mapped at least the header, which is mapped for the process
-        // lifetime.
-        let version = unsafe {
-            let header = core::slice::from_raw_parts(pointer as *const u8, HEADER_LEN);
-            let (Some(&low), Some(&high)) = (header.get(4), header.get(5)) else {
-                return;
-            };
-            u16::from_le_bytes([low, high])
-        };
-        let entry_len = match version {
-            1 => ENTRY_LEN,
-            2 => ENTRY_LEN_V2,
-            3 => ENTRY_LEN_V3,
-            4 => ENTRY_LEN_V4,
-            5 => ENTRY_LEN_V5,
-            _ => return,
-        };
-        let Some(len) = entry_len
+        let Some(len) = ENTRY_LEN
             .checked_mul(count)
             .and_then(|entries| entries.checked_add(HEADER_LEN))
         else {
