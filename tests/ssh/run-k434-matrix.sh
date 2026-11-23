@@ -11,6 +11,10 @@
 # mode runs S1, S2, S3, S4, S5/S6 (including S5-session), S7 and S8 in order on that image and writes
 # serial-S1.log ... serial-S8.log deltas.
 #
+# It also runs the pty-path acceptance gate (tests/ssh/pty-path-gate.py) on a test-only image built
+# from the release initfs with /bin/pty-path and k449-metrics=2, recording pty-path.log,
+# pty-path.exit and pty-path.img. RAVEN_K434_PTY_PATH_GATE=0 skips it.
+#
 # The inner matrix cap is matrix.sh's RAVEN_MATRIX_TIMEOUT (default 780 s). The expected full run is
 # about 10 minutes from the measured rows (S7 5:08, S8 1:20, S5-session 0:34, plus boot and S1-S4);
 # 780 s is that expectation plus margin. The image build cap is 900 s because the measured build is
@@ -104,6 +108,40 @@ if [ "${RAVEN_K434_PTY_QTEST:-1}" = 1 ]; then
     timeout 120 sh tests/fixtures/ssh-openpty/build.sh || true
 else
     echo "k434: S8 auxiliary qtests skipped (RAVEN_K434_PTY_QTEST=0)"
+fi
+
+if [ "${RAVEN_K434_PTY_PATH_GATE:-1}" = 1 ]; then
+    echo "k434: pty-path acceptance gate"
+    timeout 120 sh tests/fixtures/pty-path/build.sh > "$out/pty-path-build.log" 2>&1 || true
+    timeout 120 cargo build -q -p raven-b70-overlay > "$out/pty-path-overlay-build.log" 2>&1 || true
+    overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
+    initfs=build/x86_64/initfs.img
+    if [ -x "$overlay" ] && [ -f "$initfs" ]; then
+        timeout 60 "$overlay" "$initfs" "$out/pty-path-initfs.img" \
+            "/bin/pty-path=$root/build/fixtures/pty-path/pty-path:0755" \
+            > "$out/pty-path-overlay.log" 2>&1 || true
+        timeout 600 cargo xtask image --arch x86_64 --profile release \
+            --initfs "$out/pty-path-initfs.img" \
+            --cmdline "console=ttyS0 test-exit=1 k449-metrics=2" \
+            --output "$out/pty-path.img" > "$out/pty-path-image.log" 2>&1 || true
+    fi
+    if [ -f "$out/pty-path.img" ]; then
+        if timeout 180 env PTY_GATE_IMAGE="$out/pty-path.img" PTY_GATE_LABEL=release \
+            PTY_GATE_SESSIONS=3 python3 tests/ssh/pty-path-gate.py \
+            > "$out/pty-path.log" 2>&1; then
+            echo 0 > "$out/pty-path.exit"
+        else
+            echo $? > "$out/pty-path.exit"
+            echo "k434: pty-path gate red (see $out/pty-path.log)"
+        fi
+    else
+        echo 1 > "$out/pty-path.exit"
+        echo "k434: pty-path image missing; gate not run" > "$out/pty-path.log"
+    fi
+    printf 'pty_path_image=%s\npty_path_exit=%s\n' "$out/pty-path.img" \
+        "$(cat "$out/pty-path.exit")" >> "$out/manifest.txt"
+else
+    echo "k434: pty-path gate skipped (RAVEN_K434_PTY_PATH_GATE=0)"
 fi
 
 RAVEN_MATRIX_ONLY=full \
