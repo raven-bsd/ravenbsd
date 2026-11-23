@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K434 aarch64 network evidence: the release image must discover the QEMU `virt` PCIe
+# virtio-net function, launch the frame service, register `nic:`, and let netd publish eth0
+# with the QEMU user-network address before the user can reach the gateway. This is the
+# aarch64 TCG complement to `release-login` (no KVM claim).
+name = "ssh-aarch64-net"
+arch = "aarch64"
+profile = "release"
+timeout_secs = 300
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+# S0/device discovery: pcid enumerates the virtio-net function on the ECAM bus.
+[[expect]]
+regex = '^pcid: device [0-9a-f]{2}:.*vendor=0x1af4 device=0x1041 '
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+# S0/driver binding: devd matches it and launches the modern virtio-net frame service.
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:.*vendor=0x1af4 device=0x1041 '
+
+[[expect]]
+regex = '^devd: driver virtio-net bar='
+
+[[expect]]
+regex = '^virtio-net: serving nic:$'
+
+# netd registration and the static QEMU user-network address.
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^svcd: netd up$'
+
+# S0/reachability: the guest reaches the QEMU user-network gateway over the registered NIC.
+[[expect]]
+regex = '^ping: 10\.0\.2\.2 seq=[0-9]+ rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: [0-9]+ packets transmitted, [0-9]+ received, 0% packet loss$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|bad ELF|crash loop|svcd: netd unavailable'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "ping 10.0.2.2\nexit 0\n"
+delay_ms = 100
