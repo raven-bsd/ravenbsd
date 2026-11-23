@@ -94,8 +94,8 @@ mod program {
     const TX_RING_BASE: usize = 0x0100;
     /// 12-byte zero virtio-net header for TX chains, below the B39 region.
     const TX_HEADER_OFFSET: usize = 0x0800;
-    /// Bounded pump wait: the frame rings are checked at least every 10 ms.
-    const IRQ_PUMP_NS: u64 = 10_000_000;
+    /// Bounded pump wait: the frame rings are checked at least every 1 ms.
+    const IRQ_PUMP_NS: u64 = 1_000_000;
 
     /// MSI-X queue message and table location supplied by `devd`.
     struct MsixInfo {
