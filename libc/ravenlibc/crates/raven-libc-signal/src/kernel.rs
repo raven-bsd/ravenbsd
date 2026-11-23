@@ -6,24 +6,14 @@
 //! The kernel only kicks (PG-7): it never reads a mask or a disposition. Every missing primitive
 //! is represented by a capability flag and a documented fallback; `SysKernel` forwards to
 //! `raven-libc-sys` where a wrapper exists and returns `ENOSYS` otherwise. No syscall number is
-//! invented here: `SIGRETURN` 0x82 and the kick bits are the labelled PROPOSED PG-7 values.
+//! invented here: the PG-7 `SIG_SETUP`/`SIGRETURN`/kick values are the `raven-abi` contract.
 
+pub use raven_abi::signal::{KICK_CANCEL, KICK_CHECK, KICK_KNOWN, KICK_SYNCCALL, KICK_TIMER};
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::{SiginfoT, Sigval};
 
 use crate::errors::{EINVAL_ERR, ENOSYS_ERR, ETIMEDOUT_ERR};
 use crate::raw;
-
-/// Kick bit 0: look at the pending sets.
-pub const KICK_CHECK: u32 = 1;
-/// Kick bit 1: cancellation (hand to C57's `on_kick`).
-pub const KICK_CANCEL: u32 = 2;
-/// Kick bit 2: `synccall`.
-pub const KICK_SYNCCALL: u32 = 4;
-/// Kick bit 3: POSIX timer.
-pub const KICK_TIMER: u32 = 8;
-/// Every bit this crate may set (PROPOSED, RD-new 2).
-pub const KICK_KNOWN: u32 = KICK_CHECK | KICK_CANCEL | KICK_SYNCCALL | KICK_TIMER;
 
 /// The synchronous fault kinds of PG-7.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

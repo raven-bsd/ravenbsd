@@ -2093,6 +2093,13 @@ impl<D: Device> Stack<D> {
                         }
                         if segment.ack_flag() {
                             update_snd_wnd(connection, segment.seq, segment.ack, segment.window);
+                            // `tcp_input` advances `snd_una` and drops acknowledged bytes in
+                            // every synchronized state. CLOSE_WAIT still has queued output
+                            // after the peer's FIN, so without this the send queue never
+                            // drains and the deferred FIN is never emitted.
+                            if seq_gt(segment.ack, connection.snd_una) {
+                                ack_advanced = Some(segment.ack);
+                            }
                         }
                     }
                     TcpState::Closing => {
@@ -3195,7 +3202,7 @@ impl<D: Device> Stack<D> {
                 }
                 Ok(())
             }
-            TcpState::CloseWait => {
+            TcpState::CloseWait if tx_empty => {
                 let _ = self.send_tcp_packet(
                     local,
                     remote,
@@ -3213,6 +3220,17 @@ impl<D: Device> Stack<D> {
                     connection.snd_nxt = connection.snd_nxt.wrapping_add(1);
                     connection.fin_sent = true;
                     connection.state = TcpState::LastAck;
+                }
+                Ok(())
+            }
+            TcpState::CloseWait => {
+                // FreeBSD `tcp_usrclosed` in CLOSE_WAIT sets `TF_NEEDFIN`; `tcp_output`
+                // emits the FIN only after `so_snd` drains. Sending the FIN at `snd_nxt`
+                // here would place it ahead of the queued output, so the peer receives
+                // one byte then EOF and loses the rest.
+                let record = self.sockets.record_mut(socket)?;
+                if let Kind::Tcp(connection) = &mut record.kind {
+                    connection.close_requested = true;
                 }
                 Ok(())
             }
