@@ -94,8 +94,8 @@ mod program {
     const TX_RING_BASE: usize = 0x0100;
     /// 12-byte zero virtio-net header for TX chains, below the B39 region.
     const TX_HEADER_OFFSET: usize = 0x0800;
-    /// Bounded pump wait: the frame rings are checked at least every 10 ms.
-    const IRQ_PUMP_NS: u64 = 10_000_000;
+    /// Bounded pump wait: the frame rings are checked at least every 1 ms.
+    const IRQ_PUMP_NS: u64 = 1_000_000;
 
     /// MSI-X queue message and table location supplied by `devd`.
     struct MsixInfo {
@@ -286,6 +286,11 @@ mod program {
             let mut guard = NIC.lock();
             *guard = Some(nic);
         }
+        // K9 KVM2: the pump wake is bounded by the running thread's scheduler slice (measured
+        // 10-14 ms late on a 1 ms wait), not by the requested timeout. Run the driver at the
+        // highest nice so the woken pump preempts the current thread and drains TX before the
+        // contract's half-close window.
+        let _ = raven_rt::priority::setpriority(raven_rt::priority::PRIO_PROCESS, 0, -20);
         thread::spawn(pump_thread, 0, 128 * 1024)
             .map_err(|error| format!("pump thread: {}", error.description()))?;
 

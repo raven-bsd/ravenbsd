@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K570 test-only pty-path probe. Stages the `tests/fixtures/pty-path` fixture at /bin/pty-path so
+# `pty-path-gate.py` can assert ttyname(0), the /dev/pts mount and the pair release over `ssh -tt`.
+# It is test tooling; the product tty utility is the uutils `tty` staged by shell.d/72-uutils.toml.
+
+[[initfs.files]]
+src = "build/fixtures/pty-path/pty-path"
+path = "/bin/pty-path"
+mode = 0o755
+generated = true

@@ -25,7 +25,7 @@ mod program {
 
     use raven_abi::errno::Errno;
     use raven_abi::types::clock;
-    use raven_proto_fs::{S_IFCHR, Stat};
+    use raven_proto_fs::{S_IFCHR, S_IFDIR, Stat};
     use raven_proto_tty::{self, Request, Response, decode_request, encode_response};
     use raven_ptyd::{Pairs, SignalSink};
     use raven_rt::entry;
@@ -108,7 +108,13 @@ mod program {
     enum Role {
         Master,
         Slave,
+        /// The `/dev/pts` mount root: a directory, not a pair endpoint.
+        Root,
     }
+
+    /// The scheme `Stat` has no `st_rdev`; the root is a mount point, not a device, so its
+    /// inode is outside the `2N+1`/`2N+2` endpoint identity.
+    const ROOT_INO: u64 = 0;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct FileEntry {
@@ -227,6 +233,7 @@ mod program {
                 let result = match role {
                     Role::Master => pty.read_master(buffer),
                     Role::Slave => pty.read_slave(buffer),
+                    Role::Root => Err(Errno::EISDIR),
                 };
                 match result {
                     Ok(count) => completed.push((job, Ok(count))),
@@ -348,30 +355,56 @@ mod program {
         ) -> HandlerResult<Opened> {
             let path = path.strip_prefix('/').unwrap_or(path);
             let (pair, role) = match path {
-                // `svcd` probes a resident scheme with the bare `pty:` path; pair 0 is the
-                // historical named pair and is safe to create for the probe.
-                "" | "master" => (0u64, Role::Master),
+                // The scheme root is the `/dev/pts` mount directory. `svcd` also probes a
+                // resident scheme with the bare `pty:` path, so the root must open cleanly.
+                "" => (0u64, Role::Root),
+                // The historical named pair 0 (`docs/pty.md`).
+                "master" => (0u64, Role::Master),
+                "slave" => (0u64, Role::Slave),
                 // `posix_openpt` opens the clone device; the server allocates the unit, then
                 // `fstat` gives the caller the pair id through the endpoint inode.
                 "ptmx" => (self.pairs.alloc(), Role::Master),
-                "slave" => (0u64, Role::Slave),
                 _ => {
-                    let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
-                        (Role::Master, rest)
-                    } else if let Some(rest) = path.strip_prefix("slave/") {
-                        (Role::Slave, rest)
+                    // The `/dev/pts` namespace mount maps `/dev/pts/<N>` to `pty:<N>`; the
+                    // public slave number names the live pair's slave endpoint (the same inode
+                    // `fstat` reports, 2N+2).
+                    if let Ok(id) = path.parse::<u64>() {
+                        // Only a live pair has a `/dev/pts/<N>` node: the donor devfs installs the
+                        // slave node when the master allocates the unit (FreeBSD `pts_alloc`), so
+                        // an unallocated number is `ENOENT`, never an implicit new pair.
+                        if self.pairs.get_mut(id).is_none() {
+                            return Err(Errno::ENOENT.into());
+                        }
+                        (id, Role::Slave)
                     } else {
-                        return Err(Errno::ENOENT.into());
-                    };
-                    (id.parse::<u64>().map_err(|_| Errno::ENOENT)?, role)
+                        let (role, id) = if let Some(rest) = path.strip_prefix("master/") {
+                            (Role::Master, rest)
+                        } else if let Some(rest) = path.strip_prefix("slave/") {
+                            (Role::Slave, rest)
+                        } else {
+                            return Err(Errno::ENOENT.into());
+                        };
+                        let id = id.parse::<u64>().map_err(|_| Errno::ENOENT)?;
+                        // A named endpoint is also a live-pair node: opening `slave/<N>` for a
+                        // closed unit must not resurrect the pair (the pty-path release row
+                        // stats `/dev/pts/<N>` after the last close).
+                        if self.pairs.get_mut(id).is_none() {
+                            return Err(Errno::ENOENT.into());
+                        }
+                        (id, role)
+                    }
                 }
             };
             let readable = flags & 1 != 0;
             let writable = flags & 2 != 0;
-            if !readable && !writable {
+            if !readable && !writable && role != Role::Root {
                 return Err(Errno::EACCES.into());
             }
-            self.pairs.open(pair);
+            // The mount root owns no pair; creating pair 0 for it left `files=0 pairs=1` after
+            // the first `/dev/pts` stat (the pty-churn final row).
+            if role != Role::Root {
+                self.pairs.open(pair);
+            }
             let id = self.next;
             self.next = self.next.wrapping_add(1);
             self.files.insert(id, FileEntry { pair, role });
@@ -380,10 +413,14 @@ mod program {
 
         fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
             let entry = self.file(file)?;
+            if entry.role == Role::Root {
+                return Err(Errno::EISDIR.into());
+            }
             let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
             let count = match entry.role {
                 Role::Master => pty.read_master(buffer),
                 Role::Slave => pty.read_slave(buffer),
+                Role::Root => return Err(Errno::EISDIR.into()),
             }
             .map_err(HandlerError::Errno)?;
             Ok(count)
@@ -397,6 +434,9 @@ mod program {
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
             let entry = self.file(file)?;
+            if entry.role == Role::Root {
+                return Err(Errno::EISDIR.into());
+            }
             if buffer.is_empty() {
                 return self.read(file, 0, buffer);
             }
@@ -447,11 +487,15 @@ mod program {
 
         fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
             let entry = self.file(file)?;
+            if entry.role == Role::Root {
+                return Err(Errno::EISDIR.into());
+            }
             {
                 let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
                 match entry.role {
                     Role::Master => pty.write_master(buffer),
                     Role::Slave => pty.write_slave(buffer),
+                    Role::Root => return Err(Errno::EISDIR.into()),
                 }
             }
             if entry.role == Role::Master {
@@ -464,6 +508,9 @@ mod program {
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
             let entry = self.file(file)?;
+            if entry.role == Role::Root {
+                return Err(Errno::ENOTTY.into());
+            }
             let pty = self.pairs.get_mut(entry.pair).ok_or(Errno::EBADF)?;
             if request.len() < raven_proto_tty::CALL_LEN
                 || response.len() < raven_proto_tty::CALL_LEN
@@ -561,6 +608,16 @@ mod program {
 
         fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
             let entry = self.file(file)?;
+            if entry.role == Role::Root {
+                // `/dev/pts` is the namespace mount, so its root stats as a directory. A char
+                // device here made `stat("/dev/pts")` fail `S_ISDIR` and broke the mount row.
+                return Ok(Stat {
+                    mode: S_IFDIR | 0o755,
+                    nlink: 2,
+                    ino: ROOT_INO,
+                    ..Stat::default()
+                });
+            }
             // The slave is the session's tty node: root-owned and 0600, like a devfs pty node
             // after `pty_setowner`. OpenSSH treats a chown/chmod `EROFS` on such a node as a
             // read-only device and continues. The master is opened by the session owner and
@@ -584,6 +641,10 @@ mod program {
             let Some(entry) = self.files.remove(&file) else {
                 return Err(Errno::EBADF.into());
             };
+            if entry.role == Role::Root {
+                // The mount root owns no pair, so closing it must not touch the pair table.
+                return Ok(());
+            }
             // The kernel delivers CLOSE once the last duplicate of the slave is gone; from
             // then on the master sees EOF instead of an empty read. Any deferred slave read
             // is completed with 0 as well, so a hanging reader cannot outlive its pair.
