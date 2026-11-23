@@ -90,13 +90,30 @@ fn sampler() {
                     .map(|server| server.name.clone())
                     .collect::<alloc::vec::Vec<_>>()
                     .join(",");
+                let state = match *process.state.lock() {
+                    process::ProcessState::Created => 0u64,
+                    process::ProcessState::Running => 1,
+                    process::ProcessState::Exited => 2,
+                };
+                let last_syscall = process.last_syscall.load(Ordering::Relaxed);
+                let pc = process.last_pc.load(Ordering::Relaxed);
+                let inside = u64::from(process.in_syscall.load(Ordering::Relaxed));
+                let wait = process.wait_object.load(Ordering::Relaxed);
+                let threads = u64::from(process.threads.load(Ordering::Relaxed));
                 kprintln!(
-                    "K449-PENDING pid={} queued={} active={} client={} schemes={}",
+                    "K449-PENDING t={} pid={} queued={} active={} client={} schemes={} state={} last_syscall={} pc=0x{:x} in_syscall={} wait={} threads={}",
+                    crate::time::now_ns(),
                     process.id,
                     queued,
                     active,
                     client,
-                    schemes
+                    schemes,
+                    state,
+                    last_syscall,
+                    pc,
+                    inside,
+                    wait,
+                    threads
                 );
             }
         }
