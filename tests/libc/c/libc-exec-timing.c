@@ -120,6 +120,14 @@ int main(int argc, char **argv) {
     if (canary != NULL) {
         memset(canary, 0xA5, canary_len);
     }
+    enum { CHUNK_COUNT = 1024, CHUNK_SIZE = 64 };
+    unsigned char *chunks[CHUNK_COUNT];
+    for (int index = 0; index < CHUNK_COUNT; index++) {
+        chunks[index] = malloc(CHUNK_SIZE);
+        if (chunks[index] != NULL) {
+            memset(chunks[index], 0x5A, CHUNK_SIZE);
+        }
+    }
     uint64_t fork_ns = now_ns();
     pid_t child = fork();
     if (child == 0) {
@@ -248,6 +256,20 @@ int main(int argc, char **argv) {
         }
     }
 
+    int chunks_ok = 1;
+    for (int index = 0; index < CHUNK_COUNT; index++) {
+        if (chunks[index] == NULL) {
+            chunks_ok = 0;
+            continue;
+        }
+        for (int byte = 0; byte < CHUNK_SIZE; byte++) {
+            if (chunks[index][byte] != 0x5A) {
+                chunks_ok = 0;
+                break;
+            }
+        }
+    }
+
     printf("EXEC-TIMING parent fork=%llu exec_ret=%llu wait=%llu pid=%d status=%d\n",
            (unsigned long long)fork_ns, (unsigned long long)exec_ret_ns,
            (unsigned long long)wait_ns, (int)child, status);
@@ -255,9 +277,13 @@ int main(int argc, char **argv) {
         printf("EXEC-TIMING fork_ns=%llu\n", (unsigned long long)(exec_ret_ns - fork_ns));
         printf("EXEC-TIMING total_ns=%llu\n", (unsigned long long)(wait_ns - fork_ns));
     }
-    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s\n", fork_ok ? "ok" : "bad",
-           spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad", spawnp_ok ? "ok" : "bad");
+    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s chunks=%s\n",
+           fork_ok ? "ok" : "bad", spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad",
+           spawnp_ok ? "ok" : "bad", chunks_ok ? "ok" : "bad");
     fflush(stdout);
+    for (int index = 0; index < CHUNK_COUNT; index++) {
+        free(chunks[index]);
+    }
     free(canary);
     return child < 0 ? 1 : 0;
 }
