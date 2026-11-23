@@ -946,13 +946,12 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
     let _block = lock_block(&thread);
     // A kick without a registered handler cannot run user code, so it is a plain wake, not an
     // EINTR. Keep the interrupt for a thread with a real SIG_SETUP entry.
-    let status = if status == Errno::EINTR.to_ret()
-        && thread.signal_entry.load(Ordering::Acquire) == 0
-    {
-        0
-    } else {
-        status
-    };
+    let status =
+        if status == Errno::EINTR.to_ret() && thread.signal_entry.load(Ordering::Acquire) == 0 {
+            0
+        } else {
+            status
+        };
     if let Some(token) = token
         && thread.block_token.load(Ordering::SeqCst) != token
     {
