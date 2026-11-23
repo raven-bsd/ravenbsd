@@ -114,9 +114,17 @@ fn reference(
     actions: &FileActions,
     env: &mut ScriptedEnv,
 ) -> Result<RefScratch, Errno> {
-    let mut map: BTreeMap<i32, (u32, bool)> = BTreeMap::new();
+    let mut map: BTreeMap<i32, (u32, u8, u32, bool)> = BTreeMap::new();
     for entry in table {
-        map.insert(entry.fd, (entry.handle, entry.cloexec || cloexec_default));
+        map.insert(
+            entry.fd,
+            (
+                entry.handle,
+                entry.kind,
+                entry.status,
+                entry.cloexec || cloexec_default,
+            ),
+        );
     }
     let mut cwd = if cwd.is_empty() {
         b"/".to_vec()
@@ -130,7 +138,7 @@ fn reference(
             FileAction::Open { fd, path, .. } => match env.open(path, 0, 0) {
                 Ok(handle) => {
                     temp_handles.push(handle);
-                    map.insert(*fd, (handle, false));
+                    map.insert(*fd, (handle, 0, 0, false));
                 }
                 Err(error) => {
                     close_temps(env, &temp_handles);
@@ -138,11 +146,11 @@ fn reference(
                 }
             },
             FileAction::Dup2 { fd, newfd } => {
-                let Some((handle, _)) = map.get(fd).copied() else {
+                let Some((handle, kind, status, _)) = map.get(fd).copied() else {
                     close_temps(env, &temp_handles);
                     return Err(EBADF);
                 };
-                map.insert(*newfd, (handle, false));
+                map.insert(*newfd, (handle, kind, status, false));
             }
             FileAction::Close { fd } => {
                 map.remove(fd);
@@ -151,7 +159,7 @@ fn reference(
                 cwd = ref_resolve(&cwd, path);
             }
             FileAction::Fchdir { fd } => {
-                let Some((handle, _)) = map.get(fd).copied() else {
+                let Some((handle, ..)) = map.get(fd).copied() else {
                     close_temps(env, &temp_handles);
                     return Err(EBADF);
                 };
@@ -180,12 +188,19 @@ fn reference(
             }
         }
     }
-    map.retain(|_, (_, cloexec)| !*cloexec);
+    map.retain(|_, (_, _, _, cloexec)| !*cloexec);
     let fdmap = map
         .iter()
-        .map(|(fd, (handle, _))| FdMapEntry {
+        .map(|(fd, (handle, kind, status, _))| FdMapEntry {
             fd: *fd,
             handle: *handle,
+            kind: *kind,
+            status: *status,
+            path: None,
+            event: 0,
+            readiness: 0,
+            socket: None,
+            pty_master: false,
         })
         .collect();
     Ok(RefScratch {
@@ -269,6 +284,13 @@ fn two_thousand_seeded_action_lists_match_the_reference() {
                 table.push(FdEntry {
                     fd,
                     handle: 10 + fd as u32,
+                    kind: 0,
+                    status: 2,
+                    path: None,
+                    event: 0,
+                    readiness: 0,
+                    socket: None,
+                    pty_master: false,
                     cloexec: rng.next() & 1 == 0,
                 });
             }
