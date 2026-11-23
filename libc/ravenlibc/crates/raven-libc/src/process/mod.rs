@@ -112,6 +112,7 @@ pub(crate) fn parent_fd_table() -> alloc::vec::Vec<raven_libc_proc::spawn_model:
                 handle: ofd.handle().0,
                 kind: raven_libc_platform::fd::inherit::kind_byte(ofd.kind()),
                 status: ofd.status(),
+                path: ofd.path().map(|path| path.into_vec()),
                 cloexec: platform.cloexec(fd).unwrap_or(false),
             });
         }

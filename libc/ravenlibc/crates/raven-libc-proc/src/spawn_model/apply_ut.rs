@@ -70,7 +70,19 @@ fn entry(fd: i32, handle: u32, cloexec: bool) -> FdEntry {
         handle,
         kind: 0,
         status: 2,
+        path: None,
         cloexec,
+    }
+}
+
+fn tty_entry(fd: i32, handle: u32, path: &[u8]) -> FdEntry {
+    FdEntry {
+        fd,
+        handle,
+        kind: 2,
+        status: 2,
+        path: Some(path.to_vec()),
+        cloexec: false,
     }
 }
 
@@ -80,7 +92,19 @@ fn map(fd: i32, handle: u32, kind: u8, status: u32) -> FdMapEntry {
         handle,
         kind,
         status,
+        path: None,
     }
+}
+
+#[test]
+fn a_tty_entry_carries_its_kind_and_path() {
+    let mut env = FakeEnv::new(vec![]);
+    let actions = FileActions::new();
+    let table = vec![tty_entry(1, 7, b"/dev/pts/7")];
+    let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
+    let inherited = scratch.fdmap.first().expect("entry");
+    assert_eq!(inherited.kind, 2);
+    assert_eq!(inherited.path.as_deref(), Some(b"/dev/pts/7".as_slice()));
 }
 
 #[test]

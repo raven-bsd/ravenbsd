@@ -306,7 +306,7 @@ pub fn spawn_image_with<S: Sys>(
 /// The kind and status are the parent's open-file-description values, the same fields the exec
 /// `FdMap` carries (version 5). The child never re-derives them by probing a handle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SpawnFd {
+pub struct SpawnFd<'a> {
     /// Descriptor number in the child.
     pub fd: i32,
     /// Handle transferred into the child.
@@ -315,6 +315,8 @@ pub struct SpawnFd {
     pub kind: u8,
     /// Access mode and status bits.
     pub status: u32,
+    /// Public absolute path, when the parent's OFD remembers one.
+    pub path: Option<&'a [u8]>,
 }
 
 /// Spawn an in-memory image and inherit `fdmap` descriptors into the child.
@@ -328,7 +330,7 @@ pub fn spawn_image_with_fdmap<S: Sys>(
     image: &[u8],
     path: &str,
     options: &SpawnOptions<'_>,
-    fdmap: &[SpawnFd],
+    fdmap: &[SpawnFd<'_>],
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
     spawn_image_with_fdmap_cwd(image, path, options, b"/", fdmap, sys)
@@ -345,7 +347,7 @@ pub fn spawn_image_with_fdmap_cwd<S: Sys>(
     path: &str,
     options: &SpawnOptions<'_>,
     cwd: &[u8],
-    fdmap: &[SpawnFd],
+    fdmap: &[SpawnFd<'_>],
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
     if image.len() > MAX_FILE_IMAGE {
@@ -750,7 +752,7 @@ fn spawn_elf<S: Sys>(
     cwd: &[u8],
     path: &str,
     options: &SpawnOptions<'_>,
-    fdmap: &[SpawnFd],
+    fdmap: &[SpawnFd<'_>],
     exec: Option<(Handle, bool)>,
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
@@ -832,6 +834,7 @@ fn spawn_elf<S: Sys>(
                     handle: handle.0,
                     kind: entry.kind,
                     status: entry.status,
+                    path: entry.path,
                 }),
                 Err(error) => {
                     let _ = sys.handle_close(child);
@@ -1756,7 +1759,7 @@ fn plan_image<'a>(
 /// common case and stays supported (K463).
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[allow(dead_code)] // ravenbsd target builds compile this for the no-alloc path; the alloc build uses encode_fdmap
-fn no_alloc_fdmap(fdmap: &[SpawnFd]) -> Result<(), SpawnError> {
+fn no_alloc_fdmap(fdmap: &[SpawnFd<'_>]) -> Result<(), SpawnError> {
     if fdmap.is_empty() {
         Ok(())
     } else {
@@ -1768,27 +1771,46 @@ fn no_alloc_fdmap(fdmap: &[SpawnFd]) -> Result<(), SpawnError> {
     test,
     all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")
 ))]
-fn encode_fdmap(entries: &[SpawnFd]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
+fn encode_fdmap(entries: &[SpawnFd<'_>]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
     /// One version-5 `FdMap` entry, the 53-byte record the decoder reads.
     const FDMAP_V5_ENTRY: usize = 53;
     let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
+    let mut strings = alloc_crate::vec::Vec::new();
+    let mut offsets = alloc_crate::vec::Vec::with_capacity(entries.len());
+    for entry in entries {
+        let path = if entry.kind == 2 { entry.path } else { None };
+        match path {
+            Some(path) => {
+                if path.is_empty() || path.len() > 4095 || path.contains(&0) {
+                    return Err(SpawnError::TooLarge);
+                }
+                let offset = u32::try_from(strings.len()).map_err(|_| SpawnError::TooLarge)?;
+                offsets.push(offset);
+                strings.extend_from_slice(path);
+                strings.push(0);
+            }
+            None => offsets.push(u32::MAX),
+        }
+    }
     let mut out = alloc_crate::vec::Vec::with_capacity(
-        8usize.saturating_add(FDMAP_V5_ENTRY.saturating_mul(entries.len())),
+        8usize
+            .saturating_add(FDMAP_V5_ENTRY.saturating_mul(entries.len()))
+            .saturating_add(strings.len()),
     );
     out.extend_from_slice(b"RFDM");
     out.extend_from_slice(&5u16.to_le_bytes());
     out.extend_from_slice(&count.to_le_bytes());
-    for entry in entries {
+    for (entry, offset) in entries.iter().zip(offsets) {
         let tty = entry.kind == 2;
         out.extend_from_slice(&entry.fd.to_le_bytes());
         out.extend_from_slice(&entry.handle.to_le_bytes());
-        // The terminal identity is what the child cannot re-derive without entering a server.
-        // A non-terminal keeps the conservative version-1 kind and O_RDWR: this map carries no
-        // socket/event metadata, so claiming `Socket` would be a partial file object.
+        // The terminal identity and its resolved path are what the child cannot re-derive
+        // without entering a server. A non-terminal keeps the conservative version-1 kind,
+        // O_RDWR and no path: this map carries no socket/event metadata.
         out.push(if tty { 2 } else { 255 });
         out.push(0); // FD_CLOEXEC already filtered by apply_actions
         out.extend_from_slice(&if tty { entry.status } else { 2 }.to_le_bytes());
-        out.extend_from_slice(&u32::MAX.to_le_bytes()); // NO_PATH
+        out.extend_from_slice(&offset.to_le_bytes());
         out.extend_from_slice(&0u32.to_le_bytes()); // event
         out.extend_from_slice(&0u32.to_le_bytes()); // readiness
         out.extend_from_slice(&0i32.to_le_bytes()); // socket.domain
@@ -1802,6 +1824,7 @@ fn encode_fdmap(entries: &[SpawnFd]) -> Result<alloc_crate::vec::Vec<u8>, SpawnE
         }
         out.push(0); // pty_master
     }
+    out.extend_from_slice(&strings);
     Ok(out)
 }
 

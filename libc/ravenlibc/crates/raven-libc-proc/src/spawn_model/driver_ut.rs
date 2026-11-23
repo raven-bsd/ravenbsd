@@ -284,6 +284,7 @@ fn the_request_carries_the_inherited_fdmap() {
         handle: 7,
         kind: 0,
         status: 2,
+        path: None,
         cloexec: false,
     }];
     let context = ctx(&table, b"/tmp");
@@ -307,6 +308,7 @@ fn the_request_carries_the_inherited_fdmap() {
             handle: 7,
             kind: 0,
             status: 2,
+            path: None,
         }]
     );
     assert_eq!(request.cwd, b"/tmp".to_vec());
@@ -342,6 +344,7 @@ fn temporary_handles_are_closed_after_success() {
             handle: 9,
             kind: 0,
             status: 0,
+            path: None,
         }]
     );
 }
@@ -572,6 +575,7 @@ fn cloexec_default_sets_the_hint_and_hides_inherited_fds() {
         handle: 7,
         kind: 0,
         status: 2,
+        path: None,
         cloexec: false,
     }];
     let context = ctx(&table, b"/");
@@ -643,6 +647,7 @@ fn an_open_action_is_in_the_request_and_closed() {
             handle: 9,
             kind: 0,
             status: 0,
+            path: None,
         }]
     );
 }

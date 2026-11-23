@@ -196,6 +196,7 @@ fn reference(
             handle: *handle,
             kind: *kind,
             status: *status,
+            path: None,
         })
         .collect();
     Ok(RefScratch {
@@ -281,6 +282,7 @@ fn two_thousand_seeded_action_lists_match_the_reference() {
                     handle: 10 + fd as u32,
                     kind: 0,
                     status: 2,
+                    path: None,
                     cloexec: rng.next() & 1 == 0,
                 });
             }

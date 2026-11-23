@@ -13,7 +13,7 @@ use crate::request::FdMapEntry;
 use crate::spawn_model::api::{FileAction, FileActions};
 
 /// One inherited descriptor.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FdEntry {
     /// Descriptor number.
     pub fd: i32,
@@ -23,6 +23,8 @@ pub struct FdEntry {
     pub kind: u8,
     /// Access mode and status bits from the parent's open-file description.
     pub status: u32,
+    /// Public absolute path, when the parent's OFD remembers one.
+    pub path: Option<Vec<u8>>,
     /// Whether the descriptor closes at exec.
     pub cloexec: bool,
 }
@@ -92,6 +94,7 @@ pub fn apply_actions(
             handle: entry.handle,
             kind: entry.kind,
             status: entry.status,
+            path: entry.path.clone(),
         })
         .collect();
     Ok(scratch)
@@ -120,6 +123,7 @@ fn apply_inner(
                         handle,
                         kind: 0,
                         status: u32::try_from(*oflag & 0o3).unwrap_or_default(),
+                        path: None,
                         cloexec: false,
                     },
                 );
@@ -128,7 +132,7 @@ fn apply_inner(
                 let source = entries
                     .iter()
                     .find(|entry| entry.fd == *fd)
-                    .copied()
+                    .cloned()
                     .ok_or(EBADF)?;
                 set_entry(
                     entries,
@@ -137,6 +141,7 @@ fn apply_inner(
                         handle: source.handle,
                         kind: source.kind,
                         status: source.status,
+                        path: source.path,
                         cloexec: false,
                     },
                 );
@@ -151,7 +156,7 @@ fn apply_inner(
                 let entry = entries
                     .iter()
                     .find(|entry| entry.fd == *fd)
-                    .copied()
+                    .cloned()
                     .ok_or(EBADF)?;
                 if !env.is_dir(entry.handle)? {
                     return Err(ENOTDIR);

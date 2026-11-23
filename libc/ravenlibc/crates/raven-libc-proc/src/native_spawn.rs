@@ -155,6 +155,7 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
                     handle: entry.handle,
                     kind: entry.kind,
                     status: entry.status,
+                    path: entry.path.as_deref(),
                 })
                 .collect();
             let handle = self

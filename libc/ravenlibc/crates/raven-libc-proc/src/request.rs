@@ -9,7 +9,7 @@
 use alloc::vec::Vec;
 
 /// One inherited descriptor in a spawn or exec map.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FdMapEntry {
     /// Destination file descriptor.
     pub fd: i32,
@@ -19,6 +19,8 @@ pub struct FdMapEntry {
     pub kind: u8,
     /// Access mode and status bits from the parent's open-file description.
     pub status: u32,
+    /// Public absolute path, when the parent's OFD remembers one.
+    pub path: Option<Vec<u8>>,
 }
 
 /// A request to spawn a new image.

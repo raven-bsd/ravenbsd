@@ -27,12 +27,13 @@ fn fd_map_entry_carries_the_ofd_identity() {
         handle: 8,
         kind: 2,
         status: 2,
+        path: Some(b"/dev/pts/3".to_vec()),
     };
     assert_eq!(entry.fd, 3);
     assert_eq!(entry.handle, 8);
     assert_eq!(entry.kind, 2);
     assert_eq!(entry.status, 2);
-    assert_eq!(core::mem::size_of::<FdMapEntry>(), 16);
+    assert_eq!(entry.path.as_deref(), Some(b"/dev/pts/3".as_slice()));
 }
 
 #[test]
