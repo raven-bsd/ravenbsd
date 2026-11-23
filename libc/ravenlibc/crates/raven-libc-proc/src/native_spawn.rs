@@ -61,7 +61,7 @@ pub trait Loader {
         argv: &[&str],
         env: &[&str],
         cwd: &[u8],
-        fdmap: &[(i32, u32)],
+        fdmap: &[raven_spawn::SpawnFd],
     ) -> Result<u32, Errno>;
     /// Wait for a child; a `WNOHANG` miss returns pid 0.
     fn wait_ex(&self, idtype: u32, id: i32, options: u32) -> Result<(i32, i32), Errno>;
@@ -147,10 +147,34 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
         let slot = self.reserve()?;
         let result = (|| {
             let image = self.loader.read_image(&resolved)?;
-            let fds: Vec<(i32, u32)> = request
+            let fds: Vec<raven_spawn::SpawnFd> = request
                 .fdmap
                 .iter()
-                .map(|entry| (entry.fd, entry.handle))
+                .map(|entry| {
+                    let endpoint =
+                        |value: crate::request::SocketEndpoint| raven_spawn::SpawnEndpoint {
+                            ip: value.ip,
+                            port: value.port,
+                        };
+                    raven_spawn::SpawnFd {
+                        fd: entry.fd,
+                        handle: entry.handle,
+                        kind: entry.kind,
+                        status: entry.status,
+                        path: entry.path.as_deref(),
+                        event: entry.event,
+                        readiness: entry.readiness,
+                        socket: entry.socket.map(|meta| raven_spawn::SpawnSocket {
+                            domain: meta.domain,
+                            ty: meta.ty,
+                            proto: meta.proto,
+                            state: meta.state,
+                            local: meta.local.map(endpoint),
+                            peer: meta.peer.map(endpoint),
+                        }),
+                        pty_master: entry.pty_master,
+                    }
+                })
                 .collect();
             let handle = self
                 .loader
@@ -348,7 +372,7 @@ impl Loader for RtLoader {
         argv: &[&str],
         env: &[&str],
         cwd: &[u8],
-        fdmap: &[(i32, u32)],
+        fdmap: &[raven_spawn::SpawnFd],
     ) -> Result<u32, Errno> {
         let options = raven_spawn::SpawnOptions { args: argv, env };
         let mut sys = CommandSys {
