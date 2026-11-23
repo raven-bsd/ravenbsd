@@ -71,6 +71,15 @@ struct FreeNode {
     next: *mut FreeNode,
 }
 
+/// Smallest remainder worth keeping as a free node.
+const MIN_FREE: usize = size_of::<FreeNode>();
+
+/// Round `size` up to `align` (both non-zero, `align` a power of two).
+fn round_up(size: usize, align: usize) -> Option<usize> {
+    size.checked_add(align - 1)
+        .map(|value| value & !(align - 1))
+}
+
 struct State {
     chunk: *mut u8,
     chunk_len: usize,
@@ -88,36 +97,110 @@ impl State {
         }
     }
 
-    fn alloc(&mut self, source: &mut dyn PageSource, layout: Layout) -> *mut u8 {
-        let size = layout.size().max(1);
-        let align = layout.align().max(core::mem::align_of::<FreeNode>());
+    /// Insert a free node in address order and coalesce contiguous neighbours.
+    ///
+    /// Donor contract: NetBSD `lib/libc/stdlib/malloc.c:free_bytes` returns a
+    /// freed chunk to its page's size class so the same class can reuse it, and
+    /// `:malloc_bytes` only allocates a new page when that class is empty. This
+    /// allocator is byte-granular rather than size-class paged, so it preserves the
+    /// same property by splitting a reused block and merging adjacent free blocks.
+    ///
+    /// # Safety
+    ///
+    /// `pointer` must point to a mapped region of at least `size` bytes that is no
+    /// longer reachable by the caller, and must be aligned for [`FreeNode`].
+    unsafe fn insert_free(&mut self, pointer: *mut FreeNode, size: usize) {
+        if size < size_of::<FreeNode>() {
+            return;
+        }
+        let mut previous: *mut FreeNode = ptr::null_mut();
+        let mut node = self.free;
+        while !node.is_null() && (node as usize) < (pointer as usize) {
+            previous = node;
+            // SAFETY: every node in the list is a live `FreeNode` inside a mapped chunk.
+            node = unsafe { (*node).next };
+        }
+        // SAFETY: the caller transferred this region; writing the node header is the only use.
+        unsafe {
+            pointer.write(FreeNode { size, next: node });
+        }
+        if previous.is_null() {
+            self.free = pointer;
+        } else {
+            // SAFETY: `previous` is a node in the list and points below `pointer`.
+            unsafe { (*previous).next = pointer };
+        }
+        // Merge with the following node when exactly adjacent.
+        if !node.is_null() && (pointer as usize).saturating_add(size) == node as usize {
+            // SAFETY: `node` follows `pointer` and both are live free nodes.
+            unsafe {
+                (*pointer).size = (*pointer).size.saturating_add((*node).size);
+                (*pointer).next = (*node).next;
+            }
+        }
+        // Merge with the preceding node when exactly adjacent.
+        if !previous.is_null() {
+            // SAFETY: `previous` is a live free node in the address-ordered list.
+            let previous_end = (previous as usize).saturating_add(unsafe { (*previous).size });
+            if previous_end == pointer as usize {
+                // SAFETY: `previous` and `pointer` are adjacent live free nodes.
+                unsafe {
+                    (*previous).size = (*previous).size.saturating_add((*pointer).size);
+                    (*previous).next = (*pointer).next;
+                }
+            }
+        }
+    }
 
+    /// Take a free block of at least `size` bytes, splitting the tail back to the list.
+    fn take_free(&mut self, size: usize, align: usize) -> Option<*mut u8> {
         let mut previous: *mut FreeNode = ptr::null_mut();
         let mut node = self.free;
         while !node.is_null() {
-            // SAFETY: every free-list node was written by `dealloc` and remains in a mapped chunk.
-            let current = unsafe { &mut *node };
-            if current.size >= size && (node as usize).is_multiple_of(align) {
+            // SAFETY: every free-list node is a live `FreeNode` in a mapped chunk.
+            let node_size = unsafe { (*node).size };
+            let node_align = (node as usize).is_multiple_of(align);
+            if node_size >= size && node_align {
+                // SAFETY: `node` is a live free node whose size was read above.
+                let next = unsafe { (*node).next };
                 if previous.is_null() {
-                    self.free = current.next;
+                    self.free = next;
                 } else {
-                    // SAFETY: `previous` is a free-list node.
-                    unsafe { (*previous).next = current.next };
+                    // SAFETY: `previous` is a live list node.
+                    unsafe { (*previous).next = next };
                 }
-                return node as *mut u8;
+                let split = round_up(size, core::mem::align_of::<FreeNode>())?;
+                if node_size >= split.saturating_add(MIN_FREE) {
+                    // SAFETY: the split offset stays inside the live `node_size` block.
+                    let remainder = unsafe { (node as *mut u8).add(split) }.cast::<FreeNode>();
+                    // SAFETY: the tail is inside the same live block, aligned for `FreeNode`,
+                    // and is no longer reachable through the caller's allocation.
+                    unsafe { self.insert_free(remainder, node_size - split) };
+                }
+                return Some(node.cast::<u8>());
             }
             previous = node;
-            node = current.next;
+            // SAFETY: `node` is a live free node from the list.
+            node = unsafe { (*node).next };
+        }
+        None
+    }
+
+    fn alloc(&mut self, source: &mut dyn PageSource, layout: Layout) -> *mut u8 {
+        let align = layout.align().max(core::mem::align_of::<FreeNode>());
+        let Some(size) = round_up(layout.size().max(1), align) else {
+            return ptr::null_mut();
+        };
+
+        if let Some(pointer) = self.take_free(size, align) {
+            return pointer;
         }
 
         let base = self.chunk as usize;
         let Some(start) = base.checked_add(self.chunk_offset) else {
             return ptr::null_mut();
         };
-        let Some(aligned) = start
-            .checked_add(align - 1)
-            .map(|value| value & !(align - 1))
-        else {
+        let Some(aligned) = round_up(start, align) else {
             return ptr::null_mut();
         };
         let Some(end) = aligned.checked_add(size) else {
@@ -127,6 +210,18 @@ impl State {
             return ptr::null_mut();
         };
         if self.chunk.is_null() || offset_end > self.chunk_len {
+            // Salvage the unallocated tail before switching to a new chunk, so a later
+            // small allocation can still use it.
+            if !self.chunk.is_null() && self.chunk_offset < self.chunk_len {
+                let tail = self.chunk_len - self.chunk_offset;
+                if tail >= size_of::<FreeNode>() {
+                    // SAFETY: the offset is inside the current mapped chunk.
+                    let tail_pointer = unsafe { self.chunk.add(self.chunk_offset) };
+                    // SAFETY: the tail is mapped, aligned by the allocation rounding, and
+                    // no live allocation starts inside it.
+                    unsafe { self.insert_free(tail_pointer.cast::<FreeNode>(), tail) };
+                }
+            }
             let Some(map_len) = size
                 .checked_add(align)
                 .and_then(|value| value.checked_add(4095))
@@ -147,18 +242,17 @@ impl State {
     }
 
     fn dealloc(&mut self, pointer: *mut u8, layout: Layout) {
-        if pointer.is_null() || layout.size() < size_of::<FreeNode>() {
+        if pointer.is_null() {
             return;
         }
+        let align = layout.align().max(core::mem::align_of::<FreeNode>());
+        let Some(size) = round_up(layout.size().max(1), align) else {
+            return;
+        };
         let node = pointer.cast::<FreeNode>();
-        // SAFETY: the caller hands back a live allocation of at least `layout.size()` bytes.
-        unsafe {
-            node.write(FreeNode {
-                size: layout.size(),
-                next: self.free,
-            });
-        }
-        self.free = node;
+        // SAFETY: the caller hands back the live allocation and the rounded size matches the
+        // size reserved by `alloc`, so the node stays inside that allocation.
+        unsafe { self.insert_free(node, size) };
     }
 }
 
@@ -369,8 +463,14 @@ mod tests {
         test_dealloc(&allocator, second, layout);
         let a = test_alloc(&allocator, layout);
         let b = test_alloc(&allocator, layout);
-        assert!(a == second || a == first);
-        assert!(b == second || b == first);
+        assert!(
+            a == second || a == first,
+            "a={a:p} first={first:p} second={second:p}"
+        );
+        assert!(
+            b == second || b == first,
+            "b={b:p} first={first:p} second={second:p}"
+        );
         assert_ne!(a, b);
     }
 
@@ -397,3 +497,7 @@ mod tests {
         test_dealloc(&allocator, again, layout);
     }
 }
+
+#[cfg(test)]
+#[path = "alloc_ut.rs"]
+mod alloc_ut;
