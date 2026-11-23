@@ -227,8 +227,10 @@ impl<SE: crate::extensions::ShellExtensions> crate::Shell<SE> {
 
         // Give the shell a chance to run on-exit tasks. An `exit` there sets the shell's
         // status; a failure there doesn't change the command's outcome.
-        if let Ok(Some(status)) = self.run_exit_trap().await {
-            result.exit_code = status.into();
+        if self.traps.handles(crate::traps::TrapSignal::Exit) {
+            if let Ok(Some(status)) = self.run_exit_trap().await {
+                result.exit_code = status.into();
+            }
         }
 
         Ok(result)
@@ -261,8 +263,10 @@ impl<SE: crate::extensions::ShellExtensions> crate::Shell<SE> {
 
         // Give the shell a chance to run on-exit tasks. An `exit` there sets the shell's
         // status; a failure there doesn't change the script's outcome.
-        if let Ok(Some(status)) = self.run_exit_trap().await {
-            result.exit_code = status.into();
+        if self.traps.handles(crate::traps::TrapSignal::Exit) {
+            if let Ok(Some(status)) = self.run_exit_trap().await {
+                result.exit_code = status.into();
+            }
         }
 
         Ok(result)
