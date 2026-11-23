@@ -20,6 +20,14 @@ pub mod router;
 
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU32, AtomicU64, Ordering};
 
+/// Live in-flight scheme requests (S36b diagnostic).
+static LIVE_REQUESTS: AtomicU64 = AtomicU64::new(0);
+
+/// Number of live `PendingRequest` objects (S36b diagnostic).
+pub fn live_requests() -> u64 {
+    LIVE_REQUESTS.load(Ordering::Acquire)
+}
+
 /// K147 fixed-cost stage trace, enabled by `k147-trace` on the kernel command line.
 ///
 /// The first call parses the command line once; every later check is a cached atomic load.
@@ -203,6 +211,7 @@ impl PendingRequest {
             crate::sync::register_thread(&thread);
             thread.tid
         });
+        LIVE_REQUESTS.fetch_add(1, Ordering::Relaxed);
         Arc::new(Self {
             id: packet.request_id,
             client,
@@ -418,10 +427,18 @@ pub fn on_process_exit(process: &Arc<Process>) {
     }
 
     while let Some(request) = pop_request(&process.client_requests) {
-        if matches!(request.opcode, Opcode::Close | Opcode::Dup) {
-            // One-way notifications must still reach the server after the client is gone: the
-            // server releases the open-file description on the last CLOSE, and DUP updates its
-            // reference count. They are the client's last words, not cancellable work.
+        if request.opcode == Opcode::Dup {
+            // A DUP still in the server queue belonged to a descriptor that died with this
+            // client; remove it and roll the server reference back. A delivered DUP stays with
+            // the server and its reference is released by the CLOSE notification.
+            if router::withdraw_undelivered_dup(&request) {
+                request.fail(Errno::EIO);
+                request.release_captures();
+            }
+            continue;
+        }
+        if request.opcode == Opcode::Close {
+            // The last CLOSE must still reach the server after the client is gone.
             continue;
         }
         request.cancel();
@@ -494,6 +511,12 @@ pub fn on_process_exit(process: &Arc<Process>) {
             capture::frames_in_use(),
             stats.free_bytes
         );
+    }
+}
+
+impl Drop for PendingRequest {
+    fn drop(&mut self) {
+        LIVE_REQUESTS.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
