@@ -55,3 +55,15 @@ path = "/sbin/ptyd"
 [[initfs.files]]
 src = "tests/qtest/cases/libc-forkpty-fixture/ptyd.toml"
 path = "/etc/services.d/ptyd.toml"
+
+# K548 rev348: the Rust std Command canary for the brush child-fault.
+[[initfs.files]]
+src = "build/fixtures/exec-canary/exec-canary"
+path = "/bin/exec-canary"
+mode = 0o755
+generated = true
+
+# K548 rev349: the shell cwd for the Rust std Command canary.
+[[initfs.files]]
+src = "profiles/release.d/home-raven.keep"
+path = "/home/raven/.keep"

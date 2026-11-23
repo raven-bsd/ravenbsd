@@ -52,42 +52,49 @@ struct Summary {
 pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8> {
     let steps = build_steps(workspace, fast, changed)?;
     let order: Vec<String> = steps.iter().map(|step| step.name.clone()).collect();
-    // The guard scan and the provenance checker are independent single-process passes; run them
-    // beside the cargo/clippy/nextest steps instead of after them. On the full gate the
-    // provenance scan is the largest serial phase, and nextest releases the cargo lock while it
-    // runs the tests, so the two overlap (K548 rev335 gate wall).
+    // The guard scan and every command step are independent passes; run them beside each other
+    // instead of strictly after one another. The tests step dominates the gate, and the cargo
+    // steps release the target lock while they run, so fmt/clippy/doc overlap it (K548 rev335 /
+    // rev339 gate wall). Every job measures its own wall time; the gate wall is the longest job.
     let mut deferred = Vec::new();
-    let mut jobs: Vec<(String, Instant, thread::JoinHandle<Status>)> = Vec::new();
+    let mut jobs: Vec<(String, thread::JoinHandle<(Status, f64)>)> = Vec::new();
     for step in steps {
         let Step { name, kind } = step;
         match kind {
             StepKind::Guard => {
                 println!("==> {name}");
                 let root = workspace.root.clone();
-                let started = Instant::now();
-                let job = thread::spawn(move || match guard::scan_repo(&root) {
-                    Ok(violations) => {
-                        guard::print_violations(&violations);
-                        status_for(i32::from(!violations.is_empty()))
-                    }
-                    Err(error) => {
-                        eprintln!("check: `guard` could not run: {error:#}");
-                        Status::Failed(1)
-                    }
+                let job = thread::spawn(move || {
+                    let started = Instant::now();
+                    let status = match guard::scan_repo(&root) {
+                        Ok(violations) => {
+                            guard::print_violations(&violations);
+                            status_for(i32::from(!violations.is_empty()))
+                        }
+                        Err(error) => {
+                            eprintln!("check: `guard` could not run: {error:#}");
+                            Status::Failed(1)
+                        }
+                    };
+                    (status, started.elapsed().as_secs_f64())
                 });
-                jobs.push((name, started, job));
+                jobs.push((name, job));
             }
-            StepKind::Command(spec) if name == "provenance" => {
+            StepKind::Command(spec) => {
                 println!("==> {name}");
-                let started = Instant::now();
-                let job = thread::spawn(move || match run_command(&spec) {
-                    Ok(code) => status_for(code),
-                    Err(error) => {
-                        eprintln!("check: `provenance` could not run: {error:#}");
-                        Status::Failed(1)
-                    }
+                let label = name.clone();
+                let job = thread::spawn(move || {
+                    let started = Instant::now();
+                    let status = match run_command(&spec) {
+                        Ok(code) => status_for(code),
+                        Err(error) => {
+                            eprintln!("check: `{label}` could not run: {error:#}");
+                            Status::Failed(1)
+                        }
+                    };
+                    (status, started.elapsed().as_secs_f64())
                 });
-                jobs.push((name, started, job));
+                jobs.push((name, job));
             }
             other => deferred.push(Step { name, kind: other }),
         }
@@ -149,9 +156,8 @@ pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8
             seconds,
         });
     }
-    for (name, started, job) in jobs {
-        let status = job.join().unwrap_or(Status::Failed(1));
-        let seconds = started.elapsed().as_secs_f64();
+    for (name, job) in jobs {
+        let (status, seconds) = job.join().unwrap_or((Status::Failed(1), 0.0));
         if matches!(status, Status::Failed(_)) {
             failed = true;
         }

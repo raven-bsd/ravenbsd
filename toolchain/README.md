@@ -175,3 +175,28 @@ path in every cached rmeta and makes unrelated builds fail with E0460 (`found po
 version of crate std`). The lead owns the link; minions use `rustc +ravenbsd` as already linked
 and do not run `make toolchain`. A toolchain patch is reviewed and installed by the lead only.
 
+
+## Distributable toolchain (K548 rev351)
+
+The installed prefix under `build/toolchain` is relocatable (the `rustc`/`cargo` launchers resolve
+`$ORIGIN/../lib`), so a `tar.xz` of the prefix is the distributable.
+
+Build the artifact: `make toolchain-dist` (or `sh toolchain/dist.sh --output DIR`). It writes
+`ravenbsd-toolchain-<version>-x86_64-unknown-linux-gnu.tar.xz`, `SHA256SUMS`, `install.sh` and
+`METADATA` (version, source tarball SHA-256, size, prerequisites and the from-source path).
+
+Install: `sh install.sh --tarball ... --prefix DIR`. It verifies `SHA256SUMS`, extracts the
+relocatable prefix and runs `rustup toolchain link ravenbsd DIR`. The default prefix is
+`$HOME/.ravenbsd/toolchain`.
+
+Test: `make toolchain-dist-test`. It unlinks the local `build/toolchain`, installs the tarball into a
+temporary prefix, builds `toolchain/smoke --target x86_64-unknown-ravenbsd` with only that prefix,
+and restores the local link. The local `build/toolchain` must not be needed for the smoke build.
+
+From source (the route next to the artifact): `make toolchain` runs `toolchain/build.sh`, which
+downloads and verifies `rustc-1.97.1-src.tar.xz` (SHA-256 in `rust-version`), applies
+`patches/0001..0003`, copies `bootstrap.toml`, runs `x.py install` with the CI LLVM, and links the
+prefix. Host prerequisites: rustup, the stock rustc 1.97.1, `sha256sum tar xz patch python3 cc git
+curl`, about 10 GB of disk for the source/build tree, and `gcc-aarch64-linux-gnu` for the aarch64
+std. Measured on 20 logical CPUs: 6:11 for the stage-1 install; 0:10 for a reinstall from the cached
+tree.
