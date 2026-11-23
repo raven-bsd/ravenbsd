@@ -32,6 +32,12 @@ trap down EXIT HUP INT TERM
 
 $SUDO sh scripts/qemu-net.sh up
 up=1
+mkdir -p build/ssh/first-byte
+{
+    date -u +%Y-%m-%dT%H:%M:%SZ
+    uptime
+    printf 'qemu=%s\n' "$(pgrep -c -x qemu-system-x86_64 2>/dev/null || true)"
+} >> build/ssh/first-byte/host.txt
 python3 tests/fixtures/ssh-first-byte/probe.py
 rc=$?
 exit "$rc"

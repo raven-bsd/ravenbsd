@@ -63,6 +63,27 @@ def kill(child: subprocess.Popen) -> None:
     child.wait()
 
 
+def connect_after_ready(
+    serial: Path,
+    needle: bytes,
+    started: float,
+    timeout: float,
+    connect,
+):
+    """Wait for the sshd ready marker, then run exactly one connect.
+
+    The gate row must never connect before the service readiness line, or an
+    early TCP connect is logged as a banner failure at any host load.  The
+    helper is the single seam the unit test drives with a synthetic early
+    connect.
+    """
+    ready = wait_serial(serial, needle, started, timeout)
+    if ready is None:
+        return None
+    connect()
+    return ready
+
+
 def boot() -> tuple[subprocess.Popen, Path, float]:
     RUN.mkdir(parents=True, exist_ok=True)
     vars_path = RUN / "vars.fd"
@@ -84,7 +105,9 @@ def boot() -> tuple[subprocess.Popen, Path, float]:
     child = subprocess.Popen(argv, cwd=ROOT, start_new_session=True,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     started = time.monotonic()
-    ready = wait_serial(serial, b"svcd: sshd up", started, 180)
+    ready = connect_after_ready(
+        serial, b"svcd: sshd up", started, 180, lambda: None
+    )
     if ready is None:
         kill(child)
         raise RuntimeError(f"sshd service never started; serial {serial}")
@@ -196,14 +219,21 @@ def main() -> int:
     finally:
         kill(child)
     log("summary", f"image={IMAGE}")
-    for result in attempts:
-        log("summary", f"ssh attempt={result['index']} from_ready={result['from_ready']:.3f}s "
-                       f"connect={result['connect']} banner={result['banner']}")
-    for result in raws:
-        log("summary", f"raw={result['index']} from_ready={result['from_ready']:.3f}s "
-                       f"first_byte_delta="
-                       f"{None if result['first'] is None or result['connected'] is None else round(result['first'] - result['connected'], 3)} "
-                       f"bytes={result['bytes']}")
+    summary = RUN / "summary.txt"
+    with open(summary, "w", encoding="utf-8") as out:
+        out.write(f"image={IMAGE}\n")
+        for result in attempts:
+            line = (f"ssh attempt={result['index']} from_ready={result['from_ready']:.3f}s "
+                    f"connect={result['connect']} banner={result['banner']}")
+            log("summary", line)
+            out.write(line + "\n")
+        for result in raws:
+            delta = (None if result["first"] is None or result["connected"] is None
+                     else round(result["first"] - result["connected"], 3))
+            line = (f"raw={result['index']} from_ready={result['from_ready']:.3f}s "
+                    f"first_byte_delta={delta} bytes={result['bytes']}")
+            log("summary", line)
+            out.write(line + "\n")
     log("logs", str(RUN))
     return 0
 
