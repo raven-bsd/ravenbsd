@@ -34,7 +34,7 @@ unsafe extern "C" fn shell_signal_entry(bits: usize, fault: *const FaultRecord) 
 /// K514 rev109 test-only: log the libc side of the `SIG_SETUP` entry handoff.
 #[cfg(target_os = "none")]
 fn diag_entry(entry: usize, ctx: usize, flags: u32) {
-    let mut line = [0u8; 96];
+    let mut line = [0u8; 160];
     let mut len = 0usize;
     let prefix = b"K514DIAG libc sig_setup entry=";
     line[..prefix.len()].copy_from_slice(prefix);
@@ -58,6 +58,18 @@ fn diag_entry(entry: usize, ctx: usize, flags: u32) {
         line[len..len + label.len()].copy_from_slice(label);
         len += label.len();
     }
+    let first = unsafe { core::ptr::read_unaligned(entry as *const [u8; 4]) };
+    let marker = b" first4=";
+    line[len..len + marker.len()].copy_from_slice(marker);
+    len += marker.len();
+    for byte in first {
+        line[len] = b' ';
+        line[len + 1] = b"0123456789abcdef"[(byte >> 4) as usize];
+        line[len + 2] = b"0123456789abcdef"[(byte & 0xf) as usize];
+        len += 3;
+    }
+    line[len] = b'\n';
+    len += 1;
     let _ = raven_libc_sys::sys::debug_write(&line[..len]);
 }
 
