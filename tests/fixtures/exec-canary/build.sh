@@ -19,7 +19,7 @@ out=$root/build/fixtures/exec-canary
 RUSTFLAGS="--cfg getrandom_backend=\"custom\" -C strip=symbols -C relocation-model=static -C code-model=small -C link-arg=-T$root/xtask/brush-x86_64.ld -C link-arg=$crt/crt1.o -C link-arg=$crt/crti.o -C link-arg=-L$crt -C link-arg=-lc -C link-arg=$crt/crtn.o"
 export RUSTFLAGS
 
-cargo +ravenbsd build --manifest-path "$root/tests/fixtures/exec-canary/Cargo.toml" \
+RUSTUP_TOOLCHAIN=ravenbsd cargo build --manifest-path "$root/tests/fixtures/exec-canary/Cargo.toml" \
     --bin exec-canary --target "$target" --release \
     --target-dir "$out/target"
 
