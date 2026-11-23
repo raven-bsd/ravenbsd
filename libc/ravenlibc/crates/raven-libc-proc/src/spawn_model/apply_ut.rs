@@ -68,87 +68,8 @@ fn entry(fd: i32, handle: u32, cloexec: bool) -> FdEntry {
     FdEntry {
         fd,
         handle,
-        kind: 0,
-        status: 2,
-        path: None,
-        event: 0,
-        readiness: 0,
-        socket: None,
-        pty_master: false,
         cloexec,
     }
-}
-
-fn tty_entry(fd: i32, handle: u32, path: &[u8]) -> FdEntry {
-    FdEntry {
-        fd,
-        handle,
-        kind: 2,
-        status: 2,
-        path: Some(path.to_vec()),
-        event: 0,
-        readiness: 0,
-        socket: None,
-        pty_master: false,
-        cloexec: false,
-    }
-}
-
-fn map(fd: i32, handle: u32, kind: u8, status: u32) -> FdMapEntry {
-    FdMapEntry {
-        fd,
-        handle,
-        kind,
-        status,
-        path: None,
-        event: 0,
-        readiness: 0,
-        socket: None,
-        pty_master: false,
-    }
-}
-
-#[test]
-fn a_socket_entry_carries_its_identity_event_and_readiness() {
-    let mut env = FakeEnv::new(vec![]);
-    let actions = FileActions::new();
-    let socket = crate::request::SocketMeta {
-        domain: 2,
-        ty: 1,
-        proto: 6,
-        state: 5,
-        local: Some(crate::request::SocketEndpoint {
-            ip: [10, 0, 2, 15],
-            port: 22,
-        }),
-        peer: Some(crate::request::SocketEndpoint {
-            ip: [10, 0, 2, 2],
-            port: 40000,
-        }),
-    };
-    let mut inherited = entry(3, 9, false);
-    inherited.kind = 3;
-    inherited.event = 9;
-    inherited.readiness = 5;
-    inherited.socket = Some(socket);
-    let table = vec![inherited];
-    let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
-    let carried = scratch.fdmap.first().expect("entry");
-    assert_eq!(carried.kind, 3);
-    assert_eq!(carried.event, 9);
-    assert_eq!(carried.readiness, 5);
-    assert_eq!(carried.socket, Some(socket));
-}
-
-#[test]
-fn a_tty_entry_carries_its_kind_and_path() {
-    let mut env = FakeEnv::new(vec![]);
-    let actions = FileActions::new();
-    let table = vec![tty_entry(1, 7, b"/dev/pts/7")];
-    let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
-    let inherited = scratch.fdmap.first().expect("entry");
-    assert_eq!(inherited.kind, 2);
-    assert_eq!(inherited.path.as_deref(), Some(b"/dev/pts/7".as_slice()));
 }
 
 #[test]
@@ -159,7 +80,7 @@ fn open_records_a_temp_and_replaces_the_fd() {
     let table = vec![entry(3, 1, true)];
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
     assert_eq!(scratch.temp_handles, vec![9]);
-    assert_eq!(scratch.fdmap, vec![map(3, 9, 0, 0)]);
+    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 3, handle: 9 }]);
     assert!(env.closed.is_empty());
 }
 
@@ -181,7 +102,13 @@ fn dup2_copies_and_clears_cloexec() {
     actions.add_dup2(1, 5).expect("dup2");
     let table = vec![entry(1, 7, false)];
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![map(1, 7, 0, 2), map(5, 7, 0, 2)]);
+    assert_eq!(
+        scratch.fdmap,
+        vec![
+            FdMapEntry { fd: 1, handle: 7 },
+            FdMapEntry { fd: 5, handle: 7 }
+        ]
+    );
 }
 
 #[test]
@@ -191,7 +118,7 @@ fn dup2_to_the_same_fd_still_clears_cloexec() {
     actions.add_dup2(1, 1).expect("dup2");
     let table = vec![entry(1, 7, true)];
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![map(1, 7, 0, 2)]);
+    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 1, handle: 7 }]);
 }
 
 #[test]
@@ -212,7 +139,7 @@ fn close_of_a_free_fd_is_a_no_op() {
     actions.add_close(99).expect("close");
     let scratch =
         apply_actions(&[entry(1, 7, false)], b"/", false, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![map(1, 7, 0, 2)]);
+    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 1, handle: 7 }]);
 }
 
 #[test]
@@ -293,7 +220,7 @@ fn closefrom_drops_high_fds() {
     actions.add_closefrom(10).expect("closefrom");
     let table = vec![entry(9, 1, false), entry(10, 2, false), entry(11, 3, false)];
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![map(9, 1, 0, 2)]);
+    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 9, handle: 1 }]);
 }
 
 #[test]
@@ -312,7 +239,7 @@ fn an_open_after_cloexec_default_survives() {
     actions.add_open(3, b"/dev/null", 0, 0).expect("open");
     let table = vec![entry(1, 7, false)];
     let scratch = apply_actions(&table, b"/", true, &actions, &mut env).expect("apply");
-    assert_eq!(scratch.fdmap, vec![map(3, 9, 0, 0)]);
+    assert_eq!(scratch.fdmap, vec![FdMapEntry { fd: 3, handle: 9 }]);
 }
 
 #[test]
@@ -332,7 +259,11 @@ fn the_fdmap_is_sorted_by_fd() {
     let scratch = apply_actions(&table, b"/", false, &actions, &mut env).expect("apply");
     assert_eq!(
         scratch.fdmap,
-        vec![map(2, 2, 0, 2), map(5, 3, 0, 2), map(7, 1, 0, 2)]
+        vec![
+            FdMapEntry { fd: 2, handle: 2 },
+            FdMapEntry { fd: 5, handle: 3 },
+            FdMapEntry { fd: 7, handle: 1 }
+        ]
     );
 }
 
