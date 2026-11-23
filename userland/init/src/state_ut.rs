@@ -734,6 +734,37 @@ fn release_disk_manifests_grant_block_ufs_and_disk_prefixes() {
 }
 
 #[test]
+fn ready_timing_line_is_standard_and_carries_the_four_stamps() {
+    let timing = ReadyTiming {
+        generation: 3,
+        start_ms: Some(10),
+        spawned_ms: Some(20),
+        first_poll_ms: Some(25),
+        deadline_ms: Some(5_020),
+        stalled_ms: 0,
+        finished_ms: Some(30),
+    };
+    assert_eq!(
+        format_ready_timing("vfsd", &timing, "ready_at"),
+        "svcd: vfsd timing: generation=3 start=10 spawn=20 first-ready=25 ready=30 deadline=5020 stalled=0 status=ready_at"
+    );
+
+    let no_readiness = ReadyTiming {
+        generation: 1,
+        start_ms: Some(10),
+        spawned_ms: Some(42),
+        first_poll_ms: None,
+        deadline_ms: None,
+        stalled_ms: 0,
+        finished_ms: Some(42),
+    };
+    assert_eq!(
+        format_ready_timing("logd", &no_readiness, "ready_at"),
+        "svcd: logd timing: generation=1 start=10 spawn=42 first-ready=none ready=42 deadline=none stalled=0 status=ready_at"
+    );
+}
+
+#[test]
 fn ready_timing_records_start_spawn_poll_and_finish() {
     let mut manifest = service("a");
     manifest.readiness = Readiness::Scheme;
