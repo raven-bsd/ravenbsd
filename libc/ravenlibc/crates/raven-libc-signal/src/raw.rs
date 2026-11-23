@@ -371,6 +371,20 @@ pub fn set_ctx_area(tp: usize, address: usize) {
     with_state(tp, |state| state.set_ctx_area(address));
 }
 
+/// Reset the per-thread signal delivery state for a fork child.
+///
+/// `SIG_SETUP` is per kernel thread. The child's thread is new but inherits the parent's TCB, so
+/// the inherited context registration is stale: clear it (and the thread-directed pending and
+/// deferred records) so the entry can be registered for the child thread. The mask and the
+/// process-wide dispositions are inherited and are not touched. Returns whether the parent had a
+/// registered entry, so the caller can re-register it immediately for the child.
+pub fn reset_after_fork(tp: usize) -> bool {
+    let had_entry = with_state(tp, |state| state.ctx_area() != 0);
+    with_state(tp, |state| state.reset_for_fork());
+    pending_store(tp, 0);
+    had_entry
+}
+
 /// COPY-IN: copy the kernel area into a `ucontext_t`.
 pub fn copy_ctx_in(tp: usize, context: &mut UcontextT) {
     let source = ctx_area(tp) as *const u8;
