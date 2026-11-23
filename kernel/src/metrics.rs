@@ -59,6 +59,7 @@ fn sampler() {
         let class = memory::heap::class_stats(16);
         let turnstile = crate::sync::turnstile_counts();
         let zombies = process::zombie_count();
+        let pending = crate::ipc::pending_counts();
         kprintln!(
             "{}",
             format_line(
@@ -78,9 +79,9 @@ fn sampler() {
                 class.map_or(0, |stats| stats.free as u64),
                 class.map_or(0, |stats| stats.in_use as u64),
                 class.map_or(0, |stats| stats.slabs as u64),
-                0,
-                0,
-                0,
+                pending.0,
+                pending.1,
+                pending.2,
                 0,
                 0,
                 0,
