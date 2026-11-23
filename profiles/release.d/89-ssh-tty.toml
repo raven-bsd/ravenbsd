@@ -5,7 +5,7 @@
 # by tests/fixtures/ssh-tty/build.sh so `ssh -tt ... tty` can print /dev/pts/N. It is test tooling.
 
 [[initfs.files]]
-src = "build/fixtures/ssh-tty/tty"
+src = "build/fixtures/ssh-tty/{arch}/tty"
 path = "/bin/tty"
 mode = 0o755
 generated = true
