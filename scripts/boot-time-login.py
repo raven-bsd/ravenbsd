@@ -65,6 +65,24 @@ def parse_service_up(line):
     return match.group(1) if match else None
 
 
+LOADER_MARKS = (
+    ("loader: dtb ", "dtb"),
+    ("loader: memory map:", "memory_map"),
+    ("loader: loader image ", "image"),
+    ("loader: page tables: building", "paging_start"),
+    ("loader: page tables: built", "paging_end"),
+    ("loader: jumping to kernel entry", "jump"),
+)
+
+
+def parse_loader_mark(line):
+    """Return the verbose loader phase mark carried by a serial line."""
+    for prefix, mark in LOADER_MARKS:
+        if line.startswith(prefix):
+            return mark
+    return None
+
+
 def run_once(args, image, vars_file, run_number, out_dir):
     sock_path = os.path.join(out_dir, "serial-%d.sock" % run_number)
     try:
@@ -126,6 +144,7 @@ def run_once(args, image, vars_file, run_number, out_dir):
         services = []
         service_start_ns = {}
         service_ready_ns = {}
+        loader_marks = {}
         loader_ns = None
         kernel_ns = None
         first_svc_ns = None
@@ -175,6 +194,9 @@ def run_once(args, image, vars_file, run_number, out_dir):
                 started = parse_service_start(line)
                 if started:
                     service_start_ns.setdefault(started, now)
+                mark = parse_loader_mark(line)
+                if mark:
+                    loader_marks.setdefault(mark, now)
 
             if loader_ns is None and b"loader: RavenBSD loader" in data:
                 loader_ns = now
@@ -266,6 +288,44 @@ def run_once(args, image, vars_file, run_number, out_dir):
     service_timing.sort(
         key=lambda item: (item["ready"] is None, item["ready"] or 0.0, item["name"])
     )
+    def loader_ms(key):
+        stamp = loader_marks.get(key)
+        return ms(stamp - start) if stamp is not None else None
+
+    loader_phases = {
+        "banner": ms(loader_ns - start) if loader_ns is not None else None,
+        "dtb": loader_ms("dtb"),
+        "memory_map": loader_ms("memory_map"),
+        "image": loader_ms("image"),
+        "paging_start": loader_ms("paging_start"),
+        "paging_end": loader_ms("paging_end"),
+        "jump": loader_ms("jump"),
+        "kernel": ms(kernel_ns - start) if kernel_ns is not None else None,
+    }
+    loader_split = {}
+    previous = loader_phases["banner"]
+    for name, key in (
+        ("image_load", "dtb"),
+        ("exit_boot", "memory_map"),
+        ("memmap", "paging_start"),
+        ("relocation", "paging_end"),
+        ("handoff", "jump"),
+    ):
+        current = loader_phases[key]
+        if current is not None and previous is not None:
+            loader_split[name] = current - previous
+        else:
+            loader_split[name] = None
+        if current is not None:
+            previous = current
+    if loader_phases["jump"] is not None and loader_phases["banner"] is not None:
+        loader_split["loader_total"] = loader_phases["jump"] - loader_phases["banner"]
+    else:
+        loader_split["loader_total"] = None
+    if loader_phases["kernel"] is not None and loader_phases["jump"] is not None:
+        loader_split["kernel_entry"] = loader_phases["kernel"] - loader_phases["jump"]
+    else:
+        loader_split["kernel_entry"] = None
     return {
         "run": run_number,
         "kernel_id": kernel_id,
@@ -274,6 +334,8 @@ def run_once(args, image, vars_file, run_number, out_dir):
         "stage": stage,
         "slowest": top,
         "service_timing": service_timing,
+        "loader_phases": loader_phases,
+        "loader_split": loader_split,
         "log": log_path,
     }
 
@@ -368,6 +430,37 @@ def main():
                     ),
                 )
             )
+            print(
+                "boot-time-login: loader_phases run=%d banner_ms=%s dtb_ms=%s "
+                "memory_map_ms=%s image_ms=%s paging_start_ms=%s paging_end_ms=%s "
+                "jump_ms=%s kernel_ms=%s"
+                % (
+                    result["run"],
+                    fmt(result["loader_phases"]["banner"]),
+                    fmt(result["loader_phases"]["dtb"]),
+                    fmt(result["loader_phases"]["memory_map"]),
+                    fmt(result["loader_phases"]["image"]),
+                    fmt(result["loader_phases"]["paging_start"]),
+                    fmt(result["loader_phases"]["paging_end"]),
+                    fmt(result["loader_phases"]["jump"]),
+                    fmt(result["loader_phases"]["kernel"]),
+                )
+            )
+            print(
+                "boot-time-login: loader_split run=%d image_load_ms=%s exit_boot_ms=%s "
+                "memmap_ms=%s relocation_ms=%s handoff_ms=%s loader_total_ms=%s "
+                "kernel_entry_ms=%s"
+                % (
+                    result["run"],
+                    fmt(result["loader_split"]["image_load"]),
+                    fmt(result["loader_split"]["exit_boot"]),
+                    fmt(result["loader_split"]["memmap"]),
+                    fmt(result["loader_split"]["relocation"]),
+                    fmt(result["loader_split"]["handoff"]),
+                    fmt(result["loader_split"]["loader_total"]),
+                    fmt(result["loader_split"]["kernel_entry"]),
+                )
+            )
 
     keys = (
         "firmware",
@@ -424,6 +517,53 @@ def main():
         + ",".join(
             "%s:%s:%s" % (name, fmt(start), fmt(ready))
             for ready, start, name in service_summary
+        )
+    )
+    loader_keys = (
+        "banner",
+        "dtb",
+        "memory_map",
+        "image",
+        "paging_start",
+        "paging_end",
+        "jump",
+        "kernel",
+    )
+    loader_summary = {}
+    for key in loader_keys:
+        values = [
+            result["loader_phases"][key]
+            for result in results
+            if result["loader_phases"][key] is not None
+        ]
+        loader_summary[key] = statistics.median(values) if values else None
+    print(
+        "boot-time-login: loader_p50 "
+        + " ".join(
+            "%s_ms=%s" % (key, fmt(loader_summary[key])) for key in loader_keys
+        )
+    )
+    split_keys = (
+        "image_load",
+        "exit_boot",
+        "memmap",
+        "relocation",
+        "handoff",
+        "loader_total",
+        "kernel_entry",
+    )
+    split_summary = {}
+    for key in split_keys:
+        values = [
+            result["loader_split"][key]
+            for result in results
+            if result["loader_split"][key] is not None
+        ]
+        split_summary[key] = statistics.median(values) if values else None
+    print(
+        "boot-time-login: loader_split_p50 "
+        + " ".join(
+            "%s_ms=%s" % (key, fmt(split_summary[key])) for key in split_keys
         )
     )
 

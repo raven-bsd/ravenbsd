@@ -29,7 +29,22 @@ def test_parse_service_up():
     assert module.parse_service_up("1795445681.300 randd: started") is None
 
 
+def test_parse_loader_mark():
+    module = load_module()
+    assert module.parse_loader_mark("loader: dtb 0x0+0x0 counter_freq=0") == "dtb"
+    assert module.parse_loader_mark("loader: memory map: 26 regions") == "memory_map"
+    assert module.parse_loader_mark("loader: loader image 0x1e010000+0x15000") == "image"
+    assert module.parse_loader_mark("loader: page tables: building") == "paging_start"
+    assert module.parse_loader_mark("loader: page tables: built") == "paging_end"
+    assert (
+        module.parse_loader_mark("loader: jumping to kernel entry 0xffffffff80200000")
+        == "jump"
+    )
+    assert module.parse_loader_mark("RavenBSD kernel 0.1 (x86_64)") is None
+
+
 if __name__ == "__main__":
     test_parse_service_start()
     test_parse_service_up()
+    test_parse_loader_mark()
     print("boot-time-login_ut: PASS")
