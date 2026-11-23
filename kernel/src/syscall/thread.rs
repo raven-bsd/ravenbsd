@@ -335,9 +335,13 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EINVAL);
     }
     let entry = frame.rdi;
+    let mut first = [0u8; 4];
+    if let Ok(probe) = UserSlice::new(entry, 4) {
+        let _ = copy_from_user(&mut first, probe);
+    }
     crate::kprintln!(
-        "K514DIAG kernel sig_setup pid={} entry={:#x} ctx={:#x} flags={:#x}",
-        caller.id, entry, frame.rsi, frame.rdx
+        "K514DIAG kernel sig_setup pid={} entry={:#x} ctx={:#x} flags={:#x} first4={:02x} {:02x} {:02x} {:02x}",
+        caller.id, entry, frame.rsi, frame.rdx, first[0], first[1], first[2], first[3]
     );
     let offset = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
