@@ -62,6 +62,151 @@ static NEXT_TID: AtomicU32 = AtomicU32::new(1);
 /// [`MAX_THREADS`] and sizing every level to the same bound means the queue can never refuse a
 /// runnable thread. Idle threads are never enqueued and are excluded.
 static LIVE_THREADS: AtomicUsize = AtomicUsize::new(0);
+
+/// Every thread object ever created, weakly (S36b leaked-thread diagnostic only).
+static ALL_THREADS: Mutex<Vec<alloc::sync::Weak<Thread>>> = Mutex::new(Vec::new());
+
+fn remember_thread(thread: &Arc<Thread>) {
+    ALL_THREADS.lock().push(Arc::downgrade(thread));
+}
+
+/// Leaked thread objects (thread whose process is torn down) and their strong-ref histogram.
+///
+/// Returns `(leaked, external_refs_1, external_refs_2plus, blocked, ready, dead, token_set)`.
+pub fn leaked_thread_objects() -> [u64; 7] {
+    let mut stats = [0u64; 7];
+    for weak in ALL_THREADS.lock().iter() {
+        let Some(thread) = weak.upgrade() else {
+            continue;
+        };
+        if !thread.process.torn_down.load(Ordering::Acquire) {
+            continue;
+        }
+        stats[0] = stats[0].saturating_add(1);
+        match Arc::strong_count(&thread).saturating_sub(1) {
+            0 | 1 => stats[1] = stats[1].saturating_add(1),
+            _ => stats[2] = stats[2].saturating_add(1),
+        }
+        match thread.state() {
+            ThreadState::Blocked => stats[3] = stats[3].saturating_add(1),
+            ThreadState::Ready => stats[4] = stats[4].saturating_add(1),
+            ThreadState::Dead => stats[5] = stats[5].saturating_add(1),
+            ThreadState::Running => {}
+        }
+        if thread.block_token.load(Ordering::Acquire) != 0 {
+            stats[6] = stats[6].saturating_add(1);
+        }
+    }
+    stats
+}
+
+/// Holder census for leaked thread objects (S36 diagnostic).
+///
+/// Returns `(total, current, runqueue, sleepers, reap, threads_live, process_waiters, futex,
+/// handles, multi_holder, unexplained, request_waiters)`. A weak `threads_live` entry is counted
+/// separately: it is not a strong owner, but it shows the unregister path missed the thread.
+/// `request_waiters` is the client wait queue of every queued or active `PendingRequest`; that
+/// queue holds an `Arc<Thread>` until the request completes or is withdrawn.
+pub fn thread_holder_stats() -> [u64; 12] {
+    let Some(registry) = ALL_THREADS.try_lock() else {
+        return [0u64; 12];
+    };
+    let threads: Vec<Arc<Thread>> = registry
+        .iter()
+        .filter_map(|weak| weak.upgrade())
+        .filter(|thread| thread.process.torn_down.load(Ordering::Acquire))
+        .collect();
+    drop(registry);
+    let Some(processes) = crate::process::processes_try() else {
+        return [0u64; 12];
+    };
+    let mut requests = Vec::new();
+    for process in &processes {
+        if let Some(queue) = process.scheme_queue.try_lock() {
+            requests.extend(queue.iter().cloned());
+        }
+        if let Some(queue) = process.active_requests.try_lock() {
+            requests.extend(queue.iter().cloned());
+        }
+        if let Some(queue) = process.client_requests.try_lock() {
+            requests.extend(queue.iter().cloned());
+        }
+    }
+    let mut stats = [0u64; 12];
+    for thread in &threads {
+        stats[0] = stats[0].saturating_add(1);
+        let mut holders = 0u64;
+        let sched = crate::sched::holder_state(thread.id);
+        for (index, count) in sched.iter().enumerate() {
+            if *count != 0 {
+                stats[index.saturating_add(1)] = stats[index.saturating_add(1)].saturating_add(1);
+                holders = holders.saturating_add(1);
+            }
+        }
+        if let Some(live) = thread.process.threads_live.try_lock() {
+            if live.iter().any(|weak| {
+                weak.upgrade()
+                    .is_some_and(|entry| Arc::ptr_eq(&entry, thread))
+            }) {
+                stats[5] = stats[5].saturating_add(1);
+                holders = holders.saturating_add(1);
+            }
+        }
+        // Handles before queues: the process teardown path holds a process's handle table and then
+        // takes wait-queue locks, so the census must not invert that order.
+        let handle = processes.iter().any(|process| {
+            let Some(handles) = process.handles.try_lock() else {
+                return false;
+            };
+            let mut found = false;
+            handles.for_each_live(|_, object, _, _| {
+                if let crate::process::handle::Object::Thread(target) = object
+                    && Arc::ptr_eq(target, thread)
+                {
+                    found = true;
+                }
+            });
+            found
+        });
+        if handle {
+            stats[8] = stats[8].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        let process_waiters = processes.iter().any(|process| {
+            [
+                &process.waiters,
+                &process.signal_waiters,
+                &process.child_waiters,
+                &process.scheme_waiters,
+            ]
+            .iter()
+            .any(|queue| queue.try_contains_thread(thread.id) == Some(true))
+        });
+        if process_waiters {
+            stats[6] = stats[6].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        if crate::syscall::futex::try_contains_thread(thread.id) == Some(true) {
+            stats[7] = stats[7].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        if requests
+            .iter()
+            .any(|request| request.waiters.try_contains_thread(thread.id) == Some(true))
+        {
+            stats[11] = stats[11].saturating_add(1);
+            holders = holders.saturating_add(1);
+        }
+        if holders > 1 {
+            stats[9] = stats[9].saturating_add(1);
+        }
+        if holders == 0 {
+            stats[10] = stats[10].saturating_add(1);
+        }
+    }
+    stats
+}
+
 /// Admission denials since boot (K530 churn diagnostic).
 static SLOT_DENIES: AtomicUsize = AtomicUsize::new(0);
 /// Slots released since boot (K530 churn diagnostic).
@@ -481,6 +626,7 @@ impl Thread {
         unsafe {
             thread.set_saved_rsp(saved);
         }
+        remember_thread(&thread);
         Ok(thread)
     }
 
@@ -503,12 +649,13 @@ impl Thread {
         unsafe {
             thread.set_saved_rsp(saved);
         }
+        remember_thread(&thread);
         Ok(thread)
     }
 
     /// Create the in-place idle thread for the boot CPU.
     pub fn new_idle(process: Arc<Process>, current_rsp: u64, cr3: u64) -> Arc<Thread> {
-        Arc::new(Thread {
+        let thread = Arc::new(Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             tid: next_tid(),
             clear_tid: AtomicU64::new(0),
@@ -555,7 +702,9 @@ impl Thread {
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
-        })
+        });
+        remember_thread(&thread);
+        thread
     }
 
     /// Create the idle thread for an application processor.
@@ -565,7 +714,7 @@ impl Thread {
     /// `sched_switch` saves the live stack pointer.
     pub fn new_idle_ap(process: Arc<Process>, cr3: u64) -> Result<Arc<Thread>, Errno> {
         let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
-        Ok(Arc::new(Thread {
+        let thread = Arc::new(Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             tid: next_tid(),
             clear_tid: AtomicU64::new(0),
@@ -612,7 +761,9 @@ impl Thread {
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
-        }))
+        });
+        remember_thread(&thread);
+        Ok(thread)
     }
 }
 
@@ -764,4 +915,14 @@ pub fn stack_cached() -> u64 {
 /// Stacks dropped because the cache was full (diagnostic).
 pub fn stack_drops() -> u64 {
     STACK_DROPS.load(Ordering::Relaxed)
+}
+
+/// Frames reserved by every kernel stack carved so far (K449 test-only metric).
+///
+/// Stack heap blocks are never returned to the heap (the guard-page mapping cannot be restored),
+/// so every fresh stack keeps its reserved page count. Cached stacks are included.
+pub fn stack_frames() -> u64 {
+    STACK_FRESH
+        .load(Ordering::Relaxed)
+        .saturating_mul(STACK_RESERVED_PAGES)
 }

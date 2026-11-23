@@ -218,6 +218,12 @@ fn lock_cpu(cpu: usize) -> SpinMutexGuard<'static, Option<CpuSched>> {
     CPUS.get(index).unwrap_or(&CPUS[0]).lock()
 }
 
+/// Non-blocking per-CPU scheduler lock for the metrics-thread census.
+fn try_lock_cpu(cpu: usize) -> Option<SpinMutexGuard<'static, Option<CpuSched>>> {
+    let index = cpu.min(MAX_CPUS.saturating_sub(1));
+    CPUS.get(index).unwrap_or(&CPUS[0]).try_lock()
+}
+
 /// Initialise the per-CPU scheduler slot for an application processor.
 pub fn init_cpu(cpu: usize, idle: Arc<Thread>) -> Result<(), Errno> {
     if cpu == 0 || cpu >= MAX_CPUS {
@@ -784,6 +790,10 @@ pub fn sleep_until(deadline: u64) -> isize {
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
     if current.process.exiting.load(Ordering::Acquire) {
+        // Drop the frame's strong reference before diverging: the dead stack is freed without
+        // running destructors, so a live `Arc<Thread>` here would keep the Thread and its
+        // Process alive forever.
+        drop(current);
         exit_thread(0);
     }
     note_unblock(&current);
@@ -803,6 +813,34 @@ fn cancel_sleep(token: u64) {
         let _ = state
             .sleepers
             .remove_where(|(_, entry_token, _)| *entry_token == token);
+    }
+}
+
+/// Wake every sleeper owned by `process_id` on every CPU (process teardown).
+///
+/// `NANOSLEEP` and futex timeouts keep an `Arc<Thread>` in the per-CPU sleep list. A process
+/// terminated while one of its threads sleeps would otherwise retain the thread and its process
+/// until the deadline. FreeBSD `kern_sleepq.c`/`kern_timeout.c` abort a process's sleepers at
+/// exit; NetBSD `kern_sleepq.c` does the same.
+pub fn cancel_process_sleepers(process_id: u64) {
+    if !INITIALIZED.load(Ordering::Acquire) {
+        return;
+    }
+    for cpu in 0..smp::online_cpus() {
+        for _ in 0..raven_sched_core::MAX_THREADS {
+            let victim = {
+                let mut slot = lock_cpu(cpu);
+                slot.as_mut().and_then(|state| {
+                    state
+                        .sleepers
+                        .remove_where(|(thread, _, _)| thread.process.id == process_id)
+                })
+            };
+            let Some((thread, token, _)) = victim else {
+                break;
+            };
+            let _ = wake(thread, Some(token), Errno::EIO.to_ret());
+        }
     }
 }
 
@@ -978,6 +1016,10 @@ pub fn block_current() -> isize {
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
     if current.process.exiting.load(Ordering::Acquire) {
+        // Drop the frame's strong reference before diverging: the dead stack is freed without
+        // running destructors, so a live `Arc<Thread>` here would keep the Thread and its
+        // Process alive forever.
+        drop(current);
         exit_thread(0);
     }
     note_unblock(&current);
@@ -1250,6 +1292,7 @@ pub fn exit_thread(code: i32) -> ! {
     // exit. The live list is weak, but an unremoved entry is a permanent 16-byte leak.
     thread.process.unregister_thread(&thread);
     crate::syscall::futex::remove_thread(thread.id);
+    crate::sched::wait::WaitQueue::purge_thread(thread.id);
     thread.process.unregister_thread(&thread);
     // FreeBSD `thread_fini`/NetBSD `lwp_dtor`: a thread's turnstile registration does not outlive
     // the thread. The graph node holds base/effective map entries and donation edges; dropping it
@@ -1338,6 +1381,63 @@ static REAP: SpinMutex<Vec<usize>> = SpinMutex::new(Vec::new());
 
 fn push_reap(raw: usize) {
     REAP.lock().push(raw);
+}
+
+/// Number of dead threads waiting for the next scheduling point (S36b diagnostic).
+pub fn reap_pending() -> usize {
+    REAP.lock().len()
+}
+
+/// Scheduler holders of `thread_id`: `[current, runqueue, sleepers, reap]` (S36 diagnostic).
+///
+/// Each count is per-CPU; a thread can appear in more than one category (for example a woken
+/// thread whose sleep entry has not expired yet). The caller must not hold a CPU slot lock.
+pub fn holder_state(thread_id: u64) -> [u64; 4] {
+    let mut stats = [0u64; 4];
+    if !INITIALIZED.load(Ordering::Acquire) {
+        return stats;
+    }
+    // The per-CPU slot locks are normally taken with interrupts masked (the timer tick uses the
+    // same lock). The census must do the same, or the timer ISR on this CPU spins on the lock the
+    // census holds.
+    let _guard = sync::critical();
+    for cpu in 0..smp::online_cpus() {
+        let Some(slot) = try_lock_cpu(cpu) else {
+            continue;
+        };
+        let Some(state) = slot.as_ref() else {
+            continue;
+        };
+        if state
+            .current
+            .as_ref()
+            .is_some_and(|thread| thread.id == thread_id)
+        {
+            stats[0] = stats[0].saturating_add(1);
+        }
+        if state.runqueue.iter().any(|thread| thread.id == thread_id) {
+            stats[1] = stats[1].saturating_add(1);
+        }
+        if state
+            .sleepers
+            .iter()
+            .any(|(thread, _, _)| thread.id == thread_id)
+        {
+            stats[2] = stats[2].saturating_add(1);
+        }
+    }
+    let Some(reap) = REAP.try_lock() else {
+        return stats;
+    };
+    for raw in reap.iter() {
+        // SAFETY: every entry is an `Arc::into_raw` owned by REAP; the lock keeps it live and the
+        // reaper only takes the whole vector under the same lock.
+        let thread = unsafe { &*(*raw as *const Thread) };
+        if thread.id == thread_id {
+            stats[3] = stats[3].saturating_add(1);
+        }
+    }
+    stats
 }
 
 /// Threads waiting for the deferred stack reaper (S36 timeout diagnostic).

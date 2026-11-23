@@ -205,6 +205,21 @@ impl<T> IrqSpinLock<T> {
         percpu::preempt_inc();
         IrqGuard { lock: self, flags }
     }
+
+    /// Try to acquire the lock without spinning (S36 diagnostic).
+    pub fn try_lock(&self) -> Option<IrqGuard<'_, T>> {
+        let flags = disable_interrupts();
+        if self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            restore_interrupts(flags);
+            return None;
+        }
+        percpu::preempt_inc();
+        Some(IrqGuard { lock: self, flags })
+    }
 }
 
 /// Guard returned by [`IrqSpinLock::lock`].
