@@ -257,6 +257,21 @@ pub const THREAD_SET_TLS: usize = 0x23;
 /// this constant and the kernel do not raise signals.
 pub const THREAD_KICK: usize = 0x81;
 
+/// `proc_sigrecv_ex(out: *mut [u64; 6], flags: u32, deliverable: u64) -> signo` (raw 0x85).
+///
+/// The six-word output is `[signo, sender_pid, si_code, si_uid, si_value, 0]`. With
+/// [`PROC_SIGRECV_DELIVERABLE`] the kernel selects only a queued signal whose bit is in
+/// `deliverable`; every masked signal stays queued. Raw constant, not a `Syscall` variant.
+pub const PROC_SIGRECV_EX: usize = 0x85;
+
+/// `proc_sigqueue(target: pid, signo: i32, value: u64) -> 0` (raw 0x86).
+///
+/// Queues one `SI_QUEUE` record carrying `value` for `target`. Raw constant.
+pub const PROC_SIGQUEUE: usize = 0x86;
+
+/// `PROC_SIGRECV_EX` flag: select only a signal whose bit is in the deliverable mask.
+pub const PROC_SIGRECV_DELIVERABLE: u32 = 2;
+
 /// `thread_self() -> tid`.
 ///
 /// Returns the calling thread's stable 30-bit, nonzero tid. A raw constant,

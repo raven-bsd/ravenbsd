@@ -43,7 +43,7 @@ use core::cell::RefCell;
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_platform::Handle;
-use raven_libc_platform::fd::{InheritedSocket, SocketMeta};
+use raven_libc_platform::fd::{InheritedSocket, SocketEndpoint, SocketMeta};
 use raven_proto_net::{Call, Endpoint, IfaceRequest, IfaceResponse};
 
 pub mod addr;
@@ -296,24 +296,43 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             );
             rec.sock = (inherited.handle != Handle::NONE).then_some(Sock(inherited.handle.0));
             rec.nonblock = inherited.status & raven_libc_abi::fcntl::O_NONBLOCK as u32 != 0;
+            rec.local = meta.local.map(|endpoint| Endpoint {
+                ip: endpoint.ip,
+                port: endpoint.port,
+            });
+            rec.peer = meta.peer.map(|endpoint| Endpoint {
+                ip: endpoint.ip,
+                port: endpoint.port,
+            });
             let _ = self.table.borrow_mut().insert(inherited.ofd, rec);
         }
     }
 
     /// Publish every live socket's identity to the platform OFD for the next `execve`.
+    ///
+    /// The table key is the OFD, which is the lifetime the metadata belongs to. Resolving the
+    /// recorded fd would lose a socket whose original descriptor was closed after `dup2` onto
+    /// stdio (the OpenSSH re-exec shape): the OFD still lives on the duplicated fd, but the
+    /// original number is gone.
     pub fn sync_meta(&self) {
-        for (_, rec) in self.table.borrow().iter() {
-            if let Ok(info) = self.fds.resolve(rec.fd) {
-                self.fds.set_meta(
-                    info.ofd,
-                    SocketMeta {
-                        domain: rec.domain,
-                        ty: rec.ty,
-                        proto: rec.proto,
-                        state: rec.state.code(),
-                    },
-                );
-            }
+        for (ofd, rec) in self.table.borrow().iter() {
+            self.fds.set_meta(
+                *ofd,
+                SocketMeta {
+                    domain: rec.domain,
+                    ty: rec.ty,
+                    proto: rec.proto,
+                    state: rec.state.code(),
+                    local: rec.local.map(|endpoint| SocketEndpoint {
+                        ip: endpoint.ip,
+                        port: endpoint.port,
+                    }),
+                    peer: rec.peer.map(|endpoint| SocketEndpoint {
+                        ip: endpoint.ip,
+                        port: endpoint.port,
+                    }),
+                },
+            );
         }
     }
 
