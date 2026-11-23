@@ -262,7 +262,7 @@ impl Device for NicDevice {
             return Err(TxError::TooLong);
         };
         fill(buffer);
-        if len >= 34 && len <= 64 && TXDBG.fetch_add(1, core::sync::atomic::Ordering::Relaxed) < 40 {
+        if len >= 34 && len <= 64 {
             let ihl = usize::from(buffer[14] & 0xf) * 4;
             let tcp = 14 + ihl;
             if tcp + 20 <= len {
@@ -276,10 +276,12 @@ impl Device for NicDevice {
                 ]);
                 let flags = buffer[tcp + 13];
                 let data = len.saturating_sub(tcp + 20);
-                raven_rt::println!(
-                    "netd: nitx src={src} dst={dst} len={len} seq={seq} flags={flags:#x} data={data} free={}",
-                    self.tx_free.len()
-                );
+                if src == 23098 || dst == 23098 {
+                    raven_rt::println!(
+                        "netd: nitx src={src} dst={dst} len={len} seq={seq} flags={flags:#x} data={data} free={}",
+                        self.tx_free.len()
+                    );
+                }
             }
         }
         let descriptor = Desc::new(offset as u64, len as u32, DESC_FIRST | DESC_LAST);
