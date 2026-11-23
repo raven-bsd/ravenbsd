@@ -88,6 +88,22 @@ fn sampler() {
             process::dead_live_threads(),
             crate::ipc::router::close_notice_count(),
         );
+        let mut shown = 0usize;
+        for entry in process::processes() {
+            let queued = entry.scheme_queue.lock().len();
+            if queued == 0 {
+                continue;
+            }
+            kprintln!(
+                "K449-PENDING pid={} queued={queued} path={}",
+                entry.id,
+                entry.path
+            );
+            shown = shown.saturating_add(1);
+            if shown >= 8 {
+                break;
+            }
+        }
     }
 }
 
