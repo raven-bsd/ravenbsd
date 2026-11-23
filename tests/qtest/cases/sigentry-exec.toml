@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K548 rev355: the program-side proof that exec clears the per-thread SIG_SETUP entry. The parent
+# registers a local absolute SIG_SETUP entry, prints its value and execs the same static binary.
+# The exec'd image never calls SIG_SETUP; it kicks itself and prints the entry it inherited. With
+# the kernel exec clear the kick is a bare wake and the child prints zero.
+
+name = "sigentry-exec"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 120
+pre = ["sh tests/fixtures/sigentry-exec/build.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^sigentry-exec: parent entry=0x[0-9a-f]+ setup=0$'
+
+[[expect]]
+regex = '^sigentry-exec: child entry=0x0$'
+
+[[forbid]]
+regex = '(?i)page fault|EXCEPTION|panic|sigentry-exec: .*(errno|fail)'
