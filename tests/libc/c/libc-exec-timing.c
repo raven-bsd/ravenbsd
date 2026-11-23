@@ -515,6 +515,29 @@ int main(int argc, char **argv) {
     }
     free(canary);
 
+    // K548 rev349: the shell-like environment for the Rust std Command canary (the S4 brush
+    // shell's exported env and cwd). The canary's Command::current_dir is /home/raven too.
+    (void)setenv("HOME", "/home/raven", 1);
+    (void)setenv("USER", "raven", 1);
+    (void)setenv("LOGNAME", "raven", 1);
+    (void)setenv("SHELL", "/bin/brush", 1);
+    (void)setenv("PWD", "/home/raven", 1);
+    (void)setenv("TERM", "xterm-256color", 1);
+    (void)setenv("SSH_CONNECTION", "10.0.2.2 12345 10.0.2.15 22", 1);
+    (void)setenv("SSH_CLIENT", "10.0.2.2 12345 22", 1);
+    (void)setenv("SSH_TTY", "/dev/pts/0", 1);
+    (void)setenv("LS_COLORS", "di=1;34:ln=1;36:so=1;35:pi=33:ex=1;32:bd=1;33:cd=1;33", 1);
+    (void)setenv("GREP_COLORS", "mt=01;31:ms=01;32:mc=01;33:fn=35:ln=32:bn=32:se=36", 1);
+    (void)setenv("PS1", "\\[\\e[38;5;183m\\]raven# \\[\\e[0m\\]", 1);
+    (void)setenv("HISTFILE", "/tmp/brush_history", 1);
+    (void)setenv("HISTCONTROL", "ignoreboth", 1);
+    (void)setenv("HISTTIMEFORMAT", "%F %T ", 1);
+    (void)setenv("HISTSIZE", "1000", 1);
+    (void)setenv("HISTFILESIZE", "1000", 1);
+    (void)setenv("RAVEN_PROFILE", "loaded", 1);
+    (void)setenv("CLICOLOR", "1", 1);
+    (void)setenv("RAVEN_BOBTHESHELL_LOADED", "1", 1);
+
     // K548 rev348: run the Rust std Command canary in a child of this tested process. Its own
     // output (EXEC-CANARY) is the first divergence check above the libc spawn copy.
     pid_t rust_canary = fork();

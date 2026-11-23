@@ -32,7 +32,7 @@ regex = '^.*EXEC-TIMING fork_ns=[0-9]+$'
 regex = '^.*EXEC-TIMING canary fork=ok spawn=ok socket=ok spawnp=ok big=ok inh=ok dup=ok same=ok chdir=ok heap=ok chunks=ok$'
 
 [[expect]]
-regex = '^.*EXEC-CANARY status_ok=true canary_ok=true$'
+regex = '^.*EXEC-CANARY-TOKIO status_ok=true canary_ok=true$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|EXEC-TIMING .* FAIL'
