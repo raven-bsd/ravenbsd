@@ -30,6 +30,7 @@
 #include <unistd.h>
 
 extern char **environ;
+extern int posix_spawn_file_actions_addchdir_np(posix_spawn_file_actions_t *, const char *);
 
 // Raw `CLOCK_GET` (raven ABI 0x04, not the Linux 228) before libc init; CLOCK_MONOTONIC == 1.
 static uint64_t raw_now_ns(void) {
@@ -427,6 +428,32 @@ int main(int argc, char **argv) {
         }
     }
 
+    int chdir_ok = canary != NULL;
+    if (canary != NULL) {
+        posix_spawn_file_actions_t chdir_actions;
+        if (posix_spawn_file_actions_init(&chdir_actions) == 0) {
+            (void)posix_spawn_file_actions_addchdir_np(&chdir_actions, "/");
+            pid_t chdir_child = -1;
+            char *chdir_args[] = {"libc-test", "spawn-child", NULL};
+            if (posix_spawn(&chdir_child, "/bin/libc-test", &chdir_actions, NULL, chdir_args,
+                            environ) == 0) {
+                int chdir_status = 0;
+                (void)waitpid(chdir_child, &chdir_status, 0);
+            } else {
+                chdir_ok = 0;
+            }
+            (void)posix_spawn_file_actions_destroy(&chdir_actions);
+        } else {
+            chdir_ok = 0;
+        }
+        for (size_t index = 0; index < canary_len; index++) {
+            if (canary[index] != 0xA5) {
+                chdir_ok = 0;
+                break;
+            }
+        }
+    }
+
     int chunks_ok = 1;
     for (int index = 0; index < CHUNK_COUNT; index++) {
         if (chunks[index] == NULL) {
@@ -448,10 +475,11 @@ int main(int argc, char **argv) {
         printf("EXEC-TIMING fork_ns=%llu\n", (unsigned long long)(exec_ret_ns - fork_ns));
         printf("EXEC-TIMING total_ns=%llu\n", (unsigned long long)(wait_ns - fork_ns));
     }
-    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s big=%s inh=%s dup=%s same=%s chunks=%s\n",
+    printf("EXEC-TIMING canary fork=%s spawn=%s socket=%s spawnp=%s big=%s inh=%s dup=%s same=%s chdir=%s chunks=%s\n",
            fork_ok ? "ok" : "bad", spawn_ok ? "ok" : "bad", socket_ok ? "ok" : "bad",
            spawnp_ok ? "ok" : "bad", big_ok ? "ok" : "bad", inh_ok ? "ok" : "bad",
-           dup_ok ? "ok" : "bad", same_ok ? "ok" : "bad", chunks_ok ? "ok" : "bad");
+           dup_ok ? "ok" : "bad", same_ok ? "ok" : "bad", chdir_ok ? "ok" : "bad",
+           chunks_ok ? "ok" : "bad");
     fflush(stdout);
     for (int index = 0; index < CHUNK_COUNT; index++) {
         free(chunks[index]);
