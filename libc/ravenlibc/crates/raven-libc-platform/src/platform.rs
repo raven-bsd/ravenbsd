@@ -2167,12 +2167,15 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
     }
 
-    /// Take a fresh scheme reference for every inherited socket in the fork child.
+    /// Take a fresh scheme reference for every inherited scheme descriptor in the fork child.
     ///
     /// The kernel copies the handle table on fork, but the scheme server counts references per
     /// open file. A parent `close` must therefore not be the last reference while the child still
     /// holds the descriptor. `DUP` both gives the child its own handle and sends the server the
     /// duplicate notification; `closef`-style last-reference release then works on both sides.
+    /// Both sockets and tty/pty masters are scheme-backed: an sshd session forks after opening
+    /// the accepted socket and the pty master, and the parent's close must not release the
+    /// server-side object while the session child still owns it.
     pub fn fork_child_inherit(&self) {
         let mut seen = alloc::collections::BTreeSet::new();
         let indices: Vec<u32> = self
@@ -2193,7 +2196,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 };
                 (ofd.kind, ofd.handle.get())
             };
-            if kind != OfdKind::Socket || handle == Handle::NONE {
+            if !matches!(kind, OfdKind::Socket | OfdKind::Tty) || handle == Handle::NONE {
                 continue;
             }
             if let Ok(duplicate) = self
