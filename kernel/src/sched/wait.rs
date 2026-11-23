@@ -90,6 +90,32 @@ impl WaitQueue {
         }
     }
 
+    /// Wake and remove every waiter whose **thread** belongs to `process_id`.
+    ///
+    /// Object queues (pipe, duplex, pager, IRQ, event, console, record lock) key their entries by
+    /// an object id, not by the process id that `wake_process` matches, so the process sweep must
+    /// select on `waiter.thread.process.id`. Removing the entry drops the queue's `Arc<Thread>`;
+    /// the `EIO` wake makes the terminal thread run its normal exit path.
+    pub fn wake_threads_of_process(&self, process_id: u64) -> usize {
+        let mut count = 0usize;
+        loop {
+            let waiter = {
+                let mut waiters = self.waiters.lock();
+                waiters
+                    .iter()
+                    .position(|waiter| waiter.thread.process.id == process_id)
+                    .map(|index| waiters.remove(index).thread)
+            };
+            let Some(thread) = waiter else {
+                break;
+            };
+            if super::wake(thread, None, Errno::EIO.to_ret()) {
+                count = count.saturating_add(1);
+            }
+        }
+        count
+    }
+
     /// Wake and remove every waiter of `process_id` from every live queue.
     ///
     /// This is the object-queue half of process teardown: a thread can be blocked on a queue
@@ -104,7 +130,7 @@ impl WaitQueue {
             // SAFETY: the registry lock keeps every listed queue alive until its Drop unlinks
             // it under the same lock.
             let current = unsafe { &*queue };
-            count = count.saturating_add(current.wake_process(process_id));
+            count = count.saturating_add(current.wake_threads_of_process(process_id));
             queue = current.next.load(Ordering::Acquire);
         }
         count
