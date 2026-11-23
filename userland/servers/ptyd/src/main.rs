@@ -561,8 +561,17 @@ mod program {
 
         fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
             let entry = self.file(file)?;
+            // The slave is the session's tty node: root-owned and 0600, like a devfs pty node
+            // after `pty_setowner`. OpenSSH treats a chown/chmod `EROFS` on such a node as a
+            // read-only device and continues. The master is opened by the session owner and
+            // keeps the permissive device mode.
+            let mode = if entry.role == Role::Slave {
+                S_IFCHR | 0o600
+            } else {
+                S_IFCHR | 0o666
+            };
             Ok(Stat {
-                mode: S_IFCHR | 0o666,
+                mode,
                 nlink: 1,
                 // The donor devfs pty node has a device inode. The scheme Stat has `ino`, so
                 // report the pair/role identity that the SCM_RIGHTS exchange can compare.
