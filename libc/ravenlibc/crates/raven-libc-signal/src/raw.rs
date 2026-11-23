@@ -563,6 +563,8 @@ unsafe extern "C" {
     ) -> usize;
     fn __rl_sigreturn_stub() -> !;
     fn __raven_sigentry();
+    #[cfg(target_arch = "x86_64")]
+    static __raven_sigentry_addr: usize;
     fn __rl_start_context();
     fn __rl_current_sp() -> usize;
     /// The function pointer the `__raven_sigentry` stub calls.
@@ -687,7 +689,9 @@ pub fn entry_function() -> usize {
 #[inline(never)]
 #[cfg(target_arch = "x86_64")]
 pub fn sigentry_address() -> usize {
-    core::hint::black_box(__raven_sigentry_rs as *const () as usize)
+    // SAFETY: the data word is defined by the entry asm; it names the local stub label and is
+    // only read here.
+    unsafe { __raven_sigentry_addr }
 }
 
 /// The address of the assembly entry stub the kernel resumes at.

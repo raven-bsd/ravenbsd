@@ -15,6 +15,7 @@ core::arch::global_asm!(
     .hidden __raven_sigentry
     .type __raven_sigentry,@function
 __raven_sigentry:
+.Lsigentry:
     and $-16,%rsp
     mov __rl_entry_fn(%rip),%rax
     test %rax,%rax
@@ -37,6 +38,11 @@ __rl_sigreturn_stub:
     .align 8
 __rl_entry_fn:
     .quad 0
+    .global __raven_sigentry_addr
+    .hidden __raven_sigentry_addr
+    .align 8
+__raven_sigentry_addr:
+    .quad .Lsigentry
 "#,
     sigreturn = const raven_abi::signal::SIGRETURN,
     options(att_syntax)
