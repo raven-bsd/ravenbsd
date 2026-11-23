@@ -209,45 +209,6 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             if deliver_fault(frame, kind, cr2) {
                 return;
             }
-            crate::kprintln!(
-                "PFDBG rip={:#x} cr2={:#x} rsp={:#x} rdi={:#x} rsi={:#x} rax={:#x} rbx={:#x} rbp={:#x}",
-                frame.rip,
-                cr2,
-                frame.rsp,
-                frame.rdi,
-                frame.rsi,
-                frame.rax,
-                frame.rbx,
-                frame.rbp
-            );
-            // SAFETY: the interrupted stack pointer is a live user mapping; the eight words
-            // are inside the same stack page and only read for this diagnostic.
-            let words = unsafe { core::ptr::read_unaligned(frame.rsp as *const [u64; 8]) };
-            crate::kprintln!(
-                "PFSTACK {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
-                words[0],
-                words[1],
-                words[2],
-                words[3],
-                words[4],
-                words[5],
-                words[6],
-                words[7]
-            );
-            // SAFETY: same live stack mapping; the return slot is inside the launcher's frame.
-            let ret = unsafe {
-                core::ptr::read_unaligned((frame.rsp.saturating_add(0x1d8)) as *const u64)
-            };
-            // SAFETY: the prologue saved rbx at rsp+0x1a8 in the same live stack frame.
-            let saved_rbx = unsafe {
-                core::ptr::read_unaligned((frame.rsp.saturating_add(0x1a8)) as *const u64)
-            };
-            crate::kprintln!(
-                "PFRET {:#x} saved_rbx={:#x} rsp={:#x}",
-                ret,
-                saved_rbx,
-                frame.rsp
-            );
             crate::process::page_fault(cr2);
         }
     }

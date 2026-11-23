@@ -2335,16 +2335,8 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
 
 /// Terminate the current process because of a user page fault.
 pub fn page_fault(cr2: u64) -> ! {
-    let (id, path) = current().map_or_else(
-        || (0, String::new()),
-        |process| (process.id, process.path.clone()),
-    );
-    kprintln!(
-        "process: pid={} {} killed by page fault at 0x{:x}",
-        id,
-        path,
-        cr2
-    );
+    let path = current().map_or_else(String::new, |process| process.path.clone());
+    kprintln!("process: {} killed by page fault at 0x{:x}", path, cr2);
     exit_current(-11)
 }
 
