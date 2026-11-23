@@ -1172,6 +1172,38 @@ int main(int argc, char **argv) {
     if (argc > 1 && strcmp(argv[1], "diag") == 0) {
         return diag_main();
     }
+    if (argc > 1 && strcmp(argv[1], "k1k6") == 0) {
+        row = "K1";
+        if (check_poll() != 0) {
+            return 1;
+        }
+        row = "K2";
+        if (check_read() != 0) {
+            return 1;
+        }
+        row = "K3";
+        if (check_write() != 0) {
+            return 1;
+        }
+        row = "K4";
+        if (check_dup_exec() != 0) {
+            return 1;
+        }
+        row = "K5";
+        if (check_pty() != 0) {
+            return 1;
+        }
+        row = "K6-listen";
+        if (check_listen_only() != 0) {
+            return 1;
+        }
+        row = "K6";
+        if (check_accept() != 0) {
+            return 1;
+        }
+        say("CONTRACT SUMMARY PASS 6/6\n");
+        return 0;
+    }
     row = "K1";
     if (check_poll() != 0) {
         return 1;

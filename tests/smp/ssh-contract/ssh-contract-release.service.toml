@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K445 release-profile conformance probe: K1-K6 only.
+name = "ssh-contract"
+exec = "/bin/ssh-contract"
+args = ["k1k6"]
+needs = ["scheme:file", "scheme:net", "scheme:pty"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
