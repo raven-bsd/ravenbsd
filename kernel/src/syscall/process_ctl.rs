@@ -17,8 +17,8 @@ use raven_usercopy::UserSlice;
 use crate::ipc::model::{self, NAME_MAX, PATH_MAX};
 use crate::ipc::{registry, router};
 use crate::process::status::{
-    P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit, SIGKILL, WAIT_OPTIONS,
-    WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, signal_valid,
+    P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit, SIGCHLD, SIGKILL,
+    WAIT_OPTIONS, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, signal_valid,
 };
 use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
@@ -990,6 +990,46 @@ pub fn namespace(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// `sched::thread::Thread::kick_bits` signal-check bit.
+const KICK_CHECK_BIT: u32 = 1;
+
+/// True when an interrupted wakeup is a caught signal that will run a handler.
+///
+/// A child exit queues `SIGCHLD` and kicks every thread with a registered signal entry. When the
+/// caller waits for a different child, that sibling's `SIGCHLD` is not an interrupt: the wait
+/// keeps blocking. A raw `THREAD_KICK` with no queued signal is an explicit interrupt, and any
+/// queued signal other than `SIGCHLD` is a caught signal for this thread.
+fn wait_interrupt_is_signal(caller: &Process) -> bool {
+    caller.has_pending_signal_where(|signal| signal.signo != SIGCHLD)
+        || !caller.has_pending_signal()
+}
+
+/// Consume a sticky signal-check kick so the wait can block again.
+///
+/// A registered `SIG_SETUP` entry keeps `KICK_CHECK` set for the return-to-user path. When the
+/// kick is only a sibling child exit, the wait clears it and re-arms it before it returns the
+/// selected child, so the user handler still runs after the wait instead of interrupting it.
+/// Returns the kick bits that are not the signal-check bit; a non-zero result is another
+/// interrupt (a raw `THREAD_KICK` or a pending signal) and must not be swallowed.
+fn clear_wait_kick() -> u32 {
+    sched::current_thread().map_or(0, |thread| {
+        thread
+            .kick_bits
+            .fetch_and(!KICK_CHECK_BIT, Ordering::AcqRel)
+            & !KICK_CHECK_BIT
+    })
+}
+
+/// Re-arm a kick consumed for a sibling child exit before the wait returns to user mode.
+fn rearm_wait_kick(rearm: &mut bool) {
+    if *rearm {
+        if let Some(thread) = sched::current_thread() {
+            thread.kick_bits.fetch_or(KICK_CHECK_BIT, Ordering::AcqRel);
+        }
+        *rearm = false;
+    }
+}
+
 /// `proc_wait(proc, out_code) -> 0`.
 pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
@@ -1007,11 +1047,13 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     let destination = UserSlice::new(frame.rsi, 4)?;
 
     let mut interrupted = false;
+    let mut rearm = false;
     loop {
         let state = target.state.lock();
         if *state == ProcessState::Exited {
             let code = target.exit_code.load(Ordering::Acquire);
             drop(state);
+            rearm_wait_kick(&mut rearm);
             copy_to_user(destination, &code.to_le_bytes())?;
             let _ = process::reap_pid(&target);
             return Ok(0);
@@ -1028,9 +1070,27 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
         // terminal on the wakeup. Re-check it before reporting the interruption as `EINTR`.
         if interrupted {
             drop(state);
-            return Err(Errno::EINTR);
+            if wait_interrupt_is_signal(&caller) {
+                rearm_wait_kick(&mut rearm);
+                return Err(Errno::EINTR);
+            }
+            // The only queued signal is a sibling child's SIGCHLD: consume the kick, keep the
+            // pending signal for the user handler, and block for the selected process.
+            if clear_wait_kick() != 0 {
+                rearm_wait_kick(&mut rearm);
+                return Err(Errno::EINTR);
+            }
+            rearm = true;
+            interrupted = false;
+            continue;
         }
-        let token = sched::begin_block_interruptible()?;
+        let token = match sched::begin_block_interruptible() {
+            Ok(token) => token,
+            Err(error) => {
+                rearm_wait_kick(&mut rearm);
+                return Err(error);
+            }
+        };
         if sched::take_kick() {
             sched::end_block(token);
             drop(state);
@@ -1049,6 +1109,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             }
             Err(error) => {
                 sched::end_block(token);
+                rearm_wait_kick(&mut rearm);
                 return Err(error);
             }
         }
@@ -1160,31 +1221,58 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
     let destination = UserSlice::new(frame.r10, 4)?;
 
     let mut interrupted = false;
+    let mut rearm = false;
     loop {
-        let children = children_for(&caller, idtype, id)?;
+        let children = match children_for(&caller, idtype, id) {
+            Ok(children) => children,
+            Err(error) => {
+                rearm_wait_kick(&mut rearm);
+                return Err(error);
+            }
+        };
         if children.is_empty() {
+            rearm_wait_kick(&mut rearm);
             return Err(Errno::ECHILD);
         }
         for child in &children {
             if let Some(event) = peek_event(child, options) {
                 let status = event.status();
-                take_event(child, event);
                 let pid = usize::try_from(child.id).map_err(|_| Errno::EINVAL)?;
+                take_event(child, event);
+                rearm_wait_kick(&mut rearm);
                 copy_to_user(destination, &status.to_le_bytes())?;
                 return Ok(pid);
             }
         }
         if options & WNOHANG != 0 {
+            rearm_wait_kick(&mut rearm);
             return Ok(0);
         }
         // A signal wakeup can carry the event that satisfies this wait: the child exit queues
         // SIGCHLD and kicks the thread before/while `child_waiters` wakes it. Scan the selected
         // children once more before reporting EINTR, so an available status is never lost.
         if interrupted {
-            return Err(Errno::EINTR);
+            if wait_interrupt_is_signal(&caller) {
+                rearm_wait_kick(&mut rearm);
+                return Err(Errno::EINTR);
+            }
+            // Only a sibling child's SIGCHLD is queued: consume the kick, keep the signal pending
+            // for the user handler, and continue waiting for the selected child.
+            if clear_wait_kick() != 0 {
+                rearm_wait_kick(&mut rearm);
+                return Err(Errno::EINTR);
+            }
+            rearm = true;
+            interrupted = false;
         }
 
-        let token = sched::begin_block_interruptible()?;
+        let token = match sched::begin_block_interruptible() {
+            Ok(token) => token,
+            Err(error) => {
+                rearm_wait_kick(&mut rearm);
+                return Err(error);
+            }
+        };
         if sched::take_kick() {
             sched::end_block(token);
             interrupted = true;
@@ -1207,6 +1295,7 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
             }
             Err(error) => {
                 sched::end_block(token);
+                rearm_wait_kick(&mut rearm);
                 return Err(error);
             }
         }

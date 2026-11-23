@@ -22,6 +22,10 @@ regex = '^s36: wait race ok$'
 [[expect]]
 regex = '^s36: wait race handle ok$'
 
+# Scenario 8: a sibling child exit must not interrupt the wait for another child.
+[[expect]]
+regex = '^s36: wait sibling ok$'
+
 # Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
 [[expect]]
 regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
