@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K445 diagnostic: K1 socketpair and K6 accepted-listener readiness, 50 iterations each, inside
+# one boot.  The listener binds an ephemeral port and connects through loopback; the K1 loop uses
+# a fresh socketpair per iteration.  A flip prints the iteration, step, fd, events, revents,
+# errno and guest load.
+name = "ssh-contract-diag"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+pre = [
+    "SSH_CONTRACT_OUT=build/fixtures/ssh-contract-diag SSH_CONTRACT_DIAG=1 sh tests/smp/ssh-contract/build.sh",
+    "SSH_CONTRACT_OUT=build/fixtures/ssh-contract-diag SSH_CONTRACT_K6_LOOP=50 sh tests/smp/ssh-contract/start-host.sh",
+]
+initfs = "build/fixtures/ssh-contract-diag/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23097,hostfwd=tcp:127.0.0.1:0-:23098",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-monitor", "unix:build/fixtures/ssh-contract-diag/monitor.sock,server=on,wait=off",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*DIAG K1 PASS loops=50$'
+
+[[expect]]
+regex = '^.*DIAG K6 PASS loops=50$'
+
+[[expect]]
+regex = '^.*DIAG SUMMARY PASS$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)DIAG .* FAIL|panic|EXCEPTION'
