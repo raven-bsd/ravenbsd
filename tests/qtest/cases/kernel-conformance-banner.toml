@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# CONTRACTS C4 banner: `_start` enters `kmain` and the first console lines are the fixed
+# `RavenBSD kernel 0.1 (<arch>) <build id>` banner and the usable-memory line. The C4 boot-stack
+# constant (8 MiB, CONTRACTS C4 as amended 2026-11-24, kernel/src/arch/x86_64/start.rs:29) is not
+# observable from the serial console; tests/host/kernel-conformance/src/lib.rs asserts it from source.
+
+name = "kernel-conformance-banner"
+arch = "x86_64"
+profile = "base"
+# OVMF plus the kernel bring-up; same margin as boot-uname.
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\) .+$'
+
+[[expect]]
+regex = '^mem: \d+ MiB usable in \d+ regions$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
