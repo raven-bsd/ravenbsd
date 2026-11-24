@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[3]
 CONFORMANCE = ROOT / "tests" / "conformance"
 OUT = ROOT / "build" / "conformance" / "aarch64"
 SELFTEST = CONFORMANCE / "aarch64" / "selftest" / "boot-uname-aarch64.toml"
+DIVERGENCES = CONFORMANCE / "aarch64" / "divergences"
 
 # The qtest case image build is cached by profile; the margin covers the image assembly and
 # a fresh xtask build on a quiet host.  The table's own timeout_secs bounds the guest.
@@ -63,6 +64,19 @@ def discover(include_mutations: bool) -> list[Path]:
         if not include_mutations and "mutation" in path.name:
             continue
         rows.append(path)
+    return rows
+
+
+def discover_self_contained() -> list[Path]:
+    """Return rows that are self-contained runners instead of shared qtest tables."""
+    rows: list[Path] = []
+    for path in sorted(CONFORMANCE.iterdir()):
+        if not path.is_dir() or path.name == "aarch64":
+            continue
+        if any(path.glob("*.toml")):
+            continue
+        if (path / "run.py").is_file() or (path / "build.sh").is_file():
+            rows.append(path)
     return rows
 
 
@@ -225,21 +239,28 @@ def main() -> int:
 
     if args.self_test:
         rows = [SELFTEST]
+        self_rows: list[Path] = []
     elif args.table:
         path = Path(args.table)
         rows = [path if path.is_absolute() else ROOT / path]
+        self_rows = []
     else:
         rows = discover(args.include_mutations)
+        self_rows = discover_self_contained()
 
-    if not rows:
+    if not rows and not self_rows:
         if not args.allow_empty:
             print(
-                "conformance-aarch64: no tables under tests/conformance/*/ "
-                "(S172 harness not merged); use --allow-empty for the readiness check",
+                "conformance-aarch64: no tables or self-contained rows under "
+                "tests/conformance/*/ (S172 harness not merged); use --allow-empty for the "
+                "readiness check",
                 file=sys.stderr,
             )
             return 2
-        print("conformance-aarch64: tables=0 passed=0 failed=0 skipped=0")
+        print(
+            "conformance-aarch64: tables=0 self_contained=0 passed=0 failed=0 "
+            "divergences=0 skipped=0"
+        )
         print("conformance-aarch64: PASS (ready; no shared tables yet)")
         return 0
 
@@ -253,13 +274,29 @@ def main() -> int:
             continue
         results.append(run_case(case, name, args.plan))
 
+    divergences: list[dict[str, object]] = []
+    for path in self_rows:
+        record = DIVERGENCES / f"{path.name}.md"
+        if record.is_file():
+            print(
+                f"conformance-aarch64: {relative(path)} divergence recorded={relative(record)}"
+            )
+            divergences.append({"name": relative(path), "status": "divergence"})
+        else:
+            print(
+                f"conformance-aarch64: {relative(path)} UNRECORDED DIVERGENCE: no aarch64 "
+                f"table and no {relative(record)}",
+                file=sys.stderr,
+            )
+            divergences.append({"name": relative(path), "status": "unrecorded-divergence"})
+
     failed = [row for row in results if row["status"] not in ("pass", "plan")]
     passed = [row for row in results if row["status"] == "pass"]
     print(
-        f"conformance-aarch64: tables={len(results)} passed={len(passed)} "
-        f"failed={len(failed)} skipped=0"
+        f"conformance-aarch64: tables={len(results)} self_contained={len(self_rows)} "
+        f"passed={len(passed)} failed={len(failed)} divergences={len(divergences)} skipped=0"
     )
-    if failed:
+    if failed or divergences:
         print("conformance-aarch64: FAIL")
         return 1
     print("conformance-aarch64: PASS")
