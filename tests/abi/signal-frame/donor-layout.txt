@@ -1,0 +1,73 @@
+sizeof(fbsd_mcontext_t)=0x320 align=16
+fbsd_mcontext_t.mc_onstack=0x0
+fbsd_mcontext_t.mc_rdi=0x8
+fbsd_mcontext_t.mc_rsi=0x10
+fbsd_mcontext_t.mc_rdx=0x18
+fbsd_mcontext_t.mc_rcx=0x20
+fbsd_mcontext_t.mc_r8=0x28
+fbsd_mcontext_t.mc_rip=0xa0
+fbsd_mcontext_t.mc_rsp=0xb8
+fbsd_mcontext_t.mc_rflags=0xb0
+fbsd_mcontext_t.mc_cs=0xa8
+fbsd_mcontext_t.mc_ss=0xc0
+fbsd_mcontext_t.mc_fpstate=0xe0
+fbsd_mcontext_t.mc_fsbase=0x2e0
+fbsd_mcontext_t.mc_tlsbase=0x300
+fbsd_mcontext_t.mc_spare=0x308
+sizeof(fbsd_sigset_t)=0x10 align=4
+sizeof(fbsd_stack_t)=0x18 align=8
+fbsd_stack_t.ss_sp=0x0
+fbsd_stack_t.ss_size=0x8
+fbsd_stack_t.ss_flags=0x10
+sizeof(fbsd_siginfo_t)=0x50 align=8
+fbsd_siginfo_t.si_signo=0x0
+fbsd_siginfo_t.si_errno=0x4
+fbsd_siginfo_t.si_code=0x8
+fbsd_siginfo_t.si_pid=0xc
+fbsd_siginfo_t.si_uid=0x10
+fbsd_siginfo_t.si_status=0x14
+fbsd_siginfo_t.si_addr=0x18
+fbsd_siginfo_t.si_value=0x20
+fbsd_siginfo_t._reason=0x28
+sizeof(fbsd_ucontext_t)=0x370 align=16
+fbsd_ucontext_t.uc_sigmask=0x0
+fbsd_ucontext_t.uc_mcontext=0x10
+fbsd_ucontext_t.uc_link=0x330
+fbsd_ucontext_t.uc_stack=0x338
+fbsd_ucontext_t.uc_flags=0x350
+fbsd_ucontext_t.__spare__=0x354
+sizeof(fbsd_sigframe_t)=0x3d0 align=16
+fbsd_sigframe_t.sf_ahu=0x0
+fbsd_sigframe_t.sf_uc=0x10
+fbsd_sigframe_t.sf_si=0x380
+sizeof(nb_fpregset_t)=0x200 align=8
+sizeof(nb_mcontext_t)=0x2d8 align=8
+nb_mcontext_t.__gregs=0x0
+nb_mcontext_t._mc_tlsbase=0xd0
+nb_mcontext_t.__fpregs=0xd8
+nb_greg_RDI=0
+nb_greg_RSI=1
+nb_greg_RDX=2
+nb_greg_RCX=3
+nb_greg_R8=4
+nb_greg_R9=5
+nb_greg_R10=6
+nb_greg_R11=7
+nb_greg_R12=8
+nb_greg_R13=9
+nb_greg_R14=10
+nb_greg_R15=11
+nb_greg_RBP=12
+nb_greg_RBX=13
+nb_greg_RAX=14
+nb_greg_GS=15
+nb_greg_FS=16
+nb_greg_ES=17
+nb_greg_DS=18
+nb_greg_TRAPNO=19
+nb_greg_ERR=20
+nb_greg_RIP=21
+nb_greg_CS=22
+nb_greg_RFLAGS=23
+nb_greg_RSP=24
+nb_greg_SS=25

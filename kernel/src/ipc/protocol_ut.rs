@@ -350,3 +350,77 @@ fn seek_opcode_and_positional_offset_roundtrip() {
     assert_eq!(decoded.flags, 2);
     assert!(decoded.validate(false).is_ok());
 }
+
+#[test]
+fn the_wire_version_is_one() {
+    assert_eq!(VERSION, 1);
+    let packet = SchemePacket::request(Opcode::Read, 1, 1);
+    assert_eq!(packet.version, 1);
+    assert_eq!(packet.validate(false), Ok(()));
+    let mut future = packet;
+    future.version = 2;
+    assert_eq!(future.validate(false), Err(PacketError::BadVersion));
+}
+
+#[test]
+fn c14_kinds_are_exactly_the_declared_transferable_set() {
+    for kind in ObjectKind::ALL {
+        let expected = matches!(
+            kind,
+            ObjectKind::MemObject
+                | ObjectKind::MemObjectInitfs
+                | ObjectKind::SchemeFile
+                | ObjectKind::SchemeServer
+                | ObjectKind::RootDevice
+                | ObjectKind::MmioRegion
+                | ObjectKind::BootBlob
+                | ObjectKind::DmaBuffer
+                | ObjectKind::Irq
+                | ObjectKind::Pipe
+                | ObjectKind::Duplex
+                | ObjectKind::Timer
+                | ObjectKind::UserEvent
+        );
+        assert_eq!(transferable(kind), expected, "{kind:?}");
+    }
+    // The four kinds that never cross a transfer stay refused.
+    for kind in [
+        ObjectKind::Process,
+        ObjectKind::Namespace,
+        ObjectKind::Thread,
+        ObjectKind::EventQueue,
+    ] {
+        assert!(!transferable(kind), "{kind:?} must not be transferable");
+    }
+}
+
+#[test]
+fn transfer_rights_are_source_and_mask_and_zero_removes_all() {
+    let source = Rights(Rights::READ.0 | Rights::WRITE.0 | Rights::TRANSFER.0);
+    assert_eq!(transfer_rights(source, 0), Rights::NONE);
+    assert_eq!(transfer_rights(source, Rights::READ.0), Rights::READ);
+    assert_eq!(transfer_rights(source, Rights::WRITE.0), Rights::WRITE);
+    assert_eq!(transfer_rights(source, u32::MAX), source);
+    assert_eq!(transfer_rights(Rights::NONE, u32::MAX), Rights::NONE);
+}
+
+#[test]
+fn four_attachments_roundtrip_in_the_tail() {
+    let mut packet = SchemePacket::default();
+    packet.attach_count = MAX_ATTACHMENTS as u32;
+    for (index, slot) in packet.attach.iter_mut().enumerate() {
+        *slot = Attachment {
+            handle: 10 + index as u32,
+            rights_mask: Rights::READ.0,
+        };
+    }
+    let decoded = decode(&to_vec(&packet).unwrap()).unwrap();
+    assert_eq!(decoded.attach_count, 4);
+    assert_eq!(
+        decoded.attach[3],
+        Attachment {
+            handle: 13,
+            rights_mask: Rights::READ.0
+        }
+    );
+}

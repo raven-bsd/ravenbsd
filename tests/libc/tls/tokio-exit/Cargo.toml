@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "s188-tokio-exit"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-3-Clause"
+
+[workspace]
+
+[[bin]]
+name = "s188-tokio-exit"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { path = "../../../../userland/brush/vendor/tokio", features = ["rt-multi-thread", "time", "sync"] }
+
+[profile.release]
+strip = "symbols"
