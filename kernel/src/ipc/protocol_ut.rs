@@ -363,13 +363,34 @@ fn the_wire_version_is_one() {
 }
 
 #[test]
-fn only_the_three_c14_kinds_are_transferable() {
+fn c14_kinds_are_exactly_the_declared_transferable_set() {
     for kind in ObjectKind::ALL {
         let expected = matches!(
             kind,
-            ObjectKind::MemObject | ObjectKind::SchemeFile | ObjectKind::SchemeServer
+            ObjectKind::MemObject
+                | ObjectKind::MemObjectInitfs
+                | ObjectKind::SchemeFile
+                | ObjectKind::SchemeServer
+                | ObjectKind::RootDevice
+                | ObjectKind::MmioRegion
+                | ObjectKind::BootBlob
+                | ObjectKind::DmaBuffer
+                | ObjectKind::Irq
+                | ObjectKind::Pipe
+                | ObjectKind::Duplex
+                | ObjectKind::Timer
+                | ObjectKind::UserEvent
         );
         assert_eq!(transferable(kind), expected, "{kind:?}");
+    }
+    // The four kinds that never cross a transfer stay refused.
+    for kind in [
+        ObjectKind::Process,
+        ObjectKind::Namespace,
+        ObjectKind::Thread,
+        ObjectKind::EventQueue,
+    ] {
+        assert!(!transferable(kind), "{kind:?} must not be transferable");
     }
 }
 
