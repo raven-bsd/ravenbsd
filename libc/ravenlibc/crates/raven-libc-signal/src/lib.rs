@@ -58,6 +58,7 @@ pub mod mask;
 pub mod maskops;
 pub mod names;
 pub mod psignal;
+pub mod sigaction_abi;
 pub mod safe_list;
 pub mod send;
 pub mod sig2str;
