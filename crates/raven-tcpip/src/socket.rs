@@ -17,7 +17,7 @@ use crate::ipv4_stack::to_wire;
 use crate::ipv6_stack::IpAddr;
 use crate::listen::{AcceptQueue, HalfOpenQueue};
 use crate::stack::Stack;
-use crate::table::{ConnectionKey, ConnectionTable, TimeWaitInfo};
+use crate::table::{ConnectionKey, ConnectionTable, Rebind, TimeWaitInfo, rebind_decision};
 
 /// Hard ceiling of a listener's accept queue; the runtime limit is the
 /// `tcp.accept_queue_limit` property.
@@ -289,10 +289,33 @@ impl<D: Device> Stack<D> {
     /// Port zero is rejected with [`Errno::EADDRNOTAVAIL`], a duplicate with
     /// [`Errno::EADDRINUSE`].
     pub fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
+        self.tcp_listen_reuse(port, backlog, false)
+    }
+
+    /// Listen with the caller's `SO_REUSEADDR` policy.
+    ///
+    /// FreeBSD `sys/netinet/in_pcb.c:in_pcbbind_setup` lets a bind reuse a local port whose only
+    /// holders are `TIME_WAIT` sockets when `SO_REUSEADDR` is set; NetBSD `in_pcb.c:in_pcbbind`
+    /// and Linux `net/ipv4/inet_connection_sock.c:inet_csk_get_port` carry the same rule. Raven
+    /// already documents that decision in [`rebind_decision`]; this is the missing wiring.
+    pub fn tcp_listen_reuse(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno> {
         if port == 0 {
             return Err(Errno::EADDRNOTAVAIL);
         }
-        if self.port_in_use(port) {
+        let (existing_listener, existing_tcp, time_wait) = self.port_holders(port);
+        if rebind_decision(
+            false,
+            existing_listener,
+            existing_tcp,
+            time_wait,
+            reuse_addr,
+        ) == Rebind::AddrInUse
+        {
             return Err(Errno::EADDRINUSE);
         }
         let rx_cap = self.recv_buffer_cap();
@@ -450,6 +473,15 @@ impl<D: Device> Stack<D> {
             }
             _ => self.tcp_shutdown(socket),
         }
+    }
+
+    /// Read and clear the pending socket error.
+    ///
+    /// FreeBSD `sys/kern/uipc_socket.c:sogetopt` returns `so_error` and clears it; the caller
+    /// reads it once and the next read is 0. Raven keeps one `record.error` for both directions,
+    /// the recorded divergence from the separate `so_error`/`so_rerror` pair.
+    pub fn take_error(&mut self, socket: SocketId) -> Result<Option<Errno>, Errno> {
+        Ok(self.sockets.record_mut(socket)?.error.take())
     }
 
     /// Close a socket and release its buffers.
@@ -740,6 +772,37 @@ impl<D: Device> Stack<D> {
                 Kind::Icmp { .. } => false,
             }
         })
+    }
+
+    /// Classify the live holders of `port` for [`rebind_decision`].
+    ///
+    /// A `TIME_WAIT` record is reported separately because `SO_REUSEADDR` may override it; a
+    /// listener, an established connection or a UDP binding is a hard conflict. UDP shares the
+    /// TCP "existing" bucket to keep the pre-existing port-conflict policy for this revision.
+    fn port_holders(&self, port: u16) -> (bool, bool, bool) {
+        let mut listener = false;
+        let mut existing = false;
+        let mut time_wait = false;
+        for record in self.sockets.records.values() {
+            if record.closed {
+                continue;
+            }
+            match &record.kind {
+                Kind::Listener { port: local, .. } if *local == port => listener = true,
+                Kind::Udp {
+                    local_port: local, ..
+                } if *local == port => existing = true,
+                Kind::Tcp(connection) if connection.local_port == port => {
+                    if connection.state == crate::tcp_state::TcpState::TimeWait {
+                        time_wait = true;
+                    } else {
+                        existing = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        (listener, existing, time_wait)
     }
 
     pub(crate) fn alloc_ephemeral_port(&mut self) -> Result<u16, Errno> {
