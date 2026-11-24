@@ -152,18 +152,28 @@ static int eintr_row(int read_fd) {
     action.sa_handler = on_alarm;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0; /* no SA_RESTART: the wait must return EINTR */
+    printf("polling: eintr sigaction\n");
+    fflush(stdout);
     if (sigaction(SIGALRM, &action, NULL) != 0)
         return fail("eintr-sigaction", -1, errno);
 
+    printf("polling: eintr setitimer\n");
+    fflush(stdout);
     memset(&timer, 0, sizeof(timer));
     timer.it_value.tv_usec = 50 * 1000;
     if (setitimer(ITIMER_REAL, &timer, NULL) != 0)
         return fail("eintr-setitimer", -1, errno);
 
+    printf("polling: eintr poll\n");
+    fflush(stdout);
     alarm_seen = 0;
-    result = poll_one(read_fd, POLLIN, -1, &revents);
-    if (result != -EINTR || !alarm_seen)
+    /* Bounded: a missing signal delivery must fail the row, not hang the whole table. */
+    result = poll_one(read_fd, POLLIN, 2000, &revents);
+    if (result != -EINTR || !alarm_seen) {
+        printf("polling: eintr detail result=%d errno=%d alarm_seen=%d revents=%d\n",
+               result, errno, (int)alarm_seen, (int)revents);
         return fail("eintr", result, errno);
+    }
     return ok("eintr");
 }
 
@@ -307,14 +317,19 @@ int main(void) {
         (void)fail("idle-pipe-create", -1, errno);
     } else {
         (void)timeout_row(idle[0]);
-        (void)eintr_row(idle[0]);
-        (void)close(idle[0]);
-        (void)close(idle[1]);
     }
 
     (void)socket_error_row();
     (void)eventfd_row();
     (void)timerfd_row();
+
+    /* The signal row runs last: a hang in the signal path must not hide the other rows. */
+    if (idle[0] >= 0)
+        (void)eintr_row(idle[0]);
+    if (idle[0] >= 0) {
+        (void)close(idle[0]);
+        (void)close(idle[1]);
+    }
 
     if (failed)
         return 1;
