@@ -1002,6 +1002,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
     let mut user_address_space = UserAddressSpace::new(address_space);
+    #[cfg(target_arch = "x86_64")]
     install_sigcode(&mut user_address_space).map_err(|_| Errno::ENOMEM)?;
     let (namespace, root, ids, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
