@@ -7,9 +7,7 @@ SHELL=/bin/brush
 # Raven Violet (K80): the visible text stays `raven# ` so the serial transcripts are stable.
 PS1='\[\e[38;5;183m\]raven# \[\e[0m\]'
 RAVEN_PROFILE=loaded
-# K571/S188 diagnostic: name the brush frames at the teardown panic. Remove before release.
-RUST_BACKTRACE=1
-export PATH HOME TERM USER LOGNAME SHELL PS1 RAVEN_PROFILE RUST_BACKTRACE
+export PATH HOME TERM USER LOGNAME SHELL PS1 RAVEN_PROFILE
 umask 022
 
 # The release login is brush; register a deterministic completion spec for the transcript

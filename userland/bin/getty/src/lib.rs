@@ -88,7 +88,7 @@ pub trait Session {
 /// getty derives it from the account that authenticated.
 #[must_use]
 pub fn profile_env(profile: &Profile, user: &str, home: &str, shell: &str) -> Vec<String> {
-    let mut env = Vec::with_capacity(8);
+    let mut env = Vec::with_capacity(7);
     env.push(format!("PATH={}", profile.path));
     env.push(format!("HOME={home}"));
     env.push(format!("TERM={}", profile.term));
@@ -96,8 +96,6 @@ pub fn profile_env(profile: &Profile, user: &str, home: &str, shell: &str) -> Ve
     env.push(format!("LOGNAME={user}"));
     env.push(format!("SHELL={shell}"));
     env.push(String::from("PWD=/"));
-    // K571/S188 diagnostic: name the frames of the teardown panic; remove before release.
-    env.push(String::from("RUST_BACKTRACE=full"));
     env
 }
 

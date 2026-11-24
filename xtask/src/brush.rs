@@ -201,7 +201,7 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
         .map(|path| format!(" -C link-arg=-T{}", path.display()))
         .unwrap_or_default();
     let flags = format!(
-        "--cfg getrandom_backend=\"custom\" -C strip=none -C force-frame-pointers=yes -C relocation-model=static{}{} \
+        "--cfg getrandom_backend=\"custom\" -C strip=symbols -C relocation-model=static{}{} \
          -C link-arg={} -C link-arg={} -C link-arg=-L{} -C link-arg=-lc -C link-arg={}",
         code_model,
         linker_arg,
