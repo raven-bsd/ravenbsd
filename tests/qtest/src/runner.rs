@@ -58,6 +58,8 @@ pub(crate) struct RunOutput {
     pub completed: bool,
     /// Set when the scripted dialogue did not finish.
     pub step_failure: Option<StepFailure>,
+    /// Set when a `[[forbid]]` line matched and the run was stopped before the exit.
+    pub forbidden_failure: bool,
 }
 
 /// A `send` payload beginning with `@qmp:<socket>:<key,...>` is a QMP key chord, not serial text.
@@ -286,6 +288,7 @@ fn run_inner(
     let mut complete_since: Option<Instant> = None;
     let mut next_complete_check = started;
     let mut step_failure: Option<StepFailure> = None;
+    let mut forbidden_failure = false;
     loop {
         if child.try_wait()?.is_some() {
             break;
@@ -301,6 +304,13 @@ fn run_inner(
             // semantics identical to the final verdict.
             if now >= next_complete_check {
                 next_complete_check = now + Duration::from_millis(25);
+                let matches = matcher::evaluate(case, &lines);
+                if !matches.forbidden_hits.is_empty() {
+                    forbidden_failure = true;
+                    kill_tree(&mut child);
+                    drop(stdin.take());
+                    break;
+                }
                 if expectations_complete(case, &lines, dialogue.as_deref()) {
                     complete_since.get_or_insert(now);
                 } else {
@@ -419,6 +429,7 @@ fn run_inner(
         timed_out,
         completed,
         step_failure,
+        forbidden_failure,
     })
 }
 

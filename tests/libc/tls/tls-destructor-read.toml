@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S183 second row: the main thread reads the same thread_local! from its destructor. The std
+# AccessError contract case is expected to abort the service; the kernel test-exit status is a
+# failure, so the row asserts the std message instead of a success exit.
+
+name = "tls-destructor-read"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 60
+pre = ["sh tests/libc/tls/build.sh x86_64 destructor"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "timeout"
+
+[[expect]]
+regex = '^TLS183: destructor-read start$'
+
+[[expect]]
+regex = '^TLS183: PANIC .*AccessError$'

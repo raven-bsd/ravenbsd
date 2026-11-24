@@ -17,6 +17,7 @@ use raven_usercopy::{UserSlice, is_user_address};
 use crate::cmdline::CmdLine;
 use crate::kprintln;
 use crate::memory::paging;
+use crate::process::status;
 use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
 use crate::sched::thread::ThreadState;
@@ -406,6 +407,251 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
             context_absolute,
             flags
         );
+    }
+    Ok(0)
+}
+
+/// The System V amd64 `struct sigaction` (152 bytes; `sigset_t` is 128 bytes).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserSigAction {
+    handler: u64,
+    mask: [u64; 16],
+    flags: i32,
+    _pad: i32,
+    restorer: u64,
+}
+
+const _: () = assert!(size_of::<UserSigAction>() == 152);
+const _: () = assert!(core::mem::offset_of!(UserSigAction, mask) == 8);
+const _: () = assert!(core::mem::offset_of!(UserSigAction, flags) == 136);
+const _: () = assert!(core::mem::offset_of!(UserSigAction, restorer) == 144);
+
+/// The System V amd64 `stack_t` (24 bytes).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserStack {
+    ss_sp: u64,
+    ss_flags: i32,
+    _pad: i32,
+    ss_size: u64,
+}
+
+const _: () = assert!(size_of::<UserStack>() == 24);
+const _: () = assert!(core::mem::offset_of!(UserStack, ss_flags) == 8);
+const _: () = assert!(core::mem::offset_of!(UserStack, ss_size) == 16);
+
+const ZERO_SIGACTION: UserSigAction = UserSigAction {
+    handler: 0,
+    mask: [0; 16],
+    flags: 0,
+    _pad: 0,
+    restorer: 0,
+};
+
+/// `sigaction(signo: i32, act: *const SigAction, old: *mut SigAction) -> 0` (raw 0x87).
+///
+/// Installs or reads the per-process disposition. The user structure is the System V amd64
+/// `struct sigaction` (handler at 0, `sigset_t sa_mask` at 8, `sa_flags` at 136, `sa_restorer` at
+/// 144). `SIGKILL`/`SIGSTOP` accept only `SIG_DFL`; unknown handler flags are `EINVAL` when a
+/// handler is caught, matching FreeBSD `kern_sigaction`.
+pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let signo = (frame.rdi as u32) as i32;
+    if signo < 1 || signo > status::SIG_MAX as i32 {
+        return Err(Errno::EINVAL);
+    }
+    let signo = signo as u32;
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let act = frame.rsi as *const UserSigAction;
+    let old = frame.rdx as *mut UserSigAction;
+    let mut sigacts = caller.sigacts.lock();
+    if !old.is_null() {
+        let previous = sigacts.get(signo);
+        let mut out = ZERO_SIGACTION;
+        out.handler = previous.handler;
+        out.mask[0] = previous.mask;
+        out.flags = previous.flags as i32;
+        let destination = UserSlice::new(old as u64, size_of::<UserSigAction>() as u64)?;
+        let bytes = unsafe {
+            // SAFETY: `out` is a live, fully initialised user-structure mirror; the byte view
+            // covers exactly its size and is only read for the copy.
+            core::slice::from_raw_parts(
+                &out as *const UserSigAction as *const u8,
+                size_of::<UserSigAction>(),
+            )
+        };
+        copy_to_user(destination, bytes)?;
+    }
+    if !act.is_null() {
+        let mut input = ZERO_SIGACTION;
+        let source = UserSlice::new(act as u64, size_of::<UserSigAction>() as u64)?;
+        let bytes = unsafe {
+            // SAFETY: `input` is a live, uninitialised-by-value POD mirror; the mutable byte view
+            // covers exactly its size and the copy fills it before it is read.
+            core::slice::from_raw_parts_mut(
+                &mut input as *mut UserSigAction as *mut u8,
+                size_of::<UserSigAction>(),
+            )
+        };
+        copy_from_user(bytes, source)?;
+        let handler = input.handler;
+        let flags = input.flags as u32;
+        if handler != process::SIG_DFL
+            && handler != process::SIG_IGN
+            && flags & !process::SA_SUPPORTED != 0
+        {
+            return Err(Errno::EINVAL);
+        }
+        if handler != process::SIG_DFL && handler != process::SIG_IGN && !is_user_address(handler) {
+            return Err(Errno::EFAULT);
+        }
+        if (signo == status::SIGKILL || signo == status::SIGSTOP) && handler != process::SIG_DFL {
+            return Err(Errno::EINVAL);
+        }
+        sigacts.set(
+            signo,
+            process::SigAction {
+                handler,
+                mask: input.mask.first().copied().unwrap_or(0),
+                flags,
+            },
+        );
+        if handler == process::SIG_IGN {
+            // The donor drops a queued signal when it becomes ignored (`sigqueue_delete_proc`).
+            caller
+                .pending_signals
+                .lock()
+                .retain(|signal| signal.signo != signo);
+        }
+    }
+    Ok(0)
+}
+
+/// `sigprocmask(how: i32, set: *const u64, old: *mut u64) -> 0` (raw 0x88).
+///
+/// The mask is per thread; `SIGKILL` and `SIGSTOP` can never be blocked. A signal that becomes
+/// unblocked is delivered on the return-to-user path by [`crate::process::sig_deliver_pending`].
+pub fn sigprocmask(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let how = (frame.rdi as u32) as i32;
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    if !thread.user {
+        return Err(Errno::EINVAL);
+    }
+    let current = thread.sig_blocked.load(Ordering::Acquire);
+    let mut requested = 0u64;
+    if frame.rsi != 0 {
+        let source = UserSlice::new(frame.rsi, 8)?;
+        let bytes = unsafe {
+            // SAFETY: `requested` is a live u64; the mutable byte view covers exactly 8 bytes and
+            // the copy fills it before it is read.
+            core::slice::from_raw_parts_mut(&mut requested as *mut u64 as *mut u8, 8)
+        };
+        copy_from_user(bytes, source)?;
+    }
+    if frame.rdx != 0 {
+        let destination = UserSlice::new(frame.rdx, 8)?;
+        let bytes = unsafe {
+            // SAFETY: `current` is a live u64; the byte view covers exactly 8 bytes and is only
+            // read for the copy.
+            core::slice::from_raw_parts(&current as *const u64 as *const u8, 8)
+        };
+        copy_to_user(destination, bytes)?;
+    }
+    if frame.rsi != 0 {
+        let unblockable =
+            process::signal_bit(status::SIGKILL) | process::signal_bit(status::SIGSTOP);
+        let updated = match how {
+            process::SIG_BLOCK => current | requested,
+            process::SIG_UNBLOCK => current & !requested,
+            process::SIG_SETMASK => requested,
+            _ => return Err(Errno::EINVAL),
+        };
+        thread
+            .sig_blocked
+            .store(updated & !unblockable, Ordering::Release);
+    }
+    Ok(0)
+}
+
+/// `sigaltstack(ss: *const Stack, old: *mut Stack) -> 0` (raw 0x89).
+///
+/// FreeBSD `kern_sigaltstack`: `SS_DISABLE` clears the stack, `SS_ONSTACK` makes a replace
+/// `EPERM`, a live stack must be at least `MINSIGSTKSZ` and inside the user range.
+pub fn sigaltstack(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    if !thread.user {
+        return Err(Errno::EINVAL);
+    }
+    let old = frame.rsi as *mut UserStack;
+    if !old.is_null() {
+        let sp = thread.sig_alt_sp.load(Ordering::Acquire);
+        let size = thread.sig_alt_size.load(Ordering::Acquire);
+        let mut flags = thread.sig_alt_flags.load(Ordering::Acquire);
+        if sp == 0 || size == 0 {
+            flags = process::SS_DISABLE;
+        } else if thread.sig_on_altstack.load(Ordering::Acquire) {
+            flags |= process::SS_ONSTACK;
+        }
+        let out = UserStack {
+            ss_sp: sp,
+            ss_flags: flags as i32,
+            _pad: 0,
+            ss_size: size,
+        };
+        let destination = UserSlice::new(old as u64, size_of::<UserStack>() as u64)?;
+        let bytes = unsafe {
+            // SAFETY: `out` is a live POD mirror; the byte view covers exactly its size.
+            core::slice::from_raw_parts(
+                &out as *const UserStack as *const u8,
+                size_of::<UserStack>(),
+            )
+        };
+        copy_to_user(destination, bytes)?;
+    }
+    let ss = frame.rdi as *const UserStack;
+    if !ss.is_null() {
+        let mut input = UserStack {
+            ss_sp: 0,
+            ss_flags: 0,
+            _pad: 0,
+            ss_size: 0,
+        };
+        let source = UserSlice::new(ss as u64, size_of::<UserStack>() as u64)?;
+        let bytes = unsafe {
+            // SAFETY: `input` is a live POD mirror; the mutable byte view covers exactly its size.
+            core::slice::from_raw_parts_mut(
+                &mut input as *mut UserStack as *mut u8,
+                size_of::<UserStack>(),
+            )
+        };
+        copy_from_user(bytes, source)?;
+        let flags = input.ss_flags as u32;
+        if flags & !(process::SS_DISABLE | process::SS_AUTODISARM) != 0 {
+            return Err(Errno::EINVAL);
+        }
+        if flags & process::SS_DISABLE != 0 {
+            thread.sig_alt_sp.store(0, Ordering::Release);
+            thread.sig_alt_size.store(0, Ordering::Release);
+            thread
+                .sig_alt_flags
+                .store(process::SS_DISABLE, Ordering::Release);
+            return Ok(0);
+        }
+        if thread.sig_on_altstack.load(Ordering::Acquire) {
+            return Err(Errno::EPERM);
+        }
+        if input.ss_size < process::MINSIGSTKSZ {
+            return Err(Errno::ENOMEM);
+        }
+        let Some(end) = input.ss_sp.checked_add(input.ss_size) else {
+            return Err(Errno::EINVAL);
+        };
+        if !is_user_address(input.ss_sp) || !is_user_address(end.saturating_sub(1)) {
+            return Err(Errno::EFAULT);
+        }
+        thread.sig_alt_sp.store(input.ss_sp, Ordering::Release);
+        thread.sig_alt_size.store(input.ss_size, Ordering::Release);
+        thread.sig_alt_flags.store(flags, Ordering::Release);
     }
     Ok(0)
 }

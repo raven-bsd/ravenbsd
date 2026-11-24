@@ -26,6 +26,9 @@ pub mod pi4;
 pub mod psci;
 pub mod selftest;
 pub mod serial;
+/// The C19 aarch64 signal-frame layout; the vectors call into it when the S44 model merges.
+#[allow(dead_code)]
+pub mod signal;
 pub mod start;
 pub mod syscall;
 pub mod timer;

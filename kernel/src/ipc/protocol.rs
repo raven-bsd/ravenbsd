@@ -20,7 +20,11 @@ use core::mem::{offset_of, size_of};
 use raven_abi::types::Rights;
 
 /// Current packet version.
-pub const VERSION: u32 = 2;
+///
+/// C14: the version bumps only when an **existing** field layout changes. The reply-attachment
+/// tail and the caller-credential fields are append-only, so the wire stays version 1 with
+/// `attach_count == 0` for peers that do not use attachments.
+pub const VERSION: u32 = 1;
 /// Maximum path suffix carried by an `Open` packet.
 pub const MAX_PATH: usize = 256;
 /// Maximum inline data carried by a packet.
@@ -51,6 +55,102 @@ pub const fn attachment_rights(source: Rights, mask: u32) -> Rights {
     } else {
         source.intersect(Rights(mask))
     }
+}
+
+/// The kernel object vocabulary used by the C14 handle-transfer policy.
+///
+/// The kernel's `Object` enum maps to this vocabulary in `syscall/handle_xfer.rs`; keeping the
+/// policy here makes the allow-list and the rights rule host-testable in `protocol_ut`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ObjectKind {
+    /// A process handle.
+    Process,
+    /// The boot initfs memory object.
+    MemObjectInitfs,
+    /// An anonymous memory object.
+    MemObject,
+    /// A namespace handle.
+    Namespace,
+    /// A thread handle.
+    Thread,
+    /// A wait-for-many event queue.
+    EventQueue,
+    /// A monotonic timer event source.
+    Timer,
+    /// A user-space doorbell event source.
+    UserEvent,
+    /// The root device capability.
+    RootDevice,
+    /// A device-memory window.
+    MmioRegion,
+    /// A read-only boot-time blob.
+    BootBlob,
+    /// A physically contiguous device buffer.
+    DmaBuffer,
+    /// A device interrupt source.
+    Irq,
+    /// An open scheme file.
+    SchemeFile,
+    /// A registered scheme server capability.
+    SchemeServer,
+    /// A server-side request handle.
+    SchemeRequest,
+    /// One end of an in-kernel pipe.
+    Pipe,
+    /// One end of a kernel duplex endpoint pair.
+    Duplex,
+}
+
+impl ObjectKind {
+    /// Every kind, for the conformance table.
+    pub const ALL: [Self; 18] = [
+        Self::Process,
+        Self::MemObjectInitfs,
+        Self::MemObject,
+        Self::Namespace,
+        Self::Thread,
+        Self::EventQueue,
+        Self::Timer,
+        Self::UserEvent,
+        Self::RootDevice,
+        Self::MmioRegion,
+        Self::BootBlob,
+        Self::DmaBuffer,
+        Self::Irq,
+        Self::SchemeFile,
+        Self::SchemeServer,
+        Self::SchemeRequest,
+        Self::Pipe,
+        Self::Duplex,
+    ];
+}
+
+/// C14: only `MemObject`, `SchemeFile` and `SchemeServer` may cross a handle transfer.
+pub const fn transferable(kind: ObjectKind) -> bool {
+    matches!(
+        kind,
+        ObjectKind::MemObject
+            | ObjectKind::MemObjectInitfs
+            | ObjectKind::SchemeFile
+            | ObjectKind::SchemeServer
+            | ObjectKind::RootDevice
+            | ObjectKind::MmioRegion
+            | ObjectKind::BootBlob
+            | ObjectKind::DmaBuffer
+            | ObjectKind::Irq
+            | ObjectKind::Pipe
+            | ObjectKind::Duplex
+            | ObjectKind::Timer
+            | ObjectKind::UserEvent
+    )
+}
+
+/// C14: transferred rights are the source rights AND the caller mask.
+///
+/// Unlike [`attachment_rights`], a zero mask is not "all current rights": the transfer still
+/// succeeds and installs a handle with no rights (`Rights::NONE`).
+pub const fn transfer_rights(source: Rights, mask: u32) -> Rights {
+    source.intersect(Rights(mask))
 }
 
 /// Packet opcode.

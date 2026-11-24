@@ -243,6 +243,15 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::THREAD_SET_TLS {
         return thread::set_tls(frame);
     }
+    if number == raven_abi::syscall::SIGACTION {
+        return thread::sigaction(frame);
+    }
+    if number == raven_abi::syscall::SIGPROCMASK {
+        return thread::sigprocmask(frame);
+    }
+    if number == raven_abi::syscall::SIGALTSTACK {
+        return thread::sigaltstack(frame);
+    }
     if number == raven_abi::syscall::THREAD_KICK {
         return thread::kick(frame);
     }
@@ -266,6 +275,17 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == raven_abi::signal::SIGRESEND {
         return thread::sigresend(frame);
+    }
+    // C19: the kernel sigacts table (`sigaction`/`sigprocmask`/`sigaltstack`), raw constants
+    // assigned by the lead in `raven_abi::syscall`.
+    if number == raven_abi::syscall::SIGACTION {
+        return thread::sigaction(frame);
+    }
+    if number == raven_abi::syscall::SIGPROCMASK {
+        return thread::sigprocmask(frame);
+    }
+    if number == raven_abi::syscall::SIGALTSTACK {
+        return thread::sigaltstack(frame);
     }
     // S72: wall-clock and entropy syscalls, dispatched by reviewer-assigned raw numbers that are
     // not yet `raven-abi` variants (see `basic::{GETRANDOM, CLOCK_SET}` for the required diff).

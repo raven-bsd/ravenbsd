@@ -63,7 +63,13 @@ mod program {
     const PROXY_CHUNK: usize = 64 * 1024;
     const PAGE: usize = 4096;
     /// Budget for proxy open-file descriptions.
-    const MAX_OPEN_FILES: usize = 256;
+    ///
+    /// The caller's `RLIMIT_NOFILE` soft limit is the per-process bound; this aggregate budget must
+    /// not be lower than the maximum any process may set. The kernel handle table is 65,536
+    /// (`raven-handles::MAX_HANDLES`), the same shape as FreeBSD `maxfilesperproc`, NetBSD
+    /// `maxfiles` and Linux `sysctl_nr_open`; the old 256 constant refused valid opens before the
+    /// caller's limit.
+    const MAX_OPEN_FILES: usize = 65_536;
 
     /// S11 `Opcode::Open` wire value.
     const OPEN_OPCODE: u16 = 1;
