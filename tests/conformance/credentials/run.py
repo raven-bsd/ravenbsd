@@ -23,11 +23,13 @@ Usage:
   python3 tests/conformance/credentials/run.py --image build/conformance/credentials/credentials.img
   python3 tests/conformance/credentials/run.py --image ... --mutation
   python3 tests/conformance/credentials/run.py --image ... --service
+  python3 tests/conformance/credentials/run.py --image ... --limits
   python3 tests/conformance/credentials/run.py --selftest
 
 `--service` reads the umask rows from a staged one-shot svcd service image
 (`build-service.sh`) instead of the SSH path; it is the S189 path while the brush
-external-command route is unavailable.
+external-command route is unavailable. `--limits` reads the S190 libc rlimit/rusage
+rows from the `build-limits.sh` service image.
 
 Exit: 0 all rows green, 1 a row/style check failed, 2 setup error.
 """
@@ -322,6 +324,61 @@ def check_umask_rows(rows: dict[str, dict[str, str]]) -> list[str]:
     return failures
 
 
+def check_limits_rows(rows: dict[str, dict[str, str]]) -> list[str]:
+    """The S190 rows: libc rlimit/rusage marshalling against the green kernel rows."""
+    failures: list[str] = []
+    kernel = rows.get("kernel-rlimit-nofile")
+    kernel_cur = _int(kernel, "cur", failures, "kernel-rlimit-nofile")
+    kernel_max = _int(kernel, "max", failures, "kernel-rlimit-nofile")
+
+    libc = rows.get("libc-getrlimit")
+    if _int(libc, "ret", failures, "libc-getrlimit") != 0:
+        failures.append("libc-getrlimit: expected 0")
+    libc_cur = _int(libc, "cur", failures, "libc-getrlimit")
+    libc_max = _int(libc, "max", failures, "libc-getrlimit")
+    if libc_cur is not None and kernel_cur is not None and libc_cur != kernel_cur:
+        failures.append(f"libc-getrlimit: cur={libc_cur}, kernel holds {kernel_cur}")
+    if libc_max is not None and kernel_max is not None and libc_max != kernel_max:
+        failures.append(f"libc-getrlimit: max={libc_max}, kernel holds {kernel_max}")
+
+    if _int(rows.get("libc-setrlimit"), "ret", failures, "libc-setrlimit") != 0:
+        failures.append("libc-setrlimit: round-trip failed")
+    hard = rows.get("libc-hard-raise")
+    if _int(hard, "ret", failures, "libc-hard-raise") != -1:
+        failures.append("libc-hard-raise: must fail")
+    if _int(hard, "errno", failures, "libc-hard-raise") != 1:
+        failures.append("libc-hard-raise: expected EPERM (1)")
+
+    for prefix in ("libc-rusage", "kernel-rusage"):
+        samples: list[tuple[int, int, int]] = []
+        for index in range(3):
+            name = f"{prefix}{index}"
+            row = rows.get(name)
+            if row is None:
+                failures.append(f"{name}: missing")
+                continue
+            if _int(row, "errno", failures, name) != 0:
+                failures.append(f"{name}: syscall failed")
+            if prefix == "libc-rusage" and _int(row, "ret", failures, name) != 0:
+                failures.append(f"{name}: getrusage failed")
+            user = _int(row, "user", failures, name)
+            system = _int(row, "sys", failures, name)
+            maxrss = _int(row, "maxrss", failures, name)
+            if user is not None and system is not None and maxrss is not None:
+                samples.append((user, system, maxrss))
+        for index in range(1, len(samples)):
+            before = samples[index - 1][0] + samples[index - 1][1]
+            after = samples[index][0] + samples[index][1]
+            if after < before:
+                failures.append(f"{prefix}{index}: user+sys went backwards ({before} -> {after})")
+        if samples and samples[-1][2] < MAP_BYTES:
+            failures.append(f"{prefix}: maxrss={samples[-1][2]} < mapped {MAP_BYTES}")
+
+    if "FAIL" in rows:
+        failures.append(f"probe: FAIL row={rows['FAIL']}")
+    return failures
+
+
 def selftest() -> int:
     """Exercise the row parser and every assertion with a clean and a dirty fixture."""
     failures: list[str] = []
@@ -347,7 +404,7 @@ def selftest() -> int:
             "cred: kernel-rlimit-hard-raise errno=1",
             "cred: kernel-rlimit-hard-raise-state errno=0 cur=256 max=256",
             "cred: kernel-rlimit-restore errno=0",
-            "cred: libc-getrlimit ret=0 errno=0 cur=1024 max=32768",
+            "cred: libc-getrlimit ret=0 errno=0 cur=256 max=256",
             "cred: libc-setrlimit ret=0 errno=0",
             "cred: libc-hard-raise ret=-1 errno=1",
             "cred: nofile soft=256 base=3 open-ok=253 errno=0",
@@ -419,6 +476,26 @@ def selftest() -> int:
     check(
         "umask-service-dirty",
         any("umask-file" in failure for failure in check_umask_rows(parse_rows(dirty_service))),
+        True,
+    )
+    check("limits-clean", check_limits_rows(parse_rows(clean)), [])
+    dirty_limits = clean.replace(
+        "cred: libc-setrlimit ret=0 errno=0", "cred: libc-setrlimit ret=-1 errno=38"
+    )
+    check(
+        "limits-dirty-setrlimit",
+        any("libc-setrlimit" in failure
+            for failure in check_limits_rows(parse_rows(dirty_limits))),
+        True,
+    )
+    dirty_rusage = clean.replace(
+        "cred: libc-rusage2 ret=0 errno=0 user=3 sys=4 maxrss=8388608",
+        "cred: libc-rusage2 ret=0 errno=0 user=0 sys=0 maxrss=0",
+    )
+    check(
+        "limits-dirty-rusage",
+        any("maxrss" in failure
+            for failure in check_limits_rows(parse_rows(dirty_rusage))),
         True,
     )
     if failures:
@@ -607,6 +684,55 @@ def run_service(image: Path, accel: str, keep: bool) -> int:
             (run_dir / "vars.fd").unlink(missing_ok=True)
 
 
+def run_limits(image: Path, accel: str, keep: bool) -> int:
+    """Run the staged limits service and check the S190 libc rlimit/rusage rows."""
+    if not image.is_file():
+        print(f"cred-conformance: image {image} is missing", file=sys.stderr)
+        return 2
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    run_dir = ROOT / "build" / "conformance" / "credentials" / f"limits-{stamp}"
+    child, serial = boot_service(run_dir, image, accel)
+    try:
+        deadline = time.monotonic() + 180
+        while time.monotonic() < deadline:
+            try:
+                text = serial.read_text(encoding="utf-8", errors="replace")
+            except FileNotFoundError:
+                text = ""
+            if "cred: limits-service done" in text or child.poll() is not None:
+                break
+            time.sleep(0.2)
+        serial_text = serial.read_text(encoding="utf-8", errors="replace")
+        (run_dir / "serial.out").write_text(serial_text, encoding="utf-8")
+        rows = parse_rows(serial_text)
+        failures = check_limits_rows(rows)
+        for line in (
+            "KERNEL PANIC",
+            "EXCEPTION",
+            "SegmentOutsideUserRange",
+            "bad ELF",
+            "killed by page fault",
+            "tlb shootdown timeout",
+        ):
+            if line in serial_text:
+                failures.append(f"serial: {line}")
+        if "cred: limits-service done" not in serial_text:
+            failures.append("serial: the limits service did not finish")
+        if failures:
+            for failure in failures:
+                print(f"cred-conformance: FAIL: {failure}")
+            print(f"cred-conformance: run={run_dir}")
+            return 1
+        print("cred-conformance: PASS libc-getrlimit libc-setrlimit libc-hard-raise "
+              "libc-rusage")
+        print(f"cred-conformance: run={run_dir}")
+        return 0
+    finally:
+        stop(child)
+        if not keep:
+            (run_dir / "vars.fd").unlink(missing_ok=True)
+
+
 def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
     if not image.is_file():
         print(f"cred-conformance: image {image} is missing", file=sys.stderr)
@@ -700,6 +826,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--mutation", action="store_true")
     parser.add_argument("--service", action="store_true",
                         help="read the umask rows from a staged one-shot svcd service")
+    parser.add_argument("--limits", action="store_true",
+                        help="read the S190 rlimit/rusage rows from a staged one-shot svcd service")
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--selftest", action="store_true")
     options = parser.parse_args(argv)
@@ -709,6 +837,8 @@ def main(argv: list[str]) -> int:
         print("cred-conformance: --image is required (or --selftest)", file=sys.stderr)
         return 2
     image = options.image if options.image.is_absolute() else ROOT / options.image
+    if options.limits:
+        return run_limits(image, options.accel, options.keep)
     if options.service:
         return run_service(image, options.accel, options.keep)
     return run(image, options.accel, options.mutation, options.keep)
