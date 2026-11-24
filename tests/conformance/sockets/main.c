@@ -2,16 +2,20 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
 // S174 socket conformance probe. One-shot guest service; prints CONFORM rows for:
-// accept/getpeername, SO_ERROR once, shutdown(SHUT_WR) FIN + read-after-EOF,
-// listener close/rebind, and the half-close HUP row.
+// sockaddr layout/byte order, SO_REUSEADDR, accept/getpeername, SO_ERROR once,
+// shutdown(SHUT_WR) FIN + read-after-EOF, the half-close HUP row,
+// shutdown(SHUT_RD), shutdown(SHUT_RDWR), and listener close/rebind.
 
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <signal.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #define LISTEN_PORT 23100
@@ -93,6 +97,43 @@ static int accept_one(int listen_fd)
     if (poll(&pfd, 1, 30000) <= 0)
         return -1;
     return accept(listen_fd, NULL, NULL);
+}
+
+static int row_layout(void)
+{
+    struct sockaddr_in in;
+    struct sockaddr_un un;
+    unsigned short port = htons(0x1234);
+    unsigned char wire[2];
+    memcpy(wire, &port, sizeof(wire));
+    if (sizeof(in) != 16 || offsetof(struct sockaddr_in, sin_family) != 0 ||
+        offsetof(struct sockaddr_in, sin_port) != 2 ||
+        offsetof(struct sockaddr_in, sin_addr) != 4 ||
+        offsetof(struct sockaddr_un, sun_family) != 0 ||
+        offsetof(struct sockaddr_un, sun_path) != 2 ||
+        sizeof(un) < offsetof(struct sockaddr_un, sun_path) + 1 ||
+        wire[0] != 0x12 || wire[1] != 0x34) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail),
+                       "in=%u un=%u port=%02x%02x", (unsigned)sizeof(in),
+                       (unsigned)sizeof(un), wire[0], wire[1]);
+        return fail("layout", detail);
+    }
+    return pass("layout", "sockaddr_in=16 offset=2 sockaddr_un path=2 be-port");
+}
+
+static int row_reuseaddr(int listen_fd)
+{
+    int value = 0;
+    socklen_t value_len = sizeof(value);
+    if (getsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &value, &value_len) != 0)
+        return fail("reuseaddr", "getsockopt SO_REUSEADDR");
+    if (value != 1) {
+        char detail[48];
+        (void)snprintf(detail, sizeof(detail), "SO_REUSEADDR=%d", value);
+        return fail("reuseaddr", detail);
+    }
+    return pass("reuseaddr", "getsockopt=1");
 }
 
 static int row_accept(int listen_fd)
@@ -254,21 +295,86 @@ static int row_half(int listen_fd)
     return fail("half", "no POLLHUP");
 }
 
+static int row_shutrd(int listen_fd)
+{
+    char word[5];
+    char ack[5] = "RDACK";
+    char byte;
+    int fd = accept_one(listen_fd);
+    if (fd < 0)
+        return fail("shutrd", "accept timeout");
+    if (read_exact(fd, word, sizeof(word)) != 0 || word[0] != 7 ||
+        memcmp(&word[1], "RDAT", 4) != 0) {
+        close(fd);
+        return fail("shutrd", "RDAT");
+    }
+    if (shutdown(fd, SHUT_RD) != 0) {
+        close(fd);
+        return fail("shutrd", "shutdown RD");
+    }
+    if (read(fd, &byte, 1) != 0) {
+        close(fd);
+        return fail("shutrd", "read after SHUT_RD");
+    }
+    if (write_exact(fd, ack, sizeof(ack)) != 0) {
+        close(fd);
+        return fail("shutrd", "write after SHUT_RD");
+    }
+    close(fd);
+    return pass("shutrd", "read EOF, write still works");
+}
+
+static int row_shutrdwr(int listen_fd)
+{
+    char word[5];
+    char byte;
+    int fd = accept_one(listen_fd);
+    if (fd < 0)
+        return fail("shutrdwr", "accept timeout");
+    if (read_exact(fd, word, sizeof(word)) != 0 || word[0] != 8 ||
+        memcmp(&word[1], "RDWR", 4) != 0) {
+        close(fd);
+        return fail("shutrdwr", "RDWR");
+    }
+    if (shutdown(fd, SHUT_RDWR) != 0) {
+        close(fd);
+        return fail("shutrdwr", "shutdown RDWR");
+    }
+    if (read(fd, &byte, 1) != 0) {
+        close(fd);
+        return fail("shutrdwr", "read after SHUT_RDWR");
+    }
+    errno = 0;
+    if (write(fd, &byte, 1) >= 0 || errno != EPIPE) {
+        char detail[48];
+        (void)snprintf(detail, sizeof(detail), "write errno=%d", errno);
+        close(fd);
+        return fail("shutrdwr", detail);
+    }
+    close(fd);
+    return pass("shutrdwr", "read EOF, write EPIPE");
+}
+
 int main(void)
 {
     int listen_fd;
-    int total = 6;
+    int total = 10;
     setvbuf(stdout, NULL, _IOLBF, 0);
+    (void)signal(SIGPIPE, SIG_IGN);
+    row_layout();
     listen_fd = listener();
     if (listen_fd < 0) {
         printf("CONFORM SUMMARY FAIL 0/%d\n", total);
         return 1;
     }
+    row_reuseaddr(listen_fd);
     row_accept(listen_fd);
     row_soerror();
     row_shutdown(listen_fd);
     /* The half-close row uses the original listener before the close/rebind row. */
     row_half(listen_fd);
+    row_shutrd(listen_fd);
+    row_shutrdwr(listen_fd);
     close(listen_fd);
     listen_fd = listener();
     if (listen_fd < 0)

@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# Start the S174 host peer before QEMU boots. The fixed hostfwd is
-# tcp:127.0.0.1:23100 -> guest:23100; the peer retries until the listener appears.
+# Start the S174 host peer before QEMU boots. The hostfwd is ephemeral
+# (tcp:127.0.0.1:0 -> guest:23100) and the peer reads QEMU's `info usernet`
+# from the monitor socket to find the chosen host port; it retries until the
+# listener appears.
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)

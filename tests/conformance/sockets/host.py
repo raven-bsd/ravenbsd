@@ -145,6 +145,30 @@ def main() -> int:
         stream.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
                           struct.pack("ii", 1, 0))
         stream.close()
+        # Row 7: shutdown(SHUT_RD); the guest reads EOF and still writes RDACK.
+        try:
+            with connect(args.host, args.port) as stream:
+                stream.settimeout(10.0)
+                stream.sendall(b"\x07RDAT")
+                ack = bytearray()
+                while len(ack) < 5:
+                    chunk = stream.recv(5 - len(ack))
+                    if not chunk:
+                        break
+                    ack += chunk
+                rows.append(f"shutrd ack={bytes(ack)!r}")
+                stream.settimeout(3.0)
+                rows.append(f"shutrd tail={read_eof(stream)!r}")
+        except OSError as error:
+            rows.append(f"shutrd error={error}")
+        # Row 8: shutdown(SHUT_RDWR); the guest reads EOF and its write fails EPIPE.
+        try:
+            with connect(args.host, args.port) as stream:
+                stream.settimeout(10.0)
+                stream.sendall(b"\x08RDWR")
+                rows.append(f"shutrdwr tail={read_eof(stream)!r}")
+        except OSError as error:
+            rows.append(f"shutrdwr error={error}")
         with open(args.result, "w", encoding="utf-8") as handle:
             handle.write("ok\n")
         if args.log:
