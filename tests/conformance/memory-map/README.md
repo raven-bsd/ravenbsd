@@ -35,7 +35,15 @@ python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --mutation
 ```
 
-`build.sh` uses the release initfs and stages only `/bin/mmap-probe`; no product file changes.
+`build.sh` uses the release initfs and stages `/bin/mmap-probe`; no product file changes. The
+conformance image also stages three test-only helpers: `/bin/s198-hostkeys` (creates `/tmp/ssh` and
+execs `ssh-keygen`), `/bin/s198-shell` (the `raven` login shell; it passes the probe flags through)
+and the `/etc/services.d/ssh-hostkeys.toml` override for the one-shot. On this base the product
+`ssh-hostkeys` service runs its command through `/bin/rsh`, whose child faults at `rip=0`
+(`process: child pid=19 ppid=18 killed by page fault at 0x0`) before `/tmp/ssh` exists, and the
+release `brush` login shell faults before an SSH command returns (the S195 K514 handover). These
+helpers are transport only: the probe, the kernel and the rows under test are unchanged. The
+product boot/login defect is handed to its owner with the serial lines above.
 
 ### Kernel heap churn (S198)
 

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S198 test-only override of the release ssh-hostkeys one-shot. The product service runs the
+# command through /bin/rsh, whose child faults at rip=0 on this base before /tmp/ssh exists; this
+# image uses the direct helper with the same key path. The sshd service and the product manifest
+# are unchanged; only the conformance image stages this file.
+
+name = "ssh-hostkeys"
+exec = "/bin/s198-hostkeys"
+args = ["/bin/s198-hostkeys"]
+needs = ["vfsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false
