@@ -4,6 +4,9 @@
 # S174 socket conformance, TCG control. The guest runs the one-shot probe on the
 # network-config-test profile; the host peer drives accept/getpeername, SO_ERROR,
 # shutdown(FIN then read), half-close, SHUT_RD, SHUT_RDWR, and close/rebind.
+# S202: `layout` is a tracked RED xfail. The BSD contract puts sin_len at 0 and
+# sin_family at 1; the current profile still puts the family at 0. The case expects
+# that exact failure, so it goes red when the header flips or another row regresses.
 name = "socket-conformance-tcg"
 arch = "x86_64"
 profile = "network-config-test"
@@ -24,10 +27,12 @@ qemu_extra = [
     "-monitor", "unix:build/fixtures/socket-conformance/monitor.sock,server=on,wait=off",
     "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-conformance/qemu.pcap",
 ]
-expect_exit = "success"
+expect_exit = "failure"
 
+# Tracked RED: the row must report the BSD expectation and the current deviation.
+# If it starts passing, this case fails and the profile flip must be recorded.
 [[expect]]
-regex = '^.*CONFORM layout PASS .*$'
+regex = '^.*CONFORM layout FAIL .*want_family=1 sin_len=0.*$'
 
 [[expect]]
 regex = '^.*CONFORM reuseaddr PASS .*$'
@@ -54,13 +59,13 @@ regex = '^.*CONFORM shutrdwr PASS .*$'
 regex = '^.*CONFORM rebound PASS .*$'
 
 [[expect]]
-regex = '^.*CONFORM SUMMARY PASS 10/10$'
+regex = '^.*CONFORM SUMMARY FAIL 9/10$'
 
 [[expect]]
-regex = '^init exited \(0\)$'
+regex = '^.*init exited \(1\)$'
 
 # S186 stops a case at the first forbidden line. A row-level FAIL must not abort the run before
-# the remaining rows print; the expects above already require every row PASS and SUMMARY 10/10.
-# Only a crash is forbidden here.
+# the remaining rows print; the expects above require every row except the tracked RED `layout`
+# to PASS, and the summary to be exactly 9/10. Only a crash is forbidden here.
 [[forbid]]
 regex = '(?i)panic|EXCEPTION'

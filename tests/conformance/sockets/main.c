@@ -121,20 +121,32 @@ static int row_layout(void)
     unsigned short port = htons(0x1234);
     unsigned char wire[2];
     memcpy(wire, &port, sizeof(wire));
-    if (sizeof(in) != 16 || offsetof(struct sockaddr_in, sin_family) != 0 ||
+    /* BSD sockaddr_in starts with sin_len at 0 and sin_family at 1 (NetBSD
+     * sys/netinet/in.h:246-252). The profile decision D-1/D-5 has not flipped the
+     * Raven header yet, so the family offset is the observable proxy for sin_len
+     * and this row is tracked RED until it does. Do not weaken the other checks. */
+    if (sizeof(in) != 16 || offsetof(struct sockaddr_in, sin_family) != 1 ||
         offsetof(struct sockaddr_in, sin_port) != 2 ||
         offsetof(struct sockaddr_in, sin_addr) != 4 ||
         offsetof(struct sockaddr_un, sun_family) != 0 ||
         offsetof(struct sockaddr_un, sun_path) != 2 ||
         sizeof(un) < offsetof(struct sockaddr_un, sun_path) + 1 ||
         wire[0] != 0x12 || wire[1] != 0x34) {
-        char detail[96];
+        char detail[128];
         (void)snprintf(detail, sizeof(detail),
-                       "in=%u un=%u port=%02x%02x", (unsigned)sizeof(in),
-                       (unsigned)sizeof(un), wire[0], wire[1]);
+                       "in=%u family=%u port=%u addr=%u un=%u sun_path=%u "
+                       "wire=%02x%02x want_family=1 sin_len=0",
+                       (unsigned)sizeof(in),
+                       (unsigned)offsetof(struct sockaddr_in, sin_family),
+                       (unsigned)offsetof(struct sockaddr_in, sin_port),
+                       (unsigned)offsetof(struct sockaddr_in, sin_addr),
+                       (unsigned)sizeof(un),
+                       (unsigned)offsetof(struct sockaddr_un, sun_path),
+                       wire[0], wire[1]);
         return fail("layout", detail);
     }
-    return pass("layout", "sockaddr_in=16 offset=2 sockaddr_un path=2 be-port");
+    return pass("layout",
+                "sockaddr_in=16 family=1 sin_len=0 sockaddr_un path=2 be-port");
 }
 
 static int row_reuseaddr(int listen_fd)

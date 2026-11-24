@@ -6,6 +6,8 @@
 # hostfwd; the half-close pcap is captured for the release row. One vCPU: the release 4-vCPU
 # post-summary teardown hang (K574 open gap, process/fd) prevents `init exited`; the network TCG
 # case covers the 4-vCPU socket rows, and K574 covers the release KVM/TCG4 gate.
+# S202: `layout` is a tracked RED xfail against the BSD sin_len/sin_family layout;
+# it must stay red until the profile flips, and an unexpected pass fails the case.
 name = "socket-conformance-release-tcg"
 arch = "x86_64"
 profile = "release"
@@ -24,10 +26,11 @@ qemu_extra = [
     "-monitor", "unix:build/fixtures/socket-conformance-release/monitor.sock,server=on,wait=off",
     "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-conformance-release/qemu-release-tcg.pcap",
 ]
-expect_exit = "success"
+expect_exit = "failure"
 
+# Tracked RED: the row must report the BSD expectation and the current deviation.
 [[expect]]
-regex = '^.*CONFORM layout PASS .*$'
+regex = '^.*CONFORM layout FAIL .*want_family=1 sin_len=0.*$'
 
 [[expect]]
 regex = '^.*CONFORM reuseaddr PASS .*$'
@@ -54,12 +57,13 @@ regex = '^.*CONFORM shutrdwr PASS .*$'
 regex = '^.*CONFORM rebound PASS .*$'
 
 [[expect]]
-regex = '^.*CONFORM SUMMARY PASS 10/10$'
+regex = '^.*CONFORM SUMMARY FAIL 9/10$'
 
 [[expect]]
-regex = '^init exited \(0\)$'
+regex = '^.*init exited \(1\)$'
 
 # A row-level FAIL must not abort the remaining rows (S186 stops at the first forbidden line);
-# the expects above already require every row PASS and SUMMARY 10/10. Only a crash is forbidden.
+# the expects above require every row except the tracked RED `layout` to PASS, and the summary
+# to be exactly 9/10. Only a crash is forbidden.
 [[forbid]]
 regex = '(?i)panic|EXCEPTION'
