@@ -86,6 +86,23 @@ impl<D: Device> RavenTcpipBackend<D> {
         SocketId(socket.0)
     }
 
+    fn listen_with(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno> {
+        let socket = self
+            .stack
+            .tcp_listen_reuse(port, backlog, reuse_addr)
+            .map(Self::ours)?;
+        self.listeners.insert(port, backlog.max(1));
+        let _ = self
+            .stack
+            .set_property("tcp.accept_queue_limit", backlog.max(1) as u64);
+        Ok(socket)
+    }
+
     fn flush_pending_udp(&mut self) {
         let mut pending = core::mem::take(&mut self.pending_udp);
         let mut again = Vec::new();
@@ -341,12 +358,16 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
-        let socket = self.stack.tcp_listen(port, backlog).map(Self::ours)?;
-        self.listeners.insert(port, backlog.max(1));
-        let _ = self
-            .stack
-            .set_property("tcp.accept_queue_limit", backlog.max(1) as u64);
-        Ok(socket)
+        self.listen_with(port, backlog, false)
+    }
+
+    fn tcp_listen_reuse(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno> {
+        self.listen_with(port, backlog, reuse_addr)
     }
 
     fn tcp_accept(&mut self, listener: SocketId) -> Result<Option<SocketId>, Errno> {
@@ -552,6 +573,14 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
             5 => Ok(0),
             _ => Err(Errno::EINVAL),
         }
+    }
+
+    fn take_socket_error(&mut self, s: SocketId) -> Result<i32, Errno> {
+        if self.closed.contains(&s.0) {
+            return Err(Errno::EBADF);
+        }
+        let error = self.stack.take_error(Self::native(s))?;
+        Ok(error.map_or(0, |error| i32::try_from(-error.to_ret()).unwrap_or(0)))
     }
 }
 
