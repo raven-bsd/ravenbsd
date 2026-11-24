@@ -2282,14 +2282,32 @@ def main() -> int:
                 # The close captures need sshd/TCP, not the DNS lease; resolvd may be red.
                 console = handle  # type: ignore[assignment]
                 lease_ok = True
+            elif only == "s4":
+                # The release tap profile assigns 10.0.2.15 statically in netd; resolvd reports
+                # "lease eth0: no such file or directory" and never prints SERIAL_LEASE. The S4
+                # row needs sshd and its listener, which wait_tcp verifies next; requiring the
+                # resolvd lease string here made a healthy release boot BLOCKED.
+                lease_ok = serial_has(handle, b"svcd: sshd up", 60)  # type: ignore[arg-type]
+                if lease_ok:
+                    lease_ok = serial_has(
+                        handle, b"netd: interface eth0 10.0.2.15", 60
+                    )  # type: ignore[arg-type]
             elif socket_only:
                 console = handle  # type: ignore[assignment]
                 lease_ok = serial_has(console, SERIAL_LEASE, 60)
             else:
                 lease_ok = serial_has(handle, SERIAL_LEASE, 60)  # type: ignore[arg-type]
             if not lease_ok:
-                record(row_label, "BLOCKED",
-                       f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+                if only == "s4":
+                    record(
+                        row_label,
+                        "BLOCKED",
+                        "guest did not reach svcd: sshd up and netd: interface eth0 10.0.2.15 "
+                        "within 60 s",
+                    )
+                else:
+                    record(row_label, "BLOCKED",
+                           f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
             elif not wait_tcp(22, 30):
                 record(row_label, "BLOCKED",
                        "guest listener did not accept a TCP connection after svcd: sshd up")
