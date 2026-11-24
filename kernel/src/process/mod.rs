@@ -636,14 +636,14 @@ pub struct Process {
     /// Requests this process is waiting for as a client.
     pub client_requests: Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
     /// Capture-window slots owned by this process as a server.
-    pub capture_slots: Mutex<CaptureSlots>,
+    pub capture_slots: Mutex<Box<CaptureSlots>>,
     /// Syscall personality and optional Linux trap handler (S41).
     pub personality: Mutex<PersonalityState>,
     /// Signals queued for this process.
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
     /// Per-process C19 signal dispositions (handlers are per process; the mask is per thread).
     /// Boxed so the 2.6 KiB `SigActs` table stays off the bounded kernel stack in
-    /// `new_empty_process` (the S185 `PROC_CREATE` double fault).
+    /// `new_empty_process` (the S185/S192 `PROC_CREATE` double fault).
     pub sigacts: Mutex<Box<SigActs>>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
@@ -922,7 +922,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         scheme_waiters: WaitQueue::new(),
         active_requests: Mutex::new(alloc::vec::Vec::new()),
         client_requests: Mutex::new(alloc::vec::Vec::new()),
-        capture_slots: Mutex::new(CaptureSlots::new()),
+        capture_slots: Mutex::new(Box::new(CaptureSlots::new())),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(Box::new(SigActs::new())),
@@ -1004,7 +1004,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         scheme_waiters: WaitQueue::new(),
         active_requests: Mutex::new(alloc::vec::Vec::new()),
         client_requests: Mutex::new(alloc::vec::Vec::new()),
-        capture_slots: Mutex::new(CaptureSlots::new()),
+        capture_slots: Mutex::new(Box::new(CaptureSlots::new())),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(Box::new(SigActs::new())),
@@ -1079,7 +1079,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         scheme_waiters: WaitQueue::new(),
         active_requests: Mutex::new(alloc::vec::Vec::new()),
         client_requests: Mutex::new(alloc::vec::Vec::new()),
-        capture_slots: Mutex::new(CaptureSlots::new()),
+        capture_slots: Mutex::new(Box::new(CaptureSlots::new())),
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(Box::new(**source.sigacts.lock())),
@@ -1494,6 +1494,18 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     if cmdline.get("s44-sigactscheck").is_some() {
         sigacts_selftest();
     }
+    if cmdline.get("s192-size").is_some() {
+        kprintln!(
+            "s192: process={} sigacts={} capture={} waitq={} handle={} ids={} namespace={}",
+            core::mem::size_of::<Process>(),
+            core::mem::size_of::<SigActs>(),
+            core::mem::size_of::<CaptureSlots>(),
+            core::mem::size_of::<WaitQueue>(),
+            core::mem::size_of::<HandleTable<Object>>(),
+            core::mem::size_of::<ProcessIds>(),
+            core::mem::size_of::<Namespace>(),
+        );
+    }
     let path = cmdline.get("init").unwrap_or("/init");
     let entry = initfs::lookup(path).ok_or(ProcessError::NoInit)?;
     let data = entry.data;
@@ -1555,7 +1567,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         scheme_waiters: WaitQueue::new(),
         active_requests: Mutex::new(alloc::vec::Vec::new()),
         client_requests: Mutex::new(alloc::vec::Vec::new()),
-        capture_slots: Mutex::new(CaptureSlots::new()),
+        capture_slots: Mutex::new(Box::new(CaptureSlots::new())),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(Box::new(SigActs::new())),
