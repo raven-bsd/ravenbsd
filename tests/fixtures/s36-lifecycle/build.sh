@@ -7,6 +7,7 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
+mode=${1:-lifecycle}
 
 out=build/fixtures/s36-lifecycle
 mkdir -p "$out"
@@ -41,8 +42,17 @@ if ! strings "$base" 2>/dev/null | grep -q '/sbin/vfsd'; then
 fi
 cargo build -q -p raven-b70-overlay
 overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
-"$overlay" "$base" "$out/initfs.img" \
-    "/sbin/vfsd=$vfsd:0755" \
-    "/bin/s36-lifecycle=$root/target/x86_64-unknown-none/release/raven-s36-lifecycle:0755" \
-    "/etc/services.d/s36-lifecycle.toml=$root/tests/fixtures/s36-lifecycle/s36.service.toml:0644" \
-    "/etc/svcd.conf=$root/tests/fixtures/s36-lifecycle/s36.svcd.conf:0644"
+if [ "$mode" = "pager" ]; then
+    # S167 C18: the same binary runs only the pager lifetime rows under a different service.
+    "$overlay" "$base" "$out/pager-initfs.img" \
+        "/sbin/vfsd=$vfsd:0755" \
+        "/bin/pager-lifetime=$root/target/x86_64-unknown-none/release/raven-s36-lifecycle:0755" \
+        "/etc/services.d/pager-lifetime.toml=$root/tests/fixtures/s36-lifecycle/pager-lifetime.service.toml:0644" \
+        "/etc/svcd.conf=$root/tests/fixtures/s36-lifecycle/pager-lifetime.svcd.conf:0644"
+else
+    "$overlay" "$base" "$out/initfs.img" \
+        "/sbin/vfsd=$vfsd:0755" \
+        "/bin/s36-lifecycle=$root/target/x86_64-unknown-none/release/raven-s36-lifecycle:0755" \
+        "/etc/services.d/s36-lifecycle.toml=$root/tests/fixtures/s36-lifecycle/s36.service.toml:0644" \
+        "/etc/svcd.conf=$root/tests/fixtures/s36-lifecycle/s36.svcd.conf:0644"
+fi
