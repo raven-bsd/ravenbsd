@@ -1466,6 +1466,9 @@ pub fn reparent_children(parent: &Process) -> usize {
 /// accumulated time and the parent's signal queue.
 pub fn notify_parent(process: &Process, sigchld: bool) {
     let ppid = process.ids.lock().ppid;
+    if s194_trace() {
+        kprintln!("s194: notify-parent child={} parent={}", process.id, ppid);
+    }
     let Some(parent) = lookup_pid(ppid) else {
         return;
     };
@@ -2176,10 +2179,9 @@ fn cleanup_evidence(process: &Process) -> bool {
 /// [`UserAddressSpace::release`], which switches CR3 to the kernel root: a foreign caller
 /// (terminating another process, reaping an unstarted child) must keep its own CR3, because it
 /// returns to user mode through `sysret`.  The cold path frees the target's frames and page
-/// tables without switching, which is safe because user threads run only on CPU 0 in a
-/// non-preemptible kernel: the caller is the only running user thread, so the target's root is
-/// not active anywhere, and none of its blocked or runnable threads can be switched to (the
-/// scheduler filter drops them).
+/// tables without switching, after [`crate::sched::quiesce_process`] has proved that no thread of
+/// the target is current on any CPU; the scheduler filter drops its runnable threads from the
+/// run queues.
 ///
 /// The per-exit evidence prints (`s24`/`s25`/`s21`/`s36` counters) belong to the dying
 /// thread's own exit path and run in that context only; a foreign caller skips them (an
@@ -2199,10 +2201,27 @@ fn cmdline_has(key: &str) -> bool {
     })
 }
 
+/// S194 teardown-stage trace, enabled by `s194-trace` on the kernel command line.
+pub(crate) fn s194_trace() -> bool {
+    cmdline_has("s194-trace")
+}
+
 fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
     }
+    if s194_trace() {
+        kprintln!(
+            "s194: teardown start pid={} own={}",
+            process.id,
+            own_context
+        );
+    }
+    // FreeBSD `exit1`/NetBSD `exit_lwps`: every sibling stops before the vmspace is released.
+    // `terminate_once` has already published `exiting` and asked the other CPUs to reschedule;
+    // wait until none of them is still current, so no thread can execute user code (or read a
+    // TLS block) while the address space and its frames are freed.
+
     // The pid registry keeps a weak zombie entry until `PROC_WAIT_EX` reaps the status; a weak
     // entry whose process is gone is removed by `lookup_pid`.
     // Fail pending scheme requests and remove the registry entries while the server page tables
@@ -2584,14 +2603,26 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
 /// used only by this terminal path, which no syscall can race on the boot CPU), and every wake
 /// releases the queue before taking the scheduler lock.
 fn wake_process_waiters(process: &Arc<Process>) {
+    if s194_trace() {
+        kprintln!("s194: wake-owned pid={}", process.id);
+    }
     // Process-owned queues.
     let _ = process.signal_waiters.wake_process(process.id);
     let _ = process.child_waiters.wake_process(process.id);
     let _ = process.scheme_waiters.wake_process(process.id);
+    if s194_trace() {
+        kprintln!("s194: wake-futex pid={}", process.id);
+    }
     // Futex buckets are global.
     crate::syscall::futex::remove_process(process.id);
+    if s194_trace() {
+        kprintln!("s194: wake-sleepers pid={}", process.id);
+    }
     // Per-CPU sleep lists hold an `Arc<Thread>` until the deadline.
     crate::sched::cancel_process_sleepers(process.id);
+    if s194_trace() {
+        kprintln!("s194: wake-handles pid={}", process.id);
+    }
 
     // Resources reachable from the dying table.  A blocked syscall keeps its object `Arc`, so
     // the object is still live even after this table is replaced.  IRQ objects are collected and
@@ -2630,6 +2661,9 @@ fn wake_process_waiters(process: &Arc<Process>) {
             _ => {}
         });
     }
+    if s194_trace() {
+        kprintln!("s194: wake-processes pid={}", process.id);
+    }
     // A thread of the dying process may wait on another live process's queue through a pid, not
     // a handle: `PROC_WAIT_EX`/`waitpid` keeps only the child pid, and libc closes the fork
     // handle. Sweep every live process's queues by waiter process id so that thread is woken and
@@ -2644,9 +2678,15 @@ fn wake_process_waiters(process: &Arc<Process>) {
         let _ = other.signal_waiters.wake_process(process.id);
         let _ = other.scheme_waiters.wake_process(process.id);
     }
+    if s194_trace() {
+        kprintln!("s194: wake-all-queues pid={}", process.id);
+    }
     // Object queues (pipe, duplex, memory page waiters, console, record locks) are not reachable
     // from the dying handle table; the global queue registry reaches every live queue.
     let _ = crate::sched::wait::WaitQueue::wake_all_queues_for_process(process.id);
+    if s194_trace() {
+        kprintln!("s194: wake-objects pid={}", process.id);
+    }
     for irq in irqs {
         if !irq_held_elsewhere(process, &irq) {
             irq.retire();
@@ -2775,6 +2815,9 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
     // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space
     // release below stays interruptible so a target CPU can take a TLB IPI.
+    if s194_trace() {
+        kprintln!("s194: terminate pid={} own={}", process.id, own_context);
+    }
     let irq = crate::sync::critical();
     let mut state = process.state.lock();
     if *state == ProcessState::Exited {
@@ -2792,14 +2835,42 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     // reschedule so it observes `exiting` at its next scheduling point instead of returning to
     // user mode. The local CPU handles its own threads through the normal exit path.
     crate::sched::request_reschedule_all(crate::sched::smp::percpu::this_cpu());
-    reparent_children(process);
-    robust::walk_process(process);
-    wake_process_waiters(process);
-    let _ = process.waiters.wake_all();
+    // `state` is no longer needed: the process is terminal and published. Drop it before the
+    // quiesce wait so a sibling in a syscall cannot block on a lock this thread holds.
     drop(state);
+    // FreeBSD `exit1`/NetBSD `exit_lwps`: every sibling stops before the process releases its
+    // address space or signals its parent. The other CPUs have the reschedule request before this
+    // wait; the per-CPU slot lock makes the terminal check and `current` publish atomic, so no
+    // sibling can be switched in once the scan finds none.
+    crate::sched::quiesce_process(process);
+    if s194_trace() {
+        kprintln!("s194: after-quiesce pid={}", process.id);
+    }
+    reparent_children(process);
+    if s194_trace() {
+        kprintln!("s194: after-reparent pid={}", process.id);
+    }
+    robust::walk_process(process);
+    if s194_trace() {
+        kprintln!("s194: after-robust pid={}", process.id);
+    }
+    wake_process_waiters(process);
+    if s194_trace() {
+        kprintln!("s194: after-wake-waiters pid={}", process.id);
+    }
+    let _ = process.waiters.wake_all();
+    if s194_trace() {
+        kprintln!("s194: after-proc-waiters pid={}", process.id);
+    }
     crate::process::tty::hangup_session_leader(process);
+    if s194_trace() {
+        kprintln!("s194: after-tty pid={}", process.id);
+    }
     notify_parent(process, true);
     crate::event::notify_source(Arc::as_ptr(process) as usize as u64);
+    if s194_trace() {
+        kprintln!("s194: after-event pid={}", process.id);
+    }
     drop(irq);
     teardown(process, code, own_context);
     true
@@ -2807,10 +2878,9 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
 
 /// Process-wide `EXIT`: terminate every thread, tear down once, then exit the caller.
 ///
-/// Other threads of the process never run user code again: the scheduler drops any runnable
-/// thread of a terminal process, and a woken thread re-checks the flag before returning to user
-/// mode.  Since user threads run only on the boot CPU inside a non-preemptible kernel, no other
-/// thread is executing while this syscall runs, so the address space can be released here.
+/// Other threads of the process never run user code again: `terminate_once` waits in
+/// [`crate::sched::quiesce_process`] until every sibling is off-CPU before any release, and a
+/// woken thread re-checks `exiting` before returning to user mode.
 pub fn exit_process(code: i32) -> ! {
     if let Some(process) = current() {
         let _ = robust::walk_thread();
